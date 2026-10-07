@@ -4,9 +4,8 @@ using Serilog;
 namespace OpenFPS.Server.Repositories;
 
 /// <summary>
-/// Roles an administrator made: a name and the permissions that go with it (/role). A custom role sits
-/// on top of Player, so a "builder" or a "host" is exactly the commands it was given. Kept in roles.json
-/// in the server's working folder, beside friends.json; without a path (a test) it lives in memory.
+/// Roles an administrator made (/role): a name and its permissions, on top of Player. Kept in
+/// roles.json beside friends.json; without a path (a test) in memory.
 /// </summary>
 public class RoleRepository
 {

@@ -4,16 +4,13 @@ using Serilog;
 namespace OpenFPS.Server.Repositories;
 
 /// <summary>
-/// Who each player has called a friend, kept in friends.json beside openfps.db and motd.txt.
+/// Who each player has called a friend, in friends.json beside openfps.db. One way, like a contact
+/// list: adding somebody does not add you to theirs.
 ///
-/// A JSON file and not a table, on purpose. The user store is EF Core over SQLite created with
-/// <c>EnsureCreated</c>, which builds a schema once and never again: a new table added to the model
-/// would simply not exist in every openfps.db already out there, and the first friend added would
-/// throw. A migration pipeline is a larger change than a list of names needs. Keyed by the folded
-/// (lower-case) username, which is what the user store keys on too.
-///
-/// One-directional, like a contact list: adding somebody does not add you to theirs.
-/// Thread-safe: commands run on the tick thread but the friend list is answered from the dispatcher.
+/// A file and not a table because the user store is created with <c>EnsureCreated</c>, which never
+/// adds a table to a database that already exists: the first friend added would throw. Keyed by the
+/// folded username, as the user store is. Locked: commands run on the tick thread, the list is
+/// answered from the dispatcher.
 /// </summary>
 public class FriendRepository
 {
@@ -26,8 +23,6 @@ public class FriendRepository
         _path = Path.GetFullPath(path);
         Load();
     }
-
-    public string PathOnDisk => _path;
 
     private static string Key(string username) => username.Trim().ToLowerInvariant();
 
@@ -43,8 +38,7 @@ public class FriendRepository
         }
         catch (Exception ex)
         {
-            // A damaged file must not take the server down, and must not be silently overwritten
-            // either: keep it aside so the names can be recovered by hand.
+            // A damaged file must not take the server down, nor be overwritten: kept aside for recovery.
             Log.Error(ex, "FriendRepository: could not read {Path}; starting with no friends and keeping the file as .bad.", _path);
             try { File.Copy(_path, _path + ".bad", overwrite: true); } catch { }
         }

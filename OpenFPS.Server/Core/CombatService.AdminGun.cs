@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -208,9 +205,8 @@ public sealed partial class CombatService
         _lastShot[session] = now;
         var forward = Vector3.Transform(new Vector3(0, 0, 1), world.Get<Transform>(session.Entity).Rotation);
         var muzzle = position + new Vector3(0, HipHeight, 0) + forward * 0.5f;
-        // Kill and freeze are aimed at people, and the assist helps them as it helps any shot. Vaporize
-        // and inspect are aimed at a THING: no assist (it would turn the gun onto somebody walking past
-        // the wall you meant), and no scatter, so the round goes exactly where the body faces.
+        // Vaporize and inspect are aimed at a thing: no assist (it would turn onto somebody walking past
+        // the wall you meant) and no scatter. Kill and freeze take the assist like any shot.
         bool atPeople = state.Mode is AdminGunMode.Kill or AdminGunMode.Freeze;
         Shoot(session, world, grid, weapon, position, forward, muzzle, cycle: false,
               reportKey: AdminGun.ReportKey(weapon.Id, state.Report), admin: state.Mode,
@@ -254,8 +250,7 @@ public sealed partial class CombatService
                  + "X changes the mode, Y the calibre, /admingun report N the sound.");
     }
 
-    /// <summary>Puts somebody new walking in a vaporized pedestrian's place is <see cref="ReplaceWalker"/>;
-    /// this forgets a vehicle the vehicle system was moving, before it is removed. The server hands it over.</summary>
+    /// <summary>Forgets a vehicle the vehicle system was moving, before it is vaporized. The server hands it over.</summary>
     public Func<string, int, bool>? ForgetVehicle { get; set; }
 
     /// <summary>Whether something is moved by the vehicle system (traffic, people walking), and so can be
@@ -293,7 +288,7 @@ public sealed partial class CombatService
             }
 
             default:
-                Vaporize(f, world, grid, lookup, hit, body, at, metres, Tell);
+                Vaporize(f, world, grid, lookup, hit, body, at, Tell);
                 return true;
         }
     }
@@ -334,7 +329,7 @@ public sealed partial class CombatService
     }
 
     /// <summary>Lets go of everything on this map whose time is up; a player is told.</summary>
-    private void Thaw(string mapId, World world)
+    private void Thaw(World world)
     {
         double now = Clock();
         List<Entity>? due = null;
@@ -362,7 +357,7 @@ public sealed partial class CombatService
     /// only until the server restarts, unless the map is saved after.
     /// </summary>
     private void Vaporize(Flight f, World world, SpatialGrid<Entity> grid, Dictionary<int, Entity> lookup,
-                          Entity hit, bool body, Vector3 at, float metres, Action<string> tell)
+                          Entity hit, bool body, Vector3 at, Action<string> tell)
     {
         string mapId = f.MapId;
         var shooter = f.Shooter;
@@ -382,8 +377,8 @@ public sealed partial class CombatService
             _server.EmitWorldAudio(mapId, -1, "vaporize", new[] { AdminGun.HitSound(AdminGunMode.Vaporize, at) });
             Log.Warning("ADMIN GUN: {User} vaporized {Whom} ({Id}) at {At} on {Map}.", shooter.Username, who, hit.Id, PlayerCoordinates.Format(where), mapId);
             int id = hit.Id;
-            // A walker is taken off the street and somebody else walks their walk at once (no body: it
-            // is vaporized). RetireWalker removes it and tells the clients; anybody else is ours to remove.
+            // A walker leaves no body: RetireWalker removes it and tells the clients, and somebody else
+            // walks their walk at once. Anything else is ours to remove.
             bool walker = RetireWalker != null && world.Has<Pedestrian>(hit) && RetireWalker(mapId, world, hit);
             if (walker) ReplaceWalker?.Invoke(mapId, world, id);
             else if (world.IsAlive(hit)) { ForgetVehicle?.Invoke(mapId, id); _maps.DestroyEntity(mapId, hit); _server.BroadcastRemoval(mapId, id); }

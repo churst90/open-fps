@@ -1,18 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Gtk;
 using OpenFPS.Client.Core;
 
 
 
 /// <summary>
-/// The main menu's windows: Saved Servers and Settings, and the sounds every menu makes.
-///
-/// Every button ticks as focus lands on it and confirms when pressed, and every window closes on
-/// Escape with a falling cue — so a menu can be learned by ear as well as by what the screen reader
-/// says. The data behind them (<see cref="ClientSettings"/>) lives in the shared client core, so the
-/// Windows and Mac heads get the same servers and settings from the same file.
+/// The main menu's windows, Saved Servers and Settings, and the sounds every menu makes: a tick as
+/// focus lands, a confirm on a press, a falling cue on Escape. The data (<see cref="ClientSettings"/>)
+/// is in the shared client core, so the Windows head reads the same file.
 /// </summary>
 internal static partial class GtkClientProgram
 {
@@ -46,10 +40,9 @@ internal static partial class GtkClientProgram
     }
 
     /// <summary>
-    /// Tab leaves a list for <paramref name="next"/> instead of stepping to the next row. Each row of a
-    /// GTK list takes focus and the selection follows it, so Tab on a chosen server moved to the one
-    /// below and chose that: "Set as preferred" then set the wrong server (Cody, 2026-10-03). Arrows
-    /// move within the list; Tab and Shift+Tab move between it and the buttons, as in any dialog.
+    /// Tab leaves a list for <paramref name="next"/> instead of stepping to the next row: the selection
+    /// follows focus in a GTK list, so Tab chose the server below and "Set as preferred" set the wrong
+    /// one (Cody, 2026-10-03). Arrows move within the list.
     /// </summary>
     private static void TabLeavesList(ListBox list, Widget next)
     {

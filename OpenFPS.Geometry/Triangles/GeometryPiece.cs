@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -620,8 +618,8 @@ public static class PieceColumns
 /// <summary>
 /// Which of two surfaces met at the same distance counts: the one whose solid covers less ground, then the
 /// lower owner's. Two surfaces in the same place are a thing laid flush on another (a drive on the ground,
-/// a rug on a floor), and the thing laid on is the smaller patch. The box path took whichever its list had first,
-/// which was not the same on the server and the client.
+/// a rug on a floor), and the thing laid on is the smaller patch. Never the order they were found in: that
+/// differs between the server and a client.
 /// </summary>
 public readonly struct Ties
 {

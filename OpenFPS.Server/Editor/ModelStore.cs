@@ -1,7 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
-using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using Serilog;
 
@@ -97,7 +95,6 @@ public sealed class ModelStore
     /// <summary>The version in use now: 0 if it has never been changed.</summary>
     public int CurrentVersion(string kind, string id) => History(kind, id)?.Current ?? 0;
 
-    /// <summary>Whether a model has been retired.</summary>
     public bool IsRetired(string kind, string id) => History(kind, id)?.Retired == true;
 
     /// <summary>The model in use now on the server, as JSON.</summary>

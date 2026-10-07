@@ -1,24 +1,13 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
-using System.Threading;
 
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The measuring half of "profile, then cut the hot paths": named timers and counters that any thread can
-/// write to, and a periodic report of what a frame actually spent.
-///
-/// It is off unless <c>OPENFPS_PROFILE=1</c>, and when off every entry point here is a static bool test and
-/// a return. That is the whole point of it being permanent rather than a scaffold added and removed around
-/// each investigation: the probes can live in the hot paths, so the next time something is slow the numbers
-/// are one environment variable away instead of a re-instrumentation exercise.
-///
-/// Deliberately NOT a general profiler — no call tree, no sampling, no allocation tracking. It answers one
-/// question, how long does this named thing take and how often does it happen, because that is the question
-/// the audit's remaining performance items ask.
+/// Named timers and counters any thread can write to, and a periodic report: how long a named thing takes
+/// and how often. Off unless <c>OPENFPS_PROFILE=1</c>, and then every entry point is a bool test and a
+/// return, so the probes can stay in the hot paths.
 /// </summary>
 public static class PerfProbe
 {
@@ -90,9 +79,8 @@ public static class PerfProbe
     }
 
     /// <summary>
-    /// Formats everything collected since the last report and resets the counters, so each report covers
-    /// one window rather than all of history — an average over a whole session hides the frame that hitched.
-    /// Returns an empty list when nothing was recorded.
+    /// Everything collected since the last report, and the counters reset: an average over a whole session
+    /// hides the frame that hitched. Empty when nothing was recorded.
     /// </summary>
     public static List<string> Drain()
     {

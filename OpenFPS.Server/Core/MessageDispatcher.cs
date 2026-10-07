@@ -1,15 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using OpenFPS.Common.Networking;
 using Serilog;
 
 namespace OpenFPS.Server.Core;
 
-/// <summary>
-/// A centralized dispatcher that maps message types to their respective handling logic.
-/// Implements the Mediator pattern to decouple network gateways from game services.
-/// </summary>
+/// <summary>Routes each message from either gateway to its handler, after the login gate, the input
+/// sanity checks and the limits.</summary>
 public class MessageDispatcher : IMessageDispatcher
 {
     private readonly Dictionary<Type, Action<int, IMessage, Action<IMessage>>> _handlers = new();
@@ -61,27 +56,16 @@ public class MessageDispatcher : IMessageDispatcher
     /// <summary>Messages refused because their connection had not logged in.</summary>
     public long RefusedBeforeLogin => System.Threading.Interlocked.Read(ref _refusedBeforeLogin);
 
-    /// <summary>
-    /// Registers a handler for a specific message type. 
-    /// Internally wraps the handler to allow type-safe dispatching.
-    /// </summary>
     public void RegisterHandler<T>(Action<int, T, Action<IMessage>> handler) where T : IMessage
     {
         _handlers[typeof(T)] = (connectionId, msg, reply) => handler(connectionId, (T)msg, reply);
     }
 
-    /// <summary>
-    /// Dispatches the message to a registered handler. 
-    /// If no handler is found, a warning is logged.
-    /// </summary>
     public void Dispatch(int connectionId, IMessage message, Action<IMessage> replyAction)
     {
-        // Phase 2: Sanity Gates & Anti-Cheat
         if (message is ClientInputUpdate input)
         {
-            // Finite first. NaN is not greater than one, so the length check alone let it through to
-            // the player's position; an infinite direction normalised to NaN; and Math.Clamp passes
-            // NaN, which a NaN look would have put into the yaw for good. Not a number is no input.
+            // Finite first: NaN passes a length check and Math.Clamp, and would stay in the position or yaw for good.
             if (!IsFinite(input.MoveDirection)) input.MoveDirection = System.Numerics.Vector3.Zero;
             if (!float.IsFinite(input.LookDelta.X) || !float.IsFinite(input.LookDelta.Y))
                 input.LookDelta = System.Numerics.Vector2.Zero;
@@ -118,8 +102,7 @@ public class MessageDispatcher : IMessageDispatcher
         }
         else if (_warnedUnhandled.TryAdd(type, true))
         {
-            // Once per type: a client sending the server's own messages back at it would otherwise
-            // write a line to the log for every one.
+            // Logged once per type, or a client echoing the server's own messages would flood the log.
             Log.Warning("No handler registered for message type {Type}", type.Name);
         }
     }

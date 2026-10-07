@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
-using System.Threading.Tasks;
 
 namespace OpenFPS.Common.Geometry;
 
@@ -181,9 +178,6 @@ public sealed class TriangleWorldBuilder
         Current = Current.WithMoved(moved[..n]);
         return Current;
     }
-
-    /// <summary>Whether an owner is placed as a mover in the current world.</summary>
-    public bool IsMover(int owner) => _moverIndex.ContainsKey(owner);
 
     public TileKey KeyOf(in SolidSpec s)
     {

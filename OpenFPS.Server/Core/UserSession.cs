@@ -5,10 +5,7 @@ using System.Numerics;
 
 namespace OpenFPS.Server.Core;
 
-/// <summary>
-/// Represents an active player session on the server, tracking their connection, 
-/// current location, and input state.
-/// </summary>
+/// <summary>A logged-in connection: who it is, where their body is, and what they have been sent.</summary>
 public class UserSession
 {
     public int ConnectionId { get; set; }
@@ -34,18 +31,15 @@ public class UserSession
     public long LastProcessedSequenceId { get; set; } = -1;
 
     /// <summary>
-    /// Entities this client has been sent a definition for. The server owns this: an entity it is not in
-    /// here gets its definition before any state that references it, and an entity removed from the world
-    /// is announced and struck off. Without it, remote players arrive as bare transforms with no
-    /// definition — invisible to the client's snapshot — and disconnected players never leave.
+    /// Entities this client has been sent a definition for: one not in here gets its definition before
+    /// any state that references it, and one removed from the world is announced and struck off.
     /// </summary>
     public HashSet<int> KnownEntities { get; } = new();
 
     /// <summary>
-    /// The dynamic entities that were inside this client's area of interest last broadcast. Anything that
-    /// drops out is announced as removed. Static geometry is deliberately NOT tracked here: the client
-    /// builds its acoustic map from the whole streamed map, so evicting a distant wall would silently
-    /// change how the world sounds.
+    /// The dynamic entities inside this client's area of interest at the last broadcast; anything that
+    /// drops out is announced as removed. Static geometry is not tracked here: evicting a distant wall
+    /// would change how the world sounds (a streamed map's tiles are <see cref="Tiles"/>' to send and take).
     /// </summary>
     public HashSet<int> VisibleDynamicEntities { get; } = new();
 
@@ -122,14 +116,10 @@ public class UserSession
     public long DroppedInputs { get; set; }
 
     /// <summary>
-    /// This player's memory of where the floor was. The ground probe runs once per INPUT, and a player who
-    /// sends several sub-tick inputs in a tick has barely moved between them, so the probe kept recomputing
-    /// an answer it already had. Lives on the session so it is naturally per-player and disappears with the
-    /// disconnect. See <see cref="OpenFPS.Common.GroundProbeMemo"/>.
+    /// This player's memory of where the floor was: the ground probe runs once per input, and several
+    /// inputs in one tick barely move. See <see cref="OpenFPS.Common.GroundProbeMemo"/>.
     /// </summary>
     public OpenFPS.Common.GroundProbeMemo GroundProbe;
-
-    public DateTime LastCollisionTime { get; set; } = DateTime.MinValue;
 
     /// <summary>
     /// Set once this session has had its first spawn and the message of the day with it. A change of
@@ -144,11 +134,7 @@ public class UserSession
     /// </summary>
     public PlayerState? Saved { get; set; }
 
-    /// <summary>
-    /// Where this player is building, and what they have put there.
-    ///
-    /// Per-session and deliberately not persisted: a build cursor is a place you are working, like a
-    /// caret, not a property of the world. It goes when you do.
-    /// </summary>
+    /// <summary>Where this player is building and what they have put there. Not kept: a build cursor is
+    /// a place you are working, like a caret, and goes when you do.</summary>
     public BuildSession Build { get; } = new();
 }

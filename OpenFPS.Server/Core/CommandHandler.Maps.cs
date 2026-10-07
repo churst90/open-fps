@@ -1,12 +1,12 @@
+using Arch.Core;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Services;
 
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// Maps of your own: /map new, public, private, invite, uninvite, and /maps. Not gated: making a map
-/// and deciding who comes into it is every player's. On a map you own you build, spawn, move yourself
-/// and save as staff do anywhere (<see cref="Permissions.OnOwnMap"/>).
+/// Maps of your own: /map new, public, private, invite, uninvite, /maps and /join. Every player's. On a
+/// map you own you build, spawn, move yourself and save as staff do anywhere (<see cref="Permissions.OnOwnMap"/>).
 /// </summary>
 public partial class CommandHandler
 {
@@ -194,5 +194,34 @@ public partial class CommandHandler
             return false;
         }
         return true;
+    }
+
+    /// <summary>/join MAP: another loaded map, if it is public, yours, or you are staff.</summary>
+    private void HandleJoin(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var enterable = _maps.LoadedMapIds.Where(id => OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, id, session))
+                                          .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).Select(_maps.DisplayName).ToList();
+        if (args.Length < 1) { Say(reply, $"Usage: /join [map]. Maps: {string.Join(", ", enterable)}."); return; }
+
+        // By id or by the listed name, which may be several words ("/join magnolia tx").
+        string said = string.Join(" ", args);
+        string? mapId = _maps.ResolveMapId(said) ?? _maps.ResolveMapId(args[0]);
+        if (mapId == null)
+        {
+            Say(reply, $"There is no map called {said}. Maps: {string.Join(", ", enterable)}.");
+            return;
+        }
+        string named = _maps.DisplayName(mapId);
+        if (!OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, mapId, session))
+        {
+            Say(reply, $"{named} is private.");
+            return;
+        }
+        if (mapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase) && session.Entity != Entity.Null)
+        {
+            Say(reply, $"You are already on {named}.");
+            return;
+        }
+        _server.MoveToMap(session, mapId, reply);
     }
 }

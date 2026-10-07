@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 using System.Speech.Synthesis;
 using OpenFPS.Client.Core.Platform;

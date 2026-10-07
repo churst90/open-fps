@@ -14,13 +14,9 @@ public sealed class PrefabValidationResult
 }
 
 /// <summary>
-/// Checks a prefab against what the engine can actually do with it, at load, and says exactly what is wrong.
-///
-/// The rules here are all the same rule: a prefab must not be able to describe something the engine will
-/// then quietly ignore. Deserialization already accepts anything — an unknown key, a mis-cased enum name, a
-/// negative range, emitter settings on an entity whose emitter is switched off — and the result is an entity
-/// that spawns without the behaviour its author wrote down. In a game played entirely by ear, that is
-/// indistinguishable from a bug in the audio engine, which is where the search then goes.
+/// Checks a prefab at load against what the engine can do with it, and says what is wrong. One rule
+/// throughout: a prefab must not describe something the engine will quietly ignore (an unknown key, a
+/// mis-cased enum, emitter settings on a silent emitter), because by ear that sounds like an audio bug.
 /// </summary>
 public static class PrefabValidator
 {
@@ -281,9 +277,7 @@ public static class PrefabValidator
 
         if (declaresPortal || t.ApertureSize.HasValue || isDoor)
         {
-            // A DOOR is the one thing that is legitimately both. The leaf blocks the opening while it
-            // is shut — that is what a door is for — and opening it swings the leaf aside rather than
-            // making it insubstantial. Everything else that is both is still the mistake this says.
+            // A door is the one thing that is rightly both: its leaf blocks the opening until it swings aside.
             if (isSolid && !isDoor)
                 r.Errors.Add("This is a portal AND a solid collider — a doorway that blocks the doorway. Set IsSolid to false.");
             if (isDoor && !hasCollider)

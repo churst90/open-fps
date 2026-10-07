@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -16,18 +13,13 @@ namespace OpenFPS.Server.Systems;
 /// man on the city (Cody, 2026-10-06: "he walks the streets, rides the bus, hangs out at bus stops and
 /// in front of stores and the lobby in apartment buildings because he's homeless").
 ///
-/// His day is a string of places (<see cref="Haunt"/>), found from the map: the bus stops, the
-/// pavement outside each building's front entrance, the lobbies behind them, the squares. He stays at
-/// one for some minutes, then goes to another, on foot along the pavements or, from a bus stop, by bus.
-/// Where he goes next depends on the hour and the weather: a lobby at night and in the cold or wet, a
-/// bus stop, a doorway or a square in the day. A lobby's front door is locked from the street; he
-/// waits at it until somebody opens it, and after a while somebody inside lets him in.
+/// His day is a string of places found from the map (<see cref="Haunt"/>: bus stops, front entrances,
+/// lobbies, squares), chosen by the hour and the weather and reached on foot or by bus. A lobby's door
+/// is locked from the street: he waits at it until somebody opens it or lets him in.
 ///
-/// Every choice is drawn from a random sequence seeded by the map, his name and the game day, so the
-/// same day goes the same way on the same weather, and a restart puts him where his day has him.
-///
-/// What he says is <see cref="PedestrianSpeech"/>'s (its Homeless part): this only moves him, and says
-/// what he is doing (<see cref="ViewOf"/>).
+/// Every choice is drawn from a sequence seeded by the map, his name and the game day, so the same day
+/// goes the same way and a restart puts him where his day has him. What he says is
+/// <see cref="PedestrianSpeech"/>'s; this moves him and says what he is doing (<see cref="ViewOf"/>).
 /// </summary>
 public sealed class CharacterSystem
 {
@@ -158,7 +150,7 @@ public sealed class CharacterSystem
                 }
                 if (c.Entity == Entity.Null || now >= c.GoneUntil)
                 {
-                    Begin(c, world, now, cond, awayFrom: c.Entity == Entity.Null ? null : c.LastSeen);
+                    Begin(c, now, cond, awayFrom: c.Entity == Entity.Null ? null : c.LastSeen);
                     c.GoneUntil = double.NaN;
                 }
                 continue;
@@ -189,7 +181,7 @@ public sealed class CharacterSystem
     }
 
     /// <summary>Starts (or restarts) a character's day at the place it has them at this hour.</summary>
-    private void Begin(Character c, World world, double now, SpeechConditions cond, Vector3? awayFrom)
+    private void Begin(Character c, double now, SpeechConditions cond, Vector3? awayFrom)
     {
         var rng = Draw(c);
         var choices = awayFrom is { } dead
@@ -244,7 +236,7 @@ public sealed class CharacterSystem
                     if (!DoorSystem.OpenEnough(world, c.At?.Door ?? Entity.Null) && now - c.DoorSince < 6) break;
                     c.OpeningDoor = false;
                 }
-                if (Walk(c, ref t, ref vel, dt)) Arrive(c, world, now, cond);
+                if (Walk(c, ref t, ref vel, dt)) Arrive(c, now, cond);
                 break;
 
             case Doing.AtDoor:
@@ -264,7 +256,7 @@ public sealed class CharacterSystem
                 {
                     // Somebody on their way out holds it for him: pushed by its bar, from inside.
                     DoorSystem.Set(world, door, true, by: c.Target.Inside);
-                    // Again in a quarter of a minute if it is shut by then and he is still out here.
+                    // Asked again in 15 s if it has shut on him.
                     c.DoorSince = now - DoorWaitSeconds / Pace + 15;
                     Log.Information("CHARACTER {Name}: somebody inside lets him into {Place}.", c.Data.Name, c.Target.Name);
                 }
@@ -295,7 +287,7 @@ public sealed class CharacterSystem
                 else if (now - c.BusSince >= BusWaitSeconds)          // the bus keeps real time, whatever his pace
                 {
                     Log.Information("CHARACTER {Name}: no bus at {Place}; walking to {To} instead.", c.Data.Name, c.At.Name, c.RideTo!.Name);
-                    WalkTo(c, world, t.Position, c.RideTo!, now, cond);
+                    WalkTo(c, world, t.Position, c.RideTo!, now);
                     c.RideTo = null;
                 }
                 break;
@@ -333,7 +325,7 @@ public sealed class CharacterSystem
                 if (!world.IsAlive(c.Bus))
                 {
                     CompositeService.Disembark(world, c.Entity);
-                    WalkTo(c, world, t.Position with { Y = Ground(world, grid, t.Position) }, c.RideTo!, now, cond);
+                    WalkTo(c, world, t.Position with { Y = Ground(world, grid, t.Position) }, c.RideTo!, now);
                     break;
                 }
                 bool atStop = world.Has<SoundEmitterComponent>(c.Bus) && world.Get<SoundEmitterComponent>(c.Bus).ServingStop;
@@ -368,7 +360,6 @@ public sealed class CharacterSystem
         var at = c.At!;
         var here = world.Get<Transform>(c.Entity).Position;
         var others = c.Haunts.Where(h => h.Kind == HauntKind.BusStop && h != at).ToList();
-        // From a bus stop, sometimes the bus to another.
         if (at.Kind == HauntKind.BusStop && others.Count > 0 && rng.NextDouble() < RideChance(cond))
         {
             c.RideTo = others[rng.Next(others.Count)];
@@ -378,12 +369,12 @@ public sealed class CharacterSystem
             return;
         }
         var next = Choose(c.Haunts, at, new Vector2(here.X, here.Z), cond, rng);
-        WalkTo(c, world, here, next, now, cond);
+        WalkTo(c, world, here, next, now);
     }
 
     /// <summary>Sets off on foot for a place: out of a lobby by its door if he is in one, along the pavements,
     /// and to its door if it is a lobby.</summary>
-    private void WalkTo(Character c, World world, Vector3 from, Haunt to, double now, SpeechConditions cond)
+    private void WalkTo(Character c, World world, Vector3 from, Haunt to, double now)
     {
         var start = new List<Vector2> { new(from.X, from.Z) };
         bool leavingLobby = c.Now != Doing.Riding && c.Now != Doing.WaitingForBus && c.At is { Kind: HauntKind.Lobby } lobby
@@ -426,7 +417,7 @@ public sealed class CharacterSystem
     }
 
     /// <summary>Reached the end of a walk: a lobby's door, or the place itself.</summary>
-    private void Arrive(Character c, World world, double now, SpeechConditions cond)
+    private void Arrive(Character c, double now, SpeechConditions cond)
     {
         var to = c.Target!;
         if (to.Kind == HauntKind.Lobby && !c.EnteringLobby)
@@ -551,8 +542,8 @@ public sealed class CharacterSystem
     public static double RideChance(SpeechConditions c) => Sheltering(c) ? 0.6 : 0.4;
 
     /// <summary>
-    /// The next place: by the kind's draw at this hour and weather, less the further it is (a place 150 m
-    /// off is half as likely as one beside him), never where he already is.
+    /// The next place, never the one he is at: weighted by kind for the hour and weather, and by
+    /// distance (half as likely 150 m off).
     /// </summary>
     public static Haunt Choose(IReadOnlyList<Haunt> haunts, Haunt? current, Vector2? from, SpeechConditions cond, Random rng)
     {
@@ -657,10 +648,6 @@ public sealed class CharacterSystem
                 c.FaceUntil = _clocks.GetValueOrDefault(mapId) + seconds;
             }
     }
-
-    /// <summary>The places a character goes, for tests and /where.</summary>
-    internal IReadOnlyList<Haunt> HauntsOf(string name)
-        => _all.FirstOrDefault(c => c.Data.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Haunts ?? new List<Haunt>();
 
     // ── Small things ────────────────────────────────────────────────────────────────────────────
 

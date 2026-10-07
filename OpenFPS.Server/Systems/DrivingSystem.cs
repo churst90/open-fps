@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -12,35 +10,16 @@ using Serilog;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// A composite with somebody in its driving seat.
-///
-/// There are no handling numbers in this file, and that is the point. What a car pulls comes out of
-/// its engine's torque through its own gearbox; what it will corner and stop at comes out of its
-/// tyres' peak grip against its mass; what it will not exceed comes out of its drag area, because
-/// top speed is where the engine stops out-pulling the air. Give it a truck's profile and it drives
-/// like a truck without a line here changing. That is the same bargain the rest of the audio engine
-/// makes: behaviour falls out of what a thing is made of, never out of a table of per-vehicle
-/// constants.
-///
-/// The one thing that IS decided here is how a person's two axes of input become throttle, brake and
-/// steering, because that is a question about players rather than about cars.
-///
-/// The car stands on the same per-wheel model traffic does (<see cref="WheelDynamics"/>): each
-/// wheel's load, slip and force, from the preset's chassis and tyres. Ask for more cornering than is
-/// left after the braking and the car runs wide, and the noise it makes doing so is the same number
-/// that made it run wide — the most-worked wheel's share of its grip, which the client squeals on.
+/// A composite with somebody in its driving seat. No handling numbers live here: pull, grip and top
+/// speed come from the preset's engine, gearbox, tyres and drag, and the car stands on the same
+/// per-wheel model as traffic (<see cref="WheelDynamics"/>). Only how a player's two input axes become
+/// throttle, brake and steering is decided here.
 /// </summary>
 public static class DrivingSystem
 {
     /// <summary>
-    /// Seconds for the wheel to go from straight ahead to full lock while a steering key is held.
-    ///
-    /// A key is on or off, and a wheel that followed it exactly went from straight to thirty-five
-    /// degrees in one tick and back in the next. Held, that is a car that can only go straight or
-    /// turn as hard as it can; TAPPED, which is how a lot of people steer with a keyboard, it is a
-    /// jolt of full lock for every tap. Turning the wheel at the pace hands turn one makes a tap a
-    /// small correction and a hold a steadily tightening turn — the way every keyboard driving game
-    /// has settled on, because it is the only way two keys can stand in for a wheel.
+    /// Seconds for the wheel to go from straight ahead to full lock while a steering key is held, so a
+    /// tap is a small correction and a hold a tightening turn rather than a jolt of full lock.
     /// </summary>
     private const float SteerSecondsToLock = 0.7f;
 
@@ -49,12 +28,8 @@ public static class DrivingSystem
     private const float SteerSecondsToCentre = 0.3f;
 
     /// <summary>
-    /// How far past what the tyres can hold the wheel may be turned at speed, as a fraction.
-    ///
-    /// At walking pace full lock is fine. At seventy it is a spin, and nobody driving turns the
-    /// wheel that far at seventy, so the lock is limited to the angle at which the corner uses the
-    /// tyres' grip — worked out from the grip and the wheelbase, not tuned. A little over it, so
-    /// holding the key hard into a bend does reach the edge and the tyres say so.
+    /// How far past the angle that uses all the tyres' grip the wheel may be turned at speed: a little
+    /// over, so holding the key into a bend reaches the edge and the tyres say so.
     /// </summary>
     private const float SteerPastGrip = 1.15f;
 
@@ -77,16 +52,14 @@ public static class DrivingSystem
         {
             ref var em = ref world.Get<SoundEmitterComponent>(root);
             em.SynthRunning = on;
-            // Running lives in the DEFINITION, which is sent once unless something asks again —
-            // the lesson of the crossing bell that rang on the server and nowhere else.
+            // Running lives in the definition, which is sent once unless something asks again.
             resendDefinition?.Invoke(root.Id);
         }
         return on ? "You turn the key. The engine starts." : "You switch the engine off.";
     }
 
-    /// <summary>How long held controls survive a silent client before they start decaying, seconds.
-    /// A driver does not lift off because a packet was lost; a driver who has gone does coast to a
-    /// stop rather than drive away forever.</summary>
+    /// <summary>How long held controls survive a silent client before they start decaying, seconds:
+    /// longer than a lost packet, so a driver who has gone coasts to a stop.</summary>
     private const float ControlHoldSeconds = 0.75f;
 
     /// <summary>How fast a thing will reverse, m/s. Reverse is one low gear and a short one.</summary>
@@ -98,9 +71,8 @@ public static class DrivingSystem
     private const float AirDensity = 1.225f;
 
     /// <summary>
-    /// Each driven car on its wheels, by entity: the same per-wheel model traffic runs on
-    /// (WheelDynamics), so a traffic car and your car corner, brake and slide alike. Kept here rather
-    /// than on the component because it is a simulation, not something the wire or a save carries.
+    /// Each driven car on its wheels, by entity. Kept here rather than on the component: it is a
+    /// simulation, not something the wire or a save carries.
     /// </summary>
     private sealed class Running
     {
@@ -136,29 +108,18 @@ public static class DrivingSystem
         return wheels != null;
     }
 
-    /// <summary>How far a body is held off the floor when testing whether it has hit something.
-    /// Everything drives over something; without this, everything is permanently crashed into it.</summary>
+    /// <summary>How far a body is held off the floor when testing whether it has hit something.</summary>
     private const float GroundClearance = 0.35f;
 
     /// <summary>
-    /// How much of its peak torque an engine absorbs on a closed throttle, at the redline.
-    ///
-    /// A lifted throttle does not disconnect the engine, it drags it — pumping losses and friction,
-    /// through the same gearing that drives the wheels. It is why lifting off slows a car so much
-    /// faster than freewheeling, why that slowing is stronger in a low gear, and why the exhaust pops
-    /// on the overrun. Without it a coasting car takes several minutes to stop, which is what a car
-    /// in neutral actually does and not what anyone lifting off expects.
+    /// How much of its peak torque an engine absorbs on a closed throttle, at the redline: pumping
+    /// losses and friction through the gearing. Without it a car that lifts off takes minutes to stop.
     /// </summary>
     private const float EngineBrakingFraction = 0.15f;
 
     /// <summary>
-    /// Turns one input packet into what the driver is asking for.
-    ///
-    /// Forward and back are throttle and brake, and which one "back" means depends on whether the
-    /// thing is already moving — press back while rolling forward and you are braking; press it again
-    /// once stopped and you are reversing. That is the mapping every driving game settles on because
-    /// it is the one that needs no explaining, and it needs none here least of all: a player who
-    /// cannot see the gear selector has nothing else to go on.
+    /// Turns one input packet into what the driver is asking for. Back while rolling forward is the
+    /// brake; back once stopped is reverse, so there is no gear selector to find.
     /// </summary>
     public static void ApplyControls(World world, Entity root, ClientInputUpdate input)
     {
@@ -182,8 +143,7 @@ public static class DrivingSystem
         else
         {
             drive.Throttle = 0f;
-            // A hand off the keys is a lift, not a brake. The car slows on drag and rolling
-            // resistance, which is what makes coasting audible as something different from braking.
+            // A hand off the keys is a lift, not a brake: coasting must sound different from braking.
             drive.Brake = input.Jump ? 1f : 0f;
         }
 
@@ -220,8 +180,7 @@ public static class DrivingSystem
         }
         var profile = MachineRegistry.VehicleFor(drive.Preset);
 
-        // A driver who has gone quiet. Not an instant cut — that would make ordinary packet loss
-        // stutter the throttle — but a lift, then a coast.
+        // A driver gone quiet lifts, then coasts; an instant cut would stutter on packet loss.
         drive.ControlAge += dt;
         if (drive.ControlAge > ControlHoldSeconds)
         {
@@ -271,15 +230,13 @@ public static class DrivingSystem
         float wheelbase = MathF.Max(0.5f, body.Wheelbase);
         float maxSteer = chassis.MaxSteerAngleRad;
 
-        // The wheel, turned by hands rather than thrown by a switch: towards where the keys ask at
-        // the pace hands turn a wheel, and back to the middle faster when they let go.
         float target = Math.Clamp(drive.SteerTarget, -1f, 1f);
         bool returning = MathF.Abs(target) < MathF.Abs(drive.Steer) || MathF.Sign(target) != MathF.Sign(drive.Steer);
         float rate = dt / (returning ? SteerSecondsToCentre : SteerSecondsToLock);
         drive.Steer += Math.Clamp(target - drive.Steer, -rate, rate);
 
-        // ...and no further than the tyres can use at this speed. The angle whose corner needs all
-        // of the grip is atan(wheelbase / r) with r = v^2 / (grip g).
+        // No further than the tyres can use: the angle whose corner needs all the grip is
+        // atan(wheelbase / r), r = v^2 / (grip g).
         float usableLock = maxSteer;
         if (speed > StandstillSpeed)
             usableLock = MathF.Min(maxSteer,
@@ -288,17 +245,14 @@ public static class DrivingSystem
 
         // ── On its tyres ────────────────────────────────────────────────────────────────────────
         //
-        // The engine, the brakes and the air give the acceleration asked for; the wheels decide what
-        // of it, and of the cornering the steering asks for, the road will give — each wheel from its
-        // own load, slip and surface, so braking into a turn runs it wide and a light inside wheel
-        // lets go first. The same model the traffic is driven on.
+        // The wheels decide how much of the asked acceleration and cornering the road gives, each from
+        // its own load, slip and surface.
         body.Vx = v;
         body.ForwardOnly = false;
         if (running.WheelSurfaces is { } under && under.Length == body.Wheels.Length)
             for (int i = 0; i < under.Length; i++) body.SetSurface(i, under[i]);
         else body.SetSurface(running.Surface);
-        // The water under each wheel, where that wheel is: a puddle at the kerb is under the kerb-side
-        // wheels and not the others.
+        // The water under each wheel where that wheel is: a puddle at the kerb is under the kerb-side wheels.
         if (_mapId != null)
         {
             ref var at = ref world.Get<Transform>(root);
@@ -316,9 +270,8 @@ public static class DrivingSystem
         else
             body.Step(dt, steerAngle, longitudinal);
         float next = body.Vx;
-        // Resistance may not drag a car backwards through a standstill; it can only stop it. And
-        // below a crawl with nothing driving it, a car is stopped rather than creeping — otherwise it
-        // rolls on forever at the speed where the resistances stopped being applied.
+        // Resistance may stop a car but not drag it backwards; and below a crawl with nothing driving
+        // it, it is stopped, or it rolls on forever where the resistances stop being applied.
         if (MathF.Abs(drive.Throttle) < 0.01f
             && ((v != 0f && MathF.Sign(next) != MathF.Sign(v)) || MathF.Abs(next) < StandstillSpeed))
         {
@@ -336,15 +289,13 @@ public static class DrivingSystem
         var heading = new Vector3(MathF.Sin(drive.Heading), 0f, MathF.Cos(drive.Heading));
         var right = new Vector3(MathF.Cos(drive.Heading), 0f, -MathF.Sin(drive.Heading));
         var wanted = transform.Position + forwardWas * body.TickForward + rightWas * body.TickRight;
-        // Its own parts are not the road, and nor is whoever is sitting in it. A car with a floor
-        // finds that floor inside the step height and would climb onto it every tick.
+        // Its own parts and occupants are not the road: a car would climb onto its own floor every tick.
         var aboard = CompositeService.MembersOf(world, root.Id);
         aboard.AddRange(CompositeService.OccupantsOf(world, root.Id));
         wanted.Y = PhysicsUtils.GetGroundHeight(world, grid, wanted, aboard, out string ground);
         running.Surface = RoadSurfaces.IndexOf(ground);
-        // On its wheels (docs/GEOMETRY.md 3.11): a ray down at each, its own height, normal and surface. The
-        // car sits at their mean height and pitches and rolls with them: a wheel off a kerb drops that
-        // corner, a slope tilts the whole car. The box path's car sat level on the floor under its middle.
+        // On its wheels (docs/GEOMETRY.md 3.11): a ray down at each; the car sits at their mean height and
+        // pitches and rolls with them.
         float pitch = 0f, roll = 0f;
         var geometry = TriangleGeometry.Enabled ? grid.Geometry : null;
         if (geometry != null && body.Wheels.Length > 0 && body.Wheels.Length <= 16)
@@ -374,10 +325,8 @@ public static class DrivingSystem
         }
         wanted = Vector3.Clamp(wanted, mapMin, mapMax);
 
-        // Hitting something stops it, and now it is audible. The IMPULSE and the damage are still to
-        // come — a car that hits a wall should be damaged by it and should push what it hit — but the
-        // noise of two materials meeting at a closing speed is the same calculation for a car, a ball
-        // and a dropped crate, and it is made once in ImpactAcoustics rather than here.
+        // Hitting something stops it, and is heard (ImpactAcoustics).
+        // TODO: the impulse and the damage: a car that hits something should be damaged and push it.
         if (Blocked(world, grid, root, wanted, drive.Heading, out float hitSpeed, out var struck))
         {
             drive.Speed = 0f;
@@ -405,8 +354,7 @@ public static class DrivingSystem
             running.Wire[i] = WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, w.Water);
         }
 
-        // The client synthesises the engine from the speed this entity reports, and picks its own
-        // gear from it with the same rule used above — so the gear you hear is the gear you are in.
+        // The client picks its gear from this speed by the same rule as SelectGear.
         if (world.Has<VehicleComponent>(root))
         {
             ref var vehicle = ref world.Get<VehicleComponent>(root);
@@ -439,11 +387,9 @@ public static class DrivingSystem
     }
 
     /// <summary>
-    /// The gear a driver would be in at this speed — the lowest that is not yet past the upshift.
-    ///
-    /// The same rule the client's engine processor uses to pick a gear from the speed it is sent.
-    /// Written twice on purpose rather than shared: the client must be able to reach an answer for a
-    /// car it is only listening to, with nothing from the server but how fast it is going.
+    /// The gear a driver would be in at this speed: the lowest not yet past the upshift. The client's
+    /// engine processor has the same rule, written twice on purpose: it must reach the answer from the
+    /// speed alone. Keep the two in step.
     /// </summary>
     private static int SelectGear(Gearbox gb, float speed)
     {
@@ -453,11 +399,8 @@ public static class DrivingSystem
     }
 
     /// <summary>
-    /// How much of its peak torque an engine is making at this speed, 0..1.
-    ///
-    /// A shallow curve either side of the peak, falling away above it toward the redline: enough to
-    /// make a short-geared engine audibly different from a lazy one without pretending to be a dyno
-    /// sheet. The engine profiles carry a peak and where it is, so that is what this uses.
+    /// How much of its peak torque an engine is making at this speed, 0..1: a shallow curve about the
+    /// profile's peak, falling away toward the redline. Not a dyno sheet.
     /// </summary>
     private static float TorqueFraction(float rpm, VehicleProfile profile)
     {
@@ -475,19 +418,8 @@ public static class DrivingSystem
     }
 
     /// <summary>
-    /// Whether the body of this thing would be inside something solid at a proposed position.
-    ///
-    /// Sampled at the nose, the middle and the tail rather than as one lump, because a car is long:
-    /// a single check at the centre lets half of it into a wall before anything notices. Its own
-    /// parts and its own occupants are invisible to the test — they travel with it, and a car that
-    /// collided with its own doors would never move at all.
-    /// </summary>
-    /// <summary>
-    /// What the car just hit, told the way everything else in the game tells it.
-    ///
-    /// Nothing here is about cars. Two materials, two masses, a closing speed and the size of what
-    /// was struck — the same call a ball bouncing or a crate coming off a lorry would make, which is
-    /// why there is no collision sound code in this file beyond gathering those five things.
+    /// What the car just hit, heard as any impact is: two materials, two masses, a closing speed and
+    /// the size of what was struck, handed to ImpactAcoustics.
     /// </summary>
     private static void Collision(World world, Entity root, Entity struck, Vector3 where, float speed,
                                   float massKg, Action<int, string, IReadOnlyList<TransientSound>> heard)
@@ -498,8 +430,7 @@ public static class DrivingSystem
             world.Has<MaterialComponent>(struck) ? world.Get<MaterialComponent>(struck).Material ?? "Generic" : "Generic");
 
         var size = world.Has<ColliderComponent>(struck) ? world.Get<ColliderComponent>(struck).Size : Vector3.One;
-        // A struck thing that can move takes some of the energy away with it; one bolted to the world
-        // gives all of it back. Mass from its own volume and density, the same as everywhere else.
+        // A fixed thing gives all the energy back; a movable one's mass is its volume times density.
         bool fixedInPlace = !world.Has<Velocity>(struck);
         float struckMass = fixedInPlace
             ? massKg * 50f                       // effectively the planet
@@ -510,6 +441,10 @@ public static class DrivingSystem
         if (sounds.Count > 0) heard(root.Id, "impact", sounds);
     }
 
+    /// <summary>
+    /// Whether the body would be inside something solid at a proposed position. Sampled at the nose,
+    /// middle and tail, because a car is long; its own parts and occupants are not obstacles.
+    /// </summary>
     private static bool Blocked(World world, SpatialGrid<Entity> grid, Entity root, Vector3 position,
                                 float heading, out float closingSpeed, out Entity? struck)
     {
@@ -519,9 +454,7 @@ public static class DrivingSystem
 
         var size = world.Get<ColliderComponent>(root).Size;
         float radius = MathF.Max(0.3f, MathF.Min(size.X, size.Z) * 0.5f);
-        // Lifted clear of the floor, exactly as the player's own collision check is. A body that
-        // starts at the ground finds the ground: the car would report itself blocked by the road it
-        // is standing on and never move an inch.
+        // Lifted clear of the floor, as the player's check is, or the car is blocked by its own road.
         float clearance = MathF.Min(GroundClearance, size.Y * 0.5f);
         float height = MathF.Max(0.3f, size.Y - clearance);
         var forward = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading));

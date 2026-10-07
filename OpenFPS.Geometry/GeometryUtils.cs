@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 
 namespace OpenFPS.Common;
@@ -54,19 +53,9 @@ public static class GeometryUtils
         if (pointsInside == 8) return BoxContainment.FullyInside;
         if (pointsInside > 0) return BoxContainment.Partial;
 
-        // CORNER SAMPLING IS NOT AN INTERSECTION TEST, and believing it was lost whole regions.
-        //
-        // A long thin box can pass clean THROUGH a big cube without containing any of its eight
-        // corners and without its own centre being inside it. The octree asks this question of nodes
-        // hundreds of metres across, so a 24 m wide region volume laid along a racetrack answered
-        // "Outside" for node after node, the recursion stopped there, and the region simply was not
-        // in the grid over those stretches — while being perfectly present either side of them. The
-        // symptom was a player walking a named straight and being told the name, then nothing, then
-        // the name again.
-        //
-        // The honest test is separating axes: two convex boxes miss each other if and only if some
-        // axis exists on which their projections do not overlap, and for a box pair the candidates
-        // are the three axes of each plus the nine cross products.
+        // No corner inside is not "outside": a long thin box can pass through a big octree node without
+        // a corner in it. Corner sampling alone dropped a racetrack's region volume out of the grid
+        // along whole stretches of the straight.
         return ObbIntersectsAabb(boxCenter, boxSize, obbCenter, obbSize, obbRot)
              ? BoxContainment.Partial
              : BoxContainment.Outside;
@@ -136,14 +125,10 @@ public static class GeometryUtils
 
     public static bool IsPointInOBB(Vector3 point, Vector3 boxPos, Vector3 boxSize, Quaternion boxRot)
     {
-        // 1. Move point to origin relative to box
         Vector3 relativePoint = point - boxPos;
 
-        // 2. Rotate point by inverse box rotation to align with local axes
-        // This is mathematically equivalent to (Point - Pos) * Rot^-1
         Vector3 localPoint = Vector3.Transform(relativePoint, Quaternion.Inverse(boxRot));
 
-        // 3. Check if point is within half-extents
         Vector3 halfSize = boxSize / 2.0f;
         return (Math.Abs(localPoint.X) <= halfSize.X &&
                 Math.Abs(localPoint.Y) <= halfSize.Y &&
@@ -214,26 +199,17 @@ public static class GeometryUtils
 
     public static bool LineIntersectsOBB(Vector3 start, Vector3 end, Vector3 boxPos, Vector3 boxSize, Quaternion boxRot)
     {
-        // Transform line to local space of the OBB
         Matrix4x4 worldToLocal = Matrix4x4.CreateTranslation(-boxPos) * Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(boxRot));
         Vector3 localStart = Vector3.Transform(start, worldToLocal);
         Vector3 localEnd = Vector3.Transform(end, worldToLocal);
 
-        // Now it's an AABB intersection in local space
         return LineIntersectsAABB(localStart, localEnd, Vector3.Zero, boxSize);
     }
 
     /// <summary>
-    /// Where a ray enters a box, and which way that face points.
-    ///
-    /// The boolean above answers "is this box in the way", which is all occlusion ever needed. Anything
-    /// that has to follow sound PAST a surface needs two more things: how far away it was, so the
-    /// nearest one wins, and which way the surface faces, so the sound can carry on in the direction it
-    /// would really go. The slab method gives both — the axis whose near-plane was crossed last is the
-    /// face that was hit, and its sign is the side.
-    ///
-    /// Returns false when the ray misses, when the box is behind the ray, or when the origin is already
-    /// inside it (there is no entry face to report).
+    /// Where a ray enters a box, and which way that face points: the slab whose near plane was crossed
+    /// last is the face. False when the ray misses, the box is behind it, or the origin is already
+    /// inside (there is no entry face).
     /// </summary>
     public static bool RayHitsOBB(Vector3 origin, Vector3 direction, float maxDistance,
                                   Vector3 boxPos, Vector3 boxSize, Quaternion boxRot,
@@ -439,13 +415,9 @@ public static class GeometryUtils
         float b = 2 * (ox * dx + oz * dz - ratio * oy * dy);
         float c = ox * ox + oz * oz - ratio * oy * oy;
 
-        // A cone and its base are one convex solid, so a ray crosses its boundary at most twice: the
-        // path through it runs from the smallest valid crossing to the largest. The crossings used to
-        // be filed by their order in the quadratic — the first root as the entry, the second as the
-        // exit — and when one root lay on the mirror cone above the tip and was rightly thrown away,
-        // the one left was filed in the wrong place: a ray down through the slope got its entry at
-        // minus infinity (so "inside from the listener onward") and one up through the base an exit at
-        // infinity.
+        // A cone and its base are one convex solid: the path through it runs from the smallest valid
+        // crossing to the largest. Not by root order: when a root on the mirror cone above the tip is
+        // thrown away, the one left would be filed as the wrong end, at an infinite distance.
         float tNear = float.MaxValue, tFar = -float.MaxValue;
         void Cross(float t) { if (t < tNear) tNear = t; if (t > tFar) tFar = t; }
 
@@ -516,10 +488,8 @@ public static class GeometryUtils
         float cylMinY = cylPos.Y - height / 2.0f;
         float cylMaxY = cylPos.Y + height / 2.0f;
 
-        // 1. Vertical check
         if (aabbMax.Y < cylMinY || aabbMin.Y > cylMaxY) return result;
 
-        // 2. Horizontal check (treating AABB as a rectangle and Cylinder as a circle in XZ)
         float closestX = Math.Clamp(cylPos.X, aabbMin.X, aabbMax.X);
         float closestZ = Math.Clamp(cylPos.Z, aabbMin.Z, aabbMax.Z);
 
@@ -539,10 +509,8 @@ public static class GeometryUtils
         }
         else
         {
-            // The centre is inside the box's footprint: out by the NEAREST edge, the whole radius
-            // past it. This used to push out along the line from the box's centre, by one radius,
-            // which for a box much bigger than a body — a roof — is neither the way out nor far
-            // enough to get there, so it was applied again every pass of every tick.
+            // The centre is inside the box's footprint: out by the nearest edge, the whole radius past
+            // it. One radius along the line from the box's centre is not the way out of a roof.
             float toMinX = cylPos.X - aabbMin.X, toMaxX = aabbMax.X - cylPos.X;
             float toMinZ = cylPos.Z - aabbMin.Z, toMaxZ = aabbMax.Z - cylPos.Z;
             float best = toMaxX; result.Normal = Vector3.UnitX;       // +X from the very middle
@@ -552,12 +520,9 @@ public static class GeometryUtils
             result.Penetration = best + radius;
         }
 
-        // A box above the middle of the body that the top of it reaches into is a CEILING, and the
-        // way out of a ceiling is down. Sideways-only, jumping in a house put the head into the roof
-        // slab, and the roof — the whole house wide — pushed the body out through the nearest wall
-        // (Cody, 64 Alder Street, 2026-09-28: "I can jump over the edge to get out but I can't jump
-        // back in"). Down is taken when it is the shallower way out, which for a head in a roof is
-        // always; a wall beside you is still a wall, and so is a beam you walk into.
+        // A box above the middle of the body that its top reaches into is a ceiling, and the way out
+        // is down when that is shallower. Sideways only, a jump in a house put the head in the roof
+        // slab and the roof pushed the body out through a wall (Cody, 64 Alder Street, 2026-09-28).
         float intoCeiling = cylMaxY - aabbMin.Y;
         if (canGoDown && aabbMin.Y > cylPos.Y && intoCeiling < result.Penetration)
         {
@@ -566,13 +531,10 @@ public static class GeometryUtils
             return result;
         }
 
-        // And the other way up: a box whose top is below the middle of the body, with the body's
-        // centre over it, is a FLOOR the body is standing in, and the way out of a floor is up. The
-        // centre over it is the condition, not just any overlap: a body beside a low wall has its
-        // centre outside the wall and is pushed back off its side, which is how a parapet is a
-        // parapet and not something to be lifted onto. Inside the footprint, sideways means the
-        // nearest EDGE — for a roof slab the end of the roof, for the ground the end of the map
-        // (Brandt Court, 2026-10-04: a landing put a player 489 m west in one tick).
+        // A box whose top is below the middle of the body, with the body's centre over it, is a floor,
+        // and the way out is up. Centre over it, not any overlap: a body beside a low wall is pushed off
+        // its side. Sideways from inside the ground's footprint is the map's edge (Brandt Court,
+        // 2026-10-04: a landing put a player 489 m west in one tick).
         float intoFloor = aabbMax.Y - cylMinY;
         if (dist <= 0.0001f && aabbMax.Y < cylPos.Y && intoFloor < result.Penetration)
         {

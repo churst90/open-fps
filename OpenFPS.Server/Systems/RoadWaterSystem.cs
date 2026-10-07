@@ -54,9 +54,6 @@ public static class RoadWaterSystem
     /// <summary>A map's water, or null before its first tick.</summary>
     public static RoadWater? WaterOf(string mapId) => _maps.TryGetValue(mapId, out var m) ? m.Water : null;
 
-    /// <summary>A map's puddles, or null for a map without roads.</summary>
-    public static PuddleField? FieldOf(string mapId) => _maps.TryGetValue(mapId, out var m) ? m.Field : null;
-
     /// <summary>
     /// The water under a wheel on a road, mm: <paramref name="along"/> the road's centreline and
     /// <paramref name="lateral"/> to the right of it.

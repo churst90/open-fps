@@ -15,10 +15,6 @@ namespace OpenFPS.Server.Systems;
 /// and on the priority road a left turn across the oncoming stream gives way to it. Between two
 /// approaches of the same standing, the one on the right goes first; and if everybody is waiting for
 /// somebody, one of them goes after a while, as drivers do.
-///
-/// Without this, two cars turning into the same lane from different directions went through each
-/// other in the middle of the junction (CarFollowingTests counted them), and a give-way was a
-/// two-second stop whether anything was coming or not.
 /// </summary>
 public sealed partial class VehicleSystem
 {
@@ -69,10 +65,8 @@ public sealed partial class VehicleSystem
                 if (before.To != null) Slot(mapId, before.To).Inside.Add((v, new Movement(before, legs[leg].Segment)));
                 continue;
             }
-            // Coming to every junction on its way within the look, not only the next one: a car on
-            // the stretch before the last is still arriving, and a driver waiting to pull out has to
-            // see it. (Only the next was listed at first, and a motorbike at 13 m/s was invisible to a
-            // car giving way until it was 36 m off, too late.)
+            // Every junction within the look, not only the next: listing only the next hid a motorbike
+            // at 13 m/s from a car giving way until it was 36 m off, too late.
             float toLine = legs[leg].Segment.LengthMetres - along;
             for (int k = 0; k < legs.Count && toLine <= JunctionLookMetres; k++)
             {
@@ -113,7 +107,8 @@ public sealed partial class VehicleSystem
         float look = givesWay ? life.GiveWayApproachKmh / 3.6f : float.MaxValue;
 
         // Only decide once it is near enough to be committing; further out it simply drives.
-        // A crossing before the line moves where it stands further back, and so when it must decide.
+        // It stands with its front bumper at the line (half a car back from its middle), or short of a
+        // crossing that lies before the line.
         float atLine = MathF.Max(0f, toLine - 1f - 0.5f * v.LengthMetres);
         float holdAt = MathF.Min(atLine, ShortOfCrosswalk(v, toLine));
         float stopping = v.Speed * v.Speed / (2f * MathF.Max(0.1f, v.Brake)) + 6f;
@@ -123,8 +118,8 @@ public sealed partial class VehicleSystem
         bool wait = false;
         foreach (var (o, m) in here.Inside)
             if (o != v && Conflict(mine, m)) { wait = true; break; }
-        // ...and so does a vehicle already committed to it: too close to stop before the line and not
-        // waiting there. Two drivers who each decided before the other had entered both went, and met.
+        // ...and so does one already committed to it, or two drivers who each decided before the other
+        // entered both go, and meet.
         if (!wait)
             foreach (var (o, m, oToLine) in here.Coming)
                 if (o != v && m.In != mine.In && !o.Holding && Committed(o, oToLine) && Conflict(mine, m)
@@ -146,17 +141,14 @@ public sealed partial class VehicleSystem
                 if (!yields) continue;
                 float arrives = oToLine / MathF.Max(0.5f, o.Speed);
                 if (o.Speed < 0.5f && oToLine > 3f) continue;            // standing well back: not coming
-                // The gap is counted from when this one reaches the line, not from now: it is still
-                // some way short of it, and will cross at no more than its looking speed.
+                // The gap counts from when this one reaches the line, at no more than its looking speed.
                 float mineToLine = toLine / MathF.Max(1f, MathF.Min(v.Speed + 0.5f, look < float.MaxValue ? look : v.Speed + 0.5f));
                 if (arrives < CriticalGap(life, mine, givesWay) + mineToLine) { wait = true; break; }
             }
         }
 
-        // Everybody waiting for somebody: after a while, one goes. Only one: the others wait for it until
-        // it is into the junction, and are let go one at a time after it. Two that ran out of patience in
-        // the same quarter of a second both pulled away from the line, slower than the 0.5 m/s that makes
-        // one count as coming, and met in the middle (docs/MUTATION_2026-10-01.md, item 10).
+        // Everybody waiting for somebody: after a while one goes, and only one until it is into the
+        // junction; two let go together met in the middle (docs/MUTATION_2026-10-01.md, item 10).
         if (here.LetGo is { } went && !here.Coming.Any(x => x.V == went && x.ToLine < 6f + 0.5f * went.LengthMetres))
             here.LetGo = null;
         if (wait && v.Speed < 0.3f && toLine < 6f + 0.5f * v.LengthMetres)   // short of a crossing too
@@ -175,18 +167,14 @@ public sealed partial class VehicleSystem
         }
         else if (!wait) v.WaitingAt = null;
 
-        // Standing with the front bumper at the line, not the middle of the car: half a car further
-        // back, or its nose is in the lane of the road it is waiting to cross.
         v.Holding = wait;
-        // And short of a crossing that lies before the line, not on it.
         return (wait ? holdAt : float.MaxValue, look);
     }
 
     /// <summary>
     /// Whether a vehicle the lap puts in a junction is in fact still on the lane before it, short of the
-    /// line; if so, which leg and how far along. The smoothed line is shorter round corners than the lanes,
-    /// and the two drift apart by metres: a long truck holding at the line was taken to be in the junction
-    /// already, drove on, and met a car coming the other way (traced 2026-09-28).
+    /// line; if so, which leg and how far along. The smoothed line drifts metres from the lanes round
+    /// corners: a truck holding at the line was taken to be in the junction and drove on (traced 2026-09-28).
     /// </summary>
     private static bool ShortOfTheLine(DemoVehicle v, ref int leg, ref float along)
     {
@@ -243,9 +231,8 @@ public sealed partial class VehicleSystem
         if (_conflicts.TryGetValue(key, out bool c)) return c;
         var pa = LaneRoutes.Connector(a.In.Path, a.Out.Path);
         var pb = LaneRoutes.Connector(b.In.Path, b.Out.Path);
-        // Crossing, or passing closer than two bodies' width: two turns into neighbouring lanes never
-        // cross, but a car stopped partway round the inner one is in the way of the outer one (traced
-        // 2026-09-28: 1.7 m apart, centre to centre, a truck and a police car).
+        // Or closer than two bodies' width: turns into neighbouring lanes never cross, yet came 1.7 m
+        // apart centre to centre (traced 2026-09-28).
         c = Cross(pa, pb) || Closest(pa, pb) < BodyClearanceMetres;
         _conflicts[key] = c;
         _conflicts[(b.In.Index, b.Out.Index, a.In.Index, a.Out.Index)] = c;

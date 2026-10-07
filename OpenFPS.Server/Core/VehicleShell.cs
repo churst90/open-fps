@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Server.Repositories;
@@ -7,26 +5,18 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// A vehicle you can get into, built from what its profile already says it is.
-///
-/// A map names "vehicle:i4_economy" as a composite and gets a hatchback: a floor, a roof, doors below
-/// the waist and glass above it, a windscreen and a back window, a bonnet and a boot, and seats. Every
-/// number comes from the profile — the body's outside size (<see cref="VehicleProfile.LengthMetres"/>
-/// and its two siblings) and the cabin's inside size (<see cref="VehicleBody.CabinLengthM"/>), which
-/// were declared for the sound and the collision long before anyone could sit in one. So there is no
-/// file per car to rot out of step with the car: change the cabin and the shell you sit in changes.
-///
-/// The cabin is a closed box on purpose. It is the vehicle's ROOM (<see cref="TryCabin"/>, used by
-/// <see cref="CompositeService.RefreshRoom"/>), which is what makes the inside of a car sound like the
-/// inside of a car — a small, soft, close space — without anything here saying so. A bus's cabin is
-/// long and hard, a hatchback's short and carpeted, and the difference is the materials below.
+/// A vehicle you can get into, built from its profile: "vehicle:i4_economy" as a composite is a
+/// hatchback with floor, roof, doors, glass, bonnet, boot and seats, every size from the profile
+/// (<see cref="VehicleProfile.LengthMetres"/>, <see cref="VehicleBody.CabinLengthM"/>), so no file per
+/// car can drift from it. The cabin is a closed box on purpose: it is the vehicle's room
+/// (<see cref="TryCabin"/>, used by <see cref="CompositeService.RefreshRoom(string, int)"/>).
 /// </summary>
 public static class VehicleShell
 {
     public const string Prefix = "vehicle:";
 
-    /// <summary>The prefabs the shell is made of — see <see cref="VehicleCabin"/>, where the geometry lives
-    /// now, shared with the client that traces the same cabin for its sound.</summary>
+    /// <summary>The prefabs the shell is made of; the geometry is <see cref="VehicleCabin"/>'s, shared with
+    /// the client, which traces the same cabin for its sound.</summary>
     private const string Steel = VehicleCabin.Steel;
 
     /// <summary>Front-to-back room one row of seats takes, metres. Shared with the windows, one beside
@@ -67,8 +57,7 @@ public static class VehicleShell
 
         if (Measure(v) is not { } g)
         {
-            // A motorcycle, a formula car: nothing to be inside. One solid body at saddle height and a
-            // seat on top of it — you are sitting ON this, out in the air, and that is the point.
+            // A motorcycle, a formula car: nothing to be inside, so one solid body and a seat on it.
             float saddle = MathF.Min(v.HeightMetres, 0.9f);
             parts.Add(Box(Steel, new Vector3(0f, saddle * 0.5f + 0.1f, 0f),
                           new Vector3(v.WidthMetres, saddle - 0.2f, v.LengthMetres), prefabSize));

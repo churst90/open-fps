@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Threading;
 using Gtk;
 using Serilog;
 using OpenFPS.Common;
@@ -11,14 +8,11 @@ using OpenFPS.Client.Core.Platform; // ISpeechOutput / SpeechDispatcherOutput / 
 using OpenFPS.Client.Core.Session;  // ClientGameSession
 using OpenFPS.Client.Gtk.Game;      // GtkClientShell / GameWindow
 
-// OpenFPS GTK (Linux) client.
-//
-// The head is now genuinely thin: it owns speech, the GTK windows behind IClientShell, and the
-// GDK-keyval-to-GameKey map. Everything else — netcode, prediction, acoustics, bindings, the spoken
-// announcements — is ClientGameSession in OpenFPS.Client.Core, shared verbatim with the Windows head.
-//
-// The network poll + fixed-step simulation run on one background thread (GameLoop); GTK widgets are
-// only ever touched on the main thread (the shell marshals through the captured UI context).
+/// <summary>
+/// The GTK (Linux) head: speech, the windows behind IClientShell and the key map. Everything else is
+/// ClientGameSession, shared with the Windows head. The network poll and the simulation run on one
+/// background thread (GameLoop); GTK widgets are touched only on the main thread.
+/// </summary>
 internal static partial class GtkClientProgram
 {
     private static ISpeechOutput _speech = null!;
@@ -37,19 +31,17 @@ internal static partial class GtkClientProgram
     private static string _pendingAddress = "";
     private static bool _pendingRemember;
 
-    // The connect form stays up until the server has answered. Closing it on the button press dropped
-    // focus back onto the main menu, and that focus announcement — spoken with interrupt — cut off the
-    // rejection the session had just said, so a wrong password was indistinguishable from silence.
+    // The connect form stays up until the server has answered: closed on the button press, the main
+    // menu's focus announcement cut off the spoken rejection of a wrong password.
     private static Window? _loginDialog;
     private static bool _loginRegister;
     /// <summary>The server's shortest password (AuthService.MinPasswordLength).</summary>
     private const int MinPassword = 8;
-    private static Entry? _loginUser;
     private static Label? _loginStatus;
     private static string _loginStatusText = "";
 
-    // Set immediately before a programmatic GrabFocus whose reason has ALREADY been spoken, so the
-    // focus handler does not interrupt it with the name of the widget it just landed on.
+    // Set just before a GrabFocus whose reason has already been spoken, so the widget's name does not
+    // interrupt it.
     private static bool _suppressFocusSpeech;
 
     /// <summary>When this process started, so every "why did it stop" line can say how long it ran.</summary>
@@ -60,15 +52,6 @@ internal static partial class GtkClientProgram
     private const int SIGPIPE = 13;
     private static readonly IntPtr SIG_IGN = new(1);
 
-    /// <summary>
-    /// Stops a closed stdout from killing the process.
-    ///
-    /// .NET does not install a SIGPIPE handler, and the default action for it is to TERMINATE — no
-    /// exception, no core, no dump, nothing in the log. So a client whose console reader has gone
-    /// away dies silently the next time it writes a line, which on a chatty debug run is within
-    /// milliseconds. Writes now fail with EPIPE, which the runtime turns into an ordinary IOException
-    /// the console sink swallows, and the file sink keeps the log regardless.
-    /// </summary>
     [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
     private static extern int prctl(int option, ulong arg2, ulong arg3, ulong arg4, ulong arg5);
     private const int PR_SET_PTRACER = 0x59616d61;
@@ -81,6 +64,11 @@ internal static partial class GtkClientProgram
         catch (Exception ex) { Serilog.Log.Warning(ex, "Could not allow ptrace; a hang dump will fail."); }
     }
 
+    /// <summary>
+    /// Stops a closed stdout from killing the process. .NET installs no SIGPIPE handler, and the default
+    /// action terminates with no exception, core or log line; ignored, a write fails with EPIPE, which
+    /// the console sink swallows.
+    /// </summary>
     private static void IgnoreSigPipe()
     {
         try { signal(SIGPIPE, SIG_IGN); }
@@ -89,16 +77,8 @@ internal static partial class GtkClientProgram
 
     public static int Main(string[] args)
     {
-        // ── THE LOG IS WRITTEN BY THIS PROCESS, not by a pipe ────────────────────────────────────
-        //
-        // A log captured only by `| tee` in the launcher puts the client's life in the hands of
-        // whatever is reading its stdout. If the terminal goes away — closed, or an emulator that
-        // stops reading after you alt-tab — tee dies, the client gets SIGPIPE, and the process is
-        // gone: no exception, no core, no dump, and a log that ends mid-sentence, indistinguishable
-        // from a crash.
-        //
-        // So Serilog writes the file itself. The console sink stays for watching it live, and the
-        // tee in the launcher is belt and braces rather than the only copy.
+        // The log file is written by this process, not by a `| tee` in the launcher: when the terminal
+        // went away, tee died and took the client with it, and the log ended mid-sentence like a crash.
         var logCfg = new Serilog.LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.Console();
@@ -107,35 +87,22 @@ internal static partial class GtkClientProgram
             logCfg = logCfg.WriteTo.File(logPath, shared: true, flushToDiskInterval: TimeSpan.FromSeconds(2));
         Serilog.Log.Logger = logCfg.CreateLogger();
 
-        // ...and a dead reader must not be able to kill us at all. SIGPIPE's default action is to
-        // terminate the process; a GUI application has no business dying because nobody is listening
-        // to its stdout.
         IgnoreSigPipe();
         Serilog.Log.Information("OpenFPS GTK client starting (PID {Pid}).", Environment.ProcessId);
 
-        // ── LET FMOD SAY WHAT IS WRONG, INSTEAD OF GUESSING FROM A CORE ──────────────────────────
-        //
-        // FMOD ships a LOGGING build, libfmodL.so, which validates every call and reports API misuse
-        // by name — the handle that was stale, the object that was still connected, the thread it
-        // happened on: things otherwise read out of fault addresses in core files.
-        //
-        // It must be armed BEFORE System::create or it does nothing at all, which is why it is here
-        // and not in the audio provider. `run-gtk-client.sh fmodlog` swaps the library in and sets
-        // the variable; with the ordinary libfmod.so this call is a no-op and costs nothing.
+        // FMOD's logging build (libfmodL.so, `run-gtk-client.sh fmodlog`) reports API misuse by name.
+        // It must be armed before System::create, so here and not in the audio provider; with the
+        // ordinary libfmod.so this does nothing.
         string? fmodArmed = OpenFPS.Client.Core.AudioEngine.Fmod.FmodDebugLog.ArmFromEnvironment();
         if (fmodArmed != null) Serilog.Log.Information("{Line} Use `run-gtk-client.sh fmodlog`.", fmodArmed);
 
-        // ── SAY WHY IT STOPPED ───────────────────────────────────────────────────────────────────
         ProcessLifeLog.Install(_startedUtc);
         Console.CancelKeyPress += (_, _) => Serilog.Log.Information("Interrupted at the keyboard.");
 
-        // Orca when it is running, speech-dispatcher when it is not — decided per line, not once.
-        // See LinuxSpeechOutput.
+        // Orca when it is running, speech-dispatcher when it is not, decided per line.
         _speech = new OpenFPS.Client.Gtk.Platform.LinuxSpeechOutput();
         _speech.Initialize();
 
-        // Report EXACTLY which native audio libraries are missing and what each one costs. "Audio
-        // disabled" on its own tells a player nothing they can act on.
         var missingLibs = NativeAudioLibraries.FindMissing();
         _missingAudioReport = NativeAudioLibraries.DescribeMissing(missingLibs);
         bool audioEnabled = NativeAudioLibraries.IsPresent(NativeAudioLibraries.FmodFileName);
@@ -149,17 +116,16 @@ internal static partial class GtkClientProgram
         _network = new ClientNetworkService();
         _network.OnMessageReceived += OnServerMessage;
 
-        // The session is built up front (both heads do this now) so it can handle the login response
-        // itself; audio initialization is deferred to a background thread inside BeginAudioInit.
+        // Built before login so the session handles the login response itself; audio starts on a
+        // background thread in BeginAudioInit.
         var audioEngine = new AudioEngineFacade();
         _shell = new GtkClientShell(_speech, onQuit: () => _app?.Quit(), onCue: cue => _session?.Ui.Play(cue));
         _session = new ClientGameSession(_network, _speech, _shell, audioEngine,
             // FMOD's own recording, on the microphone chosen in Settings (Windows uses NAudio).
             microphone: new FmodMicrophoneCapture(audioEngine, () => _settings.InputDevice),
             enableAudio: audioEnabled);
-        // The shell needs the session's input buffer to clear held keys around modal dialogs; the
-        // session needs the shell at construction. The buffer is created by the session, so it is
-        // handed over immediately afterwards.
+        // The shell clears held keys around modal dialogs with the session's input buffer, which only
+        // exists once the session (which needs the shell) is built.
         _shell.SetInput(_session.Input);
         // The session speaks the outcome; the head only moves the form out of the way, or puts focus
         // back where the player can correct the mistake.
@@ -195,9 +161,7 @@ internal static partial class GtkClientProgram
         };
         int rc = _app.RunWithSynchronizationContext(null);
 
-        // The GTK loop returning IS the shutdown: it happens when the last window closes. Saying so
-        // distinguishes "somebody or something closed the window" from "the process was killed",
-        // which are the two things that look the same and need completely different fixes.
+        // Logged so a closed window can be told from a killed process.
         Serilog.Log.Information("GTK main loop returned {Rc} — the last window closed. Shutting down after {Sec:F0} s.",
                                 rc, (DateTime.UtcNow - _startedUtc).TotalSeconds);
         _session.Dispose();
@@ -208,28 +172,14 @@ internal static partial class GtkClientProgram
     }
 
     /// <summary>
-    /// The game loop's last tick, in UTC ticks. Written by the loop, read by the watchdog.
-    ///
-    /// ZERO until the loop has ticked ONCE, and the watchdog will not arm before then. The loop only
-    /// runs while a session is simulating, so between launch and joining a map it does not tick at
-    /// all — and a watchdog that calls that a stall fires eight seconds into every single run, which
-    /// is exactly what it did: a false alarm at the main menu that then wrecked the very run it was
-    /// supposed to be measuring.
+    /// The game loop's last tick, in UTC ticks, read by the watchdog. Zero until the first tick, and the
+    /// watchdog does not arm before then: the loop does not tick at the main menu.
     /// </summary>
     private static long _loopBeat;
 
     /// <summary>
-    /// Notices when the client has STOPPED, which is the one failure it had no instrument for.
-    ///
-    /// Three ways it can end are covered elsewhere — a native crash leaves a dump, a clean exit says
-    /// so, a dead terminal cannot kill it. The fourth is a HANG: everything simply stops, the log ends
-    /// mid-stream, and from the chair that is identical to a crash because what you notice is the
-    /// sound stopping.
-    ///
-    /// A hang is almost always a deadlock, and the only useful evidence is what every thread was
-    /// doing at the time — which is exactly what a dump holds. So this takes one, using the runtime's
-    /// own createdump against this process, and keeps running: the client is not killed, because a
-    /// hung client that recovers is worth knowing about too.
+    /// Notices a hang (the game loop stalled for eight seconds) and takes a dump of every thread with the
+    /// runtime's createdump, then keeps running: a hung client that recovers is worth knowing about too.
     /// </summary>
     private static void Watchdog()
     {
@@ -247,10 +197,8 @@ internal static partial class GtkClientProgram
 
             Serilog.Log.Fatal("GAME LOOP STALLED for {Sec:F0} s — the client is hung, not crashed. "
                             + "Taking a dump of every thread so the deadlock can be read.", since);
-            // NOT CloseAndFlush. That SHUTS THE LOGGER DOWN, so from the moment the watchdog fired
-            // nothing else would be written to the file, and a client that recovers would leave no
-            // record of it. A diagnostic that destroys the evidence it exists to collect is worse
-            // than none.
+            // Not CloseAndFlush: that shuts the logger down, and a client that recovers would leave no
+            // record of it.
 
             try
             {
@@ -265,11 +213,8 @@ internal static partial class GtkClientProgram
                     if (rt != null) createdump = Path.Combine(rt, "createdump");
                 }
                 string target = Path.Combine(dir, $"openfps-hang.{Environment.ProcessId}.dmp");
-                // LET IT ATTACH. createdump is a separate process and reads /proc/<pid>/mem, which
-                // the Yama LSM forbids between unrelated processes unless the target opts in —
-                // "Permission denied (13)", which is what the first hang dump came back with. The
-                // runtime does this for itself before spawning createdump on a crash; a watchdog
-                // spawning it by hand has to do the same.
+                // createdump reads /proc/<pid>/mem, which Yama forbids between unrelated processes
+                // unless the target opts in ("Permission denied (13)" otherwise).
                 SetPtracerAny();
                 var psi = new System.Diagnostics.ProcessStartInfo(createdump,
                     $"--full --name \"{target}\" {Environment.ProcessId}") { UseShellExecute = false };
@@ -281,7 +226,6 @@ internal static partial class GtkClientProgram
         }
     }
 
-    // ── Game / network loop (background thread) ─────────────────────────────────
     private static void GameLoop()
     {
         var lastTime = DateTime.Now;
@@ -314,14 +258,8 @@ internal static partial class GtkClientProgram
                     }
                     _session.ContinuousUpdate();
 
-                    // ── What rate this loop is actually managing ──────────────────────────────
-                    //
-                    // ContinuousUpdate is where every sound in the world gets its position, so the
-                    // period of THIS loop is the resolution of every moving source, and the per-source
-                    // work inside one iteration grows with the number of cars. Reported next to the audio system's own figure, so
-                    // a stall can be attributed to the loop or to the audio pass rather than guessed
-                    // at: if the loop is slow, it is the loop; if the loop is fine and the placement
-                    // gap is not, it is the audio pass.
+                    // Every moving sound is placed once per iteration, so this rate is their resolution.
+                    // Logged beside the audio system's own figure, so a stall is pinned on one or the other.
                     _loopIterations++;
                     System.Threading.Volatile.Write(ref _loopBeat, DateTime.UtcNow.Ticks);
                     double loopMs = (DateTime.Now - now).TotalMilliseconds;
@@ -348,8 +286,7 @@ internal static partial class GtkClientProgram
             }
             catch (Exception ex)
             {
-                // A handler/sim exception must never silently kill the game loop (which pumps the
-                // network): that would freeze the world-load handshake with no diagnostic.
+                // The loop pumps the network: one exception must not end it.
                 Log.Error(ex, "GameLoop iteration failed.");
             }
 
@@ -357,7 +294,6 @@ internal static partial class GtkClientProgram
         }
     }
 
-    // ── Main menu ───────────────────────────────────────────────────────────────
     private static void BuildMainMenu(Application app)
     {
         _mainWindow = ApplicationWindow.New(app);
@@ -381,9 +317,8 @@ internal static partial class GtkClientProgram
             _speech.Speak("Warning. " + _missingAudioReport);
     }
 
-    /// <summary>The Connect dialog; with <paramref name="register"/> it is the Create Account form instead:
-    /// blank, with only Create account and Cancel (a Connect button there logged in as the account that had
-    /// just failed to be made).</summary>
+    /// <summary>The Connect dialog; with <paramref name="register"/>, the Create Account form: blank, with
+    /// no Connect button (one there logged in as the account that had just failed to be made).</summary>
     private static void ShowLoginDialog(OpenFPS.Client.Core.SavedServer? saved, bool register = false)
     {
         if (_loginDialog != null)
@@ -405,13 +340,12 @@ internal static partial class GtkClientProgram
         dialog.SetTransientFor(_mainWindow);
         dialog.SetModal(true);
         dialog.SetDefaultSize(420, 320);
-        dialog.OnCloseRequest += (_, _) => { _loginDialog = null; _loginUser = null; _loginStatus = null; return false; };
+        dialog.OnCloseRequest += (_, _) => { _loginDialog = null; _loginStatus = null; return false; };
         CloseOnEscape(dialog);
 
         var box = VBox(16);
 
-        // A focusable status line so the last outcome can be re-read by tabbing back to it, rather than
-        // existing only as speech that has already gone by.
+        // Focusable, so the last outcome can be read again by tabbing back to it.
         _loginStatusText = "";
         _loginStatus = Label.New("");
         _loginStatus.SetWrap(true);
@@ -428,7 +362,6 @@ internal static partial class GtkClientProgram
         remember.SetActive(saved?.RememberPassword ?? false);
         SpeakOnFocus(remember, () => $"Remember password, {(remember.GetActive() ? "checked" : "not checked")}");
         box.Append(remember);
-        _loginUser = user;
 
         void Submit(bool register)
         {
@@ -438,7 +371,6 @@ internal static partial class GtkClientProgram
             _pendingRemember = remember.GetActive();
             _loginStatusText = register ? "Creating the account..." : "Connecting...";
             _loginStatus?.SetText(_loginStatusText);
-            // The dialog stays open: it closes only once the server has accepted the login.
             _session.Connect(_pendingAddress, _pendingUser, _pendingPass, register);
         }
         if (register)
@@ -468,17 +400,15 @@ internal static partial class GtkClientProgram
         else _speech.Speak("Connect dialog. Server address, username, and password fields.", true);
     }
 
-    /// <summary>Records a connect/login outcome on the still-open form and puts focus where the player
-    /// can act on it. The message itself has already been spoken by whoever raised it, so the focus move
-    /// is silenced — otherwise the widget's name would interrupt the reason.</summary>
+    /// <summary>Puts a login outcome, already spoken, on the open form, and moves focus there silently so
+    /// the widget's name does not interrupt it.</summary>
     private static void OnLoginOutcome(string message, bool success) => OnUi(() =>
     {
         if (_loginDialog == null) return;
         _loginStatusText = message;
         _loginStatus?.SetText(message);
         if (success) { CloseLoginDialog(); return; }
-        // Focus goes to the status line, which says the reason. (On Username, the screen reader read the
-        // field over the reason, and a refused password was never heard.)
+        // To the status line: on Username, the screen reader read the field over the reason.
         _suppressFocusSpeech = true;
         _loginStatus?.GrabFocus();
     });
@@ -486,7 +416,7 @@ internal static partial class GtkClientProgram
     private static void CloseLoginDialog()
     {
         var dialog = _loginDialog;
-        _loginDialog = null; _loginUser = null; _loginStatus = null;
+        _loginDialog = null; _loginStatus = null;
         dialog?.Close();
     }
 
@@ -523,10 +453,9 @@ internal static partial class GtkClientProgram
         }
     }
 
-    // ── Server messages (GameLoop thread) ───────────────────────────────────────
+    // Server messages arrive on the GameLoop thread.
     private static void OnServerMessage(IMessage msg) => _session.HandleMessage(msg);
 
-    // ── UI helpers ──────────────────────────────────────────────────────────────
     private static Box VBox(int margin)
     {
         var box = Box.New(Orientation.Vertical, 8);

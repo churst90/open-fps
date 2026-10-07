@@ -162,3 +162,19 @@ To build it, once the protocol carries a shot's origin and direction:
   the crack echoes off nearby walls the way it does in the NIJ recordings;
 - check the arrival times and the crack-report gap against the NIJ set (30 degrees at 40 m: M16
   21 ms, AK 15.5 ms).
+
+## Rounds are flown
+
+Every round, from the hip or through a scope, is flown: along the aim from the body's own axis at the
+height the gun is held, so a wall between you and your muzzle is the first thing it meets, and what it
+hits is said when it gets there (FlyBullets). It used to be a hit-scan: the nearest entity by its centre
+inside a flat 14-degree cone, a body taking the hit and a solid stopping it. A long wall's centre is
+metres away along it, so from the second floor of Brandt Court the floor's own east wall (88 m long,
+its centre 40 m off) was never in the cone, and the pedestrian below in the street was (Cody,
+2026-10-04). The aim assist's half-angle, 14 degrees (a dot of 0.97), is that old cone's, so close in
+it forgives what the hit-scan forgave.
+
+Order of a shot: the report (a gunshot is a blast wave, a body resonance, a brightness sweep and the
+action working, so it is named, not described by a few numbers); then aim assistance if it is on
+(/aimassist, on by default), which turns the gun onto somebody near the aim and in plain view; then the
+hip's own scatter; then the flight, so what the round does on the way is still the world's to decide.

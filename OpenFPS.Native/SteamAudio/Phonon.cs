@@ -1,13 +1,11 @@
-using System;
 using System.Runtime.InteropServices;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// Minimal P/Invoke bindings for the Steam Audio (phonon) C API — just the binaural-rendering
-/// path needed to prove HRTF works (context, HRTF, binaural effect, audio buffers).
-/// Resolves libphonon.so on Linux / phonon.dll on Windows. Coordinate system: right-handed,
-/// +x right, +y up, -z FORWARD (note: the game uses +z forward, so convert when passing directions).
+/// P/Invoke bindings for the Steam Audio (phonon) C API: context, HRTF, binaural effect and audio
+/// buffers (libphonon.so on Linux, phonon.dll on Windows). Right-handed, +x right, +y up, -z forward;
+/// the game is +z forward, so directions are converted on the way in.
 /// </summary>
 internal static partial class Phonon
 {
@@ -84,11 +82,8 @@ internal static partial class Phonon
         public IntPtr data;          // float**
     }
 
-    // --- SIMD capability -----------------------------------------------------------------------------
-    // Steam Audio does NOT probe the CPU: whatever level you hand iplContextCreate is the level it will
-    // emit code for. Asking for AVX2 on a machine without it is an illegal-instruction crash inside
-    // libphonon, not a graceful failure — so ask the CPU what it actually has. Cached: CPU features
-    // cannot change while the process runs.
+    // Steam Audio does not probe the CPU: it runs whatever SIMD level iplContextCreate is given, and
+    // AVX2 on a machine without it is an illegal-instruction crash inside libphonon. So ask the CPU.
     private static int _simdLevel = -1;
 
     /// <summary>The highest IPLSIMDLevel this CPU actually supports.</summary>

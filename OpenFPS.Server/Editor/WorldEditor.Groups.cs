@@ -1,8 +1,5 @@
-using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Editing;

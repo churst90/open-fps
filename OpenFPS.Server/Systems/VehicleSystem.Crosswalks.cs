@@ -1,18 +1,13 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Server.Core;
-using OpenFPS.Server.Repositories;
 using Serilog;
 
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Somebody on foot crossing a road.
-///
-/// Nothing on the map declares a crossing. A walker's line runs along a pavement, and where that line
-/// passes over a road's carriageway (a side street's mouth at a corner) is a crossing: found at load
-/// from the walkers' lines and the roads, the same rule the rest of the network follows (declare the
-/// road and the pavement, derive the rest). With no signals yet, every crossing is uncontrolled:
+/// Somebody on foot crossing a road. Nothing on the map declares a crossing: where a walker's line
+/// passes over a carriageway is one, found at load. With no signals yet, every crossing is uncontrolled:
 ///
 /// - The walker stops at the kerb and waits for a gap in the traffic long enough to walk across, the
 ///   Highway Capacity Manual's pedestrian critical headway t_c = L / S_p + t_s (StreetLifeData). A
@@ -86,10 +81,8 @@ public sealed partial class VehicleSystem
         var mine = _crosswalks.Skip(before).ToList();
         if (mine.Count == 0) return;
 
-        // Where each route vehicle's line crosses each crossing: on the line it actually drives, sampled
-        // every half metre. The route's own points are not good enough; the line is smoothed through
-        // the junctions, and scaling one onto the other is out by metres at a corner, which is where
-        // every crossing is.
+        // On the line each vehicle actually drives, every half metre: the route's points, scaled onto the
+        // smoothed line, are out by metres at a corner, which is where every crossing is.
         foreach (var v in _vehicles)
         {
             if (v.MapId != mapId || v.Route == null || v.Line == null) continue;
@@ -251,10 +244,8 @@ public sealed partial class VehicleSystem
             if (ahead <= reach) return false;                           // on it
             // Stopping for us; but one that has stood there a while gets its turn, and nobody new steps out.
             if (v.StoppingFor == cw) { if (v.CrosswalkWait > startUp + life.PedestrianAssertSeconds) return false; continue; }
-            // The time until its body is on the strip, not its middle on the walkers' line: a bus
-            // crawling round a corner at half a metre a second with its nose at the strip is there at
-            // once, not in the sixteen seconds its middle takes, and is too close to stop for anybody
-            // stepping out (traced 2026-10-02). One standing still is not coming.
+            // Until its body reaches the strip, not its middle: a bus crawling round a corner with its
+            // nose at the strip is there at once (traced 2026-10-02). One standing still is not coming.
             if ((ahead - reach) / MathF.Max(v.Speed, 1e-3f) < need) return false;
         }
         return true;
@@ -264,15 +255,9 @@ public sealed partial class VehicleSystem
     /// How far a route vehicle may still go before it must be standing short of a crossing somebody is
     /// on, metres, or MaxValue; and how hard it may brake to stand there, m/s^2.
     ///
-    /// The nearest such crossing, of all of them. The list is in the line's metres, and across the
-    /// lap's seam the first in it is not the nearest: a driver stopping for somebody five metres ahead
-    /// let them go when somebody stepped out twenty metres on, first in the list, and drove at the
-    /// first (traced 2026-10-02).
-    ///
-    /// A driver already stopping for a crossing keeps stopping for it: the walkers stepped out because
-    /// it was. Coming round a corner or pulling away it can run past where it meant to stand (the body
-    /// lags the speed asked of it), and until 2026-10-02 it then took itself to be too close to stop and
-    /// drove through them. Now it brakes harder, up to an emergency stop, to stand short of them.
+    /// The nearest of all of them: across the lap's seam the first in the list is not the nearest.
+    /// A driver already stopping keeps stopping, braking harder up to an emergency stop if it runs past
+    /// its mark, because the walkers stepped out on the strength of it (both traced 2026-10-02).
     /// </summary>
     private float CrosswalkHold(DemoVehicle v, float dt, out float decel)
     {
@@ -283,9 +268,8 @@ public sealed partial class VehicleSystem
         var line = v.Line!;
         float stopping = v.Speed * v.Speed / (2f * MathF.Max(0.1f, v.Brake));
         float look = stopping + 30f;
-        // Somebody waiting at a kerb is let across only on the lane it is arriving by, before the
-        // junction: a driver already in a junction who stopped for somebody at the far kerb would stand
-        // in everybody's way, and the whole junction locked up waiting for them (traced 2026-09-28).
+        // Somebody waiting at a kerb is let across only before the junction: a driver stopping inside one
+        // for the far kerb locked the whole junction (traced 2026-09-28).
         float laneLeft = -1f;
         if (v.Route != null)
         {

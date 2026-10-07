@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common.Components;
@@ -8,17 +5,10 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// The walkable network of a map's pavements, for somebody going from one place to another on foot.
-///
-/// Nothing declares it. Every pavement on a map is a slab whose name says it is one ("Main Street
-/// sidewalk, west side"), and its middle line is a way along it. Where two of those lines meet is a
-/// corner, and the stretch of a line between two kerbs (a side street's mouth, the road at a junction)
-/// is a crossing: the same rule the walkers' crossings follow, declare the pavement and derive the
-/// rest. A route is the shortest way along the lines from the nearest point to where you are to the
-/// nearest point to where you are going, with a step off at each end.
-///
-/// What stands on a pavement (a bus shelter, a tree) is walked round, not through: a route is checked
-/// against the solid boxes it passes and stepped sideways round any it would meet (<see cref="Clear"/>).
+/// The walkable network of a map's pavements, derived, not declared: each slab named as a pavement
+/// contributes its middle line, lines that meet make corners, and a route is the shortest way along
+/// them between the nearest points to its ends. What stands on a pavement is stepped round
+/// (<see cref="Clear"/>).
 /// </summary>
 public sealed class Pavements
 {

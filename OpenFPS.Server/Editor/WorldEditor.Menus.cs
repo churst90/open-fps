@@ -8,7 +8,6 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 
-using EntityData = OpenFPS.Server.Repositories.EntityData;
 
 namespace OpenFPS.Server.Editor;
 
@@ -64,9 +63,9 @@ public sealed partial class WorldEditor
             "setting" when parts.Length > 1 => SettingMenu(s, parts[1]),
             "place" => PlaceMenu(s),
             "place.cat" when parts.Length > 1 => CategoryMenu(s, parts[1]),
-            "place.mode" => PlaceModeMenu(s),
+            "place.mode" => PlaceModeMenu(),
             "find" when parts.Length > 1 => FindMenu(s, string.Join(":", parts[1..])),
-            "rows" => RowsMenu(s),
+            "rows" => RowsMenu(),
             "library" => LibraryMenu(),
             "kind" when parts.Length > 1 => KindMenu(parts[1], retired: false),
             "retired" when parts.Length > 1 => KindMenu(parts[1], retired: true),
@@ -76,7 +75,7 @@ public sealed partial class WorldEditor
             "versions" when parts.Length > 2 => VersionsMenu(s, parts[1], parts[2]),
             "version" when parts.Length > 3 => VersionMenu(s, parts[1], parts[2], parts[3]),
             "where" when parts.Length > 2 => WhereMenu(parts[1], parts[2]),
-            "replace" when parts.Length > 2 => ReplaceMenu(s, parts[1], parts[2]),
+            "replace" when parts.Length > 2 => ReplaceMenu(parts[1], parts[2]),
             "replacewith" when parts.Length > 3 => ReplaceWithMenu(s, parts[1], parts[2], parts[3]),
             "test" => TestMenu(),
             _ => null,
@@ -254,7 +253,7 @@ public sealed partial class WorldEditor
         return Menu("Turn", items);
     }
 
-    private EditorMenu RowsMenu(UserSession s)
+    private EditorMenu RowsMenu()
     {
         var items = new List<EditorMenuItem>();
         foreach (int n in new[] { 2, 3, 5, 10 }) items.Add(Act($"{n} copies the way you face, a width apart", $"edit row {n}"));
@@ -379,7 +378,7 @@ public sealed partial class WorldEditor
         return Menu("Place", items);
     }
 
-    private EditorMenu PlaceModeMenu(UserSession s) => Menu("Choosing a prefab", new[]
+    private EditorMenu PlaceModeMenu() => Menu("Choosing a prefab", new[]
     {
         Act("Places it at your feet, or just in front of you if it is solid", "edit place mode feet", stay: false),
         Act("Places it at the build cursor, which /origin and /at set", "edit place mode cursor", stay: false),
@@ -630,7 +629,7 @@ public sealed partial class WorldEditor
         return Menu($"Where {kind.Name(id)} is used", items);
     }
 
-    private EditorMenu? ReplaceMenu(UserSession s, string kindId, string id)
+    private EditorMenu? ReplaceMenu(string kindId, string id)
     {
         var kind = Catalog.Get(kindId);
         if (kind == null || !kind.Knows(id)) return null;

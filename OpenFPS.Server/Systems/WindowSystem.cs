@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -20,19 +18,14 @@ public struct WindowsComponent
 }
 
 /// <summary>
-/// A vehicle's power windows: rolled down and up from any seat.
-///
-/// The glass moves at the pace the window model's own motor moves it (<see cref="CarWindow.Glide"/>),
-/// so what is heard opening and what has opened arrive together, and its sound is that model: one motor
-/// in each door, each a little unlike the others. Every side window moves at once, because anyone sitting
-/// in a car can reach the switch beside them, and for a player who cannot see which switch is which, one
-/// command that does all of them is the one that is any use.
+/// A vehicle's power windows, rolled from any seat. The glass moves at its motor model's pace
+/// (<see cref="CarWindow.Glide"/>), so the sound and the opening arrive together. Every side window moves
+/// at once: a player who cannot see which switch is which needs one command for all of them.
 /// </summary>
 public static class WindowSystem
 {
-    /// <summary>How many doors' motors are heard. Each is its own sound on the event channel; past the
-    /// front two rows the rest of a long cabin's are further along it and add nothing a listener could
-    /// tell apart.</summary>
+    /// <summary>How many rows of door motors are heard; past the front two, a long cabin's add nothing a
+    /// listener could tell apart.</summary>
     private const int HeardRows = 2;
 
     /// <summary>
@@ -72,9 +65,8 @@ public static class WindowSystem
     }
 
     /// <summary>
-    /// Sends the windows of <paramref name="root"/> toward <paramref name="to"/> open: tells every client
-    /// where they are going, and lets everyone in earshot hear the motors. Returns what the person who
-    /// pressed the switch is told.
+    /// Sends the windows of <paramref name="root"/> toward <paramref name="to"/> open, tells the clients and
+    /// plays the motors. Returns what the person at the switch is told.
     /// </summary>
     public static string Set(World world, Entity root, float to, Action<int>? resendDefinition,
                              Action<int, string, IReadOnlyList<TransientSound>>? heard)
@@ -113,10 +105,9 @@ public static class WindowSystem
     }
 
     /// <summary>
-    /// One motor in each door beside the front rows, each in its own character so no two are the same
-    /// sound from two places, and each starting a few hundredths of a second after the last: no two
-    /// relays close together. Each is placed just inside its door at the waist, where the motor and the
-    /// glass are, which is inside the cabin: a listener outside hears it through the body.
+    /// One motor in each door of the front rows, each its own variant (no two the same sound from two
+    /// places) and each a few hundredths of a second after the last. Placed inside the door at the waist,
+    /// so a listener outside hears it through the body.
     /// </summary>
     internal static List<TransientSound> Sounds(World world, Entity root, VehicleProfile profile, float from, float to)
     {
@@ -136,9 +127,7 @@ public static class WindowSystem
                 {
                     Character = SoundCharacter.Knock,
                     Position = t.Position + Vector3.Transform(local, t.Rotation),
-                    // Placed on the vehicle where it is when the motor is heard, not where it was when
-                    // the switch was pressed: a car rolling its windows down at speed has gone a metre
-                    // by the time the last motor starts.
+                    // On the moving vehicle: at speed it has gone a metre by the time the last motor starts.
                     OnBody = true,
                     BodyOffset = local,
                     DelaySeconds = 0.04f * index,

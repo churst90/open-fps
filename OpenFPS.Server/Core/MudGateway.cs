@@ -1,29 +1,20 @@
-using System;
 using System.Collections.Concurrent;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using OpenFPS.Common.Networking;
 using Serilog;
 
 namespace OpenFPS.Server.Core;
 
-/// <summary>
-/// Gateway for text-based MUD (Multi-User Dungeon) connections.
-/// Listens for TCP connections and translates plain-text commands into structured game messages.
-/// This allows accessibility-focused clients (like screen readers via Telnet) to interact with the 3D world.
-/// </summary>
+/// <summary>The text gateway: telnet connections whose lines become the same messages a game client sends.</summary>
 public class MudGateway
 {
     private readonly TcpListener _listener;
     private readonly IMessageDispatcher _dispatcher;
     private bool _isRunning;
-    private int _nextConnectionId = 10000; // Offset to avoid ID collision with LiteNetLib's internal peer IDs
+    private int _nextConnectionId = 10000; // above LiteNetLib's peer ids, so the two never collide
     
     private readonly ConcurrentDictionary<int, MudConnection> _connections = new();
 
@@ -34,24 +25,19 @@ public class MudGateway
     /// <summary>Connections at once, all addresses together.</summary>
     public const int MaxConnections = 64;
     /// <summary>
-    /// Lines waiting to be written to one connection. A client that stops reading fills this, and is
-    /// then closed: the writes used to be synchronous on the tick thread, so one telnet window left
-    /// unread would have stopped the whole server once its socket buffer filled.
+    /// Lines waiting to be written to one connection. A client that stops reading fills this and is
+    /// closed: writing on the tick thread, one unread telnet window would stop the whole server.
     /// </summary>
     public const int MaxQueuedLines = 256;
 
     private static readonly UTF8Encoding NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>
-    /// Raised (on the connection's own task thread) when a MUD client goes away. The server uses it to
-    /// end the session and remove the player's body — a telnet player can now spawn one, so without this
-    /// every dropped connection would leave a corpse standing in the world.
+    /// Raised on the connection's own task thread when a MUD client goes away, so the server ends the
+    /// session and removes the body a telnet player may have.
     /// </summary>
     public Action<int>? OnDisconnected;
 
-    /// <summary>
-    /// Internal container for a MUD client's connection state.
-    /// </summary>
     private class MudConnection
     {
         public int Id;
@@ -63,29 +49,20 @@ public class MudGateway
         public string Address = "";
         public DateTime ConnectedUtc = DateTime.UtcNow;
         /// <summary>
-        /// Everything written to this connection goes through here, to one writer task. Replies arrive
-        /// from the tick thread, the thread pool and the reader task alike; one writer means no two
-        /// lines interleave and no caller ever waits on the network.
+        /// Everything written to this connection, for its one writer task. Replies come from the tick
+        /// thread, the pool and the reader alike; one writer means no interleaving and no caller waits.
         /// </summary>
         public readonly Channel<string> Outbox = Channel.CreateBounded<string>(
             new BoundedChannelOptions(MaxQueuedLines) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
         public int Closed;
     }
 
-    /// <summary>
-    /// Creates a new MUD gateway.
-    /// </summary>
-    /// <param name="port">The TCP port to listen on.</param>
-    /// <param name="dispatcher">The dispatcher to route incoming commands to game logic.</param>
     public MudGateway(int port, IMessageDispatcher dispatcher)
     {
         _listener = new TcpListener(IPAddress.Any, port);
         _dispatcher = dispatcher;
     }
 
-    /// <summary>
-    /// Starts the asynchronous acceptance loop for new MUD connections.
-    /// </summary>
     public void Start()
     {
         try
@@ -102,10 +79,7 @@ public class MudGateway
         }
     }
 
-    /// <summary>
-    /// Main loop for accepting incoming TCP connections. 
-    /// Dispatches a background Task for each client to prevent blocking.
-    /// </summary>
+    /// <summary>Accepts connections, each served by a task of its own.</summary>
     private async Task AcceptLoop()
     {
         while (_isRunning)
@@ -204,9 +178,7 @@ public class MudGateway
         try { conn.Client.Close(); } catch { }
     }
 
-    /// <summary>
-    /// Per-connection loop that reads lines of text and dispatches them as IMessage objects.
-    /// </summary>
+    /// <summary>Reads a connection's lines and dispatches them, until it closes.</summary>
     private async Task HandleConnection(MudConnection conn)
     {
         var lines = new BoundedLineReader(conn.Reader);
@@ -217,8 +189,7 @@ public class MudGateway
                 var (line, tooLong) = await lines.ReadLineAsync(MaxLineLength);
                 if (line == null) break;
 
-                // Robustness: Message length check. Bounded while reading, not after: ReadLine would
-                // have held a gigabyte with no newline in memory before anything could look at it.
+                // Bounded while reading: ReadLine would hold a gigabyte with no newline before anything looked.
                 if (tooLong)
                 {
                     Enqueue(conn, $"Error: Command too long (max {MaxLineLength} chars).");
@@ -228,7 +199,7 @@ public class MudGateway
                 line = line.Trim();
                 if (string.IsNullOrEmpty(line)) continue;
 
-                // Robustness: Rate Limiting (max 5 cmds / sec)
+                // At most 5 commands a second.
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 if (now > conn.LastSecondTimestamp)
                 {
@@ -247,7 +218,6 @@ public class MudGateway
                     IMessage? msg = ParseCommand(line);
                     if (msg != null)
                     {
-                        // Dispatch to Game Services and provide the SendReply method as the response target
                         _dispatcher.Dispatch(conn.Id, msg, reply => SendReply(conn, reply));
                     }
                     else
@@ -286,9 +256,7 @@ public class MudGateway
         return AuthService.ForLog(line);
     }
 
-    /// <summary>
-    /// Sends a response message back to the MUD client, formatting it as plain text.
-    /// </summary>
+    /// <summary>A reply to the MUD client, as plain text.</summary>
     private static void SendReply(MudConnection conn, IMessage reply)
     {
         string text = FormatReply(reply);
@@ -297,9 +265,8 @@ public class MudGateway
     }
 
     /// <summary>
-    /// Pushes a message to a MUD connection outside a request/reply exchange — chat, private messages and
-    /// world events that the UDP clients receive by peer. Without this a MUD player can talk but never
-    /// hears anyone answer. Returns false if the id is not a live MUD connection.
+    /// A message to a MUD connection outside a request and reply: chat, private messages, world events.
+    /// False if the id is not a live MUD connection.
     /// </summary>
     public bool TrySend(int connectionId, IMessage message)
     {
@@ -331,8 +298,7 @@ public class MudGateway
     {
         if (!_connections.TryGetValue(connectionId, out var conn)) return;
         if (finalLine != null) conn.Outbox.Writer.TryWrite(finalLine);
-        // Completing the outbox lets the writer finish what is queued and then close the socket; a
-        // client that is not reading gets five seconds of that before it is closed anyway.
+        // The writer finishes what is queued and closes; a client not reading gets five seconds.
         conn.Outbox.Writer.TryComplete();
         _ = Task.Delay(5000).ContinueWith(_ => Close(conn), TaskScheduler.Default);
     }
@@ -355,9 +321,7 @@ public class MudGateway
         Log.Information("MUD Gateway stopped.");
     }
 
-    /// <summary>
-    /// Translates a structured game message (IMessage) into a human-readable string for the MUD player.
-    /// </summary>
+    /// <summary>A game message as a line for the MUD player; empty for what a text player is not told.</summary>
     private static string FormatReply(IMessage reply)
     {
         return reply switch
@@ -374,8 +338,7 @@ public class MudGateway
             RegisterResponse r => r.Success ? "Registration successful." : "Registration failed: " + r.Message,
             PlayerSpawned => "You are now in the world. Try 'scan'.",
             TextEvent t => t.Text,
-            // Somebody in the street saying something: the one world sound a text player can be told
-            // word for word.
+            // The one world sound a text player can be told word for word.
             WorldAudioEvent w when w.Label.StartsWith("speech: ", StringComparison.Ordinal)
                 => $"Someone nearby says: \"{w.Label["speech: ".Length..]}\"",
             // Somebody came or went: the notice is the whole line, with no sender in front of it.
@@ -388,7 +351,7 @@ public class MudGateway
                 ChatChannel.Team => $"[{c.Sender}, to team]: {c.Text}",
                 _ => $"[{c.Sender}]: {c.Text}",
             },
-            _ => "" // Movement and world state updates are not converted to text for performance/verbosity reasons.
+            _ => ""
         };
     }
 
@@ -430,9 +393,7 @@ public class MudGateway
         return string.Join("\n", lines);
     }
 
-    /// <summary>
-    /// Basic text parser that maps natural language commands to internal Message types.
-    /// </summary>
+    /// <summary>A typed line as a message: a few words of its own, and everything else a text command.</summary>
     private IMessage? ParseCommand(string line)
     {
         var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -447,7 +408,6 @@ public class MudGateway
             "mymaps" => new MapListRequest { Scope = MapListScope.Mine },
             "friends" => new FriendListRequest(),
             "login" when parts.Length >= 3 => new LoginRequest { Username = parts[1], Password = parts[2] },
-            // Chat now reaches MUD players; this is the other half — a way for them to answer.
             "say" when parts.Length >= 2 => new ChatMessage { Text = string.Join(' ', parts[1..]) },
             _ => new TextCommand { Command = cmd, Args = parts.Length > 1 ? parts[1..] : Array.Empty<string>() }
         };

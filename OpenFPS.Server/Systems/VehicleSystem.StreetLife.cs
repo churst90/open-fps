@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -11,23 +8,14 @@ using Serilog;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// The people driving the traffic.
-///
-/// A racing line is a very good model of how a car goes round a block and no model at all of the
-/// person in it. People honk — mostly a tap, sometimes two, now and then a proper lean — and every so
-/// often somebody pulls out and a driver has to stand on the brakes, and then leans on the horn. None
-/// of it is on a timetable: each is a random event with a map-wide mean interval
-/// (<see cref="StreetLifeData"/>), landing on a vehicle picked at random, so it comes "every now and
-/// again, from different vehicles" and never as a jam.
-///
-/// Nothing here makes a sound. A honk is sent as the vehicle's own horn and a rhythm; a hard stop is
-/// a deceleration, and the tyres squeal on the client because the deceleration is past what they
-/// grip at.
+/// Street life: honks, hard stops, parking, alarms and gunfire, each a random event with a map-wide
+/// mean interval (<see cref="StreetLifeData"/>) landing on a vehicle picked at random. A honk is sent as
+/// the vehicle's horn and a rhythm; a hard stop is only a deceleration, and the client's tyres squeal.
 /// </summary>
 public sealed partial class VehicleSystem
 {
-    /// <summary>How a sound leaves this system: map, source entity, label, the sounds. Set by the
-    /// server to its world-audio broadcast; null in tests that only want traffic.</summary>
+    /// <summary>How a sound leaves this system: map, source entity, label, the sounds. The server's
+    /// world-audio broadcast; null in tests.</summary>
     public Action<string, int, string, IReadOnlyList<TransientSound>>? Heard { get; set; }
 
     private readonly Dictionary<string, StreetLifeData> _streetLife = new(StringComparer.OrdinalIgnoreCase);
@@ -62,7 +50,7 @@ public sealed partial class VehicleSystem
             && Pick(mapId, world, v => v.Line != null && v.Park == null && v.DwellLeft <= 0f && v.HardBrakeLeft <= 0f
                                        && v.Speed >= HardBrakeMinSpeed) is { } braker)
         {
-            // Down to a crawl or a third of the speed, whichever is more, as hard as the tyres allow.
+            // Down to 20 to 40 per cent of the speed, or 1.5 m/s if that is more.
             BrakeHard(braker, MathF.Max(1.5f, braker.Speed * (0.2f + 0.2f * (float)_streetRng.NextDouble())));
             Log.Information("Street: {Name} brakes hard, {From:F0} -> {To:F0} km/h at {Decel:F1} m/s^2.",
                             braker.DisplayName, braker.Speed * 3.6f, braker.HardBrakeTo * 3.6f, braker.HardBrakeDecel);
@@ -76,7 +64,6 @@ public sealed partial class VehicleSystem
         MaybePark(mapId, world, life, dt, clock);
         UpdateDrivers(mapId, world, clock);
 
-        // A car alarm, now and then: one of the cars standing empty at the kerb.
         if (Chance(life.AlarmEverySeconds, dt)
             && Pick(mapId, world, v => v.Horn.StartsWith("electric:") && v.Park is { Phase: ParkPhase.Parked, Step: 7 }) is { } alarmed)
         {
@@ -85,8 +72,7 @@ public sealed partial class VehicleSystem
             Honk(mapId, world, alarmed, pattern);
         }
 
-        // Somebody on the pavement fires two to four rounds. Picked from the people walking, so
-        // it comes from wherever they are — the street you are on, or three blocks over.
+        // Somebody walking fires two to four rounds.
         if (Chance(life.GunfireEverySeconds, dt)
             && Pick(mapId, world, v => v.Preset.Equals("walker", StringComparison.OrdinalIgnoreCase), streetOnly: false) is { } shooter)
         {
@@ -121,9 +107,8 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>
-    /// One round, the way a player's is sent (CommandHandler.HandleFire): the weapon's own synthesis
-    /// at the muzzle, a metre and a half up and half a metre out, at the cartridge's blast level. The
-    /// world's reflections and reverb make the place.
+    /// One round, sent as a player's is (CombatService.Fire): the weapon's own synthesis at the muzzle,
+    /// 1.5 m up and 0.5 m out, at the cartridge's blast level.
     /// </summary>
     private void Shoot(string mapId, World world, DemoVehicle v, WeaponDefinition gun, float yaw)
     {

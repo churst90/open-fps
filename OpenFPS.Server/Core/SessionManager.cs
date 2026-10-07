@@ -1,13 +1,8 @@
 using System.Collections.Concurrent;
-using Arch.Core;
-using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Server.Core;
 
-/// <summary>
-/// Responsible for tracking all active player sessions and their mapping to ECS entities.
-/// </summary>
+/// <summary>Every logged-in session, by connection id; safe from any thread.</summary>
 public class SessionManager
 {
     private readonly ConcurrentDictionary<int, UserSession> _sessions = new();

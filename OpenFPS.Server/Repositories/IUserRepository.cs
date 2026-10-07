@@ -3,25 +3,18 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Server.Repositories;
 
 /// <summary>
-/// Defines the persistence contract for user credentials and roles.
-/// Decoupled from the underlying storage mechanism to allow swapping implementations (flat-file, SQLite, etc.).
-///
-/// The members after <see cref="VerifyPassword"/> have bodies that do nothing, so a store that keeps
-/// only names and hashes (the test stubs, the old JSON file) still satisfies the contract. The SQLite
-/// store, which the server runs on, implements all of them.
+/// Accounts: credentials, roles and what a player leaves behind. The members after
+/// <see cref="VerifyPassword"/> default to doing nothing, so a store that keeps only names and hashes
+/// (the test stubs, the JSON file) still fits; the SQLite store the server runs on implements them all.
 /// </summary>
 public interface IUserRepository
 {
     UserData? GetUser(string username);
-    /// <summary>
-    /// Creates a user. Returns false if the username is already taken — the caller is expected to tell
-    /// the person the truth about that rather than reporting a success they cannot then log in with.
-    /// </summary>
+    /// <summary>Creates a user. False if the name is taken, which the caller must say rather than
+    /// report a success that cannot log in.</summary>
     bool AddUser(string username, string password, UserRole role);
-    /// <summary>
-    /// Whether the password is right. An unknown name must take as long to answer as a known one, so
-    /// the time a refusal takes does not say whether the account exists.
-    /// </summary>
+    /// <summary>Whether the password is right. An unknown name must take as long to answer as a known
+    /// one, so the time a refusal takes does not say whether the account exists.</summary>
     bool VerifyPassword(string username, string password);
 
     /// <summary>A successful login: when, from where. Clears the failed-login count.</summary>
@@ -46,17 +39,12 @@ public interface IUserRepository
     /// <summary>Takes a deleted custom role off everybody who had it; how many.</summary>
     int ClearCustomRole(string role) => 0;
 
-    /// <summary>
-    /// A player leaving the world: their state (place, health, stats) and what they were carrying, both
-    /// JSON, written together. False if there is no such user or this store cannot keep them, in which
-    /// case the caller puts the things down rather than let them vanish.
-    /// </summary>
+    /// <summary>A player leaving the world: their state (place, health, stats) and what they carried,
+    /// both JSON, written together. False if this store cannot keep them, and the caller then puts the
+    /// things down rather than let them vanish.</summary>
     bool SavePlayer(string username, string? state, string? belongings) => false;
 
-    /// <summary>
-    /// What a player carried when they left, read and cleared in one go: from here on it is in the world
-    /// and not in the store, so a thing given away or dropped after coming back cannot come back twice.
-    /// Null for nothing.
-    /// </summary>
+    /// <summary>What a player carried when they left, read and cleared in one go, so nothing can come
+    /// back twice. Null for nothing.</summary>
     string? TakeBelongings(string username) => null;
 }

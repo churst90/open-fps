@@ -1,51 +1,37 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A high-performance spatial partitioning structure used to optimize collision checks and entity queries.
-/// It divides the world into a 2D grid of "cells" (buckets) to reduce the search space from O(N) to roughly O(1).
+/// What is near a point: square cells on the ground plane. Static things are filed by cell once; what
+/// moves is filed again every tick.
 /// </summary>
-/// <typeparam name="T">The type of item stored in the grid (usually Entity IDs).</typeparam>
+/// <typeparam name="T">What is filed (usually an entity).</typeparam>
 public class SpatialGrid<T>
 {
     private readonly float _cellSize;
     private readonly Dictionary<(int, int), List<T>> _staticGrid = new();
 
-    // ── What moves: a tree, not cells (geometry stage 2) ─────────────────────────────────────────────
-    //
-    // The dynamic half was a dictionary of cells torn down and filled again every tick. What moves is now
-    // a list of the cells each thing covers, as it was filed, and a tree over them built the first time
-    // it is asked after a change (the triangle world's BVH builder): a question about the cells within a
-    // radius hands back exactly the things the cells did, in the order they were filed.
+    // What moves: the cells each thing covers, as filed, and a tree over them built on the first query
+    // after a change. A query hands back exactly what cells would, in the order they were filed.
     private readonly List<(T Item, int X0, int Z0, int X1, int Z1)> _dynamic = new();
     private OpenFPS.Common.Geometry.BvhNode[]? _dynamicNodes;
     private int[] _dynamicOrder = Array.Empty<int>();
     private readonly object _dynamicBuild = new();
     [ThreadStatic] private static List<int>? _dynamicHits;
 
-    /// <summary>How many moving things are filed this tick.</summary>
-    public int DynamicCount => _dynamic.Count;
-
     /// <summary>Where each static item was filed: the cells (x0, z0) to (x1, z1), or the oversize list, so
     /// one can be taken out again without rebuilding the grid (<see cref="RemoveStatic"/>).</summary>
     private readonly Dictionary<T, (int X0, int Z0, int X1, int Z1, bool Oversize)> _staticSpans = new();
 
     /// <summary>
-    /// Bumped every time the STATIC half of the grid changes (a static add, or a full clear). The dynamic
-    /// half is torn down and rebuilt every tick, so a version that counted it would change every tick and
-    /// be useless as a cache key; this one only moves when the world's geometry actually does. Anything
-    /// memoizing a query against static geometry — the server's ground probe, for one — keeps the version
-    /// it was computed at and recomputes when it no longer matches.
+    /// Bumped whenever the static half changes, and only then (the dynamic half changes every tick): the
+    /// cache key for anything memoized against static geometry, such as the server's ground probe.
     /// </summary>
     public int StaticVersion { get; private set; }
 
-    /// <summary>
-    /// Creates a new spatial grid. It has no bounds: cells exist where something has been added.
-    /// </summary>
-    /// <param name="cellSize">The size (in meters) of each square cell in the grid.</param>
+    /// <summary>A grid with no bounds: cells exist where something has been added.</summary>
+    /// <param name="cellSize">The side of a cell, metres.</param>
     public SpatialGrid(float cellSize)
     {
         _cellSize = cellSize;
@@ -69,17 +55,12 @@ public class SpatialGrid<T>
     /// <summary>Static items too big to file by cell, handed back by every query.</summary>
     public IReadOnlyList<T> Oversize => _oversize;
 
-    /// <summary>
-    /// Maps a 3D world position to a 2D grid coordinate (ignoring Y/Height).
-    /// </summary>
     private (int, int) GetCell(Vector3 pos)
     {
         return ((int)Math.Floor(pos.X / _cellSize), (int)Math.Floor(pos.Z / _cellSize));
     }
 
-    /// <summary>
-    /// Adds an item to the single cell corresponding to its exact center position.
-    /// </summary>
+    /// <summary>Files an item in the one cell its centre is in.</summary>
     public void Add(Vector3 pos, T item, bool isStatic = false)
     {
         var cell = GetCell(pos);
@@ -95,17 +76,8 @@ public class SpatialGrid<T>
     }
 
     /// <summary>
-    /// Adds an item to every cell that overlaps with its 3D bounding box (size).
-    /// This is essential for large static objects like walls that span multiple cells.
-    /// </summary>
-    /// <summary>
-    /// A box that is TURNED: indexed by the square footprint that contains it.
-    ///
-    /// The plain overload takes the size as if the box were lined up with the grid, and every caller
-    /// handed it a rotated box's own local size. A bus heading east is 10.9 m along X; indexed by its
-    /// local size it was filed as 10.9 m along Z, so the cells beside its front and back never knew
-    /// it was there and a player standing at its bumper was never tested against it. A wall turned a
-    /// few degrees off the grid is wrong by less, and wrong the same way.
+    /// A turned box, filed by the square footprint that contains it. Filed by its local size, a bus
+    /// heading east missed the cells at its ends and a player at its bumper was never tested against it.
     /// </summary>
     public void AddOverlapping(Vector3 pos, Vector3 size, Quaternion rotation, T item, bool isStatic = false)
     {
@@ -123,9 +95,10 @@ public class SpatialGrid<T>
         AddOverlapping(pos, bounds, item, isStatic);
     }
 
+    /// <summary>Files an item in every cell its box, lined up with the grid, covers.</summary>
     public void AddOverlapping(Vector3 pos, Vector3 size, T item, bool isStatic = false)
     {
-        // Add tiny epsilon to ensure boundary-aligned objects are indexed in the edge cells
+        // Pulled in a millimetre, so a box ending exactly on a cell line is not filed in the next cell.
         const float epsilon = 0.001f;
         Vector3 min = pos - (size / 2f) + new Vector3(epsilon, 0, epsilon);
         Vector3 max = pos + (size / 2f) - new Vector3(epsilon, 0, epsilon);
@@ -242,8 +215,8 @@ public class SpatialGrid<T>
     }
 
     /// <summary>
-    /// Returns all items located in cells that overlap with the specified radius around a position.
-    /// This is an approximation; result may contain items outside the exact radius but within the same cells.
+    /// Every item in the cells the radius reaches: some may be outside the radius itself, and an item filed
+    /// in several cells comes back once for each.
     /// </summary>
     public IEnumerable<T> GetItemsInRadius(Vector3 pos, float radius)
     {
@@ -268,17 +241,9 @@ public class SpatialGrid<T>
     }
 
     /// <summary>
-    /// The allocation-free, repeat-free form of <see cref="GetItemsInRadius"/>: fills <paramref name="into"/>
-    /// with every distinct item in the overlapping cells.
-    ///
-    /// Two things make this the form the hot paths want. <see cref="GetItemsInRadius"/> is an iterator, so
-    /// asking it for a count and then walking it — which both the server's collision gather and the client's
-    /// candidate query did — walks every cell TWICE. And a wall wide enough to span cells is filed in each
-    /// one, so a plain walk hands the same wall back four or nine times and every caller then ray-tests it
-    /// four or nine times. Deduplicating here fixes that once, for everyone.
-    ///
-    /// The caller owns both buffers (they are cleared on entry), which is what keeps the grid itself free of
-    /// per-call state and therefore safe to read from several threads at once.
+    /// The allocation-free form of <see cref="GetItemsInRadius"/> for hot paths: each item once, into
+    /// <paramref name="into"/>. The caller owns both buffers (cleared on entry), which keeps the grid free
+    /// of per-call state and safe to read from several threads at once.
     /// </summary>
     public void CollectInRadius(Vector3 pos, float radius, List<T> into, HashSet<T> seen)
     {
@@ -305,19 +270,13 @@ public class SpatialGrid<T>
         DynamicIn(centerCell.Item1 - cellRadius, centerCell.Item2 - cellRadius, centerCell.Item1 + cellRadius, centerCell.Item2 + cellRadius, into, seen);
     }
 
-    /// <summary>
-    /// Clears only the dynamic items from the grid.
-    /// Should be called every tick before re-populating if tracking dynamic entities.
-    /// </summary>
+    /// <summary>Clears what moves, before it is filed again for the tick.</summary>
     public void Clear()
     {
         _dynamic.Clear();
         _dynamicNodes = null;
     }
 
-    /// <summary>
-    /// Clears everything, including static geometry.
-    /// </summary>
     public void ClearAll()
     {
         _staticGrid.Clear();
@@ -329,16 +288,14 @@ public class SpatialGrid<T>
         StaticVersion++;
     }
 
-    // ── The static geometry as triangles (docs/GEOMETRY.md, stage 1) ───────────────────────────────
-    //
-    // The queries that have moved to the triangle world ask it about static geometry and ask this grid
-    // only about what moves (its dynamic half) and about the few static things the triangle world does
-    // not hold (Unindexed): a shape that is not a box, and anything added since the world was last built.
+    // The static geometry as triangles (docs/GEOMETRY.md, stage 1). Queries ask the triangle world about
+    // static geometry, and this grid only about what moves and the static things the world does not hold
+    // (Unindexed): a shape that is not a box, and anything added since the world was last built.
 
     private readonly List<T> _unindexed = new();
 
     /// <summary>The static solid boxes of this grid as a triangle world, or null where nothing has built one
-    /// (every query then answers from the grid, as before). Its movers (door leaves) are brought up to
+    /// (every query then answers from the grid). Its movers (door leaves) are brought up to
     /// where they stand first (<see cref="BeforeGeometry"/>).</summary>
     public OpenFPS.Common.Geometry.TriangleWorld? Geometry
     {
@@ -351,7 +308,7 @@ public class SpatialGrid<T>
     /// has moved since it last did (ServerGeometry, MoverPoses).</summary>
     public Action? BeforeGeometry { get; set; }
 
-    /// <summary>Static items <see cref="Geometry"/> does not hold: test them as the grid always did.</summary>
+    /// <summary>Static items <see cref="Geometry"/> does not hold: test them by their boxes.</summary>
     public IReadOnlyList<T> Unindexed => _unindexed;
 
     /// <summary>Puts a newly built triangle world in place, with the static items it does not hold.</summary>
@@ -371,7 +328,7 @@ public class SpatialGrid<T>
         StaticVersion++;
     }
 
-    /// <summary>A static item added after <see cref="Geometry"/> was built: tested the old way until the
+    /// <summary>A static item added after <see cref="Geometry"/> was built: tested by its box until the
     /// next build takes it in.</summary>
     public void AddUnindexed(T item)
     {

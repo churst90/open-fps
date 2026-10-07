@@ -519,3 +519,48 @@ within 0.1-1.7 % on average of the default's, against Embree's own run-to-run sp
 (Embree's reflections are not bit-for-bit repeatable; the default's are). The listener's scene holds
 the same 11,020 boxes as the whole-map open-ground filter.
 - The settings menus have no world detail control yet; `/detail` does it.
+
+## What the broadcast chooses from
+
+Each player used to ask the spatial grid for everything within earshot. On the city earshot is the whole
+map: about 86,000 grid entries a player a tick (a wall is filed in every cell it crosses) to find some
+7,500 entities, 16 ms each on a desktop. Two players overran the 33 ms tick on the VPS, the loop fell
+behind every few ticks, and everything anyone heard trailed what it belonged to (2026-10-04, fixed in
+60d2fc4e). The grid holds exactly the collidable entities, so one pass over the world now finds the same
+set once, with no repeats, and each player filters it.
+
+Items are gathered as well, because they have no collider: you walk over a gun on the floor and a shot
+does not stop on it. A broadcast that chose only from the collidable never mentioned an item, so one made
+by /give, or picked up and put down, never reached a client and its item beacon had nothing to sound from
+(Cody, 2026-10-04: "when I drop items I still don't hear them"). An item is the one thing that changes
+hands after the map is streamed, so it is the one colliderless thing the broadcast carries.
+
+A carried thing is sent every tick unreliably, like a body. As a static that moved, a carried gun went out
+on the reliable channel every tick its holder walked, and one lost packet held up every chat line and
+definition behind it.
+
+The stats update (health, floor material, held weapon) goes only when something in it changed. It used to
+go every tick, reliably, to say the same thing thirty times a second.
+
+## The broadcast radius
+
+How far from a player the server tells them about things is derived, not authored. It used to be one
+constant, 200 m, which suits a room and not a racetrack: a one-mile oval is about 700 m across, so cars
+spent most of a lap outside it. They vanished round the back, came back at 200 m already at full
+throttle, and the client tore down and rebuilt their engine synthesis every lap. What the player heard
+was cars pinned to one side, silence from the other, and stuttering, none of it an audio bug.
+
+The radius comes from the two things that decide it: how far the map's loudest emitter carries
+(Loudness.AudibleRange, which every sound declares) and how big the map is, since there is no point
+reaching past its corners. A map with a quiet beacon keeps a small radius; add a race engine and it grows
+on its own.
+
+The ceiling must not be below what the loudest source carries. At 1,200 m it was: an airliner is 142 dB
+at a metre and AudibleRange gives it 3,000 m, so outside 1,200 m the server stopped sending it. At
+228 m/s that was ten seconds of existence per pass, and the rest of the time the sky was empty ("I'm not
+hearing the planes"). 3,000 m is the cap AudibleRange itself applies, so a source is broadcast exactly as
+far as it can be heard.
+
+The radius is recomputed after everything that emits has been spawned (RefreshEarshotRanges). Measured
+at map load alone, the vehicles were not there yet, every racetrack came out at the 200 m floor, and
+eight cars on the oval only existed along the front straight.

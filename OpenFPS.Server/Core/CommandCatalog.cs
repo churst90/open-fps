@@ -1,15 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// Every command the server answers, with its other names, how to type it and what it does: what /help
-/// reads out, what a mistyped command is matched against, and the one place a command's usage is
-/// written down. A player without menus has only this to find out what they can do, so /help lists
-/// only the commands that player may use, and a mistake is answered with the nearest real command
-/// rather than a dead end.
+/// Every command the server answers, its other names, how to type it and what it does: what /help reads
+/// out and what a mistyped command is matched against. /help lists only what this player may use, and a
+/// mistake is answered with the nearest real command rather than a dead end.
 /// </summary>
 public static class CommandCatalog
 {

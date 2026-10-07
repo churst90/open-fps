@@ -4,6 +4,25 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- Housekeeping (docs/HOUSEKEEPING.md) of the server, Geometry, Native and both client heads. No
+  behaviour, sound or wire change: the render fingerprints, the emitter stream replay and the library
+  boundary pass unregenerated.
+  - Comments: narration and history cut, every warning and measured fact kept in a sentence, doc
+    comments that sat on the wrong member put back on their own. Comment lines: server 6,874 to
+    4,966, Geometry 776 to 669, Native 270 to 215 (FMOD's own bindings untouched), GTK head 355 to
+    224, Windows head 232 to 213. Reasoning that was in no doc moved to docs: the new
+    docs/SERVER_NOTES.md (building without pointing, composites), docs/WORLD_STREAMING.md (what the
+    broadcast chooses from, the broadcast radius) and docs/GUNFIRE.md (rounds are flown).
+  - Dead code: members with no caller anywhere (GameServer.BroadcastModel, MapRepository.Delete and
+    DirectoryPath, RoadWaterSystem.FieldOf, CharacterSystem.HauntsOf, MapOverlay.IsAdded,
+    UserSession.LastCollisionTime, ServerGeometry.MarkDirty, the repositories' PathOnDisk,
+    VehicleSystem.RacersForTest, CombatService.WalkersComingBack, and in Geometry
+    Capsule.AxisLow, CapsuleIntersects, SpatialGrid.DynamicCount, Surface.Sees,
+    TriangleWorld.TryGetMover and MoverCount, TriangleWorldBuilder.IsMover); parameters no body read
+    (BoxColumns' cell size among them); two dead client fields; about 200 unused usings.
+  - `CommandHandler.cs` (2,669 lines) is split by area into partial files: Admin, Building, Doors,
+    Hands, People, Scan, Seats, Sound and Teams, with /move joining Teleport and /join joining Maps.
+    A pure move.
 - Server fixes from todo Now 4-6 and 13, each with a test that failed before it. Wire: one field
   appended (`ServerStateUpdate.Held`); client and server must be rebuilt together.
   - `/spawn` on a shipped map (the city, the speedway, the real places) no longer records the walker,

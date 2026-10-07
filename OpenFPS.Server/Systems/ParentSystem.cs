@@ -1,10 +1,10 @@
 using Arch.Core;
 using OpenFPS.Common.Components;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace OpenFPS.Server.Systems;
 
+/// <summary>Places every part from its parent's pose and its own local pose, each tick.</summary>
 public static class ParentSystem
 {
     public static void Update(World world, Dictionary<int, Entity> lookup)
@@ -19,13 +19,10 @@ public static class ParentSystem
                 {
                     var parentTransform = world.Get<Transform>(parentEntity);
 
-                    // Calculate world position: Parent Position + (Parent Rotation * Local Position)
                     Vector3 worldPos = parentTransform.Position + Vector3.Transform(parent.LocalPosition, parentTransform.Rotation);
-                    
-                    // Calculate world rotation: Parent Rotation * Local Rotation
+
                     Quaternion worldRot = parentTransform.Rotation * parent.LocalRotation;
 
-                    // Only dirty if actually moved
                     if (transform.Position != worldPos || transform.Rotation != worldRot)
                     {
                         transform.Position = worldPos;

@@ -1,6 +1,3 @@
-using System;
-using System.Linq;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -12,30 +9,14 @@ using Serilog;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Drives the map's vehicles along their roads.
+/// Drives the map's vehicles, aircraft, small machines and walkers along their lines. The server
+/// decides only where each is and how fast it goes; the client runs the engine from the emitter's
+/// preset id and that speed.
 ///
-/// A vehicle is an ordinary dynamic entity — a transform, a velocity, a collider so the spatial grid
-/// carries it into every client's earshot, and a sound emitter whose id names an engine preset. The
-/// client hears that id and runs the engine live, following the speed this system reports, so all
-/// the server decides is where the car is and how fast it is going. Which is as it should be: the
-/// server knows nothing about exhausts.
-///
-/// A vehicle either SHUTTLES a straight road or LAPS a circuit.
-///
-/// Shuttling is the demonstration case: a straight line between two points, out and back, at each
-/// speed in a list. The car sits at one end idling, pulls away, holds the speed, brakes to a stop at
-/// the other end, waits, turns round, and comes back at the next speed.
-///
-/// Lapping is a race. The car follows a <see cref="MapData.Tracks"/> centreline offset onto its own
-/// line, and its speed at every point of the lap is decided by the CURVATURE there: the fastest it
-/// can go through a bend of radius R at g lateral g is sqrt(g * 9.81 * R), and no faster. A backward
-/// pass round the loop then pulls each limit down to whatever the brakes can still shed before the
-/// next slower point, which is how a real racing line is computed and why the car starts slowing
-/// before the corner rather than at it. That profile is the entire sound of a lap — an engine
-/// pulling all the way down the straight, a lift and a settle through the turn, and back on it at
-/// the exit — and none of it is scripted; it falls out of the shape of the track and the grip of
-/// the car. Give two cars different grip and top speed and they lap at different rates, catch each
-/// other and pass, with no notion of racing anywhere in the code.
+/// A vehicle either SHUTTLES between two points (out and back at each speed in a list) or follows a
+/// <see cref="RaceLine"/>: a track or a route on the roads, whose speed at every point comes from the
+/// curvature (sqrt(g * 9.81 * R)) pulled down by a backward braking pass. Nothing about a lap is
+/// scripted; it falls out of the shape of the line and the grip of the car.
 /// </summary>
 public sealed partial class VehicleSystem
 {
@@ -81,29 +62,24 @@ public sealed partial class VehicleSystem
         public int Laps;
         public string DisplayName = "";
 
-        /// <summary>How hard the tyres are working, 0..2, 1 being the limit. Worked out HERE because
-        /// this is the only place that knows the corner: the racing line's speed limit already has
-        /// the banking in it, so the fraction of it being used is the fraction of the grip being
-        /// used, and no listener can arrive at that from a velocity alone.</summary>
+        /// <summary>How hard the tyres are working, 0..2, 1 being the limit. Worked out here because only
+        /// the line knows the corner and its banking; a listener cannot get it from a velocity.</summary>
         public float TyreDemand;
 
-        /// <summary>Where this vehicle stops on its route, in order round the lap. Empty for
-        /// anything that does not — a car does not use a bus stop.</summary>
+        /// <summary>Where this vehicle stops on its route, in order round the lap.</summary>
         public (float At, float Dwell, string Kind)[] Stops = System.Array.Empty<(float, float, string)>();
         /// <summary>Which stop it is heading for, an index into <see cref="Stops"/>.</summary>
         public int NextStop;
         /// <summary>Seconds left standing. Above zero means it is AT a stop, not driving to one.</summary>
         public float DwellLeft;
-        /// <summary>The stop it has just left, and how far round it was when it left — so it does
-        /// not immediately see the stop it is standing on and serve it again for ever.</summary>
+        /// <summary>The stop it has just left and where, so it does not serve the one it stands on again.</summary>
         public int LeftStop = -1;
         public float LeftAtLap;
         /// <summary>How hard this vehicle CHOOSES to corner, which set its racing line. The tyres are
         /// measured against <see cref="Grip"/>, which may be more.</summary>
         public float CorneringG = 1f;
 
-        /// <summary>Flat-ground grip in g, from the map. Only the LONGITUDINAL half of the demand
-        /// needs it; the lateral half comes out of the racing line, which already knows the bank.</summary>
+        /// <summary>Flat-ground grip in g, from the map; the lateral demand comes from the line, which knows the bank.</summary>
         public float Grip = 1f;
 
         /// <summary>The vehicle preset, and the horn that comes with it ("" for none).</summary>
@@ -112,7 +88,6 @@ public sealed partial class VehicleSystem
         /// <summary>A road vehicle on a street: something with a driver who can honk, brake hard or
         /// park. Not an aircraft, a mower, a walker or a racing car.</summary>
         public bool OnStreet;
-        /// <summary>Somebody on foot.</summary>
         public bool IsWalker;
         /// <summary>A walker who was killed and has not been replaced yet: nobody is on this walk, so
         /// it is in nobody's lane (RetireWalker, ReplaceWalker).</summary>
@@ -178,10 +153,8 @@ public sealed partial class VehicleSystem
     private readonly HashSet<(string, string)> PairSeen = new();
 
     /// <summary>Spawns every vehicle a map declares. Call once after the maps are loaded.</summary>
-    /// <param name="shells">
-    /// Builds the body of a vehicle people can ride in. Without it (the tests that only want traffic)
-    /// every vehicle is a bare moving box, as it always was.
-    /// </param>
+    /// <param name="shells">Builds the body of a vehicle people can ride in; without it every vehicle
+    /// is a bare moving box.</param>
     public void Spawn(MapManager maps, CompositeService? shells = null)
         => Spawn(maps, shells, null, null);
 
@@ -202,7 +175,6 @@ public sealed partial class VehicleSystem
         _maps = maps;
         foreach (var entry in maps.GetAllMaps())
         {
-            int routeIndex = 0;
             string mapId = entry.Key;
             var data = entry.Value.data;
             if (onlyMap != null && !mapId.Equals(onlyMap, StringComparison.OrdinalIgnoreCase)) continue;
@@ -210,28 +182,11 @@ public sealed partial class VehicleSystem
             if (list == null) continue;
             foreach (var vd in list)
             {
-                // ── A vehicle, or an aircraft ────────────────────────────────────────────────────
-                //
-                // The mover does not care which. A shuttle is a straight line between two points in
-                // THREE dimensions and always was — RoadStart and RoadEnd carry a Y — so an airliner
-                // crossing the map at six hundred metres and a truck going through the tunnel are
-                // the same object to this system, and an approach is a shuttle that ends lower than
-                // it starts. What differs is only how loud the thing is, how big it is, and which
-                // library the client should look the preset up in.
-                //
-                // That last one is the whole of the coupling: the client reads the SoundId's prefix
-                // and runs the right model. Deciding it HERE, from which library actually has the
-                // preset, means a map names "airliner" and gets an airliner without anything else
-                // on either side having to be told about aircraft.
+                // Aircraft, machines and walkers are shuttles like any vehicle (RoadStart and RoadEnd
+                // carry a Y, so an approach is a shuttle that ends lower). Which library holds the
+                // preset decides the SoundId prefix the client picks its model by; a walker has no
+                // voice, the client makes its footsteps from its movement.
                 bool isAircraft = AircraftProfile.Presets.ContainsKey(vd.Preset);
-                // ── ...or a small machine, or a person ──────────────────────────────────────────
-                //
-                // A push mower moves because somebody is pushing it, at a walking pace, up and down
-                // a garden; and a person moves because they are walking. Both are the same object to
-                // this system as a truck: a thing on a line between two points at a speed. What
-                // differs is the voice — a small machine's is "machine:<preset>" (see the client's
-                // physical voice path), and a walker has none at all, because the client hears a
-                // body with legs by its footsteps, which it makes from the body's own movement.
                 bool isMachine = !isAircraft && SmallMachineSpec.Presets.ContainsKey(vd.Preset);
                 bool isWalker = string.Equals(vd.Preset, "walker", StringComparison.OrdinalIgnoreCase);
                 if (!isAircraft && !isMachine && !isWalker && !MachineRegistry.Knows(vd.Preset))
@@ -246,23 +201,15 @@ public sealed partial class VehicleSystem
                 string displayKind = isAircraft ? air!.Name : isMachine ? machine!.Name : isWalker ? "someone walking" : profile!.Engine.Name;
                 float sourceLevelDb = isAircraft ? air!.SourceLevelDb : isMachine ? machine!.SourceLevelDb : isWalker ? 0f : profile!.SourceLevelDb;
                 string prefix = isAircraft ? "aircraft:" : isMachine ? "machine:" : "engine:";
-                // An airliner is sixty metres of aeroplane; a car is four and a half of car. The
-                // collider is what carries it into a client's earshot through the spatial grid, so
-                // an aeroplane sized like a hatchback is one that appears late.
-                // An aeroplane's size is its WINGSPAN and its LENGTH, which it now declares. It used
-                // to be guessed from cruise speed — a fast aeroplane was a big one — which made a
-                // turboprop wider than an airliner is long and had nothing to do with either.
+                // The collider carries it into a client's earshot through the spatial grid: an
+                // undersized aeroplane appears late. An aeroplane is its declared wingspan by length.
                 var hull = isAircraft
                     ? new Vector3(air!.WingspanMetres, 6f, air.LengthMetres)
                     : isMachine ? new Vector3(0.6f, 1.0f, 0.9f)
                     : isWalker ? new Vector3(0.5f, 1.8f, 0.5f)
                     : new Vector3(profile!.WidthMetres, profile.HeightMetres, profile.LengthMetres);
-                // SOLID, so you cannot walk through it. A car, a bus, a mower: all of them. Not an
-                // aeroplane, whose box is wingspan by length and would wall off the empty air under a
-                // wing, and not a pedestrian, who steps round you rather than shoving you along the
-                // pavement. A car that drives into you pushes you out of its way — the movement
-                // solver lifts a player out of whatever they are inside — and that is all for now:
-                // being hit hurting is its own piece of work.
+                // Not an aeroplane, whose box would wall off the air under a wing, nor a walker, who
+                // steps round you. A car that drives into you only pushes you out of its way.
                 bool solid = !isAircraft && !isWalker;
 
                 // A vehicle that names a track laps it; one that does not shuttles its road.
@@ -294,7 +241,7 @@ public sealed partial class VehicleSystem
                 }
                 else if (vd.Route != null)
                 {
-                    route = BuildRoute(maps, mapId, vd, routeIndex++);
+                    route = BuildRoute(maps, mapId, vd);
                     if (route == null) continue;
                     float topSpeed = (vd.TopSpeedKmh > 0 ? vd.TopSpeedKmh : 200f) / 3.6f;
                     float grip = vd.CorneringG > 0 ? vd.CorneringG : 1.0f;
@@ -325,12 +272,8 @@ public sealed partial class VehicleSystem
                                    : isMachine ? $"{displayKind}, being worked"
                                    : isWalker ? "walking"
                                    : $"{displayKind}, driving the road";
-                // ── A bus you can get on ────────────────────────────────────────────────────────
-                //
-                // A vehicle that stops at a BUS STOP is one that takes passengers, and that is the
-                // whole test — nothing on the map says "boardable". It gets a real body with seats,
-                // the same shell a parked car has, and a person waiting at the stop gets on when it
-                // stops. Everything else about it is the traffic it always was.
+                // A vehicle that stops at a bus stop takes passengers (nothing on the map says
+                // "boardable"): it gets the same shell with seats a parked car has.
                 Entity e = Entity.Null;
                 if (shells != null && profile != null && line != null && TakesPassengers(data, vd, route, line)
                     && maps.TryGetMap(mapId, out var shellWorld, out _, out _, out _))
@@ -383,15 +326,12 @@ public sealed partial class VehicleSystem
                     new VehicleComponent { VehicleType = vd.Preset, MaxSeats = isAircraft || isMachine ? 0 : 2 },
                     new SoundEmitterComponent
                     {
-                        // The client recognises the prefix and runs the engine itself.
                         IsSynth = true,
                         SoundId = prefix + vd.Preset,
                         Mode = PlaybackMode.LoopOne,
                         Volume = 1f,
-                        // How far this car actually carries, from how loud it is — the same
-                        // calculation the client uses to place it. A flat 220 m was the number the
-                        // server then sized its broadcast radius from, so on a one-mile oval the
-                        // cars stopped existing for the client round the back of the track.
+                        // From its loudness, as the client places it: the broadcast radius is sized
+                        // from this, and a flat 220 m lost the cars round the back of a one-mile oval.
                         Range = Loudness.AudibleRange(sourceLevelDb),
                         MinDistance = 3f,
                     }));
@@ -418,9 +358,7 @@ public sealed partial class VehicleSystem
                     ApproachSpeed = air?.ApproachSpeedMps ?? 0f,
                 };
 
-                // Where this vehicle stops on its route. A stop names who uses it — a bus stop is
-                // for buses and a car does not pull into one — so the same track carries the stops
-                // for everything that runs it and each vehicle takes the ones that are its own.
+                // A stop names who uses it (ForPreset), so one track carries the stops for everything on it.
                 if (line != null)
                 {
                     var track = data.Tracks?.Find(tr => string.Equals(tr.Id, vd.Track, StringComparison.OrdinalIgnoreCase));
@@ -433,8 +371,7 @@ public sealed partial class VehicleSystem
                             .Select(sp => (At: sp.AtMetres, Dwell: sp.DwellSeconds, Kind: sp.Kind ?? "stop"))
                             .ToArray();
                         v.Stops = mine;
-                        // Start heading for the first stop that is actually ahead of it, or it will
-                        // drive most of a lap backwards to reach one it has already passed.
+                        // The first stop ahead of it, not one it has already passed.
                         for (int si = 0; si < mine.Length; si++)
                             if (mine[si].At >= v.Lap) { v.NextStop = si; break; }
                         if (mine.Length > 0)
@@ -442,9 +379,7 @@ public sealed partial class VehicleSystem
                                             mapId, display, mine.Length, vd.Track);
                     }
                 }
-                // A racer is already at speed when the world starts; it is a lap in progress, not a
-                // standing start, and a standing start would put eight engines on the limiter at
-                // once in the same three seconds.
+                // Already at speed: a standing start would put every engine on the limiter at once.
                 if (line != null)
                 {
                     line.Sample(v.Lap, out _, out _, out float v0);
@@ -471,11 +406,8 @@ public sealed partial class VehicleSystem
                     {
                         v.Wheels.Modulated = true;
                         var body = v.Wheels;
-                        // A driver takes a bend no faster than is comfortable (the side friction at
-                        // which drivers ease off, DriverSteering.ComfortTurnSpeed), and never faster
-                        // than keeps the tyres quiet.
-                        // On a wet road the tyres' limit is the dry one scaled by the grip the water
-                        // leaves (a steady turn's speed goes as the root of the friction).
+                        // No faster than is comfortable (DriverSteering.ComfortTurnSpeed) nor than keeps
+                        // the tyres quiet; wet, a steady turn's speed goes as the root of the grip left.
                         v.CornerSpeed = k => MathF.Min(DriverSteering.ComfortTurnSpeed(k),
                                                        body.SteadyTurnSpeed(k, TyreFriction.SquealOnset) * MathF.Sqrt(body.WetGripShare));
                         v.Driver = new LineFollower(v.Wheels);
@@ -551,8 +483,7 @@ public sealed partial class VehicleSystem
                     world.Get<SoundEmitterComponent>(v.Entity).ServingStop = serving;
                     AudioChanged?.Invoke(v.Entity.Id);
                 }
-                // The same trace a shuttle gets — racers need it more, because a vehicle on a lap
-                // that fails to stop looks identical to one that has no stops declared.
+                // OPENFPS_TRACE_SHUTTLE, as for shuttles: a racer that fails to stop looks like one with no stops.
                 if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } rtrace
                     && v.DisplayName.Contains(rtrace, StringComparison.OrdinalIgnoreCase)
                     && (int)(v.Phase * 2) != (int)((v.Phase - dt) * 2))
@@ -569,15 +500,9 @@ public sealed partial class VehicleSystem
                 continue;
             }
 
-            // Where a shuttle actually is, twice a second, for one vehicle named by a substring:
-            //
-            //   OPENFPS_TRACE_SHUTTLE="Mower, garden 2" ./run-server.sh city
-            //
-            // "The lawnmowers don't move" is a claim about the server that cannot be settled from
-            // the client, where a slow machine on a short line sounds the same standing still as
-            // crawling. Costs nothing unless the variable is set, and it settled that one in three
-            // minutes: the mowers traverse their sixteen metres at 1.1 m/s, turn, wait and come
-            // back, exactly as declared. What was missing was audible MOVEMENT, not movement.
+            // Where a shuttle is, twice a second, for a vehicle named by a substring:
+            // OPENFPS_TRACE_SHUTTLE="Mower, garden 2" ./run-server.sh city. Settles from the server
+            // whether something moves, which the client cannot tell for a slow machine.
             if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } trace
                 && v.DisplayName.Contains(trace, StringComparison.OrdinalIgnoreCase)
                 && (int)(v.Phase * 2) != (int)((v.Phase - dt) * 2))
@@ -709,42 +634,26 @@ public sealed partial class VehicleSystem
     private const float FlareDecel = 0.6f;
 
     /// <summary>
-    /// Whether this leg is an aeroplane landing: one that rolls (its preset has a ground run), on a leg
-    /// that comes down by more than ten metres to within a few metres of the ground plane. A level
-    /// overflight, or a helicopter, keeps the old turn at the end.
+    /// Whether this leg is an aeroplane landing: a preset with a ground run, on a leg that comes down
+    /// by more than ten metres to within a few metres of the ground. Anything else turns at the end.
     /// </summary>
     private static bool Landing(DemoVehicle v)
         => v.Ground != null && v.To.Y < v.From.Y - 10f && v.To.Y < 5f;
 
     /// <summary>
-    /// One tick of a car on a circuit: chase the speed the line allows here, and move that far.
-    ///
-    /// The target is read a BRAKING DISTANCE AHEAD rather than underfoot, because a driver does not
-    /// discover a corner on arriving at it. Looking ahead by v^2/2a — exactly the distance this car
-    /// needs to shed the speed — is what makes it start lifting at the right place, and it is why a
-    /// formula car (which stops in half the distance) stays on the throttle noticeably longer into
-    /// the same turn than the stock car beside it.
+    /// One tick of a vehicle on a line. The target speed is read a braking distance (v^2/2a) ahead,
+    /// so it lifts before a corner as a driver does, and a car that stops shorter lifts later.
     /// </summary>
     private void UpdateRacer(DemoVehicle v, ref Transform t, ref Velocity vel, float dt)
     {
         var line = v.Line!;
 
-        // ── Standing at a stop ─────────────────────────────────────────────────────────────────
-        //
-        // Held STILL, not crawling. Everything a halted vehicle makes is an event read off its own
-        // speed going to zero and staying there — the spring brakes after two and a half seconds,
-        // the doors, the kneel — and a bus that never quite stops never makes any of it. That is
-        // why a city full of buses had no air in it: they were all on racing lines, and a racing
-        // line never stops.
+        // At a stop: held at exactly zero, because the spring brakes, doors and kneel are all read
+        // off the speed reaching zero and staying there.
         if (v.DwellLeft > 0f)
         {
-            // Held at a crossing: it is the CROSSING that lets you go, not a clock.
-            //
-            // Both halves matter. Counting a declared dwell down at a crossing sends the vehicle
-            // over the rails when the timer expires no matter where the train is — traced doing
-            // exactly that, pulling away with the train eighty-seven metres out — and releasing
-            // only on a timer means it also sits there after the train has long gone. So while the
-            // crossing is closed the dwell is topped up, and the instant it opens it is dropped.
+            // At a crossing the crossing releases it, not the dwell: a timer once sent a car over
+            // the rails with the train 87 m out.
             if (v.Stops.Length > 0
                 && string.Equals(v.Stops[v.NextStop].Kind, "crossing", StringComparison.OrdinalIgnoreCase)
                 && _crossings != null)
@@ -774,24 +683,13 @@ public sealed partial class VehicleSystem
         float want = line.SlowestWithin(v.Lap, lookahead);
         // A wet road, and the rain: a little slower than the road allows (StreetLife).
         if (_streetLife.TryGetValue(v.MapId, out var weatherLife)) want *= 1f - RainCaution(v.MapId, weatherLife).Speed;
-        // Steering itself round on its tyres, it has to take the bends the line really makes.
-        // It looks twice its straight-line braking distance ahead, because braking beside cornering
-        // sheds less.
+        // Steered on its tyres, it looks twice its braking distance ahead: braking while cornering sheds less.
         if (v.Driver != null) want = MathF.Min(want, line.BendSpeedWithin(v.Lap, 2f * lookahead, v.CorneringG, v.Brake, v.CornerSpeed,
                                                                          DriverSteering.ComfortSideFriction));
 
-        // ── Coming up on one ───────────────────────────────────────────────────────────────────
-        //
-        // The same braking rule the shuttle uses: the fastest it may be going with this much road
-        // left and this much brake, v = sqrt(2 a s). So it slows the way a vehicle slows rather
-        // than arriving and then stopping, and the deceleration is real — which is what the air
-        // system reads to decide the service brakes have been used.
-        // ── Standing on the brakes ──────────────────────────────────────────────────────────────
-        //
-        // Somebody pulled out, or stepped off the kerb. The driver wants to be doing a lot less, now,
-        // and brakes at close to what the tyres will give — which is what makes them squeal: the
-        // demand below is worked out from the deceleration actually applied, and nothing here asks
-        // for a noise.
+        // Everything it stops for below slows it on v = sqrt(2 a s): the deceleration is real, and the
+        // client's air system reads it as the service brakes.
+        // A hard stop brakes near what the tyres give; the squeal comes from that demand, not from a cue.
         float brake = v.Brake;
         if (v.HardBrakeLeft > 0f)
         {
@@ -800,10 +698,7 @@ public sealed partial class VehicleSystem
             brake = MathF.Max(v.Brake, v.HardBrakeDecel);
         }
 
-        // ── Pulling in to park ─────────────────────────────────────────────────────────────────
-        //
-        // The same v = sqrt(2 a s) as a bus stop, to a kerb beside a door; and over the last few car
-        // lengths it eases across toward the kerb, so it stops out of the lane rather than in it.
+        // Parking: over the last few car lengths it eases across to the kerb, out of the lane.
         if (v.Park is { Phase: ParkPhase.Approach } pk)
         {
             float toPark = pk.Spot.At - v.Lap;
@@ -827,15 +722,11 @@ public sealed partial class VehicleSystem
             if (gone > 18f) { v.KerbShift = 0f; v.Park = null; }
         }
 
-        // ── A junction ─────────────────────────────────────────────────────────────────────────
-        //
-        // Arriving to look if it gives way, and standing at the line if something it must give way
-        // to is too close, or something it would hit is already in the junction. See Junctions.
+        // A junction: slow to look if it gives way, and stand at the line if it must (Junctions).
         var (toHold, look) = JunctionHold(v, dt);
         if (look < float.MaxValue && toHold == float.MaxValue)
         {
-            // Measured on the lane JunctionHold measured it on: the lap may already put a vehicle that is
-            // still short of the line in the junction, and the next lane's length is no distance to it.
+            // On the lane JunctionHold measured: the lap may already put a vehicle short of the line in the junction.
             var (leg, along) = WhereOnLane(v);
             if (along < 0f) ShortOfTheLine(v, ref leg, ref along);
             float toLine = v.Route!.Legs[leg].Segment.LengthMetres - along;
@@ -847,9 +738,8 @@ public sealed partial class VehicleSystem
             if (toHold <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { Halt(v); vel.Linear = Vector3.Zero; return; }
         }
 
-        // ── Somebody on a crossing ahead ───────────────────────────────────────────────────────
-        // Its ordinary braking curve to where it stands, at whatever rate gets it there: past the curve,
-        // a driver who has started stopping brakes harder (see CrosswalkHold).
+        // Somebody on a crossing ahead: past the ordinary curve, a driver who has started stopping
+        // brakes harder (CrosswalkHold).
         float toCrosswalk = CrosswalkHold(v, dt, out float crosswalkBrake);
         if (toCrosswalk < float.MaxValue)
         {
@@ -873,10 +763,8 @@ public sealed partial class VehicleSystem
 
         float wasSpeed = v.Speed;
         float accel = v.Accel;
-        // In a bend on its own tyres, the driver pulls away only with what the cornering leaves of
-        // the comfortable ellipse (see RaceLine.BendSpeedWithin, which plans the braking the same
-        // way). The cornering is what the driver feels: the body's own lateral acceleration,
-        // or the line's where that is more.
+        // In a bend a driver pulls away only with what the cornering leaves of the comfortable
+        // ellipse, as RaceLine.BendSpeedWithin plans the braking.
         if (v.Driver != null)
         {
             float lateral = MathF.Max(v.Speed * v.Speed * MathF.Abs(line.CurvatureAt(v.Lap)), MathF.Abs(v.Wheels!.Ay));
@@ -888,12 +776,8 @@ public sealed partial class VehicleSystem
         else v.Speed = MathF.Max(want, v.Speed - brake * dt);
         Follow(v, wasSpeed, dt);
 
-        // ── On the roads: steered, on its tyres ─────────────────────────────────────────────────
-        //
-        // The speed decided above is what the driver WANTS at the end of this tick. The driver
-        // steers for the lane (and the kerb, pulling in), asks the tyres for that speed, and gets
-        // what they give: the body moves under its tyres and where it ends up is read back against
-        // the line.
+        // On the roads the speed above is only what the driver asks the tyres for: the body moves
+        // under them and where it ends up is read back against the line.
         if (v.Driver != null)
         {
             SurfaceUnder(v);
@@ -912,32 +796,11 @@ public sealed partial class VehicleSystem
             return;
         }
 
-        // What the tyres are being asked for, as a fraction of what they have.
-        //
-        // LATERALLY it is (v / vlimit)^2, and that is not an approximation: the line's limit speed is
-        // the one where lateral acceleration equals the available grip, a = v^2/R either way, so the
-        // ratio of accelerations is the square of the ratio of speeds. Crucially the line's limit
-        // ALREADY has the banking in it, so a car tracking its line comes out at 1.0 rather than at
-        // 1.59.
-        // LONGITUDINALLY it is whatever acceleration or braking is actually being applied against the
-        // same grip. The two combine in quadrature, because a tyre has one contact patch and cornering
-        // and braking come out of the same friction circle.
-        // Against the CORNERING limit, not the speed limit. The speed limit is the top speed on a
-        // straight and whatever the braking pass allows into a turn, so measuring against it would
-        // report a car flat out down the back straight as being at the limit of its grip, and every
-        // car would screech.
-        // AGAINST THE GRIP, not against the line's own limit.
-        //
-        // The line's limit is sqrt(CorneringG * 9.81 * R), so (v / cornerLimit)^2 is the fraction of
-        // the CORNERING number being used — and a vehicle tracking its line is at 1.0 of that by
-        // construction, in every corner, for ever. That is right for a racing line and wrong for a
-        // bus: every vehicle on a city map would screech through every junction.
-        //
-        // What the tyre is actually being asked for is the fraction of its GRIP. The radius drops
-        // out: R = cornerLimit^2 / (CorneringG * g), so the grip-limited speed at the same corner is
-        // cornerLimit * sqrt(Grip / CorneringG), and the fraction of grip used is therefore
-        // (v / cornerLimit)^2 * (CorneringG / Grip). With GripG unset the two are equal, the ratio is
-        // one, and the speedway is unchanged to the bit.
+        // The fraction of the tyres' grip in use: lateral and longitudinal in quadrature (one friction
+        // circle). Lateral is (v / cornerLimit)^2 * (CorneringG / Grip): measured against the cornering
+        // limit (which has the banking in it), not the speed limit, or every car flat out on a straight
+        // would screech; and scaled to the grip, or every bus would screech through every junction.
+        // With GripG unset the scale is one and the speedway is unchanged.
         float cornerShare = v.Grip > 0.01f ? Math.Clamp(v.CorneringG / v.Grip, 0f, 1f) : 1f;
         float latFraction = float.IsInfinity(cornerLimit) || cornerLimit < 0.5f
             ? 0f
@@ -1031,7 +894,6 @@ public sealed partial class VehicleSystem
             body.SetWater(i, water?.WaterMm(body.Wheels[i].Surface, 2f, float.PositiveInfinity, 0f) ?? 0f);
     }
 
-    /// <summary>The wheels as the wire carries them.</summary>
     private static void EncodeWheels(DemoVehicle v)
     {
         var body = v.Wheels!;
@@ -1051,23 +913,16 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>
-    /// Whether a vehicle this slow can be brought to rest in one tick on its own brake. A fixed
-    /// release speed (say 1.2 m/s, set to zero on the spot) is 36 m/s^2 on a 3 m/s^2 bus: a lurch at
-    /// the end of every stop, and the engine is handed that as its target. The approach curve, v = sqrt(2 a s), already brings the speed down to this as it arrives.
+    /// Whether a vehicle this slow can be brought to rest in one tick on its own brake. Not a fixed
+    /// release speed: zeroing 1.2 m/s in a tick is 36 m/s^2, a lurch the engine is handed as its target.
     /// </summary>
     private static bool CanHalt(float speed, float brake, float dt) => speed <= brake * dt + 1e-3f;
 
     /// <summary>
     /// Road left to the next stop this vehicle must actually make, metres, or MaxValue if there is
-    /// none ahead. Sets <see cref="DemoVehicle.NextStop"/> to whichever that is.
-    ///
-    /// It SCANS, every tick, rather than walking a stored index forward. An index advanced only on
-    /// arrival works for one stop and fails for two: a vehicle locked on to a crossing three hundred
-    /// metres ahead drives straight over the one under its wheels, because that one is not the stop
-    /// it is thinking about.
-    ///
-    /// An OPEN crossing is not a stop at all and is skipped here, which is what makes traffic flow
-    /// over it and queue at it without either being a special case further down.
+    /// none ahead. Sets <see cref="DemoVehicle.NextStop"/> to whichever that is. Scans every stop each
+    /// tick: an index advanced on arrival drove over a stop while locked on to one further ahead.
+    /// An open crossing is not a stop.
     /// </summary>
     private float DistanceToNextStop(DemoVehicle v, RaceLine line)
     {
@@ -1080,9 +935,7 @@ public sealed partial class VehicleSystem
             if (d < -1f) d += line.Length;              // it is round the other side
             if (d >= best) continue;
 
-            // The one it has just served, until it is properly clear of it. Without this a
-            // vehicle standing on a stop sees a stop nought metres ahead and serves it again,
-            // for ever.
+            // The one just served, until 25 m clear of it, or it is served again for ever.
             if (i == v.LeftStop)
             {
                 float since = v.Lap - v.LeftAtLap;
@@ -1106,11 +959,8 @@ public sealed partial class VehicleSystem
     private CrossingSystem? _crossings;
 
     /// <summary>
-    /// Hands the road the crossings, so a stop of kind "crossing" can ask whether it is closed.
-    ///
-    /// One direction only, and deliberately: the road reads the crossing, the crossing reads the
-    /// trains, and the trains read nothing. A train does not slow for a level crossing and does not
-    /// need to know one is there.
+    /// Hands the road the crossings, so a stop of kind "crossing" can ask whether it is closed. One
+    /// way only: the road reads the crossing, the crossing reads the trains, the trains read nothing.
     /// </summary>
     public void SetCrossings(CrossingSystem crossings) => _crossings = crossings;
 
@@ -1125,8 +975,7 @@ public sealed partial class VehicleSystem
 
     public int Count => _vehicles.Count;
 
-    /// <summary>What a vehicle is doing right now, for tests: the physics is otherwise only visible
-    /// through where it puts the entity.</summary>
+    /// <summary>What a vehicle is doing right now, for tests.</summary>
     internal readonly record struct Inspection(float Speed, float Lap, int Laps, float DwellLeft, float KerbShift,
                                                float TyreDemand, float LapLength, int NextStop, float Brake, float Accel,
                                                bool OnStreet, string Horn, float Wait,

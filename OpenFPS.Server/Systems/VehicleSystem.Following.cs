@@ -4,11 +4,8 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Keeping a gap to the vehicle in front.
-///
-/// Until 2026-09-27 no vehicle knew any other was there: two cars on the same lane with different
-/// grip caught each other and drove through. Each now keeps a gap by the Intelligent Driver Model
-/// (Treiber, Hennecke and Helbing 2000), whose braking term is
+/// Keeping a gap to the vehicle in front, by the Intelligent Driver Model (Treiber, Hennecke and
+/// Helbing 2000), whose braking term is
 ///
 ///   a_follow = a (1 - (s* / s)^2),   s* = s0 + max(0, v T + v (v - v_lead) / (2 sqrt(a b)))
 ///
@@ -17,8 +14,7 @@ namespace OpenFPS.Server.Systems;
 /// road term of the IDM is the speed the vehicle already chases (the line's limit, the next stop), so
 /// following only ever takes speed away: the vehicle does whichever is slower.
 ///
-/// Only on a map with street life. On the speedway the cars are racing; queueing behind a slower car
-/// would turn every race into a procession.
+/// Only on a map with street life: on the speedway, queueing would turn every race into a procession.
 /// </summary>
 public sealed partial class VehicleSystem
 {
@@ -85,8 +81,7 @@ public sealed partial class VehicleSystem
         float sStar = s0 + MathF.Max(0f, wasSpeed * headway + wasSpeed * (wasSpeed - ahead.Lead.Speed) / (2f * MathF.Sqrt(a * b)));
         float idm = a * (1f - (sStar / s) * (sStar / s));
         float accel = Acc(idm, wasSpeed, ahead.Lead.Speed, ahead.Lead.Wheels?.Ax ?? 0f, s, a, b);
-        // No harder than a driver stamping on the brakes can: the same share of the tyres a staged
-        // hard stop uses, which leaves them turning (a locked wheel is not a thing a driver chooses).
+        // No harder than a staged hard stop, which leaves the wheels turning.
         accel = MathF.Max(accel, -MathF.Max(b, HardBrakeGripFraction * v.Grip * 9.81f));
         float allowed = MathF.Max(0f, wasSpeed + accel * dt);
         if (allowed < v.Speed) v.Speed = allowed;
@@ -145,13 +140,5 @@ public sealed partial class VehicleSystem
         foreach (var v in _vehicles)
             if (v.MapId == mapId && v.Wheels != null)
                 yield return (v.DisplayName, v.Preset, v.Speed, v.Lap, v.TyreDemand, v.Wheels, v.Driver, v.Entity, v.Line, v.CorneringG, v.KerbShift);
-    }
-
-    /// <summary>Tests: every lane's vehicles in order, with their positions round it.</summary>
-    internal IEnumerable<(string Track, float Lane, float Lap, float Length, float LapLength, float Speed)> RacersForTest(string mapId)
-    {
-        foreach (var v in _vehicles)
-            if (v.MapId == mapId && v.Line != null && InLane(v))
-                yield return (v.TrackId, v.LaneOffset, v.Lap, v.LengthMetres, v.Line.Length, v.Speed);
     }
 }

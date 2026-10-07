@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -139,15 +137,6 @@ public sealed class TriangleWorld
     private Dictionary<int, int>? _movers;
 
     internal TriangleWorld WithMoverIndex(Dictionary<int, int> movers) { _movers = movers; return this; }
-
-    /// <summary>Whether an owner is a mover here, and which instance places it.</summary>
-    public bool TryGetMover(int owner, out int instance)
-    {
-        instance = -1;
-        return _movers != null && _movers.TryGetValue(owner, out instance);
-    }
-
-    public int MoverCount => _movers?.Count ?? 0;
 
     /// <summary>
     /// The same world with its movers at the poses <paramref name="poseOf"/> gives (false: leave it where
@@ -642,8 +631,7 @@ public sealed class TriangleWorld
     /// The same, and the floor's outward normal. A floor is a face no steeper than the walkable slope
     /// (<see cref="SolidContact.WalkableCos"/>, 45 degrees): a steeper one is a wall, and a probe that
     /// meets it goes on down past it to whatever is under it, so a body cannot stand on a bank too steep
-    /// to walk and slides down it instead (docs/GEOMETRY.md 3.2). A box's top is level, so on a map of
-    /// boxes this is the probe stage 1 had.
+    /// to walk and slides down it instead (docs/GEOMETRY.md 3.2).
     /// </summary>
     public float Ground<F>(Vector3 pos, float radius, float step, GeometryLayers layers, ref F filter, out SolidRef solid, out int owner,
                            out Vector3 normal) where F : IGeometryFilter

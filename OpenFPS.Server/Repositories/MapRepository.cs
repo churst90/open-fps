@@ -4,12 +4,11 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using System.Security.Cryptography;
-using System.Text;
 using Serilog;
 
 namespace OpenFPS.Server.Repositories;
 
-// Generic ECS Component Container
+/// <summary>One entity in a map file: a prefab placed, with whatever the map sets over it.</summary>
 public class EntityData
 {
     public int EntityId { get; set; }
@@ -21,8 +20,7 @@ public class EntityData
     public int? RegionBId { get; set; }
     public bool? IsIndoor { get; set; }
 
-    /// <summary>What to call this thing. On a region it is the name a player HEARS as they walk into
-    /// it, so it is the difference between a map you can navigate and one you cannot.</summary>
+    /// <summary>What to call this thing. On a region, the name a player hears as they walk into it.</summary>
     public string? Name { get; set; }
     public float? ApertureSize { get; set; }
 
@@ -37,13 +35,13 @@ public class EntityData
     /// Floor, Ceiling, North, South, East, West. Exactly six entries. Overrides whatever the prefab set.</summary>
     public string[]? RoomMaterials { get; set; }
 
-    /// <summary>The same thing as <see cref="RoomMaterials"/> written as raw resonance indices.
-    /// Kept for the maps that already use it; prefer the names, which can be checked at load.</summary>
+    /// <summary><see cref="RoomMaterials"/> as raw resonance indices, for the maps that use it; prefer
+    /// the names, which are checked at load.</summary>
     public int[]? Materials { get; set; }
 
-    /// <summary>Which tile of a tiled map this stands in ("3,-2": TileMetres squares from the map's
-    /// origin, x then z). Written by tools/gen_osm.py so a map can later be streamed by tile without
-    /// being regenerated. The streamer works tiles out from geometry instead (MapTiles).</summary>
+    /// <summary>Which tile of a tiled map this stands in ("3,-2": TileMetres squares from the origin,
+    /// x then z), written by tools/gen_osm.py. The streamer works tiles out from geometry instead
+    /// (MapTiles).</summary>
     public string? Tile { get; set; }
 
     /// <summary>What a generated map's entity is part of ("roads", "zones", "structure", "rooms",
@@ -83,11 +81,9 @@ public class MapData
     public Vector3 MinBound { get; set; } = new Vector3(-50, 0, -50);
     public Vector3 MaxBound { get; set; } = new Vector3(50, 20, 50);
     /// <summary>
-    /// Where a player, and anything a player drives, can go. MinBound and MaxBound are the acoustic
-    /// grid's, and they can be far bigger than the ground: the city's reach a kilometre out and nine
-    /// hundred metres up so that an approaching airliner is inside them. Walking was held to those,
-    /// so you could walk off the edge of the ground and fall. Leave these out and they are the same
-    /// as the bounds.
+    /// Where a player, and anything a player drives, can go; omitted, the bounds. MinBound and MaxBound
+    /// are the acoustic grid's and can be far bigger than the ground (the city's reach a kilometre out
+    /// for the airliners); held to those, you could walk off the edge of the ground.
     /// </summary>
     public Vector3? PlayMin { get; set; }
     public Vector3? PlayMax { get; set; }
@@ -99,10 +95,8 @@ public class MapData
     public float VoxelResolution { get; set; } = 0.5f;
     public float OcclusionFloor { get; set; } = 0.2f;
 
-    // Atmospheric & Physics Overrides.
-    // AirPressure is MILLIBARS, not atmospheres: sea level is 1013.25, not 1. The old default of 1.0
-    // sailed straight into the client's `AirPressure / 1013.25` normalisation and clamped at the floor,
-    // so every map on the server was authored, silently, as near-vacuum. NormalizeAtmosphere now says so.
+    // AirPressure is millibars, not atmospheres: a 1.0 made every map a near-vacuum to the client's air
+    // absorption. NormalizeAtmosphere catches it.
     public float Gravity { get; set; } = PhysicsConstants.Gravity;
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
@@ -159,13 +153,8 @@ public class MapData
     /// <summary>People with names and lives of their own on this map, one of each (CharacterSystem).</summary>
     public List<CharacterData>? Characters { get; set; }
 
-    /// <summary>
-    /// Composites placed on this map — houses, stalls, barricades, anything built out of parts and
-    /// saved. Instantiated at load in the order they appear.
-    ///
-    /// This list is what makes a building PERMANENT. A composite placed at run time and not recorded
-    /// here is a house until the next restart, which is not a house; it is a rehearsal.
-    /// </summary>
+    /// <summary>Composites placed on this map, made at load in this order. A composite placed at run
+    /// time and not recorded here is gone at the next restart.</summary>
     public List<CompositePlacement>? Composites { get; set; }
 
     /// <summary>The map a player lands on when they log in, if no other map claims it. Exactly one
@@ -176,8 +165,7 @@ public class MapData
     /// the owner who may edit it, and the owner whose private maps are listed only to them.</summary>
     public string OwnerId { get; set; } = string.Empty;
 
-    /// <summary>Whether anybody may walk into it. Defaults to true, so that a map authored before
-    /// there was such a question does not vanish from the list by having said nothing.</summary>
+    /// <summary>Whether anybody may walk into it. Defaults to true, so a map that says nothing stays listed.</summary>
     public bool IsPublic { get; set; } = true;
 
     /// <summary>Who the owner has let into a private map (/map invite), by username. Kept, with the
@@ -191,32 +179,21 @@ public class MapData
 }
 
 /// <summary>
-/// A closed circuit: the centreline, as a loop of points a car follows round and round.
-///
-/// It is deliberately just a polyline. An oval, a road course and a figure of eight are the same
-/// object to the code that drives it, and the shape lives in the map where it can be seen and
-/// changed rather than in a track-generator nobody can read. The points are the CENTRELINE; a
-/// vehicle picks its own line by offsetting sideways from it.
-/// </summary>
-/// <summary>
-/// How often, across the whole map, the drivers do the things drivers do. Averages: each is a
-/// random event with this mean interval, so the gaps are irregular the way real ones are, and
-/// which vehicle it happens to is chosen at random too — "every now and again, from different
-/// vehicles", not a timetable. Zero turns one off.
+/// How often, across the whole map, the drivers do the things drivers do: each a random event with this
+/// mean interval, from a vehicle chosen at random, not a timetable. Zero turns one off. Also the
+/// following, giving-way and crossing figures traffic drives by.
 /// </summary>
 public class StreetLifeData
 {
     /// <summary>Somebody somewhere on the map sounds their horn, on average this often, seconds.</summary>
     public float HornEverySeconds { get; set; }
-    /// <summary>Somebody has to stand on the brakes — a car pulling out, a pedestrian — on average
-    /// this often. The tyres squeal because the braking is past what they grip at, not because a
-    /// squeal was asked for; and often the horn follows.</summary>
+    /// <summary>Somebody stands on the brakes, on average this often. The tyres squeal because the
+    /// braking is past their grip, not because a squeal was asked for.</summary>
     public float HardBrakeEverySeconds { get; set; }
     /// <summary>A car pulls in to the kerb near a door, the driver gets out and goes inside, and
     /// later comes back and drives off — on average this often across the map.</summary>
     public float ParkEverySeconds { get; set; }
-    /// <summary>Somebody on foot fires a few rounds, on average this often across the map: so the
-    /// guns are heard now and then, from wherever that person happens to be.</summary>
+    /// <summary>Somebody on foot fires a few rounds, on average this often across the map.</summary>
     public float GunfireEverySeconds { get; set; }
     /// <summary>A car standing empty at the kerb has its alarm go off, on average this often.</summary>
     public float AlarmEverySeconds { get; set; }
@@ -258,14 +235,10 @@ public class StreetLifeData
     /// them, seconds. Drivers always stop for somebody already on the crossing.</summary>
     public float PedestrianAssertSeconds { get; set; } = 8f;
 
-    // ── In the rain ──────────────────────────────────────────────────────────────────────────────
-    //
-    // Drivers on a wet road go a little slower and leave a little more room; in heavy rain, slower
-    // still. Read against the road's water and the rain (RoadWaterSystem): "wet" is the road's texture
-    // full, "heavy" the rain at Rainfall.HeavyRate. FHWA's loop-detector study of three cities (Rakha
-    // et al., FHWA-HOP-07-073, 2007, Table ES.2): free-flow speed 2-3.6 % lower in light rain and 6-9 %
-    // in rain of about 16 mm/h; capacity 10-11 % lower in either, with jam density unchanged, which at
-    // much the same speed is a time headway about 12 % longer. Zero turns either off.
+    // In the rain. "Wet" is the road's texture full of water, "heavy" rain at Rainfall.HeavyRate
+    // (RoadWaterSystem). Rakha et al., FHWA-HOP-07-073 (2007), Table ES.2: free-flow speed 2-3.6 % lower
+    // in light rain and 6-9 % at about 16 mm/h; capacity 10-11 % lower in either with jam density
+    // unchanged, a time headway about 12 % longer. Zero turns either off.
 
     /// <summary>The share of their speed drivers give up on a wet road in light rain.</summary>
     public float WetSpeedReduction { get; set; } = 0.03f;
@@ -281,6 +254,8 @@ public class StreetLifeData
     public float PedestrianRiskSeconds { get; set; } = 30f;
 }
 
+/// <summary>A closed circuit: its centreline as a loop of points. A vehicle picks its own line by
+/// offsetting sideways from it.</summary>
 public class TrackData
 {
     public string Id { get; set; } = string.Empty;
@@ -290,48 +265,30 @@ public class TrackData
     /// <summary>Surface width, metres. Bounds how far a vehicle may pull off the centreline.</summary>
     public float WidthMetres { get; set; } = 15f;
     /// <summary>
-    /// How steeply the turns are banked, degrees. Zero is a flat track.
-    ///
-    /// The racing line needs this and cannot work it out: the waypoints give the centreline's
-    /// elevation, and the bank is the CROSS-slope, which a single line of points does not describe.
-    /// Leaving it at zero on a track whose geometry is banked makes the cars lift for corners they
-    /// could take flat — on the speedway that was three to four semitones of rev drop, twice a lap,
-    /// for every car.
+    /// How steeply the turns are banked, degrees; zero is flat. The racing line cannot work out the
+    /// cross-slope from a line of points. Left at zero on a banked track, the cars lift for corners they
+    /// could take flat: three to four semitones of rev drop twice a lap on the speedway.
     /// </summary>
     public float BankingDegrees { get; set; } = 0f;
 
-    /// <summary>
-    /// Places on this route where a vehicle stops. Empty for a road nobody stops on.
-    ///
-    /// This is the one piece of route description the map had no way to express, and four separate
-    /// things were waiting on it: a bus's air brakes (the spring brakes and the doors only fire
-    /// after a vehicle has been STILL for a couple of seconds, and nothing on a track ever was), a
-    /// train halting at a platform, a vehicle giving way at a junction, and a crossing that knows
-    /// something is coming. One list, and all four fall out of a vehicle that actually stops.
-    /// </summary>
+    /// <summary>Places on this route where a vehicle stops: bus stops, platforms, give-way lines,
+    /// crossings. A bus's air brakes and doors fire only once it has been still a couple of seconds.</summary>
     public List<TrackStopData> Stops { get; set; } = new();
 }
 
 /// <summary>
-/// A place where a road crosses the railway on the level.
-///
-/// Declared as a POINT and nothing else. Which rail line runs through it, which roads run through
-/// it, and how far round each of those the crossing sits are all things the server can work out
-/// from the geometry it already has — and working them out is much safer than writing them down,
-/// because a crossing whose declared offset has drifted from the track it names is a crossing that
-/// rings for nothing and stops nobody.
+/// A place where a road crosses the railway on the level, declared as a point only. Which line and
+/// roads run through it, and where along them, the server works out from the geometry, so a declared
+/// offset cannot drift from the track and ring for nothing.
 /// </summary>
 public class LevelCrossingData
 {
     public string? Name { get; set; }
     /// <summary>Where the rails meet the road.</summary>
     public Vector3 Position { get; set; }
-    /// <summary>
-    /// How far up the line a train starts the sequence, metres. Real crossings are timed rather
-    /// than placed: the circuit is set so the bells ring for a fixed WARNING TIME before arrival —
-    /// twenty seconds in most places — so a fast line needs a longer approach than a slow one. The
-    /// distance is derived from that time and the line's speed limit unless a map overrides it.
-    /// </summary>
+    /// <summary>How long before a train arrives the bells ring, seconds (twenty in most places). The
+    /// approach distance follows from this and the line's speed limit unless <see cref="WarningMetres"/>
+    /// overrides it.</summary>
     public float WarningSeconds { get; set; } = 20f;
     /// <summary>Overrides the derived distance, metres. Zero means work it out from the time.</summary>
     public float WarningMetres { get; set; }
@@ -350,24 +307,16 @@ public class TrackStopData
     /// longer; a junction is a few.</summary>
     public float DwellSeconds { get; set; } = 18f;
     /// <summary>
-    /// What kind of stop it is. Nothing about the SOUND is decided here — the voice makes what the
-    /// vehicle's own parts make when it halts — but it decides whether a bus kneels and opens its
-    /// doors or merely waits at a line.
-    /// </summary>
-    /// <summary>
-    /// What kind of stop it is. Nothing about the SOUND is decided here — the voice makes what the
-    /// vehicle's own parts make when it halts — but it decides how long it waits:
+    /// What kind of stop it is, which decides how long it waits and whether a bus kneels and opens its
+    /// doors; the sound is whatever the vehicle's parts make when it halts.
     ///
-    ///   "bus_stop"  / "platform"  a fixed dwell, for passengers
-    ///   "give_way"                a fixed, short dwell at a junction
-    ///   "crossing"                CONDITIONAL — held only while the crossing is closed, and
-    ///                             driven straight through when it is not. A crossing that stopped
-    ///                             traffic on a timer would be a level crossing that has nothing to
-    ///                             do with the trains.
+    ///   "bus_stop" / "platform"  a fixed dwell, for passengers
+    ///   "give_way"               a fixed, short dwell at a junction
+    ///   "crossing"               held only while the crossing is closed, else driven through
     /// </summary>
     public string Kind { get; set; } = "stop";
-    /// <summary>Only vehicles whose preset contains this stop here. Empty means everything does —
-    /// which is right for a junction and wrong for a bus stop, since a car does not use one.</summary>
+    /// <summary>Only vehicles whose preset contains this stop here. Empty means everything does: right for
+    /// a junction, wrong for a bus stop.</summary>
     public string? ForPreset { get; set; }
 }
 
@@ -430,35 +379,20 @@ public class VehicleData
     public string? Track { get; set; }
     /// <summary>What this car will do on the straight, km/h. Its own limit, not the track's.</summary>
     public float TopSpeedKmh { get; set; }
-    /// <summary>Lateral grip in g. This is what decides corner speed — v = sqrt(g * 9.81 * R) at the
-    /// local radius — and therefore how much a car has to lift and how hard it gets back on the
-    /// throttle, which is the whole sound of a lap. A road car on a flat bend is 0.9; a stock car on
-    /// a banked oval is nearer 2.8 because the banking carries part of the load; a formula car with
-    /// wings is 4 and up.</summary>
+    /// <summary>How hard it corners, g: the corner speed is sqrt(g * 9.81 * R), which is the sound of a
+    /// lap. A road car on a flat bend 0.9, a stock car on a banked oval nearer 2.8, a winged formula car
+    /// 4 and up.</summary>
     public float CorneringG { get; set; }
     /// <summary>
-    /// How much grip the tyres actually HAVE, in g — as distinct from how hard this vehicle chooses
-    /// to corner, which is <see cref="CorneringG"/>. Zero means "the same", which is a racing line.
-    ///
-    /// THE TWO ARE NOT THE SAME THING and treating them as one is audible. The line's corner speed
-    /// is sqrt(CorneringG * 9.81 * R), so a vehicle tracking its own line is by construction at
-    /// exactly 1.0 of CorneringG — and VehicleSystem measures the tyres against that same number, so
-    /// the demand comes out at 1.0 in every corner and the client renders 1.0 as a tyre at its limit.
-    /// For a RACE CAR that is correct and is the point: a racing line is at the limit, and the
-    /// speedway is built on it.
-    ///
-    /// A bus is not. A bus taking a corner at the limit of its grip is a bus on two wheels. Ordinary
-    /// traffic corners at a third of what its tyres could do, which is why a city street is not full
-    /// of screeching — and why every vehicle on the city map screeched until these were separated.
-    ///
-    /// So a city vehicle now says both: CorneringG is the gentle number that picks its speed, GripG
-    /// is the real friction circle everything is measured against. Leaving GripG unset keeps the old
-    /// behaviour exactly, which is what every existing map wants.
+    /// How much grip the tyres have, g, as distinct from how hard it chooses to corner
+    /// (<see cref="CorneringG"/>); zero means the same, which is a racing line. Tyres are measured
+    /// against this: with the two equal every corner is at the limit and squeals, which is right for a
+    /// race car and wrong for traffic, which corners at about a third of its grip. Every vehicle on the
+    /// city screeched until they were separated.
     /// </summary>
     public float GripG { get; set; }
 
-    /// <summary>Where on the lap this car starts, metres along from the first waypoint. Spreading a
-    /// field out is the difference between a race and a convoy.</summary>
+    /// <summary>Where on the lap this car starts, metres along from the first waypoint.</summary>
     public float StartOffsetMetres { get; set; }
     /// <summary>The line this car takes, metres to the RIGHT of the centreline (negative is left,
     /// which on an anticlockwise oval is the inside). Clamped to the track width.</summary>
@@ -508,7 +442,7 @@ public class MapRepository
 
     public MapRepository(string directory)
     {
-        // Path Discovery: Check local, then check OpenFPS.Server/
+        // Found from the repo root or from the server's own folder.
         if (!Directory.Exists(directory) && Directory.Exists(Path.Combine("OpenFPS.Server", directory)))
         {
             _directory = Path.GetFullPath(Path.Combine("OpenFPS.Server", directory));
@@ -522,12 +456,8 @@ public class MapRepository
         Log.Information("MapRepository: Initialized with directory {Path}", _directory);
     }
 
-    /// <summary>
-    /// How a map file is read. One definition, so anything that loads a map — the server at startup,
-    /// a test, a tool — agrees about trailing commas, comments and how a Vector3 is spelled. Maps are
-    /// hand-edited, and a loader that silently disagrees with the one the server uses is a map that
-    /// passes its test and fails in the game.
-    /// </summary>
+    /// <summary>How a map file is read: one definition, so the server, the tests and the tools agree
+    /// about trailing commas, comments and how a Vector3 is spelled.</summary>
     public static JsonSerializerOptions JsonOptions { get; } = BuildOptions();
 
     private static JsonSerializerOptions BuildOptions()
@@ -536,7 +466,7 @@ public class MapRepository
         {
             Converters =
             {
-                new JsonStringEnumConverter(JsonNamingPolicy.CamelCase), // Support both CamelCase and exact matches
+                new JsonStringEnumConverter(JsonNamingPolicy.CamelCase),
                 new OpenFPS.Common.Networking.Vector3Converter(),
                 new OpenFPS.Common.Networking.QuaternionConverter()
             },
@@ -544,7 +474,7 @@ public class MapRepository
             AllowTrailingCommas = true,
             ReadCommentHandling = JsonCommentHandling.Skip
         };
-        // Add a case-insensitive string-to-enum fallback
+        // Exact enum names too, not only camelCase.
         options.Converters.Add(new JsonStringEnumConverter());
         return options;
     }
@@ -561,10 +491,8 @@ public class MapRepository
         var maps = new List<MapData>();
         var options = JsonOptions;
 
-        // The maps that ship with the server, the real places made by tools/gen_osm.py (a folder of
-        // their own, so the tests that load every shipped map do not load a town each), then the ones
-        // players made (/map new), which live in a folder of their own so that a checkout of the
-        // repository never carries anybody's map.
+        // Shipped maps, then real places (places/, so the tests that load every shipped map do not load
+        // a town each), then players' maps (players/, so a checkout never carries anybody's map).
         var files = Directory.GetFiles(_directory, "*.json").ToList();
         if (Directory.Exists(PlacesDirectory)) files.AddRange(Directory.GetFiles(PlacesDirectory, "*.json").OrderBy(f => f, StringComparer.Ordinal));
         if (Directory.Exists(PlayerDirectory)) files.AddRange(Directory.GetFiles(PlayerDirectory, "*.json"));
@@ -592,7 +520,6 @@ public class MapRepository
             }
         }
 
-        // Only create a default map if NO maps exist in the directory at all
         if (maps.Count == 0 && Directory.GetFiles(_directory, "*.json").Length == 0)
         {
             Log.Information("MapRepository: No maps found. Generating fresh default map.");
@@ -604,18 +531,11 @@ public class MapRepository
         return maps;
     }
 
-    /// <summary>
-    /// Checks the map's authored atmosphere against the units the engine actually reads it in, and
-    /// says so out loud when it does not match.
-    ///
-    /// This is the same rule as everywhere else in the loader: a value the engine cannot honour is
-    /// named, not silently absorbed. A map is not rejected for it (that would delete a playable world
-    /// over a number), but the substitution is reported so the number can be fixed at the source.
-    /// </summary>
+    /// <summary>Checks the authored atmosphere against the units the engine reads it in; a value out of
+    /// range is replaced and the replacement logged, not the map rejected.</summary>
     public static void NormalizeAtmosphere(MapData data, string fileName)
     {
-        // Below 300 mb is lower than the summit of Everest (~337 mb) — no map is up there, so a value
-        // this small is an author writing atmospheres (1.0) where the engine reads millibars.
+        // Below the summit of Everest (~337 mb): an author writing atmospheres (1.0) for millibars.
         const float MinPlausibleMb = 300.0f;
         const float MaxPlausibleMb = 1100.0f;
         const float SeaLevelMb = 1013.25f;
@@ -646,14 +566,8 @@ public class MapRepository
         }
     }
 
-    /// <summary>
-    /// Names every key the map file carries that the loader does not understand.
-    ///
-    /// System.Text.Json drops an unrecognised property without a word, so a mistyped field — `Aperture`
-    /// for `ApertureSize`, `Materials` on an entity that is not a region — is a setting that never applies
-    /// and never complains, and the only symptom is that the map sounds wrong. Unlike a prefab, a map
-    /// entity is NOT rejected for it: dropping it would delete a wall. It is reported and loaded.
-    /// </summary>
+    /// <summary>Logs every key the map file carries that the loader does not know: System.Text.Json drops
+    /// them without a word. Unlike a prefab, the entity still loads; dropping it would delete a wall.</summary>
     private static void ReportUnknownFields(string json, string fileName)
     {
         try
@@ -702,9 +616,6 @@ public class MapRepository
     private static readonly HashSet<string> EntityFields = new(
         typeof(EntityData).GetProperties().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The folder the shipped maps are in, as resolved.</summary>
-    public string DirectoryPath => _directory;
-
     /// <summary>Where the world editor keeps each map's edits (docs/WORLD_EDITOR.md section 7). Not read as maps.</summary>
     public string OverlayDirectory => Path.Combine(_directory, "overlays");
 
@@ -745,13 +656,8 @@ public class MapRepository
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
 
-    /// <summary>
-    /// Writes a map back to its own file, exactly as it now stands.
-    ///
-    /// Load-bearing since composites: a building placed at run time is appended to the map's own data
-    /// the moment it is placed, and this is what commits that to disk. Without it a house lasts until
-    /// the next restart, which is not a house, it is a rehearsal.
-    /// </summary>
+    /// <summary>Writes a map back to its own file as it now stands, composites placed at run time
+    /// included.</summary>
     public void Save(MapData map)
     {
         string filePath = PathFor(map);
@@ -765,11 +671,5 @@ public class MapRepository
             }
         });
         File.WriteAllText(filePath, json);
-    }
-
-    public void Delete(string id)
-    {
-        string filePath = Path.Combine(_directory, $"{id}.json");
-        if (File.Exists(filePath)) File.Delete(filePath);
     }
 }

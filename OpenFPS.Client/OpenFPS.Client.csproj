@@ -9,10 +9,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- Lets this Windows-targeted project COMPILE on Linux (it still only RUNS on Windows). Without
-         it the SDK refuses with NETSDK1100, which meant the Windows head could not be compile-checked
-         from the machine the Linux head is developed on — and a shared session class that only one of
-         its two heads can be built against is exactly how the two drifted apart in the first place. -->
+    <!-- Compiles (does not run) on Linux, so the Windows head is checked against the shared session
+         on the machine the Linux head is built on. Without it the SDK refuses with NETSDK1100. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
@@ -37,16 +35,14 @@
     <None Update="ASSETS\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <!-- Native libraries (FMOD + NVDA bridge) live in the repo-root lib/ folder, which is
-         OUTSIDE this project's cone. Items outside the cone must be Include'd with a Link,
-         not Update'd — the previous "..\libs\*.dll" (wrong folder, Update) matched nothing,
-         so the FMOD DLLs never landed next to the exe and the client failed to start. -->
     <!-- The authored machine library. The client assembles a vehicle's engine itself from the name
          the server sends, so it has to know the same machines the server does. Without these every
          car, bus and aircraft has no engine to play. -->
     <None Include="..\OpenFPS.Server\machines\*.json" Link="machines\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Native libraries (FMOD, the NVDA bridge) from the repo-root lib/, outside this project's cone:
+         Include with a Link, not Update, or nothing matches and the client cannot start. -->
     <None Include="..\lib\*.dll" Link="%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

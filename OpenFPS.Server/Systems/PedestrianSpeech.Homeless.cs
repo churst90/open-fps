@@ -1,28 +1,18 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Text.RegularExpressions;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Server.Core;
 
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// A homeless man's lines (Alex, ALEX-2026-10-06.md): what he says, and what makes him say it.
+/// A homeless man's lines (Alex; changes.md, 2026-10-06): he asks people near him for something, thanks
+/// a giver, is bitter at whoever walks past, flares up when bumped or crowded, asks for a ride, argues
+/// with the police, yells at cars, mutters, and tells a story to somebody who stays.
 ///
-/// He asks the people who come near him for money, a cigarette, weed, something stronger, food, or at
-/// night somewhere to sleep; thanks whoever gives him something; is bitter at whoever walks past his
-/// ask; flares up when he is bumped or crowded, and now and then at nothing; asks for a ride when a car
-/// stops beside him or somebody gets into one; argues with the police when a police car is near; yells
-/// at cars that pass close or honk; mutters to himself when nobody is talking to him; and tells one of
-/// his stories to somebody who stands with him a while.
-///
-/// He is a presence, not a loop: never two lines at once, a few seconds' breath after every line,
-/// each person asked once in a while and not every time they pass, and the muttering a minute or two
-/// apart. Everything is said only where a player could hear it.
+/// A presence, not a loop: never two lines at once, a breath after every line, each person asked only
+/// once in a while, and nothing said where no player could hear it.
 /// </summary>
 public sealed partial class PedestrianSpeech
 {
@@ -37,8 +27,7 @@ public sealed partial class PedestrianSpeech
     public const float AskMetres = 4.5f;
     /// <summary>A player is asked again after this long, a passer-by after <see cref="WalkerAskAgainSeconds"/>.</summary>
     public const double PlayerAskAgainSeconds = 120, WalkerAskAgainSeconds = 300;
-    /// <summary>Between asking one passer-by and the next, seconds, at least: a street of people walking
-    /// past is not a queue to be worked through.</summary>
+    /// <summary>The least gap between asking one passer-by and the next, seconds.</summary>
     public const double WalkerAskGapSeconds = 30;
     /// <summary>A breath after every line of his before he starts another of his own accord, seconds.</summary>
     public const double AfterLineSeconds = 3;
@@ -112,10 +101,9 @@ public sealed partial class PedestrianSpeech
     }
 
     /// <summary>
-    /// Whether somebody may say something about a shot or a horn (React). Anybody may; a character only
-    /// about a shot close by, and only when they are not still getting their breath back from their last
-    /// line. A horn is his to yell at in his own words (homeless_cars), and a far shot every half minute
-    /// was half of everything he said.
+    /// Whether somebody may react to a shot or a horn. A character only to a near shot, and not while
+    /// still catching his breath: a horn he yells at in his own words (homeless_cars), and far shots
+    /// were half of everything he said.
     /// </summary>
     private bool MayReact(string mapId, int id, string kind, float metres, double now)
     {
@@ -155,7 +143,7 @@ public sealed partial class PedestrianSpeech
         bool walking = view?.Doing is CharacterSystem.Doing.Walking or CharacterSystem.Doing.Boarding;
         ph.Walking = walking;
 
-        // Everybody who could hear him, in a vehicle or not: a player on the bus with him too.
+        // Players in vehicles too: one on the bus with him hears him.
         var hearers = new List<Vector3>();
         world.Query(new QueryDescription().WithAll<Transform, PlayerComponent>().WithNone<DeadComponent>(),
             (ref Transform t) => hearers.Add(t.Position));
@@ -252,7 +240,6 @@ public sealed partial class PedestrianSpeech
                 if (Line(ph, me, "homeless_cars", cond) is { Length: > 0 } line)
                 { Face(mapId, p, (horn ?? passing)!.Value, line); SayAs(p, me, ph, line, Speech.LoudDb, 0.3f, now, say); return; }
             }
-            // A car standing beside him with somebody getting in or out of it, or a player in it.
             foreach (var (car, carId) in standing)
             {
                 int who = players.Where(q => Apart(q.At, car) < 3f).Select(q => q.Id).FirstOrDefault(-1);
@@ -334,7 +321,6 @@ public sealed partial class PedestrianSpeech
         if (!player)
         {
             ph.NextWalkerAsk = now + WalkerAskGapSeconds * (1 + _rng.NextDouble());
-            // The passer-by may say no, out loud, as they go by.
             if (_people.TryGetValue((mapId, target), out var them) && now >= them.BusyUntil && !OnPhone(them, now)
                 && _rng.NextDouble() < WalkerAnswersChance)
             {
@@ -422,10 +408,7 @@ public sealed partial class PedestrianSpeech
 /// <summary>Which of a homeless man's lines fit when.</summary>
 public static class HomelessLines
 {
-    /// <summary>
-    /// What he asks for, by the draw at this hour and weather: mostly money, then a cigarette, food,
-    /// weed, and rarely something stronger; at night or in the cold and wet, often somewhere to sleep.
-    /// </summary>
+    /// <summary>What he asks for: mostly money; somewhere to sleep only at night or in the cold and wet.</summary>
     public static string AskCategory(SpeechConditions c, Random rng)
     {
         bool shelter = CharacterSystem.Sheltering(c);
@@ -443,8 +426,7 @@ public static class HomelessLines
         return "homeless_money";
     }
 
-    /// <summary>What he says to nobody: muttering mostly, a word about where he needs to sleep when it is
-    /// night or cold, the bus when he is waiting for one, and now and then an outburst.</summary>
+    /// <summary>What he says to nobody, and how loud.</summary>
     public static (string Category, float Db) Idle(SpeechConditions c, bool atBusStop, Random rng)
     {
         double r = rng.NextDouble();
@@ -465,15 +447,13 @@ public static class HomelessLines
     private static readonly Regex Today = new(@"\b(this morning|cold tonight|tonight|today)\b",
                                               RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    /// <summary>Whether a story is true now. Only what it says about today is checked ("this morning",
-    /// "tonight"); the rest of a story is in the past, so "two in the morning" or "Sunday dinner" is
-    /// told at any hour.</summary>
+    /// <summary>Whether a story is true now: only what it says about today ("this morning", "tonight")
+    /// is checked, since the rest of a story is in the past.</summary>
     public static bool StoryTrueNow(string text, SpeechConditions c) => TrueNow(text, c, Today);
 
     /// <summary>
-    /// Whether a line is true now: every word in it about the hour or the weather is. "Somewhere to sleep
-    /// tonight" from the afternoon on; "It's so fucking cold" when it is; "Not today", "one morning",
-    /// "every night" and "a hot dog" at any time, because they are not about now.
+    /// Whether every word in a line about the hour or the weather is true now. Phrases that are not about
+    /// now ("not today", "every night", "a hot dog") are struck out first.
     /// </summary>
     public static bool TrueNow(string text, SpeechConditions c) => TrueNow(text, c, Words);
 

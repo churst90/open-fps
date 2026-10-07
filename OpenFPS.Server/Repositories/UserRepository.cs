@@ -8,9 +8,7 @@ public class UserData
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.Player;
 
-    // What the server knows about the account beyond the credential. Null where it was never recorded:
-    // an account made before 2026-10-02 has no creation time, and one that has never logged in since
-    // has no last login.
+    // Null where never recorded: an account made before 2026-10-02 has no creation time.
     public DateTime? CreatedUtc { get; set; }
     public DateTime? LastLoginUtc { get; set; }
     public string? LastLoginAddress { get; set; }

@@ -8,12 +8,11 @@ namespace OpenFPS.Server.Core;
 /// as you have one, it takes you to a place, a player or a point, as often as you like (Cody,
 /// 2026-10-05: unlimited uses; obtaining one is the hard part).
 ///
-/// What it does is three sound EVENTS and a move, in this order: it charges where you stand for
-/// <see cref="ChargeSeconds"/>, then you go — heard leaving where you were and arriving where you land.
-/// The server only says that each happened and where; the client renders them (the event names are
-/// agreed with it, and are the SynthKey and label of each). Docs/PLAN_2026-10-05.md section 2 has the
-/// physics they stand for: a capacitor charging, about 75 litres of air rushing in where a body was,
-/// and the same volume pushed out where it appears.
+/// Three sound events and a move, in this order: it charges where you stand for
+/// <see cref="ChargeSeconds"/>, then you are heard leaving where you were and arriving where you land.
+/// The server says only that each happened and where; the client renders them (the event names are
+/// the SynthKey and label of each). The physics is in docs/PLAN_2026-10-05.md section 2: a capacitor
+/// charging, about 75 litres of air rushing in where a body was, and the same pushed out where it lands.
 ///
 /// Nothing cancels a charge: moving or being hurt during it does not stop the teleport.
 /// </summary>

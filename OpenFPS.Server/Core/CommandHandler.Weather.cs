@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Common;
@@ -11,7 +9,7 @@ namespace OpenFPS.Server.Core;
 
 /// <summary>
 /// /weather: what the weather is, and setting it for testing. The weather is the whole server's, so
-/// setting it is a staff command (Permissions: developers and administrators).
+/// setting it is a staff command (Permissions).
 ///
 ///     /weather                        the weather and the wind now
 ///     /weather clear|rain|snow|storm  that front, held until /weather auto
@@ -19,14 +17,14 @@ namespace OpenFPS.Server.Core;
 ///     /weather wind 8 northwest       the wind, held; a direction and steady/gusty/very gusty optional
 ///     /weather auto                   back to fronts rolling in on their own
 ///
-/// The answer is read out by a screen reader, so it is one short plain sentence or two.
+/// The answer is one or two short plain sentences: a screen reader reads it.
 /// </summary>
 public partial class CommandHandler
 {
     private const string WeatherUsage =
         "Usage: /weather, /weather clear, rain, snow or storm, /weather drizzle, /weather rain light, moderate, heavy or extreme, or a rate in millimetres an hour, or dBZ, and drops then a size, /weather freezing rain, /weather sleet, /weather snow light, moderate or heavy, /weather hail pea, marble, quarter, golf or baseball, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
 
-    private void HandleWeather(UserSession session, string[] args, Action<IMessage> reply)
+    private void HandleWeather(string[] args, Action<IMessage> reply)
     {
         var env = _server.WorldEnvironment;
         if (args.Length == 0)

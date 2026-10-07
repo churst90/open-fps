@@ -1,13 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Repositories;
-using OpenFPS.Server.Systems;
 using Serilog;
 
 namespace OpenFPS.Server.Core;
@@ -15,27 +11,14 @@ namespace OpenFPS.Server.Core;
 /// <summary>
 /// Picking things up, carrying them, and putting them down.
 ///
-/// An item in your hands is the SAME ENTITY as one on the ground — which is what
-/// <see cref="InventoryComponent"/> already said it believed, and is the right belief. A rifle you
-/// are carrying has a material, a mass and a position, so dropping it makes the noise that mass and
-/// that material make meeting that floor, through a calculation that already exists and knows
-/// nothing about rifles. Items as rows in a table would need every bit of that inventing again.
+/// A carried item is the same entity as one on the ground, with its material, mass and position, so
+/// dropping it makes the impact sound any other fall does. It hangs off its holder by a
+/// <see cref="ParentComponent"/>, as a wall hangs off a house: rigidly, pointing where you point.
 ///
-/// Carrying is the composite machinery once more: a carried item wears a <see cref="ParentComponent"/>
-/// pointing at its holder, and ParentSystem has carried children with their parent every tick since
-/// long before any of this. A held rifle and a wall in a house are attached the same way, and for
-/// the same reason — unlike an OCCUPANT, a held thing really is rigidly attached, and points where
-/// you point.
-///
-/// Two hands, and something that needs both fills both slots. That constraint is what makes carrying
-/// things a spatial decision made out loud rather than a menu scrolled through.
-///
-/// There are three places a thing can be and only three, and each is one question with one answer:
-/// <see cref="HeldComponent"/> says SOMEBODY HAS IT (so nobody else can lift it off the floor, or
-/// off your back); <see cref="HandsComponent"/> says which of them are in your hands; and
-/// <see cref="InventoryComponent"/> says which are slung on you instead. Nothing is a flag that
-/// some code remembers to check — a stowed rifle is still a rifle at a position in the world, riding
-/// on your back, and if it falls it falls from there.
+/// Two hands; something that needs both fills both slots. <see cref="HeldComponent"/> says somebody
+/// has it (so nobody else can lift it), <see cref="HandsComponent"/> which are in the hands, and
+/// <see cref="InventoryComponent"/> which are slung on the back, where a stowed rifle is still a rifle
+/// at a position in the world.
 /// </summary>
 public class HandsService
 {
@@ -45,13 +28,8 @@ public class HandsService
     public const float Reach = PhysicsConstants.InteractionRange;
 
     /// <summary>
-    /// What a person can carry slung on them, kilograms.
-    ///
-    /// A mass and not a slot count, for the same reason everything else here is physical: two
-    /// rifles and a crowbar is a load, and six torches is not, and a number of pockets cannot tell
-    /// those apart. It also means the limit is one a player can reason about out loud — the /inv
-    /// readout says what it weighs, so "I can't take that as well" is arithmetic they can follow
-    /// rather than a rule they have to learn.
+    /// What a person can carry slung on them, kilograms. A mass, not a slot count: two rifles and a crowbar
+    /// is a load and six torches is not, and /inv says the weight, so the limit is arithmetic a player can follow.
     /// </summary>
     public const float CarryCapacityKg = 25f;
 
@@ -65,14 +43,13 @@ public class HandsService
     public HandsService(MapManager maps) => _maps = maps;
 
     /// <summary>
-    /// Told the id of every item that is picked up or put down, so its definition goes out again: an item
-    /// is a beacon on the ground and not in somebody's hands (EntityDefinitionFactory), and a definition
-    /// is otherwise sent only once. The server wires it to GameServer.SyncAudioComponent.
+    /// Told the id of every item picked up or put down, so its definition goes out again: an item is a
+    /// beacon on the ground and not in somebody's hands (EntityDefinitionFactory). GameServer.SyncAudioComponent.
     /// </summary>
     public Action<int>? Carried { get; set; }
 
     /// <summary>Told when something is taken out of the world here (an emptied bag of belongings), so every
-    /// client is told it has gone. The server wires it to GameServer.BroadcastRemoval.</summary>
+    /// client is told it has gone: GameServer.BroadcastRemoval.</summary>
     public Action<string, int>? Removed { get; set; }
 
     /// <summary>What is in a player's hands, right first. The same entity twice means it fills both.</summary>
@@ -125,23 +102,10 @@ public class HandsService
         return false;
     }
 
-    /// <summary>
-    /// Picks something up.
-    ///
-    /// Refusing tells the player WHAT IS IN THE WAY rather than merely no — a player who cannot see
-    /// their own hands has no other way to find out why a thing will not come, and "your hands are
-    /// full" is an instruction where "you cannot" is a dead end.
-    /// </summary>
     /// <summary>The prefabs a player can carry: what /give can hand out.</summary>
     public IEnumerable<string> GivableItems()
         => _maps.Prefabs.Where(p => p.Value.IsItem || p.Value.Type == EntityType.Item).Select(p => p.Key).OrderBy(k => k);
 
-    /// <summary>
-    /// New items made from a prefab and given to a player (staff /give): into their hands while they have
-    /// a hand free, then onto their back while it takes the weight, and anything left at their feet.
-    /// <paramref name="name"/> is the item's name, <paramref name="placed"/> where they went, for the
-    /// receiver ("1 in both hands, 1 on your back").
-    /// </summary>
     /// <summary>
     /// The item prefab a player means: its id, its name ("AKM", "Glock 17"), or the start of either
     /// when only one item fits ("akm", "glock"). Null when none or more than one does.
@@ -160,6 +124,11 @@ public class HandsService
     /// <summary>The most of one thing a single /give makes.</summary>
     public const int MaxGive = 50;
 
+    /// <summary>
+    /// New items made from a prefab and given to a player (/give): into their hands while one is free, then
+    /// onto their back while it takes the weight, the rest at their feet. <paramref name="name"/> is the
+    /// item's name, <paramref name="placed"/> where they went ("1 in both hands, 1 on your back").
+    /// </summary>
     public bool Give(UserSession to, string prefabId, int count, out string name, out string placed, out string message)
     {
         name = placed = message = "";
@@ -184,8 +153,7 @@ public class HandsService
             if (item == Entity.Null) { message = $"The {prefabId} could not be made."; return false; }
             name = NameOf(world, item);
             Carried?.Invoke(item.Id);
-            // A gun given comes loaded, and its spare magazines go into the receiver's pockets; the
-            // first gun's says so.
+            // A gun given comes loaded and its spares are pocketed; the first gun's line says so.
             string gun = Loaded(world, to.Entity, item);
             if (loaded.Length == 0) loaded = gun;
             if (PutInHands(world, to.Entity, item, out _))
@@ -212,10 +180,6 @@ public class HandsService
         return true;
     }
 
-    /// <summary>
-    /// The interact key's pick-up: the nearest loose item within <paramref name="metres"/>, if there is
-    /// one. False (and nothing said) when there is none, so the key can mean something else.
-    /// </summary>
     /// <summary>What a player is carrying, for the inventory list: hands first, then the back.</summary>
     public InventoryList List(UserSession session)
     {
@@ -239,6 +203,10 @@ public class HandsService
         return new InventoryList { Ids = ids.ToArray(), Labels = labels.ToArray(), Places = places.ToArray() };
     }
 
+    /// <summary>
+    /// The interact key's pick-up: the nearest loose item within <paramref name="metres"/>, if there is
+    /// one. False (and nothing said) when there is none, so the key can mean something else.
+    /// </summary>
     public bool TakeWithin(UserSession session, float metres, out string message)
     {
         message = "";
@@ -251,6 +219,10 @@ public class HandsService
         return true;
     }
 
+    /// <summary>
+    /// Picks something up. A refusal says what is in the way ("your hands are full"): a player who cannot
+    /// see their hands has no other way to find out.
+    /// </summary>
     public bool Take(UserSession session, string named, out string message)
     {
         message = "";
@@ -273,8 +245,7 @@ public class HandsService
 
         if (CombatService.IsAdminGun(world, item.Value) && !session.Can(Permissions.AdminGun))
         { message = "The admin gun is the admin's alone. You leave it where it is."; return false; }
-        // A bag of somebody's belongings is gone through, not carried off whole: what is in it comes out
-        // into your hands, onto your back and into your pockets.
+        // A bag of somebody's belongings is gone through, not carried off whole.
         if (world.Has<BelongingsBag>(item.Value))
         {
             message = Rummage(session, world, lookup, item.Value, name) + AnotherWithinReach(world, from);
@@ -286,8 +257,7 @@ public class HandsService
 
         _maps.RefreshGrid(session.CurrentMapId);
         Carried?.Invoke(item.Value.Id);
-        // A body goes over the shoulder, and the pace that comes with it is said, because a player who
-        // cannot see themselves bent under it would otherwise only find out by walking.
+        // Say the slow pace a body brings, or the player finds out only by walking.
         message = (world.Has<Corpse>(item.Value)
                       ? $"You lift the {name} over your shoulder. It takes both hands, and you can only walk slowly with it."
                       : $"You take the {name} in {WhereItWent(world, session.Entity, item.Value)}{Loaded(world, session.Entity, item.Value)}.")
@@ -296,14 +266,7 @@ public class HandsService
         return true;
     }
 
-    /// <summary>
-    /// Slings what you are holding onto your back, freeing the hand.
-    ///
-    /// The whole point of having a bag at all: two hands is a hard limit and a rifle spends both, so
-    /// without somewhere to put a thing down that is not the ground, carrying a rifle would mean
-    /// carrying nothing else ever. Stowed is not stored — it stays an entity on your back at a
-    /// position, and it comes back to your hands from there.
-    /// </summary>
+    /// <summary>Slings what you are holding onto your back, freeing the hands: a rifle spends both.</summary>
     public bool Stow(UserSession session, string which, out string message)
     {
         message = "";
@@ -333,8 +296,7 @@ public class HandsService
             }
             if (already + mass > CarryCapacityKg)
             {
-                // Refusing says the arithmetic, because the arithmetic is the rule: a player who is
-                // told the numbers can work out what to put down, and one told "too heavy" cannot.
+                // Say the arithmetic: told the numbers, a player can work out what to put down.
                 refused = $"The {NameOf(world, item)} will not go on as well — {already:F1} plus "
                         + $"{mass:F1} is over the {CarryCapacityKg:F0} kilograms you can manage.";
                 continue;
@@ -360,11 +322,7 @@ public class HandsService
         return true;
     }
 
-    /// <summary>
-    /// Takes something off your back and puts it in your hands.
-    ///
-    /// Named, because a bag you cannot see is a bag you address by saying what you want out of it.
-    /// </summary>
+    /// <summary>Takes something off your back, by name or the last thing put there, and into your hands.</summary>
     public bool Draw(UserSession session, string named, out string message)
     {
         message = "";
@@ -374,8 +332,8 @@ public class HandsService
         var carried = Stowed(world, session.Entity, lookup);
         if (carried.Count == 0) { message = "You have nothing on your back."; return false; }
 
-        // An index and not FirstOrDefault: a miss there is default(Entity), id 0, which is not
-        // Entity.Null (id -1) but a real entity, the first one the map spawned.
+        // An index, not FirstOrDefault: a miss there is default(Entity), id 0, a real entity, not
+        // Entity.Null (id -1).
         int found = string.IsNullOrEmpty(named)
             ? carried.Count - 1                               // the last thing you put there
             : carried.FindIndex(e => Matches(world, e, named));
@@ -388,7 +346,7 @@ public class HandsService
 
         Bag(world, session.Entity).Remove(item.Id);
         _maps.RefreshGrid(session.CurrentMapId);
-        // A gun is DRAWN, and what matters about it the moment it is in your hands is what is in it.
+        // A gun drawn says what is in it.
         message = Arms.IsWeapon(world, item, out var weapon)
             ? $"You draw the {NameOf(world, item)}, {Arms.RoundsWords(weapon, Arms.Ammo(world, item, weapon).Rounds)}."
             : $"You take the {NameOf(world, item)} off your back, into {WhereItWent(world, session.Entity, item)}.";
@@ -396,13 +354,8 @@ public class HandsService
     }
 
     /// <summary>
-    /// Puts something down, and it lands.
-    ///
-    /// The landing is the interesting half and it costs nothing: a dropped thing has a mass and a
-    /// material and the ground has a material, which is the whole input to the impact calculation
-    /// everything else already uses. A dropped steel bar and a dropped cushion are as different as
-    /// they should be, with nobody having recorded either. It falls from wherever it actually was —
-    /// a hand at chest height, or a back — so the height is read off the world rather than assumed.
+    /// Puts something down, and it lands: the impact from its mass and material, the floor's material and
+    /// the height it fell from, read off the world (a hand at chest height, or a back).
     /// </summary>
     public bool Drop(UserSession session, string which, out string message,
                      Action<int, string, IReadOnlyList<TransientSound>>? heard = null)
@@ -416,8 +369,7 @@ public class HandsService
         bool all = which.Equals("all", StringComparison.OrdinalIgnoreCase);
         var dropping = InHands(world, session.Entity, lookup, all ? "all" : which);
 
-        // A name, or "all", also reaches what is slung on your back: a thing you are carrying is a
-        // thing you can put down, and making a player draw it first to drop it is ceremony.
+        // A name, or "all", also reaches what is slung on your back: no drawing it first to drop it.
         if (all || (dropping.Count == 0 && !string.IsNullOrEmpty(which) && !IsHandWord(which)))
             foreach (var stowed in Stowed(world, session.Entity, lookup))
                 if (all || Matches(world, stowed, which))
@@ -446,11 +398,10 @@ public class HandsService
             if (world.Has<HeldComponent>(item)) world.Remove<HeldComponent>(item);
             if (world.Has<ParentComponent>(item)) world.Remove<ParentComponent>(item);
 
-            // At your feet, just in front, on whatever the floor turns out to be.
             var landing = at + forward * 0.6f;
             float ground = PhysicsUtils.GetGroundHeight(world, grid, landing, out string floor);
-            // No floor found under that point is "-1000", and the item went a kilometre under the map,
-            // out of reach and out of every beacon's range. It lands where you are standing instead.
+            // No floor under that point is -1000, which sent the item a kilometre under the map; it
+            // lands where you stand instead.
             if (ground < -900f) { ground = at.Y; floor = ""; }
             landing.Y = ground;
 
@@ -461,14 +412,12 @@ public class HandsService
 
             if (heard != null && world.Has<Corpse>(item))
             {
-                // A body is not dropped from the shoulder but set down: the legs and then the trunk, from
-                // a few hand-widths, onto whatever the floor is.
+                // A body is set down, not dropped: the legs and then the trunk, from a few hand-widths.
                 heard(item.Id, "a body set down", CombatService.BodyFall(world, grid, landing, lowered: true));
             }
             else if (heard != null && world.Has<ItemComponent>(item))
             {
-                // It falls from where it was — a hand, or a back — so it arrives at sqrt(2gh), the
-                // same arithmetic that tells a listener which floor a window was on.
+                // It arrives at sqrt(2gh) from where it was held.
                 float fell = MathF.Max(0.05f, from - ground);
                 float speed = MathF.Sqrt(2f * PhysicsConstants.Gravity * fell);
                 float mass = MassOf(world, item);
@@ -488,11 +437,8 @@ public class HandsService
     }
 
     /// <summary>
-    /// Everything a player has on them, hands first, in words.
-    ///
-    /// This is the whole inventory screen, and it is a sentence rather than a grid because that is
-    /// what a screen reader can take in at a go. Hands come first because hands are the part with a
-    /// hard limit, and the weight comes last because the weight is the other limit.
+    /// Everything a player has on them, in a sentence: hands first (their limit is two), the weight last
+    /// (the other limit), then spare ammunition.
     /// </summary>
     public string Readout(UserSession session)
     {
@@ -631,7 +577,7 @@ public class HandsService
             }
             else
             {
-                // Made only to be weighed: back into the bag's list, out of the world before anybody hears of it.
+                // Made only to be weighed: out of the world again before anybody hears of it.
                 _maps.DestroyEntity(session.CurrentMapId, item);
                 left.Add(saved);
                 stays.Add(name);
@@ -808,17 +754,15 @@ public class HandsService
         return made;
     }
 
-    // ── The mechanics the four commands share ───────────────────────────────────────────────────
+    // ── Shared mechanics ────────────────────────────────────────────────────────────────────────
 
     private bool TryGetHolder(UserSession session, out World world, out SpatialGrid<Entity> grid,
                               out Dictionary<int, Entity> lookup)
         => _maps.TryGetMap(session.CurrentMapId, out world, out _, out grid, out lookup);
 
     /// <summary>
-    /// Fills a hand, or says which hand is in the way.
-    ///
-    /// Something needing both hands is recorded in BOTH slots — the same entity id twice — so that
-    /// "have I a hand free" stays one question with one answer.
+    /// Fills a hand, or says which hand is in the way. Something needing both hands is recorded in both
+    /// slots, the same id twice, so "have I a hand free" stays one question.
     /// </summary>
     private static bool PutInHands(World world, Entity player, Entity item, out string why)
     {
@@ -843,11 +787,8 @@ public class HandsService
     }
 
     /// <summary>
-    /// Hangs an item off its holder at an offset, and puts it there now rather than next tick.
-    ///
-    /// Now rather than next tick because the spatial grid is rebuilt immediately after, and a thing
-    /// indexed at the place it was lying on the floor is a thing other players can still trip over
-    /// while you walk away with it.
+    /// Hangs an item off its holder at an offset, and puts it there now, not next tick: the grid is rebuilt
+    /// straight after, and an item indexed where it lay can still be tripped over as you walk away.
     /// </summary>
     private static void Attach(World world, Entity player, Entity item, Vector3 offset, bool bothHands)
     {
@@ -858,7 +799,7 @@ public class HandsService
             LocalPosition = offset,
             LocalRotation = Quaternion.Identity,
         });
-        // A thing being carried moves, so the grid has to treat it as something that moves.
+        // Carried, it moves, so the grid must file it as a mover.
         if (!world.Has<Velocity>(item)) world.Add(item, new Velocity());
 
         var holder = world.Get<Transform>(player);
@@ -950,12 +891,8 @@ public class HandsService
     }
 
     /// <summary>
-    /// "a torch", "an AKM".
-    ///
-    /// Worth the four lines because every one of these sentences is SPOKEN, and a screen reader
-    /// reads "a AKM" exactly as written — a stumble in the middle of the one line telling a player
-    /// what they are carrying. The rule is the sound of the first letter, which is right for an
-    /// initialism read letter by letter as well as for an ordinary word.
+    /// "a torch", "an AKM": by the first letter, which suits an initialism read letter by letter too. A
+    /// screen reader reads "a AKM" exactly as written.
     /// </summary>
     private static string WithArticle(string name)
         => string.IsNullOrEmpty(name) ? "a thing"

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using Arch.Core;
 using OpenFPS.Common;
@@ -7,15 +6,10 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// A driven vehicle's horn and siren switches.
-///
-/// The horn sounds while the driver's horn key is down: every input packet says whether it is
-/// (<see cref="OpenFPS.Common.Networking.ClientInputUpdate.Horn"/>), so a dropped packet costs one
-/// tick and a driver who goes quiet lets go of it. The siren is a switch: on until it is switched off,
-/// with nobody in the car or not, which is what a real one does.
-///
-/// Every client hears both from the vehicle's state (EntityState.Signals); nothing else is sent.
-/// Kept here rather than on a component because it is a few switches, not something a save carries.
+/// A driven vehicle's horn and siren switches. The horn sounds while every input packet says the key
+/// is down (<see cref="OpenFPS.Common.Networking.ClientInputUpdate.Horn"/>); the siren stays on until
+/// switched off, driver or not. Clients hear both from EntityState.Signals. Not on a component: a save
+/// does not carry them.
 /// </summary>
 public static class VehicleSignals
 {

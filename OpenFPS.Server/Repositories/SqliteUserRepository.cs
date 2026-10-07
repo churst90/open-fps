@@ -7,14 +7,11 @@ using Serilog;
 namespace OpenFPS.Server.Repositories;
 
 /// <summary>
-/// SQLite-backed implementation of <see cref="IUserRepository"/>.
-/// Uses EF Core for safe, transactional credential storage.
-/// Creates a fresh DbContext per operation to avoid threading issues with a shared context.
+/// The accounts, in SQLite through EF Core. A fresh DbContext per operation, because a shared one is
+/// not thread-safe.
 ///
-/// Passwords are bcrypt hashes: a per-password random salt is part of the hash, and the cost is
-/// <see cref="WorkFactor"/> (2^12 rounds unless a test asks for less). BCrypt.Net compares the
-/// computed hash in constant time. A hash made at a lower cost is rehashed at the current one the
-/// next time its owner logs in.
+/// Passwords are salted bcrypt hashes at <see cref="WorkFactor"/>, compared in constant time; a hash
+/// made at a lower cost is rehashed at the current one the next time its owner logs in.
 /// </summary>
 public class SqliteUserRepository : IUserRepository
 {
@@ -44,11 +41,8 @@ public class SqliteUserRepository : IUserRepository
         Log.Information("UserRepository: SQLite database ready.");
     }
 
-    /// <summary>
-    /// The columns added after the first release, with the SQL that adds each to an older table.
-    /// The types are what EF Core would have created them as, so an upgraded table and a new one read
-    /// the same.
-    /// </summary>
+    /// <summary>The columns added after the first release, typed as EF Core would create them, so an
+    /// upgraded table and a new one read the same.</summary>
     private static readonly (string Column, string Definition)[] AddedColumns =
     {
         ("CreatedUtc", "TEXT NULL"),
@@ -65,12 +59,9 @@ public class SqliteUserRepository : IUserRepository
     };
 
     /// <summary>
-    /// Brings a database made by an older server up to the current table.
-    ///
-    /// EnsureCreated makes a new database whole but never touches one that exists, and the VPS has
-    /// accounts in one. Each missing column is added with ALTER TABLE, which keeps every row. Before
-    /// the first change the file is copied beside itself (openfps.db.before-YYYYMMDD-HHMMSS), so an
-    /// upgrade that went wrong can be undone by hand.
+    /// Adds the missing columns to a database an older server made: EnsureCreated never touches one
+    /// that exists. ALTER TABLE keeps every row, and the file is first copied beside itself
+    /// (openfps.db.before-YYYYMMDD-HHMMSS) so a bad upgrade can be undone by hand.
     /// </summary>
     private static void UpgradeSchema(AppDbContext ctx)
     {
@@ -116,10 +107,9 @@ public class SqliteUserRepository : IUserRepository
     }
 
     /// <summary>
-    /// The first run seeds an admin. With OPENFPS_ADMIN_PASSWORD set, that is its password — and on an
-    /// existing database the admin's password is RESET to it, which is the only way to change it
-    /// without a client. A server reachable from the internet must be started with it at least once:
-    /// admin/admin123 is written in this repository for anyone to read.
+    /// Seeds an admin on the first run. With OPENFPS_ADMIN_PASSWORD set, that is its password, and on
+    /// an existing database the admin's password is reset to it. A server reachable from the internet
+    /// must be started with it at least once: admin/admin123 is in this repository for anyone to read.
     /// </summary>
     private void EnsureAdminSeed()
     {
@@ -151,8 +141,7 @@ public class SqliteUserRepository : IUserRepository
 
     public UserData? GetUser(string username)
     {
-        // Folded here, not inside the expression tree: EF has to translate the predicate to SQL and
-        // cannot translate a call into our own code.
+        // Folded here, not in the predicate: EF cannot translate a call into our own code to SQL.
         var key = Normalize(username);
         using var ctx = CreateContext();
         var record = ctx.Users.AsNoTracking()
@@ -200,8 +189,7 @@ public class SqliteUserRepository : IUserRepository
         }
         catch (DbUpdateException)
         {
-            // Two registrations of one name at once: the check above passed for both, and the
-            // primary key refused the second. Same answer as the check.
+            // Two registrations of one name at once: the primary key refused the second.
             Log.Warning("UserRepository: Attempted to register duplicate username '{User}'.", key);
             return false;
         }
@@ -299,10 +287,7 @@ public class SqliteUserRepository : IUserRepository
 
     private AppDbContext CreateContext() => new(_options);
 
-    /// <summary>
-    /// Case-folds a username for storage and lookup. Invariant, not current-culture: under a Turkish
-    /// locale ToLower() maps 'I' to a dotless 'ı', so the same account name would hash to two different
-    /// keys depending on where the server happens to be running.
-    /// </summary>
+    /// <summary>Case-folds a username, invariantly: under a Turkish locale ToLower() maps 'I' to a
+    /// dotless 'ı', and one account would have two keys.</summary>
     private static string Normalize(string username) => username.Trim().ToLowerInvariant();
 }

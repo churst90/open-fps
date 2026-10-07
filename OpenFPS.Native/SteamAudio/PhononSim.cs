@@ -1,15 +1,12 @@
-using System;
 using System.Runtime.InteropServices;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// P/Invoke bindings for the Steam Audio (phonon) SIMULATION API — scene / static mesh / simulator /
-/// source / direct-effect — used to replace the hand-rolled occlusion/reflection/portal layer.
-/// Struct layouts are transcribed verbatim from phonon.h 4.8.1 (the version this libphonon ships as),
-/// so they MUST match the C ABI exactly: a wrong field/order = native memory corruption.
-/// Coordinate system is Steam Audio's: +x right, +y up, -z forward (the game uses +z forward — convert
-/// directions/orientation at the boundary; occlusion is position-only so the spike ignores it).
+/// P/Invoke bindings for the Steam Audio (phonon) simulation API: scene, meshes, simulator, sources,
+/// effects and probes. Struct layouts are transcribed from phonon.h 4.8.1 and must match the C ABI
+/// exactly: a wrong field or order corrupts native memory. Steam Audio is -z forward; every world
+/// coordinate goes through <see cref="World"/>.
 /// </summary>
 internal static partial class Phonon
 {
