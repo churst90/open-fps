@@ -5,10 +5,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A turbo spools as soon as the throttle opens. Reported 2026-09-27 on the compound-turbo pickup:
-/// "when it hits the gas the turbo doesn't spin up right away, the whine stays constant until a
-/// certain point". The spool's target was the LARGER of the idle freewheel and the throttle's share,
-/// and the throttle's share only passed the freewheel at 1,300-1,700 rpm.
+/// A turbo spools as soon as the throttle opens (2026-09-27, compound-turbo pickup: "the whine stays
+/// constant until a certain point"): the spool's target was the larger of the idle freewheel and the
+/// throttle's share, which passed the freewheel only at 1,300-1,700 rpm.
 /// </summary>
 public class TurboSpoolTests
 {
@@ -39,7 +38,7 @@ public class TurboSpoolTests
         _o.WriteLine($"idle spool {idle:F2}");
         foreach (var t in trace) _o.WriteLine($"{t.T:F1}s  {t.Rpm,5:F0} rpm  throttle {t.Throttle:F2}  spool {t.Spool:F2}");
 
-        // Half a second in, with the pedal down, the shaft is on its way up — not still freewheeling.
+        // Half a second in, pedal down, the shaft is on its way up, not still freewheeling.
         var half = trace.First(t => t.T >= 0.5);
         Assert.True(half.Throttle > 0.2f, "the driver did not put the pedal down");
         Assert.True(half.Spool > idle + 0.05f, $"spool {half.Spool:F2} at 0.5 s, idle {idle:F2}: it has not started");

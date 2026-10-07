@@ -6,32 +6,13 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The city's traffic sounds as it did when Cody approved it (2026-10-04 evening, "vehicles sound good").
-///
-/// On 2026-10-05 he heard the vehicles as "too reverby, and they all sound the same", after a day
-/// that merged six changes into the vehicle code (tyres at the device's rate, the bus compressor,
-/// machines built on a base, the exhaust slot, the road air horn, the network trim). Rendered again,
-/// every city vehicle's voice was sample for sample what the approved build (cc1855a8) made, so
-/// nothing in the voice had moved. This holds it there: each vehicle the city runs, driven away from
-/// a stop to 50 km/h and held, measured at a metre in three bands. A change to any of them has to
-/// be made on purpose, by ear, and the table updated with it.
-///
-/// The table is the approved build's own output (the same numbers come out of cc1855a8 and of
-/// 94428d20). Half a decibel either way is room for floating point on another machine, not for a
-/// change anyone would hear.
-///
-/// Changed on purpose on 2026-10-05, when the engine bays were opened up ("the front of the car seems
-/// to be quiet"): the bay is now worked out from its openings and lining (EngineBaySpec) instead of a
-/// flat 0.15 on every car. At this cruise the cars are their tyres and moved by at most 0.4 dB; the
-/// diesel pickup (bay 0.30 to 0.66) gained 1.8 dB below 250 Hz, the step van (0.5 to 0.87) 1.7 / 0.8 /
-/// 1.4 dB, and the mail truck (0.25 to 0.66) 0.4 dB below 250 Hz. The trucks, the bus and the bikes
-/// did not move. This table is that build's output; it waits on Cody's ear like any other change.
-///
-/// What the table also shows: at this cruise the commuter cars (i4_compact, i4_economy, i4_midsize,
-/// i6_street, mail_truck, diesel_i4) measure within half a decibel of each other in every band,
-/// 74.5 / 86.4 / 81.7 dB. Their engines are 11 to 20 dB under their tyres there, and every car has
-/// the same tyre (TyreProfile.SportsOnAsphalt). That is why they sound alike at a cruise; it was so
-/// in the approved build too.
+/// The city's traffic sounds as it did when Cody approved it (2026-10-04, "vehicles sound good"): each
+/// vehicle the city runs, pulled away to 50 km/h and held, measured at a metre in three bands against the
+/// approved build's own output (cc1855a8), within half a decibel. A change is made on purpose, by ear, with
+/// the table. Changed on purpose 2026-10-05 when the engine bays were opened up (EngineBaySpec): the diesel
+/// pickup, step van and mail truck moved up to 1.8 dB, waiting on Cody's ear (changes.md, 2026-10-05).
+/// At this cruise the commuter cars measure within half a decibel of each other in every band: their
+/// engines are 11-20 dB under the one shared tyre (TyreProfile.SportsOnAsphalt).
 /// </summary>
 public class CityFleetVoiceTests
 {

@@ -86,18 +86,16 @@ public class CityZoneTests
     }
 
     /// <summary>
-    /// A flight of stairs and a landing are names, not rooms. Standing in the middle of each one in
-    /// every tower, the client names the flight or the landing — and the server, saying where another
-    /// player is, names the same — while the room for sound is the stairwell (or, at the top of the
-    /// last flight, the roof's stair housing) exactly as it was: no named place is a region in the
-    /// acoustic map, so the shaft's reverberation and its openings are untouched.
+    /// A flight of stairs and a landing are names, not rooms: in every tower the client and the server name the
+    /// flight or landing, while the room for sound is still the stairwell (or the roof's stair housing): no
+    /// named place is an acoustic region.
     /// </summary>
     [Fact]
     public void AFlightAndALandingAreNamesNotRooms()
     {
         var world = City();
         var map = world.AcousticMap!;
-        // The stairs' places: the city has others since (Elm Park's fountain, a garden gate).
+        // The stairs' places only: the city has others (Elm Park's fountain, a garden gate).
         var places = world.MarkerEntityIds.Where(id => OpenFPS.Client.Core.NamedPlaces.Is(world.Entities[id].Definition))
                                           .Where(id => world.Entities[id].Definition.Identity.Name is var n
                                                        && (n.Contains(" stairs, ") || n.Contains(" landing, ")))
@@ -117,8 +115,8 @@ public class CityZoneTests
             var e = world.Entities[id];
             string name = e.Definition.Identity.Name;
             Assert.False(map.Regions.ContainsKey(id), $"'{name}' is a region");
-            // At eye height over the middle of its floor: the bottom of the box is the floor (a
-            // landing) or the floor at the foot (a flight, whose middle tread is half a storey up).
+            // At eye height over the middle of its floor: a landing's floor, or a flight's foot (its middle tread is
+            // half a storey up).
             var size = e.Definition.Collider.Size;
             var floorY = e.Transform.Position.Y - size.Y / 2;
             bool flight = name.Contains(" stairs, ");
@@ -134,11 +132,10 @@ public class CityZoneTests
     }
 
     /// <summary>
-    /// "Sound struggles to come through the door only when loud things pass by" (Cody, 2026-10-02).
-    /// Brandt Court's front door swung open, heard 2.5 m inside: a car 17 m down Main Street on the
-    /// leaf's side and one 18 m up it. The route's legs ended on the door's edge, in the corner between
-    /// the jamb and the leaf hinged on it, so every way round the open leaf was refused and it was
-    /// charged as solid steel: the leaf's side came in at -68 dB in the mids, the other at -18.
+    /// "Sound struggles to come through the door only when loud things pass by" (Cody, 2026-10-02): Brandt
+    /// Court's front door open, heard 2.5 m inside, cars 17 m down and 18 m up Main Street. Route legs ended in
+    /// the corner between jamb and leaf, every way round was refused, and the leaf was charged as solid steel
+    /// (-68 dB in the mids on its side, -18 on the other).
     /// </summary>
     [Fact]
     public void AnOpenFrontDoorLetsTheStreetInFromBothSides()

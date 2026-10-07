@@ -16,12 +16,9 @@ using OpenFPS.Server.Systems;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A gun that holds what it holds, a reload that takes as long as the hands take, a hit that hurts,
-/// a chime for the shooter alone, and keys that do what the moment calls for.
-///
-/// Every server case here runs the real command handler against a real map, with the clock held in
-/// the test's hand: a reload's length is a claim about time, and a test that waited for it would be
-/// a test nobody runs.
+/// A gun holds what it holds, a reload takes as long as the hands take, a hit hurts, a chime is for the
+/// shooter alone, and the keys do what the moment calls for. Server cases run the real command handler
+/// on a real map with the clock in the test's hand.
 /// </summary>
 public class WeaponsTests : IDisposable
 {
@@ -415,11 +412,8 @@ public class WeaponsTests : IDisposable
         public void Quit() { }
     }
 
-    /// <summary>
-    /// A shooting range: the default map, the real command handler and combat service with the
-    /// clock in the test's hand, a shooter facing north in an empty corner and somebody else
-    /// standing off to the side.
-    /// </summary>
+    /// <summary>A shooting range: the default map, the real command handler and combat service with the
+    /// clock in the test's hand, a shooter facing north in an empty corner and somebody off to the side.</summary>
     internal sealed class Range
     {
         public readonly MapManager Maps;

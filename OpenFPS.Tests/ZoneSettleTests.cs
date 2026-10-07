@@ -30,10 +30,9 @@ public class ZoneSettleTests
     }
 
     /// <summary>
-    /// Cody's landing on Brandt Court's roof after a /tp to 100 m (2026-10-04, 05:37:59 to 05:38:03),
-    /// replayed from the client log's zone lines: his position bounced between the roof and up to
-    /// thirteen metres over it, and the zone between the roof's two boxes and none ("sidewalk", from
-    /// the concrete under him). Eighteen lines were said; the roof is said once, when he settles.
+    /// Cody's landing on Brandt Court's roof after a /tp to 100 m (2026-10-04), replayed from the client log:
+    /// the position bounced up to 13 m over the roof and the zone between the roof's two boxes and none.
+    /// Eighteen lines were said; the roof is said once, when he settles.
     /// </summary>
     [Fact]
     public void ABouncingLandingSaysTheRoofOnce()
@@ -101,8 +100,8 @@ public class ZoneSettleTests
         Assert.Single(still.Said);
     }
 
-    /// <summary>A body thrown about — corrected, carried, bouncing — is not settled anywhere while it
-    /// jumps more than a metre an update, however long the zone under it holds.</summary>
+    /// <summary>A body thrown about (corrected, carried, bouncing) is not settled while it jumps more than a
+    /// metre an update, however long the zone under it holds.</summary>
     [Fact]
     public void AJumpingBodyIsNotSettled()
     {

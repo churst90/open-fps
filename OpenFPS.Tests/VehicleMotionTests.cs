@@ -11,12 +11,9 @@ using EntityData = OpenFPS.Server.Repositories.EntityData;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// How a vehicle on a route moves: the physics under the city's traffic, one vehicle at a time on a
-/// map made for the test. The city tests show that things happen — a bus stops, a car waits at a
-/// crossing. These pin HOW: the corner speed the friction circle allows, braking along
-/// v = sqrt(2 a s) and never harder than the vehicle's brake, stopping where the map says for as long
-/// as it says, counting laps, and what a hard stop asks of the tyres.
-/// Written for the survivors of the 2026-09-24 mutation run over VehicleSystem.
+/// How a vehicle on a route moves, one at a time on a map made for the test: the corner speed the friction
+/// circle allows, braking along v = sqrt(2 a s) no harder than its brake, stops and dwells, laps, and what a
+/// hard stop asks of the tyres. Written for the survivors of the 2026-09-24 mutation run over VehicleSystem.
 /// </summary>
 public class VehicleMotionTests : IDisposable
 {
@@ -128,11 +125,8 @@ public class VehicleMotionTests : IDisposable
 
     // ── Cornering ─────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Round a constant bend a car settles at the speed its cornering number allows,
-    /// sqrt(mu * 9.81 * R), and that is 1.0 of its cornering and 1.0 of its tyres when the map gives
-    /// no separate grip.
-    /// </summary>
+    /// <summary>Round a constant bend a car settles at sqrt(mu * 9.81 * R), using all of its cornering and
+    /// all of its tyres when the map gives no separate grip.</summary>
     [Fact]
     public void RoundABendACarHoldsTheSpeedItsCorneringAllows()
     {
@@ -144,8 +138,8 @@ public class VehicleMotionTests : IDisposable
         Assert.InRange(s.TyreDemand, 0.9f, 1.05f);
     }
 
-    /// <summary>...and a car with more grip than it corners on uses only that share of its tyres —
-    /// the rule that stopped every vehicle on the city screeching through every junction.</summary>
+    /// <summary>A car with more grip than it corners on uses only that share of its tyres: the rule that
+    /// stopped every city vehicle screeching through every junction.</summary>
     [Fact]
     public void GripAboveTheCorneringNumberIsHeadroom()
     {
@@ -168,10 +162,8 @@ public class VehicleMotionTests : IDisposable
         Assert.InRange(rig.State.TyreDemand, share * share * 0.9f, share * share * 1.1f);
     }
 
-    /// <summary>
-    /// Into a bend off a straight it has ALREADY slowed to the corner's speed on arrival, having
-    /// braked no harder than its brake: it reads the line a braking distance ahead, v^2/2a.
-    /// </summary>
+    /// <summary>Into a bend off a straight it has already slowed to the corner's speed, braking no harder
+    /// than its brake: it reads the line a braking distance (v^2/2a) ahead.</summary>
     [Fact]
     public void ItBrakesForABendBeforeReachingIt()
     {
@@ -216,11 +208,8 @@ public class VehicleMotionTests : IDisposable
 
     // ── Stops ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// It stops where the map says, stands still for the dwell, and comes into it on the brakes by
-    /// v = sqrt(2 a s): late enough that it is still near that curve twenty metres out, and never
-    /// harder than its brake.
-    /// </summary>
+    /// <summary>It stops where the map says, stands for the dwell, and brakes in by v = sqrt(2 a s): still
+    /// near that curve twenty metres out, and never harder than its brake.</summary>
     [Fact]
     public void AStopIsMadeWhereAndForAsLongAsTheMapSays()
     {
@@ -305,7 +294,7 @@ public class VehicleMotionTests : IDisposable
         var rig = Build(Circle(60f), Car(accel: 0f, brake: 0f, corneringG: 0.5f, gripG: 0f));
         Assert.Equal(5.5f, rig.State.Brake);
         Assert.Equal(3.2f, rig.State.Accel);
-        // It starts AT speed — a lap in progress, not a standing start.
+        // It starts at speed: a lap in progress, not a standing start.
         Assert.InRange(rig.State.Speed, MathF.Sqrt(0.5f * 9.81f * 60f) * 0.95f, MathF.Sqrt(0.5f * 9.81f * 60f) * 1.02f);
     }
 
@@ -326,10 +315,8 @@ public class VehicleMotionTests : IDisposable
 
     // ── Standing on the brakes ────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A hard stop sheds speed at 0.92 of what the tyres grip, down to the speed asked for, and the
-    /// tyres report being worked near their limit while it does.
-    /// </summary>
+    /// <summary>A hard stop sheds speed at 0.92 of the tyres' grip down to the speed asked for, with the
+    /// tyres reported near their limit meanwhile.</summary>
     [Fact]
     public void AHardStopBrakesAtWhatTheTyresGive()
     {
@@ -353,7 +340,7 @@ public class VehicleMotionTests : IDisposable
         Assert.InRange(lowest, 2.9f, 3.3f);
         Assert.InRange(worstDemand, 0.85f, 1.0f);
         Assert.False(rig.Vehicles.BrakeHard(-12345, 1f));
-        // ...and it is a moment, not a new speed limit: it gets going again.
+        // A moment, not a new speed limit: it gets going again.
         rig.Tick(30 * 12);
         Assert.True(rig.State.Speed > from * 0.9f, $"still at {rig.State.Speed:F1} m/s twelve seconds after a hard stop from {from:F1}");
     }
@@ -361,9 +348,9 @@ public class VehicleMotionTests : IDisposable
     // ── What a preset becomes ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A map names a preset and gets the right kind of thing: a road vehicle, an aircraft, a small
-    /// machine or a person, each with its own voice prefix, size, solidity and description; and a
-    /// preset nobody knows, or a track that is missing or too short, spawns nothing.
+    /// A map names a preset and gets the right kind of thing (road vehicle, aircraft, small machine or person),
+    /// each with its own voice prefix, size, solidity and description; an unknown preset, or a missing or too
+    /// short track, spawns nothing.
     /// </summary>
     [Fact]
     public void APresetBecomesTheRightKindOfThing()
@@ -470,11 +457,8 @@ public class VehicleMotionTests : IDisposable
 
     // ── Shuttles ──────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Out and back along a straight road: up to the pass's speed at its acceleration, braking by
-    /// v = sqrt(2 a s) to stop at the end, turning round over 2.5 s, waiting, and coming back at the
-    /// next speed in its list.
-    /// </summary>
+    /// <summary>A shuttle runs out and back along a straight road: up to speed, braking by v = sqrt(2 a s) to
+    /// stop at the end, turning round over 2.5 s, waiting, and back at the next speed in its list.</summary>
     [Fact]
     public void AShuttleRunsOutTurnsWaitsAndComesBack()
     {
@@ -528,8 +512,7 @@ public class VehicleMotionTests : IDisposable
         float Yaw() { var q = rig.World.Get<Transform>(rig.Entity).Rotation; return MathF.Atan2(2f * (q.W * q.Y), 1f - 2f * q.Y * q.Y); }
         for (int guard = 0; !(rig.State.Speed == 0f && rig.Position.Z > 19.9f); guard++) { Assert.True(guard < 30 * 20); rig.Tick(); }
         Assert.InRange(MathF.Abs(Yaw()), 0f, 0.01f);
-        // A quarter of the way through it has turned less than a quarter: it eases in
-        // (smoothstep, 0.156 of the half-turn at a quarter of the time).
+        // It eases in (smoothstep): 0.156 of the half-turn at a quarter of the time.
         rig.Tick((int)(0.625f / Dt));
         Assert.InRange(MathF.Abs(Yaw()), MathF.PI * 0.12f, MathF.PI * 0.2f);
         rig.Tick((int)(0.625f / Dt));
@@ -565,10 +548,9 @@ public class VehicleMotionTests : IDisposable
     private static readonly StreetLifeData ParkNow = new() { ParkEverySeconds = 0.001f, HornEverySeconds = 0f, HardBrakeEverySeconds = 0f };
 
     /// <summary>
-    /// Somebody parks by a door, goes in, and comes back, in order and on time: brakes to the spot and
-    /// pulls in two metres toward the kerb, key off, the car door, out and round the back of the car
-    /// at a walking pace, the building's door opens, in, shut; later the same the other way, key on,
-    /// and away — easing back out into the lane over eighteen metres.
+    /// Somebody parks by a door, goes in and comes back, in order and on time: pull in two metres toward the
+    /// kerb, key off, car door, round the back at a walking pace, the building's door, in, shut; later the
+    /// same the other way, and ease back into the lane over eighteen metres.
     /// </summary>
     [Fact]
     public void SomebodyParksGoesInAndComesBack()
@@ -668,10 +650,8 @@ public class VehicleMotionTests : IDisposable
         Assert.Equal("", rig.State.Park);
     }
 
-    /// <summary>
-    /// An automatic door opens for the driver as they come up to it, going in and coming out, and
-    /// shuts itself behind them; nobody touches it. A door with a closer is left to its closer.
-    /// </summary>
+    /// <summary>An automatic door opens for the driver coming up to it, either way, and shuts itself; a door
+    /// with a closer is left to its closer.</summary>
     [Theory]
     [InlineData("auto_sliding_door")]
     [InlineData("steel_door")]
@@ -766,9 +746,8 @@ public class VehicleMotionTests : IDisposable
     }
 
     /// <summary>
-    /// "Every now and then have an npc fire a couple round." Somebody walking fires two or three
-    /// rounds at about the declared rate, each the weapon's own synthesis at the cartridge's level —
-    /// and it is the walker who fires, never the traffic.
+    /// "Every now and then have an npc fire a couple round." A walker fires two or three rounds at about the
+    /// declared rate, each the weapon's own synthesis at the cartridge's level; the traffic never fires.
     /// </summary>
     [Fact]
     public void SomebodyWalkingFiresAFewRoundsNowAndThen()
@@ -828,11 +807,8 @@ public class VehicleMotionTests : IDisposable
         Assert.Empty(heard);
     }
 
-    /// <summary>
-    /// A hard stop is chosen from moving traffic, takes it down to between a fifth and two fifths of
-    /// its speed (never under 1.5 m/s), and is answered by a startled honk a moment later about half
-    /// the time.
-    /// </summary>
+    /// <summary>A hard stop is chosen from moving traffic, takes it to a fifth to two fifths of its speed
+    /// (never under 1.5 m/s), and about half the time a startled honk answers it.</summary>
     [Fact]
     public void AHardStopTakesTrafficDownAndIsOftenAnsweredWithTheHorn()
     {

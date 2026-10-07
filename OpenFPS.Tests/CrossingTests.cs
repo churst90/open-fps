@@ -4,13 +4,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A level crossing's bell has to arrive at the client as a well-formed emitter, and that is a
-/// separate question from whether the crossing logic works. It rang correctly on the server for two
-/// rounds while being completely absent on the client — once because the client's physical-voice
-/// lookup did not know a "bell:" id and dropped it, and once because the flag that says it is
-/// ringing lives in the DEFINITION, which is sent once per entity and was never re-sent.
-///
-/// So this checks the thing the client actually receives.
+/// A level crossing's bell arrives at the client as a well-formed emitter. It rang on the server while
+/// absent on the client twice: the client's physical-voice lookup dropped a "bell:" id, and the ringing flag
+/// lived in the definition, sent once per entity.
 /// </summary>
 public class CrossingTests
 {
@@ -28,12 +24,8 @@ public class CrossingTests
             _o.WriteLine($"{c.Name} at {c.Position}, bell '{c.Bell}', clear {c.ClearMetres} m");
     }
 
-    /// <summary>
-    /// A crossing's give-way line is on a road, the crossing is on the rails, and the platforms are
-    /// nowhere near either. A 55 m consist standing at a platform 20 m from a crossing blocks the
-    /// road it is meant to be clear of — which is exactly what happened when the platforms were
-    /// placed at arbitrary fractions of the lap before the crossings existed.
-    /// </summary>
+    /// <summary>A crossing's give-way line is on a road, the crossing on the rails, and the platforms nowhere
+    /// near either: a 55 m consist at a platform 20 m from a crossing blocks the road.</summary>
     [Fact]
     public void PlatformsAreWellClearOfCrossings()
     {
@@ -60,12 +52,8 @@ public class CrossingTests
     }
 
     /// <summary>
-    /// Every synthesised sound id the map or its systems produce is one the CLIENT can price.
-    ///
-    /// The client's LookUpPhysicalLevel returns null for a prefix it does not recognise, and null
-    /// means the emitter is dropped by both the voice ranking and the submit path — silently, and
-    /// identically to a sound that simply never plays. A new kind of source is therefore invisible
-    /// until someone adds a line there, which is what happened to "bell:".
+    /// Every synthesised sound id the map or its systems produce is one the client can price: LookUpPhysicalLevel
+    /// returns null for an unknown prefix and the emitter is dropped silently, as "bell:" was.
     /// </summary>
     [Theory]
     [InlineData("bell:crossing_gong")]
@@ -93,13 +81,8 @@ public class CrossingTests
     {
         string path = System.IO.Path.Combine(AppContext.BaseDirectory, "maps", "city.json");
         if (!System.IO.File.Exists(path)) return null;
-        // The SERVER'S options, not fresh ones.
-        //
-        // System.Text.Json binds PROPERTIES, and Vector3's X, Y and Z are FIELDS — so a map read
-        // with default options comes back with every position at the origin, silently. The first
-        // run of this reported both crossings at <0,0,0> and a platform "0 m" from one of them,
-        // which looked exactly like a map-authoring fault and was a test-harness fault. The server
-        // registers a Vector3Converter; read the file the way the thing under test reads it.
+        // The server's options: System.Text.Json binds properties and Vector3's X, Y and Z are fields, so default
+        // options read every position as the origin, silently. The server registers a Vector3Converter.
         return System.Text.Json.JsonSerializer.Deserialize<OpenFPS.Server.Repositories.MapData>(
             System.IO.File.ReadAllText(path),
             OpenFPS.Server.Repositories.MapRepository.JsonOptions);

@@ -5,10 +5,8 @@ using OpenFPS.Client.AudioEngine.Fmod;
 
 namespace OpenFPS.Tests;
 
-/// <summary>
-/// The engine synthesis, checked against the physics it claims rather than against a recording:
-/// firing patterns, pipe acoustics, and the behaviour of the whole machine on a bench.
-/// </summary>
+/// <summary>The engine synthesis checked against the physics it claims: firing patterns, pipe
+/// acoustics and the whole machine on a bench.</summary>
 public class EngineSynthTests
 {
     private const int Sr = VehicleSynth.SampleRate;   // the bench renders at the mixer's rate
@@ -28,10 +26,8 @@ public class EngineSynthTests
         }
     }
 
-    /// <summary>
-    /// A muffler's case listens to the pressure in its chambers; it must not change what the chambers do. The same
-    /// engine with its case and without it puts out the same wave at the pipe, sample for sample.
-    /// </summary>
+    /// <summary>A muffler's case listens to its chambers and must not change them: with and without the
+    /// case, the same wave at the pipe, sample for sample.</summary>
     [Fact]
     public void AMufflersCaseDoesNotChangeWhatLeavesThePipe()
     {
@@ -126,8 +122,8 @@ public class EngineSynthTests
     [Fact]
     public void WaveLine_Steepening_BringsCrestsForwardAndKeepsTroughsBack()
     {
-        // A slow half-sine of +2 kPa arrives earlier than the same wave at -2 kPa when the line
-        // steepens — crests travel faster than troughs. That is finite-amplitude acoustics.
+        // A +2 kPa half-sine arrives before the same wave at -2 kPa on a steepening line: crests travel
+        // faster than troughs (finite-amplitude acoustics).
         float Centroid(float sign)
         {
             var w = new WaveLine(200);
@@ -173,10 +169,8 @@ public class EngineSynthTests
     [Fact]
     public void ExpansionChamber_AttenuatesAtItsQuarterWave_MostForALargerCan()
     {
-        // Munjal: TL = 10 log(1 + (m - 1/m)^2 sin^2(kL) / 4) — peaks at kL = pi/2, larger for a
-        // larger area ratio m. Built from two junctions and a chamber pipe, fed from a long pipe and
-        // read at the far end of another long pipe, with neither end ever reflecting: what arrives is
-        // the chamber's transmission alone, internal reflections included.
+        // Munjal: TL = 10 log(1 + (m - 1/m)^2 sin^2(kL) / 4), peaking at kL = pi/2, larger for a larger area
+        // ratio m. Neither end reflects, so what arrives is the chamber's transmission alone.
         float Transmission(float m, float hz)
         {
             const float area = 0.003f, L = 0.25f, kelvin = 500f;
@@ -235,10 +229,8 @@ public class EngineSynthTests
             // And it revved.
             float peak = 0f; for (int i = r.OrderStart[2]; i < r.OrderStart[3]; i++) peak = MathF.Max(peak, r.Rpm[i]);
             Assert.True(peak > v.Engine.RedlineRpm * 0.55f, $"{key}: only reached {peak}");
-            // Loud enough to be an engine, and no louder than that kind of engine really is at a
-            // metre. The ceiling has to know about the muffler: a road car with a can on it is 95-115
-            // and anything past about 128 is a bug, but an unsilenced race engine measures 130-140 at
-            // the pipe mouth and capping it at a road car's figure would be asserting the wrong thing.
+            // Loud enough to be an engine and no louder than its kind at a metre: a silenced road car is 95-115
+            // and past about 128 is a bug; an unsilenced race engine measures 130-140 at the pipe mouth.
             bool silenced = v.Engine.Exhaust.Muffler.Kind != MufflerKind.None;
             float ceiling = silenced ? 128f : 142f;
             Assert.True(r.ExhaustDb >= 55f && r.ExhaustDb <= ceiling,
@@ -247,11 +239,8 @@ public class EngineSynthTests
         }
     }
 
-    /// <summary>
-    /// No vehicle changes up above its own engine's redline. The road V10's gearbox said 8,200 rpm on
-    /// an engine that redlines at 6,200, so floored it never changed gear at all and sat at its power
-    /// limit in whatever gear it was in.
-    /// </summary>
+    /// <summary>No vehicle changes up above its own redline (the road V10's gearbox said 8,200 rpm on a
+    /// 6,200 rpm engine, so floored it never changed gear).</summary>
     [Fact]
     public void EveryGearboxChangesUpBelowItsEnginesRedline()
     {
@@ -264,11 +253,9 @@ public class EngineSynthTests
     }
 
     /// <summary>
-    /// Every vehicle, floored from half its redline in first, revs to its own shift point and changes
-    /// up. The drivers — the bench's and the game's — assume the engine can get there. The road V10
-    /// could not (its gearbox changed up above its redline), and the sportbike could not (friction
-    /// set to hide an engine that made torque on a shut throttle capped it at 11,200 of 13,800 rpm).
-    /// Both sat at their power limit in one gear. Twelve seconds of the game's own voice each.
+    /// Every vehicle, floored from half its redline in first, revs to its own shift point and changes up
+    /// (twelve seconds of the game's own voice each). The road V10's gearbox shifted above its redline, and
+    /// the sportbike's friction capped it at 11,200 of 13,800 rpm; both sat at their power limit in one gear.
     /// </summary>
     [Fact]
     public void EveryVehicleFlooredReachesItsShiftPoint()
@@ -304,10 +291,9 @@ public class EngineSynthTests
     }
 
     /// <summary>
-    /// The soft ceiling bends, it does not jump. It used to be tanh past ±0.8 and straight below,
-    /// which stepped from 0.8 to 0.664 at the knee — a click on both edges of every backfire. Swept
-    /// finely from -3 to +3, no step between neighbouring inputs is bigger than the input step, the
-    /// output never goes backwards, and it never reaches its ceiling.
+    /// The soft ceiling bends, it does not jump: swept from -3 to +3, no output step is bigger than the input
+    /// step, it never goes backwards and never reaches its ceiling. A tanh past ±0.8 stepped from 0.8 to
+    /// 0.664 at the knee, a click on both edges of every backfire.
     /// </summary>
     [Fact]
     public void TheSoftCeilingIsContinuousAndMonotonic()
@@ -326,18 +312,9 @@ public class EngineSynthTests
     }
 
     /// <summary>
-    /// Every preset must declare the level it actually measures, and must not peak so far above it
-    /// that the synthesis clips.
-    ///
-    /// This is the test that would have caught the speedway sounding "overloaded, crackling and
-    /// breaking up". VehicleProfile.SourceLevelDb decides two things — where the emitter is placed,
-    /// and what one full-scale sample means inside EngineVoiceState — and the second is unforgiving:
-    /// anything past the reference goes through a tanh. An unsilenced V10 peaks thirteen times over a
-    /// road car's reference, so with one shared number it did not arrive loud, it arrived square.
-    ///
-    /// Both halves are asserted. The declared level has to match the measurement, or placement is
-    /// wrong. And the measured PEAK has to sit inside the headroom, or the waveform is clipped
-    /// however right the declared level is.
+    /// No preset's tailpipe render peaks so far over its full scale that the synthesis clips: what one
+    /// full-scale sample means comes from VehicleProfile.SourceLevelDb, and past it is a tanh (an unsilenced
+    /// V10 on a road car's reference arrived square, the speedway's "overloaded, crackling").
     /// </summary>
     [Fact]
     public void DeclaredSourceLevelMatchesWhatThePresetMeasures()
@@ -352,20 +329,10 @@ public class EngineSynthTests
                 new(DriverAction.Holding, 3.5f, v.Engine.RedlineRpm * 0.85f, 1f),
             }, seed: 5);
 
-            // NOT asserted against the declared level any more, and that is a correction rather
-            // than a relaxation. This render is the TAILPIPE (plus a third of the intake); the
-            // vehicle the game plays is EngineVoiceState, which is that plus the body ringing, the
-            // engine bay, the cooling fan, the tyres and the air system. On a car the two are the
-            // same number to a decibel, because a car IS its exhaust. On a turbocharged bus they
-            // are twelve decibels apart — the turbine has eaten the exhaust and what is left is
-            // the block, the intake and the fan — and declaring the tailpipe figure for the whole
-            // vehicle placed the buses three decibels under their own model. See
-            // DeclaredSourceLevelMatchesTheLiveVoice below, which asserts the thing that matters.
-
-            // Two thresholds, because they mean different things. What the waveform does over and
-            // over (the 99.9th percentile) must fit inside the headroom, or the engine is clipped.
-            // The single largest sample is allowed well past it — that is a backfire, and a tanh
-            // rounding a backfire is a limiter doing its job.
+            // The declared level is asserted on the live voice (DeclaredSourceLevelMatchesTheLiveVoice): this is
+            // the tailpipe plus a third of the intake, which on a turbo bus is 12 dB from the whole vehicle.
+            // The 99.9th percentile must fit the headroom or the engine is squared; the single largest sample is
+            // a backfire, and a tanh rounding it is a limiter doing its job.
             var amps = new List<float>(r.Exhaust.Length - r.OrderStart[2]);
             for (int i = r.OrderStart[2]; i < r.Exhaust.Length; i++)
                 amps.Add(MathF.Abs(r.Exhaust[i] + r.Intake[i] * 0.35f) * r.PascalsPerUnit);
@@ -389,18 +356,9 @@ public class EngineSynthTests
     }
 
     /// <summary>
-    /// What the profile declares is what the GAME'S VOICE measures at one metre — not what an
-    /// offline tailpipe render does.
-    ///
-    /// <see cref="VehicleProfile.SourceLevelDb"/> decides where the emitter is placed AND what one
-    /// full-scale sample means inside the voice, and the two pull in opposite directions: declare a
-    /// vehicle four decibels louder than it really is and its samples come out four decibels
-    /// smaller while its placement gain only comes up by the compressed share of that, so it plays
-    /// about two decibels too quiet. A mis-declaration is never harmless and never cancels.
-    ///
-    /// So this renders <see cref="EngineVoiceState"/> — the object the mixer wraps — at full
-    /// throttle, meters it where the engine is near its redline, and holds it to its declaration.
-    /// Re-measure with <c>--voice-levels</c> and update the preset.
+    /// What the profile declares is what the game's voice (<see cref="EngineVoiceState"/>) measures at a
+    /// metre near the redline at full throttle. The level sets both placement and full scale, which pull
+    /// opposite ways: declared 4 dB loud plays about 2 dB quiet. Re-measure with <c>--voice-levels</c>.
     /// </summary>
     [Fact]
     public void DeclaredSourceLevelMatchesTheLiveVoice()
@@ -444,14 +402,8 @@ public class EngineSynthTests
 
     // ── The live voice: how it starts and how it stops ──────────────────────────────────────────
 
-    /// <summary>
-    /// A voice placed at speed must already BE at that speed, not chase it.
-    ///
-    /// A car entering the listener's voice budget at three hundred kilometres an hour used to start
-    /// from a dead engine and a stopped driveline, and the virtual driver then floored it to catch
-    /// up — an entire spin-up compressed into the eighty milliseconds the speed filter takes. Heard
-    /// once per car per pass, that is the "slight popping as they drive around".
-    /// </summary>
+    /// <summary>A voice placed at speed is already at that speed. One started from a dead engine and
+    /// spun up inside the speed filter's 80 ms: the "slight popping as they drive around".</summary>
     [Fact]
     public void AVoicePlacedAtSpeedStartsAtTheRightRevsRatherThanSpinningUp()
     {
@@ -472,19 +424,9 @@ public class EngineSynthTests
     }
 
     /// <summary>
-    /// The mixer callback must never synthesize and never wait, whatever state the ring is in.
-    ///
-    /// This is the fault that made a map load cut out for seconds, and it is invisible from the
-    /// outside: Consume used to take the producer's lock and, holding it, render whatever the worker
-    /// had not got to yet. The producer held that same lock for a WHOLE top-up — a warm-up plus up
-    /// to seven hundred milliseconds of audio, which at load-time speed is around a hundred and
-    /// seventy-five milliseconds of wall clock — and FMOD's buffer is ninety-three. So the deeper
-    /// the buffer got, the longer the mixer could be frozen by it, which is why every attempt to fix
-    /// this with buffer depth made it worse.
-    ///
-    /// What the callback must do instead is take what is there and ramp out of the rest. The test
-    /// drains the ring dry and asks for another block anyway: it has to come back promptly, and it
-    /// has to come back without the engine having been advanced a single sample.
+    /// The mixer callback never synthesizes and never waits: a drained ring gives back promptly, without the
+    /// engine advancing a sample. The callback rendering under the producer's lock cut map loads out for
+    /// seconds (docs/AUDIO_LOAD_DROPOUTS.md, section 1).
     /// </summary>
     [Fact]
     public void TheMixerNeverSynthesizesAndNeverWaitsOnTheProducer()
@@ -494,8 +436,8 @@ public class EngineSynthTests
         var voice = new EngineVoiceState(v, 48000f, 5) { TargetSpeed = speed };
         voice.PlaceAtSpeed(speed);
 
-        // Cold: not primed, so the block is silence and the crank has not moved. The position still
-        // advances, because the voice keeps wall clock whether or not it has audio to play.
+        // Cold, the block is silence and the crank has not moved, but the position advances: the voice
+        // keeps wall clock whether or not it has audio.
         var buf = new float[512];
         float rpmBefore = voice.Engine.Rpm;
         long playedBefore = voice.Played;
@@ -511,8 +453,7 @@ public class EngineSynthTests
         while (voice.Lead >= buf.Length && blocks < 4096) { voice.Consume(buf); blocks++; }
         Assert.True(blocks > 0, "the producer rendered nothing to consume");
 
-        // Now the ring is short of a block and no producer is running. The call must come back
-        // anyway, without integrating anything itself.
+        // The ring is short of a block and no producer runs: the call returns without integrating.
         rpmBefore = voice.Engine.Rpm;
         int starvesBefore = voice.Starves;
         playedBefore = voice.Played;
@@ -520,24 +461,16 @@ public class EngineSynthTests
 
         Assert.Equal(rpmBefore, voice.Engine.Rpm);
         Assert.True(voice.Starves > starvesBefore, "a starved block was not reported");
-        // Ramped out of the last sample, not stepped off it, and silent by the end of the block.
+        // Ramped out of the last sample, silent by the end of the block.
         Assert.Equal(0f, buf[^1], 6);
-        // And — the part that matters — the voice did not fall behind. A starved block is a GAP.
+        // And it did not fall behind: a starved block is a gap.
         Assert.Equal(playedBefore + buf.Length, voice.Played);
     }
 
     /// <summary>
-    /// A voice that starves must lose audio, never lose TIME.
-    ///
-    /// Taking only the samples that were there and keeping your place is the obvious thing to write,
-    /// and it does not sound like a dropout at all: a voice handed 900 samples of a 1024-sample block
-    /// that keeps its place is playing at 88 % speed — a tone and a half flat — and thirty cars all
-    /// doing it sounds like the whole field winding down together. It also walks each car's sound
-    /// further and further behind where the car actually is, which smears a grid into a wash. Both
-    /// were heard on the speedway, and neither is recognisable as missing audio.
-    ///
-    /// So: starve a voice repeatedly and check that its play position still tracks the number of
-    /// samples the mixer asked for, exactly.
+    /// A starving voice loses audio, never time: its play position tracks the samples asked for exactly.
+    /// Keeping its place plays slow (900 of 1024 samples is 88 %, a tone and a half flat) and walks the car's
+    /// sound behind the car (docs/AUDIO_LOAD_DROPOUTS.md).
     /// </summary>
     [Fact]
     public void AStarvedVoiceLosesAudioButNeverFallsBehindWallClock()
@@ -554,29 +487,21 @@ public class EngineSynthTests
         for (int i = 0; i < blocks; i++)
         {
             voice.Consume(buf);
-            // Top up only occasionally, so most blocks come up short — the load condition.
+            // Top up only occasionally, so most blocks come up short: the load condition.
             if (i % 40 == 0) voice.Produce();
         }
 
         Assert.True(voice.Starves > 0, "the voice was never actually starved, so this proves nothing");
         Assert.Equal(start + (long)blocks * buf.Length, voice.Played);
 
-        // And once the producer is allowed to catch up, the voice is making a sound again rather
-        // than sitting in the hole it dug.
+        // Once the producer catches up, the voice sounds again.
         for (int i = 0; i < 4; i++) voice.Produce();
         voice.Consume(buf);
         Assert.True(Rms(buf) > 1e-4f, "the voice never recovered after starving");
     }
 
-    /// <summary>
-    /// A voice that was fading and then wins its slot back must come BACK.
-    ///
-    /// Fading out is half a mechanism; without the other half a car that loses its slot for a moment
-    /// and immediately regains it keeps its engine, keeps its position, keeps being updated every
-    /// frame — and is silent for the rest of its life. In a field where cars trade places constantly
-    /// that happens to one car after another, so the traffic thins out from the inside while the
-    /// distant pack still circulates. It is a silent failure in the most literal sense.
-    /// </summary>
+    /// <summary>A voice that was fading and wins its slot back comes back. Without it a car that lost its
+    /// slot for a moment stayed silent for good, and the traffic thinned from the inside.</summary>
     [Fact]
     public void AFadingVoiceComesBackWhenItIsWanted()
     {
@@ -590,7 +515,7 @@ public class EngineSynthTests
         float loud = Rms(buf);
         Assert.True(loud > 1e-4f, "the voice was not making a sound to begin with");
 
-        // Start a fade, let it get most of the way down, then change our mind.
+        // Start a fade, let it get most of the way down, then win the slot back.
         voice.TargetEnvelope = 0f;
         for (int i = 0; i < 6; i++) voice.Render(buf);
         Assert.True(Rms(buf) < loud * 0.5f, "the fade did not take hold");
@@ -611,13 +536,8 @@ public class EngineSynthTests
     }
 
     /// <summary>
-    /// Stopping a voice must be a fade, not a cut.
-    ///
-    /// There is no zero-crossing to stop a synthesized engine on — the waveform is wherever the crank
-    /// happens to be — so releasing the voice mid-cycle leaves a step, and a step is a click. On a
-    /// track where cars trade places in the voice budget every few seconds, that is a click every few
-    /// seconds. This asserts the envelope actually reaches silence and that nothing on the way there
-    /// is a bigger jump than the engine itself was already making.
+    /// Stopping a voice is a fade to silence, not a cut: there is no zero crossing to stop an engine on,
+    /// and nothing on the way down may jump further than the engine's own slew.
     /// </summary>
     [Fact]
     public void AVoiceFadesToSilenceWithoutAStepInTheWaveform()
@@ -628,7 +548,7 @@ public class EngineSynthTests
         voice.PlaceAtSpeed(speed);
 
         var buf = new float[512];
-        // Settle, and learn how big a step this engine takes all by itself.
+        // Settle, and learn how big a step this engine takes by itself.
         for (int i = 0; i < 40; i++) voice.Render(buf);
         float natural = 0f;
         float prev = 0f;
@@ -656,11 +576,9 @@ public class EngineSynthTests
     }
 
     /// <summary>
-    /// Two tailpipes are two sources. Dead behind the car the even-firing V10's banks arrive in step
-    /// and cancel at the bank firing rate (order 2.5); a listener round the side hears the two with
-    /// a path difference and the fundamental comes back. Summing the pipes at one point — which is
-    /// what the model did for every engine — gave everyone the centre-line sound: a single partial an
-    /// octave up, heard as a siren.
+    /// Two tailpipes are two sources. Dead behind the even-firing V10 its banks cancel at order 2.5; round
+    /// the side a path difference brings the fundamental back. Summed at one point, every engine had the
+    /// centre-line sound: one partial an octave up, heard as a siren.
     /// </summary>
     [Fact]
     public void TwoTailpipes_HeardOffTheCentreLine_KeepTheBankFundamental()
@@ -676,7 +594,7 @@ public class EngineSynthTests
         // 10 m away: dead behind, and 30 degrees round toward one side.
         var behind = VehicleSynth.Render(v, orders, 7, new System.Numerics.Vector3(0f, 1.2f, -10f));
         var side = VehicleSynth.Render(v, orders, 7, new System.Numerics.Vector3(5f, 1.2f, -8.66f));
-        // And the old bench — no listener at all — must be exactly the centre-line sum.
+        // With no listener, the bench is exactly the centre-line sum.
         var summed = VehicleSynth.Render(v, orders, 7);
 
         float bankOverFiring(VehicleRender r)
@@ -747,13 +665,8 @@ public class EngineSynthTests
                 ExhaustCam = baseE.ExhaustCam with { DurationDegrees = duration },
                 IntakeCam = baseE.IntakeCam with { DurationDegrees = duration - 4f },
             };
-            // With the muffler CASE silenced, because the claim under test is about the camshaft.
-            //
-            // This started failing when the case gained its ring, and for a real reason rather than
-            // a broken one: a can ringing for 220 ms carries energy across an idle cycle of 170 ms,
-            // so it averages neighbouring cycles together and buries exactly the cycle-to-cycle
-            // difference a lopey cam produces. That smoothing is a true property of the exhaust
-            // system and a false reading of the cam, so the cam is measured without it.
+            // With the muffler case silenced: the claim is about the camshaft, and a can ringing 220 ms across a
+            // 170 ms idle cycle averages away the cycle-to-cycle difference a lopey cam makes.
             e = e with { Exhaust = e.Exhaust with {
                 Muffler = e.Exhaust.Muffler with { ShellLevel = 0f } } };
 

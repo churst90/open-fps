@@ -12,11 +12,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The shared connection life of a session, which both heads now take from ClientGameSession: a
-/// dropped connection is said, the world is torn down and the login retried; a retry that never
-/// answers ends on the main menu; the game menu logs out before it leaves; and the map arrives in
-/// batches. Run against a real LiteNetLib server on the loopback, because the events that drive all
-/// of this are LiteNetLib's.
+/// The session's connection life, shared by both heads: a drop is said, the world torn down and the login
+/// retried; a retry that never answers ends on the main menu; the game menu logs out before it leaves; the
+/// map arrives in batches. Against a real LiteNetLib server on the loopback, whose events drive all of it.
 /// </summary>
 public class ConnectionLifecycleTests
 {
@@ -389,11 +387,9 @@ public class MicrophoneResamplerTests
             for (int i = 0; i < chunk; i++, n++) input.Add(MathF.Sin(MathF.Tau * 440f * n / 44100f));
             r.Process(input, outSamples);
         }
-        // 4410 in at 44.1 kHz is 0.1 s: about 4800 out, less the filter's half-length still waiting
-        // for the samples after it.
+        // 4410 in at 44.1 kHz is 0.1 s: about 4800 out, less the filter's half-length still waiting.
         Assert.InRange(outSamples.Count, 4770, 4801);
-        // Each output sample is the tone at its own time (no delay), once the filter is past the
-        // silence it started from.
+        // Each output sample is the tone at its own time (no delay) once past the silence the filter started from.
         for (int k = 32; k < outSamples.Count; k++)
             Assert.InRange(outSamples[k] - MathF.Sin(MathF.Tau * 440f * k / 48000f), -0.005f, 0.005f);
     }

@@ -13,13 +13,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What the city's parts are called, and what a scan says about the place you are standing in.
-///
-/// "I need to hear what I ran into ... something like 'front entrance to x building' or 'west side of
-/// parking garage' or, just 'parking garage' and such. ground doesn't need to be announced, that's
-/// what z is for to know where I'm standing" (Cody, 2026-10-04). The generator named most parts by
-/// their prefab, so a scan on Brandt Court's roof said "Brick Wall", and one in Marlow Tower's
-/// stairwell said "Concrete Floor" twice and the stairwell itself.
+/// What the city's parts are called, and what a scan says where you stand: "something like 'front entrance
+/// to x building' or 'west side of parking garage' ... ground doesn't need to be announced" (Cody,
+/// 2026-10-04). Parts named by prefab made a scan say "Brick Wall" and "Concrete Floor".
 /// </summary>
 public class CityPartNamesTests : IClassFixture<CityPartNamesTests.City>
 {

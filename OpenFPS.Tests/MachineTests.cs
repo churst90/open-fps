@@ -4,27 +4,16 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A machine is a parts list.
-///
-/// The claim being tested is narrow and load-bearing: the vocabulary in <see cref="MachinePart"/> —
-/// a model, a profile, an offset, a handful of numbers — can hold everything the built-in vehicle
-/// library says, so an author writing a machine in JSON is using the same parts the library is made
-/// of rather than a simplified imitation of them. If that is true, taking any preset apart and
-/// putting it back together has to return the same vehicle, field for field.
-///
-/// It is the test that lets the C# factories stop being the only way to describe a car.
+/// A machine is a parts list: <see cref="MachinePart"/>'s vocabulary holds everything the built-in vehicle
+/// library says, so taking any preset apart and putting it back returns the same vehicle, field for field,
+/// and an author writing JSON uses the same parts the library is made of.
 /// </summary>
 public class MachineTests
 {
     public MachineTests() => MachineRegistry.Clear();
 
-    /// <summary>
-    /// Every preset, taken apart into parts and reassembled, is the same vehicle.
-    ///
-    /// Field for field, including the ones nobody would think to check — the panel spans of the
-    /// body, the gear ratios, what the tyres squeal at. A missing field here is not a cosmetic loss:
-    /// it is a car that sounds different depending on whether it came from C# or from a file.
-    /// </summary>
+    /// <summary>Every preset taken apart into parts and reassembled is the same vehicle, field for field: a
+    /// missing field is a car that sounds different from C# and from a file.</summary>
     [Fact]
     public void EveryBuiltInVehicleSurvivesBeingTakenApart()
     {
@@ -36,8 +25,7 @@ public class MachineTests
         }
     }
 
-    /// <summary>...and the same again with the parts list written out to JSON and read back, which
-    /// is the form an author actually sees.</summary>
+    /// <summary>The same again through JSON, the form an author sees.</summary>
     [Fact]
     public void EveryBuiltInVehicleSurvivesARoundTripThroughJson()
     {
@@ -51,12 +39,8 @@ public class MachineTests
     }
 
     /// <summary>
-    /// Every engine in the library has its own name.
-    ///
-    /// Which is what makes a vehicle able to say which engine it is holding. A VehicleProfile keeps
-    /// an EngineProfile, not the key it was built from, and its own EngineKey is the VEHICLE's key —
-    /// the school bus runs a "diesel_bus". The name is the only identity an engine has, and a
-    /// duplicate would silently give two cars each other's engine on export.
+    /// Every engine in the library has its own name: a VehicleProfile keeps an EngineProfile, not the key it
+    /// came from (its EngineKey is the vehicle's), so a duplicate name would swap two cars' engines on export.
     /// </summary>
     [Fact]
     public void EveryEngineHasADistinctName()
@@ -71,12 +55,8 @@ public class MachineTests
         }
     }
 
-    /// <summary>
-    /// A machine written from scratch, in the form the doc proposed: parts, with offsets.
-    ///
-    /// No base, so the parts have to carry the whole car between them. This is the case that proves
-    /// a map author can describe a vehicle that does not exist in C#.
-    /// </summary>
+    /// <summary>A machine written from scratch as parts with offsets and no base: a vehicle that does not
+    /// exist in C#.</summary>
     [Fact]
     public void AMachineCanBeAssembledFromPartsAlone()
     {
@@ -109,19 +89,13 @@ public class MachineTests
         Assert.Equal(VehicleBody.Van.CabinLengthM, v.Body!.CabinLengthM);
         Assert.Equal(new[] { 4.31f, 2.33f, 1.52f, 1.13f }, v.Gearbox.Ratios);
         Assert.Equal(2800f, v.Gearbox.UpshiftRpm);
-        // A setting nobody mentioned keeps the profile's value rather than becoming zero — which is
-        // what lets a definition be short.
+        // A setting nobody mentioned keeps the profile's value rather than becoming zero.
         Assert.Equal(Gearbox.SixSpeedSports.DownshiftRpm, v.Gearbox.DownshiftRpm);
         Assert.Equal(2600f, v.MassKg);
         Assert.Equal(107f, v.SourceLevelDb);
     }
 
-    /// <summary>
-    /// "That bus, but with the silencer taken off" — three lines, and everything else unchanged.
-    ///
-    /// The variation is the common case for an author, and it is the one that was impossible before:
-    /// naming a preset got you the preset, and anything else meant C#.
-    /// </summary>
+    /// <summary>"That bus, but with the silencer taken off": three lines, everything else unchanged.</summary>
     [Fact]
     public void AMachineCanVaryOneThatExists()
     {
@@ -150,8 +124,8 @@ public class MachineTests
         Assert.Equal(bus.Tyres, loud.Tyres);
         Assert.Equal(bus.Body!.PanelSpansM, loud.Body!.PanelSpansM);
         Assert.Equal(bus.SourceLevelDb, loud.SourceLevelDb);
-        // ...including what the parts vocabulary has no word for: it is still a bus, on air brakes,
-        // blowing a bus horn and beeping at its door, with its fan, its clutch and its open bay.
+        // Including what the parts vocabulary has no word for: air brakes, bus horn, door chime, fan, clutch,
+        // open bay.
         Assert.Equal(bus.AirSystem, loud.AirSystem);
         Assert.Equal(VehicleProfile.HornFor(bus), VehicleProfile.HornFor(loud));
         Assert.Equal(bus.DoorChime, loud.DoorChime);
@@ -162,10 +136,9 @@ public class MachineTests
     }
 
     /// <summary>
-    /// Every preset, taken apart and put back together ON ITSELF, is the same vehicle in every field
-    /// there is: a machine starts as its base and its parts change only what they name. Assembled
-    /// from the parts' fields alone, a machine based on a bus lost its air brakes, its horn, its door
-    /// chime, its fan and where its engine was, and a stock car its side exit.
+    /// Every preset rebuilt on itself is the same vehicle in every field: a machine starts as its base and its
+    /// parts change only what they name. Built from the parts alone, a bus lost its air brakes, horn, door
+    /// chime, fan and engine position, and a stock car its side exit.
     /// </summary>
     [Fact]
     public void EveryBuiltInVehicleRebuiltOnItselfIsItself()
@@ -182,11 +155,8 @@ public class MachineTests
         }
     }
 
-    /// <summary>
-    /// The side pipes come out of the side. The worked example in the machines folder puts its pipe
-    /// 0.95 m right of the centreline, and that x was read by nothing: the pipe was on the centreline
-    /// and the car as loud on one side as the other.
-    /// </summary>
+    /// <summary>The side pipes come out of the side: the machines folder's example puts its pipe 0.95 m right
+    /// of the centreline, and once that x was read by nothing.</summary>
     [Fact]
     public void TheSidePipesComeOutOfTheSide()
     {
@@ -245,10 +215,8 @@ public class MachineTests
         }
     }
 
-    /// <summary>
-    /// An authored machine of the same name REPLACES the built-in, and that is how a map swaps a car
-    /// out of the library without editing the library.
-    /// </summary>
+    /// <summary>An authored machine of the same name replaces the built-in: a map swaps a car without editing
+    /// the library.</summary>
     [Fact]
     public void AnAuthoredMachineWinsOverTheBuiltInOfTheSameName()
     {
