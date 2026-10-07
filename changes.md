@@ -28,6 +28,12 @@ Recent work, newest first. `git log` has the rest.
   - Direct keys on Shift while an editor list is open, off by default (`/editorkeys on`); to be tried
     with Orca and NVDA first.
   - Wire: MapSettingsUpdate, union tag 42. Rebuild client and server together.
+- Downpipes no longer flutter (unheard; renders in `inbox/water-smoothing-2026-10-06/round2`). A gutter
+  outlet's gulps and the film striking a downpipe's shoe are heard through the pipe's 5.5 m of air,
+  and its open ends handed a fifth to a third of every splash back every 32 ms up to 6 kHz: the flange
+  left in the downpipe files. Each open end now keeps e^(−(ka)²/2) of what reaches it, as a real pipe's
+  does; the low modes and the level are as they were. The other peaks in the downpipe files (0.3-0.65
+  ms) are the HRTF's own and are in white noise played from the same places. docs/RUNNING_WATER.md 11.1.
 
 ## 2026-10-06
 
