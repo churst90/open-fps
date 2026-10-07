@@ -230,6 +230,8 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Voices that played without an HRTF stage because the pool was empty: panned by FMOD,
     /// not placed by Steam Audio.</summary>
     private int _saPoolMisses, _lastSaPoolMisses;
+    /// <summary>Voices not started because no binaural voice was left (PlaySpatialSound).</summary>
+    private int _refusedForHrtf, _lastRefusedForHrtf;
     // Pooled DSPs that could not be detached and were thrown away. Should stay zero; see Detach.
     private int _failedDetaches, _lastFailedDetaches;
     // Pooled DSPs cut loose from the DSP side because their channel was already recycled: the ordinary
@@ -2338,6 +2340,18 @@ public partial class FmodAudioProvider : IAudioProvider
                 StopSound(emitter.EntityId);
             }
         }
+
+        // No binaural voice left: not started, rather than played without HRTF, flat and in the middle of
+        // the head ("the sound went mono" with a freight on the city: 60-84 voices past the pool). The
+        // budgets see it not playing and give voices up when the pool runs low (ClientAudioSystem,
+        // HrtfLowWater). Your own steps and speech (Essential) still play, and a reflection is refused by
+        // the pool's reserve already.
+        if (_steamAudioEnabled && emitter.Type is EmitterType.EntityAttached or EmitterType.WorldLocked
+            && !emitter.IsReflection && !emitter.Essential && SpatialVoicesFree == 0)
+        {
+            _refusedForHrtf++;
+            return;
+        }
         
         FMOD.ChannelGroup targetGroup = emitter.IsReflection ? _reflectionGroup : default;
         FMOD.Channel channel;
@@ -3161,21 +3175,22 @@ public partial class FmodAudioProvider : IAudioProvider
         int noHrtf = 0;
         foreach (var a in _activeSounds) if (a.SaState == null && !a.IsReflection && a.Channel.hasHandle()) noHrtf++;
 
-        int starves = EngineVoiceState.GlobalStarves;
+        int starves = EngineVoiceState.GlobalStarves + PhysicalVoiceState.GlobalStarves;
         int gen2 = GC.CollectionCount(2);
         double pauseMs = GC.GetTotalPauseDuration().TotalMilliseconds;
         _system.getChannelsPlaying(out int playing, out int real);
         Log.Information("Mixer load: dsp {Dsp:F1}%, update {Update:F1}%, stream {Stream:F1}% — "
                       + "{Engines} engine/echo voice(s) of {Total} active, {Real}/{Playing} real channel(s), "
-                      + "{NoHrtf} direct voice(s) without HRTF ({Misses} new since last, {SaFree} binaural free), {Starve} starve(s), "
+                      + "{NoHrtf} direct voice(s) without HRTF ({Misses} new since last, {SaFree} binaural free, {Refused} refused for want of one), {Starve} starve(s), "
                       + "gc {Gen2} gen2 / {Pause:F0} ms paused, {Late} DSP(s) cut loose after their channel went, {Detach} stuck, "
-                      + "{WrongBus} send drop(s) on the wrong bus",
+                      + "{WrongBus} send drop(s) on the wrong bus; render pool {Pool:P0} busy",
                         cpu.dsp, cpu.update, cpu.stream, voices, _activeSounds.Count, real, playing,
-                        noHrtf, _saPoolMisses - _lastSaPoolMisses, SpatialVoicesFree,
+                        noHrtf, _saPoolMisses - _lastSaPoolMisses, SpatialVoicesFree, _refusedForHrtf - _lastRefusedForHrtf,
                         starves - _lastStarves, gen2 - _lastGen2, pauseMs - _lastPauseMs,
                         _lateDetaches - _lastLateDetaches, _failedDetaches - _lastFailedDetaches,
-                        _sendDropsOnWrongBus);
+                        _sendDropsOnWrongBus, _enginePool?.TakeBusy() ?? 0f);
         _lastSaPoolMisses = _saPoolMisses; _lastFailedDetaches = _failedDetaches;
+        _lastRefusedForHrtf = _refusedForHrtf;
         _lastLateDetaches = _lateDetaches;
         _lastStarves = starves; _lastGen2 = gen2; _lastPauseMs = pauseMs;
 

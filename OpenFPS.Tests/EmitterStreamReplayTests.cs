@@ -612,8 +612,11 @@ internal sealed class StreamMixer : IAudioProvider
     public void SetAcousticPath(int id, AcousticPathData p) => LogDelta("Path", id, p, _pathFields, whole: false);
     public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) => Log("Reverb", ms, enclosure, hf, lf);
     public void SetAirTemperature(float c) => Log("Air", c);
-    public float MixerLoad => 0f;
-    public int SpatialVoicesFree => 256;
+    /// <summary>What the mixer says its load is; a test of the budgets sets it.</summary>
+    public float Load;
+    public float MixerLoad => Load;
+    public int Free = 256;
+    public int SpatialVoicesFree => Free;
     public void ReviveEngine(int id) => Log("ReviveEngine", id);
     public bool FadeOutEngine(int id) { Log("FadeEngine", id); return true; }
     public bool FadeOutVoice(int id) { Log("FadeVoice", id); return true; }

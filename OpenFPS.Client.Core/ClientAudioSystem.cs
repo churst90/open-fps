@@ -291,9 +291,39 @@ public partial class ClientAudioSystem
 
     /// <summary>Past this the callback is close enough to its deadline to start shedding work.</summary>
     private const float MixerLoadCeiling = 0.70f;
-    /// <summary>And under this there is room to take a voice back.</summary>
-    private const float MixerLoadFloor = 0.45f;
+    /// <summary>
+    /// And this far under the ceiling, held for <see cref="RestoreAfterSeconds"/>, there is room to take a
+    /// voice back. It was an absolute 45 %, under what the city's mixer costs with nothing playing (its
+    /// reverbs, its traced tail and echoes: about 55 %), so nothing given up was ever taken back: on
+    /// 2026-10-07 the machines went from ten to one in the first thirty seconds on the city and stayed
+    /// there for the hour, the fountain, the crossing bell, the trees and every train sharing one voice.
+    /// A voice costs the mixer about 0.3 % (60 voices at 60 %, 200 at 100 %), so eight points is room for
+    /// twenty.
+    /// </summary>
+    private const float RestoreMargin = 0.08f;
+    private const double RestoreAfterSeconds = 3.0;
     private const double BudgetSettleSeconds = 1.0;
+    private double _underRestoreSince = -1;
+    /// <summary>
+    /// A voice taken back and given up again within <see cref="RestoreProbationSeconds"/> was one too
+    /// many: the next restore waits twice as long (from 15 s up to four minutes), so the budget settles
+    /// instead of a voice coming and going every couple of seconds at the ceiling.
+    /// </summary>
+    private const double RestoreProbationSeconds = 15.0;
+    private double _lastRestoreAt = double.NegativeInfinity;
+    private double _restoreBackoff = 15.0;
+    private double _restoreAllowedAt;
+    /// <summary>A voice was given up: if it was taken back only just now, the next restore waits longer.</summary>
+    private void GaveUp(double now)
+    {
+        if (now - _lastRestoreAt < RestoreProbationSeconds) _restoreBackoff = Math.Min(240.0, _restoreBackoff * 2.0);
+        else if (now - _lastRestoreAt > 120.0) _restoreBackoff = 15.0;
+        _restoreAllowedAt = now + _restoreBackoff;
+    }
+
+    /// <summary>Binaural voices free under which the budgets give a voice up as they do for the mixer:
+    /// past the pool, a voice plays flat and in the middle of the head.</summary>
+    private const int HrtfLowWater = 6;
 
     /// <summary>
     /// The budget is left alone this long after a map load, and after that the load must stay over the
@@ -302,13 +332,15 @@ public partial class ClientAudioSystem
     /// then and re-adding a second later builds new engines at the worst moment, heard as cars appearing
     /// and vanishing on the first lap.
     /// </summary>
-    private const double BudgetHoldSeconds = 3.0;
+    private const double BudgetHoldSeconds = 30.0;
     private const double OverCeilingSeconds = 0.75;
     private double _budgetHeldUntil;
     private double _overCeilingSince = -1;
 
     /// <summary>Called when a map starts loading and again at spawn: the mixer's load reading cannot be
-    /// trusted for a few seconds (BudgetHoldSeconds).</summary>
+    /// trusted for a while (BudgetHoldSeconds). Thirty seconds: on the city the bake, the scene build and
+    /// the decodes held the mixer at 74-108 % for the first twenty-five, and three seconds' hold let the
+    /// budget shed everything it could in that time.</summary>
     public void NoteSceneLoading() => _budgetHeldUntil = _now() + BudgetHoldSeconds;
     private readonly UpdateThrottle _throttle = new(UpdateHz);
     /// <summary>Seconds since this system was built. A stopwatch in the game; a test hands in its
@@ -1544,13 +1576,21 @@ public partial class ClientAudioSystem
             if (_adaptiveMachines > MachineFloor) _adaptiveMachines--;
             else if (_adaptiveBudget > MinEngineVoices) _adaptiveBudget--;
             _lastBudgetChange = now;
-            Log.Information("Audio: engines starving at {Rate:F0}/s; {Cars} engine(s), {Machines} machine(s).",
+            GaveUp(now);
+            Log.Information("Audio: engines starving at {Rate:F0}/s; {Cars} engine(s), {Machines} machine voice(s).",
                             _starveRate, _adaptiveBudget, _adaptiveMachines);
         }
 
-        if (load > 0f && now >= _budgetHeldUntil && now - _lastBudgetChange >= BudgetSettleSeconds)
+        // The binaural pool nearly empty is a shortage like the mixer's: a voice past it plays flat.
+        int hrtfFree = _audio.SpatialVoicesFree;
+        bool hrtfShort = hrtfFree < HrtfLowWater;
+        bool roomToRestore = load > 0f && load < MixerLoadCeiling - RestoreMargin && _starveRate < 1f && hrtfFree > HrtfReserve;
+        if (!roomToRestore) _underRestoreSince = -1;
+        else if (_underRestoreSince < 0) _underRestoreSince = now;
+
+        if ((load > 0f || hrtfShort) && now >= _budgetHeldUntil && now - _lastBudgetChange >= BudgetSettleSeconds)
         {
-            if (load > MixerLoadCeiling && now - _overCeilingSince >= OverCeilingSeconds)
+            if (hrtfShort || load > MixerLoadCeiling && now - _overCeilingSince >= OverCeilingSeconds)
             {
                 // Places of extended sources first, then a machine's second outlet: their loss costs only
                 // geometry, since what they carried slews back into the voice still playing.
@@ -1564,10 +1604,12 @@ public partial class ClientAudioSystem
                 else if (_adaptiveBudget > MinEngineVoices) _adaptiveBudget--;
                 else goto settled;
                 _lastBudgetChange = now;
-                Log.Information("Audio: mixer at {Load:P0}; {Cars} engine(s), {Distant} borrowed, {Echoes} reflection(s) each.",
-                                load, _adaptiveBudget, _adaptiveDistant, _adaptiveEchoes);
+                GaveUp(now);
+                Log.Information("Audio: {Why}; {Cars} engine(s), {Machines} machine voice(s), {Places} place(s), {Distant} borrowed, {Echoes} reflection(s) each.",
+                                hrtfShort ? $"{hrtfFree} binaural voice(s) free" : $"mixer at {load:P0}",
+                                _adaptiveBudget, _adaptiveMachines, _adaptivePlaces, _adaptiveDistant, _adaptiveEchoes);
             }
-            else if (load < MixerLoadFloor && _starveRate < 1f)
+            else if (_underRestoreSince >= 0 && now - _underRestoreSince >= RestoreAfterSeconds && now >= _restoreAllowedAt)
             {
                 if (_adaptiveBudget < EngineVoiceBudget) _adaptiveBudget++;
                 else if (_adaptiveMachines < MachineVoiceBudget) _adaptiveMachines++;
@@ -1577,8 +1619,11 @@ public partial class ClientAudioSystem
                 else if (_adaptiveEchoes < EchoCeiling && _echoMsSmoothed < EchoPassCeilingMs / 3) _adaptiveEchoes++;
                 else goto settled;
                 _lastBudgetChange = now;
-                Log.Information("Audio: mixer at {Load:P0}; {Cars} engine(s), {Distant} borrowed, {Echoes} reflection(s) each.",
-                                load, _adaptiveBudget, _adaptiveDistant, _adaptiveEchoes);
+                _lastRestoreAt = now;
+                // One step at a time, each after the load has stayed low again.
+                _underRestoreSince = now;
+                Log.Information("Audio: mixer at {Load:P0}, taking a voice back; {Cars} engine(s), {Machines} machine voice(s), {Places} place(s), {Distant} borrowed, {Echoes} reflection(s) each.",
+                                load, _adaptiveBudget, _adaptiveMachines, _adaptivePlaces, _adaptiveDistant, _adaptiveEchoes);
             }
             settled: ;
         }
@@ -1710,10 +1755,10 @@ public partial class ClientAudioSystem
             foreach (var e in _engineDistances) if (e.D2 < nearestD2) nearestD2 = e.D2;
             float nearest = cars > 0 ? MathF.Sqrt(nearestD2) : 0f;
             Log.Information("Cars: {Cars} on the map — {Live} synthesized, {Borrowed} borrowed, {Silent} out of budget; "
-                          + "nearest {Nearest:F0} m; {Echoes} reflection(s) per engine.",
+                          + "nearest {Nearest:F0} m; {Echoes} reflection(s) per engine; machines {MachineVoices} of {MachineBudget} voice(s), {Trains} train(s) voiced.",
                             cars, _liveEngines.Count, _distantVoiced.Count,
                             Math.Max(0, cars - _liveEngines.Count - _distantVoiced.Count),
-                            nearest, _adaptiveEchoes);
+                            nearest, _adaptiveEchoes, _machineVoicesSpent, _adaptiveMachines, _liveTrains.Count);
             Log.Information("  {Voices} reflection voice(s) of a {Budget} budget, floor {Floor:G3}; "
                           + "{Pending} submission(s) queued, {Transients} transient(s) waiting to be heard.",
                             _engineEchoes.VoiceCount, _engineEchoes.MaxReflectionVoices, _engineEchoes.AudibilityFloor,

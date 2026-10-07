@@ -31,7 +31,9 @@ public sealed class EngineRenderPool : IDisposable
         // acoustic bake, the scene build and the sample decodes, and on Parallel.For the producers
         // starved exactly then (audio choppy for the first seconds in a map).
         // Half the machine, up to twelve: with forty engines on the city at 0.1-0.23 of a core each
-        // (--tap-balance cost), six threads were short and the nearest cars starved.
+        // (--tap-balance cost), six threads were short and the nearest cars starved. ProcessorCount is the
+        // machine's unless DOTNET_PROCESSOR_COUNT says otherwise: the build and test scripts set it, the
+        // client's start scripts do not (24 cores, 12 workers, on Cody's 2026-10-07 log).
         int count = Math.Clamp(Environment.ProcessorCount / 2, 2, 12);
         _workers = new Thread[count];
         for (int i = 0; i < count; i++)
@@ -74,22 +76,50 @@ public sealed class EngineRenderPool : IDisposable
         }
     }
 
+    /// <summary>The next voice of the current sweep a worker may take.</summary>
+    private int _next;
+    /// <summary>Stopwatch ticks the workers spent rendering, for <see cref="TakeBusy"/>.</summary>
+    private long _busyTicks;
+    private long _busySince = System.Diagnostics.Stopwatch.GetTimestamp();
+
+    /// <summary>
+    /// Every worker takes the next voice of one shared sweep down the list, nearest first, rather than a
+    /// fixed share of it. With fixed shares a worker held up by one slow voice (a train's tap waiting on its
+    /// train's lock, on 2026-10-07) starved every other voice of its share while eleven workers had time;
+    /// now the others take them. And when the pool cannot fill every ring in time, the voices at the end of
+    /// the list, the furthest, are the ones that starve, and the budget gives those up (ChooseLiveEngines).
+    /// </summary>
     private void Work(int id, int stride)
     {
         while (_running)
         {
             var voices = _voices;
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
-                for (int i = id; i < voices.Length; i += stride) voices[i].Produce();
+                for (int i = Interlocked.Increment(ref _next) - 1; i < voices.Length; i = Interlocked.Increment(ref _next) - 1)
+                    voices[i].Produce();
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "EngineRenderPool: error while rendering ahead.");
             }
+            Interlocked.Add(ref _busyTicks, System.Diagnostics.Stopwatch.GetTimestamp() - start);
+            // The sweep is done: the next starts from the top. Two workers may both start it; a voice
+            // already being rendered is passed over (Produce's own guard).
+            if (Volatile.Read(ref _next) >= voices.Length) Interlocked.Exchange(ref _next, 0);
             // Short enough to stay well ahead of the lead, long enough not to spin a core.
             Thread.Sleep(2);
         }
+    }
+
+    /// <summary>The share of the workers' time spent rendering since the last call, 0 to 1. For the log.</summary>
+    public float TakeBusy()
+    {
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        long busy = Interlocked.Exchange(ref _busyTicks, 0);
+        long span = now - Interlocked.Exchange(ref _busySince, now);
+        return span > 0 ? (float)busy / (span * (float)_workers.Length) : 0f;
     }
 
     public void Dispose()
