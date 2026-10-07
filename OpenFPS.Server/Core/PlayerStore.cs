@@ -125,12 +125,15 @@ public sealed class PlayerStore
         state.Map = mapId;
 
         bool dead = world.Has<DeadComponent>(body);
+        state.DeadUntilUtc = null;
         if (dead)
         {
-            // Somebody who leaves dead comes back up whole, at the spawn, as the respawn would have
-            // stood them up had they stayed.
+            // Somebody who leaves dead comes back at the spawn, where the respawn would have stood them
+            // up, and still dead until the wait is over: leaving does not skip it.
             state.SetPlace(mapId, null);
             state.Health = state.MaxHealth = null;
+            double left = world.Get<DeadComponent>(body).DiedAt + CombatService.PlayerRespawnSeconds - AudioClock.Now;
+            if (left > 0) state.DeadUntilUtc = DateTime.UtcNow.AddSeconds(Math.Min(left, CombatService.PlayerRespawnSeconds));
         }
         else
         {
@@ -164,8 +167,9 @@ public sealed class PlayerStore
     }
 
     /// <summary>
-    /// A body just put into the world: its health as it was, and what it was carrying given back, taken
-    /// out of the store as it is. Returns how many things came back.
+    /// A body just put into the world: its health as it was, dead still if it left dead and the wait is
+    /// not over, and what it was carrying given back, taken out of the store as it is. Returns how many
+    /// things came back.
     /// </summary>
     public int Arrive(UserSession session, string mapId, World world, Entity body)
     {
@@ -175,6 +179,12 @@ public sealed class PlayerStore
             ref var h = ref world.Get<HealthComponent>(body);
             if (state.MaxHealth is int max && max > 0) h.Max = max;
             h.Current = Math.Clamp(health, 1, h.Max);
+        }
+        if (state?.DeadUntilUtc is DateTime until && until > DateTime.UtcNow)
+        {
+            double left = Math.Min((until - DateTime.UtcNow).TotalSeconds, CombatService.PlayerRespawnSeconds);
+            world.Add(body, new DeadComponent { DiedAt = AudioClock.Now - (CombatService.PlayerRespawnSeconds - left) });
+            if (world.Has<HealthComponent>(body)) world.Get<HealthComponent>(body).Current = 0;
         }
 
         string? json;

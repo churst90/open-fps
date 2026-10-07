@@ -316,15 +316,14 @@ public class PlayerPersistenceTests : IDisposable
     }
 
     [Fact]
-    public async Task SomebodyWhoLeavesDeadComesBackWholeAtTheSpawn()
+    public async Task SomebodyWhoLeavesDeadAfterTheWaitComesBackWholeAtTheSpawn()
     {
         var rig = NewRig();
         var alice = await rig.Arrive("alice");
         var world = rig.World(alice);
         world.Get<Transform>(alice.Entity).Position += new Vector3(3f, 0f, 2f);
         world.Get<HealthComponent>(alice.Entity).Current = 0;
-        world.Add(alice.Entity, new DeadComponent { DiedAt = 1 });
-        Assert.True(rig.Hands.Give(alice, "glock_pistol", 1, out _, out _, out string m), m);
+        world.Add(alice.Entity, new DeadComponent { DiedAt = AudioClock.Now - CombatService.PlayerRespawnSeconds - 5 });
 
         rig.LogOut(alice);
         var back = await rig.Arrive("alice");
@@ -333,8 +332,46 @@ public class PlayerPersistenceTests : IDisposable
         Assert.Equal(rig.Maps.GetSpawnPoint("default").Position, world.Get<Transform>(back.Entity).Position);
         Assert.Equal(100, world.Get<HealthComponent>(back.Entity).Current);
         Assert.False(world.Has<DeadComponent>(back.Entity));
-        // Given while dead, after the bag was left (staff can): kept like anything else carried.
-        Assert.NotNull(HandsService.Holding(world, back.Entity, rig.Lookup(back)).Right);
+    }
+
+    /// <summary>Logging out dead and straight back in does not skip the wait: you come back dead, at
+    /// the spawn, with what was left of it.</summary>
+    [Fact]
+    public async Task LeavingDeadDoesNotSkipTheWait()
+    {
+        var rig = NewRig();
+        var alice = await rig.Arrive("alice");
+        var world = rig.World(alice);
+        world.Get<HealthComponent>(alice.Entity).Current = 0;
+        world.Add(alice.Entity, new DeadComponent { DiedAt = AudioClock.Now - 10 });
+
+        rig.LogOut(alice);
+        var back = await rig.Arrive("alice");
+
+        world = rig.World(back);
+        Assert.True(world.Has<DeadComponent>(back.Entity), "came back alive after ten seconds dead");
+        double left = world.Get<DeadComponent>(back.Entity).DiedAt + CombatService.PlayerRespawnSeconds - AudioClock.Now;
+        Assert.InRange(left, CombatService.PlayerRespawnSeconds - 20, CombatService.PlayerRespawnSeconds - 9);
+        Assert.Equal(0, world.Get<HealthComponent>(back.Entity).Current);
+        Assert.Equal(rig.Maps.GetSpawnPoint("default").Position, world.Get<Transform>(back.Entity).Position);
+    }
+
+    /// <summary>Nothing can be given to somebody dead: what they carried is in the bag by their body,
+    /// and a thing given then would get up with them.</summary>
+    [Fact]
+    public async Task NothingIsGivenToSomebodyDead()
+    {
+        var rig = NewRig();
+        int glocksBefore = rig.Made("default", "glock_pistol").Count;
+        var alice = await rig.Arrive("alice");
+        var world = rig.World(alice);
+        world.Get<HealthComponent>(alice.Entity).Current = 0;
+        world.Add(alice.Entity, new DeadComponent { DiedAt = AudioClock.Now });
+
+        Assert.False(rig.Hands.Give(alice, "glock_pistol", 1, out _, out _, out string why));
+        Assert.Contains("dead", why);
+        Assert.Null(HandsService.Holding(world, alice.Entity, rig.Lookup(alice)).Right);
+        Assert.Equal(glocksBefore, rig.Made("default", "glock_pistol").Count);
     }
 
     /// <summary>

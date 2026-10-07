@@ -1417,6 +1417,11 @@ public class GameServer
             // Health as it was, and the things they were carrying, back in their hands and on their back.
             _store?.Arrive(session, mapId, world, session.Entity);
             if (remembered) Log.Information("{User} is back where they left {Map}.", session.Username, mapId);
+            if (world.Has<DeadComponent>(session.Entity))
+            {
+                double left = world.Get<DeadComponent>(session.Entity).DiedAt + CombatService.PlayerRespawnSeconds - AudioClock.Now;
+                SendToSession(session, new TextEvent { Text = $"You are dead. You come back in {Math.Max(1, Math.Ceiling(left)):0} seconds." });
+            }
 
             var t = world.Get<Transform>(session.Entity);
             SendToSession(session, new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
