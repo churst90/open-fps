@@ -190,6 +190,79 @@ public class RunningWaterRound2Tests
         Assert.InRange(shape.FallMetres, shoe.DropMetres + 0.9f * terminal * terminal / (2f * 9.81f), shoe.DropMetres + 1.1f * terminal * terminal / (2f * 9.81f));
     }
 
+    /// <summary>
+    /// "the down pipe drains still flange" (Cody, 2026-10-07). The gutter outlet's gulps and the film
+    /// striking the shoe are heard through the downpipe's 5.5 m of air, whose round trip is 32.3 ms. Its
+    /// open ends let the high notes out (an unflanged pipe's reflection falls as e^(−(ka)²/2)); the old
+    /// loop kept a fifth to a third of them up to 6 kHz, so every splash came back every 32 ms: the
+    /// cepstrum of 8192-sample frames peaked there in more than half of them. The pipe's low modes stay.
+    /// </summary>
+    [Fact]
+    public void A_downpipe_does_not_hand_its_splashes_back_every_round_trip()
+    {
+        foreach (var spec in new[] { RunningWaterSpec.GutterOutlet, RunningWaterSpec.Downpipe })
+        {
+            var s = new RunningWaterSynth(spec, Rate, 7);
+            var x = Run(s, 0.3f, 12f);
+            var cav = spec.Cavity!;
+            float roundTrip = 2f * (cav.LengthMetres + 0.6f * cav.DiameterMetres) / 343f;
+            int lag = (int)MathF.Round(roundTrip * Rate);
+            const int n = 8192;
+            int frames = 0, combs = 0;
+            var re = new double[n];
+            var im = new double[n];
+            for (int at = 2 * Rate; at + n <= x.Length; at += n / 2)
+            {
+                for (int i = 0; i < n; i++) { re[i] = x[at + i] * (0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (n - 1))); im[i] = 0; }
+                Fft(re, im, false);
+                for (int i = 0; i < n; i++) { re[i] = Math.Log(re[i] * re[i] + im[i] * im[i] + 1e-30); im[i] = 0; }
+                Fft(re, im, true);
+                // z of the cepstrum's peak near the round trip over 0.3-40 ms.
+                int a = (int)(0.0003 * Rate), b = (int)(0.040 * Rate);
+                var seg = re.Skip(a).Take(b - a).ToArray();
+                double med = seg.OrderBy(v => v).ElementAt(seg.Length / 2), sd = Math.Sqrt(seg.Select(v => (v - med) * (v - med)).Average());
+                double peak = Enumerable.Range(lag - 2, 5).Max(i => re[i]);
+                frames++;
+                if ((peak - med) / sd > 6) combs++;
+            }
+            _o.WriteLine($"  {spec.Name}: round trip {roundTrip * 1e3:F1} ms, comb in {combs} of {frames} frames");
+            Assert.True(combs <= frames / 10, $"{spec.Name}: a comb at the pipe's round trip in {combs} of {frames} frames");
+        }
+    }
+
+    /// <summary>In-place radix-2 FFT; the inverse scales by 1/n.</summary>
+    private static void Fft(double[] re, double[] im, bool inverse)
+    {
+        int n = re.Length;
+        for (int i = 1, j = 0; i < n; i++)
+        {
+            int bit = n >> 1;
+            for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+            j ^= bit;
+            if (i < j) { (re[i], re[j]) = (re[j], re[i]); (im[i], im[j]) = (im[j], im[i]); }
+        }
+        for (int len = 2; len <= n; len <<= 1)
+        {
+            double ang = 2 * Math.PI / len * (inverse ? 1 : -1);
+            double wr = Math.Cos(ang), wi = Math.Sin(ang);
+            for (int i = 0; i < n; i += len)
+            {
+                double cr = 1, ci = 0;
+                for (int k = 0; k < len / 2; k++)
+                {
+                    int u = i + k, v = i + k + len / 2;
+                    double tr = re[v] * cr - im[v] * ci, ti = re[v] * ci + im[v] * cr;
+                    re[v] = re[u] - tr; im[v] = im[u] - ti;
+                    re[u] += tr; im[u] += ti;
+                    double nr = cr * wr - ci * wi;
+                    ci = cr * wi + ci * wr;
+                    cr = nr;
+                }
+            }
+        }
+        if (inverse) for (int i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+    }
+
     [Fact]
     public void A_roof_drips_long_after_the_rain_through_its_slow_store()
     {
