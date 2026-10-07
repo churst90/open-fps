@@ -35,6 +35,11 @@ public sealed class EventSum
     private const int PulseTableRes = 32;
     private static readonly float[] PulseTable = MakePulseTable();
 
+    // An explicit static constructor, so the table is made when the first sum is (off the audio threads),
+    // not whenever a pulse is first placed: without one the runtime may defer it, and a burning car's first
+    // pulse 23 minutes into its fire built it on the mixer's thread (1,056 bytes; FireTests.NothingAllocates).
+    static EventSum() { }
+
     private static float[] MakePulseTable()
     {
         var table = new float[8 * PulseTableRes + 2];
