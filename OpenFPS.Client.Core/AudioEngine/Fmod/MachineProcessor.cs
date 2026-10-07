@@ -112,6 +112,12 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
     /// anything. All of them, unless it renders from something rendered elsewhere (TrainSlotState).</summary>
     protected virtual int Ready(int want) => want;
 
+    /// <summary>Samples rendered and not yet played: how long the voice can go on without rendering.</summary>
+    protected long Buffered => Volatile.Read(ref _written) - Volatile.Read(ref _played);
+
+    /// <summary>How far ahead the voice is rendering now, samples.</summary>
+    protected int LeadSamples => (int)(_leadSeconds * SampleRate);
+
     /// <summary>The ring skipped <paramref name="samples"/> it never rendered (the voice starved and the
     /// mixer ran on): a model keeping its own timeline moves it on as far.</summary>
     protected virtual void Skipped(long samples) { }

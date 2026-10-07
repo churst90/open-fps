@@ -186,6 +186,28 @@ public class TrainVoicingTests
     }
 
     [Fact]
+    public void A_voice_whose_lane_never_comes_still_plays_its_wagons()
+    {
+        // The diesel's lane is never rendered (its worker held up). Once the voice has nothing in hand it
+        // renders anyway, the engine faded out of it, rather than starving whole: wagons and all.
+        var t = new TrainVoiceState("freight/t", TrainProfile.ByName("freight"), Rate, 5);
+        var carry = t.Layout.Where(e => e.Kind == TrainLayout.Kind.ExhaustStack || e.Kind == TrainLayout.Kind.Bogie)
+                            .Select(e => e.Index).Take(12).ToArray();
+        t.SetPlan(0, new TrainSlotPlan(carry, carry.Select(_ => 0.5f).ToArray()));
+        var slot = new TrainSlotState(t, 0, TrainVoicing.SlotLevelDb(t.Layout), Rate, startSample: 0);
+        var block = new float[1024];
+        double energy = 0;
+        for (int b = 0; b < 40; b++)
+        {
+            slot.Produce();
+            slot.Consume(block);
+            foreach (var x in block) energy += x * (double)x;
+        }
+        Assert.All(t.Lanes, l => Assert.Equal(0, l.Rendered));
+        Assert.True(energy > 0, "the voice gave nothing while its engine's lane was behind");
+    }
+
+    [Fact]
     public void A_source_handed_between_voices_keeps_its_power()
     {
         // Two voices of one train; one bogie moves from the first to the second. Over the hand-over the two

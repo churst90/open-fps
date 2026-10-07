@@ -415,6 +415,9 @@ public sealed class TrainSlotState : PhysicalVoiceState
         public int Chain = -1;
         public float[]? Ring;
         public TrainLane? Lane;
+        /// <summary>A point source fades out over 64 samples from its last sample when its lane is late,
+        /// and back in when it catches up.</summary>
+        public float Gate = 1f, Last;
     }
     private readonly Dictionary<int, Member> _members = new();
     private readonly List<Member> _order = new();
@@ -495,8 +498,17 @@ public sealed class TrainSlotState : PhysicalVoiceState
             }
             if (have < ready) ready = have;
         }
+        // A lane behind (a diesel's worker held up) waits while the voice has something in hand; once the
+        // voice is about to run dry it renders anyway, and a source whose lane has not got there fades out
+        // of it for those samples (StepSynth). One engine drops out for a moment, softly, instead of the
+        // whole voice: wagons, bell and all.
+        if (ready < want && Buffered < UrgentSamples) ready = want;
         return (int)Math.Max(0, ready);
     }
+
+    /// <summary>What the voice keeps in hand however late a lane is: half its lead and a block, so it
+    /// primes and never runs dry.</summary>
+    private int UrgentSamples => LeadSamples / 2 + 512;
 
     /// <summary>The ring was resynced past what was rendered (the voice starved): the cursor moves with it,
     /// so the voice stays on the train's timeline.</summary>
@@ -620,7 +632,14 @@ public sealed class TrainSlotState : PhysicalVoiceState
         for (int k = 0; k < order.Count; k++)
         {
             var m = order[k];
-            if (m.Ring != null) y += m.Weight * m.Ring[(int)(at & TrainVoiceState.RingMask)];
+            if (m.Ring == null) continue;
+            if (m.Lane!.Rendered > at)
+            {
+                m.Last = m.Ring[(int)(at & TrainVoiceState.RingMask)];
+                m.Gate = MathF.Min(1f, m.Gate + 1f / 64f);
+            }
+            else m.Gate = MathF.Max(0f, m.Gate - 1f / 64f);
+            y += m.Weight * m.Gate * m.Last;
         }
         int here = (int)(at - _blockStart);
         while (_nextBlow < _blows.Count && _blows[_nextBlow].At <= here)
