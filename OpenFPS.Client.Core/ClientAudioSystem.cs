@@ -1,7 +1,4 @@
-using System;
 using System.Numerics;
-using System.Collections.Generic;
-using System.Linq;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -337,9 +334,6 @@ public class ClientAudioSystem
     /// own, so it can tick the throttled update and step past the engine hold without sleeping.</summary>
     private readonly Func<double> _now;
 
-    /// <summary>Audio updates performed / skipped by the rate cap. Diagnostic.</summary>
-    public (long Ran, long Skipped) UpdateCounts => (_throttle.Runs, _throttle.Skipped);
-
     // Near-field boundary probing. The directions are rebuilt each frame from the listener's rotation
     // (BoundaryModel.ProbeDirections is head space), and every buffer here is owned and reused — this
     // runs on every audio frame.
@@ -580,13 +574,6 @@ public class ClientAudioSystem
         // this is where the head is, which way it faces, and what is round it.
         var earListener = EarListener(world, visualEyePos, listenerVelocity, listenerRotation);
         _audio.SetEarWind(earListener);
-        {
-            double windNow = WindField.Now();
-            var weather = WindField.Weather;
-            var air = WindField.VelocityAt(weather, visualEyePos.X, earListener.HeightMetres, visualEyePos.Z, windNow);
-            var felt = EarWind.Relative(air, earListener);
-            _state.FeltWind = new Vector3(felt.X, 0f, felt.Y);
-        }
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
         WorldAudio.ListenerVehicleId = _state.RidingEntityId;
@@ -988,10 +975,6 @@ public class ClientAudioSystem
     private void UpdateAcousticState(WorldSnapshot world, Vector3 eyePos, int regId)
     {
         _state.Temperature = world.Temperature;
-        _state.Humidity = world.Humidity;
-        _state.AirPressure = world.AirPressure;
-        _state.WindVelocity = world.WindVelocity;
-        _state.WindGustiness = world.WindGustiness;
 
         // Scale down precipitation intensity based on local shelter
         _state.PrecipitationIntensity = world.PrecipitationIntensity * (1.0f - _state.ShelterFactor);
@@ -1006,8 +989,6 @@ public class ClientAudioSystem
         if (world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(regId, out var reg))
         {
             _state.IsIndoor = reg.IsIndoor;
-            _state.RoomSize = reg.RoomSize;
-            _state.RoomCenter = world.AcousticMap.RegionPositions.GetValueOrDefault(regId, eyePos);
         }
         else
         {
@@ -1461,9 +1442,6 @@ public class ClientAudioSystem
         float doorway = _audio.EngineDoorsOpen(_state.RidingEntityId) ? DoorwayPowerFraction : 0f;
         return OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(vehicle, _cabins.WindowsOpen(ride, _now()), doorway);
     }
-
-    private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos)
-        => OnTheWheels(snap, world, eyePos, out _);
 
     /// <summary>...and how high it is over the ground, metres (infinity when that was not asked).</summary>
     private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos, out float height)
@@ -2984,47 +2962,6 @@ public class ClientAudioSystem
     private readonly Dictionary<int, (Vector3 Velocity, double At)> _motionHistory = new();
     private readonly Dictionary<int, float> _tyreDemand = new();
 
-    /// <summary>
-    /// The fraction of its tyres' grip an entity is currently using, from two successive samples of
-    /// its velocity.
-    ///
-    /// Held between calls rather than recomputed, because the position is only new thirty times a
-    /// second and differentiating the same pair twice would halve the answer. Smoothed on the way out
-    /// for the same reason the provider smooths anything else: a 30 Hz staircase in a level is as
-    /// audible as one in a pitch.
-    /// </summary>
-    private float TyreDemand(EntitySnapshot snap, double sampledAt, float gripG)
-    {
-        float previous = _tyreDemand.GetValueOrDefault(snap.Id, 0f);
-        if (_motionHistory.TryGetValue(snap.Id, out var last))
-        {
-            double dt = sampledAt - last.At;
-            // Only when the sample is genuinely new. Asking twice about one pair of snapshots would
-            // compute an acceleration from no elapsed time.
-            if (dt > 1e-3)
-            {
-                Vector3 v = snap.Velocity;
-                Vector3 a = (v - last.Velocity) / (float)dt;
-                float speed = v.Length();
-                float aLong = 0f, aLat = a.Length();
-                if (speed > 0.5f)
-                {
-                    Vector3 along = v / speed;
-                    aLong = Vector3.Dot(a, along);
-                    aLat = (a - along * aLong).Length();
-                }
-                float demand = OpenFPS.Common.TyreFriction.Demand(aLong, aLat, gripG);
-                // Fast to rise, slow to fall — a tyre lets go on the instant and settles over a
-                // couple of hundred milliseconds. Matches the DSP's own smoothing of the same number.
-                previous += (demand - previous) * (demand > previous ? 0.5f : 0.12f);
-                _tyreDemand[snap.Id] = previous;
-                _motionHistory[snap.Id] = (v, sampledAt);
-            }
-        }
-        else _motionHistory[snap.Id] = (snap.Velocity, sampledAt);
-        return previous;
-    }
-
     private void ProcessAudioEmitter(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos, float engineDt = 0f)
     {
         double now = _now();
@@ -3761,8 +3698,6 @@ public class ClientAudioSystem
     /// <summary>How far a footstep take's pitch and level wander from one play to the next.</summary>
     private const float FootstepPitchJitter = 0.03f, FootstepLevelJitterDb = 1f;
 
-    /// <summary>The last own footstep's slope, and the level and pitch it was given for it.</summary>
-    internal (StepSlope Slope, float Db, float Pitch) LastStepGait { get; private set; }
 
     private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset, float boostDb,
                                 StepSlope slope = StepSlope.Level, int bodyId = -1)
@@ -3788,7 +3723,6 @@ public class ClientAudioSystem
         // ...and on stairs, a toe put down on the tread going up is lighter than a step on the level and
         // a heel dropped onto the tread below is heavier: see StrideAccumulator.SlopeDb.
         float slopeDb = StrideAccumulator.SlopeDb(slope), slopePitch = StrideAccumulator.SlopePitch(slope);
-        if (follows) LastStepGait = (slope, slopeDb, slopePitch);
         var (stepGain, stepReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb);
 
         // 1. Direct Sound (Will now undergo full acoustic pathing)
@@ -3888,12 +3822,6 @@ public class ClientAudioSystem
     private const int STEP_ECHO_POOL_SIZE = 48;
     private readonly List<OpenFPS.Common.EarlyReflections.Arrival> _stepArrivals = new();
     private int _stepEchoIndex;
-
-    /// <summary>Is the listener in a room (a closed boundary) rather than out of doors?</summary>
-    private bool ListenerEnclosed(WorldSnapshot world, Vector3 at)
-        => world.AcousticMap != null
-           && world.AcousticMap.Regions.TryGetValue(_listenerRegion, out var room)
-           && RoomAcoustics.IsEnclosure(room);
 
     /// <summary>
     /// The walls answering your own footsteps.
@@ -4385,41 +4313,6 @@ public class ClientAudioSystem
         // round the listener every few ticks (Enclosure.Look), and the floor underfoot is one of
         // those boxes, so what you are standing on already colours the room. The region's material
         // is kept current here for anything that still reads the Sabine estimate at bus creation.
-    }
-
-    private int _breathSeed;
-
-    /// <summary>
-    /// A body breathing, through the same channel as every other short sound in the world.
-    ///
-    /// Nobody recorded any of these. A breath is turbulent air through a narrow opening — a hiss —
-    /// and the transient synthesiser already makes those. Routing it
-    /// through <see cref="WorldAudioPlayer"/> rather than playing a sample means it is attenuated,
-    /// occluded through walls, reverberated by the room and placed in the listener's head by exactly
-    /// the code that handles a gunshot, none of which had to learn what breathing is.
-    /// </summary>
-    public void OnBreath(int entityId, Vector3 position, OpenFPS.Common.Breath breath)
-    {
-        if (!breath.Taken) return;
-
-        WorldAudio.Receive(new OpenFPS.Common.Networking.WorldAudioEvent
-        {
-            SourceEntityId = entityId,
-            Label = breath.IsInhale ? "breath in" : "breath out",
-            Seed = unchecked(++_breathSeed),
-            Sounds = new System.Collections.Generic.List<OpenFPS.Common.TransientSound>
-            {
-                new OpenFPS.Common.TransientSound
-                {
-                    Character = OpenFPS.Common.SoundCharacter.Hiss,
-                    Position = position,
-                    LevelDb = breath.LevelDb,
-                    Hz = breath.Hz,
-                    DecaySeconds = breath.DecaySeconds,
-                    Noisiness = 1.0f,
-                },
-            },
-        }, OpenFPS.Common.AudioClock.Now);
     }
 
     /// <summary>Your own landing: under your own head, and it stays there. See OnOwnFootstep.</summary>

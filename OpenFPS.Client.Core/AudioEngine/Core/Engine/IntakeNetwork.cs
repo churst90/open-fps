@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 
@@ -118,8 +117,6 @@ internal sealed class IntakeNetwork
 
     /// <summary>Manifold pressure, pascals absolute: the state of the plenum.</summary>
     public float PlenumPressure => _plenumMass * Gas.R * _plenumK / _plenumVolume;
-    /// <summary>Mass flow through the throttle, kg/s, smoothed.</summary>
-    public float ThrottleFlow => _throttleFlowMean;
 
     /// <summary>Open fraction of the throttle plate, 0..1. A plate never quite shuts: about one per
     /// cent of the bore leaks past it, which is why an engine can idle at all with the pedal up.</summary>

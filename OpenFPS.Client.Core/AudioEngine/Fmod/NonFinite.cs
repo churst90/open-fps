@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
@@ -34,8 +31,6 @@ public sealed class NonFiniteUnit
     public int Reported;
     public volatile string? Name;
     public int Region = int.MinValue;
-    /// <summary>Handed to another sound: may be reported again, under its name.</summary>
-    public void Rearm(string? name, int region = int.MinValue) { Name = name; Region = region; Reported = 0; }
 }
 
 internal static class NonFinite

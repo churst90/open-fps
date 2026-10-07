@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -48,8 +46,6 @@ public sealed class ClientGeometry
 
     /// <summary>Builds finished, and how long the last took, milliseconds; pieces built by it. Diagnostic.</summary>
     public int Builds { get; private set; }
-    public double LastBuildMs { get; private set; }
-    public int LastPiecesBuilt { get; private set; }
 
     public ClientGeometry(float tileMetres) => _builder = new TriangleWorldBuilder(tileMetres) { Parallel = false };
 
@@ -208,8 +204,6 @@ public sealed class ClientGeometry
                     _published = built;
                     _inFlight = null;
                     Builds++;
-                    LastBuildMs = clock.Elapsed.TotalMilliseconds;
-                    LastPiecesBuilt = builder.LastBuilt;
                 }
                 else
                 {

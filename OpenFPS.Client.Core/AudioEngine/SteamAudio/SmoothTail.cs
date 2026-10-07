@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -266,7 +265,7 @@ internal sealed class SmoothTail
         }
         Measure(w, c1, c2, c3, a1, a2, a3, directions);
         Array.Clear(LastTook);
-        if (FromFiftyMs) { copies = null; _start = 0; Array.Clear(LastCopies); }
+        if (FromFiftyMs) { _start = 0; Array.Clear(LastCopies); }
         else if (copies != null)
         {
             copies.TakeFrom(_mOmni, Frames, Frame, SampleRate, LastTook);
@@ -421,7 +420,6 @@ internal sealed class SmoothTail
     }
     /// <summary>The averaged remainder covariance, for TracedReverb's late shares.</summary>
     public double[] Cov => _cov;
-    public bool IsEmpty => _empty;
 
     /// <summary>
     /// The late tail to convolve, windowed. Without a directional part (<paramref name="afterDirectional"/>

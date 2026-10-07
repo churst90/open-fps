@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>

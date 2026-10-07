@@ -1,10 +1,8 @@
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// Platform-agnostic speech / screen-reader output — the single chokepoint for everything the
-/// game says to the player. This is the seam that lets each platform use its best native option:
-///   Windows -> TolkSpeechOutput        (Tolk: NVDA / JAWS / SAPI / ...)
-///   Linux   -> SpeechDispatcherOutput   (speech-dispatcher: Orca / espeak-ng / ...)
+/// Speech and screen-reader output: everything the game says to the player goes through here. Each
+/// head brings its own (NvdaSpeechOutput on Windows, LinuxSpeechOutput over Orca or speech-dispatcher).
 /// </summary>
 public interface ISpeechOutput : IDisposable
 {

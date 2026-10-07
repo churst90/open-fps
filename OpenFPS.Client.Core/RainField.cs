@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
@@ -8,7 +6,6 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Client.Core;
 
@@ -135,7 +132,6 @@ public sealed class RainSurvey
         public bool Vehicle;
         public VehicleBody? Body;
         public bool Solid;
-        public float SizeThickness;
         public Vector3 Size;
         public WallBuild Build;
     }
@@ -173,7 +169,7 @@ public sealed class RainSurvey
         long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
         var result = new Result();
         float reach = RingEdges[^1];
-        Gather(world, ear, reach + 2f, ownEntityId, ridingEntityId);
+        Gather(world, ear, reach + 2f, ownEntityId);
         result.Candidates = _things.Count;
         foreach (var m in _layers) m.Clear();
         Array.Clear(_seenAny);
@@ -625,7 +621,7 @@ public sealed class RainSurvey
 
     // ── What there is to meet ───────────────────────────────────────────────────────────────────
 
-    private void Gather(WorldSnapshot world, Vector3 ear, float radius, int ownEntityId, int ridingEntityId)
+    private void Gather(WorldSnapshot world, Vector3 ear, float radius, int ownEntityId)
     {
         _things.Clear();
         if (world.StaticGrid != null)
@@ -690,7 +686,6 @@ public sealed class RainSurvey
             BayB = MathF.Min(RainSurfaces.BuiltBayMetres, mid),
             Solid = true,
             Size = size,
-            SizeThickness = thickness,
             Build = new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres),
         });
     }

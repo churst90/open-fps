@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core.Yard;
@@ -23,8 +22,6 @@ public sealed class Thermostat
     /// <summary>Whether it is calling for the compressor, after the last <see cref="Step"/>.</summary>
     public bool Calling { get; private set; }
 
-    /// <summary>The share of the time it runs at the last temperature it was given.</summary>
-    public float Duty { get; private set; }
 
     public Thermostat(ThermostatSpec spec, int seed)
     {
@@ -51,7 +48,6 @@ public sealed class Thermostat
         }
         _phase += Math.Max(0f, dt) * rate;
         _phase -= Math.Floor(_phase);
-        Duty = duty;
         Calling = duty >= 1f || (duty > 0f && _phase < duty);
         return Calling;
     }

@@ -1,5 +1,3 @@
-using System.Linq;
-using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
@@ -32,7 +30,6 @@ public sealed class AircraftSynth
     public float Blades { get; private set; }
     public float Jet { get; private set; }
     public float Core { get; private set; }
-    public float Engine { get; private set; }
     /// <summary>The wheels: sliding on the instant of touchdown, rolling afterwards.</summary>
     public float Gear { get; private set; }
     public float Total { get; private set; }
@@ -378,7 +375,7 @@ public sealed class AircraftSynth
                  * MathF.Sqrt(MathF.Max(1, g.Wheels));
         }
 
-        Blades = blades; Jet = jet; Core = core; Engine = engine; Gear = gear;
+        Blades = blades; Jet = jet; Core = core; Gear = gear;
         Total = blades + jet + core + engine + gear;
     }
 

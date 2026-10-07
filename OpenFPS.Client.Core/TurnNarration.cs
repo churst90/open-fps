@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Client.Core;
 
 /// <summary>
@@ -78,9 +76,6 @@ public sealed class TurnNarration
 
     /// <summary>True from a turn until the narration after it: the head is still moving or settling.</summary>
     public bool Pending => _pending;
-
-    /// <summary>The last line accepted, for telling whether it is still the last thing said.</summary>
-    public string? LastLine => _spoken;
 
     /// <summary>Forget any turn in progress (a spawn, a teleport, getting into a seat).</summary>
     public void Reset()

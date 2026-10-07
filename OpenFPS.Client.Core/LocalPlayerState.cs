@@ -1,7 +1,4 @@
 using System.Numerics;
-using System.Collections.Generic;
-using OpenFPS.Common.Components;
-using System;
 
 namespace OpenFPS.Client.Core;
 
@@ -56,8 +53,6 @@ public class LocalPlayerState
     /// <summary>The gun in your hands (a weapon id), or empty: what decides whether Enter fires and R
     /// reloads. From the server's StatsUpdate.</summary>
     public string HeldWeaponId { get; set; } = "";
-    /// <summary>Rounds in it, or -1 with none.</summary>
-    public int HeldRounds { get; set; } = -1;
     /// <summary>The scope on it (a ScopeRegistry id), or empty: what numpad star raises.</summary>
     public string HeldScopeId { get; set; } = "";
     /// <summary>The fastest you may move on foot, m/s, or 0 for none: set while you carry a body. From the
@@ -81,28 +76,11 @@ public class LocalPlayerState
     /// new room.</summary>
     public int CurrentRoomId { get; set; } = int.MinValue;
     public bool IsIndoor { get; set; }
-    public Vector3 RoomSize { get; set; }
-    public Vector3 RoomCenter { get; set; }
     public Vector3 MapMin { get; set; } = new Vector3(-50, 0, -50);
     public Vector3 MapMax { get; set; } = new Vector3(50, 10, 50);
-    public Vector3 MapSize { get; set; } = new Vector3(100, 100, 100);
     public float ShelterFactor { get; set; } = 0.0f;
 
     public float Temperature { get; set; } = 20.0f;
-    public float Humidity { get; set; } = 0.5f;
-    public float AirPressure { get; set; } = 1013.25f;
-
-    /// <summary>The sustained wind the server broadcasts, m/s. Weather, not what you feel.</summary>
-    public Vector3 WindVelocity { get; set; } = Vector3.Zero;
-
-    /// <summary>How hard the sustained wind gusts, 0..1. The amplitude of the swell the client
-    /// synthesizes locally; see <see cref="OpenFPS.Common.WindModel"/>.</summary>
-    public float WindGustiness { get; set; } = 0.0f;
-
-    /// <summary>The air moving past the listener's head this frame, m/s (x east, z north): the
-    /// weather's wind where the head is (WindField, gusts and all, less what the place shelters),
-    /// minus the head's own movement. What the ears hear (EarWind).</summary>
-    public Vector3 FeltWind { get; set; } = Vector3.Zero;
 
     public float PrecipitationIntensity { get; set; } = 0.0f;
 

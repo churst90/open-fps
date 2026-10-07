@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 

@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -245,8 +244,6 @@ internal sealed class DiffuseLateConvolver
         if (ir != null && (ir.Start != _start || ir.Partitions > _maxP || ir.Noise.Directions < _dirs)) return;
         _next = ir;
     }
-
-    public bool HasIr => _cur != null || _next != null;
 
     /// <summary>One piece of <paramref name="input"/> in; one piece per direction out, into
     /// <paramref name="outputs"/>[d].</summary>

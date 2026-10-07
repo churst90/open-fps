@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
@@ -159,9 +157,6 @@ internal sealed class BogieVoice
     private readonly float _axleGain;
     private double _distance;             // metres the bogie centre has travelled
 
-    /// <summary>Where along the track the bogie centre is, metres.</summary>
-    public double Position { get; private set; }
-    public int Axles => _axleOffset.Length;
 
     public IReadOnlyList<float> WheelModeHz => _modeHz;
     public float SquealHz => _squealHz;
@@ -250,7 +245,6 @@ internal sealed class BogieVoice
     /// <summary>Put the axle at a place on the track, and work out when it next meets something.</summary>
     public void Place(double position)
     {
-        Position = position;
         _distance = position;
         double period = _t.JointSpacingMetres > 0.1f
             ? (_t.StaggeredJoints ? _t.JointSpacingMetres * 0.5 : _t.JointSpacingMetres)
@@ -309,7 +303,6 @@ internal sealed class BogieVoice
     {
         float v = MathF.Max(0f, speed);
         _distance += v * _dt;
-        Position = _distance;
 
         float y = Roll(v);
 

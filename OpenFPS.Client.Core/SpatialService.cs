@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -263,9 +261,6 @@ public class SpatialService
         Vector3 nudgedStart = start + (rayDir * 0.05f);
         Vector3 nudgedEnd = end - (rayDir * 0.05f);
 
-        Vector3 rayMin = Vector3.Min(nudgedStart, nudgedEnd);
-        Vector3 rayMax = Vector3.Max(nudgedStart, nudgedEnd);
-
         Vector3 center = (start + end) / 2.0f;
         // Search a wider radius to ensure we catch large static objects like foundations
         List<EntitySnapshot> entitiesToTest;
@@ -358,17 +353,6 @@ public class SpatialService
         // loudest band lost, bleed is the bands' mean.
         cumulativeBleed = (eqLow + eqMid + eqHigh) / 3f;
         maxBlock = Math.Clamp(1f - MathF.Max(eqLow, MathF.Max(eqMid, eqHigh)), 0f, 1f);
-    }
-
-    /// <summary>
-    /// Performs a multi-raycast in given directions. Used for echolocation.
-    /// </summary>
-    public void RaycastAll(WorldSnapshot world, Vector3 start, Vector3[] directions, float maxDist, out float[] distances, out float[] absorptions, out string[] materials)
-    {
-        distances = new float[directions.Length];
-        absorptions = new float[directions.Length];
-        materials = new string[directions.Length];
-        RaycastAll(world, start, directions, maxDist, distances, absorptions, materials);
     }
 
     /// <summary>

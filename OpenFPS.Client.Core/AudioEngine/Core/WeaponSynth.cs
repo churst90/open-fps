@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core;
@@ -33,7 +32,6 @@ public readonly record struct WeaponProfile(
 
     public static WeaponProfile Rifle => From(WeaponRegistry.Ar15);
     public static WeaponProfile Pistol => From(WeaponRegistry.Glock);
-    public static WeaponProfile Shotgun => From(WeaponRegistry.Shotgun);
 }
 
 /// <summary>

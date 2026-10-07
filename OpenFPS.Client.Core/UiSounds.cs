@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common.Networking;
 
@@ -207,30 +205,6 @@ public sealed class UiSounds
                 float release = MathF.Min(1f, (len - i) / (0.01f * rate));
                 float w = MathF.Sin(MathF.Tau * n.Hz * t) + 0.25f * MathF.Sin(MathF.Tau * 2f * n.Hz * t);
                 buf[start + i] += w * attack * decay * release;
-            }
-        }
-        return Scale(buf, gain);
-    }
-
-    /// <summary>
-    /// Notes that swell in and out rather than strike: (hertz, start seconds, length seconds), each a
-    /// raised cosine with the beacon swell's slow, slight vibrato. For cues that should arrive gently.
-    /// </summary>
-    private static float[] Swells(int rate, float gain, params (float Hz, float At, float Seconds)[] notes)
-    {
-        float end = 0f;
-        foreach (var n in notes) end = MathF.Max(end, n.At + n.Seconds);
-        var buf = new float[(int)((end + 0.02f) * rate)];
-        foreach (var n in notes)
-        {
-            int start = (int)(n.At * rate), len = (int)(n.Seconds * rate);
-            double ph = 0;
-            for (int i = 0; i < len && start + i < buf.Length; i++)
-            {
-                float t = i / (float)rate;
-                float env = 0.5f - 0.5f * MathF.Cos(MathF.Tau * t / n.Seconds);
-                ph += MathF.Tau * n.Hz * (1f + 0.004f * MathF.Sin(MathF.Tau * 5f * t)) / rate;
-                buf[start + i] += env * (float)(Math.Sin(ph) + 0.25 * Math.Sin(2 * ph));
             }
         }
         return Scale(buf, gain);

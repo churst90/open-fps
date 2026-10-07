@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Threading;
 using OpenFPS.Common;
 using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 
@@ -44,10 +41,7 @@ public sealed class SteamAudioSimulator : IDisposable
     /// the level of a sound that has to find its way round, where the direct stage only knows it is
     /// blocked.</param>
     public readonly record struct PathResult(bool Found, Vector3 WorldDirection, float Energy,
-                                             float EqLow = 0f, float EqMid = 0f, float EqHigh = 0f)
-    {
-        public static readonly PathResult None = new(false, Vector3.Zero, 0f);
-    }
+                                             float EqLow = 0f, float EqMid = 0f, float EqHigh = 0f);
 
     /// <summary>The direct result mapped to the engine's per-band acoustic parameters: <see cref="Occlusion"/>
     /// is "fraction blocked" (0=clear) and EqLow/Mid/High are per-band clarity (1=clear). Pure mapping,
@@ -98,8 +92,6 @@ public sealed class SteamAudioSimulator : IDisposable
 
     private readonly IntPtr _context;
     private readonly int _maxSources;
-    private readonly int _samplingRate;
-    private readonly int _frameSize;
     private readonly int _flags;        // any combination of DIRECT | PATHING | REFLECTIONS
     private readonly bool _direct;
     private readonly bool _pathing;
@@ -127,8 +119,6 @@ public sealed class SteamAudioSimulator : IDisposable
         return len > 1e-6f ? d / len : Vector3.Zero;
     }
 
-    private readonly float[] _shScratch = new float[4];
-
     /// <summary>Whether any source staged pathing inputs since the last <see cref="Run"/>. See Run.</summary>
     private bool _pathingStaged;
 
@@ -145,8 +135,6 @@ public sealed class SteamAudioSimulator : IDisposable
         if (samplingRate <= 0) samplingRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;   // 0: the mixer's
         _context = context;
         _maxSources = maxSources;
-        _samplingRate = samplingRate;
-        _frameSize = frameSize;
         _direct = enableDirect;
         _pathing = enablePathing;
         _reflections = enableReflections;
@@ -482,30 +470,6 @@ public sealed class SteamAudioSimulator : IDisposable
         Phonon.iplSourceGetOutputs(source, _flags, ref outputs);
         ref var d = ref outputs.direct;
         return new DirectResult(d.occlusion, d.transmission0, d.transmission1, d.transmission2);
-    }
-
-    /// <summary>Reads the most recent pathing result for a source — the WORLD direction the sound arrives
-    /// from after routing through openings. Returns <see cref="PathResult.None"/> when pathing is off or
-    /// no path was found (caller should keep using the direct line to the source).</summary>
-    public PathResult GetPathing(IntPtr source)
-    {
-        if (source == IntPtr.Zero || !PathingReady) return PathResult.None;
-        var outputs = default(Phonon.IPLSimulationOutputs);
-        Phonon.iplSourceGetOutputs(source, _flags, ref outputs);
-        if (outputs.pathing.shCoeffs == IntPtr.Zero) return PathResult.None;
-
-        // Reused: this runs once per occluded source per tick, and a four-float array per call is a
-        // garbage-collection cost paid on the audio worker thread. Single-threaded by contract (see Run).
-        var sh = _shScratch;
-        Marshal.Copy(outputs.pathing.shCoeffs, sh, 0, 4);
-        float energy = sh[0];
-        if (energy <= 0.001f) return PathResult.None;
-        Vector3 dir = PathingWorldDirection(sh[0], sh[1], sh[2], sh[3]);
-        if (dir == Vector3.Zero) return PathResult.None;
-        return new PathResult(true, dir, energy,
-                              Math.Clamp(outputs.pathing.eqCoeffs0, 0f, 1f),
-                              Math.Clamp(outputs.pathing.eqCoeffs1, 0f, 1f),
-                              Math.Clamp(outputs.pathing.eqCoeffs2, 0f, 1f));
     }
 
     private static Phonon.IPLCoordinateSpace3 Coord(Vector3 origin) => new()

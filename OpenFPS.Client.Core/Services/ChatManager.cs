@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using OpenFPS.Common.Networking;
 using OpenFPS.Client.Core.Platform;
 

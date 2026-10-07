@@ -1,5 +1,3 @@
-using System;
-using System.Threading;
 using System.Runtime.CompilerServices;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Common;

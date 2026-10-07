@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
@@ -41,7 +39,6 @@ internal sealed class ExhaustNetwork
     private readonly float[] _scratchA = new float[20], _scratchY = new float[20], _scratchB = new float[20];
     private readonly float _airDensity = 1.2f;
     private float _flowLossFraction;
-    private float _meanMassFlow;
     private float _tailK = 293f;
 
     /// <summary>
@@ -116,8 +113,6 @@ internal sealed class ExhaustNetwork
         /// <summary>What the shell radiated this sample, pascals at one metre. Diagnostic.</summary>
         public float ShellRadiated;
 
-        /// <summary>Acoustic pressure summed over the chambers this sample — the drive. Diagnostic.</summary>
-        public float ChamberPressure;
 
         /// <summary>Where this pipe leaves the car, machine frame, relative to the exhaust part.</summary>
         public Vector3 Exit;
@@ -404,8 +399,6 @@ internal sealed class ExhaustNetwork
     /// pipe, so the number saturates at 0 dB however loud the can gets and a six-fold change in it
     /// reads as three decibels.</summary>
     public float PipeRadiated { get; private set; }
-    /// <summary>Exit velocity of branch 0 this sample, m/s, for anyone who wants to look.</summary>
-    public float ExitVelocity => _branch[0].ExitVelocity;
 
     /// <summary>
     /// Retunes every pipe for the gas now in the system. Called a few hundred times a second, not
@@ -415,7 +408,6 @@ internal sealed class ExhaustNetwork
     /// <param name="massFlowKgPerS">Mean exhaust mass flow of the whole engine.</param>
     public void UpdateGas(float portKelvin, float massFlowKgPerS)
     {
-        _meanMassFlow = massFlowKgPerS;
         float ambient = 293f;
         float tailK = ambient + (portKelvin - ambient) * _x.TailCooling;
         _tailK = tailK;
@@ -665,7 +657,6 @@ internal sealed class ExhaustNetwork
             // spreading out to a metre — as one measured ratio rather than three guessed ones. It is
             // set by rendering with the shell on and reading the level it lands at against the pipe;
             // see the note on MufflerSpec.ShellLevel.
-            br.ChamberPressure = chamberPressure;
             if (br.Shell != null)
             {
                 br.ShellRadiated = br.Shell.Process(chamberPressure) * _x.Muffler.ShellLevel;
@@ -701,9 +692,6 @@ internal sealed class ExhaustNetwork
         ShellRadiated = shell;
         PipeRadiated = pipe;
     }
-
-    /// <summary>Mean exhaust flow the network was last told about, kg/s.</summary>
-    public float MeanMassFlow => _meanMassFlow;
 
     /// <summary>Everything the console might want to print about the geometry.</summary>
     public IEnumerable<string> Describe()

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 
 namespace OpenFPS.Client.Core.Platform;

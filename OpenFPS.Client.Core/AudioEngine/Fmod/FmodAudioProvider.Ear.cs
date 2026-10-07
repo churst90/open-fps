@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -271,9 +270,6 @@ public partial class FmodAudioProvider
     private float _windGainDb, _windCorrectionDb;
     private double _windEarAt;
     private bool _windEarStarted;
-
-    /// <summary>The wind's ear stage, for the log and the lab: its correction, dB.</summary>
-    public float EarWindCorrectionDb => _windGainDb;
 
     private void AttachEarToWind()
     {

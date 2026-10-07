@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 
 namespace OpenFPS.Client.AudioEngine.Core.Signals;
@@ -53,6 +52,4 @@ internal struct Mode
         return y;
     }
 
-    /// <summary>The state, for a mode that is struck once and then left to ring.</summary>
-    public float Value => _z1;
 }

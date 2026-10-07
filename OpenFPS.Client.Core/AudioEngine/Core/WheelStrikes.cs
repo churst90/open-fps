@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 
 namespace OpenFPS.Client.AudioEngine.Core;
 
@@ -98,8 +96,6 @@ public sealed class WheelStrikes
         float f = Math.Clamp(k - lo, 0f, 1f);
         return _peaks[wheel][lo] + (_peaks[wheel][hi] - _peaks[wheel][lo]) * f;
     }
-
-    public int Wheels => _t.Length;
 
     /// <summary>Strikes to come (game thread).</summary>
     public void Queue(IReadOnlyList<WheelStrike> batch)

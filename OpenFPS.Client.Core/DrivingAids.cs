@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
@@ -134,9 +132,6 @@ public sealed class DrivingAids
     private const float CancelAfterDegrees = 45f;
     private const int RelayId = -966010;
     private const string TickSound = "SYNTH/drive_relay_on", TockSound = "SYNTH/drive_relay_off";
-
-    /// <summary>-1 left, +1 right, 0 off.</summary>
-    public int Indicator => _indicator;
 
     /// <summary>J (-1) or L (+1): that side's indicator on, or off if it already was. What to say.</summary>
     public string ToggleIndicator(int side)

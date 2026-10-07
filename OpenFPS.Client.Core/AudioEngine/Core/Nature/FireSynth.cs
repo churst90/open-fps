@@ -1,8 +1,5 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading.Tasks;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
@@ -803,22 +800,6 @@ public sealed class FireSynth
             if (u < acc) return p;
         }
         return places - 1;
-    }
-
-    /// <summary>A place's events by the crackle rate there: whichever place a crackle of the whole would land in.</summary>
-    private int PlaceByRate()
-    {
-        int places = _sums.Length;
-        if (places == 1) return 0;
-        float total = 0f;
-        for (int p = 0; p < places; p++) total += _crackleRateAt[p];
-        float u = _sum.Uniform() * total, acc = 0f;
-        for (int p = 0; p < places; p++)
-        {
-            acc += _crackleRateAt[p];
-            if (u < acc) return p;
-        }
-        return 0;
     }
 
     /// <summary>The next sample at each place, pascals at a metre from it: <paramref name="places"/>

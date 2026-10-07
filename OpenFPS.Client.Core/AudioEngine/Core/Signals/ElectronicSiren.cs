@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;   // OnePole
 

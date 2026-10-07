@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Common;
@@ -50,7 +49,7 @@ public sealed class EarWindState : IGuardedUnit
         var box = System.Threading.Volatile.Read(ref _listener);
         if (!Enabled || box == null)
         {
-            Synth.Control(default, dt);
+            Synth.Control(default);
             return;
         }
         var listener = box.L;
@@ -58,7 +57,7 @@ public sealed class EarWindState : IGuardedUnit
         if (_exposure < 0f) _exposure = target;
         _exposure += (target - _exposure) * (1f - MathF.Exp(-dt / ExposureSeconds));
         var ears = EarWind.Hear(WindField.Weather, listener with { Exposure = _exposure }, WindField.Now());
-        Synth.Control(ears, dt);
+        Synth.Control(ears);
     }
 }
 

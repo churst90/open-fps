@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
@@ -54,8 +53,6 @@ public sealed class ChimeHorn
     public bool Blowing { get; set; }
     /// <summary>Output, pascals at one metre on the horn's axis, valid after Step().</summary>
     public float Out { get; private set; }
-    /// <summary>How much air is reaching the manifold, 0..1.</summary>
-    public float Valve => _valve;
 
     public ChimeHorn(ChimeHornSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
     {

@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
@@ -135,8 +134,6 @@ public sealed class EngineSynth
     /// <summary>Net torque from the gas on the crank this sample, Nm, scaled so full throttle at
     /// the torque peak gives the profile's peak torque.</summary>
     public float Torque { get; private set; }
-    /// <summary>Mean exhaust mass flow, kg/s, smoothed over a few cycles.</summary>
-    public float MassFlow => _massFlowLp;
     /// <summary>Manifold pressure, bar absolute.</summary>
     public float ManifoldBar => _map / Gas.Atmosphere;
     /// <summary>Whether combustion is happening — for the caller's log, not the physics.</summary>
@@ -152,8 +149,6 @@ public sealed class EngineSynth
     /// <summary>What the idle governor is adding: bypass area as a fraction of the bore on a petrol
     /// engine (0..0.04), fuel on a diesel (0..1).</summary>
     public float IdleAir => _idleAir;
-    /// <summary>The torque calibration applied, so the console can say what the model made.</summary>
-    public float TorqueScale => _torqueScale;
     public float EvoPressureCalibratedBar { get; private set; }
 
     public readonly EngineProfile Profile;
@@ -271,7 +266,7 @@ public sealed class EngineSynth
         public float ExhaustUMean, IntakeUMean; // slow mean volume velocity through each valve, m^3/s
         public float PortE, PortI, FlowE, FlowI; // diagnostics: port acoustic pressure, valve mass flow
         // This cycle's combustion, decided at intake valve closing.
-        public float HeatTotal, SparkDeg, BurnDeg, BurnPrev, Quality, Dilution;
+        public float HeatTotal, SparkDeg, BurnDeg, BurnPrev, Quality;
         public float Premix;                   // diesel: fraction of the charge that burns premixed
         public bool Burning, ChargeDecided, Misfired;
         public float PopAmp; public int PopLeft, PopLength;
@@ -464,7 +459,7 @@ public sealed class EngineSynth
     /// the pipes and the muffler then do to it what they do to everything else, which is what gives
     /// a muffled truck its flat, lower top (Donaldson US 6,082,487).
     /// </summary>
-    private float BlowdownJet(ref Cylinder cy, float mdot, float area, float lift, float valveD, int c)
+    private float BlowdownJet(ref Cylinder cy, float mdot, float area)
     {
         float rhoT = 0.63f * MathF.Max(1e-3f, cy.Mass / MathF.Max(1e-7f, cy.Volume));
         float cCyl = Gas.SoundSpeed(cy.Temp, Gas.GammaExhaust);
@@ -707,7 +702,6 @@ public sealed class EngineSynth
         _gasTick = _gasTick + 1 == GasEvery ? 0 : _gasTick + 1;
 
         // ── Crank ────────────────────────────────────────────────────────────────────────────
-        double before = _theta;
         _theta += _omega * (180.0 / Math.PI) * _dt;
         if (_theta >= _cycleDeg) _theta -= _cycleDeg;
         // The engine computer's count since the key was turned. Lost with the ignition, and with the
@@ -812,7 +806,7 @@ public sealed class EngineSynth
                     cy.BurntMass += entering;
                 }
                 portPeak = MathF.Max(portPeak, MathF.Abs(aE + bE));
-                if (ValveJetNoise && mdot > 0f) bE += BlowdownJet(ref cy, mdot, area, liftE, e.ExhaustValve.DiameterMm * 1e-3f, c);
+                if (ValveJetNoise && mdot > 0f) bE += BlowdownJet(ref cy, mdot, area);
             }
             else
             {
@@ -916,8 +910,8 @@ public sealed class EngineSynth
 
             // Valvetrain: a tick as each valve leaves its seat and a louder one as it lands.
             bool eOpen = liftE > 1e-5f;
-            if (eOpen != cy.EOpenWas) _click.Trigger(eOpen ? 0.5f : 1f, 3600f + 400f * (c % 3));
-            if (intakeOpen != cy.IOpenWas) _click.Trigger(intakeOpen ? 0.45f : 0.9f, 3100f + 300f * (c % 4));
+            if (eOpen != cy.EOpenWas) _click.Trigger(eOpen ? 0.5f : 1f);
+            if (intakeOpen != cy.IOpenWas) _click.Trigger(intakeOpen ? 0.45f : 0.9f);
             cy.EOpenWas = eOpen; cy.IOpenWas = intakeOpen;
         }
 
@@ -1571,7 +1565,6 @@ public sealed class EngineSynth
         var e = Profile;
         float fresh = MathF.Max(0f, cy.Mass - cy.BurntMass);
         float dilution = cy.Mass > 1e-9f ? cy.BurntMass / cy.Mass : 1f;
-        cy.Dilution = dilution;
 
         if (!firing) { cy.ChargeDecided = false; cy.HeatTotal = 0f; return; }
         if (rpm > e.RedlineRpm + 120f) { cy.ChargeDecided = false; cy.HeatTotal = 0f; return; } // limiter
@@ -1760,14 +1753,6 @@ public sealed class EngineSynth
     }
     // Stryker restore all
 
-    /// <summary>Resets the engine to cold and still.</summary>
-    public void Reset()
-    {
-        _armOmega = 0f; _clutchLocked = false;
-        _omega = 0f; _theta = 0; _idleAir = 0f; _spool = 0f; _massFlowLp = 0f; _syncDegrees = 0f;
-        _turbineTone = 0f; _wb1 = _wb2 = _wx1 = _wx2 = 0f;
-    }
-
     /// <summary>Console lines about the built engine.</summary>
     public System.Collections.Generic.IEnumerable<string> Describe()
     {
@@ -1778,19 +1763,15 @@ public sealed class EngineSynth
         foreach (var line in _exhaust.Describe()) yield return line;
     }
 
-    /// <summary>A short mechanical tick: a two-pole ring plus a puff of noise.</summary>
+    /// <summary>A short mechanical tick: a puff of noise, rung by the head's structure.</summary>
     private sealed class ClickVoice
     {
-        private readonly float _rate;
         private readonly Random _rng;
-        private float _env, _freq = 3500f;
+        private float _env;
         private readonly float _decay;   // 0.9 a sample at 44.1 kHz: 0.2 ms
-        public ClickVoice(float rate, int seed) { _rate = rate; _rng = new Random(seed); _decay = At44k.Decay(0.9f, rate); }
-        public void Trigger(float amp, float freq)
-        {
-            _env = MathF.Min(1.5f, _env + amp * (0.7f + 0.6f * (float)_rng.NextDouble()));
-            _freq = freq;
-        }
+        public ClickVoice(float rate, int seed) { _rng = new Random(seed); _decay = At44k.Decay(0.9f, rate); }
+        public void Trigger(float amp)
+            => _env = MathF.Min(1.5f, _env + amp * (0.7f + 0.6f * (float)_rng.NextDouble()));
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public float Process()
         {

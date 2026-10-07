@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Core;
@@ -36,9 +34,6 @@ public interface IAudioProvider : IDisposable
     /// Steam Audio is unavailable to decode one.
     /// </summary>
     bool PlayAmbientBed(string soundId, AmbisonicLayout layout, float volume, bool loop = true);
-
-    /// <summary>Sets the level a bed glides toward. Two beds at two levels is a cross-fade.</summary>
-    void SetAmbientBedVolume(string soundId, float volume);
 
     /// <summary>Stops a bed and frees its decoder.</summary>
     void StopAmbientBed(string soundId);
@@ -121,7 +116,6 @@ public interface IAudioProvider : IDisposable
     void StopSound(int entityId);
     bool IsPlaying(int entityId);
     Vector3 GetSoundPosition(int entityId);
-    float GetPlaybackProgress(int entityId);
     IEnumerable<int> GetActiveSpatialSoundIds();
     void Preload(string soundId);
 

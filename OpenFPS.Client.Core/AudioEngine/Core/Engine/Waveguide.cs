@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 
@@ -246,15 +245,6 @@ internal sealed class WaveLine
         return _gain * _lp;
     }
 
-    public void Clear()
-    {
-        Array.Clear(_buf);
-        _lp = 0f; _vPrev = 0f; _preV = 0f;
-        _tauPrev = _time - 1 + _d0;
-        _preTau = _tauPrev - 1;
-        _frontN = 0; _frontSumTau = 0;
-        _accSlot = long.MinValue; _accSum = 0; _accN = 0;
-    }
 }
 
 /// <summary>
@@ -345,7 +335,6 @@ internal sealed class Pipe
     /// <summary>The backward wave arriving at the near end. Call exactly once per sample.</summary>
     public float ArriveNear() => _bwd.Read();
 
-    public void Clear() { _fwd.Clear(); _bwd.Clear(); }
 }
 
 /// <summary>

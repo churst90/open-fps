@@ -1,6 +1,4 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
 using OpenFPS.Common.Hearing;
 
@@ -47,9 +45,6 @@ public sealed class EarVoiceState : IGuardedUnit
         Volatile.Write(ref _snap, 1);
     }
     private int _snap;
-
-    public float TargetLowDb => Volatile.Read(ref _targetLow);
-    public float TargetHighDb => Volatile.Read(ref _targetHigh);
 
     // ── Mixer thread ─────────────────────────────────────────────────────────────────────────
     internal float LowDb, HighDb;

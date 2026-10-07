@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
@@ -68,8 +66,6 @@ public sealed class SteamFrontEnd
     /// with the exhaust.</summary>
     public bool SafetyValve { get; set; }
 
-    public float ChuffHz { get; private set; }
-    public float StackHz => _s.StackHz;
 
     public SteamFrontEnd(SteamLocoSpec s, float rate, int seed)
     {
@@ -118,7 +114,6 @@ public sealed class SteamFrontEnd
     public float Step(float speedMps)
     {
         float driverHz = MathF.Abs(speedMps) * MathF.Max(0.2f, Slip) / (MathF.PI * MathF.Max(0.3f, _s.DriverDiameterMetres));
-        ChuffHz = driverHz * _beatPhase.Length;
 
         double before = _rev;
         _rev += driverHz * _dt;

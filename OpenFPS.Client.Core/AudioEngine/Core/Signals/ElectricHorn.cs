@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
@@ -62,8 +60,6 @@ public sealed class ElectricHorn
     public bool Blowing { get; set; }
     /// <summary>Output, pascals at one metre on the horn's axis, valid after Step().</summary>
     public float Out { get; private set; }
-
-    public ElectricHornSpec Spec => _spec;
 
     public ElectricHorn(ElectricHornSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
     {

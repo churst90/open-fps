@@ -1,6 +1,4 @@
-using System;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 
@@ -42,13 +40,11 @@ public abstract class NatureVoiceState : PhysicalVoiceState
 /// <summary>A fountain, a cascade, a weir: water falling into water. See <see cref="FallingWaterSynth"/>.</summary>
 public sealed class WaterVoiceState : NatureVoiceState
 {
-    public readonly WaterFeatureSpec Spec;
     public readonly FallingWaterSynth Water;
 
     public WaterVoiceState(WaterFeatureSpec spec, float sampleRate, int seed, Vector3 position)
         : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.WindHeightMetres)
     {
-        Spec = spec;
         Water = new FallingWaterSynth(spec, sampleRate, seed);
     }
 
@@ -131,10 +127,6 @@ public sealed class WaterFeatureVoice
     {
         if (tap >= 0 && tap < _spread.Length) Volatile.Write(ref _spread[tap], spread);
     }
-
-    /// <summary>Tap <paramref name="tap"/>'s sample at <paramref name="at"/>, rendering ahead as needed.
-    /// Called from the render pool's worker threads.</summary>
-    public float Sample(int tap, long at) => Sample(tap, 0, at);
 
     /// <summary>Place <paramref name="place"/> of tap <paramref name="tap"/> at <paramref name="at"/>.</summary>
     public float Sample(int tap, int place, long at)
@@ -220,7 +212,6 @@ public sealed class WaterTapState : NatureVoiceState
 /// <summary>A wood fire. See <see cref="FireSynth"/>.</summary>
 public sealed class FireVoiceState : NatureVoiceState
 {
-    public readonly FireSpec Spec;
     public readonly FireSynth Fire;
 
     /// <summary>When it was lit on the shared clock (FireSpec.KeyFor), or null for one always burning.</summary>
@@ -229,7 +220,6 @@ public sealed class FireVoiceState : NatureVoiceState
     public FireVoiceState(FireSpec spec, float sampleRate, int seed, Vector3 position)
         : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.FlameHeightMetres)
     {
-        Spec = spec;
         Fire = new FireSynth(spec, sampleRate, seed);
     }
 
@@ -247,13 +237,11 @@ public sealed class FireVoiceState : NatureVoiceState
 /// <summary>A tree, or a hedge, with the wind in it. See <see cref="FoliageSynth"/>.</summary>
 public sealed class FoliageVoiceState : NatureVoiceState
 {
-    public readonly FoliageSpec Spec;
     public readonly FoliageSynth Foliage;
 
     public FoliageVoiceState(FoliageSpec spec, float sampleRate, int seed, Vector3 position)
         : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.CrownHeightMetres)
     {
-        Spec = spec;
         Foliage = new FoliageSynth(spec, sampleRate, seed);
     }
 
@@ -283,7 +271,6 @@ public sealed class FoliageVoiceState : NatureVoiceState
 /// </summary>
 public sealed class PlacedNatureVoice
 {
-    public readonly string Key;
     public readonly int Places;
     public readonly Vector3 Position;
     public readonly float SourceLevelDb, HeadroomDb, WindHeight;
@@ -314,11 +301,11 @@ public sealed class PlacedNatureVoice
     public int Voices;
 
     public PlacedNatureVoice(string key, FoliageSpec spec, int places, float sampleRate, int seed, Vector3 position)
-        : this(key, places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.CrownHeightMetres)
+        : this(places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.CrownHeightMetres)
         => Foliage = new FoliageSynth(spec, sampleRate, seed, places);
 
     public PlacedNatureVoice(string key, FireSpec spec, int places, float sampleRate, int seed, Vector3 position)
-        : this(key, places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.FlameHeightMetres)
+        : this(places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.FlameHeightMetres)
     {
         Fire = new FireSynth(spec, sampleRate, seed, places);
         FireSpec.ParseKey(key, out _, out _litAt);
@@ -328,18 +315,17 @@ public sealed class PlacedNatureVoice
     private readonly double? _litAt;
 
     public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position)
-        : this(key, Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f)
+        : this(Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f)
         => Flow = new RunningWaterSynth(spec, sampleRate, seed);
 
     /// <summary>Waves at an edge (ShoreSynth): the source's own fetch, the way its water lies and its
     /// length come from the map's key (ShoreSpec.KeyFor).</summary>
     public PlacedNatureVoice(string key, ShoreSpec spec, ShoreGeometry geometry, float sampleRate, int seed, Vector3 position)
-        : this(key, spec.TotalPlaces, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 10f)
+        : this(spec.TotalPlaces, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 10f)
         => Shore = new ShoreSynth(spec, sampleRate, seed, geometry);
 
-    private PlacedNatureVoice(string key, int places, float sampleRate, Vector3 position, float levelDb, float headroomDb, float windHeight)
+    private PlacedNatureVoice(int places, float sampleRate, Vector3 position, float levelDb, float headroomDb, float windHeight)
     {
-        Key = key;
         Places = Math.Max(1, places);
         Position = position;
         SourceLevelDb = levelDb;

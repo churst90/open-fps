@@ -1,8 +1,6 @@
-using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Yard;
@@ -113,21 +111,15 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
     private int _producing;
     private double _seconds;
 
-    public long Played => Volatile.Read(ref _played);
-    public long Lead => Volatile.Read(ref _written) - Volatile.Read(ref _played);
-    public int Starves => _starves;
-    private int _starves;
 
     private long _consumedSincePrimed;
     private float _lastOut;
     private float _envelope;
 
-    public float LeadSeconds => _leadSeconds;
     private volatile float _leadSeconds = MinLeadSeconds;
     public const float MinLeadSeconds = 0.25f;
     public const float MaxLeadSeconds = 0.7f;
 
-    public bool Primed => _primed;
     private volatile bool _primed;
 
     protected const float WarmupSeconds = 0.08f;
@@ -227,7 +219,6 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
         _lastOut = 0f;
 
         if (!_primed) return;
-        _starves++;
         Interlocked.Increment(ref GlobalStarves);
         float lead = _leadSeconds;
         if (_consumedSincePrimed > lead * SampleRate)
@@ -404,7 +395,6 @@ public sealed class MachineVoiceState : PhysicalVoiceState
 /// </summary>
 public sealed class AircraftVoiceState : PhysicalVoiceState
 {
-    public readonly AircraftProfile Profile;
     public readonly AircraftSynth Aircraft;
 
     /// <summary>The power lever, 0..1. Game thread writes.</summary>
@@ -434,7 +424,6 @@ public sealed class AircraftVoiceState : PhysicalVoiceState
     public AircraftVoiceState(AircraftProfile p, float sampleRate, int seed, float lever = 1f)
         : base(p.SourceLevelDb, sampleRate)
     {
-        Profile = p;
         Aircraft = new AircraftSynth(p, sampleRate, seed);
         // Already at this power, not spooling up to it. See AircraftSynth.PlaceAtLever.
         _lever = Math.Clamp(lever, 0f, 1f);
@@ -488,7 +477,6 @@ public sealed class AircraftVoiceState : PhysicalVoiceState
 /// </summary>
 public sealed class SirenVoiceState : PhysicalVoiceState
 {
-    public readonly SirenSpec Spec;
     public readonly ElectronicSiren Siren;
 
     /// <summary>Which sound the head is making. Game thread writes.</summary>
@@ -497,7 +485,6 @@ public sealed class SirenVoiceState : PhysicalVoiceState
     public SirenVoiceState(SirenSpec spec, float sampleRate)
         : base(spec.SourceLevelDb, sampleRate)
     {
-        Spec = spec;
         Siren = new ElectronicSiren(spec, sampleRate);
     }
 
@@ -530,7 +517,6 @@ public sealed class SirenVoiceState : PhysicalVoiceState
 /// </summary>
 public sealed class HornVoiceState : PhysicalVoiceState
 {
-    public readonly string Horn;
     public readonly float[] Pattern;
     private readonly ChimeHorn? _air;
     private readonly ElectricHorn? _electric;
@@ -538,7 +524,6 @@ public sealed class HornVoiceState : PhysicalVoiceState
     public HornVoiceState(string horn, float[] pattern, float sampleRate, int seed)
         : base(Honk.LevelDb(horn), sampleRate)
     {
-        Horn = horn;
         Pattern = pattern;
         int colon = horn.IndexOf(':');
         string kind = colon > 0 ? horn[..colon] : "";
@@ -548,9 +533,6 @@ public sealed class HornVoiceState : PhysicalVoiceState
         else
             _electric = new ElectricHorn(ElectricHornSpec.ByName(preset), sampleRate, seed);
     }
-
-    /// <summary>Seconds from the first audible sample to the last sound of the horn dying away.</summary>
-    public float Seconds => Honk.Held(Pattern) ? float.PositiveInfinity : Honk.Duration(Pattern) + 0.3f;
 
     protected override void PushListener(Vector3 frame)
     {
@@ -586,7 +568,6 @@ public sealed class HornVoiceState : PhysicalVoiceState
 /// </summary>
 public sealed class BellVoiceState : PhysicalVoiceState
 {
-    public readonly StruckBellSpec Spec;
     public readonly StruckBell Bell;
 
     /// <summary>Rendered with the bell's own headroom (StruckBellSpec.PeakHeadroomDb): under the
@@ -596,7 +577,6 @@ public sealed class BellVoiceState : PhysicalVoiceState
     public BellVoiceState(StruckBellSpec spec, float sampleRate, int seed)
         : base(spec.ReferenceDb, sampleRate, spec.PeakHeadroomDb)
     {
-        Spec = spec;
         Bell = new StruckBell(spec, sampleRate, seed);
     }
 

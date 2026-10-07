@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
@@ -54,8 +53,6 @@ public sealed class SteamWhistle
     public bool Blowing { get; set; }
     /// <summary>Output, pascals at one metre, valid after Step().</summary>
     public float Out { get; private set; }
-    /// <summary>The gas temperature in the bells now — the thing the pitch is riding on.</summary>
-    public float GasKelvin => _kelvin;
     public float SoundSpeed => MathF.Sqrt(1.33f * 461.5f * MathF.Max(280f, _kelvin));
 
     public SteamWhistle(WhistleSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 23)

@@ -1,8 +1,5 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
-using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -52,12 +49,7 @@ internal sealed class AmbisonicBedState : IGuardedUnit
 
     // Diagnostics.
     public long CallbackCount;
-    public volatile int LastBlockLength;
-    public volatile int LastOutChannels;
     public volatile int Bailed;
-    public volatile float InputRms;
-    public volatile bool ProducedAudio;
-    public volatile float LastRmsL, LastRmsR;
 }
 
 /// <summary>
@@ -144,8 +136,6 @@ internal static class AmbisonicBedDsp
         int n = (int)length;
 
         // Steam Audio's effects are built for exactly the frame size they were created with.
-        s.LastBlockLength = n;
-        s.LastOutChannels = outCh;
         Interlocked.Increment(ref s.CallbackCount);
 
         if (n != s.FrameSize || s.Effect == IntPtr.Zero || s.Pcm.Length == 0)
@@ -205,10 +195,6 @@ internal static class AmbisonicBedDsp
         }
         s.CurrentVolume = target;
 
-        double inSum = 0;
-        for (int i = 0; i < n * ch; i++) inSum += scratch[i] * (double)scratch[i];
-        s.InputRms = (float)Math.Sqrt(inSum / (n * ch));
-
         // 3. Interleaved -> Steam Audio's planar buffer -> rotated + decoded binaural pair.
         Phonon.iplAudioBufferDeinterleave(s.Context, scratch, ref s.InBuf);
 
@@ -223,8 +209,6 @@ internal static class AmbisonicBedDsp
         Phonon.iplAudioBufferInterleave(s.Context, ref s.OutBuf, s.StereoScratch);
 
         // 4. Out.
-        bool nonZero = false;
-        double sumL = 0, sumR = 0;
         unsafe
         {
             float* o = (float*)outbuffer;
@@ -232,17 +216,12 @@ internal static class AmbisonicBedDsp
             for (int i = 0; i < n; i++)
             {
                 float l = st[i * 2], r = st[i * 2 + 1];
-                sumL += l * (double)l; sumR += r * (double)r;
-                if (l != 0f || r != 0f) nonZero = true;
                 o[i * outCh] = l;
                 if (outCh > 1) o[i * outCh + 1] = r;
                 for (int c = 2; c < outCh; c++) o[i * outCh + c] = 0f;
             }
         }
 
-        if (nonZero) s.ProducedAudio = true;
-        s.LastRmsL = (float)Math.Sqrt(sumL / n);
-        s.LastRmsR = (float)Math.Sqrt(sumR / n);
         return RESULT.OK;
     }
 }

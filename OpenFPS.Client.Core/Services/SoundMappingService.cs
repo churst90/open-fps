@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.IO;
-using System;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.AudioEngine.Core;
 
@@ -121,12 +118,10 @@ public class SoundMappingService
             materialName = NearestRecorded(materialName);
         }
 
-        string relativePath = "";
-
         // 1. Try Material + Variant subfolder
         string variantFolder = materialName + (_state.CurrentVariant ?? "0");
         string key = $"{action}/{materialName}/{variantFolder}";
-        relativePath = _bank.GetRandomSoundPath(key);
+        string relativePath = _bank.GetRandomSoundPath(key);
         
         if (string.IsNullOrEmpty(relativePath))
         {

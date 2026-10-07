@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;

@@ -1,7 +1,5 @@
-using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
@@ -281,26 +279,16 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private float _lastOut;
 
     /// <summary>
-    /// How far ahead of the mixer THIS voice's producer tries to stay, in seconds.
-    ///
-    /// Per voice, and that matters. A global figure grown whenever ANY voice was caught short would
-    /// let one car created four milliseconds ago, whose ring is empty only because it is new, make
-    /// all thirty of the others owe more audio on a machine that is already behind; the lead would
-    /// ratchet to its ceiling within a second of a map load and stay there. A voice buys its own
-    /// headroom with its own starvation, and only after it has been playing for at least one lead —
-    /// before that there is nothing to diagnose, only a ring that is still filling.
-    ///
-    /// Long enough to absorb a scheduling hiccup on a busy machine, short enough that a change the
-    /// game thread makes — the throttle, the speed the car is doing — is not heard noticeably late.
+    /// How far ahead of the mixer this voice's producer tries to stay, seconds. Per voice: a global
+    /// figure grown when any voice starved let one new car (empty only because it is new) push all
+    /// thirty others to the ceiling within a second of a map load. A voice grows its own lead from
+    /// its own starves, and only after it has played for one lead. Long enough to absorb a scheduling
+    /// hiccup, short enough that a throttle change is not heard late.
     /// </summary>
-    public float LeadSeconds => _leadSeconds;
     private volatile float _leadSeconds = MinLeadSeconds;
     public const float MinLeadSeconds = 0.25f;
     /// <summary>The deepest the buffer will go when the machine cannot keep up.</summary>
     public const float MaxLeadSeconds = 0.7f;
-
-    /// <summary>The sample played <paramref name="back"/> samples ago, linearly interpolated.</summary>
-    public float ReadBack(double back) => ReadAt(Volatile.Read(ref _played) - back);
 
     /// <summary>
     /// One sample at an ABSOLUTE position in this voice's stream, linearly interpolated.
@@ -1047,9 +1035,6 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>The level the machine is running at, dB SPL at a metre, smoothed over half a second.</summary>
     public float RunningLevelDb => _levelMs > 0 ? 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f) : 0f;
 
-    /// <summary>The lift in force, dB: what the law in loudness units adds to this voice.</summary>
-    public float LiftDbNow => 20f * MathF.Log10(MathF.Max(1e-6f, _levelGain));
-
     private void FlushBands()
     {
         if (_bandFill == 0) return;
@@ -1125,10 +1110,6 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>Where the bay's noise leaves the vehicle, grille and open floor, and what the body does
     /// to it on the way to the listener. See BayRadiation.</summary>
     private readonly OpenFPS.Client.AudioEngine.Core.Engine.BayRadiation _bayRadiation;
-    /// <summary>The bay's radiation, for tests and instruments.</summary>
-    internal OpenFPS.Client.AudioEngine.Core.Engine.BayRadiation BayRadiation => _bayRadiation;
-    /// <summary>The pipe's radiation, for tests and instruments.</summary>
-    internal OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation Radiation => _radiation;
     /// <summary>The front brakes singing at the end of a stop, on a vehicle whose brakes do. See
     /// BrakeSqueal.</summary>
     private readonly OpenFPS.Client.AudioEngine.Core.BrakeSqueal _squeal;
@@ -1275,9 +1256,6 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         if (MathF.Abs(outPa) > PeakChimePa) PeakChimePa = MathF.Abs(outPa);
         return outPa;
     }
-
-    /// <summary>How many body modes this voice is running. Diagnostic, for the cost report.</summary>
-    public int BodyModeCount => _body.ModeCount;
 
     /// <summary>
     /// Starts the voice as a car ALREADY DOING this speed, rather than as one that has to get there.
@@ -2182,7 +2160,6 @@ public sealed class EngineTapState : IGuardedUnit
     /// <summary>Where this tap's channel's own clock sits on its parent's (EngineVoiceState.ChannelClockOffset).</summary>
     public long ChannelClockOffset { get => Volatile.Read(ref _channelClockOffset); set => Volatile.Write(ref _channelClockOffset, value); }
     private long _channelClockOffset = long.MinValue;
-    public bool ChannelClockKnown => ChannelClockOffset != long.MinValue;
 
     /// <summary>The cabin path this tap plays (1 and up), or -1 for the machine's front outlet.</summary>
     public readonly int CabinPath = -1;

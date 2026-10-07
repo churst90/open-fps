@@ -1,7 +1,5 @@
-using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Threading;
 using Thread = System.Threading.Thread;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
@@ -317,7 +315,7 @@ internal sealed class TracedEchoRig : IGuardedUnit
     public IntPtr WorkerContext, ProviderContext;
     public IntPtr Effect, EffectB, Decode, Hrtf;
     public Phonon.IPLAudioBuffer Mono, Ambi, AmbiB, Stereo;
-    public float[] Capture = Array.Empty<float>(), MonoScratch = Array.Empty<float>(), StereoScratch = Array.Empty<float>();
+    public float[] Capture = Array.Empty<float>(), StereoScratch = Array.Empty<float>();
     public float[] AmbiScratchA = Array.Empty<float>(), AmbiScratchB = Array.Empty<float>();
     /// <summary>Where the crossfade stands: 0 all bank A, 1 all bank B. Mixer thread only.</summary>
     public float Blend = -1f;
@@ -341,8 +339,6 @@ internal sealed class TracedEchoRig : IGuardedUnit
     /// <summary>The effect's convolution tail belongs to the last voice; the mix resets it on its
     /// first block with a new one.</summary>
     public volatile bool NeedsReset;
-    /// <summary>Which voice (entity id) it is on, for the readout.</summary>
-    public int Owner;
     public volatile float InRms, OutRms;
 }
 

@@ -1,6 +1,4 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
 
@@ -86,8 +84,6 @@ internal sealed class SteamAudioVoiceState
 
     // Diagnostics for the headless smoke test.
     public long CallbackCount;
-    public volatile bool ProducedAudio;
-    public volatile float LastRms; // RMS of the most recent output block (level/distance checks)
     public volatile float LastRmsL, LastRmsR; // per-channel RMS — proves L/R binaural separation
 }
 
@@ -331,7 +327,6 @@ internal static class SteamAudioDsp
         float blend = Math.Clamp(state.SpatialBlend, 0f, 1f);
         float fromBlend = state.LastBlend < 0f ? blend : state.LastBlend;
         state.LastBlend = blend;
-        bool nonZero = false;
         double sumSq = 0, sumSqL = 0, sumSqR = 0;
         unsafe
         {
@@ -368,7 +363,6 @@ internal static class SteamAudioDsp
                     float l = st[i * 2], r = st[i * 2 + 1];
                     o[i * 2] = l; o[i * 2 + 1] = r;
                     sumSqL += l * (double)l; sumSqR += r * (double)r;
-                    if (l != 0f || r != 0f) nonZero = true;
                 }
                 sumSq = sumSqL + sumSqR;
             }
@@ -378,7 +372,6 @@ internal static class SteamAudioDsp
                 {
                     float l = st[i * 2], r = st[i * 2 + 1];
                     sumSqL += l * (double)l; sumSqR += r * (double)r;
-                    if (l != 0f || r != 0f) nonZero = true;
                     for (int c = 0; c < outCh; c++) o[i * outCh + c] = c == 0 ? l : (c == 1 ? r : 0f);
                 }
                 sumSq = sumSqL + sumSqR;
@@ -386,8 +379,6 @@ internal static class SteamAudioDsp
         }
 
         Interlocked.Increment(ref state.CallbackCount);
-        if (nonZero) state.ProducedAudio = true;
-        state.LastRms = (float)Math.Sqrt(sumSq / (n * 2));
         state.LastRmsL = (float)Math.Sqrt(sumSqL / n);
         state.LastRmsR = (float)Math.Sqrt(sumSqR / n);
         return RESULT.OK;

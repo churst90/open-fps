@@ -1,11 +1,7 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Common.Components;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -102,17 +98,6 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>How the listener's room colours its own tail: the ratio of the high band's decay to the
     /// middle's, and the low band's to the middle's. 1 means an even decay across the spectrum.</summary>
     public float ListenerHfDecayRatio => _listenerHfDecayRatio;
-    /// <summary>Where the listener's reverberant field comes from, world space, and how one-sided it
-    /// is (0 = from everywhere, 1 = from one direction). See Enclosure.ReturnCentroid.</summary>
-    public Vector3 ListenerReturnDirection => new(_listenerReturnX, _listenerReturnY, _listenerReturnZ);
-    public float ListenerAnisotropy => _listenerAnisotropy;
-    /// <summary>The distance between surfaces round the listener, metres — the room's size as the
-    /// rays found it. The diffuse tail begins a couple of these after the direct sound.</summary>
-    public float ListenerMeanFreePath => _listenerMfp;
-    /// <summary>The room's surface area as the rays measured it, m². The room equation needs it and
-    /// used to assume a cube instead; see Enclosure.ReverberantToDirectPower.</summary>
-    public float ListenerSurfaceArea => _listenerSurface;
-    private volatile float _listenerReturnX, _listenerReturnY, _listenerReturnZ, _listenerAnisotropy, _listenerMfp, _listenerSurface;
     public float ListenerLfDecayRatio => _listenerLfDecayRatio;
     private readonly Dictionary<int, IntPtr> _saSources = new();   // entityId -> acquired IPLSource
     private readonly Dictionary<int, long> _saLastSeen = new();     // entityId -> TickCount64 of last request
@@ -804,22 +789,10 @@ public class AsyncAcousticWorker : IDisposable
         }
 
         int region = -1;
-        bool listenerEnclosed = false;
         if (world.AcousticMap != null)
         {
             try { region = _acoustics.GetRegionAt(world, req.SourcePos); }
             catch { region = -1; }
-            // The LISTENER's boundary, which is what the air absorption model is asking about. This
-            // was the SOURCE's region and the test was "is it not the global id", so a source that
-            // stood in any named region made the listener indoors — and after the speedway got its
-            // sector names, that was every source on the map.
-            try
-            {
-                listenerEnclosed = world.AcousticMap.Regions.TryGetValue(
-                                       _acoustics.GetRegionAt(world, req.ListenerPos), out var lr)
-                                   && RoomAcoustics.IsEnclosure(lr);
-            }
-            catch { listenerEnclosed = false; }
         }
 
         var path = new AcousticPathData
@@ -848,7 +821,7 @@ public class AsyncAcousticWorker : IDisposable
 
         if (trace != null) Provenance[req.EntityId] = trace;
         var paths = new List<AcousticPathData>(1 + EarlyReflections.MaxArrivals) { path };
-        AddEarlyReflections(paths, world, req, region, listenerEnclosed);
+        AddEarlyReflections(paths, world, req, region);
         return paths;
     }
 
@@ -868,7 +841,7 @@ public class AsyncAcousticWorker : IDisposable
     /// level comes from how enclosed the place is (see Enclosure).
     /// </summary>
     private void AddEarlyReflections(List<AcousticPathData> into, WorldSnapshot world,
-                                     AcousticRequest req, int region, bool listenerEnclosed)
+                                     AcousticRequest req, int region)
     {
         var geometry = _enclosureWorld;
         var solids = geometry != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? null : ReflectionSolids();
@@ -1030,11 +1003,6 @@ public class AsyncAcousticWorker : IDisposable
         }
         return answer;
     }
-
-    /// <summary>Builds the graph for a scene. What the map's openings disagree with in the geometry is
-    /// said once, when the map arrives, not on every door's swing.</summary>
-    private OpeningRoutes BuildRoutes(WorldSnapshot world, List<SteamAudioScene.Box> boxes, bool report)
-        => BuildRoutes(world, boxes, null, null, report);
 
     /// <summary>
     /// The routes through openings for a scene. With the scene's acoustic triangle store
@@ -1226,7 +1194,7 @@ public class AsyncAcousticWorker : IDisposable
 
     /// <summary>The two scenes for a world: assembled from the tile set's sub-scenes (only the tiles
     /// that changed are built), or, without Embree, built whole.</summary>
-    private static (SteamAudioScene Full, SteamAudioScene Listener) ScenesFor(IntPtr ctx, TileSceneSet? set, WorldSnapshot world,
+    private static (SteamAudioScene Full, SteamAudioScene Listener) ScenesFor(IntPtr ctx, TileSceneSet? set,
                                                                              List<SteamAudioScene.Box> boxes, ISet<int>? leaves = null)
     {
         if (set != null)
@@ -1373,7 +1341,7 @@ public class AsyncAcousticWorker : IDisposable
             {
                 var parts = System.Diagnostics.Stopwatch.StartNew();
                 var leaves = OpeningGraph.LeavesOf(world);
-                var (full, listener) = ScenesFor(ctx, set, world, doorBoxes, leaves);
+                var (full, listener) = ScenesFor(ctx, set, doorBoxes, leaves);
                 var geometry = GeometryFor(set, store, doorBoxes, leaves);
                 _lastScenesMs = parts.Elapsed.TotalMilliseconds;
                 SceneOnlyMsTotal += _lastScenesMs;
@@ -1419,7 +1387,7 @@ public class AsyncAcousticWorker : IDisposable
             // number of swings and tile changes (AudioLab --path-probe door= swings=, --stream-walk stops=).
             _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
             _acousticStore = _tileScenes == null ? new AcousticGeometry(world.TileMetres) : null;
-            var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, world, boxes, mapLeaves);
+            var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, boxes, mapLeaves);
             _saScene.Dispose();
             _saScene = assembledFull;
             _saListenerScene?.Dispose();
@@ -1500,12 +1468,6 @@ public class AsyncAcousticWorker : IDisposable
         var (low, mid, high) = Enclosure.DecaySeconds(survey);
 
         _listenerEnclosure = survey.Enclosure;
-        _listenerReturnX = survey.ReturnDirection.X;
-        _listenerReturnY = survey.ReturnDirection.Y;
-        _listenerReturnZ = survey.ReturnDirection.Z;
-        _listenerAnisotropy = survey.Anisotropy;
-        _listenerMfp = survey.MeanFreePathMetres;
-        _listenerSurface = survey.SurfaceAreaSquareMetres;
         _listenerReverbMs = Math.Clamp(mid * 1000f, AcousticConstants.MinReverbDecayMs,
                                                     AcousticConstants.MaxReverbDecayMs);
         // How much faster the top decays than the middle. This is the audible half of what a material

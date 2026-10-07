@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -224,7 +222,7 @@ public static class Thunder
                 // Each step's fine structure from its own seed (not HashCode, which is salted per
                 // process), so a listener a few metres away, who follows a different set of steps
                 // down, still hears the same channel.
-                FineStructure(pieces, path[i - 1], path[i], listener, e, p == 0, unchecked(strike.Seed * 73856093 ^ (p + 1) * 19349663 ^ i * 83492791));
+                FineStructure(pieces, path[i - 1], path[i], e, p == 0, unchecked(strike.Seed * 73856093 ^ (p + 1) * 19349663 ^ i * 83492791));
             }
         }
         if (pieces.Count == 0) return new List<Part>();
@@ -366,12 +364,11 @@ public static class Thunder
     /// at every distance: a straight 8 m piece seen end on is heard only at its two ends, with silence
     /// between, and a rumble made of those breaks up (Cody, round 1: "crackly and breaks up").
     /// </summary>
-    private static void FineStructure(List<Piece> into, Vector3 a, Vector3 b, Vector3 listener, float energy, bool main, int seed)
+    private static void FineStructure(List<Piece> into, Vector3 a, Vector3 b, float energy, bool main, int seed)
     {
         float len = Vector3.Distance(a, b);
         float r0 = RelaxationRadius(energy);
         int n = (int)MathF.Floor(len / MathF.Max(0.25f, r0));
-        float d = Vector3.Distance((a + b) * 0.5f, listener);
         if (n < 2 || len <= 0f)
         {
             into.Add(new Piece(a, b, 1f, main, energy));
@@ -723,7 +720,7 @@ public static class Thunder
         /// per metre of channel that gives that amplitude.</summary>
         public sealed class Class
         {
-            public int Index; public float T0; public float A2; public float Strength;
+            public float T0; public float A2; public float Strength;
             public readonly System.Collections.Concurrent.ConcurrentDictionary<int, Kernel> Bins = new();
         }
 
@@ -757,7 +754,7 @@ public static class Thunder
             float e = MathF.Pow(2f, index / (float)PerDoubling);
             float t0 = LightningPhysics.NWaveSeconds(e, _c);
             float a2 = AmplitudeAt2m(e, _c);
-            return _classes.GetOrAdd(index, new Class { Index = index, T0 = t0, A2 = a2, Strength = a2 / LineResponseCached(t0, _c) });
+            return _classes.GetOrAdd(index, new Class { T0 = t0, A2 = a2, Strength = a2 / LineResponseCached(t0, _c) });
         }
 
         public Kernel For(Class cls, float distance)

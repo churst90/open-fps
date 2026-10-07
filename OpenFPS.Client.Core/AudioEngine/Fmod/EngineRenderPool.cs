@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Linq;
 using Serilog;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
@@ -46,10 +42,6 @@ public sealed class EngineRenderPool : IDisposable
     /// fill every ring in time, the cars that get filled are the ones you can hear.
     /// </summary>
     private volatile IRenderedVoice[] _voices = Array.Empty<IRenderedVoice>();
-
-    /// <summary>Blocks the mixer asked for that no producer had rendered yet, since the client
-    /// started. The mixer no longer finishes those blocks itself — it ramps out and reports.</summary>
-    public int Underruns => EngineVoiceState.GlobalStarves + PhysicalVoiceState.GlobalStarves;
 
     public EngineRenderPool(Func<List<IRenderedVoice>> snapshot)
     {

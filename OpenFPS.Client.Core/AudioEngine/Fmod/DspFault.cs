@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>

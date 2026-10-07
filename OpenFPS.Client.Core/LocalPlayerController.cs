@@ -1,7 +1,5 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 
 namespace OpenFPS.Client.Core;
 

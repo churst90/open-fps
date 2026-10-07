@@ -1,10 +1,5 @@
-using System.Linq;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
@@ -289,11 +284,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public void PlayAmbientBed(string soundId, AmbisonicLayout layout, float volume, bool loop = true)
         => _ambientBedCommands.Enqueue((soundId, layout, volume, loop, false));
 
-    /// <summary>Re-aims a playing bed's level. Implemented as a play command, which is what the provider
-    /// treats a repeat start as — so this cannot race a start that has not been applied yet.</summary>
-    public void SetAmbientBedVolume(string soundId, float volume)
-        => _ambientBedCommands.Enqueue((soundId, AmbisonicLayout.AmbiX, volume, true, false));
-
     public void StopAmbientBed(string soundId)
         => _ambientBedCommands.Enqueue((soundId, AmbisonicLayout.AmbiX, 0f, false, true));
 
@@ -490,8 +480,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
         => _isInitialized && _provider.RegisterSynthesisedSoundFloat(soundId, pcm, sampleRate);
     public Vector3 GetSoundPosition(int entityId) => _isInitialized ? _provider.GetSoundPosition(entityId) : Vector3.Zero;
-    public float GetPlaybackProgress(int entityId) => _isInitialized ? _provider.GetPlaybackProgress(entityId) : 0f;
-    public bool HasCategory(string category) => _isInitialized && _bank.HasCategory(category);
     /// <summary>The sounds in one folder of the bank, e.g. BIRDS/SPARROW.</summary>
     public IReadOnlyList<string> SoundsIn(string category)
         => _isInitialized ? _bank.Members(category) : Array.Empty<string>();

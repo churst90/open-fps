@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
@@ -67,11 +65,6 @@ internal sealed class DiffuseBranch
     /// </summary>
     public static (DiffuseBranch Left, DiffuseBranch Right) EarPair(int seed, int span = 1764, int taps = 96, int rate = DesignRate)
         => (new DiffuseBranch(seed, taps, span, rate), new DiffuseBranch(seed + 977, taps, span, rate));
-
-    private DiffuseBranch(int taps, int span)
-    {
-        Taps = taps; _pos = new int[taps]; _gain = new float[taps]; _line = new float[span + 1];
-    }
 
     public float Process(float x)
     {

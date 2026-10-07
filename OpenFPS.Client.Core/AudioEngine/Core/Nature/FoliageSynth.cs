@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -180,9 +179,6 @@ public sealed class FoliageSynth
     /// <summary>Which of <paramref name="places"/> outer places bough <paramref name="b"/> is heard from:
     /// neighbouring boughs together, so each place is one side of the crown.</summary>
     public static int PlaceOfBough(int b, int places) => places <= 0 ? 0 : Math.Clamp(b * places / Boughs, 0, places - 1);
-
-    /// <summary>How many places the tree is heard from: one, the middle, unless made with more.</summary>
-    public int Places => _sums.Length;
 
     /// <summary>How much of the tree its outer places carry, 0 (all from the middle) to 1 (an equal share
     /// each): ExtendedSources.Shares. Set between control calls; the shedding glides to it.</summary>

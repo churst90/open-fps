@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
@@ -71,8 +68,6 @@ public sealed class TrainSynth
     public bool HornBlowing { get => _horn?.Blowing ?? false; set { if (_horn != null) _horn.Blowing = value; } }
     public bool WhistleBlowing { get => _whistle?.Blowing ?? false; set { if (_whistle != null) _whistle.Blowing = value; } }
     public bool BellRinging { get => _bell?.Ringing ?? false; set { if (_bell != null) _bell.Ringing = value; } }
-    public SteamFrontEnd? Steam => _steam;
-    public EngineSynth? Diesel => _diesel;
     /// <summary>Every prime mover in the consist, lead unit first.</summary>
     public IReadOnlyList<EngineSynth> Diesels => _diesels;
 

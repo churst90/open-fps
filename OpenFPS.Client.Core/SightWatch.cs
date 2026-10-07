@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
@@ -76,8 +74,6 @@ public sealed class SightWatch
 
     /// <summary>The last line said, for telling whether it is still the last thing said.</summary>
     public string? LastLine { get; private set; }
-
-    public SightIndex Index => _index;
 
     /// <summary>
     /// One simulation tick. <paramref name="looking"/>: your own input turned or tilted your head this

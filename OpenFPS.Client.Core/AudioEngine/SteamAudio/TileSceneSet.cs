@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Geometry;
@@ -85,7 +83,6 @@ internal sealed class TileSceneSet : IDisposable
     /// <summary>One version of one tile's geometry: its sub-scenes, and their instances in each pair.</summary>
     private sealed class Piece
     {
-        public TileKey Key;
         public ulong Signature;
         public int Triangles;
         public Vector3 Origin;
@@ -257,7 +254,7 @@ internal sealed class TileSceneSet : IDisposable
 
     private Piece NewPiece(GeometryPiece piece)
     {
-        var p = new Piece { Key = piece.Key, Signature = piece.Signature, Triangles = piece.TriangleCount,
+        var p = new Piece { Signature = piece.Signature, Triangles = piece.TriangleCount,
                             Ground = SubScene(piece, openGround: true), Rest = SubScene(piece, openGround: false) };
         // The boxes the scene holds, for the reflection search and the bounds (SteamAudioScene.SetGeometry).
         for (int s = 0; s < piece.SolidCount; s++)

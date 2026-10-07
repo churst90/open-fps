@@ -311,11 +311,11 @@ public class WeatherWindTests
         var s = new EarWindSynth(44100, 3);
         int n = 44100 * 6;
         var l = new float[n]; var r = new float[n];
-        for (int i = 0; i < 44100; i += 1024) { s.Control(ears, 1024 / 44100f); s.Render(new float[1024], new float[1024]); }
+        for (int i = 0; i < 44100; i += 1024) { s.Control(ears); s.Render(new float[1024], new float[1024]); }
         for (int i = 0; i < n; i += 1024)
         {
             int m = Math.Min(1024, n - i);
-            s.Control(ears, m / 44100f);
+            s.Control(ears);
             s.Render(l.AsSpan(i, m), r.AsSpan(i, m));
         }
         double el = 0, er = 0, lr = 0;
@@ -326,7 +326,7 @@ public class WeatherWindTests
         Assert.InRange(dr, EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb) - 1.5, EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb) + 1.5);
         Assert.InRange(lr / Math.Sqrt(el * er), -0.1, 0.1);
         // Still air makes nothing.
-        s.Control(EarWind.Ears(0f, Vector2.Zero, 0f), 1f);
+        s.Control(EarWind.Ears(0f, Vector2.Zero, 0f));
         for (int k = 0; k < 100; k++) s.Render(l.AsSpan(0, 1024), r.AsSpan(0, 1024));
         Assert.True(s.Silent);
     }

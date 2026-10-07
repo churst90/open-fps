@@ -1,10 +1,6 @@
-using System;
 using System.Numerics;
-using System.Collections.Generic;
-using System.Linq;
 using System.Buffers;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using static OpenFPS.Common.PhysicsConstants;
 

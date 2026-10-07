@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Core;

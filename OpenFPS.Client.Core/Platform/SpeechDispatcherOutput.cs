@@ -1,12 +1,10 @@
-using System;
 using System.Runtime.InteropServices;
 using Serilog;
 
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// Linux speech output via speech-dispatcher (libspeechd) — the same TTS stack Orca drives
-/// (espeak-ng, etc.). The Linux counterpart to <see cref="TolkSpeechOutput"/> on Windows.
+/// Linux speech output via speech-dispatcher (libspeechd), the same TTS stack Orca drives.
 /// </summary>
 public sealed class SpeechDispatcherOutput : ISpeechOutput
 {

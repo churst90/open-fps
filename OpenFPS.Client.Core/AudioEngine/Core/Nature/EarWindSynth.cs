@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using OpenFPS.Common;
 
@@ -26,8 +25,6 @@ public sealed class EarWindSynth
     public const float BuffetDepth = 0.5f;
     /// <summary>The size of the eddies that buffet, m: about a head and shoulders.</summary>
     public const float BuffetEddyMetres = 0.5f;
-    /// <summary>How much of the buffeting the two ears share.</summary>
-    public const float BuffetShared = 0.5f;
     /// <summary>Below this, nobody hears the pressure and it costs headroom, Hz.</summary>
     public const float HighPassHz = 20f;
 
@@ -84,7 +81,7 @@ public sealed class EarWindSynth
     /// once a block. Levels glide over 50 ms and the knee over 100 ms, so a block boundary is never a
     /// step.
     /// </summary>
-    public void Control(in EarWindAtEars ears, float dt)
+    public void Control(in EarWindAtEars ears)
     {
         Last = ears;
         float l = EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb);
@@ -187,9 +184,6 @@ public sealed class EarWindSynth
         _delayL[at] = l; _delayR[at] = r;
         _delayAt = at + 1 == LookAhead ? 0 : at + 1;
     }
-
-    /// <summary>How far the governor has the ears down now, dB (0 when it is doing nothing).</summary>
-    public float GovernorDb => _peakEnv > PeakCeiling ? 20f * MathF.Log10(PeakCeiling / _peakEnv) : 0f;
 
     private void SetKnee(float hz)
     {

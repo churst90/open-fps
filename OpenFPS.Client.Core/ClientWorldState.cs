@@ -1,12 +1,8 @@
 using System.Numerics;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common;
-using System.Linq;
-using System;
-using System.Threading;
 
 namespace OpenFPS.Client.Core;
 
@@ -61,9 +57,6 @@ public class ClientWorldState
     /// stream stopped and restarted, and one jump beats seconds of a world that does not move.</summary>
     private const double MaxDriftBeforeSnap = 0.5;
 
-    /// <summary>Times the playback clock has run outside the buffer. Diagnostic — it should be 0.</summary>
-    public int InterpolationStalls => _interpolationStalls;
-    private int _interpolationStalls;
 
     /// <summary>When the interpolated transforms were last advanced, seconds on
     /// <see cref="OpenFPS.Common.AudioClock"/>. Copied into every snapshot built from them.</summary>
@@ -142,14 +135,6 @@ public class ClientWorldState
     /// sheet and the puddles. Dry until a server sends one.</summary>
     private readonly RoadWater _roadWater = new();
     private float _roadWaterMm;
-    /// <summary>The water in a wheel path of an asphalt road now, mm (RoadWater.WaterMm 2.5 m from the
-    /// crown, no kerb, no puddle): for a vehicle whose wheels the server does not send.</summary>
-    public float CurrentRoadWaterMm { get { lock (_envLock) return _roadWaterMm; } }
-    /// <summary>The road water state, for an instrument. Read under no lock: a copy is not kept.</summary>
-    public RoadWater RoadWater => _roadWater;
-    public float CurrentTemperature { get { lock(_envLock) return _env.Temperature; } }
-    public float CurrentWindGustiness { get { lock(_envLock) return _env.WindGustiness; } }
-    public Vector3 CurrentWindVelocity { get { lock(_envLock) return _env.WindVelocity; } }
 
     public void UpdateAtmosphere(WorldStateUpdate update)
     {
@@ -554,7 +539,6 @@ public class ClientWorldState
             if (Math.Abs(error) > MaxDriftBeforeSnap)
             {
                 _clientInterpolationTime = target;
-                _interpolationStalls++;
                 Serilog.Log.Debug("Interpolation clock resynchronised: {Error:F2} s out, {Count} snapshot(s) buffered.",
                                   error, _snapshotBuffer.Count);
             }

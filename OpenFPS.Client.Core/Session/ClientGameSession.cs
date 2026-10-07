@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
-using System.Threading.Tasks;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -103,9 +98,6 @@ public sealed partial class ClientGameSession : IDisposable
 
     /// <summary>True once the local player has spawned into the world.</summary>
     public bool IsInGame => _ownEntityId != -1;
-
-    /// <summary>True once the audio engine has finished initializing.</summary>
-    public bool AudioReady => _audioEngine.IsInitialized;
 
     /// <summary>The shared world state, for heads that want to inspect it (diagnostics).</summary>
     public ClientWorldState World => _world;
@@ -483,10 +475,6 @@ public sealed partial class ClientGameSession : IDisposable
         "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, brackets to read chat, slash for the command console.",
         "Escape for the game menu: keep playing, main menu, or quit.");
 
-    /// <summary>Rebinds a key. Exposed so a head (or a future settings screen) can re-map without
-    /// touching the session.</summary>
-    public void Bind(InputContext context, GameKey key, Action action) => _bindings.Bind(context, key, action);
-
     /// <summary>Whether anything is bound to a key in a context. For a settings screen, and for the
     /// test that keeps a screen reader's keys free of game actions (see <see cref="ScreenReaderKeys"/>).</summary>
     public bool IsBound(InputContext context, GameKey key) => _bindings.IsBound(context, key);
@@ -500,7 +488,7 @@ public sealed partial class ClientGameSession : IDisposable
     internal static string ReverbCommand(string[] args)
     {
         if (args.Length > 0) return "Traced everywhere now; there is no room mode. /reflections sets the level.";
-        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus(null);
+        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus();
     }
 
     /// <summary>
@@ -1022,7 +1010,6 @@ public sealed partial class ClientGameSession : IDisposable
                 _state.Rotation = manifest.SpawnPoint.Rotation;
                 _state.MapMin = manifest.PlayMin;
                 _state.MapMax = manifest.PlayMax;
-                _state.MapSize = manifest.WorldSize;
 
                 // With how far round us a streamed map should be sent: the world detail setting.
                 var radii = WorldDetail.Radii;
@@ -1170,7 +1157,6 @@ public sealed partial class ClientGameSession : IDisposable
             case StatsUpdate stats:
                 _state.Health = stats.Health;
                 _state.HeldWeaponId = stats.HeldWeaponId ?? "";
-                _state.HeldRounds = stats.HeldRounds;
                 _state.HeldScopeId = stats.HeldScopeId ?? "";
                 _state.SpeedLimit = stats.SpeedLimit;
                 _state.CurrentMaterial = stats.CurrentMaterial;

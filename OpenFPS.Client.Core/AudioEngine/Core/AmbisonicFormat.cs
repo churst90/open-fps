@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Client.AudioEngine.Core;
 
 /// <summary>How a multi-channel ambisonic file lays out its channels and scales them.</summary>

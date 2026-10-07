@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Core;
@@ -45,8 +43,6 @@ public sealed class BoundaryVoiceState
     /// worse, because it tears the waveform apart mid-cycle.</summary>
     public float Glide;
 
-    /// <summary>Diagnostics: the loudest reflection currently being rendered.</summary>
-    public volatile float LoudestGain;
 
     /// <summary>The non-finite guard's flags: the mix arriving at the master, and this stage's output.</summary>
     public int NonFiniteInputReported, NonFiniteReported;
@@ -266,7 +262,6 @@ public static class BoundaryProximityProcessor
                 output[i * outChannels + c] = inChannels > c ? input[i * inChannels + c] : 0f;
         }
 
-        s.LoudestGain = loudest;
     }
 
     /// <summary>Reads the line `delaySamples` behind the write head, interpolating between the two

@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using OpenFPS.Common;
@@ -242,7 +240,7 @@ public sealed class SteamAudioScene : IDisposable
             if (b.Size.X > 0 && b.Size.Y > 0 && b.Size.Z > 0) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
         Solids = solids;
 
-        _mesh = AddMesh(_context, _scene, boxes, out var bmin, out var bmax);
+        _mesh = AddMesh(_scene, boxes, out var bmin, out var bmax);
         if (_mesh != IntPtr.Zero) { BoundsMin = bmin; BoundsMax = bmax; }
         Phonon.iplSceneCommit(_scene);
     }
@@ -251,7 +249,7 @@ public sealed class SteamAudioScene : IDisposable
     /// The boxes as one static mesh, added to <paramref name="scene"/> (not committed); zero if there are
     /// none. Vertices in Steam Audio's frame. The bounds are in the game's.
     /// </summary>
-    internal static IntPtr AddMesh(IntPtr context, IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax)
+    internal static IntPtr AddMesh(IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax)
     {
         boundsMin = boundsMax = Vector3.Zero;
         IntPtr mesh = IntPtr.Zero;
@@ -458,8 +456,4 @@ public sealed class SteamAudioScene : IDisposable
 
     public void Dispose() => Release();
 
-    private static class Defaults
-    {
-        public static Phonon.IPLSceneSettings SceneSettings = new() { type = Phonon.IPL_SCENETYPE_DEFAULT };
-    }
 }

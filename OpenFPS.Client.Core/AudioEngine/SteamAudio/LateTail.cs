@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -114,8 +113,6 @@ internal sealed class LateTailConvolver
         if (ir != null && (ir.Block != _block || ir.Partitions > _maxPartitions)) return;
         _next = ir;
     }
-
-    public bool HasIr => _ir != null || _next != null;
 
     /// <summary>Convolves one block of <paramref name="input"/> into <paramref name="output"/>.</summary>
     public void Process(ReadOnlySpan<float> input, Span<float> output)

@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -54,15 +53,13 @@ public sealed class BayRadiation
 
     /// <summary>The gains the bay is heading for, per band. For tests and instruments.</summary>
     public (float Low, float Mid, float High) Target => (_tL, _tM, _tH);
-    /// <summary>Where the grille is, in the vehicle's own frame.</summary>
-    public Vector3 Grille => _grille;
     public bool Active => _active;
 
     public BayRadiation(VehicleProfile v, float sampleRate)
     {
         _body = new Vector3(v.WidthMetres, v.HeightMetres, v.LengthMetres);
         bool openFrame = (v.Body?.CabinLengthM ?? 0f) <= 0f;
-        _active = v.EngineBay is { } bay && !openFrame && !v.EngineAtRear;
+        _active = v.EngineBay != null && !openFrame && !v.EngineAtRear;
         _grilleShare = v.EngineBay?.GrilleShare ?? 0f;
         _gapLossDbPerMetre = v.EngineBay?.UnderbodyLossDbPerMetre ?? 0f;
         // The engine, at the front voice's slot; its grille faces the nearer end of the car (forward

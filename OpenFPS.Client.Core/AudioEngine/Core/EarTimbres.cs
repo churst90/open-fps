@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.IO;
-using System.Threading.Tasks;
 using OpenFPS.Common.Hearing;
 
 namespace OpenFPS.Client.AudioEngine.Core;

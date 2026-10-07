@@ -1,6 +1,4 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
 
@@ -83,8 +81,6 @@ internal sealed class TracedReverbState
     }
     private readonly int _sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
 
-    // Diagnostics: what goes in and what comes out, for the /reverb line.
-    public volatile float InRms, OutRms;
     /// <summary>Running totals of the energy in (mono) and out (per ear), for the lab.</summary>
     public double InEnergy, OutEnergy, ChannelEnergy;
     public int Channels;
@@ -156,7 +152,7 @@ internal sealed class DiffuseTail
     /// </summary>
     public volatile float[]? LateShares;
 
-    private void UpdateBranchGains(int sub)
+    private void UpdateBranchGains()
     {
         var bias = new System.Numerics.Vector3(Volatile.Read(ref _biasX), Volatile.Read(ref _biasY), Volatile.Read(ref _biasZ));
         var shares = LateShares;
@@ -278,7 +274,7 @@ internal sealed class DiffuseTail
             W[k] = h1 - _b1;
         }
         Array.Clear(Stereo, 0, sub * 2);
-        UpdateBranchGains(sub);
+        UpdateBranchGains();
         var rot = new System.Numerics.Quaternion(Volatile.Read(ref _rx), Volatile.Read(ref _ry), Volatile.Read(ref _rz), Volatile.Read(ref _rw));
         var toHead = System.Numerics.Quaternion.Conjugate(rot);
         float baseGain = BinauralTrim / MathF.Sqrt(DiffuseBranch.Count);
@@ -338,7 +334,7 @@ internal sealed class DiffuseTail
     {
         Array.Clear(Stereo, 0, sub * 2);
         Array.Clear(Low, 0, sub);
-        UpdateBranchGains(sub);
+        UpdateBranchGains();
         var rot = new System.Numerics.Quaternion(Volatile.Read(ref _rx), Volatile.Read(ref _ry), Volatile.Read(ref _rz), Volatile.Read(ref _rw));
         var toHead = System.Numerics.Quaternion.Conjugate(rot);
         float baseGain = BinauralTrim / MathF.Sqrt(DiffuseBranch.Count);
@@ -796,8 +792,6 @@ internal static class TracedReverbDsp
             }
         }
         s.InEnergy += inSum; s.OutEnergy += outSum / 2; s.ChannelEnergy += chSum / inCh; s.Channels = inCh;
-        s.InRms = (float)Math.Sqrt(inSum / n);
-        s.OutRms = (float)Math.Sqrt(outSum / (2 * n));
         return RESULT.OK;
     }
 }

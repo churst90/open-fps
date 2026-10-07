@@ -1,6 +1,4 @@
-using System;
 using System.Globalization;
-using System.Linq;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Common;
 using OpenFPS.Common.Hearing;

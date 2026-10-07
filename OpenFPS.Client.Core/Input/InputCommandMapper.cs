@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Core.Input;
@@ -57,12 +55,6 @@ public sealed class InputCommandMapper
 
     /// <summary>Binds a key with modifiers in the Global context.</summary>
     public void Bind(GameKey key, KeyModifiers modifiers, Action action) => Bind(InputContext.Global, key, modifiers, action);
-
-    /// <summary>Removes a binding.</summary>
-    public void Unbind(InputContext context, GameKey key) => _keyMap[context].Remove((key, KeyModifiers.None));
-
-    /// <summary>Removes a modified binding.</summary>
-    public void Unbind(InputContext context, GameKey key, KeyModifiers modifiers) => _keyMap[context].Remove((key, modifiers));
 
     /// <summary>True when the key is bound in the given context or globally.</summary>
     public bool IsBound(InputContext context, GameKey key) => IsBound(context, key, KeyModifiers.None);

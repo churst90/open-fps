@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 
 namespace OpenFPS.Client.AudioEngine.Acoustics;

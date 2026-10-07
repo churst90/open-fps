@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using FMOD;
 using Serilog;
@@ -1330,8 +1326,7 @@ public partial class FmodAudioProvider : IAudioProvider
         v.State.SpatialBlend = 1f;
         v.State.PreEq = null;
         Array.Clear(v.State.PreEqState);
-        v.State.LastRms = v.State.LastRmsL = v.State.LastRmsR = 0f;
-        v.State.ProducedAudio = false;
+        v.State.LastRmsL = v.State.LastRmsR = 0f;
         v.State.GuardName = null; v.State.NonFiniteReported = 0; v.State.NonFiniteInputReported = 0;
         state = v.State; dsp = v.Dsp; handle = v.Handle;
         return true;
@@ -1361,30 +1356,6 @@ public partial class FmodAudioProvider : IAudioProvider
     private readonly float[] _simReverbHistory = new float[5];
     private int _simReverbCount;
 
-    /// <summary>
-    /// The geometry-derived reverberation time for the listener's surroundings, from the ray tracer.
-    ///
-    /// Median-filtered over the last five readings, and that is not smoothing for its own sake. The
-    /// measurement is stochastic — successive runs over the SAME street canyon returned 1729, 2725 and
-    /// 2800 ms — and every so often a run finds nothing at all and reports zero. Used raw, the good
-    /// readings make the reverb time wander audibly, and a single empty one collapses the street to
-    /// open air for a frame, which is a far worse artefact than being slightly wrong about the decay.
-    ///
-    /// A median rejects the dropout outright (one bad sample in five cannot move it) while tracking a
-    /// genuine change — walking out of the canyon into a field moves three readings and the median
-    /// follows. A mean would let every dropout drag the value down, and a floor-check could not tell
-    /// a failed trace from an actual open field, because both report the same number.
-    /// </summary>
-    /// <summary>A send may amplify (FMOD allows a mix above 1), and in a sealed hard room the law asks
-    /// it to; this is the ceiling, 20 dB, past which the diffuse field of a whisper next to your ear
-    /// is not a thing anyone needs.</summary>
-    private const float MaxReverbSend = 10f;
-
-    /// <summary>How much of a reflection's energy is scattered rather than mirrored, and so belongs in
-    /// the diffuse field rather than in the arrival. The rest is already counted by its source's own
-    /// send — see the note in ApplyAcousticFilters.</summary>
-    private const float ReflectionScatteredShare = 0.25f;
-
     /// <summary>The largest reverb send any voice was given since the last report, and how far away
     /// that voice was. Reported rather than the constant, because the send has not been a constant
     /// since it became the room equation.</summary>
@@ -1392,6 +1363,12 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Lab overrides for the reverb unit's early-reflection share (%) and late delay (ms);
     /// NaN means the constants. The AudioLab's room walk sets these to measure them.</summary>
 
+    /// <summary>
+    /// The ray tracer's reverberation time for the listener's surroundings, median-filtered over the
+    /// last five readings. The measurement is stochastic (one street canyon gave 1729, 2725 and 2800 ms)
+    /// and now and then a run finds nothing and reports zero: a median rejects that dropout, where a mean
+    /// would be dragged down by it and a floor could not tell it from a real open field.
+    /// </summary>
     public void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio)
     {
         _enclosureTarget = enclosure;
@@ -1420,13 +1397,6 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The last measurement of each, which the live values above walk toward.</summary>
     private float _enclosureTarget;
     private double _roomAdvancedAt;
-
-    /// <summary>How the listener's room colours its tail, as ratios of the mid band's decay. This is
-    /// what a material sounds like: carpet's top dies four times faster than its middle, concrete's
-    /// barely tilts.</summary>
-
-    /// <summary>What the enclosure measure currently reads, for the spikes and the report line.</summary>
-    public float ListenerEnclosure => _listenerEnclosure;
 
     // Speed of sound, m/s, derived from the world's air temperature. Defaults to the 20 °C value so a
     // provider that is never told the weather behaves exactly as it did before.
@@ -1490,7 +1460,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The listener's measured enclosure, eased toward the survey's reading at the pace of
     /// the room's own decay (AdvanceListenerRoom). It scales what the listener's own room hears of a
     /// sound at a distance (the send).</summary>
-    private void ApplySimulatedReverb(int listenerRegionId) => AdvanceListenerRoom();
+    private void ApplySimulatedReverb() => AdvanceListenerRoom();
 
     public void SetAcousticMap(AcousticMap map)
     {
@@ -1769,7 +1739,7 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 FrameSize = _saFrameSize, WorkerContext = echoes.Context, ProviderContext = _saContext,
                 Effect = effect, EffectB = effectB, Decode = decode, Hrtf = _saHrtf,
-                Capture = new float[_saFrameSize], MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
+                Capture = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
                 AmbiScratchA = new float[_saFrameSize * TracedEchoes.Channels], AmbiScratchB = new float[_saFrameSize * TracedEchoes.Channels],
                 Orientation = Phonon.ListenerFrame(_listenerRot), SampleRate = echoes.SampleRate,
             };
@@ -1796,7 +1766,6 @@ public partial class FmodAudioProvider : IAudioProvider
             echoes.Release(slot);
             return;
         }
-        rig.Owner = a.EntityId;
         rig.AttachGeneration[0] = System.Threading.Volatile.Read(ref echoes.BankGeneration[0]);
         rig.AttachGeneration[1] = System.Threading.Volatile.Read(ref echoes.BankGeneration[1]);
         a.EchoWeight = 0f;
@@ -1824,7 +1793,6 @@ public partial class FmodAudioProvider : IAudioProvider
             a.Channel.removeDSP(rig.CaptureDsp);
         }
         TracedReverbSet.Echoes?.Release(slot);
-        rig.Owner = 0;
     }
 
     // ── Each source's own late sound (LateField) ─────────────────────────────────────────────────
@@ -2093,7 +2061,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>For the /reverb readout: mode, and how the tracing is doing.</summary>
-    public static string TracedReverbStatus(FmodAudioProvider? p)
+    public static string TracedReverbStatus()
     {
         if (TracedReverbSet.Listener == null) return "No trace yet — the scene is still being built.";
         var (rooms, runs, ms) = TracedReverbSet.Stats();
@@ -2158,9 +2126,6 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_overloadDb < 0.05f) _overloadDb = 0f;
         _overloadGain = MathF.Pow(10f, -_overloadDb / 20f);
     }
-
-    /// <summary>For the readouts and tests: how far the world is giving way right now, dB.</summary>
-    public float OverloadNowDb => _overloadDb;
 
     private void UpdateTracedStages()
     {
@@ -2568,7 +2533,6 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>How many times a send was about to be disconnected through a unit that did not own
     /// it. Must stay 0; anything else is the city crash waiting to happen (see DropSend).</summary>
     private static int _sendDropsOnWrongBus;
-    public static int SendDropsOnWrongBus => _sendDropsOnWrongBus;
 
     /// <summary>Localizes a room's reverb to its doorway (HRTF) when the listener is outside, or makes it
     /// fill the room (binaural bypassed) when inside. Falls back to FMOD 3D positioning if Steam Audio is
@@ -2624,27 +2588,6 @@ public partial class FmodAudioProvider : IAudioProvider
             bus.set3DAttributes(ref fp, ref fv);
         }
         else bus.set3DLevel(0.0f);
-    }
-
-    /// <summary>
-    /// Peak level actually flowing through a region's reverb DSP, metered by FMOD itself.
-    ///
-    /// Reading the bus's binaural stage cannot answer this: that stage is BYPASSED whenever the
-    /// listener is inside the region — and outdoors the listener is always inside region -1. This
-    /// meters the reverb DSP's own input and output and is true regardless of what is bypassed
-    /// downstream.
-    /// </summary>
-    internal bool TryMeterReverbBus(int regionId, out float inputPeak, out float outputPeak)
-    {
-        inputPeak = 0f; outputPeak = 0f;
-        if (!_reverbDsps.TryGetValue(regionId, out var dsp) || !dsp.hasHandle()) return false;
-        dsp.setMeteringEnabled(true, true);
-        if (dsp.getMeteringInfo(out var inInfo, out var outInfo) != RESULT.OK) return false;
-        for (int i = 0; i < inInfo.numchannels && i < 32; i++)
-            inputPeak = Math.Max(inputPeak, inInfo.peaklevel[i]);
-        for (int i = 0; i < outInfo.numchannels && i < 32; i++)
-            outputPeak = Math.Max(outputPeak, outInfo.peaklevel[i]);
-        return true;
     }
 
     /// <summary>Lab only: a voice's binaural stage as it last ran — each ear's level and how placed it
@@ -3864,7 +3807,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 UpdateTracedStages();
                 UpdateTracedEchoes();
                 UpdateLateField();
-                ApplySimulatedReverb(listenerRegionId);
+                ApplySimulatedReverb();
 
                 for (int i = _activeSounds.Count - 1; i >= 0; i--)
                 {
@@ -4480,10 +4423,6 @@ public partial class FmodAudioProvider : IAudioProvider
 
         if (active.ThreeEqDsp.hasHandle())
         {
-            Vector3 toSound = Vector3.Normalize(active.CurrentApparentPosition - lPosVec);
-            Vector3 forward = Vector3.Transform(Vector3.UnitZ, _listenerRot);
-            Vector3 right = Vector3.Transform(Vector3.UnitX, _listenerRot);
-
             var (lowDb, midDb, highDb) = PathEqDb(active.CurrentLow, active.CurrentMid, active.CurrentHigh,
                                                   active.AirLowDb, active.AirMidDb, active.AirHighDb);
 
@@ -4918,9 +4857,6 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    /// <summary>Diagnostics (AudioLab): the loudest boundary reflection currently being rendered.</summary>
-    internal float BoundaryReflectionLevel => _boundaryState?.LoudestGain ?? 0f;
-
     /// <summary>
     /// Starts an ambisonic ambience bed, or re-aims an already-playing one at a new level.
     ///
@@ -5035,40 +4971,6 @@ public partial class FmodAudioProvider : IAudioProvider
         if (bed.Channel.hasHandle()) bed.Channel.stop();
         if (bed.Dsp.hasHandle()) bed.Dsp.release();
         ReleaseBedResources(bed.State, bed.Handle);
-    }
-
-    /// <summary>Sets the level a bed glides toward. Two beds and two levels is a cross-fade.</summary>
-    public void SetAmbientBedVolume(string soundId, float volume)
-    {
-        if (_ambientBeds.TryGetValue(soundId, out var bed)) bed.State.TargetVolume = volume;
-    }
-
-    /// <summary>Diagnostics (AudioLab): the ear levels a bed most recently decoded to.</summary>
-    internal bool TryGetAmbientBedLevels(string soundId, out float rmsL, out float rmsR)
-    {
-        rmsL = 0f; rmsR = 0f;
-        if (!_ambientBeds.TryGetValue(soundId, out var bed)) return false;
-        rmsL = bed.State.LastRmsL;
-        rmsR = bed.State.LastRmsR;
-        return true;
-    }
-
-    /// <summary>Diagnostics (AudioLab): why a bed is silent, which is otherwise unknowable from outside
-    /// the mixer thread.</summary>
-    internal string DescribeAmbientBed(string soundId)
-    {
-        if (!_ambientBeds.TryGetValue(soundId, out var bed)) return "no such bed";
-        var s = bed.State;
-        string bail = s.Bailed switch
-        {
-            0 => "none",
-            1 => $"BLOCK LENGTH {s.LastBlockLength} != effect frame size {s.FrameSize}",
-            2 => "decode effect is null",
-            _ => "no PCM"
-        };
-        return $"callbacks={s.CallbackCount} inputRms={s.InputRms:F5} block={s.LastBlockLength} outCh={s.LastOutChannels} " +
-               $"frames={(s.Channels > 0 ? s.Pcm.Length / s.Channels : 0)} pos={s.Position:F0} " +
-               $"produced={s.ProducedAudio} bail={bail}";
     }
 
     private void ReleaseBedResources(AmbisonicBedState state, System.Runtime.InteropServices.GCHandle handle)
@@ -5239,17 +5141,6 @@ public partial class FmodAudioProvider : IAudioProvider
     }
     
     public bool IsPlaying(int entityId) { lock (_lock) return _activeById.ContainsKey(entityId); }
-    public float GetPlaybackProgress(int entityId) { 
-        lock (_lock) { 
-            var sound = FindActive(entityId); 
-            if (sound == null) return 0f; 
-            sound.Channel.getCurrentSound(out var fmodSound); 
-            if (!fmodSound.hasHandle()) return 0f; 
-            fmodSound.getLength(out uint len, TIMEUNIT.MS); 
-            sound.Channel.getPosition(out uint pos, TIMEUNIT.MS); 
-            return (len == 0) ? 0f : (float)pos / len; 
-        } 
-    }
     public IEnumerable<int> GetActiveSpatialSoundIds() { lock(_lock) return new List<int>(_activeById.Keys); }
     public Vector3 GetSoundPosition(int entityId) { lock(_lock) return FindActive(entityId)?.Position ?? Vector3.Zero; }
 
