@@ -72,6 +72,13 @@ public sealed class SteamAudioScene : IDisposable
     /// </summary>
     internal static SteamAudioScene Borrowed(IntPtr context, IntPtr scene) => new(context) { _scene = scene, _borrowed = true };
 
+    /// <summary>
+    /// A borrowed scene whose owner is about to release the handle: from now on this object is not built,
+    /// so a holder that kept it past its hand-over (a retired scene, a tracer made late) gets nothing
+    /// instead of a freed handle.
+    /// </summary>
+    internal void Revoke() { if (_borrowed) _scene = IntPtr.Zero; }
+
     /// <summary>The boxes a borrowed scene now holds, for <see cref="Solids"/> and the bounds.</summary>
     internal void SetGeometry(IReadOnlyList<Box> boxes)
     {

@@ -29,6 +29,9 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 ///
 /// open=R measures every source again with every door leaf within R metres of the ear swung a quarter
 /// turn, as a rebuild in the game does when one swings; door=x,y,z swings the one leaf nearest that point.
+/// swings=N swings them open, shut, open... N times, measuring after each rebuild has been handed over
+/// (with tile scenes, each swing lands in the other pair of top scenes). traced also says what the traced
+/// reverb at the ear and the first source's traced echoes give the two ears each time (TracedBinaural).
 /// legcost times the straight leg from each source to the ear instead: the one-box barrier search and the
 /// whole leg, which is what a route query costs when its way to a door is blocked.
 /// </summary>
@@ -73,7 +76,10 @@ public static class PathProbeSpike
             return 0;
         }
         int id = 1;
+        bool traced = args.Contains("traced");
+        void Ask(Vector3 at) => worker.EnqueueRequest(new AcousticRequest { EntityId = 997, ListenerPos = at, SourcePos = at + Vector3.UnitX, SourceRadius = 0.1f });
         Measure(worker, acoustics, world, ear, srcs, ref id);
+        if (traced && srcs.Count > 0) TracedBinaural.Report(ear, srcs[0], Ask);
 
         var openArg = args.FirstOrDefault(a => a.StartsWith("open="));
         var doorArgs = args.Where(a => a.StartsWith("door=")).Select(a => P(a[5..])).ToList();
@@ -85,30 +91,53 @@ public static class PathProbeSpike
             if (r > 0f) foreach (var e in leaves) if (Vector3.Distance(e.Transform.Position, ear) <= r) chosen.Add(e.Id);
             foreach (var at in doorArgs)
                 if (leaves.Count > 0) chosen.Add(leaves.OrderBy(e => Vector3.Distance(e.Transform.Position, at)).First().Id);
-            foreach (int doorId in chosen)
+            // swings=N: open, shut, open... N times, each handed over as its own rebuild, so a scene set used
+            // in turn (TileSceneSet's two pairs) is measured on every pair and after every kind of change.
+            int swings = int.TryParse(args.FirstOrDefault(a => a.StartsWith("swings="))?[7..], out int n) ? Math.Max(1, n) : 1;
+            var closed = chosen.ToDictionary(d => d, d => world.Entities[d].Transform);
+            if (worker.TileScenesState is { } before) Console.WriteLine($"  tile scenes: {before}");
+            for (int s = 1; s <= swings; s++)
             {
-                var e = world.Entities[doorId];
-                var def = e.Definition;
-                Console.WriteLine($"  door {e.Id} at ({e.Transform.Position.X:F1}, {e.Transform.Position.Y:F1}, {e.Transform.Position.Z:F1}): opened");
-                // Swung a quarter turn on its hinge, as DoorSystem swings it: about the leaf's +X edge.
-                var moved = e;
-                var rot = e.Transform.Rotation;
-                var hinge = e.Transform.Position + Vector3.Transform(new Vector3(def.Collider.Size.X * 0.5f, 0, 0), rot);
-                var swung = rot * Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
-                moved.Transform.Rotation = swung;
-                moved.Transform.Position = hinge + Vector3.Transform(new Vector3(-def.Collider.Size.X * 0.5f, 0, 0), swung);
-                world.Entities[e.Id] = moved;
+                bool open = s % 2 == 1;
+                foreach (int doorId in chosen)
+                {
+                    var e = world.Entities[doorId];
+                    var def = e.Definition;
+                    var shut = closed[doorId];
+                    Console.WriteLine($"  door {e.Id} at ({shut.Position.X:F1}, {shut.Position.Y:F1}, {shut.Position.Z:F1}): {(open ? "opened" : "shut")}");
+                    var moved = e;
+                    if (open)
+                    {
+                        // Swung a quarter turn on its hinge, as DoorSystem swings it: about the leaf's +X edge.
+                        var rot = shut.Rotation;
+                        var hinge = shut.Position + Vector3.Transform(new Vector3(def.Collider.Size.X * 0.5f, 0, 0), rot);
+                        var swung = rot * Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
+                        moved.Transform.Rotation = swung;
+                        moved.Transform.Position = hinge + Vector3.Transform(new Vector3(-def.Collider.Size.X * 0.5f, 0, 0), swung);
+                    }
+                    else moved.Transform = shut;
+                    world.Entities[e.Id] = moved;
+                }
+                int swapsBefore = worker.SceneSwaps;
+                worker.UpdateWorld(world);
+                // The worker only looks at the doors on a tick with something to answer, and the rebuild
+                // runs off it: keep it busy until the new scene has landed, and a little after.
+                var until = DateTime.UtcNow.AddSeconds(30);
+                while (worker.SceneSwaps == swapsBefore && DateTime.UtcNow < until)
+                {
+                    worker.EnqueueRequest(new AcousticRequest { EntityId = 998, ListenerPos = ear, SourcePos = ear + Vector3.UnitX, SourceRadius = 0.1f });
+                    Thread.Sleep(100);
+                }
+                for (int i = 0; i < 5; i++)
+                {
+                    worker.EnqueueRequest(new AcousticRequest { EntityId = 998, ListenerPos = ear, SourcePos = ear + Vector3.UnitX, SourceRadius = 0.1f });
+                    Thread.Sleep(100);
+                }
+                Console.WriteLine($"  --- doors {(open ? "open" : "shut")} (swing {s}; {worker.SceneSwaps} scene swap(s)"
+                                + (worker.TileScenesState is { } state ? $"; tile scenes: {state}" : "") + ") ---");
+                Measure(worker, acoustics, world, ear, srcs, ref id);
+                if (traced && srcs.Count > 0) TracedBinaural.Report(ear, srcs[0], Ask);
             }
-            worker.UpdateWorld(world);
-            // The worker only looks at the doors on a tick with something to answer, and the rebuild
-            // runs off it: keep it busy until the new scene has landed.
-            for (int i = 0; i < 30; i++)
-            {
-                worker.EnqueueRequest(new AcousticRequest { EntityId = 998, ListenerPos = ear, SourcePos = ear + Vector3.UnitX, SourceRadius = 0.1f });
-                Thread.Sleep(100);
-            }
-            Console.WriteLine("  --- doors open ---");
-            Measure(worker, acoustics, world, ear, srcs, ref id);
         }
         Console.WriteLine($"  worker: {worker.RouteCostSummary}");
         return 0;
