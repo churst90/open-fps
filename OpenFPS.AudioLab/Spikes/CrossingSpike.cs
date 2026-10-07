@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
@@ -106,7 +102,6 @@ public static class CrossingSpike
         public required Func<float, Vector3> Where { get; init; }   // of time
         public required Func<float> Render { get; init; }
         public float Extent { get; init; } = 1.5f;
-        public float Lp1, Lp2, Gp1, Gp2;
     }
 
     public static int RunCrossing(string[] args)

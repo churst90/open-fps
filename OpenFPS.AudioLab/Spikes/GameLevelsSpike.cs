@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Threading;
-using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
@@ -687,7 +681,7 @@ public static class GameLevelsSpike
     private sealed class AWeight
     {
         private readonly (double b0, double b1, double b2, double a1, double a2)[] _s;
-        private readonly double[] _z1, _z2;
+        private readonly double[] _z1;
         private readonly double _gain;
         public AWeight(int rate)
         {
@@ -700,7 +694,7 @@ public static class GameLevelsSpike
             void HighPass(double w) { double k = 2.0 / T; double a0 = k + w; list.Add((k / a0, -k / a0, 0, (w - k) / a0, 0)); }
             void LowPass(double w) { double k = 2.0 / T; double a0 = k + w; list.Add((w / a0, w / a0, 0, (w - k) / a0, 0)); }
             HighPass(f1); HighPass(f1); HighPass(f2); HighPass(f3); LowPass(f4); LowPass(f4);
-            _s = list.ToArray(); _z1 = new double[_s.Length]; _z2 = new double[_s.Length];
+            _s = list.ToArray(); _z1 = new double[_s.Length];
             // Normalise to 0 dB at 1 kHz.
             double g = 1;
             foreach (var (b0, b1, _, a1, _) in _s)

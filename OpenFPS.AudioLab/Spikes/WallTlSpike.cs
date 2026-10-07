@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -12,7 +10,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class WallTlSpike
 {
-    public static int Run(string[] args)
+    public static int Run()
     {
         AcousticRegistry.Initialize();
         var walls = new List<(string Name, string Material, Vector3 Size, WallBuild Build)>

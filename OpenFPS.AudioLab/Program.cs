@@ -1,10 +1,6 @@
-using System.Linq;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
-using OpenFPS.Client.Core.Platform;
 using Serilog;
 
 // FMOD'S OWN LOGGING, FIRST THING. It does nothing whatsoever once System::create has run, so it
@@ -51,7 +47,7 @@ string[] usage =
     "",
     "Vehicles",
     "  --voice-levels [preset ...] [sweep] [parts]   the game's whole vehicle voice at 1 m against its declared level",
-    "  --engine-levels [preset ...]                  the tailpipe alone, offline: headroom and crest factor",
+    "  --engine-levels                               every machine's tailpipe alone, offline: headroom and crest factor",
     "  --engine-orders <preset> [rpm=] [thr=] [wav]  order content, band balance, centroid",
     "  --engine-trace <preset> [idle|off] [rpm= ...] rpm, manifold pressure and torque each quarter second",
     "  --engine-gallery [preset]                     every preset's orders side by side",
@@ -403,7 +399,7 @@ if (args.Contains("--voice-levels"))
 
 if (args.Contains("--engine-levels"))
 {
-    int lvcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Levels(args);
+    int lvcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Levels();
     Log.CloseAndFlush();
     Environment.Exit(lvcode);
 }
@@ -633,7 +629,7 @@ if (args.Contains("--reload-sounds"))
 
 if (args.Contains("--binaural-input"))
 {
-    Environment.Exit(OpenFPS.AudioLab.Spikes.BinauralInputSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BinauralInputSpike.Run());
 }
 if (args.Contains("--game-levels"))
 {
@@ -754,7 +750,7 @@ if (args.Contains("--room-echoes"))
 if (args.Contains("--wall-tl"))
 {
     // --wall-tl: the city's walls, floors, doors and glass, transmission loss per third octave and per mixer band.
-    Environment.Exit(OpenFPS.AudioLab.Spikes.WallTlSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WallTlSpike.Run());
 }
 if (args.Contains("--pop-hunt"))
 {
@@ -820,7 +816,7 @@ if (args.Contains("--tail-cost"))
 if (args.Contains("--tail-iacc"))
 {
     // --tail-iacc: the tail's spatial rendering alone, the two ears' coherence per octave.
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailIaccSpike.Run(args));
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailIaccSpike.Run());
 }
 if (args.Contains("--late-field"))
 {

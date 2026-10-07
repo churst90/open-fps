@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.Core;
@@ -70,7 +65,7 @@ public static class FireSpike
             var spec = FireSpec.ByName(key);
             var sw = Stopwatch.StartNew();
             var (pa, census) = Render(spec, sec, seed, wind, age, heard, parts);
-            double cost = sw.Elapsed.TotalSeconds / (sec + Settle(spec));
+            double cost = sw.Elapsed.TotalSeconds / (sec + Settle());
             var (nx, nz, d) = FireSynth.CellGrid(spec);
             Console.WriteLine();
             Console.WriteLine($"== fire:{key} ({spec.Name}): {spec.HeatReleaseKw / 1000f:F2} MW over {spec.AreaWidth:F1} x {spec.AreaDepth:F1} m; " +
@@ -125,7 +120,7 @@ public static class FireSpike
         return 0;
     }
 
-    private static float Settle(FireSpec spec) => 8f;
+    private static float Settle() => 8f;
 
     /// <summary>A fire at a metre (every place summed), or heard from <paramref name="heard"/> m: pascals.</summary>
     /// <summary>The last render's places, each its own stream, for the lab to write out.</summary>
@@ -143,7 +138,7 @@ public static class FireSpike
         }
         // The glass is rendered off the audio threads; wait for it here so a short render can have it.
         for (int i = 0; i < 400 && !s.GlassReady; i++) Thread.Sleep(50);
-        int n = (int)(sec * Rate), lead = (int)(Settle(spec) * Rate);
+        int n = (int)(sec * Rate), lead = (int)(Settle() * Rate);
         var places = new float[layout.Length][];
         for (int p = 0; p < places.Length; p++) places[p] = new float[n];
         var out1 = new float[layout.Length];
@@ -153,7 +148,7 @@ public static class FireSpike
             {
                 double t = i / (double)Rate;
                 if (float.IsNaN(wind)) s.ReadWind(0f, 0f, t); else s.Wind = wind;
-                if (!float.IsNaN(age)) s.Age = age - Settle(spec) + t;
+                if (!float.IsNaN(age)) s.Age = age - Settle() + t;
                 s.Control(256f / Rate);
             }
             s.NextPlaces(out1);

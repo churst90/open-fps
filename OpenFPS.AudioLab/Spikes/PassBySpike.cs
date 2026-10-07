@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>

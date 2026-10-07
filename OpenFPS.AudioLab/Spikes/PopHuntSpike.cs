@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -32,7 +27,7 @@ public static class PopHuntSpike
         public Vector3 A, B;      // the lane's two ends
         public float S, Speed;    // metres along it, metres a second (sign is the direction)
         public Vector3 Pos;
-        public float Mid = float.NaN, High = float.NaN;
+        public float Mid = float.NaN;
         public Watch MidWatch = new(), HighWatch = new();
         public string Prov = "";
         public Vector3 AnsweredAt;
@@ -149,7 +144,7 @@ public static class PopHuntSpike
                 c.AnsweredAt = p.SourcePosition;
                 if (verbose && (MathF.Abs(mid - c.Mid) > 3f || float.IsNaN(c.Mid)))
                     Console.WriteLine($"  {now,7:F3} e{c.Id} ({c.Pos.X:F0}, {c.Pos.Z:F0}) {Vector3.Distance(ear, c.Pos):F0} m: mid {mid:F0} high {high:F0} occ {p.Occlusion:F2}  [{c.Prov}]");
-                c.Mid = mid; c.High = high;
+                c.Mid = mid;
                 if (Check(c.MidWatch, mid, now, c.Prov, c.AnsweredAt, out var midLine))
                 {
                     excursions++;

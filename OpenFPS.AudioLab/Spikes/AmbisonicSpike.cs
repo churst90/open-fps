@@ -1,6 +1,4 @@
-using System;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
 

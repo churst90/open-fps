@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Threading;
-using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
@@ -126,12 +120,10 @@ public static class WetRoadSpike
     /// <summary>One vehicle's wheels held at a steady speed, and where each is in the car's frame.</summary>
     private sealed class Rig
     {
-        public readonly VehicleProfile Profile;
         public readonly WheelDynamics Body;
         public readonly float CogZ;
         public Rig(VehicleProfile v, float speed)
         {
-            Profile = v;
             Body = new WheelDynamics(v);
             CogZ = v.Running.CentreOfGravityZ;
             Body.Hold(speed, 0f, 0f);

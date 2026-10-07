@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;
 

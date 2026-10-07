@@ -1,7 +1,3 @@
-using System.Linq;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Numerics;
 using Thread = System.Threading.Thread;
 using OpenFPS.Common;

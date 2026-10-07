@@ -1,7 +1,4 @@
-using System;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

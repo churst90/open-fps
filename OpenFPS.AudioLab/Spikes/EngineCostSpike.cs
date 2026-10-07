@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.AudioEngine.Core;
@@ -35,7 +33,7 @@ public static class EngineCostSpike
     ///
     /// Command line: --engine-levels
     /// </summary>
-    public static int Levels(string[] args)
+    public static int Levels()
     {
         Console.WriteLine("\n  Full load, one metre. level = loudest second; peak = the largest sample in it.\n");
         Console.WriteLine("    preset            level dB    peak dB   99.9% dB   crest dB   sust dB   declared");

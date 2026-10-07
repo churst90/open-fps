@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -34,7 +33,7 @@ public static class BinauralInputSpike
         return RESULT.OK;
     }
 
-    public static int Run(string[] args)
+    public static int Run()
     {
         var rng = new Random(7);
         var signal = new float[Rate * 2];

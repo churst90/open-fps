@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;
@@ -96,7 +92,7 @@ public static class PatioRefSpike
         Print(measured);
 
         string? outDir = Arg(args, "out");
-        if (outDir != null && wavs == null) WriteSet(outDir, refPcm, refRate, refM, ours, measured);
+        if (outDir != null && wavs == null) WriteSet(outDir, refPcm, refRate, ours, measured);
         return 0;
     }
 
@@ -384,7 +380,7 @@ public static class PatioRefSpike
 
     // ── The listening set ───────────────────────────────────────────────────────────────────────────
 
-    private static void WriteSet(string dir, float[] refPcm, int refRate, Measures refM,
+    private static void WriteSet(string dir, float[] refPcm, int refRate,
                                  List<(string Name, float[] Pcm, int Rate)> ours, List<Measures> measured)
     {
         Directory.CreateDirectory(dir);

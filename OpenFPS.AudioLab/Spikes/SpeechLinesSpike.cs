@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;

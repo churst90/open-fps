@@ -1,7 +1,5 @@
-using System;
 using System.Numerics;
 using Thread = System.Threading.Thread;
-using System.IO;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Data;
@@ -688,7 +686,7 @@ public static class ProviderOrbit
         var r2 = reverbA.addInput(fader2, out var c2, FMOD.DSPCONNECTION_TYPE.SEND);
         // B must have a send of its own: DSPI::disconnectFrom returns early when the unit it is
         // called on has no inputs at all, which is the one case the first version of this tested.
-        var r0 = reverbB.addInput(fader3, out var cB, FMOD.DSPCONNECTION_TYPE.SEND);
+        var r0 = reverbB.addInput(fader3, out _, FMOD.DSPCONNECTION_TYPE.SEND);
         Tick(); Report($"two sends into A, one into B ({r1},{r2},{r0})");
         // What DropSend's guard relies on: one update after addInput, the connection knows its owner.
         var go = c1.getOutput(out var c1Owner);
@@ -819,7 +817,7 @@ public static class ProviderOrbit
         var rr = reverb.disconnectFrom(kf, extra); Tick(); Say($"removed it honestly -> {rr}: inputs={Count()}");
         Say("removing the keeper's own send (count must reach 0 with the list empty)...");
         keeper.stop(); Tick(); Say($"keeper stopped: inputs={Count()}");
-        var last = Send(keeper); // keeper is dead; this fails, harmless
+        Send(keeper); // keeper is dead; this fails, harmless
         sys.playSound(loopSnd, master, false, out var k2); var s2 = Send(k2); Tick(); Say($"fresh send: inputs={Count()}");
         k2.getDSP(FMOD.CHANNELCONTROL_DSP_INDEX.FADER, out var k2f);
         var r2 = reverb.disconnectFrom(k2f, s2); Tick(); Say($"fresh send removed honestly -> {r2}: inputs={Count()}");

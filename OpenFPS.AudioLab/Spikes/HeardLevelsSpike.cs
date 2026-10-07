@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
@@ -99,16 +96,16 @@ public static class HeardLevelsSpike
             for (int v = 0; v < KnobDoor.Variants; v += 3)
             {
                 string key = KnobDoor.Key(true, KnobDoor.Construction.HollowCore, v, 0.9f, how, 0.9f, 2.1f);
-                AddModel(sources, $"knob close {how.ToString().ToLowerInvariant()} v{v}", KnobDoor.CloseLevelDb(how), key, KnobDoor.PascalsAtFullScale, Rate);
+                AddModel(sources, $"knob close {how.ToString().ToLowerInvariant()} v{v}", KnobDoor.CloseLevelDb(how), key);
             }
         }
         for (int v = 0; v < KnobDoor.Variants; v += 3)
             AddModel(sources, $"knob open v{v}", KnobDoor.OpenLevelDb,
-                     KnobDoor.Key(false, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, 0.9f, 2.1f), KnobDoor.PascalsAtFullScale, Rate);
+                     KnobDoor.Key(false, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, 0.9f, 2.1f));
         for (int v = 0; v < PushBarDoor.Variants; v++)
         {
-            AddModel(sources, $"push-bar open v{v}", PushBarDoor.OpenLevelDb(v), PushBarDoor.Key(false, v, 1.4f, 1.0f, 2.1f), PushBarDoor.PascalsAtFullScale, Rate);
-            AddModel(sources, $"push-bar close v{v}", PushBarDoor.CloseLevelDb(v), PushBarDoor.Key(true, v, 1.4f, 1.0f, 2.1f), PushBarDoor.PascalsAtFullScale, Rate);
+            AddModel(sources, $"push-bar open v{v}", PushBarDoor.OpenLevelDb(v), PushBarDoor.Key(false, v, 1.4f, 1.0f, 2.1f));
+            AddModel(sources, $"push-bar close v{v}", PushBarDoor.CloseLevelDb(v), PushBarDoor.Key(true, v, 1.4f, 1.0f, 2.1f));
         }
         foreach (var kind in new[] { SlidingDoor.Kind.Patio, SlidingDoor.Kind.Automatic })
             foreach (int v in new[] { 1, 3 })
@@ -116,8 +113,8 @@ public static class HeardLevelsSpike
                 float open = kind == SlidingDoor.Kind.Patio ? 1.4f : SlidingDoor.AutomaticSeconds(1.0f, true);
                 float shut = kind == SlidingDoor.Kind.Patio ? 1.4f : SlidingDoor.AutomaticSeconds(1.0f, false);
                 string k = kind == SlidingDoor.Kind.Patio ? "patio" : "auto";
-                AddModel(sources, $"{k} open v{v}", SlidingDoor.OpenLevelDb(kind, v), SlidingDoor.Key(kind, false, v, open, kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f), SlidingDoor.PascalsAtFullScale, Rate);
-                AddModel(sources, $"{k} close v{v}", SlidingDoor.CloseLevelDb(kind, v), SlidingDoor.Key(kind, true, v, shut, kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f), SlidingDoor.PascalsAtFullScale, Rate);
+                AddModel(sources, $"{k} open v{v}", SlidingDoor.OpenLevelDb(kind, v), SlidingDoor.Key(kind, false, v, open, kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f));
+                AddModel(sources, $"{k} close v{v}", SlidingDoor.CloseLevelDb(kind, v), SlidingDoor.Key(kind, true, v, shut, kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f));
             }
 
         // ── For comparison: other things the game plays ──────────────────────────────────────────────
@@ -206,7 +203,7 @@ public static class HeardLevelsSpike
     /// <summary>A door model's key as the client plays it: its render through WorldAudioPlayer.RenderDoorKey,
     /// placed at the level WorldAudioPlayer.AtOwnLevel gives it (the render's own peak), the server's figure
     /// shown beside it. The model's LAFmax at a metre is the buffer's LAFmax over its full scale.</summary>
-    private static void AddModel(List<Source> list, string name, float declared, string key, double pascalsAtFullScale, int rate)
+    private static void AddModel(List<Source> list, string name, float declared, string key)
     {
         var own = new System.Collections.Concurrent.ConcurrentDictionary<string, float>();
         float[] buf = OpenFPS.Client.Core.WorldAudioPlayer.RenderDoorKey(key, own);

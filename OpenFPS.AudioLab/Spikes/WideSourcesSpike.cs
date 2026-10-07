@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
@@ -38,7 +33,6 @@ public static class WideSourcesSpike
     private sealed record Segment(string Name, double Start, double Seconds, double CpuPercent, float MixerLoad, int Voices, double PlacedDb);
 
     // Where the sources stand, relative to their own middle, as on the city map (tools/gen_city.py).
-    private static readonly Vector3 FountainCentre = new(0f, 0f, 0f);
     private static readonly (int Tap, Vector3 At)[] FountainTaps =
     {
         (0, new Vector3(0f, 1.9f, 0f)),

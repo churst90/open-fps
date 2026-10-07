@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;
@@ -31,7 +27,7 @@ public static class PushBarRefSpike
 
     public sealed class Cluster
     {
-        public double Start, LoudestAt, Level5;
+        public double Start, Level5;
         public List<(double Ms, double Db)> Hits = new();
         public double[] Bands = new double[4];
         public double SpanMs => Hits.Count == 0 ? 0 : Hits[^1].Ms;
@@ -144,7 +140,7 @@ public static class PushBarRefSpike
         foreach (var g in groups)
         {
             int pk = g.OrderByDescending(h => eh[h]).First();
-            var c = new Cluster { Start = g[0] / 1000.0, LoudestAt = pk / 1000.0, Level5 = e5[Math.Min(e5.Length - 1, pk / 5)] - top5 };
+            var c = new Cluster { Start = g[0] / 1000.0, Level5 = e5[Math.Min(e5.Length - 1, pk / 5)] - top5 };
             foreach (int h in g) c.Hits.Add((h - g[0], eh[h] - eh[pk]));
             int a = Math.Max(0, (pk - 1) * ms), b = Math.Min(x.Length, (pk + 29) * ms);
             c.Bands = BandShares(x, a, b, rate);

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
@@ -62,27 +58,27 @@ public static class WheelSquealSpike
         }
 
         var report = new List<string>();
-        Scenario("1-ordinary-stop", "i4_midsize", 0.85f, modulated: true, outDir, report, (body, t) =>
+        Scenario("1-ordinary-stop", "i4_midsize", 0.85f, modulated: true, report, (body, t) =>
         {
             if (t < 2f) return (50f / 3.6f, 0f);
             return (MathF.Max(0f, body.Vx - 2.92f / 30f), 0f);
         }, startSpeed: 50f / 3.6f, seconds: 9f);
 
-        Scenario("2-hard-stop", "i4_midsize", 0.85f, modulated: false, outDir, report, (body, t) =>
+        Scenario("2-hard-stop", "i4_midsize", 0.85f, modulated: false, report, (body, t) =>
         {
             if (t < 2f) return (70f / 3.6f, 0f);
             // Standing on the pedal: asking for more than the tyres have.
             return (MathF.Max(0f, body.Vx - 11f / 30f), 0f);
         }, startSpeed: 70f / 3.6f, seconds: 7f);
 
-        Scenario("3-fast-turn", "i4_midsize", 0.85f, modulated: false, outDir, report, (body, t) =>
+        Scenario("3-fast-turn", "i4_midsize", 0.85f, modulated: false, report, (body, t) =>
         {
             // A 40 m left-hand bend at a speed that rises from 0.3 g to past the limit.
             float speed = MathF.Sqrt(MathF.Min(1.05f, 0.3f + 0.09f * t) * 9.81f * 40f);
             return (speed, -1f / 40f);
         }, startSpeed: MathF.Sqrt(0.3f * 9.81f * 40f), seconds: 10f);
 
-        Scenario("4-wheelspin-pull-away", "v8_muscle", 0.9f, modulated: false, outDir, report, (body, t) =>
+        Scenario("4-wheelspin-pull-away", "v8_muscle", 0.9f, modulated: false, report, (body, t) =>
         {
             if (t < 1f) return (0f, 0f);
             // Floored from rest: asking the rear tyres for 8 m/s^2.
@@ -118,7 +114,7 @@ public static class WheelSquealSpike
     /// that holds that curvature at its speed (the kinematic angle plus the understeer the model has
     /// at that lateral acceleration), and its wheels go to two voices of the same car.
     /// </summary>
-    private static void Scenario(string name, string preset, float grip, bool modulated, string outDir, List<string> report,
+    private static void Scenario(string name, string preset, float grip, bool modulated, List<string> report,
                                  Func<WheelDynamics, float, (float Speed, float Curvature)> plan, float startSpeed, float seconds)
     {
         if (Binaural) { RoadsideBinaural(name, preset, grip, modulated, plan, startSpeed, seconds); return; }

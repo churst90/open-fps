@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -388,7 +384,7 @@ public static class GeometryParitySpike
                         overlap.MaxError = Math.Max(overlap.MaxError, Math.Abs(hit0.Penetration - hit1.Penetration));
                         if (MathF.Abs(hit0.Penetration - hit1.Penetration) > 1e-3f || ang > 1e-3f)
                         {
-                            bool tie = TiedWayOut(centre, bc, bs, br, r);
+                            bool tie = TiedWayOut(centre, bc, bs, br);
                             if (tie && MathF.Abs(hit0.Penetration - hit1.Penetration) <= 1e-3f) { overlap.Ties++; overlap.Same++; continue; }
                             overlap.Differ(tie ? "the way out of the middle of a box (tied)" : "way out",
                                 $"body at {V(centre)} (down {down}), box {V(bc)} size {V(bs)}: old ({hit0.Normal.X:F5}, {hit0.Normal.Z:F5}) {hit0.Penetration:F6}, "
@@ -511,7 +507,7 @@ public static class GeometryParitySpike
                 steps.MaxError = Math.Max(steps.MaxError, err);
                 if (err <= 1e-3f && g0 == g1) { steps.Same++; }
                 else if (grade != 0f) { steps.Ties++; steps.Same++; steps.TiePairs["on a flight or a slope: slower by the grade"] = steps.TiePairs.GetValueOrDefault("on a flight or a slope: slower by the grade") + 1; }
-                else steps.Differ(CapsuleWhy(geo, p, p0, p1), $"from {V(p)} vel {V(vel)} input {V(input)}: cylinder {V(p0)} {g0}, capsule {V(p1)} {g1} ({err * 1000:F1} mm)", show);
+                else steps.Differ(CapsuleWhy(geo, p), $"from {V(p)} vel {V(vel)} input {V(input)}: cylinder {V(p0)} {g0}, capsule {V(p1)} {g1} ({err * 1000:F1} mm)", show);
 
                 if (i % 10 != 0) continue;
                 Vector3 a = p, av = Vector3.Zero, b = p, bv = Vector3.Zero, cc = p + new Vector3(1e-4f, 0, 0), cv = Vector3.Zero;
@@ -966,7 +962,7 @@ public static class GeometryParitySpike
 
         // ── Routes through the openings ──────────────────────────────────────────────────────────
         if (only.Contains("routes"))
-            RoutesParity(maps, mapId, ecs, lookup, data, mapSize, n, show, rng, tallies, args);
+            RoutesParity(maps, mapId, ecs, lookup, data, mapSize, n, show, tallies, args);
 
         // ── The report ───────────────────────────────────────────────────────────────────────────
         Console.WriteLine();
@@ -1000,7 +996,7 @@ public static class GeometryParitySpike
     /// both, and what a tile changing costs each.
     /// </summary>
     private static void RoutesParity(MapManager maps, string mapId, World ecs, Dictionary<int, Entity> lookup, MapData data,
-                                     Vector3 mapSize, int n, int show, Random rng, List<Tally> tallies, string[] args)
+                                     Vector3 mapSize, int n, int show, List<Tally> tallies, string[] args)
     {
         var world = new WorldSnapshot();
         var defs = new List<EntityDefinition>();
@@ -1085,18 +1081,18 @@ public static class GeometryParitySpike
                 Console.WriteLine($"    only tiled: {V(b.Center)} size {V(b.Size)} {b.Material}");
             return;
         }
-        CompareRoutes("Routes through openings (a whole build each way)", old, tiled, world, regionAt, new Random(5), n, show, tallies);
+        CompareRoutes("Routes through openings (a whole build each way)", old, tiled, regionAt, new Random(5), n, show, tallies);
         // The map writes a turn in six digits and it is not quite unit length; the box path's corners take
         // it as it is (scaled by its length squared), the triangles make it unit first. With the box list's
         // turns made unit, the box grid should answer as the tiles do.
         var unitBoxes = boxes.Select(b => b with { Rotation = b.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(b.Rotation) }).ToList();
         var gridUnit = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, unitBoxes, regionAt);
-        CompareRoutes("Box grid, turns made unit, against the tiles", gridUnit, tiled, world, regionAt, new Random(5), n, show, tallies);
+        CompareRoutes("Box grid, turns made unit, against the tiles", gridUnit, tiled, regionAt, new Random(5), n, show, tallies);
         // For scale: the box grid against itself with its boxes met the other way round.
         OpeningRoutes.ReverseGridOrderForParity = true;
         var reversed = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt);
         OpeningRoutes.ReverseGridOrderForParity = false;
-        CompareRoutes("Control: the box grid against itself, boxes met in reverse", old, reversed, world, regionAt, new Random(5), n, show, tallies);
+        CompareRoutes("Control: the box grid against itself, boxes met in reverse", old, reversed, regionAt, new Random(5), n, show, tallies);
 
         // One tile changes, as a door swinging or a tile arriving does: what each way costs, and the
         // answers after it.
@@ -1118,16 +1114,16 @@ public static class GeometryParitySpike
         clock.Restart();
         OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
         Console.WriteLine($"  nothing changed: tile build {clock.Elapsed.TotalMilliseconds:F0} ms ({cache.Derived} derived, {cache.Kept} kept)");
-        CompareRoutes("Routes through openings (after one tile changed)", oldAfter, tiledAfter, world, regionAt, new Random(6), n, show, tallies);
+        CompareRoutes("Routes through openings (after one tile changed)", oldAfter, tiledAfter, regionAt, new Random(6), n, show, tallies);
         // The point of building tile by tile: kept and rebuilt, it answers as a build from nothing does.
         // Both unasked: a graph keeps the legs it has worked out, coarsely by place, so one that has
         // answered other questions first can answer this one from a neighbour's leg.
         var fresh = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, AcousticGeometry.FromBoxes(changed, data.TileMetres, leaves), null, new OpeningRoutes.TileCache());
         var kept = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
-        CompareRoutes("Tile build after a change against a tile build from nothing", fresh, kept, world, regionAt, new Random(7), n, show, tallies, exact: true);
+        CompareRoutes("Tile build after a change against a tile build from nothing", fresh, kept, regionAt, new Random(7), n, show, tallies, exact: true);
     }
 
-    private static void CompareRoutes(string name, OpeningRoutes old, OpeningRoutes tiled, WorldSnapshot world, Func<Vector3, int> regionAt,
+    private static void CompareRoutes(string name, OpeningRoutes old, OpeningRoutes tiled, Func<Vector3, int> regionAt,
                                       Random rng, int n, int show, List<Tally> tallies, bool exact = false)
     {
         var openings = new Tally(name + ": openings");
@@ -1458,7 +1454,7 @@ public static class GeometryParitySpike
     }
 
     /// <summary>Why a step parts the capsule from the cylinder: what each touches at the end.</summary>
-    private static string CapsuleWhy(TriangleWorld world, Vector3 from, Vector3 cyl, Vector3 cap)
+    private static string CapsuleWhy(TriangleWorld world, Vector3 from)
     {
         // An edge met by the rounded bottom (below the knee) or top (above the brow) of the capsule.
         var near = new List<SolidRef>(); var all = new AcceptAll();
@@ -1511,7 +1507,7 @@ public static class GeometryParitySpike
 
     /// <summary>Whether a body's axis is (within 1 mm) equally far from two edges of a box's footprint, so
     /// either is the nearest way out.</summary>
-    private static bool TiedWayOut(Vector3 centre, Vector3 bc, Vector3 bs, Quaternion br, float r)
+    private static bool TiedWayOut(Vector3 centre, Vector3 bc, Vector3 bs, Quaternion br)
     {
         var l = Vector3.Transform(centre - bc, Quaternion.Inverse(br));
         var h = bs * 0.5f;

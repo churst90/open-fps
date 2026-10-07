@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
