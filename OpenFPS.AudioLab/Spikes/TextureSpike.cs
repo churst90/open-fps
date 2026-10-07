@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Client.AudioEngine.Core;
@@ -18,6 +14,7 @@ namespace OpenFPS.AudioLab.Spikes;
 ///
 ///   --textures stats FILE...                 each file's summary features (any WAV: 16/24/32-bit or
 ///                                            float, any rate, mixed to mono, brought to 48 kHz)
+///   --textures wave FILE...                  each file's 4-16 kHz kurtosis and crest in 10 ms windows
 ///   --textures compare REF... -- FILE...     the references' range and each file against it (* outside)
 ///   --textures render out=DIR [before=DIR] [sec=30]
 ///        the fountain from 2, 8 and 20 m south of its kerb, and a park tree in a 3, 6 and 10 m/s wind
@@ -79,7 +76,7 @@ public static class TextureSpike
             Render(dir, Arg(rest, "before="), sec);
             return 0;
         }
-        Console.WriteLine("--textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR] [sec=30]");
+        Console.WriteLine("--textures stats FILE... | wave FILE... | compare REF... -- FILE... | render out=DIR [before=DIR] [sec=30]");
         return 1;
     }
 
@@ -112,7 +109,7 @@ public static class TextureSpike
         var (centre, taps) = FountainOnTheMap();
         Console.WriteLine($"fountain at {centre}, {taps.Count} taps: " + string.Join("; ", taps.Select(t => $"{t - centre}")));
 
-        // The new fountain: every tap rendered by the one synth, each placed where the map puts it.
+        // Every tap rendered by the one synth, each placed where the map puts it.
         var synth = new FallingWaterSynth(fountain, Rate, 7);
         var tapPa = new float[synth.TapCount][];
         for (int t = 0; t < tapPa.Length; t++) tapPa[t] = new float[n];
