@@ -762,6 +762,47 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
+    /// A repeating one-shot whose last play ends in the very frame its next firing comes round speaks
+    /// that frame. The new submission is a new play: the budget used to see the old play finish in the
+    /// same pass, mark it finished and throw the new submission away with it, so the emitter was silent
+    /// for a whole interval (docs/COVERAGE_2026-10-06.md, finding 3).
+    /// </summary>
+    [Fact]
+    public void ARepeatingEmitterWhoseLastPlayEndsAsItsIntervalComesRoundSpeaksAgain()
+    {
+        var h = new ClientAudioHarness();
+        h.StandAt(Vector3.Zero);
+        const int Pa = 23;                 // 23 % 7 = 2: the first firing 1.8 s after first sight
+        var def = new EntityDefinition
+        {
+            EntityId = Pa,
+            Type = EntityType.StaticObject,
+            Transform = new Transform { Position = new Vector3(0f, 4f, 10f), Rotation = Quaternion.Identity, Scale = Vector3.One },
+        };
+        def.SoundEmitter.SoundId = "announcements/test_line";
+        def.SoundEmitter.Mode = PlaybackMode.Single;
+        def.SoundEmitter.Volume = 1f;
+        def.SoundEmitter.MinDistance = 2f;
+        def.SoundEmitter.Range = 80f;
+        def.SoundEmitter.RepeatIntervalSeconds = 10f;
+        h.World.RegisterDefinition(def);
+
+        int Starts() => h.Mixer.Started.Count(e => e.EntityId == Pa);
+        h.Tick();
+        h.Wait(2.0); h.Tick();
+        Assert.Equal(1, Starts());
+        Assert.Contains(Pa, h.Mixer.Live);
+
+        // The line ends between two updates, and the next update is the one the interval comes round in.
+        h.Wait(10.0);
+        h.Mixer.Live.Remove(Pa);
+        h.Tick();
+        h.Tick(3);
+        Assert.Equal(2, Starts());
+        Assert.Contains(Pa, h.Mixer.Live);
+    }
+
+    /// <summary>
     /// An authored beacon whose category the map forbids is not heard, and one already playing is
     /// stopped. Through the map's policy, not the player's switches (which are written to disk).
     /// </summary>

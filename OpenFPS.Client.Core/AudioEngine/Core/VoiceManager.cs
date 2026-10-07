@@ -119,6 +119,17 @@ public class VoiceManager
         if (_voiceStates.TryGetValue(emitter.EntityId, out var status))
         {
             status.StopRequested = false; // Reset if re-submitted
+            // A ONE-SHOT ASKED FOR AGAIN AFTER ITS LAST PLAY ENDED IS A NEW PLAY. If the end has not
+            // been seen yet (it came between two passes), the next pass would see the old play finish,
+            // mark it finished and throw this submission away with it: a repeating announcement whose
+            // last line ended in the frame its interval came round was silent for a whole interval.
+            // So the old play's bookkeeping goes now, and the submission starts afresh.
+            if (emitter.Mode == PlaybackMode.Single && status.State == InternalState.Playing
+                && status.IsPhysicallyPlaying && !_audio.IsPlaying(emitter.EntityId))
+            {
+                _voiceStates.Remove(emitter.EntityId);
+                if (_fading.Remove(emitter.EntityId)) _audio.CancelFade(emitter.EntityId);
+            }
         }
         _activeSubmissions[emitter.EntityId] = emitter;
     }
