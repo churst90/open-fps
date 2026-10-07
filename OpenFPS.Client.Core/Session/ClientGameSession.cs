@@ -476,6 +476,8 @@ public sealed partial class ClientGameSession : IDisposable
         "N turns the narration of what is ahead, as you turn and move and as things pass, on or off.",
         "G take, Q drop, Shift+R draw, T clap or ignition.",
         "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
+        "Driving: T engine on, Shift T off, H held the horn, U siren, Shift U its tone, J and L indicators, K lane assist,",
+        "Shift K all driving sounds, Z the road, Shift H your health.",
         "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
         "plus and minus zoom, 1 and 3 the turret, period the rangefinder, 0 held to hold your breath, slash or Enter to fire.",
         "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, brackets to read chat, slash for the command console.",
