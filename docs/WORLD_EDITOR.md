@@ -355,11 +355,14 @@ Selecting is not an operation: it changes nothing and is per player.
 
 1. Overlay for every map, including player maps and the speedway, rather than writing player maps
    directly. One rule, and a map file is never rewritten by the editor. Baking is phase 3.
-2. maps/overlays/ and model_versions/ are not in .gitignore: edits made on your own server can be
-   committed like any other map change. Say if they should be ignored instead.
+2. maps/overlays/ and model_versions/ are in .gitignore (decided 2026-10-07): they are the running
+   server's data, and a deploy from the repository must not overwrite edits made on the live server.
 3. Invited editors may use the editor on that map and nothing else (not /spawn or /savemap). Changing
    models needs edit-models (developers and admins), because a model is shared by every map.
 4. Undo history is lost on a restart; the edits themselves are kept.
 5. A solid thing placed "at your feet" is put just in front of you, so you are not inside it.
 6. Owners and named editors may place at most 5,000 things on a map with the editor; staff are not
    limited. Things to carry need the give permission to place, and premium items cannot be placed.
+
+Decided (Cody, 2026-10-07): "go with your recommendations on the editor". All of the above stand, with 2 as
+amended: the editor's data is ignored by git.
