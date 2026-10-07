@@ -222,7 +222,8 @@ draining 285 m² in moderate rain (5 mm/h) carries 0.27-0.36 L/s, 9 mm deep at t
 
 Each fall becomes a `WaterFallSpec` for the fountain's own physics (drops, lumps, splashes, plunge
 bubbles), its events written into this source's places through `FallingWaterSynth.Placer`, its rates
-following the flow (`FlowScale`). The sheet's thickness at the lip (weir law) decides how it arrives:
+following the flow (`FlowScale`); since round 2 the fall itself is retuned as the flow changes, its
+sheet and lumps thicker and its plunge carrying more air (`Retune`, section 10.8). The sheet's thickness at the lip (weir law) decides how it arrives:
 under 2 mm it fingers into strands that bead into drops; from 6 mm it falls coherent, in lumps the
 size of its strands. A film down a pipe's wall arrives whole at its terminal speed (section 1.5,
 (Q/D)^0.4), as if it had fallen v²/2g.
@@ -271,12 +272,12 @@ round where its water lands. Every event goes to one place: no place is a copy o
 ## 7. Not modelled yet
 
 - The pipe wall radiating along its length, and structure-borne noise through clamps.
-- The vortex and gurgle where a gutter enters its downpipe, and trap seals clearing.
-- Fall sizes changing with flow: only the rates follow the flow, so a fall grows about 3 dB a doubling
-  where Watts et al. measured 6 for a weir. The film's terminal speed is set at the reference rain.
-- The tail after rain is one exponential per catchment; real roofs drip longer (water held in gutters).
+- Trap seals clearing.
 - Snowmelt.
-- Taps and sinks (recordings gathered; no preset yet).
+
+Built in round 2 (section 10): the vortex and gurgle where a gutter enters its downpipe (10.1); falls
+that grow with the flow, 4-7 dB a doubling across the drop-to-sheet transition (10.8); the film's speed
+at a downpipe's shoe following the flow; a slow store, so roofs drip on after rain; taps and sinks.
 
 ## 8. Results
 
@@ -298,7 +299,8 @@ spread, and the 4-16 kHz kurtosis in 10 ms windows:
 | gutter, 5 / 25 mm/h | 5 / 6 | 3.76 / 5.00 | 3.29-4.22 |
 
 The creek's octaves from 250 Hz to 16 kHz sit inside the recordings' (2 kHz at their brightest). The
-downpipe is darker than every recorded downpipe at 4-8 kHz. The gutter's two recordings are larger
+downpipe is darker than every recorded downpipe at 4-8 kHz (round 1; brighter since round 2, where the
+water leaving its shoe carries the film's speed). The gutter's two recordings are larger
 flows than a 0.27 L/s trickle, both in heavy rain.
 
 Levels at a metre (point-equivalent): creek 67.3 dB at 40 L/s (59 at 10, 73 at 160); gutter 51 dB,

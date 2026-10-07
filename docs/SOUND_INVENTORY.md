@@ -63,6 +63,17 @@ Models are in `AudioEngine/Core/Nature`; voices in `AudioEngine/Fmod/NatureVoice
 
 `EventSum` and `Resonator` are the shared building blocks.
 
+Also modelled since 2026-10-05, each with its own doc:
+
+- Rain, sleet, snow and hail on what they land on: `RainSynth`, `RainPatch` (Nature).
+- Thunder from the lightning channel: `Thunder.cs` (Core).
+- Wind at your ears: `EarWindSynth` (Nature).
+- Running water (creeks, gutters, drains, downpipes, taps and sinks): `RunningWaterSynth`;
+  docs/RUNNING_WATER.md.
+- Waves at a shore, a wall or a hull: `ShoreSynth`; docs/WAVES_AND_SHORES.md.
+- Fire at any size, from a campfire to a crown fire (`/spawn fire PRESET`): `FireSynth`; docs/FIRE.md.
+- Wet tyres, spray and puddles: `WetTyres.cs` (Core); docs/WET_ROADS.md.
+
 ### Doors, keys, knocks
 
 The server picks the model in `DoorSystem` by `DoorKind`. Every event and which model plays it is in
@@ -148,9 +159,6 @@ Live audio, not files:
 
 ## Not built yet
 
-- **Rain on surfaces.** `PrecipitationIntensity` is on the wire. Today it only switches footsteps to
-  wet or snow folders.
-- **Wind at your own ears.** Turbulence at the pinnae, a bed that turns with your head.
 - **Clothing and carried gear.** Rustle and knock, driven by the gait.
 - **Water you touch.** Footsteps in it, things dropped into it. `FallingWaterSynth` has the bubble
   model to start from.
