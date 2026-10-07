@@ -11,14 +11,9 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The acoustic worker as it runs without Steam Audio — the test project loads no native library, so
-/// this is the path every client without phonon takes: requests drained a tick at a time, the latest
-/// per source winning, each answered by the hand-rolled tracer and filed under its source with where
-/// that source was. And what it does when even the tracer fails: keep the last real answer, and only
-/// a source that never had one is told the way is clear.
-///
-/// The worker is a real thread. Nothing here times it: each test waits (bounded) for the answer it
-/// needs and then asserts on what the answer is.
+/// The acoustic worker without Steam Audio, as every client without phonon runs it: latest request per
+/// source wins, answered by the hand-rolled tracer; when the tracer fails the last real answer is kept.
+/// The worker is a real thread; tests wait (bounded) for answers and never time it.
 /// </summary>
 public class AsyncAcousticWorkerTests
 {
@@ -64,12 +59,9 @@ public class AsyncAcousticWorkerTests
         return paths;
     }
 
-    /// <summary>
-    /// Asked three times about one source before it ran, the worker answers once, for the last place
-    /// it was asked about — and that answer is the hand-rolled tracer's for that place, every path of
-    /// it stamped with the source position it was computed for (what lets a pooled voice id tell its
-    /// own answer from a previous occupant's).
-    /// </summary>
+    /// <summary>Asked three times about one source, the worker answers once, the tracer's answer for the
+    /// last place, each path stamped with that source position (so a pooled voice id can tell its own
+    /// answer from a previous occupant's).</summary>
     [Fact]
     public void TheLatestRequestForASourceIsAnsweredByTheTracerAndStampedWithWhereItWas()
     {
@@ -99,11 +91,8 @@ public class AsyncAcousticWorkerTests
         Assert.True(mine.Occlusion > 0f, "a car behind a brick wall is behind it");
     }
 
-    /// <summary>
-    /// Without Steam Audio there is nothing simulated to report: no simulated reverb (so the listener's
-    /// room keeps its own estimate), an open, even-coloured room, no nearby simulator answer for a
-    /// one-shot to borrow, and the health flag not crying "degraded" about a simulator that never ran.
-    /// </summary>
+    /// <summary>Without Steam Audio nothing simulated is reported: no reverb, an open even-coloured room,
+    /// nothing for a one-shot to borrow, and no "degraded" flag for a simulator that never ran.</summary>
     [Fact]
     public void WithoutSteamAudioNothingSimulatedIsClaimed()
     {
@@ -126,10 +115,8 @@ public class AsyncAcousticWorkerTests
         Assert.Equal("no simulation runs yet", worker.RayBudgetSummary);
     }
 
-    /// <summary>
-    /// A forgotten source's answer is dropped, so a removed entity is never handed its stale paths;
-    /// asked about again, it is answered afresh. The world the worker holds is the last one given.
-    /// </summary>
+    /// <summary>A forgotten source's answer is dropped and a new request answered afresh; the worker
+    /// holds the last world given.</summary>
     [Fact]
     public void AForgottenSourceHasNoAnswerUntilItIsAskedAgain()
     {
@@ -151,10 +138,7 @@ public class AsyncAcousticWorkerTests
         Await(() => worker.TryGetResult(7, out var p) && p[0].SourcePosition == moved, "answered the source again");
     }
 
-    /// <summary>
-    /// A request made before there is a world is dropped, not held: once the queue has been drained
-    /// with nothing to answer against, giving the worker a world answers only what is asked after.
-    /// </summary>
+    /// <summary>A request made before there is a world is dropped, not held.</summary>
     [Fact]
     public void ARequestWithNoWorldIsDroppedNotHeld()
     {
@@ -172,11 +156,8 @@ public class AsyncAcousticWorkerTests
         Assert.False(worker.TryGetResult(1, out _), "a request with no world to answer it was kept");
     }
 
-    /// <summary>
-    /// When even the tracer fails, a source that had an answer keeps it — never reset to "nothing in
-    /// the way", which would take every wall out of the level for it — and only a source that never
-    /// had one is given a clear path, at its own position and distance.
-    /// </summary>
+    /// <summary>When the tracer fails a source keeps its last answer (a reset to clear would remove every
+    /// wall); only a source that never had one gets a clear path at its own position.</summary>
     [Fact]
     public void WhenTheTracerFailsASourceKeepsItsLastAnswer()
     {

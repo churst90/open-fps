@@ -7,10 +7,8 @@ using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
-/// <summary>
-/// What the room survey costs on the real city, walking — the openness boundary casts extra probes
-/// from the middle of every long ray, and a listener who keeps moving keeps asking new questions.
-/// </summary>
+/// <summary>What the room survey costs walking the real city, where the openness boundary's extra probes
+/// and a moving listener keep it busy.</summary>
 public class EnclosureCostTests
 {
     private readonly ITestOutputHelper _o;
@@ -43,12 +41,9 @@ public class EnclosureCostTests
             worst = Math.Max(worst, ms); total += ms; n++;
         }
         _o.WriteLine($"{n} surveys along Main Street: mean {total / n:F1} ms, worst {worst:F1} ms ({solids.Count} solids)");
-        // It runs on the acoustic worker a few times a second, not on the mixer; tens of milliseconds
-        // is what that thread can spare.
-        // Measured 30 ms before the openness boundary and 48 ms with it (14-ray probes, 2 m by 0.5 m
-        // cache cells, skipped for a listener already a third open). It had crept to 55 ms as the city
-        // grew — every ray tested against every box within range — and is 33 ms since a box the ray's
-        // LINE cannot touch is rejected before the exact test (2026-09-24).
+        // On the acoustic worker a few times a second, which can spare tens of milliseconds. Measured
+        // 30 ms before the openness boundary, 48 with it, 55 as the city grew, and 33 since boxes the
+        // ray's line cannot touch are rejected first (2026-09-24).
         Assert.True(total / n < 60, $"a survey costs {total / n:F1} ms on average");
     }
 }

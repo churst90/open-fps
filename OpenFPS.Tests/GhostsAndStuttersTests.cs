@@ -8,34 +8,20 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The two faults from docs/AUDIO_GHOSTS_AND_STUTTERS.md, held to their fixes.
-///
-/// Issue 1 — "the cars disappear and I hear the ghost of their reflections" — was four things at
-/// once: occlusion that arrived a hundred seconds into the session, a probe half buried in the road,
-/// reflections exempt from the whole model, and a knee-high wall treated as a total block. Issue 2 —
-/// "the close ones going fast stop for a second" — was a position whose timestamp said it had just
-/// been sampled when it was a whole simulation step old.
-///
-/// What is checkable without a mixer is the MODEL: the barrier physics, where the acoustic question
-/// is asked, whether the map a vehicle is told to drive is driveable, and the arithmetic of the age
-/// of a position. Each of those was wrong in a way that arithmetic can catch.
+/// The two faults of docs/AUDIO_GHOSTS_AND_STUTTERS.md held to their fixes, checked without a mixer:
+/// barrier physics, where the acoustic question is asked, a driveable track, and a position's age.
 /// </summary>
 public class GhostsAndStuttersTests
 {
     // ── Rule 3: a barrier attenuates by its geometry, not by a boolean ──────────────────────────
 
-    /// <summary>
-    /// A knee-high wall is not a wall. The pit wall that silenced the field is 0.9 m tall, and a car
-    /// twenty metres behind it is barely shadowed at all: the sound goes over the top having travelled
-    /// a couple of centimetres further than it would have done through the wall.
-    /// </summary>
+    /// <summary>A knee-high wall is not a wall: a car 20 m behind the 0.9 m pit wall that silenced the
+    /// field is barely shadowed, its path over the top a few centimetres longer.</summary>
     [Fact]
     public void AKneeHighWallCostsAFewDecibelsNotTwentySix()
     {
-        // 0.9 m tall, 0.3 m thick, standing between a car's exhaust (0.3 m up) and a listener's ear.
-        // The listener is well back from it — an infield listener and a pit wall — because a low wall
-        // only breaks the sight line at all when one of the two is a long way past it. That is the
-        // geometry the report came from, and it is exactly where the model used to say "silence".
+        // 0.9 m tall, 0.3 m thick, between an exhaust 0.3 m up and an ear well back from it: the
+        // reported geometry (a low wall breaks the sight line only with one end far past it).
         var centre = new Vector3(0f, 0.45f, 0f);
         var size = new Vector3(60f, 0.9f, 0.3f);
         var source = new Vector3(0f, 0.3f, -20f);
@@ -47,14 +33,12 @@ public class GhostsAndStuttersTests
         float lowDb = Diffraction.InsertionLossDb(delta, Diffraction.LowBandHz);
         float highDb = Diffraction.InsertionLossDb(delta, Diffraction.HighBandHz);
 
-        // Everything a screen does is bounded below by its grazing value and above by its ceiling.
         Assert.InRange(lowDb, Diffraction.GrazingInsertionLossDb, 12f);
         Assert.True(highDb > lowDb, $"a barrier takes the top off first; got low {lowDb:F1} dB, high {highDb:F1} dB");
         Assert.True(highDb < Diffraction.MaxInsertionLossDb,
             $"a wall you can see over should not saturate the model; got {highDb:F1} dB");
 
-        // The number that matters: what the engine used to do instead. Visibility zero mapped to a
-        // dry level 26 dB down with 72 dB off the top, which is silence.
+        // The old model made this silence: 26 dB down with 72 dB off the top.
         Assert.True(Diffraction.BandGain(delta, Diffraction.LowBandHz) > 0.25f,
             "a car behind a knee-high wall has to stay clearly audible");
     }
@@ -86,11 +70,8 @@ public class GhostsAndStuttersTests
         Assert.Equal(0f, Diffraction.InsertionLossDb(-1f, 1000f));
     }
 
-    /// <summary>
-    /// The shortest way past a wall standing on the ground goes OVER it, never under it. Without the
-    /// leg-clearance test the search happily returns the buried bottom edge, which is both shorter and
-    /// a route sound cannot take — and would report a tall wall as costing almost nothing.
-    /// </summary>
+    /// <summary>The shortest way past a wall on the ground goes over it, never under: without the
+    /// leg-clearance test the buried bottom edge wins and a tall wall costs almost nothing.</summary>
     [Fact]
     public void TheDetourGoesOverAWallRatherThanThroughTheGround()
     {
@@ -101,9 +82,7 @@ public class GhostsAndStuttersTests
 
         Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity, source, listener, out float over));
 
-        // Straight through is 20 m; up the front face, across the half-metre top and down the back is
-        // appreciably longer. The route UNDER the wall is a metre shorter still and is not available,
-        // which is the thing this is really checking.
+        // The route under the wall would be a metre shorter, and must not be taken.
         float direct = Vector3.Distance(source, listener);
         var topFront = new Vector3(0f, 4f, -0.25f);
         var topBack = new Vector3(0f, 4f, 0.25f);
@@ -113,11 +92,8 @@ public class GhostsAndStuttersTests
 
     // ── Rule 2: the acoustic source point is the emission point ─────────────────────────────────
 
-    /// <summary>
-    /// A car's occlusion probe must sit in the air above the road, not half inside it. The entity's
-    /// origin is its contact patch; asking about that point with a half-metre sphere put about half
-    /// the samples underground on every level stretch of every track, for every vehicle.
-    /// </summary>
+    /// <summary>A car's occlusion probe sits above the road: a half-metre sphere at the contact patch put
+    /// about half its samples underground.</summary>
     [Fact]
     public void ACarIsProbedAtItsExhaustAndItsSphereStaysOutOfTheRoad()
     {
@@ -131,13 +107,12 @@ public class GhostsAndStuttersTests
             $"the probe sphere reaches {point.Y - radius:F2} m, which is below the surface the car rests on");
         Assert.InRange(radius, AudioEmission.MinOcclusionRadius, AudioEmission.DefaultOcclusionRadius);
 
-        // And it is BEHIND the car, which is where an exhaust is — the same point the voice is placed
-        // at, so the probe and the voice can never again disagree about where the sound is.
+        // Behind the car, at the exhaust, where the voice is placed too.
         Assert.True(Vector3.Distance(point, snap.Transform.Position) > 0.5f,
             "the engine voice sits at the tailpipe; the probe has to be at the same place");
     }
 
-    /// <summary>An emitter with nothing authored is still probed at its own origin, as before.</summary>
+    /// <summary>An emitter with nothing authored is probed at its own origin.</summary>
     [Fact]
     public void AnEmitterWithNoOffsetIsUnchanged()
     {
@@ -153,12 +128,8 @@ public class GhostsAndStuttersTests
 
     // ── Rule 6: the map is validated against the things that drive on it ────────────────────────
 
-    /// <summary>
-    /// The shipped speedway's track has to be driveable end to end. It was not: the front straight
-    /// ran through the grandstand deck for the last hundred and twenty metres before turn 4, because
-    /// the generator set the stand back from the straight's NEAREST point and the straight is a
-    /// tangent between two circles of different radii, so it slants by forty-six metres.
-    /// </summary>
+    /// <summary>The shipped speedway's track is driveable end to end. The front straight once ran through
+    /// the grandstand for 120 m: it slants 46 m, and the stand was set back from its nearest point.</summary>
     [Fact]
     public void EveryShippedTrackIsDriveable()
     {
@@ -174,7 +145,7 @@ public class GhostsAndStuttersTests
                 + "vehicles driving it are inside a building, which is heard as them disappearing");
     }
 
-    /// <summary>And the check has to be able to SEE a building on the line, or it proves nothing.</summary>
+    /// <summary>The check sees a building on the line, or it proves nothing.</summary>
     [Fact]
     public void ABuildingOnTheLineIsCaught()
     {
@@ -204,13 +175,9 @@ public class GhostsAndStuttersTests
     // ── Rule 5: a moving source is timestamped by when it was SAMPLED ───────────────────────────
 
     /// <summary>
-    /// The stamp has to survive being re-applied, because it is re-applied constantly: the voice
-    /// manager hands every playing voice back to the provider on each of its 250 Hz ticks with the
-    /// same stored emitter. Stamped "now" on each of those, the age of a position never exceeded one
-    /// tick, dead reckoning could not carry a car more than a quarter of a metre, and the 250 Hz loop
-    /// wrote the same pitch eight times over and then jumped.
-    ///
-    /// This models the two rules side by side over one simulation step.
+    /// A position's stamp survives re-application on every 250 Hz tick: stamped "now" each time, its age
+    /// never exceeded a tick, dead reckoning carried a car a quarter metre at most, and the pitch held
+    /// then jumped. Models both rules over one simulation step.
     /// </summary>
     [Fact]
     public void ReApplyingAnEmitterDoesNotMakeItsPositionYoung()
@@ -222,9 +189,9 @@ public class GhostsAndStuttersTests
         double worstStampedOnSubmit = 0, worstStampedOnSample = 0;
         for (double now = sampledAt; now < sampledAt + SimStep; now += Tick)
         {
-            // What it used to do: every re-application declared the position freshly sampled.
+            // Stamped on submit: every re-application declared the position fresh.
             worstStampedOnSubmit = Math.Max(worstStampedOnSubmit, 0.0);
-            // What it does now: the emitter carries when it was true, and nothing resets that.
+            // Stamped on sample: the emitter carries when it was true.
             worstStampedOnSample = Math.Max(worstStampedOnSample, now - sampledAt);
         }
 
@@ -234,15 +201,12 @@ public class GhostsAndStuttersTests
             $"a sample-time stamp has to expose the whole step; saw {worstStampedOnSample * 1000:F0} ms");
     }
 
-    /// <summary>
-    /// And the reckoning must be allowed to cover that age. A cap shorter than the real sampling
-    /// period is a hold by another name: the source freezes for the rest of every step.
-    /// </summary>
+    /// <summary>Dead reckoning may cover that age: a cap shorter than the sampling period freezes the
+    /// source for the rest of every step.</summary>
     [Fact]
     public void TheDeadReckonCapCoversAWholeSimulationStep()
     {
-        // Mirrors FmodAudioProvider.MaxDeadReckonSeconds, which is private. If that changes below one
-        // simulation step this test is the thing that says the freeze is back.
+        // Mirrors the private FmodAudioProvider.MaxDeadReckonSeconds; keep them in step.
         const double MaxDeadReckonSeconds = 0.08;
         const double SimStep = 1.0 / 30.0;
         const double AudioSubmitPeriod = 0.022;
@@ -254,16 +218,8 @@ public class GhostsAndStuttersTests
 
     // ── An emitter that makes sound on its own is processed every frame ─────────────────────────
 
-    /// <summary>
-    /// A public-address horn that says its piece every twenty seconds is an emitter that runs on its
-    /// own, and has to be treated as one.
-    ///
-    /// It was not. The client registered an entity for per-frame audio processing only if its mode was
-    /// LoopOne or it was a synth — a list of two cases, not a rule — so a Single-with-a-repeat-interval
-    /// emitter was never in the audio system at all: no voice, no occlusion, no log line, nothing to
-    /// notice. The repeat logic written expressly to serve it could never run, because nothing ever
-    /// called the code containing it.
-    /// </summary>
+    /// <summary>A Single emitter with a repeat interval (a PA every 20 s) runs on its own and is
+    /// processed every frame; it once never reached the audio system, silently.</summary>
     [Fact]
     public void AnEmitterThatMakesSoundOnItsOwnIsProcessed()
     {
@@ -279,10 +235,7 @@ public class GhostsAndStuttersTests
         Assert.True(new SoundEmitterComponent { SoundId = "engine:v8_muscle", IsSynth = true }.RunsOnItsOwn());
     }
 
-    /// <summary>
-    /// And a plain one-shot does NOT, which is the thing the old narrow test was really protecting.
-    /// Registering a Single with no repeat interval would replay it every frame for ever.
-    /// </summary>
+    /// <summary>A plain one-shot does not: registered, it would replay every frame.</summary>
     [Fact]
     public void APlainOneShotIsNotProcessedEveryFrame()
     {

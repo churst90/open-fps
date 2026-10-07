@@ -58,8 +58,8 @@ public class HigherOrderReflectionTests
             new(new Vector3(0, 1.25f, -2.25f), new Vector3(5, 2.5f, 0.5f), Q, "Concrete"),
         };
         var into = new List<EarlyReflections.Arrival>();
-        // Asked for third order in a closed room anyway (the renderer would not), the copies of copies
-        // it finds are the room's DENSE tail: many, close together, and quieter at every order.
+        // Asked for third order anyway (the renderer would not), they are the room's dense tail: many,
+        // close together, quieter at every order.
         EarlyReflections.Find(new Vector3(-1, 1.5f, 0), new Vector3(1, 1.6f, 0.5f), room, into,
                               maxOrder: EarlyReflections.MaxOrder);
         Assert.DoesNotContain(into, a => a.Order >= 2 && EarlyReflections.IsSeparateEvent(a));

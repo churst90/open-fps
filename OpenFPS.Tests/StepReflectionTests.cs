@@ -4,20 +4,9 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The walls answering a footfall — the arrivals between the near field and the tail.
-///
-/// Reported from the chair, walking the city's car park: *"a parking garage is big, this sounds like
-/// a box... rather than reflections being emitted from the walls, it's like the whole room is
-/// reverby... it surrounds me rather than being directional. I should hear reflections from a wall,
-/// from the wall's direction, not an all around reflection from everywhere at once."*
-///
-/// That is exactly what direct-plus-diffuse-tail with nothing in between sounds like. The near-field
-/// probes cover the last three metres and the diffuse bus covers the tail; everything from three
-/// metres to the size of the room was missing, and in a 21 by 28 metre garage that is the whole room.
-///
-/// These hold what has to be true of the arrivals for the room to have a shape: that a low ceiling
-/// answers SOON and from ABOVE, that a far wall answers LATER and from ITS OWN DIRECTION, and that
-/// neither is louder than the step it is a copy of.
+/// The walls answering a footfall between the near field and the tail: a low ceiling soon and from
+/// above, a far wall later and from its own direction, neither louder than the step.
+/// docs/THE_CITY_BLOCK.md, "Footfalls answered by the walls".
 /// </summary>
 public class StepReflectionTests
 {
@@ -56,18 +45,15 @@ public class StepReflectionTests
         var arrivals = Arrivals(Garage());
         Assert.NotEmpty(arrivals);
 
-        // The ceiling is 0.8 m over the ear and 2.4 m over the foot, so its image is about 3.2 m away
-        // against 1.6 m direct — an extra 1.6 m, which is under five milliseconds.
+        // The ceiling's image is about 3.2 m away against 1.6 m direct: under 5 ms later.
         var above = arrivals.Find(a => (a.ImagePosition.Y - Ear.Y) > 1f);
         Assert.True(above.ExtraDelaySeconds > 0f, "nothing answered from overhead in a room 2.5 m high");
         Assert.InRange(above.ExtraDelaySeconds, 0.002f, 0.025f);
         Assert.True(above.GainMid < 1f, "a reflection cannot be louder than the sound it copies");
     }
 
-    /// <summary>
-    /// A wall ten metres off answers from ITS OWN DIRECTION and tens of milliseconds later — which is
-    /// the information the diffuse bus cannot carry, because a bus has no direction at all.
-    /// </summary>
+    /// <summary>A wall ten metres off answers from its own direction tens of milliseconds later, which the
+    /// diffuse bus cannot carry.</summary>
     [Fact]
     public void AFarWallAnswersLaterAndFromItsOwnSide()
     {
@@ -87,10 +73,7 @@ public class StepReflectionTests
         }
     }
 
-    /// <summary>
-    /// A room with the walls taken away answers with nothing. The floor of the ladder: standing in the
-    /// open, a footstep is a footstep and there is nothing to hear after it.
-    /// </summary>
+    /// <summary>In the open, nothing answers a footstep.</summary>
     [Fact]
     public void OpenGroundAnswersOnlyWithTheGround()
     {
@@ -104,10 +87,8 @@ public class StepReflectionTests
             Assert.True(a.ImagePosition.Y < Foot.Y, "something answered from above, in the open air");
     }
 
-    /// <summary>
-    /// The nearer the surface, the sooner and the louder. Held because it is the whole of what makes
-    /// a small room read as small, and it is one comparison rather than a number anybody chose.
-    /// </summary>
+    /// <summary>The nearer the surface, the sooner and louder its answer: what makes a small room read
+    /// as small.</summary>
     [Fact]
     public void ALowerCeilingAnswersSoonerAndLouder()
     {

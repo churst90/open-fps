@@ -13,13 +13,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// "Sidewalks aren't labeled as sidewalks still, they're just 'outside'."
-///
-/// Two faults behind one report. The map-wide outdoor region is always in the acoustic map, so the
-/// lookup that guarded the name-from-the-ground fallback always succeeded and that fallback never
-/// ran: every unboxed metre of open ground was "Outside". And the city's cross streets — Dock,
-/// Central, Foundry, North — named their carriageways but not their pavements, so a player walking
-/// the footway of any of them was on exactly that unboxed ground.
+/// "Sidewalks aren't labeled as sidewalks still, they're just 'outside'." Two faults: the map-wide outdoor
+/// region always matched, so the name-from-the-ground fallback never ran; and the cross streets named
+/// their carriageways but not their pavements.
 /// </summary>
 public class PlaceNameTests
 {
@@ -57,11 +53,8 @@ public class PlaceNameTests
         Assert.Equal("Outside", ClientAudioSystem.NameOfPlace(EmptyMap(), AcousticConstants.GlobalRegionId, "Generic", 0f));
     }
 
-    /// <summary>
-    /// A doorway is the wall's thickness and in no zone. Standing in the one between Union Building's
-    /// ground-floor corridor and flat 00B (where the where-am-I key said "Under Shelter"), it is named
-    /// from the two zones either side of it.
-    /// </summary>
+    /// <summary>A doorway, in no zone, is named from the zones either side: the one between Union Building's
+    /// corridor and flat 00B said "Under Shelter".</summary>
     [Fact]
     public void ADoorwayIsNamedFromTheZonesEitherSide()
     {
@@ -88,10 +81,8 @@ public class PlaceNameTests
         Assert.Contains("Union Building flat 00B", name);
     }
 
-    /// <summary>
-    /// Walk both pavements of every east-west street on the real city map, through the same region
-    /// lookup and ground probe the client uses, and every step is named as a pavement.
-    /// </summary>
+    /// <summary>Every step along both pavements of every east-west city street is named as a pavement,
+    /// through the client's region lookup and ground probe.</summary>
     [Fact]
     public void TheCrossStreetPavementsAreNamedPavements()
     {
@@ -145,10 +136,8 @@ public class PlaceNameTests
         Assert.True(walked > 100, $"only {walked} concrete steps found beside the cross streets");
         Assert.True(wrong.Count == 0, $"{wrong.Count} pavement step(s) not named a sidewalk: {string.Join("  ", wrong.Take(12))}");
 
-        // And a street is not a room. The region prefab defaults to IsIndoor, which would read as
-        // full shelter (rain off, "Under Shelter") — the load survey has to measure every cross
-        // street and its pavements as open. (Main Street's block 2 is correctly covered: two-thirds
-        // of it lies under the tunnel roof.)
+        // A street is not a room: the region prefab defaults to IsIndoor, so the load survey must measure
+        // the cross streets as open. (Main Street's block 2 is rightly covered, under the tunnel roof.)
         var indoor = defs.Where(d => Regex.IsMatch(d.Region.FriendlyName ?? "", @"^(Dock|Central|Foundry|North) Street(, block \d+| sidewalk)$")
                                      && d.Region.IsIndoor)
                          .Select(d => d.Region.FriendlyName).ToList();

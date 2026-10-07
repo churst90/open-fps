@@ -10,9 +10,8 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What a driver is TOLD, on the real city: the road's name, the junction ahead and its exits, which
-/// lane, which way. "Z doesn't tell me if I'm on the street or not, so I have no clue where I'm
-/// turning or when" — these are the answers to that, checked against the map rather than a toy.
+/// What a driver is told on the real city: the road's name, the junction ahead and its exits, the lane,
+/// the way ("Z doesn't tell me if I'm on the street or not, so I have no clue where I'm turning or when").
 /// </summary>
 public class DrivingAidsTests
 {
@@ -91,10 +90,8 @@ public class DrivingAidsTests
         Assert.Contains("wrong side", aids.Readout);
     }
 
-    /// <summary>
-    /// Off the road, you are told where the road is. From the first garage bay, nose east, Main
-    /// Street is a few metres AHEAD — the garage opens onto it.
-    /// </summary>
+    /// <summary>Off the road you are told where it is: from the first garage bay, nose east, Main Street is
+    /// a few metres ahead.</summary>
     [Fact]
     public void OffTheRoadTheReadoutSaysWhereTheNearestRoadIs()
     {
@@ -111,10 +108,9 @@ public class DrivingAidsTests
     }
 
     /// <summary>
-    /// "It's hard to know how far I'm turning, and I overshoot the lane." Pointed twenty degrees off
-    /// Main Street at town speed, lane assist steers back toward the middle of the lane — left if
-    /// you are pointing right of the road, right if left — and Z says how far off you are. Turned
-    /// sixty degrees away you are turning on purpose, and it keeps its hands off.
+    /// Twenty degrees off Main Street at town speed, lane assist steers back to the lane's middle and Z
+    /// says how far off you are; sixty degrees off is a deliberate turn and it keeps its hands off ("It's
+    /// hard to know how far I'm turning, and I overshoot the lane").
     /// </summary>
     [Theory]
     [InlineData(20f, -1)]
@@ -136,10 +132,8 @@ public class DrivingAidsTests
     }
 
     /// <summary>
-    /// "I'm not hearing any cues." None of them played: a cue follows the listener's head but was
-    /// left at the default position, the middle of the map, and the voice manager drops anything
-    /// more than one and a half ranges from the listener — everywhere past 120 m from the centre,
-    /// which is most of Main Street. Two hundred metres up Main Street, the guide must reach the mixer.
+    /// 200 m up Main Street the guide reaches the mixer ("I'm not hearing any cues"): a head-locked cue
+    /// left at the map's middle was dropped past 1.5 ranges, everywhere beyond 120 m from the centre.
     /// </summary>
     [Fact]
     public void TheGuideBeepIsPlayedFarFromTheMiddleOfTheMap()

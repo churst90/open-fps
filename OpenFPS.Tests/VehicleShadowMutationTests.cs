@@ -8,9 +8,8 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A vehicle between you and a sound, held to the edges Stryker found untested (2026-09-24): the
-/// detour over a roof worked out by hand, the barrier being the same whichever way the sound goes
-/// and wherever the scene stands, what is and is not a barrier, and how two of them add up.
+/// A vehicle between you and a sound, at the edges Stryker found untested (2026-09-24): the roof
+/// detour by hand, symmetry and placement, what is a barrier, and how two add up.
 /// </summary>
 public class VehicleShadowMutationTests
 {
@@ -21,11 +20,9 @@ public class VehicleShadowMutationTests
         => VehicleShadow.Detour(rest, rot, size, a, b);
 
     /// <summary>
-    /// Over the roof of a low box the detour is exactly the extra length of going up to the roof line
-    /// where the straight line enters the box, across, and down again where it leaves. A box 2 m wide,
-    /// 6 m long and 1.6 m tall (its body starts 0.2 m off the ground), and a line at 0.9 m cutting
-    /// across it at a slant: it enters the near side at (-1, -0.5) and leaves the far side at (1, 0.5).
-    /// Round an end or a side is further, so the roof is the answer.
+    /// Over a low box's roof the detour is up to the roof line where the line enters, across, and down
+    /// where it leaves: a 2 x 6 x 1.6 m box (body from 0.2 m), a line at 0.9 m entering at (-1, -0.5)
+    /// and leaving at (1, 0.5). Round an end or side is further.
     /// </summary>
     [Fact]
     public void TheDetourOverALowRoofIsTheExtraLengthUpAndDownAgain()
@@ -42,13 +39,8 @@ public class VehicleShadowMutationTests
         Assert.Equal(expected, D(Vector3.Zero, Straight, size, a, b), 4);
     }
 
-    /// <summary>
-    /// Round the near end of a bus: a line at ear height that clips the corner of its end is
-    /// cheapest going round that corner and straight on — about 8 cm, where the roof and the other
-    /// side are over half a metre. Sound bending round an edge takes the shortest path past it; the
-    /// first version of this test expected the route to run along the end face to where the line
-    /// would have come out (15 cm), which was the old geometry's answer, not the shortest.
-    /// </summary>
+    /// <summary>A line at ear height clipping the corner of a bus's end is cheapest round that corner,
+    /// about 8 cm, where the roof and the other side are over half a metre.</summary>
     [Fact]
     public void TheDetourRoundTheNearEndIsRoundTheCorner()
     {
@@ -59,10 +51,7 @@ public class VehicleShadowMutationTests
         Assert.Equal(expected, D(Vector3.Zero, Straight, Bus, a, b), 4);
     }
 
-    /// <summary>
-    /// The same scene picked up and put down somewhere else, turned, is the same barrier. Position and
-    /// heading only say where the box is; the detour is a property of the three things together.
-    /// </summary>
+    /// <summary>The same scene moved and turned is the same barrier.</summary>
     [Fact]
     public void MovingAndTurningTheWholeSceneChangesNothing()
     {
@@ -93,10 +82,7 @@ public class VehicleShadowMutationTests
         (new Vector3(-6f, 1.6f, -8f), new Vector3(0f, 1.6f, 8f)),    // a long slant along it, on the -x side
     };
 
-    /// <summary>
-    /// A barrier costs the same whichever way the sound crosses it: swapping the listener and the
-    /// source cannot change how far round the box the sound must go.
-    /// </summary>
+    /// <summary>A barrier costs the same whichever way the sound crosses it.</summary>
     [Fact]
     public void ABarrierIsTheSameInBothDirections()
     {
@@ -108,11 +94,8 @@ public class VehicleShadowMutationTests
         }
     }
 
-    /// <summary>
-    /// A bus is the same from either end and either side. The same crossing mirrored end for end, or
-    /// side for side, goes round the mirrored end or side and is the same detour — which only holds if
-    /// the way round is taken off whichever end or side is NEARER the crossing.
-    /// </summary>
+    /// <summary>A crossing mirrored end for end or side for side is the same detour, which holds only if
+    /// the way round is taken off the end or side nearer the crossing.</summary>
     [Fact]
     public void TheWayRoundIsOffTheNearerEndOrSide()
     {
@@ -132,10 +115,8 @@ public class VehicleShadowMutationTests
         Assert.True(D(Vector3.Zero, Straight, Bus, na, nb) < roofOnly);
     }
 
-    /// <summary>
-    /// A source inside the box is that vehicle's business, and so is a listener in it: neither end of
-    /// the line may be inside the barrier. A car's own engine is not shadowed by the car.
-    /// </summary>
+    /// <summary>A line with either end inside the box is not shadowed by it: a car's own engine is not
+    /// shadowed by the car.</summary>
     [Fact]
     public void NeitherEndMayBeInsideTheBarrier()
     {
@@ -145,10 +126,8 @@ public class VehicleShadowMutationTests
         Assert.Equal(0f, D(Vector3.Zero, Straight, Bus, inside, outside));
     }
 
-    /// <summary>
-    /// A line that misses the box on any axis costs nothing: beside it, past its end, over its roof,
-    /// and under it through the gap between the body and the road.
-    /// </summary>
+    /// <summary>A line that misses the box costs nothing: beside, past the end, over the roof, or under
+    /// the body.</summary>
     [Fact]
     public void ALineThatMissesTheBoxOnAnyAxisCostsNothing()
     {
@@ -208,10 +187,8 @@ public class VehicleShadowMutationTests
 
     private static float Gain(float db) => MathF.Pow(10f, -db / 20f);
 
-    /// <summary>
-    /// A bus between you and a car takes its Maekawa loss off each of the three bands the mixer's EQ
-    /// has — most off the top, least off the bottom — and reports the top band's loss.
-    /// </summary>
+    /// <summary>A bus between you and a car takes its Maekawa loss off each EQ band, most off the top,
+    /// and reports the top band's loss.</summary>
     [Fact]
     public void ABusBetweenTakesItsLossOffEachBand()
     {
@@ -226,10 +203,7 @@ public class VehicleShadowMutationTests
         Assert.Equal(Gain(high), path.EqHigh, 4);
     }
 
-    /// <summary>
-    /// A second vehicle in the line takes a little more, not as much again: the worst one plus a
-    /// quarter of the other, band by band.
-    /// </summary>
+    /// <summary>A second vehicle in the line adds a quarter of its loss to the worst one's, band by band.</summary>
     [Fact]
     public void ASecondVehicleAddsAQuarterOfItsLoss()
     {
@@ -252,11 +226,8 @@ public class VehicleShadowMutationTests
         Assert.Equal(Gain(Both(b.High, v.High)), path.EqHigh, 4);
     }
 
-    /// <summary>
-    /// Some bodies are not barriers: the source itself, the vehicle you are riding in, anything not
-    /// solid, anything smaller than 2.5 cubic metres (a person, a mower), and anything beside the path.
-    /// None of them touches the path or reports a loss.
-    /// </summary>
+    /// <summary>Not barriers: the source itself, the vehicle you ride, anything not solid or under 2.5 m³
+    /// (a person, a mower), and anything beside the path.</summary>
     [Fact]
     public void WhatIsNotABarrierLeavesThePathAlone()
     {
@@ -278,10 +249,7 @@ public class VehicleShadowMutationTests
         None(World(), 99, -1);
     }
 
-    /// <summary>
-    /// Anything of 2.5 cubic metres or more is a barrier, whatever its proportions — a tall narrow box
-    /// as much as a long low one, and one of exactly the threshold.
-    /// </summary>
+    /// <summary>Anything of 2.5 m³ or more is a barrier, whatever its proportions, the threshold included.</summary>
     [Fact]
     public void AnyBodyOfTheThresholdVolumeIsABarrier()
     {
@@ -299,13 +267,9 @@ public class VehicleShadowMutationTests
     }
 
     /// <summary>
-    /// KNOWN DEFECT, not a mutant: a bus standing broadside across a LEVEL line between two points
-    /// at the same height casts no shadow at all. The "round its side" route is built from the points
-    /// where the line enters and leaves, moved to one of the two faces it crosses — so for a line that
-    /// crosses the two long faces square-on, it is the straight line itself, through the bus, and
-    /// the least of the three routes is zero. The roof route (about 0.29 m here) is what should win.
-    /// The existing bus test passes only because its ear and source are at different heights, which
-    /// gives the degenerate route a few centimetres of vertical kink.
+    /// Known defect: a bus broadside across a level line casts no shadow. The "round its side" route,
+    /// built from the entry and exit points moved to a face, is the straight line through the bus, so
+    /// the least route is zero; the roof (about 0.29 m) should win.
     /// </summary>
     [Fact]
     public void ABusBroadsideShadowsALevelLine()

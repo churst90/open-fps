@@ -14,19 +14,10 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for three things a live session found, all of them the same shape: a thing that should have
-/// been heard was not, or a thing that should not have been heard was.
-///
-///  1. Crossing a doorway read the PORTAL PREFAB'S AUTHORING NOTES aloud, mid-stride. The proximity
-///     announcer spoke every named entity within three metres, and every entity is named — the walls,
-///     the floors, the auto-injected foundation, the acoustic region volumes and the portals all carry
-///     a name so that authors and logs can refer to them.
-///  2. A rejected login was silent. The head closed its connect form the instant the button was
-///     pressed, and the focus announcement that followed — spoken with interrupt — landed on top of the
-///     rejection the session had just said.
-///  3. Retrying that login did nothing at all. LiteNetLib's <c>Connect</c> returns the existing peer
-///     when one is already connected and fires no event, so the head never sent a second
-///     <c>LoginRequest</c>, so the server never answered, so there was nothing to speak.
+/// Three faults a live session found: crossing a doorway read the portal prefab's authoring notes aloud
+/// (every entity is named, and the announcer spoke every name within 3 m); a rejected login was talked
+/// over by the head's focus announcement; and a retry sent nothing, since LiteNetLib's <c>Connect</c>
+/// returns the existing peer and fires no event.
 /// </summary>
 public class AnnouncementAndLoginTests
 {
@@ -87,8 +78,7 @@ public class AnnouncementAndLoginTests
     [Fact]
     public void TheAnnounceFlagSurvivesTheTripToTheClient()
     {
-        // End to end on the real shipped map: whatever the server decides has to be on the wire, because
-        // the client has nothing else to go on.
+        // On the real shipped map: what the server decides must be on the wire.
         var prefabs = new PrefabRepository(PrefabDirectory);
         var maps = new MapRepository(MapDirectory);
         var manager = new MapManager(maps, prefabs);
@@ -103,8 +93,7 @@ public class AnnouncementAndLoginTests
         Assert.All(scaffolding, d => Assert.False(d.Identity.Announce,
             $"'{d.Identity.Name}' is acoustic scaffolding and must not be announced."));
 
-        // ...and so is the architecture. Nothing on the default map is announced at all — it is a
-        // material/occlusion lab of walls, floors and beacons.
+        // ...and so is the architecture: nothing on the default map is announced.
         Assert.All(defs.Where(d => d.Identity.Announce),
             d => Assert.True(d.Type is EntityType.Item or EntityType.NPC or EntityType.Beacon,
                 $"'{d.Identity.Name}' is a {d.Type} and should not be announcing itself."));
@@ -124,9 +113,8 @@ public class AnnouncementAndLoginTests
             announce: true));
 
         speech.Spoken.Clear();
-        // The proximity scan is counted in TICKS, not seconds, so the steps are run with a tiny delta:
-        // there is no floor under a hand-built world, and a full second of real ticks would drop the
-        // player out of range of both entities before the scan came round.
+        // The proximity scan counts ticks, so the steps use a tiny delta: with no floor under a hand-built
+        // world, a real second would drop the player out of range first.
         for (int i = 0; i < PhysicsConstants.TickRate; i++) session.SimStep(0.001f);
 
         Assert.False(speech.Said("Acoustic Portal"));
@@ -176,9 +164,8 @@ public class AnnouncementAndLoginTests
     [Fact]
     public void ConnectingWhileAlreadyConnectedReRunsTheHandshake()
     {
-        // The real thing over the loopback, because the bug was in LiteNetLib's contract, not in ours:
-        // Connect() returns the existing peer and fires no OnPeerConnected, and every layer above was
-        // waiting for that event to send the login.
+        // Over the loopback, because the fault was LiteNetLib's contract: Connect() returns the existing
+        // peer and fires no OnPeerConnected.
         var listener = new AcceptingListener();
         var server = new NetManager(listener) { AutoRecycle = true };
         Assert.True(server.Start(0));
@@ -195,8 +182,7 @@ public class AnnouncementAndLoginTests
                 "the client never connected to the loopback server");
             Assert.Equal(1, connectedEvents);
 
-            // The second attempt — the retry after a rejected password. Before the fix this produced
-            // nothing whatsoever: no event, no LoginRequest, no answer, no speech.
+            // The retry after a rejected password.
             client.Connect("127.0.0.1", server.LocalPort);
             Assert.Equal(2, connectedEvents);
             Assert.True(client.IsConnected);

@@ -9,9 +9,8 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Recorded sounds hear the ground too: a door, a shot. Until 2026-09-27 only the synthesised voices
-/// carried a ground reflection. Speech does not, yet (see WorldAudioPlayer.HearsTheGround); the
-/// geometry below is still the one a voice would get.
+/// Recorded sounds (a door, a shot) hear the ground as synthesised voices do. Speech does not (see
+/// WorldAudioPlayer.HearsTheGround); the geometry below is still the one a voice would get.
 /// </summary>
 public class RecordedGroundTests
 {

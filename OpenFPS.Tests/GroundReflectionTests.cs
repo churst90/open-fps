@@ -94,11 +94,8 @@ public class GroundReflectionTests
         Assert.True(farHigh < nearLow && farHigh > 0.5f);
     }
 
-    /// <summary>
-    /// "High bit crushy frequencies ... after a while." The read position was worked out as a float,
-    /// which has no fraction left past 2^24 samples (6.3 minutes): the reflection's delay snapped to
-    /// whole steps of 2, 4, 8 samples. Twenty minutes in, a half-sample delay must still interpolate.
-    /// </summary>
+    /// <summary>Twenty minutes in, a half-sample delay still interpolates: a float read position has no
+    /// fraction past 2^24 samples (6.3 min), heard as "high bit crushy frequencies ... after a while".</summary>
     [Fact]
     public void AfterTwentyMinutesTheDelayStillHasAFraction()
     {
@@ -120,12 +117,8 @@ public class GroundReflectionTests
         return g;
     }
 
-    /// <summary>
-    /// "house_downpipe_and_gutter_outlet_heavy.wav has a flanging/very fast repeating sound to it"
-    /// (Cody, 2026-10-06): a gutter outlet 2.8 m up, heard 1.8 m away over paving, was its own stream
-    /// again 8 ms later, a comb every 125 Hz. Running water hands back the ground's power: there are no
-    /// notches, and noise through it has no echo of itself at the delay.
-    /// </summary>
+    /// <summary>A texture's ground hands back power, not a copy: no notches, no echo at the delay (Cody,
+    /// 2026-10-06: a gutter outlet 2.8 m up combed every 125 Hz, "a flanging/very fast repeating sound").</summary>
     [Fact]
     public void ATextureHasNoComb()
     {

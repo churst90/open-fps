@@ -4,19 +4,9 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// How big the room is, measured from inside it — and why assuming it was a cube was audible.
-///
-/// The room equation needs the surface area: the reverberant field a source raises goes as 1/(S·ā),
-/// because that is how much the room absorbs per bounce. <see cref="Enclosure"/> used to substitute
-/// S ≈ 13.5·MFP², which is exact for a cube and hopeless for anything flat or long — and a city is
-/// made of flat and long things. A car park 21 by 28 metres and 2.5 high has 1,390 m² of surface; the
-/// cube form gives it 246. Five times too little absorption is nine decibels too much reverberation,
-/// and every footstep in that garage went to the master limiter's ceiling and stayed there.
-///
-/// It is measured now, from the same sphere of rays that measures everything else: the solid angle a
-/// patch of wall subtends is dS·cosθ/d², so ∮(d²/cosθ)dω is the surface area of any convex room seen
-/// from any point inside it. These hold that it really is — for a cube, a slab and a tube, from the
-/// middle and from up against a wall.
+/// <see cref="Enclosure"/> measures a room's surface area from inside, ∮(d²/cosθ)dω over its sphere of
+/// rays, for a cube, a slab and a tube, from the middle and against a wall. The cube form it replaced
+/// (S ≈ 13.5·MFP²) gave a 21 x 28 x 2.5 m car park 246 m² for 1,390 (docs/THE_CITY_BLOCK.md).
 /// </summary>
 public class RoomSizeTests
 {
@@ -58,25 +48,21 @@ public class RoomSizeTests
         float measured = survey.SurfaceAreaSquareMetres;
         float cube = 13.5f * survey.MeanFreePathMetres * survey.MeanFreePathMetres;
 
-        // A long tube is the hard case and comes back about a third low: 192 rays cannot resolve the
-        // far ends of a corridor, which subtend almost no solid angle and carry a great deal of area.
-        // That is 1.6 dB too much reverberation in a corridor, against the 7.6 dB the cube form was
-        // wrong by in a car park — so it is the limit of this measure, stated rather than hidden.
+        // The measure's stated limit: a long tube reads about a third low (192 rays cannot resolve a
+        // corridor's far ends), 1.6 dB too wet, against the cube form's 7.6 dB in a car park.
         Assert.True(measured > truth * 0.6f && measured < truth * 1.45f,
             $"{shape}: measured {measured:F0} m^2 against {truth:F0} true");
 
-        // ...and for anything that is not a cube, the assumption it replaced was wrong by a lot.
+        // For anything not a cube, the cube form was far off.
         if (MathF.Abs(x - y) > 1f || MathF.Abs(y - z) > 1f)
             Assert.True(cube < truth * 0.6f,
                 $"{shape}: the cube form gives {cube:F0} m^2 against {truth:F0} true — it was supposed to be wrong here");
     }
 
     /// <summary>
-    /// The one that mattered: your own footsteps in a bare concrete car park.
-    ///
-    /// The classical room equation says the reverberant field at 1.6 m is (r/r_c)² with
-    /// r_c = sqrt(S·ā/(1−ā)/16π) — about +5 dB of power for this room, an amplitude ratio near 1.7.
-    /// The cube form said 3.0, nine decibels of power too much, and that is what clipped the master.
+    /// Your own footsteps in a bare concrete car park: the room equation gives the field at 1.6 m as
+    /// (r/r_c)², r_c = sqrt(S·ā/(1−ā)/16π), about +5 dB (amplitude near 1.7); the cube form's 3.0
+    /// clipped the master.
     /// </summary>
     [Fact]
     public void ACarParkAnswersAboutAsLoudlyAsItsOwnSurfaceAllows()
@@ -93,9 +79,7 @@ public class RoomSizeTests
             $"the cube form gave {assumed:P0} where the measured surface gives {measured:P0}");
     }
 
-    /// <summary>
-    /// Open ground raises no reverberant field, whatever else changes. The floor of the ladder.
-    /// </summary>
+    /// <summary>Open ground raises no reverberant field.</summary>
     [Fact]
     public void OpenGroundStaysDry()
     {
@@ -110,12 +94,8 @@ public class RoomSizeTests
         Assert.True(send < 0.25f, $"a field sent {send:P0} of every sound to a reverb bus");
     }
 
-    /// <summary>
-    /// A listener does not change the room by standing somewhere else in it. The surface area is a
-    /// fact about the room, so two places in the same car park have to agree — which the old measure
-    /// (the mean distance to the nearest surface) did not: it read 4.2 m from the middle and 3.0 m
-    /// against a wall, which is 3 dB of reverberation appearing because somebody walked.
-    /// </summary>
+    /// <summary>Two places in the same car park measure the same room; the old mean-free-path measure read
+    /// 4.2 m in the middle and 3.0 m by a wall, 3 dB of reverberation from walking.</summary>
     [Fact]
     public void TheRoomIsTheSameSizeWhereverYouStandInIt()
     {

@@ -30,11 +30,9 @@ public class EnclosureMutationTests
         Assert.Equal(0f, Enclosure.Measure(Vector3.Zero, new List<Enclosure.Solid>()));
     }
 
-    /// <summary>
-    /// <see cref="Enclosure.Measure"/> and <see cref="Enclosure.Look"/> cast the same sphere of rays and
-    /// the same two bounces; in a sealed room — where nothing crosses into a more open place, so
-    /// Look's boundary test drops no ray — they must read the same enclosure, to the last bit.
-    /// </summary>
+    /// <summary>In a sealed room (Look's boundary test drops no ray) <see cref="Enclosure.Measure"/> and
+    /// <see cref="Enclosure.Look(System.Numerics.Vector3, System.Collections.Generic.IReadOnlyList{Enclosure.Solid})"/>
+    /// read the same enclosure to the bit.</summary>
     [Fact]
     public void MeasureAndLookAgreeInASealedRoom()
     {
@@ -45,12 +43,8 @@ public class EnclosureMutationTests
         Assert.Equal(Enclosure.Look(at, room).Enclosure, measured, 6);
     }
 
-    /// <summary>
-    /// Two walls further apart than <see cref="Enclosure.ReverberantRangeMetres"/> are not a room. One
-    /// is 10 m off and one 55 m off, 65 m apart: a ray's second leg, from either wall to the other, is
-    /// always longer than 60 m, so no ray survives two bounces and the enclosure is exactly nothing —
-    /// although a ray leaving from where the listener stands WOULD reach the 55 m wall.
-    /// </summary>
+    /// <summary>Two walls 65 m apart, beyond <see cref="Enclosure.ReverberantRangeMetres"/>, are no room:
+    /// no second leg survives, though a first ray reaches the 55 m wall.</summary>
     [Fact]
     public void TwoWallsFurtherApartThanTheReverberantRangeAreNotARoom()
     {
@@ -62,11 +56,8 @@ public class EnclosureMutationTests
         Assert.Equal(0f, Enclosure.Measure(Vector3.Zero, walls));
     }
 
-    /// <summary>
-    /// The second leg leaves from the FRONT of the face it struck. Maps overlap their boxes, so a wall
-    /// can have another box buried in it a few millimetres behind its face; that is not a second
-    /// surface the sound can reach, and a lone wall with a 4 mm slab inside it is still no room.
-    /// </summary>
+    /// <summary>The second leg leaves from the front of the face struck: a box buried millimetres inside a
+    /// wall (maps overlap boxes) is not a surface, and a lone wall stays no room.</summary>
     [Fact]
     public void ABoxBuriedInsideAWallIsNotASecondSurface()
     {
@@ -88,11 +79,8 @@ public class EnclosureMutationTests
         Assert.Equal(0f, s.Anisotropy);
     }
 
-    /// <summary>
-    /// The room equation's surface-area fallback. A measured area of one square metre or less is no
-    /// measurement, and the cube's 13.5·MFP² stands in: reverberant/direct = 16π r² e / (S (1 - e)),
-    /// with S = 216 m² for a 4 m mean free path. A real measurement is used as it is.
-    /// </summary>
+    /// <summary>A measured area of 1 m² or less is none, and the cube's 13.5·MFP² stands in:
+    /// reverberant/direct = 16π r² e / (S (1 - e)), S = 216 m² at a 4 m mean free path.</summary>
     [Fact]
     public void TheRoomEquationFallsBackToACubeWhenNoAreaWasMeasured()
     {

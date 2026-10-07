@@ -9,14 +9,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Who gets a voice, and what happens to whoever does not.
-///
-/// This is the one part of the audio engine with no acoustics in it — it is bookkeeping — and it had
-/// no tests at all, because it used to need FMOD and a sound card to construct. What went wrong in it
-/// was invisible from everywhere else: a ONE-SHOT that lost the budget was kept in the queue and
-/// re-scored for ever, and fired whenever the listener moved somewhere that made its score win. A clap
-/// from a minute ago, played from a position computed for a place you have walked away from — heard on
-/// the speedway as reflections piling up in a spot where nothing was happening.
+/// Who gets a voice, and what happens to whoever does not. Its faults are invisible elsewhere: a
+/// one-shot that lost the budget was once re-scored for ever and fired minutes later wherever the
+/// listener's move let it win, heard on the speedway as reflections piling up where nothing happened.
 /// </summary>
 public class VoiceBudgetTests
 {
@@ -31,9 +26,8 @@ public class VoiceBudgetTests
         public readonly List<int> Stopped = new();
 
         public readonly HashSet<int> Fading = new();
-        /// <summary>How many frames a fade takes here. The real one is a slew in the mixer; what the
-        /// budget needs to be right about is that it takes MORE THAN ONE, and that a voice can win
-        /// its slot back in the middle of one.</summary>
+        /// <summary>Frames a fade takes here. What matters to the budget is that it takes more than one,
+        /// and that a voice can win its slot back in the middle of one.</summary>
         public int FadeFrames = 2;
         private readonly Dictionary<int, int> _fadeAge = new();
 
@@ -83,12 +77,8 @@ public class VoiceBudgetTests
         IsEvent = false,
     };
 
-    /// <summary>
-    /// A one-shot that loses the budget is forgotten, not stored.
-    ///
-    /// The queue must not grow, and — this is the part that was audible — the loser must never be
-    /// played later. Its moment has gone.
-    /// </summary>
+    /// <summary>A one-shot that loses the budget is forgotten: the queue does not grow and the loser is
+    /// never played later.</summary>
     [Fact]
     public void AnEventThatDoesNotWinAVoiceIsForgottenRatherThanQueued()
     {
@@ -118,18 +108,8 @@ public class VoiceBudgetTests
         Assert.Empty(late);
     }
 
-    /// <summary>
-    /// ...but a CONTINUOUS source that loses the budget keeps its place and comes back.
-    ///
-    /// The distinction is the whole point: a car that is out-scored is still there, still making a
-    /// noise, and gets a voice again when one frees. Dropping those would be cars falling silent as
-    /// they went round the back.
-    /// </summary>
-    /// <summary>
-    /// A distant car passing behind buildings goes under the silence floor and back out, again and
-    /// again. It must not be stopped and rebuilt each time: a rebuilt engine is a fresh start, and at
-    /// 300 m one car was rebuilt 45 times in nine minutes — distant traffic heard as stuttering.
-    /// </summary>
+    /// <summary>A distant car going behind buildings and out again is not stopped and rebuilt each time:
+    /// at 300 m one car was rebuilt 45 times in nine minutes, heard as stuttering.</summary>
     [Fact]
     public void AnEngineGoingBehindABuildingIsNotRebuilt()
     {
@@ -147,6 +127,8 @@ public class VoiceBudgetTests
         Assert.Empty(mixer.Stopped);
     }
 
+    /// <summary>A continuous source that loses the budget keeps its place and gets a voice again when one
+    /// frees; dropping it would be cars falling silent round the back.</summary>
     [Fact]
     public void AnEngineThatDoesNotWinAVoiceKeepsItsPlaceAndComesBack()
     {
@@ -173,15 +155,8 @@ public class VoiceBudgetTests
         Assert.Contains(2, mixer.Started);
     }
 
-    /// <summary>
-    /// A hundred quiet, distant sources cannot take the voice off one near car.
-    ///
-    /// This is the fault the old ranking had, stated as a test. Voices were scored on an AUTHORED
-    /// priority — engines 1, transients 2 — squared, over distance: so a clap two hundred metres away
-    /// outranked a car at five metres by four to one, and the car did not fade, it was stopped and
-    /// rebuilt the next frame. Now everything is ranked on the level it will actually deliver, and a
-    /// hundred things nobody can hear add up to nothing.
-    /// </summary>
+    /// <summary>A hundred quiet, distant sources cannot take the voice off one near car: ranking is on
+    /// delivered level (an authored priority once let a clap at 200 m outrank a car at 5 m).</summary>
     [Fact]
     public void AHundredQuietDistantSourcesCannotDisplaceOneNearCar()
     {
@@ -202,12 +177,8 @@ public class VoiceBudgetTests
         Assert.DoesNotContain(1, mixer.Stopped);
     }
 
-    /// <summary>
-    /// ...and the reverse, which is the half that makes it physics rather than a rule about cars.
-    ///
-    /// One near, loud transient — a clap at three metres — outranks a distant car, because at that
-    /// moment it is the louder thing. Nothing here knows which is which.
-    /// </summary>
+    /// <summary>The reverse: a clap at three metres outranks a distant car because it is louder; nothing
+    /// here knows which is a car.</summary>
     [Fact]
     public void ANearTransientOutranksADistantCar()
     {
@@ -223,14 +194,8 @@ public class VoiceBudgetTests
         Assert.DoesNotContain(1, mixer.Playing);
     }
 
-    /// <summary>
-    /// A continuous source that loses its slot FADES; a one-shot is cut.
-    ///
-    /// The difference is what a sound IS, not how loud it is. A car that runs out of budget is still
-    /// there — cutting it mid-waveform is a click, and for a synthesized engine it is a rebuild from
-    /// silence. A one-shot has already missed its moment, and fading something that is over buys
-    /// nothing and holds a voice.
-    /// </summary>
+    /// <summary>A continuous source that loses its slot fades (a cut is a click, and a rebuild for an
+    /// engine); a one-shot is cut, since fading it only holds a voice.</summary>
     [Fact]
     public void AContinuousSourceFadesOutWhereAOneShotIsCut()
     {
@@ -260,14 +225,8 @@ public class VoiceBudgetTests
         Assert.Contains(1, mixer.Stopped);
     }
 
-    /// <summary>
-    /// A source that wins its slot back MID-FADE is brought round rather than left to die.
-    ///
-    /// The exact fault that made cars fall silent for the rest of their lives once before: a voice
-    /// was taken off the retiring list with its envelope still heading for zero and nothing anywhere
-    /// to turn it round. It kept its engine, kept its position, kept being updated every frame, and
-    /// was inaudible.
-    /// </summary>
+    /// <summary>A source that wins its slot back mid-fade is brought round. Guards the fault where a voice
+    /// left the retiring list with its envelope still falling and stayed inaudible for good.</summary>
     [Fact]
     public void ASourceThatWinsItsSlotBackMidFadeIsBroughtRound()
     {
@@ -282,9 +241,7 @@ public class VoiceBudgetTests
         voices.Process(Vector3.Zero);
         Assert.Contains(1, mixer.Fading);
 
-        // The event ends; the car is the loudest thing again. Two frames, because a one-shot that
-        // finished is scored once more before it is noticed to be over — it frees its slot on the
-        // frame after it ends, which is a frame of grace out of a fade that is several frames long.
+        // Two frames: a finished one-shot frees its slot on the frame after it ends.
         mixer.FinishedOnItsOwn(2);
         voices.Submit(Engine(1, new Vector3(6, 0, 0)));
         voices.Process(Vector3.Zero);
@@ -297,13 +254,8 @@ public class VoiceBudgetTests
         Assert.DoesNotContain(1, mixer.Stopped);
     }
 
-    /// <summary>
-    /// An essential voice is not outbid by the physics.
-    ///
-    /// The one deliberate departure: your own footsteps, speech and a warning tone are what a player
-    /// NEEDS, and on a loud map the arithmetic would rightly bury every one of them. A short explicit
-    /// list, pinned — not a knob on every object.
-    /// </summary>
+    /// <summary>Essential voices (your footsteps, speech, a warning tone) are not outbid by louder
+    /// sources: a short pinned list, the one deliberate departure from ranking by level.</summary>
     [Fact]
     public void AnEssentialVoiceIsNotOutbidByTheLoudestThingOnTheMap()
     {
@@ -321,14 +273,8 @@ public class VoiceBudgetTests
         Assert.Contains(-100, mixer.Playing);
     }
 
-    /// <summary>
-    /// Giving a source a SIZE does not make it louder — it flattens the near field and leaves the far
-    /// field exactly where it was.
-    ///
-    /// The half that was wrong in the engine: a vehicle's reference distance was widened to three
-    /// metres and nothing was paid back for it, which is not an extended source, it is a louder one.
-    /// Worth up to eight decibels on a quiet vehicle.
-    /// </summary>
+    /// <summary>A source's size flattens the near field and leaves the far field where it was; widening
+    /// the reference distance with nothing paid back made quiet vehicles up to 8 dB louder.</summary>
     [Fact]
     public void ExtentFlattensTheNearFieldAndLeavesTheFarFieldAlone()
     {
@@ -341,7 +287,7 @@ public class VoiceBudgetTests
 
         _o.WriteLine($"point: gain {point.Gain:F3} ref {point.ReferenceDistance:F2} m; "
                    + $"3.2 m across: gain {sized.Gain:F3} ref {sized.ReferenceDistance:F2} m");
-        // Far away, identical to within a rounding error: that is what makes the point model usable.
+        // Far away, identical to within a rounding error.
         foreach (float d in new[] { 20f, 50f, 130f })
             Assert.Equal(Far(d, point), Far(d, sized), 4);
 
@@ -355,14 +301,8 @@ public class VoiceBudgetTests
         Assert.True(fudged > honest * 1.5f, "the old fudge was not worth several decibels, so this test proves nothing.");
     }
 
-    /// <summary>
-    /// The three bands of negative voice ids must not overlap.
-    ///
-    /// They did. A transient's id was a hash of the sound modulo a million — −1,000 to −1,001,000 —
-    /// straight across the engine-echo band at −600,000 and the borrowed-voice band at −700,000, so a
-    /// footstep could take over a car's reflection voice or a distant car's voice. Heard as the
-    /// reflection of a bike that had long since gone past, and as cars going quiet for no reason.
-    /// </summary>
+    /// <summary>The negative voice-id bands do not overlap: transient ids once spanned the engine-echo and
+    /// borrowed-voice bands, so a footstep could take over a car's reflection or distant voice.</summary>
     [Fact]
     public void TheVoiceIdBandsDoNotOverlap()
     {
@@ -380,19 +320,13 @@ public class VoiceBudgetTests
         Assert.False(EngineReflections.IsEchoVoice(transientLowest),
             "a transient is being classified as an engine echo.");
 
-        // And consecutive transients are different voices, which is what stops a sound and its own
-        // reflection replacing each other in the submission queue.
+        // Consecutive transients are different voices, so a sound and its reflection do not replace each other.
         var seen = new HashSet<int>();
         for (int i = 1; i <= 1000; i++) Assert.True(seen.Add(WorldAudioPlayer.TransientVoiceId(i)));
     }
 
-    /// <summary>
-    /// A transient's range must not fade it out before it stops being audible.
-    ///
-    /// The mixer fades a voice to nothing over the last quarter of its range, so a range shorter than
-    /// the level can carry is not a saving, it is a silence — at 250 m the fade began at 187, and the
-    /// grandstand is 219 m from the spawn.
-    /// </summary>
+    /// <summary>A transient's range does not fade it out while still audible: the mixer fades over the last
+    /// quarter of the range, and at 250 m that began at 187 m, short of the grandstand at 219.</summary>
     [Fact]
     public void ALoudTransientIsNotFadedOutInsideTheMapItIsOn()
     {

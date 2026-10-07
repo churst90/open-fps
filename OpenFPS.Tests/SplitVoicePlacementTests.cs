@@ -5,14 +5,10 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A car heard through two voices has its length modelled once, not twice.
-///
-/// Heard as one voice, a car is placed as a thing three metres long (Loudness.Place with its extent):
-/// inside that the level is flat, because a metre nearer the intake is a metre further from the
-/// exhaust. Close enough for its two ends to be told apart, each end gets a voice of its own at the
-/// end it comes from, and that geometry is then modelled outright. Widening each end as well made the
-/// tailpipe stop getting louder inside 3.3 m: about 4 dB short at 2 m behind a hatchback and 9 dB at
-/// 1 m (Cody, 2026-10-05: "even the police interceptor I can hardly hear").
+/// A car heard through two voices has its length modelled once: as one voice it is placed with its
+/// extent, and split, each end is a point at its own end. Widening the ends as well left a hatchback's
+/// tailpipe 4 dB short at 2 m and 9 dB at 1 m (Cody, 2026-10-05: "even the police interceptor I can
+/// hardly hear").
 /// </summary>
 public class SplitVoicePlacementTests
 {

@@ -63,8 +63,7 @@ public class CarFollowingTests
                     var d = q.Position - p.Position;
                     float along = MathF.Abs(System.Numerics.Vector3.Dot(d, fwd));
                     float side = MathF.Abs(d.X * fwd.Z - d.Z * fwd.X);
-                    // Inside a junction, two cars turning into the same lane is a question of who gives
-                    // way (gap acceptance), not of following: counted by its own test, not this one.
+                    // Inside a junction it is gap acceptance, not following: its own test.
                     if (outside != null && outside.Any(j => InJunction(p.Position, j) || InJunction(q.Position, j))) continue;
                     if (side < 1.5f && along < 0.5f * (p.Length + q.Length))
                     {
@@ -90,10 +89,8 @@ public class CarFollowingTests
         Assert.Equal(0, with);
     }
 
-    /// <summary>
-    /// Inside a junction nobody meets anybody: two cars turning into one lane, or crossing each other's
-    /// path. Centres within 2.5 m whichever way they point, counted once a second over three minutes.
-    /// </summary>
+    /// <summary>Inside a junction no two cars come within 2.5 m, centre to centre, sampled once a second
+    /// over three minutes.</summary>
     [Fact]
     public void No_two_vehicles_meet_inside_a_junction()
     {
@@ -111,8 +108,7 @@ public class CarFollowingTests
                 {
                     var (p, q) = (cars[a], cars[b]);
                     if (!junctions.Any(j => InJunction(p.Position, j) && InJunction(q.Position, j))) continue;
-                    // Side by side in neighbouring lanes, pointing the same way and a lane apart, is two
-                    // cars turning into two lanes, not a meeting (2026-09-28: 2.4 m apart mid-turn).
+                    // Side by side a lane apart, the same way, is two cars turning into two lanes (2026-09-28: 2.4 m mid-turn).
                     float turnApart = MathF.Abs(MathF.IEEERemainder(p.Heading - q.Heading, 2 * MathF.PI));
                     var fwd = new System.Numerics.Vector3(MathF.Sin(p.Heading), 0f, MathF.Cos(p.Heading));
                     var dd = q.Position - p.Position;

@@ -10,14 +10,10 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What ClientAudioSystem decides about everything that is not a single car's level: how many engines
-/// are built an update, which preset keeps a donor, how many cars may borrow, which machines win a
-/// voice and on what measure (what each would sound like here, through the ear model, not how near it
-/// is), what is given up first when the mixer runs short, the cabin you are sitting in, every kind of
-/// physical source placed at its own declared level, and the woods heard as one past the hand-over.
-///
-/// Driven through <see cref="ClientAudioHarness"/>: the budget, the facade and the acoustic worker are
-/// the real ones, and the clock is the test's.
+/// ClientAudioSystem's choices beyond one car's level: engines built per update, preset donors,
+/// borrowing, machine voices ranked by loudness at the ear, what goes first when the mixer runs short,
+/// the cabin, physical sources at their declared levels, and woods heard as one. Driven through
+/// <see cref="ClientAudioHarness"/> (real budget, facade and acoustic worker; the test's clock).
 /// </summary>
 [Collection(nameof(LevelCompressionSetting))]
 public class ClientAudioSelectionTests
@@ -29,10 +25,8 @@ public class ClientAudioSelectionTests
 
     // ── Engines ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A map load presents every car at once, and building an engine is an allocation spike: they are
-    /// let in two an update, nearest first, until the budget is full.
-    /// </summary>
+    /// <summary>Engines are an allocation spike, so a map load lets cars in two an update, nearest
+    /// first, until the budget is full.</summary>
     [Fact]
     public void EnginesAreBuiltTwoAnUpdateNearestFirst()
     {
@@ -54,11 +48,8 @@ public class ClientAudioSelectionTests
                                                   && e.EntityId > ClientAudioSystem.DistantVoiceBase - 1000);
     }
 
-    /// <summary>
-    /// A car outside the budget borrows the ring of a live car of its own preset; one whose preset has
-    /// no live car would be silent. So the nearest car of every preset on the map is given an engine
-    /// whatever the budget says, and it is a real engine, not a borrowed voice.
-    /// </summary>
+    /// <summary>The nearest car of every preset gets a real engine whatever the budget says: a car
+    /// outside the budget borrows a live car of its own preset, and with none it would be silent.</summary>
     [Fact]
     public void EveryPresetOnTheMapKeepsOneLiveEngine()
     {
@@ -80,12 +71,9 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// The preset's donor sits outside the budget, and it must stay there. It used to be stopped and
-    /// re-admitted every time its hold ran out, and every re-admission stamped it as newly built: held
-    /// again, ranked first, and given a slot inside the budget, which turned out the car at the
-    /// budget's edge. That car's engine was faded and rebuilt from nothing, the donor's echoes were
-    /// forgotten, and the whole cycle came round every 2.5 s for as long as nothing moved. Ten seconds
-    /// of a field standing still must stop and start nothing.
+    /// A preset's donor stays outside the budget: ten seconds of a still field stop and start nothing.
+    /// Guards the cycle where each re-admission stamped the donor as new and turned out the car at the
+    /// budget's edge every 2.5 s.
     /// </summary>
     [Fact]
     public void ADonorOutsideTheBudgetDoesNotChurnTheCarsInIt()
@@ -112,11 +100,8 @@ public class ClientAudioSelectionTests
         Assert.Equal(budget, Enumerable.Range(1, budget).Count(h.Mixer.Live.Contains));
     }
 
-    /// <summary>
-    /// Borrowing makes a car cheap but not free: a borrowed voice is still a placed, filtered voice. At
-    /// most twelve are voiced, the nearest twelve outside the live budget; past them a car is too far
-    /// away to pick out of the pack and has no voice at all.
-    /// </summary>
+    /// <summary>At most twelve cars borrow, the nearest outside the live budget: a borrowed voice is
+    /// still a placed, filtered voice, and past them a car cannot be picked out of the pack.</summary>
     [Fact]
     public void AtMostTwelveCarsBorrowAndTheyAreTheNearestOfTheRest()
     {
@@ -171,11 +156,9 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// The car you are sitting in is heard from inside: no distance, no direction to speak of, no path
-    /// (the body is the occluder, and the voice has rendered what gets through it), riding with your
-    /// head, in your room, at the gain its reference distance would have had. Every other way into the
-    /// cabin is a voice of its own on the same engine, turned to where it comes in; none of it is split
-    /// into a front voice. Stepping out lets every cabin path go.
+    /// The car you sit in is heard from inside: no distance or path (the voice renders what the body
+    /// lets through), riding with your head, in your room, at its reference distance's gain. Every other
+    /// way into the cabin is its own voice on the same engine, no front voice; stepping out ends them.
     /// </summary>
     [Fact]
     public void TheCarYouAreSittingInIsHeardFromInsideByEveryPathIn()
@@ -239,10 +222,8 @@ public class ClientAudioSelectionTests
         Assert.False(h.Mixer.Latest[Car].FollowsListener);
     }
 
-    /// <summary>
-    /// Close enough for its two ends to be told apart, a car gets a second voice at its front; at most
-    /// six cars at once, and the six nearest. Further off, it is one voice.
-    /// </summary>
+    /// <summary>A car close enough for its two ends to be told apart gets a front voice: at most six,
+    /// the nearest. Further off, it is one voice.</summary>
     [Fact]
     public void AtMostSixCarsAreSplitAndTheyAreTheNearest()
     {
@@ -302,11 +283,10 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// Every kind of physical source is placed by its own declared level and its own size, from the
-    /// same lookup the ranking used: the reference distance Loudness.Place gives that level and size,
-    /// the size as its extent, the level handed on for the ear model, and the gain (for a source that is
-    /// not spread over places of its own) the placed gain times its headroom's return. A kind the lookup
-    /// did not know would not be voiced at all, which is how the crossing bell once went silent.
+    /// Every kind of physical source is placed by its own declared level and size from the lookup the
+    /// ranking used: Loudness.Place's reference distance, the size as extent, the level for the ear
+    /// model, and (unless spread over places) the placed gain times its headroom's return. A kind the
+    /// lookup did not know would be unvoiced, as the crossing bell once was.
     /// </summary>
     [Theory]
     [MemberData(nameof(Kinds))]
@@ -377,10 +357,9 @@ public class ClientAudioSelectionTests
     // ── Standing machines: the budget and the ear ───────────────────────────────────────────────
 
     /// <summary>
-    /// The machine budget ranks by what each machine would sound like HERE, not by how near it is. Ten
-    /// window units (59 dB) a few metres off fill the budget on distance alone; a rooftop condenser
-    /// (65 dB) a little further away is louder where you stand than the furthest of them, and takes
-    /// its place. Nothing outside the budget is voiced.
+    /// The machine budget ranks by what each machine sounds like here, not by distance: a 65 dB condenser
+    /// a little further off takes the slot of the furthest of ten 59 dB window units. Nothing outside the
+    /// budget is voiced.
     /// </summary>
     [Fact]
     public void MachinesAreRankedByWhatTheyWouldSoundLikeHereNotByDistance()
@@ -408,12 +387,9 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// The machine budget ranks a machine by how loud it is to the ear (Cody, 2026-10-07; as
-    /// VoiceManager.Audibility ranks every other voice), not by the gain the law plays it at. A
-    /// condenser (65 dB) 12 m off beats the furthest of ten window units (59 dB) while it is not
-    /// measured. Measured as a rumble with everything in the 25 Hz third-octave, the law plays it more
-    /// than 10 dB up so that it is heard at its real loudness, which is very little: it now loses the
-    /// slot. Under the old rule (rank on the corrected gain) the rumble ranked those decibels HIGHER.
+    /// Machines rank by loudness at the ear, not by the gain the law plays them at (Cody, 2026-10-07; as
+    /// VoiceManager.Audibility). An unmeasured 65 dB condenser 12 m off beats the furthest 59 dB window
+    /// unit; measured as a 25 Hz rumble, which the law lifts over 10 dB, it is quiet to the ear and loses.
     /// </summary>
     [Fact]
     public void TheMachineBudgetRanksOnHowLoudTheEarHearsAMachine()
@@ -455,10 +431,8 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// The rule in its plainest form, through the machine budget: one slot left, a 65 dB condenser that
-    /// is a 25 Hz rumble and a 59 dB window unit that is a 1 kHz tone, at the same distance. The tone is
-    /// heard as far louder and takes the slot; the rumble, which the law plays at more gain, does not.
-    /// Unmeasured, the louder condenser takes it.
+    /// One slot left, at one distance: a 59 dB 1 kHz tone beats a 65 dB 25 Hz rumble, which the law plays
+    /// at more gain but the ear hears as quieter. Unmeasured, the louder condenser takes it.
     /// </summary>
     [Fact]
     public void ARumbleLosesTheLastMachineSlotToAQuieterToneAtTheSameDistance()
@@ -507,9 +481,9 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// A machine that holds a voice keeps it until a challenger is decisively louder, and none is let
-    /// go within its first moments: walking past a row of equal machines does not swap voices at
-    /// every step. Once the hold is over and the listener has walked to the other end, the set follows.
+    /// A machine keeps its voice until a challenger is decisively louder and is never let go inside its
+    /// hold, so walking past a row of equal machines does not swap voices every step; past the hold, at
+    /// the far end, the set follows.
     /// </summary>
     [Fact]
     public void AMachineKeepsItsVoiceUntilItIsDecisivelyBeaten()
@@ -559,10 +533,9 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// A mixer over its ceiling gives things up IN ORDER, one a second: first the voices whose loss
-    /// costs nothing but geometry (a machine's second outlet), then standing machines down to one, then
-    /// reflections, then borrowed voices down to four, and only then cars, never below two. A car
-    /// vanishing is noticed; a wall that stops answering is not.
+    /// A mixer over its ceiling gives things up in order, one a second: a machine's second outlet,
+    /// standing machines down to one, reflections, borrowed voices down to four, then cars, never below
+    /// two. A car vanishing is noticed; a wall that stops answering is not.
     /// </summary>
     [Fact]
     public void AnOverloadedMixerGivesUpFrontVoicesThenMachinesThenBorrowedVoicesThenCars()
@@ -610,9 +583,8 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// During a load the mixer's reading is a lie (it pins while the thread is stalled), so for the
-    /// first seconds after NoteSceneLoading nothing is given up; and after that one bad reading is not
-    /// an overload: the ceiling has to be exceeded for three quarters of a second together.
+    /// The mixer's load pins during a scene load, so nothing is given up for the first seconds after
+    /// NoteSceneLoading; after that an overload is the ceiling exceeded for 0.75 s together, not one reading.
     /// </summary>
     [Fact]
     public void NothingIsGivenUpWhileASceneLoadsOrForOneBadReading()
@@ -638,10 +610,9 @@ public class ClientAudioSelectionTests
     // ── Woods heard as one ──────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Past the hand-over a tree is not a voice of its own: a wood of them is one source whose synth
-    /// renders as many trees as it stands for. Walk into the wood and the nearest trees take voices of
-    /// their own, and leave the wood: it then stands for fewer trees, and the wood's voice is still
-    /// placed as the wood (its key, its middle, its size).
+    /// Past the hand-over a wood is one source rendering as many trees as it stands for. Inside it the
+    /// nearest trees take their own voices and the wood stands for the rest, still placed as the wood
+    /// (its key, middle and size).
     /// </summary>
     [Fact]
     public void ADistantWoodIsOneVoiceAndItsNearTreesLeaveItAsYouWalkIn()
@@ -692,11 +663,9 @@ public class ClientAudioSelectionTests
     // ── Rain ────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Rain on an open street: each far patch is a voice where its patch is, on its own side of the
-    /// listener, carrying its own path; and the drops close by are played one by one where they land
-    /// (on the ground within the survey's near rings, or on the listener's own head and shoulders),
-    /// each placed by the drop law (DropBank.Placement: with no measured field level, Loudness.Place
-    /// of the drop's own level).
+    /// Rain on an open street: each far patch is a voice at its patch with its own path, and near drops
+    /// play one by one where they land (ground in the near rings, or your head and shoulders), placed by
+    /// DropBank.Placement (with no measured field level, Loudness.Place of the drop's own level).
     /// </summary>
     [Fact]
     public void RainIsPlacedWhereItLandsPatchesOnTheirSidesAndDropsOneByOne()
@@ -758,11 +727,8 @@ public class ClientAudioSelectionTests
 
     // ── Other emitters ──────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A repeating one-shot (a PA, a foghorn) is handed over only when its interval comes round: its
-    /// first firing staggered by its own id, then once an interval, and never over itself while the
-    /// last one is still playing.
-    /// </summary>
+    /// <summary>A repeating one-shot (a PA, a foghorn) fires first at a stagger set by its id, then once
+    /// an interval, never over its own last play.</summary>
     [Fact]
     public void ARepeatingEmitterSpeaksOnceAnIntervalAndNeverOverItself()
     {
@@ -803,10 +769,9 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// A repeating one-shot whose last play ends in the very frame its next firing comes round speaks
-    /// that frame. The new submission is a new play: the budget used to see the old play finish in the
-    /// same pass, mark it finished and throw the new submission away with it, so the emitter was silent
-    /// for a whole interval (docs/COVERAGE_2026-10-06.md, finding 3).
+    /// A repeating one-shot whose last play ends in the frame its next firing comes round speaks that
+    /// frame; the budget used to drop the new submission with the finished play, silent for an interval
+    /// (docs/COVERAGE_2026-10-06.md, finding 3).
     /// </summary>
     [Fact]
     public void ARepeatingEmitterWhoseLastPlayEndsAsItsIntervalComesRoundSpeaksAgain()
@@ -843,10 +808,8 @@ public class ClientAudioSelectionTests
         Assert.Contains(Pa, h.Mixer.Live);
     }
 
-    /// <summary>
-    /// An authored beacon whose category the map forbids is not heard, and one already playing is
-    /// stopped. Through the map's policy, not the player's switches (which are written to disk).
-    /// </summary>
+    /// <summary>A beacon whose category the map forbids is not heard, and one playing is stopped; set
+    /// through the map's policy, not the player's switches (which are written to disk).</summary>
     [Fact]
     public void ABeaconWhoseCategoryIsForbiddenIsStopped()
     {
@@ -890,10 +853,8 @@ public class ClientAudioSelectionTests
         throw new InvalidOperationException("no car id starts a call promptly");
     }
 
-    /// <summary>
-    /// A siren is placed every frame whatever its car's engine is doing, and when the car leaves the
-    /// world its siren stops with it, rather than wailing on where the car was.
-    /// </summary>
+    /// <summary>A siren is placed every frame whatever its car's engine does, and stops when the car
+    /// leaves the world rather than wailing on where it was.</summary>
     [Fact]
     public void ASirenStopsWhenItsCarLeavesTheWorld()
     {
