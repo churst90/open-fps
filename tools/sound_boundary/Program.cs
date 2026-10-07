@@ -55,14 +55,15 @@ string implicitUsings = string.Join("\n", new[]
 var projects = new (string Name, string Dir, string[] Refs, string[] Extra)[]
 {
     // The library's projects first, lowest first (docs/SOUND_LIBRARY_BOUNDARY.md, section 6).
+    ("OpenFPS.Geometry", "OpenFPS.Geometry", Array.Empty<string>(), Array.Empty<string>()),
     ("OpenFPS.Native", "OpenFPS.Native", Array.Empty<string>(), Array.Empty<string>()),
-    ("OpenFPS.Common", "OpenFPS.Common", Array.Empty<string>(), Array.Empty<string>()),
-    ("OpenFPS.Client.Core", "OpenFPS.Client.Core", new[] { "OpenFPS.Common", "OpenFPS.Native" }, Array.Empty<string>()),
-    ("OpenFPS.Server", "OpenFPS.Server", new[] { "OpenFPS.Common" }, Array.Empty<string>()),
-    ("OpenFPS.Client", "OpenFPS.Client", new[] { "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core" }, Array.Empty<string>()),
-    ("OpenFPS.Client.Gtk", "OpenFPS.Client.Gtk", new[] { "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core" }, Array.Empty<string>()),
-    ("OpenFPS.AudioLab", "OpenFPS.AudioLab", new[] { "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core", "OpenFPS.Server" }, Array.Empty<string>()),
-    ("OpenFPS.Tests", "OpenFPS.Tests", new[] { "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core", "OpenFPS.Server" },
+    ("OpenFPS.Common", "OpenFPS.Common", new[] { "OpenFPS.Geometry" }, Array.Empty<string>()),
+    ("OpenFPS.Client.Core", "OpenFPS.Client.Core", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native" }, Array.Empty<string>()),
+    ("OpenFPS.Server", "OpenFPS.Server", new[] { "OpenFPS.Geometry", "OpenFPS.Common" }, Array.Empty<string>()),
+    ("OpenFPS.Client", "OpenFPS.Client", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core" }, Array.Empty<string>()),
+    ("OpenFPS.Client.Gtk", "OpenFPS.Client.Gtk", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core" }, Array.Empty<string>()),
+    ("OpenFPS.AudioLab", "OpenFPS.AudioLab", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core", "OpenFPS.Server" }, Array.Empty<string>()),
+    ("OpenFPS.Tests", "OpenFPS.Tests", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core", "OpenFPS.Server" },
         new[] { "OpenFPS.Client.Gtk/Game/GtkKeyMap.cs" }),
 };
 

@@ -7,6 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The geometry library (docs/SOUND_LIBRARY_BOUNDARY.md, stage 2). -->
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Arch" Version="2.1.0" />
     <PackageReference Include="LiteNetLib" Version="1.2.0" />
     <PackageReference Include="MemoryPack" Version="1.21.4" />
@@ -26,9 +31,18 @@
   <!-- ── THE WIRE CONTRACT ────────────────────────────────────────────────────────────────────────
        Messages and components serialise positionally, so a client and a server built from different
        versions of this project do not fail: they misread each other. This hashes every source file
-       of this project (sorted by path, line endings normalised, so a Windows checkout hashes the
-       same) into WireContract.Hash. The client sends it with its login and the server refuses a
-       mismatch by name, instead of a friend's out-of-date build spawning into garbage. -->
+       of this project, and of the library projects it references (sorted by path from the repository's
+       root, line endings normalised, so a Windows checkout hashes the same), into WireContract.Hash.
+       The client sends it with its login and the server refuses a mismatch by name, instead of a
+       friend's out-of-date build spawning into garbage.
+
+       The library's files are in it because their types are on the wire too (a collider's ShapeSpec,
+       TileKey's numbers in the tile messages) and because the client predicts movement with the same
+       geometry the server moves bodies with: two builds whose geometry differs disagree about where a
+       body is (docs/SOUND_LIBRARY_BOUNDARY.md, 15.3). -->
+  <ItemGroup>
+    <WireLibrarySource Include="..\OpenFPS.Geometry\**\*.cs" />
+  </ItemGroup>
   <UsingTask TaskName="HashWireContract" TaskFactory="RoslynCodeTaskFactory"
              AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
@@ -44,12 +58,13 @@
       <Code Type="Fragment" Language="cs"><![CDATA[
         var root = Path.GetFullPath(Root).TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
         var paths = Files.Select(f => Path.GetFullPath(f.ItemSpec))
-                         // Only this project's own sources. The SDK also compiles generated files
-                         // (global usings, assembly info) from the output folder, which is somewhere
-                         // else for every build and would make two builds of the same code disagree.
+                         // Only sources under the root. The SDK also compiles generated files (global
+                         // usings, assembly info) from the output folder, which is somewhere else for
+                         // every build (or under a project's obj/) and would make two builds of the same
+                         // code disagree.
                          .Where(p => p.StartsWith(root))
                          .Select(p => new { Full = p, Rel = p.Substring(root.Length).Replace('\\', '/') })
-                         .Where(p => !p.Rel.StartsWith("obj/") && !p.Rel.StartsWith("bin/"))
+                         .Where(p => !p.Rel.Split('/').Any(s => s == "obj" || s == "bin"))
                          .OrderBy(p => p.Rel, System.StringComparer.Ordinal);
         using (var sha = SHA256.Create())
         {
@@ -65,13 +80,13 @@
 
   <!-- The project file is an input too: a change to how the hash is made must remake it, or a build
        folder keeps the old answer while a fresh one gets the new, and the two refuse each other. -->
-  <Target Name="GenerateWireContract" BeforeTargets="CoreCompile" Inputs="@(Compile);$(MSBuildProjectFullPath)"
+  <Target Name="GenerateWireContract" BeforeTargets="CoreCompile" Inputs="@(Compile);@(WireLibrarySource);$(MSBuildProjectFullPath)"
           Outputs="$(IntermediateOutputPath)WireContract.g.cs">
-    <HashWireContract Files="@(Compile)" Root="$(MSBuildProjectDirectory)">
+    <HashWireContract Files="@(Compile);@(WireLibrarySource)" Root="$(MSBuildProjectDirectory)\..">
       <Output TaskParameter="Hash" PropertyName="WireContractHash" />
     </HashWireContract>
     <WriteLinesToFile File="$(IntermediateOutputPath)WireContract.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
-                      Lines="namespace OpenFPS.Common%3B;/// &lt;summary&gt;A hash of this project's sources: client and server must match it to talk.&lt;/summary&gt;;public static class WireContract { public const string Hash = &quot;$(WireContractHash)&quot;%3B }" />
+                      Lines="namespace OpenFPS.Common%3B;/// &lt;summary&gt;A hash of this project's sources and its library's: client and server must match it to talk.&lt;/summary&gt;;public static class WireContract { public const string Hash = &quot;$(WireContractHash)&quot;%3B }" />
   </Target>
   <Target Name="IncludeWireContract" BeforeTargets="CoreCompile" AfterTargets="GenerateWireContract">
     <ItemGroup>

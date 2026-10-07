@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The sound library's lowest project (docs/SOUND_LIBRARY_BOUNDARY.md, stage 2; docs/GEOMETRY.md):
+       the triangle world and its trees, shapes and surfaces, a body against a solid, wheel rays, the
+       tiles, the box helpers and the spatial grid, and the diagnostics timer every layer may use. It
+       references no other project and knows nothing of entities: open-fps's entities become solids in
+       OpenFPS.Common (EntityGeometry), on the host's side.
+
+       Namespaces are those the files had in OpenFPS.Common (decision 6). -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- A collider's form (ShapeSpec) travels in ColliderComponent, positionally, so it keeps its
+         [MemoryPackable] and its bytes (decision 4). Its sources are in OpenFPS.Common's wire hash. -->
+    <PackageReference Include="MemoryPack" Version="1.21.4" />
+  </ItemGroup>
+
+</Project>

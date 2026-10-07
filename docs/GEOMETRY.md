@@ -1304,6 +1304,15 @@ Measured besides:
    passengers turn with it. Keep?
 5. **The speedway's ground is dirt** between its own surfaces (where the loader's concrete was).
 
+### 10.11 Where the code is (2026-10-07)
+
+The triangle world is a project of its own now, `OpenFPS.Geometry`, the lowest of the sound library's
+(docs/SOUND_LIBRARY_BOUNDARY.md, section 15): `OpenFPS.Common/Geometry/*` is
+`OpenFPS.Geometry/Triangles/`, and `GeometryUtils`, `SpatialGrid`, `BoxColumns`, `PerfProbe`, `TileKey`,
+`WallBuild` and `BoxContainment` are beside it. Namespaces did not change. `EntityGeometry` and
+`MoverPoses` stay in Common, on the host's side. New shapes, queries, terrain and the voxel layer go in
+that project and take `SolidSpec`, `Surface` and plain vectors, never an entity.
+
 ## Appendix: box-geometry consumers today
 
 From a survey of the code (2026-10-06). Line numbers drift; the names do not.

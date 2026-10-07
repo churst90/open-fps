@@ -292,6 +292,8 @@ public class LibraryBoundaryTests
     /// </summary>
     public static IEnumerable<object[]> LibraryAssemblies() => new[]
     {
+        // The triangle world, shapes, tiles, the grid. MemoryPack: a collider's ShapeSpec is on the wire.
+        new object[] { typeof(OpenFPS.Common.Geometry.TriangleWorld).Assembly.GetName().Name!, new[] { "MemoryPack.Core" } },
         // FMOD's wrapper and the Steam Audio bindings. Serilog: BackgroundPriority logs (decision 5).
         new object[] { typeof(FMOD.System).Assembly.GetName().Name!, new[] { "Serilog" } },
     };

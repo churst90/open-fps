@@ -16,6 +16,11 @@ Recent work, newest first. `git log` has the rest.
 - Sound library, stage 1: FMOD's C# wrapper, the Steam Audio bindings, the native library list and
   the thread-priority helper are a project of their own, `OpenFPS.Native`, which Client.Core references
   (docs/SOUND_LIBRARY_BOUNDARY.md, section 14). Moved, not changed: the same renders and stream.
+- Sound library, stage 2: the triangle world, shapes, wheel rays, tiles, the box helpers, the spatial
+  grid and the diagnostics timer are `OpenFPS.Geometry`, which Common references (docs/SOUND_LIBRARY_
+  BOUNDARY.md, section 15). The wire hash now covers the geometry too: a client and a server whose
+  geometry differs would disagree about where a body is. The door render fingerprint is unchanged.
+  `ColliderShape` stays in Common for now, for Cody to confirm (15.2).
 - Near rain drops are the same in every client: their renders were seeded from `string.GetHashCode`,
   which .NET randomises per process. No change to how they sound.
 - Tests no longer write the player's door render cache (`~/.local/share/OpenFPS/rendercache`) or prune

@@ -25,6 +25,7 @@ library that open-fps and Resonance both reference. Step 1 of
 12. Appendices: every type by file, every crossing line, every static, every file read
 13. Stage 0 as built: the guards, and how to regenerate them
 14. Stage 1 as built: OpenFPS.Native
+15. Stage 2 as built: OpenFPS.Geometry
 
 ---
 
@@ -741,6 +742,7 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
 - Move `Geometry/*`, `GeometryUtils.cs`, `SpatialGrid.cs`, `BoxColumns.cs`, `PerfProbe.cs`.
   Common references Geometry.
 - After this stage the geometry stage 2 work lands in the Geometry project (section 9.2).
+- As built: section 15. `ColliderShape` was not moved (15.2).
 
 ### Stage 3: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics` (2 to 3 sessions)
 
@@ -1757,6 +1759,84 @@ By `git mv`, namespaces unchanged:
 
 Not touched: none of these files is in OpenFPS.Common, so `WireContract.Hash` and
 `DoorModelFingerprint` are computed over exactly the files they were.
+
+## 15. Stage 2 as built (2026-10-07): `OpenFPS.Geometry`
+
+### 15.1 What moved
+
+First three types out of the files that stay behind, each into a file of its own in Common (one
+commit, text unchanged): `BoxContainment` out of `SparseAcousticOctree.cs`, `WallBuild` out of
+`WallTransmission.cs` (its doc's cref to `WallTransmission` became plain text: the geometry does not
+see the acoustics), `TileKey` out of `Tiles.cs`. Then, by `git mv`, namespaces unchanged:
+
+| From (OpenFPS.Common/) | To (OpenFPS.Geometry/) |
+|---|---|
+| `Geometry/*` (Bvh, GeometryPiece, Shapes, SolidContact, Surfaces, TriangleGeometry, TriangleWorld, TriangleWorldBuilder, WheelRays) | `Triangles/` |
+| `GeometryUtils.cs` (with `MathHelper`), `SpatialGrid.cs`, `BoxColumns.cs`, `PerfProbe.cs` | the project's root |
+| `BoxContainment.cs`, `WallBuild.cs`, `TileKey.cs` | the project's root |
+
+- `OpenFPS.Geometry` references no project and one package, MemoryPack: a collider's `ShapeSpec` is
+  `[MemoryPackable]` and travels in `ColliderComponent` (decision 4, applied here first). Common
+  references Geometry; everything else gets it through Common. Nothing in it reads an entity: geometry
+  stage 2 had already put `EntityGeometry` and `MoverPoses` on the host's side.
+- No `InternalsVisibleTo`: nothing outside the project used an internal of these files.
+- The layering table (3.5) lost its three Geometry rows: `GeometryUtils` and `TriangleWorldBuilder`
+  /`Construction` now find `BoxContainment` and `WallBuild` beside them.
+
+### 15.2 Not moved: `ColliderShape`
+
+Section 8 listed `ColliderShape` for this stage. It stays in `Components.cs`, for Cody to confirm:
+
+- nothing in the geometry uses it (the triangle world has its own `ShapeKind`; the entity adapter,
+  `EntityGeometry`, reads `ColliderShape` and turns a box into a solid, on the host's side);
+- it is the entity model's collider enum, on the wire in `ColliderComponent`, with members
+  (`Sphere`, `Cylinder`, `Cone`, `Polygon`) the triangle world does not build;
+- the three library files that read it (`SteamAudioScene`, `RainField`, `AcousticVolumeGenerator`) read
+  it off `ColliderComponent`, which stage 6 replaces with the world input; after that the library needs
+  no `ColliderShape` at all.
+
+Moving it would put a type of the game's entity model into the geometry library to serve readers that
+are going away. If a library type is wanted later, it is the geometry's own shape, not this enum.
+
+### 15.3 The wire hash and the door fingerprint
+
+- `WireContract.Hash` now covers Common's sources and the Geometry project's, hashed by their paths
+  from the repository's root (`OpenFPS.Common.csproj`, `WireLibrarySource`). Geometry's files belong in
+  it: `ShapeSpec` and `TileKey`'s numbers are on the wire, and the client predicts movement with the
+  same geometry the server moves bodies with, so two builds whose geometry differs disagree about where
+  a body is. The hash changed with the move (`5e96a5472e62` to `551d1fe5906e` here) and changes again
+  with any edit to a Geometry file (checked: a comment added to `TileKey.cs` changed it, and taking it
+  out changed it back). A client and a server from either side of this commit refuse each other at
+  login, as they would for any edit to Common. Native is not in it: the server never loads it.
+- `DoorModelFingerprint` is unchanged (`b9dfebdd55c8`): the door renders read none of the moved
+  files. Followed through the survey's edges, every source a cached door render is made from (the
+  models, `DoorPhysics`, `Doors`, `Glass`, `AcousticRegistry`, `VehicleCabin`, `VehicleBody`) is still in
+  Common and still listed. Stage 3 moves them, and their list with them (section 8, stage 3 risks).
+- `publish-windows.sh` reads both hashes from `obj/OpenFPS.Common/`, where they are still written.
+
+### 15.4 Checks
+
+- Every project builds: Geometry, Common, the server, Client.Core, the GTK client, the Windows client,
+  the lab, the tests.
+- The render fingerprint and the emitter stream: the same bits as before the move. The ratchet: the same
+  607 references; `files.tsv` changed by the paths only; `LibraryReferencesOnlyLibrary`: Geometry
+  references only the runtime and MemoryPack.Core.
+- The test classes that touch the moved code: GeometryStage1Tests, GeometryStage2Tests,
+  GeometryUtilsTests, BoxOverlapTests, SteamAudioSceneTests, SteamAudioMappingTests, TileSceneSetTests,
+  WallTransmissionTests, WorldStreamingTests, DoorPrewarmTests.
+- CI and the scripts: nothing to edit. The workflow builds `OpenFPS.Tests`, which brings the project in;
+  `run-server.sh`, `run-gtk-client.sh`, `publish-server.sh` and `publish-windows.sh` build their
+  executables' projects, which reference it through Common.
+
+### 15.5 Left for stage 3
+
+- The ten small fixes of section 8, then `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`.
+  `DoorModelSource` moves with the door models; the wire hash's `WireLibrarySource` gains the Sound
+  project's files (`TransientSound`, `WheelState`, `Precipitation`, `WindAir`, `LightningStrike` travel).
+- `PerfProbe` is in Geometry as the survey placed it (the lowest project, so every layer can time
+  itself); it is a process-wide static (section 4.2's diagnostics exception).
+- `MoverPoses` stays host: the server's count of door leaves moved, read by `ServerGeometry` and the
+  client's geometry adapter. The triangle world takes the poses as a function (`WithMoverPoses`).
 
 ---
 

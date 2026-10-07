@@ -75,12 +75,6 @@ FILE_RULES = [
     (CC + 'Input/', 'b', '', ''),
     (CC + 'Services/', 'b', '', ''),
     (CC, 'b', '', 'client game'),
-    # Common: geometry
-    (CO + 'Geometry/', 'a', 'Geometry', ''),
-    (CO + 'GeometryUtils.cs', 'a', 'Geometry', ''),
-    (CO + 'SpatialGrid.cs', 'a', 'Geometry', ''),
-    (CO + 'BoxColumns.cs', 'a', 'Geometry', ''),
-    (CO + 'PerfProbe.cs', 'a', 'Geometry', 'diagnostics timer; lowest project so every layer can use it'),
     # Common: acoustics
     (CO + 'AcousticConstants.cs', 'a', 'Acoustics', ''),
     (CO + 'AcousticMap.cs', 'a', 'Acoustics', ''),

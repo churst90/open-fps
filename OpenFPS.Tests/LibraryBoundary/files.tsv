@@ -178,8 +178,6 @@ OpenFPS.Common/AudioEvents.cs	mixed	Sound	SoundCharacter,TransientSound
 OpenFPS.Common/Ballistics.cs	lib	Sound	
 OpenFPS.Common/Beacons.cs	host		
 OpenFPS.Common/Birds.cs	lib	Sound	
-OpenFPS.Common/BoxColumns.cs	lib	Geometry	
-OpenFPS.Common/BoxContainment.cs	lib	Sound	
 OpenFPS.Common/Breathing.cs	lib	Sound	
 OpenFPS.Common/BulletFlyby.cs	lib	Sound	
 OpenFPS.Common/BulletImpact.cs	lib	Sound	
@@ -205,16 +203,6 @@ OpenFPS.Common/Engines.cs	lib	Sound
 OpenFPS.Common/EntityGeometry.cs	host		
 OpenFPS.Common/ExternalBallistics.cs	lib	Sound	
 OpenFPS.Common/Footsteps.cs	lib	Sound	
-OpenFPS.Common/Geometry/Bvh.cs	lib	Geometry	
-OpenFPS.Common/Geometry/GeometryPiece.cs	lib	Geometry	
-OpenFPS.Common/Geometry/Shapes.cs	lib	Geometry	
-OpenFPS.Common/Geometry/SolidContact.cs	lib	Geometry	
-OpenFPS.Common/Geometry/Surfaces.cs	lib	Geometry	
-OpenFPS.Common/Geometry/TriangleGeometry.cs	lib	Geometry	
-OpenFPS.Common/Geometry/TriangleWorld.cs	lib	Geometry	
-OpenFPS.Common/Geometry/TriangleWorldBuilder.cs	lib	Geometry	
-OpenFPS.Common/Geometry/WheelRays.cs	lib	Geometry	
-OpenFPS.Common/GeometryUtils.cs	lib	Geometry	
 OpenFPS.Common/Glass.cs	lib	Sound	
 OpenFPS.Common/GlassDoor.cs	lib	Sound	
 OpenFPS.Common/GlassFracture.cs	lib	Sound	
@@ -245,7 +233,6 @@ OpenFPS.Common/MoverPoses.cs	host
 OpenFPS.Common/NatureModels.cs	lib	Sound	
 OpenFPS.Common/OpeningRoutes.cs	lib	Acoustics	
 OpenFPS.Common/PanelAcoustics.cs	lib	Acoustics	
-OpenFPS.Common/PerfProbe.cs	lib	Geometry	
 OpenFPS.Common/PhysicsConstants.cs	host		
 OpenFPS.Common/PhysicsUtils.cs	host		
 OpenFPS.Common/PlayerCoordinates.cs	host		
@@ -270,14 +257,12 @@ OpenFPS.Common/Signals.cs	lib	Sound
 OpenFPS.Common/SlidingDoor.cs	lib	Sound	
 OpenFPS.Common/SmallMachines.cs	lib	Sound	
 OpenFPS.Common/SparseAcousticOctree.cs	lib	Acoustics	
-OpenFPS.Common/SpatialGrid.cs	lib	Geometry	
 OpenFPS.Common/Spectrum.cs	lib	Sound	
 OpenFPS.Common/Speech/Speech.cs	host		
 OpenFPS.Common/StatePacking.cs	host		
 OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	lib	Acoustics	
 OpenFPS.Common/Systems/FaceOpenings.cs	lib	Acoustics	
 OpenFPS.Common/TeleporterSounds.cs	lib	Sound	
-OpenFPS.Common/TileKey.cs	lib	Geometry	
 OpenFPS.Common/Tiles.cs	host		
 OpenFPS.Common/TrackClearance.cs	host		
 OpenFPS.Common/TrainSignals.cs	lib	Sound	
@@ -288,7 +273,6 @@ OpenFPS.Common/VehicleBody.cs	lib	Sound
 OpenFPS.Common/VehicleCabin.cs	lib	Sound	
 OpenFPS.Common/VehicleSignalBits.cs	lib	Sound	
 OpenFPS.Common/Vehicles.cs	lib	Sound	
-OpenFPS.Common/WallBuild.cs	lib	Sound	
 OpenFPS.Common/WallTransmission.cs	lib	Acoustics	
 OpenFPS.Common/Waves.cs	lib	Sound	
 OpenFPS.Common/WeaponHandling.cs	lib	Sound	
@@ -298,6 +282,22 @@ OpenFPS.Common/Wind.cs	lib	Sound
 OpenFPS.Common/WindModel.cs	lib	Sound	
 OpenFPS.Common/WoodChorus.cs	lib	Sound	
 OpenFPS.Common/WorldSnapshot.cs	host		
+OpenFPS.Geometry/BoxColumns.cs	lib	Geometry	
+OpenFPS.Geometry/BoxContainment.cs	lib	Geometry	
+OpenFPS.Geometry/GeometryUtils.cs	lib	Geometry	
+OpenFPS.Geometry/PerfProbe.cs	lib	Geometry	
+OpenFPS.Geometry/SpatialGrid.cs	lib	Geometry	
+OpenFPS.Geometry/TileKey.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Bvh.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/GeometryPiece.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Shapes.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/SolidContact.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Surfaces.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/TriangleGeometry.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/TriangleWorld.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/WheelRays.cs	lib	Geometry	
+OpenFPS.Geometry/WallBuild.cs	lib	Geometry	
 OpenFPS.Native/FmodNative/fmod.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_dsp.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_errors.cs	lib	Native	
