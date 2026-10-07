@@ -403,7 +403,7 @@ public class ServerHardeningTests : IDisposable
         foreach (var type in MessageDispatcher.SentByClients)
         {
             var sample = (IMessage)Activator.CreateInstance(type)!;
-            Assert.True(NetworkService.IsClientMessage(MemoryPackSerializer.Serialize(sample)[0]), type.Name);
+            Assert.True(NetworkService.IsClientMessage(MemoryPackSerializer.Serialize<IMessage>(sample)[0]), type.Name);
         }
     }
 
@@ -417,14 +417,18 @@ public class ServerHardeningTests : IDisposable
         new VoiceData { OpusData = new byte[60], Sequence = 9 },
         new RegisterRequest { Username = "sean", Password = "password1" },
         new MapDataRequest { MapName = "city", FullDetailMetres = 100 },
-        new MapListRequest(), new ScopedShot { Yaw = 1 }, new InventoryRequest(),
+        new MapListRequest { Scope = MapListScope.Mine }, new ScopedShot { Yaw = 1 }, new InventoryRequest(),
+        new PlayerListRequest(), new FriendListRequest(), new LogoutRequest(),
+        new InteractRequest { Action = "interact", TargetEntityId = null },
+        new TextCommand { Command = "pm", Args = new[] { "sean", "héllo wörld", "" } },
+        new ChatMessage { Text = "ünïcode text", To = null!, Channel = ChatChannel.All },
     }.Select(m => new object[] { m.GetType().Name, MemoryPackSerializer.Serialize(m) });
 
     [Theory]
     [MemberData(nameof(ClientSamples))]
     public void AMangledMessageNeverThrowsAndNeverAllocatesMuch(string name, byte[] good)
     {
-        var random = new Random(name.GetHashCode());
+        var random = new Random(name.Sum(c => c));
         long worst = 0;
         for (int round = 0; round < 3000; round++)
         {
@@ -446,6 +450,43 @@ public class ServerHardeningTests : IDisposable
             worst = Math.Max(worst, GC.GetAllocatedBytesForCurrentThread() - before);
         }
         Assert.True(worst < 1_000_000, $"{name}: one mangled message allocated {worst:N0} bytes");
+    }
+
+    [Theory]
+    [InlineData(int.MinValue)]
+    [InlineData(int.MinValue + 1)]
+    [InlineData(int.MinValue + 2)]
+    [InlineData(int.MinValue + 3)]
+    public void AStringLengthThatOverflowsIsRefusedNotReadPastTheBuffer(int header)
+    {
+        // MemoryPack asks for ~header + 4 bytes, which overflows to a negative size and passes its bounds
+        // check: before the wire check this read 2 GB past the buffer and the process died
+        // (AccessViolationException), from one LoginRequest sent before logging in.
+        foreach (var sample in new IMessage[] { new LoginRequest { Username = "aaaa", Password = "bbbb" }, new ChatMessage { Text = "cccc" },
+                                                 new TextCommand { Command = "dddd", Args = new[] { "eeee" } } })
+        {
+            byte[] good = MemoryPackSerializer.Serialize<IMessage>(sample);
+            for (int at = 2; at + 4 <= good.Length; at++)
+            {
+                var bytes = (byte[])good.Clone();
+                BitConverter.TryWriteBytes(bytes.AsSpan(at), header);
+                if (WireCheck.Walked(bytes) >= 0 && !WireCheck.IsSafe(bytes)) continue;
+                NetworkService.TryDecode(bytes, out _, out _);
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ClientSamples))]
+    public void TheWireCheckWalksEveryClientMessageExactly(string name, byte[] good)
+    {
+        Assert.True(WireCheck.IsSafe(good), name);
+        int walked = WireCheck.Walked(good);
+        // A type with no strings is not walked; one with strings must be walked to its last byte, or the
+        // layout is not MemoryPack's.
+        Assert.True(walked == -1 || walked == good.Length, $"{name}: walked {walked} of {good.Length} bytes");
+        Assert.True(NetworkService.TryDecode(good, out var back, out var problem), problem);
+        Assert.Equal(name, back!.GetType().Name);
     }
 
     // ── Fragments: what LiteNetLib would hold before any message is read ───────────────────────
@@ -513,6 +554,50 @@ public class ServerHardeningTests : IDisposable
         // A merged part that says it is longer than what arrived reaches into an old buffer: dropped.
         BitConverter.TryWriteBytes(merged.AsSpan(1), (ushort)(bad.Length + 50));
         Assert.Equal(0, Through(guard, merged));
+    }
+
+    [Fact]
+    public void ARealClientsMessagesStillArriveThroughTheGuard()
+    {
+        // Real LiteNetLib packets over the loopback: small ones merged into one datagram, and one big
+        // enough to come in fragments.
+        var server = new NetworkService();
+        server.Start(0);
+        var client = new OpenFPS.Client.Core.ClientNetworkService();
+        client.Start();
+        try
+        {
+            client.Connect("127.0.0.1", server.LocalPort);
+            Assert.True(Pump(() => client.IsConnected), "the client never connected");
+            for (int i = 0; i < 20; i++) client.Send(new TextCommand { Command = "scan" });
+            client.Send(new ChatMessage { Text = new string('x', 8000) });
+            client.Flush();
+            var got = new List<IMessage>();
+            Assert.True(Pump(() =>
+            {
+                while (server.TryDequeueMessage(out var item)) got.Add(item.message);
+                return got.Count >= 21;
+            }), $"{got.Count} of 21 messages arrived");
+            Assert.Equal(8000, got.OfType<ChatMessage>().Single().Text.Length);
+        }
+        finally
+        {
+            client.Disconnect();
+            server.Stop();
+        }
+
+        bool Pump(Func<bool> done)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                server.PollEvents();
+                client.Poll();
+                if (done()) return true;
+                Thread.Sleep(5);
+            }
+            return done();
+        }
     }
 
     // ── Logs ────────────────────────────────────────────────────────────────────────────────────

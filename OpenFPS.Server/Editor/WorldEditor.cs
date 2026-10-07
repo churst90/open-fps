@@ -24,8 +24,7 @@ public sealed partial class WorldEditor
     public const string Refusal = "The world editor is for this map's owner, the people they ask to edit it, and developers.";
     public const int MaxUndo = 200;
     public const float DefaultStep = 0.5f;
-    /// <summary>How far from the middle of the map, along any axis, the editor puts a thing: twice the
-    /// largest map's reach. Past it the server's tile and grid arithmetic stops meaning anything.</summary>
+    /// <summary>How far from the map's middle, on any axis, the editor puts a thing: twice the largest map.</summary>
     public const float MaxDistanceMetres = 20_000f;
     /// <summary>The body a solid thing must keep clear of: a player's cylinder, feet to head.</summary>
     private const float FootPadding = 0.15f;
@@ -105,11 +104,7 @@ public sealed partial class WorldEditor
         + "/edit info, /edit map settings, /edit map set weather|time|ground|beacon CATEGORY VALUE, "
         + "/edit model show|set|up|down|versions|where|use|pin|unpin|new|copy|replace|retire|restore|remove KIND ID ..., /edit undo, /edit redo.";
 
-    /// <summary>
-    /// What an /edit command costs against the editor's rate limit (MessageLimits.Edits): nothing for
-    /// what only looks (menus, selecting, finding, the settings said), one for a change, more for a change
-    /// of many things at once (a row by its length, a group, a replacement). docs/SERVER_SECURITY.md.
-    /// </summary>
+    /// <summary>What an /edit costs against MessageLimits.Edits: 0 to look, 1 to change, more to change many things.</summary>
     public static double EditCost(string[] args)
     {
         if (args.Length == 0) return 0;
@@ -140,6 +135,12 @@ public sealed partial class WorldEditor
 
     /// <summary>Everything /edit does. The caller has checked the player may edit here.</summary>
     public void Handle(UserSession s, string[] args, Action<IMessage> reply)
+    {
+        using var saving = Overlays.Defer();
+        Run(s, args, reply);
+    }
+
+    private void Run(UserSession s, string[] args, Action<IMessage> reply)
     {
         var hand = HandOf(s);
         string verb = args.Length > 0 ? args[0].ToLowerInvariant() : "menu";

@@ -77,6 +77,7 @@ public sealed class GroupKind : EditorKind
     {
         var spec = JsonSerializer.Deserialize<GroupSpec>(json, Json) ?? throw new ArgumentException("The group is empty.");
         if (spec.Parts.Length == 0) throw new ArgumentException("A group has at least one part.");
+        if (spec.Parts.Length > WorldEditor.MaxHeld) throw new ArgumentException($"A group has at most {WorldEditor.MaxHeld} parts.");
         foreach (var p in spec.Parts)
             if (!_prefabs.Prefabs.ContainsKey(p.PrefabId.ToLowerInvariant())) throw new ArgumentException($"There is no prefab called {p.PrefabId}.");
         return JsonSerializer.Serialize(spec, Json);
@@ -166,6 +167,8 @@ public sealed partial class WorldEditor
         if (kind.Canonical(word) is not { } id || GroupOf(id) is not { } spec) { Say(reply, $"There is no group called {word}."); return; }
         if (Models.IsRetired(GroupKind.KindId, id)) { Say(reply, $"The group {id} is retired, so it is not offered for new things."); return; }
         if (Full(s, spec.Parts.Length, out string full)) { Say(reply, full); return; }
+        foreach (var part in spec.Parts)
+            if (_maps.Prefabs.TryGetValue(part.PrefabId.ToLowerInvariant(), out var pt) && !MayPlace(s, pt, out full)) { Say(reply, full); return; }
         if (!TryBody(s, reply, out _, out var feet, out float yaw)) return;
         int q = Quarter(yaw);
         var forward = Compass4[q];

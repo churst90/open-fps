@@ -153,9 +153,35 @@ public sealed class MapOverlayStore
     /// <summary>Overlay files written, for the tests.</summary>
     public int Writes { get; private set; }
 
-    /// <summary>Writes a map's overlay now: a temporary file, then a rename.</summary>
+    private int _deferred;
+    private readonly HashSet<string> _dirty = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Holds every Save until the returned scope ends, then writes each changed map once.</summary>
+    // A row of fifty, a group or a replacement saved the whole file once per thing, on the tick thread.
+    public IDisposable Defer()
+    {
+        _deferred++;
+        return new Scope(this);
+    }
+
+    private sealed class Scope(MapOverlayStore store) : IDisposable
+    {
+        private bool _done;
+        public void Dispose()
+        {
+            if (_done) return;
+            _done = true;
+            if (--store._deferred > 0) return;
+            var maps = store._dirty.ToList();
+            store._dirty.Clear();
+            foreach (var mapId in maps) store.Save(mapId);
+        }
+    }
+
+    /// <summary>Writes a map's overlay now (a temporary file, then a rename), or at the end of a <see cref="Defer"/>.</summary>
     public void Save(string mapId)
     {
+        if (_deferred > 0) { _dirty.Add(mapId); return; }
         string? path = PathFor(mapId);
         if (path == null || !_overlays.TryGetValue(mapId, out var o)) return;
         Writes++;

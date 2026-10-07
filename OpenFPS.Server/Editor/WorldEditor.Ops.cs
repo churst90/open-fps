@@ -213,6 +213,7 @@ public sealed partial class WorldEditor
                 if (forward)
                 {
                     if (there) { why = $"{p.Thing.Data.Name ?? p.Thing.Data.PrefabId} is already there."; return false; }
+                    if (p.Thing.Added && Full(s, 1, out why)) return false;
                     return Restore(op.MapId, p.Thing, out why);
                 }
                 if (!there) { why = "it has been deleted already."; return false; }
@@ -226,6 +227,8 @@ public sealed partial class WorldEditor
                 if (!forward)
                 {
                     if (there) { why = $"{d.Name} is already back."; return false; }
+                    // Another editor may have placed things since: an undone deletion is a placing.
+                    if (d.Thing.Added && Full(s, 1, out why)) return false;
                     return Restore(op.MapId, d.Thing, out why);
                 }
                 if (!there) { why = $"{d.Name} has been deleted already."; return false; }
@@ -577,6 +580,7 @@ public sealed partial class WorldEditor
         why = "";
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) { why = "the map is not loaded."; return false; }
         var d = thing.Data;
+        if (!InReach(d.Position)) { why = TooFar; return false; }
         var size = SizeAt(d.PrefabId, d.Scale);
         if (_maps.Prefabs.TryGetValue(d.PrefabId.ToLowerInvariant(), out var template) && template.ColliderSize.HasValue
             && (template.IsSolid ?? true) && (template.Shape ?? ColliderShape.Box) == ColliderShape.Box
@@ -623,6 +627,7 @@ public sealed partial class WorldEditor
         var after = to(world, e, before);
         if (after == null) return;
         string name = NameOf(world, e);
+        if (!InReach(after.Value.Position)) { Say(reply, $"Not {verb}: {TooFar}"); return; }
         if (BlockedBy(world, e, after.Value) is { } who) { Say(reply, $"Not {verb}: that would put {name} through {who}."); return; }
         ApplyPose(s.CurrentMapId, world, e, after.Value);
         Record(s.CurrentMapId, id, world, e);
@@ -736,7 +741,7 @@ public sealed partial class WorldEditor
     {
         if (!TryBody(s, reply, out _, out _, out float yaw)) return;
         if (!TrySelected(s, reply, out var world, out var e, out int id)) return;
-        if (Full(s, 1, out string full)) { Say(reply, full); return; }
+        if (Full(s, 1, out string full) || !MayCopy(s, world, e, out full)) { Say(reply, full); return; }
         var source = Take(s.CurrentMapId, world, e, id);
         var dir = Compass4[Quarter(yaw)];
         var (lo, hi) = Box(world, e);
@@ -784,6 +789,19 @@ public sealed partial class WorldEditor
         if (s.Can(Permissions.Edit) || Overlays.Get(s.CurrentMapId).Added.Count + adding <= PlacedCap) return false;
         refusal = $"This map has {PlacedCap} things placed with the editor, the most a player's map may have.";
         return true;
+    }
+
+    private const string TooFar = "that is more than 20 kilometres from the middle of the map.";
+
+    /// <summary>Whether a point is within <see cref="MaxDistanceMetres"/> of the map's middle on every axis.</summary>
+    internal static bool InReach(Vector3 p)
+        => MathF.Abs(p.X) <= MaxDistanceMetres && MathF.Abs(p.Y) <= MaxDistanceMetres && MathF.Abs(p.Z) <= MaxDistanceMetres;
+
+    /// <summary>Whether a copy of this thing may be made: what <see cref="MayPlace"/> says of its prefab.</summary>
+    private bool MayCopy(UserSession s, World world, Entity e, out string refusal)
+    {
+        refusal = "";
+        return !_maps.Prefabs.TryGetValue(PrefabOf(world, e).ToLowerInvariant(), out var t) || MayPlace(s, t, out refusal);
     }
 
     /// <summary>Whether a player may put this prefab on the map: never a premium item, and things to carry

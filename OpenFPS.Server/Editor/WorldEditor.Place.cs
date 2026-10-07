@@ -30,6 +30,9 @@ public sealed partial class WorldEditor
     /// <summary>The most copies one row makes.</summary>
     public const int MaxRow = 50;
 
+    /// <summary>The most things held at once, and so the most parts a group is made of.</summary>
+    public const int MaxHeld = 500;
+
     private void PlaceCommand(UserSession s, string[] args, Action<IMessage> reply)
     {
         if (args.Length >= 2 && args[0].Equals("mode", StringComparison.OrdinalIgnoreCase))
@@ -158,7 +161,7 @@ public sealed partial class WorldEditor
         if (args.Length > 1 && (!TryNumber(args[1], out spacing) || spacing <= 0 || spacing > 100)) { Say(reply, "The spacing is metres, more than 0 and up to 100."); return; }
         if (!TryBody(s, reply, out _, out _, out float yaw)) return;
         if (!TrySelected(s, reply, out var world, out var e, out int id)) return;
-        if (Full(s, count, out string full)) { Say(reply, full); return; }
+        if (Full(s, count, out string full) || !MayCopy(s, world, e, out full)) { Say(reply, full); return; }
         var source = Take(s.CurrentMapId, world, e, id);
         var dir = Compass4[Quarter(yaw)];
         var (lo, hi) = Box(world, e);
@@ -214,6 +217,7 @@ public sealed partial class WorldEditor
         }
         if (!_maps.TryGetMap(s.CurrentMapId, out var world, out _, out _, out _) || !_maps.AuthoredEntities(s.CurrentMapId).TryGetValue(id, out var e)) return;
         if (hand.Held.Contains(id)) { Say(reply, $"{NameOf(world, e)} is held already; {Plural(hand.Held.Count, "thing")} held."); return; }
+        if (hand.Held.Count >= MaxHeld) { Say(reply, $"{Plural(MaxHeld, "thing")} are held, the most a group may have."); return; }
         hand.Held.Add(id);
         Say(reply, $"Holding {NameOf(world, e)} as well: {Plural(hand.Held.Count, "thing")} held. /edit group NAME makes them a group.");
         Refresh(s, reply);
