@@ -70,6 +70,9 @@ public sealed record FieldDescriptor
     /// <summary>The longest text a Text field takes.</summary>
     public const int MaxTextLength = 60;
 
+    /// <summary>The label at the start of a sentence.</summary>
+    private string Cap => Label.Length == 0 ? Label : char.ToUpperInvariant(Label[0]) + Label[1..];
+
     /// <summary>The step to use: the declared one, or about a hundredth of the range.</summary>
     public double EffectiveStep
     {
@@ -122,18 +125,18 @@ public sealed record FieldDescriptor
         value = "";
         error = "";
         string text = (typed ?? "").Trim();
-        if (ReadOnly) { error = $"{Label} cannot be changed here."; return false; }
+        if (ReadOnly) { error = $"{Cap} cannot be changed here."; return false; }
         switch (Type)
         {
             case FieldType.Number:
             case FieldType.Integer:
             {
                 if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double d) || !double.IsFinite(d))
-                { error = $"{Label} needs a number{(RangeText.Length > 0 ? ", " + RangeText : "")}."; return false; }
+                { error = $"{Cap} needs a number{(RangeText.Length > 0 ? ", " + RangeText : "")}."; return false; }
                 if (Type == FieldType.Integer && Math.Abs(d - Math.Round(d)) > 1e-9)
-                { error = $"{Label} needs a whole number{(RangeText.Length > 0 ? ", " + RangeText : "")}."; return false; }
+                { error = $"{Cap} needs a whole number{(RangeText.Length > 0 ? ", " + RangeText : "")}."; return false; }
                 if (d < Min - 1e-9 || d > Max + 1e-9)
-                { error = $"{Label} must be {RangeText}; {Format(d)} is outside it."; return false; }
+                { error = $"{Cap} must be {RangeText}; {Format(d)} is outside it."; return false; }
                 value = Type == FieldType.Integer ? ((long)Math.Round(d)).ToString(CultureInfo.InvariantCulture)
                                                   : d.ToString("R", CultureInfo.InvariantCulture);
                 return true;
@@ -144,7 +147,7 @@ public sealed record FieldDescriptor
                     case "on": case "yes": case "true": case "1": value = "true"; return true;
                     case "off": case "no": case "false": case "0": value = "false"; return true;
                 }
-                error = $"{Label} is on or off.";
+                error = $"{Cap} is on or off.";
                 return false;
             case FieldType.Choice:
             {
@@ -152,13 +155,13 @@ public sealed record FieldDescriptor
                 if (exact != null) { value = exact; return true; }
                 var starts = Choices.Where(c => c.StartsWith(text, StringComparison.OrdinalIgnoreCase)).ToList();
                 if (text.Length > 0 && starts.Count == 1) { value = starts[0]; return true; }
-                error = $"{Label} is one of: {string.Join(", ", Choices)}.";
+                error = $"{Cap} is one of: {string.Join(", ", Choices)}.";
                 return false;
             }
             default:
-                if (text.Length == 0) { error = $"{Label} needs some words."; return false; }
-                if (text.Length > MaxTextLength) { error = $"{Label} is at most {MaxTextLength} letters."; return false; }
-                if (text.Any(char.IsControl)) { error = $"{Label} cannot hold control characters."; return false; }
+                if (text.Length == 0) { error = $"{Cap} needs some words."; return false; }
+                if (text.Length > MaxTextLength) { error = $"{Cap} is at most {MaxTextLength} letters."; return false; }
+                if (text.Any(char.IsControl)) { error = $"{Cap} cannot hold control characters."; return false; }
                 value = text;
                 return true;
         }
