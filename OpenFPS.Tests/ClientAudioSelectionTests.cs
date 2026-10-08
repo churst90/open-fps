@@ -297,6 +297,11 @@ public class ClientAudioSelectionTests
         h.StandAt(Vector3.Zero);
         const int Id = 77;
         AddSource(h, Id, soundId, new Vector3(0f, 1f, 12f), new Vector3(4f, 1f, 4f));
+        if (soundId.StartsWith("rail:", StringComparison.Ordinal))
+        {
+            ARailSourceIsPlacedThroughItsTrainsVoiceAtItsOwnLevel(h, soundId);
+            return;
+        }
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Id), 30), $"{soundId} was never voiced");
 
         var (level, extent) = Declared(soundId);
@@ -313,6 +318,46 @@ public class ClientAudioSelectionTests
             Assert.Equal(gain * PhysicalVoiceState.HeadroomGain(Headroom(soundId)), e.Volume, 5);
         else
             Assert.True(e.Volume > 0f && float.IsFinite(e.Volume));
+    }
+
+    /// <summary>
+    /// A train's source has no voice of its own (docs/TRAINS.md, "Voicing a train"): it is carried by one
+    /// of its train's voices, which is placed at the train's loudest field level (TrainVoicing.SlotLevelDb),
+    /// unwidened, with the many-source headroom given back. The source's weight in that voice makes it as
+    /// loud as its own level and size would have played it: past both reference distances the law is
+    /// gain times reference over distance, so weight × (its pressure over the voice's) × the voice's
+    /// gain × reference is the source's own gain × reference.
+    /// </summary>
+    private void ARailSourceIsPlacedThroughItsTrainsVoiceAtItsOwnLevel(ClientAudioHarness h, string soundId)
+    {
+        Assert.True(TrainVoiceState.ParseKey(soundId, out string preset, out string train, out int index));
+        string key = preset + "/" + train;
+        bool Voiced() => h.Mixer.Latest.Values.Any(e => e.PhysicalKey.StartsWith($"rail:{key}/@", StringComparison.Ordinal));
+        Assert.True(h.TickUntil(Voiced, 30), $"{soundId}: its train was never voiced");
+        Assert.False(h.Mixer.WasStarted(77), "a train's source was given a voice of its own");
+
+        var e = h.Mixer.Latest.Values.Single(v => v.PhysicalKey.StartsWith($"rail:{key}/@", StringComparison.Ordinal));
+        Assert.True(TrainVoiceState.ParseSlotKey(e.PhysicalKey, out _, out _, out int slot));
+        var layout = TrainLayout.Sources(TrainProfile.ByName(preset));
+        float slotLevel = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(layout);
+        var (slotGain, slotReference) = Loudness.Place(slotLevel);
+        Assert.Equal(slotLevel, e.EarLevelDb, 3);
+        Assert.Equal(slotReference, e.MinDistance, 4);
+        Assert.Equal(0f, e.ExtentMetres);
+        Assert.Equal(slotGain * PhysicalVoiceState.HeadroomGain(TrainSlotState.HeadroomDb), e.Volume, 5);
+        Assert.True(e.Range >= Loudness.AudibleRange(slotLevel) - 1e-3f, $"range {e.Range} under the voice's audible range");
+        Assert.Equal("", e.EngineKey);
+
+        Assert.True(h.Mixer.Plans.TryGetValue((key, slot), out var plan), "the voice was never told what it carries");
+        int k = Array.IndexOf(plan.Sources, index);
+        Assert.True(k >= 0, $"source {index} is not in its voice's plan");
+        var (level, extent) = Declared(soundId);
+        var (gain, reference) = Loudness.Place(level, extent);
+        float own = gain * reference;
+        float through = plan.Weights[k] * MathF.Pow(10f, (level - slotLevel) / 20f) * slotGain * slotReference;
+        _o.WriteLine($"{soundId}: {level:F1} dB, extent {extent:F2} m, carried by voice {slot} at {slotLevel:F1} dB with weight {plan.Weights[k]:F4}; "
+                   + $"gain x reference {through:F4} against its own {own:F4}");
+        Assert.Equal(own, through, own * 1e-3f);
     }
 
     private static (float Level, float Extent) Declared(string soundId)
@@ -534,8 +579,10 @@ public class ClientAudioSelectionTests
 
     /// <summary>
     /// A mixer over its ceiling gives things up in order, one a second: a machine's second outlet,
-    /// standing machines down to one, reflections, borrowed voices down to four, then cars, never below
-    /// two. A car vanishing is noticed; a wall that stops answering is not.
+    /// machine voices down to six (MinMachineVoices), reflections, borrowed voices down to four, then cars,
+    /// never below two. A car vanishing is noticed; a wall that stops answering is not. Taken back in the
+    /// other order, cars first, once the load has stayed well under the ceiling for a few seconds and the
+    /// last give-up is fifteen seconds old (docs/CLIENT_NOTES.md, "The budgets").
     /// </summary>
     [Fact]
     public void AnOverloadedMixerGivesUpFrontVoicesThenMachinesThenBorrowedVoicesThenCars()
@@ -567,19 +614,26 @@ public class ClientAudioSelectionTests
         Assert.True(borrowedDown > machinesDown, "borrowed voices were given up before the machines");
         Assert.True(enginesDown > borrowedDown, "cars were given up before the borrowed voices");
         var end = seen[^1];
-        Assert.Equal(1, end.Machines);
+        Assert.Equal(ClientAudioSystem.MinMachineVoices, end.Machines);
         Assert.Equal(4, end.Borrowed);
         Assert.Equal(2, end.Engines);
 
-        // The load falls: the cars come back first.
+        // The load falls: nothing comes back at once, and then the cars come back first.
         h.Mixer.Load = 0.2f;
         var before = seen[^1];
-        for (int s = 0; s < 3; s++) { h.Tick(); h.Wait(1.05); h.Tick(); }
-        var after = Counts(h, cars, machines);
+        for (int s = 0; s < 2; s++) { h.Tick(); h.Wait(1.05); h.Tick(); }
+        Assert.Equal(before, Counts(h, cars, machines));
+        var after = before;
+        for (int s = 0; s < 30 && after == before; s++)
+        {
+            h.Tick(); h.Wait(1.05); h.Tick();
+            after = Counts(h, cars, machines);
+        }
         _o.WriteLine($"recovering: {after}");
         Assert.True(after.Engines > before.Engines, "the cars were not the first thing taken back");
         Assert.Equal(before.Machines, after.Machines);
         Assert.Equal(before.Fronts, after.Fronts);
+        Assert.Equal(before.Borrowed, after.Borrowed);
     }
 
     /// <summary>

@@ -263,7 +263,7 @@ public partial class ClientAudioSystem
     /// <summary>However short the mixer runs, this many machine voices are kept, and the loudest machine
     /// keeps its voice whatever it costs: the one you are standing next to is the one you would notice
     /// going silent.</summary>
-    private const int MinMachineVoices = 6;
+    internal const int MinMachineVoices = 6;
 
     /// <summary>Nothing at all, when the budget is zero: the adaptive floor must not put one back.</summary>
     private int MachineFloor => MachineVoiceBudget == 0 ? 0 : MinMachineVoices;

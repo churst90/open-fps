@@ -145,6 +145,10 @@ internal sealed class RecordingMixer : IAudioProvider
     public readonly List<int> Stopped = new();
     public readonly HashSet<int> Live = new();
 
+    /// <summary>What each of a train's voices was last told to carry, by "preset/train" and voice.</summary>
+    public readonly Dictionary<(string Train, int Slot), TrainSlotPlan> Plans = new();
+    public void PlanTrainSlot(string preset, string train, int slot, TrainSlotPlan plan) => Plans[(preset + "/" + train, slot)] = plan;
+
     public bool HasPath(int id) => Paths.ContainsKey(id);
     public AcousticPathData LastPath(int id) => Paths[id][^1];
     public bool WasStarted(int id) => Started.Exists(e => e.EntityId == id);
