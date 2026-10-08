@@ -6,6 +6,11 @@ Updated 2026-10-07: every item checked against the code, the git history, change
 
 ## Next, in order
 
+Cody's list of 2026-10-08 (one world, server-built tiles, distant updates, sound from geometry, enemies and
+Dinosaur World, railways and editor words, chat names and roles, NPC doors, weather as a system, cars and fighting)
+is in [docs/CODY_ASKS_2026-10-08.md](docs/CODY_ASKS_2026-10-08.md), with its suggested order. The batch and the trains
+fix are shipped (VPS 3fc38430512b).
+
 1. Finish this batch: the honest tests and the lab argument bugs; the probable bugs (below), on their
    own branch, heard by Cody before they merge.
 2. One full test run on the final main (`tools/test-local.sh`).
