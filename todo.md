@@ -312,6 +312,27 @@ Charge as TNT equivalent; peak overpressure and positive-phase duration from Kin
 distance; the Friedlander waveform near, a low boom far; ground reflection; the city's echoes; glass
 that breaks above an overpressure. Needs the loudness law fixed for very loud sounds first.
 
+### Cars in full detail (Cody, 2026-10-08)
+Cody: "I want cars to be very detailed and we need to model the parts that matter." From the AK Engine
+Synth video (inbox, transcribed): ours is the more physical model; these are what to take and what to add.
+- Pre-computed cycles for distant cars (agreed): our own engine model renders each engine type's cycles over
+  a grid of rpm and load, denser at low rpm where the sound changes fastest, several cycles per point so the
+  variation survives. Made at first launch and kept on disk per build, like the door renders, and shipped in
+  the Windows zip. Near and driven cars stay live; distant and borrowed cars play the stored cycles.
+- Cycle-to-cycle combustion variation: peak pressure, timing and burn rate vary from cycle to cycle and
+  cylinder to cylinder, more at idle, light load and with big cam overlap; occasional misfires. The lopey,
+  choppy idle of a cammed V8 comes from this.
+- Suspension: springs, dampers, bump stops and bushes per wheel from the per-wheel physics; strut knock,
+  top-mount clunk, bottoming out, creaks, and body panels and loose trim rattling, each driven by the real
+  impulse at that wheel (as the AK video does for collisions and bumps, but modelled, not sampled).
+- Drivetrain: gear whine at the mesh frequency (teeth times shaft speed), helical against straight-cut,
+  differential whine, clutch engagement, driveline clunk on load reversal, a dog-box's clunk, the synchro.
+- Tyres: tread-block noise from the pattern, the tyre cavity's air resonance (about 200-250 Hz), stones
+  picked up and thrown, the surface under each wheel (the rail grooves' clack is approved by ear 2026-10-08).
+- Check our pipes against published muffler and exhaust measurements.
+- F1 above about 12,300 rpm: model the pulses steepening at high pressure (a small 1D gas-flow solver in the
+  primaries), the fault the convolution approach cannot fix either.
+
 ### Vehicles: what is still simple
 - Bodies: a driven car is about ten boxes; traffic cars are one box; no vehicle is in the acoustic
   scene, so nothing reflects off a car.
