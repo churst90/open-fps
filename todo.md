@@ -189,6 +189,29 @@ and the server's voice line.
 - The traced decay of the tunnel and the garage against real figures.
 - Beacons: door range 12 m to 6 m, and lifting beacons when a louder sound is near (proposed, Cody).
 
+### Reflections in their own process (Cody, 2026-10-08; discuss Friday 2026-10-09)
+Tracing (TracedReverb, TracedEchoes, LateField, Steam Audio's own threads) runs in the client
+process. Its `ThreadPriority.BelowNormal` does nothing on Linux, and none of those threads is niced.
+Convolution runs on the FMOD mixer thread.
+- First: read "Mixer load" and "Audio: mixer at" with `/echoes on` and `off`, to learn whether the
+  cost is tracing or convolution.
+- First: call `BackgroundPriority.LowerThisThread` at the top of each trace loop.
+- Recommended next: the split itself, if the first two do not fix it:
+  - A helper (`OpenFPS.AcousticsHost`) started by the client; it dies with the client (death signal
+    on Linux, job object on Windows) and is niced to +19 or set below normal, Steam Audio's threads
+    included.
+  - The scene goes to the helper: triangles and materials at load, then doors, tile swaps and cabins.
+  - The client sends positions. The helper sends back each response as samples, extracted the way
+    `TracedReverb.ExtractLate` does it.
+  - Responses travel through double-buffered shared memory, about 50-70 MB/s (1.2 MB per order-1
+    response).
+  - The client convolves them with its own convolver (`LateTail`), because Steam Audio's responses
+    are opaque.
+  - If the helper crashes, the game falls back to the room reverb with no echoes, then restarts it.
+- What the split solves: tracing cannot take the mixer's CPU, collect garbage in the game's heap,
+  hold a lock the audio waits on, or crash the game.
+- What it does not solve: convolution cost (Mixer load), total CPU, or the 125-250 ms refresh.
+
 ### Water
 - A big river's bank in a calm is silent: an eddy's wave never breaks (`breaks = !eddy`).
 - Shingle reaches the master limiter at 3 m: the plunging breakers (90.9 dB), not the stones.
