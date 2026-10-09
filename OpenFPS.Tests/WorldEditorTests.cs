@@ -37,7 +37,7 @@ public class WorldEditorTests : IDisposable
         var rig = new Rig(_dir, UserRole.Player);
         rig.On("mine");
         Assert.IsType<EditorMenu>(rig.Menu("menu"));
-        Assert.StartsWith("Placed Concrete Wall", rig.Run("edit", "place", "concrete_wall"));
+        Assert.StartsWith("Placed: Concrete Wall", rig.Run("edit", "place", "concrete_wall"));
 
         rig.On("theirs");
         Assert.Equal(WorldEditor.Refusal, rig.Run("edit"));
@@ -111,7 +111,7 @@ public class WorldEditorTests : IDisposable
     {
         var rig = new Rig(_dir, UserRole.Player);
         rig.On("mine");
-        Assert.Equal("Placed Concrete Wall 0.65 metres in front of you, facing north. It is selected.", rig.Run("edit", "place", "concrete_wall"));
+        Assert.Equal("Placed: Concrete Wall, 2 by 0.5 by 3 metres high, 0.65 metres in front of you, facing north. It is selected.", rig.Run("edit", "place", "concrete_wall"));
         int id = rig.Selected;
         Assert.True(id >= MapOverlay.FirstAddedId);
         var placed = rig.PoseOf(id);
@@ -257,7 +257,7 @@ public class WorldEditorTests : IDisposable
         rig.Stand(rig.Other, "mine", new Vector3(5f, 0.05f, 5.7f));
         Assert.Equal("Not placed: that would put Concrete Wall through other.", rig.Run("edit", "place", "concrete_wall"));
         // Something with no solid body may go anywhere.
-        Assert.StartsWith("Placed Fire", rig.Run("edit", "place", "fire_pit"));
+        Assert.StartsWith("Placed: Fire", rig.Run("edit", "place", "fire_pit"));
 
         rig.Stand(rig.Other, "mine", new Vector3(5f, 0.05f, 9f));
         rig.Run("edit", "place", "concrete_wall");

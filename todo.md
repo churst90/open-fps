@@ -34,8 +34,8 @@ because the one world costs CPU and bandwidth first.
 9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3.
 10. Chat names and roles (item 8): done 2026-10-09 (protected Owner role, "admin [Mafia] Owner: hi";
     Common changed, so a new Windows zip and VPS build go out together). The editor (item 7): the
-    typed-value text box is built on a branch; Cody wants F12 to become a dialog, not a menu, and
-    to do nothing without permission. Layout under discussion (tabs Place, Edit, Build, World).
+    typed-value text box, Control+B and the F12 dialog (tabs Place, Edit, Build, World; nothing
+    without permission) are built, untried with Orca and NVDA.
 11. Weather as a system (item 12): rain, wet roads, wind and fire tied together.
 12. Cars in full detail: the distant-car cycle cache first (also a performance win), then lopey idle,
     suspension, drivetrain, tyres and F1 steepening.
@@ -50,7 +50,8 @@ Waiting on Cody's ear:
 - Trains' own horn, whistle and bell; air conditioners cycling with the weather
   (inbox/fault-fixes-2026-10-06).
 - Downpipes, round 2: the flange should be gone (inbox/water-smoothing-2026-10-06/round2).
-- The world editor in the game (F12), and `/editorkeys on` with Orca, then NVDA.
+- The world editor dialog in the game (F12: tabs, labels, Control+Tab), and `/editorkeys on` with
+  Orca, then NVDA.
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
 
 ## Now

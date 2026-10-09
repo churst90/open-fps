@@ -416,6 +416,8 @@ public sealed partial class WorldEditor
                    : kind.Kind == ModelLibrary.Kinds.Engine ? "Give a vehicle it with the vehicle's engine field."
                    : kind.Kind == ModelLibrary.Kinds.Vehicle ? "/give vehicle " + newId + " parks one beside you."
                    : "Give a thing it with its model setting, or replace another model with it.";
+        // In the dialog the copy becomes the entry being looked at, ready to change.
+        if (HandOf(s).Dialog) HandOf(s).DialogModel = (kind.Kind, newId);
         Say(reply, $"Made the {kind.Spoken} {newId}, {note}. Version 1. {use}");
         Notify(s, $"{s.Username} made the {kind.Spoken} {newId}.");
         Refresh(s, reply);

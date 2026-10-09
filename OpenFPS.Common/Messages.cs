@@ -93,6 +93,12 @@ public partial struct EditorMenuItem
     /// <summary>How many numbers are typed, apart by spaces: 3 for east, north and up. 0 or 1 is one.</summary>
     public byte Count;
 
+    // Appended 2026-10-09 for the F12 dialog (docs/WORLD_EDITOR.md section 16).
+    /// <summary>Which part of the editor dialog the item belongs in ("edit.thing", "world.field"); empty in a menu.</summary>
+    public string Section;
+    /// <summary>A tick: a thing held with the others.</summary>
+    public bool Checked;
+
     public EditorMenuItem()
     {
         Label = "";
@@ -104,6 +110,7 @@ public partial struct EditorMenuItem
         Min = double.MinValue;
         Max = double.MaxValue;
         Help = "";
+        Section = "";
     }
 }
 

@@ -67,6 +67,12 @@ public sealed partial class WorldEditor
     /// <summary>Sends the menu at a path, or says there is none.</summary>
     internal void SendMenu(UserSession s, string path, Action<IMessage> reply, bool refresh)
     {
+        // With the dialog open, what would open or refresh a menu brings its tab up to date instead.
+        if (HandOf(s).Dialog && !s.IsTextClient)
+        {
+            reply(DialogTab(s, HandOf(s).DialogTab));
+            return;
+        }
         var menu = BuildMenu(s, path);
         if (menu == null)
         {

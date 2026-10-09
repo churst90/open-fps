@@ -80,6 +80,8 @@ public partial class CommandHandler
         {
             // Control+B asks for the build dialog: a player who may not edit hears nothing at all.
             if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForBuildForm(args)) return;
+            // So does F12, which asks for the editor dialog.
+            if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForDialog(args)) return;
             // F12 is answered in words of its own: who the editor is for.
             if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForMenu(args))
                 Say(reply, OpenFPS.Server.Editor.WorldEditor.Refusal);

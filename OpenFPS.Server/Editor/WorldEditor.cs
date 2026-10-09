@@ -11,7 +11,7 @@ using OpenFPS.Server.Core;
 namespace OpenFPS.Server.Editor;
 
 /// <summary>
-/// The world editor on the server (docs/WORLD_EDITOR.md): /edit and the F12 menu. Every operation is
+/// The world editor on the server (docs/WORLD_EDITOR.md): /edit, its menus and the F12 dialog. Every operation is
 /// made here, on the tick thread, in the order it arrives; it changes the live map, is kept in the map's
 /// overlay at once, goes on the editor's own undo stack, and is told to the other editors on the map.
 /// The world itself reaches every client through the messages it always has: a moved thing's state and
@@ -55,6 +55,11 @@ public sealed partial class WorldEditor
         /// <summary>The last prefab placed, for /edit again, and whether it went to the build cursor.</summary>
         public string? LastPlaced;
         public bool LastAtCursor;
+        /// <summary>The F12 dialog is open: what would open a menu refreshes its tab instead.</summary>
+        public bool Dialog;
+        public string DialogTab = DialogTabs[0];
+        /// <summary>The library entry chosen on the dialog's Build tab.</summary>
+        public (string Kind, string Id)? DialogModel;
     }
 
     private readonly Dictionary<string, Hand> _hands = new(StringComparer.OrdinalIgnoreCase);
@@ -86,7 +91,7 @@ public sealed partial class WorldEditor
     public static bool MayEdit(MapManager maps, UserSession s)
         => s.Can(Permissions.Edit) || maps.IsOwner(s.CurrentMapId, s.Username) || maps.IsEditor(s.CurrentMapId, s.Username);
 
-    /// <summary>Whether /edit with these words asks for the menu (F12), which is refused in words of its own.</summary>
+    /// <summary>Whether /edit with these words asks for the menu (/edit typed on its own), which is refused in words of its own.</summary>
     public static bool AsksForMenu(string[] args) => args.Length == 0 || args[0].Equals("menu", StringComparison.OrdinalIgnoreCase);
 
     private static void Say(Action<IMessage> reply, string text) => reply(new TextEvent { Text = text });
@@ -95,9 +100,9 @@ public sealed partial class WorldEditor
 
     public const string Usage =
         "Usage: /edit on its own opens the menu. /edit select nearest|within METRES|NAME|#ID, /edit select add nearest|NAME|#ID, "
-        + "/edit select group, /edit select clear, /edit held move|nudge|turn ..., /edit selected, /edit move EAST NORTH UP, "
-        + "/edit nudge DIRECTION [METRES], /edit turn DEGREES, "
-        + "/edit face DIRECTION, /edit bring, /edit duplicate, /edit row COUNT [SPACING], /edit delete, /edit set FIELD VALUE, "
+        + "/edit select drop #ID, /edit select group, /edit select clear, /edit held move|nudge|turn ..., /edit selected, "
+        + "/edit move EAST NORTH UP, /edit move to EAST NORTH UP, /edit nudge DIRECTION [METRES], /edit turn DEGREES, "
+        + "/edit face DIRECTION|DEGREES, /edit bring, /edit duplicate, /edit row COUNT [SPACING], /edit delete, /edit set FIELD VALUE, "
         + "/edit up FIELD, /edit down FIELD, /edit settings, /edit place PREFAB [at cursor], /edit place group ID, /edit again, "
         + "/edit build floor|wall|roof|door|window|prefab [FIELD VALUE ...], "
         + "/edit find WORDS, /edit preview PREFAB, /edit prefabs [CATEGORY], /edit group NAME, /edit spawn here, /edit step METRES, "
@@ -112,7 +117,7 @@ public sealed partial class WorldEditor
         switch (Word(0))
         {
             case "menu": case "info": case "selected": case "settings": case "fields": case "prefabs":
-            case "find": case "search": case "select": case "hold": case "step":
+            case "find": case "search": case "select": case "hold": case "step": case "dialog":
                 return 0;
             case "map":
                 return Word(1) == "set" ? 1 : 0;
@@ -153,8 +158,11 @@ public sealed partial class WorldEditor
         switch (verb)
         {
             case "menu":
+                // A menu asked for by name means no dialog is open.
+                hand.Dialog = false;
                 SendMenu(s, rest.Length > 0 ? string.Join(" ", rest) : "root", reply, refresh: false);
                 return;
+            case "dialog": DialogCommand(s, rest, reply); return;
             case "info": Say(reply, MapInfo(s)); return;
             case "spawn":
                 if (rest.Length == 0 || !rest[0].Equals("here", StringComparison.OrdinalIgnoreCase)) { Say(reply, "Say /edit spawn here."); return; }
@@ -166,6 +174,7 @@ public sealed partial class WorldEditor
                     HoldPlacement(s, reply);
                     return;
                 }
+                if (rest.Length > 0 && rest[0].ToLowerInvariant() is "drop" or "remove") { Hold(s, rest, reply); return; }
                 if (rest.Length > 0 && rest[0].ToLowerInvariant() is "add" or "clear" or "hold")
                 {
                     Hold(s, rest[0].Equals("clear", StringComparison.OrdinalIgnoreCase) ? new[] { "clear" } : rest[1..], reply);
@@ -364,6 +373,9 @@ public sealed partial class WorldEditor
     {
         if (!TryBody(s, reply, out var world, out var feet, out float yaw)) return;
         var hand = HandOf(s);
+        // The dialog's list chooses as you arrow through it: the screen reader reads the row, so nothing is said.
+        bool quiet = args.Length > 1 && args[^1].Equals("dialog", StringComparison.OrdinalIgnoreCase);
+        if (quiet) args = args[..^1];
         string what = string.Join(" ", args).Trim();
         if (what.Length == 0) { Say(reply, "Say /edit select nearest, /edit select within METRES, /edit select NAME, or /edit select #NUMBER."); return; }
 
@@ -371,7 +383,7 @@ public sealed partial class WorldEditor
         {
             var near = Nearest(s, 1);
             if (near.Count == 0) { Say(reply, "There is nothing here the editor can take hold of."); return; }
-            SelectId(s, near[0].Id, reply);
+            SelectId(s, near[0].Id, reply, quiet);
             return;
         }
         if (args[0].Equals("within", StringComparison.OrdinalIgnoreCase))
@@ -388,7 +400,7 @@ public sealed partial class WorldEditor
         if (what.StartsWith('#'))
         {
             if (!int.TryParse(what[1..], NumberStyles.Integer, CultureInfo.InvariantCulture, out int id)) { Say(reply, "A number is # and digits: /edit select #1002."); return; }
-            SelectId(s, id, reply);
+            SelectId(s, id, reply, quiet);
             return;
         }
         // By name: what you said, anywhere in the name or the prefab, nearest first.
@@ -400,17 +412,17 @@ public sealed partial class WorldEditor
         if (named.Count > 1 && s.IsTextClient)
             Say(reply, $"{named.Count} things are called {what}; the nearest is selected. Others: "
                      + string.Join("; ", named.Skip(1).Take(8).Select(c => $"#{c.Id} {NameOf(world, c.E)}, {Where(world, c.E, feet, yaw)}")) + ".");
-        SelectId(s, named[0].Id, reply);
+        SelectId(s, named[0].Id, reply, quiet);
     }
 
-    private void SelectId(UserSession s, int id, Action<IMessage> reply)
+    private void SelectId(UserSession s, int id, Action<IMessage> reply, bool quiet = false)
     {
         if (!_maps.TryGetMap(s.CurrentMapId, out var world, out _, out _, out _)) return;
         if (!_maps.AuthoredEntities(s.CurrentMapId).TryGetValue(id, out var e) || !Editable(world, e))
         { Say(reply, $"There is nothing numbered {id} here the editor can take hold of."); return; }
         var hand = HandOf(s);
         hand.Selected = id;
-        Say(reply, "Selected " + Summary(s, world, e, id));
+        if (!quiet) Say(reply, "Selected " + Summary(s, world, e, id));
         if (!s.IsTextClient) SendMenu(s, "selected", reply, refresh: false);
     }
 
