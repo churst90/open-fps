@@ -1330,7 +1330,7 @@ public class GameServer
         var batch = new EntityDefinitionBatch();
         foreach (var e in staticEntities)
         {
-            batch.Definitions.Add(CreateDefinition(world, e));
+            batch.Definitions.Add(streamed ? TileStreamer.Definition(world, e, tiles, session.Tiles) : CreateDefinition(world, e));
             session.KnownEntities.Add(e.Id);
             if (batch.Definitions.Count < EntityDefinitionBatch.Size) continue;
             bytes += SendCounted(session, EntityDefinitionPack.Pack(batch));

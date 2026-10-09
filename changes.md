@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- Ground at 8 m in the far ring (docs/WORLD_STREAMING.md, "Coarse ground in the far ring"). A tile you have
+  only in your far ring is sent with its ground at 7.8 m (32 cells a tile) instead of 2 m, and again at 2 m
+  when it comes within the full radius; the tile you stand in is always 2 m, and the server's ground is
+  always 2 m. Magnolia's join at medium: 942 KB of definitions (1,179 KB on the wire), was 1,513 KB with
+  2 m everywhere; Albany 1,112 KB, was 1,613. About 1 % of near-ground lines of sight in a tile change when
+  it is swapped, once, at the full radius. `TerrainTileComponent` gained a method only, so the wire is
+  unchanged.
 - Magnolia and Albany are in the world (docs/WORLD_STREAMING.md, "Places in the world"). `/join world
   magnolia` arrives at the map's own spawn among the same houses, roads, lawns, named places and traffic,
   on the same ground (within 2 mm of the map's). Each thing goes to the world tile its middle is in, rooms

@@ -725,6 +725,46 @@ Measured (`WorldPlacesTests`, Magnolia, this machine):
 | Roads, junctions, traffic | 198, 206, 4 vehicles: all of the map's |
 | The whole place as world tiles | 196 tiles, 36,374 things, 5.1 MB packed (26 KB a tile, the biggest 57 KB), made in 0.4 s after its ground is laid |
 
+### Coarse ground in the far ring (2026-10-09)
+
+A tile of ground was sent at 2 m whatever the tile's detail, which took Magnolia's join from 530 KB to
+1,388 KB. Now a client is sent a tile's ground at about 8 m while it has the tile only in its far ring, and
+at 2 m once the tile comes within the full radius.
+
+- **The coarse ground** (`TerrainTileComponent.Coarse`): 32 cells a side, so posts 7.8 m apart that land
+  on both edges of the tile; each post's height read off the tile's own 2 m triangles, over the same base;
+  each cell the material under its middle. Two coarse tiles side by side share their edge posts (within the
+  centimetre). Where a coarse tile meets a full one their edges differ between the coarse posts (a hairline
+  crack 300 m or more from the listener); not closed.
+- **What is sent** (`TileStreamer.Definition`): the same entity either way. The join and every tile
+  arriving later carry a tile's ground coarse if the client has that tile at coarse; when the tile comes up
+  to full, its ground is sent again whole and the client's triangle world, acoustic map and Steam Audio
+  scene take the new one in place of the old. Ground already sent at 2 m is not sent again coarse when the
+  tile falls back to coarse.
+- **Nobody stands on it.** The tile a player is in is always full, and the full radius is at least 100 m
+  (300 m at medium), so the swap happens at the full radius, never under anyone's feet. The server's own
+  ground is always the 2 m one: movement, cars, bullets and the server's sound paths never see the coarse
+  ground.
+- **What changes for the ear**: a sound whose path grazes the ground in the tile being swapped. Over all of
+  Magnolia's 196 tiles, the 7.8 m ground lies from the 2 m by a median of 2.1 cm, 41 cm at 99 points in a
+  hundred and 2.1 m at worst (a creek bank); of 19,600 lines from 1 m to 1.6 m over the ground within a
+  tile, 1,145 are blocked by the 2 m ground and 186 (0.95 %) change when the tile is swapped. Each tile
+  swaps once as a player approaches (the 50 m hysteresis), so such a change is a single step in one far
+  sound's occlusion, not a flutter.
+
+Measured (`WorldStreamingTests`, `WorldPlacesTests`):
+
+| Join at medium detail | Definitions packed | On the wire |
+|---|---|---|
+| Magnolia map, before terrain (stage 1) | 530 KB | |
+| Magnolia map, 2 m ground everywhere (T2, 5 m survey) | 1,388 KB | |
+| Magnolia map, 2 m ground everywhere (2 m survey, 11.3) | 1,513 KB | 1,750 KB |
+| Magnolia map, 2 m near and 7.8 m far (12 + 37 tiles) | 942 KB | 1,179 KB |
+| Albany map, 2 m near and 7.8 m far | 1,112 KB (was 1,613) | |
+| The world at Magnolia (9 tiles at 2 m, 36 at 7.8 m) | | 1,077 KB |
+
+Walking 700 m east on Magnolia now streams 429 KB (was 608 KB): 10 KB a tile.
+
 ### Left after stage 2 (as of 2026-10-09)
 
 - Outside the real places, world tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
@@ -732,7 +772,7 @@ Measured (`WorldPlacesTests`, Magnolia, this machine):
 - A player who logs out in the world comes back on the landing map (a frame is not a saved map); saving
   the world position and making the frame again at login.
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
-- Coarse terrain at 8 m for the far ring; the client's tile cache; land cover for the ground's
+- (Coarse terrain at 8 m for the far ring: done, above.) The client's tile cache; land cover for the ground's
   materials (every cell is dirt).
 - (Done 2026-10-09: a driven vehicle is braked to a stop before an edge that is not ready; see Building ahead.)
 

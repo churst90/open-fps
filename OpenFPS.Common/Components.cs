@@ -46,6 +46,41 @@ public partial class TerrainTileComponent
         _field = f;
         return f;
     }
+
+    /// <summary>Cells a side of a tile of ground in the far ring: 250 m in 32 is 7.8 m between posts, the 8 m
+    /// of docs/GEOMETRY.md decision 1, and a post on both edges of the tile.</summary>
+    public const int CoarseCells = 32;
+
+    private TerrainTileComponent? _coarse;
+
+    /// <summary>
+    /// The same ground with <see cref="CoarseCells"/> cells a side, for a tile a client has only in its far
+    /// ring (docs/WORLD_STREAMING.md, Coarse ground): each post's height read off this tile's own triangles,
+    /// over the same base, so the two lie on one another along a post's line; each cell the material under its
+    /// middle. This one if it is no finer. Made once.
+    /// </summary>
+    public TerrainTileComponent Coarse()
+    {
+        if (Posts - 1 <= CoarseCells) return this;
+        var made = _coarse;
+        if (made != null) return made;
+        var fine = Field(0f);
+        int posts = CoarseCells + 1;
+        float spacing = Size / CoarseCells;
+        var heights = new short[posts * posts];
+        for (int j = 0; j < posts; j++)
+            for (int i = 0; i < posts; i++)
+                heights[j * posts + i] = (short)Math.Clamp(MathF.Round(fine.HeightAt(i * spacing, j * spacing) * 100f), short.MinValue, short.MaxValue);
+        var cells = new byte[CoarseCells * CoarseCells];
+        if (Cells.Length > 0)
+            for (int j = 0; j < CoarseCells; j++)
+                for (int i = 0; i < CoarseCells; i++)
+                {
+                    fine.CellAt((i + 0.5f) * spacing, (j + 0.5f) * spacing, out int fi, out int fj, out _, out _);
+                    cells[j * CoarseCells + i] = Cells[fj * (Posts - 1) + fi];
+                }
+        return _coarse = new TerrainTileComponent { Posts = posts, Spacing = spacing, HeightsCm = heights, Cells = cells, Materials = Materials };
+    }
 }
 
 [MemoryPackable]

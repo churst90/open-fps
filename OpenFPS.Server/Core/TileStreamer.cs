@@ -24,6 +24,10 @@ public sealed class TileInterest
     /// the world a tile arriving is worked in at once, even for a player standing still at its edge.</summary>
     public long SeenVersion { get; set; } = -1;
 
+    /// <summary>Tiles of ground this client was sent at the far ring's spacing (TerrainTileComponent.Coarse):
+    /// each is sent again whole when its tile comes up to full detail.</summary>
+    public HashSet<int> CoarseGround { get; } = new();
+
     /// <summary>Totals for this map, for the log and the tests.</summary>
     public long DefinitionsSent, Removed, TilesLoaded, TilesDropped, BytesSent;
     /// <summary>Bytes sent since the last TileStreamUpdate, for its log line.</summary>
@@ -51,6 +55,7 @@ public sealed class TileInterest
         Stale = false;
         Pending.Clear();
         Done.Clear();
+        CoarseGround.Clear();
         SeenVersion = -1;
         DefinitionsSinceUpdate = RemovedSinceUpdate = 0;
         DefinitionsSent = Removed = TilesLoaded = TilesDropped = BytesSent = BytesSinceUpdate = 0;
@@ -101,6 +106,34 @@ public static class TileStreamer
                 if (seen.Add(id) && tiles.Wanted(id, levels)) ids.Add(id);
         return ids;
     }
+
+    /// <summary>
+    /// A fixed entity's definition for this client: as it is, except a tile of ground the client has only in
+    /// its far ring, which goes at the far ring's spacing (8 m, not 2) and is noted, so it is sent again whole
+    /// when the tile comes up to full detail. The tile a client stands in is always full, so the ground under
+    /// anybody's feet is never the coarse one; the server's own is always the 2 m ground.
+    /// </summary>
+    public static EntityDefinition Definition(World world, Entity e, MapTiles tiles, TileInterest interest)
+    {
+        var def = EntityDefinitionFactory.From(world, e);
+        if (def.Terrain == null) return def;
+        var level = TileDetail.None;
+        if (tiles.TryGet(e.Id, out var m))
+            foreach (var k in m.Tiles)
+                if (interest.Levels.TryGetValue(k, out var l) && l > level) level = l;
+        if (level == TileDetail.Coarse)
+        {
+            def.Terrain = def.Terrain.Coarse();
+            interest.CoarseGround.Add(e.Id);
+        }
+        else interest.CoarseGround.Remove(e.Id);
+        return def;
+    }
+
+    /// <summary>Whether a fixed entity the client has must be sent again: a tile of ground it has at the far
+    /// ring's spacing whose tile is now full.</summary>
+    private static bool OwedWhole(TileInterest interest, int id, TileDetail level)
+        => level == TileDetail.Full && interest.CoarseGround.Contains(id);
 
     /// <summary>The tiles a client has, as the update that says so.</summary>
     public static TileStreamUpdate Snapshot(TileInterest interest, MapTiles tiles, int definitions)
@@ -202,6 +235,7 @@ public static class TileStreamer
         session.KnownEntities.Remove(id);
         session.SentStates.Remove(id);
         session.VisibleDynamicEntities.Remove(id);
+        session.Tiles.CoarseGround.Remove(id);
         gone.Add(id);
     }
 
@@ -216,12 +250,13 @@ public static class TileStreamer
         {
             var job = interest.Pending.Peek();
             var members = tiles.Members(job.Tile);
+            var level = interest.Levels.TryGetValue(job.Tile, out var l) ? l : TileDetail.None;
             while (job.Next < members.Count && budget > 0)
             {
                 int id = members[job.Next++];
-                if (session.KnownEntities.Contains(id) || !tiles.Wanted(id, interest.Levels)) continue;
+                if ((session.KnownEntities.Contains(id) && !OwedWhole(interest, id, level)) || !tiles.Wanted(id, interest.Levels)) continue;
                 if (!lookup.TryGetValue(id, out var e) || !world.IsAlive(e)) continue;
-                batch.Definitions.Add(EntityDefinitionFactory.From(world, e));
+                batch.Definitions.Add(Definition(world, e, tiles, interest));
                 session.KnownEntities.Add(id);
                 budget--;
                 if (batch.Definitions.Count >= EntityDefinitionBatch.Size)
@@ -232,7 +267,7 @@ public static class TileStreamer
             }
             if (job.Next < members.Count) break;
             interest.Pending.Dequeue();
-            interest.Done.Add(new TileState(job.Tile, interest.Levels.TryGetValue(job.Tile, out var l) ? l : TileDetail.None));
+            interest.Done.Add(new TileState(job.Tile, level));
             finished = true;
         }
         int sent = DefinitionsPerTick - budget;

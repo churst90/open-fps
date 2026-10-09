@@ -224,6 +224,17 @@ public class WorldPlacesTests : IDisposable
         Assert.Equal((Id, place.Version), store.PlacedFrom(arrivedIn));
         _o.WriteLine($"store: {store.Count} tiles, {store.TotalBytes / 1024.0:F0} KB, of which placed {store.PlacedBytes / 1024.0:F0} KB");
 
+        // What joining the world here costs a client at medium detail: ground at 2 m near, 7.8 m far.
+        long joinBytes = 0;
+        var joined = new List<OpenFPS.Common.Networking.IMessage>();
+        server.Sent = (s, m) => { joined.Add(m); joinBytes += MemoryPack.MemoryPackSerializer.Serialize(m).Length; };
+        server.SendMapData(alice, new OpenFPS.Common.Networking.MapDataRequest { MapName = frame.Id, FullDetailMetres = 300f, FarMetres = 800f });
+        server.Sent = null;
+        var grounds = joined.OfType<OpenFPS.Common.Networking.EntityDefinitionPack>().SelectMany(p => p.Unpack()!.Definitions).Where(d => d.Terrain != null).ToList();
+        _o.WriteLine($"join of the world at Magnolia, medium: {joinBytes / 1024.0:F0} KB; {grounds.Count(g => g.Terrain!.Posts == 126)} tiles of ground at 2 m, "
+                   + $"{grounds.Count(g => g.Terrain!.Posts == TerrainTileComponent.CoarseCells + 1)} at 7.8 m");
+        Assert.Contains(grounds, g => g.Terrain!.Posts == TerrainTileComponent.CoarseCells + 1);
+
         // What the whole place costs: every tile of it, made and packed as the store keeps it.
         var all2 = System.Diagnostics.Stopwatch.StartNew();
         long bytes = 0;
