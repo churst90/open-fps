@@ -299,6 +299,7 @@ internal static partial class GtkClientProgram
         _mainWindow = ApplicationWindow.New(app);
         _mainWindow.Title = "OpenFPS";
         _mainWindow.SetDefaultSize(480, 320);
+        Scene.Apply(_mainWindow);
 
         var box = VBox(24);
         box.Append(Label.New("OpenFPS — Main Menu"));

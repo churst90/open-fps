@@ -15,6 +15,8 @@ namespace OpenFPS.Client.UI;
 /// </summary>
 public sealed class MainWindow : Form
 {
+    protected override void OnPaintBackground(PaintEventArgs e) => Scene.Paint(e.Graphics, ClientRectangle);
+
     private readonly InputStateBuffer _input;
     private readonly NvdaSpeechOutput _speech;
     private readonly Action<UiCue> _cue;
@@ -41,6 +43,8 @@ public sealed class MainWindow : Form
         Text = "OpenFPS — In Game";
         ClientSize = new Size(640, 360);
         StartPosition = FormStartPosition.CenterScreen;
+        DoubleBuffered = true;
+        ResizeRedraw = true;
 
         // Not focusable: with no focusable child the form itself holds focus, so every key reaches it
         // and nothing inside can consume arrows or Tab for its own navigation.
@@ -50,6 +54,7 @@ public sealed class MainWindow : Form
             Padding = new Padding(16),
             Text = OpenFPS.Client.Core.Session.ClientGameSession.KeyHelp,
         });
+        Scene.Style(this);
 
         Activated += (_, _) => { _active = true; _input.Clear(); };
         Deactivate += (_, _) => { _active = false; _input.Clear(); };

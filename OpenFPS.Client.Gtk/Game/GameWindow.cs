@@ -99,6 +99,7 @@ internal sealed class GameWindow
         _window = window;
         _window.Title = "OpenFPS — In Game";
         _window.SetDefaultSize(480, 320);
+        Scene.Apply(_window);
 
         var label = Label.New(OpenFPS.Client.Core.Session.ClientGameSession.KeyHelp);
         label.SetWrap(true);
