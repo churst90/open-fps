@@ -2,6 +2,23 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-09
+
+- The traced reverb of the room you are in costs 38 % less on the mixer thread, with the same sound
+  (--tail-cost, fully optimised, one core: 3,051-3,104 us a 1,024-sample mixer block before,
+  1,890-1,920 after; 14.4 % of a core to 8.9 %). Two changes, each the same output as before to float
+  rounding (null tests: 127-131 dB under the output, -135 to -171 dBFS at a loud room's level):
+  - The directional part (SharedInputConvolver) convolves in two levels: each response's first 1,024
+    samples in blocks of 256, every block, and the rest in blocks of 1,024, once a mixer block. A
+    quarter of the multiply-adds and of the response read from memory, the same delay. 268 us a
+    256-sample piece to 147.
+  - The field and the directional part go through one head response per direction instead of one
+    each: the effect is linear and both turn with the head alike. 285 us a piece to 126. The one
+    difference: a direction whose directional part was silent for a block used to skip its effect,
+    holding back that effect's last few milliseconds until it next played; now nothing is held back.
+  - Any other audible room's stage is Steam Audio's own convolution of the whole two-second,
+    nine-channel response, about 500 us a piece each, and is unchanged.
+
 ## 2026-10-07
 
 - Trains, the budgets and the city after Cody's session (14:44-15:40: "sounds are cutting out
