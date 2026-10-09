@@ -741,6 +741,10 @@ public partial class ChatMessage : IMessage
     /// <summary>Set when the server says somebody came, went or is away: the Sender is then the person it
     /// is about, and the Text the whole notice.</summary>
     public PresenceKind Presence;
+    /// <summary>The sender's team, or "" for none.</summary>
+    public string Team = string.Empty;
+    /// <summary>The sender's role as said in chat ("Owner", "Developer", a custom role), or "" for a player.</summary>
+    public string Title = string.Empty;
 }
 
 [MemoryPackable]

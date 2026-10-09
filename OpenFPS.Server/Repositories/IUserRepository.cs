@@ -29,6 +29,10 @@ public interface IUserRepository
     /// <summary>Changes a user's role. False if there is no such user.</summary>
     bool SetRole(string username, UserRole role) => false;
 
+    /// <summary>Everybody with this role. A store that cannot say returns none, so the last owner is
+    /// never taken off by a store that cannot count them.</summary>
+    IReadOnlyList<string> UsernamesWithRole(UserRole role) => Array.Empty<string>();
+
     /// <summary>Replaces a user's granted permissions (comma separated). False if there is no such user
     /// or this store cannot keep them.</summary>
     bool SetGrants(string username, string grants) => false;

@@ -4,8 +4,9 @@ using System;
 
 namespace OpenFPS.Common.Components;
 
-/// <summary>Stored and sent by number: append only.</summary>
-public enum UserRole { Player, Dev, Admin, Moderator }
+/// <summary>Stored and sent by number: append only. Owner has every permission and cannot be taken
+/// off the server's last owner (docs/SERVER_SECURITY.md).</summary>
+public enum UserRole { Player, Dev, Admin, Moderator, Owner }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
 public enum WeatherType { Clear, Rain, Snow, Storm }
 public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon } 

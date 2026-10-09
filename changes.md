@@ -2,6 +2,22 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-09
+
+- A protected Owner role (docs/CODY_ASKS_2026-10-08.md item 8). The Owner has every permission;
+  the Admin has every one but the new `owners`, which makes an owner or changes an owner's role. The
+  seeded `admin` account is the Owner, and a server started on an older database makes `admin` the
+  Owner if no account is one. The Owner role cannot be created, changed or deleted with `/role`
+  (a custom role called `owner` in an older `roles.json` is not loaded), `/grant` and `/revoke`
+  refuse an owner, `owners` cannot be granted or put in a custom role, and `/setrole` never takes the
+  role off the last owner. `UserRole.Owner` is appended to the enum: Common changed, so the Windows
+  client and the VPS server need the new build.
+- Names in chat: the name, the team in brackets, then the role if it is not an ordinary player:
+  "admin [Mafia] Owner: hello", "sean [Mafia]: hello", "bob Builder to all: hello". A team message
+  leaves the team out. `ChatMessage.Team` and `ChatMessage.Title` are appended; the GTK and Windows
+  clients share the format in Client.Core, and the MUD reads the same names.
+- Staff in chat (the admin chord) and the "Where is" item in the people menu include owners.
+
 ## 2026-10-07
 
 - Trains, the budgets and the city after Cody's session (14:44-15:40: "sounds are cutting out

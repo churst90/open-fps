@@ -309,6 +309,10 @@ Press `/` to open the chat line. Type a message and press Enter.
 - `/t message` goes to **your team**, on any map.
 - `/motd` repeats the message of the day. The server sends it to you once when you arrive.
 
+A message is read with who said it: their name, their team in brackets, then their role if they are
+not an ordinary player. For example "admin [Mafia] Owner: hello", "sean [Mafia]: hello",
+"bob Developer to all: hello", "kim: hello". A team message leaves the team out.
+
 There are four chat buffers: **All**, **Map**, **Private** and **Server**. Team messages go in
 Private. Each keeps the last 500 messages. Use `[` and `]` to read messages in the current buffer
 and Shift with them to change buffer. Private, team and server messages are always spoken. Other
@@ -1003,15 +1007,22 @@ Rebuild the server and client afterwards, since the list is built into both.
 
 ### Roles
 
-There are four roles:
+There are five roles:
 - **Player**: the game, and building on maps of their own.
 - **Moderator**: looks after people, never the world.
 - **Dev** (developer): builds and tests the world, on any map. No power over people.
-- **Admin** (administrator): everything.
+- **Admin** (administrator): everything except making or changing owners.
+- **Owner**: everything. The `admin` account is the owner.
 
-On a map you own, every player has the building commands. The administrator changes roles with
-`/setrole NAME player|moderator|dev|admin`, and can make custom roles with `/role`. The full table of
-permissions is in [SERVER_SECURITY.md](SERVER_SECURITY.md).
+What you can do comes only from your role and any single permissions granted to you.
+
+The Owner role cannot be changed, renamed or removed. Only an owner can make somebody an owner or
+change an owner's role, and the last owner always stays one. You cannot change your own role. A
+server started on an older database makes the `admin` account the owner if no account is one.
+
+On a map you own, every player has the building commands. Administrators change roles with
+`/setrole NAME player|moderator|dev|admin|owner`, and can make custom roles with `/role`. The full
+table of permissions is in [SERVER_SECURITY.md](SERVER_SECURITY.md).
 
 ## The message of the day
 
@@ -1087,8 +1098,10 @@ Sound on the nearest object:
   seconds and stays until `/weather auto`, which lets the weather change on its own again.
 
 ### The administrator only
-- `/setrole NAME ROLE`: player, moderator, dev, admin, or a custom role.
-- `/role list|create|add|remove|show|delete ...`: custom roles, kept in `roles.json`.
+- `/setrole NAME ROLE`: player, moderator, dev, admin, owner, or a custom role. Only an owner can
+  make an owner or change an owner's role, and the last owner stays one.
+- `/role list|create|add|remove|show|delete ...`: custom roles, kept in `roles.json`. The built-in
+  roles cannot be changed.
 - `/grant` and `/revoke` of any permission, for anybody.
 - `/give [NAME] teleporter`, `/give [NAME] vehicle PRESET` (parks one beside them, theirs): premium
   items.

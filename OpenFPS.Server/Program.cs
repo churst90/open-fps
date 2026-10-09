@@ -481,11 +481,7 @@ public class GameServer
             return;
         }
         Log.Information("[CHAT {Channel}] {User}: {Text}", channel, from.Username, text);
-        var line = new ChatMessage
-        {
-            Sender = from.Username, Text = text, Channel = channel,
-            FromStaff = from.Role is UserRole.Admin or UserRole.Dev or UserRole.Moderator,
-        };
+        var line = ChatFrom(from, text, channel);
         var to = channel switch
         {
             ChatChannel.All => _sessions.GetAllSessions(),
@@ -494,6 +490,19 @@ public class GameServer
         };
         foreach (var s in to) SendToSession(s, line);
     }
+
+    /// <summary>
+    /// A player's line as everybody gets it: their name, their team and their role's title, which each
+    /// client puts together ("admin [Mafia] Owner: hello"). A team line leaves the team out: everybody
+    /// hearing it is in it.
+    /// </summary>
+    public ChatMessage ChatFrom(UserSession from, string text, ChatChannel channel) => new()
+    {
+        Sender = from.Username, Text = text, Channel = channel,
+        FromStaff = OpenFPS.Server.Core.Permissions.IsStaff(from.Role),
+        Team = channel == ChatChannel.Team ? "" : Teams?.NameOf(from.Username) ?? "",
+        Title = OpenFPS.Server.Core.Permissions.ChatTitle(from.Role, from.CustomRole),
+    };
 
     /// <summary>The server speaking to everyone: an announcement, sent as "Server".</summary>
     public void Announce(string text, bool fromStaff)
