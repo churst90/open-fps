@@ -300,8 +300,12 @@ internal sealed class DiffuseTail
     /// The late field (<see cref="LateIn"/>) through the directions' own head responses into
     /// <see cref="Stereo"/>, each weighted as the branches are (where the late energy comes from,
     /// and the sources' lean). <see cref="Low"/> is left silent: the low end is in the head responses.
+    /// With <paramref name="directional"/>, each direction's part of the directional tail
+    /// (<see cref="SdmOut"/>) goes through the same head response with it: the effect is linear and
+    /// both turn with the head alike, so one effect does what <see cref="AddDirectional"/>'s second
+    /// twenty did (the head responses 285 us a 256-sample piece before, 126 after, --tail-cost).
     /// </summary>
-    public void RenderLate(int sub)
+    public void RenderLate(int sub, bool directional = false)
     {
         Array.Clear(Stereo, 0, sub * 2);
         Array.Clear(Low, 0, sub);
@@ -313,7 +317,12 @@ internal sealed class DiffuseTail
         {
             var src = LateIn[b];
             float gain = baseGain * _branchGain[b];
-            for (int k = 0; k < sub; k++) Branch[k] = src[k] * gain;
+            if (directional)
+            {
+                var dir = SdmOut[b];
+                for (int k = 0; k < sub; k++) Branch[k] = src[k] * gain + dir[k];
+            }
+            else for (int k = 0; k < sub; k++) Branch[k] = src[k] * gain;
             Phonon.iplAudioBufferDeinterleave(EarContext, Branch, ref Mono);
             var local = Phonon.SafeDirection(System.Numerics.Vector3.Transform(Direction(b), toHead));
             var ep = new Phonon.IPLBinauralEffectParams
@@ -700,13 +709,13 @@ internal static class TracedReverbDsp
                 lfc.Set(field);
                 lfc.Process(mono.AsSpan(0, sub), dff.LateIn);
                 dff.LateShares = reverb.LateSdm?.LateShare;
-                dff.RenderLate(sub);
-                if (dff.SdmReady && s.SdmConv is { } sc2)
+                bool directional = dff.SdmReady && s.SdmConv != null;
+                if (directional)
                 {
-                    sc2.Set(reverb.LateSdm);
-                    sc2.Process(mono.AsSpan(0, sub), dff.SdmOut);
-                    dff.AddDirectional(sub);
+                    s.SdmConv!.Set(reverb.LateSdm);
+                    s.SdmConv.Process(mono.AsSpan(0, sub), dff.SdmOut);
                 }
+                dff.RenderLate(sub, directional);
                 for (int k = 0; k < sub; k++)
                 {
                     float l = (dff.Stereo[k * 2] + dff.Low[k]) * g, r = (dff.Stereo[k * 2 + 1] + dff.Low[k]) * g;

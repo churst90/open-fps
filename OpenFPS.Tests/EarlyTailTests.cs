@@ -248,7 +248,10 @@ public class EarlyTailTests
                     if (!dirs) continue;
                     var sdm = s.BuildDirectional(Block);
                     foreach (var d in sdm.PerDirection.Where(d => d != null))
-                    { Assert.All(d!.Re, v => Assert.True(float.IsFinite(v))); Assert.All(d.Im, v => Assert.True(float.IsFinite(v))); }
+                    {
+                        Assert.All(d!.Re, v => Assert.True(float.IsFinite(v))); Assert.All(d.Im, v => Assert.True(float.IsFinite(v)));
+                        Assert.All(d.LongRe, v => Assert.True(float.IsFinite(v))); Assert.All(d.LongIm, v => Assert.True(float.IsFinite(v)));
+                    }
                     Assert.All(sdm.Share, v => Assert.True(float.IsFinite(v)));
                     var field = s.BuildDiffuseLate(DiffuseLateNoise.Shared(Rate, Length, DiffuseBranch.Count));
                     Assert.All(field.C0, v => Assert.True(float.IsFinite(v))); Assert.All(field.C1, v => Assert.True(float.IsFinite(v)));
