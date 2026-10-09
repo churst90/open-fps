@@ -47,6 +47,7 @@ Waiting on Cody's ear:
 - The world editor in the game (F12), and `/editorkeys on` with Orca, then NVDA.
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
 - The hull's blows in time (inbox/probable-bugs-2026-10-09/1-hull).
+- Recorded sounds' echoes smeared off rough walls: your steps and a PA (inbox/probable-bugs-2026-10-09/4-scattering).
 
 ## Now
 
@@ -58,9 +59,12 @@ The last four were handled on 2026-10-09, on their own branch (renders in inbox/
 - Fixed, no sound change in the game: the fire's fizz has its own part (`FireSynth.FizzPart`, lab
   `parts=fizz`). It was muted with the crackles in the lab. In the game every part is 1, so the game's
   fire is the same to the bit.
-- `AcousticPathData.ReflectionId` is read (the reflection slots, fixed in 0e0e5ae6). `Scattering` is still
-  written and never read. Reading it would smear a recorded loop's wall copy by the wall's roughness, as an
-  engine's echo is. That is a sound change, so it was not wired up; see the TODO on the field.
+- `AcousticPathData.ReflectionId` is read (the reflection slots, fixed in 0e0e5ae6). `Scattering` is now
+  read too (Cody asked, 2026-10-09): a recording's copy off a rough wall keeps its mirror share clean and
+  smears the scattered share through the engines' EchoDiffuser. Your footsteps get the wash they lacked.
+  Waiting on Cody's ear (inbox/probable-bugs-2026-10-09/4-scattering).
+- Seen, not changed: a recorded loop's copy starts at its source's play position only to the nearest
+  mixer block, so its delay off one wall came out 41 ms in one run and 57 ms in another.
 - Fixed: a new engine donor is no longer held for 2.5 s inside the budget, so the car at the budget's edge
   is not let go and rebuilt when a donor arrives.
 - Seen, not changed: a pocket's ring on a hull starts one block (2.7 ms) after the pocket itself
