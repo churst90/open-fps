@@ -141,13 +141,13 @@ public sealed class SteamAudioScene : IDisposable
     /// 9-15 ms behind it at -2 to -7 dB, a small room ("they sound like they're in a room when they
     /// aren't", capture of 2026-09-27). A source's own ground reflection is modelled with the source.
     /// </summary>
-    public static List<Box> WithoutOpenGround(IReadOnlyList<Box> boxes)
+    public static List<Box> WithoutOpenGround(IReadOnlyList<Box> boxes, GroundHeights? ground = null)
     {
         var ext = new (Vector3 Min, Vector3 Max)[boxes.Count];
         for (int i = 0; i < boxes.Count; i++) ext[i] = WorldExtents(boxes[i]);
         var kept = new List<Box>(boxes.Count);
         for (int i = 0; i < boxes.Count; i++)
-            if (!IsOpenGround(boxes[i], ext[i], ext)) kept.Add(boxes[i]);
+            if (!IsOpenGround(boxes[i], ext[i], ext, ground)) kept.Add(boxes[i]);
         return kept;
     }
 
@@ -162,7 +162,7 @@ public sealed class SteamAudioScene : IDisposable
     /// </summary>
     private const float GroundLevel = 1.0f;
 
-    internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, (Vector3 Min, Vector3 Max)[] all)
+    internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, (Vector3 Min, Vector3 Max)[] all, GroundHeights? ground = null)
         => IsOpenGround(b, own, (x, z, above) =>
         {
             foreach (var (omin, omax) in all)
@@ -171,7 +171,7 @@ public sealed class SteamAudioScene : IDisposable
                 if (x >= omin.X && x <= omax.X && z >= omin.Z && z <= omax.Z) return true;
             }
             return false;
-        });
+        }, ground);
 
     /// <summary>Anything this high or higher could stand over a slab of open ground (its top at most
     /// <see cref="GroundLevel"/>, cover at least <see cref="Headroom"/> over that).</summary>
@@ -179,7 +179,8 @@ public sealed class SteamAudioScene : IDisposable
 
     /// <summary>The same test, asking <paramref name="coveredAt"/>(x, z, lowest) whether anything whose
     /// underside is at least <c>lowest</c> stands over the point (x, z).</summary>
-    internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, Func<float, float, float, bool> coveredAt)
+    internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, Func<float, float, float, bool> coveredAt,
+                                      GroundHeights? ground = null)
     {
         if (b.Size.Y > SlabThickness || b.Size.X < 1f || b.Size.Z < 1f) return false;
         // Turned about anything but the vertical, it is not a floor.
@@ -187,7 +188,9 @@ public sealed class SteamAudioScene : IDisposable
         if (MathF.Abs(up.Y) < 0.99f) return false;
         var (min, max) = own;
         float top = max.Y;
-        if (top > GroundLevel) return false;
+        // At ground level where it lies: on terrain, the ground's own height under its middle.
+        float groundY = ground?.At((min.X + max.X) * 0.5f, (min.Z + max.Z) * 0.5f) ?? 0f;
+        if (top > groundY + GroundLevel) return false;
         // Open to the sky over most of it: the middle and four points halfway to the corners.
         var c = (min + max) * 0.5f;
         var q = (max - min) * 0.25f;
@@ -215,7 +218,7 @@ public sealed class SteamAudioScene : IDisposable
         return (min, max);
     }
 
-    public void Build(IReadOnlyList<Box> boxes)
+    public void Build(IReadOnlyList<Box> boxes, IReadOnlyList<OpenFPS.Common.Geometry.SolidSpec>? terrains = null)
     {
         Release();
         _scene = CreateScene(_context);
@@ -226,7 +229,7 @@ public sealed class SteamAudioScene : IDisposable
             if (b.Size.X > 0 && b.Size.Y > 0 && b.Size.Z > 0) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
         Solids = solids;
 
-        _mesh = AddMesh(_scene, boxes, out var bmin, out var bmax);
+        _mesh = AddMesh(_scene, boxes, out var bmin, out var bmax, terrains);
         if (_mesh != IntPtr.Zero) { BoundsMin = bmin; BoundsMax = bmax; }
         Phonon.iplSceneCommit(_scene);
     }
@@ -235,7 +238,8 @@ public sealed class SteamAudioScene : IDisposable
     /// The boxes as one static mesh, added to <paramref name="scene"/> (not committed); zero if there are
     /// none. Vertices in Steam Audio's frame. The bounds are in the game's.
     /// </summary>
-    internal static IntPtr AddMesh(IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax)
+    internal static IntPtr AddMesh(IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax,
+                                   IReadOnlyList<OpenFPS.Common.Geometry.SolidSpec>? terrains = null)
     {
         boundsMin = boundsMax = Vector3.Zero;
         IntPtr mesh = IntPtr.Zero;
@@ -251,6 +255,11 @@ public sealed class SteamAudioScene : IDisposable
             int mi = MaterialIndex(b, materials, matIndexByName);
             AppendBox(b, verts, tris, triMat, mi);
         }
+        if (terrains != null)
+            foreach (var t in terrains)
+                if (t.Terrain != null)
+                    SceneTerrain.Append(t, Vector3.Zero, verts, tris, triMat,
+                                        (name, panel) => MaterialIndex(name, panel, default, materials, matIndexByName));
         if (tris.Count == 0) return IntPtr.Zero;
 
         var vArr = verts.ToArray();
@@ -328,6 +337,16 @@ public sealed class SteamAudioScene : IDisposable
                 tris.Add(new Phonon.IPLTriangle { i0 = a, i1 = c, i2 = b });
                 triMat.Add(mi);
             }
+        }
+        // The tile's ground is open ground.
+        if (openGround && piece.Terrain != null)
+        {
+            var spec = new OpenFPS.Common.Geometry.SolidSpec(piece.TerrainOwner, default, Quaternion.Identity, Vector3.Zero, default,
+                                                             Terrain: piece.Terrain);
+            // The terrain's corner in the piece's frame: the spec's corner is its position less half the tile.
+            spec = spec with { Position = piece.TerrainOffset + new Vector3(piece.Terrain.Size * 0.5f, 0f, piece.Terrain.Size * 0.5f) };
+            SceneTerrain.Append(spec, Vector3.Zero, verts, tris, triMat,
+                                (name, panel) => MaterialIndex(name, panel, default, materials, matIndexByName));
         }
         if (tris.Count == 0) return IntPtr.Zero;
         var vArr = verts.ToArray(); var tArr = tris.ToArray(); var miArr = triMat.ToArray(); var mArr = materials.ToArray();

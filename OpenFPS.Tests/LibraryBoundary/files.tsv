@@ -105,6 +105,7 @@ OpenFPS.Client.Core/AudioEngine/SteamAudio/EarlyCopies.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/SteamAudio/HrtfBands.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/LateField.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/LateTail.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SceneTerrain.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/SmoothTail.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioDsp.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioScene.cs	lib	Audio	
@@ -297,6 +298,7 @@ OpenFPS.Geometry/SpatialGrid.cs	lib	Geometry
 OpenFPS.Geometry/TileKey.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Bvh.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/GeometryPiece.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Heightfield.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Shapes.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/SolidContact.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Surfaces.cs	lib	Geometry	

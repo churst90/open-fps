@@ -1,5 +1,6 @@
 using Arch.Core;
 using OpenFPS.Common.Networking;
+using OpenFPS.Server.OneWorld;
 using OpenFPS.Server.Services;
 
 namespace OpenFPS.Server.Core;
@@ -170,6 +171,16 @@ public partial class CommandHandler
     /// <summary>"You are on cody-yard, your map, private. Invited: sean." What /map says on its own.</summary>
     private string DescribeMap(UserSession session, string mapId)
     {
+        if (_server.World is { } world && world.TryGetFrame(mapId, out var frame))
+        {
+            // Where, not which map: a frame of the world is the world (Cody, 2026-10-08: places by name;
+            // builders also get the grid square).
+            var at = session.Entity != Entity.Null && _maps.TryGetMap(mapId, out var w, out _, out _, out _) && w.IsAlive(session.Entity)
+                ? w.Get<OpenFPS.Common.Components.Transform>(session.Entity).Position : default;
+            string square = session.Can(Permissions.Edit) || session.Can(Permissions.MapsAny)
+                ? $" Grid square {frame.WorldKeyOf(OpenFPS.Common.TileKey.Of(at, (float)WorldTileKey.TileMetres))}." : "";
+            return $"You are in {world.Describe(frame, at)}.{square}";
+        }
         if (!_maps.TryGetMapData(mapId, out var d)) return $"Map '{mapId}' is not loaded.";
         bool mine = _maps.IsOwner(mapId, session.Username);
         string owner = mine ? "your map" : string.IsNullOrWhiteSpace(d.OwnerId) ? "a map of the server's" : $"{d.OwnerId}'s map";
@@ -196,15 +207,68 @@ public partial class CommandHandler
         return true;
     }
 
+    /// <summary>
+    /// /join world PLACE: arrive at a place in the one world (docs/WORLD_STREAMING.md, stage 2). A place by
+    /// name ("magnolia"), an address ("address 1042 Belmont Ave SW, Albany, OR"), or for builders a
+    /// latitude and longitude. The world is built there the first time anyone goes.
+    /// </summary>
+    private void HandleJoinWorld(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (_server.World is not { } world) { Say(reply, "The world is not open on this server."); return; }
+        var places = string.Join("; ", world.Places.Select(p => p.Name));
+        if (args.Length == 0)
+        {
+            Say(reply, $"Places in the world: {places}. /join world PLACE, or /join world address STREET, TOWN, STATE.");
+            return;
+        }
+        void Tell(string text) => _server.SendToSession(session, new TextEvent { Text = text });
+        if (args[0].Equals("address", StringComparison.OrdinalIgnoreCase))
+        {
+            string address = string.Join(" ", args.Skip(1));
+            if (address.Length < 5) { Say(reply, "Usage: /join world address STREET, TOWN, STATE."); return; }
+            Say(reply, $"Looking up {address}.");
+            _ = Task.Run(async () =>
+            {
+                WorldPlace? found = null;
+                string? error = null;
+                try { found = await OpenFPS.Server.OneWorld.Geocoder.FindAsync(address); }
+                catch (Exception ex) { error = ex.Message; }
+                _server.EnqueueCommand(() =>
+                {
+                    if (error != null) Tell("The address could not be looked up just now. Try again.");
+                    else if (found == null) Tell($"No address matches {address}.");
+                    else world.Arrive(session, found, Tell);
+                });
+            });
+            return;
+        }
+        var place = world.FindPlace(string.Join(" ", args));
+        if (place == null) { Say(reply, $"There is no place called {string.Join(" ", args)} in the world. Places: {places}."); return; }
+        // Coordinates are for builders; everybody else goes by name (Cody, 2026-10-08).
+        if (!world.Places.Contains(place) && !session.Can(Permissions.Edit) && !session.Can(Permissions.MapsAny))
+        {
+            Say(reply, $"Places in the world: {places}.");
+            return;
+        }
+        Say(reply, $"Going to {place.Name}.");
+        world.Arrive(session, place, Tell);
+    }
+
     /// <summary>/join MAP: another loaded map, if it is public, yours, or you are staff.</summary>
     private void HandleJoin(UserSession session, string[] args, Action<IMessage> reply)
     {
         var enterable = _maps.LoadedMapIds.Where(id => OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, id, session))
                                           .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).Select(_maps.DisplayName).ToList();
-        if (args.Length < 1) { Say(reply, $"Usage: /join [map]. Maps: {string.Join(", ", enterable)}."); return; }
+        if (args.Length < 1) { Say(reply, $"Usage: /join [map], or /join world [place]. Maps: {string.Join(", ", enterable)}."); return; }
 
         // By id or by the listed name, which may be several words ("/join magnolia tx").
         string said = string.Join(" ", args);
+        var words = said.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words[0].Equals("world", StringComparison.OrdinalIgnoreCase))
+        {
+            HandleJoinWorld(session, words.Skip(1).ToArray(), reply);
+            return;
+        }
         string? mapId = _maps.ResolveMapId(said) ?? _maps.ResolveMapId(args[0]);
         if (mapId == null)
         {

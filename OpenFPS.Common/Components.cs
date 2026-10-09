@@ -9,7 +9,44 @@ namespace OpenFPS.Common.Components;
 public enum UserRole { Player, Dev, Admin, Moderator, Owner }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
 public enum WeatherType { Clear, Rain, Snow, Storm }
-public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon } 
+/// <summary>Terrain is a tile of ground (TerrainTileComponent); its collider is not solid, so the readers of
+/// boxes pass it by, and the triangle world takes it as a heightfield. Append new shapes only.</summary>
+public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon, Terrain }
+
+/// <summary>
+/// A tile of ground (docs/GEOMETRY.md 2.3): <see cref="Posts"/> a side, <see cref="Spacing"/> apart, from
+/// the entity's position less half the tile's size in x and z. Heights are whole centimetres over the
+/// entity's height, so every machine turns them into the same floats. A material per cell, as an index
+/// into <see cref="Materials"/>. Sent with the entity's definition and stored with its tile.
+/// </summary>
+[MemoryPackable]
+public partial class TerrainTileComponent
+{
+    public int Posts;
+    public float Spacing;
+    public short[] HeightsCm = Array.Empty<short>();
+    public byte[] Cells = Array.Empty<byte>();
+    public string[] Materials = Array.Empty<string>();
+    // APPEND ONLY below this line: the wire format is positional.
+
+    /// <summary>Post to post across the tile, metres.</summary>
+    [MemoryPackIgnore] public float Size => (Posts - 1) * Spacing;
+
+    private OpenFPS.Common.Geometry.Heightfield? _field;
+    private float _fieldBase = float.NaN;
+
+    /// <summary>The heightfield for a tile whose base height is <paramref name="baseY"/>, made once.</summary>
+    public OpenFPS.Common.Geometry.Heightfield Field(float baseY)
+    {
+        var f = _field;
+        if (f != null && _fieldBase == baseY) return f;
+        f = OpenFPS.Common.Geometry.Heightfield.FromCentimetres(Posts, Spacing, baseY, HeightsCm,
+                                                              Cells.Length > 0 ? Cells : null, Materials.Length > 0 ? Materials : null);
+        _fieldBase = baseY;
+        _field = f;
+        return f;
+    }
+}
 
 [MemoryPackable]
 public partial struct Transform 

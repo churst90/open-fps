@@ -17,7 +17,7 @@ namespace OpenFPS.Tests;
 /// test output's maps folder, so the tests that load every shipped map do not each load a town; these
 /// copy one into a folder of its own and load it the way the server and the client do.
 /// </summary>
-public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
+public partial class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
 {
     private readonly ITestOutputHelper _o;
     private readonly Loaded _maps;
@@ -163,7 +163,8 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
             if (!DoorPrefabs.Contains(d.Identity.PrefabId) || d.Portal.RegionAId == d.Portal.RegionBId) continue;
             doors++;
             var normal = Vector3.Transform(Vector3.UnitZ, e.Transform.Rotation);
-            var at = new Vector3(e.Transform.Position.X, 1.6f, e.Transform.Position.Z);
+            // At the leaf's own middle: the ground, and the house on it, are not at 0 on a real place.
+            var at = e.Transform.Position;
             int front = acoustics.GetRoomAt(p.World, at + normal * 0.6f), back = acoustics.GetRoomAt(p.World, at - normal * 0.6f);
             var sides = new HashSet<int> { front, back };
             if (!sides.Contains(d.Portal.RegionAId) || !sides.Contains(d.Portal.RegionBId))

@@ -1035,17 +1035,18 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>The two scenes for a world: assembled from the tile set's sub-scenes (only the tiles
     /// that changed are built), or, without Embree, built whole.</summary>
     private static (SteamAudioScene Full, SteamAudioScene Listener) ScenesFor(IntPtr ctx, TileSceneSet? set,
-                                                                             List<SteamAudioScene.Box> boxes, ISet<int>? leaves = null)
+                                                                             List<SteamAudioScene.Box> boxes, ISet<int>? leaves,
+                                                                             List<OpenFPS.Common.Geometry.SolidSpec> terrains)
     {
         if (set != null)
         {
-            set.Update(boxes, leaves);
+            set.Update(boxes, leaves, terrains);
             return set.Assemble();
         }
         var full = new SteamAudioScene(ctx);
-        full.Build(boxes);
+        full.Build(boxes, terrains);
         var listener = new SteamAudioScene(ctx);
-        listener.Build(SteamAudioScene.WithoutOpenGround(boxes));
+        listener.Build(SteamAudioScene.WithoutOpenGround(boxes, new GroundHeights(terrains)));
         return (full, listener);
     }
 
@@ -1054,11 +1055,12 @@ public class AsyncAcousticWorker : IDisposable
     /// the tile set's store, or without Embree a store of the map's own brought up to the same boxes.
     /// </summary>
     private static OpenFPS.Common.Geometry.TriangleWorld? GeometryFor(TileSceneSet? set, AcousticGeometry? store,
-                                                                      List<SteamAudioScene.Box> boxes, ISet<int>? leaves = null)
+                                                                      List<SteamAudioScene.Box> boxes, ISet<int>? leaves,
+                                                                      List<OpenFPS.Common.Geometry.SolidSpec> terrains)
     {
         if (!OpenFPS.Common.Geometry.TriangleGeometry.Enabled) return null;
         if (set != null) return set.Geometry;
-        return store?.Update(boxes, leaves);
+        return store?.Update(boxes, leaves, terrains);
     }
     private long _buildStartedTicks;
 
@@ -1167,6 +1169,7 @@ public class AsyncAcousticWorker : IDisposable
             _buildIsForTiles = tiles;
             RecordDoorPoses(world);
             var doorBoxes = SteamAudioScene.BoxesFromWorld(world);
+            var doorTerrains = world.TerrainSolids();
             var ctx = _saContext; var forMap = _saSceneMap; var set = _tileScenes;
             // The routes are made again when the openings changed, otherwise at most every few seconds: the
             // coarse ring moving as you drive changes their far barriers, not their doorways, and making
@@ -1182,8 +1185,8 @@ public class AsyncAcousticWorker : IDisposable
             {
                 var parts = System.Diagnostics.Stopwatch.StartNew();
                 var leaves = OpeningGraph.LeavesOf(world);
-                var (full, listener) = ScenesFor(ctx, set, doorBoxes, leaves);
-                var geometry = GeometryFor(set, store, doorBoxes, leaves);
+                var (full, listener) = ScenesFor(ctx, set, doorBoxes, leaves, doorTerrains);
+                var geometry = GeometryFor(set, store, doorBoxes, leaves, doorTerrains);
                 _lastScenesMs = parts.Elapsed.TotalMilliseconds;
                 SceneOnlyMsTotal += _lastScenesMs;
                 parts.Restart();
@@ -1201,6 +1204,7 @@ public class AsyncAcousticWorker : IDisposable
         var built = System.Diagnostics.Stopwatch.StartNew();
 
         var boxes = SteamAudioScene.BoxesFromWorld(world);
+        var terrains = world.TerrainSolids();
         var mapLeaves = OpeningGraph.LeavesOf(world);
         _lastSceneBoxes = boxes.Count;
         // A new map gets new scene objects; the old are retired, not rebuilt in place: the tracers and
@@ -1225,7 +1229,7 @@ public class AsyncAcousticWorker : IDisposable
             // swings=, --stream-walk stops=).
             _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
             _acousticStore = _tileScenes == null ? new AcousticGeometry(world.TileMetres) : null;
-            var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, boxes, mapLeaves);
+            var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, boxes, mapLeaves, terrains);
             _saScene.Dispose();
             _saScene = assembledFull;
             _saListenerScene?.Dispose();
@@ -1236,9 +1240,9 @@ public class AsyncAcousticWorker : IDisposable
         else
         {
             _acousticStore = new AcousticGeometry(world.TileMetres);
-            _saScene.Build(boxes);
+            _saScene.Build(boxes, terrains);
         }
-        _enclosureWorld = GeometryFor(_tileScenes, _acousticStore, boxes, mapLeaves);
+        _enclosureWorld = GeometryFor(_tileScenes, _acousticStore, boxes, mapLeaves, terrains);
         _acoustics.PublishReflectionWorld(_enclosureWorld, world.AcousticMap);
         _routeTiles = new OpeningRoutes.TileCache();
         _saSceneMap = world.AcousticMap;
@@ -1251,7 +1255,7 @@ public class AsyncAcousticWorker : IDisposable
             {
                 _saListenerScene ??= new SteamAudioScene(_saContext);
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var withoutGround = SteamAudioScene.WithoutOpenGround(boxes);
+                var withoutGround = SteamAudioScene.WithoutOpenGround(boxes, new GroundHeights(terrains));
                 _saListenerScene.Build(withoutGround);
                 if (mapChanged)
                     Console.WriteLine($"[AcousticWorker] Listener trace scene: {boxes.Count - withoutGround.Count} open-ground slab(s) left out "

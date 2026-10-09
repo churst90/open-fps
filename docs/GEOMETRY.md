@@ -30,6 +30,7 @@ AudioLab `--geometry map=<id> [terrain=<metres>]`.
 8. Decisions for Cody
 9. Stage 1 as built (2026-10-06)
 10. Stage 2 as built (2026-10-06)
+11. Stage 3 as built (2026-10-09)
 
 ---
 
@@ -754,6 +755,9 @@ working and boxes valid.
 
 ### Stage 3: terrain from real elevation for the real places (4 to 6 sessions)
 
+Being built with streaming stage 2 (2026-10-09): the order of work is in docs/WORLD_STREAMING.md,
+"Stage 2 with terrain".
+
 - `fetch_place.py`: 3DEP at 10 m and 1 m where available. `gen_osm.py`: graded terrain tiles,
   building pads, draped roads with kerbs and sidewalks, drives, bridges and tunnels from OSM tags,
   creeks cut in. The 3 km ground slab goes.
@@ -1312,6 +1316,89 @@ The triangle world is a project of its own now, `OpenFPS.Geometry`, the lowest o
 `WallBuild` and `BoxContainment` are beside it. Namespaces did not change. `EntityGeometry` and
 `MoverPoses` stay in Common, on the host's side. New shapes, queries, terrain and the voxel layer go in
 that project and take `SolidSpec`, `Surface` and plain vectors, never an entity.
+
+## 11. Stage 3 as built (2026-10-09)
+
+Built with streaming stage 2 (docs/WORLD_STREAMING.md, "Stage 2 with terrain"). Step T1: the terrain itself.
+
+### 11.1 The heightfield
+
+`OpenFPS.Geometry/Triangles/Heightfield.cs`. A tile of ground is posts on a square grid (126 a side at
+2 m for a 250 m tile), a material per cell, heights in the world. Each cell is two triangles split along
+the diagonal from post (i, j) to (i + 1, j + 1). On the wire and on disk the heights are whole
+centimetres over the tile's base, so the server and every client turn them into the same floats.
+
+- **Part of its tile's piece.** A `SolidSpec` can carry a `Heightfield`; the builder keys it by its
+  middle, so it lands in its own tile's piece beside the boxes. Terrain triangles are numbered after the
+  piece's box triangles, and under each triangle is a prism down to 20 m under the tile's lowest post,
+  numbered after the boxes' solids. `SolidCount` still counts boxes only: whatever walks every solid of
+  a piece (the routes through openings, the scene's box lists) is asking about boxes.
+- **Queries.** Rays walk the cells under them (Amanatides and Woo), skipping cells whose corners the ray's
+  height cannot reach; each cell's two triangles are tested by the same Möller-Trumbore test as a box's.
+  `Closest`, `Any`, `All`, `Containing` and `Overlapping` find the ground; `Along` and `Column` (the
+  routes through openings) do not. Of a face laid flush on the ground and the ground, the face is met:
+  a prism counts as covering the whole tile (Ties).
+- **The body.** A prism is a convex solid with eight triangles and five planes, so `SolidContact` meets
+  it as it meets a wedge: a walkable slope is a floor, a bank steeper than 45 degrees a wall. The movement
+  gather asks for prisms only round the body (`TriangleWorld.Overlapping` with a terrain box), not under
+  the 30 m it gathers boxes from.
+- **An entity.** `TerrainTileComponent` (Posts, Spacing, HeightsCm, Cells, Materials) on an entity at
+  the middle of its tile, at its base height. Its collider is `ColliderShape.Terrain` (appended to the
+  enum), not solid, size zero: every reader of boxes passes it by. `EntityGeometry.Classify` makes it
+  static geometry. The definition carries it in `EntityDefinition.Terrain` (appended).
+- **Sound.** The acoustic store and both Steam Audio paths (tile sub-scenes and the whole scene) take the
+  ground as triangles of open ground with each cell's material. What counts as open ground was "a thin
+  slab whose top is under a metre"; on terrain it is under a metre over the ground beneath it, so a road
+  lying on a hill 8 m up is still left out of the listener's trace. The worker reads the ground from the
+  snapshot's definitions (`WorldSnapshot.TerrainSolids`), never from the background geometry build, so
+  it never lags them.
+- With `OPENFPS_TRIANGLES=0` there is no terrain: the box path cannot stand on it.
+
+Tests: `GeometryTerrainTests` (heights and planes, centimetres, the ground probe and its normal, cell
+materials underfoot, a walk up and down 15 %, a 60 degree bank as a wall, a walk across a tile edge, a
+hill in the way of a ray, inside the ground, a kerb on a slope, the server and a client making the same
+bits, open ground on raised terrain).
+
+### 11.2 The real places on real ground (step T2)
+
+- **The survey.** `tools/places/ID/elevation.json` is 3DEP as downloaded (about 5 m; Magnolia 600 x 600
+  posts, 55 to 79 m over the sea; Albany 598 x 598, 58 to 76 m), whole centimetres in base64
+  (`fetch_place.py elevation`), about 0.95 MB each. 5.1 asked for 1/3 arc-second with 1 m lidar where it
+  exists; the 5 m export is what the archive has, and is finer than 10 m.
+- **The map carries it** (`MapData.Elevation`): the survey resampled onto a 5 m grid of the map's own
+  metres, whole centimetres over a base, y = 0 the ground at the spawn address. About 1 MB of each map.
+  `gen_osm.py` sets everything on it (`ground()`, the grid read bilinearly) and the server lays the 2 m
+  terrain from the same grid read the same way (`MapElevation.HeightAt`), so both agree.
+- **What the generator does** (`ground_all`): a building on a level pad at the ground by its front door
+  (the middle of its wall nearest the street); every strip of a line (roads, verges, sidewalks, drives,
+  paths, ballast, creeks) pitched along its run and level across, in pieces of at most 20 m; a road's
+  heights, and its verges', sidewalks' and junctions', from the ground averaged over a 20 m square
+  (`road_y`), so a road runs smooth and its parts agree; lawns tilted to the ground under their corners;
+  ponds level at their lowest bank; fences and rails pitched along their length and set 5 cm in;
+  anything else solid set down to the lowest ground under it; named places, rooms outside buildings and
+  the woods' volumes stretched over the ground under them. Road centrelines (what traffic rides) get a
+  point every 20 m at the road's height. The 3 km dirt slab is gone. Without elevation.json nothing
+  changes: the flat maps come out byte for byte as before.
+- **What the server does** (`TerrainBuilder`, at map load): the survey at every 2 m post over the map's
+  bounds in 250 m tiles (196 a map), then graded over the whole map at once, so tile edges agree. Under
+  each slab lying on the ground (fixed, solid, a box at most 0.6 m thick, a metre each way, tilted under
+  30 degrees, its underside within 1.5 m over or 3 m under the ground at a post) the ground is flattened
+  to the slab's underside; every post of a cell the slab covers is cut down to it, so no part of a
+  triangle of ground can rise through it (both are planes over a triangle: corners under means all
+  under). Round each graded patch the ground blends back to the survey over 4 m. The tiles are entities
+  on the "ground" layer (coarse). A map with an elevation gets no loader's natural ground; its void plane
+  is 20 m under its lowest post.
+- **Measured** (`RealPlaceMapTests`): away from grading the terrain is within 0.137 m of the survey at 99
+  points in a hundred and 0.43 to 0.50 m at worst (median 4 to 7 mm) over 3,000 points a place; along
+  every road every 5 m (10,209 points on Magnolia, 8,035 on Albany) and at every lawn and drive the floor
+  is the slab, never the ground; a walk of 750 ticks from the spawn down the drive and along the street
+  both ways is on the ground every tick, its biggest step 0.12 to 0.14 m; there is ground under every
+  25 m of the play area. Server load: Magnolia 1.5 s (was 1.3), Albany 2.7 s. Entities: Magnolia 36,291
+  (was 32,598), Albany 46,020 (was 41,327), from the roads in 20 m pieces. A join at medium detail on
+  Magnolia is 1,388 KB packed (was 530 KB): about 17 KB a tile of ground, 49 tiles.
+- **Not done**: road cross-sections (crown, kerb, gutter) and draped road meshes, bridges and tunnels,
+  creeks cut in, the coarse ring's terrain at 8 m, a grade limit on roads (12 %, 6 % on a highway),
+  ground materials from the land cover (every cell is dirt, as the slab was).
 
 ## Appendix: box-geometry consumers today
 

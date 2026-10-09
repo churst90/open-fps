@@ -58,10 +58,20 @@ public static class MovementSystem
         float mapMinimumY = MapMinimumY; 
         float mapGravity = Gravity;
 
+        string? mapId = null;
         world.Query(new QueryDescription().WithAll<ZoneComponent>(), (ref ZoneComponent zone) => {
             mapMinimumY = zone.MinimumY;
             mapGravity = zone.Gravity;
+            mapId = zone.MapId;
         });
+        // On the world, a body stays in the tiles that are there (docs/WORLD_STREAMING.md, At an edge that is not ready).
+        Func<TileKey, bool>? tileReady = null;
+        float tileMetres = 0f;
+        if (mapId != null && maps.TryGetTiles(mapId, out var worldTiles) && worldTiles.Dynamic)
+        {
+            tileReady = worldTiles.IsReady;
+            tileMetres = worldTiles.TileMetres;
+        }
 
         // A margin below the map's floor, so a fall is not cut short by the respawn.
         float voidThreshold = mapMinimumY - 5.0f;
@@ -204,7 +214,9 @@ public static class MovementSystem
                         StepHeight = StepHeight,
                         IsJumpRequested = input.Jump,
                         MapMin = mapMin,
-                        MapMax = mapMax
+                        MapMax = mapMax,
+                        TileReady = tileReady,
+                        TileMetres = tileMetres,
                     };
 
                     var obstacles = new SharedMovementEngine.Obstacles(collidersSlice);

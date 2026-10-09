@@ -42,8 +42,13 @@ Made up, deterministically (the same input gives the same map, byte for byte):
 - Speed limits where none is mapped: the state's usual limits by road class (place.json).
 - Driveways for houses OpenStreetMap has none for.
 
-The ground is flat. Elevation is kept in each place's `elevation.json` (USGS 3DEP, about 30 m) for
-when the engine has terrain.
+The ground follows the survey: USGS 3DEP at the resolution it was downloaded at (about 5 m), in each
+place's `elevation.json`. The generator writes it into the map on a 5 m grid of the map's own metres
+(`Elevation`) and sets everything on it: houses on level pads at the ground by their front door, roads
+level across and pitched along their run in pieces of at most 20 m over the ground averaged across
+20 m, lawns tilted to the ground, solid things set into it, named places stretched over it. The server
+lays 2 m terrain from the same grid at load and grades it to the slabs lying on it (docs/GEOMETRY.md
+5.1 and 11). y = 0 is the ground at the spawn address.
 
 ## How a place is represented
 
@@ -137,7 +142,8 @@ not checked.
    (OpenStreetMap from Overpass, Overture's buildings, addresses, places and water, the WorldCover
    tile window, 3DEP elevation and the TIGER address ranges; anything already there is kept).
 3. Prepare: `python tools/fetch_place.py prepare tools/places/NAME/place.json` clips everything to
-   the area and writes the small JSON inputs beside place.json.
+   the area and writes the small JSON inputs beside place.json. `fetch_place.py elevation` writes
+   only elevation.json, from the archive's 3DEP download.
 4. Generate (standard library only): `python3 tools/gen_osm.py tools/places/NAME`. It prints the
    counts and the spawn. Commit the inputs and the map together; `RealPlaceMapTests` checks the map
    is what the generator makes from them.

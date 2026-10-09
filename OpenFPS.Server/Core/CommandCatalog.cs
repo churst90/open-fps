@@ -22,7 +22,7 @@ public static class CommandCatalog
         E("Talking", "pm", "/pm NAME MESSAGE", "a private message to one player"),
         E("Talking", "motd", "/motd", "read the message of the day"),
         E("Talking", "afk", "/afk", "mark yourself away, or back", "away"),
-        E("Moving", "join", "/join [MAP]", "go to another map; on its own, list the maps", "travel"),
+        E("Moving", "join", "/join [MAP], /join world [PLACE]", "go to another map, or arrive at a place in the world; on its own, list them", "travel"),
         E("Moving", "tp", "/tp PLACE, /tp PLAYER, /tp MAP, or /tp x y z", "with a teleporter in your inventory: go to a named place, a player, a map, or a point (x east, y north, z height)", "goto", "teleport"),
         E("Moving", "map", "/map [new NAME|public|private|invite PLAYER|uninvite PLAYER|editor add|remove PLAYER]", "maps of your own: make one, open it to everybody or close it, invite people, ask people to edit it; on its own, the map you are on"),
         E("Moving", "maps", "/maps [mine]", "the maps you can go to, or the ones you own"),

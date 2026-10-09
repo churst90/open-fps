@@ -401,6 +401,31 @@ The server never lets a player into a tile it does not have. If the next tile is
 - Tiles outside every data source (sea, another country without data) are generated as flat open
   ground with no roads, so there is no invisible wall in the middle of nowhere.
 
+## Stage 2 with terrain: the order of work (2026-10-09)
+
+Streaming stage 2 and geometry stage 3 (docs/GEOMETRY.md section 7) are built together, on one branch,
+in four steps. Each leaves every map working and is committed with its tests.
+
+| Step | What | What it proves |
+|---|---|---|
+| T1 | The heightfield in `OpenFPS.Geometry`: one terrain tile per 250 m tile, 2 m posts, heights in centimetres, a material per cell. Part of its tile's piece, so rays, the ground probe, containment and contact find it with no change to their callers; each cell's two triangles are convex prisms for the body. A terrain tile is an entity (`TerrainTileComponent`, appended to the definition) so the streamer, the client's geometry, the acoustic store and Steam Audio take it as they take boxes | Heights, slopes, a steep bank as a wall, a hill in the way of sound, footsteps on the cell's material, the server and a client building the same bits, all on a made-up terrain |
+| T2 | Real elevation for Magnolia and Albany. The map carries its elevation (3DEP, 5 m, in the map's metres); the server makes the 2 m terrain tiles at load, graded to the floors and solids that rest on it. `gen_osm.py` sets everything on the ground: houses on level pads, road and drive slabs pitched along their run, lawns tilted to the ground, trees and props on it, road centrelines with heights. The 3 km dirt slab goes | The ground follows the survey within a stated tolerance away from grading; the spawn, kerbs, walks and footsteps on the real maps; both maps still load and regenerate byte for byte |
+| W1 | The world store on the server: tiles keyed by UTM zone and 250 m square, versioned by generator, gzip JSON written whole, a lock per tile, and a disk cap (20 GB, a server setting). The tile generator runs in the server in the background, two at a time: terrain from 3DEP asked for in the tile's own UTM metres, nothing downloaded kept; flat open ground where there is no survey | A tile is made once and read from disk after; the cap evicts the least recently visited tiles; a second request for a tile being made waits for it |
+| W2 | One world: a map called "the world" whose tiles are the store's, loaded as players near them. The frame's origin goes on the manifest (appended). Players arrive at a place by name; the maps list has two parts, the world and maps. A tile not yet built stops a player at its edge (a short low tone and once "Not built yet. Wait here, or turn back.") | Tiles are asked for from the far radius and arrive while a player walks; nobody enters a tile that is not there |
+
+What is left after these four:
+
+- The per-tile generator for OpenStreetMap and Overture features (roads, buildings, addresses, woods)
+  that gives the same answer whichever tile is made first. Until then a world tile is terrain, and the
+  real places are the two maps.
+- Coarse terrain at 8 m for the far ring (every tile is sent at 2 m), the client's tile cache, frames
+  that rebase past 8 km, crossing a UTM zone edge.
+- Draped road meshes with kerbs and sidewalks as swept profiles, bridges and tunnels, creeks cut in
+  (geometry stage 4 shapes); diffraction over the terrain profile and the ground reflection reading the
+  slope.
+- Traffic, walkers and Alex follow the roads' heights where the roads carry them; anything that leaves a
+  road keeps its old flat assumptions.
+
 ## Stage 3: seamless travel
 
 - One world per server instead of one map per world: the server loads tiles of the world as players
@@ -520,6 +545,96 @@ within 0.1-1.7 % on average of the default's, against Embree's own run-to-run sp
 (Embree's reflections are not bit-for-bit repeatable; the default's are). The listener's scene holds
 the same 11,020 boxes as the whole-map open-ground filter.
 - The settings menus have no world detail control yet; `/detail` does it.
+
+## Stage 2 as built (2026-10-09)
+
+Steps T1 and T2 (terrain, and the real places on it) are in docs/GEOMETRY.md section 11.
+
+### W1: the world store and making tiles
+
+Code: `OpenFPS.Server/OneWorld/` (`Utm`, `WorldTileKey`, `WorldTile`, `WorldStore`, `Elevation`,
+`WorldTileService`, `WorldSettings`). Tests: `WorldStoreTests`.
+
+- **Keys.** UTM on WGS84 (USGS Professional Paper 1395's series, no Norway or Svalbard exceptions), a
+  tile every 250 m from each zone's own origin: `15N/943/13342` is Bobcat Lane. Round trips to a ten
+  millionth of a degree.
+- **The store**, under `world/` in the server's folder (gitignored):
+  `tiles/v1/{zone}{N|S}/{x}/{z}/full.json.gz` per tile, `{z}.lock` while one is being made, and
+  `index.json` with each tile's size and when it was last visited. A tile is gzip JSON: its ground
+  (2 m posts, centimetres over a base in metres over the sea, base64), where the ground came from, and
+  room for entities later. Written to a temporary name and renamed; a tile that does not read is made
+  again.
+- **The cap**: 20 GB unless `world.json` says otherwise (`CapGigabytes`). When a write takes the store
+  over it, tiles are dropped until it is under nine tenths of the cap: an older generator's first, then
+  the least recently visited (a player's tiles are touched as they are loaded, W2), never one a player
+  has loaded or one being made. A dropped tile is made again when it is next wanted: the cap costs the
+  next visitor a wait, never a hole.
+- **Making a tile**: the 3DEP ImageServer is asked for the tile in its own UTM metres (`bboxSR` and
+  `imageSR` the zone's EPSG code), 126 x 126 cells of 2 m centred on the posts, as a float TIFF read in
+  memory and thrown away. At most two at a time (`MaxAtOnce`), two minutes each, a lock file against a
+  second server process (broken after ten minutes). A tile the survey could not be asked for (no network)
+  is not stored and is tried again after 30 s; one the survey covers none of (the sea, abroad) is flat
+  open ground at sea level, stored like any other.
+- **Measured**: Bobcat Lane's tile from 3DEP made in 0.95 s, 21.9 KB on disk, ground 64.7 to 72.1 m.
+  Magnolia's own ground as tiles: 18.5 to 19.8 KB each, so 20 GB holds about a million tiles, every
+  250 m square of 65,000 km² (Texas is 696,000 km²). Ground only; buildings and roads will add to it.
+- **Settings** (`world.json`, all optional): `StorePath` ("world"), `CapGigabytes` (20), `Generate`
+  (true), `MaxAtOnce` (2).
+
+### W2: one world
+
+Code: `OneWorld/WorldMaps` (frames, places, tiles round players, arrivals), `OneWorld/Geocoder`,
+`MapTiles` (tiles that come and go: `AddTile`, `RemoveTile`, `IsReady`, `Version`), `TileStreamer`
+(only tiles that are there; a tile arriving is worked in at once), `SharedMovementEngine` (the fence),
+`/join world`, the two-part list. Tests: `WorldMapsTests`.
+
+- **Frames.** The world is served as frames: maps whose (0, 0) is the south-west corner of the 250 m
+  UTM square a player first arrived in, x east and z north along the grid, y metres over the sea less
+  the frame's base (the ground there, to the metre). Frame tile (x, z) is world tile (origin + x, origin
+  + z). A frame reaches 6 km each way; arrivals within it share it, so two players in one town meet.
+  Moving a frame with its players (rebasing at 8 km) and crossing a zone edge are stage 3. A frame is
+  made by the server, never written to a file (`MapData.IsWorld`), and gets no loader's ground.
+- **Tiles round players**, every quarter of a second on the tick thread: the world tiles within each
+  player's far radius and 100 m more are wanted; a stored one is loaded (its ground an entity on the
+  "ground" layer, coarse), a missing one is made in the background. A tile nobody holds or is near is
+  let go after 30 s. The store's cap never drops a loaded tile, and a loaded tile is touched.
+- **Arriving.** `/join world magnolia` (a place by its words), `/join world address 1042 Belmont Ave SW,
+  Albany, OR` (the Census geocoder, any US address), or for builders `/join world 30.1237, -95.7409`.
+  The tile arrived in and the eight round it are wanted at once; the player is told "Building the world
+  at ..." if it is not stored, and is moved into the frame, stood on the ground, as soon as it is. Two
+  minutes without it: "could not be built just now".
+- **The edge that is not ready.** `MovementContext.TileReady` and `TileMetres`: on the world, a step from
+  a ready tile toward one that is not stops a body's radius short of the shared edge on that axis (it
+  slides along the edge), and across a corner on both. The server asks its tile index; the client asks
+  the tiles it holds whose ground its triangle world has built, so a foot never comes down on ground the
+  client cannot stand on yet. The client plays a short low tone (196 Hz, 0.22 s) while pressing on, at
+  most every 0.6 s, no knock, and says "Not built yet. Wait here, or turn back." once until it has been
+  clear of an edge for 5 s. When the tile arrives the body walks on. A driven vehicle is not stopped at
+  the edge yet (DrivingSystem does not ask the fence); the world has no vehicles of its own yet.
+- **The list of where to go** (F6) has two parts: "The world" (`world_places.json`, and any map of a
+  real place not listed there, at its origin) and "Maps". A frame is never listed as a map. The text
+  gateway lists the world's places first too.
+- **Where am I.** `/map` in the world: "the world, 1.2 kilometres north east of Magnolia, Texas, 31907
+  Bobcat Lane"; builders also get the grid square (`15N/943/13342`).
+- **Measured** (`WorldMapsTests`, the real survey): arriving at Bobcat Lane with nothing stored took
+  0.4 to 0.7 s; the 41 tiles round it 2.5 s on one run and 60 s on another (3DEP's own speed, two at a
+  time); 20.6 KB a tile. The ground round the arrival is 0.9 m under Magnolia's map survey there: asked
+  for 2 m cells the service mosaics the 1 m lidar, the map's export (5 m cells in degrees) a coarser
+  product. Not a projection error: the UTM conversion matches PROJ to the centimetre.
+- **Wire, appended:** `MapManifest.IsWorld`, `WorldZone`, `WorldNorth`, `FrameEasting`, `FrameNorthing`,
+  `FrameBaseY`; `MapSummary.IsWorldPlace`. With T1's `ColliderShape.Terrain`, `TerrainTileComponent` and
+  `EntityDefinition.Terrain`.
+
+### Left after stage 2 (as of 2026-10-09)
+
+- World tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
+  the same answer whichever tile is made first; until then the real places are their maps.
+- A player who logs out in the world comes back on the landing map (a frame is not a saved map); saving
+  the world position and making the frame again at login.
+- Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
+- Coarse terrain at 8 m for the far ring; the client's tile cache; land cover for the ground's
+  materials (every cell is dirt).
+- A driven vehicle braked hard before an edge that is not ready.
 
 ## What the broadcast chooses from
 

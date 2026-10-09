@@ -130,6 +130,46 @@ public class GameServer
         return due;
     }
 
+    /// <summary>The one world (docs/WORLD_STREAMING.md, stage 2): its frames, tiles and places. Null on a
+    /// server started without it (a test's).</summary>
+    public OpenFPS.Server.OneWorld.WorldMaps? World { get; private set; }
+
+    /// <summary>The world's store and the service that makes its tiles, from the server's world.json.</summary>
+    public void StartWorld(OpenFPS.Server.OneWorld.WorldSettings settings, OpenFPS.Server.OneWorld.IElevationSource? survey = null)
+    {
+        try
+        {
+            var store = new OpenFPS.Server.OneWorld.WorldStore(settings.StorePath, settings.CapBytes);
+            survey ??= settings.Generate ? new OpenFPS.Server.OneWorld.Usgs3Dep() : new OpenFPS.Server.OneWorld.NoNewTiles();
+            var service = new OpenFPS.Server.OneWorld.WorldTileService(store, survey, settings.MaxAtOnce);
+            World = new OpenFPS.Server.OneWorld.WorldMaps(_maps, service, () => _sessions.GetAllSessions(),
+                                                        OpenFPS.Server.OneWorld.WorldMaps.LoadPlaces(_maps));
+            Log.Information("World: tiles kept in {Path}, at most {Cap:F1} GB ({Have:F2} GB in {Count} tiles now); {Places} place(s) to arrive at; {Making}.",
+                            store.Root, store.CapBytes / 1073741824.0, store.TotalBytes / 1073741824.0, store.Count, World.Places.Count,
+                            settings.Generate ? "new tiles made from USGS 3DEP" : "no new tiles made");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "World: could not be started; the maps work as before.");
+            World = null;
+        }
+    }
+
+    /// <summary>A player into a frame of the world, stood where they arrive.</summary>
+    private void ArriveInWorld(UserSession session, string mapId, Vector3 at)
+    {
+        session.ArriveAt = (mapId, at, true);
+        MoveToMap(session, mapId);
+    }
+
+    /// <summary>The world's part of a tick, and the commands it queues: for a test without the loop.</summary>
+    internal void WorldTickForTest()
+    {
+        DrainCommandBuffer();
+        World?.Update(ArriveInWorld);
+        DrainCommandBuffer();
+    }
+
     /// <summary>Gives an unstarted server the maps and sessions a test built, so <see cref="MoveToMap"/>
     /// and spawning run without a socket.</summary>
     public void Attach(MapManager maps, SessionManager sessions, OccupancyService? seats = null, HandsService? hands = null)
@@ -374,6 +414,7 @@ public class GameServer
         _seats = new OccupancyService(_maps, EmitWorldAudio);
         _hands = new HandsService(_maps) { Carried = SyncAudioComponent, Removed = BroadcastRemoval };
         _store = new PlayerStore(_userRepo, _maps, _hands);
+        StartWorld(OpenFPS.Server.OneWorld.WorldSettings.Load());
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
         _friends = new FriendRepository("friends.json");
@@ -402,7 +443,7 @@ public class GameServer
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends, combat);
 
         // These register their handlers with the dispatcher, which is what keeps them alive.
-        _ = new DiscoveryService(_dispatcher, _sessions, _maps);
+        _ = new DiscoveryService(_dispatcher, _sessions, _maps, () => World);
         _ = new SocialService(_dispatcher, _sessions, _friends);
         
         RegisterHandlers();
@@ -456,6 +497,10 @@ public class GameServer
 
         try { _maps?.Shutdown(); }
         catch (Exception ex) { Log.Warning(ex, "Error tearing down map worlds."); }
+
+        // When each tile was last visited, for the store's cap after the restart.
+        try { World?.Service.Store.SaveIndex(); }
+        catch (Exception ex) { Log.Warning(ex, "Error writing the world store's index."); }
 
         Log.Information("Server stopped cleanly.");
     }
@@ -764,6 +809,15 @@ public class GameServer
             Lightning(dt);
             // Horns whose key has not been reported down for a few ticks are let go.
             VehicleSignals.Update(dt);
+
+            // The world's tiles round its players, every quarter of a second, before the maps are walked:
+            // an arrival may make a frame.
+            if (World != null && tick % 8 == 0)
+            {
+                using var _world = PerfProbe.Measure("server.world");
+                World.Update(ArriveInWorld);
+                if (tick % (TickRate * 30) == 0) World.Service.Store.SaveIndex();
+            }
 
             foreach (var entry in _maps.GetAllMaps())
             {
@@ -1142,6 +1196,15 @@ public class GameServer
             manifest.Humidity = mapData.Humidity;
             manifest.AirPressure = mapData.AirPressure;
             manifest.AirAbsorptionMultiplier = mapData.AirAbsorptionMultiplier;
+        }
+        if (World != null && World.TryGetFrame(mapId, out var frame))
+        {
+            manifest.IsWorld = true;
+            manifest.WorldZone = frame.Origin.Zone;
+            manifest.WorldNorth = frame.Origin.North;
+            manifest.FrameEasting = frame.Origin.Easting;
+            manifest.FrameNorthing = frame.Origin.Northing;
+            manifest.FrameBaseY = frame.BaseY;
         }
         else
         {

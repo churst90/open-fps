@@ -447,6 +447,28 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
 Choose a map in the F6 list, or type `/join` and the map name. The client says "Travelling to" the
 map, loads it and puts you in. You stay logged in.
 
+The F6 list has two parts when the server has the world open: **The world** (real places to arrive at)
+and **Maps** (the game's maps and players' own).
+
+## The world
+
+One world of real ground, built by the server the first time anyone goes near a place and kept after
+that. For now it is the ground itself, from the US Geological Survey's elevation survey: hills, banks
+and creek beds, but no roads or buildings yet (those are on the maps of real places).
+
+- Choose a place under "The world" in F6, or type `/join world magnolia`. `/join world` on its own
+  lists the places.
+- `/join world address 1042 Belmont Ave SW, Albany, OR` arrives at any US street address (the Census
+  Bureau's geocoder is asked).
+- The first visit to a place takes a moment: you hear "Building the world at ...", then arrive.
+- Tiles of ground are made round you as you go, 250 m at a time. If you walk to one that is not made
+  yet, you are stopped at its edge with a short low tone and the words "Not built yet. Wait here, or
+  turn back." When it arrives you walk on.
+- `/map` says where you are by the place you arrived at ("the world, 1.2 kilometres north east of
+  Magnolia, Texas, 31907 Bobcat Lane"). Builders also get the grid square, and may type a latitude and
+  longitude: `/join world 30.1237, -95.7409`.
+- A frame of the world reaches 6 km each way from where it was first arrived at; past that is its edge.
+
 ## The world editor
 
 F12 opens the world editor dialog. It changes the map you are on, while you play: there is no build
@@ -932,6 +954,22 @@ is loaded at start.
 - A map with `"TileMetres"` above 0 (the real places, made by tools/gen_osm.py) is streamed: each
   client is sent the tiles near it and the rest as it moves (docs/WORLD_STREAMING.md). The server
   log says what each join and each set of tiles cost ("Join of ...", "Tiles for ...").
+
+### The world's tiles
+
+The server makes the world's tiles itself and keeps them in `world/` in its folder (beside
+`openfps.db`). Nothing it downloads is kept, only the tiles. It needs the internet the first time
+anybody goes somewhere new. Settings, all optional, in `world.json` beside it:
+
+    { "StorePath": "world", "CapGigabytes": 20, "Generate": true, "MaxAtOnce": 2 }
+
+- `CapGigabytes`: the most the tiles may take on disk (20 GB to start). Past it, the tiles nobody has
+  visited for longest are dropped, never one somebody is standing near; a dropped tile is made again
+  when somebody next goes there. A tile of ground is about 20 KB, so 20 GB is about a million tiles.
+- `Generate`: false serves only tiles already made; players are stopped at the edge of the rest.
+- `MaxAtOnce`: how many tiles are made at the same time.
+- The places to arrive at are in `world_places.json` (an id, a name, a latitude and a longitude each).
+- The server log says where the tiles are kept and how much they take ("World: tiles kept in ...").
 
 ### Players' own maps
 

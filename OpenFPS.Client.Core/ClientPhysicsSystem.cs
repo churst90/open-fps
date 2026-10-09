@@ -21,6 +21,14 @@ public class ClientPhysicsSystem
     public Vector3 MapMax { get; set; } = new(50, 20, 50);
     public float Gravity { get; set; } = PhysicsConstants.Gravity;
 
+    /// <summary>On the world: which of its tiles are there to walk into (held, and their ground built), and
+    /// their size; null elsewhere. The server fences the same edges (SharedMovementEngine).</summary>
+    public Func<OpenFPS.Common.TileKey, bool>? TileReady { get; set; }
+    public float TileMetres { get; set; }
+
+    /// <summary>The last step was stopped at the edge of a tile not built yet.</summary>
+    public bool Fenced { get; private set; }
+
     private readonly List<OpenFPS.Common.Geometry.SolidRef> _solids = new(32);
 
     /// <summary>Every solid but the body's own and those the triangle world is rebuilding.</summary>
@@ -143,7 +151,11 @@ public class ClientPhysicsSystem
                 StepHeight = StepHeight,
                 IsJumpRequested = input.Jump,
                 MapMin = MapMin,
-                MapMax = MapMax
+                MapMax = MapMax,
+                // Held, and its ground built into the triangles: a foot never comes down on ground the client
+                // cannot stand on yet.
+                TileReady = TileReady is { } held ? key => held(key) && snapshot.Geometry is { } g && g.InstanceOfTile(key) >= 0 : null,
+                TileMetres = TileMetres,
             };
 
             var collidersSlice = new ReadOnlySpan<SharedMovementEngine.Collider>(colliderArray, 0, colliderCount);
@@ -161,6 +173,7 @@ public class ClientPhysicsSystem
                     System.Runtime.InteropServices.CollectionsMarshal.AsSpan(solids));
             }
             var result = SharedMovementEngine.Step(ctx, obstacles, out var contact);
+            Fenced = contact.Fenced;
 
             _state.Position = result.NewPosition;
             _state.Velocity = result.NewVelocity;

@@ -387,8 +387,17 @@ public class MudGateway
         string what = response.Scope == MapListScope.Mine ? "Your maps" : "Maps on this server";
         if (response.Maps.Length == 0) return $"{what}: none.";
 
-        var lines = new List<string> { $"{what}:" };
-        foreach (var map in response.Maps)
+        var lines = new List<string>();
+        // The world's places first, as /join takes them, then the maps.
+        var places = response.Maps.Where(m => m.IsWorldPlace).ToList();
+        if (places.Count > 0)
+        {
+            lines.Add("The world:");
+            foreach (var p in places)
+                lines.Add($"  {p.Name} (/join {p.Id}){(p.PlayerCount == 0 ? "" : p.PlayerCount == 1 ? ": 1 player" : $": {p.PlayerCount} players")}{(p.IsCurrent ? ", near where you are" : "")}.");
+        }
+        lines.Add($"{what}:");
+        foreach (var map in response.Maps.Where(m => !m.IsWorldPlace))
         {
             string people = map.PlayerCount == 1 ? "1 player" : $"{map.PlayerCount} players";
             string named = string.IsNullOrWhiteSpace(map.Name) || map.Name == map.Id ? map.Id : $"{map.Name} ({map.Id})";

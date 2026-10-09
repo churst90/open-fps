@@ -36,6 +36,22 @@ public class WorldSnapshot
     public IReadOnlySet<int>? GeometryStale;
     public List<int> UnindexedStatics = new();
 
+    /// <summary>The tiles of ground held, as solids (docs/GEOMETRY.md 2.3), by owner: what the acoustic
+    /// scene lays its ground from. Read from the definitions, so it never lags them.</summary>
+    public List<OpenFPS.Common.Geometry.SolidSpec> TerrainSolids()
+    {
+        var list = new List<OpenFPS.Common.Geometry.SolidSpec>();
+        foreach (var snap in Entities.Values)
+        {
+            var def = snap.Definition;
+            if (def == null || def.Collider.Shape != ColliderShape.Terrain || def.Moves) continue;
+            var spec = EntityGeometry.SpecOf(def, snap.Transform, GeometryRole.Static);
+            if (spec.Terrain != null) list.Add(spec);
+        }
+        list.Sort(static (a, b) => a.Owner.CompareTo(b.Owner));
+        return list;
+    }
+
     /// <summary>
     /// Counts changes to the static geometry under <see cref="AcousticMap"/> without a new map (tiles
     /// arriving and leaving); the acoustic worker rebuilds its Steam Audio scene when it moves

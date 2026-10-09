@@ -3,8 +3,9 @@
 Downloads the open data a real-place map is made from, and boils it down to the small inputs
 tools/gen_osm.py reads. Two steps, both driven by the place's own file:
 
-    fetch_place.py download tools/places/NAME/place.json
-    fetch_place.py prepare  tools/places/NAME/place.json
+    fetch_place.py download  tools/places/NAME/place.json
+    fetch_place.py prepare   tools/places/NAME/place.json
+    fetch_place.py elevation tools/places/NAME/place.json   only elevation.json, from the archive
 
 `download` fills the place's archive directory ("Archive" in place.json, outside the repository) with
 the raw layers, skipping any that are already there, and writes SOURCES.txt there saying where each
@@ -177,7 +178,7 @@ def download(place):
     source(os.path.basename(wc), "ESA WorldCover 2021 v200, 10 m land cover classes, a window of the 3-degree tile(s)",
            " ".join(urls), "CC BY 4.0, (c) ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021)")
 
-    # USGS 3DEP elevation, ~5 m. Kept for later terrain work; the engine's ground is flat.
+    # USGS 3DEP elevation, ~5 m: the map's ground (elevation() below, gen_osm's ground()).
     dem = os.path.join(d, "usgs-3dep-dem.tif")
     if not os.path.exists(dem):
         px = min(4000, int(max(n - s, (e - w) * math.cos(math.radians(lat))) * 111_000 / 5))
@@ -186,7 +187,7 @@ def download(place):
             "format": "tiff", "pixelType": "F32", "interpolation": "RSP_BilinearInterpolation", "f": "image"})
         with open(dem, "wb") as f:
             f.write(get("https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?" + q))
-    source(os.path.basename(dem), "USGS 3D Elevation Program bare-earth elevation, metres (not used yet: the engine's ground is flat)",
+    source(os.path.basename(dem), "USGS 3D Elevation Program bare-earth elevation, metres",
            "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer", "public domain (USGS)")
 
     # Census TIGER/Line address ranges, for a house the address points miss: one file per county
@@ -418,17 +419,40 @@ def prepare(place):
                        "L": "moss and lichen", ".": "no data"},
             "west": R7(t.c), "north": R7(t.f), "dlon": t.a, "dlat": -t.e,
             "rows": ["".join(CLASS.get(int(v), ".") for v in row) for row in a]})
-    with rasterio.open(os.path.join(d, "usgs-3dep-dem.tif")) as src:
-        a = src.read(1).astype(float)
-        t = src.transform
-        step = max(1, int(round(30.0 / (abs(t.a) * 111_000 * math.cos(math.radians((s + n) / 2))))))
-        sub = a[::step, ::step]
-        write(out, "elevation.json", {
-            "source": "USGS 3DEP (public domain), resampled to about 30 m; the full grid is in the archive",
-            "west": R7(t.c), "north": R7(t.f), "dlon": t.a * step, "dlat": -t.e * step, "units": "metres",
-            "rows": [[round(float(v), 1) for v in row] for row in sub]})
+    elevation(place)
     print(f"prepared {out}: {len(ways_out)} ways, {len(nodes_out)} nodes, {len(bl)} buildings, {len(ad)} addresses, "
           f"{len(pl)} places, {len(wa)} water features, {len(rng)} address ranges")
+
+
+def elevation(place):
+    """
+    elevation.json from the archive's 3DEP grid, at the resolution it was downloaded at (about 5 m):
+    whole centimetres over the lowest point, as little-endian 16-bit integers in base64, row by row
+    from the north. lon0 and lat0 are the middle of the north-west cell. tools/gen_osm.py lays the
+    map's ground from it (docs/GEOMETRY.md 5.1).
+    """
+    import base64
+    import numpy as np
+    import rasterio
+    d, out = place["_archive"], place["_dir"]
+    with rasterio.open(os.path.join(d, "usgs-3dep-dem.tif")) as src:
+        a = src.read(1).astype(np.float64)
+        t = src.transform
+        nodata = src.nodata
+    if nodata is not None:
+        bad = a == nodata
+        if bad.any():
+            a[bad] = np.nanmedian(np.where(bad, np.nan, a))
+    base = math.floor(float(a.min()) * 100.0) / 100.0
+    cm = np.rint((a - base) * 100.0)
+    if cm.max() > 32767:
+        raise SystemExit("elevation: more than 327 m of relief does not fit in centimetres")
+    write(out, "elevation.json", {
+        "source": "USGS 3D Elevation Program, bare earth (public domain), as downloaded",
+        "lon0": R7(t.c + t.a / 2), "lat0": R7(t.f + t.e / 2), "dlon": t.a, "dlat": -t.e,
+        "cols": int(a.shape[1]), "rows": int(a.shape[0]), "unit": 0.01, "base": base,
+        "data": base64.b64encode(cm.astype("<i2").tobytes()).decode("ascii")})
+    print(f"elevation: {a.shape[1]} x {a.shape[0]} posts, {float(a.min()):.2f} to {float(a.max()):.2f} m")
 
 
 def write(dirname, name, obj):
@@ -438,11 +462,13 @@ def write(dirname, name, obj):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3 or sys.argv[1] not in ("download", "prepare"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("download", "prepare", "elevation"):
         print(__doc__)
         sys.exit(2)
     place = load_place(sys.argv[2])
     if sys.argv[1] == "download":
         download(place)
+    elif sys.argv[1] == "elevation":
+        elevation(place)
     else:
         prepare(place)

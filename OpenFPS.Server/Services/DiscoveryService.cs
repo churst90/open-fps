@@ -8,11 +8,14 @@ public class DiscoveryService
 {
     private readonly SessionManager _sessions;
     private readonly MapManager _maps;
+    private readonly Func<OpenFPS.Server.OneWorld.WorldMaps?> _world;
 
-    public DiscoveryService(IMessageDispatcher dispatcher, SessionManager sessions, MapManager maps)
+    public DiscoveryService(IMessageDispatcher dispatcher, SessionManager sessions, MapManager maps,
+                            Func<OpenFPS.Server.OneWorld.WorldMaps?>? world = null)
     {
         _sessions = sessions;
         _maps = maps;
+        _world = world ?? (() => null);
         dispatcher.RegisterHandler<PlayerListRequest>(HandlePlayerListRequest);
         dispatcher.RegisterHandler<MapListRequest>(HandleMapListRequest);
     }
@@ -74,8 +77,25 @@ public class DiscoveryService
             population[s.CurrentMapId] = population.GetValueOrDefault(s.CurrentMapId) + 1;
 
         var maps = new List<MapSummary>();
+        // The world first: the places to arrive at, each with how many are in the world round it.
+        if (request.Scope == MapListScope.Server && _world() is { } world)
+            foreach (var place in world.Places)
+            {
+                string frame = world.FrameIdOf(place) ?? "";
+                maps.Add(new MapSummary
+                {
+                    Id = "world " + place.Id,
+                    Name = place.Name,
+                    IsPublic = true,
+                    IsWorldPlace = true,
+                    PlayerCount = frame.Length > 0 ? population.GetValueOrDefault(frame) : 0,
+                    IsCurrent = frame.Length > 0 && frame.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase),
+                });
+            }
         foreach (string id in _maps.LoadedMapIds)
         {
+            // A frame of the world is not a map of its own: its places are listed above.
+            if (OpenFPS.Server.OneWorld.WorldMaps.IsWorldMap(id)) continue;
             string owner = _maps.TryGetMapData(id, out var data) ? data.OwnerId ?? "" : "";
             bool isPublic = !_maps.TryGetMapData(id, out var d2) || d2.IsPublic;
             bool mine = owner.Equals(session.Username, StringComparison.OrdinalIgnoreCase);
@@ -94,8 +114,8 @@ public class DiscoveryService
             });
         }
 
-        maps.Sort((a, b) => b.PlayerCount != a.PlayerCount
-            ? b.PlayerCount.CompareTo(a.PlayerCount)
+        maps.Sort((a, b) => a.IsWorldPlace != b.IsWorldPlace ? (a.IsWorldPlace ? -1 : 1)
+            : b.PlayerCount != a.PlayerCount ? b.PlayerCount.CompareTo(a.PlayerCount)
             : string.Compare(a.Id, b.Id, StringComparison.OrdinalIgnoreCase));
 
         reply(new MapListResponse { Scope = request.Scope, Maps = maps.ToArray() });

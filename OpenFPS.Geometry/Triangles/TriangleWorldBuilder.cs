@@ -56,7 +56,7 @@ public sealed class TriangleWorldBuilder
         var byTile = new Dictionary<TileKey, List<SolidSpec>>();
         foreach (var s in statics)
         {
-            if (s.Mesh == null && (s.BoxSize.X <= 0f || s.BoxSize.Y <= 0f || s.BoxSize.Z <= 0f)) continue;
+            if (s.Mesh == null && s.Terrain == null && (s.BoxSize.X <= 0f || s.BoxSize.Y <= 0f || s.BoxSize.Z <= 0f)) continue;
             var key = KeyOf(s);
             if (!byTile.TryGetValue(key, out var list)) byTile[key] = list = new List<SolidSpec>();
             list.Add(s);
@@ -181,6 +181,8 @@ public sealed class TriangleWorldBuilder
 
     public TileKey KeyOf(in SolidSpec s)
     {
+        // A terrain tile is its tile's ground, whatever its size: keyed by its middle.
+        if (s.Terrain != null) return TileKey.Of(s.Position, TileMetres);
         var half = HalfExtents(s);
         if (2f * half.X > TileMetres || 2f * half.Z > TileMetres) return WideKey;
         return TileKey.Of(s.Position, TileMetres);
@@ -230,6 +232,7 @@ public sealed class TriangleWorldBuilder
         S(sf.Material); V(sf.Construction.PanelSize); F(sf.Construction.Build.LeafMetres); F(sf.Construction.Build.StudSpacingMetres);
         F(sf.Construction.ShellThickness); Mix((uint)sf.Layers); Mix((uint)sf.Flags); F(sf.Absorption);
         if (s.Mesh != null) { Mix((uint)(s.Mesh.Hash >> 32)); Mix((uint)s.Mesh.Hash); }
+        if (s.Terrain != null) { Mix((uint)(s.Terrain.Hash >> 32)); Mix((uint)s.Terrain.Hash); }
         if (s.Parts != null) foreach (var part in s.Parts) { Mix((uint)(part.Hash >> 32)); Mix((uint)part.Hash); }
         return h;
     }
