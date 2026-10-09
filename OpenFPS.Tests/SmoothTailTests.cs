@@ -244,7 +244,7 @@ public class SmoothTailTests
         for (int d = 0; d < d1.PerDirection.Length; d++)
         {
             Assert.Equal(d1.PerDirection[d] == null, d2.PerDirection[d] == null);
-            if (d1.PerDirection[d] is { } p) Assert.Equal(p.Re, d2.PerDirection[d]!.Re);
+            if (d1.PerDirection[d] is { } p) { Assert.Equal(p.Re, d2.PerDirection[d]!.Re); Assert.Equal(p.LongRe, d2.PerDirection[d]!.LongRe); }
         }
 
         // A trace a little louder scales the response by that gain, sample for sample, not its noise.
