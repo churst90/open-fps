@@ -609,8 +609,8 @@ Code: `OneWorld/WorldMaps` (frames, places, tiles round players, arrivals), `One
   the tiles it holds whose ground its triangle world has built, so a foot never comes down on ground the
   client cannot stand on yet. The client plays a short low tone (196 Hz, 0.22 s) while pressing on, at
   most every 0.6 s, no knock, and says "Not built yet. Wait here, or turn back." once until it has been
-  clear of an edge for 5 s. When the tile arrives the body walks on. A driven vehicle is not stopped at
-  the edge yet (DrivingSystem does not ask the fence); the world has no vehicles of its own yet.
+  clear of an edge for 5 s. When the tile arrives the body walks on. Since "Building ahead" (below) this is a last resort, and a
+  driven vehicle is braked to a stop before it.
 - **The list of where to go** (F6) has two parts: "The world" (`world_places.json`, and any map of a
   real place not listed there, at its origin) and "Maps". A frame is never listed as a map. The text
   gateway lists the world's places first too.
@@ -625,6 +625,61 @@ Code: `OneWorld/WorldMaps` (frames, places, tiles round players, arrivals), `One
   `FrameBaseY`; `MapSummary.IsWorldPlace`. With T1's `ColliderShape.Terrain`, `TerrainTileComponent` and
   `EntityDefinition.Terrain`.
 
+### Building ahead: nobody waits at an edge (2026-10-09)
+
+Cody, 2026-10-09: the world should be built before a player gets there, not while they stand at its edge.
+The edge stop stays, as a last resort only.
+
+Code: `WorldTileService` (the queue), `WorldMaps` (`Interest`, `SecondsToReach`, `Hold`, `Prebuild`),
+`GameServer.MapDataAsked` and `MoveToMapNow` (the held join), `DrivingSystem.TileFence`, the client's
+`WorldLoading` handling. Tests: `WorldLoadAheadTests`, `OccupancyTests.ACarIsBrakedToAStopShortOfGroundNotBuiltYet`.
+
+- **The queue.** Tiles to make wait in a queue taken in order of how soon somebody could be in each, in
+  seconds: the distance to the tile's nearest point, over the player's speed toward it if they are heading
+  that way, or over a run (7.2 m/s) if that is sooner (they can turn and run). The tile you are in is 0.
+  Speed is the server's own: the body's velocity, or the vehicle's for somebody riding. Every quarter of a
+  second the priorities are worked out again for every player. Tiles nobody is on their way to any more go
+  to the back of the queue and are still made.
+- **What is wanted.** Every tile within a player's far radius and 100 m more, as before, and every tile
+  they could reach within 30 seconds however far that is (a car at 60 m/s: 1.8 km ahead). 30 s because
+  3DEP took up to 3 s a tile on its slow run (41 tiles in 60 s, two at a time) and one answer can take
+  ten times that.
+- **Arriving.** `/join world PLACE` (and F6 The world) puts you in the world's frame as soon as the tile
+  you arrive in is made (under a second when 3DEP is quick), which shows the loading screen. The server
+  then holds your join until every tile within your far radius of where you will stand is built and
+  loaded, and tells the loading screen how it goes: "Building the world: 12 of 41 tiles." shown every
+  second and said every 5 seconds (message `WorldLoading`, 45). Then the join goes out with all of them,
+  and you stand in a finished ring. A text session waits the same way and hears the same line. The wait
+  ends early, and the edge does the rest, if the remaining tiles cannot be made now (no network, or a
+  server that makes no new tiles), or after two minutes.
+- **At start.** The tiles within 1,300 m of every place in `world_places.json` (the far radius at high
+  detail and the margin) are queued behind anything a player wants, so the first visitor to a listed
+  place waits for nothing. `world.json` `"Prebuild": false` turns it off.
+- **A car at the edge.** A driven vehicle on the world looks ahead along its way for its stopping
+  distance (80 % of its tyres' grip), two ticks' travel and 4 m; if a tile there is not built, it is
+  braked hard whatever the driver asks, and the driver is told once "The road ahead is not built yet.
+  Stopping here until it is." It can always back away, and when the tile is built it drives on. If it
+  reaches the edge anyway it is held there, never driven onto nothing.
+
+Measured (`WorldLoadAheadTests`: the real `WorldMaps` and `WorldTileService`, a survey that answers each
+tile a set time after it is asked on a clock the test turns, two at a time, a straight run east from
+Bobcat Lane for 5 to 5.5 km):
+
+| | 3 s a tile (3DEP's slow run) | 6 s a tile |
+|---|---|---|
+| Arriving, medium detail (45 tiles) | 69 s on the loading screen | 128 s |
+| Arriving, low detail | 33 s | |
+| Walker 4.5 m/s, runner 7.2 m/s | never at an edge; built ground at least 825 m ahead | |
+| Car 30 m/s (108 km/h) | never at an edge; at least 575 m ahead | never; down to 100 m ahead |
+| Fastest straight run that never meets an edge | 60 m/s (216 km/h), medium or low detail | 30 m/s (108 km/h) |
+| The first speed that meets one | 70 m/s, after 3.3 km (medium) or 2.1 km (low) | 40 m/s, after 1.8 km |
+
+Two at a time, 3 s a tile is two thirds of a tile a second. A straight run needs a tile every 250 m on its
+line and the ones beside it; past about 65 m/s the tiles beside the road, which a car could also swerve
+into within seconds, come in faster than that. Then a car is braked to a stop short of the edge and goes
+on when the tile is built; a walker is stopped at the edge as before. Asking 3DEP for four tiles in one
+request, or three at a time, would raise the speed; neither is done.
+
 ### Left after stage 2 (as of 2026-10-09)
 
 - World tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
@@ -634,7 +689,7 @@ Code: `OneWorld/WorldMaps` (frames, places, tiles round players, arrivals), `One
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
 - Coarse terrain at 8 m for the far ring; the client's tile cache; land cover for the ground's
   materials (every cell is dirt).
-- A driven vehicle braked hard before an edge that is not ready.
+- (Done 2026-10-09: a driven vehicle is braked to a stop before an edge that is not ready; see Building ahead.)
 
 ## What the broadcast chooses from
 

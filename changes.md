@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- The world is built before you get there (docs/WORLD_STREAMING.md, "Building ahead"). Arriving with
+  `/join world PLACE` or F6 waits on the loading screen ("Building the world: 12 of 41 tiles.", said every
+  5 s) until every tile within your far radius is built, then you stand in a finished ring. Moving, the
+  tiles are made in order of how soon you could reach them, from your speed and heading, and anything
+  you could reach within 30 s is wanted however far; the rings round the places in world_places.json are
+  made at start, after anything a player wants (`world.json` "Prebuild"). A driven car is braked to a
+  stop short of a tile not built yet and told so once. Measured with the survey at 3 s a tile: walking,
+  running and a 30 m/s car never meet an edge; above about 65 m/s one can. New message `WorldLoading`
+  (45), so Common changed: new Windows zip and server update together. WorldLoadAheadTests.
 - The world editor is a dialog (docs/WORLD_EDITOR.md section 16), in both clients. F12 opens it on a
   map you may edit; elsewhere F12 does nothing at all. F12 again, Escape or Close shuts it. Tabs
   Place, Edit, Build and World, changed with Control+Tab and Control+Shift+Tab (or Control+Page Down

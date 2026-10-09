@@ -72,7 +72,7 @@ public class WorldMapsTests : IDisposable
         server.Attach(maps, sessions);
         beforeWorld?.Invoke(server);
         var survey = new Hills();
-        server.StartWorld(new WorldSettings { StorePath = Path.Combine(_dir, "world"), CapGigabytes = 1 }, survey);
+        server.StartWorld(new WorldSettings { StorePath = Path.Combine(_dir, "world"), CapGigabytes = 1, Prebuild = false }, survey);
         Assert.NotNull(server.World);
         server.World!.Service.RetryAfter = TimeSpan.FromMilliseconds(50);
         return (maps, sessions, server, survey);
