@@ -155,6 +155,16 @@ public class GameServer
             Log.Information("World: tiles kept in {Path}, at most {Cap:F1} GB ({Have:F2} GB in {Count} tiles now); {Places} place(s) to arrive at; {Making}.",
                             store.Root, store.CapBytes / 1073741824.0, store.TotalBytes / 1073741824.0, store.Count, World.Places.Count,
                             settings.Generate ? "new tiles made from USGS 3DEP" : "no new tiles made");
+            // A cap the disk cannot hold fills the disk before the cap is reached.
+            try
+            {
+                long free = new DriveInfo(store.Root).AvailableFreeSpace;
+                if (free + store.TotalBytes < store.CapBytes)
+                    Log.Warning("World: the disk under {Path} has {Free:F1} GB free, less than the store's cap of {Cap:F1} GB; "
+                                + "set CapGigabytes in world.json below what the disk can spare, or StorePath to a bigger disk.",
+                                store.Root, free / 1073741824.0, store.CapBytes / 1073741824.0);
+            }
+            catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException) { }
         }
         catch (Exception ex)
         {

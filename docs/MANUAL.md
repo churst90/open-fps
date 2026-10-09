@@ -961,14 +961,24 @@ The server makes the world's tiles itself and keeps them in `world/` in its fold
 `openfps.db`). Nothing it downloads is kept, only the tiles. It needs the internet the first time
 anybody goes somewhere new. Settings, all optional, in `world.json` beside it:
 
-    { "StorePath": "world", "CapGigabytes": 20, "Generate": true, "MaxAtOnce": 2 }
+    { "StorePath": "world", "CapGigabytes": 20, "Generate": true, "MaxAtOnce": 2, "Prebuild": true }
 
+- `StorePath`: where the tiles are kept: a folder relative to the server's folder (`world`, the
+  default), or a full path such as `/var/lib/openfps/world`. The server's user must be able to write
+  there. An update never touches it: the package carries no `world/`.
 - `CapGigabytes`: the most the tiles may take on disk (20 GB to start). Past it, the tiles nobody has
   visited for longest are dropped, never one somebody is standing near; a dropped tile is made again
   when somebody next goes there. A tile of ground is about 20 KB, so 20 GB is about a million tiles.
+  The server warns at start if the disk under the store has less free space than the cap.
+- The real places copied into the world (Magnolia and Albany, from their maps) are kept in the store too,
+  about 5 MB each, and the cap never drops them. They are copied again when their map changes.
 - `Generate`: false serves only tiles already made; players are stopped at the edge of the rest.
 - `MaxAtOnce`: how many tiles are made at the same time.
+- `Prebuild`: false leaves the tiles round each place in `world_places.json` to be made when somebody
+  first goes there, instead of at start.
 - The places to arrive at are in `world_places.json` (an id, a name, a latitude and a longitude each).
+  Arriving waits on the loading screen ("Building the world: 12 of 41 tiles.") until the ground round you
+  is built.
 - The server log says where the tiles are kept and how much they take ("World: tiles kept in ...").
 
 ### Players' own maps
