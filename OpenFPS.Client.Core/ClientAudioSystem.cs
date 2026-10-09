@@ -1639,7 +1639,10 @@ public partial class ClientAudioSystem
             float d2 = Vector3.DistanceSquared(snap.Transform.Position, eyePos);
             // The keep bias and the hold stop the set churning as cars trade places (EngineKeepBias).
             float key = _liveEngines.Contains(entityId) ? d2 * (EngineKeepBias * EngineKeepBias) : d2;
-            if (_engineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds)
+            // A donor (last pass's) is not held: held, a new donor ranked first, took a slot inside the
+            // budget and turned out the car at its edge for 2.5 s.
+            if (_engineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds
+                && !_presetDonors.Contains(entityId))
                 key = -1f;
             // The one you are sitting in is never ranked out: it is the loudest thing in your world.
             if (entityId == _state.RidingEntityId) key = float.NegativeInfinity;
@@ -1718,6 +1721,7 @@ public partial class ClientAudioSystem
             _audio.ReviveEngine(id);
             if (!_engineStarted.ContainsKey(id)) _engineStarted[id] = now;
             _engineSourceByPreset[preset] = id;
+            _presetDonors.Add(id);
             _engineRetiring.Remove(id);
             int borrowed = DistantVoiceBase - Math.Abs(id);
             if (_distantBoundTo.Remove(borrowed)) _audio.StopSound(borrowed);
