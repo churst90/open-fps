@@ -198,8 +198,13 @@ and the server's voice line.
 Tracing (TracedReverb, TracedEchoes, LateField, Steam Audio's own threads) runs in the client
 process. Its `ThreadPriority.BelowNormal` does nothing on Linux, and none of those threads is niced.
 Convolution runs on the FMOD mixer thread.
-- First: read "Mixer load" and "Audio: mixer at" with `/echoes on` and `off`, to learn whether the
-  cost is tracing or convolution.
+- Measured 2026-10-09 (city street, standing still, /tmp/openfps-client.log 11:36-11:40): the cost is
+  convolution, not tracing. Mixer load 70 % with echoes on, 62 % off. Of the mixer's time, the traced
+  reverb's convolution is 26.5 % either way and the traced echoes' 10.4 %; binaural 13 %, everything
+  else under 3 % each. The governor took voices back 17 times at 60-62 %. The trace threads themselves
+  are off the mixer (TracedReverb about a third of a core, LateField 5 %, both now nice 10). So the split
+  below would not lower Mixer load; the reverb's convolution is what to make cheaper. Also seen: the 12
+  EngineRender threads take about half a core each (6 cores), and the acoustic worker 70 % of one.
 - Done 2026-10-09: `BackgroundPriority.LowerThisThread` (+10) at the top of TracedReverb, TracedEchoes
   and LateField's loops. Unchecked: whether Steam Audio's second worker (numThreads 2) inherits it;
   `ps -L -o tid,ni,comm -p PID` while playing shows each thread's nice.
