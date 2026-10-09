@@ -30,7 +30,7 @@ namespace OpenFPS.AudioLab.Spikes;
 ///
 /// steady=M holds the wind at M m/s instead of reading the field, turb= sets the field's turbulence,
 /// tap=N renders one tap of a water feature, and parts= renders only some parts: impact, drop, lump,
-/// plunge, splash (water); roar, crackle, steam, settle (fire); leaf, shed (foliage).
+/// plunge, splash (water); roar, crackle, fizz, steam, settle (fire); leaf, shed (foliage).
 ///
 /// The texture statistics are the ones the footstep rounds lacked: per octave, how PEAKY the band is
 /// (kurtosis — a dense wash is 3, separate clicks are tens), how much its envelope moves (the
@@ -226,6 +226,7 @@ public static class NatureSpike
                 {
                     s.RoarPart = Parts.Contains("roar") ? 1f : 0f;
                     s.CracklePart = Parts.Contains("crackle") ? 1f : 0f;
+                    s.FizzPart = Parts.Contains("fizz") ? 1f : 0f;
                     s.SteamPart = Parts.Contains("steam") ? 1f : 0f;
                     s.SettlePart = Parts.Contains("settle") ? 1f : 0f;
                 }

@@ -14,7 +14,7 @@ namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --fire: fires from a campfire to a crown fire (FireSynth, docs/FIRE.md), rendered from their models.
-///   levels [preset ...] [sec=30] [wind=] [age=] [seed=7] [heard=D] [parts=roar,crackle,steam,settle,torch,fall,glass,burst]
+///   levels [preset ...] [sec=30] [wind=] [age=] [seed=7] [heard=D] [parts=roar,crackle,fizz,steam,settle,torch,fall,glass,burst]
 ///        each preset developed (or age= s after lighting): level at a metre with every place summed (Leq,
 ///        LAeq, octaves, peak headroom), texture statistics against its recordings, 10 ms 4-16 kHz kurtosis,
 ///        and its cost. heard=D: a microphone D m off, each place by its distance, 1/r and ISO 9613-1 air.
@@ -131,7 +131,7 @@ public static class FireSpike
         if (parts != null)
         {
             float On(string name) => parts.Contains(name) ? 1f : 0f;
-            s.RoarPart = On("roar"); s.CracklePart = On("crackle"); s.SteamPart = On("steam"); s.SettlePart = On("settle");
+            s.RoarPart = On("roar"); s.CracklePart = On("crackle"); s.FizzPart = On("fizz"); s.SteamPart = On("steam"); s.SettlePart = On("settle");
             s.TorchPart = On("torch"); s.FallPart = On("fall"); s.GlassPart = On("glass"); s.BurstPart = On("burst");
         }
         // The glass renders off the audio threads; a short render waits for it.

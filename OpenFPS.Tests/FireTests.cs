@@ -155,13 +155,35 @@ public class FireTests : IDisposable
         var hotter = one with { HeatReleaseKw = 14400f };
         double Roar(FireSpec s)
         {
-            var f = new FireSynth(s, Rate, 3, FireSynth.Layout(s).Length) { CracklePart = 0f, FallPart = 0f, Spread = 1f };
+            var f = new FireSynth(s, Rate, 3, FireSynth.Layout(s).Length) { CracklePart = 0f, FizzPart = 0f, FallPart = 0f, Spread = 1f };
             return Db(Render(f, 12f, wind: 1f));
         }
         double a = Roar(one), b = Roar(four), c = Roar(hotter);
         _o.WriteLine($"36 m² {a:F1} dB, 144 m² {b:F1} dB, 36 m² at twice the rate {c:F1} dB");
         Assert.InRange(b - a, 4.5, 7.5);
         Assert.InRange(c - a, 4.5, 7.5);
+    }
+
+    /// <summary>The fizz is its own part: muting the crackles leaves it, and alone its power follows the
+    /// heat release (docs/FIRE.md 7.3). It was scaled by the crackles' part.</summary>
+    [Fact]
+    public void TheFizzIsItsOwnPartAndFollowsTheHeatRelease()
+    {
+        FireSynth Only(FireSpec spec, float fizz) => new(spec, Rate, 3)
+        {
+            RoarPart = 0f, CracklePart = 0f, FizzPart = fizz, SteamPart = 0f, SettlePart = 0f,
+            TorchPart = 0f, FallPart = 0f, GlassPart = 0f, BurstPart = 0f,
+        };
+        var pit = FireSpec.GardenFirePit;
+        var alone = Render(Only(pit, 1f), 30f);
+        var muted = Render(Only(pit, 0f), 30f);
+        var hotter = Render(Only(pit with { HeatReleaseKw = 4f * pit.HeatReleaseKw }, 1f), 30f);
+        double a = Db(alone), h = Db(hotter);
+        double peakMuted = muted.Max(v => MathF.Abs(v));
+        _o.WriteLine($"fizz alone {a:F1} dB at a metre; four times the heat {h:F1} dB; muted, peak {peakMuted:G3} Pa");
+        Assert.True(a > 20.0, "the crackles muted took the fizz with them");
+        Assert.True(peakMuted < 1e-6, "the fizz muted still sounds");
+        Assert.InRange(h - a, 4.0, 8.0);
     }
 
     /// <summary>A bigger body of fire puffs slower: 1.5 / √D.</summary>
