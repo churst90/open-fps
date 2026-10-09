@@ -415,10 +415,10 @@ in four steps. Each leaves every map working and is committed with its tests.
 
 What is left after these four:
 
-- The per-tile generator for OpenStreetMap and Overture features (roads, buildings, addresses, woods)
-  that gives the same answer whichever tile is made first. Until then a world tile is terrain, and the
+  that gives the same answer whichever tile is made first. Until then a world tile is terrain, except over
+  the two real places, whose maps are copied in ("Places in the world", 2026-10-09).
   real places are the two maps.
-- Coarse terrain at 8 m for the far ring (every tile is sent at 2 m), the client's tile cache, frames
+- (Done 2026-10-09, "Coarse ground in the far ring":) coarse terrain at 8 m for the far ring. Still to do: the client's tile cache, frames
   that rebase past 8 km, crossing a UTM zone edge.
 - Draped road meshes with kerbs and sidewalks as swept profiles, bridges and tunnels, creeks cut in
   (geometry stage 4 shapes); diffraction over the terrain profile and the ground reflection reading the
