@@ -546,6 +546,41 @@ within 0.1-1.7 % on average of the default's, against Embree's own run-to-run sp
 the same 11,020 boxes as the whole-map open-ground filter.
 - The settings menus have no world detail control yet; `/detail` does it.
 
+## Stage 2 as built (2026-10-09)
+
+Steps T1 and T2 (terrain, and the real places on it) are in docs/GEOMETRY.md section 11.
+
+### W1: the world store and making tiles
+
+Code: `OpenFPS.Server/OneWorld/` (`Utm`, `WorldTileKey`, `WorldTile`, `WorldStore`, `Elevation`,
+`WorldTileService`, `WorldSettings`). Tests: `WorldStoreTests`.
+
+- **Keys.** UTM on WGS84 (USGS Professional Paper 1395's series, no Norway or Svalbard exceptions), a
+  tile every 250 m from each zone's own origin: `15N/943/13342` is Bobcat Lane. Round trips to a ten
+  millionth of a degree.
+- **The store**, under `world/` in the server's folder (gitignored):
+  `tiles/v1/{zone}{N|S}/{x}/{z}/full.json.gz` per tile, `{z}.lock` while one is being made, and
+  `index.json` with each tile's size and when it was last visited. A tile is gzip JSON: its ground
+  (2 m posts, centimetres over a base in metres over the sea, base64), where the ground came from, and
+  room for entities later. Written to a temporary name and renamed; a tile that does not read is made
+  again.
+- **The cap**: 20 GB unless `world.json` says otherwise (`CapGigabytes`). When a write takes the store
+  over it, tiles are dropped until it is under nine tenths of the cap: an older generator's first, then
+  the least recently visited (a player's tiles are touched as they are loaded, W2), never one a player
+  has loaded or one being made. A dropped tile is made again when it is next wanted: the cap costs the
+  next visitor a wait, never a hole.
+- **Making a tile**: the 3DEP ImageServer is asked for the tile in its own UTM metres (`bboxSR` and
+  `imageSR` the zone's EPSG code), 126 x 126 cells of 2 m centred on the posts, as a float TIFF read in
+  memory and thrown away. At most two at a time (`MaxAtOnce`), two minutes each, a lock file against a
+  second server process (broken after ten minutes). A tile the survey could not be asked for (no network)
+  is not stored and is tried again after 30 s; one the survey covers none of (the sea, abroad) is flat
+  open ground at sea level, stored like any other.
+- **Measured**: Bobcat Lane's tile from 3DEP made in 0.95 s, 21.9 KB on disk, ground 64.7 to 72.1 m.
+  Magnolia's own ground as tiles: 18.5 to 19.8 KB each, so 20 GB holds about a million tiles, every
+  250 m square of 65,000 km² (Texas is 696,000 km²). Ground only; buildings and roads will add to it.
+- **Settings** (`world.json`, all optional): `StorePath` ("world"), `CapGigabytes` (20), `Generate`
+  (true), `MaxAtOnce` (2).
+
 ## What the broadcast chooses from
 
 Each player used to ask the spatial grid for everything within earshot. On the city earshot is the whole

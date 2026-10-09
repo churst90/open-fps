@@ -510,6 +510,9 @@ OpenFPS.Server/friends.json
 OpenFPS.Server/friends.json.bad
 OpenFPS.Server/map_access.json
 OpenFPS.Server/map_access.json.bad
+# The world's tiles, made by the server as players go (OneWorld/WorldStore), and its settings.
+OpenFPS.Server/world/
+OpenFPS.Server/world.json
 OpenFPS.Server/maps/players/
 # The world editor's data on a running server (docs/WORLD_EDITOR.md section 10): a deploy must not
 # overwrite edits made on the live server.
