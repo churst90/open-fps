@@ -396,6 +396,17 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
 - `/map public`, `/map private`: let anybody in, or only you and the people you invite.
 - `/map invite NAME`, `/map uninvite NAME`. The person is told.
 - `/maps`: the maps you can go to. `/maps mine`: your own, and who is invited.
+- `/setmapsize`: the size of the map you are on. `/setmapsize EAST NORTH HEIGHT`: change it, in
+  metres, on a map you own (or any map, with `maps-any`). The map's south-west corner at the ground
+  stays where it is, so nothing on the map moves: a new map is 100 by 100, 40 high, from -50, -50, 0,
+  and `/setmapsize 200 300 40` makes it reach 150 east and 250 north. East and north are 10 to 4,000,
+  the height 5 to 1,000. If anything on the map, or the spawn point, would be left outside, it says
+  how many and names up to three, and changes nothing; add `force` to do it anyway (nothing is moved
+  or deleted, it is just past the edge). Anyone standing past the new edge is brought inside at their
+  next step. Natural ground is laid again under the new size where the map's own ground does not
+  reach. Kept in the map's overlay file, and the editor's undo takes it back. The server's own maps
+  (the city, the speedway, the real places) are made by programs in `tools` and are refused. Also in
+  the world editor's Map menu: "Change the size, typed".
 - `/detail low|medium|high`: how much of a large map is loaded round you. The maps of real places
   (magnolia tx, albany or) are sent in 250 m tiles: everything within 150, 300 or 500 m, and the
   what sound notices from further off (the ground, roads, the outsides of buildings with their front
@@ -916,7 +927,7 @@ generated map stays what its generator wrote.
 - Things the editor places are numbered from 900,000,000.
 - Models changed in the editor are kept in `OpenFPS.Server/model_versions/KIND.ID.json`, every
   version, and loaded at start. New models, prefab versions and groups are kept there too.
-- A map's pins and its settings (weather, time, ground, beacon rules) are in its overlay file.
+- A map's pins and its settings (weather, time, ground, beacon rules, size) are in its overlay file.
 - To undo every edit on a map, stop the server and delete its overlay file.
 
 ### What a map file contains
@@ -1046,9 +1057,16 @@ this command." `/help` lists only the commands you may use.
 - `/bring NAME`: bring a player to you.
 - `/kick NAME [reason]`: disconnect a player.
 - `/mute NAME [minutes]`: stop a player chatting, 10 minutes if not said. `/unmute NAME`.
+- `/ban NAME [DURATION] [REASON]`: ban an account. A duration is `30m`, `2h`, `7d` or `4w`; without
+  one the ban lasts until it is lifted. If they are on, they are removed at once and told why. At
+  login they are told "You are banned until 14 October, 18:00 UTC: spamming." or "You are banned:
+  no reason given." A ban that has run out lifts itself. The account need not be online.
+- `/unban NAME`: lift a ban.
+- `/bans`: who is banned, one line each: by whom, when, until when, and why.
 - Go to any map, private or not (developers too).
 
-The administrator cannot be kicked or muted by a moderator.
+The administrator cannot be kicked, muted or banned by a moderator. Nobody can ban an owner or
+themselves, and below the owner you can ban only somebody whose role is below yours.
 
 ### Developers (and the administrator), on any map; everyone on maps they own
 

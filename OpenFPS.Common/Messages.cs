@@ -150,6 +150,11 @@ public partial class MapSettingsUpdate : IMessage
     public string MapId = "";
     /// <summary>"category=policy" pairs, as MapManifest.BeaconPolicy.</summary>
     public string[] BeaconPolicy = Array.Empty<string>();
+    /// <summary>Where a player can walk and drive now (/setmapsize), as MapManifest.PlayMin and PlayMax.
+    /// False from a server that sends no play area. Appended 2026-10-09.</summary>
+    public bool HasPlayArea;
+    public Vector3 PlayMin;
+    public Vector3 PlayMax;
     public MapSettingsUpdate() { }
 }
 

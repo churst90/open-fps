@@ -45,6 +45,9 @@ public class StaffGateTests : IDisposable
         { "kick", new[] { "other" }, UserRole.Moderator },
         { "mute", new[] { "other", "5" }, UserRole.Moderator },
         { "unmute", new[] { "other" }, UserRole.Moderator },
+        { "ban", new[] { "other", "2h", "spamming" }, UserRole.Moderator },
+        { "unban", new[] { "other" }, UserRole.Moderator },
+        { "bans", Array.Empty<string>(), UserRole.Moderator },
         { "move", new[] { "150", "150", "6" }, UserRole.Dev },
         { "give", new[] { "torch" }, UserRole.Dev },
         { "spawn", new[] { "Box", "Metal", "1", "1", "1" }, UserRole.Dev },
@@ -140,6 +143,7 @@ public class StaffGateTests : IDisposable
     [InlineData("kick", UserRole.Dev, new[] { "other" })]
     [InlineData("mute", UserRole.Dev, new[] { "other" })]
     [InlineData("bring", UserRole.Dev, new[] { "other" })]
+    [InlineData("ban", UserRole.Dev, new[] { "other" })]
     public void ModeratorsDoNotBuildAndDevelopersDoNotModerate(string command, UserRole role, string[] args)
     {
         var rig = new Rig(_dir, role, command);
@@ -203,7 +207,7 @@ public class StaffGateTests : IDisposable
         Assert.NotEqual(before, admin.Fingerprint());
     }
 
-    private static bool ReadOnly(string command) => command is "sessions" or "user" or "account" or "throttled" or "ratelimit" or "where" or "locate";
+    private static bool ReadOnly(string command) => command is "sessions" or "user" or "account" or "throttled" or "ratelimit" or "where" or "locate" or "bans";
 
     [Fact]
     public void APlayerWithEmptyHandsNamingAWeaponFiresNothing()
@@ -380,6 +384,9 @@ public class StaffGateTests : IDisposable
                 case "revoke":
                     _users.SetGrants("other", "give");
                     break;
+                case "unban": case "bans":
+                    _users.SetBan("other", DateTime.UtcNow, null, "someone", "spamming");
+                    break;
                 case "unlock":
                     // A name with a lock to lift.
                     for (int i = 0; i < AuthService.LockoutAfterFailures; i++) _server.Auth.Check("192.0.2.9", "other", "wrong-password");
@@ -446,6 +453,7 @@ public class StaffGateTests : IDisposable
             text.Append($"roles {_session.Role} {_other.Role} {_users.RoleOf("other")} grants {_users.GrantsOf("other")} custom {_users.CustomOf("other")} defined {string.Join(",", _server.Roles.Names)}\n");
             text.Append($"other {_sessionsOnline()} muted {_other.MutedUntilUtc > DateTime.UtcNow}\n");
             text.Append($"locks {string.Join(",", _server.Auth.LockedNames().Select(l => l.Name))}\n");
+            text.Append($"bans {string.Join(",", _users.Banned().Select(u => $"{u.Username} {u.BannedUntilUtc} {u.BanReason}"))}\n");
             var env = _server.WorldEnvironment;
             text.Append($"weather {env.CurrentScenario} {env.TargetWind} {env.TargetGustiness} {env.Pinned}\n");
             foreach (string dir in new[] { _mapDir, _compositeDir })
@@ -479,10 +487,22 @@ public class StaffGateTests : IDisposable
             _grants[username] = grants;
             return true;
         }
-        public UserData? GetUser(string username) =>
-            _roles.TryGetValue(username.Trim(), out var role)
-                ? new UserData { Username = username.Trim().ToLowerInvariant(), Role = role, Permissions = GrantsOf(username.Trim()), CustomRole = CustomOf(username.Trim()) }
-                : null;
+        public UserData? GetUser(string username)
+        {
+            if (!_roles.TryGetValue(username.Trim(), out var role)) return null;
+            var u = new UserData { Username = username.Trim().ToLowerInvariant(), Role = role, Permissions = GrantsOf(username.Trim()), CustomRole = CustomOf(username.Trim()) };
+            if (_bans.TryGetValue(u.Username, out var b)) { u.BannedUtc = b.At; u.BannedUntilUtc = b.Until; u.BannedBy = b.By; u.BanReason = b.Why; }
+            return u;
+        }
+        private readonly Dictionary<string, (DateTime At, DateTime? Until, string By, string? Why)> _bans = new(StringComparer.OrdinalIgnoreCase);
+        public bool SetBan(string username, DateTime atUtc, DateTime? untilUtc, string by, string? reason)
+        {
+            if (!_roles.ContainsKey(username)) return false;
+            _bans[username] = (atUtc, untilUtc, by, reason);
+            return true;
+        }
+        public bool ClearBan(string username) => _bans.Remove(username);
+        public IReadOnlyList<UserData> Banned() => _bans.Keys.OrderBy(k => k).Select(k => GetUser(k)!).ToList();
         public bool AddUser(string username, string password, UserRole role) => false;
         public bool VerifyPassword(string username, string password) => false;
         public bool SetRole(string username, UserRole role)

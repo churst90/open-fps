@@ -4,6 +4,21 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- Bans. `/ban NAME [DURATION] [REASON]` (30m, 2h, 7d or 4w; none is until lifted), `/unban NAME`,
+  `/bans`. A new permission, `ban`, for Moderators and above, grantable and allowed in custom roles.
+  Nobody bans an owner or themselves; below the Owner only a role above the target's, and a protected
+  account only by somebody protected. A player on the server is removed at once; at login a banned
+  account hears "You are banned until 14 October, 18:00 UTC: spamming." (only after the right
+  password). Ended bans lift themselves. Kept in four new `Users` columns, added in place to an older
+  database (backed up first, as before). Accounts only, no address bans. docs/SERVER_SECURITY.md,
+  "Bans". BanTests.
+- `/setmapsize EAST NORTH HEIGHT [force]` on a map you own (or any with `maps-any`); on its own it says
+  the size. The south-west corner at the ground stays put, so nothing moves. Refused, with a count and
+  up to three names, if things or the spawn point would be left outside, unless `force`. People past
+  the new edge are brought in at their next step; natural ground is laid again under the new size.
+  Kept in the map's overlay, undone by the editor's undo, and offered in the editor's Map menu as a
+  typed item. Refused on the server's generated maps. `MapSettingsUpdate` gained appended members
+  (the play area), so Common changed: new Windows zip and server update together. MapSizeTests.
 - A protected Owner role (docs/CODY_ASKS_2026-10-08.md item 8). The Owner has every permission;
   the Admin has every one but the new `owners`, which makes an owner or changes an owner's role. The
   seeded `admin` account is the Owner, and a server started on an older database makes `admin` the

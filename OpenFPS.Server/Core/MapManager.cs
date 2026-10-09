@@ -198,6 +198,26 @@ public class MapManager
             Log.Information("MapManager: map '{Map}' broadcasts within {Range:F0} m of a player.", kv.Key, kv.Value);
     }
 
+    /// <summary>One map's broadcast radius again, after its bounds changed (/setmapsize).</summary>
+    public void RefreshEarshot(string mapId)
+    {
+        if (_maps.TryGetValue(mapId, out var entry)) ComputeEarshot(entry.data, entry.world);
+    }
+
+    /// <summary>
+    /// Where natural ground is laid under a map's bounds: top at Y=0, centred on the bounds, not the
+    /// origin (centred on 0 it left a strip with no floor). The prefab is ten metres square.
+    /// </summary>
+    internal static (Vector3 Position, Vector3 Scale) NaturalGroundPose(MapData m)
+    {
+        Vector3 size = m.MaxBound - m.MinBound, centre = (m.MinBound + m.MaxBound) * 0.5f;
+        return (new Vector3(centre.X, -0.05f, centre.Z), new Vector3(size.X / 10f, 1f, size.Z / 10f));
+    }
+
+    /// <summary>The prefab a map's natural ground is: the one it chose, if this server has it, or dirt.</summary>
+    internal string NaturalGroundOf(MapData m)
+        => m.GroundPrefab is { } g && _prefabRepo.Prefabs.ContainsKey(g.ToLowerInvariant()) ? g : NaturalGroundPrefab;
+
     private void ComputeEarshot(MapData m, World world)
     {
         float loudest = DefaultEarshotRange;
@@ -435,11 +455,8 @@ public class MapManager
         if (!GroundCovers(world, m.WalkMin, m.WalkMax))
         {
             Log.Information("MapManager: '{Id}' has no ground of its own under all of its play area. Laying natural ground ({Ground}) under its bounds.", m.Id, m.GroundPrefab ?? NaturalGroundPrefab);
-            Vector3 mapSize = m.MaxBound - m.MinBound;
-            // Top at Y=0, centred on the bounds, not the origin: centred on 0 it left a strip with no floor.
-            Vector3 centre = (m.MinBound + m.MaxBound) * 0.5f;
-            string ground = m.GroundPrefab is { } g && _prefabRepo.Prefabs.ContainsKey(g.ToLowerInvariant()) ? g : NaturalGroundPrefab;
-            var foundation = _prefabRepo.Spawn(world, ground, new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
+            var (at, scale) = NaturalGroundPose(m);
+            var foundation = _prefabRepo.Spawn(world, NaturalGroundOf(m), at, Quaternion.Identity, scale);
             // Named "Ground": a round that ended in it was "Hit Concrete Floor" on the city's open grass.
             if (world.Has<IdentityComponent>(foundation)) world.Get<IdentityComponent>(foundation).Name = "Ground";
             if (world.Has<NameComponent>(foundation)) world.Get<NameComponent>(foundation).Name = "Ground";

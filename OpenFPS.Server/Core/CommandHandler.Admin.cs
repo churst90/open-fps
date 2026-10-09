@@ -79,7 +79,8 @@ public partial class CommandHandler
             ? $" Online now, {(online.IsTextClient ? "MUD" : "UDP")} from {Address(online.RemoteAddress)}, on {online.CurrentMapId}."
             : " Not online.";
         string realName = string.IsNullOrEmpty(record.RealName) ? "" : $" Real name {record.RealName}.";
-        Say(reply, $"{record.Username}, {RoleWord(record.Role)}. {created} {login}{failed}{lockText}{now}{realName}");
+        string ban = record.IsBannedAt(DateTime.UtcNow) ? " Banned " + Bans.Detail(record, DateTime.UtcNow) : "";
+        Say(reply, $"{record.Username}, {RoleWord(record.Role)}. {created} {login}{failed}{lockText}{now}{realName}{ban}");
     }
 
     /// <summary>/throttled: addresses over a limit now, and names locked now.</summary>

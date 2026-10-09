@@ -37,7 +37,7 @@ public static class Permissions
     public const string GrantAny = "grant-any";
     /// <summary>/perms NAME: reading somebody else's permissions.</summary>
     public const string PermsAny = "perms-any";
-    /// <summary>Kicked or muted only by somebody who has it too.</summary>
+    /// <summary>Kicked, muted or banned only by somebody who has it too.</summary>
     public const string Protected = "protected";
     /// <summary>/map public, private, invite and uninvite on a map that is not yours.</summary>
     public const string MapsAny = "maps-any";
@@ -82,6 +82,7 @@ public static class Permissions
         ["kick"] = (Mod, "disconnect a player", false),
         ["mute"] = (Mod, "stop a player chatting for a while", false),
         ["unmute"] = (Mod, "let a muted player chat again", false),
+        ["ban"] = (Mod, "ban a player's account, for a time or until lifted; /unban and /bans too", false),
         [JoinPrivate] = (ModDev, "go to somebody else's private map", false),
         ["give"] = (Dev, "give a player an ordinary item", false),
         [GivePremium] = (AdminOnly, "give premium items: the teleporter and vehicles", false),
@@ -115,7 +116,7 @@ public static class Permissions
         [TeleportFree] = (AdminOnly, "use /tp without a teleporter", false),
         [MovePlayer] = (AdminOnly, "move another player to a place or to another player", false),
         [AdminGun] = (AdminOnly, "hold, fire and set the admin gun", false),
-        [Protected] = (AdminOnly, "cannot be kicked or muted by somebody without this too", false),
+        [Protected] = (AdminOnly, "cannot be kicked, muted or banned by somebody without this too", false),
         [MapsAny] = (AdminOnly, "make any map public or private, and invite people to it", false),
         ["sessions"] = (AdminOnly, "list connections and addresses", false),
         ["user"] = (AdminOnly, "read an account", false),
@@ -129,9 +130,11 @@ public static class Permissions
     /// <summary>What an Admin does not have: only an owner makes or unmakes owners.</summary>
     private static bool OwnerOnly(string permission) => permission == Owners;
 
-    /// <summary>The main name of a command typed under another one.</summary>
+    /// <summary>The main name of a command typed under another one, or of the command whose
+    /// permission it shares: /unban and /bans are ban's.</summary>
     public static string Canonical(string command) => command switch
     {
+        "unban" or "bans" => "ban",
         "locate" => "where",
         "goto" => "tp",
         "teleport" => "tp",
