@@ -779,6 +779,10 @@ public partial class ClientAudioSystem
                         EqHigh = echo.EqHigh,
                         AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
                         ReflectionSpread = path.Spread,
+                        // A rough wall's scattered share, √s of the pressure, is smeared by its roughness;
+                        // the mirror share stays a clean copy (EchoWashState; nothing at all off a smooth wall).
+                        EchoScattering = path.Scattering,
+                        EchoMirrorShare = MathF.Sqrt(1f - Math.Clamp(path.Scattering, 0f, 1f)),
                         // Not a reverb send: the provider uses bleed only to pull an apparent position
                         // toward the real one, and a copy's two are the same.
                         TransmissionBleed = path.MaterialAbsorption * 0.5f 
@@ -1639,7 +1643,10 @@ public partial class ClientAudioSystem
             float d2 = Vector3.DistanceSquared(snap.Transform.Position, eyePos);
             // The keep bias and the hold stop the set churning as cars trade places (EngineKeepBias).
             float key = _liveEngines.Contains(entityId) ? d2 * (EngineKeepBias * EngineKeepBias) : d2;
-            if (_engineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds)
+            // A donor (last pass's) is not held: held, a new donor ranked first, took a slot inside the
+            // budget and turned out the car at its edge for 2.5 s.
+            if (_engineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds
+                && !_presetDonors.Contains(entityId))
                 key = -1f;
             // The one you are sitting in is never ranked out: it is the loudest thing in your world.
             if (entityId == _state.RidingEntityId) key = float.NegativeInfinity;
@@ -1718,6 +1725,7 @@ public partial class ClientAudioSystem
             _audio.ReviveEngine(id);
             if (!_engineStarted.ContainsKey(id)) _engineStarted[id] = now;
             _engineSourceByPreset[preset] = id;
+            _presetDonors.Add(id);
             _engineRetiring.Remove(id);
             int borrowed = DistantVoiceBase - Math.Abs(id);
             if (_distantBoundTo.Remove(borrowed)) _audio.StopSound(borrowed);
@@ -3678,43 +3686,61 @@ public partial class ClientAudioSystem
             // The floor the foot is on: the step is made of it already.
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(stepPos.Y, ear.Y) - 0.2f) continue;
             if (a.Order >= 2 && ++secondOrder > WorldAudioPlayer.MaxSecondOrderCopies) continue;
-            // The mirror share only (WorldAudioPlayer.MirrorShare): a step is a bank sample, so its
-            // scattered share has no wash to go to yet.
-            float gain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference)
-                       * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order);
+            float placed = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference);
+            float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
+            float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
+            // A first-order wall's scattered share, √s of the pressure, as its wash: the step smeared by the
+            // wall's roughness, coloured by what it absorbs but not by the mirror's loss (a one-off sound's
+            // wash, WorldAudioPlayer.QueueWash). Nothing off a smooth wall.
+            float s = Math.Clamp(a.Scattering, 0f, 1f);
+            float wash = a.Order == 1 && OpenFPS.Client.AudioEngine.Fmod.EchoWashState.Applies(s) ? placed * MathF.Sqrt(s) : 0f;
+            if (wash >= OpenFPS.Common.ImageSource.MinGain)
+                SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb,
+                               wash * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim, lowDb, highDb, s);
+            // The mirror share (WorldAudioPlayer.MirrorShare), a clean copy.
+            float gain = placed * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order);
             if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
             gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
             var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
-            float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
-            float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
-            int echoId = STEP_ECHO_BASE_ID - (_stepEchoIndex % STEP_ECHO_POOL_SIZE);
-            _stepEchoIndex++;
-            _audio.Submit(new SpatialEmitter
-            {
-                EntityId = echoId,
-                SoundId = soundId,
-                Position = a.ImagePosition,
-                ApparentPosition = a.ImagePosition,
-                Type = EmitterType.WorldLocked,
-                // Scaled by what the surfaces and the longer path kept; the renderer's 1/r at the image
-                // is undone in `gain`, as for every copy.
-                Volume = stepGain * gain,
-                MinDistance = stepReference,
-                EarLevelDb = stepLevelDb,
-                EarCopyDb = 20f * MathF.Log10(MathF.Max(1e-6f, gain)),
-                Range = 25f,
-                // No DelayMs: the facade delays every submission by its distance, and the image is the
-                // whole path away.
-                IsReflection = true,
-                IsEvent = true,
-                // The path is this: clear both legs (checked when it was found), coloured by the walls.
-                CarriesPath = true,
-                Occlusion = 0f, ApertureFactor = 1f, TransmissionBleed = 0f,
-                EqLow = MathF.Pow(10f, (loss.LowDb + lowDb) / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, (loss.HighDb + highDb) / 20f),
-                TargetRegionId = _listenerRegion,
-            });
+            SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb, gain, loss.LowDb + lowDb, loss.HighDb + highDb, 0f);
             if (++added >= WorldAudioPlayer.MaxRoomEchoes) break;
         }
+    }
+
+    /// <summary>One copy of your step at a wall's image: the mirror (<paramref name="smear"/> 0) or the
+    /// wall's wash, smeared by its roughness in the mixer (EchoWashState).</summary>
+    private void SubmitStepCopy(in OpenFPS.Common.EarlyReflections.Arrival a, string soundId, float stepGain, float stepReference,
+                                float stepLevelDb, float gain, float eqLowDb, float eqHighDb, float smear)
+    {
+        int echoId = STEP_ECHO_BASE_ID - (_stepEchoIndex % STEP_ECHO_POOL_SIZE);
+        _stepEchoIndex++;
+        _audio.Submit(new SpatialEmitter
+        {
+            EntityId = echoId,
+            SoundId = soundId,
+            Position = a.ImagePosition,
+            ApparentPosition = a.ImagePosition,
+            Type = EmitterType.WorldLocked,
+            // Scaled by what the surfaces and the longer path kept; the renderer's 1/r at the image
+            // is undone in `gain`, as for every copy.
+            Volume = stepGain * gain,
+            MinDistance = stepReference,
+            EarLevelDb = stepLevelDb,
+            EarCopyDb = 20f * MathF.Log10(MathF.Max(1e-6f, gain)),
+            Range = 25f,
+            // No DelayMs: the facade delays every submission by its distance, and the image is the
+            // whole path away.
+            IsReflection = true,
+            IsEvent = true,
+            // The path is this: clear both legs (checked when it was found), coloured by the walls.
+            CarriesPath = true,
+            Occlusion = 0f, ApertureFactor = 1f, TransmissionBleed = 0f,
+            EqLow = MathF.Pow(10f, eqLowDb / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, eqHighDb / 20f),
+            TargetRegionId = _listenerRegion,
+            // All of it smeared: the mirror is its own voice.
+            EchoScattering = smear,
+            EchoMirrorShare = 0f,
+        });
     }
 
     /// <summary>The map's outdoor ambience bed, from the manifest; started by the next audio update.</summary>

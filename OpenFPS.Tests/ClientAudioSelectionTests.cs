@@ -100,6 +100,37 @@ public class ClientAudioSelectionTests
         Assert.Equal(budget, Enumerable.Range(1, budget).Count(h.Mixer.Live.Contains));
     }
 
+    /// <summary>
+    /// A donor arriving on a full budget takes no slot in it: no car inside is let go and rebuilt. Held as
+    /// a newly built engine for its first 2.5 s, a new donor ranked first and turned out the car at the
+    /// budget's edge, which came back when the hold ran out.
+    /// </summary>
+    [Fact]
+    public void ANewDonorDoesNotTurnOutACarInTheBudget()
+    {
+        var h = new ClientAudioHarness();
+        h.StandAt(Vector3.Zero);
+        int budget = ClientAudioSystem.EngineVoiceBudget;
+        int n = budget + 4;
+        for (int i = 0; i < n; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i * 2f, 0f, 0f));
+        h.Tick(budget);
+        h.Wait(3.0);
+        h.Tick(budget);
+        Assert.Equal(budget, Enumerable.Range(1, budget).Count(h.Mixer.Live.Contains));
+
+        int starts = h.Mixer.Started.Count, stops = h.Mixer.Stopped.Count;
+        const int Lone = 5000;
+        h.AddCar(Lone, "school_bus", new Vector3(0f, 0f, 200f));
+        for (int s = 0; s < 60; s++) { h.Wait(0.1); h.Tick(); }
+        var started = h.Mixer.Started.Skip(starts).Select(e => e.EntityId).ToList();
+        var stopped = h.Mixer.Stopped.Skip(stops).ToList();
+        _o.WriteLine($"6 s after the bus arrived: started {string.Join(", ", started)}; stopped {string.Join(", ", stopped)}");
+        Assert.Contains(Lone, h.Mixer.Live);
+        Assert.Empty(stopped.Where(id => id >= 1 && id <= budget));
+        Assert.Empty(started.Where(id => id >= 1 && id <= budget));
+        Assert.Equal(budget, Enumerable.Range(1, budget).Count(h.Mixer.Live.Contains));
+    }
+
     /// <summary>At most twelve cars borrow, the nearest outside the live budget: a borrowed voice is
     /// still a placed, filtered voice, and past them a car cannot be picked out of the pack.</summary>
     [Fact]

@@ -333,6 +333,44 @@ public partial class FmodAudioProvider : IAudioProvider
         _diffractionPool.Push(dsp);
     }
 
+    /// <summary>A wash unit and the state its callback reads. Pooled with its handle, so a footstep's
+    /// copies do not leave a handle behind for every step.</summary>
+    private sealed class PooledWashDsp
+    {
+        public FMOD.DSP Dsp;
+        public System.Runtime.InteropServices.GCHandle Handle;
+        public readonly EchoWashState State = new();
+    }
+    private readonly System.Collections.Concurrent.ConcurrentStack<PooledWashDsp> _washPool = new();
+
+    /// <summary>A wash unit set for this surface. Pooled units are detached, so the state is safe to change.</summary>
+    private PooledWashDsp? GetWashDsp(float scattering, float mirrorShare, int seed)
+    {
+        if (!_washPool.TryPop(out var wash))
+        {
+            wash = new PooledWashDsp();
+            if (EchoWashProcessor.CreateDSP(_system, wash.State, out wash.Dsp, out wash.Handle) != RESULT.OK) return null;
+        }
+        _system.getSoftwareFormat(out int rate, out _, out _);
+        wash.State.Configure(scattering, mirrorShare, seed, rate);
+        return wash;
+    }
+
+    private void ReleaseWashDsp(ActiveSound active)
+    {
+        var wash = active.Wash;
+        if (wash == null) return;
+        active.Wash = null;
+        // Still in some channel's chain: dropped, its callback told to pass through, the handle kept.
+        if (!Detach(active.Channel, wash.Dsp, "echo wash"))
+        {
+            wash.Dsp.setUserData(IntPtr.Zero);
+            if (wash.Handle.IsAllocated) _retiredHandles.Add(wash.Handle);
+            return;
+        }
+        _washPool.Push(wash);
+    }
+
     /// <summary>
     /// Takes every room's reverberation unit off its bus and frees both, in that order. FMOD refuses
     /// to release a unit still attached (said only in its logging build: "Failed to release because
@@ -439,8 +477,10 @@ public partial class FmodAudioProvider : IAudioProvider
         /// <summary>A sound made for this voice alone (a voice-chat packet). Released with the voice,
         /// never before: releasing an FMOD sound stops every channel that is playing it.</summary>
         public FMOD.Sound OwnedSound;
-        public FMOD.DSP ThreeEqDsp; 
-        public FMOD.DSP DiffractionDsp; 
+        public FMOD.DSP ThreeEqDsp;
+        public FMOD.DSP DiffractionDsp;
+        /// <summary>A recording's copy off a rough wall: its smear (EchoWashState), pooled.</summary>
+        public PooledWashDsp? Wash;
         
         // Granular state
         public FMOD.DSP GranularDsp;
@@ -2738,7 +2778,21 @@ public partial class FmodAudioProvider : IAudioProvider
             channel.set3DLevel(1.0f);
             PlaceInHead(channel, emitter.FollowsListener ? emitter.ListenerOffset : emitter.Position - _listenerPos);
         }
-        
+
+        // A recording's copy off a rough wall: its scattered share smeared by the wall's roughness. Added
+        // last at the tail, so it is the first thing the signal meets.
+        PooledWashDsp? wash = null;
+        if (emitter.IsReflection && !emitter.IsSynth && !emitter.IsGranular && emitter.Type != EmitterType.UI
+            && EchoWashState.Applies(emitter.EchoScattering))
+        {
+            wash = GetWashDsp(emitter.EchoScattering, emitter.EchoMirrorShare, emitter.EntityId);
+            if (wash != null && channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, wash.Dsp) != RESULT.OK)
+            {
+                _washPool.Push(wash);
+                wash = null;
+            }
+        }
+
         channel.setVolume(emitter.Volume);
         channel.setPitch(emitter.IsGranular || emitter.IsSynth ? 1.0f : emitter.Pitch); 
 
@@ -2785,7 +2839,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 LastStrikes = emitter.WheelStrikes, 
                 EntityId = emitter.EntityId, SoundId = emitter.SoundId, Type = emitter.Type, 
                 OverloadExempt = overDb > 0f,
-                Channel = channel, ThreeEqDsp = threeEqDsp, DiffractionDsp = diffractionDsp,
+                Channel = channel, ThreeEqDsp = threeEqDsp, DiffractionDsp = diffractionDsp, Wash = wash,
                 GranularDsp = granularDsp, GranularHandle = granularHandle, GranularState = granularState,
                 SynthDsp = synthDsp, SynthHandle = synthHandle, SynthState = synthState,
                 EngineDsp = engineDsp, EngineHandle = engineHandle, EngineState = engineState, EchoState = echoState,
@@ -3353,6 +3407,7 @@ public partial class FmodAudioProvider : IAudioProvider
         ReleaseSteamAudioVoice(active);
         ReleaseThreeEqDsp(active.Channel, active.ThreeEqDsp);
         ReleaseDiffractionDsp(active.Channel, active.DiffractionDsp);
+        ReleaseWashDsp(active);
         ReleaseSendTapDsp(active);
         ReleaseEar(active);
         // The owned units too: FMOD refuses to release an attached unit ("Failed to release because
@@ -4926,6 +4981,7 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_boundaryHandle.IsAllocated) _boundaryHandle.Free();
         foreach (var h in _retiredHandles) if (h.IsAllocated) h.Free();
         _retiredHandles.Clear();
+        while (_washPool.TryPop(out var wash)) if (wash.Handle.IsAllocated) wash.Handle.Free();
         if (_isInitialized) _system.release();
     }
 }

@@ -53,18 +53,29 @@ Waiting on Cody's ear:
 - The world editor dialog in the game (F12: tabs, labels, Control+Tab), and `/editorkeys on` with
   Orca, then NVDA.
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
+- The hull's blows in time (inbox/probable-bugs-2026-10-09/1-hull).
+- Recorded sounds' echoes smeared off rough walls: your steps and a PA (inbox/probable-bugs-2026-10-09/4-scattering).
 
 ## Now
 
 ### Probable bugs
-Found by the housekeeping on 2026-10-07. The rest were fixed and merged in 246a4e1c (heard by Cody);
-these four were not part of it. Fixes go on their own branch.
-- A hull's blow lands at the start of its block, up to 2.7 ms early (`ShoreSynth.HullPlate.Blow` does
-  not read `at`).
-- The fire's fizz is scaled by `CracklePart` (FireSynth.cs 870).
-- Not heard: `AcousticPathData.ReflectionId` and `Scattering` are written and never read.
-- A new engine donor is held for 2.5 s inside the budget, so one budget car is let go once and rebuilt
-  2.5 s later (docs/COVERAGE_2026-10-06.md).
+Found by the housekeeping on 2026-10-07. The rest were fixed and merged in 246a4e1c (heard by Cody).
+The last four were handled on 2026-10-09, on their own branch (renders in inbox/probable-bugs-2026-10-09):
+- Fixed, waiting on Cody's ear: a hull's blow now lands at its own sample in the block. It landed at the
+  block's start, 0 to 2.7 ms early (1.2 ms on average).
+- Fixed, no sound change in the game: the fire's fizz has its own part (`FireSynth.FizzPart`, lab
+  `parts=fizz`). It was muted with the crackles in the lab. In the game every part is 1, so the game's
+  fire is the same to the bit.
+- `AcousticPathData.ReflectionId` is read (the reflection slots, fixed in 0e0e5ae6). `Scattering` is now
+  read too (Cody asked, 2026-10-09): a recording's copy off a rough wall keeps its mirror share clean and
+  smears the scattered share through the engines' EchoDiffuser. Your footsteps get the wash they lacked.
+  Waiting on Cody's ear (inbox/probable-bugs-2026-10-09/4-scattering).
+- Seen, not changed: a recorded loop's copy starts at its source's play position only to the nearest
+  mixer block, so its delay off one wall came out 41 ms in one run and 57 ms in another.
+- Fixed: a new engine donor is no longer held for 2.5 s inside the budget, so the car at the budget's edge
+  is not let go and rebuilt when a donor arrives.
+- Seen, not changed: a pocket's ring on a hull starts one block (2.7 ms) after the pocket itself
+  (`HullPlate.Ring` is queued after the block's drives were laid down).
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.

@@ -93,6 +93,29 @@ Recent work, newest first. `git log` has the rest.
   scale within seconds. EngineRenderCostTests holds each change against the code it replaced.
   The hybrid CPU inflates what top shows: the pool's threads land on the 3.3 GHz cores and read about
   half as much again as the same work on one fast core.
+- The last four probable bugs from the 2026-10-07 housekeeping. Renders in inbox/probable-bugs-2026-10-09.
+  - A wave's blow on a moored boat's hull lands at its own sample in the block. It landed at the start
+    of the block, 0 to 2.7 ms early (1.2 ms on average, measured on the aluminium hull's blows). Levels
+    are unchanged.
+  - The fire's fizz has its own part, `FireSynth.FizzPart` (lab: `parts=fizz`). It was scaled by the
+    crackles' part, so muting the crackles in the lab muted the fizz too. The game's fire is unchanged to
+    the bit (every part is 1 in the game).
+  - `AcousticPathData.ReflectionId` is read since 0e0e5ae6. `Scattering` is read now too (Cody asked).
+    A recording's copy off a wall is split as the wall splits it. The mirror share stays a clean copy.
+    The scattered share goes through the engines' EchoDiffuser in the mixer (EchoWashState, a unit at
+    the input end of the copy's chain). Walls of scattering 0.05 or less (glass, marble, still water) are
+    left exactly as they were.
+    - A recorded loop's copy (a PA) is one voice: √(1 − s) clean plus √s smeared.
+    - Your own step gets a second voice beside its clean copy off a first-order wall: √s of the copy,
+      all smeared, coloured by the wall but without the mirror's roughness loss. This is what one-off
+      sounds have had since 2026-09-28. Before, the scattered share was dropped.
+    - Claps and gunshots are unchanged.
+    - Off brick, a step's echo now spreads its energy over 19.8 ms instead of 4.2 ms, crest 20.2 dB
+      instead of 22.6 dB, and 4 dB more of it.
+    - AudioLab: `--probable-bugs scene=scatter wall=Glass|Brick`.
+  - A preset's donor engine is no longer held as a new engine. Held, it ranked first for 2.5 s, took a
+    slot inside the budget, and the car at the budget's edge was let go and rebuilt (with every borrowed
+    voice restarted) each time a donor arrived.
 
 ## 2026-10-07
 

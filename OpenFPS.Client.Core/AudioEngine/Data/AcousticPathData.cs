@@ -29,8 +29,8 @@ public struct AcousticPathData
     /// voice (ClientAudioSystem.AssignReflectionSlots).</summary>
     public int ReflectionId;
     public float ReflectionDelayMs;
-    // TODO: a recorded loop's copy is not smeared by it, as an engine's echo is (EngineEchoState.Scattering).
-    /// <summary>How rough the surface is, 0..1; the copy's width (<see cref="Spread"/>) is made from it.</summary>
+    /// <summary>How rough the surface is, 0..1: the copy's width (<see cref="Spread"/>), and the share of a
+    /// recording's copy that is smeared (SpatialEmitter.EchoMirrorShare).</summary>
     public float Scattering;
     public float Spread; // degrees, 0-360: the sound's width
 

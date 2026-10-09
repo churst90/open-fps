@@ -185,7 +185,7 @@ public class NatureTests
     public void AFirePuffsAtTheRateItsWidthSets()
     {
         var spec = FireSpec.ByName("fire_pit");
-        var fire = new FireSynth(spec, Rate, 3) { CracklePart = 0f, SteamPart = 0f, SettlePart = 0f };
+        var fire = new FireSynth(spec, Rate, 3) { CracklePart = 0f, FizzPart = 0f, SteamPart = 0f, SettlePart = 0f };
         int hop = Rate / 50;
         var env = new List<double>();
         double e = 0;

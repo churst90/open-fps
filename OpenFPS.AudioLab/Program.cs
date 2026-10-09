@@ -64,7 +64,7 @@ string[] usage =
     "  --binaural-input                              a mono voice through the binaural stage in FMOD against the HRTF alone",
     "  --game-levels [out=DIR] [set=measure|render|compare|all|ear|wind|faults|faults-ac|faults-squeal|faults-landing] [cars=a,b] [ear=on|off] [listening=] [calm=]",
     "                                                one thing at a time through the real mixer, captured; spectra [preset ...] for an engine's bass",
-    "  --probable-bugs scene=pa|landing|bell|yard|rooms|upmix [out=DIR] [room=flat|stair|street]",
+    "  --probable-bugs scene=pa|landing|bell|yard|rooms|upmix|scatter [out=DIR] [room=flat|stair|street] [wall=Glass|Brick]",
     "                                                the 2026-10-07 probable bugs through the real mixer, captured",
     "  --wide-sources [out=DIR] [set=measure|roofs|tree|render|level|all] [wide=on|off] [sec=] [turbulence=] [collapse=on] [spread=] | cost",
     "                                                a tree, the fountain, the fire and rain through the game path, for interaural coherence; cost: what they cost the mixer",
