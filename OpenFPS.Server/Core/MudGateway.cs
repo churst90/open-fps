@@ -322,7 +322,7 @@ public class MudGateway
     }
 
     /// <summary>A game message as a line for the MUD player; empty for what a text player is not told.</summary>
-    private static string FormatReply(IMessage reply)
+    internal static string FormatReply(IMessage reply)
     {
         return reply switch
         {
@@ -346,14 +346,18 @@ public class MudGateway
             ChatMessage c => c.Channel switch
             {
                 ChatChannel.Private when c.To.Length > 0 => $"[to {c.To}]: {c.Text}",
-                ChatChannel.Private => $"[from {c.Sender}]: {c.Text}",
-                ChatChannel.All => $"[{c.Sender}, to all]: {c.Text}",
-                ChatChannel.Team => $"[{c.Sender}, to team]: {c.Text}",
-                _ => $"[{c.Sender}]: {c.Text}",
+                ChatChannel.Private => $"[from {Who(c)}]: {c.Text}",
+                ChatChannel.All => $"[{Who(c)}, to all]: {c.Text}",
+                ChatChannel.Team => $"[{Who(c)}, to team]: {c.Text}",
+                _ => $"[{Who(c)}]: {c.Text}",
             },
             _ => ""
         };
     }
+
+    /// <summary>The sender as the game client names them: "admin [Mafia] Owner".</summary>
+    private static string Who(ChatMessage c)
+        => c.Sender + (c.Team.Length > 0 ? $" [{c.Team}]" : "") + (c.Title.Length > 0 ? $" {c.Title}" : "");
 
     /// <summary>
     /// A world editor menu as numbered lines, each with what to type for it: the same menu the game

@@ -14,7 +14,9 @@ namespace OpenFPS.Server.Core;
 /// permission is what allows them on any map. Owning a map is a scope, not a role.
 ///
 /// The roles and the table are in docs/SERVER_SECURITY.md: a Moderator looks after people and never the
-/// world, a Dev builds and tests the world and has no power over people, an Admin has everything.
+/// world, a Dev builds and tests the world and has no power over people, an Admin has everything but
+/// <see cref="Owners"/>, and an Owner has everything. Power comes from roles and grants only, never
+/// from an account's name.
 /// </summary>
 public static class Permissions
 {
@@ -42,6 +44,10 @@ public static class Permissions
     /// <summary>Holding and firing the admin gun, and setting it: /calibre, /admingun. The admin's alone.</summary>
     public const string AdminGun = "admin-gun";
 
+    /// <summary>Making somebody an owner, or changing an owner's role. An Owner's alone, so an Admin
+    /// cannot lock the server's owner out.</summary>
+    public const string Owners = "owners";
+
     /// <summary>The world editor (F12, /edit): on any map with it, on your own map without it, and on a
     /// map whose owner made you one of its editors (<see cref="ForMapEditors"/>). docs/WORLD_EDITOR.md.</summary>
     public const string Edit = "edit";
@@ -52,7 +58,7 @@ public static class Permissions
     public static readonly IReadOnlyList<string> Powers = new[]
     {
         FireAny, JoinPrivate, EditAny, MovePlayer, GivePremium, TeleportFree, GrantAny, PermsAny, Protected, MapsAny, AdminGun,
-        EditModels,
+        EditModels, Owners,
     };
 
     /// <summary>
@@ -66,7 +72,7 @@ public static class Permissions
         ModDev = { UserRole.Moderator, UserRole.Dev }, AdminOnly = Array.Empty<UserRole>();
 
     /// <summary>Every gated permission, the roles below Admin that have it on any map, and whether
-    /// everybody has it on a map they own. Admin has them all.</summary>
+    /// everybody has it on a map they own. Owner has them all, Admin all but <see cref="OwnerOnly"/>.</summary>
     private static readonly Dictionary<string, (UserRole[] Roles, string What, bool OwnMap)> Table = new()
     {
         ["announce"] = (Mod, "say something to everybody as staff", false),
@@ -117,7 +123,11 @@ public static class Permissions
         ["unlock"] = (AdminOnly, "unlock an account", false),
         ["setrole"] = (AdminOnly, "change a player's role", false),
         ["role"] = (AdminOnly, "make and change custom roles", false),
+        [Owners] = (AdminOnly, "make somebody an owner, or change an owner's role; owners only", false),
     };
+
+    /// <summary>What an Admin does not have: only an owner makes or unmakes owners.</summary>
+    private static bool OwnerOnly(string permission) => permission == Owners;
 
     /// <summary>The main name of a command typed under another one.</summary>
     public static string Canonical(string command) => command switch
@@ -143,11 +153,55 @@ public static class Permissions
     /// <summary>What a custom role or a /grant may carry: any permission but the ones that hand out
     /// permissions and roles. Those stay with administrators.</summary>
     public static bool Grantable(string permission)
-        => IsGated(permission) && permission is not ("grant" or "revoke" or "setrole" or "role" or GrantAny);
+        => IsGated(permission) && permission is not ("grant" or "revoke" or "setrole" or "role" or GrantAny or Owners);
 
     /// <summary>Whether a role has a permission without any grant.</summary>
-    public static bool RoleHas(UserRole role, string permission)
-        => role == UserRole.Admin || (Table.TryGetValue(permission, out var t) && t.Roles.Contains(role));
+    public static bool RoleHas(UserRole role, string permission) => role switch
+    {
+        UserRole.Owner => true,
+        UserRole.Admin => !OwnerOnly(permission),
+        _ => Table.TryGetValue(permission, out var t) && t.Roles.Contains(role),
+    };
+
+    /// <summary>The built-in roles' names as typed, which a custom role may not take.</summary>
+    public static readonly IReadOnlySet<string> BuiltInRoleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "player", "dev", "developer", "admin", "administrator", "mod", "moderator", "owner",
+    };
+
+    /// <summary>A built-in role by any of its typed names; null for anything else.</summary>
+    public static UserRole? BuiltInRole(string name) => name.ToLowerInvariant() switch
+    {
+        "player" => UserRole.Player,
+        "dev" or "developer" => UserRole.Dev,
+        "admin" or "administrator" => UserRole.Admin,
+        "mod" or "moderator" => UserRole.Moderator,
+        "owner" => UserRole.Owner,
+        _ => null,
+    };
+
+    /// <summary>A role in a sentence: "an owner", "a developer".</summary>
+    public static string RoleWord(UserRole role) => role switch
+    {
+        UserRole.Owner => "owner",
+        UserRole.Admin => "administrator",
+        UserRole.Dev => "developer",
+        UserRole.Moderator => "moderator",
+        _ => "player",
+    };
+
+    /// <summary>
+    /// The role said after a name in chat: a custom role's name, or the built-in role's, capitalised;
+    /// "" for an ordinary player, who carries no title.
+    /// </summary>
+    public static string ChatTitle(UserRole role, string? customRole)
+    {
+        string word = !string.IsNullOrEmpty(customRole) ? customRole : role == UserRole.Player ? "" : RoleWord(role);
+        return word.Length == 0 ? "" : char.ToUpperInvariant(word[0]) + word[1..];
+    }
+
+    /// <summary>Staff are heard as staff in chat: every built-in role above Player.</summary>
+    public static bool IsStaff(UserRole role) => role != UserRole.Player;
 
     /// <summary>Whether this account may: by its role, or by a permission granted to it.</summary>
     public static bool Has(UserRole role, IReadOnlyCollection<string> grants, string permission)

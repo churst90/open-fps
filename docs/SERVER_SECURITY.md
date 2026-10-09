@@ -5,9 +5,10 @@ commands that show it. For running a server on a VPS, see `WINDOWS_AND_SERVER.md
 
 ## Roles
 
-There are four roles: Player, Moderator, Dev (developer) and Admin. A new account is a Player. Only
-an Admin changes a role (`/setrole NAME player|moderator|dev|admin`). The seeded `admin` account is
-an Admin.
+There are five roles: Player, Moderator, Dev (developer), Admin and Owner. A new account is a
+Player. Only an Admin or Owner changes a role (`/setrole NAME player|moderator|dev|admin|owner`). The
+seeded `admin` account is the Owner. Power comes only from roles and grants: no check looks at an
+account's name.
 
 - **Player**: the game, and building on maps of their own.
 - **Moderator**: looks after people, never the world. Announcements, where somebody is, bringing
@@ -16,9 +17,20 @@ an Admin.
 - **Dev**: builds and tests the world, on any map. Spawning, firing any weapon, giving ordinary
   items, joining private maps, and granting a player permissions the developer holds. No power over
   people.
-- **Admin**: everything, and alone changes roles, makes custom roles, grants anything to anybody,
-  gives premium items (the teleporter, vehicles), moves other players, and sees and changes accounts
-  and addresses.
+- **Admin**: everything but `owners`, and alone changes roles, makes custom roles, grants anything
+  to anybody, gives premium items (the teleporter, vehicles), moves other players, and sees and
+  changes accounts and addresses.
+- **Owner**: everything, including `owners`.
+
+**The Owner role** (2026-10-09) is there so the server can never lock its owner out:
+- `/role create|add|remove|delete owner` are refused, as for every built-in role. A custom role
+  called `owner` in an older `roles.json` is not loaded.
+- `/setrole` on an owner, or to `owner`, needs `owners`, which only the Owner role has and nobody
+  can be granted. The last owner keeps the role, and nobody changes their own role.
+- `/grant` and `/revoke` refuse an owner: the role already has every permission.
+- On start, if no account is an Owner, the `admin` account becomes one (its custom role is
+  cleared). With no `admin` account the server logs a warning.
+- An owner can be kicked or muted by somebody with `protected` (an Admin), as an Admin can.
 
 A permission is a command's name, or one of the powers at the end of the table. Roles are sets of
 permissions, in `OpenFPS.Server/Core/Permissions.cs`. The agreed table is
@@ -52,8 +64,10 @@ You can now use: move, put, spawn."
 **Single permissions.** `/grant sean give`, `/revoke sean give`. Grants are kept with the account.
 An Admin (`grant-any`) grants anything to anybody. A Dev grants and revokes only permissions they
 hold, only for players, and never for somebody whose custom role can do something the Dev cannot.
-`grant`, `revoke`, `setrole`, `role` and `grant-any` cannot be granted. `/perms` lists your own,
+`grant`, `revoke`, `setrole`, `role`, `grant-any` and `owners` cannot be granted. `/perms` lists your own,
 `/perms NAME` (`perms-any`) someone else's, `/perms all` every permission.
+
+The Owner has every row. The Admin has every row but the last.
 
 | Permission | Player | Moderator | Dev | Admin |
 | --- | --- | --- | --- | --- |
@@ -86,6 +100,7 @@ hold, only for players, and never for somebody whose custom role can do somethin
 | `maps-any`: `/map public`, `private`, `invite` on a map that is not yours | no | no | no | yes |
 | `sessions`, `user` (`/account`), `throttled` (`/ratelimit`), `unlock` | no | no | no | yes |
 | `setrole`, `role` (custom roles) | no | no | no | yes |
+| `owners`: make an owner, change an owner's role | no | no | no | no |
 
 A mute lasts for the session or until it runs out.
 
@@ -233,8 +248,9 @@ Lost on restart:
   that are locked, with the time left.
 - `/unlock <name>`: lifts a name's lock and forgets its failures. `/unlock <address>` gives an
   address its limits back.
-- `/setrole <name> player|moderator|dev|admin|<custom role>`: changes a role. An online player gets
-  the new role at once. You cannot change your own.
+- `/setrole <name> player|moderator|dev|admin|owner|<custom role>`: changes a role. An online player
+  gets the new role at once. You cannot change your own. Only an owner changes an owner or makes one,
+  and the last owner stays one.
 
 ## Upgrading an older accounts database
 

@@ -31,6 +31,7 @@ public class SqliteUserRepository : IUserRepository
         _dummyHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N"), WorkFactor);
         EnsureDatabaseCreated();
         EnsureAdminSeed();
+        EnsureOwner();
     }
 
     private void EnsureDatabaseCreated()
@@ -107,7 +108,7 @@ public class SqliteUserRepository : IUserRepository
     }
 
     /// <summary>
-    /// Seeds an admin on the first run. With OPENFPS_ADMIN_PASSWORD set, that is its password, and on
+    /// Seeds the admin account, an Owner, on the first run. With OPENFPS_ADMIN_PASSWORD set, that is its password, and on
     /// an existing database the admin's password is reset to it. A server reachable from the internet
     /// must be started with it at least once: admin/admin123 is in this repository for anyone to read.
     /// </summary>
@@ -121,7 +122,7 @@ public class SqliteUserRepository : IUserRepository
             {
                 Username = "admin",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(string.IsNullOrEmpty(chosen) ? "admin123" : chosen, WorkFactor),
-                Role = UserRole.Admin,
+                Role = UserRole.Owner,
                 CreatedUtc = DateTime.UtcNow,
             });
             ctx.SaveChanges();
@@ -137,6 +138,32 @@ public class SqliteUserRepository : IUserRepository
             && BCrypt.Net.BCrypt.Verify("admin123", a.PasswordHash))
             Log.Warning("UserRepository: the admin password is still the default, admin123. "
                       + "Start once with OPENFPS_ADMIN_PASSWORD set before anyone else can reach this server.");
+    }
+
+    /// <summary>
+    /// A server always has an owner. A database from before the Owner role (2026-10-09), or one whose
+    /// owners were taken off by hand, makes the seeded admin account the owner again.
+    /// </summary>
+    private void EnsureOwner()
+    {
+        using var ctx = CreateContext();
+        if (ctx.Users.Any(u => u.Role == UserRole.Owner)) return;
+        if (ctx.Users.FirstOrDefault(u => u.Username == "admin") is not { } admin)
+        {
+            Log.Warning("UserRepository: no account is an owner and there is no admin account to make one. "
+                      + "Set an account's Role to Owner in the Users table.");
+            return;
+        }
+        admin.Role = UserRole.Owner;
+        admin.CustomRole = null;
+        ctx.SaveChanges();
+        Log.Information("UserRepository: no account was an owner; admin is the owner now.");
+    }
+
+    public IReadOnlyList<string> UsernamesWithRole(UserRole role)
+    {
+        using var ctx = CreateContext();
+        return ctx.Users.AsNoTracking().Where(u => u.Role == role).Select(u => u.Username).ToList();
     }
 
     public UserData? GetUser(string username)

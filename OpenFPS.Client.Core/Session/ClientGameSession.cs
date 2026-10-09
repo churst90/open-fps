@@ -1493,7 +1493,7 @@ public sealed partial class ClientGameSession : IDisposable
     private ListMenu PersonMenu(string name, bool isFriend)
     {
         var items = new List<MenuItem> { new("Private message", () => _shell.OpenCommandConsole($"/pm {name} ")) };
-        if (_role is UserRole.Admin or UserRole.Moderator) items.Add(new("Where is", () => Command("where", name)));
+        if (_role is UserRole.Owner or UserRole.Admin or UserRole.Moderator) items.Add(new("Where is", () => Command("where", name)));
         items.Add(new("View profile", () => Command("profile", name)));
         items.Add(isFriend ? new("Remove friend", () => Command("friend", "remove", name))
                            : new("Add friend", () => Command("friend", "add", name)));

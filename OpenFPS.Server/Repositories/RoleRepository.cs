@@ -78,7 +78,16 @@ public class RoleRepository
             var loaded = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(File.ReadAllText(_path));
             if (loaded == null) return;
             _roles = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kv in loaded) _roles[Key(kv.Key)] = new SortedSet<string>(kv.Value ?? new List<string>(), StringComparer.Ordinal);
+            foreach (var kv in loaded)
+            {
+                // A custom role made before its name became built in (owner, 2026-10-09) would read as one.
+                if (Core.Permissions.BuiltInRole(Key(kv.Key)) != null)
+                {
+                    Log.Warning("RoleRepository: ignoring the custom role {Role}: it has a built-in role's name.", kv.Key);
+                    continue;
+                }
+                _roles[Key(kv.Key)] = new SortedSet<string>(kv.Value ?? new List<string>(), StringComparer.Ordinal);
+            }
         }
         catch (Exception ex)
         {

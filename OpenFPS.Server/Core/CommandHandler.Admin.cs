@@ -135,6 +135,7 @@ public partial class CommandHandler
         if (!Permissions.IsGated(perm)) { Say(reply, $"'{args[1]}' is not a permission. /perms lists them."); return; }
         if (!Permissions.Grantable(perm)) { Say(reply, "Roles and permissions stay with administrators: make them an administrator instead."); return; }
         if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
+        if (record.Role == UserRole.Owner) { Say(reply, $"{record.Username} is an owner and has every permission; there is nothing to {verb}."); return; }
         // Without grant-any: only to a player, and only what the granter can do.
         if (!session.Can(Permissions.GrantAny) && GrantCeiling(session, record, perm) is { } refused) { Say(reply, refused); return; }
         var grants = Permissions.Parse(record.Permissions);
@@ -178,7 +179,7 @@ public partial class CommandHandler
             custom = record.CustomRole is { } c && _server.Roles.Exists(c) ? c : "";
         }
         var byRole = Permissions.All.Where(p => Permissions.RoleHas(role, p)).Concat(_server.Roles.PermissionsOf(custom)).Distinct().ToList();
-        string roleText = role == UserRole.Admin ? "every permission" : byRole.Count == 0 ? "nothing beyond play" : string.Join(", ", byRole);
+        string roleText = RoleText(role, byRole);
         string granted = grants.Count == 0 ? "No single permissions granted." : $"Granted: {string.Join(", ", grants.OrderBy(g => g))}.";
         string word = custom.Length > 0 ? custom : RoleWord(role);
         string article = "aeiou".Contains(char.ToLowerInvariant(word[0])) ? "an" : "a";
@@ -190,24 +191,18 @@ public partial class CommandHandler
     {
         var roles = _server.Roles;
         string customList = roles.Names.Count > 0 ? ", or one you made: " + string.Join(", ", roles.Names) : "";
-        if (args.Length < 2) { Say(reply, $"Usage: /setrole NAME ROLE. Roles: player, moderator, dev, admin{customList}."); return; }
-        UserRole? role = args[1].ToLowerInvariant() switch
-        {
-            "player" => UserRole.Player,
-            "dev" or "developer" => UserRole.Dev,
-            "admin" or "administrator" => UserRole.Admin,
-            "mod" or "moderator" => UserRole.Moderator,
-            _ => null,
-        };
+        if (args.Length < 2) { Say(reply, $"Usage: /setrole NAME ROLE. Roles: player, moderator, dev, admin, owner{customList}."); return; }
+        UserRole? role = Permissions.BuiltInRole(args[1]);
         string custom = role == null && roles.Exists(args[1]) ? RoleRepository.Key(args[1]) : "";
         if (role == null && custom.Length == 0)
-        { Say(reply, $"'{args[1]}' is not a role. Roles: player, moderator, dev, admin{customList}."); return; }
+        { Say(reply, $"'{args[1]}' is not a role. Roles: player, moderator, dev, admin, owner{customList}."); return; }
         if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
         // Not your own: an admin who demoted themselves by a slip would have nobody to put it back.
         if (record.Username.Equals(session.Username, StringComparison.OrdinalIgnoreCase))
         { Say(reply, "You cannot change your own role."); return; }
         // A custom role sits on top of Player.
         var newRole = role ?? UserRole.Player;
+        if (OwnerRefusal(session, record, newRole) is { } refusal) { Say(reply, refusal); return; }
         // Touch the custom role only to set or clear one, so a store without custom roles still works.
         bool customChanges = custom.Length > 0 || !string.IsNullOrEmpty(record.CustomRole);
         if (!_users.SetRole(record.Username, newRole)
@@ -234,10 +229,34 @@ public partial class CommandHandler
         Say(reply, $"{record.Username} is now {article} {word}.");
     }
 
+    /// <summary>
+    /// Why this role change would touch an owner and may not, or null. Only an owner makes or unmakes
+    /// owners, and the last one keeps it, so the server always has somebody who can do everything.
+    /// </summary>
+    private string? OwnerRefusal(UserSession changer, UserData target, UserRole newRole)
+    {
+        bool isOwner = target.Role == UserRole.Owner;
+        if (!isOwner && newRole != UserRole.Owner) return null;
+        if (!changer.Can(Permissions.Owners))
+            return isOwner ? $"{target.Username} is an owner; only an owner can change an owner's role."
+                           : "Only an owner can make somebody an owner.";
+        if (isOwner && newRole != UserRole.Owner
+            && !_users!.UsernamesWithRole(UserRole.Owner).Any(n => !n.Equals(target.Username, StringComparison.OrdinalIgnoreCase)))
+            return $"{target.Username} is the server's last owner. Make somebody else an owner first.";
+        return null;
+    }
+
+    private static string RoleText(UserRole role, List<string> byRole) => role switch
+    {
+        UserRole.Owner => "every permission",
+        UserRole.Admin => "every permission but owners",
+        _ => byRole.Count == 0 ? "nothing beyond play" : string.Join(", ", byRole),
+    };
+
     /// <summary>" You can now: tp, where." for a role that is a list of commands; nothing for player.</summary>
     private static string RoleSummary(UserSession s)
     {
-        if (s.Role == UserRole.Admin) return " You can use every command.";
+        if (s.Role is UserRole.Owner or UserRole.Admin) return " You can use every command.";
         var can = Permissions.All.Where(s.Can).ToList();
         return can.Count == 0 ? "" : $" You can now use: {string.Join(", ", can)}.";
     }
@@ -259,13 +278,22 @@ public partial class CommandHandler
         }
         if (args.Length < 2) { Say(reply, "Usage: /role list, create NAME [PERMISSIONS], add NAME PERMISSION, remove NAME PERMISSION, show NAME, delete NAME."); return; }
         string name = RoleRepository.Key(args[1]);
+        // The built-in roles are fixed: nothing here renames, changes or removes one, Owner least of all.
+        if (Permissions.BuiltInRole(name) is { } builtIn)
+        {
+            var has = Permissions.All.Where(p => Permissions.RoleHas(builtIn, p)).ToList();
+            Say(reply, sub == "show"
+                ? $"{name}: {RoleText(builtIn, has)}. A built-in role; it cannot be changed."
+                : builtIn == UserRole.Owner
+                    ? "owner is a built-in role with every permission. It cannot be changed or removed."
+                    : $"{name} is a built-in role. It cannot be changed or removed.");
+            return;
+        }
         switch (sub)
         {
             case "create":
             {
                 if (!RoleRepository.IsValidName(name)) { Say(reply, "A role name is 2 to 20 letters, digits, '_' or '-', starting with a letter."); return; }
-                if (name is "player" or "dev" or "developer" or "admin" or "administrator" or "mod" or "moderator")
-                { Say(reply, $"{name} is a built-in role."); return; }
                 if (!roles.Create(name)) { Say(reply, $"There is already a role called {name}."); return; }
                 var refused = new List<string>();
                 foreach (var p in args.Skip(2))
@@ -322,5 +350,5 @@ public partial class CommandHandler
 
     private static string Describe(HashSet<string> perms) => perms.Count == 0 ? "no permissions yet" : string.Join(", ", perms.OrderBy(p => p));
 
-    private static string Article(UserRole role) => role == UserRole.Admin ? "an" : "a";
+    private static string Article(UserRole role) => "aeiou".Contains(RoleWord(role)[0]) ? "an" : "a";
 }
