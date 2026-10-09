@@ -28,7 +28,8 @@ still falls, and that rain now stops. Open for Cody: a new front is drawn about 
 
 After items 1-6 (agreed with Cody 2026-10-08): performance and distant updates come before new content,
 because the one world costs CPU and bandwidth first.
-7. Reflections in their own process, only if the measurement shows tracing is the cost.
+7. Dropped 2026-10-09: reflections in their own process. The measurement showed the cost is the
+   reverb's convolution, not tracing; the convolution was made 38 % cheaper instead (heard, merged).
 8. Distant updates (CODY_ASKS item 4), while the server-tile code is fresh.
 9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3.
 10. Chat names and roles (item 8): done 2026-10-09 (protected Owner role, "admin [Mafia] Owner: hi";
