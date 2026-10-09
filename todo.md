@@ -23,6 +23,24 @@ fix are shipped (VPS 3fc38430512b).
 6. World editor phase 3: people, roads and routes, map versions, baking an overlay into a map file
    (docs/WORLD_EDITOR.md section 9).
 
+Before items 4-6: the three bugs of 2026-10-08 (E picks the door when facing a car, NPCs leave doors
+open, rain while the weather says clear), and the two cheap reflection steps (measure "Mixer load"
+with echoes on and off; nice the trace threads). See "Reflections in their own process".
+
+After items 1-6 (agreed with Cody 2026-10-08): performance and distant updates come before new content,
+because the one world costs CPU and bandwidth first.
+7. Reflections in their own process, only if the measurement shows tracing is the cost.
+8. Distant updates (CODY_ASKS item 4), while the server-tile code is fresh.
+9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3.
+10. Chat names and roles (item 8) and the editor dialog and wording (item 7). Both are small; fit them
+    between the big items.
+11. Weather as a system (item 12): rain, wet roads, wind and fire tied together.
+12. Cars in full detail: the distant-car cycle cache first (also a performance win), then lopey idle,
+    suspension, drivetrain, tyres and F1 steepening.
+13. Enemies, Dinosaur World, melee and NPC inventories (items 6 and 11).
+
+In every play session, clear the "Waiting on Cody's ear" list so heard work merges before it piles up.
+
 Waiting on Cody's ear:
 - Driving cues and horns: H horn, U siren, J and L indicators, the brake cue, line rumble, the speed
   limit, rails, gates, aircraft roll-out (inbox/driving-2026-10-06). The brake cue's notes, the rail
