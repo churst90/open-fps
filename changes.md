@@ -17,6 +17,12 @@ Recent work, newest first. `git log` has the rest.
   leaves the team out. `ChatMessage.Team` and `ChatMessage.Title` are appended; the GTK and Windows
   clients share the format in Client.Core, and the MUD reads the same names.
 - Staff in chat (the admin chord) and the "Where is" item in the people menu include owners.
+- World editor: an item that asks for a value ("Type a value", "By degrees, typed" and the rest) opens a
+  dialog with one labelled text box instead of the command line, in both clients. The box holds the
+  value now, selected; its label gives the unit and its description the range and help. Enter applies,
+  Escape cancels; a value out of range is refused with the reason and the box stays open with the text.
+  EditorMenuItem gained appended members, so the build hash changed (new Windows zip and server update
+  together). docs/WORLD_EDITOR.md section 14. Untried with Orca and NVDA.
 
 ## 2026-10-07
 

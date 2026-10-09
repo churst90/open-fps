@@ -194,6 +194,88 @@ public sealed class MainWindow : Form
     }
 
     /// <summary>
+    /// One labelled text box for a value the world editor asks for. Enter or Apply hands the text to
+    /// <paramref name="submit"/>: null closes the dialog, a reason is said and shown and the dialog
+    /// stays open with the text kept. Escape or Cancel cancels.
+    /// </summary>
+    public void AskForValue(EditorValuePrompt prompt, Func<string, string?> submit)
+    {
+        if (_modalOpen) return;
+        _modalOpen = true;
+        // The Enter that chose the item is still down, and its release goes to the dialog.
+        _input.Clear();
+
+        using var dialog = new Form
+        {
+            Text = prompt.Title,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(460, 220),
+        };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 5, Padding = new Padding(8) };
+        // UseMnemonic off: a label such as "Rock & roll" must not lose its ampersand.
+        var label = new Label { Text = prompt.Label, AutoSize = true, UseMnemonic = false };
+        // NVDA reads the name, the value (selected) and then the description.
+        var entry = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Text = prompt.Initial,
+            AccessibleName = prompt.Label,
+            AccessibleDescription = prompt.Description,
+        };
+        var about = new Label { Text = prompt.Description, AutoSize = true, MaximumSize = new Size(440, 0), UseMnemonic = false };
+        var refusal = new Label { Text = "", AutoSize = true, MaximumSize = new Size(440, 0), UseMnemonic = false };
+        var apply = new Button { Text = "Apply", AutoSize = true };
+        var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, AutoSize = true };
+        layout.Controls.Add(label, 0, 0);
+        layout.SetColumnSpan(label, 2);
+        layout.Controls.Add(entry, 0, 1);
+        layout.SetColumnSpan(entry, 2);
+        layout.Controls.Add(about, 0, 2);
+        layout.SetColumnSpan(about, 2);
+        layout.Controls.Add(refusal, 0, 3);
+        layout.SetColumnSpan(refusal, 2);
+        layout.Controls.Add(apply, 0, 4);
+        layout.Controls.Add(cancel, 1, 4);
+        dialog.Controls.Add(layout);
+        dialog.AcceptButton = apply;
+        dialog.CancelButton = cancel;
+
+        // Apply is not a DialogResult button: a refused value must leave the dialog open.
+        apply.Click += (_, _) =>
+        {
+            string? why = submit(entry.Text);
+            if (why == null) { dialog.DialogResult = DialogResult.OK; return; }
+            refusal.Text = why;
+            _cue(UiCue.MenuEdge);
+            // Focus stays in the box, so NVDA has nothing of its own to say over the reason.
+            _speech.Speak(why, interrupt: true);
+            entry.Focus();
+        };
+        dialog.Shown += (_, _) =>
+        {
+            entry.Focus();
+            entry.SelectAll();
+            // NVDA reads the dialog and the field as they take focus; speaking over it would cut it off.
+            if (!_speech.ScreenReaderRunning) _speech.Speak(prompt.Spoken, interrupt: true);
+        };
+
+        DialogResult result;
+        _openDialog = dialog;
+        try { result = dialog.ShowDialog(this); }
+        finally { _modalOpen = false; _openDialog = null; _input.Clear(); }
+
+        if (result == DialogResult.Cancel)
+        {
+            _cue(UiCue.MenuBack);
+            _speech.Speak("Cancelled.", interrupt: true);
+        }
+    }
+
+    /// <summary>
     /// The game menu: Keep playing, Main menu, Quit. Keep playing has the focus and is also what Enter
     /// and Escape do on it, so a stray key does not end the game. NVDA reads the dialog and the focused
     /// button itself; the game speaks only without it.

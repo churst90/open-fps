@@ -1,6 +1,7 @@
 using MemoryPack;
 using System.Numerics;
 using OpenFPS.Common.Components;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common.Networking;
 
@@ -61,11 +62,12 @@ public enum EditorItemKind : byte
     Menu = 1,
     /// <summary>Sends <see cref="EditorMenuItem.Command"/>, the text of an /edit command, as if typed.</summary>
     Action = 2,
-    /// <summary>Puts <see cref="EditorMenuItem.Command"/> on the command line for the player to finish (a number).</summary>
+    /// <summary>Asks for a typed value in a dialog (<see cref="EditorMenuItem.Prompt"/> and the members after
+    /// it), then sends <see cref="EditorMenuItem.Command"/> with the value on the end.</summary>
     Input = 3,
 }
 
-/// <summary>One item of a world editor menu.</summary>
+/// <summary>One item of a world editor menu. Serialised positionally: append members only.</summary>
 [MemoryPackable]
 public partial struct EditorMenuItem
 {
@@ -75,10 +77,33 @@ public partial struct EditorMenuItem
     /// <summary>The menu stays open after the action, for something done again and again (a nudge).</summary>
     public bool Stay;
 
+    // An Input item's value: what the text box is called and holds, and how the client checks it.
+    /// <summary>What the value is, said as the text box's label: "hum level", "metres east, north and up".</summary>
+    public string Prompt;
+    /// <summary>The value now, as typed: put in the box when it opens. Empty for none.</summary>
+    public string Value;
+    /// <summary>Number, Integer or Text. Text is only checked for being there; the server checks the rest.</summary>
+    public FieldType ValueType;
+    public string Unit;
+    /// <summary>The range a number must be in; double.MinValue and MaxValue when open.</summary>
+    public double Min;
+    public double Max;
+    /// <summary>One line said after the label and range.</summary>
+    public string Help;
+    /// <summary>How many numbers are typed, apart by spaces: 3 for east, north and up. 0 or 1 is one.</summary>
+    public byte Count;
+
     public EditorMenuItem()
     {
         Label = "";
         Command = "";
+        Prompt = "";
+        Value = "";
+        ValueType = FieldType.Text;
+        Unit = "";
+        Min = double.MinValue;
+        Max = double.MaxValue;
+        Help = "";
     }
 }
 

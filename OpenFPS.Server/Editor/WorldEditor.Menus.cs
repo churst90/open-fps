@@ -20,7 +20,49 @@ public sealed partial class WorldEditor
     private static EditorMenuItem Info(string label) => new() { Label = label, Kind = EditorItemKind.Info };
     private static EditorMenuItem Opens(string label, string path) => new() { Label = label, Kind = EditorItemKind.Menu, Command = path };
     private static EditorMenuItem Act(string label, string command, bool stay = true) => new() { Label = label, Kind = EditorItemKind.Action, Command = command, Stay = stay };
-    private static EditorMenuItem Typed(string label, string prefill) => new() { Label = label, Kind = EditorItemKind.Input, Command = prefill };
+
+    /// <summary>Asks for words in a dialog, then sends <paramref name="command"/> with them on the end.</summary>
+    private static EditorMenuItem Typed(string label, string command, string prompt, string help = "", string value = "")
+        => new() { Label = label, Kind = EditorItemKind.Input, Command = command, Prompt = prompt, Help = help, Value = value };
+
+    /// <summary>Asks for a number, or <paramref name="count"/> numbers, checked against the range in the dialog.</summary>
+    private static EditorMenuItem TypedNumber(string label, string command, string prompt, string unit, double min, double max,
+                                              string help = "", string value = "", int count = 1, bool whole = false)
+        => new()
+        {
+            Label = label, Kind = EditorItemKind.Input, Command = command, Prompt = prompt, Help = help, Value = value,
+            ValueType = whole ? FieldType.Integer : FieldType.Number, Unit = unit, Min = min, Max = max, Count = (byte)count,
+        };
+
+    /// <summary>Asks for a field's value: its label, unit, range and help, with the value now in the box.</summary>
+    private static EditorMenuItem TypedField(string label, FieldDescriptor field, string? value, string command)
+        => new()
+        {
+            Label = label, Kind = EditorItemKind.Input, Command = command, Prompt = field.Label, Help = field.Help,
+            Value = TypedValue(field, value),
+            ValueType = field.Type is FieldType.Number or FieldType.Integer ? field.Type : FieldType.Text,
+            Unit = field.Unit, Min = field.Min, Max = field.Max,
+        };
+
+    // What the typed moves, steps and ids take; the commands refuse the same.
+    private const string MoveWords = "metres east, north and up";
+    private const string MoveHelp = "Three numbers, such as 1 0 0 for a metre east. Negative goes west, south or down.";
+    private const double MaxMove = 1000;
+    private const string NewIdHelp = "Letters, digits, _ and -, up to 64.";
+
+    private EditorMenuItem StepItem(UserSession s)
+        => TypedNumber($"Step, {Metres(HandOf(s).Step)}, typed", "/edit step ", "nudge step", "m", 0.01, 50,
+                       "How far one nudge moves it.", FieldDescriptor.Format(HandOf(s).Step));
+
+    /// <summary>A stored value as a person would type it: a float's 0.800000011920929 is 0.8.</summary>
+    internal static string TypedValue(FieldDescriptor field, string? stored)
+    {
+        if (stored == null) return "";
+        if (field.Type is not (FieldType.Number or FieldType.Integer)) return stored;
+        if (!double.TryParse(stored, NumberStyles.Float, CultureInfo.InvariantCulture, out double d) || !double.IsFinite(d)) return "";
+        float f = (float)d;
+        return f == d ? f.ToString(CultureInfo.InvariantCulture) : d.ToString(CultureInfo.InvariantCulture);
+    }
 
     /// <summary>Sends the menu at a path, or says there is none.</summary>
     internal void SendMenu(UserSession s, string path, Action<IMessage> reply, bool refresh)
@@ -129,8 +171,8 @@ public sealed partial class WorldEditor
             items.Add(Info(d.Editors.Count == 0 ? "Editors: none besides the owner" : $"Editors: {string.Join(", ", d.Editors)}"));
             if (_maps.IsOwner(s.CurrentMapId, s.Username) || s.Can(Permissions.MapsAny))
             {
-                items.Add(Typed("Add an editor, typed", "/map editor add "));
-                items.Add(Typed("Remove an editor, typed", "/map editor remove "));
+                items.Add(Typed("Add an editor, typed", "/map editor add ", "name of the player to add"));
+                items.Add(Typed("Remove an editor, typed", "/map editor remove ", "name of the editor to remove"));
             }
         }
         return Menu("Map", items);
@@ -146,10 +188,10 @@ public sealed partial class WorldEditor
             Opens("Within 20 metres", "select.within:20"),
             Opens("Doors near you", "doors"),
             Opens("Places and rooms", "places"),
-            Typed("By name, typed", "/edit select "),
-            Typed("By number, typed", "/edit select #"),
+            Typed("By name, typed", "/edit select ", "name of the thing to select"),
+            TypedNumber("By number, typed", "/edit select #", "number of the thing to select", "", 0, int.MaxValue, whole: true),
             Act("Hold the nearest as well", "edit select add nearest"),
-            Typed("Hold one as well, by name or number, typed", "/edit select add "),
+            Typed("Hold one as well, by name or number, typed", "/edit select add ", "name of the thing to hold", "Or # and its number, such as #1002."),
         };
         if (HandOf(s).Held.Count > 0) items.Add(Act($"Let go of the {Plural(HandOf(s).Held.Count, "held thing")}", "edit select clear"));
         return Menu("Select", items);
@@ -202,7 +244,7 @@ public sealed partial class WorldEditor
         var items = new List<EditorMenuItem>
         {
             Info(Summary(s, world, e, id)),
-            Typed("Move by numbers: east, north, up", "/edit move "),
+            TypedNumber("Move by numbers: east, north, up", "/edit move ", MoveWords, "", -MaxMove, MaxMove, MoveHelp, count: 3),
             Opens($"Nudge, step {Metres(HandOf(s).Step)}", "nudge"),
             Opens($"Turn, facing {CompassOf(YawOf(world.Get<Transform>(e).Rotation))}", "turn"),
             Act("Bring to you", "edit bring"),
@@ -236,18 +278,18 @@ public sealed partial class WorldEditor
                     items.Add(Act($"{NameOf(world, e)}, {Where(world, e, feet, yaw)}", $"edit select #{id}"));
         if (hand.Held.Count > 0)
         {
-            items.Add(Typed("Move them together by numbers: east, north, up", "/edit held move "));
+            items.Add(TypedNumber("Move them together by numbers: east, north, up", "/edit held move ", MoveWords, "", -MaxMove, MaxMove, MoveHelp, count: 3));
             items.Add(Opens($"Nudge them together, step {Metres(hand.Step)}", "held.nudge"));
             items.Add(Opens("Turn them together", "held.turn"));
         }
-        items.Add(Typed("Group them, typed: a name for the group", "/edit group "));
+        items.Add(Typed("Group them, typed: a name for the group", "/edit group ", "name for the group"));
         items.Add(Act("Let go of them all", "edit select clear"));
         return Menu($"Held, {Plural(hand.Held.Count, "thing")}", items);
     }
 
     private EditorMenu HeldNudgeMenu(UserSession s)
     {
-        var items = new List<EditorMenuItem> { Typed($"Step, {Metres(HandOf(s).Step)}, typed", "/edit step ") };
+        var items = new List<EditorMenuItem> { StepItem(s) };
         foreach (var w in NudgeWords) items.Add(Act(Capital(w), $"edit held nudge {w}"));
         return Menu("Nudge them together", items);
     }
@@ -258,14 +300,14 @@ public sealed partial class WorldEditor
         Act("15 degrees anticlockwise", "edit held turn -15"),
         Act("90 degrees clockwise", "edit held turn 90"),
         Act("90 degrees anticlockwise", "edit held turn -90"),
-        Typed("By degrees, typed", "/edit held turn "),
+        TypedNumber("By degrees, typed", "/edit held turn ", "degrees to turn", "", -360, 360, "Positive turns them clockwise about their middle, negative anticlockwise."),
     });
 
     private static readonly string[] NudgeWords = { "north", "south", "east", "west", "up", "down", "forward", "back", "left", "right" };
 
     private EditorMenu NudgeMenu(UserSession s)
     {
-        var items = new List<EditorMenuItem> { Typed($"Step, {Metres(HandOf(s).Step)}, typed", "/edit step ") };
+        var items = new List<EditorMenuItem> { StepItem(s) };
         foreach (var w in NudgeWords) items.Add(Act(Capital(w), $"edit nudge {w}"));
         return Menu("Nudge", items);
     }
@@ -279,7 +321,7 @@ public sealed partial class WorldEditor
         items.Add(Act("90 degrees clockwise", "edit turn 90"));
         items.Add(Act("90 degrees anticlockwise", "edit turn -90"));
         foreach (var w in new[] { "north", "east", "south", "west" }) items.Add(Act($"Face {w}", $"edit face {w}"));
-        items.Add(Typed("By degrees, typed", "/edit turn "));
+        items.Add(TypedNumber("By degrees, typed", "/edit turn ", "degrees to turn", "", -360, 360, "Positive turns it clockwise, negative anticlockwise."));
         return Menu("Turn", items);
     }
 
@@ -287,7 +329,7 @@ public sealed partial class WorldEditor
     {
         var items = new List<EditorMenuItem>();
         foreach (int n in new[] { 2, 3, 5, 10 }) items.Add(Act($"{n} copies the way you face, a width apart", $"edit row {n}"));
-        items.Add(Typed("Copies and spacing in metres, typed", "/edit row "));
+        items.Add(Typed("Copies and spacing in metres, typed", "/edit row ", "copies, and spacing in metres", $"Up to {MaxRow} copies: 4 puts them a width apart, 4 2.5 puts them 2.5 metres apart."));
         return Menu("A row of copies", items);
     }
 
@@ -344,7 +386,7 @@ public sealed partial class WorldEditor
                 foreach (var c in choices.Take(60))
                     if (value == null || !field.Say(value).Equals(c, StringComparison.OrdinalIgnoreCase)) items.Add(Act(Capital(c), choose(c)));
             }
-            else items.Add(Typed("Type a value", typed));
+            else items.Add(TypedField("Type a value", field, value, typed));
             if (value != null && field.Type is FieldType.Number or FieldType.Integer)
             {
                 string step = FieldDescriptor.Format(field.EffectiveStep) + (field.Unit.Length > 0 ? " " + field.Unit : "");
@@ -398,7 +440,7 @@ public sealed partial class WorldEditor
         var items = new List<EditorMenuItem>
         {
             Opens($"Choosing a prefab {PlaceModeWords(hand.Mode)}. Change", "place.mode"),
-            Typed("Search, typed", "/edit find "),
+            Typed("Search, typed", "/edit find ", "words to search for", "Prefabs whose name has every word."),
         };
         if (hand.LastPlaced is { } last && _maps.Prefabs.TryGetValue(last.ToLowerInvariant(), out var lt))
             items.Add(Act($"Again: {lt.Name}, where you stand", "edit again"));
@@ -466,7 +508,7 @@ public sealed partial class WorldEditor
         var found = Find(s, words);
         var items = found.Select(t => PrefabItem(s, t)).ToList();
         if (items.Count == 0) items.Add(Info($"Nothing is called {words}."));
-        items.Add(Typed("Search again, typed", "/edit find "));
+        items.Add(Typed("Search again, typed", "/edit find ", "words to search for", "Prefabs whose name has every word."));
         return Menu($"Found for {words}, {found.Count}", items);
     }
 
@@ -515,7 +557,7 @@ public sealed partial class WorldEditor
         var kind = Catalog.Get(kindId);
         if (kind == null) return null;
         var items = kind.Ids.Where(i => kind.BuiltInJson(i) != null && !Models.IsRetired(kind.Kind, i)).OrderBy(i => i, StringComparer.OrdinalIgnoreCase)
-            .Select(id => Typed($"{id}: {kind.Name(id)}. Type the new model's id", $"/edit model new {kind.Kind} {id} "));
+            .Select(id => Typed($"{id}: {kind.Name(id)}. Type the new model's id", $"/edit model new {kind.Kind} {id} ", "id for the new model", NewIdHelp));
         return Menu($"New {kind.Spoken} from a template, as built", items);
     }
 
@@ -569,7 +611,7 @@ public sealed partial class WorldEditor
                 if (!at.IsValueList) { if (arr is { Count: > 0 }) items.Add(Act("Add a copy of the last one, to change after", add)); }
                 else if (at.Field!.Type == FieldType.Choice && at.Field.Choices.Count <= 12)
                     foreach (var c in at.Field.Choices) items.Add(Act($"Add {c}", $"{add} {c}"));
-                else items.Add(Typed("Add, typed: one or more values", $"/{add} "));
+                else items.Add(Typed("Add, typed: one or more values", $"/{add} ", $"{at.Label} to add", "One or more, apart by spaces."));
             }
             if (at.Field is { Help.Length: > 0 } f) items.Add(Info(f.Help));
             return Menu(Capital(at.Label), items);
@@ -607,7 +649,7 @@ public sealed partial class WorldEditor
             if (kind.Kind != ModelLibrary.Kinds.Engine) items.Add(Opens("Replace it with another", $"replace:{kind.Kind}:{id}"));
             if (mayChange)
             {
-                items.Add(Typed("Copy it, as it is now: type the new model's id", $"/edit model copy {kind.Kind} {id} "));
+                items.Add(Typed("Copy it, as it is now: type the new model's id", $"/edit model copy {kind.Kind} {id} ", "id for the copy", NewIdHelp));
                 items.Add(Models.IsRetired(kind.Kind, id)
                     ? Act("Bring it back: offer it for new things again", $"edit model restore {kind.Kind} {id}")
                     : Act("Retire it: offer it no longer for new things", $"edit model retire {kind.Kind} {id}"));
