@@ -100,28 +100,12 @@ public static class GeometrySpike
         return (w, solids, spawn, min, sizeMap, lat0, lon0);
     }
 
-    /// <summary>A heightfield from elevation.json (bilinear between posts), relative to the origin's height.</summary>
-    private static Func<float, float, float> LoadElevation(string path, double lat0, double lon0)
+    /// <summary>The map's own ground (MapElevation, bilinear between posts), heights over the origin's.</summary>
+    private static Func<float, float, float> LoadElevation(string mapPath)
     {
-        using var d = JsonDocument.Parse(File.ReadAllText(path));
-        var r = d.RootElement;
-        double west = r.GetProperty("west").GetDouble(), north = r.GetProperty("north").GetDouble();
-        double dlon = r.GetProperty("dlon").GetDouble(), dlat = r.GetProperty("dlat").GetDouble();
-        var rows = r.GetProperty("rows").EnumerateArray().Select(row => row.EnumerateArray().Select(v => v.ValueKind == JsonValueKind.Number ? v.GetSingle() : float.NaN).ToArray()).ToArray();
-        int nr = rows.Length, nc = rows[0].Length;
-        double kx = 111320.0 * Math.Cos(lat0 * Math.PI / 180.0), kz = 110574.0;
-        float At(int i, int j) { i = Math.Clamp(i, 0, nr - 1); j = Math.Clamp(j, 0, nc - 1); float v = rows[i][j]; return float.IsNaN(v) ? 60f : v; }
-        float Raw(float x, float z)
-        {
-            double lon = lon0 + x / kx, lat = lat0 + z / kz;
-            double fj = (lon - west) / dlon, fi = (north - lat) / dlat;
-            int i = (int)Math.Floor(fi), j = (int)Math.Floor(fj);
-            float ti = (float)(fi - i), tj = (float)(fj - j);
-            float a = At(i, j) * (1 - tj) + At(i, j + 1) * tj, b = At(i + 1, j) * (1 - tj) + At(i + 1, j + 1) * tj;
-            return a * (1 - ti) + b * ti;
-        }
-        float h0 = Raw(0, 0);
-        return (x, z) => Raw(x, z) - h0;
+        var e = OpenFPS.Server.Repositories.MapRepository.LoadFromFile(mapPath)?.Elevation;
+        if (e == null) return (_, _) => 0f;
+        return (x, z) => (float)e.HeightAt(x, z);
     }
 
     private static void AddTerrain(Tris w, Vector3 min, Vector3 size, float g, Func<float, float, float> h, int mat)
@@ -564,8 +548,7 @@ public static class GeometrySpike
         Console.WriteLine($"{mapId}: {solids.Count} solid boxes, {boxTris:N0} triangles ({sw.ElapsedMilliseconds} ms to load)");
         if (terrain > 0)
         {
-            var elev = OpenFPS.AudioLab.LabPaths.InRepo("tools", "places", mapId, "elevation.json");
-            var h = File.Exists(elev) ? LoadElevation(elev, lat0, lon0) : (_, _) => 0f;
+            var h = LoadElevation(mapPath);
             AddTerrain(w, min, size, terrain, h, w.MatIndex("Dirt"));
             Console.WriteLine($"  + terrain at {terrain} m: {w.Count - boxTris:N0} triangles, {w.Count:N0} in all");
         }

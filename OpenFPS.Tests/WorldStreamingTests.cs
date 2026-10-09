@@ -139,6 +139,7 @@ public class WorldStreamingTests
         string maps = Path.Combine(dir, "maps");
         Directory.CreateDirectory(Path.Combine(maps, "places"));
         File.Copy(Path.Combine(AppContext.BaseDirectory, "places", id + ".json"), Path.Combine(maps, "places", id + ".json"));
+        RealPlaceMapTests.CopyGround(id, Path.Combine(maps, "places"));
         AcousticRegistry.Initialize();
         var manager = new MapManager(new MapRepository(maps), new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
         manager.Initialize();

@@ -60,6 +60,15 @@ public class GeoPoint
     public double Lon { get; set; }
 }
 
+/// <summary>A point of a UTM zone: the zone, which half, and metres east and north.</summary>
+public class MapUtm
+{
+    public int Zone { get; set; }
+    public bool North { get; set; } = true;
+    public double Easting { get; set; }
+    public double Northing { get; set; }
+}
+
 public class MapData
 {
     public string Id { get; set; } = string.Empty;
@@ -129,6 +138,10 @@ public class MapData
     /// <summary>On a map of a real place, the ground's height from the survey (tools/gen_osm.py): the server
     /// lays its terrain from it at load (TerrainBuilder). Null: the ground is flat.</summary>
     public MapElevation? Elevation { get; set; }
+
+    /// <summary>On a map of a real place, where its (0, 0) is on the world's UTM grid (tools/gen_osm.py): the
+    /// map is the world's tiles moved by this, never turned (OneWorld.WorldPlaces).</summary>
+    public MapUtm? Utm { get; set; }
 
     /// <summary>A frame of the world (OneWorld.WorldMaps), made by the server, never a file: its tiles
     /// come and go as players near them.</summary>
@@ -491,6 +504,7 @@ public class MapRepository
     public static MapData? LoadFromFile(string path)
     {
         var data = JsonSerializer.Deserialize<MapData>(File.ReadAllText(path), JsonOptions);
+        data?.Elevation?.Resolve(Path.GetDirectoryName(Path.GetFullPath(path))!);
         return data != null && !string.IsNullOrEmpty(data.Id) ? data : null;
     }
 
@@ -511,7 +525,9 @@ public class MapRepository
                 string json = File.ReadAllText(file);
                 ReportUnknownFields(json, Path.GetFileName(file));
                 var data = JsonSerializer.Deserialize<MapData>(json, options);
-                if (data != null && !string.IsNullOrEmpty(data.Id)) 
+                // A real place's ground is in a file of its own beside it.
+                data?.Elevation?.Resolve(Path.GetDirectoryName(Path.GetFullPath(file))!);
+                if (data != null && !string.IsNullOrEmpty(data.Id))
                 {
                     NormalizeAtmosphere(data, Path.GetFileName(file));
                     maps.Add(data);

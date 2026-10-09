@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- Magnolia and Albany on the world's grid at 2 m (docs/GEOMETRY.md 11.3). `fetch_place.py elevation`
+  asks 3DEP itself for 2 m cells on the place's UTM grid (the 1 m lidar), the same request the world's
+  tiles make, so the map's ground and the world's agree to the half centimetre (the world's was 0.9 m
+  under the map's at Bobcat Lane). `gen_osm.py` lays the map on that grid (UTM less the 2 m post nearest
+  the origin, `tools/utm.py`), so the map is the world's tiles moved, never turned (`MapData.Utm`). The
+  ground ships beside each map as `maps/places/ID.elevation` (the same bytes as elevation.json). Spawns
+  moved under a metre: Magnolia `/tp -11.2 23.2 1`, Albany `/tp -25.3 -10.6 1.4`. Road pieces overlap
+  5 cm at their joins. Terrain against the survey: 99 points in 100 within 3 cm (was 14 cm).
 - The world is built before you get there (docs/WORLD_STREAMING.md, "Building ahead"). Arriving with
   `/join world PLACE` or F6 waits on the loading screen ("Building the world: 12 of 41 tiles.", said every
   5 s) until every tile within your far radius is built, then you stand in a finished ring. Moving, the

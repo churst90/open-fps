@@ -5,7 +5,7 @@ tools/gen_osm.py reads. Two steps, both driven by the place's own file:
 
     fetch_place.py download  tools/places/NAME/place.json
     fetch_place.py prepare   tools/places/NAME/place.json
-    fetch_place.py elevation tools/places/NAME/place.json   only elevation.json, from the archive
+    fetch_place.py elevation tools/places/NAME/place.json   only elevation.json, from the 3DEP service
 
 `download` fills the place's archive directory ("Archive" in place.json, outside the repository) with
 the raw layers, skipping any that are already there, and writes SOURCES.txt there saying where each
@@ -424,35 +424,128 @@ def prepare(place):
           f"{len(pl)} places, {len(wa)} water features, {len(rng)} address ranges")
 
 
+ELEVATION_SERVICE = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
+ELEVATION_MARGIN = 60.0      # the map's bounds reach this far past the area (gen_osm.py's ELEV_MARGIN)
+
+
+def float_tiff(b):
+    """One band of 32-bit floats from an uncompressed TIFF, strips or tiles, either byte order: (width,
+    height, values row by row from the top, no-data value or None). OpenFPS.Server/OneWorld/Elevation.cs
+    FloatTiff reads the same answers."""
+    import struct
+    le = b[:2] == b"II"
+    if not le and b[:2] != b"MM":
+        raise ValueError("not a TIFF")
+    o = "<" if le else ">"
+    u16 = lambda at: struct.unpack_from(o + "H", b, at)[0]
+    u32 = lambda at: struct.unpack_from(o + "I", b, at)[0]
+    ifd = u32(4)
+    tags = {}
+    for k in range(u16(ifd)):
+        e = ifd + 2 + 12 * k
+        tag, typ, n = u16(e), u16(e + 2), u32(e + 4)
+        if typ == 2:                                     # ASCII
+            at = e + 8 if n <= 4 else u32(e + 8)
+            tags[tag] = b[at:at + n].rstrip(b"\0 ").decode("ascii", "replace")
+            continue
+        size = 2 if typ == 3 else 4
+        at = e + 8 if n * size <= 4 else u32(e + 8)
+        tags[tag] = [u16(at + 2 * i) if typ == 3 else u32(at + 4 * i) for i in range(n)]
+    width, height = tags[256][0], tags[257][0]
+    if tags.get(259, [1])[0] != 1 or tags.get(258, [0])[0] != 32 or tags.get(339, [1])[0] != 3:
+        raise ValueError("not one uncompressed band of 32-bit floats")
+    values = [0.0] * (width * height)
+    if 322 in tags:
+        tw, th = tags[322][0], tags[323][0]
+        across = (width + tw - 1) // tw
+        for t, at in enumerate(tags[324]):
+            tx, ty = t % across * tw, t // across * th
+            row = struct.unpack_from(o + "%df" % (tw * th), b, at)
+            for y in range(th):
+                gy = ty + y
+                if gy >= height:
+                    break
+                for x in range(tw):
+                    if tx + x < width:
+                        values[gy * width + tx + x] = row[y * tw + x]
+    else:
+        per = tags.get(278, [height])[0]
+        r = 0
+        for at in tags[273]:
+            rows = min(per, height - r)
+            values[r * width:(r + rows) * width] = struct.unpack_from(o + "%df" % (rows * width), b, at)
+            r += rows
+    nd = tags.get(42113)
+    return width, height, values, (float(nd) if isinstance(nd, str) and nd.strip() else None)
+
+
 def elevation(place):
     """
-    elevation.json from the archive's 3DEP grid, at the resolution it was downloaded at (about 5 m):
-    whole centimetres over the lowest point, as little-endian 16-bit integers in base64, row by row
-    from the north. lon0 and lat0 are the middle of the north-west cell. tools/gen_osm.py lays the
-    map's ground from it (docs/GEOMETRY.md 5.1).
+    elevation.json: USGS 3DEP asked for 2 m cells on the place's UTM grid, the grid the world's tiles are
+    on (OpenFPS.Server/OneWorld): the service mosaics the 1 m lidar where there is some. Posts every 2 m
+    over every whole 250 m tile of the zone the map reaches, so a world tile copied from the map has all its
+    ground. Whole centimetres over the lowest post, little-endian 16-bit, row by row from the SOUTH-west,
+    each row given as its difference from the row before (the first as it is) and the lot zlib-deflated,
+    in base64. tools/gen_osm.py lays the map's ground from it (docs/GEOMETRY.md 5.1). Standard library
+    only; asks the service, keeps nothing else.
     """
-    import base64
-    import numpy as np
-    import rasterio
-    d, out = place["_archive"], place["_dir"]
-    with rasterio.open(os.path.join(d, "usgs-3dep-dem.tif")) as src:
-        a = src.read(1).astype(np.float64)
-        t = src.transform
-        nodata = src.nodata
-    if nodata is not None:
-        bad = a == nodata
-        if bad.any():
-            a[bad] = np.nanmedian(np.where(bad, np.nan, a))
-    base = math.floor(float(a.min()) * 100.0) / 100.0
-    cm = np.rint((a - base) * 100.0)
-    if cm.max() > 32767:
+    import array, base64, zlib
+    sys.path.insert(0, HERE)
+    import utm
+    out = place["_dir"]
+    with open(os.path.join(out, "area.json")) as f:
+        rings = json.load(f)["rings"]
+    lat0, lon0 = place["Origin"]
+    zone, north, oe, on = utm.origin_of(lat0, lon0)
+    pts = [utm.from_latlon(lat, lon, zone, north) for ring in rings for lat, lon in ring]
+    T = utm.TILE
+    tx0 = int(math.floor((min(p[0] for p in pts) - ELEVATION_MARGIN) / T))
+    tx1 = int(math.floor((max(p[0] for p in pts) + ELEVATION_MARGIN) / T))
+    tz0 = int(math.floor((min(p[1] for p in pts) - ELEVATION_MARGIN) / T))
+    tz1 = int(math.floor((max(p[1] for p in pts) + ELEVATION_MARGIN) / T))
+    step = 2.0
+    per = int(T / step)
+    cols, rows = (tx1 - tx0 + 1) * per + 1, (tz1 - tz0 + 1) * per + 1
+    e0, n0 = tx0 * T, tz0 * T
+    # Cells as wide as the posts are apart, centred on them: the world's tiles ask the same way.
+    w, s = e0 - step / 2, n0 - step / 2
+    sr = utm.epsg(zone, north)
+    q = urllib.parse.urlencode({
+        "bbox": f"{w:.3f},{s:.3f},{w + cols * step:.3f},{s + rows * step:.3f}", "bboxSR": sr, "imageSR": sr,
+        "size": f"{cols},{rows}", "format": "tiff", "pixelType": "F32",
+        "interpolation": "RSP_BilinearInterpolation", "f": "image"})
+    print(f"elevation: asking 3DEP for {cols} x {rows} posts of zone {zone}{'N' if north else 'S'} "
+          f"({tx1 - tx0 + 1} x {tz1 - tz0 + 1} tiles from {tx0}, {tz0})")
+    width, height, v, nodata = float_tiff(get(ELEVATION_SERVICE + "?" + q, timeout=600))
+    if (width, height) != (cols, rows):
+        raise SystemExit(f"elevation: 3DEP answered {width} x {height} for {cols} x {rows}")
+    good = sorted(x for x in v if math.isfinite(x) and -1000 < x < 9000 and x != nodata)
+    if not good:
+        raise SystemExit("elevation: the survey has nothing here")
+    fill = good[len(good) // 2]
+    bad = 0
+    heights = []
+    for j in range(rows):                                # from the south: the TIFF's last row
+        row = v[(rows - 1 - j) * cols:(rows - j) * cols]
+        for x in row:
+            if not (math.isfinite(x) and -1000 < x < 9000 and x != nodata):
+                x, bad = fill, bad + 1
+            heights.append(x)
+    lo = min(heights)
+    base = math.floor(lo * 100.0) / 100.0
+    cm = [int(math.floor((h - base) * 100.0 + 0.5)) for h in heights]
+    if max(cm) > 32767:
         raise SystemExit("elevation: more than 327 m of relief does not fit in centimetres")
+    deltas = cm[:cols] + [cm[k] - cm[k - cols] for k in range(cols, len(cm))]
+    packed = array.array("h", deltas)
+    if sys.byteorder != "little":
+        packed.byteswap()
     write(out, "elevation.json", {
-        "source": "USGS 3D Elevation Program, bare earth (public domain), as downloaded",
-        "lon0": R7(t.c + t.a / 2), "lat0": R7(t.f + t.e / 2), "dlon": t.a, "dlat": -t.e,
-        "cols": int(a.shape[1]), "rows": int(a.shape[0]), "unit": 0.01, "base": base,
-        "data": base64.b64encode(cm.astype("<i2").tobytes()).decode("ascii")})
-    print(f"elevation: {a.shape[1]} x {a.shape[0]} posts, {float(a.min()):.2f} to {float(a.max()):.2f} m")
+        "source": "USGS 3D Elevation Program, bare earth (public domain), 2 m cells on the UTM grid",
+        "zone": zone, "north": north, "east0": e0, "north0": n0, "spacing": step,
+        "cols": cols, "rows": rows, "unit": 0.01, "base": base, "encoding": "zlib-row-delta",
+        "data": base64.b64encode(zlib.compress(packed.tobytes(), 9)).decode("ascii")})
+    print(f"elevation: {cols} x {rows} posts, {lo:.2f} to {max(heights):.2f} m, {bad} filled")
 
 
 def write(dirname, name, obj):
