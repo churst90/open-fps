@@ -417,7 +417,6 @@ What is left after these four:
 
   that gives the same answer whichever tile is made first. Until then a world tile is terrain, except over
   the two real places, whose maps are copied in ("Places in the world", 2026-10-09).
-  real places are the two maps.
 - (Done 2026-10-09, "Coarse ground in the far ring":) coarse terrain at 8 m for the far ring. Still to do: the client's tile cache, frames
   that rebase past 8 km, crossing a UTM zone edge.
 - Draped road meshes with kerbs and sidewalks as swept profiles, bridges and tunnels, creeks cut in
