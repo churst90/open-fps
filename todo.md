@@ -200,7 +200,9 @@ process. Its `ThreadPriority.BelowNormal` does nothing on Linux, and none of tho
 Convolution runs on the FMOD mixer thread.
 - First: read "Mixer load" and "Audio: mixer at" with `/echoes on` and `off`, to learn whether the
   cost is tracing or convolution.
-- First: call `BackgroundPriority.LowerThisThread` at the top of each trace loop.
+- Done 2026-10-09: `BackgroundPriority.LowerThisThread` (+10) at the top of TracedReverb, TracedEchoes
+  and LateField's loops. Unchecked: whether Steam Audio's second worker (numThreads 2) inherits it;
+  `ps -L -o tid,ni,comm -p PID` while playing shows each thread's nice.
 - Recommended next: the split itself, if the first two do not fix it:
   - A helper (`OpenFPS.AcousticsHost`) started by the client; it dies with the client (death signal
     on Linux, job object on Windows) and is niced to +19 or set below normal, Steam Audio's threads
