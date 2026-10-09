@@ -446,6 +446,43 @@ public class DspCallbackTests
         for (int i = 0; i < n / 2; i++) Assert.Equal(0f, output.Data[i]);
     }
 
+    /// <summary>
+    /// A recording's copy off a rough wall (EchoWashProcessor): its callback hands the mixer exactly what its
+    /// state renders, in each channel of a stereo recording; a clean copy (mirror share 1) is the input to
+    /// the bit; a channel count that does not match passes nothing rather than guess. Nothing allocated.
+    /// </summary>
+    [Fact]
+    public void AWallsWashIsItsStatesRender()
+    {
+        var read = Callback(typeof(EchoWashProcessor));
+        var state = new EchoWashState();
+        var twin = new EchoWashState();
+        state.Configure(0.45f, MathF.Sqrt(0.55f), 5, Rate);
+        twin.Configure(0.45f, MathF.Sqrt(0.55f), 5, Rate);
+        using var dsp = new FakeDsp(state);
+        int n = Block;
+        using var input = new Pinned(n * 2);
+        using var output = new Pinned(n * 2);
+        var rnd = new Random(9);
+        for (int i = 0; i < input.Data.Length; i++) input.Data[i] = (float)(rnd.NextDouble() * 2 - 1) * 0.5f;
+        var expect = new float[n * 2];
+        for (int b = 0; b < 3; b++)
+        {
+            Run(read, dsp, input.Ptr, output, n, 2, 2);
+            twin.Process(input.Data, expect, 2);
+            for (int i = 0; i < expect.Length; i++) Assert.Equal(expect[i], output.Data[i]);
+        }
+
+        Assert.Equal(0, AllocatedOver(() => Run(read, dsp, input.Ptr, output, n, 2, 2), 8));
+
+        state.Configure(0.45f, 1f, 5, Rate);
+        Run(read, dsp, input.Ptr, output, n, 2, 2);
+        for (int i = 0; i < input.Data.Length; i++) Assert.Equal(input.Data[i], output.Data[i]);
+
+        Run(read, dsp, input.Ptr, output, n / 2, 2, 1);
+        for (int i = 0; i < n / 2; i++) Assert.Equal(0f, output.Data[i]);
+    }
+
     // ── The master bus: the boundary reflections, the limiter, the dither, the capture ───────
 
     /// <summary>
