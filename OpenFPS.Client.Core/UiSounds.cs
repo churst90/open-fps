@@ -17,6 +17,8 @@ public enum UiCue
     ChatTeam,
     // Your shot landed on somebody; your shot killed them.
     Hit, Kill,
+    /// <summary>Walking into a tile of the world that is not built yet: stopped, and nothing struck.</summary>
+    UnbuiltEdge,
 }
 
 /// <summary>
@@ -174,6 +176,8 @@ public sealed class UiSounds
         // A kill: the same A, then up a fourth and up a fifth, quick, the last one left to ring.
         // A leap and not the chat's steps, so it cannot be taken for a message.
         UiCue.Kill => Notes(rate, 0.6f, (1760f, 0f, 0.07f), (2349.3f, 0.06f, 0.07f), (3520f, 0.12f, 0.3f)),
+        // The edge of what is built: one short low note, no knock, nothing in the world struck.
+        UiCue.UnbuiltEdge => Notes(rate, 0.5f, (196f, 0f, 0.22f)),
         _ => Notes(rate, 0.4f, (1000f, 0f, 0.05f)),
     };
 

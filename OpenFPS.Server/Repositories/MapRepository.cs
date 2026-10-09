@@ -130,6 +130,10 @@ public class MapData
     /// lays its terrain from it at load (TerrainBuilder). Null: the ground is flat.</summary>
     public MapElevation? Elevation { get; set; }
 
+    /// <summary>A frame of the world (OneWorld.WorldMaps), made by the server, never a file: its tiles
+    /// come and go as players near them.</summary>
+    [JsonIgnore] public bool IsWorld { get; set; }
+
     /// <summary>Vehicles that drive the map's roads. See VehicleSystem.</summary>
     public List<VehicleData>? Vehicles { get; set; }
     /// <summary>Trains that run the map's rail tracks. See RailSystem.</summary>

@@ -37,17 +37,21 @@ public class WorldStoreTests : IDisposable
 
     // ═══ UTM ═══════════════════════════════════════════════════════════════════════════════════════
 
+    /// <summary>Against PROJ (pyproj 3, EPSG:4326 to the zone's EPSG code, 2026-10-09), to the centimetre, and
+    /// back to a ten millionth of a degree.</summary>
     [Theory]
-    [InlineData(30.123703, -95.740935, 15, true)]     // Magnolia, Texas
-    [InlineData(44.590205, -123.113244, 10, true)]    // Albany, Oregon
-    [InlineData(-33.8568, 151.2153, 56, false)]       // Sydney
-    [InlineData(64.1466, -21.9426, 27, true)]         // Reykjavik
-    [InlineData(0.0, -93.0, 15, true)]                // the equator on zone 15's middle
-    public void Utm_goes_there_and_back(double lat, double lon, int zone, bool north)
+    [InlineData(30.123703, -95.740935, 15, true, 235921.30, 3335664.38)]     // Magnolia, Texas
+    [InlineData(44.590205, -123.113244, 10, true, 491011.25, 4937435.25)]    // Albany, Oregon
+    [InlineData(-33.8568, 151.2153, 56, false, 334900.57, 6252288.75)]       // Sydney
+    [InlineData(64.1466, -21.9426, 27, true, 454138.38, 7113689.87)]         // Reykjavik
+    [InlineData(0.0, -93.0, 15, true, 500000.0, 0.0)]                        // the equator on zone 15's middle
+    public void Utm_goes_there_and_back(double lat, double lon, int zone, bool north, double easting, double northing)
     {
         var (z, n, e, nn) = Utm.FromLatLon(lat, lon);
         Assert.Equal(zone, z);
         Assert.Equal(north, n);
+        Assert.Equal(easting, e, 0.015);
+        Assert.Equal(northing, nn, 0.015);
         var (lat2, lon2) = Utm.ToLatLon(z, n, e, nn);
         Assert.True(Math.Abs(lat2 - lat) < 1e-7 && Math.Abs(lon2 - lon) < 1e-7, $"({lat}, {lon}) came back as ({lat2}, {lon2})");
         Assert.InRange(e, 160_000, 840_000);

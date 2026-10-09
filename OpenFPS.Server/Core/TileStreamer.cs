@@ -20,6 +20,9 @@ public sealed class TileInterest
     /// <summary>Set when the radii change, so the next tick works the levels out again wherever the
     /// player is.</summary>
     public bool Stale { get; set; }
+    /// <summary>The map's tiles as they were when the levels were last worked out (MapTiles.Version): on
+    /// the world a tile arriving is worked in at once, even for a player standing still at its edge.</summary>
+    public long SeenVersion { get; set; } = -1;
 
     /// <summary>Totals for this map, for the log and the tests.</summary>
     public long DefinitionsSent, Removed, TilesLoaded, TilesDropped, BytesSent;
@@ -48,6 +51,7 @@ public sealed class TileInterest
         Stale = false;
         Pending.Clear();
         Done.Clear();
+        SeenVersion = -1;
         DefinitionsSinceUpdate = RemovedSinceUpdate = 0;
         DefinitionsSent = Removed = TilesLoaded = TilesDropped = BytesSent = BytesSinceUpdate = 0;
     }
@@ -84,8 +88,9 @@ public static class TileStreamer
         var radii = interest.Radii;
         interest.Reset();
         interest.Radii = radii;
-        var levels = TileSelection.Desired(at, tiles.TileMetres, radii, null, tiles.Min, tiles.Max);
+        var levels = Ready(tiles, TileSelection.Desired(at, tiles.TileMetres, radii, null, tiles.Min, tiles.Max));
         interest.SetLevels(levels);
+        interest.SeenVersion = tiles.Version;
         interest.LastCentre = at;
         interest.TilesLoaded = levels.Count;
 
@@ -115,7 +120,7 @@ public static class TileStreamer
                               Vector3 at, Action<IMessage> send)
     {
         var interest = session.Tiles;
-        if (interest.Stale || interest.LastCentre is not { } last
+        if (interest.Stale || interest.SeenVersion != tiles.Version || interest.LastCentre is not { } last
             || Vector3.DistanceSquared(new Vector3(last.X, 0f, last.Z), new Vector3(at.X, 0f, at.Z)) >= MoveMetres * MoveMetres)
             Rechoose(session, tiles, world, lookup, at, send);
         Drain(session, tiles, world, lookup, send);
@@ -128,7 +133,8 @@ public static class TileStreamer
         interest.Stale = false;
         interest.LastCentre = at;
         var before = interest.Levels;
-        var after = TileSelection.Desired(at, tiles.TileMetres, interest.Radii, before, tiles.Min, tiles.Max);
+        interest.SeenVersion = tiles.Version;
+        var after = Ready(tiles, TileSelection.Desired(at, tiles.TileMetres, interest.Radii, before, tiles.Min, tiles.Max));
 
         var down = new List<TileKey>();
         var up = new List<TileKey>();
@@ -181,6 +187,14 @@ public static class TileStreamer
         }
         // Only removals: say so now. Loads are said as each tile finishes.
         if (interest.Pending.Count == 0) Announce(interest, tiles, send);
+    }
+
+    /// <summary>On the world, only the tiles that are there: one not made yet is chosen when it arrives.</summary>
+    private static Dictionary<TileKey, TileDetail> Ready(MapTiles tiles, Dictionary<TileKey, TileDetail> levels)
+    {
+        if (!tiles.Dynamic) return levels;
+        foreach (var key in levels.Keys.Where(k => !tiles.IsReady(k)).ToList()) levels.Remove(key);
+        return levels;
     }
 
     private static void Forget(UserSession session, int id, List<int> gone)

@@ -197,6 +197,10 @@ public partial struct MapSummary
     /// messages are serialised by position.</summary>
     public string Name;
 
+    /// <summary>A place to arrive at in the world rather than a map: the list has the world first, then
+    /// the maps. Its id is what /join takes ("world magnolia"). Appended.</summary>
+    public bool IsWorldPlace;
+
     public MapSummary()
     {
         Id = "";
@@ -255,6 +259,20 @@ public partial class MapManifest : IMessage
     /// streamed map the client is sent the tiles near it, and every definition batch after
     /// MapLoadComplete is a tile arriving (docs/WORLD_STREAMING.md). Appended last.</summary>
     public float TileMetres;
+
+    /// <summary>
+    /// This map is the world (docs/WORLD_STREAMING.md, stage 2): its tiles are made as players come near,
+    /// and a body is stopped at the edge of one not built yet. Its frame: (0, 0, 0) is the south-west
+    /// corner of a 250 m square of UTM zone <see cref="WorldZone"/> (<see cref="WorldNorth"/> for the
+    /// northern half) at <see cref="FrameEasting"/>, <see cref="FrameNorthing"/>, and
+    /// <see cref="FrameBaseY"/> metres over the sea. Appended.
+    /// </summary>
+    public bool IsWorld;
+    public int WorldZone;
+    public bool WorldNorth;
+    public double FrameEasting;
+    public double FrameNorthing;
+    public float FrameBaseY;
 
     public MapManifest() { }
 }

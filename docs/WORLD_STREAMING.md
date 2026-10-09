@@ -581,6 +581,61 @@ Code: `OpenFPS.Server/OneWorld/` (`Utm`, `WorldTileKey`, `WorldTile`, `WorldStor
 - **Settings** (`world.json`, all optional): `StorePath` ("world"), `CapGigabytes` (20), `Generate`
   (true), `MaxAtOnce` (2).
 
+### W2: one world
+
+Code: `OneWorld/WorldMaps` (frames, places, tiles round players, arrivals), `OneWorld/Geocoder`,
+`MapTiles` (tiles that come and go: `AddTile`, `RemoveTile`, `IsReady`, `Version`), `TileStreamer`
+(only tiles that are there; a tile arriving is worked in at once), `SharedMovementEngine` (the fence),
+`/join world`, the two-part list. Tests: `WorldMapsTests`.
+
+- **Frames.** The world is served as frames: maps whose (0, 0) is the south-west corner of the 250 m
+  UTM square a player first arrived in, x east and z north along the grid, y metres over the sea less
+  the frame's base (the ground there, to the metre). Frame tile (x, z) is world tile (origin + x, origin
+  + z). A frame reaches 6 km each way; arrivals within it share it, so two players in one town meet.
+  Moving a frame with its players (rebasing at 8 km) and crossing a zone edge are stage 3. A frame is
+  made by the server, never written to a file (`MapData.IsWorld`), and gets no loader's ground.
+- **Tiles round players**, every quarter of a second on the tick thread: the world tiles within each
+  player's far radius and 100 m more are wanted; a stored one is loaded (its ground an entity on the
+  "ground" layer, coarse), a missing one is made in the background. A tile nobody holds or is near is
+  let go after 30 s. The store's cap never drops a loaded tile, and a loaded tile is touched.
+- **Arriving.** `/join world magnolia` (a place by its words), `/join world address 1042 Belmont Ave SW,
+  Albany, OR` (the Census geocoder, any US address), or for builders `/join world 30.1237, -95.7409`.
+  The tile arrived in and the eight round it are wanted at once; the player is told "Building the world
+  at ..." if it is not stored, and is moved into the frame, stood on the ground, as soon as it is. Two
+  minutes without it: "could not be built just now".
+- **The edge that is not ready.** `MovementContext.TileReady` and `TileMetres`: on the world, a step from
+  a ready tile toward one that is not stops a body's radius short of the shared edge on that axis (it
+  slides along the edge), and across a corner on both. The server asks its tile index; the client asks
+  the tiles it holds whose ground its triangle world has built, so a foot never comes down on ground the
+  client cannot stand on yet. The client plays a short low tone (196 Hz, 0.22 s) while pressing on, at
+  most every 0.6 s, no knock, and says "Not built yet. Wait here, or turn back." once until it has been
+  clear of an edge for 5 s. When the tile arrives the body walks on. A driven vehicle is not stopped at
+  the edge yet (DrivingSystem does not ask the fence); the world has no vehicles of its own yet.
+- **The list of where to go** (F6) has two parts: "The world" (`world_places.json`, and any map of a
+  real place not listed there, at its origin) and "Maps". A frame is never listed as a map. The text
+  gateway lists the world's places first too.
+- **Where am I.** `/map` in the world: "the world, 1.2 kilometres north east of Magnolia, Texas, 31907
+  Bobcat Lane"; builders also get the grid square (`15N/943/13342`).
+- **Measured** (`WorldMapsTests`, the real survey): arriving at Bobcat Lane with nothing stored took
+  0.4 to 0.7 s; the 41 tiles round it 2.5 s on one run and 60 s on another (3DEP's own speed, two at a
+  time); 20.6 KB a tile. The ground round the arrival is 0.9 m under Magnolia's map survey there: asked
+  for 2 m cells the service mosaics the 1 m lidar, the map's export (5 m cells in degrees) a coarser
+  product. Not a projection error: the UTM conversion matches PROJ to the centimetre.
+- **Wire, appended:** `MapManifest.IsWorld`, `WorldZone`, `WorldNorth`, `FrameEasting`, `FrameNorthing`,
+  `FrameBaseY`; `MapSummary.IsWorldPlace`. With T1's `ColliderShape.Terrain`, `TerrainTileComponent` and
+  `EntityDefinition.Terrain`.
+
+### Left after stage 2 (as of 2026-10-09)
+
+- World tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
+  the same answer whichever tile is made first; until then the real places are their maps.
+- A player who logs out in the world comes back on the landing map (a frame is not a saved map); saving
+  the world position and making the frame again at login.
+- Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
+- Coarse terrain at 8 m for the far ring; the client's tile cache; land cover for the ground's
+  materials (every cell is dirt).
+- A driven vehicle braked hard before an edge that is not ready.
+
 ## What the broadcast chooses from
 
 Each player used to ask the spatial grid for everything within earshot. On the city earshot is the whole

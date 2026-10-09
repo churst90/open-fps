@@ -67,6 +67,16 @@ public sealed class Usgs3Dep : IElevationSource
     }
 }
 
+/// <summary>A server that makes no new tiles (world.json "Generate": false): only tiles already stored are
+/// served, and a player is stopped at the edge of the rest.</summary>
+public sealed class NoNewTiles : IElevationSource
+{
+    public string Name => "none";
+
+    public Task<float[]?> HeightsAsync(WorldTileKey key, int posts, double spacing, CancellationToken ct)
+        => throw new InvalidOperationException("this server makes no new tiles (world.json Generate is false)");
+}
+
 /// <summary>
 /// The part of TIFF the elevation service answers with: one band of 32-bit floats, uncompressed, in strips or
 /// tiles, either byte order; the GDAL no-data tag if present.

@@ -45,6 +45,10 @@ public static class SharedMovementEngine
         /// <summary>The slope of the ground along the way the body is going, rise over run (positive up);
         /// 0 on the level. See <see cref="GradeAlong"/> and <see cref="GradeSpeed"/>.</summary>
         public float Grade;
+        /// <summary>On the world (docs/WORLD_STREAMING.md, stage 2): which of its tiles are there to walk
+        /// into, and their size. Null on every other map. The server's and the client's must agree.</summary>
+        public System.Func<TileKey, bool>? TileReady;
+        public float TileMetres;
     }
 
     /// <summary>
@@ -59,6 +63,8 @@ public static class SharedMovementEngine
         public int ColliderIndex;
         public Vector3 Normal;
         public float IntoSpeed;
+        /// <summary>Stopped at the edge of a tile of the world that is not built yet.</summary>
+        public bool Fenced;
     }
 
     public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders)
@@ -449,6 +455,10 @@ public static class SharedMovementEngine
         if (pos.Z < minZ) { pos.Z = minZ; vel.Z = 0; }
         if (pos.Z > maxZ) { pos.Z = maxZ; vel.Z = 0; }
 
+        // The edge of a tile of the world that is not built yet (docs/WORLD_STREAMING.md, At an edge that
+        // is not ready): a wall that is not a wall, a body's radius in, along whichever side it would cross.
+        if (ctx.TileReady != null && ctx.TileMetres > 0f && Fence(ctx, ref pos, ref vel)) contact.Fenced = true;
+
         // --- 5. FINAL POST-STEP GROUND CHECK ---
         if (ctx.GroundHeight > DefaultGroundCheckLimit && pos.Y < ctx.GroundHeight)
         {
@@ -458,6 +468,35 @@ public static class SharedMovementEngine
         }
 
         return (pos, vel, isGrounded);
+    }
+
+    /// <summary>
+    /// Keeps a body in tiles that are there: from the tile it starts in, a move into a neighbour that is not
+    /// ready stops a body's radius short of the shared edge, on that axis only, so it slides along the
+    /// edge; a body already standing in a tile that is not ready (it went while they stood there) is left
+    /// to walk out. True when it stopped anything.
+    /// </summary>
+    private static bool Fence(in MovementContext ctx, ref Vector3 pos, ref Vector3 vel)
+    {
+        float t = ctx.TileMetres, r = ctx.PlayerRadius;
+        var from = TileKey.Of(ctx.Position, t);
+        if (!ctx.TileReady!(from)) return false;
+        bool fenced = false;
+        float x0 = from.X * t, x1 = x0 + t, z0 = from.Z * t, z1 = z0 + t;
+        if (pos.X > x1 - r && !ctx.TileReady(new TileKey(from.X + 1, from.Z))) { pos.X = MathF.Max(ctx.Position.X, x1 - r); vel.X = 0f; fenced = true; }
+        if (pos.X < x0 + r && !ctx.TileReady(new TileKey(from.X - 1, from.Z))) { pos.X = MathF.Min(ctx.Position.X, x0 + r); vel.X = 0f; fenced = true; }
+        if (pos.Z > z1 - r && !ctx.TileReady(new TileKey(from.X, from.Z + 1))) { pos.Z = MathF.Max(ctx.Position.Z, z1 - r); vel.Z = 0f; fenced = true; }
+        if (pos.Z < z0 + r && !ctx.TileReady(new TileKey(from.X, from.Z - 1))) { pos.Z = MathF.Min(ctx.Position.Z, z0 + r); vel.Z = 0f; fenced = true; }
+        // Across a corner into a tile that is not there with both its sides open: held on both axes.
+        var to = TileKey.Of(pos, t);
+        if (to != from && !ctx.TileReady(to))
+        {
+            pos.X = Math.Clamp(pos.X, MathF.Min(ctx.Position.X, x0 + r), MathF.Max(ctx.Position.X, x1 - r));
+            pos.Z = Math.Clamp(pos.Z, MathF.Min(ctx.Position.Z, z0 + r), MathF.Max(ctx.Position.Z, z1 - r));
+            vel.X = vel.Z = 0f;
+            fenced = true;
+        }
+        return fenced;
     }
 
     /// <summary>How much deeper than it began a step may leave the body in anything, metres: float

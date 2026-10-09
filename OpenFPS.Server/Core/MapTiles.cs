@@ -51,11 +51,49 @@ public sealed class MapTiles
     public IReadOnlyList<int> Global => _global;
     public IEnumerable<TileKey> Tiles => _byTile.Keys;
 
-    public MapTiles(float tileMetres, TileKey min, TileKey max)
+    public MapTiles(float tileMetres, TileKey min, TileKey max, bool dynamic = false)
     {
         TileMetres = tileMetres;
         Min = min;
         Max = max;
+        if (dynamic) _ready = new HashSet<TileKey>();
+    }
+
+    // ═══ Tiles that come and go: the world (docs/WORLD_STREAMING.md, stage 2) ═══════════════════════
+
+    /// <summary>On the world, the tiles loaded on the server; null on a map whose tiles are all there.</summary>
+    private readonly HashSet<TileKey>? _ready;
+
+    /// <summary>Whether tiles come and go (the world) rather than all being there from the load.</summary>
+    public bool Dynamic => _ready != null;
+
+    /// <summary>Counts tiles arriving and going, so a client's choice of tiles is worked out again.</summary>
+    public long Version { get; private set; }
+
+    /// <summary>Whether a tile is there to be sent and walked into.</summary>
+    public bool IsReady(TileKey key) => _ready == null || _ready.Contains(key);
+
+    public IReadOnlyCollection<TileKey> ReadyTiles => _ready ?? (IReadOnlyCollection<TileKey>)_byTile.Keys;
+
+    /// <summary>A tile of the world loaded: its entities, each in it alone at the detail it needs.</summary>
+    public void AddTile(TileKey key, IEnumerable<(Entity Entity, TileDetail Needs)> members)
+    {
+        foreach (var (e, needs) in members) Add(e, new[] { key }, needs);
+        _ready?.Add(key);
+        if (!_byTile.ContainsKey(key)) _byTile[key] = new List<int>();
+        Version++;
+    }
+
+    /// <summary>A tile of the world unloaded: its entities' ids, which the caller destroys.</summary>
+    public List<int> RemoveTile(TileKey key)
+    {
+        var ids = new List<int>();
+        if (_byTile.Remove(key, out var list))
+            foreach (int id in list)
+                if (_members.TryGetValue(id, out var m) && m.Tiles.Length == 1) { _members.Remove(id); ids.Add(id); }
+        _ready?.Remove(key);
+        Version++;
+        return ids;
     }
 
     /// <summary>

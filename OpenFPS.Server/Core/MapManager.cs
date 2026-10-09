@@ -290,7 +290,7 @@ public class MapManager
         float foundMinimumY = 1000f;
         bool hasAnyFloor = false;
         // On a map streamed in tiles, the layer of everything that came from the file (MapTiles).
-        var layers = m.TileMetres > 0f ? new Dictionary<int, string?>() : null;
+        var layers = m.TileMetres > 0f && !m.IsWorld ? new Dictionary<int, string?>() : null;
 
         // Maps write quaternions in six digits, not quite unit length, and Vector3.Transform scales by the
         // length squared: a slab's top a float's last bit low on one path and not another. Normalised
@@ -460,7 +460,7 @@ public class MapManager
 
         // Natural ground (dirt, Cody 2026-10-06) where the map has none of its own. A map whose ground
         // covers its play area gets none: a slab flush under the city's own was met wherever ties went its way.
-        if (!hasTerrain && !GroundCovers(world, m.WalkMin, m.WalkMax))
+        if (!hasTerrain && !m.IsWorld && !GroundCovers(world, m.WalkMin, m.WalkMax))
         {
             Log.Information("MapManager: '{Id}' has no ground of its own under all of its play area. Laying natural ground ({Ground}) under its bounds.", m.Id, m.GroundPrefab ?? NaturalGroundPrefab);
             Vector3 mapSize = m.MaxBound - m.MinBound;
@@ -478,8 +478,8 @@ public class MapManager
 
         ValidateTracks(m, world);
 
-        // The void plane: 20 m below the lowest floor.
-        m.MinimumY = hasAnyFloor ? (foundMinimumY - 20.0f) : -50.0f;
+        // The void plane: 20 m below the lowest floor. The world's is its own (its ground comes later).
+        if (!m.IsWorld) m.MinimumY = hasAnyFloor ? (foundMinimumY - 20.0f) : -50.0f;
         
         world.Create(
             new NameComponent { Name = m.Id }, 
@@ -510,6 +510,11 @@ public class MapManager
             Log.Information("MapManager: '{Id}' is streamed in {Count} tiles of {Metres} m ({Tiled} entities in tiles, {Global} sent to everyone).",
                             m.Id, tiles.Tiles.Count(), m.TileMetres, tiles.TiledCount, tiles.Global.Count);
         }
+        else if (m.IsWorld)
+        {
+            // The world's tiles arrive as players near them (OneWorld.WorldMaps).
+            _tiles[m.Id] = new MapTiles(m.TileMetres, TileKey.Of(m.MinBound, m.TileMetres), TileKey.Of(m.MaxBound, m.TileMetres), dynamic: true);
+        }
         else _tiles.Remove(m.Id);
         BuildRoads(m);
         ComputeEarshot(m, world);
@@ -519,7 +524,7 @@ public class MapManager
             else Log.Warning("MapManager: map '{Map}' also claims IsDefault, but '{Winner}' claimed it first; players will land on '{Winner}'.", m.Id, DefaultMapId);
         }
         RefreshGrid(m.Id);
-        VerifySpawnPoint(m);
+        if (!m.IsWorld) VerifySpawnPoint(m);
     }
 
     /// <summary>
@@ -992,6 +997,16 @@ public class MapManager
         CreateMapInstance(map);
         Access?.Record(map);
         Log.Information("MapManager: made map '{Map}' for {Owner}.", map.Id, map.OwnerId);
+        return true;
+    }
+
+    /// <summary>A frame of the world, made by the server (OneWorld.WorldMaps): never written to disk, its
+    /// tiles loaded as players near them. False if a map of that id is loaded already.</summary>
+    public bool AddWorldMap(MapData map)
+    {
+        if (_maps.ContainsKey(map.Id)) return false;
+        map.IsWorld = true;
+        CreateMapInstance(map);
         return true;
     }
 
