@@ -19,9 +19,12 @@ the honest tests, the probable bugs and the trains fix are merged and shipped (V
 6. World editor phase 3: people, roads and routes, map versions, baking an overlay into a map file
    (docs/WORLD_EDITOR.md section 9).
 
-Before items 4-6: the three bugs of 2026-10-08 (E picks the door when facing a car, NPCs leave doors
-open, rain while the weather says clear), and the two cheap reflection steps (measure "Mixer load"
-with echoes on and off; nice the trace threads). See "Reflections in their own process".
+Before items 4-6: the two cheap reflection steps (measure "Mixer load" with echoes on and off; nice
+the trace threads). See "Reflections in their own process". The three bugs of 2026-10-08 are fixed
+(2026-10-09, unheard): E weighs a shut door against a car by facing; Alex waits in a lobby clear of
+the doorway, which had held the closer off; /weather says "Clearing" while a cleared front's rain
+still falls, and that rain now stops. Open for Cody: a new front is drawn about once a minute
+(0.0005 a tick at 30 ticks a second), so the weather rarely settles; slower, or wait for item 11?
 
 After items 1-6 (agreed with Cody 2026-10-08): performance and distant updates come before new content,
 because the one world costs CPU and bandwidth first.
