@@ -4,6 +4,22 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- The world editor is a dialog (docs/WORLD_EDITOR.md section 16), in both clients. F12 opens it on a
+  map you may edit; elsewhere F12 does nothing at all. F12 again, Escape or Close shuts it. Tabs
+  Place, Edit, Build and World, changed with Control+Tab and Control+Shift+Tab (or Control+Page Down
+  and Up). Place: search, category, prefabs with their descriptions, where it goes, Place, Preview,
+  Place again, and the Control+B form's floor, wall, roof, door and window. Edit (was Select, Selected
+  and Held): things near you, Space ticks several, find by name or number, the chosen thing's
+  position, facing and settings as labelled boxes, Apply changes, Bring to me, Duplicate, Row of
+  copies, Delete (asks first), and moving, turning and grouping what is ticked. Build (was Library):
+  models by kind and prefabs by category, Duplicate first, fields, versions, where used, replace.
+  World (was Map): weather, time and ground, spawn, map size, Rooms and areas (was Places and rooms),
+  beacon rules, editors, pinned models, map information (was Test tools). Undo, Redo and Close under
+  every tab. Placing keeps the dialog open and the game says "Placed: ...". `/edit` typed still opens
+  the menus, and the MUD still gets them. New commands: `/edit move to EAST NORTH UP`, `/edit face
+  DEGREES`, `/edit select drop #ID`. `EditorMenuItem` gained `Section` and `Checked` (appended), so
+  Common changed: new Windows zip and server update together. Untried with Orca and NVDA.
+  EditorDialogTests.
 - Bans. `/ban NAME [DURATION] [REASON]` (30m, 2h, 7d or 4w; none is until lifted), `/unban NAME`,
   `/bans`. A new permission, `ban`, for Moderators and above, grantable and allowed in custom roles.
   Nobody bans an owner or themselves; below the Owner only a role above the target's, and a protected

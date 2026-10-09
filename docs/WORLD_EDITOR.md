@@ -6,8 +6,9 @@ itself, undo and redo, and edits that are kept.
 
 ## 1. What it is
 
-- F12 opens the World Editor menu, in the game, while you play. There is no build mode: you walk, you
-  collide, you can be hurt. Close the menu (Escape) to move, press F12 again to carry on.
+- F12 opens the world editor dialog, in the game, while you play (section 16; until 2026-10-09 it
+  opened the menus of section 3, which `/edit` typed on its own still does). There is no build mode:
+  you walk, you collide, you can be hurt. Close the dialog (F12 or Escape) to move.
 - Everything you can place or tune is a **model** in one library: a prefab, a machine, a water
   feature, a fire, a tree, a horn, a train, later a vehicle, an engine, a character, a road. Each kind
   of model **describes itself**: its fields, their units, sensible ranges, a one-line help and, where
@@ -28,7 +29,7 @@ itself, undo and redo, and edits that are kept.
 | Admin, Dev | any map |
 | A map's owner | their own map |
 | People the owner asks to edit (`/map editor add NAME`) | that map |
-| Moderator, other players | nowhere; F12 says "The world editor is for this map's owner, the people they ask to edit it, and developers." |
+| Moderator, other players | nowhere; F12 does nothing (no sound, no words); `/edit` typed says "The world editor is for this map's owner, the people they ask to edit it, and developers." |
 
 - The permission is `edit` (Permissions table: Dev, on your own map for everybody). Invited editors are
   the one addition to the scope rule: `Permissions.ForMapEditors("edit")` is true, so `edit` also holds
@@ -42,9 +43,12 @@ itself, undo and redo, and edits that are kept.
 
 ## 3. Using it
 
+The dialog F12 opens is described in section 16. This section is the menu that `/edit` typed on its own
+opens, which the MUD gateway also shows as numbered lines; it holds everything the dialog leaves out.
+
 ### Keys
 
-- F12: open the World Editor at its first menu. F12 again while it is open goes back to the first menu.
+- `/edit`: open the World Editor at its first menu.
 - In the menu: Up and Down move, Enter or Right chooses, Escape, Left or Backspace go back, a letter
   jumps to the next item starting with it. These are the keys of every other in-game list (F5, F6, F8).
 - Items that change something and that you will want again (nudges, a step up or down on a setting)
@@ -884,8 +888,137 @@ dialog can tell its answer from anything else said.
   for a prefab that can be sized). No new message and no new member: the wire is unchanged.
 - Client.Core: BuildCatalog (the form read), BuildForm (fields, what is in use, the check, the
   command, the remembered values), BuildDialog, and ModalDialog: a dialog that stays open while it is
-  used and closes on Escape or the key that opened it. The F12 dialog being designed is to use
+  used and closes on Escape or the key that opened it. The F12 dialog (section 16) uses
   ModalDialog the same way. Heads: GtkClientShell.Build.cs and MainWindow.Build.cs.
 - Rooms are measured at load (regions measure themselves): a wall built into a room changes how the
   room sounds after the map is loaded again, not at once. The wall itself is heard at once (it is
   geometry), as any placed thing is.
+
+## 16. The F12 dialog
+
+Built 2026-10-09 (Cody: the editor should be a dialog, not a menu, and do nothing without
+permission). Untried with Orca and NVDA: tests only.
+
+### Opening and closing
+
+- F12 opens it, in both clients, on a map you may edit (`edit` here: the same rule as `/edit` and
+  Control+B). The client asks the server (`/edit dialog open TAB`) and the server does not answer a
+  player who may not edit, so on any other map F12 does nothing: no sound, no speech.
+- F12 again, Escape or Close shuts it. It opens on the tab last used this session.
+- It is modal. While it is open you do not move, so "in front of you" is from where you stood.
+  Actions that need you to move or listen (nudging by the step, walking somewhere) are not in it; the
+  menus of section 3 (`/edit` typed) still have them.
+- Placing, applying and the other buttons keep it open. The game says what happened, as the server
+  words it ("Placed: Concrete Wall, 2 by 0.5 by 3 metres high, 0.65 metres in front of you, facing
+  north. It is selected."). The focus stays where it was.
+
+### Keys
+
+- Control+Tab and Control+Shift+Tab change tab, as do Control+Page Down and Control+Page Up; the focus
+  goes to the first control of the tab. Control or Alt on their own do nothing.
+- Tab and Shift+Tab move through a tab's controls in the order listed below, then to Undo, Redo and
+  Close. Tab leaves a list rather than stepping through its rows; the arrows move in it.
+- Enter in a box, drop-down or list presses the button it belongs to (Place, Apply changes, Find,
+  Set ...). Enter on a button presses it.
+- Space ticks or unticks a row of Things near you. On other lists Space does nothing.
+- Up and Down change a closed drop-down's choice (on GTK the game says the new choice, as in the
+  Control+B dialog). Space opens its list.
+
+### The tabs, in Tab order
+
+Undo, Redo and Close are under every tab. Undo and Redo say what they would undo or redo ("Undo:
+moved Fountain"); with nothing to undo the button says so and is dimmed.
+
+**Place**
+
+- Place a prefab: Search (words in a prefab's name or category; the list shows those with every
+  word); Category (All categories, then the editor's categories, and Groups if there are any);
+  Prefabs (each "Name, width by depth by height high: its description"); Where it goes (at your feet,
+  or just in front of you if it is solid; at the build cursor; preview only); Place; Preview (things
+  with a sound of their own); Place again (names the last thing placed).
+- Build a piece: the Control+B form (section 15) without its Prefab kind, since the list above places
+  prefabs: What (floor, wall, roof, door, window), its fields, and Place the piece. The same form,
+  values and checks as Control+B, which stays as the quick way to it.
+
+**Edit** (what used to be Select, Selected and Held)
+
+- Things near you: what is within 20 metres (up to 40), what you stand on or in first, then nearest;
+  each "Name, distance and direction". Arrowing chooses one (`/edit select #ID dialog`, said by
+  nobody: the screen reader reads the row). Space ticks it (`/edit select add #ID dialog` or
+  `/edit select drop #ID dialog`). Find by name or number, and Find (`/edit select NAME` or `#ID`): the
+  nearest match is chosen and put in the list.
+- Chosen: NAME: Position (east, north and up in metres, as F1 says where you are; `/edit move to`),
+  Facing (degrees clockwise from north; `/edit face DEGREES`), then the thing's settings as the
+  Settings menu builds them (name, width, height, depth, model, volume, range, door sides, room
+  materials ...): a box for a number or words, a drop-down for a choice, a tick for on and off. The
+  first box's description starts with the thing's summary. Apply changes; Bring to me; Duplicate;
+  Row of copies: how many, and spacing in metres; Row of copies; Delete (asks "Delete NAME?", No
+  first).
+- N ticked (only when something is ticked): Move them together (east, north, up), Move them; Turn
+  them together (degrees), Turn them; Group name, Group them; Untick all.
+
+**Build** (the Library)
+
+- Library: a line that says "Changes apply to every map that uses it, so duplicate first to try
+  things." (also the description of Kind); Kind (Prefabs first, then the other kinds, each with how
+  many); Category (prefabs only); Models ("id: Name, version N"). Arrowing chooses one
+  (`/edit dialog model KIND ID`).
+- The chosen model: what it is and where it is used; Id for the copy (suggested ID_copy) and
+  Duplicate (`/edit model copy`, edit-models). The copy becomes the one shown, ready to change.
+- Fields: every field of the model, groups and lists opened out ("Compressor hum level, 63 dB"),
+  then the value of the field chosen (a box, a drop-down or a tick, read only without edit-models)
+  and Set (`/edit model set`).
+- Versions: newest first, with Use on every map, Pin on this map and Lift this map's pin.
+- Where it is used: one row per loaded map.
+- Replace: Replace it with, Replace on this map, Replace everywhere (edit-models).
+
+**World** (what used to be Map)
+
+- Weather, time and ground: Weather, Time of day, Natural ground; Apply changes; Set spawn here.
+- Map size (the owner, or `maps-any`, and not on the server's own maps): east, north and height;
+  Change the size (`/setmapsize`).
+- Rooms and areas (what used to be "Places and rooms", renamed so that "place" means only the
+  action): the named places and rooms, nearest first; Edit it chooses one and shows the Edit tab with
+  its name and materials.
+- Beacon rules: one drop-down per kind of beacon (on unless a player turns it off, off unless turned
+  on, always on, never); Apply beacon rules.
+- Editors: who may edit the map; for the owner, Player name, Add editor, Remove the chosen editor.
+- Model versions pinned to this map; Lift the chosen pin.
+- Map information (what used to be Test tools): name and owner, size, tiles, how many things, the
+  spawn point; What is around me (`/scan`).
+
+### Screen readers
+
+- GTK (Orca): standard GTK 4 widgets. Each box, drop-down and list has its label as its mnemonic
+  widget (its accessible name) and its help as a tooltip (its description). Each tab page and each
+  titled part is a frame named for it, so Orca says the name as the focus moves into it. The game
+  says nothing Orca reads (the window, the tab, the focused control); it speaks a refusal, a
+  drop-down's new choice on Up and Down, and the server's answers.
+- Windows (NVDA): a TabControl, each part a GroupBox, controls with AccessibleName and
+  AccessibleDescription; the things list is a CheckedListBox, so NVDA says "checked" and Space ticks.
+  With NVDA running the game says nothing NVDA reads; without it, it says the dialog and the tab as
+  they open. A refusal and the server's answers are always said.
+
+### Code and wire
+
+- Server: WorldEditor.Dialog.cs. `/edit dialog open TAB` sends the editor menu "dialog" with every
+  tab; `/edit dialog tab TAB` sends "dialog.TAB" (Refresh); `/edit dialog model KIND ID` chooses the
+  Build tab's model; `/edit dialog close`. While the dialog is open, whatever would open or refresh a
+  menu (a placing, a change, an undo) sends the current tab instead, so the dialog is kept up to date
+  by the same Refresh every operation already makes. `/edit menu` clears it.
+- Each item carries a Section ("place.prefab", "edit.thing", "edit.field", "build.version",
+  "world.beacon", "foot.undo" ...); fields are Input items as the value dialog has them (section 14),
+  their choices Info items with the field's Command. The Place tab's piece form is the build form's
+  items (section 15) with Section "piece".
+- New on the server for the dialog, and typed too: `/edit move to EAST NORTH UP`, `/edit face
+  DEGREES`, `/edit select drop #ID`, and `dialog` on the end of a select (said by nobody) or a hold
+  (said as "Ticked"). `/edit place` now says "Placed: NAME, SIZE, where, facing". A deleted thing is let
+  go of. A copy made while the dialog is open becomes its Build tab's model.
+- Wire: `EditorMenuItem` gained `Section` and `Checked`, appended after `Count`. No new message.
+  OpenFPS.Common changed: a new Windows zip and a server update go together.
+- Client.Core: EditorDialog (tabs, sections and controls; what the player typed is kept when the
+  server's values come again; the checks of EditorValuePrompt; the commands), EditorDialogMemory (the
+  tab, the category, where, the kind, for the session). Heads: GtkClientShell.Editor.cs and
+  MainWindow.Editor.cs draw any section from its controls, update a section in place when its
+  controls are the same, and draw it again (keeping the focus) when they are not.
+- Tests: EditorDialogTests.

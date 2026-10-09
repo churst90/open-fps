@@ -255,14 +255,15 @@ against them. People in the street use doors the same way.
 | F6 | Maps |
 | Shift+F6 | Your maps |
 | F8 | Friends |
-| F12 | The world editor, on a map you may edit (see "The world editor") |
+| F12 | The world editor dialog, on a map you may edit (see "The world editor"); not a list. Elsewhere it does nothing |
 | Control+B | The build dialog, on a map you may edit (see "Building quickly"); not a list |
 | I | Your inventory |
 
 Inside a list:
 - Up and Down move. Enter or Right chooses. Escape, Left or Backspace goes back.
 - A letter jumps to the next item starting with that letter.
-- You stand still while a list is open. F5, F6, F8 and F12 switch straight to another list.
+- You stand still while a list is open. F5, F6 and F8 switch straight to another list; F12 opens the
+  editor dialog over it.
 - Choosing a **player** or **friend** gives: Private message, View profile, and Add or Remove
   friend. Staff also get Where is.
 - Choosing a **map** takes you there. A map is read as its name, how many players are on it,
@@ -406,8 +407,8 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
   or deleted, it is just past the edge). Anyone standing past the new edge is brought inside at their
   next step. Natural ground is laid again under the new size where the map's own ground does not
   reach. Kept in the map's overlay file, and the editor's undo takes it back. The server's own maps
-  (the city, the speedway, the real places) are made by programs in `tools` and are refused. Also in
-  the world editor's Map menu: "Change the size, typed".
+  (the city, the speedway, the real places) are made by programs in `tools` and are refused. Also on
+  the world editor's World tab: Map size.
 - `/detail low|medium|high`: how much of a large map is loaded round you. The maps of real places
   (magnolia tx, albany or) are sent in 250 m tiles: everything within 150, 300 or 500 m, and the
   what sound notices from further off (the ground, roads, the outsides of buildings with their front
@@ -448,36 +449,40 @@ map, loads it and puts you in. You stay logged in.
 
 ## The world editor
 
-F12 opens the world editor. It changes the map you are on, while you play: there is no build mode,
-you walk and collide as usual. Close it with Escape to move, and press F12 to carry on. The design is
-in docs/WORLD_EDITOR.md.
+F12 opens the world editor dialog. It changes the map you are on, while you play: there is no build
+mode, you walk and collide as usual. While the dialog is open you do not move, so "in front of you" is
+from where you stood when you opened it. The design is in docs/WORLD_EDITOR.md.
 
 Who may use it:
-- Developers and the administrator, on any map.
+- Developers, the administrator and the owner role, on any map.
 - A map's owner, on that map.
 - People the owner names with `/map editor add NAME` (and `/map editor remove NAME`), on that map.
   `/map editor` lists them. Naming an editor also invites them in.
-- Anyone else hears "The world editor is for this map's owner, the people they ask to edit it, and
-  developers."
+- For anyone else F12 does nothing: no sound and no words.
 
-The menu works like the other lists. Items that change something you may want again (a nudge, a step
-up or down) keep the menu open, so Enter can be pressed again. Items that need a number or a name
-open a small dialog with one text box. The box is labelled with what it is (and its unit), holds the
-value now, selected, so typing replaces it, and its description gives the range. Enter applies,
-Escape cancels. A value out of range is refused with the reason, and the box stays open with what you
-typed, to correct.
+The dialog:
+- Four tabs: Place, Edit, Build and World. Control+Tab and Control+Shift+Tab change tab, as do
+  Control+Page Down and Control+Page Up. The focus goes to the first control of the tab.
+- Tab and Shift+Tab move through the controls. Each box, list and drop-down is labelled, and its
+  description has the range and a line of help.
+- Enter in a box or a list presses the button it belongs to (Place in the prefab list, Apply in a
+  setting's box). Space ticks a row of the things-near-you list.
+- Undo, Redo and Close are under every tab. Undo and Redo say what they would undo or redo.
+- F12, Escape or Close shuts it. Placing, applying and the other buttons keep it open, and the game
+  says what happened ("Placed: Concrete Wall, 2 by 0.5 by 3 metres high, 0.65 metres in front of you,
+  facing north."). A value out of range is said and shown, nothing is sent, and the focus goes to the
+  box to correct.
 
-| Menu | What is in it |
+| Tab | What is in it, in Tab order |
 |---|---|
-| Map | Name, owner, size, tiles, how many things, the spawn point; Set spawn here; Settings (weather, time of day, natural ground); Beacon rules; the models this map pins; the editors |
-| Place | What choosing a prefab does (place it at your feet, at the build cursor, or play a preview to you); Search; Again; the prefabs by category (walls, floors, doors, machines, water, fire, trees, sounds, places, things to carry); Groups |
-| Select | Nearest things; things within 5, 10 or 20 metres; doors near you; places and rooms; by name; by number; hold one as well (for a group). Choosing one selects it and opens its menu |
-| Selected | What it is and where; move by numbers (east, north, up); nudge by the step (north, south, east, west, up, down, forward, back, left, right); turn 15 or 90 degrees or face a direction; bring to you; duplicate; a row of copies; delete; settings; its model; its prefab; for a part of a placed group, hold its whole group |
-| Held | The things you hold together; move them together by numbers, nudge them together, turn them together about their middle; group them; let go |
-| Places and rooms | The rooms and named places on the map, nearest first, to select and set |
-| Library | Every kind of model (machines, water features, fire, trees, shores, running water, horns, whistles, bells, air systems, trains, rail vehicles, track, engines, vehicles, prefabs, groups): each model's values, its versions, where it is used, replace it, copy it, retire it, and new models from a template |
-| Test tools | What is around me; map information |
-| Undo, Redo | Say what they would undo or redo |
+| Place | Search; Category; Prefabs (each with its size and description); Where it goes (at your feet, at the build cursor, or preview only); Place; Preview; Place again. Then "Build a piece": What (floor, wall, roof, door, window) and its fields as in Control+B, and Place the piece |
+| Edit | Things near you (nearest first; Space ticks); Find by name or number; Find. Then the chosen thing: Position (east, north, up), Facing in degrees, and its settings; Apply changes; Bring to me; Duplicate; Row of copies (how many, and spacing); Delete (asks first). With things ticked: move them together, turn them together, group them, untick all |
+| Build | Kind; Category (prefabs); Models. For the chosen one: Id for the copy and Duplicate; Fields and the value of the field chosen, with Set; Versions, with Use on every map, Pin on this map, Lift this map's pin; Where it is used; Replace it with, on this map or everywhere. Changes apply to every map that uses it, so duplicate first to try things |
+| World | Weather, Time of day, Natural ground, Apply changes, Set spawn here; Map size (owner, not on the server's own maps); Rooms and areas, with Edit it; Beacon rules, one drop-down per kind of beacon, and Apply beacon rules; Editors (add and remove); Model versions pinned to this map; Map information and What is around me |
+
+`/edit` typed on its own still opens the old menus as lists, with everything the dialog leaves out
+(nudging by the step, a list's items added or taken out, retiring a model, new models from a template,
+holding a placed group). Items that need a number or a name open a small dialog with one text box.
 
 - Settings of a placed thing: name, width, height, depth; for a thing that makes a sound its model,
   volume, range and minimum distance; for a door the side that needs a key and the side you push it
@@ -488,12 +493,12 @@ typed, to correct.
   a step up or down. Changing a model changes it on every map and needs the `edit-models`
   permission (developers and the administrator). Each change is a new version; Versions lists them.
   Everyone hears the change at once.
-- Versions: each model's menu has Versions. Choose one to use it on every map (edit-models), or to
-  pin it on this map: then this map's players hear that version, whatever the others use. Pinning is a
+- Versions (Build tab): choose one to use it on every map (edit-models), or to pin it on this map: then this map's players hear that version, whatever the others use. Pinning is a
   setting of the map, so a map's owner may do it. What the server simulates with a model (a vehicle's
   mass and gearbox, say) is the current version on every map; a pin is for what is heard.
-- New models: "New from a template" starts from a built-in model as built; "Copy it" starts from a model
-  as it is now. Type the new model's id (letters, digits, _ and -). A new prefab can be placed at once;
+- New models: Duplicate on the Build tab (or "Copy it" in the `/edit` menu) starts from a model as it
+  is now, and the copy becomes the one shown; "New from a template" in the `/edit` menu starts from a
+  built-in model as built. Type the new model's id (letters, digits, _ and -). A new prefab can be placed at once;
   give a thing a new sound model with its model setting, or replace one model with another.
 - Replace it with another: every thing on this map (or every loaded map, with edit-models) that uses
   one model uses another. One undo puts them all back.
@@ -516,10 +521,11 @@ typed, to correct.
 - Search finds prefabs whose name has every word you type. Preview plays a prefab's sound two metres in
   front of you for six seconds, to you alone; nothing is placed. Again places the last prefab again
   where you stand. A row makes copies of the selected thing in a line the way you face.
-- The build cursor: `/origin` sets it where you stand, `/at` moves it. With Place set to the build
-  cursor, choosing a prefab puts it there, for places you cannot walk to (a roof).
-- Groups: hold some things (Select, hold one as well), then Group them and give the group a name. The
-  group is a model; Place, Groups puts its things down in front of you, turned the way you face. A
+- The build cursor: `/origin` sets it where you stand, `/at` moves it. With "Where it goes" set to the
+  build cursor, Place puts the prefab there, for places you cannot walk to (a roof).
+- Groups: tick some things on the Edit tab, type a group name and press Group them. The group is a
+  model; on the Place tab the Groups category puts its things down in front of you, turned the way you
+  face. A
   placed group is its things, each its own, and they are held as it is placed. Later, select any one of
   them and choose "Hold its whole group" (`/edit select group`): Held then moves, nudges or turns them
   all together, turning about their middle, and one undo puts them all back. A group's parts can be
@@ -547,14 +553,15 @@ command for each:
 | `/edit select nearest`, `/edit select NAME`, `/edit select #ID`, `/edit select within METRES` | Select |
 | `/edit selected`, `/edit settings` | What is selected, and its settings |
 | `/edit move EAST NORTH UP` | Move by metres; negative goes west, south, down |
+| `/edit move to EAST NORTH UP` | Move to a place, as F1 says where you are (the dialog's Position box) |
 | `/edit nudge DIRECTION [METRES]`, `/edit step METRES` | Move by the step (0.5 m to start with) |
-| `/edit turn DEGREES`, `/edit face DIRECTION` | Turn clockwise (negative: anticlockwise), or to a compass direction |
+| `/edit turn DEGREES`, `/edit face DIRECTION`, `/edit face DEGREES` | Turn clockwise (negative: anticlockwise), or to a compass direction, or to degrees from north (the dialog's Facing box) |
 | `/edit bring`, `/edit duplicate`, `/edit delete` | Bring to you, copy, delete |
 | `/edit set FIELD VALUE`, `/edit up FIELD`, `/edit down FIELD` | A setting: Name, Width, Height, Depth, Model, Volume, Range, MinDistance, KeyedSide (neither, front, back), PushSide (front, back), Indoor, Floor, Ceiling, North, South, East, West |
 | `/edit place PREFAB [at cursor]`, `/edit prefabs [CATEGORY]` | Place a prefab, at your feet or at the build cursor; list them |
 | `/edit find WORDS`, `/edit preview PREFAB`, `/edit again` | Search; hear a prefab; place the last one again |
 | `/edit row COUNT [SPACING]` | Copies of the selected thing in a line the way you face |
-| `/edit select add nearest\|NAME\|#ID`, `/edit select clear` | Hold things together; let go |
+| `/edit select add nearest\|NAME\|#ID`, `/edit select drop #ID`, `/edit select clear` | Hold things together (the dialog's ticks); let one go; let go of all |
 | `/edit select group` | Hold every part of the placed group the selected thing belongs to |
 | `/edit held move EAST NORTH UP`, `/edit held nudge DIRECTION [METRES]`, `/edit held turn DEGREES` | Move or turn everything held together, one undo; turning is about their middle |
 | `/edit group NAME`, `/edit place group NAME` | Make a group of what you hold; place one |
@@ -597,7 +604,7 @@ a floor, wall, roof, door, window or prefab at the size you type, in one go.
 
 Placing keeps the dialog open, with your values, and the focus back on What, so Enter places another.
 The game says what was placed: "Placed: floor, 6 by 8 metres, concrete, at your feet." The next time
-the dialog opens it has the values you last placed. Undo (F12, or `/edit undo`) takes a placing back,
+the dialog opens it has the values you last placed. Undo (in the F12 dialog, or `/edit undo`) takes a placing back,
 including a wall that was cut for a door.
 
 The same from the command line: `/edit build wall length 6 height 2.7 material brick ahead 2`,
