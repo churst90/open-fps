@@ -318,6 +318,8 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(GameKey.F8, () => _network.Send(new FriendListRequest()));
         // The world editor (docs/WORLD_EDITOR.md): the server says whether you may, and builds the menu.
         _bindings.Bind(GameKey.F12, OpenWorldEditor);
+        // The build dialog (section 15). A chord: Control on its own stays the screen reader's.
+        _bindings.Bind(InputContext.Gameplay, BuildDialog.Key.Key, BuildDialog.Key.Modifiers, ToggleBuildDialog);
 
         // Chat scrollback: brackets step through messages, shift-brackets through buffers.
         _bindings.Bind(GameKey.BracketLeft, () => CycleChat(-1));
@@ -409,7 +411,8 @@ public sealed partial class ClientGameSession : IDisposable
         "Shift K all driving sounds, Z the road, Shift H your health.",
         "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
         "plus and minus zoom, 1 and 3 the turret, period the rangefinder, 0 held to hold your breath, slash or Enter to fire.",
-        "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, brackets to read chat, slash for the command console.",
+        "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, Control B to build (on a map you may edit),",
+        "brackets to read chat, slash for the command console.",
         "Escape for the game menu: keep playing, main menu, or quit.");
 
     /// <summary>Whether anything is bound to a key in a context. For a settings screen, and for the
@@ -507,7 +510,8 @@ public sealed partial class ClientGameSession : IDisposable
             if (menuOpen && EditorKeys.Enabled && _shiftHeldThisStep
                 && _menus.Current?.Tag.StartsWith(EditorTagPrefix, StringComparison.Ordinal) == true
                 && EditorKeys.CommandFor(key) is { } editorCommand) { SendTyped(editorCommand); continue; }
-            if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8 or GameKey.F12)) { _menus.HandleKey(key); continue; }
+            if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8 or GameKey.F12)
+                && new GameKeyChord(key, modifiers) != BuildDialog.Key) { _menus.HandleKey(key); continue; }
             _bindings.Execute(context, key, modifiers);
         }
         _listening.Tick(_simTime);

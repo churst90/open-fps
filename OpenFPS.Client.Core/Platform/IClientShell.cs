@@ -34,6 +34,14 @@ public interface IClientShell
     void AskForValue(EditorValuePrompt prompt, Func<string, string?> submit) => OpenCommandConsole(prompt.Command);
 
     /// <summary>
+    /// The build dialog (Control+B, docs/WORLD_EDITOR.md section 15): a modal window made from
+    /// <see cref="BuildDialog.Form"/>, focus on its first control. Place calls <see cref="BuildDialog.Place"/>
+    /// and stays open; the head closes it on Escape, Cancel or <see cref="ModalDialog.Opener"/>, and when
+    /// <see cref="ModalDialog.CloseRequested"/> fires. A head without it opens the command console.
+    /// </summary>
+    void ShowBuildDialog(BuildDialog dialog) => OpenCommandConsole("/edit build ");
+
+    /// <summary>
     /// Escape in game: the game menu (Keep playing, Main menu, Quit), with Keep playing focused so a
     /// stray Enter does nothing. Escape or closing it is <see cref="GameMenuChoice.KeepPlaying"/>. The
     /// session does the logging out; the shell only asks.

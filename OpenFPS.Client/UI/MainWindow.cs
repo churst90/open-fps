@@ -13,7 +13,7 @@ namespace OpenFPS.Client.UI;
 /// Keys come from this window's own messages, not a system-wide hook: a hook saw the screen reader's
 /// keys too, and a key released in another window (Alt+Tab's Alt) stayed held.
 /// </summary>
-public sealed class MainWindow : Form
+public sealed partial class MainWindow : Form
 {
     private readonly InputStateBuffer _input;
     private readonly NvdaSpeechOutput _speech;

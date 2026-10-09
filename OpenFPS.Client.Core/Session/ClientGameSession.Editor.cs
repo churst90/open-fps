@@ -22,6 +22,19 @@ public partial class ClientGameSession
     /// </summary>
     internal void ShowEditorMenu(EditorMenu menu)
     {
+        // The build dialog's form, and the answers to what it sent, are not lists.
+        switch (menu.Path)
+        {
+            case BuildCatalog.FormPath: ShowBuildDialog(menu); return;
+            case "build.placed":
+                _chat.AddServerMessage(menu.Title);
+                _build?.Answer(true, menu.Title);
+                return;
+            case "build.refused":
+                if (OpenBuild is { } open) open.Answer(false, menu.Title);
+                else _chat.AddServerMessage(menu.Title);
+                return;
+        }
         var list = ToList(menu);
         if (menu.Refresh) { _menus.Replace(list); return; }
         bool editorOpen = _menus.Current?.Tag.StartsWith(EditorTagPrefix, StringComparison.Ordinal) == true;
@@ -52,6 +65,27 @@ public partial class ClientGameSession
         SendTyped(command);
         return null;
     });
+
+    private readonly BuildMemory _buildMemory = new();
+    private BuildDialog? _build;
+
+    /// <summary>The build dialog, if one is open.</summary>
+    internal BuildDialog? OpenBuild => _build is { IsOpen: true } b ? b : null;
+
+    /// <summary>Control+B: asks the server for the build dialog, which answers only a player who may edit
+    /// this map; anybody else hears nothing. Pressed again it closes the dialog.</summary>
+    private void ToggleBuildDialog()
+    {
+        if (OpenBuild is { } open) { open.Close(); return; }
+        Command("edit", "build", "form");
+    }
+
+    private void ShowBuildDialog(EditorMenu form)
+    {
+        if (OpenBuild != null) return;
+        _build = new BuildDialog(new BuildForm(BuildCatalog.From(form), _buildMemory), SendTyped);
+        _shell.ShowBuildDialog(_build);
+    }
 
     /// <summary>Sends "edit nudge north" as the command /edit nudge north.</summary>
     private void SendTyped(string text)

@@ -78,6 +78,8 @@ public partial class CommandHandler
         // docs/SERVER_SECURITY.md has the table; keep it in step with Permissions.
         if (!MayHere(session, Permissions.Canonical(commandName)))
         {
+            // Control+B asks for the build dialog: a player who may not edit hears nothing at all.
+            if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForBuildForm(args)) return;
             // F12 is answered in words of its own: who the editor is for.
             if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForMenu(args))
                 Say(reply, OpenFPS.Server.Editor.WorldEditor.Refusal);
