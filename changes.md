@@ -9,8 +9,8 @@ Recent work, newest first. `git log` has the rest.
   when it comes within the full radius; the tile you stand in is always 2 m, and the server's ground is
   always 2 m. Magnolia's join at medium: 942 KB of definitions (1,179 KB on the wire), was 1,513 KB with
   2 m everywhere; Albany 1,112 KB, was 1,613. About 1 % of near-ground lines of sight in a tile change when
-  it is swapped, once, at the full radius. `TerrainTileComponent` gained a method only, so the wire is
-  unchanged.
+  it is swapped, once, at the full radius. `TerrainTileComponent` gained a method only: no wire change of
+  its own (Common changed already for WorldLoading).
 - Magnolia and Albany are in the world (docs/WORLD_STREAMING.md, "Places in the world"). `/join world
   magnolia` arrives at the map's own spawn among the same houses, roads, lawns, named places and traffic,
   on the same ground (within 2 mm of the map's). Each thing goes to the world tile its middle is in, rooms
