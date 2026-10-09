@@ -1369,7 +1369,7 @@ public sealed class ShoreSynth
     /// (RainPlate.BlowMagnitude); a pocket's pressure rings at its own note and drives the modes near it.
     /// The bay's velocity radiates as a baffled plate, p = ρc √(σ S / 8π) v at a metre.
     /// </summary>
-    private sealed class HullPlate
+    internal sealed class HullPlate
     {
         private const int MaxModes = 16;
         private readonly int _modes;
@@ -1387,6 +1387,11 @@ public sealed class ShoreSynth
         private readonly float[] _dPhase = new float[MaxDrives], _dStep = new float[MaxDrives], _dAmp = new float[MaxDrives], _dDecay = new float[MaxDrives];
         private readonly int[] _dWait = new int[MaxDrives];
         private int _drives;
+        // This block's blows: place, sample, and each mode's velocity kick.
+        private const int MaxBlows = 16;
+        private readonly int[] _bPlace = new int[MaxBlows], _bAt = new int[MaxBlows];
+        private readonly float[,] _bKick = new float[MaxBlows, MaxModes];
+        private int _blows;
 
         public HullPlate(HullSpec spec, float rate, int places)
         {
@@ -1427,6 +1432,7 @@ public sealed class ShoreSynth
         public void BeginBlock()
         {
             Array.Clear(_force);
+            _blows = 0;
             // The pockets' pressure as force, sample by sample, into this block.
             for (int d = 0; d < _drives; d++)
             {
@@ -1450,12 +1456,14 @@ public sealed class ShoreSynth
         }
 
         /// <summary>A blow of this momentum (N·s) lasting about τ, at a sample of the coming block.</summary>
-        // TODO: `at` is not read; every blow lands at the start of its block (up to 2.7 ms early).
         public void Blow(int place, int at, float impulse, float tau)
         {
-            if (place < 0 || place >= _re.GetLength(0)) return;
+            if (place < 0 || place >= _re.GetLength(0) || _blows >= MaxBlows) return;
+            int b = _blows++;
+            _bPlace[b] = place;
+            _bAt[b] = Math.Clamp(at, 0, Block - 1);
             for (int i = 0; i < _modes; i++)
-                _re[place, i] += impulse * _shape[i] * RainPlate.BlowMagnitude(tau, _hz[i]) / _mass[i];
+                _bKick[b, i] = impulse * _shape[i] * RainPlate.BlowMagnitude(tau, _hz[i]) / _mass[i];
         }
 
         /// <summary>A pocket's pressure ringing at its note, as a force of this amplitude (N) on the bay.</summary>
@@ -1477,6 +1485,9 @@ public sealed class ShoreSynth
             ReadOnlySpan<float> shape = _shape, gain = _gain, cw = _cw, sw = _sw, decay = _decay, kick = _kick;
             for (int s = 0; s < into.Length; s++)
             {
+                for (int b = 0; b < _blows; b++)
+                    if (_bAt[b] == s && _bPlace[b] == place)
+                        for (int i = 0; i < modes; i++) re[i] += _bKick[b, i];
                 float f = _force[place, s];
                 float y = 0f;
                 for (int i = 0; i < modes; i++)
