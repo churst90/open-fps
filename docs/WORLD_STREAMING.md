@@ -660,6 +660,11 @@ Code: `WorldTileService` (the queue), `WorldMaps` (`Interest`, `SecondsToReach`,
   braked hard whatever the driver asks, and the driver is told once "The road ahead is not built yet.
   Stopping here until it is." It can always back away, and when the tile is built it drives on. If it
   reaches the edge anyway it is held there, never driven onto nothing.
+- **Logging in where you left.** A player who logged out in the world is saved, as on any map, by the
+  frame's id (which names the frame's corner tile) and the place in it. At login that is turned back into
+  a point of the world (`WorldMaps.WhereSaved`, `BaseYOf`) and they arrive there as above, under the height
+  they left at (a floor, not the roof over it), facing the way they faced. If the ground there cannot be
+  built within 30 s they land on the landing map as before. A text session lands on the landing map.
 
 Measured (`WorldLoadAheadTests`: the real `WorldMaps` and `WorldTileService`, a survey that answers each
 tile a set time after it is asked on a clock the test turns, two at a time, a straight run east from
@@ -769,8 +774,8 @@ Walking 700 m east on Magnolia now streams 429 KB (was 608 KB): 10 KB a tile.
 
 - Outside the real places, world tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
   the same answer whichever tile is made first; until then the real places are their maps, copied in (above).
-- A player who logs out in the world comes back on the landing map (a frame is not a saved map); saving
-  the world position and making the frame again at login.
+- (Done 2026-10-09: a player who logs out in the world comes back to the same spot at login, through the
+  loading screen; the landing map if the ground there cannot be built within 30 s. See Building ahead.)
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
 - (Coarse terrain at 8 m for the far ring: done, above.) The client's tile cache; land cover for the ground's
   materials (every cell is dirt).

@@ -92,7 +92,7 @@ public sealed class WorldMaps
     }
 
     private sealed record Pending(UserSession Session, WorldPlace Place, WorldTileKey Key, double Easting, double Northing,
-                                  DateTime Until, Action<string> Say);
+                                  DateTime Until, Action<string> Say, double? OverSea, Action? Failed);
 
     /// <summary>A player in a frame on the loading screen: their join is sent when the tiles round where
     /// they will stand, out to their far radius, are all loaded.</summary>
@@ -238,18 +238,71 @@ public sealed class WorldMaps
     public void Arrive(UserSession session, WorldPlace place, Action<string> say)
     {
         var (zone, north, e, n) = Utm.FromLatLon(place.Lat, place.Lon);
+        double? overSea = null;
         // A place with a map in the world arrives where the map's spawn is: the same drive, not the geocode.
         if (Copied?.ByMap(place.Id) is { } copied && copied.Zone == zone && copied.North == north)
-            (e, n, _) = copied.Grid(copied.Map.SpawnPoint.Position);
-        var key = WorldTileKey.Of(zone, north, e, n);
+        {
+            (e, n, double y) = copied.Grid(copied.Map.SpawnPoint.Position);
+            overSea = y;
+        }
+        ArriveAt(session, place, zone, north, e, n, overSea, ArrivalTimeout, say, null);
+    }
+
+    /// <summary>
+    /// Takes a player to a point of a zone (<paramref name="label"/> names the frame if one is made), stood on
+    /// the ground under <paramref name="overSea"/> (metres over the sea; the top of whatever is there if
+    /// null). <paramref name="failed"/> is called if they cannot be put there within <paramref name="timeout"/>.
+    /// </summary>
+    public void ArriveAt(UserSession session, WorldPlace label, int zone, bool north, double easting, double northing, double? overSea,
+                         TimeSpan timeout, Action<string> say, Action? failed)
+    {
+        var key = WorldTileKey.Of(zone, north, easting, northing);
         lock (_pending)
         {
             _pending.RemoveAll(p => p.Session == session);
-            _pending.Add(new Pending(session, place, key, e, n, Clock() + ArrivalTimeout, say));
+            _pending.Add(new Pending(session, label, key, easting, northing, Clock() + timeout, say, overSea, failed));
         }
         // Every tile they will be sent on arriving, nearest first: the one they arrive in before any.
-        WantRound(key, e, n, session.Tiles.Radii.FarMetres + WantMarginMetres, 0.0);
-        if (!_service.Store.Has(key)) say($"Building the world at {place.Name}. This takes a moment the first time anyone goes there.");
+        WantRound(key, easting, northing, session.Tiles.Radii.FarMetres + WantMarginMetres, 0.0);
+        if (!_service.Store.Has(key)) say($"Building the world at {label.Name}. This takes a moment the first time anyone goes there.");
+    }
+
+    /// <summary>
+    /// Where a saved place on a frame of the world is (PlayerState: a frame's id names its corner tile): the
+    /// zone, half, easting, northing and height over the sea, or null for a map that is not a frame.
+    /// </summary>
+    public static (int Zone, bool North, double Easting, double Northing, double OverSea)? WhereSaved(string frameId, Vector3 local, float baseY)
+    {
+        if (!IsWorldMap(frameId) || !WorldTileKey.TryParse(frameId[IdPrefix.Length..], out var origin)) return null;
+        return (origin.Zone, origin.North, origin.Easting + local.X, origin.Northing + local.Z, baseY + local.Y);
+    }
+
+    /// <summary>The height over the sea a frame's y is counted from: the frame's if it is made, else what it
+    /// will be when it is made again (its corner tile's ground, to the metre); null if that is not stored.</summary>
+    public double? BaseYOf(string frameId)
+    {
+        if (TryGetFrame(frameId, out var f)) return f.BaseY;
+        if (!IsWorldMap(frameId) || !WorldTileKey.TryParse(frameId[IdPrefix.Length..], out var origin)) return null;
+        return _service.Store.TryRead(origin, out var tile) && tile.Terrain != null ? MathF.Round(tile.Terrain.BaseY) : null;
+    }
+
+    /// <summary>The listed place nearest a point of a zone, to name a frame by; the point itself if none is
+    /// within 50 km.</summary>
+    public WorldPlace NearestPlace(int zone, bool north, double easting, double northing)
+    {
+        WorldPlace? best = null;
+        double bestD = 50_000;
+        foreach (var p in Places)
+        {
+            if (p.Lat == 0 && p.Lon == 0) continue;
+            var (z, nh, e, n) = Utm.FromLatLon(p.Lat, p.Lon);
+            if (z != zone || nh != north) continue;
+            double d = Math.Sqrt((e - easting) * (e - easting) + (n - northing) * (n - northing));
+            if (d < bestD) { bestD = d; best = p; }
+        }
+        if (best != null) return best;
+        var (lat, lon) = Utm.ToLatLon(zone, north, easting, northing);
+        return new WorldPlace($"{lat:F5},{lon:F5}", $"{lat:F5}, {lon:F5}", lat, lon);
     }
 
     /// <summary>Asks for every tile within <paramref name="metres"/> of a point of a zone, in order of how far
@@ -341,6 +394,7 @@ public sealed class WorldMaps
             {
                 p.Say($"The world at {p.Place.Name} could not be built just now. Try again in a minute.");
                 _pending.Remove(p);
+                p.Failed?.Invoke();
             }
             ready = _pending.Where(p => _service.Store.Has(p.Key)).ToList();
             foreach (var p in ready) _pending.Remove(p);
@@ -348,18 +402,14 @@ public sealed class WorldMaps
         foreach (var p in ready)
         {
             var frame = FrameFor(p.Key, p.Easting, p.Northing, p.Place);
-            if (frame == null) { p.Say($"The world at {p.Place.Name} could not be read. Try again."); continue; }
+            if (frame == null) { p.Say($"The world at {p.Place.Name} could not be read. Try again."); p.Failed?.Invoke(); continue; }
             var local = new TileKey(p.Key.X - frame.Origin.X, p.Key.Z - frame.Origin.Z);
-            if (!Load(frame, local)) continue;
+            if (!Load(frame, local)) { p.Failed?.Invoke(); continue; }
             _maps.RefreshGrid(frame.Id);
             var at = frame.Local(p.Easting, p.Northing, frame.BaseY);
-            // At a map's spawn, the ground under it (a drive, not the roof over a porch); elsewhere the top.
-            float probe = 2000f;
-            if (Copied?.ByMap(p.Place.Id) is { } copied && copied.Zone == frame.Origin.Zone)
-            {
-                var (_, _, overSea) = copied.Grid(copied.Map.SpawnPoint.Position);
-                probe = (float)(overSea - frame.BaseY) + 2f - at.Y;
-            }
+            // Under a known height (a map's spawn, where they left), the ground under it: a drive or a floor,
+            // not the roof over it; elsewhere the top of whatever is there.
+            float probe = p.OverSea is double overSea ? (float)(overSea - frame.BaseY) + 2f - at.Y : 2000f;
             float ground = GroundAt(frame, at, probe);
             at.Y = ground > -1000f ? ground + 0.2f : 0f;
             go(p.Session, frame.Id, at);

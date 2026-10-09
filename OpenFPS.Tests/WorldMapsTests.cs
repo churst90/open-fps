@@ -307,6 +307,49 @@ public class WorldMapsTests : IDisposable
         Assert.InRange(world2m - map5m, -1.5, 1.5);
     }
 
+    /// <summary>
+    /// Coming back where you left the world, as a login does: the saved frame and place (PlayerState keeps a
+    /// frame's id, which names its corner tile, and the place in it) give the point of the world, and
+    /// arriving there again stands you on the same spot of the same frame.
+    /// </summary>
+    [Fact]
+    public void Coming_back_to_the_world_puts_you_where_you_left_it()
+    {
+        var (maps, sessions, server, _) = Rig();
+        var world = server.World!;
+        var alice = new UserSession { ConnectionId = 1, Username = "alice", CurrentMapId = "speedway", Welcomed = true };
+        sessions.AddSession(1, alice);
+        world.Arrive(alice, Bobcat, _ => { });
+        Until(server, () => WorldMaps.IsWorldMap(alice.CurrentMapId) && alice.Entity != Entity.Null);
+        string left = alice.CurrentMapId;
+        Assert.True(maps.TryGetMap(left, out var ecs, out _, out var grid, out _));
+        var spot = ecs.Get<Transform>(alice.Entity).Position + new Vector3(130f, 0f, -40f);
+        spot.Y = PhysicsUtils.GetGroundHeight(ecs, grid, spot + new Vector3(0, 50, 0), out _) + 0.1f;
+
+        var where = WorldMaps.WhereSaved(left, spot, (float)world.BaseYOf(left)!.Value);
+        Assert.NotNull(where);
+        Assert.True(world.TryGetFrame(left, out var frame));
+        Assert.Equal(frame.Origin.Easting + spot.X, where!.Value.Easting, 3);
+        Assert.Equal(frame.Origin.Northing + spot.Z, where.Value.Northing, 3);
+        Assert.Null(WorldMaps.WhereSaved("speedway", spot, 0f));
+
+        server.MoveToMap(alice, "speedway");
+        Until(server, () => alice.CurrentMapId == "speedway" && alice.Entity != Entity.Null);
+        bool failed = false;
+        var w = where.Value;
+        world.ArriveAt(alice, world.NearestPlace(w.Zone, w.North, w.Easting, w.Northing), w.Zone, w.North, w.Easting, w.Northing, w.OverSea,
+                       TimeSpan.FromSeconds(30), _ => { }, () => failed = true);
+        Until(server, () => WorldMaps.IsWorldMap(alice.CurrentMapId) && alice.Entity != Entity.Null);
+        Assert.False(failed);
+        Assert.Equal(left, alice.CurrentMapId);
+        var back = ecs.Get<Transform>(alice.Entity).Position;
+        _o.WriteLine($"left at ({spot.X:F2}, {spot.Z:F2}, {spot.Y:F2}), back at ({back.X:F2}, {back.Z:F2}, {back.Y:F2})");
+        Assert.InRange(Vector2.Distance(new Vector2(back.X, back.Z), new Vector2(spot.X, spot.Z)), 0f, 0.01f);
+        Assert.InRange(back.Y - spot.Y, -0.2f, 0.3f);
+        // No listed place within 50 km (this rig lists none): the frame is named by the point itself.
+        Assert.StartsWith("30.12", world.NearestPlace(w.Zone, w.North, w.Easting, w.Northing).Name);
+    }
+
     /// <summary>An address from the Census geocoder is said as a person says it.</summary>
     [Theory]
     [InlineData("1042 BELMONT AVE SW, ALBANY, OR, 97321", "1042 Belmont Ave SW, Albany, OR")]

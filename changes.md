@@ -4,6 +4,8 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- Logging out in the world and back in returns you to the same spot, through the loading screen, facing
+  the way you faced; the landing map if the ground there cannot be built within 30 s.
 - Ground at 8 m in the far ring (docs/WORLD_STREAMING.md, "Coarse ground in the far ring"). A tile you have
   only in your far ring is sent with its ground at 7.8 m (32 cells a tile) instead of 2 m, and again at 2 m
   when it comes within the full radius; the tile you stand in is always 2 m, and the server's ground is

@@ -1100,8 +1100,25 @@ public class GameServer
             return;
         }
 
+        // Left in the world: back to the same spot, through the loading screen, or the landing map if it
+        // cannot be built in time.
+        if (World != null && session.Saved?.Map is { } left && session.Saved.PlaceOn(left) is { } saved
+            && OpenFPS.Server.OneWorld.WorldMaps.WhereSaved(left, new Vector3(saved.X, saved.Y, saved.Z), (float)(World.BaseYOf(left) ?? 0)) is { } spot)
+        {
+            Log.Information("{User} left in the world at {Frame}; arriving there again.", session.Username, left);
+            // Under the height they left at if the frame's base is known; on top of whatever is there if not.
+            World.ArriveAt(session, World.NearestPlace(spot.Zone, spot.North, spot.Easting, spot.Northing), spot.Zone, spot.North,
+                           spot.Easting, spot.Northing, World.BaseYOf(left) is null ? null : spot.OverSea, LoginToWorldTimeout,
+                           text => SendToSession(session, new TextEvent { Text = text }), () => SendManifest(session));
+            return;
+        }
+
         SendManifest(session);
     }
+
+    /// <summary>How long a login back into the world waits for the ground where they left before landing them
+    /// on the landing map instead.</summary>
+    private static readonly TimeSpan LoginToWorldTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>Leaving on purpose: the clean-up of a dropped connection, now rather than at the timeout,
     /// so everyone is told they logged out rather than lost the connection.</summary>
