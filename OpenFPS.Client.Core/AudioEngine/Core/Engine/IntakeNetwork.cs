@@ -235,17 +235,22 @@ internal sealed class IntakeNetwork
         return intensity * area * u * mach * band * level * 8f * restriction;
     }
 
+    // The law's constants for air, worked out once rather than every sample (see EngineSynth.OrificeGas).
+    private const float GammaAir = Gas.GammaAir;
+    private static readonly float AirCrit = MathF.Pow(2f / (GammaAir + 1f), GammaAir / (GammaAir - 1f));
+    private static readonly float AirRootGamma = MathF.Sqrt(GammaAir);
+    private static readonly float AirChoked = MathF.Pow(2f / (GammaAir + 1f), (GammaAir + 1f) / (2f * (GammaAir - 1f)));
+
     /// <summary>Choked/subsonic orifice flow for air, kg/s.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private static float Orifice(float pUp, float tUp, float pDown, float area)
     {
         if (area <= 0f || pUp <= pDown) return 0f;
-        const float gamma = Gas.GammaAir;
         float pr = pDown / pUp;
-        float crit = MathF.Pow(2f / (gamma + 1f), gamma / (gamma - 1f));
         float rt = MathF.Sqrt(Gas.R * tUp);
-        if (pr <= crit)
-            return area * pUp * MathF.Sqrt(gamma) * MathF.Pow(2f / (gamma + 1f), (gamma + 1f) / (2f * (gamma - 1f))) / rt;
+        if (pr <= AirCrit)
+            return area * pUp * AirRootGamma * AirChoked / rt;
+        const float gamma = Gas.GammaAir;
         float t1 = MathF.Pow(pr, 2f / gamma) - MathF.Pow(pr, (gamma + 1f) / gamma);
         return t1 <= 0f ? 0f : area * pUp * MathF.Sqrt(2f * gamma / (gamma - 1f) * t1) / rt;
     }

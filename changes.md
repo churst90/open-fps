@@ -2,6 +2,25 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-09
+
+- The engine render pool costs about 12 % less, every sample unchanged. On a street (32 live voices)
+  the twelve EngineRender threads took about six cores. The time is the synthesis itself, not the pool:
+  the workers sleep between sweeps, render nothing that is not playing, and a voice costs the same
+  rendered on one thread. Sampled with eu-stack (`--pool-cost offline ptracer`): the valve solver is a
+  third of an engine (twenty evaluations of the orifice law a sample on a V8, two powf each), the
+  waveguides a fifth. The orifice law's constants are worked out once per gas, the valve solver no
+  longer evaluates the bracket end its first guess replaces, the waveguide keeps its read slot instead
+  of dividing for it, the pipe keeps its admittance, the crank's sine and cosine are taken once per
+  cylinder, and constant filter coefficients and levels are no longer recomputed every sample. 32 street
+  voices on one core: 3.10 core-seconds per second of sound against 2.74; a push mower 52 ms a second
+  against 39. 58 renders (every vehicle preset, nine scenes, mowers, a piston aeroplane) are
+  bit-identical before and after (`--pool-cost render DIR wide`, `--pool-cost diff`). Bit-identical is
+  the only safe test: an engine voice is chaotic enough that a one-ulp change in one power grows to full
+  scale within seconds. EngineRenderCostTests holds each change against the code it replaced.
+  The hybrid CPU inflates what top shows: the pool's threads land on the 3.3 GHz cores and read about
+  half as much again as the same work on one fast core.
+
 ## 2026-10-07
 
 - Trains, the budgets and the city after Cody's session (14:44-15:40: "sounds are cutting out

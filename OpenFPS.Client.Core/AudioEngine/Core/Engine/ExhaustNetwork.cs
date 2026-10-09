@@ -89,6 +89,19 @@ internal sealed class ExhaustNetwork
         /// can's steel around them, and therefore the ones whose pressure drives it.</summary>
         public readonly List<int> ChamberIndices = new();
 
+        // The two above by chain position, for the per-sample walk: a dictionary lookup and a list
+        // search at every junction every sample. Built once the chain is complete (Freeze).
+        public (Pipe Neck, Pipe Cavity)?[] ResonatorAt = Array.Empty<(Pipe, Pipe)?>();
+        public bool[] IsChamber = Array.Empty<bool>();
+
+        public void Freeze()
+        {
+            ResonatorAt = new (Pipe, Pipe)?[Chain.Count];
+            IsChamber = new bool[Chain.Count];
+            foreach (var (i, r) in Resonators) ResonatorAt[i] = r;
+            foreach (int i in ChamberIndices) IsChamber[i] = true;
+        }
+
         /// <summary>The can, as metal. Null when the muffler has no shell worth modelling.</summary>
         public BodyResonator? Shell;
 
@@ -187,6 +200,7 @@ internal sealed class ExhaustNetwork
             float tailL = _x.TailpipeMetres.Length > b ? _x.TailpipeMetres[b]
                         : _x.TailpipeMetres[0] * (1f + 0.09f * b);
             br.Chain.Add(new Pipe(tailL, tailArea, rate, wall, steep));
+            br.Freeze();
             var exits = _x.TailpipeExitsMetres;
             br.Exit = exits != null && b < exits.Length ? exits[b] : Vector3.Zero;
             if (br.Exit != Vector3.Zero) _hasExits = true;
@@ -405,7 +419,7 @@ internal sealed class ExhaustNetwork
                 float cs = Gas.SoundSpeed(t, Gas.GammaExhaust);
                 float mach = flowPerBranch / (rho * cs * p.Area);
                 p.SetGas(t, Gas.GammaExhaust, mach);
-                if (br.Resonators.TryGetValue(i, out var res))
+                if (br.ResonatorAt[i] is { } res)
                 {
                     res.Neck.SetGas(t, Gas.GammaExhaust, 0f);
                     res.Cavity.SetGas(t, Gas.GammaExhaust, 0f);
@@ -560,7 +574,7 @@ internal sealed class ExhaustNetwork
             {
                 var up = chain[i];
                 var down = chain[i + 1];
-                if (br.Resonators.TryGetValue(i, out var res))
+                if (br.ResonatorAt[i] is { } res)
                 {
                     // Three-port: pipe, next pipe, and the resonator's neck. The neck's far end
                     // meets the cavity, whose far end is closed.
@@ -588,7 +602,7 @@ internal sealed class ExhaustNetwork
                     down.PushForward(on);
 
                     // The junction's pressure (arriving plus reflected) at a chamber's end pushes on the can.
-                    if (br.Shell != null && br.ChamberIndices.Contains(i)) chamberPressure += atEnd + back;
+                    if (br.Shell != null && br.IsChamber[i]) chamberPressure += atEnd + back;
                 }
             }
 
