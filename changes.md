@@ -2,6 +2,21 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-09
+
+- The last four probable bugs from the 2026-10-07 housekeeping. Renders in inbox/probable-bugs-2026-10-09.
+  - A wave's blow on a moored boat's hull lands at its own sample in the block. It landed at the start
+    of the block, 0 to 2.7 ms early (1.2 ms on average, measured on the aluminium hull's blows). Levels
+    are unchanged.
+  - The fire's fizz has its own part, `FireSynth.FizzPart` (lab: `parts=fizz`). It was scaled by the
+    crackles' part, so muting the crackles in the lab muted the fizz too. The game's fire is unchanged to
+    the bit (every part is 1 in the game).
+  - `AcousticPathData.ReflectionId` is read since 0e0e5ae6. `Scattering` is still unread and left as it
+    is: reading it would smear a recorded loop's wall copy, a sound change for Cody to decide.
+  - A preset's donor engine is no longer held as a new engine. Held, it ranked first for 2.5 s, took a
+    slot inside the budget, and the car at the budget's edge was let go and rebuilt (with every borrowed
+    voice restarted) each time a donor arrived.
+
 ## 2026-10-07
 
 - Trains, the budgets and the city after Cody's session (14:44-15:40: "sounds are cutting out

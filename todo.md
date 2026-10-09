@@ -46,18 +46,25 @@ Waiting on Cody's ear:
 - Downpipes, round 2: the flange should be gone (inbox/water-smoothing-2026-10-06/round2).
 - The world editor in the game (F12), and `/editorkeys on` with Orca, then NVDA.
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
+- The hull's blows in time (inbox/probable-bugs-2026-10-09/1-hull).
 
 ## Now
 
 ### Probable bugs
-Found by the housekeeping on 2026-10-07. The rest were fixed and merged in 246a4e1c (heard by Cody);
-these four were not part of it. Fixes go on their own branch.
-- A hull's blow lands at the start of its block, up to 2.7 ms early (`ShoreSynth.HullPlate.Blow` does
-  not read `at`).
-- The fire's fizz is scaled by `CracklePart` (FireSynth.cs 870).
-- Not heard: `AcousticPathData.ReflectionId` and `Scattering` are written and never read.
-- A new engine donor is held for 2.5 s inside the budget, so one budget car is let go once and rebuilt
-  2.5 s later (docs/COVERAGE_2026-10-06.md).
+Found by the housekeeping on 2026-10-07. The rest were fixed and merged in 246a4e1c (heard by Cody).
+The last four were handled on 2026-10-09, on their own branch (renders in inbox/probable-bugs-2026-10-09):
+- Fixed, waiting on Cody's ear: a hull's blow now lands at its own sample in the block. It landed at the
+  block's start, 0 to 2.7 ms early (1.2 ms on average).
+- Fixed, no sound change in the game: the fire's fizz has its own part (`FireSynth.FizzPart`, lab
+  `parts=fizz`). It was muted with the crackles in the lab. In the game every part is 1, so the game's
+  fire is the same to the bit.
+- `AcousticPathData.ReflectionId` is read (the reflection slots, fixed in 0e0e5ae6). `Scattering` is still
+  written and never read. Reading it would smear a recorded loop's wall copy by the wall's roughness, as an
+  engine's echo is. That is a sound change, so it was not wired up; see the TODO on the field.
+- Fixed: a new engine donor is no longer held for 2.5 s inside the budget, so the car at the budget's edge
+  is not let go and rebuilt when a donor arrives.
+- Seen, not changed: a pocket's ring on a hull starts one block (2.7 ms) after the pocket itself
+  (`HullPlate.Ring` is queued after the block's drives were laid down).
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
