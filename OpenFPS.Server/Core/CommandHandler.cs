@@ -438,6 +438,19 @@ public partial class CommandHandler
                 _server.SendToSession(unmuted, new TextEvent { Text = "You can chat again." });
                 Say(reply, $"{unmuted.Username} can chat again.");
                 break;
+            case "ban":
+                HandleBan(session, args, reply);
+                break;
+            case "unban":
+                HandleUnban(session, args, reply);
+                break;
+            case "bans":
+                HandleBans(reply);
+                break;
+            // Owner or maps-any: the editor checks, as it does for the map's other settings.
+            case "setmapsize":
+                Editor.SetMapSize(session, args, reply);
+                break;
             case "join":
             case "travel":
                 HandleJoin(session, args, reply);

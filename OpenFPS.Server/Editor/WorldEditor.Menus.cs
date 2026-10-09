@@ -160,6 +160,10 @@ public sealed partial class WorldEditor
             string owner = string.IsNullOrWhiteSpace(d.OwnerId) ? "the server's" : d.OwnerId.Equals(s.Username, StringComparison.OrdinalIgnoreCase) ? "yours" : $"{d.OwnerId}'s";
             items.Add(Info($"{d.DisplayName}, {owner}, {(d.IsPublic ? "public" : "private")}"));
             items.Add(Info($"Size {FieldDescriptor.Format(MathF.Round(size.X))} by {FieldDescriptor.Format(MathF.Round(size.Z))} metres, from {PlayerCoordinates.Format(d.MinBound)} to {PlayerCoordinates.Format(d.MaxBound)}"));
+            if ((_maps.IsOwner(s.CurrentMapId, s.Username) || s.Can(Permissions.MapsAny)) && !_maps.IsShipped(s.CurrentMapId))
+                items.Add(TypedNumber("Change the size, typed", "/setmapsize ", "size: metres east, north and high", "metres", MinHeight, MaxSide,
+                    "Three numbers: east, north and height. The south-west corner stays where it is. Refused if things would be left outside; add force to do it anyway.",
+                    MapSettings.Get(d, MapSettings.Size), count: 3));
             items.Add(Info(d.TileMetres > 0 ? $"Streamed in tiles of {FieldDescriptor.Format(d.TileMetres)} metres" : "Sent whole, not in tiles"));
             items.Add(Info($"{_maps.AuthoredEntities(s.CurrentMapId).Count} things"));
             items.Add(Info($"Spawn point at {PlayerCoordinates.Format(d.SpawnPoint.Position)}, facing {CompassOf(YawOf(d.SpawnPoint.Rotation))}"));

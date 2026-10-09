@@ -573,6 +573,14 @@ here has been tried in the game client yet, only by tests and through the MUD ga
 - Natural ground: the loader lays MapData.GroundPrefab where a map has no ground of its own; changing it
   lays the new ground at once. A map that lays its own ground says so.
 - Beacon rules go to the map's players at once in MapSettingsUpdate (union tag 42, new).
+- Size (2026-10-09): `/setmapsize EAST NORTH HEIGHT [force]`, and "Change the size, typed" in the Map
+  menu for the owner or `maps-any`. Kept as the overlay setting `Size` ("200 300 40", the order players
+  type it) and laid on MaxBound at load; MinBound never moves, so no coordinates change and the
+  client's acoustic grid keeps its corner. Live, it updates the ZoneComponent, lays the natural ground
+  again under the new bounds (or takes it up where the map's own ground now covers them), recomputes
+  the earshot, and sends MapSettingsUpdate with the play area (HasPlayArea, PlayMin, PlayMax,
+  appended) so the client's prediction has the server's edges. Refused on shipped (generated) maps.
+  Undo is a MapSetOp whose before is always a size, never "unset".
 
 ### Direct keys
 

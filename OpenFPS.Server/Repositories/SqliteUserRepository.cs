@@ -57,6 +57,10 @@ public class SqliteUserRepository : IUserRepository
         ("CustomRole", "TEXT NULL"),
         ("PlayerState", "TEXT NULL"),
         ("Belongings", "TEXT NULL"),
+        ("BannedUtc", "TEXT NULL"),
+        ("BannedUntilUtc", "TEXT NULL"),
+        ("BannedBy", "TEXT NULL"),
+        ("BanReason", "TEXT NULL"),
     };
 
     /// <summary>
@@ -173,8 +177,11 @@ public class SqliteUserRepository : IUserRepository
         using var ctx = CreateContext();
         var record = ctx.Users.AsNoTracking()
             .FirstOrDefault(u => u.Username == key);
-        if (record == null) return null;
-        return new UserData
+        return record == null ? null : ToData(record);
+    }
+
+    private static UserData ToData(UserRecord record)
+        => new()
         {
             Username = record.Username,
             PasswordHash = record.PasswordHash,
@@ -190,8 +197,11 @@ public class SqliteUserRepository : IUserRepository
             CustomRole = record.CustomRole,
             PlayerState = record.PlayerState,
             Belongings = record.Belongings,
+            BannedUtc = AsUtc(record.BannedUtc),
+            BannedUntilUtc = AsUtc(record.BannedUntilUtc),
+            BannedBy = record.BannedBy,
+            BanReason = record.BanReason,
         };
-    }
 
     public bool AddUser(string username, string password, UserRole role)
     {
@@ -293,6 +303,35 @@ public class SqliteUserRepository : IUserRepository
             r.Belongings = null;
         });
         return taken;
+    }
+
+    public bool SetBan(string username, DateTime atUtc, DateTime? untilUtc, string by, string? reason) => Update(username, r =>
+    {
+        r.BannedUtc = atUtc;
+        r.BannedUntilUtc = untilUtc;
+        r.BannedBy = Clip(by);
+        r.BanReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+    });
+
+    public bool ClearBan(string username)
+    {
+        bool was = false;
+        bool found = Update(username, r =>
+        {
+            was = r.BannedUtc != null;
+            r.BannedUtc = null;
+            r.BannedUntilUtc = null;
+            r.BannedBy = null;
+            r.BanReason = null;
+        });
+        return found && was;
+    }
+
+    public IReadOnlyList<UserData> Banned()
+    {
+        using var ctx = CreateContext();
+        return ctx.Users.AsNoTracking().Where(u => u.BannedUtc != null).OrderBy(u => u.Username)
+                  .AsEnumerable().Select(ToData).ToList();
     }
 
     private bool Update(string username, Action<UserRecord> change)

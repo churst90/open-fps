@@ -45,4 +45,8 @@ public class UserRecord
     public string? CustomRole { get; set; }
     public string? PlayerState { get; set; }
     public string? Belongings { get; set; }
+    public DateTime? BannedUtc { get; set; }
+    public DateTime? BannedUntilUtc { get; set; }
+    public string? BannedBy { get; set; }
+    public string? BanReason { get; set; }
 }

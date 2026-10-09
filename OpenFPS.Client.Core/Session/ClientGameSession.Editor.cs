@@ -107,10 +107,18 @@ public partial class ClientGameSession
             : "Editor direct keys off.";
     }
 
-    /// <summary>A map's settings changed while we are on it: its beacon rules, at once.</summary>
+    /// <summary>A map's settings changed while we are on it: its beacon rules and its edges, at once.</summary>
     internal void ApplyMapSettings(MapSettingsUpdate update)
     {
         _audioSystem.Beacons.SetMapPolicy(update.BeaconPolicy);
+        if (update.HasPlayArea)
+        {
+            // The prediction's edges must be the server's, or a step past the old edge is pulled back.
+            _physics.MapMin = update.PlayMin;
+            _physics.MapMax = update.PlayMax;
+            _state.MapMin = update.PlayMin;
+            _state.MapMax = update.PlayMax;
+        }
         Serilog.Log.Information("MapSettingsUpdate: {Map} beacon rules {Rules}.", update.MapId, string.Join(", ", update.BeaconPolicy));
     }
 }

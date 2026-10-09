@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -24,6 +25,27 @@ public sealed record MapSetOp(string MapId, string Path, string Label, string? B
 public static class MapSettings
 {
     public const string Weather = "Weather", Hour = "Hour", Ground = "Ground", BeaconPrefix = "Beacon.";
+
+    /// <summary>
+    /// The map's size from its south-west corner at the ground (MinBound, which never moves), stored as
+    /// "EAST NORTH HEIGHT" in metres, the order players type it (/setmapsize).
+    /// </summary>
+    public const string Size = "Size";
+
+    /// <summary>A size as stored: "200 300 40".</summary>
+    public static string FormatSize(float east, float north, float height)
+        => string.Join(" ", new[] { east, north, height }.Select(v => v.ToString("0.##", CultureInfo.InvariantCulture)));
+
+    /// <summary>A stored size: metres east, north and up. False for anything else.</summary>
+    public static bool TryParseSize(string? stored, out float east, out float north, out float height)
+    {
+        east = north = height = 0f;
+        var parts = (stored ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 3
+            && float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out east) && float.IsFinite(east) && east > 0f
+            && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out north) && float.IsFinite(north) && north > 0f
+            && float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out height) && float.IsFinite(height) && height > 0f;
+    }
 
     /// <summary>"server" or a weather the map holds.</summary>
     public static readonly string[] WeatherWords = { "server", "clear", "rain", "snow", "storm" };
@@ -99,6 +121,13 @@ public static class MapSettings
         if (path.Equals(Weather, StringComparison.OrdinalIgnoreCase)) map.HeldWeather = WeatherOf(stored) != null ? stored!.ToLowerInvariant() : null;
         else if (path.Equals(Hour, StringComparison.OrdinalIgnoreCase)) map.HeldHour = stored != null && TryHour(stored, out var h) ? h : null;
         else if (path.Equals(Ground, StringComparison.OrdinalIgnoreCase)) map.GroundPrefab = stored;
+        else if (path.Equals(Size, StringComparison.OrdinalIgnoreCase))
+        {
+            // No stored size is the map file's own, which is what the map already has.
+            if (!TryParseSize(stored, out float east, out float north, out float height)) return;
+            map.Size = new System.Numerics.Vector3(east, height, north);
+            map.MaxBound = map.MinBound + map.Size;
+        }
         else if (path.StartsWith(BeaconPrefix, StringComparison.OrdinalIgnoreCase))
         {
             string category = path[BeaconPrefix.Length..].ToLowerInvariant();
@@ -114,6 +143,11 @@ public static class MapSettings
         if (path.Equals(Weather, StringComparison.OrdinalIgnoreCase)) return map.HeldWeather ?? "server";
         if (path.Equals(Hour, StringComparison.OrdinalIgnoreCase)) return map.HeldHour is float h ? h.ToString("R", CultureInfo.InvariantCulture) : "server";
         if (path.Equals(Ground, StringComparison.OrdinalIgnoreCase)) return map.GroundPrefab ?? MapManager.NaturalGroundPrefab;
+        if (path.Equals(Size, StringComparison.OrdinalIgnoreCase))
+        {
+            var size = map.MaxBound - map.MinBound;
+            return FormatSize(size.X, size.Z, size.Y);
+        }
         if (path.StartsWith(BeaconPrefix, StringComparison.OrdinalIgnoreCase))
             return map.BeaconPolicy != null && map.BeaconPolicy.TryGetValue(path[BeaconPrefix.Length..], out var p) ? p : "default_on";
         return "";
@@ -238,12 +272,14 @@ public sealed partial class WorldEditor
         Overlays.Save(mapId);
         MapSettings.Apply(map, path, stored);
         if (path == MapSettings.Ground) RelayGround(mapId, stored ?? MapManager.NaturalGroundPrefab);
-        if (path.StartsWith(MapSettings.BeaconPrefix, StringComparison.OrdinalIgnoreCase))
+        if (path == MapSettings.Size) Resized(mapId, map);
+        if (path.StartsWith(MapSettings.BeaconPrefix, StringComparison.OrdinalIgnoreCase) || path == MapSettings.Size)
         {
             var update = new MapSettingsUpdate
             {
                 MapId = mapId,
                 BeaconPolicy = map.BeaconPolicy == null ? Array.Empty<string>() : map.BeaconPolicy.Select(kv => $"{kv.Key}={kv.Value}").ToArray(),
+                HasPlayArea = true, PlayMin = map.WalkMin, PlayMax = map.WalkMax,
             };
             foreach (var session in _sessions.GetSessionsInMap(mapId).ToList())
                 if (!session.IsTextClient) _server.SendToSession(session, update);
@@ -251,17 +287,154 @@ public sealed partial class WorldEditor
         // The weather and the hour are in the next state of the sky each player is sent (GetStateForMap).
     }
 
+    /// <summary>
+    /// What loading did with the bounds, done again for new ones: the zone, the natural ground (laid
+    /// again under the new bounds, or taken up where the map's own ground now covers them) and how far
+    /// the map is heard. The acoustic grid's corner is MinBound, which a resize never moves.
+    /// </summary>
+    private void Resized(string mapId, MapData map)
+    {
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return;
+        world.Query(new QueryDescription().WithAll<ZoneComponent>(), (ref ZoneComponent zone) =>
+        {
+            zone.Size = map.Size;
+            zone.MinBound = map.MinBound;
+            zone.MaxBound = map.MaxBound;
+        });
+        if (NaturalGround(mapId) is { } old && old != Entity.Null)
+        {
+            int oldId = old.Id;
+            _maps.DestroyEntity(mapId, old);
+            _server.BroadcastRemoval(mapId, oldId);
+        }
+        if (!MapManager.GroundCovers(world, map.WalkMin, map.WalkMax))
+        {
+            var (at, scale) = MapManager.NaturalGroundPose(map);
+            var made = _maps.SpawnPrefab(mapId, _maps.NaturalGroundOf(map), at, Quaternion.Identity, scale, "Ground");
+            if (made != Entity.Null) _server.SyncAudioComponent(made.Id);
+        }
+        _maps.RefreshGrid(mapId);
+        _maps.RefreshEarshot(mapId);
+    }
+
+    /// <summary>The natural ground the loader laid on a map, or null if the map lays its own.</summary>
+    private Entity? NaturalGround(string mapId)
+    {
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return null;
+        var authored = _maps.AuthoredEntities(mapId).Values.Select(e => e.Id).ToHashSet();
+        Entity? found = null;
+        world.Query(new QueryDescription().WithAll<IdentityComponent, Transform>(), (Entity e, ref IdentityComponent ident) =>
+        {
+            if (found == null && !authored.Contains(e.Id) && ident.Name == "Ground" && MapSettings.GroundPrefabs.Contains(ident.PrefabId ?? "")) found = e;
+        });
+        return found;
+    }
+
+    // Generous for a map built in the game; the city is 1,800 by 2,500.
+    private const float MinSide = 10f, MaxSide = 4000f, MinHeight = 5f, MaxHeight = 1000f;
+
+    /// <summary>
+    /// /setmapsize [EAST NORTH HEIGHT] [force]: the map's size in metres, from its south-west corner at the
+    /// ground, which stays where it is, so nothing on the map moves. Its owner's, or anybody's with
+    /// maps-any; never a map a generator writes. Kept in the overlay like the map's other settings, with undo.
+    /// </summary>
+    public void SetMapSize(UserSession s, string[] args, Action<IMessage> reply)
+    {
+        string mapId = s.CurrentMapId;
+        if (!_maps.TryGetMapData(mapId, out var map)) { Say(reply, $"Map '{mapId}' is not loaded."); return; }
+        var words = args.Where(a => !a.Equals("force", StringComparison.OrdinalIgnoreCase)).ToArray();
+        bool force = words.Length < args.Length;
+        if (words.Length == 0) { Say(reply, SaySize(map) + " /setmapsize EAST NORTH HEIGHT changes it."); return; }
+
+        if (!_maps.IsOwner(mapId, s.Username) && !s.Can(Permissions.MapsAny))
+        { Say(reply, $"{map.DisplayName} is not yours: only its owner, or somebody with maps-any, can change its size."); return; }
+        if (_maps.IsShipped(mapId))
+        { Say(reply, $"{map.DisplayName} is made by a program in tools, so its size is set there. /setmapsize changes maps made with /map new."); return; }
+
+        var n = new float[3];
+        if (words.Length != 3 || Enumerable.Range(0, 3).Any(i => !float.TryParse(words[i], NumberStyles.Float, CultureInfo.InvariantCulture, out n[i]) || !float.IsFinite(n[i])))
+        { Say(reply, "Say /setmapsize EAST NORTH HEIGHT in metres, such as /setmapsize 200 300 40, and force to leave things outside it."); return; }
+        float east = n[0], north = n[1], height = n[2];
+        if (east < MinSide || east > MaxSide || north < MinSide || north > MaxSide || height < MinHeight || height > MaxHeight)
+        { Say(reply, $"East and north are {FieldDescriptor.Format(MinSide)} to {FieldDescriptor.Format(MaxSide)} metres, and the height {FieldDescriptor.Format(MinHeight)} to {FieldDescriptor.Format(MaxHeight)}."); return; }
+
+        string after = MapSettings.FormatSize(east, north, height);
+        string now = MapSettings.Get(map, MapSettings.Size);
+        if (after == now) { Say(reply, "The map is already that size."); return; }
+
+        var newMax = map.MinBound + new Vector3(east, height, north);
+        var left = LeftOutside(mapId, map, newMax, out bool spawnOut);
+        if ((left.Count > 0 || spawnOut) && !force)
+        {
+            Say(reply, $"That would leave {Outside(left, spawnOut)} outside the map. "
+                     + $"/setmapsize {after} force does it anyway; nothing is moved or deleted, and nobody can walk out to what is outside.");
+            return;
+        }
+
+        var settings = Overlays.Get(mapId).Settings;
+        // Never null before, so undo puts back this size and not "whatever the file says".
+        string before = settings != null && settings.TryGetValue(MapSettings.Size, out var kept) ? kept : now;
+        ApplyMapSetting(mapId, MapSettings.Size, after);
+        Push(s, new MapSetOp(mapId, MapSettings.Size, "size", before, after));
+
+        int pulledIn = 0;
+        _maps.TryGetMap(mapId, out var world, out _, out _, out _);
+        foreach (var other in _sessions.GetSessionsInMap(mapId).ToList())
+        {
+            if (world == null || other.Entity == Entity.Null || !world.IsAlive(other.Entity) || !world.Has<Transform>(other.Entity)) continue;
+            var p = world.Get<Transform>(other.Entity).Position;
+            if (p.X >= map.WalkMin.X && p.X <= map.WalkMax.X && p.Z >= map.WalkMin.Z && p.Z <= map.WalkMax.Z) continue;
+            pulledIn++;
+            if (other != s) _server.SendToSession(other, new TextEvent { Text = $"{s.Username} made this map smaller. You are past its new edge; your next step brings you inside it." });
+        }
+
+        Say(reply, $"{SaySize(map)}"
+                 + (left.Count > 0 || spawnOut ? $" Left outside: {Outside(left, spawnOut)}." : "")
+                 + (pulledIn > 0 ? $" {Plural(pulledIn, "player")} past the new edge {(pulledIn == 1 ? "is" : "are")} brought inside at the next step." : ""));
+        Notify(s, $"{s.Username} set the map's size to {FieldDescriptor.Format(east)} by {FieldDescriptor.Format(north)} metres, {FieldDescriptor.Format(height)} high.");
+        Refresh(s, reply);
+    }
+
+    /// <summary>"This map is 200 metres east, 300 north and 40 high, from its south-west corner at ..."</summary>
+    private static string SaySize(MapData map)
+    {
+        var size = map.MaxBound - map.MinBound;
+        string play = map.PlayMin != null || map.PlayMax != null
+            ? $" People can go {FieldDescriptor.Format(MathF.Round(map.WalkMax.X - map.WalkMin.X))} by {FieldDescriptor.Format(MathF.Round(map.WalkMax.Z - map.WalkMin.Z))} metres of it."
+            : "";
+        return $"{map.DisplayName} is {FieldDescriptor.Format(MathF.Round(size.X, 2))} metres east, {FieldDescriptor.Format(MathF.Round(size.Z, 2))} north "
+             + $"and {FieldDescriptor.Format(MathF.Round(size.Y, 2))} high, from its south-west corner at {PlayerCoordinates.Format(map.MinBound)}.{play}";
+    }
+
+    /// <summary>The map's things inside its bounds now that would be outside new ones, and whether the
+    /// spawn point would be. Below the ground does not count: the corner at the ground does not move.</summary>
+    private List<string> LeftOutside(string mapId, MapData map, Vector3 newMax, out bool spawnOut)
+    {
+        static bool Within(Vector3 p, Vector3 lo, Vector3 hi) => p.X >= lo.X && p.X <= hi.X && p.Z >= lo.Z && p.Z <= hi.Z && p.Y <= hi.Y;
+        spawnOut = Within(map.SpawnPoint.Position, map.MinBound, map.MaxBound) && !Within(map.SpawnPoint.Position, map.MinBound, newMax);
+        var names = new List<string>();
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return names;
+        foreach (var e in _maps.AuthoredEntities(mapId).Values.Where(e => world.IsAlive(e) && world.Has<Transform>(e)))
+        {
+            var p = world.Get<Transform>(e).Position;
+            if (Within(p, map.MinBound, map.MaxBound) && !Within(p, map.MinBound, newMax)) names.Add(NameOf(world, e));
+        }
+        return names;
+    }
+
+    /// <summary>"3 things: a wall, a box and a lamp, and the spawn point", named up to three.</summary>
+    private static string Outside(List<string> names, bool spawn)
+    {
+        string things = names.Count == 0 ? ""
+            : $"{Plural(names.Count, "thing")}: {string.Join(", ", names.Take(3))}{(names.Count > 3 ? $" and {names.Count - 3} more" : "")}";
+        return spawn ? (things.Length > 0 ? things + ", and the spawn point" : "the spawn point") : things;
+    }
+
     /// <summary>The natural ground laid again as another prefab, where the old one was.</summary>
     private bool RelayGround(string mapId, string prefab)
     {
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return false;
-        var authored = _maps.AuthoredEntities(mapId).Values.Select(e => e.Id).ToHashSet();
-        Entity old = Entity.Null;
-        world.Query(new QueryDescription().WithAll<IdentityComponent, Transform>(), (Entity e, ref IdentityComponent ident) =>
-        {
-            if (old == Entity.Null && !authored.Contains(e.Id) && ident.Name == "Ground" && MapSettings.GroundPrefabs.Contains(ident.PrefabId ?? "")) old = e;
-        });
-        if (old == Entity.Null) return false;   // the map lays its own ground
+        if (NaturalGround(mapId) is not { } old) return false;   // the map lays its own ground
         var t = world.Get<Transform>(old);
         int oldId = old.Id;
         _maps.DestroyEntity(mapId, old);
