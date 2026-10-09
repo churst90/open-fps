@@ -401,6 +401,31 @@ The server never lets a player into a tile it does not have. If the next tile is
 - Tiles outside every data source (sea, another country without data) are generated as flat open
   ground with no roads, so there is no invisible wall in the middle of nowhere.
 
+## Stage 2 with terrain: the order of work (2026-10-09)
+
+Streaming stage 2 and geometry stage 3 (docs/GEOMETRY.md section 7) are built together, on one branch,
+in four steps. Each leaves every map working and is committed with its tests.
+
+| Step | What | What it proves |
+|---|---|---|
+| T1 | The heightfield in `OpenFPS.Geometry`: one terrain tile per 250 m tile, 2 m posts, heights in centimetres, a material per cell. Part of its tile's piece, so rays, the ground probe, containment and contact find it with no change to their callers; each cell's two triangles are convex prisms for the body. A terrain tile is an entity (`TerrainTileComponent`, appended to the definition) so the streamer, the client's geometry, the acoustic store and Steam Audio take it as they take boxes | Heights, slopes, a steep bank as a wall, a hill in the way of sound, footsteps on the cell's material, the server and a client building the same bits, all on a made-up terrain |
+| T2 | Real elevation for Magnolia and Albany. The map carries its elevation (3DEP, 5 m, in the map's metres); the server makes the 2 m terrain tiles at load, graded to the floors and solids that rest on it. `gen_osm.py` sets everything on the ground: houses on level pads, road and drive slabs pitched along their run, lawns tilted to the ground, trees and props on it, road centrelines with heights. The 3 km dirt slab goes | The ground follows the survey within a stated tolerance away from grading; the spawn, kerbs, walks and footsteps on the real maps; both maps still load and regenerate byte for byte |
+| W1 | The world store on the server: tiles keyed by UTM zone and 250 m square, versioned by generator, gzip JSON written whole, a lock per tile, and a disk cap (20 GB, a server setting). The tile generator runs in the server in the background, two at a time: terrain from 3DEP asked for in the tile's own UTM metres, nothing downloaded kept; flat open ground where there is no survey | A tile is made once and read from disk after; the cap evicts the least recently visited tiles; a second request for a tile being made waits for it |
+| W2 | One world: a map called "the world" whose tiles are the store's, loaded as players near them. The frame's origin goes on the manifest (appended). Players arrive at a place by name; the maps list has two parts, the world and maps. A tile not yet built stops a player at its edge (a short low tone and once "Not built yet. Wait here, or turn back.") | Tiles are asked for from the far radius and arrive while a player walks; nobody enters a tile that is not there |
+
+What is left after these four:
+
+- The per-tile generator for OpenStreetMap and Overture features (roads, buildings, addresses, woods)
+  that gives the same answer whichever tile is made first. Until then a world tile is terrain, and the
+  real places are the two maps.
+- Coarse terrain at 8 m for the far ring (every tile is sent at 2 m), the client's tile cache, frames
+  that rebase past 8 km, crossing a UTM zone edge.
+- Draped road meshes with kerbs and sidewalks as swept profiles, bridges and tunnels, creeks cut in
+  (geometry stage 4 shapes); diffraction over the terrain profile and the ground reflection reading the
+  slope.
+- Traffic, walkers and Alex follow the roads' heights where the roads carry them; anything that leaves a
+  road keeps its old flat assumptions.
+
 ## Stage 3: seamless travel
 
 - One world per server instead of one map per world: the server loads tiles of the world as players

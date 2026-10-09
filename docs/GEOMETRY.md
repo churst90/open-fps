@@ -754,6 +754,9 @@ working and boxes valid.
 
 ### Stage 3: terrain from real elevation for the real places (4 to 6 sessions)
 
+Being built with streaming stage 2 (2026-10-09): the order of work is in docs/WORLD_STREAMING.md,
+"Stage 2 with terrain".
+
 - `fetch_place.py`: 3DEP at 10 m and 1 m where available. `gen_osm.py`: graded terrain tiles,
   building pads, draped roads with kerbs and sidewalks, drives, bridges and tunnels from OSM tags,
   creeks cut in. The 3 km ground slab goes.
