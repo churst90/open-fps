@@ -678,12 +678,24 @@ public sealed partial class WorldEditor
 
     private void Move(UserSession s, string[] args, Action<IMessage> reply)
     {
+        if (args.Length > 0 && args[0].Equals("to", StringComparison.OrdinalIgnoreCase)) { MoveTo(s, args[1..], reply); return; }
         if (args.Length < 3 || !TryNumber(args[0], out float east) || !TryNumber(args[1], out float north) || !TryNumber(args[2], out float up))
         { Say(reply, "Say /edit move EAST NORTH UP, in metres: /edit move 1 0 0 is a metre east. Negative goes west, south, down."); return; }
         if (MathF.Abs(east) > 1000 || MathF.Abs(north) > 1000 || MathF.Abs(up) > 1000) { Say(reply, "A move is at most 1000 metres each way."); return; }
         var by = PlayerCoordinates.ToWorld(east, north, up);
         Repose(s, reply, "moved", (_, _, p) => p with { Position = p.Position + by },
                name => $"Moved {name} {Offset(by)}.");
+    }
+
+    /// <summary>/edit move to EAST NORTH UP: to a place in player coordinates (x east, y north, z height), as
+    /// the editor dialog's position box has it.</summary>
+    private void MoveTo(UserSession s, string[] args, Action<IMessage> reply)
+    {
+        if (args.Length < 3 || !TryNumber(args[0], out float east) || !TryNumber(args[1], out float north) || !TryNumber(args[2], out float up))
+        { Say(reply, "Say /edit move to EAST NORTH UP: the place in metres, as the position is said."); return; }
+        var to = PlayerCoordinates.ToWorld(east, north, up);
+        Repose(s, reply, "moved", (_, _, p) => p with { Position = to },
+               name => $"Moved {name} to {PlayerCoordinates.Format(to)}.");
     }
 
     /// <summary>"0.5 metres north and 1 metre up".</summary>
@@ -742,6 +754,15 @@ public sealed partial class WorldEditor
     private void Face(UserSession s, string[] args, Action<IMessage> reply)
     {
         string word = string.Join(" ", args).Trim().ToLowerInvariant().Replace("-", " ");
+        // Degrees clockwise from north, as the editor dialog's facing box has them.
+        if (args.Length == 1 && TryNumber(args[0], out float degrees))
+        {
+            if (degrees < -360 || degrees > 360) { Say(reply, "Facing is in degrees from 0 to 360: 0 north, 90 east, 180 south, 270 west."); return; }
+            float to = degrees * MathF.PI / 180f;
+            Repose(s, reply, "turned", (_, _, p) => p with { Rotation = Quaternion.CreateFromYawPitchRoll(to, 0f, 0f) },
+                   name => $"{name} faces {FieldDescriptor.Format(((degrees % 360) + 360) % 360)} degrees, {CompassOf(to)}.");
+            return;
+        }
         int index = Array.IndexOf(Compass8, word);
         if (index < 0) { Say(reply, "Say /edit face north, north east, east, south east, south, south west, west or north west."); return; }
         float yaw = index * MathF.PI / 4f;
@@ -806,6 +827,7 @@ public sealed partial class WorldEditor
         Remove(s.CurrentMapId, world, e, id);
         Push(s, new DeleteOp(s.CurrentMapId, thing, name));
         HandOf(s).Selected = null;
+        HandOf(s).Held.Remove(id);
         Say(reply, $"Deleted {name}. Undo puts it back.");
         Notify(s, $"{s.Username} deleted {name}.");
         if (!s.IsTextClient) SendMenu(s, "root", reply, refresh: true);

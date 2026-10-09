@@ -316,8 +316,8 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(GameKey.F6, () => _network.Send(new MapListRequest { Scope = MapListScope.Server }));
         _bindings.Bind(GameKey.F6, KeyModifiers.Shift, () => _network.Send(new MapListRequest { Scope = MapListScope.Mine }));
         _bindings.Bind(GameKey.F8, () => _network.Send(new FriendListRequest()));
-        // The world editor (docs/WORLD_EDITOR.md): the server says whether you may, and builds the menu.
-        _bindings.Bind(GameKey.F12, OpenWorldEditor);
+        // The world editor dialog (docs/WORLD_EDITOR.md section 16): the server says whether you may.
+        _bindings.Bind(GameKey.F12, ToggleEditorDialog);
         // The build dialog (section 15). A chord: Control on its own stays the screen reader's.
         _bindings.Bind(InputContext.Gameplay, BuildDialog.Key.Key, BuildDialog.Key.Modifiers, ToggleBuildDialog);
 

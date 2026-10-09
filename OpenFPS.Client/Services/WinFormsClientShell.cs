@@ -53,6 +53,8 @@ public sealed class WinFormsClientShell : IClientShell
 
     public void ShowBuildDialog(BuildDialog dialog) => OnGameWindow(win => win.ShowBuildDialog(dialog));
 
+    public void ShowEditorDialog(EditorDialog dialog) => OnGameWindow(win => win.ShowEditorDialog(dialog));
+
     public void ShowGameMenu(Action<GameMenuChoice> chosen)
     {
         if (_gameWindow == null) { chosen(GameMenuChoice.KeepPlaying); return; }

@@ -86,7 +86,8 @@ public sealed partial class WorldEditor
         hand.Selected = thing.Id;
         hand.LastPlaced = t.Id;
         hand.LastAtCursor = atCursor;
-        Say(reply, $"Placed {t.Name} {where}, facing {CompassOf(YawOf(pose.Rotation))}. It is selected.");
+        string dims = t.ColliderSize.HasValue ? $", {FieldDescriptor.Format(size.X)} by {FieldDescriptor.Format(size.Z)} by {Metres(size.Y)} high" : "";
+        Say(reply, $"Placed: {t.Name}{dims}, {where}, facing {CompassOf(YawOf(pose.Rotation))}. It is selected.");
         Notify(s, $"{s.Username} placed {t.Name}.");
         Refresh(s, reply);
     }
@@ -199,6 +200,13 @@ public sealed partial class WorldEditor
     {
         var hand = HandOf(s);
         if (args.Length == 0) { Say(reply, "Say /edit select add nearest, /edit select add NAME or /edit select add #NUMBER; /edit select clear lets go of them all."); return; }
+        bool dialog = args.Length > 0 && args[^1].Equals("dialog", StringComparison.OrdinalIgnoreCase);
+        if (dialog) args = args[..^1];
+        if (args.Length == 2 && args[0].ToLowerInvariant() is "drop" or "remove")
+        {
+            LetGo(s, args[1], dialog, reply);
+            return;
+        }
         if (args.Length == 1 && args[0].Equals("clear", StringComparison.OrdinalIgnoreCase))
         {
             int n = hand.Held.Count;
@@ -220,7 +228,21 @@ public sealed partial class WorldEditor
         if (hand.Held.Contains(id)) { Say(reply, $"{NameOf(world, e)} is held already; {Plural(hand.Held.Count, "thing")} held."); return; }
         if (hand.Held.Count >= MaxHeld) { Say(reply, $"{Plural(MaxHeld, "thing")} are held, the most a group may have."); return; }
         hand.Held.Add(id);
-        Say(reply, $"Holding {NameOf(world, e)} as well: {Plural(hand.Held.Count, "thing")} held. /edit group NAME makes them a group.");
+        Say(reply, dialog ? $"Ticked {NameOf(world, e)}: {hand.Held.Count} ticked."
+                          : $"Holding {NameOf(world, e)} as well: {Plural(hand.Held.Count, "thing")} held. /edit group NAME makes them a group.");
+        Refresh(s, reply);
+    }
+
+    /// <summary>/edit select drop #ID: one held thing let go, the others still held.</summary>
+    private void LetGo(UserSession s, string word, bool dialog, Action<IMessage> reply)
+    {
+        var hand = HandOf(s);
+        if (!word.StartsWith('#') || !int.TryParse(word[1..], NumberStyles.Integer, CultureInfo.InvariantCulture, out int id))
+        { Say(reply, "Say /edit select drop #NUMBER."); return; }
+        string name = _maps.TryGetMap(s.CurrentMapId, out var world, out _, out _, out _)
+                      && _maps.AuthoredEntities(s.CurrentMapId).TryGetValue(id, out var e) && world.IsAlive(e) ? NameOf(world, e) : $"number {id}";
+        if (!hand.Held.Remove(id)) { Say(reply, $"{Capital(name)} is not held."); return; }
+        Say(reply, dialog ? $"Unticked {name}: {hand.Held.Count} ticked." : $"Let go of {name}; {Plural(hand.Held.Count, "thing")} held.");
         Refresh(s, reply);
     }
 }

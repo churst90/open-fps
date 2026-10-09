@@ -268,7 +268,7 @@ public sealed class BuildForm
 /// <summary>
 /// A dialog over the game that stays open while it is used: the key that opened it closes it again, as do
 /// Escape and Cancel; doing what it is for keeps it open. The build dialog (Control+B) is one; the F12
-/// editor dialog is to be another. The head shows it and asks <see cref="IsCloseKey"/> of each key.
+/// editor dialog is another. The head shows it and asks <see cref="IsCloseKey"/> of each key.
 /// </summary>
 public abstract class ModalDialog
 {
@@ -291,11 +291,20 @@ public abstract class ModalDialog
     {
         if (!IsOpen) return;
         IsOpen = false;
+        OnClosed();
         CloseRequested?.Invoke();
     }
 
     /// <summary>The head closed it itself (Escape, Cancel, the opener, the window's close button).</summary>
-    public void Closed() => IsOpen = false;
+    public void Closed()
+    {
+        if (!IsOpen) return;
+        IsOpen = false;
+        OnClosed();
+    }
+
+    /// <summary>Called once, however it closed.</summary>
+    protected virtual void OnClosed() { }
 }
 
 /// <summary>A key and the modifiers held with it.</summary>

@@ -13,7 +13,19 @@ public partial class ClientGameSession
     /// <summary>The tag every editor list carries, so one sent again replaces itself.</summary>
     internal const string EditorTagPrefix = "editor:";
 
-    private void OpenWorldEditor() => Command("edit", "menu");
+    private readonly EditorDialogMemory _editorMemory = new();
+    private EditorDialog? _editor;
+
+    /// <summary>The F12 dialog, if one is open.</summary>
+    internal EditorDialog? OpenEditor => _editor is { IsOpen: true } d ? d : null;
+
+    /// <summary>F12: asks the server for the editor dialog, which answers only a player who may edit this
+    /// map; anybody else hears nothing. Pressed again it closes the dialog.</summary>
+    private void ToggleEditorDialog()
+    {
+        if (OpenEditor is { } open) { open.Close(); return; }
+        Command("edit", "dialog", "open", _editorMemory.Tab);
+    }
 
     /// <summary>
     /// An editor menu from the server. The first menu replaces whatever lists are open; any other opens
@@ -22,19 +34,31 @@ public partial class ClientGameSession
     /// </summary>
     internal void ShowEditorMenu(EditorMenu menu)
     {
-        // The build dialog's form, and the answers to what it sent, are not lists.
+        // The dialogs' forms, and the answers to what they sent, are not lists.
         switch (menu.Path)
         {
+            case "dialog":
+                if (OpenEditor == null && OpenBuild == null)
+                {
+                    _editor = new EditorDialog(menu, _editorMemory, _buildMemory, SendTyped);
+                    _shell.ShowEditorDialog(_editor);
+                }
+                return;
             case BuildCatalog.FormPath: ShowBuildDialog(menu); return;
             case "build.placed":
                 _chat.AddServerMessage(menu.Title);
-                _build?.Answer(true, menu.Title);
+                if (OpenEditor is { } editor) editor.PieceAnswer(true, menu.Title);
+                else _build?.Answer(true, menu.Title);
                 return;
             case "build.refused":
-                if (OpenBuild is { } open) open.Answer(false, menu.Title);
+                if (OpenEditor is { } refusedIn) refusedIn.PieceAnswer(false, menu.Title);
+                else if (OpenBuild is { } open) open.Answer(false, menu.Title);
                 else _chat.AddServerMessage(menu.Title);
                 return;
         }
+        if (menu.Path.StartsWith("dialog.", StringComparison.Ordinal)) { OpenEditor?.Update(menu); return; }
+        // The dialog is modal: a menu sent while it is open is not shown under it.
+        if (OpenEditor != null) return;
         var list = ToList(menu);
         if (menu.Refresh) { _menus.Replace(list); return; }
         bool editorOpen = _menus.Current?.Tag.StartsWith(EditorTagPrefix, StringComparison.Ordinal) == true;
@@ -77,6 +101,7 @@ public partial class ClientGameSession
     private void ToggleBuildDialog()
     {
         if (OpenBuild is { } open) { open.Close(); return; }
+        if (OpenEditor != null) return;
         Command("edit", "build", "form");
     }
 
