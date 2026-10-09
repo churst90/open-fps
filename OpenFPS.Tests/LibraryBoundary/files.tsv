@@ -74,6 +74,7 @@ OpenFPS.Client.Core/AudioEngine/Fmod/BoundaryProximityProcessor.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/DspFault.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/EarStage.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/EarWindVoice.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/EchoWashProcessor.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/EngineProcessor.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/EngineRenderPool.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.Ear.cs	lib	Audio	
@@ -116,6 +117,7 @@ OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverb.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverbDsp.cs	lib	Audio	
 OpenFPS.Client.Core/BeaconAids.cs	host		
 OpenFPS.Client.Core/BirdLife.cs	host		
+OpenFPS.Client.Core/BuildForm.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.cs	host		
 OpenFPS.Client.Core/ClientGeometry.cs	host		
@@ -126,7 +128,9 @@ OpenFPS.Client.Core/ClientWorldState.cs	host
 OpenFPS.Client.Core/DiagnosticSwitches.cs	host		
 OpenFPS.Client.Core/DrivingAids.cs	host		
 OpenFPS.Client.Core/DrivingCueSounds.cs	host		
+OpenFPS.Client.Core/EditorDialog.cs	host		
 OpenFPS.Client.Core/EditorKeys.cs	host		
+OpenFPS.Client.Core/EditorValuePrompt.cs	host		
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	host		
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	host		
 OpenFPS.Client.Core/ListMenu.cs	host		
