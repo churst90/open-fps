@@ -1812,18 +1812,25 @@ public class GameServer
 
             // Then a shut door in reach, from a seat the one beside you: once to open it, again to get
             // in or out.
-            if (OpenDoorInReach(world, position, session.Entity, Say)) return;
-
+            var door = ShutDoorInReach(world, position, out Vector3 doorAt, out string doorName);
             if (world.Has<OccupantComponent>(session.Entity))
             {
+                if (door != null && OpenDoor(world, door.Value, doorName, position, session.Entity, Say)) return;
                 _seats.Exit(session, out string leaving);
                 Say(leaving);
                 return;
             }
             // Beside a car the client usually points at one of its doors; either names the car.
             int root = -1;
-            if (interact.TargetEntityId.HasValue) root = RootOf(session.CurrentMapId, interact.TargetEntityId.Value);
-            if (root < 0) root = _seats.NearestEnterable(session.CurrentMapId, position, OccupancyService.BoardingRange);
+            Vector3 carAt = default;
+            if (interact.TargetEntityId.HasValue) root = RootOf(session.CurrentMapId, interact.TargetEntityId.Value, out carAt);
+            if (root < 0) root = _seats.NearestEnterable(session.CurrentMapId, position, OccupancyService.BoardingRange, out carAt);
+
+            // A shut door and a car both in reach: the one you face wins, else the nearer (Cody,
+            // 2026-10-08: E beside a car opened the apartment door behind him).
+            float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;
+            if (door != null && (root < 0 || Prefer(position, yaw, doorAt, carAt))
+                && OpenDoor(world, door.Value, doorName, position, session.Entity, Say)) return;
 
             if (root >= 0)
             {
@@ -1852,30 +1859,59 @@ public class GameServer
         });
     }
 
-    /// <summary>Opens the shut door within arm's length, if there is one, and says so. Only shut doors, so
-    /// once one is open the key moves on to getting in or out.</summary>
-    private static bool OpenDoorInReach(World world, Vector3 position, Entity who, Action<string> say)
+    /// <summary>The nearest shut door within arm's length that opens by hand. Only shut doors, so once one
+    /// is open the key moves on to getting in or out.</summary>
+    private static Entity? ShutDoorInReach(World world, Vector3 position, out Vector3 at, out string name)
     {
         Entity? nearest = null;
         float best = PhysicsConstants.InteractionRange;
-        string name = "door";
+        Vector3 found = default;
+        string named = "door";
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
         {
             if (d.Target > 0f) return;                    // already open, or on its way
             if (!DoorSystem.OpensByHand(d)) return;       // it opens for you, or for the lift
             float distance = Vector3.Distance(position, t.Position);
             if (distance > best) return;
-            best = distance; nearest = e;
-            name = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
-                 ? world.Get<IdentityComponent>(e).Name : "door";
+            best = distance; nearest = e; found = t.Position;
+            named = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
+                  ? world.Get<IdentityComponent>(e).Name : "door";
         });
+        at = found; name = named;
+        return nearest;
+    }
 
-        if (nearest == null) return false;
-        if (!DoorSystem.Set(world, nearest.Value, open: true, by: position, who: who)) return false;
-        var opened = world.Get<DoorComponent>(nearest.Value);
+    /// <summary>Opens a door and says so.</summary>
+    private static bool OpenDoor(World world, Entity door, string name, Vector3 position, Entity who, Action<string> say)
+    {
+        if (!DoorSystem.Set(world, door, open: true, by: position, who: who)) return false;
+        var opened = world.Get<DoorComponent>(door);
         say(DoorSystem.OpenedPhrase(opened, name) + "."
-            + (DoorSystem.InTheWay(world, nearest.Value, 1f, who) != null ? " Someone is in the way of it." : ""));
+            + (DoorSystem.InTheWay(world, door, 1f, who) != null ? " Someone is in the way of it." : ""));
         return true;
+    }
+
+    /// <summary>How far either side of where you face something counts as in front of you, radians.</summary>
+    internal const float FacingHalfAngle = MathF.PI / 3f;
+
+    /// <summary>
+    /// Whether <paramref name="a"/> is meant over <paramref name="b"/> by someone at <paramref name="from"/>
+    /// facing <paramref name="yaw"/>: the one in front of you, and when both or neither are, the nearer.
+    /// Measured across the floor, so a door's height does not count against it.
+    /// </summary>
+    internal static bool Prefer(Vector3 from, float yaw, Vector3 a, Vector3 b)
+    {
+        bool aAhead = InFront(from, yaw, a), bAhead = InFront(from, yaw, b);
+        if (aAhead != bAhead) return aAhead;
+        return Flat(a - from).LengthSquared() <= Flat(b - from).LengthSquared();
+
+        static Vector3 Flat(Vector3 v) => new(v.X, 0f, v.Z);
+        static bool InFront(Vector3 from, float yaw, Vector3 to)
+        {
+            var toward = Flat(to - from);
+            if (toward.LengthSquared() < 1e-4f) return true;   // standing on it
+            return Vector3.Dot(Vector3.Normalize(toward), Flat(ScopeMath.Forward(yaw, 0f))) >= MathF.Cos(FacingHalfAngle);
+        }
     }
 
     /// <summary>How close you must stand to a tap to turn it, m, measured along the floor: at the sink.</summary>
@@ -1953,11 +1989,13 @@ public class GameServer
     }
 
     /// <summary>The composite an entity is or is part of, else -1: pointing at a door is pointing at the car,
-    /// whose root is in the middle where nobody stands.</summary>
-    private int RootOf(string mapId, int entityId)
+    /// whose root is in the middle where nobody stands. <paramref name="at"/> is where the part pointed at is.</summary>
+    private int RootOf(string mapId, int entityId, out Vector3 at)
     {
+        at = default;
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return -1;
         if (!lookup.TryGetValue(entityId, out var e) || !world.IsAlive(e)) return -1;
+        if (world.Has<Transform>(e)) at = world.Get<Transform>(e).Position;
         if (world.Has<OccupancyComponent>(e)) return e.Id;
         if (world.Has<ParentComponent>(e))
         {

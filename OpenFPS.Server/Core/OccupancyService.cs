@@ -111,20 +111,27 @@ public class OccupancyService
 
     /// <summary>The composite with a seat nearest a point, or -1: by its seats, so "get in" beside a car
     /// against a wall means the car, not the house.</summary>
-    public int NearestEnterable(string mapId, Vector3 near, float radius)
+    public int NearestEnterable(string mapId, Vector3 near, float radius) => NearestEnterable(mapId, near, radius, out _);
+
+    /// <summary>As above, and where its nearest seat is.</summary>
+    public int NearestEnterable(string mapId, Vector3 near, float radius, out Vector3 seatAt)
     {
+        seatAt = default;
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return -1;
         int best = -1; float bestD2 = radius * radius;
+        Vector3 at = default;
         var q = new QueryDescription().WithAll<Transform, CompositeComponent, OccupancyComponent>();
         world.Query(in q, (Entity e, ref Transform t, ref CompositeComponent _, ref OccupancyComponent o) =>
         {
             if (o.Seats == null || o.Seats.Count == 0) return;
             foreach (var seat in o.Seats)
             {
-                float d2 = Vector3.DistanceSquared(SeatPosition(t, seat), near);
-                if (d2 <= bestD2) { bestD2 = d2; best = e.Id; }
+                var p = SeatPosition(t, seat);
+                float d2 = Vector3.DistanceSquared(p, near);
+                if (d2 <= bestD2) { bestD2 = d2; best = e.Id; at = p; }
             }
         });
+        seatAt = at;
         return best;
     }
 
