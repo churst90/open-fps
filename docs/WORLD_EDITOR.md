@@ -49,8 +49,8 @@ itself, undo and redo, and edits that are kept.
   jumps to the next item starting with it. These are the keys of every other in-game list (F5, F6, F8).
 - Items that change something and that you will want again (nudges, a step up or down on a setting)
   keep the menu open, so Enter can be pressed again.
-- Items that need a number open the command line with the start of the command typed for you
-  (`/edit move `, `/edit set Volume `). Type the number and press Enter. The menu is still open after.
+- Items that need a number or a name open a dialog with one labelled text box (section 14). Enter
+  applies, Escape cancels. The menu is still open after.
 - No editor action is on Control, Alt or Insert, or on the numeric keypad (screen readers use it for
   review with Num Lock off). Phase 2 adds direct keys on Shift while an editor list is open, off unless
   a player turns them on (section 11.8).
@@ -224,7 +224,8 @@ Selecting is not an operation: it changes nothing and is per player.
   - `EditorMenu { Path, Title, Items[], Refresh }`: one menu. Each item is
     `EditorMenuItem { Label, Kind, Command, Stay }`. Kind is Info (choosing says it again), Menu
     (Command is the path of the menu it opens: the client sends `edit menu PATH`), Action (Command is
-    the text of an /edit command to send), Input (Command is put on the command line for you to finish).
+    the text of an /edit command to send), Input (a dialog asks for a value and sends Command with it
+    on the end; section 14).
     Stay keeps the menu open after an action. Refresh replaces a menu with the same Path if it is the one
     open, without speaking, so a value shown in a label is current after you change it.
   - `ModelUpdate { Kind, Id, Version, SpecJson }`: a model's new current version.
@@ -712,3 +713,45 @@ together for the vehicle library to agree (both read machines/).
 1. **Map-file `Form` (a ramp's shape on a map entry) is not carried by Remake or by duplicate.** Found
    while doing item 1: `MapOverlayStore.Clone` and `Remake` copy every other map-entry field but not
    `Form`. Recommendation: carry it; no map in the repository uses `Form` on an entry yet.
+
+## 14. Typed values in a dialog
+
+Built 2026-10-09 (Cody's list of 2026-10-08, item 7). Untried with Orca and NVDA: tests only.
+
+### What it does
+
+- An Input item ("Type a value", "By degrees, typed", "Move by numbers: east, north, up" and the rest)
+  opens a dialog instead of the command line. The items are where they were, with the same labels.
+- The dialog has one text box. Its label is what the value is, with its unit ("Compressor hum level,
+  in dB"); it holds the value now, all selected, so typing replaces it; its description says the value
+  now, the range and the field's help ("Now 63 dB. From 30 to 90 dB. The magnetic hum ...").
+- Enter (or Apply) checks what was typed. A good value closes the dialog and sends the command, as if
+  typed (`/edit model set small_machine ac_condenser Compressor.HumDb 66`). A refused one is said and
+  shown under the box; the dialog stays open with the text kept and the focus in the box. The value it
+  opened with is not sent again ("Unchanged."), since that would make an undo step and a new version
+  of a model.
+- Escape (or Cancel) closes it and says "Cancelled."
+- Checks: a number against its range, a whole number where the field is one, the right count of
+  numbers for a move (three, apart by spaces or commas), a decimal comma read as a point. Words are only
+  checked for being there; the server checks the rest, as before, and says why if it refuses.
+
+### Screen readers
+
+- GTK (Orca): a real GtkEntry. The label is its mnemonic widget, which makes it the entry's accessible
+  name (labelled-by); the tooltip is its accessible description. The game also says one line as it
+  opens (label, value, range, keys), as the command console does.
+- Windows (NVDA): a TextBox with AccessibleName and AccessibleDescription set. The game says nothing on
+  opening while NVDA runs (NVDA reads the dialog and the field); without NVDA it says the same line as
+  on Linux. A refusal is always said, through NVDA when it runs.
+
+### Code and wire
+
+- `EditorValuePrompt` (OpenFPS.Client.Core): the label, description, the line said, and the check
+  (`FieldDescriptor.TryParse`, the server's own) that turns the text into the command. Both heads use
+  it through `IClientShell.AskForValue`; a head without the dialog falls back to the command line.
+- `EditorMenuItem` gained, appended after `Stay`: Prompt, Value, ValueType, Unit, Min, Max, Help,
+  Count. OpenFPS.Common changed, so the build hash changed: a new Windows zip and a server update go
+  together. The MUD gateway shows Input items as before.
+- Server: `Typed`, `TypedNumber` and `TypedField` (WorldEditor.Menus.cs) fill them in. A float's stored
+  value is put in the box as typed (0.800000011920929 is 0.8).
+

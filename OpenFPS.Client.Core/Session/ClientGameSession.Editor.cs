@@ -36,12 +36,22 @@ public partial class ClientGameSession
             // The answer opens on top, so the lists stay open while it is asked for.
             EditorItemKind.Menu => new MenuItem(item.Label, () => Command("edit", ("menu " + item.Command).Split(' ', StringSplitOptions.RemoveEmptyEntries)), Stays: true),
             EditorItemKind.Action => new MenuItem(item.Label, () => SendTyped(item.Command), Stays: item.Stay),
-            // The command line, with the start of the command typed; the lists wait underneath.
-            EditorItemKind.Input => new MenuItem(item.Label, () => _shell.OpenCommandConsole(item.Command), Stays: true),
+            // A dialog with one text box; the lists wait underneath.
+            EditorItemKind.Input => new MenuItem(item.Label, () => AskForValue(new EditorValuePrompt(item)), Stays: true),
             _ => new MenuItem(item.Label, () => _speech.Speak(item.Label, interrupt: true), Stays: true),
         }).ToList();
         return new ListMenu(menu.Title, items) { Tag = EditorTagPrefix + menu.Path };
     }
+
+    /// <summary>Asks for an Input item's value, checks it, and sends its command; a refusal keeps the dialog open.</summary>
+    internal void AskForValue(EditorValuePrompt prompt) => _shell.AskForValue(prompt, typed =>
+    {
+        // Sending the same value again would still make an undo step, and a new version of a model.
+        if (prompt.IsUnchanged(typed)) { Say("Unchanged."); return null; }
+        if (!prompt.TryCommand(typed, out var command, out var error)) return error;
+        SendTyped(command);
+        return null;
+    });
 
     /// <summary>Sends "edit nudge north" as the command /edit nudge north.</summary>
     private void SendTyped(string text)

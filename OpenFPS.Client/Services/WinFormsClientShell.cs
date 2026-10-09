@@ -1,3 +1,4 @@
+using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.UI;
 
@@ -47,6 +48,8 @@ public sealed class WinFormsClientShell : IClientShell
     public void OpenCommandConsole() => OpenCommandConsole("");
 
     public void OpenCommandConsole(string initialText) => OnGameWindow(win => win.OpenCommandWindow(initialText));
+
+    public void AskForValue(EditorValuePrompt prompt, Func<string, string?> submit) => OnGameWindow(win => win.AskForValue(prompt, submit));
 
     public void ShowGameMenu(Action<GameMenuChoice> chosen)
     {

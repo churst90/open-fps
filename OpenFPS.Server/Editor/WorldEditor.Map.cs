@@ -317,7 +317,8 @@ public sealed partial class WorldEditor
         {
             items.Add(Act("The server's clock", "edit map set time server"));
             foreach (var h in new[] { 0, 6, 9, 12, 15, 18, 21 }) items.Add(Act($"Hold it at {h:00}:00", $"edit map set time {h}"));
-            items.Add(Typed("Hold it at an hour, typed", "/edit map set time "));
+            string held = now != "server" && MapSettings.TryHour(now, out var hour) && hour is float at ? MapSettings.SayHour(at) : "";
+            items.Add(Typed("Hold it at an hour, typed", "/edit map set time ", "hour", "0 to 24: 14.5 or 14:30 is half past two.", held));
         }
         else if (path == MapSettings.Ground)
             foreach (var g in field.Choices) items.Add(Act(_maps.Prefabs.TryGetValue(g, out var p) ? p.Name : g, $"edit map set ground {g}"));

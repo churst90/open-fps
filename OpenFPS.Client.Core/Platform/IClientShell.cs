@@ -25,6 +25,15 @@ public interface IClientShell
     void OpenCommandConsole(string initialText) => OpenCommandConsole();
 
     /// <summary>
+    /// A dialog with one labelled text box for a value (the world editor's typed settings), holding
+    /// <see cref="EditorValuePrompt.Initial"/> all selected. Enter hands the text to
+    /// <paramref name="submit"/>, which answers null when it was taken (the dialog closes) or the reason
+    /// it was not (said and shown; the dialog stays open with the text kept). Escape cancels. A head
+    /// without the dialog opens the command console with the start of the command typed.
+    /// </summary>
+    void AskForValue(EditorValuePrompt prompt, Func<string, string?> submit) => OpenCommandConsole(prompt.Command);
+
+    /// <summary>
     /// Escape in game: the game menu (Keep playing, Main menu, Quit), with Keep playing focused so a
     /// stray Enter does nothing. Escape or closing it is <see cref="GameMenuChoice.KeepPlaying"/>. The
     /// session does the logging out; the shell only asks.

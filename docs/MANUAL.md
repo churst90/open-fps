@@ -445,8 +445,11 @@ Who may use it:
   developers."
 
 The menu works like the other lists. Items that change something you may want again (a nudge, a step
-up or down) keep the menu open, so Enter can be pressed again. Items that need a number open the
-command line with the start of the command typed for you; type the number and press Enter.
+up or down) keep the menu open, so Enter can be pressed again. Items that need a number or a name
+open a small dialog with one text box. The box is labelled with what it is (and its unit), holds the
+value now, selected, so typing replaces it, and its description gives the range. Enter applies,
+Escape cancels. A value out of range is refused with the reason, and the box stays open with what you
+typed, to correct.
 
 | Menu | What is in it |
 |---|---|
