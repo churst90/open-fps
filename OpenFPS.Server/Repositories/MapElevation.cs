@@ -78,6 +78,14 @@ public sealed class MapElevation
         }
     }
 
+    /// <summary>The same posts moved by (<paramref name="dx"/>, <paramref name="dy"/>, <paramref name="dz"/>):
+    /// a place's ground in another frame (OneWorld.WorldPlaces).</summary>
+    public MapElevation Moved(double dx, double dy, double dz) => new()
+    {
+        OriginX = OriginX + dx, OriginZ = OriginZ + dz, Spacing = Spacing, Columns = Columns, Rows = Rows,
+        BaseY = BaseY + dy, SeaLevelY = SeaLevelY + dy, Source = Source, File = File, Encoding = Encoding, _posts = Posts,
+    };
+
     /// <summary>The ground's height at (x, z), bilinear between posts and held at the grid's edge: exactly
     /// gen_osm's ground(), in doubles.</summary>
     public double HeightAt(double x, double z)

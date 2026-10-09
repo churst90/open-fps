@@ -11,6 +11,9 @@ namespace OpenFPS.Server.Repositories;
 /// <summary>One entity in a map file: a prefab placed, with whatever the map sets over it.</summary>
 public class EntityData
 {
+    /// <summary>A copy to change the place or the measured rooms of (OneWorld.WorldPlaces); arrays are shared.</summary>
+    public EntityData Copy() => (EntityData)MemberwiseClone();
+
     public int EntityId { get; set; }
     public string PrefabId { get; set; } = string.Empty;
     public Vector3 Position { get; set; }

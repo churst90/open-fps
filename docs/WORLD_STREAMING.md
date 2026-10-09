@@ -680,10 +680,55 @@ into within seconds, come in faster than that. Then a car is braked to a stop sh
 on when the tile is built; a walker is stopped at the edge as before. Asking 3DEP for four tiles in one
 request, or three at a time, would raise the speed; neither is done.
 
+### Places in the world: Magnolia and Albany copied into its tiles (2026-10-09)
+
+`/join world magnolia` (or Albany) arrives at the map's own spawn, among the same houses, roads, lawns,
+named places and traffic as the map, on the same ground. The maps keep working on their own as well.
+
+Code: `OneWorld/WorldPlaces` (the copy), `WorldTileService.Placed` (the hook a placed tile is made by),
+`WorldStore` (placed tiles in the index), `MapManager.SpawnCopied` (a map's things into a live map, the
+map load's own path), `MapTiles.AddPlaced`, `WorldMaps.Pump`, `VehicleSystem.SpawnMap`. Tests:
+`WorldPlacesTests`.
+
+- **Laid on the world's grid.** A place's map is in UTM metres less a 2 m post near its origin
+  (docs/GEOMETRY.md 11.3), so a world tile over it is the map moved, never turned (`MapData.Utm`), and the
+  map's survey posts are the world's posts.
+- **How a place is cut.** Each thing of the map goes to the one tile its middle is in. Rooms, the
+  doorways between them and their doors go together, to the tile of their middle, so a room never
+  arrives without its doorway. A thing that spans tiles is stored once, in its own tile, and is sent to a
+  client with every tile it overlaps (as on a map). Rooms carry what the map's load measured (their
+  materials by name, indoors or not), so a tile needs no survey when it loads.
+- **Its ground** is the map's: the same posts graded to the same slabs (`TerrainBuilder`), laid over
+  whole world tiles. A place's tiles never ask the survey.
+- **Roads, junctions, traffic and street life are not cut**: a road network is one thing. A frame of the
+  world that wholly contains a place takes them, moved into the frame, when it is made; the place's
+  vehicles are spawned on it then.
+- **Stored** in the world store as ordinary tile files (`full.json.gz`), made through the tile queue like
+  any tile, but marked as placed in `index.json` (the place and a version: the copy's format and the
+  SHA-256 of the map file). The cap never drops a placed tile: it is content, not a cache of the survey.
+  If placed tiles alone pass nine tenths of the cap, the server says so in its log every time the cap is
+  checked. At start, a stored tile of a place that was not copied from the map as it is now (an older
+  map, or ground made from the survey before the place was copied in) is dropped and copied again when
+  next wanted.
+- **On the server** a stored tile is read and unpacked off the tick thread and put into its frame at most
+  6 ms a tick, soonest first: a tile of a town is up to 2,000 things.
+
+Measured (`WorldPlacesTests`, Magnolia, this machine):
+
+| | |
+|---|---|
+| Copying Magnolia out of its map at start | 42 ms |
+| `/join world magnolia` to standing there, nothing stored | 1.5 s (the 55 tiles round the arrival; no survey asked) |
+| Fixed things of the map within 400 m of the spawn found in the world, the same, where the map has them | 6,514 of 6,514 |
+| The world's ground against the map's, 4,000 points within 600 m | median 0, worst 1.7 mm |
+| What a body stands on (roads, lawns and drives too), 2,000 points | median 0, worst 2.3 cm |
+| Roads, junctions, traffic | 198, 206, 4 vehicles: all of the map's |
+| The whole place as world tiles | 196 tiles, 36,374 things, 5.1 MB packed (26 KB a tile, the biggest 57 KB), made in 0.4 s after its ground is laid |
+
 ### Left after stage 2 (as of 2026-10-09)
 
-- World tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
-  the same answer whichever tile is made first; until then the real places are their maps.
+- Outside the real places, world tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
+  the same answer whichever tile is made first; until then the real places are their maps, copied in (above).
 - A player who logs out in the world comes back on the landing map (a frame is not a saved map); saving
   the world position and making the frame again at login.
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.

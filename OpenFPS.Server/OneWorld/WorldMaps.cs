@@ -77,6 +77,11 @@ public sealed class WorldMaps
         public readonly Dictionary<TileKey, List<Entity>> Loaded = new();
         public readonly Dictionary<TileKey, DateTime> UnwantedSince = new();
         public DateTime EmptySince = DateTime.UtcNow;
+        /// <summary>Stored tiles being read off the tick thread, and how soon anybody could be in each:
+        /// <see cref="Pump"/> puts them in, soonest first.</summary>
+        public readonly Dictionary<TileKey, (Task<WorldTile?> Read, double Soon)> Reading = new();
+        /// <summary>The real places whose roads and traffic this frame took (WorldPlaces.ForFrame).</summary>
+        public List<string> PlacesTaken = new();
 
         /// <summary>The world tile under one of the frame's own tiles.</summary>
         public WorldTileKey WorldKeyOf(TileKey local) => Origin.Offset(local.X, local.Z);
@@ -109,14 +114,26 @@ public sealed class WorldMaps
     /// <summary>How often the waiting player hears how far the building has got, at most.</summary>
     public static readonly TimeSpan SpeakEvery = TimeSpan.FromSeconds(5);
 
-    public WorldMaps(MapManager maps, WorldTileService service, Func<IEnumerable<UserSession>> sessions, IReadOnlyList<WorldPlace> places)
+    public WorldMaps(MapManager maps, WorldTileService service, Func<IEnumerable<UserSession>> sessions, IReadOnlyList<WorldPlace> places,
+                     WorldPlaces? copied = null)
     {
         _maps = maps;
         _service = service;
         _sessions = sessions;
         Places = places;
+        Copied = copied;
         _service.InUse = InUse;
+        if (copied != null) _service.Placed = copied.Make;
     }
+
+    /// <summary>The maps of real places copied into the world, or null.</summary>
+    public WorldPlaces? Copied { get; }
+
+    /// <summary>A frame was made: its map is loaded, its roads and traffic given (the server spawns its vehicles).</summary>
+    public event Action<string>? FrameMade;
+
+    /// <summary>How long a tick may spend putting read tiles into frames (<see cref="Pump"/>).</summary>
+    public static readonly TimeSpan PumpBudget = TimeSpan.FromMilliseconds(6);
 
     public static bool IsWorldMap(string mapId) => mapId.StartsWith(IdPrefix, StringComparison.OrdinalIgnoreCase);
 
@@ -221,6 +238,9 @@ public sealed class WorldMaps
     public void Arrive(UserSession session, WorldPlace place, Action<string> say)
     {
         var (zone, north, e, n) = Utm.FromLatLon(place.Lat, place.Lon);
+        // A place with a map in the world arrives where the map's spawn is: the same drive, not the geocode.
+        if (Copied?.ByMap(place.Id) is { } copied && copied.Zone == zone && copied.North == north)
+            (e, n, _) = copied.Grid(copied.Map.SpawnPoint.Position);
         var key = WorldTileKey.Of(zone, north, e, n);
         lock (_pending)
         {
@@ -333,7 +353,14 @@ public sealed class WorldMaps
             if (!Load(frame, local)) continue;
             _maps.RefreshGrid(frame.Id);
             var at = frame.Local(p.Easting, p.Northing, frame.BaseY);
-            float ground = GroundAt(frame, at);
+            // At a map's spawn, the ground under it (a drive, not the roof over a porch); elsewhere the top.
+            float probe = 2000f;
+            if (Copied?.ByMap(p.Place.Id) is { } copied && copied.Zone == frame.Origin.Zone)
+            {
+                var (_, _, overSea) = copied.Grid(copied.Map.SpawnPoint.Position);
+                probe = (float)(overSea - frame.BaseY) + 2f - at.Y;
+            }
+            float ground = GroundAt(frame, at, probe);
             at.Y = ground > -1000f ? ground + 0.2f : 0f;
             go(p.Session, frame.Id, at);
         }
@@ -375,17 +402,21 @@ public sealed class WorldMaps
             OcclusionFloor = 0.1f,
             IsPublic = true,
         };
+        // The roads, junctions and traffic of the real places it reaches, whole.
+        if (Copied != null) frame.PlacesTaken = Copied.ForFrame(map, key, frame.BaseY, half);
         if (!_maps.AddWorldMap(map)) return null;
         lock (_frames) _frames[frame.Id] = frame;
-        Log.Information("World: frame {Frame} made round {Place} (base {Base} m over the sea).", frame.Id, frame.Place.Name, frame.BaseY);
+        Log.Information("World: frame {Frame} made round {Place} (base {Base} m over the sea){Places}.", frame.Id, frame.Place.Name, frame.BaseY,
+                        frame.PlacesTaken.Count > 0 ? $", with the roads and traffic of {string.Join(", ", frame.PlacesTaken)}" : "");
+        FrameMade?.Invoke(frame.Id);
         return frame;
     }
 
-    private float GroundAt(Frame frame, Vector3 at)
+    private float GroundAt(Frame frame, Vector3 at, float probe = 2000f)
     {
         if (!_maps.TryGetMap(frame.Id, out var world, out _, out var grid, out _)) return -1000f;
         _maps.SyncGeometry(frame.Id);
-        return PhysicsUtils.GetGroundHeight(world, grid, at + new Vector3(0f, 2000f, 0f), out _);
+        return PhysicsUtils.GetGroundHeight(world, grid, at + new Vector3(0f, probe, 0f), out _);
     }
 
     // ═══ Tiles round players ══════════════════════════════════════════════════════════════════════
@@ -423,7 +454,7 @@ public sealed class WorldMaps
                     frame.UnwantedSince.Remove(k);
                     if (frame.Loaded.ContainsKey(k)) continue;
                     var wk = frame.WorldKeyOf(k);
-                    if (_service.Store.Has(wk)) changed |= Load(frame, k);
+                    if (_service.Store.Has(wk)) Read(frame, k, t);
                     else if (!ranks.TryGetValue(wk, out double had) || t < had) ranks[wk] = t;
                 }
                 var now = Clock();
@@ -432,6 +463,7 @@ public sealed class WorldMaps
                     if (wanted.ContainsKey(k) || held.Contains(k)) continue;
                     if (!frame.UnwantedSince.TryGetValue(k, out var since)) { frame.UnwantedSince[k] = now; continue; }
                     if (now - since < UnloadAfter) continue;
+                    tiles.RemoveEntities(frame.Loaded[k].Select(e => e.Id));
                     foreach (var e in frame.Loaded[k]) _maps.DestroyEntity(frame.Id, e);
                     tiles.RemoveTile(k);
                     frame.Loaded.Remove(k);
@@ -557,19 +589,71 @@ public sealed class WorldMaps
     private bool Load(Frame frame, TileKey local)
     {
         if (frame.Loaded.ContainsKey(local)) return true;
-        if (!_maps.TryGetMap(frame.Id, out var world, out _, out _, out _) || !_maps.TryGetTiles(frame.Id, out var tiles)) return false;
+        if (!_service.Store.TryRead(frame.WorldKeyOf(local), out var tile)) return false;
+        frame.Reading.Remove(local);
+        return Put(frame, local, tile);
+    }
+
+    /// <summary>Starts reading a stored tile off the tick thread, for <see cref="Pump"/> to put in.</summary>
+    private void Read(Frame frame, TileKey local, double soon)
+    {
+        if (frame.Reading.TryGetValue(local, out var reading)) { frame.Reading[local] = (reading.Read, Math.Min(reading.Soon, soon)); return; }
         var wk = frame.WorldKeyOf(local);
-        if (!_service.Store.TryRead(wk, out var tile)) return false;
-        var entities = new List<Entity>();
+        frame.Reading[local] = (Task.Run(() => _service.Store.TryRead(wk, out var tile) ? tile : null), soon);
+    }
+
+    /// <summary>
+    /// Puts tiles that have been read into their frames, soonest first, for at most <paramref name="budget"/>
+    /// (a tile of a town is a thousand things or more). Every tick, on the tick thread.
+    /// </summary>
+    public void Pump(TimeSpan budget)
+    {
+        List<Frame> frames;
+        lock (_frames) frames = _frames.Values.ToList();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        foreach (var frame in frames)
+        {
+            if (frame.Reading.Count == 0) continue;
+            bool changed = false;
+            using (_maps.DeferGrid())
+                foreach (var (local, (read, _)) in frame.Reading.Where(kv => kv.Value.Read.IsCompleted).OrderBy(kv => kv.Value.Soon).ToList())
+                {
+                    if (clock.Elapsed > budget) break;
+                    frame.Reading.Remove(local);
+                    if (frame.Loaded.ContainsKey(local) || read.Result is not { } tile) continue;
+                    changed |= Put(frame, local, tile);
+                }
+            if (changed) _maps.RefreshGrid(frame.Id);
+        }
+    }
+
+    /// <summary>Waits for every tile being read and puts them all in: a test's tick.</summary>
+    internal void SettleForTest()
+    {
+        List<Frame> frames;
+        lock (_frames) frames = _frames.Values.ToList();
+        foreach (var frame in frames) Task.WaitAll(frame.Reading.Values.Select(r => r.Read).ToArray(), TimeSpan.FromSeconds(30));
+        Pump(TimeSpan.MaxValue);
+    }
+
+    /// <summary>A tile into its frame: its ground as an entity on the "ground" layer, and what a real place
+    /// has standing on it (WorldPlaces), moved from the tile's own metres into the frame's.</summary>
+    private bool Put(Frame frame, TileKey local, WorldTile tile)
+    {
+        if (frame.Loaded.ContainsKey(local)) return true;
+        if (!_maps.TryGetMap(frame.Id, out var world, out _, out _, out _) || !_maps.TryGetTiles(frame.Id, out var tiles)) return false;
+        var members = new List<(Entity Entity, string? Layer)>();
         if (tile.Terrain is { Posts: >= 2 } t)
         {
             var e = TerrainTiles.Spawn(world, local.X * tiles.TileMetres, local.Z * tiles.TileMetres, t.BaseY - frame.BaseY, t.ToComponent());
             _maps.IndexEntity(frame.Id, e);
-            entities.Add(e);
+            members.Add((e, "ground"));
         }
-        tiles.AddTile(local, entities.Select(e => (e, TileDetail.Coarse)));
-        frame.Loaded[local] = entities;
-        _service.Store.Touch(wk);
+        if (tile.Entities.Count > 0)
+            members.AddRange(_maps.SpawnCopied(frame.Id, tile.Entities, new Vector3(local.X * tiles.TileMetres, -frame.BaseY, local.Z * tiles.TileMetres)));
+        tiles.AddPlaced(world, local, members);
+        frame.Loaded[local] = members.Select(m => m.Entity).ToList();
+        _service.Store.Touch(frame.WorldKeyOf(local));
         return true;
     }
 }

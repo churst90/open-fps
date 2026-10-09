@@ -142,8 +142,14 @@ public class GameServer
             var store = new OpenFPS.Server.OneWorld.WorldStore(settings.StorePath, settings.CapBytes);
             survey ??= settings.Generate ? new OpenFPS.Server.OneWorld.Usgs3Dep() : new OpenFPS.Server.OneWorld.NoNewTiles();
             var service = new OpenFPS.Server.OneWorld.WorldTileService(store, survey, settings.MaxAtOnce);
+            // The maps of real places, copied into the world's tiles; tiles copied from an older map go.
+            var copied = OpenFPS.Server.OneWorld.WorldPlaces.FromMaps(_maps);
+            int stale = copied.DropStale(store);
+            if (stale > 0) Log.Information("World: {Count} stored tile(s) of the places will be copied again from their maps.", stale);
             World = new OpenFPS.Server.OneWorld.WorldMaps(_maps, service, () => _sessions.GetAllSessions(),
-                                                        OpenFPS.Server.OneWorld.WorldMaps.LoadPlaces(_maps));
+                                                        OpenFPS.Server.OneWorld.WorldMaps.LoadPlaces(_maps), copied);
+            // A frame over a real place has its traffic.
+            World.FrameMade += mapId => EnqueueCommand(() => _vehicles?.SpawnMap(_maps, _composites, mapId));
             // The rings round the listed places, made after anything a player wants.
             if (settings.Generate && settings.Prebuild) World.Prebuild();
             Log.Information("World: tiles kept in {Path}, at most {Cap:F1} GB ({Have:F2} GB in {Count} tiles now); {Places} place(s) to arrive at; {Making}.",
@@ -169,6 +175,7 @@ public class GameServer
     {
         DrainCommandBuffer();
         World?.Update(ArriveInWorld);
+        World?.SettleForTest();
         DrainCommandBuffer();
     }
 
@@ -819,6 +826,12 @@ public class GameServer
                 using var _world = PerfProbe.Measure("server.world");
                 World.Update(ArriveInWorld);
                 if (tick % (TickRate * 30) == 0) World.Service.Store.SaveIndex();
+            }
+            // Tiles read since, into their frames, a few milliseconds' worth a tick.
+            if (World != null)
+            {
+                using var _pump = PerfProbe.Measure("server.world.pump");
+                World.Pump(OpenFPS.Server.OneWorld.WorldMaps.PumpBudget);
             }
 
             foreach (var entry in _maps.GetAllMaps())

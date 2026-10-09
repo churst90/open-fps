@@ -320,43 +320,15 @@ public class MapManager
         // First pass: spawn everything.
         foreach (var entityData in m.Entities)
         {
-            try 
+            try
             {
-                var entity = _prefabRepo.Spawn(world, entityData.PrefabId, entityData.Position,
-                                               entityData.Rotation, entityData.Scale, entityData.Name);
-                if (!string.IsNullOrWhiteSpace(entityData.Name))
-                {
-                    if (world.Has<NameComponent>(entity)) world.Get<NameComponent>(entity).Name = entityData.Name;
-                    if (world.Has<IdentityComponent>(entity)) world.Get<IdentityComponent>(entity).Name = entityData.Name;
-                }
+                var entity = SpawnFromData(world, entityData, m.Id, Vector3.Zero, materialsAuthored, indoorAuthored);
                 lookup[entity.Id] = entity;
                 if (layers != null) layers[entity.Id] = entityData.Layer;
                 if (entityData.EntityId > 0)
                 {
                     authored[entityData.EntityId] = entity;
                     idMap[entityData.EntityId] = entity.Id;
-                }
-
-                ApplyRoomMaterials(world, entity, entityData, m.Id);
-                ApplyForm(world, entity, entityData, m.Id);
-
-                // Which side of this door is locked and which way it is pushed depend on where it is put,
-                // so the map may say, over the prefab.
-                if (world.Has<DoorComponent>(entity) && (entityData.KeyedSide.HasValue || entityData.PushSide.HasValue))
-                {
-                    ref var door = ref world.Get<DoorComponent>(entity);
-                    if (entityData.KeyedSide.HasValue)
-                        door.KeyedSide = entityData.KeyedSide > 0 ? 1f : entityData.KeyedSide < 0 ? -1f : 0f;
-                    if (entityData.PushSide.HasValue) door.PushSide = entityData.PushSide < 0 ? -1f : 1f;
-                }
-                if (entityData.RoomMaterials != null || entityData.Materials != null)
-                    materialsAuthored.Add(entity.Id);
-
-                if (entityData.IsIndoor.HasValue && world.Has<RegionComponent>(entity))
-                {
-                    ref var r = ref world.Get<RegionComponent>(entity);
-                    r.IsIndoor = entityData.IsIndoor.Value;
-                    indoorAuthored.Add(entity.Id);
                 }
 
                 // The lowest floor, for the void plane.
@@ -380,8 +352,89 @@ public class MapManager
         }
 
         // Second pass: link portals to regions through the id map.
+        int portalsLinked = LinkPortals(world, m.Entities, authored, idMap, m.Id);
+        Log.Information("MapManager: Linked {Count} portal(s) for map '{Id}'.", portalsLinked, m.Id);
+
+        SurveyRegions(world, m, materialsAuthored, indoorAuthored);
+        CreateMapInstanceRest(m, world, grid, lookup, authored, layers, foundMinimumY, hasAnyFloor);
+    }
+
+    /// <summary>
+    /// One thing of a map file into a world: its prefab where the file puts it (moved by
+    /// <paramref name="offset"/>), named, with the room materials, form, door sides and indoor-ness the file
+    /// gives. A map's load and a world tile copied from a map (OneWorld.WorldPlaces) both come this way.
+    /// </summary>
+    private Entity SpawnFromData(World world, Repositories.EntityData entityData, string mapId, Vector3 offset,
+                                 HashSet<int>? materialsAuthored, HashSet<int>? indoorAuthored)
+    {
+        var entity = _prefabRepo.Spawn(world, entityData.PrefabId, entityData.Position + offset,
+                                       entityData.Rotation, entityData.Scale, entityData.Name);
+        if (!string.IsNullOrWhiteSpace(entityData.Name))
+        {
+            if (world.Has<NameComponent>(entity)) world.Get<NameComponent>(entity).Name = entityData.Name;
+            if (world.Has<IdentityComponent>(entity)) world.Get<IdentityComponent>(entity).Name = entityData.Name;
+        }
+
+        ApplyRoomMaterials(world, entity, entityData, mapId);
+        ApplyForm(world, entity, entityData, mapId);
+
+        // Which side of this door is locked and which way it is pushed depend on where it is put,
+        // so the map may say, over the prefab.
+        if (world.Has<DoorComponent>(entity) && (entityData.KeyedSide.HasValue || entityData.PushSide.HasValue))
+        {
+            ref var door = ref world.Get<DoorComponent>(entity);
+            if (entityData.KeyedSide.HasValue)
+                door.KeyedSide = entityData.KeyedSide > 0 ? 1f : entityData.KeyedSide < 0 ? -1f : 0f;
+            if (entityData.PushSide.HasValue) door.PushSide = entityData.PushSide < 0 ? -1f : 1f;
+        }
+        if (entityData.RoomMaterials != null || entityData.Materials != null)
+            materialsAuthored?.Add(entity.Id);
+
+        if (entityData.IsIndoor.HasValue && world.Has<RegionComponent>(entity))
+        {
+            ref var r = ref world.Get<RegionComponent>(entity);
+            r.IsIndoor = entityData.IsIndoor.Value;
+            indoorAuthored?.Add(entity.Id);
+        }
+        return entity;
+    }
+
+    /// <summary>
+    /// Things copied from a map into a live map (a world tile, OneWorld.WorldPlaces): each spawned at its
+    /// place moved by <paramref name="offset"/>, its doorways linked to the rooms among them by the ids in
+    /// the file, every one indexed. Their rooms carry what was measured on the map (no survey here). The
+    /// entities and their layers, in order; the caller calls <see cref="RefreshGrid"/>.
+    /// </summary>
+    public List<(Entity Entity, string? Layer)> SpawnCopied(string mapId, IReadOnlyList<Repositories.EntityData> entities, Vector3 offset)
+    {
+        var made = new List<(Entity, string?)>(entities.Count);
+        if (!_maps.TryGetValue(mapId, out var data)) return made;
+        var authored = new Dictionary<int, Entity>();
+        var idMap = new Dictionary<int, int>();
+        foreach (var d in entities)
+        {
+            try
+            {
+                var e = SpawnFromData(data.world, d, mapId, offset, null, null);
+                made.Add((e, d.Layer));
+                if (d.EntityId > 0) { authored[d.EntityId] = e; idMap[d.EntityId] = e.Id; }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("MapManager: Failed to spawn entity {PrefabId} at {Pos} on '{Map}'. {Error}", d.PrefabId, d.Position + offset, mapId, ex.Message);
+            }
+        }
+        LinkPortals(data.world, entities, authored, idMap, mapId, quiet: true);
+        foreach (var (e, _) in made) IndexEntity(mapId, e);
+        return made;
+    }
+
+    /// <summary>A map's doorways to the rooms they join, through the file's ids; how many were linked.</summary>
+    private static int LinkPortals(World world, IEnumerable<Repositories.EntityData> entities, Dictionary<int, Entity> authored,
+                                   Dictionary<int, int> idMap, string mapId, bool quiet = false)
+    {
         int portalsLinked = 0;
-        foreach (var entityData in m.Entities)
+        foreach (var entityData in entities)
         {
             if (!authored.TryGetValue(entityData.EntityId > 0 ? entityData.EntityId : -1, out var entity)) continue;
 
@@ -431,25 +484,32 @@ public class MapManager
                     if (size.X > 0 || size.Y > 0) derived = MathF.Max(size.X, size.Y);
                 }
                 p.ApertureSize = derived;
-                Log.Information("MapManager: Portal entity {Id} in '{Map}' had no ApertureSize; derived {Aperture:F2} from its collider.",
-                    entityData.EntityId, m.Id, derived);
+                if (!quiet)
+                    Log.Information("MapManager: Portal entity {Id} in '{Map}' had no ApertureSize; derived {Aperture:F2} from its collider.",
+                        entityData.EntityId, mapId, derived);
             }
 
             if (p.RegionAId == p.RegionBId)
             {
-                Log.Warning("MapManager: Portal entity {Id} in '{Map}' links region {Region} to itself — it will be ignored. " +
-                            "Set RegionAId/RegionBId to the two region EntityIds it joins (-1 = outside).",
-                    entityData.EntityId, m.Id, p.RegionAId);
+                if (!quiet)
+                    Log.Warning("MapManager: Portal entity {Id} in '{Map}' links region {Region} to itself — it will be ignored. " +
+                                "Set RegionAId/RegionBId to the two region EntityIds it joins (-1 = outside).",
+                        entityData.EntityId, mapId, p.RegionAId);
             }
             else
             {
                 portalsLinked++;
             }
         }
-        Log.Information("MapManager: Linked {Count} portal(s) for map '{Id}'.", portalsLinked, m.Id);
+        return portalsLinked;
+    }
 
-        SurveyRegions(world, m, materialsAuthored, indoorAuthored);
-
+    /// <summary>A map's load after its things are spawned and its rooms measured: its ground, the void
+    /// plane, its zone, its tiles and roads.</summary>
+    private void CreateMapInstanceRest(MapData m, World world, SpatialGrid<Entity> grid, Dictionary<int, Entity> lookup,
+                                       Dictionary<int, Entity> authored, Dictionary<int, string?>? layers,
+                                       float foundMinimumY, bool hasAnyFloor)
+    {
         // The ground from the survey on a map of a real place (docs/GEOMETRY.md 5.1), graded to what rests
         // on it, in tiles of ground.
         bool hasTerrain = false;

@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- Magnolia and Albany are in the world (docs/WORLD_STREAMING.md, "Places in the world"). `/join world
+  magnolia` arrives at the map's own spawn among the same houses, roads, lawns, named places and traffic,
+  on the same ground (within 2 mm of the map's). Each thing goes to the world tile its middle is in, rooms
+  with their doorways; the ground is the map's posts graded the same way; roads, junctions and traffic go
+  whole to the frame that contains the place. The tiles are kept in the world store marked as placed: the
+  cap never drops them, and they are copied again when the map changes. Magnolia is 196 tiles, 5.1 MB. A
+  stored tile is now read off the tick thread and put in at most 6 ms a tick. The maps still work on
+  their own. WorldPlacesTests.
 - Magnolia and Albany on the world's grid at 2 m (docs/GEOMETRY.md 11.3). `fetch_place.py elevation`
   asks 3DEP itself for 2 m cells on the place's UTM grid (the 1 m lidar), the same request the world's
   tiles make, so the map's ground and the world's agree to the half centimetre (the world's was 0.9 m

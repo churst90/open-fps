@@ -50,7 +50,27 @@ public sealed class WorldStore
         public long Bytes { get; set; }
         public DateTime VisitedUtc { get; set; }
         public int Generator { get; set; }
+        /// <summary>The real place a tile was copied from (WorldPlaces): the cap never drops it.</summary>
+        public string? Place { get; set; }
+        public string? PlaceVersion { get; set; }
     }
+
+    /// <summary>Bytes of placed tiles, which the cap never drops.</summary>
+    public long PlacedBytes
+    {
+        get { lock (_gate) return _index.Values.Where(e => e.Place != null).Sum(e => e.Bytes); }
+    }
+
+    /// <summary>The place and version a stored tile was copied from, or (null, null) for a tile of the
+    /// survey alone or one not stored.</summary>
+    public (string? Place, string? Version) PlacedFrom(WorldTileKey key)
+    {
+        lock (_gate)
+            return _index.TryGetValue(IndexKey(key, Generator), out var e) ? (e.Place, e.PlaceVersion) : (null, null);
+    }
+
+    /// <summary>Drops a stored tile so it is made again when next wanted (a placed tile whose map changed).</summary>
+    public void Drop(WorldTileKey key) => Forget(key, Generator);
 
     /// <summary>Tiles dropped to keep under the cap since the store opened.</summary>
     public int Evicted { get; private set; }
@@ -113,7 +133,8 @@ public sealed class WorldStore
         {
             string k = IndexKey(key, Generator);
             if (_index.TryGetValue(k, out var had)) _total -= had.Bytes;
-            _index[k] = new Entry { Bytes = bytes.Length, VisitedUtc = DateTime.UtcNow, Generator = Generator };
+            _index[k] = new Entry { Bytes = bytes.Length, VisitedUtc = DateTime.UtcNow, Generator = Generator,
+                                    Place = tile.Place, PlaceVersion = tile.PlaceVersion };
             _total += bytes.Length;
             _indexDirty = true;
         }
@@ -153,6 +174,8 @@ public sealed class WorldStore
                                          .ThenBy(kv => kv.Value.VisitedUtc).ThenBy(kv => kv.Key, StringComparer.Ordinal))
             {
                 if (_total - freed <= target) break;
+                // A place copied into the world is content, not a cache of the survey: never dropped.
+                if (e.Place != null && e.Generator == Generator) continue;
                 if (e.Generator == Generator && inUse != null && TryParseIndexKey(k, out var key, out _) && inUse(key)) continue;
                 victims.Add((k, e));
                 freed += e.Bytes;
@@ -168,6 +191,10 @@ public sealed class WorldStore
         if (victims.Count > 0)
             Log.Information("WorldStore: over its cap of {Cap:F1} GB; dropped {Count} least recently visited tile(s), {Total:F2} GB now.",
                             CapBytes / 1073741824.0, victims.Count, TotalBytes / 1073741824.0);
+        long placed = PlacedBytes;
+        if (placed > CapBytes / 10 * 9)
+            Log.Warning("WorldStore: the places copied into the world take {Placed:F2} GB of a {Cap:F1} GB cap, and are never dropped; "
+                        + "raise CapGigabytes in world.json.", placed / 1073741824.0, CapBytes / 1073741824.0);
     }
 
     private void Forget(WorldTileKey key, int generator)

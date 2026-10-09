@@ -23,6 +23,11 @@ public sealed class WorldTile
     public TerrainData? Terrain { get; set; }
     /// <summary>What stands on it, as a map's entities, positions in the tile's own metres.</summary>
     public List<EntityData> Entities { get; set; } = new();
+    /// <summary>The map of a real place it was copied from (WorldPlaces), or null for a tile made from the
+    /// survey alone. A placed tile is never dropped by the store's cap.</summary>
+    public string? Place { get; set; }
+    /// <summary>Which version of that map it was copied from: a tile of an older one is copied again.</summary>
+    public string? PlaceVersion { get; set; }
 
     /// <summary>A tile of ground: posts a side, spacing, heights in whole centimetres over BaseY (metres over
     /// the sea), row by row from the south-west, and a material per cell.</summary>
