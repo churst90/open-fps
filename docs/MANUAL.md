@@ -256,6 +256,7 @@ against them. People in the street use doors the same way.
 | Shift+F6 | Your maps |
 | F8 | Friends |
 | F12 | The world editor, on a map you may edit (see "The world editor") |
+| Control+B | The build dialog, on a map you may edit (see "Building quickly"); not a list |
 | I | Your inventory |
 
 Inside a list:
@@ -576,6 +577,32 @@ with a screen reader yet): while an editor list is open, Shift with an arrow nud
 forward, back, left or right; Shift with a bracket nudges it up or down; Shift with comma or period
 turns it 15 degrees; Shift slash says where it is; Shift D duplicates; Shift Delete asks to delete it;
 Shift Z undoes and Shift Y redoes. `/editorkeys off` turns them off again.
+
+### Building quickly (Control+B)
+
+Control+B opens the build dialog on a map you may edit; on any other map it does nothing. It puts down
+a floor, wall, roof, door, window or prefab at the size you type, in one go.
+
+- What: floor, wall, roof, door, window or prefab. For a prefab, its category and then the prefab.
+- The size in metres. Floor: width (left to right as you face), length (away from you), thickness.
+  Roof: height above the floor, width, length, thickness. Wall: length, height, thickness. Door: width
+  and height. Window: width, height, and height above the floor. Each box says its range.
+- Material (floor, wall, roof), or the door type. A material puts its own thickness in the box.
+- Where: in front of you (and how far), at your feet, or at the build cursor. Facing: the way you face,
+  or north, east, south, west.
+- For a door or window, "Fit into the wall in front of you", on by default: the wall you face, within
+  3 metres, has an opening cut where you look and the door or window put in it. A door opens away from
+  you. If there is no wall in reach you are told so.
+- Tab moves through the fields, Enter places, Escape, Cancel or Control+B closes the dialog.
+
+Placing keeps the dialog open, with your values, and the focus back on What, so Enter places another.
+The game says what was placed: "Placed: floor, 6 by 8 metres, concrete, at your feet." The next time
+the dialog opens it has the values you last placed. Undo (F12, or `/edit undo`) takes a placing back,
+including a wall that was cut for a door.
+
+The same from the command line: `/edit build wall length 6 height 2.7 material brick ahead 2`,
+`/edit build floor width 6 length 8 here`, `/edit build door width 1 type pushbar`. The fields are
+listed in docs/WORLD_EDITOR.md section 15.
 
 ## Stairs
 

@@ -99,6 +99,7 @@ public sealed partial class WorldEditor
         + "/edit nudge DIRECTION [METRES], /edit turn DEGREES, "
         + "/edit face DIRECTION, /edit bring, /edit duplicate, /edit row COUNT [SPACING], /edit delete, /edit set FIELD VALUE, "
         + "/edit up FIELD, /edit down FIELD, /edit settings, /edit place PREFAB [at cursor], /edit place group ID, /edit again, "
+        + "/edit build floor|wall|roof|door|window|prefab [FIELD VALUE ...], "
         + "/edit find WORDS, /edit preview PREFAB, /edit prefabs [CATEGORY], /edit group NAME, /edit spawn here, /edit step METRES, "
         + "/edit info, /edit map settings, /edit map set weather|time|ground|beacon CATEGORY VALUE, "
         + "/edit model show|set|up|down|versions|where|use|pin|unpin|new|copy|replace|retire|restore|remove KIND ID ..., /edit undo, /edit redo.";
@@ -129,6 +130,8 @@ public sealed partial class WorldEditor
                     ? 1 + Math.Clamp(n, 0, MaxRow) / 10.0 : 1;
             case "place":
                 return Word(1) switch { "mode" => 0, "group" => 5, _ => 1 };
+            case "build":
+                return Word(1) == "form" ? 0 : 1;
             default:
                 return 1;
         }
@@ -206,6 +209,7 @@ public sealed partial class WorldEditor
             case "settings":
             case "fields": SaySettings(s, reply); return;
             case "place": PlaceCommand(s, rest, reply); return;
+            case "build": BuildCommand(s, rest, reply); return;
             case "prefabs": SayPrefabs(s, rest, reply); return;
             case "step": SetStep(s, rest, reply); return;
             case "model": ModelCommand(s, rest, reply); return;

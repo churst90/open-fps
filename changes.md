@@ -19,6 +19,15 @@ Recent work, newest first. `git log` has the rest.
   Kept in the map's overlay, undone by the editor's undo, and offered in the editor's Map menu as a
   typed item. Refused on the server's generated maps. `MapSettingsUpdate` gained appended members
   (the play area), so Common changed: new Windows zip and server update together. MapSizeTests.
+- The build dialog, Control+B (docs/WORLD_EDITOR.md section 15), in both clients, on a map you may
+  edit; elsewhere Control+B does nothing. What (floor, wall, roof, door, window, prefab), the size in
+  metres, the material (from the library's floor, wall and roof prefabs the acoustic registry knows) or
+  door type, where (in front, at your feet, at the build cursor) and facing. A door or window can be
+  fitted into the wall in front of you: the wall is cut into the pieces round the opening and the door
+  or window put in it, joined to the places either side; one undo puts the wall back whole. Placing
+  keeps the dialog open with its values and focus on What; Escape, Cancel or Control+B close it.
+  Values are kept per kind for the session. `/edit build KIND FIELD VALUE ...` does the same from the
+  command line. No wire change. Untried with Orca and NVDA.
 - A protected Owner role (docs/CODY_ASKS_2026-10-08.md item 8). The Owner has every permission;
   the Admin has every one but the new `owners`, which makes an owner or changes an owner's role. The
   seeded `admin` account is the Owner, and a server started on an older database makes `admin` the

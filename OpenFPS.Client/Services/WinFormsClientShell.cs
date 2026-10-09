@@ -51,6 +51,8 @@ public sealed class WinFormsClientShell : IClientShell
 
     public void AskForValue(EditorValuePrompt prompt, Func<string, string?> submit) => OnGameWindow(win => win.AskForValue(prompt, submit));
 
+    public void ShowBuildDialog(BuildDialog dialog) => OnGameWindow(win => win.ShowBuildDialog(dialog));
+
     public void ShowGameMenu(Action<GameMenuChoice> chosen)
     {
         if (_gameWindow == null) { chosen(GameMenuChoice.KeepPlaying); return; }

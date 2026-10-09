@@ -763,3 +763,129 @@ Built 2026-10-09 (Cody's list of 2026-10-08, item 7). Untried with Orca and NVDA
 - Server: `Typed`, `TypedNumber` and `TypedField` (WorldEditor.Menus.cs) fill them in. A float's stored
   value is put in the box as typed (0.800000011920929 is 0.8).
 
+
+## 15. Building quickly: Control+B
+
+Built 2026-10-09 (Cody: "I press ctrl b ... a window with a first dropdown of type of thing ... set the
+size of the tile/entity ... tab through, type in my values and click place"). Untried with Orca and
+NVDA: tests only.
+
+### The dialog
+
+- Control+B opens it, in both clients, on a map you may edit (the same rule as F12). On any other map
+  Control+B does nothing at all: the client asks the server for the dialog's form (`/edit build form`),
+  and the server does not answer a player who may not edit. Control on its own still does nothing.
+- The controls, top to bottom, in Tab order; focus starts on What:
+  1. What: Floor, Wall, Roof, Door, Window, Prefab.
+  2. For a prefab, Category and Prefab (the Place menu's categories).
+  3. The size, in metres, each a labelled text box with the range and a line of help as its
+     description. Floor: width (left to right as you face it), length (away from you), thickness.
+     Roof: height above the floor, width, length, thickness. Wall: length, height, thickness. Door:
+     width and height (0.9 by 2.1). Window: width, height, height above the floor (the sill). Prefab:
+     width, height and depth, in use only for a plain box (a wall, a floor); a machine is its own size.
+  4. Material, for a floor, wall or roof: the materials a plain floor, wall or roof prefab of the
+     library is made of and that the acoustic registry knows, each said with its prefab ("Brick, Brick
+     Wall", "Wood, Siding Wall"). Choosing one puts its own thickness in the thickness box. For a door,
+     Door type: the hand-opened kinds (knob, push bar, glass push bar, glass pull, patio slide).
+  5. Where: In front of you, At your feet, At the build cursor (/origin, /at). Distance in front of you
+     (in use only for In front of you). Facing: the way you face (squared to north, east, south or
+     west), or north, east, south, west.
+  6. For a door or window, Fit into the wall in front of you (on by default). While it is on, Where,
+     Distance and Facing are not in use.
+  7. Place and Cancel.
+- Unused controls are dimmed and skipped by Tab.
+- Enter places from anywhere in the dialog except the Cancel button; with a drop-down list open, Enter
+  chooses in the list. Up and Down change a closed drop-down's choice (on GTK the game says the new
+  choice; on Windows NVDA does). Space opens a drop-down's list.
+- Placing keeps the dialog open with its values, and the focus goes back to What, so another can be
+  placed at once (Cody, 2026-10-09). The game says what was placed: "Placed: floor, 6 by 8 metres,
+  concrete, at your feet." A refusal (no wall in reach, a value out of range, somebody in the way) is
+  said and shown in the dialog, which stays open.
+- Escape, Cancel or Control+B again close it.
+- The values of each kind, and the last kind, are kept for the session: the next Control+B opens on
+  the kind last placed, as it was.
+- While the dialog is open you do not move, so "in front of you" is from where you stood.
+
+### Where a piece goes
+
+- In front of you: its near edge the distance ahead of you, centred on you left to right, squared to
+  north, east, south or west.
+- At your feet: a floor centred under you, a roof centred over you; anything solid just clear of you.
+- At the build cursor: centred on the cursor.
+- A floor's top is at your feet (or the cursor); a roof's underside is "above" over that; a wall, door
+  or prefab stands on it; a window's bottom is "above" over it.
+
+### Fitting a door or window
+
+1. The wall: the nearest solid box straight ahead of you within 3 metres, at the height of the
+   opening's middle. It must be a plain box (a wall prefab, not a door, a machine or a room), upright,
+   and at most 1 metre thick. Otherwise the reason is said and nothing changes.
+2. The opening: as wide as the door or window, centred where your line of sight meets the wall, moved
+   along the wall if it would pass an end. A door's bottom is your floor; a window's is the sill. If
+   the wall is not tall enough the refusal says how tall it is.
+3. The wall is taken away and made again as up to four pieces of the same prefab, with the same name,
+   turn and thickness: left and right of the opening (full height), over it, and under it (a window).
+   A piece thinner than 1 cm is left out.
+4. The door or window goes in the opening, centred in the wall's thickness, running along it. A door
+   leaf is 10 cm wider than the opening (5 cm into each jamb, as tools/gen_city.py's DOOR_LAP), and is
+   turned so it opens away from you (a door pushed from its front has its front toward you). A window
+   is the glazing prefab at its own thickness.
+5. A door joins the named places either side of it, as a generated map's door does: RegionAId is the
+   place behind its front, RegionBId the one in front, kept in the overlay as the map's numbers. With
+   the same place (or the outside) on both sides it joins nothing, like an unauthored door.
+6. One undo takes it all back and puts the wall up whole.
+
+### /edit build
+
+`/edit build KIND [FIELD VALUE ...]`, KIND one of floor, wall, roof, door, window, prefab. Fields:
+
+| Field | Kinds | Value |
+|---|---|---|
+| width | floor, roof, door, window, prefab | metres |
+| length | floor, roof, wall | metres |
+| height | wall, door, window, prefab | metres |
+| thickness | floor, roof, wall | metres; unsaid, the material's own |
+| depth | prefab | metres |
+| above | roof, window | metres above the floor |
+| material | floor, roof, wall | a material offered for that kind |
+| type | door | knob, pushbar, glass-pushbar, glass-pull, patio-slide |
+| category, prefab | prefab | a category word, a prefab id; an unsized prefab is its own size |
+| where | all | ahead, here, cursor |
+| distance | all | metres in front of you |
+| facing | all | me, north, east, south, west |
+| fit | door, window | yes or no |
+
+Short forms: `here`, `cursor`, `ahead METRES`, `fit`, `free`. A field not said takes the dialog's
+default. A choice may be shortened to its start (`material br`). Examples:
+
+```
+/edit build floor width 6 length 8 material concrete here
+/edit build wall length 6 height 2.7 material brick ahead 2
+/edit build door width 1 type pushbar
+/edit build window width 1.5 height 1.2 above 0.9
+/edit build roof width 6 length 8 above 2.7 cursor
+```
+
+The dialog sends the same command with every field and the word `dialog` on the end, which makes the
+server answer with an editor menu ("build.placed" or "build.refused") rather than a line of chat, so the
+dialog can tell its answer from anything else said.
+
+### Code and wire
+
+- Server: WorldEditor.Build.cs. Pieces are the library's prefabs placed and scaled through the
+  editor's own path (overlay additions, PlaceOp, undo), so the collider and every client's acoustic
+  geometry are the size asked, as a scaled city wall's are. A fitted door is a BatchOp: the wall's
+  DeleteOp, then a PlaceOp for each piece and the leaf.
+- `Restore` (every placing and undo) now joins a door's places from its map entry's RegionAId and
+  RegionBId, as the loader does.
+- The form is an EditorMenu with Path "build.form": the kinds as Action items, each kind's fields as
+  Input items (Command the kind, Label the field word), and each choice as an Info item (Command
+  "KIND.FIELD", Value sent, Help a prefab's category, Prompt the "field=value" pairs it sets, Count 1
+  for a prefab that can be sized). No new message and no new member: the wire is unchanged.
+- Client.Core: BuildCatalog (the form read), BuildForm (fields, what is in use, the check, the
+  command, the remembered values), BuildDialog, and ModalDialog: a dialog that stays open while it is
+  used and closes on Escape or the key that opened it. The F12 dialog being designed is to use
+  ModalDialog the same way. Heads: GtkClientShell.Build.cs and MainWindow.Build.cs.
+- Rooms are measured at load (regions measure themselves): a wall built into a room changes how the
+  room sounds after the map is loaded again, not at once. The wall itself is heard at once (it is
+  geometry), as any placed thing is.

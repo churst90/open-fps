@@ -615,6 +615,16 @@ public sealed partial class WorldEditor
         if (d.Form != null) MapManager.ApplyForm(world, e, d, mapId);
         if (thing.Settings != null)
             foreach (var (path, value) in thing.Settings) EntitySettings.TrySet(world, e, path, value, out _);
+        // A doorway's places, by the map's numbers, as the loader joins them.
+        if (world.Has<PortalComponent>(e) && (d.RegionAId.HasValue || d.RegionBId.HasValue))
+        {
+            var authored = _maps.AuthoredEntities(mapId);
+            int Live(int? id) => id is int a && authored.TryGetValue(a, out var r) && world.IsAlive(r) ? r.Id : AcousticConstants.GlobalRegionId;
+            ref var portal = ref world.Get<PortalComponent>(e);
+            if (d.RegionAId.HasValue) portal.RegionAId = Live(d.RegionAId);
+            if (d.RegionBId.HasValue) portal.RegionBId = Live(d.RegionBId);
+            _server.SyncAudioComponent(e.Id);
+        }
         _maps.AuthoredEntities(mapId)[thing.Id] = e;
 
         var o = Overlays.Get(mapId);

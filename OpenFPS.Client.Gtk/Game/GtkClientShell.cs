@@ -12,7 +12,7 @@ namespace OpenFPS.Client.Gtk.Game;
 /// The session calls these from the game-loop thread, so each marshals onto the GTK main thread before
 /// touching a widget. The console and the quit dialog are real windows so Orca can read them.
 /// </summary>
-internal sealed class GtkClientShell : IClientShell
+internal sealed partial class GtkClientShell : IClientShell
 {
     private readonly ISpeechOutput _speech;
     private readonly Action _onQuit;
