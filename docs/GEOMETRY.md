@@ -1359,6 +1359,47 @@ materials underfoot, a walk up and down 15 %, a 60 degree bank as a wall, a walk
 hill in the way of a ray, inside the ground, a kerb on a slope, the server and a client making the same
 bits, open ground on raised terrain).
 
+### 11.2 The real places on real ground (step T2)
+
+- **The survey.** `tools/places/ID/elevation.json` is 3DEP as downloaded (about 5 m; Magnolia 600 x 600
+  posts, 55 to 79 m over the sea; Albany 598 x 598, 58 to 76 m), whole centimetres in base64
+  (`fetch_place.py elevation`), about 0.95 MB each. 5.1 asked for 1/3 arc-second with 1 m lidar where it
+  exists; the 5 m export is what the archive has, and is finer than 10 m.
+- **The map carries it** (`MapData.Elevation`): the survey resampled onto a 5 m grid of the map's own
+  metres, whole centimetres over a base, y = 0 the ground at the spawn address. About 1 MB of each map.
+  `gen_osm.py` sets everything on it (`ground()`, the grid read bilinearly) and the server lays the 2 m
+  terrain from the same grid read the same way (`MapElevation.HeightAt`), so both agree.
+- **What the generator does** (`ground_all`): a building on a level pad at the ground by its front door
+  (the middle of its wall nearest the street); every strip of a line (roads, verges, sidewalks, drives,
+  paths, ballast, creeks) pitched along its run and level across, in pieces of at most 20 m; a road's
+  heights, and its verges', sidewalks' and junctions', from the ground averaged over a 20 m square
+  (`road_y`), so a road runs smooth and its parts agree; lawns tilted to the ground under their corners;
+  ponds level at their lowest bank; fences and rails pitched along their length and set 5 cm in;
+  anything else solid set down to the lowest ground under it; named places, rooms outside buildings and
+  the woods' volumes stretched over the ground under them. Road centrelines (what traffic rides) get a
+  point every 20 m at the road's height. The 3 km dirt slab is gone. Without elevation.json nothing
+  changes: the flat maps come out byte for byte as before.
+- **What the server does** (`TerrainBuilder`, at map load): the survey at every 2 m post over the map's
+  bounds in 250 m tiles (196 a map), then graded over the whole map at once, so tile edges agree. Under
+  each slab lying on the ground (fixed, solid, a box at most 0.6 m thick, a metre each way, tilted under
+  30 degrees, its underside within 1.5 m over or 3 m under the ground at a post) the ground is flattened
+  to the slab's underside; every post of a cell the slab covers is cut down to it, so no part of a
+  triangle of ground can rise through it (both are planes over a triangle: corners under means all
+  under). Round each graded patch the ground blends back to the survey over 4 m. The tiles are entities
+  on the "ground" layer (coarse). A map with an elevation gets no loader's natural ground; its void plane
+  is 20 m under its lowest post.
+- **Measured** (`RealPlaceMapTests`): away from grading the terrain is within 0.137 m of the survey at 99
+  points in a hundred and 0.43 to 0.50 m at worst (median 4 to 7 mm) over 3,000 points a place; along
+  every road every 5 m (10,209 points on Magnolia, 8,035 on Albany) and at every lawn and drive the floor
+  is the slab, never the ground; a walk of 750 ticks from the spawn down the drive and along the street
+  both ways is on the ground every tick, its biggest step 0.12 to 0.14 m; there is ground under every
+  25 m of the play area. Server load: Magnolia 1.5 s (was 1.3), Albany 2.7 s. Entities: Magnolia 36,291
+  (was 32,598), Albany 46,020 (was 41,327), from the roads in 20 m pieces. A join at medium detail on
+  Magnolia is 1,388 KB packed (was 530 KB): about 17 KB a tile of ground, 49 tiles.
+- **Not done**: road cross-sections (crown, kerb, gutter) and draped road meshes, bridges and tunnels,
+  creeks cut in, the coarse ring's terrain at 8 m, a grade limit on roads (12 %, 6 % on a highway),
+  ground materials from the land cover (every cell is dirt, as the slab was).
+
 ## Appendix: box-geometry consumers today
 
 From a survey of the code (2026-10-06). Line numbers drift; the names do not.

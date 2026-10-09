@@ -156,17 +156,36 @@ public class WorldStreamingTests
         Assert.True(maps.TryGetMap(id, out var world, out _, out _, out var lookup));
         Assert.True(maps.TryGetMapData(id, out var data));
 
-        // Everything from the file is in a tile; what is global is the loader's own handful.
-        Assert.Equal(data.Entities.Count, tiles.TiledCount);
+        // Everything from the file is in a tile, and so is the ground the loader lays from the survey; what is
+        // global is the loader's own handful.
+        var terrain = lookup.Values.Where(e => world.Has<TerrainTileComponent>(e)).ToList();
+        Assert.Equal(data.Entities.Count + terrain.Count, tiles.TiledCount);
         Assert.InRange(tiles.Global.Count, 1, 10);
-        _o.WriteLine($"{id}: {tiles.Tiles.Count()} tiles, {tiles.TiledCount} tiled, {tiles.Global.Count} global");
+        _o.WriteLine($"{id}: {tiles.Tiles.Count()} tiles, {tiles.TiledCount} tiled ({terrain.Count} of them ground), {tiles.Global.Count} global");
 
-        // The ground is one slab under the map: it is in every tile, at coarse.
-        var ground = lookup.Values.First(e => world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).Name == "Ground"
-                                              && world.Has<ColliderComponent>(e) && world.Get<ColliderComponent>(e).Size.X > 1000f);
-        Assert.True(tiles.TryGet(ground.Id, out var g));
-        Assert.Equal(TileDetail.Coarse, g.Needs);
-        Assert.True(g.Tiles.Length >= tiles.Tiles.Count() * 9 / 10, $"the ground is in {g.Tiles.Length} of {tiles.Tiles.Count()} tiles");
+        if (data.Elevation != null)
+        {
+            // The ground is a tile of terrain in every tile, each in its own tile only, at coarse.
+            var covered = new HashSet<TileKey>();
+            foreach (var t in terrain)
+            {
+                Assert.True(tiles.TryGet(t.Id, out var g));
+                Assert.Equal(TileDetail.Coarse, g.Needs);
+                var only = Assert.Single(g.Tiles);
+                Assert.Equal(TileKey.Of(world.Get<Transform>(t).Position, tiles.TileMetres), only);
+                covered.Add(only);
+            }
+            Assert.True(covered.IsSupersetOf(tiles.Tiles), "a tile with no ground");
+        }
+        else
+        {
+            // The ground is one slab under the map: it is in every tile, at coarse.
+            var ground = lookup.Values.First(e => world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).Name == "Ground"
+                                                  && world.Has<ColliderComponent>(e) && world.Get<ColliderComponent>(e).Size.X > 1000f);
+            Assert.True(tiles.TryGet(ground.Id, out var g));
+            Assert.Equal(TileDetail.Coarse, g.Needs);
+            Assert.True(g.Tiles.Length >= tiles.Tiles.Count() * 9 / 10, $"the ground is in {g.Tiles.Length} of {tiles.Tiles.Count()} tiles");
+        }
 
         // Rooms are full detail; a doorway shares its rooms' tiles, so where one goes the other does.
         int doors = 0, rooms = 0, crowns = 0;

@@ -430,9 +430,37 @@ public class MapManager
 
         SurveyRegions(world, m, materialsAuthored, indoorAuthored);
 
+        // The ground from the survey on a map of a real place (docs/GEOMETRY.md 5.1), graded to what rests
+        // on it, in tiles of ground.
+        bool hasTerrain = false;
+        if (m.Elevation != null)
+        {
+            try
+            {
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                var slabs = TerrainBuilder.Slabs(world);
+                var tiles = TerrainBuilder.Lay(m.Elevation, slabs, m.MinBound, m.MaxBound);
+                foreach (var e in TerrainBuilder.Spawn(world, tiles))
+                {
+                    lookup[e.Id] = e;
+                    if (layers != null) layers[e.Id] = "ground";
+                }
+                float low = float.MaxValue;
+                foreach (var t in tiles) foreach (float h in t.Heights) low = MathF.Min(low, h);
+                foundMinimumY = MathF.Min(foundMinimumY, low);
+                hasAnyFloor = hasTerrain = tiles.Count > 0;
+                Log.Information("MapManager: '{Id}' lays {Tiles} tiles of ground from its survey, graded to {Slabs} slabs ({Ms} ms).",
+                                m.Id, tiles.Count, slabs.Count, clock.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "MapManager: '{Id}' has an elevation that could not be laid; its ground is flat.", m.Id);
+            }
+        }
+
         // Natural ground (dirt, Cody 2026-10-06) where the map has none of its own. A map whose ground
         // covers its play area gets none: a slab flush under the city's own was met wherever ties went its way.
-        if (!GroundCovers(world, m.WalkMin, m.WalkMax))
+        if (!hasTerrain && !GroundCovers(world, m.WalkMin, m.WalkMax))
         {
             Log.Information("MapManager: '{Id}' has no ground of its own under all of its play area. Laying natural ground ({Ground}) under its bounds.", m.Id, m.GroundPrefab ?? NaturalGroundPrefab);
             Vector3 mapSize = m.MaxBound - m.MinBound;

@@ -34,7 +34,7 @@ esa-worldcover-2021-10m.tif
   licence: CC BY 4.0, (c) ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021)
 
 usgs-3dep-dem.tif
-  USGS 3D Elevation Program bare-earth elevation, metres (not used yet: the engine's ground is flat)
+  USGS 3D Elevation Program bare-earth elevation, metres
   from: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer
   licence: public domain (USGS)
 
