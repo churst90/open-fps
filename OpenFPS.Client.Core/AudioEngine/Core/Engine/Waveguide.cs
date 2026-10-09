@@ -51,6 +51,8 @@ internal sealed class WaveLine
     private readonly float[] _buf;
     private readonly int _len;
     private long _time;
+    // _time % _len, kept in step rather than divided for at every slot.
+    private int _timeSlot;
     private double _tauPrev;
     private float _vPrev;
     private float _d0;
@@ -181,13 +183,22 @@ internal sealed class WaveLine
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private int Slot(long k) => (int)(((k % _len) + _len) % _len);
+    private int Slot(long k)
+    {
+        long ahead = k - _time;
+        if ((ulong)ahead < (ulong)_len)
+        {
+            int idx = _timeSlot + (int)ahead;
+            return idx >= _len ? idx - _len : idx;
+        }
+        return (int)(((k % _len) + _len) % _len);
+    }
 
     /// <summary>
     /// Puts a value into a slot, averaging with anything already deposited there this pass: the mean,
     /// not the last writer, stops a compressed front turning into an impulse.
     /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void Deposit(long k, float value)
     {
         int idx = Slot(k);
@@ -196,13 +207,16 @@ internal sealed class WaveLine
     }
 
     /// <summary>What arrives at the far end now, after the traverse loss. Advances time.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    // Inlined, not AggressiveOptimization: that attribute stops a method being inlined, and this one is
+    // called for both ends of every pipe every sample. Its callers carry the attribute.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Read()
     {
-        int i = (int)(_time % _len);
+        int i = _timeSlot;
         float v = _buf[i];
         _buf[i] = 0f;
         _time++;
+        _timeSlot = i + 1 == _len ? 0 : i + 1;
         _lp += _alpha * (v - _lp);
         return _gain * _lp;
     }
@@ -237,18 +251,32 @@ internal sealed class Pipe
         int longest = (int)(Length / 250f * rate) + 4;
         _fwd = new WaveLine(longest);
         _bwd = new WaveLine(longest);
+        Retune();
     }
 
     /// <summary>Speed of sound, m/s, and density, kg/m^3, of the gas now in the pipe.</summary>
     public float SoundSpeed => _c;
     public float Density => _rho;
     /// <summary>Characteristic impedance, Pa s / m^3: pressure per unit volume velocity.</summary>
-    public float Impedance => _rho * _c / Area;
+    public float Impedance => _impedance;
     /// <summary>Acoustic admittance, the reciprocal — what junctions weight by. Scaled by
     /// <see cref="AreaScale"/> so a throttle plate can shut a pipe without rebuilding it.</summary>
-    public float Admittance => Area * AreaScale / (_rho * _c);
+    public float Admittance => _admittance;
     /// <summary>Fraction of the cross-section actually open, 0..1. Only a throttle changes it.</summary>
-    public float AreaScale { get; set; } = 1f;
+    public float AreaScale
+    {
+        get => _areaScale;
+        set { _areaScale = value; Retune(); }
+    }
+    private float _areaScale = 1f;
+    // Read by every junction every sample; they change only with the gas or the throttle.
+    private float _impedance, _admittance;
+
+    private void Retune()
+    {
+        _impedance = _rho * _c / Area;
+        _admittance = Area * _areaScale / (_rho * _c);
+    }
 
     /// <summary>Extra loss beyond the wall — a muffler's packing, a baffle. Gain and one-pole alpha per traverse.</summary>
     public void SetExtraLoss(float gain, float alpha) { _extraLossGain = gain; _extraLossAlpha = alpha; }
@@ -261,6 +289,7 @@ internal sealed class Pipe
     {
         _c = Gas.SoundSpeed(kelvin, gamma);
         _rho = Gas.Density(Gas.Atmosphere, kelvin);
+        Retune();
         float m = Math.Clamp(meanFlowMach, 0f, 0.4f);
         _fwd.SetDelay(Length / (_c * (1f + m)) * _rate);
         _bwd.SetDelay(Length / (_c * (1f - m)) * _rate);
@@ -317,7 +346,7 @@ internal static class Junction
     }
 
     /// <summary>Two pipes end to end: the reflection at an area change.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static (float BackIntoA, float OnIntoB) Two(float aFromA, float aFromB, float yA, float yB, float loss)
     {
         float pj = 2f * (yA * aFromA + yB * aFromB) / MathF.Max(1e-12f, yA + yB + loss);
@@ -373,7 +402,7 @@ internal sealed class OpenEnd
     }
 
     /// <summary>Feeds the wave arriving at the end; returns (reflected wave, volume velocity leaving).</summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public (float Reflected, float VolumeVelocity) Process(float arriving)
     {
         // The reflection: low frequencies come back inverted, the top leaves.
@@ -403,7 +432,7 @@ internal sealed class OpenEnd
     /// put its spectral centroid at 8 kHz. One pole at ka = 1 (c/(2 pi a), about 2 kHz for a
     /// three-inch tailpipe in hot gas) cancels the derivative above it and leaves a V8's orders alone.
     /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Radiate(float u, float airDensity)
     {
         float du = (u - _uPrev) * _rate;
@@ -435,10 +464,14 @@ internal sealed class JetNoise
         _rate = rate;
         _diameter = MathF.Max(0.01f, diameterMetres);
         _rng = new Random(seed);
+        _hpA = OnePole.AlphaFor(40f, rate);
     }
+    private readonly float _hpA;
 
     /// <summary>Lighthill coefficient for a subsonic jet, the textbook 1e-4.</summary>
     public const float Lighthill = 1e-4f;
+
+    private static readonly double SoundSpeedToTheFifth = Math.Pow(343f, 5);
 
     /// <summary>
     /// RMS pressure at one metre, pascals, of a jet of this diameter and velocity at this gas
@@ -450,7 +483,7 @@ internal sealed class JetNoise
         const float rho0 = 1.2f, c = 343f;
         float rhoRatio = 293f / MathF.Max(293f, gasKelvin);
         double u = Math.Min(Math.Abs(velocity), 600.0);
-        double w = Lighthill * rho0 * rhoRatio * Math.Pow(u, 8) * diameterMetres * diameterMetres / Math.Pow(c, 5);
+        double w = Lighthill * rho0 * rhoRatio * Math.Pow(u, 8) * diameterMetres * diameterMetres / SoundSpeedToTheFifth;
         double p2 = w * rho0 * c / (4 * Math.PI);
         return (float)Math.Sqrt(Math.Max(0.0, p2));
     }
@@ -490,8 +523,7 @@ internal sealed class JetNoise
         float amp = 0.7f * meanVelocity + 0.6f * uAbs;
         float p = LighthillPressure(_diameter, amp, gasKelvin) * level * bp;
         // Nothing below 40 Hz belongs to a jet.
-        float hpA = OnePole.AlphaFor(40f, _rate);
-        _hp += hpA * (p - _hp);
+        _hp += _hpA * (p - _hp);
         return p - _hp;
     }
 }

@@ -165,7 +165,7 @@ public sealed class EngineSynth
     // Block noise
     private float _blockLp, _knockHp;
     private float _structLpK1, _structLpK2, _structLpV1, _structLpV2, _valveLp;
-    private readonly float _structLpA, _valveLpA;
+    private readonly float _structLpA, _valveLpA, _knockHpA, _blockLpA;
     /// <summary>
     /// Calibration of the structure's ringing (--tap-balance knock): the knock is held to its anchor at
     /// full load, the declared levels DeclaredSourceLevelMatchesTheLiveVoice holds every preset to. At
@@ -202,7 +202,7 @@ public sealed class EngineSynth
             R2 = r * r;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float Step(float x)
         {
             float y = A * (x - X2) + C * Y1 - R2 * Y2;
@@ -295,6 +295,8 @@ public sealed class EngineSynth
         // smaller engine, 6 ms decay each (cast iron's damping).
         float sizeScale = MathF.Sqrt(0.125f / MathF.Max(0.05f, bore));
         _structLpA = OnePole.AlphaFor(5500f, rate);
+        _knockHpA = OnePole.AlphaFor(700f, rate);
+        _blockLpA = OnePole.AlphaFor(180f, rate);
         _valveLpA = OnePole.AlphaFor(2000f, rate);
         // The 3.6 kHz mode is the head and valve covers: without it the clatter measured 24-28 dB down
         // at 4 kHz where the research puts it at 18, and a diesel sounded choked.
@@ -372,13 +374,20 @@ public sealed class EngineSynth
         return _clearanceVolume + _pistonArea * x;
     }
 
-    /// <summary>dx/dphi of the piston, metres per radian: the lever the gas pushes on.</summary>
-    private float Lever(float deg)
+    /// <summary>
+    /// <see cref="VolumeAt"/> and dx/dphi of the piston (metres per radian, the lever the gas pushes on)
+    /// at one angle, the sine and cosine taken once: the step wants both, every cylinder, every sample.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void VolumeAndLever(float deg, out float volume, out float lever)
     {
         float phi = deg * (MathF.PI / 180f);
         float s = MathF.Sin(phi), c = MathF.Cos(phi);
-        float root = MathF.Sqrt(MathF.Max(1e-9f, _rodLength * _rodLength - _crankRadius * _crankRadius * s * s));
-        return _crankRadius * s + _crankRadius * _crankRadius * s * c / root;
+        float inner = _rodLength * _rodLength - _crankRadius * _crankRadius * s * s;
+        float x = _crankRadius * (1f - c) + _rodLength - MathF.Sqrt(MathF.Max(0f, inner));
+        volume = _clearanceVolume + _pistonArea * x;
+        float root = MathF.Sqrt(MathF.Max(1e-9f, inner));
+        lever = _crankRadius * s + _crankRadius * _crankRadius * s * c / root;
     }
 
     /// <summary>Switch for <see cref="BlowdownJet"/>: the lab's A/B, and /valveflow in game.
@@ -403,11 +412,22 @@ public sealed class EngineSynth
         float rhoT = 0.63f * MathF.Max(1e-3f, cy.Mass / MathF.Max(1e-7f, cy.Volume));
         float cCyl = Gas.SoundSpeed(cy.Temp, Gas.GammaExhaust);
         float u = MathF.Min(mdot / (rhoT * MathF.Max(1e-7f, area)), 0.91f * cCyl);
-        float rhoP = Gas.Density(Gas.Atmosphere, _portK), cP = Gas.SoundSpeed(_portK, Gas.GammaExhaust);
-        double w = ValveFlowNoiseK * rhoT * Math.Pow(u, 6) * area / Math.Pow(cP, 3);
+        // The port gas moves on the slow tick; its properties are worked out when it does.
+        if (_portK != _jetPortK)
+        {
+            _jetPortK = _portK;
+            _jetRhoP = Gas.Density(Gas.Atmosphere, _portK);
+            _jetCP = Gas.SoundSpeed(_portK, Gas.GammaExhaust);
+            _jetCP3 = Math.Pow(_jetCP, 3);
+        }
+        float rhoP = _jetRhoP, cP = _jetCP;
+        double w = ValveFlowNoiseK * rhoT * Math.Pow(u, 6) * area / _jetCP3;
         float p = MathF.Sqrt((float)(0.5 * w * rhoP * cP / MathF.Max(1e-6f, _primaryArea)));
         return p * PinkBand(ref cy, (float)(_rng.NextDouble() * 2 - 1));
     }
+
+    private float _jetPortK = float.NaN, _jetRhoP, _jetCP;
+    private double _jetCP3;
 
     /// <summary>The valve flow noise's dipole constant. See <see cref="BlowdownJet"/>.</summary>
     internal const float ValveFlowNoiseK = 1e-3f;
@@ -458,7 +478,7 @@ public sealed class EngineSynth
     }
 
     /// <summary>Valve lift from a cam lobe at some crank angle relative to its centreline, metres.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private float Lift(CamLobe lobe, float degFromCentre)
     {
         float d = degFromCentre;
@@ -645,7 +665,7 @@ public sealed class EngineSynth
             bool wrapped = phase < phasePrev;
 
             // Volume and the work of moving the piston.
-            float V = VolumeAt(phase);
+            VolumeAndLever(phase, out float V, out float lever);
             float dV = V - cy.Volume;
             cy.Volume = V;
 
@@ -800,7 +820,7 @@ public sealed class EngineSynth
             cy.Pressure = cy.Mass * Gas.R * cy.Temp / cy.Volume;
 
             // ── Torque on the crank ──────────────────────────────────────────────────────
-            gasTorque += (cy.Pressure - Gas.Atmosphere) * _pistonArea * Lever(phase);
+            gasTorque += (cy.Pressure - Gas.Atmosphere) * _pistonArea * lever;
 
             // ── What the block radiates ──────────────────────────────────────────────────
             // Combustion through the metal: the rate of pressure rise, modest for petrol, for a
@@ -855,8 +875,7 @@ public sealed class EngineSynth
         // bore knocks near 4 kHz and an 80 mm car's near 6.6, deeper for the big engine), then
         // through the metal. Only the sharp part of the rise drives the modes; the smooth part is the
         // thud below, and fed to the resonators it only pumps them.
-        float kh = OnePole.AlphaFor(700f, _rate);
-        _knockHp += kh * (knock - _knockHp);
+        _knockHp += _knockHpA * (knock - _knockHp);
         float knockDrive = knock - _knockHp;
 
         // The modes move while they ring: the gas cools from 2,500 K to 1,200 within a few degrees, so
@@ -896,8 +915,7 @@ public sealed class EngineSynth
         // junctions that reflect most of it, so it must not outweigh the knock and clatter that radiate
         // straight off the block. Weighted up, a truck six's block was 94 % below 200 Hz and 1.7 %
         // between 800 Hz and 2.5 kHz, where a diesel's identity lives: a formless low roar.
-        float bl = OnePole.AlphaFor(180f, _rate);
-        _blockLp += bl * (blockLow - _blockLp);
+        _blockLp += _blockLpA * (blockLow - _blockLp);
         float thud = _blockLp * 5.0e-8f;
         // A seat's contact lasts a fraction of a millisecond, so its force has little above a couple
         // of kilohertz; then the head rings, and the same steep top lets it out.
@@ -965,6 +983,8 @@ public sealed class EngineSynth
     /// <summary>In the duct, ten decibels under the compressor outlet (Tiikoja and Abom: the turbine
     /// is an attenuator, significant only at very high blade-passing frequencies).</summary>
     private const float TurbineDuctDb = 100f, TurbineAtRpm = 110000f;
+    // The three as pascals once, not three powers a sample.
+    private static readonly float CompressorPa = Pa(CompressorToneDb), WhooshPa = Pa(WhooshDb), TurbineDuctPa = Pa(TurbineDuctDb);
 
     private static float Pa(float db) => 20e-6f * MathF.Pow(10f, db / 20f);
 
@@ -996,7 +1016,7 @@ public sealed class EngineSynth
         float nyq = _rate * 0.45f;
         float comp = 0f, turb = 0f;
         float fc = CompressorBlades * rev;
-        float compPa = 1.41421356f * Pa(CompressorToneDb) * Scale(CompressorAtRpm) * lvl;
+        float compPa = 1.41421356f * CompressorPa * Scale(CompressorAtRpm) * lvl;
         // The tip-clearance hump: noise through a band HumpWidth wide (a sine sounds thin), at the power
         // a sine of the same amplitude would have.
         _tcnDrift += (((float)_rng.NextDouble() * 2f - 1f) - _tcnDrift) * (40f / _rate);
@@ -1029,7 +1049,7 @@ public sealed class EngineSynth
         {
             _turbinePhase += ft / _rate;
             if (_turbinePhase > 1.0) _turbinePhase -= 1.0;
-            turb = (float)Math.Sin(_turbinePhase * 2 * Math.PI) * 1.41421356f * Pa(TurbineDuctDb) * Scale(TurbineAtRpm) * lvl
+            turb = (float)Math.Sin(_turbinePhase * 2 * Math.PI) * 1.41421356f * TurbineDuctPa * Scale(TurbineAtRpm) * lvl
                  * _tailRadius * 0.70710678f * _turbineMuffler;
         }
         _turbineTone = turb;
@@ -1037,7 +1057,7 @@ public sealed class EngineSynth
         float n = (float)(_rng.NextDouble() * 2 - 1);
         float band = _wB0 * n + _wB2 * _wx2 - _wA1 * _wb1 - _wA2 * _wb2;
         _wx2 = _wx1; _wx1 = n; _wb2 = _wb1; _wb1 = band;
-        float whoosh = band * _whooshNorm * Pa(WhooshDb) * Scale(WhooshAtRpm) * lvl;
+        float whoosh = band * _whooshNorm * WhooshPa * Scale(WhooshAtRpm) * lvl;
         return comp + whoosh;
     }
 
@@ -1392,21 +1412,37 @@ public sealed class EngineSynth
 
     // ── The valve boundary ──────────────────────────────────────────────────────────────────────
 
-    /// <summary>Choked/subsonic orifice flow, kg/s, from up to down. Both pressures absolute.</summary>
-    private static float OrificeFlow(float pUp, float tUp, float pDown, float area, float gamma)
+    /// <summary>
+    /// The orifice law's constants for one gas, worked out once: they depend on gamma alone, and the
+    /// valve solver, a third of an engine's cost, evaluates the law about twenty times a sample on a V8.
+    /// </summary>
+    private readonly struct OrificeGas
+    {
+        public readonly float Crit, Choked, PowLow, PowHigh, Subsonic;
+        public OrificeGas(float gamma)
+        {
+            Crit = MathF.Pow(2f / (gamma + 1f), gamma / (gamma - 1f));
+            Choked = MathF.Sqrt(gamma) * MathF.Pow(2f / (gamma + 1f), (gamma + 1f) / (2f * (gamma - 1f)));
+            PowLow = 2f / gamma;
+            PowHigh = (gamma + 1f) / gamma;
+            Subsonic = 2f * gamma / (gamma - 1f);
+        }
+    }
+    private static readonly OrificeGas ExhaustOrifice = new(Gas.GammaExhaust), AirOrifice = new(Gas.GammaAir);
+    private static OrificeGas OrificeFor(float gamma)
+        => gamma == Gas.GammaExhaust ? ExhaustOrifice : gamma == Gas.GammaAir ? AirOrifice : new OrificeGas(gamma);
+
+    /// <summary>Choked/subsonic orifice flow, kg/s, from up to down. Both pressures absolute;
+    /// <paramref name="rt"/> is sqrt(R T) upstream.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float OrificeFlow(float pUp, float rt, float pDown, float area, in OrificeGas g)
     {
         if (area <= 0f || pUp <= pDown) return 0f;
         float pr = pDown / pUp;
-        float crit = MathF.Pow(2f / (gamma + 1f), gamma / (gamma - 1f));
-        float rt = MathF.Sqrt(Gas.R * tUp);
-        if (pr <= crit)
-        {
-            float k = MathF.Sqrt(gamma) * MathF.Pow(2f / (gamma + 1f), (gamma + 1f) / (2f * (gamma - 1f)));
-            return area * pUp * k / rt;
-        }
-        float t1 = MathF.Pow(pr, 2f / gamma) - MathF.Pow(pr, (gamma + 1f) / gamma);
+        if (pr <= g.Crit) return area * pUp * g.Choked / rt;
+        float t1 = MathF.Pow(pr, g.PowLow) - MathF.Pow(pr, g.PowHigh);
         if (t1 <= 0f) return 0f;
-        return area * pUp * MathF.Sqrt(2f * gamma / (gamma - 1f) * t1) / rt;
+        return area * pUp * MathF.Sqrt(g.Subsonic * t1) / rt;
     }
 
     /// <summary>
@@ -1432,16 +1468,24 @@ public sealed class EngineSynth
         // small cylinder at TDC overshoots every sample and rings the pipe up from nothing. Inside the
         // residual so the pipe and the cylinder see the same flow.
         float equalise = 0.5f * cylMass / dt;
+        var gas = OrificeFor(gamma);
+        float rtCyl = MathF.Sqrt(Gas.R * tCyl), rtPipe = MathF.Sqrt(Gas.R * pipeK);
         // Bracketed by the largest volume velocity either way, then regula falsi. Newton could not be
         // trusted near p_port = p_cyl, where the orifice law's slope is infinite.
         float uMax = uCap * 1.05f;
         float lo = a - Z * uMax, hi = a + Z * uMax;
-        float gLo = Residual(lo, out _), gHi = Residual(hi, out _);
-        if (gLo >= 0f) { Residual(lo, out mdot); return lo; }
-        if (gHi <= 0f) { Residual(hi, out mdot); return hi; }
+        // An end's residual is wanted for its sign, and for its value only while it still bounds the
+        // root. Past the cap the sign is known without the orifice law, since u is clamped to the cap;
+        // so the end the first guess replaces is never worked out. Same answer, one evaluation fewer.
+        bool loKnown = !(uMean == 0f && (lo - a) / Z < -uCap);
+        bool hiKnown = !(uMean == 0f && (hi - a) / Z > uCap);
+        float gLo = loKnown ? Residual(lo, out _) : 0f, gHi = hiKnown ? Residual(hi, out _) : 0f;
+        if (loKnown && gLo >= 0f) { Residual(lo, out mdot); return lo; }
+        if (hiKnown && gHi <= 0f) { Residual(hi, out mdot); return hi; }
         float b = Math.Clamp(bStart, lo, hi);
         float gB = Residual(b, out mdot);
-        if (gB > 0f) { hi = b; gHi = gB; } else { lo = b; gLo = gB; }
+        if (gB > 0f) { hi = b; gHi = gB; if (!loKnown) gLo = Residual(lo, out _); }
+        else { lo = b; gLo = gB; if (!hiKnown) gHi = Residual(hi, out _); }
         int side = 0;
         for (int it = 0; it < 10; it++)
         {
@@ -1462,12 +1506,12 @@ public sealed class EngineSynth
             float rhoPort = Gas.Density(pPort, pipeK);
             if (pCyl >= pPort)
             {
-                m = OrificeFlow(pCyl, tCyl, pPort, area, gamma);
+                m = OrificeFlow(pCyl, rtCyl, pPort, area, gas);
                 m = MathF.Min(m, equalise * (pCyl - pPort) / pCyl);
             }
             else
             {
-                m = -OrificeFlow(pPort, pipeK, pCyl, area, gamma);
+                m = -OrificeFlow(pPort, rtPipe, pCyl, area, gas);
                 m = MathF.Max(m, -equalise * (pPort - pCyl) / pCyl);
             }
             float u = Math.Clamp(m / rhoPort, -uCap, uCap);
@@ -1527,7 +1571,7 @@ public sealed class EngineSynth
         public ClickVoice(float rate, int seed) { _rng = new Random(seed); _decay = At44k.Decay(0.9f, rate); }
         public void Trigger(float amp)
             => _env = MathF.Min(1.5f, _env + amp * (0.7f + 0.6f * (float)_rng.NextDouble()));
-        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float Process()
         {
             // The impact alone: the head's structure (_structValves) does the ringing. A pole of its own
