@@ -25,7 +25,7 @@ public readonly struct GeometryInstance
         Rotated = rotation != Quaternion.Identity;
         Rotation = rotation;
         Inverse = Rotated ? Quaternion.Inverse(rotation) : Quaternion.Identity;
-        if (piece.SolidCount == 0) { Min = Max = position; return; }
+        if (piece.IsEmpty) { Min = Max = position; return; }
         var lo = piece.BoundsMin; var hi = piece.BoundsMax;
         if (!Rotated) { Min = position + lo; Max = position + hi; return; }
         var mn = new Vector3(float.MaxValue); var mx = new Vector3(float.MinValue);
@@ -164,13 +164,15 @@ public sealed class TriangleWorld
     public int OwnerOf(SolidRef s)
     {
         ref readonly var inst = ref _instances[s.Instance];
-        return inst.Owner >= 0 ? inst.Owner : inst.Piece.Solids[s.Solid].Owner;
+        return inst.Owner >= 0 ? inst.Owner : inst.Piece.OwnerOfSolid(s.Solid);
     }
+
+    /// <summary>Whether a solid is a prism of a tile's ground (docs/GEOMETRY.md 2.3) rather than a box or a shape.</summary>
+    public bool IsTerrain(SolidRef s) => _instances[s.Instance].Piece.IsTerrainSolid(s.Solid);
 
     public ref readonly Surface SurfaceOf(SolidRef s)
     {
-        var piece = _instances[s.Instance].Piece;
-        return ref piece.Surfaces[piece.Solids[s.Solid].Surface];
+        return ref _instances[s.Instance].Piece.SurfaceOfSolid(s.Solid);
     }
 
     /// <summary>The surface of the triangle a ray met.</summary>
@@ -181,6 +183,11 @@ public sealed class TriangleWorld
     public (Vector3 Centre, Vector3 Size, Quaternion Rotation) BoxOf(SolidRef s)
     {
         ref readonly var inst = ref _instances[s.Instance];
+        if (inst.Piece.IsTerrainSolid(s.Solid))
+        {
+            var (lo, hi) = BoundsOf(s);
+            return ((lo + hi) * 0.5f, Vector3.Zero, Quaternion.Identity);
+        }
         ref readonly var rec = ref inst.Piece.Solids[s.Solid];
         var rotation = inst.Rotated ? Quaternion.Normalize(inst.Rotation * rec.BoxRotation) : rec.BoxRotation;
         // A tile's solid where it was placed, exactly; a mover's where its instance now has it.
@@ -192,12 +199,12 @@ public sealed class TriangleWorld
     public (Vector3 Min, Vector3 Max) BoundsOf(SolidRef s)
     {
         ref readonly var inst = ref _instances[s.Instance];
-        ref readonly var rec = ref inst.Piece.Solids[s.Solid];
-        if (!inst.Rotated) return (inst.Position + rec.Min, inst.Position + rec.Max);
+        var (rmin, rmax) = inst.Piece.SolidBounds(s.Solid);
+        if (!inst.Rotated) return (inst.Position + rmin, inst.Position + rmax);
         var mn = new Vector3(float.MaxValue); var mx = new Vector3(float.MinValue);
         for (int c = 0; c < 8; c++)
         {
-            var p = new Vector3((c & 1) == 0 ? rec.Min.X : rec.Max.X, (c & 2) == 0 ? rec.Min.Y : rec.Max.Y, (c & 4) == 0 ? rec.Min.Z : rec.Max.Z);
+            var p = new Vector3((c & 1) == 0 ? rmin.X : rmax.X, (c & 2) == 0 ? rmin.Y : rmax.Y, (c & 4) == 0 ? rmin.Z : rmax.Z);
             var w = inst.ToWorld(p);
             mn = Vector3.Min(mn, w); mx = Vector3.Max(mx, w);
         }
@@ -214,8 +221,15 @@ public sealed class TriangleWorld
     {
         ref readonly var inst = ref _instances[s.Instance];
         var piece = inst.Piece;
-        var tris = piece.TrianglesOf(s.Solid);
         var shift = inst.Position - relativeTo;
+        if (piece.IsTerrainSolid(s.Solid))
+        {
+            // Tiles are never turned: the prism in the piece's frame, moved.
+            Span<Vector4> unused = stackalloc Vector4[Heightfield.PrismPlaneCount];
+            piece.TerrainPrism(s.Solid, shift, into[..(3 * Heightfield.PrismTriangleCount)], unused);
+            return Heightfield.PrismTriangleCount;
+        }
+        var tris = piece.TrianglesOf(s.Solid);
         for (int k = 0; k < tris.Length; k++)
         {
             ref readonly var tr = ref piece.Tris[tris[k]];
@@ -227,18 +241,24 @@ public sealed class TriangleWorld
     }
 
     /// <summary>How big a solid is (Ties).</summary>
-    public float FootprintOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].Footprint;
+    public float FootprintOf(SolidRef s) => _instances[s.Instance].Piece.FootprintOfSolid(s.Solid);
 
     /// <summary>How many triangles a solid has.</summary>
-    public int TriangleCountOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].TriCount;
+    public int TriangleCountOf(SolidRef s) => _instances[s.Instance].Piece.TriangleCountOfSolid(s.Solid);
 
     /// <summary>A convex solid's face planes relative to <paramref name="relativeTo"/>: (n, d) with n·p - d
     /// &lt; 0 inside, into <paramref name="into"/>. Returns how many (0 for a solid that is not convex).</summary>
     public int PlanesOf(SolidRef s, Vector3 relativeTo, Span<Vector4> into)
     {
         ref readonly var inst = ref _instances[s.Instance];
-        var planes = inst.Piece.PlanesOf(s.Solid);
         var shift = inst.Position - relativeTo;
+        if (inst.Piece.IsTerrainSolid(s.Solid))
+        {
+            Span<Vector3> unused = stackalloc Vector3[3 * Heightfield.PrismTriangleCount];
+            inst.Piece.TerrainPrism(s.Solid, shift, unused, into[..Heightfield.PrismPlaneCount]);
+            return Heightfield.PrismPlaneCount;
+        }
+        var planes = inst.Piece.PlanesOf(s.Solid);
         for (int k = 0; k < planes.Length; k++)
         {
             var n = new Vector3(planes[k].X, planes[k].Y, planes[k].Z);
@@ -252,7 +272,7 @@ public sealed class TriangleWorld
 
     /// <summary>How many convex pieces a solid that is not convex has (stairs, an arch); 0 for a convex
     /// solid, which is its own one piece (<see cref="TrianglesOf"/>, <see cref="PlanesOf"/>).</summary>
-    public int PartCountOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].PartCount;
+    public int PartCountOf(SolidRef s) => _instances[s.Instance].Piece.PartCountOfSolid(s.Solid);
 
     /// <summary>How many triangles convex piece <paramref name="part"/> of a solid has.</summary>
     public int PartTriangleCountOf(SolidRef s, int part)
@@ -301,7 +321,7 @@ public sealed class TriangleWorld
     public Vector3 NormalOf(SolidRef s, int triangle)
     {
         ref readonly var inst = ref _instances[s.Instance];
-        var n = Vector3.Normalize(inst.Piece.Tris[triangle].Normal);
+        var n = Vector3.Normalize(inst.Piece.TriangleAt(triangle).Normal);
         return inst.DirectionToWorld(n);
     }
 
@@ -341,7 +361,7 @@ public sealed class TriangleWorld
                     {
                         found = true;
                         hit.T = best; hit.Triangle = tri; hit.Front = front;
-                        hit.Solid = new SolidRef(ii, inst.Piece.Tris[tri].Solid);
+                        hit.Solid = new SolidRef(ii, inst.Piece.SolidOfTriangle(tri));
                     }
                 }
                 continue;
@@ -490,6 +510,13 @@ public sealed class TriangleWorld
     /// test then looks at.</summary>
     public void Overlapping<F>(Vector3 min, Vector3 max, GeometryLayers layers, ref F filter, List<SolidRef> into)
         where F : IGeometryFilter
+        => Overlapping(min, max, min, max, layers, ref filter, into);
+
+    /// <summary>The same, with the ground's prisms asked for only within [<paramref name="terrainMin"/>,
+    /// <paramref name="terrainMax"/>], which lies inside [min, max]: a body walking on terrain needs the few
+    /// cells round it, not the hundreds under the reach it gathers boxes from.</summary>
+    public void Overlapping<F>(Vector3 min, Vector3 max, Vector3 terrainMin, Vector3 terrainMax, GeometryLayers layers, ref F filter,
+                               List<SolidRef> into) where F : IGeometryFilter
     {
         if (_instances.Length == 0) return;
         Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
@@ -506,7 +533,12 @@ public sealed class TriangleWorld
                     int ii = _order[i];
                     ref readonly var inst = ref _instances[ii];
                     Vector3 lmin, lmax;
-                    if (!inst.Rotated) { lmin = min - inst.Position; lmax = max - inst.Position; }
+                    if (!inst.Rotated)
+                    {
+                        lmin = min - inst.Position; lmax = max - inst.Position;
+                        inst.Piece.Overlapping(lmin, lmax, terrainMin - inst.Position, terrainMax - inst.Position, layers, ref filter, ii, inst.Owner, into);
+                        continue;
+                    }
                     else
                     {
                         lmin = new Vector3(float.MaxValue); lmax = new Vector3(float.MinValue);
@@ -693,7 +725,7 @@ public sealed class TriangleWorld
     public float HeightOn(in GeometryHit hit, float x, float z)
     {
         ref readonly var inst = ref _instances[hit.Solid.Instance];
-        ref readonly var tr = ref inst.Piece.Tris[hit.Triangle];
+        var tr = inst.Piece.TriangleAt(hit.Triangle);
         if (inst.Rotated)
         {
             // Down through (x, z) in the piece's frame, from height 0: the face is met at -t.

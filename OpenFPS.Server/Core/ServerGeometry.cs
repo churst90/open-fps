@@ -143,6 +143,9 @@ public sealed class ServerGeometry
     {
         var h = new HashCode();
         h.Add(c.Shape); h.Add(c.IsSolid); h.Add(c.Form);
+        // A tile of ground is replaced whole when it changes: the component itself is what changed.
+        if (c.Shape == ColliderShape.Terrain && world.Has<TerrainTileComponent>(e))
+            h.Add(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(world.Get<TerrainTileComponent>(e)));
         h.Add(world.Has<EntityType>(e) ? world.Get<EntityType>(e) : EntityType.StaticObject);
         if (world.Has<MaterialComponent>(e)) h.Add(world.Get<MaterialComponent>(e).Material);
         if (world.Has<AcousticComponent>(e))
@@ -262,7 +265,7 @@ public sealed class ServerGeometry
         foreach (var s in solids)
         {
             var h = new HashCode();
-            h.Add(s.Owner); h.Add(s.BoxSize); h.Add(s.Surface); h.Add(s.Mesh?.Hash ?? 0UL);
+            h.Add(s.Owner); h.Add(s.BoxSize); h.Add(s.Surface); h.Add(s.Mesh?.Hash ?? 0UL); h.Add(s.Terrain?.Hash ?? 0UL);
             if (poses) { h.Add(s.Position); h.Add(s.Rotation); }
             sum += h.ToHashCode();
         }
@@ -337,6 +340,9 @@ public sealed class ServerGeometry
         string? name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name : null;
         var surface = EntityGeometry.SurfaceOf(material, c.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow, a.ShellThickness,
                                                a.Absorption, emitter, moves: false, doorLeaf: leaf, name);
+        if (c.Shape == ColliderShape.Terrain)
+            return world.Has<TerrainTileComponent>(e) && world.Get<TerrainTileComponent>(e) is { Posts: >= 2 } terrain
+                ? EntityGeometry.TerrainSpec(e.Id, t.Position, terrain, surface) : default;
         return SolidSpec.Of(e.Id, t.Position, t.Rotation, c.Size, surface, Shapes.Make(c.Form, c.Size));
     }
 }

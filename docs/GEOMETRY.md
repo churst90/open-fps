@@ -30,6 +30,7 @@ AudioLab `--geometry map=<id> [terrain=<metres>]`.
 8. Decisions for Cody
 9. Stage 1 as built (2026-10-06)
 10. Stage 2 as built (2026-10-06)
+11. Stage 3 as built (2026-10-09)
 
 ---
 
@@ -1315,6 +1316,48 @@ The triangle world is a project of its own now, `OpenFPS.Geometry`, the lowest o
 `WallBuild` and `BoxContainment` are beside it. Namespaces did not change. `EntityGeometry` and
 `MoverPoses` stay in Common, on the host's side. New shapes, queries, terrain and the voxel layer go in
 that project and take `SolidSpec`, `Surface` and plain vectors, never an entity.
+
+## 11. Stage 3 as built (2026-10-09)
+
+Built with streaming stage 2 (docs/WORLD_STREAMING.md, "Stage 2 with terrain"). Step T1: the terrain itself.
+
+### 11.1 The heightfield
+
+`OpenFPS.Geometry/Triangles/Heightfield.cs`. A tile of ground is posts on a square grid (126 a side at
+2 m for a 250 m tile), a material per cell, heights in the world. Each cell is two triangles split along
+the diagonal from post (i, j) to (i + 1, j + 1). On the wire and on disk the heights are whole
+centimetres over the tile's base, so the server and every client turn them into the same floats.
+
+- **Part of its tile's piece.** A `SolidSpec` can carry a `Heightfield`; the builder keys it by its
+  middle, so it lands in its own tile's piece beside the boxes. Terrain triangles are numbered after the
+  piece's box triangles, and under each triangle is a prism down to 20 m under the tile's lowest post,
+  numbered after the boxes' solids. `SolidCount` still counts boxes only: whatever walks every solid of
+  a piece (the routes through openings, the scene's box lists) is asking about boxes.
+- **Queries.** Rays walk the cells under them (Amanatides and Woo), skipping cells whose corners the ray's
+  height cannot reach; each cell's two triangles are tested by the same Möller-Trumbore test as a box's.
+  `Closest`, `Any`, `All`, `Containing` and `Overlapping` find the ground; `Along` and `Column` (the
+  routes through openings) do not. Of a face laid flush on the ground and the ground, the face is met:
+  a prism counts as covering the whole tile (Ties).
+- **The body.** A prism is a convex solid with eight triangles and five planes, so `SolidContact` meets
+  it as it meets a wedge: a walkable slope is a floor, a bank steeper than 45 degrees a wall. The movement
+  gather asks for prisms only round the body (`TriangleWorld.Overlapping` with a terrain box), not under
+  the 30 m it gathers boxes from.
+- **An entity.** `TerrainTileComponent` (Posts, Spacing, HeightsCm, Cells, Materials) on an entity at
+  the middle of its tile, at its base height. Its collider is `ColliderShape.Terrain` (appended to the
+  enum), not solid, size zero: every reader of boxes passes it by. `EntityGeometry.Classify` makes it
+  static geometry. The definition carries it in `EntityDefinition.Terrain` (appended).
+- **Sound.** The acoustic store and both Steam Audio paths (tile sub-scenes and the whole scene) take the
+  ground as triangles of open ground with each cell's material. What counts as open ground was "a thin
+  slab whose top is under a metre"; on terrain it is under a metre over the ground beneath it, so a road
+  lying on a hill 8 m up is still left out of the listener's trace. The worker reads the ground from the
+  snapshot's definitions (`WorldSnapshot.TerrainSolids`), never from the background geometry build, so
+  it never lags them.
+- With `OPENFPS_TRIANGLES=0` there is no terrain: the box path cannot stand on it.
+
+Tests: `GeometryTerrainTests` (heights and planes, centimetres, the ground probe and its normal, cell
+materials underfoot, a walk up and down 15 %, a 60 degree bank as a wall, a walk across a tile edge, a
+hill in the way of a ray, inside the ground, a kerb on a slope, the server and a client making the same
+bits, open ground on raised terrain).
 
 ## Appendix: box-geometry consumers today
 

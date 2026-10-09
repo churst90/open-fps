@@ -421,6 +421,9 @@ public partial class EntityDefinition : IMessage
     /// </summary>
     public int RidingEntityId = -1;
 
+    /// <summary>For a tile of ground, its heights and materials (ColliderShape.Terrain); null for anything else.</summary>
+    public TerrainTileComponent? Terrain;
+
     public EntityDefinition()
     {
         Identity.Name = "";

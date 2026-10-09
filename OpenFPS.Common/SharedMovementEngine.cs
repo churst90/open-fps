@@ -224,7 +224,11 @@ public static class SharedMovementEngine
         float across = ctx.PlayerRadius + ctx.Speed * dt + MathF.Abs(ctx.Velocity.X * dt) + MathF.Abs(ctx.Velocity.Z * dt) + GatherMargin;
         min = new Vector3(MathF.Min(min.X, ctx.Position.X - across), float.MinValue, MathF.Min(min.Z, ctx.Position.Z - across));
         max = new Vector3(MathF.Max(max.X, ctx.Position.X + across), float.MaxValue, MathF.Max(max.Z, ctx.Position.Z + across));
-        world.Overlapping(min, max, OpenFPS.Common.Geometry.GeometryLayers.Movement, ref filter, into);
+        // The ground's prisms only round the body: they are a couple of metres across, never a push of metres.
+        float fall = MathF.Abs(ctx.Velocity.Y * dt) + StepHeight + 1f;
+        var tmin = new Vector3(ctx.Position.X - across, ctx.Position.Y - fall, ctx.Position.Z - across);
+        var tmax = new Vector3(ctx.Position.X + across, ctx.Position.Y + ctx.PlayerHeight + fall, ctx.Position.Z + across);
+        world.Overlapping(min, max, tmin, tmax, OpenFPS.Common.Geometry.GeometryLayers.Movement, ref filter, into);
         // A handful: an insertion sort, and no comparer to allocate.
         for (int i = 1; i < into.Count; i++)
         {

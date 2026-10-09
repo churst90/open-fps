@@ -36,6 +36,8 @@ public static class EntityGeometry
                                         int portalRegionA, int portalRegionB, bool announced = false)
     {
         if (moves) return GeometryRole.None;
+        // A tile of ground: not solid to the box readers, a heightfield to the triangle world.
+        if (collider.Shape == Components.ColliderShape.Terrain) return GeometryRole.Static;
         if (!collider.IsSolid)
         {
             // A fixed box said by name, not an opening: a look finds it (SightGrid's index).
@@ -65,9 +67,16 @@ public static class EntityGeometry
                                 a.ShellThickness, a.Absorption, emitter, moves: false, doorLeaf: role == GeometryRole.Mover,
                                 def.Identity.Name);
         if (role == GeometryRole.SightOnly) surface = SightOnly(surface);
+        if (def.Collider.Shape == Components.ColliderShape.Terrain)
+            return def.Terrain is { Posts: >= 2 } terrain ? TerrainSpec(def.EntityId, transform.Position, terrain, surface) : default;
         return SolidSpec.Of(def.EntityId, transform.Position, transform.Rotation, def.Collider.Size, surface,
                             Shapes.Make(def.Collider.Form, def.Collider.Size));
     }
+
+    /// <summary>A tile of ground as a solid: its heightfield, from the entity's position (the middle of the
+    /// tile, its height the base the centimetres count from).</summary>
+    public static SolidSpec TerrainSpec(int owner, Vector3 position, Components.TerrainTileComponent terrain, in Surface surface)
+        => SolidSpec.OfTerrain(owner, position, terrain.Field(position.Y), surface);
 
     /// <summary>A surface only a look meets (<see cref="GeometryLayers.Announced"/>).</summary>
     public static Surface SightOnly(in Surface surface) => surface with { Layers = GeometryLayers.Announced, Flags = SurfaceFlags.None };
