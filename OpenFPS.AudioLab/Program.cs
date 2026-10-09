@@ -47,6 +47,7 @@ string[] usage =
     "  --engine-alias [preset] [rpm=] [rates=]       whether a breakdown at the redline is the engine's or the sample rate's",
     "  --engine-solver                               the intake valve solver on one dumped state",
     "  --engine-cost [preset ...] [kmh=] [sec=] [body=off] [rate=]",
+    "  --pool-cost cpu|offline|machines|render DIR [wide]|diff A B [voices=N] [sec=S] [ptracer]",
     "                                                what one live voice costs a core",
     "  --engine-jumps [preset ...] [kmh=] [sec=] [blame]",
     "                                                sample-to-sample jumps in the voice alone (crackle)",
@@ -464,6 +465,12 @@ if (args.Contains("--ride"))
 if (args.Contains("--shift-trace"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.ShiftTraceSpike.Run(args));
+}
+if (args.Contains("--pool-cost"))
+{
+    int pcode = OpenFPS.Client.Core.AudioEngine.Fmod.PoolCostSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(pcode);
 }
 if (args.Contains("--engine-cost"))
 {
