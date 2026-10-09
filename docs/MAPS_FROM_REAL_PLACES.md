@@ -42,18 +42,23 @@ Made up, deterministically (the same input gives the same map, byte for byte):
 - Speed limits where none is mapped: the state's usual limits by road class (place.json).
 - Driveways for houses OpenStreetMap has none for.
 
-The ground follows the survey: USGS 3DEP at the resolution it was downloaded at (about 5 m), in each
-place's `elevation.json`. The generator writes it into the map on a 5 m grid of the map's own metres
-(`Elevation`) and sets everything on it: houses on level pads at the ground by their front door, roads
-level across and pitched along their run in pieces of at most 20 m over the ground averaged across
-20 m, lawns tilted to the ground, solid things set into it, named places stretched over it. The server
-lays 2 m terrain from the same grid at load and grades it to the slabs lying on it (docs/GEOMETRY.md
-5.1 and 11). y = 0 is the ground at the spawn address.
+The ground follows the survey: USGS 3DEP asked for 2 m cells on the place's UTM grid (1 m lidar where
+there is some), in each place's `elevation.json`, posts every 2 m over every whole 250 m tile of the
+world the map reaches. The map ships the same file beside it (`places/ID.elevation`, the same bytes, so
+git keeps one copy) and names it in its `Elevation`. The generator sets everything on those posts: houses
+on level pads at the ground by their front door, roads level across and pitched along their run in pieces
+of at most 20 m (overlapping 5 cm at the joins) over the ground averaged across 20 m, lawns tilted to the
+ground, solid things set into it, named places stretched over it. The server lays 2 m terrain on the same
+posts at load and grades it to the slabs lying on it (docs/GEOMETRY.md 5.1 and 11). y = 0 is the ground
+at the spawn address.
 
 ## How a place is represented
 
-- Coordinates are local east-north metres from the place's origin (the spawn address's geocode) on
-  the WGS84 ellipsoid: x east, z north, y up. /tp and the C key say x east, y north, z height.
+- Coordinates are UTM metres of the place's zone (the world's grid, docs/WORLD_STREAMING.md) less the
+  2 m post nearest the place's origin (the spawn address's geocode): x east and z north along the grid,
+  y up. The map's `Utm` says where its (0, 0) is, so the map is the world's tiles moved, never turned.
+  Grid north is within 1.4 degrees of true north at Magnolia and 0.1 at Albany. /tp and the C key say
+  x east, y north, z height.
 - A footprint is cut into at most four rectangles in its own frame; walls go round the outside of
   their union, with the doors cut into them; a pitched roof is a deck with a ridge.
 - Roads are road data (Roads.cs) as well as boxes, so traffic can drive them and the driving aids
@@ -143,7 +148,8 @@ not checked.
    tile window, 3DEP elevation and the TIGER address ranges; anything already there is kept).
 3. Prepare: `python tools/fetch_place.py prepare tools/places/NAME/place.json` clips everything to
    the area and writes the small JSON inputs beside place.json. `fetch_place.py elevation` writes
-   only elevation.json, from the archive's 3DEP download.
+   only elevation.json, asking the 3DEP service directly (standard library only, a few seconds; about
+   3 MB for a 3 km place: each row less the row before, deflated, in base64).
 4. Generate (standard library only): `python3 tools/gen_osm.py tools/places/NAME`. It prints the
    counts and the spawn. Commit the inputs and the map together; `RealPlaceMapTests` checks the map
    is what the generator makes from them.

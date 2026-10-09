@@ -919,6 +919,12 @@ public sealed partial class ClientGameSession : IDisposable
                 }
                 break;
 
+            case WorldLoading building:
+                // Arriving in the world: the server holds the join until the tiles round us are built.
+                LoadProgress(building.Text, 10 + (building.Total > 0 ? 50 * building.Done / building.Total : 0));
+                if (building.Speak) _speech.Speak(building.Text, interrupt: false);
+                break;
+
             case MapLoadComplete:
                 _mapLoaded = true;
                 // The woods the map's trees make, heard as one past the hand-over (WoodChorus).

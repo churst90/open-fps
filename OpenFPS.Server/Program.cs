@@ -142,11 +142,29 @@ public class GameServer
             var store = new OpenFPS.Server.OneWorld.WorldStore(settings.StorePath, settings.CapBytes);
             survey ??= settings.Generate ? new OpenFPS.Server.OneWorld.Usgs3Dep() : new OpenFPS.Server.OneWorld.NoNewTiles();
             var service = new OpenFPS.Server.OneWorld.WorldTileService(store, survey, settings.MaxAtOnce);
+            // The maps of real places, copied into the world's tiles; tiles copied from an older map go.
+            var copied = OpenFPS.Server.OneWorld.WorldPlaces.FromMaps(_maps);
+            int stale = copied.DropStale(store);
+            if (stale > 0) Log.Information("World: {Count} stored tile(s) of the places will be copied again from their maps.", stale);
             World = new OpenFPS.Server.OneWorld.WorldMaps(_maps, service, () => _sessions.GetAllSessions(),
-                                                        OpenFPS.Server.OneWorld.WorldMaps.LoadPlaces(_maps));
+                                                        OpenFPS.Server.OneWorld.WorldMaps.LoadPlaces(_maps), copied);
+            // A frame over a real place has its traffic.
+            World.FrameMade += mapId => EnqueueCommand(() => _vehicles?.SpawnMap(_maps, _composites, mapId));
+            // The rings round the listed places, made after anything a player wants.
+            if (settings.Generate && settings.Prebuild) World.Prebuild();
             Log.Information("World: tiles kept in {Path}, at most {Cap:F1} GB ({Have:F2} GB in {Count} tiles now); {Places} place(s) to arrive at; {Making}.",
                             store.Root, store.CapBytes / 1073741824.0, store.TotalBytes / 1073741824.0, store.Count, World.Places.Count,
                             settings.Generate ? "new tiles made from USGS 3DEP" : "no new tiles made");
+            // A cap the disk cannot hold fills the disk before the cap is reached.
+            try
+            {
+                long free = new DriveInfo(store.Root).AvailableFreeSpace;
+                if (free + store.TotalBytes < store.CapBytes)
+                    Log.Warning("World: the disk under {Path} has {Free:F1} GB free, less than the store's cap of {Cap:F1} GB; "
+                                + "set CapGigabytes in world.json below what the disk can spare, or StorePath to a bigger disk.",
+                                store.Root, free / 1073741824.0, store.CapBytes / 1073741824.0);
+            }
+            catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException) { }
         }
         catch (Exception ex)
         {
@@ -167,6 +185,7 @@ public class GameServer
     {
         DrainCommandBuffer();
         World?.Update(ArriveInWorld);
+        World?.SettleForTest();
         DrainCommandBuffer();
     }
 
@@ -818,6 +837,12 @@ public class GameServer
                 World.Update(ArriveInWorld);
                 if (tick % (TickRate * 30) == 0) World.Service.Store.SaveIndex();
             }
+            // Tiles read since, into their frames, a few milliseconds' worth a tick.
+            if (World != null)
+            {
+                using var _pump = PerfProbe.Measure("server.world.pump");
+                World.Pump(OpenFPS.Server.OneWorld.WorldMaps.PumpBudget);
+            }
 
             foreach (var entry in _maps.GetAllMaps())
             {
@@ -893,7 +918,10 @@ public class GameServer
                     stage.Dispose();
                     stage = PerfProbe.Measure("server.driving+doors+parents");
                     DrivingSystem.Update(world, grid, entry.Value.data.WalkMin, entry.Value.data.WalkMax, dt,
-                                         (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds), entry.Key);
+                                         (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds), entry.Key,
+                                         _maps.TryGetTiles(entry.Key, out var driveTiles) && driveTiles.Dynamic
+                                             ? new DrivingSystem.TileFence(driveTiles.IsReady, driveTiles.TileMetres) : null,
+                                         root => TellDriver(world, root, "The road ahead is not built yet. Stopping here until it is."));
                     // The glass in every car's windows, toward wherever it was last sent.
                     WindowSystem.Update(world, dt);
                     // Doors swing before ParentSystem places the parts, or the swing of a door in a
@@ -1072,8 +1100,25 @@ public class GameServer
             return;
         }
 
+        // Left in the world: back to the same spot, through the loading screen, or the landing map if it
+        // cannot be built in time.
+        if (World != null && session.Saved?.Map is { } left && session.Saved.PlaceOn(left) is { } saved
+            && OpenFPS.Server.OneWorld.WorldMaps.WhereSaved(left, new Vector3(saved.X, saved.Y, saved.Z), (float)(World.BaseYOf(left) ?? 0)) is { } spot)
+        {
+            Log.Information("{User} left in the world at {Frame}; arriving there again.", session.Username, left);
+            // Under the height they left at if the frame's base is known; on top of whatever is there if not.
+            World.ArriveAt(session, World.NearestPlace(spot.Zone, spot.North, spot.Easting, spot.Northing), spot.Zone, spot.North,
+                           spot.Easting, spot.Northing, World.BaseYOf(left) is null ? null : spot.OverSea, LoginToWorldTimeout,
+                           text => SendToSession(session, new TextEvent { Text = text }), () => SendManifest(session));
+            return;
+        }
+
         SendManifest(session);
     }
+
+    /// <summary>How long a login back into the world waits for the ground where they left before landing them
+    /// on the landing map instead.</summary>
+    private static readonly TimeSpan LoginToWorldTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>Leaving on purpose: the clean-up of a dropped connection, now rather than at the timeout,
     /// so everyone is told they logged out rather than lost the connection.</summary>
@@ -1232,7 +1277,36 @@ public class GameServer
             return;
         }
         session.AwaitingMapData = false;
+        if (request.FullDetailMetres > 0f || request.FarMetres > 0f)
+            session.Tiles.Radii = StreamRadii.Clamp(request.FullDetailMetres, request.FarMetres);
+        // On the world the join waits, on the loading screen, for the tiles round where they will stand.
+        if (World != null && World.Hold(session, ArrivalPoint(session, session.CurrentMapId),
+                                        () => SendMapData(session, request), (done, total, speak) => SayWorldLoading(session, done, total, speak)))
+            return;
         SendMapData(session, request);
+    }
+
+    /// <summary>Says something to whoever is driving a vehicle, if a player is.</summary>
+    private void TellDriver(World world, int rootId, string text)
+    {
+        var q = new QueryDescription().WithAll<OccupantComponent, PlayerComponent>();
+        int connection = -1;
+        world.Query(in q, (ref OccupantComponent o, ref PlayerComponent p) =>
+        {
+            if (o.RootEntityId == rootId && o.Controls) connection = p.ConnectionId;
+        });
+        if (connection >= 0 && _sessions.TryGetSession(connection, out var session))
+            SendToSession(session, new TextEvent { Text = text });
+    }
+
+    /// <summary>How far the building of the world round an arriving player has got: on the loading screen,
+    /// said aloud when <paramref name="speak"/>; to a text session, only what is said.</summary>
+    private void SayWorldLoading(UserSession session, int done, int total, bool speak)
+    {
+        string text = done >= total ? "The world is built round you." : $"Building the world: {done} of {total} tiles.";
+        if (_mudGateway?.IsMudConnection(session.ConnectionId) != true)
+            SendToSession(session, new WorldLoading { Done = done, Total = total, Text = text, Speak = speak });
+        else if (speak) SendToSession(session, new TextEvent { Text = text });
     }
 
     /// <summary>
@@ -1283,7 +1357,7 @@ public class GameServer
         var batch = new EntityDefinitionBatch();
         foreach (var e in staticEntities)
         {
-            batch.Definitions.Add(CreateDefinition(world, e));
+            batch.Definitions.Add(streamed ? TileStreamer.Definition(world, e, tiles, session.Tiles) : CreateDefinition(world, e));
             session.KnownEntities.Add(e.Id);
             if (batch.Definitions.Count < EntityDefinitionBatch.Size) continue;
             bytes += SendCounted(session, EntityDefinitionPack.Pack(batch));
@@ -1488,7 +1562,10 @@ public class GameServer
 
         var peer = _network.GetPeer(session.ConnectionId);
         if (peer != null) SendManifest(session);
-        else HandlePlayerReady(session.ConnectionId); // a text session has nothing to load
+        // A text session has nothing to load, but on the world it waits for the ground round it all the same.
+        else if (World == null || !World.Hold(session, ArrivalPoint(session, mapId), () => HandlePlayerReady(session.ConnectionId),
+                                              (done, total, speak) => SayWorldLoading(session, done, total, speak)))
+            HandlePlayerReady(session.ConnectionId);
     }
 
     // One implementation for the broadcast, the streamer and the tests: a divergence would only show as a

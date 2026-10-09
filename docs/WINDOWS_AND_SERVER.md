@@ -58,11 +58,18 @@ only record of how it behaves.
 ./publish-server.sh            # dist/openfps-server-linux-x64-<build>.tar.gz
 ```
 
-Self-contained, with `maps/`, `prefabs/`, `composites/`, `machines/` and `motd.txt`. It does not
-carry the server's own state: `openfps.db` (accounts, roles, grants), `friends.json`,
-`teams.json`, `roles.json`, `map_access.json` and `maps/players/` (maps players made with
-`/map new`; the script deletes the local ones from the package). Unpacking an update over the old
-folder leaves them alone.
+Self-contained, with `maps/`, `prefabs/`, `composites/`, `machines/`, `motd.txt` and
+`world_places.json`. It does not carry the server's own state: `openfps.db` (accounts, roles,
+grants), `friends.json`, `teams.json`, `roles.json`, `map_access.json`, `maps/players/` (maps players
+made with `/map new`; the script deletes the local ones from the package), `world.json` and the world's
+tiles (`world/`, or wherever `world.json` puts them). Unpacking an update over the old folder leaves
+them alone.
+
+**The world's tiles** are kept in `world/` in the server's folder unless `world.json` says
+`"StorePath"` (a full path puts them elsewhere, such as a bigger disk). They take up to
+`CapGigabytes` (20 GB unless set); the server warns at start if the disk has less free space than that.
+Set the cap to what the disk can spare. Nothing in the store needs backing up: every tile is made again
+from the survey or from a map when it is next wanted (MANUAL.md, "The world's tiles").
 
 On the VPS:
 
@@ -137,15 +144,16 @@ What needs what:
   password is in `/etc/openfps/admin.env`.
 - Update:
   1. `scp` the tarball to `~debian` and unpack it there.
-  2. Back up the running folder:
-     `sudo tar -czf ~/openfps-server-backup-<old build>.tar.gz -C /opt openfps-server`.
+  2. Back up the running folder, without the world's tiles (up to the cap, and all made again when
+     wanted): `sudo tar -czf ~/openfps-server-backup-<old build>.tar.gz --exclude=openfps-server/world -C /opt openfps-server`.
   3. `sudo systemctl stop openfps`.
   4. `sudo cp -a openfps-server/. /opt/openfps-server/`, then
      `sudo chown -R openfps: /opt/openfps-server`.
   5. `sudo systemctl start openfps`.
   6. Check `/opt/openfps-server/BUILD.txt` and `journalctl -u openfps`.
 - The copy in step 4 adds and replaces files only, so the accounts, `maps/players/` and
-  `map_access.json` on the server stay.
+  `map_access.json` on the server stay, and so does `world/` (it lands at `/opt/openfps-server/world`,
+  owned by `openfps`; check the disk has room for the cap with `df -h /opt`).
 
 ## Door sounds shipped with the client
 

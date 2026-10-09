@@ -84,6 +84,8 @@ public static class DrivingSystem
         /// triangle world; null leaves every wheel on <see cref="Surface"/>.</summary>
         public byte[]? WheelSurfaces;
         public WheelContact[]? Contacts;
+        /// <summary>Braking, or held, for a tile not built yet: the driver is told once per stop.</summary>
+        public bool AtEdge;
     }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, Running> _running = new();
@@ -151,9 +153,19 @@ public static class DrivingSystem
         drive.ControlAge = 0f;
     }
 
-    /// <summary>Everything currently under its own power on this map, moved one tick.</summary>
+    /// <summary>On the world, which tiles are built (docs/WORLD_STREAMING.md, At an edge that is not ready):
+    /// a car is braked to a stop short of one that is not, and held at its edge if it gets there.</summary>
+    public readonly record struct TileFence(Func<TileKey, bool> Ready, float TileMetres);
+
+    /// <summary>Metres kept between a car and a tile not built yet when it is braked to a stop for it: half
+    /// a long car and a little more.</summary>
+    public const float EdgeMarginMetres = 4f;
+
+    /// <summary>Everything currently under its own power on this map, moved one tick. <paramref name="stopped"/>
+    /// hears of a car stopped (or held) for a tile not built yet, once per stop.</summary>
     public static void Update(World world, SpatialGrid<Entity> grid, Vector3 mapMin, Vector3 mapMax, float dt,
-                              Action<int, string, IReadOnlyList<TransientSound>>? heard = null, string? mapId = null)
+                              Action<int, string, IReadOnlyList<TransientSound>>? heard = null, string? mapId = null,
+                              TileFence? fence = null, Action<int>? stopped = null)
     {
         _mapId = mapId;
         var query = new QueryDescription().WithAll<Transform, DriveComponent, Velocity>();
@@ -162,13 +174,26 @@ public static class DrivingSystem
 
         foreach (var root in driven)
         {
-            try { Step(world, grid, root, mapMin, mapMax, dt, heard); }
+            try { Step(world, grid, root, mapMin, mapMax, dt, heard, fence, stopped); }
             catch (Exception ex) { Log.Error(ex, "DrivingSystem: entity {Id} failed to move.", root.Id); }
         }
     }
 
+    /// <summary>Whether a tile not built yet lies within <paramref name="metres"/> of <paramref name="at"/>
+    /// along <paramref name="direction"/> (a flat unit vector).</summary>
+    internal static bool UnbuiltWithin(Vector3 at, Vector3 direction, float metres, TileFence fence)
+    {
+        float step = MathF.Max(1f, fence.TileMetres / 8f);
+        for (float s = 0f; ; s = MathF.Min(metres, s + step))
+        {
+            if (!fence.Ready(TileKey.Of(at + direction * s, fence.TileMetres))) return true;
+            if (s >= metres) return false;
+        }
+    }
+
     private static void Step(World world, SpatialGrid<Entity> grid, Entity root, Vector3 mapMin, Vector3 mapMax,
-                             float dt, Action<int, string, IReadOnlyList<TransientSound>>? heard)
+                             float dt, Action<int, string, IReadOnlyList<TransientSound>>? heard,
+                             TileFence? fence = null, Action<int>? stopped = null)
     {
         ref var drive = ref world.Get<DriveComponent>(root);
         if (string.IsNullOrEmpty(drive.Preset)) return;
@@ -208,6 +233,28 @@ public static class DrivingSystem
         if (!drive.EngineOn || drive.EngineOnFor < CrankingSeconds) tractive = 0f;
         // Reverse is geared low and runs out early — you cannot reverse a car up to its top speed.
         if (drive.Throttle < 0f && speed > ReverseTopSpeed) tractive = 0f;
+
+        // On the world, braked to a stop short of ground not built yet: its stopping distance at 80 % of the
+        // tyres' grip, two ticks' travel and the margin, looked along the way it is going. Kept braking
+        // while that holds, whatever the driver asks; backing away is never stopped.
+        var edgeState = RunningFor(root.Id, drive.Preset, profile);
+        float going = speed > StandstillSpeed ? MathF.Sign(v) : MathF.Sign(drive.Throttle);
+        if (fence is { } f && going != 0f)
+        {
+            var way = new Vector3(MathF.Sin(drive.Heading), 0f, MathF.Cos(drive.Heading)) * going;
+            float stop = speed * speed / (2f * 0.8f * capacity) + 2f * speed * dt + EdgeMarginMetres;
+            var here = world.Get<Transform>(root).Position;
+            if (UnbuiltWithin(here, way, stop, f))
+            {
+                drive.Throttle = 0f;
+                drive.Brake = 1f;
+                tractive = 0f;
+                if (!edgeState.AtEdge) stopped?.Invoke(root.Id);
+                edgeState.AtEdge = true;
+            }
+            // Told again only after it has been well clear of the edge.
+            else if (edgeState.AtEdge && !UnbuiltWithin(here, way, stop + 20f, f)) edgeState.AtEdge = false;
+        }
 
         // ── What is holding it back ─────────────────────────────────────────────────────────────
         float drag = 0.5f * AirDensity * profile.DragArea * v * v;
@@ -324,6 +371,18 @@ public static class DrivingSystem
             else running.WheelSurfaces = null;
         }
         wanted = Vector3.Clamp(wanted, mapMin, mapMax);
+
+        // The last resort, when the brakes could not do it (a tile let go under it, or faster than the
+        // world is built): held where it is, never driven onto ground that is not there.
+        if (fence is { } held && !held.Ready(TileKey.Of(wanted, held.TileMetres)) && held.Ready(TileKey.Of(transform.Position, held.TileMetres)))
+        {
+            drive.Speed = 0f;
+            drive.Throttle = 0f;
+            body.Halt();
+            if (!running.AtEdge) stopped?.Invoke(root.Id);
+            running.AtEdge = true;
+            wanted = transform.Position;
+        }
 
         // Hitting something stops it, and is heard (ImpactAcoustics).
         // TODO: the impulse and the damage: a car that hits something should be damaged and push it.

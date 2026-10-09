@@ -416,10 +416,10 @@ in four steps. Each leaves every map working and is committed with its tests.
 What is left after these four:
 
 - The per-tile generator for OpenStreetMap and Overture features (roads, buildings, addresses, woods)
-  that gives the same answer whichever tile is made first. Until then a world tile is terrain, and the
-  real places are the two maps.
-- Coarse terrain at 8 m for the far ring (every tile is sent at 2 m), the client's tile cache, frames
-  that rebase past 8 km, crossing a UTM zone edge.
+  that gives the same answer whichever tile is made first. Until then a world tile is terrain, except over
+  the two real places, whose maps are copied in ("Places in the world", 2026-10-09).
+- Coarse terrain at 8 m for the far ring (done 2026-10-09, "Coarse ground in the far ring"); still to do:
+  the client's tile cache, frames that rebase past 8 km, crossing a UTM zone edge.
 - Draped road meshes with kerbs and sidewalks as swept profiles, bridges and tunnels, creeks cut in
   (geometry stage 4 shapes); diffraction over the terrain profile and the ground reflection reading the
   slope.
@@ -609,8 +609,8 @@ Code: `OneWorld/WorldMaps` (frames, places, tiles round players, arrivals), `One
   the tiles it holds whose ground its triangle world has built, so a foot never comes down on ground the
   client cannot stand on yet. The client plays a short low tone (196 Hz, 0.22 s) while pressing on, at
   most every 0.6 s, no knock, and says "Not built yet. Wait here, or turn back." once until it has been
-  clear of an edge for 5 s. When the tile arrives the body walks on. A driven vehicle is not stopped at
-  the edge yet (DrivingSystem does not ask the fence); the world has no vehicles of its own yet.
+  clear of an edge for 5 s. When the tile arrives the body walks on. Since "Building ahead" (below) this is a last resort, and a
+  driven vehicle is braked to a stop before it.
 - **The list of where to go** (F6) has two parts: "The world" (`world_places.json`, and any map of a
   real place not listed there, at its origin) and "Maps". A frame is never listed as a map. The text
   gateway lists the world's places first too.
@@ -625,16 +625,161 @@ Code: `OneWorld/WorldMaps` (frames, places, tiles round players, arrivals), `One
   `FrameBaseY`; `MapSummary.IsWorldPlace`. With T1's `ColliderShape.Terrain`, `TerrainTileComponent` and
   `EntityDefinition.Terrain`.
 
+### Building ahead: nobody waits at an edge (2026-10-09)
+
+Cody, 2026-10-09: the world should be built before a player gets there, not while they stand at its edge.
+The edge stop stays, as a last resort only.
+
+Code: `WorldTileService` (the queue), `WorldMaps` (`Interest`, `SecondsToReach`, `Hold`, `Prebuild`),
+`GameServer.MapDataAsked` and `MoveToMapNow` (the held join), `DrivingSystem.TileFence`, the client's
+`WorldLoading` handling. Tests: `WorldLoadAheadTests`, `OccupancyTests.ACarIsBrakedToAStopShortOfGroundNotBuiltYet`.
+
+- **The queue.** Tiles to make wait in a queue taken in order of how soon somebody could be in each, in
+  seconds: the distance to the tile's nearest point, over the player's speed toward it if they are heading
+  that way, or over a run (7.2 m/s) if that is sooner (they can turn and run). The tile you are in is 0.
+  Speed is the server's own: the body's velocity, or the vehicle's for somebody riding. Every quarter of a
+  second the priorities are worked out again for every player. Tiles nobody is on their way to any more go
+  to the back of the queue and are still made.
+- **What is wanted.** Every tile within a player's far radius and 100 m more, as before, and every tile
+  they could reach within 30 seconds however far that is (a car at 60 m/s: 1.8 km ahead). 30 s because
+  3DEP took up to 3 s a tile on its slow run (41 tiles in 60 s, two at a time) and one answer can take
+  ten times that.
+- **Arriving.** `/join world PLACE` (and F6 The world) puts you in the world's frame as soon as the tile
+  you arrive in is made (under a second when 3DEP is quick), which shows the loading screen. The server
+  then holds your join until every tile within your far radius of where you will stand is built and
+  loaded, and tells the loading screen how it goes: "Building the world: 12 of 41 tiles." shown every
+  second and said every 5 seconds (message `WorldLoading`, 45). Then the join goes out with all of them,
+  and you stand in a finished ring. A text session waits the same way and hears the same line. The wait
+  ends early, and the edge does the rest, if the remaining tiles cannot be made now (no network, or a
+  server that makes no new tiles), or after two minutes.
+- **At start.** The tiles within 1,300 m of every place in `world_places.json` (the far radius at high
+  detail and the margin) are queued behind anything a player wants, so the first visitor to a listed
+  place waits for nothing. `world.json` `"Prebuild": false` turns it off.
+- **A car at the edge.** A driven vehicle on the world looks ahead along its way for its stopping
+  distance (80 % of its tyres' grip), two ticks' travel and 4 m; if a tile there is not built, it is
+  braked hard whatever the driver asks, and the driver is told once "The road ahead is not built yet.
+  Stopping here until it is." It can always back away, and when the tile is built it drives on. If it
+  reaches the edge anyway it is held there, never driven onto nothing.
+- **Logging in where you left.** A player who logged out in the world is saved, as on any map, by the
+  frame's id (which names the frame's corner tile) and the place in it. At login that is turned back into
+  a point of the world (`WorldMaps.WhereSaved`, `BaseYOf`) and they arrive there as above, under the height
+  they left at (a floor, not the roof over it), facing the way they faced. If the ground there cannot be
+  built within 30 s they land on the landing map as before. A text session lands on the landing map.
+
+Measured (`WorldLoadAheadTests`: the real `WorldMaps` and `WorldTileService`, a survey that answers each
+tile a set time after it is asked on a clock the test turns, two at a time, a straight run east from
+Bobcat Lane for 5 to 5.5 km):
+
+| | 3 s a tile (3DEP's slow run) | 6 s a tile |
+|---|---|---|
+| Arriving, medium detail (45 tiles) | 69 s on the loading screen | 128 s |
+| Arriving, low detail | 33 s | |
+| Walker 4.5 m/s, runner 7.2 m/s | never at an edge; built ground at least 825 m ahead | |
+| Car 30 m/s (108 km/h) | never at an edge; at least 575 m ahead | never; down to 100 m ahead |
+| Fastest straight run that never meets an edge | 60 m/s (216 km/h), medium or low detail | 30 m/s (108 km/h) |
+| The first speed that meets one | 70 m/s, after 3.3 km (medium) or 2.1 km (low) | 40 m/s, after 1.8 km |
+
+Two at a time, 3 s a tile is two thirds of a tile a second. A straight run needs a tile every 250 m on its
+line and the ones beside it; past about 65 m/s the tiles beside the road, which a car could also swerve
+into within seconds, come in faster than that. Then a car is braked to a stop short of the edge and goes
+on when the tile is built; a walker is stopped at the edge as before. Asking 3DEP for four tiles in one
+request, or three at a time, would raise the speed; neither is done.
+
+### Places in the world: Magnolia and Albany copied into its tiles (2026-10-09)
+
+`/join world magnolia` (or Albany) arrives at the map's own spawn, among the same houses, roads, lawns,
+named places and traffic as the map, on the same ground. The maps keep working on their own as well.
+
+Code: `OneWorld/WorldPlaces` (the copy), `WorldTileService.Placed` (the hook a placed tile is made by),
+`WorldStore` (placed tiles in the index), `MapManager.SpawnCopied` (a map's things into a live map, the
+map load's own path), `MapTiles.AddPlaced`, `WorldMaps.Pump`, `VehicleSystem.SpawnMap`. Tests:
+`WorldPlacesTests`.
+
+- **Laid on the world's grid.** A place's map is in UTM metres less a 2 m post near its origin
+  (docs/GEOMETRY.md 11.3), so a world tile over it is the map moved, never turned (`MapData.Utm`), and the
+  map's survey posts are the world's posts.
+- **How a place is cut.** Each thing of the map goes to the one tile its middle is in. Rooms, the
+  doorways between them and their doors go together, to the tile of their middle, so a room never
+  arrives without its doorway. A thing that spans tiles is stored once, in its own tile, and is sent to a
+  client with every tile it overlaps (as on a map). Rooms carry what the map's load measured (their
+  materials by name, indoors or not), so a tile needs no survey when it loads.
+- **Its ground** is the map's: the same posts graded to the same slabs (`TerrainBuilder`), laid over
+  whole world tiles. A place's tiles never ask the survey.
+- **Roads, junctions, traffic and street life are not cut**: a road network is one thing. A frame of the
+  world that wholly contains a place takes them, moved into the frame, when it is made; the place's
+  vehicles are spawned on it then.
+- **Stored** in the world store as ordinary tile files (`full.json.gz`), made through the tile queue like
+  any tile, but marked as placed in `index.json` (the place and a version: the copy's format and the
+  SHA-256 of the map file). The cap never drops a placed tile: it is content, not a cache of the survey.
+  If placed tiles alone pass nine tenths of the cap, the server says so in its log every time the cap is
+  checked. At start, a stored tile of a place that was not copied from the map as it is now (an older
+  map, or ground made from the survey before the place was copied in) is dropped and copied again when
+  next wanted.
+- **On the server** a stored tile is read and unpacked off the tick thread and put into its frame at most
+  6 ms a tick, soonest first: a tile of a town is up to 2,000 things.
+
+Measured (`WorldPlacesTests`, Magnolia, this machine):
+
+| | |
+|---|---|
+| Copying Magnolia out of its map at start | 42 ms |
+| `/join world magnolia` to standing there, nothing stored | 1.5 s (the 55 tiles round the arrival; no survey asked) |
+| Fixed things of the map within 400 m of the spawn found in the world, the same, where the map has them | 6,514 of 6,514 |
+| The world's ground against the map's, 4,000 points within 600 m | median 0, worst 1.7 mm |
+| What a body stands on (roads, lawns and drives too), 2,000 points | median 0, worst 2.3 cm |
+| Roads, junctions, traffic | 198, 206, 4 vehicles: all of the map's |
+| The whole place as world tiles | 196 tiles, 36,374 things, 5.1 MB packed (26 KB a tile, the biggest 57 KB), made in 0.4 s after its ground is laid |
+
+### Coarse ground in the far ring (2026-10-09)
+
+A tile of ground was sent at 2 m whatever the tile's detail, which took Magnolia's join from 530 KB to
+1,388 KB. Now a client is sent a tile's ground at about 8 m while it has the tile only in its far ring, and
+at 2 m once the tile comes within the full radius.
+
+- **The coarse ground** (`TerrainTileComponent.Coarse`): 32 cells a side, so posts 7.8 m apart that land
+  on both edges of the tile; each post's height read off the tile's own 2 m triangles, over the same base;
+  each cell the material under its middle. Two coarse tiles side by side share their edge posts (within the
+  centimetre). Where a coarse tile meets a full one their edges differ between the coarse posts (a hairline
+  crack 300 m or more from the listener); not closed.
+- **What is sent** (`TileStreamer.Definition`): the same entity either way. The join and every tile
+  arriving later carry a tile's ground coarse if the client has that tile at coarse; when the tile comes up
+  to full, its ground is sent again whole and the client's triangle world, acoustic map and Steam Audio
+  scene take the new one in place of the old. Ground already sent at 2 m is not sent again coarse when the
+  tile falls back to coarse.
+- **Nobody stands on it.** The tile a player is in is always full, and the full radius is at least 100 m
+  (300 m at medium), so the swap happens at the full radius, never under anyone's feet. The server's own
+  ground is always the 2 m one: movement, cars, bullets and the server's sound paths never see the coarse
+  ground.
+- **What changes for the ear**: a sound whose path grazes the ground in the tile being swapped. Over all of
+  Magnolia's 196 tiles, the 7.8 m ground lies from the 2 m by a median of 2.1 cm, 41 cm at 99 points in a
+  hundred and 2.1 m at worst (a creek bank); of 19,600 lines from 1 m to 1.6 m over the ground within a
+  tile, 1,145 are blocked by the 2 m ground and 186 (0.95 %) change when the tile is swapped. Each tile
+  swaps once as a player approaches (the 50 m hysteresis), so such a change is a single step in one far
+  sound's occlusion, not a flutter.
+
+Measured (`WorldStreamingTests`, `WorldPlacesTests`):
+
+| Join at medium detail | Definitions packed | On the wire |
+|---|---|---|
+| Magnolia map, before terrain (stage 1) | 530 KB | |
+| Magnolia map, 2 m ground everywhere (T2, 5 m survey) | 1,388 KB | |
+| Magnolia map, 2 m ground everywhere (2 m survey, 11.3) | 1,513 KB | 1,750 KB |
+| Magnolia map, 2 m near and 7.8 m far (12 + 37 tiles) | 942 KB | 1,179 KB |
+| Albany map, 2 m near and 7.8 m far | 1,112 KB (was 1,613) | |
+| The world at Magnolia (9 tiles at 2 m, 36 at 7.8 m) | | 1,077 KB |
+
+Walking 700 m east on Magnolia now streams 429 KB (was 608 KB): 10 KB a tile.
+
 ### Left after stage 2 (as of 2026-10-09)
 
-- World tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
-  the same answer whichever tile is made first; until then the real places are their maps.
-- A player who logs out in the world comes back on the landing map (a frame is not a saved map); saving
-  the world position and making the frame again at login.
+- Outside the real places, world tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
+  the same answer whichever tile is made first; until then the real places are their maps, copied in (above).
+- (Done 2026-10-09: a player who logs out in the world comes back to the same spot at login, through the
+  loading screen; the landing map if the ground there cannot be built within 30 s. See Building ahead.)
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
-- Coarse terrain at 8 m for the far ring; the client's tile cache; land cover for the ground's
+- (Coarse terrain at 8 m for the far ring: done, above.) The client's tile cache; land cover for the ground's
   materials (every cell is dirt).
-- A driven vehicle braked hard before an edge that is not ready.
+- (Done 2026-10-09: a driven vehicle is braked to a stop before an edge that is not ready; see Building ahead.)
 
 ## What the broadcast chooses from
 

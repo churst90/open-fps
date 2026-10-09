@@ -51,6 +51,8 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(42, typeof(MapSettingsUpdate))]
 // 43 is free; 44 is the driving aids'.
 [MemoryPackUnion(44, typeof(MapRoads))]
+// The world: arriving waits on the loading screen for the tiles round you (docs/WORLD_STREAMING.md).
+[MemoryPackUnion(45, typeof(WorldLoading))]
 public partial interface IMessage { }
 
 /// <summary>What choosing an item of the world editor's menu does.</summary>
@@ -355,6 +357,21 @@ public partial class TileStreamUpdate : IMessage
     /// <summary>Entities taken away because their tiles went.</summary>
     public int Removed;
     public TileStreamUpdate() { }
+}
+
+/// <summary>
+/// While a player waits on the loading screen to arrive in the world: how many of the tiles round where
+/// they will stand are built. The client shows it, and says <see cref="Text"/> when <see cref="Speak"/>
+/// is set (docs/WORLD_STREAMING.md, Arriving). Append members only.
+/// </summary>
+[MemoryPackable]
+public partial class WorldLoading : IMessage
+{
+    public int Done;
+    public int Total;
+    public string Text = string.Empty;
+    public bool Speak;
+    public WorldLoading() { }
 }
 
 [MemoryPackable]

@@ -4,6 +4,40 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- Logging out in the world and back in returns you to the same spot, through the loading screen, facing
+  the way you faced; the landing map if the ground there cannot be built within 30 s.
+- Ground at 8 m in the far ring (docs/WORLD_STREAMING.md, "Coarse ground in the far ring"). A tile you have
+  only in your far ring is sent with its ground at 7.8 m (32 cells a tile) instead of 2 m, and again at 2 m
+  when it comes within the full radius; the tile you stand in is always 2 m, and the server's ground is
+  always 2 m. Magnolia's join at medium: 942 KB of definitions (1,179 KB on the wire), was 1,513 KB with
+  2 m everywhere; Albany 1,112 KB, was 1,613. About 1 % of near-ground lines of sight in a tile change when
+  it is swapped, once, at the full radius. `TerrainTileComponent` gained a method only: no wire change of
+  its own (Common changed already for WorldLoading).
+- Magnolia and Albany are in the world (docs/WORLD_STREAMING.md, "Places in the world"). `/join world
+  magnolia` arrives at the map's own spawn among the same houses, roads, lawns, named places and traffic,
+  on the same ground (within 2 mm of the map's). Each thing goes to the world tile its middle is in, rooms
+  with their doorways; the ground is the map's posts graded the same way; roads, junctions and traffic go
+  whole to the frame that contains the place. The tiles are kept in the world store marked as placed: the
+  cap never drops them, and they are copied again when the map changes. Magnolia is 196 tiles, 5.1 MB. A
+  stored tile is now read off the tick thread and put in at most 6 ms a tick. The maps still work on
+  their own. WorldPlacesTests.
+- Magnolia and Albany on the world's grid at 2 m (docs/GEOMETRY.md 11.3). `fetch_place.py elevation`
+  asks 3DEP itself for 2 m cells on the place's UTM grid (the 1 m lidar), the same request the world's
+  tiles make, so the map's ground and the world's agree to the half centimetre (the world's was 0.9 m
+  under the map's at Bobcat Lane). `gen_osm.py` lays the map on that grid (UTM less the 2 m post nearest
+  the origin, `tools/utm.py`), so the map is the world's tiles moved, never turned (`MapData.Utm`). The
+  ground ships beside each map as `maps/places/ID.elevation` (the same bytes as elevation.json). Spawns
+  moved under a metre: Magnolia `/tp -11.2 23.2 1`, Albany `/tp -25.3 -10.6 1.4`. Road pieces overlap
+  5 cm at their joins. Terrain against the survey: 99 points in 100 within 3 cm (was 14 cm).
+- The world is built before you get there (docs/WORLD_STREAMING.md, "Building ahead"). Arriving with
+  `/join world PLACE` or F6 waits on the loading screen ("Building the world: 12 of 41 tiles.", said every
+  5 s) until every tile within your far radius is built, then you stand in a finished ring. Moving, the
+  tiles are made in order of how soon you could reach them, from your speed and heading, and anything
+  you could reach within 30 s is wanted however far; the rings round the places in world_places.json are
+  made at start, after anything a player wants (`world.json` "Prebuild"). A driven car is braked to a
+  stop short of a tile not built yet and told so once. Measured with the survey at 3 s a tile: walking,
+  running and a 30 m/s car never meet an edge; above about 65 m/s one can. New message `WorldLoading`
+  (45), so Common changed: new Windows zip and server update together. WorldLoadAheadTests.
 - The world editor is a dialog (docs/WORLD_EDITOR.md section 16), in both clients. F12 opens it on a
   map you may edit; elsewhere F12 does nothing at all. F12 again, Escape or Close shuts it. Tabs
   Place, Edit, Build and World, changed with Control+Tab and Control+Shift+Tab (or Control+Page Down

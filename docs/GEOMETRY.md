@@ -1400,6 +1400,38 @@ bits, open ground on raised terrain).
   creeks cut in, the coarse ring's terrain at 8 m, a grade limit on roads (12 %, 6 % on a highway),
   ground materials from the land cover (every cell is dirt, as the slab was).
 
+### 11.3 The places on the world's grid at 2 m (2026-10-09)
+
+The world's ground at Bobcat Lane was 0.9 m under the map's: the map's survey was the archive's 5 m
+export in degrees, a coarser product than the 1 m lidar the world's 2 m tiles get. Now both are the same
+request.
+
+- **The survey.** `fetch_place.py elevation` asks the 3DEP service itself for 2 m cells on the place's UTM
+  grid, the grid the world's tiles are on, over every whole 250 m tile the map reaches (Magnolia 14 x 14
+  tiles, 1,751 x 1,751 posts, 49.95 to 78.03 m; Albany 14 x 13, 1,751 x 1,626, 58.10 to 75.91 m). Each row
+  is kept as its difference from the row before and deflated: 3.0 MB (Magnolia) and 2.1 MB (Albany),
+  against 8.2 MB plain. Asked tile by tile as the world asks, the service gives the same heights to the
+  half centimetre (three tiles of Magnolia, 47,628 posts: worst 5 mm).
+- **The map is laid on the same grid.** `gen_osm.py` projects to UTM metres less the 2 m post nearest the
+  place's origin (`tools/utm.py`, the same series as `OneWorld/Utm.cs`), so the map's 2 m posts are the
+  survey's own: nothing is resampled, and the map is the world's tiles moved, never turned (`MapData.Utm`).
+  Everything moved under 1.5 m near the spawn (Magnolia's spawn is now -11.2, 23.2; Albany's -25.3,
+  -10.6) and by the grid's turn further out (1.4 degrees at Magnolia, 0.1 at Albany).
+- **The map ships the file** beside it (`maps/places/ID.elevation`, the same bytes as elevation.json, so
+  git stores it once) and names it (`MapElevation.File`, `Encoding` "zlib-row-delta"); the map JSON no
+  longer carries the heights (Magnolia 13.7 MB, was 14.7; Albany 18.0 MB, was 19.1).
+- **Road pieces overlap 5 cm** at the joins inside a run: two pieces pitched differently left a crack a
+  ray straight down at the join could fall through to the ground under the road (found on Albany's College
+  Park Drive once the 2 m ground was there).
+- **Measured** (`RealPlaceMapTests`): away from grading the terrain is the survey to a median of 0 to 1 mm,
+  99 points in a hundred within 1.7 to 2.8 cm, at worst 6.7 to 17 cm (two triangles to a cell against the
+  survey read bilinearly, on the steepest banks); was 13.7 cm and 0.43 to 0.50 m. No road point, lawn or
+  drive has the ground on top (10,217 points of road on Magnolia, 8,033 on Albany). The 750-tick walk from
+  the spawn is on the ground every tick; its biggest step is 0.20 m on Magnolia and 0.40 m on Albany, where
+  the walk runs along the side of a drive (1009 Belmont Avenue) standing over a roadside dip the 2 m survey
+  shows and the 5 m one did not. There is ground under every 25 m of both; some creek banks are now steeper
+  than a body can stand on, so they are walls, as GEOMETRY.md 11.1 says a steep bank is.
+
 ## Appendix: box-geometry consumers today
 
 From a survey of the code (2026-10-06). Line numbers drift; the names do not.

@@ -82,30 +82,20 @@ def h01(*keys):
 
 # ══ Where things are ══════════════════════════════════════════════════════════════════════════════
 #
-# Local east-north metres on the WGS84 ellipsoid, from the origin in place.json: x east, z north, as
-# the game has them (and /tp and the C key report them, with the height last). A plane tangent at the
-# origin, so a kilometre out the error is under a millimetre across and the ground drops 8 cm below
-# it, which is ignored with the rest of the relief.
+# The world's grid (docs/WORLD_STREAMING.md, stage 2): UTM metres of the origin's zone, less the 2 m post
+# nearest the origin in place.json, x east and z north along the grid, as the game has them (and /tp and
+# the C key report them, with the height last). The world's tiles are 250 m squares of the same grid, so
+# the map is the world moved, never turned (OpenFPS.Server/OneWorld/WorldPlaces). Grid north is within
+# 1.4 degrees of true north at Magnolia, 0.1 at Albany.
+import utm  # noqa: E402
+
 LAT0, LON0 = PLACE["Origin"]
-_A, _F = 6378137.0, 1 / 298.257223563
-_E2 = _F * (2 - _F)
-
-
-def _ecef(lat, lon):
-    la, lo = math.radians(lat), math.radians(lon)
-    n = _A / math.sqrt(1 - _E2 * math.sin(la) ** 2)
-    return (n * math.cos(la) * math.cos(lo), n * math.cos(la) * math.sin(lo), n * (1 - _E2) * math.sin(la))
-
-
-_O = _ecef(LAT0, LON0)
-_SLA, _CLA = math.sin(math.radians(LAT0)), math.cos(math.radians(LAT0))
-_SLO, _CLO = math.sin(math.radians(LON0)), math.cos(math.radians(LON0))
+UTM_ZONE, UTM_NORTH, UTM_E0, UTM_N0 = utm.origin_of(LAT0, LON0)
 
 
 def P(lat, lon):
-    x, y, z = _ecef(lat, lon)
-    dx, dy, dz = x - _O[0], y - _O[1], z - _O[2]
-    return (-_SLO * dx + _CLO * dy, -_SLA * _CLO * dx - _SLA * _SLO * dy + _CLA * dz)
+    e, n = utm.from_latlon(lat, lon, UTM_ZONE, UTM_NORTH)
+    return (e - UTM_E0, n - UTM_N0)
 
 
 # ══ Geometry in the ground plane ══════════════════════════════════════════════════════════════════
@@ -489,15 +479,8 @@ def in_area(x, z):
 
 
 def geo_of(x, z):
-    """The latitude and longitude of a point of the map: the projection inverted, near enough from the
-    spherical step, then two corrections."""
-    lat = LAT0 + z / 110_900.0
-    lon = LON0 + x / (111_320.0 * math.cos(math.radians(LAT0)))
-    for _ in range(2):
-        px, pz = P(lat, lon)
-        lat += (z - pz) / 110_900.0
-        lon += (x - px) / (111_320.0 * math.cos(math.radians(LAT0)))
-    return lat, lon
+    """The latitude and longitude of a point of the map."""
+    return utm.to_latlon(UTM_ZONE, UTM_NORTH, x + UTM_E0, z + UTM_N0)
 
 
 def landcover_at(x, z):
@@ -521,43 +504,34 @@ ZMAX = max(p[1] for r in AREA for p in r)
 
 # ══ The ground ════════════════════════════════════════════════════════════════════════════════════
 #
-# The ground follows the survey (docs/GEOMETRY.md 5.1). elevation.json is 3DEP on its own grid of
-# latitude and longitude; the map carries it again on a grid of its own metres, ELEV_STEP apart, as
-# whole centimetres, and everything here is set on that grid read the way the server reads it (between
-# posts, bilinear), so the server's 2 m terrain and this file agree. y = 0 is the ground at the origin,
-# where the spawn address is. Without elevation.json the ground is flat, as it was.
+# The ground follows the survey (docs/GEOMETRY.md 5.1). elevation.json is 3DEP's posts every 2 m on the
+# world's UTM grid over whole 250 m tiles (tools/fetch_place.py elevation), and the map's origin is one of
+# those posts, so the map's 2 m posts are the survey's own: nothing is resampled. The map ships the same
+# file beside it (PLACE_ID.elevation, the same bytes) and names it; everything here is set on those posts
+# read the way the server reads them (between posts, bilinear), so the server's terrain, the world's tiles
+# and this file agree. y = 0 is the ground at the origin, where the spawn address is. Without
+# elevation.json the ground is flat, as it was.
 ELEV = load("elevation.json")
 HAS_GROUND = bool(ELEV and "data" in ELEV)
-ELEV_STEP = 5.0
+ELEV_STEP = 2.0
 ELEV_MARGIN = 60.0                    # the map's bounds reach this far past the area (MARGIN below)
 if HAS_GROUND:
     import array, base64
-    _SV = array.array("h")
-    _SV.frombytes(base64.b64decode(ELEV["data"]))
+    if (ELEV.get("zone"), ELEV.get("north"), ELEV.get("spacing")) != (UTM_ZONE, UTM_NORTH, ELEV_STEP):
+        raise SystemExit(f"{PLACE_DIR}/elevation.json is not on this place's grid: run tools/fetch_place.py elevation")
+    _d = array.array("h")
+    _d.frombytes(zlib.decompress(base64.b64decode(ELEV["data"])))
     if sys.byteorder != "little":
-        _SV.byteswap()
-    _SC, _SR = ELEV["cols"], ELEV["rows"]
-
-    def survey(lat, lon):
-        """The survey's height at a latitude and longitude, metres over the sea, bilinear between its
-        cells' middles and held at its edge."""
-        fx = min(max((lon - ELEV["lon0"]) / ELEV["dlon"], 0.0), _SC - 1.0)
-        fy = min(max((ELEV["lat0"] - lat) / ELEV["dlat"], 0.0), _SR - 1.0)
-        i, j = min(int(fx), _SC - 2), min(int(fy), _SR - 2)
-        tx, ty = fx - i, fy - j
-        k = j * _SC + i
-        h = lambda q: ELEV["base"] + _SV[q] * ELEV["unit"]
-        return (h(k) * (1 - tx) + h(k + 1) * tx) * (1 - ty) + (h(k + _SC) * (1 - tx) + h(k + _SC + 1) * tx) * ty
-
-    EX0 = math.floor((XMIN - ELEV_MARGIN) / ELEV_STEP) * ELEV_STEP
-    EZ0 = math.floor((ZMIN - ELEV_MARGIN) / ELEV_STEP) * ELEV_STEP
-    ECOLS = int(math.ceil((XMAX + ELEV_MARGIN - EX0) / ELEV_STEP)) + 1
-    EROWS = int(math.ceil((ZMAX + ELEV_MARGIN - EZ0) / ELEV_STEP)) + 1
-    SEA_Y = survey(*geo_of(0.0, 0.0))            # the height over the sea of y = 0
-    _ev = [survey(*geo_of(EX0 + i * ELEV_STEP, EZ0 + j * ELEV_STEP)) - SEA_Y for j in range(EROWS) for i in range(ECOLS)]
-    EBASE = math.floor(min(_ev) * 100.0) / 100.0
-    ECM = [int(math.floor((v - EBASE) * 100.0 + 0.5)) for v in _ev]
-    del _ev
+        _d.byteswap()
+    ECOLS, EROWS = ELEV["cols"], ELEV["rows"]
+    ECM = list(_d)
+    for _k in range(ECOLS, len(ECM)):
+        ECM[_k] += ECM[_k - ECOLS]
+    del _d
+    EX0, EZ0 = ELEV["east0"] - UTM_E0, ELEV["north0"] - UTM_N0
+    _sea = ECM[int(round(-EZ0 / ELEV_STEP)) * ECOLS + int(round(-EX0 / ELEV_STEP))]
+    SEA_Y = round(ELEV["base"] + _sea * 0.01, 2)         # the height over the sea of y = 0
+    EBASE = round(ELEV["base"] - SEA_Y, 2)
 
 
 def ground(x, z):
@@ -1144,7 +1118,9 @@ def lay_line(pts, width, prefab, y1, name, layer, verge=0.0, y0=0.0, tol=0.25, h
             qx, qz = (bx, bz) if k == n - 1 else (ax + (bx - ax) * (k + 1) / n, az + (bz - az) * (k + 1) / n)
             hp = hts[i] if k == 0 else (hfun or ground)(px, pz)
             hq = hts[i + 1] if k == n - 1 else (hfun or ground)(qx, qz)
-            f0, f1 = (e0 if k == 0 else 0.0), (e1 if k == n - 1 else 0.0)
+            # Pieces of one run overlap by SEAM at the joins between them: pitched differently, two boxes that only
+            # met there left a crack a ray straight down could fall through to the ground under the road.
+            f0, f1 = (e0 if k == 0 else SEAM), (e1 if k == n - 1 else SEAM)
             if verge > 0:
                 seg_box("grass_floor", px, pz, qx, qz, width + 2 * verge, 0.0, Y_VERGE,
                         f0 + (verge if k == 0 else 0.0), f1 + (verge if k == n - 1 else 0.0),
@@ -1154,6 +1130,7 @@ def lay_line(pts, width, prefab, y1, name, layer, verge=0.0, y0=0.0, tol=0.25, h
 
 
 SEG_MAX = 20.0                        # the longest piece of a road laid on real ground, m
+SEAM = 0.05                           # how far the pieces of one run overlap at their joins, m
 
 
 # Each way in its own width and surface, once; the records above are the roads as wholes.
@@ -2947,6 +2924,8 @@ map_data = {
     "VoxelResolution": 1.0,
     "OcclusionFloor": 0.1,
     "GeoOrigin": {"Lat": LAT0, "Lon": LON0},
+    # Where the map's (0, 0) is on the world's grid: the map is the world's tiles moved by this, never turned.
+    "Utm": {"Zone": UTM_ZONE, "North": UTM_NORTH, "Easting": UTM_E0, "Northing": UTM_N0},
     "TileMetres": TILE,
     "Roads": ROADS,
     "Junctions": JUNCTIONS,
@@ -2954,19 +2933,20 @@ map_data = {
     "Vehicles": VEHICLES,
     "Entities": entities,
 }
+ELEV_FILE = PLACE["Id"] + ".elevation"
 if HAS_GROUND:
-    # The ground's posts, for the server's terrain (MapElevation, TerrainBuilder): little-endian 16-bit
-    # whole centimetres over BaseY, row by row from the south-west.
-    _cm = array.array("h", ECM)
-    if sys.byteorder != "little":
-        _cm.byteswap()
+    # The ground's posts, for the server's terrain (MapElevation, TerrainBuilder): elevation.json as it
+    # is, beside the map, with where its first post is in the map's metres and its heights over y = 0.
     map_data["Elevation"] = {
         "OriginX": EX0, "OriginZ": EZ0, "Spacing": ELEV_STEP, "Columns": ECOLS, "Rows": EROWS,
-        "BaseY": EBASE, "SeaLevelY": round(-SEA_Y, 2), "Centimetres": base64.b64encode(_cm.tobytes()).decode("ascii"),
+        "BaseY": EBASE, "SeaLevelY": round(-SEA_Y, 2), "File": ELEV_FILE,
         "Source": ELEV.get("source", "USGS 3DEP")}
 os.makedirs(os.path.dirname(OUT) or ".", exist_ok=True)
 with open(OUT, "w") as f:
     json.dump(map_data, f, indent=1)
+if HAS_GROUND:
+    with open(os.path.join(PLACE_DIR, "elevation.json"), "rb") as src, open(os.path.join(os.path.dirname(OUT) or ".", ELEV_FILE), "wb") as dst:
+        dst.write(src.read())
 
 by_prefab = defaultdict(int)
 for e in entities:

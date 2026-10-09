@@ -13,7 +13,9 @@ the honest tests, the probable bugs and the trains fix are merged and shipped (V
 
 1-3. Done: the batch, its test run, and push, VPS and Windows zip (2026-10-07/08).
 4. Geometry stage 3, terrain from real elevation (docs/GEOMETRY.md section 7), with world streaming
-   stage 2, one world in UTM tiles generated on demand (docs/WORLD_STREAMING.md).
+   stage 2, one world in UTM tiles generated on demand (docs/WORLD_STREAMING.md). T1, T2, W1, W2 merged;
+   2026-10-09 (unheard): the world built before you get there, Magnolia and Albany copied into it, 8 m
+   ground in the far ring, the places' elevation at 2 m on the UTM grid, a login back to where you left.
 5. Sound library stage 3 alongside: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`
    (docs/SOUND_LIBRARY_BOUNDARY.md section 8).
 6. World editor phase 3: people, roads and routes, map versions, baking an overlay into a map file

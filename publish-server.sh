@@ -33,7 +33,8 @@ rm -rf "$OUT/maps/players"
 # made there (model_versions/ is in the working folder, never copied).
 rm -rf "$OUT/maps/overlays"
 cp "$REPO/OpenFPS.Server/motd.txt" "$OUT/"
-# The places in the world to arrive at. Not the world's tiles (world/): each server makes its own.
+# The places in the world to arrive at. Not the world's tiles (world/, or world.json's StorePath): each server
+# makes and keeps its own, and an update never touches them.
 cp "$REPO/OpenFPS.Server/world_places.json" "$OUT/"
 BUILD=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/*/WireContract.g.cs | head -1 | tr -d '"')
 echo "$BUILD" > "$OUT/BUILD.txt"

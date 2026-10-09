@@ -29,72 +29,55 @@ public partial class RealPlaceMapTests
         return ids;
     }
 
+    /// <summary>The ground under a point however steep it is: the 2 m survey has creek banks steeper than a
+    /// body can stand on, which FloorAt steps past, and they are ground all the same.</summary>
+    private static float GroundUnder<F>(TriangleWorld world, float x, float z, ref F filter) where F : IGeometryFilter
+    {
+        float y = world.FloorAt(x, z, 1000f, GeometryLayers.Ground, ref filter, out _);
+        if (y > -1000f) return y;
+        return world.Closest(new Vector3(x, 1000f, z), -Vector3.UnitY, 2000f, GeometryLayers.Ground, RayFaces.Front, ref filter, out var hit)
+            ? 1000f - hit.T : -1000f;
+    }
+
     private static TriangleWorld ServerWorld(Place p)
     {
         Assert.True(p.Manager.TryGetGeometry(p.Data.Id, out var geometry));
         return geometry.World;
     }
 
-    /// <summary>The survey as tools/places/ID/elevation.json has it, on its own grid of latitude and
-    /// longitude, and the map's local east-north frame (gen_osm.py's P and geo_of) to find a point on it.</summary>
+    /// <summary>The survey as tools/places/ID/elevation.json has it, read on its own: 2 m posts on the UTM
+    /// grid, the map's (0, 0) at a post of it (the map's Utm). Decoded here, not by MapElevation, so the map
+    /// is checked against the file and not against itself.</summary>
     private sealed class Survey
     {
-        private readonly double _lon0, _lat0, _dlon, _dlat, _base, _unit;
+        private readonly double _e0, _n0, _spacing, _base, _unit, _ox, _oz;
         private readonly int _cols, _rows;
-        private readonly short[] _v;
-        private readonly double _olat, _olon;
-        private readonly (double X, double Y, double Z) _o;
-        private readonly double _sla, _cla, _slo, _clo;
+        private readonly int[] _v;
 
-        public Survey(string place, double originLat, double originLon)
+        public Survey(string place, OpenFPS.Server.Repositories.MapUtm origin)
         {
             using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "tools", "places", place, "elevation.json")));
             var r = doc.RootElement;
-            _lon0 = r.GetProperty("lon0").GetDouble(); _lat0 = r.GetProperty("lat0").GetDouble();
-            _dlon = r.GetProperty("dlon").GetDouble(); _dlat = r.GetProperty("dlat").GetDouble();
+            _e0 = r.GetProperty("east0").GetDouble(); _n0 = r.GetProperty("north0").GetDouble();
+            _spacing = r.GetProperty("spacing").GetDouble();
             _cols = r.GetProperty("cols").GetInt32(); _rows = r.GetProperty("rows").GetInt32();
             _base = r.GetProperty("base").GetDouble(); _unit = r.GetProperty("unit").GetDouble();
-            var bytes = Convert.FromBase64String(r.GetProperty("data").GetString()!);
-            _v = new short[bytes.Length / 2];
+            Assert.Equal("zlib-row-delta", r.GetProperty("encoding").GetString());
+            using var z = new System.IO.Compression.ZLibStream(new MemoryStream(Convert.FromBase64String(r.GetProperty("data").GetString()!)),
+                                                               System.IO.Compression.CompressionMode.Decompress);
+            using var raw = new MemoryStream();
+            z.CopyTo(raw);
+            var bytes = raw.ToArray();
+            _v = new int[bytes.Length / 2];
             for (int k = 0; k < _v.Length; k++) _v[k] = (short)(bytes[2 * k] | (bytes[2 * k + 1] << 8));
-            _olat = originLat; _olon = originLon;
-            _o = Ecef(originLat, originLon);
-            _sla = Math.Sin(originLat * Math.PI / 180); _cla = Math.Cos(originLat * Math.PI / 180);
-            _slo = Math.Sin(originLon * Math.PI / 180); _clo = Math.Cos(originLon * Math.PI / 180);
-        }
-
-        private static (double, double, double) Ecef(double lat, double lon)
-        {
-            const double a = 6378137.0, f = 1 / 298.257223563;
-            double e2 = f * (2 - f), la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
-            double n = a / Math.Sqrt(1 - e2 * Math.Sin(la) * Math.Sin(la));
-            return (n * Math.Cos(la) * Math.Cos(lo), n * Math.Cos(la) * Math.Sin(lo), n * (1 - e2) * Math.Sin(la));
-        }
-
-        private (double X, double Z) P(double lat, double lon)
-        {
-            var (x, y, z) = Ecef(lat, lon);
-            double dx = x - _o.X, dy = y - _o.Y, dz = z - _o.Z;
-            return (-_slo * dx + _clo * dy, -_sla * _clo * dx - _sla * _slo * dy + _cla * dz);
-        }
-
-        private (double Lat, double Lon) Geo(double x, double z)
-        {
-            double lat = _olat + z / 110_900.0, lon = _olon + x / (111_320.0 * Math.Cos(_olat * Math.PI / 180));
-            for (int k = 0; k < 2; k++)
-            {
-                var (px, pz) = P(lat, lon);
-                lat += (z - pz) / 110_900.0;
-                lon += (x - px) / (111_320.0 * Math.Cos(_olat * Math.PI / 180));
-            }
-            return (lat, lon);
+            for (int k = _cols; k < _v.Length; k++) _v[k] += _v[k - _cols];
+            _ox = origin.Easting; _oz = origin.Northing;
         }
 
         /// <summary>The survey's height over the sea at a point of the map.</summary>
         public double At(double x, double z)
         {
-            var (lat, lon) = Geo(x, z);
-            double fx = Math.Clamp((lon - _lon0) / _dlon, 0, _cols - 1.0), fy = Math.Clamp((_lat0 - lat) / _dlat, 0, _rows - 1.0);
+            double fx = Math.Clamp((x + _ox - _e0) / _spacing, 0, _cols - 1.0), fy = Math.Clamp((z + _oz - _n0) / _spacing, 0, _rows - 1.0);
             int i = Math.Min((int)fx, _cols - 2), j = Math.Min((int)fy, _rows - 2);
             double tx = fx - i, ty = fy - j;
             double H(int k) => _base + _v[k] * _unit;
@@ -104,9 +87,9 @@ public partial class RealPlaceMapTests
     }
 
     /// <summary>
-    /// Away from what the ground is graded to, the terrain is the survey: within 0.25 m at 99 points in a
-    /// hundred and 0.6 m at every one, over 3,000 points of the place (2 m triangles over a 5 m resampling of
-    /// the survey's own 5 m grid; the difference is the resampling on the creek banks).
+    /// Away from what the ground is graded to, the terrain is the survey: within 5 cm at 99 points in a hundred
+    /// and 25 cm at every one, over 3,000 points of the place. The posts are the survey's own (2 m on the UTM grid);
+    /// what is left is two triangles to a cell against the survey read bilinearly, on the steepest banks.
     /// </summary>
     [Theory]
     [MemberData(nameof(Places))]
@@ -115,7 +98,7 @@ public partial class RealPlaceMapTests
         var p = _maps.Get(id);
         Assert.NotNull(p.Data.Elevation);
         var world = ServerWorld(p);
-        var survey = new Survey(id, p.Data.GeoOrigin!.Lat, p.Data.GeoOrigin.Lon);
+        var survey = new Survey(id, p.Data.Utm!);
         var only = new OnlyOwners(TerrainIds(p.Ecs));
         var slabs = TerrainBuilder.Slabs(p.Ecs);
         // The slabs filed by 50 m squares, so each point asks only those near it.
@@ -139,7 +122,7 @@ public partial class RealPlaceMapTests
             float x = min.X + (float)rng.NextDouble() * (max.X - min.X), z = min.Z + (float)rng.NextDouble() * (max.Z - min.Z);
             if (near.TryGetValue(((int)MathF.Floor(x / 50f), (int)MathF.Floor(z / 50f)), out var l)
                 && l.Any(s => s.DistanceFrom(x, z) < TerrainBuilder.SkirtMetres + 2f * TerrainTiles.Spacing + 1f)) continue;
-            float y = world.FloorAt(x, z, 1000f, GeometryLayers.Ground, ref only, out _);
+            float y = GroundUnder(world, x, z, ref only);
             Assert.True(y > -1000f, $"no ground at ({x}, {z})");
             double expected = survey.At(x, z) + p.Data.Elevation!.SeaLevelY;
             errors.Add(Math.Abs(y - expected));
@@ -148,8 +131,8 @@ public partial class RealPlaceMapTests
         double p99 = errors[(int)(errors.Count * 0.99)], worst = errors[^1], median = errors[errors.Count / 2];
         _o.WriteLine($"{id}: {errors.Count} points off the graded ground; terrain against the survey: median {median:F3} m, 99th {p99:F3} m, worst {worst:F3} m");
         Assert.True(errors.Count >= 2000, $"only {errors.Count} points away from grading");
-        Assert.True(p99 <= 0.25, $"99th percentile {p99:F3} m");
-        Assert.True(worst <= 0.6, $"worst {worst:F3} m");
+        Assert.True(p99 <= 0.05, $"99th percentile {p99:F3} m");
+        Assert.True(worst <= 0.25, $"worst {worst:F3} m");
     }
 
     /// <summary>
@@ -217,6 +200,7 @@ public partial class RealPlaceMapTests
         var solids = new List<SolidRef>();
         int airborne = 0, worstAir = 0, ticks = 0;
         float worstStep = 0f;
+        var worstAt = Vector3.Zero;
         foreach (var (dir, n) in new[] { (facing, 150), (side, 300), (-side, 300) })
             for (int t = 0; t < n; t++, ticks++)
             {
@@ -234,11 +218,11 @@ public partial class RealPlaceMapTests
                                                                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(solids));
                 var before = pos;
                 (pos, vel, bool grounded) = SharedMovementEngine.Step(ctx, obstacles, out _);
-                worstStep = MathF.Max(worstStep, MathF.Abs(pos.Y - before.Y));
+                if (MathF.Abs(pos.Y - before.Y) > worstStep) { worstStep = MathF.Abs(pos.Y - before.Y); worstAt = pos; }
                 airborne = grounded ? 0 : airborne + 1;
                 worstAir = Math.Max(worstAir, airborne);
             }
-        _o.WriteLine($"{id}: {ticks} ticks from the spawn, ended at ({pos.X:F1}, {pos.Z:F1}, {pos.Y:F2}); longest in the air {worstAir} ticks, biggest step {worstStep:F3} m");
+        _o.WriteLine($"{id}: {ticks} ticks from the spawn, ended at ({pos.X:F1}, {pos.Z:F1}, {pos.Y:F2}); longest in the air {worstAir} ticks, biggest step {worstStep:F3} m at ({worstAt.X:F1}, {worstAt.Z:F1}, {worstAt.Y:F2})");
         Assert.True(worstAir <= 2, $"in the air for {worstAir} ticks");
         Assert.True(worstStep <= PhysicsConstants.StepHeight, $"a step of {worstStep} m");
     }
@@ -257,7 +241,7 @@ public partial class RealPlaceMapTests
             for (float z = min.Z + 1f; z < max.Z; z += 25f)
             {
                 points++;
-                if (world.FloorAt(x, z, 1000f, GeometryLayers.Ground, ref all, out _) <= -1000f) holes++;
+                if (GroundUnder(world, x, z, ref all) <= -1000f) holes++;
             }
         _o.WriteLine($"{id}: {points} points, {holes} without ground; {TerrainIds(p.Ecs).Count} tiles of ground");
         Assert.Equal(0, holes);

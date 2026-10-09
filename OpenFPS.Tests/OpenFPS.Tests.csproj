@@ -37,6 +37,10 @@
     <None Include="..\OpenFPS.Server\maps\places\*.json" Link="places\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Their ground, a file beside each (MapElevation.File). -->
+    <None Include="..\OpenFPS.Server\maps\places\*.elevation" Link="places\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- The rooms map (doors, portals, the material lab): a fixture only, never served to players. -->
     <None Update="maps\*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- At most four test classes at once (2026-10-07). Many start audio, acoustics and Steam Audio threads of

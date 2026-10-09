@@ -59,8 +59,8 @@ public sealed class PlayerStore
     public string LandingMap(UserSession session, PlayerState state, string landing)
     {
         if (string.IsNullOrEmpty(state.Map)) return landing;
-        // Not into a frame of the world: its tiles may have been let go since (keeping the world position
-        // and arriving there again is stage 3 of docs/WORLD_STREAMING.md).
+        // Not straight into a frame of the world: its tiles may have been let go since. The login arrives
+        // there again through the loading screen (GameServer, WorldMaps.ArriveAt), from here if it cannot.
         if (OpenFPS.Server.OneWorld.WorldMaps.IsWorldMap(state.Map)) return landing;
         foreach (string id in _maps.LoadedMapIds)
             if (id.Equals(state.Map, StringComparison.OrdinalIgnoreCase))
