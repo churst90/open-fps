@@ -523,6 +523,15 @@ public sealed class DoorSystem
         return across <= halfWidth + DoorwayMarginMetres && through <= depth;
     }
 
+    /// <summary>Whether somebody standing at <paramref name="p"/> is in this door's doorway, and so holds its
+    /// closer off.</summary>
+    internal static bool InDoorway(World world, Entity entity, Vector3 p)
+    {
+        var door = world.Get<DoorComponent>(entity);
+        Doorway(world, entity, out var centre, out var rotation);
+        return InDoorway(p, centre, rotation, HalfWidth(world, entity, door), door.Slides);
+    }
+
     /// <summary>In front of it, either side, within its sensor's reach — through the doorway and
     /// along the wall alike, as a door sensor's field is.</summary>
     internal static bool InFront(Vector3 p, Vector3 centre, Quaternion rotation, float reach)
