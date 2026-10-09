@@ -400,6 +400,38 @@ public class WeatherWindTests
     }
 
     [Fact]
+    public void AFrontThatClearsSaysSoWhileItsRainIsStillFallingAndTheRainStops()
+    {
+        // Cody, 2026-10-08: /weather said "Clear" with moderate rain falling. A front that clears leaves
+        // its rain easing off for a minute or two, and the easing never reached nothing.
+        using var rig = new CommandRig();
+        var dev = rig.Online("dev", 1, UserRole.Dev);
+        var env = rig.Server.WorldEnvironment;
+        env.FrontProbabilityPerTick = 0;
+        env.SetDate(14f, 172);                       // a summer afternoon: rain, not snow
+        env.SetScenario(WeatherType.Rain);
+        Assert.StartsWith("Rain coming in. ", rig.Run(dev, "weather"));
+        for (int i = 0; i < 30 * 600; i++) env.Update(1f / 30f);
+        string raining = rig.Run(dev, "weather");
+        Assert.StartsWith("Rain. ", raining);
+        Assert.Contains("millimetres an hour", raining);
+
+        env.SetScenario(WeatherType.Clear);
+        env.Update(1f / 30f);
+        string clearing = rig.Run(dev, "weather");
+        _o.WriteLine(clearing);
+        Assert.StartsWith("Clearing. ", clearing);
+        Assert.Contains("millimetres an hour", clearing);
+
+        for (int i = 0; i < 30 * 600; i++) env.Update(1f / 30f);
+        Assert.Equal(0f, env.GetCurrentState().PrecipitationIntensity);
+        Assert.False(env.PrecipitationFor(env.GetCurrentState()).Falling);
+        string clear = rig.Run(dev, "weather");
+        Assert.StartsWith("Clear. ", clear);
+        Assert.DoesNotContain("millimetres", clear);
+    }
+
+    [Fact]
     public void WeatherRainTakesARateADropSizeAndARadarReading()
     {
         using var rig = new CommandRig();

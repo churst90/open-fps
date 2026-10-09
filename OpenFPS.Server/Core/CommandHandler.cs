@@ -172,7 +172,7 @@ public partial class CommandHandler
                 break;
             // The whole server's weather, for testing.
             case "weather":
-                HandleWeather(args, reply);
+                HandleWeather(session, args, reply);
                 break;
             case "prefabs":
                 HandleListPrefabs(reply);
