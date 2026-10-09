@@ -8,14 +8,10 @@ Updated 2026-10-07: every item checked against the code, the git history, change
 
 Cody's list of 2026-10-08 (one world, server-built tiles, distant updates, sound from geometry, enemies and
 Dinosaur World, railways and editor words, chat names and roles, NPC doors, weather as a system, cars and fighting)
-is in [docs/CODY_ASKS_2026-10-08.md](docs/CODY_ASKS_2026-10-08.md), with its suggested order. The batch and the trains
-fix are shipped (VPS 3fc38430512b).
+is in [docs/CODY_ASKS_2026-10-08.md](docs/CODY_ASKS_2026-10-08.md), with its suggested order. The 10-07 batch,
+the honest tests, the probable bugs and the trains fix are merged and shipped (VPS 3fc38430512b).
 
-1. Finish this batch: the honest tests and the lab argument bugs; the probable bugs (below), on their
-   own branch, heard by Cody before they merge.
-2. One full test run on the final main (`tools/test-local.sh`).
-3. Push, then the VPS, then the Windows zip. Cody: only after the whole batch. The VPS runs
-   f1a0421123d3 (2026-10-05); the wire has changed since, so client and server go together.
+1-3. Done: the batch, its test run, and push, VPS and Windows zip (2026-10-07/08).
 4. Geometry stage 3, terrain from real elevation (docs/GEOMETRY.md section 7), with world streaming
    stage 2, one world in UTM tiles generated on demand (docs/WORLD_STREAMING.md).
 5. Sound library stage 3 alongside: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`
@@ -54,24 +50,12 @@ Waiting on Cody's ear:
 ## Now
 
 ### Probable bugs
-Found by the housekeeping on 2026-10-07; not fixed on main. Fixes go on their own branch.
-- `WorldAudioPlayer.Clear` is never called on `/join`: one-shots and thunder carry over to the next map.
-- Every emitter gets `ApplyGround`: `physicalKey != null` is always true (ClientAudioSystem.cs 2864;
-  probably meant `Length > 0`).
-- A landing plays a footstep take, never the LANDING bank (`SubmitLanding` passes force 0).
-- `SetSimulatedReverbDecay` takes the hf and lf decay ratios and does not use them, so a room's colour
-  never reaches the reverb (FmodAudioProvider.cs 1110).
-- The bell's clapper damping comes back at the end of the contact, 0.1-0.3 ms, not the 12 ms `Step`
-  allows (StruckBell.cs 132).
+Found by the housekeeping on 2026-10-07. The rest were fixed and merged in 246a4e1c (heard by Cody);
+these four were not part of it. Fixes go on their own branch.
 - A hull's blow lands at the start of its block, up to 2.7 ms early (`ShoreSynth.HullPlate.Blow` does
   not read `at`).
 - The fire's fizz is scaled by `CracklePart` (FireSynth.cs 870).
-- `Footsteps.Key` writes twice the speed, so 1.4 m/s reads back as a run (AudioLab only).
-- Not heard: `AggressiveOptimization` sits on `EngineProcessor.QueueStrikes`, meant for `Synthesize`;
-  `AcousticPathData.ReflectionId` and `Scattering` are written and never read.
-- The traced reverb stage averages its stereo input (TracedReverbDsp `v /= inCh`), so since the
-  binaural input fix of 2026-10-06 the tail is 3 dB drier than the -6 Cody set by ear. Fix the input or
-  move the trim (Cody).
+- Not heard: `AcousticPathData.ReflectionId` and `Scattering` are written and never read.
 - A new engine donor is held for 2.5 s inside the budget, so one budget car is let go once and rebuilt
   2.5 s later (docs/COVERAGE_2026-10-06.md).
 
