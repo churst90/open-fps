@@ -191,7 +191,7 @@ OpenFPS.Common/AircraftGroundRun.cs	lib	Sound
 OpenFPS.Common/Applause.cs	lib	Sound	
 OpenFPS.Common/AudioClock.cs	lib	Sound	
 OpenFPS.Common/AudioEmission.cs	lib	Sound	
-OpenFPS.Common/AudioEvents.cs	mixed	Sound	SoundCharacter,TransientSound
+OpenFPS.Common/AudioEvents.cs	host		
 OpenFPS.Common/Ballistics.cs	lib	Sound	
 OpenFPS.Common/Beacons.cs	host		
 OpenFPS.Common/Birds.cs	lib	Sound	
@@ -299,6 +299,7 @@ OpenFPS.Common/Tiles.cs	host
 OpenFPS.Common/TrackClearance.cs	host		
 OpenFPS.Common/TrainSignals.cs	lib	Sound	
 OpenFPS.Common/Trains.cs	lib	Sound	
+OpenFPS.Common/TransientSound.cs	lib	Sound	
 OpenFPS.Common/TyreFriction.cs	lib	Sound	
 OpenFPS.Common/UpdateThrottle.cs	host		
 OpenFPS.Common/VehicleBody.cs	lib	Sound	
