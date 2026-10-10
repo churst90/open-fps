@@ -48,6 +48,11 @@ because the one world costs CPU and bandwidth first.
     suspension, drivetrain, tyres and F1 steepening.
 13. Enemies, Dinosaur World, melee and NPC inventories (items 6 and 11).
 
+Matter (Cody, 2026-10-10): every material interacts with every other as in real life; wind moves things
+physically and its sound comes only from what it moves; a built thing sounds by its material, size and shape.
+The design and its order of work are in docs/MATTER.md (material table, struck things by modal synthesis,
+bumps, fire by fuel, water over terrain, weather as a system, wind on things, gases, chemistry).
+
 In every play session, clear the "Waiting on Cody's ear" list so heard work merges before it piles up.
 
 Waiting on Cody's ear:
