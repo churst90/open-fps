@@ -28,6 +28,7 @@ library that open-fps and Resonance both reference. Step 1 of
 15. Stage 2 as built: OpenFPS.Geometry
 16. Stage 3 as built: OpenFPS.Sound and the first half of OpenFPS.Acoustics
 17. Stage 4 as built: rooms and openings as values
+18. Stage 5 (first slice) as built: the traced places and the weather per world
 
 ---
 
@@ -708,10 +709,12 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
 
 Where the stages stand (2026-10-10): 0, 1 and 2 built 2026-10-07 (sections 13 to 15), 3 built and merged
 2026-10-10 (section 16, 563f26de), with decision 4 taken the same day (e081faf0: Acoustics without
-MemoryPack). 4 built 2026-10-10 on its branch, not merged (section 17: the rooms and openings are values and
-in Acoustics; 384 crossings left). The order agreed with Cody on 2026-10-10: switching the acoustic map to the
-rooms flooded from the walls (docs/GEOMETRY.md 12.6 item 1) once stage 4 is merged; then stage 5 with geometry
-stage 6 (vehicles and bodies in the acoustic scene); then stages 6 to 8.
+MemoryPack). 4 built and merged 2026-10-10 (section 17, 9f9bf5ab: the rooms and openings are values and in
+Acoustics; 384 crossings left), and the acoustic map switched to the rooms flooded from the walls the same day
+(docs/GEOMETRY.md 12.6 item 1, 25a328b9). Stage 5's first slice built 2026-10-10 on its branch, not merged
+(section 18: the traced places and the weather are per world; 28 library statics fewer, crossings unchanged).
+The order agreed with Cody on 2026-10-10: the rest of stage 5 with geometry stage 6 (vehicles and bodies in the
+acoustic scene); then stages 6 to 8.
 
 ### Stage 0: guards (1 to 2 sessions)
 
@@ -821,6 +824,7 @@ levers into `LabLevers`.
   old static still compiles if the static is kept, so each static is deleted when its last reader is
   moved, and the deletion is the check.
 - Bonus: the test assembly can run in parallel again once the world state is per instance.
+- As built, the first slice (the traced places, the wind and the run-off): section 18. `AudioClock` is next.
 
 ### Stage 6: the world input and `OpenFPS.Audio` (3 to 5 sessions)
 
@@ -2159,6 +2163,136 @@ By `git mv`, namespaces unchanged (decision 6):
   `EarlyCopies` 17, `TalkerVoice` 16, `VehicleShadow` 15, `EngineReflections` 4.
 - `classify.py` still has its rules for the Common paths the moved files had, as it kept stage 3's; they match
   nothing.
+
+---
+
+## 18. Stage 5 (first slice) as built (2026-10-10): the traced places and the weather per world
+
+The first two items of stage 5's order: the traced reverb set and its two `Current` statics, then the wind and
+the run-off. Each static was deleted with its last reader, so nothing compiles that still reads one. Two commits:
+the traced places (c2ad82c4), then the weather (fd33a579). Behaviour unchanged: the guards pass
+unregenerated (18.5).
+
+### 18.1 The traced places
+
+- `TracedReverbSet` was a static class: one listener trace, one echo tracer, one late field, one cabin and up to
+  six room traces per process. It is an instance now, one per Steam Audio context. `FmodAudioProvider.Traced`
+  holds it, and `AsyncAcousticWorker`, which owns the context, is handed it: `ClientAudioSystem` passes
+  `AudioEngineFacade.Traced` (the provider's) to the worker it makes. A worker given none, as in the tests and
+  most spikes, traces into a set of its own.
+- Its `Dispose` is `Release` now: the worker calls it before it releases its context, as before, and the set
+  can be configured again after. Before, any worker's `Dispose` released every world's traces, including a
+  worker that had never made a context.
+- `TracedReverb.Current` was set and cleared and never read. It is gone.
+- `TracedEchoes.Current` was read by the traced echoes' mix callback. A `TracedEchoRig` now carries the tracer
+  it was attached with (`Echoes`, set in `AttachEchoRig` before the slot), and the mix plays only while that
+  tracer is live (`IsLive`: from its first scene until it is disposed, which is when `Current` was set and
+  cleared). With one tracer per world, which is what a world has, the mix reads the same object it did.
+- The `/reverb` and `/echoes` readouts read the provider's set, so they are the provider's instance methods,
+  reached through the facade (`AudioEngineFacade.TracedReverbStatus`, `TracedEchoesStatus`). The two numbers
+  the late field's readout keeps between frames (`_lateLawKNow`, `_tailLeanNow`) are the provider's fields.
+- The lab's spikes that build a provider and configure the set themselves make the provider first and
+  configure `provider.Traced`; `TracedBinaural.Report` takes the set it reports on; `PaLeakSpike` hands its
+  worker the provider's set, as the game does.
+
+### 18.2 The weather
+
+`WorldWeather` (`OpenFPS.Sound/WorldWeather.cs`) is one audio world's weather. Its interface:
+
+| Member | What |
+|---|---|
+| `Wind` (get, set) | the `WindWeather` ramp the voices read; swapped whole, so the mixer thread never reads half of one broadcast |
+| `Runoff` | the rain on its way to the gutters and drains (`Runoff.Update(rainMmPerHour, now)` once a frame) |
+| `Ground` | the water over the ground the drainage lines carry (`GroundWater.Load` with the server's state) |
+| `MeanSpeed`, `FromDegrees`, `Turbulence` (get, set) | the wind now; setting one makes a steady wind (the lab's levers, as `WindField`'s were) |
+| `SpeedAt(x, height, z, seconds)` | the wind at a place and moment under this weather |
+
+- The host fills it and it fetches nothing. open-fps's client writes it where it wrote the statics: the session
+  sets `Wind` and loads `Ground` on every `WorldStateUpdate` (`ClientGameSession`), and `ClientAudioSystem.Update`
+  advances `Runoff` with the rain falling. A later feed of real observations reaches it the same way, through
+  the server's broadcast, or a host that has its own weather sets the three itself.
+- Who holds it: `FmodAudioProvider.Weather`, beside `Traced`, and `AudioEngineFacade.Weather` is that one (or a
+  weather of the facade's own when the provider is not FMOD, as in the tests). The provider is the deepest
+  owner both the voices and the host reach today; the audio world of stage 7 takes it over.
+- Readers take it, never a default. The nature voices (`NatureVoiceState` and its five kinds, `WaterTapState`,
+  `PlacedNatureVoice`) and `EarWindState` take a `WorldWeather` in their constructors, required, so a voice
+  made without the world's weather does not compile; the provider passes its own. The synths take the wind
+  they read: `FoliageSynth.ReadWind` and `ReadWindAt`, `FireSynth.ReadWind` take a `WindWeather`.
+  `RunningWaterSpec.FlowNow` takes the `WorldWeather` whose run-off or ground water it reads. `EarWind.Hear`
+  already took its weather.
+- `Runoff` is a sealed class: one per world, its ladder (`Rungs`) still a static table. `GroundWater.Shared`
+  went into `WorldWeather.Ground`; `GroundWater.Held` (the lab's lever) is an instance field, so the server's
+  ground water has one too, never set.
+- `WindField` keeps what is pure: the log law, the eddies, `Gust` and `SpeedAt` of a given weather,
+  `VelocityAt`, `Carry`, and `Now()`. Gone: `Weather` with its `_weather`, `Hold` with its `AsyncLocal`,
+  `MeanSpeed`, `FromDegrees`, `Turbulence`, `Downwind`, and the overloads of `MeanAt`, `Gust` and `SpeedAt`
+  that read the current weather.
+- `WindField.Now()` stays one shared world time: UTC seconds since 2026-01-01, which the server and every
+  client agree on for the gusts, a lit fire's age and a hob's key. It is a clock, not a world's state. When
+  the monotonic clock goes behind `IAudioClock` (4.1), this is its `WorldTime`; its readers (the nature voices,
+  the ear wind, the rain's clock, the stove, `ClientWorldState`'s wind ramp, the server's hob and weather
+  broadcast) are the ones to move then.
+- Tests and spikes that held a wind (`WindField.Hold`) or set the global now build a `WorldWeather` and hand it
+  to what they make, or set the facade's (`h.Facade.Weather.Wind`). The emitter-stream replay sets its
+  facade's wind still, where it held it still; its run-off is its world's own, so it starts empty, as the
+  replay's `Runoff.Reset` made it. A shared weather written by a session test can no longer reach a test
+  beside it (WideSourcesTests' 1.45 dB of 2026-10-06).
+
+### 18.3 What is left of stage 5
+
+In the order of section 8: `AudioClock` behind `IAudioClock` (read by the mixer's callbacks, the provider, the
+game loop's dead reckoning and the server; `ClientWorldState` among them); `AudioPhysics` and
+`MixerQuality.MixerRate` into the world's atmosphere and mixer format; `EarModel` and `Loudness` into
+`HearingSettings`; `MachineRegistry` and `ModelLibrary` into a `ModelCatalog`; the console levers into
+`MixSettings`; the lab levers into `LabLevers`. Seen on the way and left for those:
+`FmodAudioProvider._tracedEchoIds` and `HasTracedEchoes` (static, read by `ClientAudioSystem`), `TracedEchoesOn`,
+`TailDb` and `CopiesDb` (console levers), `TracedReverb.SimulatedType`, `RawTail`, `OneChannelLate` and
+`LabProbeSeconds` (lab levers), `OwnVoiceRing.Shared` and `Talkers._all`.
+
+### 18.4 The ratchet and the statics
+
+| | Before (cf82a7d9) | After |
+|---|---:|---:|
+| Crossings (references) | 384 | 384 |
+| Allowance rows (file, host type) | 51 | 51 |
+| Files in `files.tsv` | 362 | 363 |
+| Library statics that can change (survey, section 4) | 391 | 363 |
+| of them written from outside their type | 68 | 62 |
+| of them reassigned by their own type | 71 | 54 |
+
+- No crossing was in these statics, so `allowed.tsv` is unchanged; `files.tsv` gained `WorldWeather.cs`
+  (library, by the Sound folder rule).
+- What went: `TracedReverbSet`'s twelve fields and its lock (the lock is readonly, so not counted),
+  `TracedReverb.Current`, `TracedEchoes.Current`, `FmodAudioProvider._lateLawKNow` and `_tailLeanNow`, `WindField.Weather`, `_weather`, `_held`, `MeanSpeed`,
+  `FromDegrees`, `Turbulence`, `Runoff._held`, `_rain`, `_last`, `Held`, `GroundWater.Shared`, `Held`. Three
+  came in on the host side and are not counted: a lab spike's weather (`NatureSpike.Air`) and two test
+  classes' (`NatureTests.Air`, `RankingByLoudnessProbe.Breeze`), each read only by its own class.
+
+### 18.5 The wire hash and the checks
+
+- `WireContract.Hash` covers `OpenFPS.Sound` outside `Core/`: `Wind.cs`, `Runoff.cs`, `GroundWater.cs`,
+  `RunningWater.cs` and the new `WorldWeather.cs` are in it, so it changes (aba568c5fa97 at cf82a7d9 and after
+  the first commit, 26e9f58973a1 after the second). A client and a server from either side refuse each other at
+  login, as for any edit to Common. Nothing sent changed. `DoorModelFingerprint` unchanged (978619539e83).
+- Every project builds: Client.Core, the GTK client, the Windows client, the lab and the tests (and so
+  Geometry, Native, Acoustics, Sound, Common and the server).
+- The guards (LibraryBoundary, RenderFingerprint, EmitterStreamReplay) after each commit, none regenerated:
+  31 passed.
+- After the second commit, in four runs, each alone on the machine:
+  - LibraryBoundary, RenderFingerprint, EmitterStreamReplay, Wind, Weather, Rain, Runoff, RunningWater,
+    RoadWater, GroundWater: 323 passed, 1 failed. The one,
+    `DspCallbackTests.AGrainIsAHannWindowOfItsSourceAtTheVoicesTrim`, counted 1,896 bytes allocated over its
+    callbacks with other classes running beside it; it passed on its own, with the rest of DspCallbackTests
+    (59 passed). It renders a granular voice, which none of this touches. Under the same filter it then passed
+    three times on the branch merged with main (862b747f) and three times on main (259f1ad3): seen once in seven.
+  - Nature, Foliage, EarWind, Ambience, Fire, Waves, WideSources, MixerRate, WoodChorus, RankingByLoudness:
+    155 passed.
+  - Reverb, SteamAudio, TracedEcho, ClientAudio, DistantUpdates, BorrowedVoice, AsyncAcousticWorker,
+    Degradation, EarlyTail, DiffuseLate, TileSceneSet, GasHob: 142 passed, 4 skipped (the Steam Audio opt-ins).
+  - With `OPENFPS_STEAMAUDIO_TESTS` set, on TileSceneSetTests, DiffuseLateTests and LayersInContactTests
+    alone: 24 passed.
+- No test drives a `TracedReverbSet` through a real provider, so the lab did: `--clap-room` (FMOD and Steam
+  Audio) reports "listener trace ready", six traced echo rigs, and a traced tail of 0.8 s T20 in the flat.
 
 ---
 

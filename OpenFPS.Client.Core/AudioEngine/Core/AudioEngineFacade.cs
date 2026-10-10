@@ -56,7 +56,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public AudioEngineFacade(IAudioProvider provider)
     {
         _provider = provider;
+        Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather();
     }
+
+    /// <summary>The weather this world hears, for the host to fill: the mixer's when there is one
+    /// (FmodAudioProvider.Weather), so its voices read what the host writes.</summary>
+    public WorldWeather Weather { get; }
 
     /// <summary>Brings up the provider, loads the bank and starts the audio thread.</summary>
     public void Initialize()
@@ -287,6 +292,21 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     {
         set { if (_provider is OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider fmod) fmod.RoutesSource = value; }
     }
+
+    /// <summary>The places the mixer plays traced, for the acoustic worker to configure on its context.
+    /// Null without FMOD: the worker then traces into a set of its own that nothing plays.</summary>
+    internal OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet? Traced
+        => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.Traced;
+
+    /// <summary>The /reverb readout (FmodAudioProvider.TracedReverbStatus).</summary>
+    public string TracedReverbStatus()
+        => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.TracedReverbStatus()
+           ?? "No trace yet — the scene is still being built.";
+
+    /// <summary>The /echoes readout (FmodAudioProvider.TracedEchoesStatus).</summary>
+    public string TracedEchoesStatus()
+        => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.TracedEchoesStatus()
+           ?? $"Echoes {(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn ? "on" : "off")}. No tracer yet — the scene is still being built.";
 
     public void SetAcousticMap(AcousticMap map)
     {

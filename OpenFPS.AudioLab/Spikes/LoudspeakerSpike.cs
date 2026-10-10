@@ -137,7 +137,7 @@ public static class LoudspeakerSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
-        WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
 
         // Ids BirdLife settles nothing on (its hash of 9 and 10 is between a pigeon's and a crow's), so the
         // captures are the speakers alone.

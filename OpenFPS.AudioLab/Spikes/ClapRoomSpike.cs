@@ -62,11 +62,11 @@ public static class ClapRoomSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
         scene.Build(boxes);
-        TracedReverbSet.Configure(ctx, scene);
-        TracedReverbSet.SetListener(ear);
+        var provider = new FmodAudioProvider();
+        provider.Traced.Configure(ctx, scene);
+        provider.Traced.SetListener(ear);
 
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
-        var provider = new FmodAudioProvider();
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         string? soundArg = Arg(args, "sound");
         bool gun = soundArg != null && WeaponRegistry.TryGet(soundArg, out _);
@@ -213,8 +213,8 @@ public static class ClapRoomSpike
             var m = provider.TracedMeter(RoomId);
             Console.WriteLine($"  traced stage: {10 * Math.Log10(m.Out / Math.Max(1e-20, m.In)):F1} dB out per ear against its mono input; "
                             + $"{10 * Math.Log10(m.Out / Math.Max(1e-20, m.PerChannel)):F1} dB against the mean of its {m.Channels} input channels; head blend {m.Blend:F2}");
-            Console.WriteLine($"  reverb: traced, listener trace {(TracedReverbSet.Listener != null ? "ready" : "MISSING")}, reflections {FmodAudioProvider.TailDb:F0} tail, {FmodAudioProvider.CopiesDb:F0} copies dB, makeup {FmodAudioProvider.MasterMakeupDb:F0} dB");
-            if (TracedReverbSet.Listener is { } lt)
+            Console.WriteLine($"  reverb: traced, listener trace {(provider.Traced.Listener != null ? "ready" : "MISSING")}, reflections {FmodAudioProvider.TailDb:F0} tail, {FmodAudioProvider.CopiesDb:F0} copies dB, makeup {FmodAudioProvider.MasterMakeupDb:F0} dB");
+            if (provider.Traced.Listener is { } lt)
             {
                 traceW = lt.LastReadBack;
                 if (lt.Smooth is { } sm)
@@ -226,7 +226,7 @@ public static class ClapRoomSpike
                 }
             }
         }
-        finally { provider.Dispose(); TracedReverbSet.Dispose(); scene.Dispose(); Phonon.iplContextRelease(ref ctx); }
+        finally { provider.Dispose(); provider.Traced.Release(); scene.Dispose(); Phonon.iplContextRelease(ref ctx); }
 
         int result = Measure(outPath, probeMs, traceW, startMs, firstMs);
         if (bed) BedThroughShots(outPath, clapTimes.Count);

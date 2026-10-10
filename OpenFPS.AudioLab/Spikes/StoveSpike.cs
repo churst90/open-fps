@@ -322,9 +322,9 @@ public static class StoveSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
         scene.Build(boxes.Select(b => new SteamAudioScene.Box(b.C, b.S, Quaternion.Identity, b.M)).ToList());
-        TracedReverbSet.Configure(ctx, scene);
-
         var provider = new FmodAudioProvider();
+        provider.Traced.Configure(ctx, scene);
+
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -363,7 +363,7 @@ public static class StoveSpike
             },
         });
         world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 20f, Humidity = 0.5f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f });
-        WindField.Weather = WindWeather.Steady(0f, 0f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 0f, 0f);
 
         // The cook standing at the hob, facing it, the ear `dist` metres from the hob's middle.
         float earY = 1.55f;

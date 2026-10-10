@@ -258,16 +258,16 @@ public class WideSourcesTests
     [Fact]
     public void ATreesPlaceVoicesAddUpToItsOneVoice()
     {
-        // A steady wind held for this test. Gusts follow the clock, and the places and the one voice are
+        // A steady wind for this test. Gusts follow the clock, and the places and the one voice are
         // rendered one after the other, so a gusty wind gave them different gusts (1.45 dB apart under
-        // load, 2026-10-06); and a session test running beside it writes the shared weather.
-        using var held = WindField.Hold(WindWeather.Steady(4.5f, 270f, 0f));
+        // load, 2026-10-06).
+        var weather = new WorldWeather { Wind = WindWeather.Steady(4.5f, 270f, 0f) };
         var spec = FoliageSpec.ParkTree;
         var at = new Vector3(400f, 7f, -300f);
         int n = 1 + FoliageSynth.Boughs;
-        var shared = new PlacedNatureVoice("foliage:park_tree", spec, n, Rate, 9, at) { TargetSpread = 1f };
+        var shared = new PlacedNatureVoice("foliage:park_tree", spec, n, Rate, 9, at, weather) { TargetSpread = 1f };
         var voices = Enumerable.Range(0, n).Select(k => new NaturePlaceState(shared, k, Rate, at)).ToArray();
-        var old = new FoliageVoiceState(spec, Rate, 9, at);
+        var old = new FoliageVoiceState(spec, Rate, 9, at, weather);
         Assert.All(voices, v => Assert.Equal(old.PascalsAtFullScale, v.PascalsAtFullScale));
         // Rendered side by side, as the mixer takes them, block by block.
         double[] e = new double[n];

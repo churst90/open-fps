@@ -110,6 +110,7 @@ public static class TextureSpike
         Console.WriteLine($"fountain at {centre}, {taps.Count} taps: " + string.Join("; ", taps.Select(t => $"{t - centre}")));
 
         // Every tap rendered by the one synth, each placed where the map puts it.
+        var air = new WorldWeather();
         var synth = new FallingWaterSynth(fountain, Rate, 7);
         var tapPa = new float[synth.TapCount][];
         for (int t = 0; t < tapPa.Length; t++) tapPa[t] = new float[n];
@@ -117,7 +118,7 @@ public static class TextureSpike
         const int block = 256;
         for (int i = 0; i < n; i += block)
         {
-            synth.Wind = WindField.SpeedAt(0f, fountain.WindHeightMetres, 0f, i / (double)Rate);
+            synth.Wind = air.SpeedAt(0f, fountain.WindHeightMetres, 0f, i / (double)Rate);
             synth.Control(block / (float)Rate);
             for (int k = i; k < Math.Min(n, i + block); k++)
             {
@@ -146,15 +147,14 @@ public static class TextureSpike
         var treeSpec = FoliageSpec.ByName("park_tree");
         var treeAt = new Vector3(3f, treeSpec.CrownHeightMetres, 4f);
         var treeEar = new Vector3(0f, 1.7f, 0f);
-        float savedMean = WindField.MeanSpeed;
         foreach (float wind in new[] { 3f, 6f, 10f })
         {
-            WindField.MeanSpeed = wind;
+            air.MeanSpeed = wind;
             var tree = new FoliageSynth(treeSpec, Rate, 7);
             var pa = new float[n];
             for (int i = 0; i < n; i += block)
             {
-                tree.ReadWind(0f, 0f, i / (double)Rate);
+                tree.ReadWind(air.Wind, 0f, 0f, i / (double)Rate);
                 tree.Control(block / (float)Rate);
                 for (int k = i; k < Math.Min(n, i + block); k++) pa[k] = tree.Next();
             }
@@ -165,7 +165,6 @@ public static class TextureSpike
                 Write(Path.Combine(dir, $"tree_before_{wind:0}ms.wav"),
                       new List<Source> { new(ReadRawPascals(old, n), treeAt, 48f, 4f) }, treeEar, n);
         }
-        WindField.MeanSpeed = savedMean;
     }
 
     private static void Write(string path, List<Source> sources, Vector3 ear, int n)

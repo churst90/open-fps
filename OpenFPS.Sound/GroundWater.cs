@@ -271,11 +271,9 @@ public sealed record GroundCatchment(float[] AreaSquareMetres, float[] LagSecond
 /// </summary>
 public sealed class GroundWater
 {
-    /// <summary>The client's: the last state the server sent, read by the running water's voices.</summary>
-    public static readonly GroundWater Shared = new();
-
-    /// <summary>For the lab: <see cref="Shared"/> stays where it was put, whatever the server sends.</summary>
-    public static volatile bool Held;
+    /// <summary>For the lab: a client's water (<see cref="WorldWeather.Ground"/>) stays where it was put,
+    /// whatever the server sends.</summary>
+    public volatile bool Held;
 
     /// <summary>How long the ground takes to give back what a storm soaked into it, s: the event depth falls
     /// by e every two days without rain. An assumption: NEH-630 ch. 10 judges a soil's wetness by the last five

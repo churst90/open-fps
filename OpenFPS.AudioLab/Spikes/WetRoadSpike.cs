@@ -222,7 +222,7 @@ public static class WetRoadSpike
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(900f, 1f, 900f), IsSolid = true },
             Material = new MaterialComponent { Material = "Asphalt" },
         });
-        WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
 
         var segments = new List<Segment>();
         Action<double>? perFrame = null;

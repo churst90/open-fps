@@ -421,7 +421,7 @@ public static class GroundWaterSpike
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(600f, 1f, 600f), IsSolid = true },
             Material = new MaterialComponent { Material = "Grass" },
         });
-        WindField.Weather = WindWeather.Steady(1.5f, 250f, 0.2f);
+        facade.Weather.Wind = WindWeather.Steady(1.5f, 250f, 0.2f);
         var segments = new List<Segment>();
         int nextId = 100;
 
@@ -453,9 +453,9 @@ public static class GroundWaterSpike
         }
         void Water(string state)
         {
-            GroundWater.Held = false;
-            GroundWater.Shared.Load(states[state].State);
-            GroundWater.Held = true;
+            facade.Weather.Ground.Held = false;
+            facade.Weather.Ground.Load(states[state].State);
+            facade.Weather.Ground.Held = true;
         }
         // The voices of the lines within 80 m of where the listener stands, moved so the listener is near the
         // origin; the ground's y kept relative.
@@ -525,7 +525,7 @@ public static class GroundWaterSpike
         }
         finally
         {
-            GroundWater.Held = false;
+            facade.Weather.Ground.Held = false;
             facade.Dispose();
         }
         var sb = new StringBuilder("name,start,seconds,cpu_percent,mixer_load,hrtf_voices\n");

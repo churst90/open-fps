@@ -1030,7 +1030,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private void StartEarWind()
     {
         _system.getSoftwareFormat(out int rate, out _, out _);
-        var state = new EarWindState(rate > 0 ? rate : MixerQuality.MixerRate);
+        var state = new EarWindState(rate > 0 ? rate : MixerQuality.MixerRate, Weather);
         if (Environment.GetEnvironmentVariable("OPENFPS_EAR_WIND") == "0")
         {
             state.Enabled = false;
@@ -1399,8 +1399,16 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Which traced stages are running (not bypassed) right now.</summary>
     private readonly Dictionary<int, bool> _tracedRunning = new();
 
+    /// <summary>The places traced for this mixer's world, on the acoustic worker's Steam Audio context
+    /// (the worker is handed this set and configures it once its scene is built).</summary>
+    internal TracedReverbSet Traced { get; } = new();
+
+    /// <summary>The weather this mixer's voices hear: the trees, fires and water read its wind and run-off,
+    /// the ear wind its wind. The host fills it (AudioEngineFacade.Weather).</summary>
+    public WorldWeather Weather { get; } = new();
+
     /// <summary>Whether there is a trace to play yet (the scene is built after the map loads).</summary>
-    internal static bool TracedActive => TracedReverbSet.Listener != null;
+    internal bool TracedActive => Traced.Listener != null;
 
     // Traced echoes: the loudest few sustained sources are traced from where they are (TracedEchoes),
     // because mirror images of a moving source jump from facade to facade. Each rig is a capture at
@@ -1601,6 +1609,7 @@ public partial class FmodAudioProvider : IAudioProvider
         rig.NeedsReset = true;
         rig.LastInputGain = -1f;
         rig.Fresh = false;
+        rig.Echoes = echoes;
         rig.Slot = slot;
         a.EchoRig = rig;
     }
@@ -1619,7 +1628,7 @@ public partial class FmodAudioProvider : IAudioProvider
             a.Channel.removeDSP(rig.MixDsp);
             a.Channel.removeDSP(rig.CaptureDsp);
         }
-        TracedReverbSet.Echoes?.Release(slot);
+        Traced.Echoes?.Release(slot);
     }
 
     // Each source's own late sound (LateField).
@@ -1642,7 +1651,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// </summary>
     private void UpdateLateField()
     {
-        var lf = TracedReverbSet.LateField;
+        var lf = Traced.LateField;
         if (lf == null || !TracedActive || !_steamAudioEnabled) { _lateLawK = float.NaN; _tailBias = Vector3.Zero; return; }
         _lateCandidates.Clear();
         foreach (var a in _activeSounds)
@@ -1694,11 +1703,11 @@ public partial class FmodAudioProvider : IAudioProvider
         _lateLawKNow = _lateLawK; _tailLeanNow = _tailBias.Length();
     }
 
-    private static volatile float _lateLawKNow = float.NaN, _tailLeanNow;
+    private volatile float _lateLawKNow = float.NaN, _tailLeanNow;
 
-    private static string LateFieldStatus()
+    private string LateFieldStatus()
     {
-        var lf = TracedReverbSet.LateField;
+        var lf = Traced.LateField;
         if (lf == null) return "No per-source late trace yet.";
         float k = _lateLawKNow;
         string law = float.IsNaN(k) ? "no law fitted yet" : $"the place's tail falls as distance to the -{k:F1}";
@@ -1713,7 +1722,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// </summary>
     private float LateSend(ActiveSound a, float d)
     {
-        var lf = TracedReverbSet.LateField;
+        var lf = Traced.LateField;
         if (lf != null && lf.TryGet(a.EntityId, out var ans)
             && ans.When >= DateTime.UtcNow.Ticks - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond)
             && float.IsFinite(ans.Ratio))
@@ -1725,7 +1734,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private void UpdateTracedEchoes()
     {
-        var echoes = TracedReverbSet.Echoes;
+        var echoes = Traced.Echoes;
         if (echoes == null || !TracedEchoesOn || !TracedActive || !_steamAudioEnabled)
         {
             foreach (var a in _activeSounds) if (a.EchoRig != null) DetachEchoRig(a);
@@ -1840,9 +1849,9 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    public static string TracedEchoesStatus()
+    public string TracedEchoesStatus()
     {
-        var e = TracedReverbSet.Echoes;
+        var e = Traced.Echoes;
         string mode = TracedEchoesOn ? "on" : "off";
         if (e == null) return $"Echoes {mode}. No tracer yet — the scene is still being built.";
         return $"Echoes {mode}, {TailDb:F0} dB against physical (the tail level). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
@@ -1886,10 +1895,10 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>For the /reverb readout: how the tracing is doing and the two trims.</summary>
-    public static string TracedReverbStatus()
+    public string TracedReverbStatus()
     {
-        if (TracedReverbSet.Listener == null) return "No trace yet — the scene is still being built.";
-        var (rooms, runs, ms) = TracedReverbSet.Stats();
+        if (Traced.Listener == null) return "No trace yet — the scene is still being built.";
+        var (rooms, runs, ms) = Traced.Stats();
         return $"Traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Tail {TailDb:F0} dB, copies {CopiesDb:F0} dB. {LateFieldStatus()}";
     }
 
@@ -1947,7 +1956,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// as, and runs only the audible ones. Audio update thread.</summary>
     private void UpdateTracedStages()
     {
-        var listenerTrace = TracedReverbSet.Listener;
+        var listenerTrace = Traced.Listener;
         if (listenerTrace == null || !_steamAudioEnabled || _saContext == IntPtr.Zero) return;
         foreach (var kv in _reverbDsps)
         {
@@ -1958,20 +1967,20 @@ public partial class FmodAudioProvider : IAudioProvider
 
         // The room you are in: yours (the cabin's, riding in one). Any other room: its own, from its
         // middle. Open ground elsewhere: yours too, the open air having no middle to trace.
-        var cabin = TracedReverbSet.Cabin;
+        var cabin = Traced.Cabin;
         foreach (var kv in _traced)
         {
             TracedReverb? trace = kv.Key == _listenerRegionId && cabin != null ? cabin : listenerTrace;
             if (kv.Key != _listenerRegionId && IsEnclosure(kv.Key) && _acousticMap != null
                 && _acousticMap.RegionPositions.TryGetValue(kv.Key, out var centre)
                 && _reverbVolumes.TryGetValue(kv.Key, out float vol) && vol > 0.001f)
-                trace = TracedReverbSet.ForRoom(kv.Key, centre) ?? listenerTrace;
+                trace = Traced.ForRoom(kv.Key, centre) ?? listenerTrace;
             // Open ground heard from indoors: traced from just outside the opening it comes in by.
             // Traced at the listener it was the street with the lobby's echoes in it.
             else if (kv.Key != _listenerRegionId && !IsEnclosure(kv.Key) && IsEnclosure(_listenerRegionId)
                      && _fieldHere.TryGetValue(kv.Key, out var field) && field.Region == _listenerRegionId && field.Gain > 0f
                      && _reverbVolumes.TryGetValue(kv.Key, out float openVol) && openVol > 0.001f)
-                trace = TracedReverbSet.ForRoom(kv.Key, field.InField) ?? listenerTrace;
+                trace = Traced.ForRoom(kv.Key, field.InField) ?? listenerTrace;
             kv.Value.State.Trace = trace;
             // Your own place plays the late tail alone, its early part being placed copies
             // (WorldAudioPlayer.QueueEarlyEchoes). A cabin keeps its whole response: nothing is placed
@@ -2273,28 +2282,28 @@ public partial class FmodAudioProvider : IAudioProvider
             ? ShoreVoice(emitter, rate)
             : kind == "wood" && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(woodPreset), places, rate,
-                                    emitter.EntityId * 43 + 17, emitter.Position)
+                                    emitter.EntityId * 43 + 17, emitter.Position, Weather)
               { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey)?[1..], TargetTrees = emitter.Trees }
             : kind == "flow"
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.RunningWaterSpec.ByName(preset), rate,
-                                    emitter.EntityId * 47 + 19, emitter.Position)
+                                    emitter.EntityId * 47 + 19, emitter.Position, Weather)
             : kind == "fire"
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FireSpec.ByName(preset), places, rate,
-                                    emitter.EntityId * 41 + 13, emitter.Position)
+                                    emitter.EntityId * 41 + 13, emitter.Position, Weather)
             : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(preset), places, rate,
-                                    emitter.EntityId * 43 + 17, emitter.Position);
+                                    emitter.EntityId * 43 + 17, emitter.Position, Weather);
         voice.TargetSpread = emitter.Spread;
         voice.TargetQuench = emitter.Quench;
         return new NaturePlaceState(voice, 0, rate, emitter.Position);
     }
 
     /// <summary>Waves at an edge: its preset and its own geometry from the key (ShoreSpec.KeyFor).</summary>
-    private static PlacedNatureVoice ShoreVoice(in SpatialEmitter emitter, int rate)
+    private PlacedNatureVoice ShoreVoice(in SpatialEmitter emitter, int rate)
     {
         OpenFPS.Common.ShoreSpec.ParseKey(emitter.PhysicalKey, out string shorePreset, out var geometry);
         var spec = OpenFPS.Common.ShoreSpec.ByName(shorePreset);
         return new PlacedNatureVoice(emitter.PhysicalKey, spec, geometry ?? spec.DefaultGeometry, rate,
-                                     emitter.EntityId * 53 + 23, emitter.Position);
+                                     emitter.EntityId * 53 + 23, emitter.Position, Weather);
     }
 
     /// <summary>How many voices a rain slot is played as (RainFeeds.PartsFor).</summary>
@@ -2308,7 +2317,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         if (!WaterFeatureVoice.ParseKey(key, out string preset, out string feature, out int tap))
             return new WaterVoiceState(OpenFPS.Common.WaterFeatureSpec.ByName(key[(key.IndexOf(':') + 1)..]),
-                                       rate, entityId * 37 + 11, position);
+                                       rate, entityId * 37 + 11, position, Weather);
         string shared = preset + "/" + feature;
         if (emitter.PlaceOfEntity != 0)
         {
@@ -2316,7 +2325,7 @@ public partial class FmodAudioProvider : IAudioProvider
             WaterTapState? middle;
             lock (_lock) { middle = FindActive(emitter.PlaceOfEntity)?.MachineState as WaterTapState; }
             if (middle == null || emitter.Place <= 0 || emitter.Place >= middle.Shared.PlacesPerTap) return null;
-            return new WaterTapState(middle.Shared, middle.Tap, rate, position, emitter.Place);
+            return new WaterTapState(middle.Shared, middle.Tap, rate, position, Weather, emitter.Place);
         }
         lock (_waterFeatures)
         {
@@ -2330,7 +2339,7 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             if (tap >= w.Water.TapCount) return null;
             w.SetSpread(tap, emitter.Spread);
-            return new WaterTapState(w, tap, rate, position);
+            return new WaterTapState(w, tap, rate, position, Weather);
         }
     }
 

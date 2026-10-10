@@ -181,14 +181,14 @@ public static class WideSourcesSpike
 
         var calm = WindWeather.Steady(0f, 250f, 0f);
         var breeze = WindWeather.Steady(4.5f, 250f, _turbulence);
-        WindField.Weather = calm;
+        facade.Weather.Wind = calm;
 
         // A park tree: its emitter at the middle of its crown, as the map places it (7 m up). d is from
         // the trunk, along the ground.
         void Tree(IEnumerable<float> distances, double seconds, string label = "tree")
         {
             Vector3 trunk = new(-60f, 0f, -60f);
-            WindField.Weather = breeze;
+            facade.Weather.Wind = breeze;
             Stand(trunk + new Vector3(0f, 0f, -distances.First()), 0f);
             int id = AddEmitter("foliage:park_tree", trunk + new Vector3(0f, 7f, 0f), 90f, 4f);
             Pump(4.0);
@@ -202,7 +202,7 @@ public static class WideSourcesSpike
             }
             measuredSound = "";
             Remove(new[] { id });
-            WindField.Weather = calm;
+            facade.Weather.Wind = calm;
             Pump(1.5);
         }
 
@@ -213,7 +213,7 @@ public static class WideSourcesSpike
         void Fountain(IEnumerable<float> distances, double seconds, string label = "fountain")
         {
             Vector3 centre = new(60f, 0f, -60f);
-            WindField.Weather = WindWeather.Steady(2f, 250f, 0.2f);
+            facade.Weather.Wind = WindWeather.Steady(2f, 250f, 0.2f);
             Stand(centre + new Vector3(0f, 0f, -KerbMetres - distances.First()), 0f);
             var ids = AddFountain(centre);
             Pump(4.0);
@@ -225,7 +225,7 @@ public static class WideSourcesSpike
                 Record($"{label} {d:0.#}m", seconds);
             }
             Remove(ids);
-            WindField.Weather = calm;
+            facade.Weather.Wind = calm;
             Pump(1.5);
         }
 
@@ -233,7 +233,7 @@ public static class WideSourcesSpike
         void FountainWalk(float halfLength, float speed)
         {
             Vector3 centre = new(60f, 0f, 60f);
-            WindField.Weather = WindWeather.Steady(2f, 250f, 0.2f);
+            facade.Weather.Wind = WindWeather.Steady(2f, 250f, 0.2f);
             float z = -KerbMetres - 4f;
             Stand(centre + new Vector3(-halfLength, 0f, z), MathF.PI / 2f);
             var ids = AddFountain(centre);
@@ -244,7 +244,7 @@ public static class WideSourcesSpike
             Record($"fountain walk {speed:0.#}ms", seconds);
             perFrame = null;
             Remove(ids);
-            WindField.Weather = calm;
+            facade.Weather.Wind = calm;
             Pump(1.5);
         }
 
@@ -252,7 +252,7 @@ public static class WideSourcesSpike
         void Fire(IEnumerable<float> distances, double seconds, string label = "fire")
         {
             Vector3 pit = new(-60f, 0f, 60f);
-            WindField.Weather = WindWeather.Steady(1.5f, 250f, 0.2f);
+            facade.Weather.Wind = WindWeather.Steady(1.5f, 250f, 0.2f);
             Stand(pit + new Vector3(0f, 0f, -distances.First()), 0f);
             int id = AddEmitter("fire:fire_pit", pit + new Vector3(0f, 0.6f, 0f), 120f, 1f);
             Pump(4.0);
@@ -266,7 +266,7 @@ public static class WideSourcesSpike
             }
             measuredSound = "";
             Remove(new[] { id });
-            WindField.Weather = calm;
+            facade.Weather.Wind = calm;
             Pump(1.5);
         }
 

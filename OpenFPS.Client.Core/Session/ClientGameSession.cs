@@ -425,10 +425,10 @@ public sealed partial class ClientGameSession : IDisposable
     /// /reverb: how the trace is doing. The tail is the place's own impulse response traced through
     /// the map, everywhere; there is no other mode to switch to.
     /// </summary>
-    internal static string ReverbCommand(string[] args)
+    internal string ReverbCommand(string[] args)
     {
         if (args.Length > 0) return "Traced everywhere now; there is no room mode. /reflections sets the level.";
-        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus();
+        return _audioEngine.TracedReverbStatus();
     }
 
     /// <summary>
@@ -1017,10 +1017,10 @@ public sealed partial class ClientGameSession : IDisposable
 
             case WorldStateUpdate wsu:
                 _world.UpdateAtmosphere(wsu);
-                // The one wind the trees, the fires and your ears read.
-                OpenFPS.Common.WindField.Weather = _world.Wind;
-                // The water over the ground the drainage lines' voices read (GroundWater).
-                OpenFPS.Common.GroundWater.Shared.Load(wsu.GroundWater);
+                // The one wind the trees, the fires and your ears read, and the water over the ground the
+                // drainage lines' voices read: this world's weather, as the server sends it.
+                _audioEngine.Weather.Wind = _world.Wind;
+                _audioEngine.Weather.Ground.Load(wsu.GroundWater);
                 break;
 
             case HitConfirm confirm:
@@ -1712,7 +1712,7 @@ public sealed partial class ClientGameSession : IDisposable
                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
                 }
                 else if (a != null) { Say("Say /echoes on or /echoes off; /tail sets the level."); return; }
-                Say(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesStatus());
+                Say(_audioEngine.TracedEchoesStatus());
                 return;
             }
             // Reflections against the direct sound, in two kinds (FmodAudioProvider.TailDb): /tail for

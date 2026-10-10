@@ -14,67 +14,14 @@ namespace OpenFPS.Common;
 /// in the short ones, as a Kolmogorov spectrum has.
 ///
 /// The server's weather (WorldEnvironmentSystem) is broadcast once a second and <see cref="WindWeather"/>
-/// ramps to each. The pattern is displaced by how far the air has travelled, which the server keeps and
-/// sends too: a pattern fixed to a direction would swing round the map's origin as the wind veered, and
-/// a tree a kilometre out would hear a minute of gusts in ten seconds. Hashed from a lattice, so two
+/// ramps to each; each audio world holds its own (<see cref="WorldWeather.Wind"/>) and everything here
+/// takes the weather it reads. The pattern is displaced by how far the air has travelled, which the
+/// server keeps and sends too: a pattern fixed to a direction would swing round the map's origin as the
+/// wind veered, and a tree a kilometre out would hear a minute of gusts in ten seconds. Hashed from a lattice, so two
 /// clients with the same broadcast and UTC second get the same answer.
 /// </summary>
 public static class WindField
 {
-    /// <summary>The weather every reader without its own sees. Swapped whole, so a reader on the mixer
-    /// thread never sees half of one broadcast and half of the next.</summary>
-    public static WindWeather Weather
-    {
-        get => _held.Value ?? System.Threading.Volatile.Read(ref _weather);
-        set => System.Threading.Volatile.Write(ref _weather, value ?? WindWeather.Default);
-    }
-    private static WindWeather _weather = WindWeather.Default;
-
-    /// <summary>
-    /// Holds a weather for the calling flow only (a test, a lab render) until the handle is disposed.
-    /// The shared weather is a global every session writes, and a test beside a session test heard it
-    /// change under it (WideSourcesTests.ATreesPlaceVoicesAddUpToItsOneVoice, 2026-10-06). The game never
-    /// holds one: on the mixer thread this is one AsyncLocal read.
-    /// </summary>
-    public static IDisposable Hold(WindWeather weather)
-    {
-        var before = _held.Value;
-        _held.Value = weather;
-        return new Release(before);
-    }
-    private static readonly System.Threading.AsyncLocal<WindWeather?> _held = new();
-    private sealed class Release(WindWeather? before) : IDisposable
-    {
-        public void Dispose() => _held.Value = before;
-    }
-
-    /// <summary>The mean wind at ten metres, m/s, now. A moderate breeze — Beaufort 3, leaves and
-    /// small twigs in constant motion — is 3.4 to 5.4. Setting it (the lab does) makes a steady wind
-    /// with the present direction and turbulence.</summary>
-    public static float MeanSpeed
-    {
-        get => Weather.At(Now()).Speed;
-        set { var a = Weather.At(Now()); Weather = WindWeather.Steady(value, a.FromDegrees, a.Turbulence); }
-    }
-
-    /// <summary>Where it blows FROM, degrees clockwise from north (the way a forecast says it).</summary>
-    public static float FromDegrees
-    {
-        get => Weather.At(Now()).FromDegrees;
-        set { var a = Weather.At(Now()); Weather = WindWeather.Steady(a.Speed, value, a.Turbulence); }
-    }
-
-    /// <summary>Standard deviation of the speed over its mean, now: about 1 / ln(z / z0) (EN 1991-1-4,
-    /// turbulence factor 1), 0.24 at ten metres and 0.26 at a park tree's crown with this
-    /// <see cref="RoughnessMetres"/>. Not 0.3: a crown's sound goes as the wind to the 3.6, so the lulls
-    /// silenced the trees and the gusts sounded like someone turning them up and down. The server's
-    /// gustiness moves it a little (<see cref="WindAir.TurbulenceFor"/>).</summary>
-    public static float Turbulence
-    {
-        get => Weather.At(Now()).Turbulence;
-        set { var a = Weather.At(Now()); Weather = WindWeather.Steady(a.Speed, a.FromDegrees, value); }
-    }
-
     /// <summary>The roughness length of the ground, m: about 0.1 for open grass with scattered trees,
     /// 0.5 to 1 for a suburb. It sets how fast the wind falls off toward the ground.</summary>
     public const float RoughnessMetres = 0.15f;
@@ -112,14 +59,8 @@ public static class WindField
         Norm = (float)(1.0 / Math.Sqrt(v));
     }
 
-    /// <summary>The unit vector the air moves TOWARD, in the map's x (east), z (north), now.</summary>
-    public static (float X, float Z) Downwind => Weather.At(Now()).Downwind;
-
-    /// <summary>The mean speed at a height, by the log law, m/s. Never below a tenth of the
-    /// ten-metre speed, because the law runs to zero at the roughness height and air does not.</summary>
-    public static float MeanAt(float heightMetres) => MeanAt(Weather.At(Now()).Speed, heightMetres);
-
-    /// <summary>The log law for a given ten-metre speed.</summary>
+    /// <summary>The mean speed at a height for a given ten-metre speed, by the log law, m/s. Never below a
+    /// tenth of the ten-metre speed, because the law runs to zero at the roughness height and air does not.</summary>
     public static float MeanAt(float tenMetreSpeed, float heightMetres) => tenMetreSpeed * HeightShare(heightMetres);
 
     /// <summary>What share of the ten-metre speed blows at a height.</summary>
@@ -130,11 +71,8 @@ public static class WindField
         return MathF.Max(0.1f, share);
     }
 
-    /// <summary>The gust signal at a place and moment under the current weather: zero mean, unit
-    /// standard deviation. Positive is a gust, negative a lull.</summary>
-    public static float Gust(float x, float z, double seconds) => Gust(Weather, x, z, seconds);
-
-    /// <summary>The gust signal under a given weather. Pure: what a test asks.</summary>
+    /// <summary>The gust signal at a place and moment under a weather: zero mean, unit standard deviation.
+    /// Positive is a gust, negative a lull.</summary>
     public static float Gust(WindWeather weather, float x, float z, double seconds)
     {
         var (te, tn) = weather.TravelAt(seconds);
@@ -153,9 +91,6 @@ public static class WindField
 
     /// <summary>The wind speed at a place, m/s: the mean at that height times one plus the
     /// turbulence, never stopping entirely (a lull in a breeze is still air moving).</summary>
-    public static float SpeedAt(float x, float heightMetres, float z, double seconds)
-        => SpeedAt(Weather, x, heightMetres, z, seconds);
-
     public static float SpeedAt(WindWeather weather, float x, float heightMetres, float z, double seconds)
     {
         var air = weather.At(seconds);
@@ -185,7 +120,9 @@ public static class WindField
     }
 
     /// <summary>The clock every voice reads the field with: UTC seconds, folded to keep a float's
-    /// precision useful. Clients agree on it to within their clocks.</summary>
+    /// precision useful. Clients agree on it to within their clocks. One world time for the server and
+    /// every client, not a world's state: it stays shared when the monotonic clock goes behind an
+    /// IAudioClock (docs/SOUND_LIBRARY_BOUNDARY.md 4.1, WorldTime).</summary>
     public static double Now() => (DateTime.UtcNow - new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
 
     // ── Value noise ────────────────────────────────────────────────────────────────────────────
@@ -265,7 +202,7 @@ public readonly record struct WindAir(float East, float North, float Turbulence,
     }
 
     /// <summary>The turbulence intensity for the server's gustiness (0..1): 0.18 steady to 0.30 gustiest.
-    /// Near the ground it is set mostly by the ground (<see cref="WindField.Turbulence"/>), so the weather
+    /// Near the ground it is set mostly by the ground (<see cref="WorldWeather.Turbulence"/>), so the weather
     /// only moves it a little. Over land the gust factor (three-second peak over the mean) is about one
     /// plus three times this: 1.55 on a steady day to 1.9 in a squally storm.</summary>
     public static float TurbulenceFor(float gustiness) => 0.18f + 0.12f * Math.Clamp(gustiness, 0f, 1f);

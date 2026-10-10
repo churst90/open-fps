@@ -232,7 +232,7 @@ wind, so a big river's bank slaps and gurgles in a calm while a still pond is si
 
 ### 5.1 The sea at each place (`ShoreSynth`)
 
-- The wind is the weather's mean wind (`WindField.Weather`), not the gusts: a gust is too short to
+- The wind is the weather's mean wind (`WorldWeather.Wind`), not the gusts: a gust is too short to
   raise waves. The sea glides toward what the wind would raise with a third of the growth time
   (section 1.1), never faster than ten seconds; a voice made mid-storm starts with its sea already up.
 - Each place along the edge is its own column of water: its own wind sea, the shared swell at its own

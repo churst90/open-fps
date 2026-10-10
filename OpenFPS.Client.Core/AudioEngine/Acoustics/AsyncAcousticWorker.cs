@@ -98,10 +98,18 @@ public class AsyncAcousticWorker : IDisposable
     private readonly Dictionary<int, AcousticRequest> _pending = new(); // the latest request per entity
     private List<int>? _evictScratch;
 
-    public AsyncAcousticWorker(SpatialAcoustics acoustics)
+    public AsyncAcousticWorker(SpatialAcoustics acoustics) : this(acoustics, null) { }
+
+    /// <summary>A worker whose places are traced into <paramref name="traced"/>: the provider's set, so its
+    /// reverb buses play what this worker's context traces. Null: a set of the worker's own.</summary>
+    internal AsyncAcousticWorker(SpatialAcoustics acoustics, TracedReverbSet? traced)
     {
         _acoustics = acoustics;
+        Traced = traced ?? new TracedReverbSet();
     }
+
+    /// <summary>The traced places on this worker's Steam Audio context. Released with the worker.</summary>
+    internal TracedReverbSet Traced { get; }
 
     /// <summary>
     /// For the emitter-stream replay (EmitterStreamReplayTests): no thread; requests are answered when the
@@ -524,7 +532,7 @@ public class AsyncAcousticWorker : IDisposable
             // The traced reverb runs its own trace on its own thread; the region tells it when you have gone
             // into another room, so its averaged tail starts again.
             int hereRegion = _acoustics.GetRegionAt(world, listener);
-            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.SetListener(listener, hereRegion);
+            Traced.SetListener(listener, hereRegion);
 
             _saSim.SetListener(listener);
             _saSim.Run();
@@ -1026,7 +1034,7 @@ public class AsyncAcousticWorker : IDisposable
     private void ReleaseRetiredTileSets()
     {
         if (_doorBuild != null || _retiredTileSets.Count == 0) return;
-        if (OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
+        if (Traced.Reconfiguring) return;
         long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
         for (int i = _retiredTileSets.Count - 1; i >= 0; i--)
             if (_retiredTileSets[i].At < cutoff) { _retiredTileSets[i].Set.Dispose(); _retiredTileSets.RemoveAt(i); }
@@ -1114,7 +1122,7 @@ public class AsyncAcousticWorker : IDisposable
         if (_saListenerScene != null) _retiredScenes.Add((_saListenerScene, now));
         _saScene = full; _saListenerScene = listener;
         _saSim.SetScene(full);
-        OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.ConfigureInBackground(_saContext, full, listener.IsBuilt ? listener : null);
+        Traced.ConfigureInBackground(_saContext, full, listener.IsBuilt ? listener : null);
         _barrierBoxes = boxes;
         _enclosureWorld = geometry;
         _acoustics.PublishReflectionWorld(geometry, map);
@@ -1136,7 +1144,7 @@ public class AsyncAcousticWorker : IDisposable
     private void ReleaseRetiredScenes()
     {
         // Not while the tracers are still being handed the new scenes: until then they trace the old.
-        if (OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
+        if (Traced.Reconfiguring) return;
         if (_saSim is { Baking: true }) return;                 // nor while the bake reads the old one
         long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
         for (int i = _retiredScenes.Count - 1; i >= 0; i--)
@@ -1156,7 +1164,7 @@ public class AsyncAcousticWorker : IDisposable
             if (_doorBuild != null) return;
             // The tile set assembles into the pair of scenes not in use, which is only free once the last
             // pair handed over has reached every tracer.
-            if (_tileScenes != null && OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
+            if (_tileScenes != null && Traced.Reconfiguring) return;
             bool tiles = world.GeometryVersion != _builtGeometryVersion;
             if (!tiles)
             {
@@ -1266,7 +1274,7 @@ public class AsyncAcousticWorker : IDisposable
                     Console.WriteLine($"[AcousticWorker] Listener trace scene: {boxes.Count - withoutGround.Count} open-ground slab(s) left out "
                                     + $"of {boxes.Count} ({sw.ElapsedMilliseconds} ms).");
             }
-            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, _saScene,
+            Traced.Configure(_saContext, _saScene,
                 _saListenerScene is { IsBuilt: true } ? _saListenerScene : null);
             // Off the worker thread: inside SetScene the bake took a hundred seconds of a core before any
             // source had an occlusion value, the world unoccluded until then.
@@ -1403,7 +1411,7 @@ public class AsyncAcousticWorker : IDisposable
         _cts.Cancel();
         _workerThread?.Join(); // after this, nothing else touches the Phonon objects
 
-        OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Dispose();
+        Traced.Release();
         if (_saSim != null) { _saSim.Dispose(); _saSim = null; }
         if (_saScene != null) { _saScene.Dispose(); _saScene = null; }
         foreach (var (retired, _) in _retiredScenes) retired.Dispose();

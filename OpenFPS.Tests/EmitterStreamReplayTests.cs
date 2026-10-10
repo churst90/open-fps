@@ -265,6 +265,9 @@ internal sealed class Replay
         World.RefreshRunner = work => work();
         World.Clear(new Vector3(4000, 400, 4000));
         Facade = new AudioEngineFacade(Mixer);
+        // A still day: the weather's wind is read on the wall clock (WindField.Now). The run-off is this
+        // world's own, so it starts empty.
+        Facade.Weather.Wind = WindWeather.Steady(0f, 0f, 0f);
         Facade.InitializeForTest();
         Audio = new ClientAudioSystem(Facade, new SoundMappingService(Player), Player, () => Now, manualAcoustics: true, seed: Seed);
     }
@@ -291,7 +294,7 @@ internal sealed class Replay
                      AudioPhysics.CurrentAirCelsius, MixerQuality.MixerRate,
                      OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
                      OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-                     OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead, Runoff.Held);
+                     OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead);
         Loudness.DynamicRangeCompression = Loudness.DefaultCompression;
         OpenFPS.Common.Hearing.EarModel.Enabled = true;
         OpenFPS.Common.Hearing.EarModel.ListeningLevelDb = OpenFPS.Common.Hearing.EarModel.DefaultListeningLevelDb;
@@ -302,13 +305,9 @@ internal sealed class Replay
         OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled = true;
         OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = true;
         RainField.RoofRidesWithHead = true;
-        Runoff.Held = false;
-        Runoff.Reset();
         try
         {
             var r = new Replay();
-            // A still day: the weather's wind is read on the wall clock (WindField.Now).
-            using (WindField.Hold(WindWeather.Steady(0f, 0f, 0f)))
             using (AudioClock.UseForTest(() => r.Now))
                 script(r);
             return r;
@@ -320,8 +319,7 @@ internal sealed class Replay
              AudioPhysics.CurrentAirCelsius, MixerQuality.MixerRate,
              OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
              OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-             OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead, Runoff.Held) = saved;
-            Runoff.Reset();
+             OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead) = saved;
         }
     }
 
