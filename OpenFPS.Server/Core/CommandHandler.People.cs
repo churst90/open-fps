@@ -27,11 +27,8 @@ public partial class CommandHandler
             return;
         }
 
-        _server.SendToSession(targetSession, new ChatMessage
-        {
-            Sender = session.Username, Text = message, Channel = ChatChannel.Private,
-            FromStaff = session.Role is UserRole.Admin or UserRole.Dev or UserRole.Moderator,
-        });
+        var line = _server.ChatFrom(session, message, ChatChannel.Private);
+        _server.SendToSession(targetSession, line);
         reply(new ChatMessage { Sender = session.Username, Text = message, Channel = ChatChannel.Private, To = targetSession.Username });
     }
 
@@ -61,13 +58,7 @@ public partial class CommandHandler
         return false;
     }
 
-    private static string RoleWord(UserRole role) => role switch
-    {
-        UserRole.Admin => "administrator",
-        UserRole.Dev => "developer",
-        UserRole.Moderator => "moderator",
-        _ => "player",
-    };
+    private static string RoleWord(UserRole role) => Permissions.RoleWord(role);
 
     /// <summary>/friend add NAME, /friend remove NAME, /friend NAME (add), /unfriend NAME.</summary>
     private void HandleFriend(UserSession session, string commandName, string[] args, Action<IMessage> reply)

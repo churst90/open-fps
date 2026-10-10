@@ -126,7 +126,7 @@ public static class NanWalkSpike
         if (tr.Late is { } l && (!Finite(l.Re) || !Finite(l.Im))) faults.Add("the late part");
         if (tr.LateSdm is { } sdm)
         {
-            if (sdm.PerDirection.Any(d => d != null && (!Finite(d.Re) || !Finite(d.Im)))) faults.Add("the directional part");
+            if (sdm.PerDirection.Any(d => d != null && (!Finite(d.Re) || !Finite(d.Im) || !Finite(d.LongRe) || !Finite(d.LongIm)))) faults.Add("the directional part");
             if (!Finite(sdm.LateShare) || !Finite(sdm.Share)) faults.Add("the shares");
         }
         if (tr.DiffuseLate is { } dl && (!Finite(dl.C0) || !Finite(dl.C1))) faults.Add("the late field");

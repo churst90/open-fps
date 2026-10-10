@@ -78,6 +78,10 @@ public partial class CommandHandler
         // docs/SERVER_SECURITY.md has the table; keep it in step with Permissions.
         if (!MayHere(session, Permissions.Canonical(commandName)))
         {
+            // Control+B asks for the build dialog: a player who may not edit hears nothing at all.
+            if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForBuildForm(args)) return;
+            // So does F12, which asks for the editor dialog.
+            if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForDialog(args)) return;
             // F12 is answered in words of its own: who the editor is for.
             if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForMenu(args))
                 Say(reply, OpenFPS.Server.Editor.WorldEditor.Refusal);
@@ -172,7 +176,7 @@ public partial class CommandHandler
                 break;
             // The whole server's weather, for testing.
             case "weather":
-                HandleWeather(args, reply);
+                HandleWeather(session, args, reply);
                 break;
             case "prefabs":
                 HandleListPrefabs(reply);
@@ -437,6 +441,19 @@ public partial class CommandHandler
                 unmuted.MutedUntilUtc = DateTime.MinValue;
                 _server.SendToSession(unmuted, new TextEvent { Text = "You can chat again." });
                 Say(reply, $"{unmuted.Username} can chat again.");
+                break;
+            case "ban":
+                HandleBan(session, args, reply);
+                break;
+            case "unban":
+                HandleUnban(session, args, reply);
+                break;
+            case "bans":
+                HandleBans(reply);
+                break;
+            // Owner or maps-any: the editor checks, as it does for the map's other settings.
+            case "setmapsize":
+                Editor.SetMapSize(session, args, reply);
                 break;
             case "join":
             case "travel":

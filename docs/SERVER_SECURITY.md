@@ -5,20 +5,33 @@ commands that show it. For running a server on a VPS, see `WINDOWS_AND_SERVER.md
 
 ## Roles
 
-There are four roles: Player, Moderator, Dev (developer) and Admin. A new account is a Player. Only
-an Admin changes a role (`/setrole NAME player|moderator|dev|admin`). The seeded `admin` account is
-an Admin.
+There are five roles: Player, Moderator, Dev (developer), Admin and Owner. A new account is a
+Player. Only an Admin or Owner changes a role (`/setrole NAME player|moderator|dev|admin|owner`). The
+seeded `admin` account is the Owner. Power comes only from roles and grants: no check looks at an
+account's name.
 
 - **Player**: the game, and building on maps of their own.
 - **Moderator**: looks after people, never the world. Announcements, where somebody is, bringing
-  them, kicking and muting, joining private maps to answer a report. Cannot build anywhere but their
+  them, kicking, muting and banning, joining private maps to answer a report. Cannot build anywhere but their
   own maps, see addresses or change accounts.
 - **Dev**: builds and tests the world, on any map. Spawning, firing any weapon, giving ordinary
   items, joining private maps, and granting a player permissions the developer holds. No power over
   people.
-- **Admin**: everything, and alone changes roles, makes custom roles, grants anything to anybody,
-  gives premium items (the teleporter, vehicles), moves other players, and sees and changes accounts
-  and addresses.
+- **Admin**: everything but `owners`, and alone changes roles, makes custom roles, grants anything
+  to anybody, gives premium items (the teleporter, vehicles), moves other players, and sees and
+  changes accounts and addresses.
+- **Owner**: everything, including `owners`.
+
+**The Owner role** (2026-10-09) is there so the server can never lock its owner out:
+- `/role create|add|remove|delete owner` are refused, as for every built-in role. A custom role
+  called `owner` in an older `roles.json` is not loaded.
+- `/setrole` on an owner, or to `owner`, needs `owners`, which only the Owner role has and nobody
+  can be granted. The last owner keeps the role, and nobody changes their own role.
+- `/grant` and `/revoke` refuse an owner: the role already has every permission.
+- On start, if no account is an Owner, the `admin` account becomes one (its custom role is
+  cleared). With no `admin` account the server logs a warning.
+- An owner can be kicked or muted by somebody with `protected` (an Admin), as an Admin can, but
+  nobody can ban an owner.
 
 A permission is a command's name, or one of the powers at the end of the table. Roles are sets of
 permissions, in `OpenFPS.Server/Core/Permissions.cs`. The agreed table is
@@ -52,8 +65,10 @@ You can now use: move, put, spawn."
 **Single permissions.** `/grant sean give`, `/revoke sean give`. Grants are kept with the account.
 An Admin (`grant-any`) grants anything to anybody. A Dev grants and revokes only permissions they
 hold, only for players, and never for somebody whose custom role can do something the Dev cannot.
-`grant`, `revoke`, `setrole`, `role` and `grant-any` cannot be granted. `/perms` lists your own,
+`grant`, `revoke`, `setrole`, `role`, `grant-any` and `owners` cannot be granted. `/perms` lists your own,
 `/perms NAME` (`perms-any`) someone else's, `/perms all` every permission.
+
+The Owner has every row. The Admin has every row but the last.
 
 | Permission | Player | Moderator | Dev | Admin |
 | --- | --- | --- | --- | --- |
@@ -65,6 +80,7 @@ hold, only for players, and never for somebody whose custom role can do somethin
 | Building, `spawn`, `move`, `savemap`, sound tools on maps you own | yes | yes | yes | yes |
 | `announce`, `setmotd`, `where` (`/locate`) | no | yes | no | yes |
 | `bring` (a player to you), `kick`, `mute` (`/mute NAME [minutes]`, 10 by default), `unmute` | no | yes | no | yes |
+| `ban`: `/ban NAME [DURATION] [REASON]`, `/unban NAME`, `/bans` (see "Bans" below) | no | yes | no | yes |
 | `join-private`: `/join` somebody else's private map | no | yes | yes | yes |
 | `give` ordinary items (`/give [NAME] ITEM [COUNT]`: "You gave sean 1 AKM.", and sean hears "cody gave you 1 AKM.") | no | no | yes | yes |
 | `fire-any`: `/fire <weapon>` with empty hands | no | no | yes | yes |
@@ -82,12 +98,35 @@ hold, only for players, and never for somebody whose custom role can do somethin
 | `tp-free`: `/tp` without a teleporter | no | no | no | yes |
 | `move-player`: `/move NAME x y z`, `/move NAME to OTHER` | no | no | no | yes |
 | `grant-any`: grant and revoke anything for anybody | no | no | no | yes |
-| `protected`: kicked or muted only by somebody who has it too | no | no | no | yes |
+| `protected`: kicked, muted or banned only by somebody who has it too | no | no | no | yes |
 | `maps-any`: `/map public`, `private`, `invite` on a map that is not yours | no | no | no | yes |
 | `sessions`, `user` (`/account`), `throttled` (`/ratelimit`), `unlock` | no | no | no | yes |
 | `setrole`, `role` (custom roles) | no | no | no | yes |
+| `owners`: make an owner, change an owner's role | no | no | no | no |
 
 A mute lasts for the session or until it runs out.
+
+### Bans
+
+Account bans (2026-10-09). `ban` covers `/ban`, `/unban` and `/bans`, and can be granted or put in a
+custom role.
+
+- `/ban NAME [DURATION] [REASON]`. A duration is `30m`, `2h`, `7d` or `4w` (up to 520 weeks); without
+  one the ban lasts until `/unban`. The account need not be online. If it is, the player is removed at
+  once and told the same words as at login. Banning again replaces the ban.
+- Nobody bans an owner or themselves. Below the Owner: a protected account only by somebody with
+  `protected` too (as `/kick`), and only an account whose role is below yours (Owner, then Admin,
+  then Moderator and Dev, then Player; a custom role counts as Player). Among players, one trusted
+  with `ban` may ban one who is not.
+- At login, after the password is checked: "You are banned until 14 October, 18:00 UTC: spamming."
+  or "You are banned: no reason given." A wrong password gets the usual refusal, so a ban never tells
+  a stranger that an account exists. Times are UTC.
+- A ban past its end lifts itself at the next login or `/bans`.
+- `/bans`: one line each, "spammer: by sean, 9 October 12:00 UTC, until 14 October 18:00 UTC:
+  spamming."
+- Kept in `Users`: `BannedUtc`, `BannedUntilUtc`, `BannedBy`, `BanReason`. Logged: who banned whom,
+  until when and why; lifts; refused logins.
+- Only accounts are banned. Somebody banned can make a new account; address bans are not built.
 
 `StaffGateTests` runs every gated command as a Player and checks it is refused and changes nothing,
 then as a role that has it and checks it does something. It fails if the permission table and its
@@ -196,7 +235,8 @@ default). The same lines go to the console, which is `journalctl -u openfps` und
 - Accounts created, with the address. Registrations refused for the new-account limit.
 - Sessions closed by the server: taken over by a new login, or no login within 2 minutes.
 - Admin actions: `/unlock`, `/setrole`, `/grant`, `/revoke`, `/role create`, admin gun mode changes.
-- Moderation: `/kick` (with the reason) and `/mute` (with the minutes).
+- Moderation: `/kick` (with the reason), `/mute` (with the minutes), `/ban` (until when, and the
+  reason), `/unban`, and logins refused for a ban.
 - Chat sent with `/all` or typed on a map, with the sender's name. Private messages are not logged.
 
 Passwords are never logged. A MUD login line that causes an error is logged as
@@ -211,7 +251,8 @@ and are cut at 64 characters.
 - when it was created (empty for accounts made before 2026-10-02);
 - last successful login: time and address;
 - wrong passwords since that login, and the time and address of the last one;
-- the real name the player set, if any.
+- the real name the player set, if any;
+- a ban, if any: when, until when, by whom and why.
 
 ### Only in memory
 
@@ -233,8 +274,9 @@ Lost on restart:
   that are locked, with the time left.
 - `/unlock <name>`: lifts a name's lock and forgets its failures. `/unlock <address>` gives an
   address its limits back.
-- `/setrole <name> player|moderator|dev|admin|<custom role>`: changes a role. An online player gets
-  the new role at once. You cannot change your own.
+- `/setrole <name> player|moderator|dev|admin|owner|<custom role>`: changes a role. An online player
+  gets the new role at once. You cannot change your own. Only an owner changes an owner or makes one,
+  and the last owner stays one.
 
 ## Upgrading an older accounts database
 
@@ -248,7 +290,8 @@ Nothing else is needed. Delete the copy once the server is running normally.
 ## Not done yet
 
 - No command to change a password; `OPENFPS_ADMIN_PASSWORD` resets only `admin`.
-- No ban. `/kick` disconnects, but the player can log straight back in.
+- Bans are by account only. A banned player can register a new account from the same address (the
+  new-account limit of 3, then one every 20 minutes, slows that).
 - The MUD port has no encryption.
 - LiteNetLib still holds the fragments of a message until it is whole: at most 8 messages of 64
   fragments per sender, about 700 KB, until the connection closes.

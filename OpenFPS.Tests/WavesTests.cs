@@ -229,6 +229,37 @@ public class WavesTests
         Assert.True(alu.Plate.StructuralLoss < wood.Plate.StructuralLoss);
     }
 
+    /// <summary>A crest's blow on the planking lands at its own sample of the block, not at the block's
+    /// start (it was up to 2.7 ms early).</summary>
+    [Fact]
+    public void A_hull_blow_lands_at_its_sample_in_the_block()
+    {
+        var hull = new ShoreSynth.HullPlate(ShoreSpec.HullWood.Hull!, Rate, 2);
+        hull.BeginBlock();
+        hull.Blow(0, 50, 0.5f, 0.005f);
+        hull.Blow(1, 0, 0.5f, 0.005f);
+        var a = new float[128];
+        var b = new float[128];
+        hull.Render(0, a);
+        hull.Render(1, b);
+        int first = Array.FindIndex(a, v => v != 0f);
+        _o.WriteLine($"blow at 50: first sound at {first}; blow at 0: first sound at {Array.FindIndex(b, v => v != 0f)}");
+        Assert.Equal(50, first);
+        Assert.NotEqual(0f, b[0]);
+        // The same blow, only later: what it rings is the same, 50 samples on.
+        float tol = 1e-6f * MathF.Abs(b[0]);
+        Assert.Equal(b[0], a[50], tol);
+        Assert.Equal(b[77], a[127], tol);
+        // A blow belongs to its own block: the next one rings on without striking again.
+        hull.BeginBlock();
+        var a2 = new float[128];
+        var b2 = new float[128];
+        hull.Render(0, a2);
+        hull.Render(1, b2);
+        Assert.Equal(b[78], a2[0], tol);
+        Assert.Equal(b2[10], a2[60], tol);
+    }
+
     [Fact]
     public void Every_preset_renders_clean_sound()
     {

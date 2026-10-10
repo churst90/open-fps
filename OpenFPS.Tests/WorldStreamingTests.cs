@@ -139,6 +139,7 @@ public class WorldStreamingTests
         string maps = Path.Combine(dir, "maps");
         Directory.CreateDirectory(Path.Combine(maps, "places"));
         File.Copy(Path.Combine(AppContext.BaseDirectory, "places", id + ".json"), Path.Combine(maps, "places", id + ".json"));
+        RealPlaceMapTests.CopyGround(id, Path.Combine(maps, "places"));
         AcousticRegistry.Initialize();
         var manager = new MapManager(new MapRepository(maps), new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
         manager.Initialize();
@@ -156,17 +157,36 @@ public class WorldStreamingTests
         Assert.True(maps.TryGetMap(id, out var world, out _, out _, out var lookup));
         Assert.True(maps.TryGetMapData(id, out var data));
 
-        // Everything from the file is in a tile; what is global is the loader's own handful.
-        Assert.Equal(data.Entities.Count, tiles.TiledCount);
+        // Everything from the file is in a tile, and so is the ground the loader lays from the survey; what is
+        // global is the loader's own handful.
+        var terrain = lookup.Values.Where(e => world.Has<TerrainTileComponent>(e)).ToList();
+        Assert.Equal(data.Entities.Count + terrain.Count, tiles.TiledCount);
         Assert.InRange(tiles.Global.Count, 1, 10);
-        _o.WriteLine($"{id}: {tiles.Tiles.Count()} tiles, {tiles.TiledCount} tiled, {tiles.Global.Count} global");
+        _o.WriteLine($"{id}: {tiles.Tiles.Count()} tiles, {tiles.TiledCount} tiled ({terrain.Count} of them ground), {tiles.Global.Count} global");
 
-        // The ground is one slab under the map: it is in every tile, at coarse.
-        var ground = lookup.Values.First(e => world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).Name == "Ground"
-                                              && world.Has<ColliderComponent>(e) && world.Get<ColliderComponent>(e).Size.X > 1000f);
-        Assert.True(tiles.TryGet(ground.Id, out var g));
-        Assert.Equal(TileDetail.Coarse, g.Needs);
-        Assert.True(g.Tiles.Length >= tiles.Tiles.Count() * 9 / 10, $"the ground is in {g.Tiles.Length} of {tiles.Tiles.Count()} tiles");
+        if (data.Elevation != null)
+        {
+            // The ground is a tile of terrain in every tile, each in its own tile only, at coarse.
+            var covered = new HashSet<TileKey>();
+            foreach (var t in terrain)
+            {
+                Assert.True(tiles.TryGet(t.Id, out var g));
+                Assert.Equal(TileDetail.Coarse, g.Needs);
+                var only = Assert.Single(g.Tiles);
+                Assert.Equal(TileKey.Of(world.Get<Transform>(t).Position, tiles.TileMetres), only);
+                covered.Add(only);
+            }
+            Assert.True(covered.IsSupersetOf(tiles.Tiles), "a tile with no ground");
+        }
+        else
+        {
+            // The ground is one slab under the map: it is in every tile, at coarse.
+            var ground = lookup.Values.First(e => world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).Name == "Ground"
+                                                  && world.Has<ColliderComponent>(e) && world.Get<ColliderComponent>(e).Size.X > 1000f);
+            Assert.True(tiles.TryGet(ground.Id, out var g));
+            Assert.Equal(TileDetail.Coarse, g.Needs);
+            Assert.True(g.Tiles.Length >= tiles.Tiles.Count() * 9 / 10, $"the ground is in {g.Tiles.Length} of {tiles.Tiles.Count()} tiles");
+        }
 
         // Rooms are full detail; a doorway shares its rooms' tiles, so where one goes the other does.
         int doors = 0, rooms = 0, crowns = 0;
@@ -229,7 +249,7 @@ public class WorldStreamingTests
         var ids = TileStreamer.Begin(interest, tiles, maps.GetSpawnPoint(id).Position);
         long bytes = 0;
         foreach (var chunk in ids.Where(lookup.ContainsKey).Chunk(EntityDefinitionBatch.Size))
-            bytes += MemoryPackSerializer.Serialize<IMessage>(EntityDefinitionPack.Pack(new EntityDefinitionBatch { Definitions = chunk.Select(i => EntityDefinitionFactory.From(world, lookup[i])).ToList() })).Length;
+            bytes += MemoryPackSerializer.Serialize<IMessage>(EntityDefinitionPack.Pack(new EntityDefinitionBatch { Definitions = chunk.Select(i => TileStreamer.Definition(world, lookup[i], tiles, interest)).ToList() })).Length;
         int coarseTiles = interest.Levels.Count(kv => kv.Value == TileDetail.Coarse);
         int perCoarse = interest.Levels.Where(kv => kv.Value == TileDetail.Coarse)
                                        .Sum(kv => tiles.Members(kv.Key).Count(i => tiles.TryGet(i, out var mm) && mm.Needs == TileDetail.Coarse)) / Math.Max(1, coarseTiles);
@@ -311,6 +331,18 @@ public class WorldStreamingTests
                 if (tiles.TryGet(def.EntityId, out var m))
                     Assert.Contains(m.Tiles, k => k.DistanceFrom(spawn, 250f) <= StreamRadii.Medium.FarMetres);
 
+        // The ground of a full tile goes at 2 m, of a coarse one at the far ring's 7.8 m.
+        int fineGround = 0, coarseGround = 0;
+        foreach (var def in Defs(sent).Where(d => d.Terrain != null))
+        {
+            Assert.True(tiles.TryGet(def.EntityId, out var m));
+            var level = alice.Tiles.Levels[Assert.Single(m.Tiles)];
+            Assert.Equal(level == TileDetail.Full ? 126 : TerrainTileComponent.CoarseCells + 1, def.Terrain!.Posts);
+            if (level == TileDetail.Full) fineGround++; else coarseGround++;
+        }
+        Assert.True(fineGround > 0 && coarseGround > 0, $"{fineGround} fine and {coarseGround} coarse tiles of ground");
+        var sentCoarse = Defs(sent).Where(d => d.Terrain is { Posts: TerrainTileComponent.CoarseCells + 1 }).Select(d => d.EntityId).ToHashSet();
+
         // Walk 700 m east, a tick at a time at a run, and let the streamer keep up.
         var broadcast = new List<IMessage>();
         server.Sent = null;
@@ -344,6 +376,16 @@ public class WorldStreamingTests
                      $"{removed.Count} removed, {streamedBytes / 1024.0:F0} KB ({streamedBytes / 1024.0 / Math.Max(1, tilesLoaded):F0} KB a tile); " +
                      $"broadcast tick median {tickTimes[tickTimes.Count / 2]:F2} ms, worst {tickTimes[^1]:F1} ms");
 
+        // Ground sent coarse whose tile came up to full detail went again whole, under the same entity; every
+        // full tile the client has now has its ground at 2 m.
+        var resent = Defs(broadcast).Where(d => d.Terrain is { Posts: 126 } && sentCoarse.Contains(d.EntityId)).ToList();
+        Assert.NotEmpty(resent);
+        foreach (var (key, level) in alice.Tiles.Levels)
+            if (level == TileDetail.Full)
+                foreach (int gid in tiles.Members(key))
+                    Assert.DoesNotContain(gid, alice.Tiles.CoarseGround);
+        _o.WriteLine($"ground: joined with {fineGround} tiles at 2 m and {coarseGround} at 7.8 m; {resent.Count} sent again whole as they came near");
+
         // The spawn tile is far behind now: none of its full-detail things are known any more.
         var spawnTile = TileKey.Of(spawn, 250f);
         Assert.False(alice.Tiles.Levels.TryGetValue(spawnTile, out var l) && l == TileDetail.Full);
@@ -351,6 +393,138 @@ public class WorldStreamingTests
         int before = broadcast.Count;
         server.BroadcastForTest(tick++);
         Assert.DoesNotContain(broadcast.Skip(before).OfType<EntityDefinition>(), d => tiles.IsTiled(d.EntityId));
+    }
+
+    /// <summary>
+    /// The far ring's ground against the near ring's over all of Magnolia (196 tiles): how far the 7.8 m
+    /// ground lies from the 2 m, that two coarse tiles meet without a crack, and how often swapping one for
+    /// the other changes whether the ground stands between a sound 1 m over it and an ear 1.6 m over it in the
+    /// same tile (what occlusion asks of the ground). The swap happens at the full radius, never under anybody.
+    /// </summary>
+    [Fact]
+    public void Coarse_ground_lies_on_the_fine_and_seldom_changes_a_line_of_sight()
+    {
+        var maps = LoadPlace("magnolia_tx");
+        Assert.True(maps.TryGetMap("magnolia_tx", out var world, out _, out _, out var lookup));
+        var grounds = lookup.Values.Where(e => world.Has<TerrainTileComponent>(e))
+                                   .Select(e => (At: world.Get<Transform>(e).Position, T: world.Get<TerrainTileComponent>(e))).ToList();
+        Assert.Equal(196, grounds.Count);
+        var rng = new Random(11);
+        var diffs = new List<float>();
+        int lines = 0, changed = 0, blockedFine = 0, changedUnskirted = 0;
+        var byCorner = new Dictionary<(int, int), (TerrainTileComponent C, float Base)>();
+        foreach (var (at, t) in grounds)
+        {
+            var c = t.Coarse();
+            Assert.Equal(TerrainTileComponent.CoarseCells + 1, c.Posts);
+            Assert.Equal(t.Size, c.Size, 3);
+            var fine = t.Field(0f);
+            var coarse = c.Field(0f);
+            var unskirted = GeometryTerrainTests.UnskirtedCoarse(t, 0f);
+            byCorner[((int)MathF.Round(at.X - t.Size / 2), (int)MathF.Round(at.Z - t.Size / 2))] = (c, at.Y);
+            for (int k = 0; k < 400; k++)
+            {
+                float x = (float)rng.NextDouble() * t.Size, z = (float)rng.NextDouble() * t.Size;
+                diffs.Add(MathF.Abs(fine.HeightAt(x, z) - coarse.HeightAt(x, z)));
+            }
+            for (int k = 0; k < 100; k++)
+            {
+                float x0 = (float)rng.NextDouble() * t.Size, z0 = (float)rng.NextDouble() * t.Size;
+                float x1 = (float)rng.NextDouble() * t.Size, z1 = (float)rng.NextDouble() * t.Size;
+                float y0 = fine.HeightAt(x0, z0) + 1.0f, y1 = fine.HeightAt(x1, z1) + 1.6f;
+                bool Blocked(OpenFPS.Common.Geometry.Heightfield h)
+                {
+                    float len = MathF.Sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0));
+                    int n = Math.Max(2, (int)(len / 0.5f));
+                    for (int s = 1; s < n; s++)
+                    {
+                        float f = s / (float)n;
+                        if (y0 + (y1 - y0) * f < h.HeightAt(x0 + (x1 - x0) * f, z0 + (z1 - z0) * f)) return true;
+                    }
+                    return false;
+                }
+                bool a = Blocked(fine), b = Blocked(coarse);
+                lines++;
+                if (a) blockedFine++;
+                if (a != b) changed++;
+                if (a != Blocked(unskirted)) changedUnskirted++;
+            }
+        }
+        // Two coarse tiles side by side share the posts of their edge.
+        int edges = 0;
+        foreach (var ((x, z), (c, cb)) in byCorner)
+            if (byCorner.TryGetValue((x + 250, z), out var east))
+            {
+                edges++;
+                for (int j = 0; j < c.Posts; j++)
+                    Assert.InRange(MathF.Abs(cb + c.HeightsCm[j * c.Posts + c.Posts - 1] * 0.01f - (east.Base + east.C.HeightsCm[j * east.C.Posts] * 0.01f)), 0f, 0.0101f);
+            }
+        diffs.Sort();
+        _o.WriteLine($"7.8 m ground against 2 m over 196 tiles: median {diffs[diffs.Count / 2] * 100:F1} cm, 99th {diffs[(int)(diffs.Count * 0.99)] * 100:F1} cm, " +
+                     $"worst {diffs[^1] * 100:F0} cm; {edges} shared edges checked; of {lines} lines from 1 m to 1.6 m over the ground in a tile, " +
+                     $"{blockedFine} blocked by the 2 m ground and {changed} ({100.0 * changed / lines:F2} %) changed by the swap " +
+                     $"({changedUnskirted} with the edges as they were before the skirt)");
+        Assert.True(diffs[diffs.Count / 2] < 0.05f);
+        Assert.True(changed < lines / 50, $"{changed} of {lines} lines of sight changed");
+    }
+
+    /// <summary>
+    /// Every seam of Magnolia's ground (364 between its 196 tiles), each with one tile at 7.8 m and its neighbour
+    /// at 2 m, either way round: grazing rays and lines of sight that pass the seam under the ground all meet
+    /// it (GeometryTerrainTests.AcrossSeam). The coarse ground as it was, unskirted, let some through.
+    /// </summary>
+    [Fact]
+    public void Coarse_ground_meets_full_ground_without_a_crack()
+    {
+        var maps = LoadPlace("magnolia_tx");
+        Assert.True(maps.TryGetMap("magnolia_tx", out var world, out _, out _, out var lookup));
+        var surface = EntityGeometry.SurfaceOf("Dirt", Vector3.One, 0, 0, false, 0, 0, false, false, false, "Ground");
+        var tiles = new Dictionary<(int, int), (Vector3 At, TerrainTileComponent T)>();
+        foreach (var e in lookup.Values.Where(e => world.Has<TerrainTileComponent>(e)))
+        {
+            var at = world.Get<Transform>(e).Position;
+            var t = world.Get<TerrainTileComponent>(e);
+            tiles[((int)MathF.Round(at.X - t.Size / 2), (int)MathF.Round(at.Z - t.Size / 2))] = (at, t);
+        }
+        Assert.Equal(196, tiles.Count);
+        var builder = new OpenFPS.Common.Geometry.TriangleWorldBuilder(250f);
+        OpenFPS.Common.Geometry.SolidSpec Fine((Vector3 At, TerrainTileComponent T) x, int id) => EntityGeometry.TerrainSpec(id, x.At, x.T, surface);
+        OpenFPS.Common.Geometry.SolidSpec Coarse((Vector3 At, TerrainTileComponent T) x, int id) => EntityGeometry.TerrainSpec(id, x.At, x.T.Coarse(), surface);
+        OpenFPS.Common.Geometry.SolidSpec Old((Vector3 At, TerrainTileComponent T) x, int id)
+            => OpenFPS.Common.Geometry.SolidSpec.OfTerrain(id, x.At, GeometryTerrainTests.UnskirtedCoarse(x.T, x.At.Y), surface);
+        int seams = 0, rays = 0, leaks = 0, sights = 0, sightLeaks = 0, oldLeaks = 0, oldSightLeaks = 0, fullLeaks = 0;
+        foreach (var ((x, z), a) in tiles)
+            foreach (bool alongX in new[] { false, true })
+            {
+                if (!tiles.TryGetValue(alongX ? (x, z + 250) : (x + 250, z), out var b)) continue;
+                seams++;
+                float seam = alongX ? z + 250f : x + 250f, v0 = (alongX ? x : z) + 1f, v1 = v0 + 248f;
+                var fa = Fine(a, 1); var fb = Fine(b, 2);
+                var truthA = GeometryTerrainTests.GroundOf(fa.Terrain!, fa.TerrainCorner);
+                var truthB = GeometryTerrainTests.GroundOf(fb.Terrain!, fb.TerrainCorner);
+                Func<float, float, float> truth = (wx, wz) => (alongX ? wz : wx) < seam ? truthA(wx, wz) : truthB(wx, wz);
+                GeometryTerrainTests.SeamRays Probe(OpenFPS.Common.Geometry.SolidSpec lo, OpenFPS.Common.Geometry.SolidSpec hi)
+                    => GeometryTerrainTests.AcrossSeam(builder.Build(new[] { lo, hi }, Array.Empty<OpenFPS.Common.Geometry.SolidSpec>()),
+                                                       GeometryTerrainTests.GroundOf(lo.Terrain!, lo.TerrainCorner),
+                                                       GeometryTerrainTests.GroundOf(hi.Terrain!, hi.TerrainCorner),
+                                                       truth, alongX, seam, v0, v1, seams, 200, 100);
+                var full = Probe(fa, fb);
+                fullLeaks += full.Leaks + full.LineLeaks;
+                foreach (var r in new[] { Probe(Coarse(a, 1), fb), Probe(fa, Coarse(b, 2)) })
+                {
+                    rays += r.Rays; leaks += r.Leaks; sights += r.Lines; sightLeaks += r.LineLeaks;
+                }
+                foreach (var r in new[] { Probe(Old(a, 1), fb), Probe(fa, Old(b, 2)) })
+                {
+                    oldLeaks += r.Leaks; oldSightLeaks += r.LineLeaks;
+                }
+            }
+        _o.WriteLine($"{seams} seams, 7.8 m beside 2 m either way round: {leaks} of {rays} grazing rays and {sightLeaks} of {sights} " +
+                     $"lines of sight under the seam got through (unskirted: {oldLeaks} and {oldSightLeaks}); 2 m beside 2 m: {fullLeaks}");
+        Assert.Equal(364, seams);
+        Assert.Equal(0, fullLeaks);
+        Assert.Equal(0, leaks + sightLeaks);
+        Assert.True(oldLeaks > 0, "the unskirted coarse ground should let some rays through, or the probe cannot see a crack");
     }
 
     [Fact]

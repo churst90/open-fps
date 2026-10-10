@@ -255,13 +255,15 @@ against them. People in the street use doors the same way.
 | F6 | Maps |
 | Shift+F6 | Your maps |
 | F8 | Friends |
-| F12 | The world editor, on a map you may edit (see "The world editor") |
+| F12 | The world editor dialog, on a map you may edit (see "The world editor"); not a list. Elsewhere it does nothing |
+| Control+B | The build dialog, on a map you may edit (see "Building quickly"); not a list |
 | I | Your inventory |
 
 Inside a list:
 - Up and Down move. Enter or Right chooses. Escape, Left or Backspace goes back.
 - A letter jumps to the next item starting with that letter.
-- You stand still while a list is open. F5, F6, F8 and F12 switch straight to another list.
+- You stand still while a list is open. F5, F6 and F8 switch straight to another list; F12 opens the
+  editor dialog over it.
 - Choosing a **player** or **friend** gives: Private message, View profile, and Add or Remove
   friend. Staff also get Where is.
 - Choosing a **map** takes you there. A map is read as its name, how many players are on it,
@@ -308,6 +310,10 @@ Press `/` to open the chat line. Type a message and press Enter.
 - `/pm name message` is a **private message**.
 - `/t message` goes to **your team**, on any map.
 - `/motd` repeats the message of the day. The server sends it to you once when you arrive.
+
+A message is read with who said it: their name, their team in brackets, then their role if they are
+not an ordinary player. For example "admin [Mafia] Owner: hello", "sean [Mafia]: hello",
+"bob Developer to all: hello", "kim: hello". A team message leaves the team out.
 
 There are four chat buffers: **All**, **Map**, **Private** and **Server**. Team messages go in
 Private. Each keeps the last 500 messages. Use `[` and `]` to read messages in the current buffer
@@ -392,6 +398,17 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
 - `/map public`, `/map private`: let anybody in, or only you and the people you invite.
 - `/map invite NAME`, `/map uninvite NAME`. The person is told.
 - `/maps`: the maps you can go to. `/maps mine`: your own, and who is invited.
+- `/setmapsize`: the size of the map you are on. `/setmapsize EAST NORTH HEIGHT`: change it, in
+  metres, on a map you own (or any map, with `maps-any`). The map's south-west corner at the ground
+  stays where it is, so nothing on the map moves: a new map is 100 by 100, 40 high, from -50, -50, 0,
+  and `/setmapsize 200 300 40` makes it reach 150 east and 250 north. East and north are 10 to 4,000,
+  the height 5 to 1,000. If anything on the map, or the spawn point, would be left outside, it says
+  how many and names up to three, and changes nothing; add `force` to do it anyway (nothing is moved
+  or deleted, it is just past the edge). Anyone standing past the new edge is brought inside at their
+  next step. Natural ground is laid again under the new size where the map's own ground does not
+  reach. Kept in the map's overlay file, and the editor's undo takes it back. The server's own maps
+  (the city, the speedway, the real places) are made by programs in `tools` and are refused. Also on
+  the world editor's World tab: Map size.
 - `/detail low|medium|high`: how much of a large map is loaded round you. The maps of real places
   (magnolia tx, albany or) are sent in 250 m tiles: everything within 150, 300 or 500 m, and the
   what sound notices from further off (the ground, roads, the outsides of buildings with their front
@@ -430,35 +447,65 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
 Choose a map in the F6 list, or type `/join` and the map name. The client says "Travelling to" the
 map, loads it and puts you in. You stay logged in.
 
+The F6 list has two parts when the server has the world open: **The world** (real places to arrive at)
+and **Maps** (the game's maps and players' own).
+
+## The world
+
+One world of real ground, built by the server the first time anyone goes near a place and kept after
+that. For now it is the ground itself, from the US Geological Survey's elevation survey: hills, banks
+and creek beds, but no roads or buildings yet (those are on the maps of real places).
+
+- Choose a place under "The world" in F6, or type `/join world magnolia`. `/join world` on its own
+  lists the places.
+- `/join world address 1042 Belmont Ave SW, Albany, OR` arrives at any US street address (the Census
+  Bureau's geocoder is asked).
+- The first visit to a place takes a moment: you hear "Building the world at ...", then arrive.
+- Tiles of ground are made round you as you go, 250 m at a time. If you walk to one that is not made
+  yet, you are stopped at its edge with a short low tone and the words "Not built yet. Wait here, or
+  turn back." When it arrives you walk on.
+- `/map` says where you are by the place you arrived at ("the world, 1.2 kilometres north east of
+  Magnolia, Texas, 31907 Bobcat Lane"). Builders also get the grid square, and may type a latitude and
+  longitude: `/join world 30.1237, -95.7409`.
+- A frame of the world reaches 6 km each way from where it was first arrived at; past that is its edge.
+
 ## The world editor
 
-F12 opens the world editor. It changes the map you are on, while you play: there is no build mode,
-you walk and collide as usual. Close it with Escape to move, and press F12 to carry on. The design is
-in docs/WORLD_EDITOR.md.
+F12 opens the world editor dialog. It changes the map you are on, while you play: there is no build
+mode, you walk and collide as usual. While the dialog is open you do not move, so "in front of you" is
+from where you stood when you opened it. The design is in docs/WORLD_EDITOR.md.
 
 Who may use it:
-- Developers and the administrator, on any map.
+- Developers, the administrator and the owner role, on any map.
 - A map's owner, on that map.
 - People the owner names with `/map editor add NAME` (and `/map editor remove NAME`), on that map.
   `/map editor` lists them. Naming an editor also invites them in.
-- Anyone else hears "The world editor is for this map's owner, the people they ask to edit it, and
-  developers."
+- For anyone else F12 does nothing: no sound and no words.
 
-The menu works like the other lists. Items that change something you may want again (a nudge, a step
-up or down) keep the menu open, so Enter can be pressed again. Items that need a number open the
-command line with the start of the command typed for you; type the number and press Enter.
+The dialog:
+- Four tabs: Place, Edit, Build and World. Control+Tab and Control+Shift+Tab change tab, as do
+  Control+Page Down and Control+Page Up. The focus goes to the first control of the tab.
+- Tab and Shift+Tab move through the controls. Each box, list and drop-down is labelled, and its
+  description has the range and a line of help.
+- Enter in a box or a list presses the button it belongs to (Place in the prefab list, Apply in a
+  setting's box). Space ticks a row of the things-near-you list or the placed-on-this-map list. Delete
+  on the placed-on-this-map list removes the chosen thing, asking first.
+- Undo, Redo and Close are under every tab. Undo and Redo say what they would undo or redo.
+- F12, Escape or Close shuts it. Placing, applying and the other buttons keep it open, and the game
+  says what happened ("Placed: Concrete Wall, 2 by 0.5 by 3 metres high, 0.65 metres in front of you,
+  facing north."). A value out of range is said and shown, nothing is sent, and the focus goes to the
+  box to correct.
 
-| Menu | What is in it |
+| Tab | What is in it, in Tab order |
 |---|---|
-| Map | Name, owner, size, tiles, how many things, the spawn point; Set spawn here; Settings (weather, time of day, natural ground); Beacon rules; the models this map pins; the editors |
-| Place | What choosing a prefab does (place it at your feet, at the build cursor, or play a preview to you); Search; Again; the prefabs by category (walls, floors, doors, machines, water, fire, trees, sounds, places, things to carry); Groups |
-| Select | Nearest things; things within 5, 10 or 20 metres; doors near you; places and rooms; by name; by number; hold one as well (for a group). Choosing one selects it and opens its menu |
-| Selected | What it is and where; move by numbers (east, north, up); nudge by the step (north, south, east, west, up, down, forward, back, left, right); turn 15 or 90 degrees or face a direction; bring to you; duplicate; a row of copies; delete; settings; its model; its prefab; for a part of a placed group, hold its whole group |
-| Held | The things you hold together; move them together by numbers, nudge them together, turn them together about their middle; group them; let go |
-| Places and rooms | The rooms and named places on the map, nearest first, to select and set |
-| Library | Every kind of model (machines, water features, fire, trees, shores, running water, horns, whistles, bells, air systems, trains, rail vehicles, track, engines, vehicles, prefabs, groups): each model's values, its versions, where it is used, replace it, copy it, retire it, and new models from a template |
-| Test tools | What is around me; map information |
-| Undo, Redo | Say what they would undo or redo |
+| Place | Search; Category (Buildings and Vehicles first); Prefabs (each with its size and description; vehicles and saved buildings and groups are in the same list); Where it goes (at your feet, at the build cursor, or preview only); Place; Preview; Place again. Then "Build a piece": What (floor, wall, roof, door, window) and its fields as in Control+B, and Place the piece |
+| Edit | Things near you (nearest first; Space ticks); Find by name or number; Find. Then "Placed on this map": Filter placed things, Filter, the list (everything placed with the editor, wherever it is, nearest first; Space ticks, Delete removes), Remove it, Go to it, Edit it, Tick all shown. Then the chosen thing: Position (east, north, up), Facing in degrees, and its settings; Apply changes; Bring to me; Duplicate; Row of copies (how many, and spacing); Delete (asks first). With things ticked: move them together, turn them together, group them, save them as a building, delete them all (asks first), untick all |
+| Build | Kind; Category (prefabs); Models. For the chosen one: Id for the copy and Duplicate; Fields and the value of the field chosen, with Set; Versions, with Use on every map, Pin on this map, Lift this map's pin; Where it is used; Replace it with, on this map or everywhere. Changes apply to every map that uses it, so duplicate first to try things |
+| World | Weather, Time of day, Natural ground, Apply changes, Set spawn here; Map size (owner, not on the server's own maps); Rooms and areas, with Edit it; Beacon rules, one drop-down per kind of beacon, and Apply beacon rules; Editors (add and remove); Model versions pinned to this map; Map information and What is around me |
+
+`/edit` typed on its own still opens the old menus as lists, with everything the dialog leaves out
+(nudging by the step, a list's items added or taken out, retiring a model, new models from a template,
+holding a placed group). Items that need a number or a name open a small dialog with one text box.
 
 - Settings of a placed thing: name, width, height, depth; for a thing that makes a sound its model,
   volume, range and minimum distance; for a door the side that needs a key and the side you push it
@@ -469,12 +516,12 @@ command line with the start of the command typed for you; type the number and pr
   a step up or down. Changing a model changes it on every map and needs the `edit-models`
   permission (developers and the administrator). Each change is a new version; Versions lists them.
   Everyone hears the change at once.
-- Versions: each model's menu has Versions. Choose one to use it on every map (edit-models), or to
-  pin it on this map: then this map's players hear that version, whatever the others use. Pinning is a
+- Versions (Build tab): choose one to use it on every map (edit-models), or to pin it on this map: then this map's players hear that version, whatever the others use. Pinning is a
   setting of the map, so a map's owner may do it. What the server simulates with a model (a vehicle's
   mass and gearbox, say) is the current version on every map; a pin is for what is heard.
-- New models: "New from a template" starts from a built-in model as built; "Copy it" starts from a model
-  as it is now. Type the new model's id (letters, digits, _ and -). A new prefab can be placed at once;
+- New models: Duplicate on the Build tab (or "Copy it" in the `/edit` menu) starts from a model as it
+  is now, and the copy becomes the one shown; "New from a template" in the `/edit` menu starts from a
+  built-in model as built. Type the new model's id (letters, digits, _ and -). A new prefab can be placed at once;
   give a thing a new sound model with its model setting, or replace one model with another.
 - Replace it with another: every thing on this map (or every loaded map, with edit-models) that uses
   one model uses another. One undo puts them all back.
@@ -497,10 +544,32 @@ command line with the start of the command typed for you; type the number and pr
 - Search finds prefabs whose name has every word you type. Preview plays a prefab's sound two metres in
   front of you for six seconds, to you alone; nothing is placed. Again places the last prefab again
   where you stand. A row makes copies of the selected thing in a line the way you face.
-- The build cursor: `/origin` sets it where you stand, `/at` moves it. With Place set to the build
-  cursor, choosing a prefab puts it there, for places you cannot walk to (a roof).
-- Groups: hold some things (Select, hold one as well), then Group them and give the group a name. The
-  group is a model; Place, Groups puts its things down in front of you, turned the way you face. A
+- The build cursor: `/origin` sets it where you stand, `/at` moves it. With "Where it goes" set to the
+  build cursor, Place puts the prefab there, for places you cannot walk to (a roof).
+- Place lists, by category: Buildings, Vehicles, Walls and fences, Floors, roads and roofs, Doors,
+  Stairs and ramps, Furniture and seating, Machines, Water, Fire, Trees and plants, Sounds, Places and
+  markers, Things to carry, then Groups. A prefab's category comes from what it is (a door, a machine's
+  sound, a room, its name), not from a list kept by hand.
+- Vehicles: every vehicle `/spawn vehicle` takes, by its plain name ("1.6 hatchback", "Helicopter").
+  Placing one parks it beside you on clear ground, facing your way, as `/spawn vehicle` does, or at the
+  build cursor. It belongs to the map: anyone may get in and drive it. One undo takes it away. It is kept
+  in the map's edits, not the map file, and parked again where it was put when the server restarts (a
+  car somebody drove off goes back to its spot). A vehicle somebody is sitting in is not removed.
+- Placed on this map (Edit tab, or `/edit placed`): everything placed with the editor on the map you
+  are on, wherever it is, nearest first. Each row says what it is, how far and which way ("104 metres
+  north east"), who placed it and when ("placed by cody, 9 October 14:02"; things placed before
+  2026-10-09 say "placed earlier"). Type words in Filter placed things and press Enter to keep only what
+  has every word in its name, kind or who placed it; "within 20" keeps what is within 20 metres. Remove
+  it (or Delete in the list) takes the chosen one away after asking, and the next one is chosen, so
+  Delete again removes the next. Go to it puts you beside it, facing it (on your own map, or with the
+  move permission). Edit it chooses it, with its fields under Chosen. Tick all shown ticks every row,
+  and "Delete the ticked things" removes them together. Every removal is one undo.
+- Groups and buildings: tick some things on the Edit tab, type a group name and press Group them, or
+  Save as a building. A building is a group listed under Buildings instead of Groups: build a house with
+  Control+B, tick its pieces (Filter "within 20" and Tick all shown is quick when you stand in it), and
+  save it as a building to place it again from Place, Buildings. Making either needs edit-models. The group is a
+  model; on the Place tab the Groups category puts its things down in front of you, turned the way you
+  face. A
   placed group is its things, each its own, and they are held as it is placed. Later, select any one of
   them and choose "Hold its whole group" (`/edit select group`): Held then moves, nudges or turns them
   all together, turning about their middle, and one undo puts them all back. A group's parts can be
@@ -528,17 +597,23 @@ command for each:
 | `/edit select nearest`, `/edit select NAME`, `/edit select #ID`, `/edit select within METRES` | Select |
 | `/edit selected`, `/edit settings` | What is selected, and its settings |
 | `/edit move EAST NORTH UP` | Move by metres; negative goes west, south, down |
+| `/edit move to EAST NORTH UP` | Move to a place, as F1 says where you are (the dialog's Position box) |
 | `/edit nudge DIRECTION [METRES]`, `/edit step METRES` | Move by the step (0.5 m to start with) |
-| `/edit turn DEGREES`, `/edit face DIRECTION` | Turn clockwise (negative: anticlockwise), or to a compass direction |
+| `/edit turn DEGREES`, `/edit face DIRECTION`, `/edit face DEGREES` | Turn clockwise (negative: anticlockwise), or to a compass direction, or to degrees from north (the dialog's Facing box) |
 | `/edit bring`, `/edit duplicate`, `/edit delete` | Bring to you, copy, delete |
+| `/edit placed [WORDS]` | Everything placed with the editor on this map, nearest first, with numbers, who and when; WORDS filter it (name, kind, who; `within 20`) |
+| `/edit remove #ID [#ID ...]`, `/edit remove held` | Remove things wherever they are, by number, or everything ticked; one undo puts them back |
+| `/edit goto #ID` | Stand beside a thing, facing it (your own map, or the move permission) |
+| `/edit select add placed [WORDS]` | Tick everything the placed list shows |
 | `/edit set FIELD VALUE`, `/edit up FIELD`, `/edit down FIELD` | A setting: Name, Width, Height, Depth, Model, Volume, Range, MinDistance, KeyedSide (neither, front, back), PushSide (front, back), Indoor, Floor, Ceiling, North, South, East, West |
 | `/edit place PREFAB [at cursor]`, `/edit prefabs [CATEGORY]` | Place a prefab, at your feet or at the build cursor; list them |
+| `/edit place vehicle:PRESET [at cursor]`, `/edit place vehicle PRESET` | Park a vehicle beside you, or at the build cursor |
 | `/edit find WORDS`, `/edit preview PREFAB`, `/edit again` | Search; hear a prefab; place the last one again |
 | `/edit row COUNT [SPACING]` | Copies of the selected thing in a line the way you face |
-| `/edit select add nearest\|NAME\|#ID`, `/edit select clear` | Hold things together; let go |
+| `/edit select add nearest\|NAME\|#ID`, `/edit select drop #ID`, `/edit select clear` | Hold things together (the dialog's ticks); let one go; let go of all |
 | `/edit select group` | Hold every part of the placed group the selected thing belongs to |
 | `/edit held move EAST NORTH UP`, `/edit held nudge DIRECTION [METRES]`, `/edit held turn DEGREES` | Move or turn everything held together, one undo; turning is about their middle |
-| `/edit group NAME`, `/edit place group NAME` | Make a group of what you hold; place one |
+| `/edit group NAME`, `/edit building NAME`, `/edit place group NAME` | Make a group, or a building, of what you hold; place one |
 | `/edit map settings`, `/edit map set weather server\|clear\|rain\|snow\|storm`, `/edit map set time server\|HOUR`, `/edit map set ground PREFAB`, `/edit map set beacon CATEGORY on\|off\|always\|never` | The map's own settings |
 | `/edit spawn here`, `/edit info` | Move the map's spawn point to you; map information |
 | `/edit model show KIND ID`, `/edit model versions KIND ID` | A model and its versions |
@@ -558,6 +633,32 @@ with a screen reader yet): while an editor list is open, Shift with an arrow nud
 forward, back, left or right; Shift with a bracket nudges it up or down; Shift with comma or period
 turns it 15 degrees; Shift slash says where it is; Shift D duplicates; Shift Delete asks to delete it;
 Shift Z undoes and Shift Y redoes. `/editorkeys off` turns them off again.
+
+### Building quickly (Control+B)
+
+Control+B opens the build dialog on a map you may edit; on any other map it does nothing. It puts down
+a floor, wall, roof, door, window or prefab at the size you type, in one go.
+
+- What: floor, wall, roof, door, window or prefab. For a prefab, its category and then the prefab.
+- The size in metres. Floor: width (left to right as you face), length (away from you), thickness.
+  Roof: height above the floor, width, length, thickness. Wall: length, height, thickness. Door: width
+  and height. Window: width, height, and height above the floor. Each box says its range.
+- Material (floor, wall, roof), or the door type. A material puts its own thickness in the box.
+- Where: in front of you (and how far), at your feet, or at the build cursor. Facing: the way you face,
+  or north, east, south, west.
+- For a door or window, "Fit into the wall in front of you", on by default: the wall you face, within
+  3 metres, has an opening cut where you look and the door or window put in it. A door opens away from
+  you. If there is no wall in reach you are told so.
+- Tab moves through the fields, Enter places, Escape, Cancel or Control+B closes the dialog.
+
+Placing keeps the dialog open, with your values, and the focus back on What, so Enter places another.
+The game says what was placed: "Placed: floor, 6 by 8 metres, concrete, at your feet." The next time
+the dialog opens it has the values you last placed. Undo (in the F12 dialog, or `/edit undo`) takes a placing back,
+including a wall that was cut for a door.
+
+The same from the command line: `/edit build wall length 6 height 2.7 material brick ahead 2`,
+`/edit build floor width 6 length 8 here`, `/edit build door width 1 type pushbar`. The fields are
+listed in docs/WORLD_EDITOR.md section 15.
 
 ## Stairs
 
@@ -881,6 +982,32 @@ is loaded at start.
   client is sent the tiles near it and the rest as it moves (docs/WORLD_STREAMING.md). The server
   log says what each join and each set of tiles cost ("Join of ...", "Tiles for ...").
 
+### The world's tiles
+
+The server makes the world's tiles itself and keeps them in `world/` in its folder (beside
+`openfps.db`). Nothing it downloads is kept, only the tiles. It needs the internet the first time
+anybody goes somewhere new. Settings, all optional, in `world.json` beside it:
+
+    { "StorePath": "world", "CapGigabytes": 20, "Generate": true, "MaxAtOnce": 2, "Prebuild": true }
+
+- `StorePath`: where the tiles are kept: a folder relative to the server's folder (`world`, the
+  default), or a full path such as `/var/lib/openfps/world`. The server's user must be able to write
+  there. An update never touches it: the package carries no `world/`.
+- `CapGigabytes`: the most the tiles may take on disk (20 GB to start). Past it, the tiles nobody has
+  visited for longest are dropped, never one somebody is standing near; a dropped tile is made again
+  when somebody next goes there. A tile of ground is about 20 KB, so 20 GB is about a million tiles.
+  The server warns at start if the disk under the store has less free space than the cap.
+- The real places copied into the world (Magnolia and Albany, from their maps) are kept in the store too,
+  about 5 MB each, and the cap never drops them. They are copied again when their map changes.
+- `Generate`: false serves only tiles already made; players are stopped at the edge of the rest.
+- `MaxAtOnce`: how many tiles are made at the same time.
+- `Prebuild`: false leaves the tiles round each place in `world_places.json` to be made when somebody
+  first goes there, instead of at start.
+- The places to arrive at are in `world_places.json` (an id, a name, a latitude and a longitude each).
+  Arriving waits on the loading screen ("Building the world: 12 of 41 tiles.") until the ground round you
+  is built.
+- The server log says where the tiles are kept and how much they take ("World: tiles kept in ...").
+
 ### Players' own maps
 
 - Any player can make up to 3 maps with `/map new NAME`; the server holds 100 player maps in all.
@@ -909,7 +1036,7 @@ generated map stays what its generator wrote.
 - Things the editor places are numbered from 900,000,000.
 - Models changed in the editor are kept in `OpenFPS.Server/model_versions/KIND.ID.json`, every
   version, and loaded at start. New models, prefab versions and groups are kept there too.
-- A map's pins and its settings (weather, time, ground, beacon rules) are in its overlay file.
+- A map's pins and its settings (weather, time, ground, beacon rules, size) are in its overlay file.
 - To undo every edit on a map, stop the server and delete its overlay file.
 
 ### What a map file contains
@@ -1003,15 +1130,22 @@ Rebuild the server and client afterwards, since the list is built into both.
 
 ### Roles
 
-There are four roles:
+There are five roles:
 - **Player**: the game, and building on maps of their own.
 - **Moderator**: looks after people, never the world.
 - **Dev** (developer): builds and tests the world, on any map. No power over people.
-- **Admin** (administrator): everything.
+- **Admin** (administrator): everything except making or changing owners.
+- **Owner**: everything. The `admin` account is the owner.
 
-On a map you own, every player has the building commands. The administrator changes roles with
-`/setrole NAME player|moderator|dev|admin`, and can make custom roles with `/role`. The full table of
-permissions is in [SERVER_SECURITY.md](SERVER_SECURITY.md).
+What you can do comes only from your role and any single permissions granted to you.
+
+The Owner role cannot be changed, renamed or removed. Only an owner can make somebody an owner or
+change an owner's role, and the last owner always stays one. You cannot change your own role. A
+server started on an older database makes the `admin` account the owner if no account is one.
+
+On a map you own, every player has the building commands. Administrators change roles with
+`/setrole NAME player|moderator|dev|admin|owner`, and can make custom roles with `/role`. The full
+table of permissions is in [SERVER_SECURITY.md](SERVER_SECURITY.md).
 
 ## The message of the day
 
@@ -1032,9 +1166,16 @@ this command." `/help` lists only the commands you may use.
 - `/bring NAME`: bring a player to you.
 - `/kick NAME [reason]`: disconnect a player.
 - `/mute NAME [minutes]`: stop a player chatting, 10 minutes if not said. `/unmute NAME`.
+- `/ban NAME [DURATION] [REASON]`: ban an account. A duration is `30m`, `2h`, `7d` or `4w`; without
+  one the ban lasts until it is lifted. If they are on, they are removed at once and told why. At
+  login they are told "You are banned until 14 October, 18:00 UTC: spamming." or "You are banned:
+  no reason given." A ban that has run out lifts itself. The account need not be online.
+- `/unban NAME`: lift a ban.
+- `/bans`: who is banned, one line each: by whom, when, until when, and why.
 - Go to any map, private or not (developers too).
 
-The administrator cannot be kicked or muted by a moderator.
+The administrator cannot be kicked, muted or banned by a moderator. Nobody can ban an owner or
+themselves, and below the owner you can ban only somebody whose role is below yours.
 
 ### Developers (and the administrator), on any map; everyone on maps they own
 
@@ -1087,8 +1228,10 @@ Sound on the nearest object:
   seconds and stays until `/weather auto`, which lets the weather change on its own again.
 
 ### The administrator only
-- `/setrole NAME ROLE`: player, moderator, dev, admin, or a custom role.
-- `/role list|create|add|remove|show|delete ...`: custom roles, kept in `roles.json`.
+- `/setrole NAME ROLE`: player, moderator, dev, admin, owner, or a custom role. Only an owner can
+  make an owner or change an owner's role, and the last owner stays one.
+- `/role list|create|add|remove|show|delete ...`: custom roles, kept in `roles.json`. The built-in
+  roles cannot be changed.
 - `/grant` and `/revoke` of any permission, for anybody.
 - `/give [NAME] teleporter`, `/give [NAME] vehicle PRESET` (parks one beside them, theirs): premium
   items.

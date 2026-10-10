@@ -24,6 +24,7 @@ public static class EntityDefinitionFactory
         def.Portal = world.Has<PortalComponent>(e) ? world.Get<PortalComponent>(e) : new PortalComponent();
         def.Transform = world.Has<Transform>(e) ? world.Get<Transform>(e) : new Transform();
         def.Moves = world.Has<Velocity>(e);
+        if (def.Collider.Shape == ColliderShape.Terrain && world.Has<TerrainTileComponent>(e)) def.Terrain = world.Get<TerrainTileComponent>(e);
         // A player is a player beacon, with their team for its tone. Set here, not as an IdentityComponent
         // on the body, so server lookups by identity (scan, take, bumping) do not start finding people.
         // A carried thing is neither a beacon nor announced: as beacons, the things you carry took every

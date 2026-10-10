@@ -97,6 +97,8 @@ public sealed class OpeningRoutes
     private readonly Dictionary<int, List<int>> _byNode = new();
     private readonly Dictionary<int, Vector3> _absorption = new();   // node -> Sabine absorption area per band, m²
     private readonly Dictionary<int, int> _nodeOf = new();          // region id -> node
+    /// <summary>The door leaves standing in an opening (in its <see cref="Opening.Contents"/>), by box.</summary>
+    private bool[] _leafInOpening = Array.Empty<bool>();
 
     public IReadOnlyList<Opening> Openings => _openings;
     public IReadOnlyList<Solid> Solids => _solids;
@@ -460,11 +462,14 @@ public sealed class OpeningRoutes
             openings.Add(o);
         }
 
+        model._leafInOpening = new bool[model._solids.Length];
         for (int i = 0; i < openings.Count; i++)
         {
             var o = openings[i];
             Add(model._byNode, o.NodeA, i);
             Add(model._byNode, o.NodeB, i);
+            foreach (int c in o.Contents)
+                if (c >= 0 && c < model._solids.Length && model._solids[c].IsLeaf) model._leafInOpening[c] = true;
         }
 
         // A room's absorption counts what leaves by its openings, at each opening's own S·τ.
@@ -1238,18 +1243,27 @@ public sealed class OpeningRoutes
     /// </summary>
     public Vector3 LegGains(Vector3 a, Vector3 b, int[] ignoreA, int[] ignoreB)
     {
-        var cand = Scratch.Get(this).Candidates;
+        var scratch = Scratch.Get(this);
+        var cand = scratch.Candidates;
         _grid.Along(a, b, cand);
-        Vector3 through = Vector3.One;
-        bool blocked = false;
+        var crossed = scratch.Layers;
+        crossed.Clear();
+        float len = Vector3.Distance(a, b);
         foreach (int i in cand)
         {
             if (Array.IndexOf(ignoreA, i) >= 0 || Array.IndexOf(ignoreB, i) >= 0) continue;
-            if (!SegmentHits(i, a, b)) continue;
-            through *= _solidGains[i];
-            blocked = true;
+            if (!SegmentSpan(i, a, b, 0f, out float t0, out float t1)) continue;
+            ref readonly var s = ref _solids[i];
+            // Solids in contact crossed one after another are one construction (Constructions).
+            bool layer = !s.IsLeaf && Constructions.IsSheet(s.Size);
+            crossed.Add(new Constructions.Crossing
+            {
+                In = t0 * len, Out = t1 * len, Props = AcousticRegistry.GetProperties(s.Material), Panel = s.Size, Build = s.Build,
+                Gains = _solidGains[i], Times = 1, Normal = layer ? Constructions.Normal(s.Size, s.Rotation) : Vector3.Zero,
+            });
         }
-        if (!blocked) return Vector3.One;
+        if (crossed.Count == 0) return Vector3.One;
+        Vector3 through = Constructions.Through(crossed, len > 1e-6f ? (b - a) / len : Vector3.UnitX);
         float delta = BarrierPathDifference(a, b, out _, out bool verified, ignoreA, ignoreB);
         if (verified && delta >= 0f)
         {
@@ -1307,8 +1321,13 @@ public sealed class OpeningRoutes
             // Sorted, and bending round more boxes only ever adds: nothing after this can beat it.
             if (dd >= best) break;
             if (++tried > MaxRoutesTried) break;
-            // Round a door leaf is through its doorway: believed only clear as it stands, never bent on
-            // round the street (ClearedLeg), which found the crack over a shut glass door at -21 dB.
+            // Round a leaf standing in its doorway is through the doorway, which the opening's own
+            // transmission (Route) already charges: a leaf 5 cm short of its lintel, as the city's glass
+            // front doors are, let a PA on the street into Selby House's lobby at -7/-12/-20 dB over the
+            // top edge, against the leaf's -18/-28/-45 (2026-10-09, --path-probe explain).
+            if (_solids[i].IsLeaf && i < _leafInOpening.Length && _leafInOpening[i]) continue;
+            // Round a leaf swung aside is believed only clear as it stands, never bent on round the street
+            // (ClearedLeg), which found the crack over a shut glass door at -21 dB.
             int chain = _solids[i].IsLeaf ? 0 : MaxChainedBoxes;
             float extra = ClearedRoute(source, ps, p, listener, i, chain, ignoreA, ignoreB, best - dd, out Vector3 last);
             if (extra < 0f || dd + extra >= best) continue;
@@ -1582,6 +1601,11 @@ public sealed class OpeningRoutes
         routes.Sort((x, y) => x.D.CompareTo(y.D));
         foreach (var (dd, ps, p, i) in routes.Take(MaxRoutesTried))
         {
+            if (_solids[i].IsLeaf && i < _leafInOpening.Length && _leafInOpening[i])
+            {
+                sb.Append($"        route round {i}, {dd:F3} m via ({p.X:F2}, {p.Y:F2}, {p.Z:F2}): a leaf standing in its doorway, the doorway's to charge\n");
+                continue;
+            }
             string Hit(Vector3 a, Vector3 b2)
             {
                 var c = new List<int>();
@@ -1768,6 +1792,7 @@ public sealed class OpeningRoutes
         public int ChainBudget;
         public readonly List<(float S, float Y, int Box)> Profile = new(), Hull = new();
         public readonly List<(int Box, float S0, float S1, float Bottom, float Top)> Crossings = new();
+        public readonly List<Constructions.Crossing> Layers = new();
         public readonly HashSet<int> Included = new();
         public float[] ProfileBins = new float[256];
         public readonly List<(float D, Vector3 SourceSide, Vector3 Edge)>[] Ways =
@@ -1790,13 +1815,17 @@ public sealed class OpeningRoutes
 
     /// <summary>Does the segment from a to b pass through box i, made <paramref name="grow"/> metres
     /// larger on every side? A slab test in the box's own frame (Kay &amp; Kajiya 1986).</summary>
-    private bool SegmentHits(int i, Vector3 a, Vector3 b, float grow = 0f)
+    private bool SegmentHits(int i, Vector3 a, Vector3 b, float grow = 0f) => SegmentSpan(i, a, b, grow, out _, out _);
+
+    /// <summary>Whether the segment a-b passes through box i (grown by <paramref name="grow"/>), and where
+    /// it goes in and out, as fractions of the way from a to b.</summary>
+    private bool SegmentSpan(int i, Vector3 a, Vector3 b, float grow, out float t0, out float t1)
     {
+        t0 = 0f; t1 = 1f;
         var f = _frames[i];
         Vector3 la = Vector3.Transform(a - f.Centre, f.Inverse), lb = Vector3.Transform(b - f.Centre, f.Inverse);
         Vector3 h = f.Half + new Vector3(grow);
         Vector3 d = lb - la;
-        float t0 = 0f, t1 = 1f;
         for (int ax = 0; ax < 3; ax++)
         {
             float o = ax == 0 ? la.X : ax == 1 ? la.Y : la.Z;

@@ -33,7 +33,7 @@ public class DspCallbackTests
     public static IEnumerable<object[]> PhysicalKinds() => new[]
     {
         "window unit", "mower", "airliner", "siren", "electric horn", "air horn", "crossing bell", "rain",
-        "light rail", "fountain", "fountain tap", "fire", "fire place", "tree", "tree place", "creek", "shore",
+        "light rail", "fountain", "fountain tap", "fire", "fire place", "tree", "tree place", "creek", "shore", "gas hob",
     }.Select(k => new object[] { k });
 
     private static readonly Vector3 Somewhere = new(400f, 0f, -300f);
@@ -57,6 +57,9 @@ public class DspCallbackTests
         "tree place" => new NaturePlaceState(new PlacedNatureVoice("foliage:park_tree", FoliageSpec.ParkTree, 1 + FoliageSynth.Boughs, Rate, 9, Somewhere) { TargetSpread = 1f }, 0, Rate, Somewhere),
         "creek" => new NaturePlaceState(new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, 19, Somewhere), 0, Rate, Somewhere),
         "shore" => new NaturePlaceState(new PlacedNatureVoice("shore:sea", ShoreSpec.SeaSand, ShoreSpec.SeaSand.DefaultGeometry, Rate, 23, Somewhere), 0, Rate, Somewhere),
+        // A burner being lit now: the knob, the sparks, the light-up (the twin is made in the same second, so
+        // both take the change as heard as it happened).
+        "gas hob" => new StoveVoiceState(GasHobSpec.FourBurnerNatural, new HobKey("hob4", "0000", "3000", WindField.Now()).Format(), Rate, 5),
         _ => throw new ArgumentException(kind),
     };
 
@@ -442,6 +445,43 @@ public class DspCallbackTests
         Assert.Equal(0, allocated);
 
         // A mismatch between what comes in and what goes out: silence, not a guess.
+        Run(read, dsp, input.Ptr, output, n / 2, 2, 1);
+        for (int i = 0; i < n / 2; i++) Assert.Equal(0f, output.Data[i]);
+    }
+
+    /// <summary>
+    /// A recording's copy off a rough wall (EchoWashProcessor): its callback hands the mixer exactly what its
+    /// state renders, in each channel of a stereo recording; a clean copy (mirror share 1) is the input to
+    /// the bit; a channel count that does not match passes nothing rather than guess. Nothing allocated.
+    /// </summary>
+    [Fact]
+    public void AWallsWashIsItsStatesRender()
+    {
+        var read = Callback(typeof(EchoWashProcessor));
+        var state = new EchoWashState();
+        var twin = new EchoWashState();
+        state.Configure(0.45f, MathF.Sqrt(0.55f), 5, Rate);
+        twin.Configure(0.45f, MathF.Sqrt(0.55f), 5, Rate);
+        using var dsp = new FakeDsp(state);
+        int n = Block;
+        using var input = new Pinned(n * 2);
+        using var output = new Pinned(n * 2);
+        var rnd = new Random(9);
+        for (int i = 0; i < input.Data.Length; i++) input.Data[i] = (float)(rnd.NextDouble() * 2 - 1) * 0.5f;
+        var expect = new float[n * 2];
+        for (int b = 0; b < 3; b++)
+        {
+            Run(read, dsp, input.Ptr, output, n, 2, 2);
+            twin.Process(input.Data, expect, 2);
+            for (int i = 0; i < expect.Length; i++) Assert.Equal(expect[i], output.Data[i]);
+        }
+
+        Assert.Equal(0, AllocatedOver(() => Run(read, dsp, input.Ptr, output, n, 2, 2), 8));
+
+        state.Configure(0.45f, 1f, 5, Rate);
+        Run(read, dsp, input.Ptr, output, n, 2, 2);
+        for (int i = 0; i < input.Data.Length; i++) Assert.Equal(input.Data[i], output.Data[i]);
+
         Run(read, dsp, input.Ptr, output, n / 2, 2, 1);
         for (int i = 0; i < n / 2; i++) Assert.Equal(0f, output.Data[i]);
     }

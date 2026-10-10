@@ -29,6 +29,10 @@ public interface IUserRepository
     /// <summary>Changes a user's role. False if there is no such user.</summary>
     bool SetRole(string username, UserRole role) => false;
 
+    /// <summary>Everybody with this role. A store that cannot say returns none, so the last owner is
+    /// never taken off by a store that cannot count them.</summary>
+    IReadOnlyList<string> UsernamesWithRole(UserRole role) => Array.Empty<string>();
+
     /// <summary>Replaces a user's granted permissions (comma separated). False if there is no such user
     /// or this store cannot keep them.</summary>
     bool SetGrants(string username, string grants) => false;
@@ -47,4 +51,14 @@ public interface IUserRepository
     /// <summary>What a player carried when they left, read and cleared in one go, so nothing can come
     /// back twice. Null for nothing.</summary>
     string? TakeBelongings(string username) => null;
+
+    /// <summary>Bans an account until <paramref name="untilUtc"/>, or until lifted (null), in place of
+    /// any ban it had. False if there is no such user or this store cannot keep bans.</summary>
+    bool SetBan(string username, DateTime atUtc, DateTime? untilUtc, string by, string? reason) => false;
+
+    /// <summary>Lifts an account's ban. False if there is no such user or it was not banned.</summary>
+    bool ClearBan(string username) => false;
+
+    /// <summary>Every account with a ban recorded, ended ones too: the caller lifts those.</summary>
+    IReadOnlyList<UserData> Banned() => Array.Empty<UserData>();
 }

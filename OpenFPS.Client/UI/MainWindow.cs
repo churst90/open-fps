@@ -13,8 +13,10 @@ namespace OpenFPS.Client.UI;
 /// Keys come from this window's own messages, not a system-wide hook: a hook saw the screen reader's
 /// keys too, and a key released in another window (Alt+Tab's Alt) stayed held.
 /// </summary>
-public sealed class MainWindow : Form
+public sealed partial class MainWindow : Form
 {
+    protected override void OnPaintBackground(PaintEventArgs e) => Scene.Paint(e.Graphics, ClientRectangle);
+
     private readonly InputStateBuffer _input;
     private readonly NvdaSpeechOutput _speech;
     private readonly Action<UiCue> _cue;
@@ -41,6 +43,8 @@ public sealed class MainWindow : Form
         Text = "OpenFPS — In Game";
         ClientSize = new Size(640, 360);
         StartPosition = FormStartPosition.CenterScreen;
+        DoubleBuffered = true;
+        ResizeRedraw = true;
 
         // Not focusable: with no focusable child the form itself holds focus, so every key reaches it
         // and nothing inside can consume arrows or Tab for its own navigation.
@@ -50,6 +54,7 @@ public sealed class MainWindow : Form
             Padding = new Padding(16),
             Text = OpenFPS.Client.Core.Session.ClientGameSession.KeyHelp,
         });
+        Scene.Style(this);
 
         Activated += (_, _) => { _active = true; _input.Clear(); };
         Deactivate += (_, _) => { _active = false; _input.Clear(); };
@@ -187,6 +192,88 @@ public sealed class MainWindow : Form
         if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(entry.Text))
             OnCommandEntered?.Invoke(entry.Text);
         else if (result == DialogResult.Cancel)
+        {
+            _cue(UiCue.MenuBack);
+            _speech.Speak("Cancelled.", interrupt: true);
+        }
+    }
+
+    /// <summary>
+    /// One labelled text box for a value the world editor asks for. Enter or Apply hands the text to
+    /// <paramref name="submit"/>: null closes the dialog, a reason is said and shown and the dialog
+    /// stays open with the text kept. Escape or Cancel cancels.
+    /// </summary>
+    public void AskForValue(EditorValuePrompt prompt, Func<string, string?> submit)
+    {
+        if (_modalOpen) return;
+        _modalOpen = true;
+        // The Enter that chose the item is still down, and its release goes to the dialog.
+        _input.Clear();
+
+        using var dialog = new Form
+        {
+            Text = prompt.Title,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(460, 220),
+        };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 5, Padding = new Padding(8) };
+        // UseMnemonic off: a label such as "Rock & roll" must not lose its ampersand.
+        var label = new Label { Text = prompt.Label, AutoSize = true, UseMnemonic = false };
+        // NVDA reads the name, the value (selected) and then the description.
+        var entry = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Text = prompt.Initial,
+            AccessibleName = prompt.Label,
+            AccessibleDescription = prompt.Description,
+        };
+        var about = new Label { Text = prompt.Description, AutoSize = true, MaximumSize = new Size(440, 0), UseMnemonic = false };
+        var refusal = new Label { Text = "", AutoSize = true, MaximumSize = new Size(440, 0), UseMnemonic = false };
+        var apply = new Button { Text = "Apply", AutoSize = true };
+        var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, AutoSize = true };
+        layout.Controls.Add(label, 0, 0);
+        layout.SetColumnSpan(label, 2);
+        layout.Controls.Add(entry, 0, 1);
+        layout.SetColumnSpan(entry, 2);
+        layout.Controls.Add(about, 0, 2);
+        layout.SetColumnSpan(about, 2);
+        layout.Controls.Add(refusal, 0, 3);
+        layout.SetColumnSpan(refusal, 2);
+        layout.Controls.Add(apply, 0, 4);
+        layout.Controls.Add(cancel, 1, 4);
+        dialog.Controls.Add(layout);
+        dialog.AcceptButton = apply;
+        dialog.CancelButton = cancel;
+
+        // Apply is not a DialogResult button: a refused value must leave the dialog open.
+        apply.Click += (_, _) =>
+        {
+            string? why = submit(entry.Text);
+            if (why == null) { dialog.DialogResult = DialogResult.OK; return; }
+            refusal.Text = why;
+            _cue(UiCue.MenuEdge);
+            // Focus stays in the box, so NVDA has nothing of its own to say over the reason.
+            _speech.Speak(why, interrupt: true);
+            entry.Focus();
+        };
+        dialog.Shown += (_, _) =>
+        {
+            entry.Focus();
+            entry.SelectAll();
+            // NVDA reads the dialog and the field as they take focus; speaking over it would cut it off.
+            if (!_speech.ScreenReaderRunning) _speech.Speak(prompt.Spoken, interrupt: true);
+        };
+
+        DialogResult result;
+        _openDialog = dialog;
+        try { result = dialog.ShowDialog(this); }
+        finally { _modalOpen = false; _openDialog = null; _input.Clear(); }
+
+        if (result == DialogResult.Cancel)
         {
             _cue(UiCue.MenuBack);
             _speech.Speak("Cancelled.", interrupt: true);

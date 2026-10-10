@@ -316,8 +316,10 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(GameKey.F6, () => _network.Send(new MapListRequest { Scope = MapListScope.Server }));
         _bindings.Bind(GameKey.F6, KeyModifiers.Shift, () => _network.Send(new MapListRequest { Scope = MapListScope.Mine }));
         _bindings.Bind(GameKey.F8, () => _network.Send(new FriendListRequest()));
-        // The world editor (docs/WORLD_EDITOR.md): the server says whether you may, and builds the menu.
-        _bindings.Bind(GameKey.F12, OpenWorldEditor);
+        // The world editor dialog (docs/WORLD_EDITOR.md section 16): the server says whether you may.
+        _bindings.Bind(GameKey.F12, ToggleEditorDialog);
+        // The build dialog (section 15). A chord: Control on its own stays the screen reader's.
+        _bindings.Bind(InputContext.Gameplay, BuildDialog.Key.Key, BuildDialog.Key.Modifiers, ToggleBuildDialog);
 
         // Chat scrollback: brackets step through messages, shift-brackets through buffers.
         _bindings.Bind(GameKey.BracketLeft, () => CycleChat(-1));
@@ -409,7 +411,8 @@ public sealed partial class ClientGameSession : IDisposable
         "Shift K all driving sounds, Z the road, Shift H your health.",
         "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
         "plus and minus zoom, 1 and 3 the turret, period the rangefinder, 0 held to hold your breath, slash or Enter to fire.",
-        "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, brackets to read chat, slash for the command console.",
+        "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, Control B to build (on a map you may edit),",
+        "brackets to read chat, slash for the command console.",
         "Escape for the game menu: keep playing, main menu, or quit.");
 
     /// <summary>Whether anything is bound to a key in a context. For a settings screen, and for the
@@ -507,7 +510,8 @@ public sealed partial class ClientGameSession : IDisposable
             if (menuOpen && EditorKeys.Enabled && _shiftHeldThisStep
                 && _menus.Current?.Tag.StartsWith(EditorTagPrefix, StringComparison.Ordinal) == true
                 && EditorKeys.CommandFor(key) is { } editorCommand) { SendTyped(editorCommand); continue; }
-            if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8 or GameKey.F12)) { _menus.HandleKey(key); continue; }
+            if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8 or GameKey.F12)
+                && new GameKeyChord(key, modifiers) != BuildDialog.Key) { _menus.HandleKey(key); continue; }
             _bindings.Execute(context, key, modifiers);
         }
         _listening.Tick(_simTime);
@@ -531,6 +535,7 @@ public sealed partial class ClientGameSession : IDisposable
         var snapshot = _world.GetSnapshot();
 
         _reconciler.Step(input, snapshot, dt);
+        UpdateUnbuiltEdge();
         UpdateWallBump(snapshot, input);
         UpdateTurnNarration(snapshot, input, gameplayActive);
 
@@ -843,6 +848,10 @@ public sealed partial class ClientGameSession : IDisposable
                 _physics.MapMin = manifest.PlayMin;
                 _physics.MapMax = manifest.PlayMax;
                 _physics.Gravity = manifest.Gravity;
+                // On the world a body stays on the tiles it holds (ClientPhysicsSystem.TileReady).
+                _physics.TileMetres = manifest.TileMetres;
+                _physics.TileReady = manifest.IsWorld ? key => _world.Tiles.ContainsKey(key) : null;
+                _unbuiltEdge = default;
 
                 _state.Position = manifest.SpawnPoint.Position;
                 _state.Rotation = manifest.SpawnPoint.Rotation;
@@ -908,6 +917,12 @@ public sealed partial class ClientGameSession : IDisposable
                     Serilog.Log.Information("MapRoads for {Map}: {Roads} roads, {Crossings} level crossings, {Tracks} tracks.",
                                             roads.MapName, data?.Roads.Count ?? 0, data?.Crossings.Count ?? 0, data?.Tracks.Count ?? 0);
                 }
+                break;
+
+            case WorldLoading building:
+                // Arriving in the world: the server holds the join until the tiles round us are built.
+                LoadProgress(building.Text, 10 + (building.Total > 0 ? 50 * building.Done / building.Total : 0));
+                if (building.Speak) _speech.Speak(building.Text, interrupt: false);
                 break;
 
             case MapLoadComplete:
@@ -1122,6 +1137,36 @@ public sealed partial class ClientGameSession : IDisposable
 
     private readonly WallBumps _bumps = new();
     private int _bumpSeed;
+
+    /// <summary>When the edge of what is built last stopped the body, when its tone last played, and
+    /// whether the words have been said since the body last walked clear of it.</summary>
+    private (double StoppedAt, double ToneAt, bool Said) _unbuiltEdge;
+
+    /// <summary>
+    /// Stopped at the edge of a tile of the world not built yet (docs/WORLD_STREAMING.md, At an edge that is
+    /// not ready): a short low tone while pressing on, no knock, and once the words. When the tile arrives
+    /// the body walks on and the tone stops of itself.
+    /// </summary>
+    private void UpdateUnbuiltEdge()
+    {
+        if (!_physics.Fenced)
+        {
+            // Clear of it for a few seconds: the next time is a new approach, and says so again.
+            if (_unbuiltEdge.Said && _simTime - _unbuiltEdge.StoppedAt > 5.0) _unbuiltEdge = default;
+            return;
+        }
+        _unbuiltEdge.StoppedAt = _simTime;
+        if (_simTime - _unbuiltEdge.ToneAt >= 0.6)
+        {
+            Ui.Play(UiCue.UnbuiltEdge);
+            _unbuiltEdge.ToneAt = _simTime;
+        }
+        if (!_unbuiltEdge.Said)
+        {
+            _speech.Speak("Not built yet. Wait here, or turn back.");
+            _unbuiltEdge.Said = true;
+        }
+    }
 
     /// <summary>
     /// After a fresh step: pressing into something not already met gives a knock where it touched and
@@ -1493,14 +1538,43 @@ public sealed partial class ClientGameSession : IDisposable
     private ListMenu PersonMenu(string name, bool isFriend)
     {
         var items = new List<MenuItem> { new("Private message", () => _shell.OpenCommandConsole($"/pm {name} ")) };
-        if (_role is UserRole.Admin or UserRole.Moderator) items.Add(new("Where is", () => Command("where", name)));
+        if (_role is UserRole.Owner or UserRole.Admin or UserRole.Moderator) items.Add(new("Where is", () => Command("where", name)));
         items.Add(new("View profile", () => Command("profile", name)));
         items.Add(isFriend ? new("Remove friend", () => Command("friend", "remove", name))
                            : new("Add friend", () => Command("friend", "add", name)));
         return new ListMenu(name, items);
     }
 
+    /// <summary>
+    /// The list of where to go, in two parts (Cody, 2026-10-08): the world, the real places to arrive at,
+    /// and the maps, the game's and players' own. Without places it is the maps alone, as it was.
+    /// </summary>
     private ListMenu MapsMenu(MapListResponse response)
+    {
+        var places = response.Maps.Where(m => m.IsWorldPlace).ToArray();
+        var maps = new MapListResponse { Scope = response.Scope, Maps = response.Maps.Where(m => !m.IsWorldPlace).ToArray() };
+        if (places.Length == 0) return MapList(maps);
+        int inWorld = places.Sum(p => p.PlayerCount);
+        string worldLabel = $"The world, {places.Length} place{(places.Length == 1 ? "" : "s")}"
+                            + (inWorld == 0 ? "" : inWorld == 1 ? ", 1 player" : $", {inWorld} players");
+        var placeItems = places.Select(p =>
+        {
+            string people = p.PlayerCount switch { 0 => "", 1 => ", 1 player", _ => $", {p.PlayerCount} players" };
+            string id = p.Id, name = p.Name;
+            return new MenuItem($"{name}{people}{(p.IsCurrent ? ", you are near here" : "")}", () =>
+            {
+                Say($"Going to {name}.");
+                Command("join", id);
+            });
+        }).ToList();
+        return new ListMenu("Where to", new List<MenuItem>
+        {
+            new(worldLabel, Opens: () => new ListMenu("The world", placeItems)),
+            new($"Maps, {maps.Maps.Length}", Opens: () => MapList(maps)),
+        });
+    }
+
+    private ListMenu MapList(MapListResponse response)
     {
         var items = new List<MenuItem>();
         foreach (var map in response.Maps)

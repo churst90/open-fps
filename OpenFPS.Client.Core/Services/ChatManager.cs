@@ -64,13 +64,17 @@ public class ChatManager
     {
         // (A presence notice, above, is whole already: "cody is online", not "cody to all: cody is online".)
         ChatChannel.Private when msg.To.Length > 0 => $"Private to {msg.To}: {msg.Text}",
-        ChatChannel.Private => $"Private from {msg.Sender}: {msg.Text}",
-        ChatChannel.All => $"{msg.Sender} to all: {msg.Text}",
-        ChatChannel.Team => $"{msg.Sender} to team: {msg.Text}",
+        ChatChannel.Private => $"Private from {Who(msg)}: {msg.Text}",
+        ChatChannel.All => $"{Who(msg)} to all: {msg.Text}",
+        ChatChannel.Team => $"{Who(msg)} to team: {msg.Text}",
         // The server's lines carry their own cue; "Server:" in front of each said nothing new.
         ChatChannel.Server => msg.Text,
-        _ => msg.Sender.Length == 0 ? msg.Text : $"{msg.Sender}: {msg.Text}",
+        _ => msg.Sender.Length == 0 ? msg.Text : $"{Who(msg)}: {msg.Text}",
     };
+
+    /// <summary>The sender as chat names them: "admin [Mafia] Owner", "sean [Mafia]", "bob Developer", "kim".</summary>
+    public static string Who(ChatMessage msg)
+        => msg.Sender + (msg.Team.Length > 0 ? $" [{msg.Team}]" : "") + (msg.Title.Length > 0 ? $" {msg.Title}" : "");
 
     /// <summary>
     /// Files a message in its ring and in All, and speaks it if it is addressed to you or is in the

@@ -21,9 +21,11 @@ public readonly record struct Pose(Vector3 Position, Quaternion Rotation, Vector
            && Vector3.Distance(Scale, o.Scale) < 1e-4f;
 }
 
-/// <summary>Everything about a placed thing that is needed to put it back exactly.</summary>
+/// <summary>Everything about a placed thing that is needed to put it back exactly. <see cref="PlacedBy"/>
+/// null means new: whoever is editing now placed it, now. "" means kept from before anybody was recorded.</summary>
 public sealed record Snapshot(int Id, EntityData Data, Dictionary<string, string>? Settings, bool Added,
-                              OverlayChange? Change, Vector3 Was, string? Placement = null);
+                              OverlayChange? Change, Vector3 Was, string? Placement = null,
+                              string? PlacedBy = null, DateTime? PlacedAt = null);
 
 /// <summary>One operation of the world editor, as its undo stack keeps it (docs/WORLD_EDITOR.md section 6).</summary>
 public abstract record EditOp(string MapId)
@@ -217,7 +219,8 @@ public sealed partial class WorldEditor
                     return Restore(op.MapId, p.Thing, out why);
                 }
                 if (!there) { why = "it has been deleted already."; return false; }
-                if (!RestOf(world, e).Near(PoseOf(p.Thing.Data))) { why = ChangedBy(p.Thing.Id, NameOf(world, e)); return false; }
+                if (Aboard(world, e) is { } rider) { why = $"{rider} is in {NameOf(world, e)}."; return false; }
+                if (!StillWhere(world, e, p.Thing.Data)) { why = ChangedBy(p.Thing.Id, NameOf(world, e)); return false; }
                 Remove(op.MapId, world, e, p.Thing.Id);
                 return true;
             }
@@ -232,7 +235,8 @@ public sealed partial class WorldEditor
                     return Restore(op.MapId, d.Thing, out why);
                 }
                 if (!there) { why = $"{d.Name} has been deleted already."; return false; }
-                if (!RestOf(world, e).Near(PoseOf(d.Thing.Data))) { why = ChangedBy(d.Thing.Id, d.Name); return false; }
+                if (Aboard(world, e) is { } rider) { why = $"{rider} is in {d.Name}."; return false; }
+                if (!StillWhere(world, e, d.Thing.Data)) { why = ChangedBy(d.Thing.Id, d.Name); return false; }
                 Remove(op.MapId, world, e, d.Thing.Id);
                 return true;
             }
@@ -294,6 +298,15 @@ public sealed partial class WorldEditor
     /// <summary>Where a thing is kept as standing: its pose, but an open door's doorway rather than its
     /// swung leaf, so it is made again shut where it was put.</summary>
     private static Pose RestOf(World world, Entity e) => LiveState.Of(world, e).Rest(PoseOf(world, e));
+
+    /// <summary>Whether a thing stands where a snapshot has it. A parked vehicle settles on its wheels, so
+    /// it counts as where it was left within a metre across the ground.</summary>
+    private static bool StillWhere(World world, Entity e, EntityData data)
+    {
+        if (!IsVehicleId(data.PrefabId, out _)) return RestOf(world, e).Near(PoseOf(data));
+        var p = world.Get<Transform>(e).Position;
+        return new Vector2(p.X - data.Position.X, p.Z - data.Position.Z).Length() < 1f;
+    }
 
     /// <summary>The size a prefab is at a scale, metres; zero if it has no body.</summary>
     private Vector3 SizeAt(string prefab, Vector3 scale)
@@ -556,10 +569,11 @@ public sealed partial class WorldEditor
         var o = Overlays.Get(mapId);
         var data = DataOf(mapId);
         var pose = RestOf(world, e);
-        data.TryGetValue(id, out var entry);
+        var add = o.AdditionFor(id);
+        // A parked vehicle is not in the map's entities: its addition is the whole of it.
+        var entry = data.TryGetValue(id, out var known) ? known : add?.Entity;
         var copy = entry != null ? MapOverlayStore.Clone(entry) : new EntityData { EntityId = id, PrefabId = PrefabOf(world, e) };
         copy.Position = pose.Position; copy.Rotation = pose.Rotation; copy.Scale = pose.Scale;
-        var add = o.AdditionFor(id);
         var change = o.ChangeFor(id);
         var settings = add?.Settings ?? change?.Settings;
         return new Snapshot(id, copy, settings == null ? null : new Dictionary<string, string>(settings), add != null,
@@ -570,7 +584,8 @@ public sealed partial class WorldEditor
                                 Settings = change.Settings == null ? null : new Dictionary<string, string>(change.Settings),
                                 WasRotation = change.WasRotation, WasScale = change.WasScale,
                             },
-                            change?.Was ?? entry?.Position ?? pose.Position, add?.Placement);
+                            change?.Was ?? entry?.Position ?? pose.Position, add?.Placement,
+                            add == null ? null : add.PlacedBy ?? "", add?.PlacedAt);
     }
 
     /// <summary>Takes a thing off the map: the world, every client, the overlay and the map's data.</summary>
@@ -578,6 +593,15 @@ public sealed partial class WorldEditor
     {
         var o = Overlays.Get(mapId);
         var data = DataOf(mapId);
+        if (o.AdditionFor(id) is { IsVehicle: true } parked)
+        {
+            o.Added.Remove(parked);
+            data.Remove(id);
+            Unpark(mapId, world, e);
+            _maps.AuthoredEntities(mapId).Remove(id);
+            Overlays.Save(mapId);
+            return;
+        }
         if (o.AdditionFor(id) is { } a) o.Added.Remove(a);
         else
         {
@@ -602,6 +626,7 @@ public sealed partial class WorldEditor
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) { why = "the map is not loaded."; return false; }
         var d = thing.Data;
         if (!InReach(d.Position)) { why = TooFar; return false; }
+        if (IsVehicleId(d.PrefabId, out _)) return RestoreVehicle(mapId, thing, out why);
         var size = SizeAt(d.PrefabId, d.Scale);
         if (_maps.Prefabs.TryGetValue(d.PrefabId.ToLowerInvariant(), out var template) && template.ColliderSize.HasValue
             && (template.IsSolid ?? true) && (template.Shape ?? ColliderShape.Box) == ColliderShape.Box
@@ -615,19 +640,21 @@ public sealed partial class WorldEditor
         if (d.Form != null) MapManager.ApplyForm(world, e, d, mapId);
         if (thing.Settings != null)
             foreach (var (path, value) in thing.Settings) EntitySettings.TrySet(world, e, path, value, out _);
+        // A doorway's places, by the map's numbers, as the loader joins them.
+        if (world.Has<PortalComponent>(e) && (d.RegionAId.HasValue || d.RegionBId.HasValue))
+        {
+            var authored = _maps.AuthoredEntities(mapId);
+            int Live(int? id) => id is int a && authored.TryGetValue(a, out var r) && world.IsAlive(r) ? r.Id : AcousticConstants.GlobalRegionId;
+            ref var portal = ref world.Get<PortalComponent>(e);
+            if (d.RegionAId.HasValue) portal.RegionAId = Live(d.RegionAId);
+            if (d.RegionBId.HasValue) portal.RegionBId = Live(d.RegionBId);
+            _server.SyncAudioComponent(e.Id);
+        }
         _maps.AuthoredEntities(mapId)[thing.Id] = e;
 
         var o = Overlays.Get(mapId);
         var copy = MapOverlayStore.Clone(d);
-        if (thing.Added)
-        {
-            o.Added.RemoveAll(a => a.Entity.EntityId == thing.Id);
-            o.Added.Add(new OverlayAddition
-            {
-                Entity = MapOverlayStore.Clone(d), Settings = thing.Settings == null ? null : new Dictionary<string, string>(thing.Settings),
-                Placement = thing.Placement,
-            });
-        }
+        if (thing.Added) KeepAddition(o, thing);
         else
         {
             o.Removed.RemoveAll(r => r.Id == thing.Id);
@@ -641,6 +668,21 @@ public sealed partial class WorldEditor
         if (_maps.TryGetMapData(mapId, out var map)) map.Entities.Add(copy);
         Overlays.Save(mapId);
         return true;
+    }
+
+    /// <summary>The addition a placed thing is kept as, with who placed it and when: a new one is the
+    /// editor's now, one taken back keeps what it had.</summary>
+    private void KeepAddition(MapOverlay o, Snapshot thing)
+    {
+        o.Added.RemoveAll(a => a.Entity.EntityId == thing.Id);
+        bool fresh = thing.PlacedBy == null;
+        o.Added.Add(new OverlayAddition
+        {
+            Entity = MapOverlayStore.Clone(thing.Data), Settings = thing.Settings == null ? null : new Dictionary<string, string>(thing.Settings),
+            Placement = thing.Placement,
+            PlacedBy = fresh ? _actor : thing.PlacedBy is { Length: > 0 } who ? who : null,
+            PlacedAt = fresh ? (_actor == null ? null : DateTime.UtcNow) : thing.PlacedAt,
+        });
     }
 
     // ── The operations ──────────────────────────────────────────────────────────────────────────
@@ -668,12 +710,24 @@ public sealed partial class WorldEditor
 
     private void Move(UserSession s, string[] args, Action<IMessage> reply)
     {
+        if (args.Length > 0 && args[0].Equals("to", StringComparison.OrdinalIgnoreCase)) { MoveTo(s, args[1..], reply); return; }
         if (args.Length < 3 || !TryNumber(args[0], out float east) || !TryNumber(args[1], out float north) || !TryNumber(args[2], out float up))
         { Say(reply, "Say /edit move EAST NORTH UP, in metres: /edit move 1 0 0 is a metre east. Negative goes west, south, down."); return; }
         if (MathF.Abs(east) > 1000 || MathF.Abs(north) > 1000 || MathF.Abs(up) > 1000) { Say(reply, "A move is at most 1000 metres each way."); return; }
         var by = PlayerCoordinates.ToWorld(east, north, up);
         Repose(s, reply, "moved", (_, _, p) => p with { Position = p.Position + by },
                name => $"Moved {name} {Offset(by)}.");
+    }
+
+    /// <summary>/edit move to EAST NORTH UP: to a place in player coordinates (x east, y north, z height), as
+    /// the editor dialog's position box has it.</summary>
+    private void MoveTo(UserSession s, string[] args, Action<IMessage> reply)
+    {
+        if (args.Length < 3 || !TryNumber(args[0], out float east) || !TryNumber(args[1], out float north) || !TryNumber(args[2], out float up))
+        { Say(reply, "Say /edit move to EAST NORTH UP: the place in metres, as the position is said."); return; }
+        var to = PlayerCoordinates.ToWorld(east, north, up);
+        Repose(s, reply, "moved", (_, _, p) => p with { Position = to },
+               name => $"Moved {name} to {PlayerCoordinates.Format(to)}.");
     }
 
     /// <summary>"0.5 metres north and 1 metre up".</summary>
@@ -732,6 +786,15 @@ public sealed partial class WorldEditor
     private void Face(UserSession s, string[] args, Action<IMessage> reply)
     {
         string word = string.Join(" ", args).Trim().ToLowerInvariant().Replace("-", " ");
+        // Degrees clockwise from north, as the editor dialog's facing box has them.
+        if (args.Length == 1 && TryNumber(args[0], out float degrees))
+        {
+            if (degrees < -360 || degrees > 360) { Say(reply, "Facing is in degrees from 0 to 360: 0 north, 90 east, 180 south, 270 west."); return; }
+            float to = degrees * MathF.PI / 180f;
+            Repose(s, reply, "turned", (_, _, p) => p with { Rotation = Quaternion.CreateFromYawPitchRoll(to, 0f, 0f) },
+                   name => $"{name} faces {FieldDescriptor.Format(((degrees % 360) + 360) % 360)} degrees, {CompassOf(to)}.");
+            return;
+        }
         int index = Array.IndexOf(Compass8, word);
         if (index < 0) { Say(reply, "Say /edit face north, north east, east, south east, south, south west, west or north west."); return; }
         float yaw = index * MathF.PI / 4f;
@@ -796,6 +859,7 @@ public sealed partial class WorldEditor
         Remove(s.CurrentMapId, world, e, id);
         Push(s, new DeleteOp(s.CurrentMapId, thing, name));
         HandOf(s).Selected = null;
+        HandOf(s).Held.Remove(id);
         Say(reply, $"Deleted {name}. Undo puts it back.");
         Notify(s, $"{s.Username} deleted {name}.");
         if (!s.IsTextClient) SendMenu(s, "root", reply, refresh: true);

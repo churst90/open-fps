@@ -308,6 +308,8 @@ internal sealed class TracedReverb : IDisposable
 
     private void Loop()
     {
+        // Priority = BelowNormal is a placebo on Linux; nice the thread so tracing loses to the mixer.
+        OpenFPS.Client.Core.Platform.BackgroundPriority.LowerThisThread("TracedReverb");
         while (_running)
         {
             try

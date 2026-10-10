@@ -31,6 +31,7 @@ public class SqliteUserRepository : IUserRepository
         _dummyHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N"), WorkFactor);
         EnsureDatabaseCreated();
         EnsureAdminSeed();
+        EnsureOwner();
     }
 
     private void EnsureDatabaseCreated()
@@ -56,6 +57,10 @@ public class SqliteUserRepository : IUserRepository
         ("CustomRole", "TEXT NULL"),
         ("PlayerState", "TEXT NULL"),
         ("Belongings", "TEXT NULL"),
+        ("BannedUtc", "TEXT NULL"),
+        ("BannedUntilUtc", "TEXT NULL"),
+        ("BannedBy", "TEXT NULL"),
+        ("BanReason", "TEXT NULL"),
     };
 
     /// <summary>
@@ -107,7 +112,7 @@ public class SqliteUserRepository : IUserRepository
     }
 
     /// <summary>
-    /// Seeds an admin on the first run. With OPENFPS_ADMIN_PASSWORD set, that is its password, and on
+    /// Seeds the admin account, an Owner, on the first run. With OPENFPS_ADMIN_PASSWORD set, that is its password, and on
     /// an existing database the admin's password is reset to it. A server reachable from the internet
     /// must be started with it at least once: admin/admin123 is in this repository for anyone to read.
     /// </summary>
@@ -121,7 +126,7 @@ public class SqliteUserRepository : IUserRepository
             {
                 Username = "admin",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(string.IsNullOrEmpty(chosen) ? "admin123" : chosen, WorkFactor),
-                Role = UserRole.Admin,
+                Role = UserRole.Owner,
                 CreatedUtc = DateTime.UtcNow,
             });
             ctx.SaveChanges();
@@ -139,6 +144,32 @@ public class SqliteUserRepository : IUserRepository
                       + "Start once with OPENFPS_ADMIN_PASSWORD set before anyone else can reach this server.");
     }
 
+    /// <summary>
+    /// A server always has an owner. A database from before the Owner role (2026-10-09), or one whose
+    /// owners were taken off by hand, makes the seeded admin account the owner again.
+    /// </summary>
+    private void EnsureOwner()
+    {
+        using var ctx = CreateContext();
+        if (ctx.Users.Any(u => u.Role == UserRole.Owner)) return;
+        if (ctx.Users.FirstOrDefault(u => u.Username == "admin") is not { } admin)
+        {
+            Log.Warning("UserRepository: no account is an owner and there is no admin account to make one. "
+                      + "Set an account's Role to Owner in the Users table.");
+            return;
+        }
+        admin.Role = UserRole.Owner;
+        admin.CustomRole = null;
+        ctx.SaveChanges();
+        Log.Information("UserRepository: no account was an owner; admin is the owner now.");
+    }
+
+    public IReadOnlyList<string> UsernamesWithRole(UserRole role)
+    {
+        using var ctx = CreateContext();
+        return ctx.Users.AsNoTracking().Where(u => u.Role == role).Select(u => u.Username).ToList();
+    }
+
     public UserData? GetUser(string username)
     {
         // Folded here, not in the predicate: EF cannot translate a call into our own code to SQL.
@@ -146,8 +177,11 @@ public class SqliteUserRepository : IUserRepository
         using var ctx = CreateContext();
         var record = ctx.Users.AsNoTracking()
             .FirstOrDefault(u => u.Username == key);
-        if (record == null) return null;
-        return new UserData
+        return record == null ? null : ToData(record);
+    }
+
+    private static UserData ToData(UserRecord record)
+        => new()
         {
             Username = record.Username,
             PasswordHash = record.PasswordHash,
@@ -163,8 +197,11 @@ public class SqliteUserRepository : IUserRepository
             CustomRole = record.CustomRole,
             PlayerState = record.PlayerState,
             Belongings = record.Belongings,
+            BannedUtc = AsUtc(record.BannedUtc),
+            BannedUntilUtc = AsUtc(record.BannedUntilUtc),
+            BannedBy = record.BannedBy,
+            BanReason = record.BanReason,
         };
-    }
 
     public bool AddUser(string username, string password, UserRole role)
     {
@@ -266,6 +303,35 @@ public class SqliteUserRepository : IUserRepository
             r.Belongings = null;
         });
         return taken;
+    }
+
+    public bool SetBan(string username, DateTime atUtc, DateTime? untilUtc, string by, string? reason) => Update(username, r =>
+    {
+        r.BannedUtc = atUtc;
+        r.BannedUntilUtc = untilUtc;
+        r.BannedBy = Clip(by);
+        r.BanReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+    });
+
+    public bool ClearBan(string username)
+    {
+        bool was = false;
+        bool found = Update(username, r =>
+        {
+            was = r.BannedUtc != null;
+            r.BannedUtc = null;
+            r.BannedUntilUtc = null;
+            r.BannedBy = null;
+            r.BanReason = null;
+        });
+        return found && was;
+    }
+
+    public IReadOnlyList<UserData> Banned()
+    {
+        using var ctx = CreateContext();
+        return ctx.Users.AsNoTracking().Where(u => u.BannedUtc != null).OrderBy(u => u.Username)
+                  .AsEnumerable().Select(ToData).ToList();
     }
 
     private bool Update(string username, Action<UserRecord> change)

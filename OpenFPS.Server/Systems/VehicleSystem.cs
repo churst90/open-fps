@@ -162,6 +162,9 @@ public sealed partial class VehicleSystem
     /// One more vehicle or walker on a map that is already running (/spawn walker): the same path the
     /// map's own take, and the entity it made, or Entity.Null with the reason logged.
     /// </summary>
+    /// <summary>A map made after the start (a frame of the world over a real place): its own vehicles.</summary>
+    public void SpawnMap(MapManager maps, CompositeService? shells, string mapId) => Spawn(maps, shells, mapId, null);
+
     public Entity SpawnOne(MapManager maps, CompositeService? shells, string mapId, VehicleData vd)
     {
         int before = _vehicles.Count;
@@ -455,6 +458,8 @@ public sealed partial class VehicleSystem
     public void Update(string mapId, World world, float dt)
     {
         UpdateStreetLife(mapId, world, dt);
+        // Building doors pulled to behind the people from parked cars.
+        _manners.Update(mapId, world, dt);
         IndexLanes(mapId);
         IndexCrosswalks(mapId);
         foreach (var v in _vehicles)

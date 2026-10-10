@@ -75,13 +75,14 @@ public class WorldEditorClientTests
     };
 
     [Fact]
-    public void F12AsksTheServerAndTheMenuIsSpokenAndWalked()
+    public void F12AsksForTheDialogAndATypedEditMenuIsSpokenAndWalked()
     {
         var (session, sent, speech, _) = NewClient();
         Assert.True(session.Press(GameKey.F12));
         var asked = Assert.IsType<TextCommand>(sent[^1]);
-        Assert.Equal(("edit", "menu"), (asked.Command, string.Join(" ", asked.Args)));
+        Assert.Equal(("edit", "dialog open place"), (asked.Command, string.Join(" ", asked.Args)));
 
+        // /edit typed on its own still answers with the menus, shown as lists.
         session.HandleMessage(Root());
         Assert.Equal("World editor, mine, 3 items. Map", speech.Spoken[^1]);
         session.Menus.HandleKey(GameKey.Down);

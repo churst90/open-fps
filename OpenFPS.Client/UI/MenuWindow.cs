@@ -11,6 +11,8 @@ namespace OpenFPS.Client.UI;
 /// </summary>
 public sealed class MenuWindow : Form
 {
+    protected override void OnPaintBackground(PaintEventArgs e) => Scene.Paint(e.Graphics, ClientRectangle);
+
     private readonly NvdaSpeechOutput _speech;
     private readonly ClientSettings _settings;
     private readonly MenuServices _services;
@@ -36,6 +38,8 @@ public sealed class MenuWindow : Form
         Text = "OpenFPS";
         ClientSize = new Size(420, 320);
         StartPosition = FormStartPosition.CenterScreen;
+        DoubleBuffered = true;
+        ResizeRedraw = true;
 
         var layout = Column();
         layout.Controls.Add(new Label { Text = "OpenFPS — Main Menu", AutoSize = true });
@@ -45,6 +49,7 @@ public sealed class MenuWindow : Form
         layout.Controls.Add(MenuButton("Settings", ShowSettings));
         layout.Controls.Add(MenuButton("Quit", () => { _speech.Speak("Goodbye."); Close(); }));
         Controls.Add(layout);
+        Scene.Style(this);
 
         Shown += (_, _) =>
         {

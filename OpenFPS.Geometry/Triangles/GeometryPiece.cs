@@ -84,11 +84,21 @@ public struct GeometryTriangle
 /// stands and how it is turned, and its surface.
 /// </summary>
 public readonly record struct SolidSpec(int Owner, Vector3 Position, Quaternion Rotation, Vector3 BoxSize,
-                                        Surface Surface, MeshAsset? Mesh = null, MeshAsset[]? Parts = null)
+                                        Surface Surface, MeshAsset? Mesh = null, MeshAsset[]? Parts = null,
+                                        Heightfield? Terrain = null)
 {
     /// <summary>A solid of a shape from the library (null for a box), filling a box of <paramref name="size"/>.</summary>
     public static SolidSpec Of(int owner, Vector3 position, Quaternion rotation, Vector3 size, Surface surface, ShapeMesh? shape)
         => new(owner, position, rotation, size, surface, shape?.Outer, shape?.Parts);
+
+    /// <summary>A terrain tile whose middle is at <paramref name="centre"/> (heights are its own, in the
+    /// world): <paramref name="surface"/> gives its layers and flags; each cell's material is its own.</summary>
+    public static SolidSpec OfTerrain(int owner, Vector3 centre, Heightfield terrain, Surface surface)
+        => new(owner, new Vector3(centre.X, 0f, centre.Z), Quaternion.Identity, Vector3.Zero, surface, Terrain: terrain);
+
+    /// <summary>Where a terrain tile's post (0, 0) is, in the world, at height 0.</summary>
+    public Vector3 TerrainCorner => Terrain == null ? Position
+        : new Vector3(Position.X - Terrain.Size * 0.5f, 0f, Position.Z - Terrain.Size * 0.5f);
 }
 
 /// <summary>
@@ -118,30 +128,101 @@ public sealed class GeometryPiece
     internal readonly GeometryTriangle[] PartTris;
     public Surface[] Surfaces { get; }
 
-    public int TriangleCount => Tris.Length;
+    /// <summary>
+    /// The tile's terrain, if it has one (docs/GEOMETRY.md 2.3), at <see cref="TerrainOffset"/> in the
+    /// piece's frame. Its triangles are numbered after the boxes' (<see cref="IsTerrainTriangle"/>) and the
+    /// prism under each is a solid numbered after theirs (<see cref="IsTerrainSolid"/>), the prism under
+    /// triangle k being solid <see cref="SolidCount"/> + k. <see cref="SolidCount"/> counts the boxes only:
+    /// whatever walks every solid of a piece is asking about boxes.
+    /// </summary>
+    public Heightfield? Terrain { get; }
+    public Vector3 TerrainOffset { get; }
+    public int TerrainOwner { get; }
+    /// <summary>Where the terrain's materials start in <see cref="Surfaces"/>: material m is surface base + m.</summary>
+    private readonly int _terrainSurfaces;
+
+    /// <summary>Box triangles and terrain triangles.</summary>
+    public int TriangleCount => Tris.Length + (Terrain?.TriangleCount ?? 0);
     public int SolidCount => Solids.Length;
     public Vector3 BoundsMin { get; }
     public Vector3 BoundsMax { get; }
+    /// <summary>Whether there is anything in it: boxes or a terrain.</summary>
+    public bool IsEmpty => Solids.Length == 0 && Terrain == null;
     /// <summary>What the piece holds in memory, bytes (arrays only).</summary>
     public long Bytes => (long)Tris.Length * 40 + TriSurface.Length * 2 + (long)TriNodes.Length * 32
                          + (long)Solids.Length * 124 + SolidTris.Length * 4 + Planes.Length * 16
-                         + (long)SolidNodes.Length * 32 + SolidOrder.Length * 4 + (long)Parts.Length * 16 + (long)PartTris.Length * 40;
+                         + (long)SolidNodes.Length * 32 + SolidOrder.Length * 4 + (long)Parts.Length * 16 + (long)PartTris.Length * 40
+                         + (Terrain == null ? 0 : (long)Terrain.Heights.Length * 4 + Terrain.Cells.Length * 9);
 
     private GeometryPiece(TileKey key, Vector3 origin, ulong signature, GeometryTriangle[] tris, ushort[] triSurface, BvhNode[] triNodes,
                           SolidRecord[] solids, int[] solidTris, Vector4[] planes, BvhNode[] solidNodes, int[] solidOrder,
-                          Surface[] surfaces, SolidPart[] parts, GeometryTriangle[] partTris)
+                          Surface[] surfaces, SolidPart[] parts, GeometryTriangle[] partTris,
+                          Heightfield? terrain, Vector3 terrainOffset, int terrainOwner, int terrainSurfaces)
     {
         Key = key; Origin = origin; Signature = signature;
         Tris = tris; TriSurface = triSurface; TriNodes = triNodes;
         Solids = solids; SolidTris = solidTris; Planes = planes;
         SolidNodes = solidNodes; SolidOrder = solidOrder; Surfaces = surfaces;
         Parts = parts; PartTris = partTris;
-        if (solids.Length > 0) { BoundsMin = triNodes[0].Min; BoundsMax = triNodes[0].Max; }
+        Terrain = terrain; TerrainOffset = terrainOffset; TerrainOwner = terrainOwner; _terrainSurfaces = terrainSurfaces;
+        var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
+        if (solids.Length > 0) { lo = triNodes[0].Min; hi = triNodes[0].Max; }
+        if (terrain != null)
+        {
+            lo = Vector3.Min(lo, terrainOffset + new Vector3(0f, terrain.FloorY, 0f));
+            hi = Vector3.Max(hi, terrainOffset + new Vector3(terrain.Size, terrain.MaxY, terrain.Size));
+        }
+        if (!IsEmpty) { BoundsMin = lo; BoundsMax = hi; }
     }
 
     public ref readonly SolidRecord Solid(int index) => ref Solids[index];
+    /// <summary>A box's triangle (index under <see cref="SolidCount"/>'s triangles; see <see cref="TriangleAt"/>
+    /// for any triangle).</summary>
     public ref readonly GeometryTriangle Triangle(int index) => ref Tris[index];
-    public ref readonly Surface SurfaceOfTriangle(int index) => ref Surfaces[TriSurface[index]];
+    public ref readonly Surface SurfaceOfTriangle(int index)
+        => ref index < Tris.Length ? ref Surfaces[TriSurface[index]] : ref Surfaces[TerrainSurfaceOf(index - Tris.Length)];
+
+    // ═══ Any solid or triangle, a box's or the terrain's ═════════════════════════════════════════
+
+    public bool IsTerrainTriangle(int triangle) => triangle >= Tris.Length;
+    public bool IsTerrainSolid(int solid) => solid >= Solids.Length;
+
+    /// <summary>Any triangle in the piece's frame, with its solid: a box's, or the terrain's (whose solid
+    /// is the prism under it).</summary>
+    public GeometryTriangle TriangleAt(int triangle)
+    {
+        if (triangle < Tris.Length) return Tris[triangle];
+        int k = triangle - Tris.Length;
+        var t = Terrain!.Triangle(k);
+        t.V0 += TerrainOffset;
+        t.Solid = Solids.Length + Terrain.PrismOf(k);
+        return t;
+    }
+
+    /// <summary>The solid a triangle belongs to.</summary>
+    public int SolidOfTriangle(int triangle) => triangle < Tris.Length ? Tris[triangle].Solid : Solids.Length + Terrain!.PrismOf(triangle - Tris.Length);
+
+    private int TerrainSurfaceOf(int k) => _terrainSurfaces + Terrain!.Cells[Terrain.CellOfTriangle(k)];
+
+    public int OwnerOfSolid(int solid) => solid < Solids.Length ? Solids[solid].Owner : TerrainOwner;
+
+    public ref readonly Surface SurfaceOfSolid(int solid)
+        => ref solid < Solids.Length ? ref Surfaces[Solids[solid].Surface] : ref Surfaces[TerrainSurfaceOf(solid - Solids.Length)];
+
+    /// <summary>A solid's bounds in the piece's frame.</summary>
+    public (Vector3 Min, Vector3 Max) SolidBounds(int solid)
+    {
+        if (solid < Solids.Length) return (Solids[solid].Min, Solids[solid].Max);
+        var (lo, hi) = Terrain!.PrismBounds(solid - Solids.Length);
+        return (lo + TerrainOffset, hi + TerrainOffset);
+    }
+
+    /// <summary>How much ground a solid covers (Ties): a terrain prism counts as the whole tile, so anything
+    /// laid flush on the ground is met before the ground.</summary>
+    public float FootprintOfSolid(int solid) => solid < Solids.Length ? Solids[solid].Footprint : Terrain!.Size * Terrain.Size;
+
+    public int TriangleCountOfSolid(int solid) => solid < Solids.Length ? Solids[solid].TriCount : Heightfield.PrismTriangleCount;
+    public int PartCountOfSolid(int solid) => solid < Solids.Length ? Solids[solid].PartCount : 0;
     /// <summary>The triangles of one solid, as indices into the piece's triangles.</summary>
     public ReadOnlySpan<int> TrianglesOf(int solid) => new(SolidTris, Solids[solid].TriStart, Solids[solid].TriCount);
     /// <summary>The face planes of a convex solid (normal, offset; a point p is inside when n·p - d &lt; 0 for all).</summary>
@@ -156,8 +237,20 @@ public sealed class GeometryPiece
     /// solids are taken in the order given: callers sort them (by owner) so that the server and a client
     /// holding the same things build the same piece.
     /// </summary>
-    public static GeometryPiece Build(TileKey key, Vector3 origin, IReadOnlyList<SolidSpec> solids, ulong signature)
+    public static GeometryPiece Build(TileKey key, Vector3 origin, IReadOnlyList<SolidSpec> all, ulong signature)
     {
+        // A tile has one terrain at most: the first (by owner, as callers sort) is the tile's ground.
+        SolidSpec? terrain = null;
+        IReadOnlyList<SolidSpec> solids = all;
+        foreach (var s in all)
+            if (s.Terrain != null)
+            {
+                terrain ??= s;
+                var boxes = new List<SolidSpec>(all.Count);
+                foreach (var b in all) if (b.Terrain == null) boxes.Add(b);
+                solids = boxes;
+                break;
+            }
         var surfaces = new List<Surface>();
         var surfaceIndex = new Dictionary<Surface, int>();
         int SurfaceIndex(in Surface s)
@@ -277,8 +370,27 @@ public sealed class GeometryPiece
         for (int i = 0; i < records.Length; i++) { smin[i] = records[i].Min; smax[i] = records[i].Max; }
         var solidNodes = BvhBuilder.Build(smin, smax, records.Length, 2, out var solidOrder);
 
+        // The terrain's materials, after the boxes' surfaces: its own layers and flags, each cell's material,
+        // and a panel as thick as a cell is wide, which no sound goes through.
+        int terrainSurfaces = surfaces.Count;
+        Heightfield? field = null;
+        Vector3 offset = default;
+        int terrainOwner = -1;
+        if (terrain is { } ts)
+        {
+            field = ts.Terrain!;
+            offset = ts.TerrainCorner - origin;
+            offset.Y = 0f;
+            terrainOwner = ts.Owner;
+            var panel = new Vector3(field.Spacing, Heightfield.Depth, field.Spacing);
+            foreach (var m in field.Materials)
+                surfaces.Add(ts.Surface with { Material = m, Construction = new Construction(panel, default) });
+            if (surfaces.Count > ushort.MaxValue) throw new InvalidOperationException("more than 65,536 surfaces in one piece");
+        }
+
         return new GeometryPiece(key, origin, signature, sortedTris, sortedSurface, triNodes, records, solidTris,
-                                 planes.ToArray(), solidNodes, solidOrder, surfaces.ToArray(), parts.ToArray(), partTris.ToArray());
+                                 planes.ToArray(), solidNodes, solidOrder, surfaces.ToArray(), parts.ToArray(), partTris.ToArray(),
+                                 field, offset, terrainOwner, terrainSurfaces);
     }
 
     /// <summary>The distinct face planes of a convex solid, from its triangles.</summary>
@@ -340,10 +452,11 @@ public sealed class GeometryPiece
         where F : IGeometryFilter
     {
         triangle = -1; front = false;
-        if (Tris.Length == 0) return false;
+        if (Terrain != null) TerrainClosest(o, d, tMin, tMax, ref best, ref tie, faces, layers, ref filter, ownerOverride, ref triangle, ref front);
+        if (Tris.Length == 0) return triangle >= 0;
         Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
         int sp = 0;
-        if (BvhBuilder.Slab(TriNodes[0], o, inv, tMin, MathF.Min(tMax, best + TieSlack(best))) == float.MaxValue) return false;
+        if (BvhBuilder.Slab(TriNodes[0], o, inv, tMin, MathF.Min(tMax, best + TieSlack(best))) == float.MaxValue) return triangle >= 0;
         stack[sp++] = 0;
         while (sp > 0)
         {
@@ -377,6 +490,92 @@ public sealed class GeometryPiece
         return triangle >= 0;
     }
 
+    /// <summary>The nearest terrain triangle along the ray, by the same rules as a box's (Closest).</summary>
+    private void TerrainClosest<F>(Vector3 o, Vector3 d, float tMin, float tMax, ref float best, ref Ties tie, RayFaces faces,
+                                   GeometryLayers layers, ref F filter, int ownerOverride, ref int triangle, ref bool front)
+        where F : IGeometryFilter
+    {
+        var field = Terrain!;
+        int owner = ownerOverride >= 0 ? ownerOverride : TerrainOwner;
+        float footprint = field.Size * field.Size;
+        var lo = o - TerrainOffset;
+        var walk = field.Walk(lo, d, tMin, MathF.Min(tMax, best + TieSlack(best)));
+        Span<int> ks = stackalloc int[MaxTerrainTrianglesInCell];
+        while (walk.Next(out int i, out int j, out float leave))
+        {
+            int n = TerrainTrianglesIn(field, i, j, ks);
+            for (int q = 0; q < n; q++)
+            {
+                int k = ks[q];
+                var tr = field.Triangle(k);
+                float slack = TieSlack(best);
+                if (!HitTriangle(tr, lo, d, tMin, MathF.Min(tMax, best + slack), out float t, out bool f)) continue;
+                if ((faces & (f ? RayFaces.Front : RayFaces.Back)) == 0) continue;
+                ref readonly var surface = ref Surfaces[TerrainSurfaceOf(k)];
+                if ((surface.Layers & layers) == 0) continue;
+                if (t >= best - slack && !tie.Beats(footprint, owner)) continue;
+                if (!filter.Accept(owner, surface)) continue;
+                best = t; tie = new Ties(footprint, owner); triangle = Tris.Length + k; front = f;
+            }
+            // Nothing in a later cell is nearer than a hit in this one.
+            if (triangle >= Tris.Length && best <= leave) return;
+        }
+    }
+
+    /// <summary>Whether the ray meets a counted terrain triangle within [tMin, tMax].</summary>
+    private bool TerrainAny<F>(Vector3 o, Vector3 d, float tMin, float tMax, RayFaces faces, GeometryLayers layers, ref F filter,
+                               int ownerOverride) where F : IGeometryFilter
+    {
+        var field = Terrain!;
+        int owner = ownerOverride >= 0 ? ownerOverride : TerrainOwner;
+        var lo = o - TerrainOffset;
+        var walk = field.Walk(lo, d, tMin, tMax);
+        Span<int> ks = stackalloc int[MaxTerrainTrianglesInCell];
+        while (walk.Next(out int i, out int j, out _))
+            for (int q = 0, n = TerrainTrianglesIn(field, i, j, ks); q < n; q++)
+            {
+                int k = ks[q];
+                if (!HitTriangle(field.Triangle(k), lo, d, tMin, tMax, out _, out bool f)) continue;
+                if ((faces & (f ? RayFaces.Front : RayFaces.Back)) == 0) continue;
+                ref readonly var surface = ref Surfaces[TerrainSurfaceOf(k)];
+                if ((surface.Layers & layers) == 0) continue;
+                if (!filter.Accept(owner, surface)) continue;
+                return true;
+            }
+        return false;
+    }
+
+    /// <summary>Every counted terrain triangle along the ray within [tMin, tMax].</summary>
+    private void TerrainAll<F>(Vector3 o, Vector3 d, float tMin, float tMax, GeometryLayers layers, ref F filter, int instance,
+                               int ownerOverride, List<GeometryCrossing> into) where F : IGeometryFilter
+    {
+        var field = Terrain!;
+        int owner = ownerOverride >= 0 ? ownerOverride : TerrainOwner;
+        var lo = o - TerrainOffset;
+        var walk = field.Walk(lo, d, tMin, tMax);
+        Span<int> ks = stackalloc int[MaxTerrainTrianglesInCell];
+        while (walk.Next(out int i, out int j, out _))
+            for (int q = 0, n = TerrainTrianglesIn(field, i, j, ks); q < n; q++)
+            {
+                int k = ks[q];
+                if (!HitTriangle(field.Triangle(k), lo, d, tMin, tMax, out float t, out bool f)) continue;
+                ref readonly var surface = ref Surfaces[TerrainSurfaceOf(k)];
+                if ((surface.Layers & layers) == 0) continue;
+                if (!filter.Accept(owner, surface)) continue;
+                into.Add(new GeometryCrossing(t, f, new SolidRef(instance, Solids.Length + field.PrismOf(k)), Tris.Length + k, owner));
+            }
+    }
+
+    // A cell's two surface triangles and, on a skirted tile's edge, the skirt under each side on the edge.
+    private const int MaxTerrainTrianglesInCell = 6;
+
+    private static int TerrainTrianglesIn(Heightfield field, int i, int j, Span<int> into)
+    {
+        into[0] = field.TriangleOf(i, j, 0);
+        into[1] = field.TriangleOf(i, j, 1);
+        return 2 + field.SkirtsOf(i, j, into[2..]);
+    }
+
     /// <summary>How close two hits are to be the same place, metres: a few millionths of the distance
     /// (what Möller–Trumbore's rounding leaves between two coplanar faces) and never less than 2 µm.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -386,6 +585,7 @@ public sealed class GeometryPiece
     internal bool Any<F>(Vector3 o, Vector3 d, Vector3 inv, float tMin, float tMax, RayFaces faces,
                          GeometryLayers layers, ref F filter, int ownerOverride) where F : IGeometryFilter
     {
+        if (Terrain != null && TerrainAny(o, d, tMin, tMax, faces, layers, ref filter, ownerOverride)) return true;
         if (Tris.Length == 0) return false;
         Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
         int sp = 0;
@@ -416,6 +616,7 @@ public sealed class GeometryPiece
     internal void All<F>(Vector3 o, Vector3 d, Vector3 inv, float tMin, float tMax, GeometryLayers layers, ref F filter,
                          int instance, int ownerOverride, List<GeometryCrossing> into) where F : IGeometryFilter
     {
+        if (Terrain != null) TerrainAll(o, d, tMin, tMax, layers, ref filter, instance, ownerOverride, into);
         if (Tris.Length == 0) return;
         Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
         int sp = 0;
@@ -470,6 +671,12 @@ public sealed class GeometryPiece
     internal void Containing<F>(Vector3 p, float slack, GeometryLayers layers, ref F filter, int instance, int ownerOverride,
                                 List<SolidRef> into) where F : IGeometryFilter
     {
+        if (Terrain != null && Terrain.Inside(p - TerrainOffset, slack, out int k))
+        {
+            ref readonly var surface = ref Surfaces[TerrainSurfaceOf(k)];
+            if ((surface.Layers & layers) != 0 && filter.Accept(ownerOverride >= 0 ? ownerOverride : TerrainOwner, surface))
+                into.Add(new SolidRef(instance, Solids.Length + k));
+        }
         if (Solids.Length == 0) return;
         Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
         int sp = 0;
@@ -498,7 +705,13 @@ public sealed class GeometryPiece
     /// <summary>Every counted solid whose bounds overlap the box [min, max].</summary>
     internal void Overlapping<F>(Vector3 min, Vector3 max, GeometryLayers layers, ref F filter, int instance, int ownerOverride,
                                  List<SolidRef> into) where F : IGeometryFilter
+        => Overlapping(min, max, min, max, layers, ref filter, instance, ownerOverride, into);
+
+    /// <summary>The same, with the terrain's prisms asked for within [terrainMin, terrainMax] only.</summary>
+    internal void Overlapping<F>(Vector3 min, Vector3 max, Vector3 terrainMin, Vector3 terrainMax, GeometryLayers layers, ref F filter,
+                                 int instance, int ownerOverride, List<SolidRef> into) where F : IGeometryFilter
     {
+        if (Terrain != null) TerrainOverlapping(terrainMin, terrainMax, layers, ref filter, instance, ownerOverride, into);
         if (Solids.Length == 0) return;
         Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
         int sp = 0;
@@ -525,9 +738,41 @@ public sealed class GeometryPiece
         }
     }
 
+    /// <summary>The terrain prisms whose bounds overlap [min, max], each cell's two halves tested apart.</summary>
+    private void TerrainOverlapping<F>(Vector3 min, Vector3 max, GeometryLayers layers, ref F filter, int instance, int ownerOverride,
+                                       List<SolidRef> into) where F : IGeometryFilter
+    {
+        var field = Terrain!;
+        var cells = Scratch.Ints;
+        cells.Clear();
+        field.Overlapping(min - TerrainOffset, max - TerrainOffset, cells);
+        int owner = ownerOverride >= 0 ? ownerOverride : TerrainOwner;
+        foreach (int k in cells)
+        {
+            var (lo, hi) = field.PrismBounds(k);
+            lo += TerrainOffset; hi += TerrainOffset;
+            if (hi.X < min.X || lo.X > max.X || hi.Y < min.Y || lo.Y > max.Y || hi.Z < min.Z || lo.Z > max.Z) continue;
+            ref readonly var surface = ref Surfaces[TerrainSurfaceOf(k)];
+            if ((surface.Layers & layers) == 0) continue;
+            if (!filter.Accept(owner, surface)) continue;
+            into.Add(new SolidRef(instance, Solids.Length + k));
+        }
+    }
+
+    /// <summary>A terrain prism's eight triangles and five planes, shifted by <paramref name="shift"/>.</summary>
+    internal void TerrainPrism(int solid, Vector3 shift, Span<Vector3> corners, Span<Vector4> planes)
+        => Terrain!.Prism(solid - Solids.Length, shift + TerrainOffset, corners, planes);
+
+    private static class Scratch
+    {
+        [ThreadStatic] private static List<int>? _ints;
+        public static List<int> Ints => _ints ??= new List<int>(64);
+    }
+
     /// <summary>Every counted solid whose bounds, grown by <paramref name="grow"/>, reach up to
     /// <paramref name="fromY"/> over the ground-plane segment (ax, az)-(bx, bz): what the vertical plane
-    /// through two points above that height can cut. In the piece's frame.</summary>
+    /// through two points above that height can cut. In the piece's frame. Boxes only: the routes through
+    /// openings this serves are between rooms, and the ground is not a wall of one.</summary>
     internal void Column<F>(float ax, float az, float bx, float bz, float fromY, float grow, GeometryLayers layers, ref F filter,
                             int instance, int ownerOverride, List<SolidRef> into) where F : IGeometryFilter
     {
@@ -558,7 +803,8 @@ public sealed class GeometryPiece
     }
 
     /// <summary>Every counted solid whose bounds a segment from <paramref name="o"/> along
-    /// <paramref name="d"/> passes through within [0, tMax], the bounds grown by <paramref name="grow"/>.</summary>
+    /// <paramref name="d"/> passes through within [0, tMax], the bounds grown by <paramref name="grow"/>.
+    /// Boxes only, as <see cref="Column"/>.</summary>
     internal void Along<F>(Vector3 o, Vector3 d, Vector3 inv, float tMax, float grow, GeometryLayers layers, ref F filter,
                            int instance, int ownerOverride, List<SolidRef> into) where F : IGeometryFilter
     {

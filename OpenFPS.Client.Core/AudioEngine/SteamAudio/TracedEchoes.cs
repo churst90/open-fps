@@ -159,6 +159,8 @@ internal sealed class TracedEchoes : IDisposable
 
     private void Loop()
     {
+        // Priority = BelowNormal is a placebo on Linux; nice the thread so tracing loses to the mixer.
+        OpenFPS.Client.Core.Platform.BackgroundPriority.LowerThisThread("TracedEchoes");
         while (_running)
         {
             try

@@ -1,6 +1,7 @@
 using MemoryPack;
 using System.Numerics;
 using OpenFPS.Common.Components;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common.Networking;
 
@@ -50,6 +51,8 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(42, typeof(MapSettingsUpdate))]
 // 43 is free; 44 is the driving aids'.
 [MemoryPackUnion(44, typeof(MapRoads))]
+// The world: arriving waits on the loading screen for the tiles round you (docs/WORLD_STREAMING.md).
+[MemoryPackUnion(45, typeof(WorldLoading))]
 public partial interface IMessage { }
 
 /// <summary>What choosing an item of the world editor's menu does.</summary>
@@ -61,11 +64,12 @@ public enum EditorItemKind : byte
     Menu = 1,
     /// <summary>Sends <see cref="EditorMenuItem.Command"/>, the text of an /edit command, as if typed.</summary>
     Action = 2,
-    /// <summary>Puts <see cref="EditorMenuItem.Command"/> on the command line for the player to finish (a number).</summary>
+    /// <summary>Asks for a typed value in a dialog (<see cref="EditorMenuItem.Prompt"/> and the members after
+    /// it), then sends <see cref="EditorMenuItem.Command"/> with the value on the end.</summary>
     Input = 3,
 }
 
-/// <summary>One item of a world editor menu.</summary>
+/// <summary>One item of a world editor menu. Serialised positionally: append members only.</summary>
 [MemoryPackable]
 public partial struct EditorMenuItem
 {
@@ -75,10 +79,40 @@ public partial struct EditorMenuItem
     /// <summary>The menu stays open after the action, for something done again and again (a nudge).</summary>
     public bool Stay;
 
+    // An Input item's value: what the text box is called and holds, and how the client checks it.
+    /// <summary>What the value is, said as the text box's label: "hum level", "metres east, north and up".</summary>
+    public string Prompt;
+    /// <summary>The value now, as typed: put in the box when it opens. Empty for none.</summary>
+    public string Value;
+    /// <summary>Number, Integer or Text. Text is only checked for being there; the server checks the rest.</summary>
+    public FieldType ValueType;
+    public string Unit;
+    /// <summary>The range a number must be in; double.MinValue and MaxValue when open.</summary>
+    public double Min;
+    public double Max;
+    /// <summary>One line said after the label and range.</summary>
+    public string Help;
+    /// <summary>How many numbers are typed, apart by spaces: 3 for east, north and up. 0 or 1 is one.</summary>
+    public byte Count;
+
+    // Appended 2026-10-09 for the F12 dialog (docs/WORLD_EDITOR.md section 16).
+    /// <summary>Which part of the editor dialog the item belongs in ("edit.thing", "world.field"); empty in a menu.</summary>
+    public string Section;
+    /// <summary>A tick: a thing held with the others.</summary>
+    public bool Checked;
+
     public EditorMenuItem()
     {
         Label = "";
         Command = "";
+        Prompt = "";
+        Value = "";
+        ValueType = FieldType.Text;
+        Unit = "";
+        Min = double.MinValue;
+        Max = double.MaxValue;
+        Help = "";
+        Section = "";
     }
 }
 
@@ -125,6 +159,11 @@ public partial class MapSettingsUpdate : IMessage
     public string MapId = "";
     /// <summary>"category=policy" pairs, as MapManifest.BeaconPolicy.</summary>
     public string[] BeaconPolicy = Array.Empty<string>();
+    /// <summary>Where a player can walk and drive now (/setmapsize), as MapManifest.PlayMin and PlayMax.
+    /// False from a server that sends no play area. Appended 2026-10-09.</summary>
+    public bool HasPlayArea;
+    public Vector3 PlayMin;
+    public Vector3 PlayMax;
     public MapSettingsUpdate() { }
 }
 
@@ -197,6 +236,10 @@ public partial struct MapSummary
     /// messages are serialised by position.</summary>
     public string Name;
 
+    /// <summary>A place to arrive at in the world rather than a map: the list has the world first, then
+    /// the maps. Its id is what /join takes ("world magnolia"). Appended.</summary>
+    public bool IsWorldPlace;
+
     public MapSummary()
     {
         Id = "";
@@ -256,6 +299,20 @@ public partial class MapManifest : IMessage
     /// MapLoadComplete is a tile arriving (docs/WORLD_STREAMING.md). Appended last.</summary>
     public float TileMetres;
 
+    /// <summary>
+    /// This map is the world (docs/WORLD_STREAMING.md, stage 2): its tiles are made as players come near,
+    /// and a body is stopped at the edge of one not built yet. Its frame: (0, 0, 0) is the south-west
+    /// corner of a 250 m square of UTM zone <see cref="WorldZone"/> (<see cref="WorldNorth"/> for the
+    /// northern half) at <see cref="FrameEasting"/>, <see cref="FrameNorthing"/>, and
+    /// <see cref="FrameBaseY"/> metres over the sea. Appended.
+    /// </summary>
+    public bool IsWorld;
+    public int WorldZone;
+    public bool WorldNorth;
+    public double FrameEasting;
+    public double FrameNorthing;
+    public float FrameBaseY;
+
     public MapManifest() { }
 }
 
@@ -300,6 +357,21 @@ public partial class TileStreamUpdate : IMessage
     /// <summary>Entities taken away because their tiles went.</summary>
     public int Removed;
     public TileStreamUpdate() { }
+}
+
+/// <summary>
+/// While a player waits on the loading screen to arrive in the world: how many of the tiles round where
+/// they will stand are built. The client shows it, and says <see cref="Text"/> when <see cref="Speak"/>
+/// is set (docs/WORLD_STREAMING.md, Arriving). Append members only.
+/// </summary>
+[MemoryPackable]
+public partial class WorldLoading : IMessage
+{
+    public int Done;
+    public int Total;
+    public string Text = string.Empty;
+    public bool Speak;
+    public WorldLoading() { }
 }
 
 [MemoryPackable]
@@ -421,6 +493,9 @@ public partial class EntityDefinition : IMessage
     /// </summary>
     public int RidingEntityId = -1;
 
+    /// <summary>For a tile of ground, its heights and materials (ColliderShape.Terrain); null for anything else.</summary>
+    public TerrainTileComponent? Terrain;
+
     public EntityDefinition()
     {
         Identity.Name = "";
@@ -493,6 +568,14 @@ public partial struct EntityState
     /// zero for anything not a player's vehicle. Nothing a client observes says a hand is on the horn.
     /// </summary>
     public byte Signals;
+
+    /// <summary>
+    /// How a far moving thing is changing, as the server has it, for the client to carry it between states
+    /// (<see cref="DistantMotion"/>): its speed's rate in millimetres a second squared, and the turn of its
+    /// heading as a rotation vector in milliradians a second. Zero for anything near or steady.
+    /// </summary>
+    public short SpeedRate;
+    public short TurnX, TurnY, TurnZ;
 
     public EntityState()
     {
@@ -741,6 +824,10 @@ public partial class ChatMessage : IMessage
     /// <summary>Set when the server says somebody came, went or is away: the Sender is then the person it
     /// is about, and the Text the whole notice.</summary>
     public PresenceKind Presence;
+    /// <summary>The sender's team, or "" for none.</summary>
+    public string Team = string.Empty;
+    /// <summary>The sender's role as said in chat ("Owner", "Developer", a custom role), or "" for a player.</summary>
+    public string Title = string.Empty;
 }
 
 [MemoryPackable]

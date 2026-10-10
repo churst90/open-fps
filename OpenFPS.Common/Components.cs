@@ -4,11 +4,146 @@ using System;
 
 namespace OpenFPS.Common.Components;
 
-/// <summary>Stored and sent by number: append only.</summary>
-public enum UserRole { Player, Dev, Admin, Moderator }
+/// <summary>Stored and sent by number: append only. Owner has every permission and cannot be taken
+/// off the server's last owner (docs/SERVER_SECURITY.md).</summary>
+public enum UserRole { Player, Dev, Admin, Moderator, Owner }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
 public enum WeatherType { Clear, Rain, Snow, Storm }
-public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon } 
+/// <summary>Terrain is a tile of ground (TerrainTileComponent); its collider is not solid, so the readers of
+/// boxes pass it by, and the triangle world takes it as a heightfield. Append new shapes only.</summary>
+public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon, Terrain }
+
+/// <summary>
+/// A tile of ground (docs/GEOMETRY.md 2.3): <see cref="Posts"/> a side, <see cref="Spacing"/> apart, from
+/// the entity's position less half the tile's size in x and z. Heights are whole centimetres over the
+/// entity's height, so every machine turns them into the same floats. A material per cell, as an index
+/// into <see cref="Materials"/>. Sent with the entity's definition and stored with its tile.
+/// </summary>
+[MemoryPackable]
+public partial class TerrainTileComponent
+{
+    public int Posts;
+    public float Spacing;
+    public short[] HeightsCm = Array.Empty<short>();
+    public byte[] Cells = Array.Empty<byte>();
+    public string[] Materials = Array.Empty<string>();
+    // APPEND ONLY below this line: the wire format is positional.
+
+    /// <summary>Post to post across the tile, metres.</summary>
+    [MemoryPackIgnore] public float Size => (Posts - 1) * Spacing;
+
+    private OpenFPS.Common.Geometry.Heightfield? _field;
+    private float _fieldBase = float.NaN;
+
+    /// <summary>The heightfield for a tile whose base height is <paramref name="baseY"/>, made once.</summary>
+    public OpenFPS.Common.Geometry.Heightfield Field(float baseY)
+    {
+        var f = _field;
+        if (f != null && _fieldBase == baseY) return f;
+        f = OpenFPS.Common.Geometry.Heightfield.FromCentimetres(Posts, Spacing, baseY, HeightsCm,
+                                                              Cells.Length > 0 ? Cells : null, Materials.Length > 0 ? Materials : null,
+                                                              skirted: IsCoarse);
+        _fieldBase = baseY;
+        _field = f;
+        return f;
+    }
+
+    /// <summary>Cells a side of a tile of ground in the far ring: 250 m in 32 is 7.8 m between posts, the 8 m
+    /// of docs/GEOMETRY.md decision 1, and a post on both edges of the tile.</summary>
+    public const int CoarseCells = 32;
+
+    /// <summary>Post to post of all full ground, metres (TerrainTiles and the world's tiles lay it at 2 m).</summary>
+    public const float FullSpacing = 2f;
+
+    /// <summary>Whether this is ground at the far ring's spacing (<see cref="Coarse"/>), told from the wire's own
+    /// fields: its heightfield hangs a skirt from its edges. Never true of the server's ground.</summary>
+    [MemoryPackIgnore] public bool IsCoarse => Posts == CoarseCells + 1 && Spacing > FullSpacing + 0.01f;
+
+    private TerrainTileComponent? _coarse;
+
+    /// <summary>
+    /// The same ground with <see cref="CoarseCells"/> cells a side, for a tile a client has only in its far
+    /// ring (docs/WORLD_STREAMING.md, Coarse ground): each post's height read off this tile's own triangles,
+    /// over the same base, so the two lie on one another along a post's line; each cell the material under its
+    /// middle. The edge posts are raised so the edge is nowhere under this tile's own 2 m edge (<see
+    /// cref="LiftEdge"/>), and its heightfield is skirted, so no ray passes between it and a full neighbour.
+    /// This one if it is no finer. Made once.
+    /// </summary>
+    public TerrainTileComponent Coarse()
+    {
+        if (Posts - 1 <= CoarseCells) return this;
+        var made = _coarse;
+        if (made != null) return made;
+        var fine = Field(0f);
+        int posts = CoarseCells + 1;
+        float spacing = Size / CoarseCells;
+        var heights = new short[posts * posts];
+        for (int j = 0; j < posts; j++)
+            for (int i = 0; i < posts; i++)
+                heights[j * posts + i] = (short)Math.Clamp(MathF.Round(fine.HeightAt(i * spacing, j * spacing) * 100f), short.MinValue, short.MaxValue);
+        var cells = new byte[CoarseCells * CoarseCells];
+        if (Cells.Length > 0)
+            for (int j = 0; j < CoarseCells; j++)
+                for (int i = 0; i < CoarseCells; i++)
+                {
+                    fine.CellAt((i + 0.5f) * spacing, (j + 0.5f) * spacing, out int fi, out int fj, out _, out _);
+                    cells[j * CoarseCells + i] = Cells[fj * (Posts - 1) + fi];
+                }
+        LiftEdge(heights, 0, Posts, 0, posts);                                          // west
+        LiftEdge(heights, Posts - 1, Posts, posts - 1, posts);                          // east
+        LiftEdge(heights, 0, 1, 0, 1);                                                  // south
+        LiftEdge(heights, (Posts - 1) * Posts, 1, (posts - 1) * posts, 1);              // north
+        return _coarse = new TerrainTileComponent { Posts = posts, Spacing = spacing, HeightsCm = heights, Cells = cells, Materials = Materials };
+    }
+
+    /// <summary>
+    /// One edge of the coarse ground, its posts at <paramref name="c0"/> + k <paramref name="cStep"/> in
+    /// <paramref name="coarse"/>, set so the edge lies on or over this tile's edge, posts <paramref name="f0"/>
+    /// + m <paramref name="fStep"/>. The skirt hangs down from the coarse edge, so a fine neighbour's edge (the
+    /// same posts) must never be over it, or a ray could pass between the two. Each post depends only on the
+    /// edge's own posts, which the neighbour shares, so two coarse tiles still meet; the corners stay where the
+    /// fine corner is, as all four tiles there have it. Whole centimetres, rounded up.
+    /// </summary>
+    private void LiftEdge(short[] coarse, int f0, int fStep, int c0, int cStep)
+    {
+        const int n = CoarseCells;
+        double fine = Spacing, step = (double)Size / n;
+        double F(int m) => HeightsCm[f0 + m * fStep];
+        double At(double s)
+        {
+            int m = Math.Clamp((int)Math.Floor(s / fine), 0, Posts - 2);
+            double t = (s - m * fine) / fine;
+            return F(m) + (F(m + 1) - F(m)) * t;
+        }
+        var c = new double[n + 1];
+        var lift = new double[n + 1];
+        for (int k = 0; k <= n; k++) c[k] = At(k * step);
+        for (int k = 0; k < n; k++)
+        {
+            double s0 = k * step, s1 = (k + 1) * step;
+            int mFirst = (int)Math.Floor(s0 / fine) + 1, mLast = (int)Math.Ceiling(s1 / fine) - 1;
+            for (int m = mFirst; m <= mLast; m++)
+            {
+                double t = (m * fine - s0) / step;
+                if (t <= 0 || t >= 1) continue;
+                double f = F(m);
+                if (k == 0) lift[1] = Math.Max(lift[1], c[0] + (f - c[0]) / t - c[1]);            // the corner stays
+                else if (k == n - 1) lift[n - 1] = Math.Max(lift[n - 1], c[n] + (f - c[n]) / (1 - t) - c[n - 1]);
+                else
+                {
+                    double under = f - (c[k] + (c[k + 1] - c[k]) * t);
+                    lift[k] = Math.Max(lift[k], under);
+                    lift[k + 1] = Math.Max(lift[k + 1], under);
+                }
+            }
+        }
+        for (int k = 0; k <= n; k++)
+        {
+            double cm = k == 0 || k == n ? c[k] : Math.Ceiling(c[k] + lift[k] - 1e-6);
+            coarse[c0 + k * cStep] = (short)Math.Clamp(cm, short.MinValue, short.MaxValue);
+        }
+    }
+}
 
 [MemoryPackable]
 public partial struct Transform 

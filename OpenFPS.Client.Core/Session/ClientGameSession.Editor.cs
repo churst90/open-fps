@@ -13,7 +13,19 @@ public partial class ClientGameSession
     /// <summary>The tag every editor list carries, so one sent again replaces itself.</summary>
     internal const string EditorTagPrefix = "editor:";
 
-    private void OpenWorldEditor() => Command("edit", "menu");
+    private readonly EditorDialogMemory _editorMemory = new();
+    private EditorDialog? _editor;
+
+    /// <summary>The F12 dialog, if one is open.</summary>
+    internal EditorDialog? OpenEditor => _editor is { IsOpen: true } d ? d : null;
+
+    /// <summary>F12: asks the server for the editor dialog, which answers only a player who may edit this
+    /// map; anybody else hears nothing. Pressed again it closes the dialog.</summary>
+    private void ToggleEditorDialog()
+    {
+        if (OpenEditor is { } open) { open.Close(); return; }
+        Command("edit", "dialog", "open", _editorMemory.Tab);
+    }
 
     /// <summary>
     /// An editor menu from the server. The first menu replaces whatever lists are open; any other opens
@@ -22,6 +34,31 @@ public partial class ClientGameSession
     /// </summary>
     internal void ShowEditorMenu(EditorMenu menu)
     {
+        // The dialogs' forms, and the answers to what they sent, are not lists.
+        switch (menu.Path)
+        {
+            case "dialog":
+                if (OpenEditor == null && OpenBuild == null)
+                {
+                    _editor = new EditorDialog(menu, _editorMemory, _buildMemory, SendTyped);
+                    _shell.ShowEditorDialog(_editor);
+                }
+                return;
+            case BuildCatalog.FormPath: ShowBuildDialog(menu); return;
+            case "build.placed":
+                _chat.AddServerMessage(menu.Title);
+                if (OpenEditor is { } editor) editor.PieceAnswer(true, menu.Title);
+                else _build?.Answer(true, menu.Title);
+                return;
+            case "build.refused":
+                if (OpenEditor is { } refusedIn) refusedIn.PieceAnswer(false, menu.Title);
+                else if (OpenBuild is { } open) open.Answer(false, menu.Title);
+                else _chat.AddServerMessage(menu.Title);
+                return;
+        }
+        if (menu.Path.StartsWith("dialog.", StringComparison.Ordinal)) { OpenEditor?.Update(menu); return; }
+        // The dialog is modal: a menu sent while it is open is not shown under it.
+        if (OpenEditor != null) return;
         var list = ToList(menu);
         if (menu.Refresh) { _menus.Replace(list); return; }
         bool editorOpen = _menus.Current?.Tag.StartsWith(EditorTagPrefix, StringComparison.Ordinal) == true;
@@ -36,11 +73,43 @@ public partial class ClientGameSession
             // The answer opens on top, so the lists stay open while it is asked for.
             EditorItemKind.Menu => new MenuItem(item.Label, () => Command("edit", ("menu " + item.Command).Split(' ', StringSplitOptions.RemoveEmptyEntries)), Stays: true),
             EditorItemKind.Action => new MenuItem(item.Label, () => SendTyped(item.Command), Stays: item.Stay),
-            // The command line, with the start of the command typed; the lists wait underneath.
-            EditorItemKind.Input => new MenuItem(item.Label, () => _shell.OpenCommandConsole(item.Command), Stays: true),
+            // A dialog with one text box; the lists wait underneath.
+            EditorItemKind.Input => new MenuItem(item.Label, () => AskForValue(new EditorValuePrompt(item)), Stays: true),
             _ => new MenuItem(item.Label, () => _speech.Speak(item.Label, interrupt: true), Stays: true),
         }).ToList();
         return new ListMenu(menu.Title, items) { Tag = EditorTagPrefix + menu.Path };
+    }
+
+    /// <summary>Asks for an Input item's value, checks it, and sends its command; a refusal keeps the dialog open.</summary>
+    internal void AskForValue(EditorValuePrompt prompt) => _shell.AskForValue(prompt, typed =>
+    {
+        // Sending the same value again would still make an undo step, and a new version of a model.
+        if (prompt.IsUnchanged(typed)) { Say("Unchanged."); return null; }
+        if (!prompt.TryCommand(typed, out var command, out var error)) return error;
+        SendTyped(command);
+        return null;
+    });
+
+    private readonly BuildMemory _buildMemory = new();
+    private BuildDialog? _build;
+
+    /// <summary>The build dialog, if one is open.</summary>
+    internal BuildDialog? OpenBuild => _build is { IsOpen: true } b ? b : null;
+
+    /// <summary>Control+B: asks the server for the build dialog, which answers only a player who may edit
+    /// this map; anybody else hears nothing. Pressed again it closes the dialog.</summary>
+    private void ToggleBuildDialog()
+    {
+        if (OpenBuild is { } open) { open.Close(); return; }
+        if (OpenEditor != null) return;
+        Command("edit", "build", "form");
+    }
+
+    private void ShowBuildDialog(EditorMenu form)
+    {
+        if (OpenBuild != null) return;
+        _build = new BuildDialog(new BuildForm(BuildCatalog.From(form), _buildMemory), SendTyped);
+        _shell.ShowBuildDialog(_build);
     }
 
     /// <summary>Sends "edit nudge north" as the command /edit nudge north.</summary>
@@ -97,10 +166,18 @@ public partial class ClientGameSession
             : "Editor direct keys off.";
     }
 
-    /// <summary>A map's settings changed while we are on it: its beacon rules, at once.</summary>
+    /// <summary>A map's settings changed while we are on it: its beacon rules and its edges, at once.</summary>
     internal void ApplyMapSettings(MapSettingsUpdate update)
     {
         _audioSystem.Beacons.SetMapPolicy(update.BeaconPolicy);
+        if (update.HasPlayArea)
+        {
+            // The prediction's edges must be the server's, or a step past the old edge is pulled back.
+            _physics.MapMin = update.PlayMin;
+            _physics.MapMax = update.PlayMax;
+            _state.MapMin = update.PlayMin;
+            _state.MapMax = update.PlayMax;
+        }
         Serilog.Log.Information("MapSettingsUpdate: {Map} beacon rules {Rules}.", update.MapId, string.Join(", ", update.BeaconPolicy));
     }
 }

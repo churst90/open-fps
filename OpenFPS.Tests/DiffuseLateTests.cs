@@ -264,3 +264,63 @@ public class DiffuseLateTests
         Assert.True(after <= before * 1.2f, $"step {after:F4} after the handover against {before:F4} before");
     }
 }
+
+/// <summary>
+/// The field and the directional part share each direction's head response since 2026-10-09
+/// (DiffuseTail.RenderLate with directional): the same as the two through effects of their own
+/// (RenderLate, then AddDirectional) to float rounding, the head turning and the lean moving. Needs
+/// Steam Audio (SteamAudioForTests).
+/// </summary>
+public class SharedHeadResponseTests
+{
+    private const int Rate = 48000, Sub = 256;
+    private readonly Xunit.Abstractions.ITestOutputHelper _out;
+
+    public SharedHeadResponseTests(Xunit.Abstractions.ITestOutputHelper output) => _out = output;
+
+    [SteamAudioEmbreeFact]
+    public void OneHeadResponseForBothIsTheTwoSummed()
+    {
+        IntPtr ctx = SteamAudioForTests.EmbreeContext;
+        var au = new Phonon.IPLAudioSettings { samplingRate = Rate, frameSize = Sub };
+        var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
+        Assert.Equal(Phonon.IPL_STATUS_SUCCESS, Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf));
+        var two = DiffuseTail.Create(ctx, Sub, TracedReverb.Channels, hrtf, Rate)!;
+        var one = DiffuseTail.Create(ctx, Sub, TracedReverb.Channels, hrtf, Rate)!;
+        Assert.True(two.SdmReady && one.SdmReady);
+        var shares = new float[DiffuseBranch.Count];
+        for (int b = 0; b < shares.Length; b++) shares[b] = (b % 4 + 1) / 50f;
+        two.LateShares = one.LateShares = shares;
+        var r = new Random(21);
+        double maxDiff = 0, peak = 0;
+        for (int block = 0; block < 400; block++)
+        {
+            // Turning a few degrees a block, the lean swinging round: every head response moves.
+            var rot = Quaternion.CreateFromYawPitchRoll(block * 0.05f, 0.1f * MathF.Sin(block * 0.03f), 0f);
+            two.SetListenerRotation(rot); one.SetListenerRotation(rot);
+            var bias = new Vector3(MathF.Cos(block * 0.02f), 0f, MathF.Sin(block * 0.02f)) * 0.3f;
+            two.SetBias(bias); one.SetBias(bias);
+            for (int d = 0; d < DiffuseBranch.Count; d++)
+                for (int k = 0; k < Sub; k++)
+                {
+                    float late = (float)(r.NextDouble() * 2 - 1) * 0.1f, dir = (float)(r.NextDouble() * 2 - 1) * 0.05f;
+                    two.LateIn[d][k] = one.LateIn[d][k] = late;
+                    two.SdmOut[d][k] = one.SdmOut[d][k] = dir;
+                }
+            two.RenderLate(Sub);
+            two.AddDirectional(Sub);
+            one.RenderLate(Sub, directional: true);
+            for (int i = 0; i < 2 * Sub; i++)
+            {
+                maxDiff = Math.Max(maxDiff, Math.Abs(two.Stereo[i] - (double)one.Stereo[i]));
+                peak = Math.Max(peak, Math.Abs(two.Stereo[i]));
+            }
+        }
+        two.Release(); one.Release();
+        Phonon.iplHRTFRelease(ref hrtf);
+        double db = 20 * Math.Log10(Math.Max(maxDiff, 1e-30)), under = db - 20 * Math.Log10(peak);
+        _out.WriteLine($"largest difference {db:F1} dBFS, largest output {20 * Math.Log10(peak):F1} dBFS ({under:F1} dB under it)");
+        Assert.True(peak > 1e-2);
+        Assert.True(db < -100, $"{db:F1} dBFS apart");
+    }
+}

@@ -201,6 +201,11 @@ public class MachineVoiceTests
                     Assert.True(ShoreSpec.Presets.ContainsKey(preset),
                         $"{Path.GetFileName(file)} names shore '{preset}', which is not a preset");
                     break;
+                case "stove":
+                    // A gas hob's key may carry its knobs' settings ("stove:hob4/0000>3000@..."); a prefab names it bare.
+                    Assert.True(HobKey.TryParse(id, out var hob) && GasHobSpec.Presets.ContainsKey(hob.Preset),
+                        $"{Path.GetFileName(file)} names gas hob '{preset}', which is not a preset");
+                    break;
                 default:
                     Assert.Fail($"{Path.GetFileName(file)} names '{id}', and '{kind}:' is not a model kind "
                               + "this client knows — it will be silent.");

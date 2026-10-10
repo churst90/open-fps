@@ -51,11 +51,112 @@ public sealed class MapTiles
     public IReadOnlyList<int> Global => _global;
     public IEnumerable<TileKey> Tiles => _byTile.Keys;
 
-    public MapTiles(float tileMetres, TileKey min, TileKey max)
+    public MapTiles(float tileMetres, TileKey min, TileKey max, bool dynamic = false)
     {
         TileMetres = tileMetres;
         Min = min;
         Max = max;
+        if (dynamic) _ready = new HashSet<TileKey>();
+    }
+
+    // ═══ Tiles that come and go: the world (docs/WORLD_STREAMING.md, stage 2) ═══════════════════════
+
+    /// <summary>On the world, the tiles loaded on the server; null on a map whose tiles are all there.</summary>
+    private readonly HashSet<TileKey>? _ready;
+
+    /// <summary>Whether tiles come and go (the world) rather than all being there from the load.</summary>
+    public bool Dynamic => _ready != null;
+
+    /// <summary>Counts tiles arriving and going, so a client's choice of tiles is worked out again.</summary>
+    public long Version { get; private set; }
+
+    /// <summary>Whether a tile is there to be sent and walked into.</summary>
+    public bool IsReady(TileKey key) => _ready == null || _ready.Contains(key);
+
+    public IReadOnlyCollection<TileKey> ReadyTiles => _ready ?? (IReadOnlyCollection<TileKey>)_byTile.Keys;
+
+    /// <summary>A tile of the world loaded: its entities, each in it alone at the detail it needs.</summary>
+    public void AddTile(TileKey key, IEnumerable<(Entity Entity, TileDetail Needs)> members)
+    {
+        foreach (var (e, needs) in members) Add(e, new[] { key }, needs);
+        _ready?.Add(key);
+        if (!_byTile.ContainsKey(key)) _byTile[key] = new List<int>();
+        Version++;
+    }
+
+    /// <summary>
+    /// A tile of the world loaded with things copied from a map (OneWorld.WorldPlaces): each is in every tile
+    /// its footprint overlaps, at the detail its layer and kind need (<see cref="Needs"/>), and rooms joined
+    /// by doorways go together, as on a map (<see cref="Build"/>). The tile is ready once they are in.
+    /// </summary>
+    public void AddPlaced(World world, TileKey owner, IReadOnlyList<(Entity Entity, string? Layer)> members)
+    {
+        var pending = new Dictionary<int, (Entity Entity, HashSet<TileKey> Keys, TileDetail Needs)>();
+        var doorways = new List<(int Id, int A, int B)>();
+        foreach (var (e, layer) in members)
+        {
+            if (!world.IsAlive(e) || !world.Has<Transform>(e)) continue;
+            var keys = new HashSet<TileKey> { owner };
+            var (lo, hi) = Footprint(world, e, world.Get<Transform>(e));
+            var a = TileKey.Of(lo, TileMetres);
+            var b = TileKey.Of(hi, TileMetres);
+            for (int x = Math.Clamp(a.X, Min.X, Max.X); x <= Math.Clamp(b.X, Min.X, Max.X); x++)
+                for (int z = Math.Clamp(a.Z, Min.Z, Max.Z); z <= Math.Clamp(b.Z, Min.Z, Max.Z); z++)
+                    keys.Add(new TileKey(x, z));
+            pending[e.Id] = (e, keys, Needs(world, e, layer));
+            if (world.Has<PortalComponent>(e))
+            {
+                var p = world.Get<PortalComponent>(e);
+                if (p.RegionAId != p.RegionBId) doorways.Add((e.Id, p.RegionAId, p.RegionBId));
+            }
+        }
+        var parent = new Dictionary<int, int>();
+        int Find(int x) { while (parent.TryGetValue(x, out var p) && p != x) x = parent[x] = parent.GetValueOrDefault(p, p); return x; }
+        foreach (var (id, ra, rb) in doorways)
+            foreach (int room in new[] { ra, rb })
+                if (pending.ContainsKey(room))
+                {
+                    parent.TryAdd(id, id);
+                    parent.TryAdd(room, room);
+                    int r1 = Find(id), r2 = Find(room);
+                    if (r1 != r2) parent[r1] = r2;
+                }
+        var groups = new Dictionary<int, HashSet<TileKey>>();
+        foreach (int id in parent.Keys)
+        {
+            int root = Find(id);
+            if (!groups.TryGetValue(root, out var keys)) groups[root] = keys = new HashSet<TileKey>();
+            keys.UnionWith(pending[id].Keys);
+        }
+        foreach (int id in parent.Keys) pending[id].Keys.UnionWith(groups[Find(id)]);
+        foreach (var (e, keys, needs) in pending.Values)
+            Add(e, keys.OrderBy(k => k.X).ThenBy(k => k.Z).ToArray(), needs);
+        _ready?.Add(owner);
+        if (!_byTile.ContainsKey(owner)) _byTile[owner] = new List<int>();
+        Version++;
+    }
+
+    /// <summary>Forgets entities in whatever tiles they were in: things of a world tile let go.</summary>
+    public void RemoveEntities(IEnumerable<int> ids)
+    {
+        foreach (int id in ids)
+        {
+            if (!_members.Remove(id, out var m)) continue;
+            foreach (var k in m.Tiles)
+                if (_byTile.TryGetValue(k, out var list)) list.Remove(id);
+        }
+    }
+
+    /// <summary>A tile of the world unloaded: its entities' ids, which the caller destroys.</summary>
+    public List<int> RemoveTile(TileKey key)
+    {
+        var ids = new List<int>();
+        if (_byTile.Remove(key, out var list))
+            foreach (int id in list)
+                if (_members.TryGetValue(id, out var m) && m.Tiles.Length == 1) { _members.Remove(id); ids.Add(id); }
+        _ready?.Remove(key);
+        Version++;
+        return ids;
     }
 
     /// <summary>

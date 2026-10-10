@@ -21,6 +21,9 @@ public sealed class AcousticGeometry
     public TriangleWorld World => _builder.Current;
     public TriangleWorldBuilder Builder => _builder;
 
+    /// <summary>The ground's height under a point as of the last <see cref="Update"/>.</summary>
+    public GroundHeights Ground { get; private set; } = GroundHeights.Flat;
+
     /// <summary>Each tile's boxes as last seen: their order-free hash, and the solids made of them.</summary>
     private Dictionary<TileKey, (long Raw, List<SolidSpec> Solids)> _tiles = new();
 
@@ -43,10 +46,16 @@ public sealed class AcousticGeometry
     /// <summary>Brings the world up to <paramref name="boxes"/>, building only the tiles that changed.
     /// <paramref name="leaves"/> are the door leaves among them, by entity id, flagged
     /// SurfaceFlags.DoorLeaf for the routes through openings.</summary>
-    public TriangleWorld Update(IReadOnlyList<SteamAudioScene.Box> boxes, ISet<int>? leaves = null)
+    public TriangleWorld Update(IReadOnlyList<SteamAudioScene.Box> boxes, ISet<int>? leaves = null,
+                                IReadOnlyList<SolidSpec>? terrains = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         bool first = _tiles.Count == 0;
+        terrains ??= Array.Empty<SolidSpec>();
+        var ground = terrains.Count > 0 ? new GroundHeights(terrains) : null;
+        Ground = ground ?? GroundHeights.Flat;
+        var terrainOf = new Dictionary<TileKey, SolidSpec>();
+        foreach (var t in terrains) if (t.Terrain != null) terrainOf.TryAdd(_builder.KeyOf(t), t);
 
         // Which tile each box is in (the builder's own rule: a box wider than a tile is in the wide piece).
         var byTile = new Dictionary<TileKey, List<SteamAudioScene.Box>>();
@@ -57,11 +66,14 @@ public sealed class AcousticGeometry
             if (!byTile.TryGetValue(key, out var list)) byTile[key] = list = new List<SteamAudioScene.Box>();
             list.Add(b);
         }
+        foreach (var k in terrainOf.Keys) if (!byTile.ContainsKey(k)) byTile[k] = new List<SteamAudioScene.Box>();
         var raw = new Dictionary<TileKey, long>(byTile.Count);
         foreach (var (k, list) in byTile)
         {
             long r = 17;
             foreach (var b in list) r += Hash(b) + (leaves != null && leaves.Contains(b.EntityId) ? 7919 : 0);   // order-free
+            // The ground under a tile decides which of its slabs lie on it, so a new ground changes them all.
+            if (terrainOf.TryGetValue(k, out var ts)) r += (long)ts.Terrain!.Hash * 31 + ts.Owner;
             raw[k] = r;
         }
 
@@ -87,13 +99,14 @@ public sealed class AcousticGeometry
         var rebuilt = new Dictionary<TileKey, List<SolidSpec>>();
         if (dirty.Count > 0)
         {
-            var coveredAt = CoverOf(boxes);
+            var coveredAt = CoverOf(boxes, ground?.Lowest ?? 0f);
             foreach (var k in dirty)
             {
-                var specs = new List<SolidSpec>(byTile[k].Count);
+                var specs = new List<SolidSpec>(byTile[k].Count + 1);
                 foreach (var b in byTile[k])
-                    specs.Add(SpecOf(b, SteamAudioScene.IsOpenGround(b, SteamAudioScene.WorldExtents(b), coveredAt),
+                    specs.Add(SpecOf(b, SteamAudioScene.IsOpenGround(b, SteamAudioScene.WorldExtents(b), coveredAt, ground),
                                      leaves != null && b.EntityId != 0 && leaves.Contains(b.EntityId)));
+                if (terrainOf.TryGetValue(k, out var ts)) specs.Add(ts with { Surface = SceneTerrain.Surface });
                 rebuilt[k] = specs;
             }
         }
@@ -114,14 +127,14 @@ public sealed class AcousticGeometry
 
     /// <summary>Whether anything whose underside is at least <c>lowest</c> stands over (x, z): what stands
     /// over the ground, filed in a grid so a slab is not tested against every box round it.</summary>
-    private static Func<float, float, float, bool> CoverOf(IReadOnlyList<SteamAudioScene.Box> boxes)
+    private static Func<float, float, float, bool> CoverOf(IReadOnlyList<SteamAudioScene.Box> boxes, float lowestGround)
     {
         var cover = new Dictionary<(int, int), List<(Vector3 Min, Vector3 Max)>>();
         foreach (var b in boxes)
         {
             if (b.Size.X <= 0 || b.Size.Y <= 0 || b.Size.Z <= 0) continue;
             var (lo, hi) = SteamAudioScene.WorldExtents(b);
-            if (lo.Y < SteamAudioScene.LowestCover) continue;
+            if (lo.Y < lowestGround + SteamAudioScene.LowestCover) continue;
             for (int cx = (int)MathF.Floor(lo.X / CoverCell); cx <= (int)MathF.Floor(hi.X / CoverCell); cx++)
                 for (int cz = (int)MathF.Floor(lo.Z / CoverCell); cz <= (int)MathF.Floor(hi.Z / CoverCell); cz++)
                 {

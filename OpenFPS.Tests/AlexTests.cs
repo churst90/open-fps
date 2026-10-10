@@ -202,6 +202,10 @@ public class AlexTests
         Assert.Contains(haunts, h => h.Kind == HauntKind.Square && h.Name == "Market Square");
         foreach (var h in haunts)
             Assert.False(Pavements.Blocked(solids, new Vector2(h.Stand.X, h.Stand.Z), h.Stand.Y), $"{h.Name} stands him in a wall");
+        // Waiting in a doorway holds its closer off, so the door stays open all the while he lingers
+        // (Cody, 2026-10-08: the apartment's front door stayed open after an NPC).
+        foreach (var h in haunts.Where(h => h.Door != Entity.Null))
+            Assert.False(DoorSystem.InDoorway(world, h.Door, h.Stand), $"{h.Name} stands him in the doorway, holding the door open");
 
         // From one shelter to the other is a walk of the pavements, crossing Main Street once.
         var a = haunts.First(h => h.Kind == HauntKind.BusStop);

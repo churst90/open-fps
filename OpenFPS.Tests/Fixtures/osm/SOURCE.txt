@@ -1,0 +1,2 @@
+(c) OpenStreetMap contributors, ODbL 1.0 (Overpass API, the data as of 2026-10-01)
+Ways with a highway tag, a region of 0.05 degrees at a time, from https://overpass-api.de/api/interpreter. A derived database of OpenStreetMap: the ODbL applies.

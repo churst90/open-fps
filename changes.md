@@ -36,6 +36,307 @@ Recent work, newest first. `git log` has the rest.
     one emitter per burning part. `/spawn fire PRESET` lights a thing its neighbours can catch from;
     `/spawn fire lightning` strikes what stands highest ahead; `/spawn fire water` puts a hose on it.
   - AudioLab `--fire spread timeline|cost|game`.
+- People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
+  the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
+  and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;
+  shut an outside door without a closer behind them, however they found it; leave an inside door as
+  found going in and shut it going out ("in" is more doorways from the outside, or the smaller room).
+  The shut is by hand, so it is the same swing and latch from the door's own model as a player's, 0.4
+  to 0.9 s after the doorway is clear. Who is about does not change the rule (Cody, 2026-10-10); this
+  reverses 2026-10-02, when a door found open was left because a rider had shut Brandt Court's door on
+  Cody. Only a body holds the leaf: it waits while anybody is in the doorway or the leaf's way, then
+  shuts. Closers start back 1 s after the last person leaves the doorway (Cody, 2026-10-10: "close on
+  their own after a second of them leaving"); they waited 3.00 s, measured, on the push-bar, glass
+  front and glass pull doors. A closer has no timer of its own, so the 1 s is the leaf held only while
+  somebody is in the doorway box; the sweep and latch, 3.6 to 4.1 s, are unchanged. Until somebody
+  has been in the doorway since it opened, it waits 2 s more for whoever opened it to walk up, so a
+  door opened and never gone through still starts back 3 s after it is fully open. Over an hour on the city with somebody parking every 20 s and Alex keeping a cold
+  night: 175 openings of 22 doors (17 house front doors, a patio door, the five towers' entrances), the
+  longest open 22 s, none left open, and the 352 walkers through no door. Magnolia: 1,323 doors, none
+  opened in an hour, since nobody there goes indoors yet. Server only. NpcDoorTests.
+- The world has its roads and woods outside the real places (docs/WORLD_STREAMING.md, "Roads and woods on the
+  world's tiles"). A world tile is made with OpenStreetMap's drivable roads, each way in its own width and
+  surface, laid in pieces on the ground as gen_osm.py lays a place's (a test holds the port to Magnolia's map:
+  70 of 70 pieces round the spawn within 0.03 mm and the same height and turn), sidewalks where tagged, a named place over each road and at each junction, the ground graded
+  under them, and the woods from the land cover (canopy volumes, trunks, the wind in the trees). Decided from
+  whole ways, never the tile, so tiles agree whichever is made first: a road across an edge is stored once and
+  graded under on both sides, and the shared edge is one line of posts. OpenStreetMap comes from Overpass a
+  0.05 degree region at a time, all at the data of 2026-10-01, kept in `world/sources/osm`; nothing generated
+  reaches into Magnolia's or Albany's tiles. Downtown Tomball: a tile 22 KB stored, 12 ms to lay; made over the network 0.6 to 3.2 s a tile, 3DEP's time as before. Generator version 3. Not yet: buildings (planned),
+  drives, paths, rail, water, and traffic on these roads. Try `/join world address 401 Market St, Tomball, TX`.
+  Unheard.
+- The world's ground has its land cover (docs/WORLD_STREAMING.md, "Land cover for the ground"). Outside the
+  real places a world tile's cells were all dirt; now each 2 m cell is what ESA WorldCover 2021 says is
+  there: woods are a leaf-litter floor (Foliage), grassland and wetland Grass, built-up Asphalt, lakes Water,
+  fields, scrub and bare ground Dirt. Read by byte range from WorldCover's Cloud-Optimised GeoTIFFs, a 1,024
+  pixel block at a time, and kept in the store's regional cache (`world/sources/worldcover`), so a block is
+  fetched once and the tiles in it are made offline after. With no land cover to be had the tile is dirt and
+  the log says so. Each tile carries WorldCover's attribution (CC BY 4.0). Generator version 2: stored tiles
+  are made again when next wanted. `world.json` `"LandCover": false` turns it off. Unheard.
+
+## 2026-10-09
+
+- World editor: Place lists Buildings and Vehicles first (docs/WORLD_EDITOR.md section 17). Vehicles are
+  every preset /spawn vehicle takes, by name; placing one parks it beside you (or at the build cursor),
+  one undo takes it away, and it is kept in the map's overlay and parked again on restart, never written
+  into the map file. Buildings holds building_box and groups saved as a building (/edit building NAME,
+  or Save as a building in the F12 dialog). Category audit of the 88 prefabs: building_box to Buildings,
+  stairs and ramps to a new Stairs and ramps, seating and soft furniture to Furniture and seating,
+  brick_arch to Walls and fences, sound_emitter and the three beacons to Sounds.
+- World editor: everything placed on a map, wherever it is. The Edit tab's "Placed on this map" (and
+  /edit placed [WORDS]) lists it nearest first with distance, compass direction, who placed it and when;
+  a filter keeps what has every word (or is within N metres). Remove it (or Delete in the list, asking
+  first) and /edit remove #ID [#ID ...] take things away from anywhere, one undo; Go to it (/edit goto
+  #ID) puts you beside one, on your own map or with the move permission. The overlay records PlacedBy
+  and PlacedAt on new additions; older ones say "placed earlier". No wire change.
+
+- No crack where far-ring ground meets 2 m ground (docs/WORLD_STREAMING.md, "Coarse ground in the far
+  ring"). The 7.8 m ground's edge posts are raised until its edge is nowhere under the 2 m edge, and it
+  hangs a skirt from its edges down to its floor, for rays and in the Steam Audio scene. On all 364 of
+  Magnolia's seams, none of 33,274 grazing rays and 1,064 lines of sight under the seam get through (3,082
+  and 22 did). Lines of sight changed by a swap: 187 of 19,600 (were 186). No wire change: a client knows
+  coarse ground by its 33 posts more than 2 m apart; 2 m ground, the server's included, is unchanged.
+- Logging out in the world and back in returns you to the same spot, through the loading screen, facing
+  the way you faced; the landing map if the ground there cannot be built within 30 s.
+- Ground at 8 m in the far ring (docs/WORLD_STREAMING.md, "Coarse ground in the far ring"). A tile you have
+  only in your far ring is sent with its ground at 7.8 m (32 cells a tile) instead of 2 m, and again at 2 m
+  when it comes within the full radius; the tile you stand in is always 2 m, and the server's ground is
+  always 2 m. Magnolia's join at medium: 942 KB of definitions (1,179 KB on the wire), was 1,513 KB with
+  2 m everywhere; Albany 1,112 KB, was 1,613. About 1 % of near-ground lines of sight in a tile change when
+  it is swapped, once, at the full radius. `TerrainTileComponent` gained a method only: no wire change of
+  its own (Common changed already for WorldLoading).
+- Magnolia and Albany are in the world (docs/WORLD_STREAMING.md, "Places in the world"). `/join world
+  magnolia` arrives at the map's own spawn among the same houses, roads, lawns, named places and traffic,
+  on the same ground (within 2 mm of the map's). Each thing goes to the world tile its middle is in, rooms
+  with their doorways; the ground is the map's posts graded the same way; roads, junctions and traffic go
+  whole to the frame that contains the place. The tiles are kept in the world store marked as placed: the
+  cap never drops them, and they are copied again when the map changes. Magnolia is 196 tiles, 5.1 MB. A
+  stored tile is now read off the tick thread and put in at most 6 ms a tick. The maps still work on
+  their own. WorldPlacesTests.
+- Magnolia and Albany on the world's grid at 2 m (docs/GEOMETRY.md 11.3). `fetch_place.py elevation`
+  asks 3DEP itself for 2 m cells on the place's UTM grid (the 1 m lidar), the same request the world's
+  tiles make, so the map's ground and the world's agree to the half centimetre (the world's was 0.9 m
+  under the map's at Bobcat Lane). `gen_osm.py` lays the map on that grid (UTM less the 2 m post nearest
+  the origin, `tools/utm.py`), so the map is the world's tiles moved, never turned (`MapData.Utm`). The
+  ground ships beside each map as `maps/places/ID.elevation` (the same bytes as elevation.json). Spawns
+  moved under a metre: Magnolia `/tp -11.2 23.2 1`, Albany `/tp -25.3 -10.6 1.4`. Road pieces overlap
+  5 cm at their joins. Terrain against the survey: 99 points in 100 within 3 cm (was 14 cm).
+- The world is built before you get there (docs/WORLD_STREAMING.md, "Building ahead"). Arriving with
+  `/join world PLACE` or F6 waits on the loading screen ("Building the world: 12 of 41 tiles.", said every
+  5 s) until every tile within your far radius is built, then you stand in a finished ring. Moving, the
+  tiles are made in order of how soon you could reach them, from your speed and heading, and anything
+  you could reach within 30 s is wanted however far; the rings round the places in world_places.json are
+  made at start, after anything a player wants (`world.json` "Prebuild"). A driven car is braked to a
+  stop short of a tile not built yet and told so once. Measured with the survey at 3 s a tile: walking,
+  running and a 30 m/s car never meet an edge; above about 65 m/s one can. New message `WorldLoading`
+  (45), so Common changed: new Windows zip and server update together. WorldLoadAheadTests.
+- The world editor is a dialog (docs/WORLD_EDITOR.md section 16), in both clients. F12 opens it on a
+  map you may edit; elsewhere F12 does nothing at all. F12 again, Escape or Close shuts it. Tabs
+  Place, Edit, Build and World, changed with Control+Tab and Control+Shift+Tab (or Control+Page Down
+  and Up). Place: search, category, prefabs with their descriptions, where it goes, Place, Preview,
+  Place again, and the Control+B form's floor, wall, roof, door and window. Edit (was Select, Selected
+  and Held): things near you, Space ticks several, find by name or number, the chosen thing's
+  position, facing and settings as labelled boxes, Apply changes, Bring to me, Duplicate, Row of
+  copies, Delete (asks first), and moving, turning and grouping what is ticked. Build (was Library):
+  models by kind and prefabs by category, Duplicate first, fields, versions, where used, replace.
+  World (was Map): weather, time and ground, spawn, map size, Rooms and areas (was Places and rooms),
+  beacon rules, editors, pinned models, map information (was Test tools). Undo, Redo and Close under
+  every tab. Placing keeps the dialog open and the game says "Placed: ...". `/edit` typed still opens
+  the menus, and the MUD still gets them. New commands: `/edit move to EAST NORTH UP`, `/edit face
+  DEGREES`, `/edit select drop #ID`. `EditorMenuItem` gained `Section` and `Checked` (appended), so
+  Common changed: new Windows zip and server update together. Untried with Orca and NVDA.
+  EditorDialogTests.
+- Bans. `/ban NAME [DURATION] [REASON]` (30m, 2h, 7d or 4w; none is until lifted), `/unban NAME`,
+  `/bans`. A new permission, `ban`, for Moderators and above, grantable and allowed in custom roles.
+  Nobody bans an owner or themselves; below the Owner only a role above the target's, and a protected
+  account only by somebody protected. A player on the server is removed at once; at login a banned
+  account hears "You are banned until 14 October, 18:00 UTC: spamming." (only after the right
+  password). Ended bans lift themselves. Kept in four new `Users` columns, added in place to an older
+  database (backed up first, as before). Accounts only, no address bans. docs/SERVER_SECURITY.md,
+  "Bans". BanTests.
+- `/setmapsize EAST NORTH HEIGHT [force]` on a map you own (or any with `maps-any`); on its own it says
+  the size. The south-west corner at the ground stays put, so nothing moves. Refused, with a count and
+  up to three names, if things or the spawn point would be left outside, unless `force`. People past
+  the new edge are brought in at their next step; natural ground is laid again under the new size.
+  Kept in the map's overlay, undone by the editor's undo, and offered in the editor's Map menu as a
+  typed item. Refused on the server's generated maps. `MapSettingsUpdate` gained appended members
+  (the play area), so Common changed: new Windows zip and server update together. MapSizeTests.
+- The build dialog, Control+B (docs/WORLD_EDITOR.md section 15), in both clients, on a map you may
+  edit; elsewhere Control+B does nothing. What (floor, wall, roof, door, window, prefab), the size in
+  metres, the material (from the library's floor, wall and roof prefabs the acoustic registry knows) or
+  door type, where (in front, at your feet, at the build cursor) and facing. A door or window can be
+  fitted into the wall in front of you: the wall is cut into the pieces round the opening and the door
+  or window put in it, joined to the places either side; one undo puts the wall back whole. Placing
+  keeps the dialog open with its values and focus on What; Escape, Cancel or Control+B close it.
+  Values are kept per kind for the session. `/edit build KIND FIELD VALUE ...` does the same from the
+  command line. No wire change. Untried with Orca and NVDA.
+- A protected Owner role (docs/CODY_ASKS_2026-10-08.md item 8). The Owner has every permission;
+  the Admin has every one but the new `owners`, which makes an owner or changes an owner's role. The
+  seeded `admin` account is the Owner, and a server started on an older database makes `admin` the
+  Owner if no account is one. The Owner role cannot be created, changed or deleted with `/role`
+  (a custom role called `owner` in an older `roles.json` is not loaded), `/grant` and `/revoke`
+  refuse an owner, `owners` cannot be granted or put in a custom role, and `/setrole` never takes the
+  role off the last owner. `UserRole.Owner` is appended to the enum: Common changed, so the Windows
+  client and the VPS server need the new build.
+- Names in chat: the name, the team in brackets, then the role if it is not an ordinary player:
+  "admin [Mafia] Owner: hello", "sean [Mafia]: hello", "bob Builder to all: hello". A team message
+  leaves the team out. `ChatMessage.Team` and `ChatMessage.Title` are appended; the GTK and Windows
+  clients share the format in Client.Core, and the MUD reads the same names.
+- Staff in chat (the admin chord) and the "Where is" item in the people menu include owners.
+- World editor: an item that asks for a value ("Type a value", "By degrees, typed" and the rest) opens a
+  dialog with one labelled text box instead of the command line, in both clients. The box holds the
+  value now, selected; its label gives the unit and its description the range and help. Enter applies,
+  Escape cancels; a value out of range is refused with the reason and the box stays open with the text.
+  EditorMenuItem gained appended members, so the build hash changed (new Windows zip and server update
+  together). docs/WORLD_EDITOR.md section 14. Untried with Orca and NVDA.
+- The traced reverb of the room you are in costs 38 % less on the mixer thread, with the same sound
+  (--tail-cost, fully optimised, one core: 3,051-3,104 us a 1,024-sample mixer block before,
+  1,890-1,920 after; 14.4 % of a core to 8.9 %). Two changes, each the same output as before to float
+  rounding (null tests: 127-131 dB under the output, -135 to -171 dBFS at a loud room's level):
+  - The directional part (SharedInputConvolver) convolves in two levels: each response's first 1,024
+    samples in blocks of 256, every block, and the rest in blocks of 1,024, once a mixer block. A
+    quarter of the multiply-adds and of the response read from memory, the same delay. 268 us a
+    256-sample piece to 147.
+  - The field and the directional part go through one head response per direction instead of one
+    each: the effect is linear and both turn with the head alike. 285 us a piece to 126. The one
+    difference: a direction whose directional part was silent for a block used to skip its effect,
+    holding back that effect's last few milliseconds until it next played; now nothing is held back.
+  - Any other audible room's stage is Steam Audio's own convolution of the whole two-second,
+    nine-channel response, about 500 us a piece each, and is unchanged.
+- The engine render pool costs about 12 % less, every sample unchanged. On a street (32 live voices)
+  the twelve EngineRender threads took about six cores. The time is the synthesis itself, not the pool:
+  the workers sleep between sweeps, render nothing that is not playing, and a voice costs the same
+  rendered on one thread. Sampled with eu-stack (`--pool-cost offline ptracer`): the valve solver is a
+  third of an engine (twenty evaluations of the orifice law a sample on a V8, two powf each), the
+  waveguides a fifth. The orifice law's constants are worked out once per gas, the valve solver no
+  longer evaluates the bracket end its first guess replaces, the waveguide keeps its read slot instead
+  of dividing for it, the pipe keeps its admittance, the crank's sine and cosine are taken once per
+  cylinder, and constant filter coefficients and levels are no longer recomputed every sample. 32 street
+  voices on one core: 3.10 core-seconds per second of sound against 2.74; a push mower 52 ms a second
+  against 39. 58 renders (every vehicle preset, nine scenes, mowers, a piston aeroplane) are
+  bit-identical before and after (`--pool-cost render DIR wide`, `--pool-cost diff`). Bit-identical is
+  the only safe test: an engine voice is chaotic enough that a one-ulp change in one power grows to full
+  scale within seconds. EngineRenderCostTests holds each change against the code it replaced.
+  The hybrid CPU inflates what top shows: the pool's threads land on the 3.3 GHz cores and read about
+  half as much again as the same work on one fast core.
+- The last four probable bugs from the 2026-10-07 housekeeping. Renders in inbox/probable-bugs-2026-10-09.
+  - A wave's blow on a moored boat's hull lands at its own sample in the block. It landed at the start
+    of the block, 0 to 2.7 ms early (1.2 ms on average, measured on the aluminium hull's blows). Levels
+    are unchanged.
+  - The fire's fizz has its own part, `FireSynth.FizzPart` (lab: `parts=fizz`). It was scaled by the
+    crackles' part, so muting the crackles in the lab muted the fizz too. The game's fire is unchanged to
+    the bit (every part is 1 in the game).
+  - `AcousticPathData.ReflectionId` is read since 0e0e5ae6. `Scattering` is read now too (Cody asked).
+    A recording's copy off a wall is split as the wall splits it. The mirror share stays a clean copy.
+    The scattered share goes through the engines' EchoDiffuser in the mixer (EchoWashState, a unit at
+    the input end of the copy's chain). Walls of scattering 0.05 or less (glass, marble, still water) are
+    left exactly as they were.
+    - A recorded loop's copy (a PA) is one voice: √(1 − s) clean plus √s smeared.
+    - Your own step gets a second voice beside its clean copy off a first-order wall: √s of the copy,
+      all smeared, coloured by the wall but without the mirror's roughness loss. This is what one-off
+      sounds have had since 2026-09-28. Before, the scattered share was dropped.
+    - Claps and gunshots are unchanged.
+    - Off brick, a step's echo now spreads its energy over 19.8 ms instead of 4.2 ms, crest 20.2 dB
+      instead of 22.6 dB, and 4 dB more of it.
+    - AudioLab: `--probable-bugs scene=scatter wall=Glass|Brick`.
+  - A preset's donor engine is no longer held as a new engine. Held, it ranked first for 2.5 s, took a
+    slot inside the budget, and the car at the budget's edge was let go and rebuilt (with every borrowed
+    voice restarted) each time a donor arrived.
+- The PA through a shut glass front door. Cody: "I'm in the Selby lobby and I hear the megaphone I put
+  outside clear as day through the apartment building door. Do all manually placed items have a sound
+  leak issue?" No. A placed thing is added to the map before the world is built, as an authored one is
+  (MapOverlayStore.ApplyBefore). Every sustained source outside a glass front door leaked the same way,
+  authored or placed. One-off sounds were not affected. Renders and what to listen for in
+  inbox/pa-leak-2026-10-09. Changing OpenFPS.Common changes the wire hash, so the server must be
+  restarted and the Windows zip rebuilt with it.
+  - Over the top of a shut leaf. The city's glass front door leaves are 2.10 m tall in 2.15 m doorways.
+    The barrier search went round the leaf over its top edge, through the 5 cm slot, as if nothing stood
+    above it: -7/-12/-20 dB from the PA into the lobby, against the leaf's -18/-28/-45
+    (`--path-probe explain`). A way round a leaf that stands in its doorway is no longer taken. Going
+    round it means going through the doorway, and the opening's own transmission already covers that
+    (OpeningRoutes.BarrierPathDifference).
+  - Thin panels in Steam Audio. Its transmission rays step about 2 cm past each hit (`--thin-panel`:
+    19 mm of glass lost a third of its decibels, 21 mm the whole). A thinner box was crossed as two
+    faces where SteamAudioScene counts on three. The 12 mm glass leaf passed -12/-19/-30. Boxes thinner
+    than 3 cm are now traced 3 cm thick, and what they let through still comes from their true size. In
+    the city: five glass front doors, four automatic sliding doors and two sheet-metal roofs.
+  - Into the lobby, door shut, sustained voice: -7.0/-12.2/-20.1 dB before, -18.1/-28.0/-44.6 after.
+    The one-shot path and the routes by the openings already gave -18/-29/-45. Rendered through the
+    game's mixer, the lobby was 3.4 dB under the pavement outside the door and is now 16 dB under it.
+  - The "Voice 8955 was placed at a position NNNN ms old" warnings are a false alarm. A repeating
+    one-shot is submitted once each time it starts and not between starts, so its placement ages through
+    its 2.5 s announcement. Its path is updated every frame, and it does not move.
+  - Lab: `--path-probe` takes `explain` (the barrier search spelled out), `emitters` (sounding entities
+    near each source as the client gets them) and `overlays=DIR` (the editor's edits laid over the map).
+    `--thin-panel` measures Steam Audio's direct transmission through one panel against its construction.
+    `--pa-leak` renders the PA scenes through the real provider.
+## 2026-10-09
+
+- Layers in contact are one panel. A city floor is four boxes touching: a 3 cm plaster ceiling, the
+  storey's 25 cm ceiling slab, the next storey's 25 cm floor slab and 4 cm of carpet. Each was paid as
+  a wall of its own, the carpet with its free-hanging table figure (20 dB in the low band), and Steam
+  Audio lost faces where two boxes touch, so the floor took 53 dB in the low band for a voice upstairs
+  and 67 dB for footsteps on the same floor (the "15 dB too quiet in the lows"); the hand-rolled tracer
+  took over 100. Now solids in contact count as one construction (`Constructions`): sheets facing the
+  same way whose faces touch or overlap and share some of their face. Fixed solids only: a door leaf is
+  hung, and a block (a bed, a sofa) is not a sheet. The airtight layers are one bonded plate (masses
+  summed, bending stiffness about the common neutral axis, loss factor by the stiffness each brings); a
+  porous layer on an airtight one adds its weight and nothing else; a stud wall keeps its cavity
+  (`WallTransmission.LayeredBandGains`). The tracer and the legs of routes group the solids they cross
+  one straight after another. Steam Audio, which only multiplies what each face it meets lets through,
+  is given each construction's outer faces only, cut where the layers change, each carrying the whole
+  construction's figure (`LayeredFaces`), so a construction is met exactly as one box. The city floor is
+  now 49.6/72.9/96.8 dB (low/mid/high) everywhere and both ways; one stud wall (17.6/41.1/49.3) and two
+  walls with a corridor between (29.7/68.9/82.5) are unchanged. The city has 506 constructions; the
+  scene has 11 % more triangles (77,232 to 85,908) and takes 130-200 ms more to build at load.
+  Measured against a lab-tested 152 mm slab (RAL-TL15-332, STC 54: 40/54/83 dB on the same bands), the
+  floor is still 10/19/14 dB heavier: the map lays 50 cm of concrete between storeys (a slab per
+  storey's floor and another per its ceiling). Lab: `--layers` (and `--layers map=city`),
+  `--floor-render`; `--path-probe` prints the line's walls as constructions. Renders in
+  inbox/floors-2026-10-09.
+- A gas hob, as a physical model (docs/GAS_HOB.md; Cody: "gas stove, tick tick tick tick whoosh").
+  Renders and what to listen for in inbox/gas-stove-2026-10-10.
+  - The knob on a plug valve, pushed in to turn from off; the injector's jet (natural gas at 61 m/s
+    through 0.72-1.28 mm, flows within 1 % of the manufacturers' tables); the mixing tube drawing in air;
+    the first gas sweeping the head; one spark module sparking every electrode 4.17 times a second
+    while a knob is held in; a spark lighting a burner only when the mixture it crosses is rich enough
+    for its energy, so sparks fail because of the gas, not by chance; whatever gas has gathered burning at
+    once in the light-up; the flames; a thermocouple holding the gas on; the pop as a flame is quenched
+    in its ports when turned off, and the safety valve's click 16 s later.
+  - The sparks, the light-up, the roar and the pop are one law, p = (γ-1)/(4πrc²) dQ/dt, the fire's. The
+    spark's crack is anchored on a measured piezo spark (Scheuer and DeCorby 2024); the hiss is
+    Lighthill's.
+  - Fitted against fifteen recordings of hobs (used as the measure only, never played): ticks 43 dB over
+    a large burner's roar (their median about 40), the flame's octaves within 1 dB of their median from
+    250 Hz to 2 kHz, light-ups 15-20 dB over the flame for 140-360 ms (theirs about 16 dB, 220 ms).
+  - Levels at a metre: every burner on full 47 dB, the large burner 43 dB on full and 22 dB on low,
+    sparks 84-90 dB peak.
+  - Prefabs `gas_hob`, `gas_hob_propane` and `gas_burner`. The interact key at one lights the next burner
+    on full, or with every burner lit turns them all off. The state is the sound key (settings and when
+    they changed), so every client hears the same light-up, and a player arriving later hears it as it
+    is. A new model kind, `gas_hob`, in the model library and the world editor.
+  - AudioLab `--stove levels|render|game`.
+- Far things are sent less often (Cody's list of 2026-10-08, item 4; docs/WORLD_STREAMING.md, "Far things
+  less often"). A moving thing 150 m or more from a player goes to that player at most 5 times a second,
+  with how it is changing as the server has it (its speed's rate and its heading's turn, eight bytes, only
+  when not zero), and early the tick the client's carrying of it would stray by a fifth of what is
+  inaudible; a state sent for a change goes once more the next tick. What a player rides, drives or carries
+  goes every tick. The client carries each far thing between its states on the server's numbers and steers
+  onto the next one, so Doppler, an engine's road speed and a train's notch come from the server's own
+  velocity. Not merged; Cody to listen to the city first.
+  - The acceptance test (DistantUpdatesTests, and `AudioLab --distant-updates`) runs the city on the real
+    server with a car passing at 108 km/h, an airliner flying over, the light rail and the walkers, and two
+    players side by side, one sent everything every tick. On a home connection, everything beyond 150 m:
+    bearing within 0.010 degree, pitch within 0.122 %, the largest change from one mixer instant to the
+    next the same to the millimetre, a train's notch a step early or late on 12 steps of 32,400.
+  - Bytes per player standing in the city: 1.33 to 0.62 Mbit/s 40 m from the railway (54 % less), 1.33 to
+    0.69 at the spawn point (48 % less); datagrams 128 to 65 and 73 a second.
+  - On a poor connection (one tick in ten out of order, 2 % lost) both clients leave the server's track by
+    the same amounts (0.017 degree, and up to 23 % of pitch where the stream ran dry), the one sent less
+    often never further. What is sent every tick now takes a late or lost tick the same eased way, which
+    changes it on such a connection (not measured against the client before).
+  - Wire change in Common (EntityState.SpeedRate and Turn, a flag in StatePacking): a new Windows zip and a
+    VPS update when it is merged.
 
 ## 2026-10-07
 

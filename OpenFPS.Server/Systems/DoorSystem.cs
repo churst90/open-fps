@@ -40,6 +40,18 @@ public sealed class DoorSystem
     /// enough for anyone on its own floor, not enough for anyone on the next.</summary>
     private const float SameFloorMetres = 1.8f;
 
+    /// <summary>
+    /// How much longer a closer holds its leaf when nobody has come into the doorway since it opened,
+    /// seconds: whoever opened it walking the last couple of metres to it. A door opened and never gone
+    /// through starts back 3 s after it is fully open, as every closer did before 2026-10-10; once
+    /// somebody has been in the doorway, it starts back <see cref="DoorComponent.CloseAfterSeconds"/>
+    /// (1 s) after the last of them leaves (Cody, 2026-10-10).
+    /// </summary>
+    public const float ReachSeconds = 2f;
+
+    /// <summary>Doors somebody has come into the doorway of since they opened, by world and entity.</summary>
+    private readonly HashSet<(World World, int Id)> _entered = new();
+
     /// <summary>The aperture each door was last announced at.</summary>
     private readonly Dictionary<int, float> _announced = new();
     private readonly List<Entity> _doors = new();
@@ -157,15 +169,22 @@ public sealed class DoorSystem
             door.SelfClosing = false;
         }
 
+        var key = (world, entity.Id);
+        if (door.Target <= 0f) _entered.Remove(key);
         if (door.CloseAfterSeconds > 0f && door.Target >= 1f)
         {
+            if (inDoorway) _entered.Add(key);
+            // Until somebody has come into the doorway, a closer's leaf also waits for whoever opened it to
+            // walk up to it; after, it goes the hold after the last of them has left.
+            float hold = door.CloseAfterSeconds + (door.Powered || _entered.Contains(key) ? 0f : ReachSeconds);
             if (inDoorway || sensed || door.Openness < 1f) door.ClearSeconds = 0f;
-            else if ((door.ClearSeconds += dt) >= door.CloseAfterSeconds)
+            else if ((door.ClearSeconds += dt) >= hold)
             {
                 door.Target = 0f;
                 door.SelfClosing = true;
                 door.ClearSeconds = 0f;
                 door.HandId = 0;
+                _entered.Remove(key);
             }
         }
         return false;
@@ -521,6 +540,15 @@ public sealed class DoorSystem
         float through = MathF.Abs(Vector3.Dot(d, Vector3.Transform(Vector3.UnitZ, rotation)));
         float depth = slides ? DoorwayDepthMetres : MathF.Max(DoorwayDepthMetres, 2f * halfWidth);
         return across <= halfWidth + DoorwayMarginMetres && through <= depth;
+    }
+
+    /// <summary>Whether somebody standing at <paramref name="p"/> is in this door's doorway, and so holds its
+    /// closer off.</summary>
+    internal static bool InDoorway(World world, Entity entity, Vector3 p)
+    {
+        var door = world.Get<DoorComponent>(entity);
+        Doorway(world, entity, out var centre, out var rotation);
+        return InDoorway(p, centre, rotation, HalfWidth(world, entity, door), door.Slides);
     }
 
     /// <summary>In front of it, either side, within its sensor's reach — through the doorway and

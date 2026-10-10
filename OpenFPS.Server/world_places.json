@@ -1,0 +1,7 @@
+// Places in the world a player can arrive at (/join world PLACE, and the world in the list of where to
+// go): an id, what it is called, and its latitude and longitude. An id that is also a map of the real
+// place keeps the map's own entry out of the list. docs/WORLD_STREAMING.md, stage 2.
+[
+  { "Id": "magnolia_tx", "Name": "Magnolia, Texas, 31907 Bobcat Lane", "Lat": 30.123703, "Lon": -95.740935 },
+  { "Id": "albany_or", "Name": "Albany, Oregon, 1042 Belmont Avenue Southwest", "Lat": 44.590205, "Lon": -123.113244 }
+]

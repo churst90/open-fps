@@ -37,7 +37,7 @@ public class WorldEditorTests : IDisposable
         var rig = new Rig(_dir, UserRole.Player);
         rig.On("mine");
         Assert.IsType<EditorMenu>(rig.Menu("menu"));
-        Assert.StartsWith("Placed Concrete Wall", rig.Run("edit", "place", "concrete_wall"));
+        Assert.StartsWith("Placed: Concrete Wall", rig.Run("edit", "place", "concrete_wall"));
 
         rig.On("theirs");
         Assert.Equal(WorldEditor.Refusal, rig.Run("edit"));
@@ -111,7 +111,7 @@ public class WorldEditorTests : IDisposable
     {
         var rig = new Rig(_dir, UserRole.Player);
         rig.On("mine");
-        Assert.Equal("Placed Concrete Wall 0.65 metres in front of you, facing north. It is selected.", rig.Run("edit", "place", "concrete_wall"));
+        Assert.Equal("Placed: Concrete Wall, 2 by 0.5 by 3 metres high, 0.65 metres in front of you, facing north. It is selected.", rig.Run("edit", "place", "concrete_wall"));
         int id = rig.Selected;
         Assert.True(id >= MapOverlay.FirstAddedId);
         var placed = rig.PoseOf(id);
@@ -257,7 +257,7 @@ public class WorldEditorTests : IDisposable
         rig.Stand(rig.Other, "mine", new Vector3(5f, 0.05f, 5.7f));
         Assert.Equal("Not placed: that would put Concrete Wall through other.", rig.Run("edit", "place", "concrete_wall"));
         // Something with no solid body may go anywhere.
-        Assert.StartsWith("Placed Fire", rig.Run("edit", "place", "fire_pit"));
+        Assert.StartsWith("Placed: Fire", rig.Run("edit", "place", "fire_pit"));
 
         rig.Stand(rig.Other, "mine", new Vector3(5f, 0.05f, 9f));
         rig.Run("edit", "place", "concrete_wall");
@@ -579,7 +579,7 @@ public class WorldEditorTests : IDisposable
         rig.On("mine");
         var root = rig.Menu("menu")!;
         Assert.Equal("World editor, mine", root.Title);
-        Assert.Equal(new[] { "Map", "Place", "Select", "Places and rooms", "Library", "Test tools", "Nothing to undo", "Nothing to redo" }, root.Items.Select(i => i.Label));
+        Assert.Equal(new[] { "Map", "Place", "Select", "Placed on this map, 0", "Places and rooms", "Library", "Test tools", "Nothing to undo", "Nothing to redo" }, root.Items.Select(i => i.Label));
 
         var place = rig.Menu("menu", "place")!;
         Assert.Contains(place.Items, i => i.Label.StartsWith("Walls and fences, ") && i.Kind == EditorItemKind.Menu && i.Command == "place.cat:Walls and fences");
@@ -614,6 +614,38 @@ public class WorldEditorTests : IDisposable
     }
 
     [Fact]
+    public void ATypedItemCarriesWhatItsDialogShows()
+    {
+        string id = TestModel();
+        var rig = new Rig(_dir, UserRole.Dev);
+        rig.On("mine");
+
+        // A model's field: the value now, its unit, range and help, checked as the server checks it.
+        var hum = rig.Menu("menu", $"mfield:small_machine:{id}:Compressor.HumDb")!;
+        var typed = hum.Items.Single(i => i.Kind == EditorItemKind.Input);
+        Assert.Equal("Type a value", typed.Label);
+        Assert.Equal((FieldType.Number, "dB", 30.0, 90.0, "63"), (typed.ValueType, typed.Unit, typed.Min, typed.Max, typed.Value));
+        Assert.Equal("compressor hum level", typed.Prompt);
+        Assert.False(string.IsNullOrWhiteSpace(typed.Help));
+
+        // A placed thing's own setting: a float's stored 0.800000011920929 is put in the box as 0.8.
+        rig.Run("edit", "place", "ac_condenser");
+        rig.Run("edit", "set", "Volume", "0.8");
+        var volume = rig.Menu("menu", "setting:Volume")!.Items.Single(i => i.Kind == EditorItemKind.Input);
+        Assert.Equal(("0.8", "/edit set Volume "), (volume.Value, volume.Command));
+
+        // Moving takes three numbers; the step is a number in metres with the step now in the box.
+        var move = rig.Menu("menu", "selected")!.Items.Single(i => i.Kind == EditorItemKind.Input && i.Command == "/edit move ");
+        Assert.Equal((FieldType.Number, (byte)3, -1000.0, 1000.0), (move.ValueType, move.Count, move.Min, move.Max));
+        var step = rig.Menu("menu", "nudge")!.Items.Single(i => i.Kind == EditorItemKind.Input);
+        Assert.Equal(("0.5", "m", 0.01, 50.0), (step.Value, step.Unit, step.Min, step.Max));
+
+        // Every typed item on the way says what its box is for.
+        foreach (var path in new[] { "select", "place", "turn", "rows", "map" })
+            Assert.All(rig.Menu("menu", path)!.Items.Where(i => i.Kind == EditorItemKind.Input), i => Assert.NotEqual("", i.Prompt));
+    }
+
+    [Fact]
     public void ATextPlayerIsSentTheSameMenuAsNumberedLines()
     {
         var menu = new EditorMenu
@@ -644,6 +676,14 @@ public class WorldEditorTests : IDisposable
         Assert.Equal((menu.Path, menu.Title, menu.Refresh), (back.Path, back.Title, back.Refresh));
         Assert.Equal(menu.Items[0], back.Items[0]);
 
+        var input = new EditorMenu
+        {
+            Items = new[] { new EditorMenuItem { Label = "Type a value", Kind = EditorItemKind.Input, Command = "/edit set Volume ", Prompt = "volume",
+                                                 Value = "0.8", ValueType = FieldType.Number, Unit = "", Min = 0, Max = 4, Help = "How loud.", Count = 1 } },
+        };
+        var inputBack = (EditorMenu)MemoryPackSerializer.Deserialize<IMessage>(MemoryPackSerializer.Serialize<IMessage>(input))!;
+        Assert.Equal(input.Items[0], inputBack.Items[0]);
+
         var update = new ModelUpdate { Kind = "small_machine", Id = "ac_condenser", Version = 3, SpecJson = ModelLibrary.SpecJson(SmallMachineSpec.AirConditionerCondenser) };
         var u = (ModelUpdate)MemoryPackSerializer.Deserialize<IMessage>(MemoryPackSerializer.Serialize<IMessage>(update))!;
         Assert.Equal((update.Kind, update.Id, update.Version, update.SpecJson), (u.Kind, u.Id, u.Version, u.SpecJson));
@@ -661,6 +701,7 @@ public class WorldEditorTests : IDisposable
     {
         public readonly MapManager Maps;
         public readonly PrefabRepository Prefabs;
+        public readonly CompositeService? Composites;
         public readonly GameServer Server;
         public readonly FakeUsers Users = new();
         public readonly UserSession Tester, Other;
@@ -671,7 +712,7 @@ public class WorldEditorTests : IDisposable
         private readonly CommandHandler _commands;
         private readonly SessionManager _sessions = new();
 
-        public Rig(string root, UserRole role, string? mapDir = null, bool overlays = true, bool models = false)
+        public Rig(string root, UserRole role, string? mapDir = null, bool overlays = true, bool models = false, bool composites = false)
         {
             string dir = Path.Combine(root, Guid.NewGuid().ToString("N"));
             MapDir = mapDir ?? Path.Combine(dir, "maps");
@@ -705,7 +746,9 @@ public class WorldEditorTests : IDisposable
                 if (!_sentTo.TryGetValue(to.Username, out var list)) _sentTo[to.Username] = list = new List<IMessage>();
                 list.Add(message);
             };
-            _commands = new CommandHandler(_sessions, Maps, Server, users: Users);
+            // Composites park vehicles, as /spawn vehicle does; most tests have none.
+            Composites = composites ? new CompositeService(Maps, Prefabs, new CompositeRepository(Path.Combine(dir, "composites"))) : null;
+            _commands = new CommandHandler(_sessions, Maps, Server, Composites, users: Users);
 
             Users.Add("tester", role);
             Users.Add("other", UserRole.Player);

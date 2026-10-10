@@ -24,16 +24,26 @@ public partial class CommandHandler
     private const string WeatherUsage =
         "Usage: /weather, /weather clear, rain, snow or storm, /weather drizzle, /weather rain light, moderate, heavy or extreme, or a rate in millimetres an hour, or dBZ, and drops then a size, /weather freezing rain, /weather sleet, /weather snow light, moderate or heavy, /weather hail pea, marble, quarter, golf or baseball, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
 
-    private void HandleWeather(string[] args, Action<IMessage> reply)
+    private void HandleWeather(UserSession session, string[] args, Action<IMessage> reply)
     {
         var env = _server.WorldEnvironment;
         if (args.Length == 0)
         {
-            var now = env.GetCurrentState();
+            // The sky over your map, and what is falling now as well as the front: a front that has just
+            // cleared leaves its rain falling for a minute or two (Cody, 2026-10-08: rain heard under
+            // "Clear").
+            var now = env.GetStateForMap(_maps.TryGetMapData(session.CurrentMapId, out var map)
+                ? MapAtmosphere.Of(map) : MapAtmosphere.Default);
+            var falling = env.HeldPrecipitation ?? env.PrecipitationFor(now);
+            string front = ScenarioWord(env.CurrentScenario);
+            if (env.HeldPrecipitation == null)
+            {
+                if (env.CurrentScenario == WeatherType.Clear && falling.Falling) front = "Clearing";
+                else if (env.CurrentScenario != WeatherType.Clear && !falling.Falling) front += " coming in";
+            }
             string held = env.Pinned ? " Held until /weather auto." : " It changes on its own.";
-            if (env.HeldPrecipitation is { } falling)
-                held = " " + DescribePrecipitation(falling) + held;
-            Say(reply, $"{ScenarioWord(env.CurrentScenario)}. {DescribeWind(now.WindVelocity, now.WindGustiness)} " +
+            if (falling.Falling) held = " " + DescribePrecipitation(falling) + held;
+            Say(reply, $"{front}. {DescribeWind(now.WindVelocity, now.WindGustiness)} " +
                        $"{now.Temperature.ToString("F0", CultureInfo.InvariantCulture)} degrees.{held}");
             return;
         }

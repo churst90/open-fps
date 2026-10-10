@@ -19,7 +19,7 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --probable-bugs scene=pa|landing|bell|yard|rooms|upmix [out=DIR] [room=flat|stair|street] [stereo=1]: the sounds the probable bugs
+/// --probable-bugs scene=pa|landing|bell|yard|rooms|upmix|scatter [out=DIR] [room=flat|stair|street] [stereo=1] [wall=Glass|Brick]: the sounds the probable bugs
 /// of 2026-10-07 change, rendered through the game's own mixer for a before and an after.
 ///
 ///   pa       a public-address speaker (a recording of speech) on a 4 m pole, from 10 and 30 m, over
@@ -32,6 +32,8 @@ namespace OpenFPS.AudioLab.Spikes;
 ///            reaches the tail. stereo=1 puts an inaudible stereo voice in the room as well.
 ///   upmix    FMOD alone: what a reverb bus's input carries of a mono send, with and without a stereo
 ///            voice on the same bus.
+///   scatter  one wall of wall=Glass|Brick 4 m ahead: claps, a pistol and your steps; then a PA speaker
+///            whose copy off the wall is an event of its own (2026-10-09: recordings' copies smeared).
 ///
 /// pa, landing, bell and yard are the whole client path (a ClientAudioSystem over the facade over the
 /// FmodAudioProvider, as --game-levels): the loudness law at the default /levels, the master and the
@@ -235,6 +237,68 @@ public static class ProbableBugsSpike
                 Record("yard walk round the pa", 40.0);
                 perFrame = null;
                 Remove(id);
+                Pump(1.5);
+            }
+            else if (scene == "scatter")
+            {
+                // One wall of `wall=` (Glass or Brick), its face 4 m in front of you: claps, a pistol and your
+                // own steps answered by it; then a PA speaker 5 m behind you with the wall 10 m ahead, far
+                // enough for its copy to be an event of its own (EarlyReflections.FusionSeconds).
+                string material = Arg(args, "wall=") ?? "Brick";
+                world.RegisterDefinition(new EntityDefinition
+                {
+                    EntityId = 2, Type = EntityType.StaticObject,
+                    Transform = new Transform { Position = new Vector3(0f, 3f, 12.25f), Rotation = Quaternion.Identity, Scale = Vector3.One },
+                    Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(40f, 6f, 0.5f), IsSolid = true },
+                    Material = new MaterialComponent { Material = material },
+                });
+                var ahead = new Vector3(0f, 0f, 100f);
+                Stand(new Vector3(0f, 0f, 8f), ahead);
+                WorldAudioEvent Shot(string key, Vector3 at, float db, float decay) => new()
+                {
+                    SourceEntityId = -1, Label = key, Seed = 1,
+                    Sounds = new List<TransientSound> { new TransientSound
+                    {
+                        Character = SoundCharacter.Knock, Position = at, LevelDb = db, SynthKey = key,
+                        DecaySeconds = decay, Noisiness = 1f,
+                    } },
+                };
+                var clap = Shot(Applause.ClapKey, player.Position + new Vector3(0f, 1.25f, 0.3f), Applause.SingleClapDb, 0.15f);
+                WeaponRegistry.TryGet("glock", out var glock);
+                var shot = Shot("weapon:glock", player.Position + new Vector3(0f, 1.5f, 0.5f), Loudness.MuzzleBlastDb(glock), 0.6f);
+                // The first event of a key renders and is dropped.
+                audio.WorldAudio.Receive(clap, AudioClock.Now);
+                audio.WorldAudio.Receive(shot, AudioClock.Now);
+                Pump(3.0);
+                void Repeat(string name, Action fire, int count, double every, double seconds)
+                {
+                    double next = clock.Elapsed.TotalSeconds + 0.3;
+                    int done = 0;
+                    perFrame = t => { if (t < next || done >= count) return; next += every; done++; fire(); };
+                    Record(name, seconds);
+                    perFrame = null;
+                    Pump(1.0);
+                }
+                Repeat($"claps {material}", () => audio.WorldAudio.Receive(clap, AudioClock.Now), 4, 1.5, 6.5);
+                Repeat($"pistol {material}", () => audio.WorldAudio.Receive(shot, AudioClock.Now), 3, 2.0, 6.5);
+                int steps = 0;
+                Repeat($"steps {material}", () => audio.OnOwnFootstep(player.Position + new Vector3((steps++ & 1) == 0 ? 0.12f : -0.12f, 0f, 0f), "Concrete", "0"),
+                       8, 0.52, 5.0);
+                // The wall's answers to one fixed take of a step and nothing else, so before and after can be
+                // measured against each other: the game picks a take at random and its own step hides them.
+                var stepEchoes = typeof(ClientAudioSystem).GetMethod("SubmitRoomStepEchoes",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+                var (stepGain, stepReference) = Loudness.Place(Loudness.FootstepDb);
+                Repeat($"step copies alone {material}", () => stepEchoes.Invoke(audio, new object[]
+                {
+                    player.Position + new Vector3(0f, 0f, 0.2f), player.Position + new Vector3(0f, player.EyeHeight, 0f),
+                    "FOOTSTEPS/Concrete/concrete_shoes_walk_57", stepGain, stepReference, Loudness.FootstepDb, world.GetSnapshot(),
+                }), 4, 1.0, 5.0);
+                Stand(new Vector3(0f, 0f, 2f), ahead);
+                int pa = AddEmitter("ANNOUNCE/st_louis_welcome", false, new Vector3(0f, 4f, -3f), 400f, 12f);
+                Pump(2.0);
+                Record($"pa {material}", 12.0);
+                Remove(pa);
                 Pump(1.5);
             }
             else { Console.WriteLine($"No scene '{scene}'."); return 1; }

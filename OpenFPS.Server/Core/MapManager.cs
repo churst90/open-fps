@@ -198,6 +198,26 @@ public class MapManager
             Log.Information("MapManager: map '{Map}' broadcasts within {Range:F0} m of a player.", kv.Key, kv.Value);
     }
 
+    /// <summary>One map's broadcast radius again, after its bounds changed (/setmapsize).</summary>
+    public void RefreshEarshot(string mapId)
+    {
+        if (_maps.TryGetValue(mapId, out var entry)) ComputeEarshot(entry.data, entry.world);
+    }
+
+    /// <summary>
+    /// Where natural ground is laid under a map's bounds: top at Y=0, centred on the bounds, not the
+    /// origin (centred on 0 it left a strip with no floor). The prefab is ten metres square.
+    /// </summary>
+    internal static (Vector3 Position, Vector3 Scale) NaturalGroundPose(MapData m)
+    {
+        Vector3 size = m.MaxBound - m.MinBound, centre = (m.MinBound + m.MaxBound) * 0.5f;
+        return (new Vector3(centre.X, -0.05f, centre.Z), new Vector3(size.X / 10f, 1f, size.Z / 10f));
+    }
+
+    /// <summary>The prefab a map's natural ground is: the one it chose, if this server has it, or dirt.</summary>
+    internal string NaturalGroundOf(MapData m)
+        => m.GroundPrefab is { } g && _prefabRepo.Prefabs.ContainsKey(g.ToLowerInvariant()) ? g : NaturalGroundPrefab;
+
     private void ComputeEarshot(MapData m, World world)
     {
         float loudest = DefaultEarshotRange;
@@ -290,7 +310,7 @@ public class MapManager
         float foundMinimumY = 1000f;
         bool hasAnyFloor = false;
         // On a map streamed in tiles, the layer of everything that came from the file (MapTiles).
-        var layers = m.TileMetres > 0f ? new Dictionary<int, string?>() : null;
+        var layers = m.TileMetres > 0f && !m.IsWorld ? new Dictionary<int, string?>() : null;
 
         // Maps write quaternions in six digits, not quite unit length, and Vector3.Transform scales by the
         // length squared: a slab's top a float's last bit low on one path and not another. Normalised
@@ -300,43 +320,15 @@ public class MapManager
         // First pass: spawn everything.
         foreach (var entityData in m.Entities)
         {
-            try 
+            try
             {
-                var entity = _prefabRepo.Spawn(world, entityData.PrefabId, entityData.Position,
-                                               entityData.Rotation, entityData.Scale, entityData.Name);
-                if (!string.IsNullOrWhiteSpace(entityData.Name))
-                {
-                    if (world.Has<NameComponent>(entity)) world.Get<NameComponent>(entity).Name = entityData.Name;
-                    if (world.Has<IdentityComponent>(entity)) world.Get<IdentityComponent>(entity).Name = entityData.Name;
-                }
+                var entity = SpawnFromData(world, entityData, m.Id, Vector3.Zero, materialsAuthored, indoorAuthored);
                 lookup[entity.Id] = entity;
                 if (layers != null) layers[entity.Id] = entityData.Layer;
                 if (entityData.EntityId > 0)
                 {
                     authored[entityData.EntityId] = entity;
                     idMap[entityData.EntityId] = entity.Id;
-                }
-
-                ApplyRoomMaterials(world, entity, entityData, m.Id);
-                ApplyForm(world, entity, entityData, m.Id);
-
-                // Which side of this door is locked and which way it is pushed depend on where it is put,
-                // so the map may say, over the prefab.
-                if (world.Has<DoorComponent>(entity) && (entityData.KeyedSide.HasValue || entityData.PushSide.HasValue))
-                {
-                    ref var door = ref world.Get<DoorComponent>(entity);
-                    if (entityData.KeyedSide.HasValue)
-                        door.KeyedSide = entityData.KeyedSide > 0 ? 1f : entityData.KeyedSide < 0 ? -1f : 0f;
-                    if (entityData.PushSide.HasValue) door.PushSide = entityData.PushSide < 0 ? -1f : 1f;
-                }
-                if (entityData.RoomMaterials != null || entityData.Materials != null)
-                    materialsAuthored.Add(entity.Id);
-
-                if (entityData.IsIndoor.HasValue && world.Has<RegionComponent>(entity))
-                {
-                    ref var r = ref world.Get<RegionComponent>(entity);
-                    r.IsIndoor = entityData.IsIndoor.Value;
-                    indoorAuthored.Add(entity.Id);
                 }
 
                 // The lowest floor, for the void plane.
@@ -360,8 +352,89 @@ public class MapManager
         }
 
         // Second pass: link portals to regions through the id map.
+        int portalsLinked = LinkPortals(world, m.Entities, authored, idMap, m.Id);
+        Log.Information("MapManager: Linked {Count} portal(s) for map '{Id}'.", portalsLinked, m.Id);
+
+        SurveyRegions(world, m, materialsAuthored, indoorAuthored);
+        CreateMapInstanceRest(m, world, grid, lookup, authored, layers, foundMinimumY, hasAnyFloor);
+    }
+
+    /// <summary>
+    /// One thing of a map file into a world: its prefab where the file puts it (moved by
+    /// <paramref name="offset"/>), named, with the room materials, form, door sides and indoor-ness the file
+    /// gives. A map's load and a world tile copied from a map (OneWorld.WorldPlaces) both come this way.
+    /// </summary>
+    private Entity SpawnFromData(World world, Repositories.EntityData entityData, string mapId, Vector3 offset,
+                                 HashSet<int>? materialsAuthored, HashSet<int>? indoorAuthored)
+    {
+        var entity = _prefabRepo.Spawn(world, entityData.PrefabId, entityData.Position + offset,
+                                       entityData.Rotation, entityData.Scale, entityData.Name);
+        if (!string.IsNullOrWhiteSpace(entityData.Name))
+        {
+            if (world.Has<NameComponent>(entity)) world.Get<NameComponent>(entity).Name = entityData.Name;
+            if (world.Has<IdentityComponent>(entity)) world.Get<IdentityComponent>(entity).Name = entityData.Name;
+        }
+
+        ApplyRoomMaterials(world, entity, entityData, mapId);
+        ApplyForm(world, entity, entityData, mapId);
+
+        // Which side of this door is locked and which way it is pushed depend on where it is put,
+        // so the map may say, over the prefab.
+        if (world.Has<DoorComponent>(entity) && (entityData.KeyedSide.HasValue || entityData.PushSide.HasValue))
+        {
+            ref var door = ref world.Get<DoorComponent>(entity);
+            if (entityData.KeyedSide.HasValue)
+                door.KeyedSide = entityData.KeyedSide > 0 ? 1f : entityData.KeyedSide < 0 ? -1f : 0f;
+            if (entityData.PushSide.HasValue) door.PushSide = entityData.PushSide < 0 ? -1f : 1f;
+        }
+        if (entityData.RoomMaterials != null || entityData.Materials != null)
+            materialsAuthored?.Add(entity.Id);
+
+        if (entityData.IsIndoor.HasValue && world.Has<RegionComponent>(entity))
+        {
+            ref var r = ref world.Get<RegionComponent>(entity);
+            r.IsIndoor = entityData.IsIndoor.Value;
+            indoorAuthored?.Add(entity.Id);
+        }
+        return entity;
+    }
+
+    /// <summary>
+    /// Things copied from a map into a live map (a world tile, OneWorld.WorldPlaces): each spawned at its
+    /// place moved by <paramref name="offset"/>, its doorways linked to the rooms among them by the ids in
+    /// the file, every one indexed. Their rooms carry what was measured on the map (no survey here). The
+    /// entities and their layers, in order; the caller calls <see cref="RefreshGrid"/>.
+    /// </summary>
+    public List<(Entity Entity, string? Layer)> SpawnCopied(string mapId, IReadOnlyList<Repositories.EntityData> entities, Vector3 offset)
+    {
+        var made = new List<(Entity, string?)>(entities.Count);
+        if (!_maps.TryGetValue(mapId, out var data)) return made;
+        var authored = new Dictionary<int, Entity>();
+        var idMap = new Dictionary<int, int>();
+        foreach (var d in entities)
+        {
+            try
+            {
+                var e = SpawnFromData(data.world, d, mapId, offset, null, null);
+                made.Add((e, d.Layer));
+                if (d.EntityId > 0) { authored[d.EntityId] = e; idMap[d.EntityId] = e.Id; }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("MapManager: Failed to spawn entity {PrefabId} at {Pos} on '{Map}'. {Error}", d.PrefabId, d.Position + offset, mapId, ex.Message);
+            }
+        }
+        LinkPortals(data.world, entities, authored, idMap, mapId, quiet: true);
+        foreach (var (e, _) in made) IndexEntity(mapId, e);
+        return made;
+    }
+
+    /// <summary>A map's doorways to the rooms they join, through the file's ids; how many were linked.</summary>
+    private static int LinkPortals(World world, IEnumerable<Repositories.EntityData> entities, Dictionary<int, Entity> authored,
+                                   Dictionary<int, int> idMap, string mapId, bool quiet = false)
+    {
         int portalsLinked = 0;
-        foreach (var entityData in m.Entities)
+        foreach (var entityData in entities)
         {
             if (!authored.TryGetValue(entityData.EntityId > 0 ? entityData.EntityId : -1, out var entity)) continue;
 
@@ -411,35 +484,67 @@ public class MapManager
                     if (size.X > 0 || size.Y > 0) derived = MathF.Max(size.X, size.Y);
                 }
                 p.ApertureSize = derived;
-                Log.Information("MapManager: Portal entity {Id} in '{Map}' had no ApertureSize; derived {Aperture:F2} from its collider.",
-                    entityData.EntityId, m.Id, derived);
+                if (!quiet)
+                    Log.Information("MapManager: Portal entity {Id} in '{Map}' had no ApertureSize; derived {Aperture:F2} from its collider.",
+                        entityData.EntityId, mapId, derived);
             }
 
             if (p.RegionAId == p.RegionBId)
             {
-                Log.Warning("MapManager: Portal entity {Id} in '{Map}' links region {Region} to itself — it will be ignored. " +
-                            "Set RegionAId/RegionBId to the two region EntityIds it joins (-1 = outside).",
-                    entityData.EntityId, m.Id, p.RegionAId);
+                if (!quiet)
+                    Log.Warning("MapManager: Portal entity {Id} in '{Map}' links region {Region} to itself — it will be ignored. " +
+                                "Set RegionAId/RegionBId to the two region EntityIds it joins (-1 = outside).",
+                        entityData.EntityId, mapId, p.RegionAId);
             }
             else
             {
                 portalsLinked++;
             }
         }
-        Log.Information("MapManager: Linked {Count} portal(s) for map '{Id}'.", portalsLinked, m.Id);
+        return portalsLinked;
+    }
 
-        SurveyRegions(world, m, materialsAuthored, indoorAuthored);
+    /// <summary>A map's load after its things are spawned and its rooms measured: its ground, the void
+    /// plane, its zone, its tiles and roads.</summary>
+    private void CreateMapInstanceRest(MapData m, World world, SpatialGrid<Entity> grid, Dictionary<int, Entity> lookup,
+                                       Dictionary<int, Entity> authored, Dictionary<int, string?>? layers,
+                                       float foundMinimumY, bool hasAnyFloor)
+    {
+        // The ground from the survey on a map of a real place (docs/GEOMETRY.md 5.1), graded to what rests
+        // on it, in tiles of ground.
+        bool hasTerrain = false;
+        if (m.Elevation != null)
+        {
+            try
+            {
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                var slabs = TerrainBuilder.Slabs(world);
+                var tiles = TerrainBuilder.Lay(m.Elevation, slabs, m.MinBound, m.MaxBound);
+                foreach (var e in TerrainBuilder.Spawn(world, tiles))
+                {
+                    lookup[e.Id] = e;
+                    if (layers != null) layers[e.Id] = "ground";
+                }
+                float low = float.MaxValue;
+                foreach (var t in tiles) foreach (float h in t.Heights) low = MathF.Min(low, h);
+                foundMinimumY = MathF.Min(foundMinimumY, low);
+                hasAnyFloor = hasTerrain = tiles.Count > 0;
+                Log.Information("MapManager: '{Id}' lays {Tiles} tiles of ground from its survey, graded to {Slabs} slabs ({Ms} ms).",
+                                m.Id, tiles.Count, slabs.Count, clock.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "MapManager: '{Id}' has an elevation that could not be laid; its ground is flat.", m.Id);
+            }
+        }
 
         // Natural ground (dirt, Cody 2026-10-06) where the map has none of its own. A map whose ground
         // covers its play area gets none: a slab flush under the city's own was met wherever ties went its way.
-        if (!GroundCovers(world, m.WalkMin, m.WalkMax))
+        if (!hasTerrain && !m.IsWorld && !GroundCovers(world, m.WalkMin, m.WalkMax))
         {
             Log.Information("MapManager: '{Id}' has no ground of its own under all of its play area. Laying natural ground ({Ground}) under its bounds.", m.Id, m.GroundPrefab ?? NaturalGroundPrefab);
-            Vector3 mapSize = m.MaxBound - m.MinBound;
-            // Top at Y=0, centred on the bounds, not the origin: centred on 0 it left a strip with no floor.
-            Vector3 centre = (m.MinBound + m.MaxBound) * 0.5f;
-            string ground = m.GroundPrefab is { } g && _prefabRepo.Prefabs.ContainsKey(g.ToLowerInvariant()) ? g : NaturalGroundPrefab;
-            var foundation = _prefabRepo.Spawn(world, ground, new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
+            var (at, scale) = NaturalGroundPose(m);
+            var foundation = _prefabRepo.Spawn(world, NaturalGroundOf(m), at, Quaternion.Identity, scale);
             // Named "Ground": a round that ended in it was "Hit Concrete Floor" on the city's open grass.
             if (world.Has<IdentityComponent>(foundation)) world.Get<IdentityComponent>(foundation).Name = "Ground";
             if (world.Has<NameComponent>(foundation)) world.Get<NameComponent>(foundation).Name = "Ground";
@@ -450,8 +555,8 @@ public class MapManager
 
         ValidateTracks(m, world);
 
-        // The void plane: 20 m below the lowest floor.
-        m.MinimumY = hasAnyFloor ? (foundMinimumY - 20.0f) : -50.0f;
+        // The void plane: 20 m below the lowest floor. The world's is its own (its ground comes later).
+        if (!m.IsWorld) m.MinimumY = hasAnyFloor ? (foundMinimumY - 20.0f) : -50.0f;
         
         world.Create(
             new NameComponent { Name = m.Id }, 
@@ -482,6 +587,11 @@ public class MapManager
             Log.Information("MapManager: '{Id}' is streamed in {Count} tiles of {Metres} m ({Tiled} entities in tiles, {Global} sent to everyone).",
                             m.Id, tiles.Tiles.Count(), m.TileMetres, tiles.TiledCount, tiles.Global.Count);
         }
+        else if (m.IsWorld)
+        {
+            // The world's tiles arrive as players near them (OneWorld.WorldMaps).
+            _tiles[m.Id] = new MapTiles(m.TileMetres, TileKey.Of(m.MinBound, m.TileMetres), TileKey.Of(m.MaxBound, m.TileMetres), dynamic: true);
+        }
         else _tiles.Remove(m.Id);
         BuildRoads(m);
         ComputeEarshot(m, world);
@@ -491,7 +601,7 @@ public class MapManager
             else Log.Warning("MapManager: map '{Map}' also claims IsDefault, but '{Winner}' claimed it first; players will land on '{Winner}'.", m.Id, DefaultMapId);
         }
         RefreshGrid(m.Id);
-        VerifySpawnPoint(m);
+        if (!m.IsWorld) VerifySpawnPoint(m);
     }
 
     /// <summary>
@@ -964,6 +1074,16 @@ public class MapManager
         CreateMapInstance(map);
         Access?.Record(map);
         Log.Information("MapManager: made map '{Map}' for {Owner}.", map.Id, map.OwnerId);
+        return true;
+    }
+
+    /// <summary>A frame of the world, made by the server (OneWorld.WorldMaps): never written to disk, its
+    /// tiles loaded as players near them. False if a map of that id is loaded already.</summary>
+    public bool AddWorldMap(MapData map)
+    {
+        if (_maps.ContainsKey(map.Id)) return false;
+        map.IsWorld = true;
+        CreateMapInstance(map);
         return true;
     }
 

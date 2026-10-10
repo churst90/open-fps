@@ -25,6 +25,32 @@ public interface IClientShell
     void OpenCommandConsole(string initialText) => OpenCommandConsole();
 
     /// <summary>
+    /// A dialog with one labelled text box for a value (the world editor's typed settings), holding
+    /// <see cref="EditorValuePrompt.Initial"/> all selected. Enter hands the text to
+    /// <paramref name="submit"/>, which answers null when it was taken (the dialog closes) or the reason
+    /// it was not (said and shown; the dialog stays open with the text kept). Escape cancels. A head
+    /// without the dialog opens the command console with the start of the command typed.
+    /// </summary>
+    void AskForValue(EditorValuePrompt prompt, Func<string, string?> submit) => OpenCommandConsole(prompt.Command);
+
+    /// <summary>
+    /// The build dialog (Control+B, docs/WORLD_EDITOR.md section 15): a modal window made from
+    /// <see cref="BuildDialog.Form"/>, focus on its first control. Place calls <see cref="BuildDialog.Place"/>
+    /// and stays open; the head closes it on Escape, Cancel or <see cref="ModalDialog.Opener"/>, and when
+    /// <see cref="ModalDialog.CloseRequested"/> fires. A head without it opens the command console.
+    /// </summary>
+    void ShowBuildDialog(BuildDialog dialog) => OpenCommandConsole("/edit build ");
+
+    /// <summary>
+    /// The F12 editor dialog (docs/WORLD_EDITOR.md section 16): a modal window with one tab page for each
+    /// of <see cref="EditorDialog.Tabs"/>, drawn from their sections and controls, and Undo, Redo and
+    /// Close under them. Control+Tab and Control+Shift+Tab (and Control+Page Down and Up) change tab
+    /// through <see cref="EditorDialog.NextTab"/>; F12, Escape and Close shut it. A head without it opens
+    /// the command console.
+    /// </summary>
+    void ShowEditorDialog(EditorDialog dialog) => OpenCommandConsole("/edit ");
+
+    /// <summary>
     /// Escape in game: the game menu (Keep playing, Main menu, Quit), with Keep playing focused so a
     /// stray Enter does nothing. Escape or closing it is <see cref="GameMenuChoice.KeepPlaying"/>. The
     /// session does the logging out; the shell only asks.

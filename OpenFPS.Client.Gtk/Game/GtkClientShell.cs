@@ -12,7 +12,7 @@ namespace OpenFPS.Client.Gtk.Game;
 /// The session calls these from the game-loop thread, so each marshals onto the GTK main thread before
 /// touching a widget. The console and the quit dialog are real windows so Orca can read them.
 /// </summary>
-internal sealed class GtkClientShell : IClientShell
+internal sealed partial class GtkClientShell : IClientShell
 {
     private readonly ISpeechOutput _speech;
     private readonly Action _onQuit;
@@ -189,6 +189,96 @@ internal sealed class GtkClientShell : IClientShell
             _speech.Speak($"{initialText.Trim()}. Type the rest, then press Enter.", interrupt: true);
         }
         else _speech.Speak("Command entry. Type a command or message, then press Enter.", interrupt: true);
+    });
+
+    public void AskForValue(EditorValuePrompt prompt, Func<string, string?> submit) => OnUi(() =>
+    {
+        if (_consoleOpen) return;
+        _consoleOpen = true;
+        // The Enter that chose the item is still down; its key-up goes to the dialog.
+        _input.Clear();
+
+        var dialog = Window.New();
+        _modal = dialog;
+        dialog.Title = prompt.Title;
+        dialog.SetModal(true);
+        dialog.SetDefaultSize(420, 160);
+        if (_gameWindow?.Toplevel != null) dialog.SetTransientFor(_gameWindow.Toplevel);
+
+        var box = Box.New(Orientation.Vertical, 8);
+        box.MarginTop = box.MarginBottom = box.MarginStart = box.MarginEnd = 16;
+
+        // The mnemonic widget makes the label the entry's accessible name (labelled-by); the tooltip is
+        // its accessible description, which Orca reads after the name.
+        var label = Label.New(prompt.Label);
+        label.SetXalign(0);
+        box.Append(label);
+        var entry = Entry.New();
+        entry.SetText(prompt.Initial);
+        if (prompt.Description.Length > 0) entry.SetTooltipText(prompt.Description);
+        label.SetMnemonicWidget(entry);
+        box.Append(entry);
+        if (prompt.Description.Length > 0)
+        {
+            var about = Label.New(prompt.Description);
+            about.SetWrap(true);
+            about.SetXalign(0);
+            box.Append(about);
+        }
+        // Why a value was refused, shown as well as said.
+        var refusal = Label.New("");
+        refusal.SetWrap(true);
+        refusal.SetXalign(0);
+        box.Append(refusal);
+
+        void Apply()
+        {
+            string? why = submit(entry.GetText());
+            if (why == null) { dialog.Close(); return; }
+            // Focus stays in the box with the text kept, so the reason is heard and not read over.
+            refusal.SetText(why);
+            _cue(UiCue.MenuEdge);
+            _speech.Speak(why, interrupt: true);
+        }
+        entry.OnActivate += (_, _) => Apply();
+
+        var apply = Button.NewWithLabel("Apply");
+        apply.OnClicked += (_, _) => Apply();
+        box.Append(apply);
+        var cancel = Button.NewWithLabel("Cancel");
+        cancel.OnClicked += (_, _) => Cancel();
+        box.Append(cancel);
+
+        void Cancel()
+        {
+            dialog.Close();
+            _cue(UiCue.MenuBack);
+            _speech.Speak("Cancelled.", interrupt: true);
+        }
+
+        dialog.OnCloseRequest += (_, _) =>
+        {
+            _consoleOpen = false;
+            _modal = null;
+            _input.Clear();
+            return false;
+        };
+
+        var keys = EventControllerKey.New();
+        keys.SetPropagationPhase(PropagationPhase.Capture);
+        keys.OnKeyPressed += (_, e) =>
+        {
+            if (e.Keyval != 0xff1b) return false;   // GDK_Escape
+            Cancel();
+            return true;
+        };
+        dialog.AddController(keys);
+
+        dialog.SetChild(box);
+        dialog.Present();
+        entry.GrabFocus();
+        entry.SelectRegion(0, -1);   // typing replaces the value
+        _speech.Speak(prompt.Spoken, interrupt: true);
     });
 
     public void ShowGameMenu(Action<GameMenuChoice> chosen) => OnUi(() =>

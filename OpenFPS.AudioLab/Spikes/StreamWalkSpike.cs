@@ -53,6 +53,8 @@ public static class StreamWalkSpike
         string dir = Path.Combine(Path.GetTempPath(), "openfps-stream-walk-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(dir, "maps", "places"));
         File.Copy(OpenFPS.AudioLab.LabPaths.Server("maps", "places", mapId + ".json"), Path.Combine(dir, "maps", "places", mapId + ".json"));
+        if (File.Exists(OpenFPS.AudioLab.LabPaths.Server("maps", "places", mapId + ".elevation")))
+            File.Copy(OpenFPS.AudioLab.LabPaths.Server("maps", "places", mapId + ".elevation"), Path.Combine(dir, "maps", "places", mapId + ".elevation"));
         var maps = new MapManager(new MapRepository(Path.Combine(dir, "maps")), new PrefabRepository(OpenFPS.AudioLab.LabPaths.Server("prefabs")));
         maps.Initialize();
         Directory.Delete(dir, true);

@@ -59,8 +59,16 @@ public class WorldEnvironmentSystem
     private float _weatherRate = 1f;
     private const float SetByHandRate = 5f;
 
+    /// <summary>Rain fading under a dry front has stopped below this, mm/h: a tenth of the lightest drizzle
+    /// (<see cref="Rainfall.DrizzleRate"/>).</summary>
+    public const float StoppedBelowMmPerHour = Rainfall.DrizzleRate * 0.1f;
+
+    /// <summary>How long the weather rolling on its own waits for a new front, on average, in seconds:
+    /// five minutes (Cody, 2026-10-09; it was about one, and the weather never settled).</summary>
+    public const double MeanSecondsBetweenFronts = 300.0;
+
     /// <summary>The chance per tick of a new front, when the weather is rolling on its own.</summary>
-    public const double DefaultFrontProbabilityPerTick = 0.0005;
+    public const double DefaultFrontProbabilityPerTick = 1.0 / (MeanSecondsBetweenFronts * PhysicsConstants.TickRate);
 
     /// <summary>The weather front currently in effect.</summary>
     public WeatherType CurrentScenario => _currentScenario;
@@ -154,6 +162,9 @@ public class WorldEnvironmentSystem
         float rate = dt * _weatherRate;
         _env.Humidity = MathHelper.Lerp(_env.Humidity, _targetHumidity, MathF.Min(1f, rate * 0.05f));
         _env.PrecipitationIntensity = MathHelper.Lerp(_env.PrecipitationIntensity, _targetPrecipitation, MathF.Min(1f, rate * 0.02f));
+        // Easing toward a dry sky never reaches it: the last front's rain fell, ever lighter, for good.
+        if (_targetPrecipitation <= 0f && Rainfall.RateFromIntensity(_env.PrecipitationIntensity) < StoppedBelowMmPerHour)
+            _env.PrecipitationIntensity = 0f;
         _env.WindVelocity = Vector3.Lerp(_env.WindVelocity, _targetWind, MathF.Min(1f, rate * 0.05f));
         // Gustiness fades too: set straight, a front snapped calm to a gale in one tick.
         _env.WindGustiness = MathHelper.Lerp(_env.WindGustiness, _targetGustiness, MathF.Min(1f, rate * 0.05f));

@@ -17,7 +17,7 @@ namespace OpenFPS.Tests;
 /// test output's maps folder, so the tests that load every shipped map do not each load a town; these
 /// copy one into a folder of its own and load it the way the server and the client do.
 /// </summary>
-public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
+public partial class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
 {
     private readonly ITestOutputHelper _o;
     private readonly Loaded _maps;
@@ -37,6 +37,7 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
             string maps = Path.Combine(dir, "maps");
             Directory.CreateDirectory(Path.Combine(maps, "places"));
             File.Copy(Path.Combine(AppContext.BaseDirectory, "places", id + ".json"), Path.Combine(maps, "places", id + ".json"));
+            CopyGround(id, Path.Combine(maps, "places"));
             AcousticRegistry.Initialize();
             var p = new Place();
             var sw = Stopwatch.StartNew();
@@ -82,6 +83,13 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
         public WorldSnapshot World = null!;
         public int Definitions;
         public TimeSpan ServerLoad, ClientGrid, AcousticBake;
+    }
+
+    /// <summary>A place's ground, the file beside its map (MapElevation.File), into another maps folder.</summary>
+    public static void CopyGround(string id, string placesDir)
+    {
+        string ground = Path.Combine(AppContext.BaseDirectory, "places", id + ".elevation");
+        if (File.Exists(ground)) File.Copy(ground, Path.Combine(placesDir, id + ".elevation"), overwrite: true);
     }
 
     public static IEnumerable<object[]> Places()
@@ -163,7 +171,8 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
             if (!DoorPrefabs.Contains(d.Identity.PrefabId) || d.Portal.RegionAId == d.Portal.RegionBId) continue;
             doors++;
             var normal = Vector3.Transform(Vector3.UnitZ, e.Transform.Rotation);
-            var at = new Vector3(e.Transform.Position.X, 1.6f, e.Transform.Position.Z);
+            // At the leaf's own middle: the ground, and the house on it, are not at 0 on a real place.
+            var at = e.Transform.Position;
             int front = acoustics.GetRoomAt(p.World, at + normal * 0.6f), back = acoustics.GetRoomAt(p.World, at - normal * 0.6f);
             var sides = new HashSet<int> { front, back };
             if (!sides.Contains(d.Portal.RegionAId) || !sides.Contains(d.Portal.RegionBId))
@@ -267,7 +276,9 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
     public void The_generator_reproduces_the_shipped_map(string id)
     {
         string repo = RepoRoot();
-        string outFile = Path.Combine(Path.GetTempPath(), $"{id}-{Guid.NewGuid():N}.json");
+        string outDir = Path.Combine(Path.GetTempPath(), $"openfps-gen-{id}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outDir);
+        string outFile = Path.Combine(outDir, id + ".json");
         try
         {
             var psi = new ProcessStartInfo("python3", $"tools/gen_osm.py tools/places/{id} --out={outFile}")
@@ -281,8 +292,17 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
             Assert.True(proc.ExitCode == 0, err);
             var shipped = File.ReadAllBytes(Path.Combine(repo, "OpenFPS.Server", "maps", "places", id + ".json"));
             Assert.True(shipped.AsSpan().SequenceEqual(File.ReadAllBytes(outFile)), $"{id}.json differs from what tools/gen_osm.py makes");
+            // Its ground beside it, the survey's file as it is.
+            string ground = Path.Combine(repo, "OpenFPS.Server", "maps", "places", id + ".elevation");
+            if (File.Exists(ground))
+            {
+                Assert.True(File.ReadAllBytes(ground).AsSpan().SequenceEqual(File.ReadAllBytes(Path.Combine(outDir, id + ".elevation"))),
+                            $"{id}.elevation differs from what tools/gen_osm.py makes");
+                Assert.True(File.ReadAllBytes(ground).AsSpan().SequenceEqual(File.ReadAllBytes(Path.Combine(repo, "tools", "places", id, "elevation.json"))),
+                            $"{id}.elevation is not tools/places/{id}/elevation.json");
+            }
         }
-        finally { File.Delete(outFile); }
+        finally { try { Directory.Delete(outDir, true); } catch (IOException) { } }
     }
 
     /// <summary>The map equivalent of the unknown-prefab-field rule (PrefabSpecTests): every key the

@@ -26,7 +26,8 @@ from the Census address ranges, as a geocoder would).
 
 THE ENGINE HAS BOXES. Every footprint is turned into a few rectangles in its own frame (an L-shaped
 house is two), walls go round the outside of their union, and a pitched roof is a deck with a ridge on
-it. The ground is flat: the elevation is kept (elevation.json) for when it is not.
+it. Everything is made on flat ground and then set on the real ground from elevation.json (ground_all,
+near the end); without elevation.json the ground stays flat.
 
 DETAIL. The map is layered so that a later loader can stream it by tile and by layer without
 regenerating it: every entity carries the 250 m tile it stands in ("Tile", from the origin) and what
@@ -81,30 +82,20 @@ def h01(*keys):
 
 # ══ Where things are ══════════════════════════════════════════════════════════════════════════════
 #
-# Local east-north metres on the WGS84 ellipsoid, from the origin in place.json: x east, z north, as
-# the game has them (and /tp and the C key report them, with the height last). A plane tangent at the
-# origin, so a kilometre out the error is under a millimetre across and the ground drops 8 cm below
-# it, which is ignored with the rest of the relief.
+# The world's grid (docs/WORLD_STREAMING.md, stage 2): UTM metres of the origin's zone, less the 2 m post
+# nearest the origin in place.json, x east and z north along the grid, as the game has them (and /tp and
+# the C key report them, with the height last). The world's tiles are 250 m squares of the same grid, so
+# the map is the world moved, never turned (OpenFPS.Server/OneWorld/WorldPlaces). Grid north is within
+# 1.4 degrees of true north at Magnolia, 0.1 at Albany.
+import utm  # noqa: E402
+
 LAT0, LON0 = PLACE["Origin"]
-_A, _F = 6378137.0, 1 / 298.257223563
-_E2 = _F * (2 - _F)
-
-
-def _ecef(lat, lon):
-    la, lo = math.radians(lat), math.radians(lon)
-    n = _A / math.sqrt(1 - _E2 * math.sin(la) ** 2)
-    return (n * math.cos(la) * math.cos(lo), n * math.cos(la) * math.sin(lo), n * (1 - _E2) * math.sin(la))
-
-
-_O = _ecef(LAT0, LON0)
-_SLA, _CLA = math.sin(math.radians(LAT0)), math.cos(math.radians(LAT0))
-_SLO, _CLO = math.sin(math.radians(LON0)), math.cos(math.radians(LON0))
+UTM_ZONE, UTM_NORTH, UTM_E0, UTM_N0 = utm.origin_of(LAT0, LON0)
 
 
 def P(lat, lon):
-    x, y, z = _ecef(lat, lon)
-    dx, dy, dz = x - _O[0], y - _O[1], z - _O[2]
-    return (-_SLO * dx + _CLO * dy, -_SLA * _CLO * dx - _SLA * _SLO * dy + _CLA * dz)
+    e, n = utm.from_latlon(lat, lon, UTM_ZONE, UTM_NORTH)
+    return (e - UTM_E0, n - UTM_N0)
 
 
 # ══ Geometry in the ground plane ══════════════════════════════════════════════════════════════════
@@ -380,9 +371,15 @@ def entity_tile(x, z):
     return _TILE_PIN[0] or tile_of(x, z)
 
 
+# While a building is being built, the height of the pad it stands on: everything it is made of is set on
+# it (ground_all, below). None outside a building.
+_Y_PIN = [None]
+
+
 def _finish(e, name, layer):
     if name:
         e["Name"] = name
+    e["_pin"] = _Y_PIN[0]
     e["Tile"] = entity_tile(e["Position"]["X"], e["Position"]["Z"])
     e["Layer"] = layer
     entities.append(e)
@@ -399,16 +396,20 @@ def obox(prefab, F, u0, u1, v0, v1, y0, y1, name=None, layer="structure"):
     if abs(a) > 1e-9:
         e["Rotation"] = yaw(-a)
     e["Scale"] = v3((u1 - u0) / bx, (y1 - y0) / by, (v1 - v0) / bz)
+    e["_box"] = (F, u0, u1, v0, v1, y0, y1)
     return _finish(e, name, layer)
 
 
-def seg_box(prefab, ax, az, bx, bz, width, y0, y1, ext0=0.0, ext1=0.0, name=None, layer="roads"):
-    """A box along a segment, `width` across it, lengthened at each end."""
+def seg_box(prefab, ax, az, bx, bz, width, y0, y1, ext0=0.0, ext1=0.0, name=None, layer="roads", heights=None):
+    """A box along a segment, `width` across it, lengthened at each end. `heights`: the ground's height at
+    each end, which the box is pitched to (ground_all); the ground under each end if not given."""
     L = math.dist((ax, az), (bx, bz))
     if L < 0.05:
         return None
     F = Frame(ax, az, math.atan2(bz - az, bx - ax))
-    return obox(prefab, F, -ext0, L + ext1, -width / 2, width / 2, y0, y1, name=name, layer=layer)
+    eid = obox(prefab, F, -ext0, L + ext1, -width / 2, width / 2, y0, y1, name=name, layer=layer)
+    entities[-1]["_seg"] = (L, heights)
+    return eid
 
 
 def prop(prefab, x, y, z, name=None, layer="props"):
@@ -422,12 +423,13 @@ def region(name, F, u0, u1, v0, v1, y0, y1, layer="zones"):
 
 def named_place(name, F, u0, u1, v0, v1, y0, y1):
     """A name without a room (named_place.json); written after everything else."""
-    named_places.append((name, F, u0, u1, v0, v1, y0, y1))
+    named_places.append((name, F, u0, u1, v0, v1, y0, y1, _Y_PIN[0]))
 
 
 def portal(x, y, z, a, b, aperture, layer="interiors"):
     e = {"EntityId": new_id(), "PrefabId": "portal", "Position": v3(x, y, z),
          "RegionAId": a, "RegionBId": b, "ApertureSize": aperture}
+    e["_pin"] = _Y_PIN[0]
     e["Tile"] = entity_tile(x, z)
     e["Layer"] = layer
     entities.append(e)
@@ -476,17 +478,16 @@ def in_area(x, z):
     return any(pip(x, z, r) for r in AREA)
 
 
+def geo_of(x, z):
+    """The latitude and longitude of a point of the map."""
+    return utm.to_latlon(UTM_ZONE, UTM_NORTH, x + UTM_E0, z + UTM_N0)
+
+
 def landcover_at(x, z):
     """The WorldCover class letter at a point (landcover.json's legend), '.' off the grid."""
     if LANDCOVER is None:
         return "."
-    # Invert the projection: near enough from the spherical step, then two corrections.
-    lat = LAT0 + z / 110_900.0
-    lon = LON0 + x / (111_320.0 * math.cos(math.radians(LAT0)))
-    for _ in range(2):
-        px, pz = P(lat, lon)
-        lat += (z - pz) / 110_900.0
-        lon += (x - px) / (111_320.0 * math.cos(math.radians(LAT0)))
+    lat, lon = geo_of(x, z)
     r = int((LANDCOVER["north"] - lat) / LANDCOVER["dlat"])
     c = int((lon - LANDCOVER["west"]) / LANDCOVER["dlon"])
     rows = LANDCOVER["rows"]
@@ -499,6 +500,72 @@ XMIN = min(p[0] for r in AREA for p in r)
 XMAX = max(p[0] for r in AREA for p in r)
 ZMIN = min(p[1] for r in AREA for p in r)
 ZMAX = max(p[1] for r in AREA for p in r)
+
+
+# ══ The ground ════════════════════════════════════════════════════════════════════════════════════
+#
+# The ground follows the survey (docs/GEOMETRY.md 5.1). elevation.json is 3DEP's posts every 2 m on the
+# world's UTM grid over whole 250 m tiles (tools/fetch_place.py elevation), and the map's origin is one of
+# those posts, so the map's 2 m posts are the survey's own: nothing is resampled. The map ships the same
+# file beside it (PLACE_ID.elevation, the same bytes) and names it; everything here is set on those posts
+# read the way the server reads them (between posts, bilinear), so the server's terrain, the world's tiles
+# and this file agree. y = 0 is the ground at the origin, where the spawn address is. Without
+# elevation.json the ground is flat, as it was.
+ELEV = load("elevation.json")
+HAS_GROUND = bool(ELEV and "data" in ELEV)
+ELEV_STEP = 2.0
+ELEV_MARGIN = 60.0                    # the map's bounds reach this far past the area (MARGIN below)
+if HAS_GROUND:
+    import array, base64
+    if (ELEV.get("zone"), ELEV.get("north"), ELEV.get("spacing")) != (UTM_ZONE, UTM_NORTH, ELEV_STEP):
+        raise SystemExit(f"{PLACE_DIR}/elevation.json is not on this place's grid: run tools/fetch_place.py elevation")
+    _d = array.array("h")
+    _d.frombytes(zlib.decompress(base64.b64decode(ELEV["data"])))
+    if sys.byteorder != "little":
+        _d.byteswap()
+    ECOLS, EROWS = ELEV["cols"], ELEV["rows"]
+    ECM = list(_d)
+    for _k in range(ECOLS, len(ECM)):
+        ECM[_k] += ECM[_k - ECOLS]
+    del _d
+    EX0, EZ0 = ELEV["east0"] - UTM_E0, ELEV["north0"] - UTM_N0
+    _sea = ECM[int(round(-EZ0 / ELEV_STEP)) * ECOLS + int(round(-EX0 / ELEV_STEP))]
+    SEA_Y = round(ELEV["base"] + _sea * 0.01, 2)         # the height over the sea of y = 0
+    EBASE = round(ELEV["base"] - SEA_Y, 2)
+
+
+def ground(x, z):
+    """The ground's height at a point of the map, as the server's terrain has it (TerrainBuilder): the
+    map's elevation posts, bilinear between them, held at the edge. 0 on flat ground."""
+    if not HAS_GROUND:
+        return 0.0
+    fx = (x - EX0) / ELEV_STEP
+    fz = (z - EZ0) / ELEV_STEP
+    i = min(max(int(math.floor(fx)), 0), ECOLS - 2)
+    j = min(max(int(math.floor(fz)), 0), EROWS - 2)
+    tx = min(max(fx - i, 0.0), 1.0)
+    tz = min(max(fz - j, 0.0), 1.0)
+    k = j * ECOLS + i
+    h00, h10 = EBASE + ECM[k] * 0.01, EBASE + ECM[k + 1] * 0.01
+    h01, h11 = EBASE + ECM[k + ECOLS] * 0.01, EBASE + ECM[k + ECOLS + 1] * 0.01
+    return (h00 * (1 - tx) + h10 * tx) * (1 - tz) + (h01 * (1 - tx) + h11 * tx) * tz
+
+
+ROAD_SMOOTH = 10.0                    # half the width of the square a road's height is averaged over, m
+
+
+def road_y(x, z):
+    """The height a road surface is laid at: the ground averaged over a 20 m square, so a road runs smooth
+    over the survey's bumps, and the same function of where it is for the carriageway, its verges, its
+    sidewalks and the junctions it meets at."""
+    if not HAS_GROUND:
+        return 0.0
+    s, n = 0.0, 0
+    for a in (-1.0, -0.5, 0.0, 0.5, 1.0):
+        for b in (-1.0, -0.5, 0.0, 0.5, 1.0):
+            s += ground(x + a * ROAD_SMOOTH, z + b * ROAD_SMOOTH)
+            n += 1
+    return s / n
 
 
 def clip_line(pts):
@@ -603,6 +670,9 @@ def slug(name):
 # roads share a node in OpenStreetMap. Ways of the same name and class that meet end to end are one
 # road, so a street the mapper happened to split in three is still one street; a road that comes back
 # on itself (a loop, a lollipop cul-de-sac) is cut where it does, because a junction joins two roads.
+# The world's tiles lay roads with a C# port of this (OpenFPS.Server/OneWorld/WorldFeatures.cs: ROAD_CLASS,
+# SURFACE, way_width, lay_line with road_y, ground_all's pitch, the zones and junctions): change both, and
+# WorldFeaturesTests.Magnolia_s_roads_are_laid_as_gen_osm_laid_them holds them together.
 ROAD_CLASS = {
     # OSM highway: (our type, rank, two-lane width m)
     "motorway": ("arterial", 5, 7.4), "trunk": ("arterial", 5, 7.4), "primary": ("arterial", 4, 7.2),
@@ -1002,7 +1072,9 @@ make_junctions()
 # surface under your feet: the forest floor at -0.2..0, a verge 0.03, a lawn 0.04, a drive 0.06, the
 # road 0.08, a pavement 0.12. A flush tie is what once put footsteps on dirt in the middle of a road.
 Y_VERGE, Y_LAWN, Y_DRIVE, Y_ROAD, Y_WALK = 0.03, 0.04, 0.06, 0.08, 0.12
-GROUND = obox("dirt_floor", WORLD, XMIN, XMAX, ZMIN, ZMAX, -0.2, 0.0, name="Ground", layer="ground")
+# On real ground the server lays the terrain instead (TerrainBuilder): no slab.
+if not HAS_GROUND:
+    obox("dirt_floor", WORLD, XMIN, XMAX, ZMIN, ZMAX, -0.2, 0.0, name="Ground", layer="ground")
 
 # Things the woods keep clear of, and the lots and buildings must not stand in.
 CLEAR = SpatialHash(20.0)
@@ -1026,9 +1098,12 @@ def is_clear(x, z, pad=0.0):
     return True
 
 
-def lay_line(pts, width, prefab, y1, name, layer, verge=0.0, y0=0.0, tol=0.25):
-    """Boxes along a polyline, each lengthened at a bend by as much as the bend opens on its outside."""
+def lay_line(pts, width, prefab, y1, name, layer, verge=0.0, y0=0.0, tol=0.25, hfun=None):
+    """Boxes along a polyline, each lengthened at a bend by as much as the bend opens on its outside, each
+    pitched along its run to the heights `hfun` gives its ends (the ground under them by default) and
+    level across: a road's verges, sidewalks and carriageway share its heights (road_y)."""
     pts = simplify(pts, tol)
+    hts = [(hfun or ground)(x, z) for x, z in pts]
     dirs = [math.atan2(pts[i + 1][1] - pts[i][1], pts[i + 1][0] - pts[i][0]) for i in range(len(pts) - 1)]
     for i in range(len(pts) - 1):
         def ext(k):
@@ -1038,11 +1113,27 @@ def lay_line(pts, width, prefab, y1, name, layer, verge=0.0, y0=0.0, tol=0.25):
             return min(width, (width / 2) * math.tan(min(turn, 2.6) / 2) + 0.05)
         e0, e1 = ext(i - 1), ext(i)
         (ax, az), (bx, bz) = pts[i], pts[i + 1]
-        if verge > 0:
-            seg_box("grass_floor", ax, az, bx, bz, width + 2 * verge, 0.0, Y_VERGE, e0 + verge, e1 + verge,
-                    name=f"{name} verge" if name else "Verge", layer="verges")
-        seg_box(prefab, ax, az, bx, bz, width, y0, y1, e0, e1, name=name, layer=layer)
+        # On real ground a straight run is laid in pieces of at most SEG_MAX, each pitched to its own ends,
+        # so a long straight road follows the hills it crosses instead of bridging them.
+        n = max(1, int(math.ceil(math.dist(pts[i], pts[i + 1]) / SEG_MAX))) if HAS_GROUND else 1
+        for k in range(n):
+            px, pz = (ax, az) if k == 0 else (ax + (bx - ax) * k / n, az + (bz - az) * k / n)
+            qx, qz = (bx, bz) if k == n - 1 else (ax + (bx - ax) * (k + 1) / n, az + (bz - az) * (k + 1) / n)
+            hp = hts[i] if k == 0 else (hfun or ground)(px, pz)
+            hq = hts[i + 1] if k == n - 1 else (hfun or ground)(qx, qz)
+            # Pieces of one run overlap by SEAM at the joins between them: pitched differently, two boxes that only
+            # met there left a crack a ray straight down could fall through to the ground under the road.
+            f0, f1 = (e0 if k == 0 else SEAM), (e1 if k == n - 1 else SEAM)
+            if verge > 0:
+                seg_box("grass_floor", px, pz, qx, qz, width + 2 * verge, 0.0, Y_VERGE,
+                        f0 + (verge if k == 0 else 0.0), f1 + (verge if k == n - 1 else 0.0),
+                        name=f"{name} verge" if name else "Verge", layer="verges", heights=(hp, hq))
+            seg_box(prefab, px, pz, qx, qz, width, y0, y1, f0, f1, name=name, layer=layer, heights=(hp, hq))
         clear_strip(ax, az, bx, bz, width / 2 + verge)
+
+
+SEG_MAX = 20.0                        # the longest piece of a road laid on real ground, m
+SEAM = 0.05                           # how far the pieces of one run overlap at their joins, m
 
 
 # Each way in its own width and surface, once; the records above are the roads as wholes.
@@ -1053,7 +1144,7 @@ for w in sorted(ways_by_kind["road"], key=lambda w: w["id"]):
     for part in clip_line([nxz(n) for n in w["nodes"]]):
         verge = VERGE if max(detail_at(x, z) for x, z in part) >= 2 else 0.0
         ww = way_width(t, t["highway"])
-        lay_line(part, ww, surface_of(t)[0], Y_ROAD, WAY_NAME[w["id"]], "roads", verge=verge)
+        lay_line(part, ww, surface_of(t)[0], Y_ROAD, WAY_NAME[w["id"]], "roads", verge=verge, hfun=road_y)
         # A sidewalk the road's own tags say it has (sidewalk=both|left|right), a planting strip out
         # from the kerb. Mapped as ways of their own they are laid with the footways instead.
         sides = {"both": (1, -1), "left": (1,), "right": (-1,)}.get(t.get("sidewalk", ""), ())
@@ -1061,7 +1152,8 @@ for w in sorted(ways_by_kind["road"], key=lambda w: w["id"]):
         sw = float(PLACE.get("SidewalkMetres", 1.5))
         for side in sides:
             off = side * (ww / 2 + 1.0 + sw / 2)
-            lay_line(offset_line(part, off), sw, "concrete_floor", Y_WALK, f"{WAY_NAME[w['id']]} sidewalk", "paths")
+            lay_line(offset_line(part, off), sw, "concrete_floor", Y_WALK, f"{WAY_NAME[w['id']]} sidewalk", "paths",
+                     hfun=lambda x, z, part=part: road_y(*project(part, x, z)[4]))
 
 # Driveways, parking aisles and private service ways: surfaces only, not roads to route on.
 DRIVES = []
@@ -1083,7 +1175,9 @@ for w in sorted(ways_by_kind["path"], key=lambda w: w["id"]):
                  (f"{near[5][4]} crosswalk" if near else "Crosswalk")
             if t.get("footway") == "crossing":
                 continue                      # the road's own surface is the crossing
-            lay_line(part, float(PLACE.get("SidewalkMetres", 1.5)), surface_of(t, "concrete")[0], Y_WALK, nm, "paths")
+            # Level with the road it runs beside, as its own sidewalks are.
+            along = (lambda x, z, g=near[5]: road_y(*project(g[1], x, z)[4])) if near else None
+            lay_line(part, float(PLACE.get("SidewalkMetres", 1.5)), surface_of(t, "concrete")[0], Y_WALK, nm, "paths", hfun=along)
         elif hw == "track":
             lay_line(part, 3.0, surface_of(t, "dirt")[0], Y_DRIVE, t.get("name") or "Track", "paths")
         elif hw == "cycleway":
@@ -1107,8 +1201,11 @@ for w in sorted(ways_by_kind["rail"], key=lambda w: w["id"]):
                 if L < 0.1:
                     continue
                 F = Frame(ax, az, math.atan2(bz - az, bx - ax))
-                for off in (-0.75, 0.75):
-                    obox("metal_wall", F, 0.0, L, off - 0.035, off + 0.035, 0.3, 0.45, name=f"{nm} rail", layer="rail")
+                n = max(1, int(math.ceil(L / SEG_MAX))) if HAS_GROUND else 1
+                for k in range(n):
+                    for off in (-0.75, 0.75):
+                        obox("metal_wall", F, L * k / n if k else 0.0, L * (k + 1) / n if k < n - 1 else L,
+                             off - 0.035, off + 0.035, 0.3, 0.45, name=f"{nm} rail", layer="rail")
 
 # Water: ponds as rectangles of their outline, streams as strips. Solid underfoot, because the
 # engine has no swimming: walking onto a pond is walking on water, and the name says so.
@@ -2379,10 +2476,34 @@ for g in ROAD_GEOM:
 
 # ══ The buildings ═════════════════════════════════════════════════════════════════════════════════
 CUT_BY_EDGE = 0                       # buildings whose parts stand in more than one tile
+
+
+def pad_of(bd):
+    """The height of the level pad a building stands on: the ground at the middle of its wall nearest the
+    street, where its front door is, so a house on a slope shows a foundation on the low side and is dug
+    in on the high side (docs/GEOMETRY.md 5.1). A building that is one solid box (a shed) stands on no
+    pad: it is set down into the ground like anything else solid."""
+    if not HAS_GROUND or bd.kind == "shed" or (detail_at(bd.cx, bd.cz) <= 1 and bd.kind in ("garage", "workshop", "barn", "outbuilding")):
+        return None
+    near = nearest_road(bd.cx, bd.cz, 200.0)
+    if near is None:
+        return ground(bd.cx, bd.cz)
+    pts = near[5][1]
+    best = None
+    for i in range(len(bd.ring) - 1):
+        mx, mz = (bd.ring[i][0] + bd.ring[i + 1][0]) / 2, (bd.ring[i][1] + bd.ring[i + 1][1]) / 2
+        d = project(pts, mx, mz)[0]
+        if best is None or d < best[0]:
+            best = (d, mx, mz)
+    return ground(best[1], best[2])
+
+
 for bd in sorted(BLD, key=lambda b: (round(b.cx, 2), round(b.cz, 2))):
     first = len(entities)
     _TILE_PIN[0] = tile_of(bd.cx, bd.cz)
+    _Y_PIN[0] = pad_of(bd)
     build(bd)
+    _Y_PIN[0] = None
     _TILE_PIN[0] = None
     if len({tile_of(e["Position"]["X"], e["Position"]["Z"]) for e in entities[first:]}) > 1:
         CUT_BY_EDGE += 1
@@ -2499,8 +2620,10 @@ for j in JUNCTIONS:
     named_place(f"{j['Name']} junction", F, -r, r, -r, r, 0.0, 4.0)
 
 # The named places last, so adding one moves no other part's id.
-for nm, F, u0, u1, v0, v1, y0, y1 in named_places:
+for nm, F, u0, u1, v0, v1, y0, y1, pin in named_places:
+    _Y_PIN[0] = pin
     obox("named_place", F, u0, u1, v0, v1, y0, y1, name=nm, layer="zones")
+    _Y_PIN[0] = None
 
 
 # ══ Shores ════════════════════════════════════════════════════════════════════════════════════════
@@ -2621,7 +2744,7 @@ if SPAWN_ADDR is not None and SPAWN_ADDR.lot is not None:
     # chosen is the nearest one where the name you hear is this address.
     def named_at(x, z):
         best = None
-        for nm, G, u0, u1, v0, v1, y0, y1 in named_places:
+        for nm, G, u0, u1, v0, v1, y0, y1, _ in named_places:
             if abs(G.ox - x) > 400 or abs(G.oz - z) > 400:
                 continue
             u, v = G.l(x, z)
@@ -2653,10 +2776,137 @@ if SPAWN_ADDR is not None and SPAWN_ADDR.lot is not None:
 SPAWN_ROT = yaw(spawn_yaw)
 
 
+# ══ Everything on the ground ══════════════════════════════════════════════════════════════════════
+#
+# Everything above was made on flat ground at y = 0, and is set on the real ground here
+# (docs/GEOMETRY.md 5.1 and 5.3). The server lays its terrain from the same posts and grades it to what
+# lies on it (TerrainBuilder): flattened under each slab that rests on the ground, so the ground never
+# shows through a road, a lawn or a floor. What is solid and stands on the ground is set into it instead.
+#   a building           on its pad (pad_of), everything it is made of: walls, floors, rooms, doors
+#   a strip of a line     pitched along its run to its ends' heights, level across (lay_line)
+#   a slab                tilted to the ground under its corners (a lawn, a yard)
+#   a pond                level, at the lowest ground round it
+#   a long solid          pitched along its length and set 5 cm in (a fence, a rail)
+#   anything else solid   its foot at the lowest ground under it (a trunk, a post, a shed)
+#   a named place, a wood  stretched from the lowest ground under it to the highest
+#   a point               on the ground where it is (a crown, a gate)
+def _qmul(a, b):
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return (aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+            aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz)
+
+
+def _turn(a, pitch_u, pitch_v):
+    """The frame's turn about the vertical, then the box tilted so its +X rises pitch_u per metre and its
+    +Z pitch_v per metre."""
+    # Turned as obox turns it: folded into a half turn, which turns the box's own axes round with it.
+    n = norm_half(a)
+    if abs(math.remainder(n - a, 2 * math.pi)) > 1.0:
+        pitch_u, pitch_v = -pitch_u, -pitch_v
+    y = yaw(-n) if abs(n) > 1e-9 else {"X": 0.0, "Y": 0.0, "Z": 0.0, "W": 1.0}
+    q = (y["X"], y["Y"], y["Z"], y["W"])
+    al, be = math.atan(pitch_u), -math.atan(pitch_v)
+    q = _qmul(q, (0.0, 0.0, math.sin(al / 2), math.cos(al / 2)))
+    q = _qmul(q, (math.sin(be / 2), 0.0, 0.0, math.cos(be / 2)))
+    return {"X": round(q[0], 6), "Y": round(q[1], 6), "Z": round(q[2], 6), "W": round(q[3], 6)}
+
+
+def _samples(F, u0, u1, v0, v1, every=20.0):
+    """The ground under a box's footprint: its corners, its middle, and a grid at most `every` apart."""
+    nu = max(1, min(24, int(math.ceil((u1 - u0) / every))))
+    nv = max(1, min(24, int(math.ceil((v1 - v0) / every))))
+    out = [ground(*F.w(u0 + (u1 - u0) * i / nu, v0 + (v1 - v0) * j / nv)) for i in range(nu + 1) for j in range(nv + 1)]
+    out.append(ground(*F.w((u0 + u1) / 2, (v0 + v1) / 2)))
+    return out
+
+
+def _set(e, F, u0, u1, v0, v1, y0, y1, centre_y, turn=None):
+    """A box of the frame's footprint, its bottom and top as given about its middle at centre_y."""
+    by = BASE[e["PrefabId"]][1]
+    cx, cz = F.w((u0 + u1) / 2, (v0 + v1) / 2)
+    e["Position"] = v3(cx, centre_y, cz)
+    e["Scale"]["Y"] = round((y1 - y0) / by, 4)
+    if turn is not None:
+        e["Rotation"] = turn
+
+
+def ground_all():
+    for e in entities:
+        pin, box, seg = e.pop("_pin", None), e.pop("_box", None), e.pop("_seg", None)
+        if not HAS_GROUND:
+            continue
+        p = e["Position"]
+        if pin is not None:
+            p["Y"] = round(p["Y"] + pin, 4)
+            continue
+        if box is None:
+            p["Y"] = round(p["Y"] + ground(p["X"], p["Z"]), 4)
+            continue
+        F, u0, u1, v0, v1, y0, y1 = box
+        su, sv = u1 - u0, v1 - v0
+        prefab = e["PrefabId"]
+        if seg is not None:
+            L, heights = seg
+            ha, hb = heights if heights is not None else (ground(F.ox, F.oz), ground(*F.w(L, 0.0)))
+            g = (hb - ha) / L
+            uc = (u0 + u1) / 2
+            _set(e, F, u0, u1, v0, v1, y0, y1, ha + g * uc + (y0 + y1) / 2, _turn(F.a, g, 0.0))
+        elif prefab == "water_surface":
+            lo = min(_samples(F, u0, u1, v0, v1))
+            _set(e, F, u0, u1, v0, v1, y0, y1, lo + (y0 + y1) / 2)
+        elif not SOLID.get(prefab, True):
+            s = _samples(F, u0, u1, v0, v1)
+            lo, hi = min(s), max(s)
+            _set(e, F, u0, u1, v0, v1, lo + y0, hi + y1, (lo + y0 + hi + y1) / 2)
+        elif y1 - y0 <= 0.6 and su >= 1.0 and sv >= 1.0:
+            g00, g10 = ground(*F.w(u0, v0)), ground(*F.w(u1, v0))
+            g01, g11 = ground(*F.w(u0, v1)), ground(*F.w(u1, v1))
+            gu = ((g10 + g11) - (g00 + g01)) / (2 * su)
+            gv = ((g01 + g11) - (g00 + g10)) / (2 * sv)
+            _set(e, F, u0, u1, v0, v1, y0, y1, (g00 + g10 + g01 + g11) / 4 + (y0 + y1) / 2, _turn(F.a, gu, gv))
+        elif max(su, sv) >= 4.0 and min(su, sv) < 1.0:
+            if su >= sv:
+                vc = (v0 + v1) / 2
+                ga, gb = ground(*F.w(u0, vc)), ground(*F.w(u1, vc))
+                turn, g = _turn(F.a, (gb - ga) / su, 0.0), (ga + gb) / 2
+            else:
+                uc = (u0 + u1) / 2
+                ga, gb = ground(*F.w(uc, v0)), ground(*F.w(uc, v1))
+                turn, g = _turn(F.a, 0.0, (gb - ga) / sv), (ga + gb) / 2
+            _set(e, F, u0, u1, v0, v1, y0, y1, g - 0.05 + (y0 + y1) / 2, turn)
+        else:
+            lo = min(_samples(F, u0, u1, v0, v1))
+            p["Y"] = round(p["Y"] + lo, 4)
+
+
+ground_all()
+if HAS_GROUND:
+    spawn = (spawn[0], spawn[1] + ground(spawn[0], spawn[2]), spawn[2])
+    # The traffic rides the centreline: on real ground a point at least every SEG_MAX, so its height is the
+    # road's between them and not a chord across a dip.
+    for r in ROADS:
+        line = r["Centreline"]
+        dense = [line[0]]
+        for q0, q1 in zip(line, line[1:]):
+            n = max(1, int(math.ceil(math.dist((q0["X"], q0["Z"]), (q1["X"], q1["Z"])) / SEG_MAX)))
+            for k in range(1, n):
+                dense.append(v3(q0["X"] + (q1["X"] - q0["X"]) * k / n, 0.0, q0["Z"] + (q1["Z"] - q0["Z"]) * k / n))
+            dense.append(q1)
+        for q in dense:
+            q["Y"] = round(road_y(q["X"], q["Z"]) + Y_ROAD, 4)
+        r["Centreline"] = dense
+    for j in JUNCTIONS:
+        j["Position"]["Y"] = round(road_y(j["Position"]["X"], j["Position"]["Z"]) + Y_ROAD, 4)
+
+
 # ══ The map ═══════════════════════════════════════════════════════════════════════════════════════
-MARGIN = 60.0
-MAP_MIN = (math.floor(XMIN - MARGIN), 0.0, math.floor(ZMIN - MARGIN))
-MAP_MAX = (math.ceil(XMAX + MARGIN), 200.0, math.ceil(ZMAX + MARGIN))
+MARGIN = ELEV_MARGIN
+# On real ground the bounds reach from under its lowest point to 200 m over its highest.
+LOW = math.floor(EBASE) - 5.0 if HAS_GROUND else 0.0
+HIGH = math.ceil(EBASE + max(ECM) * 0.01) if HAS_GROUND else 0.0
+MAP_MIN = (math.floor(XMIN - MARGIN), LOW, math.floor(ZMIN - MARGIN))
+MAP_MAX = (math.ceil(XMAX + MARGIN), HIGH + 200.0, math.ceil(ZMAX + MARGIN))
 STREET_LIFE = PLACE.get("StreetLife", {"HornEverySeconds": 0, "HardBrakeEverySeconds": 0, "ParkEverySeconds": 0,
                                        "GunfireEverySeconds": 0, "AlarmEverySeconds": 0})
 map_data = {
@@ -2664,12 +2914,12 @@ map_data = {
     "Name": PLACE.get("Name", PLACE["Id"]),
     "IsDefault": False,
     "Description": PLACE["Description"],
-    "Size": v3(MAP_MAX[0] - MAP_MIN[0], MAP_MAX[1], MAP_MAX[2] - MAP_MIN[2]),
+    "Size": v3(MAP_MAX[0] - MAP_MIN[0], MAP_MAX[1] - MAP_MIN[1], MAP_MAX[2] - MAP_MIN[2]),
     "MinBound": v3(*MAP_MIN),
     "MaxBound": v3(*MAP_MAX),
-    "PlayMin": v3(XMIN, -20.0, ZMIN),
+    "PlayMin": v3(XMIN, LOW - 20.0, ZMIN),
     "PlayMax": v3(XMAX, MAP_MAX[1], ZMAX),
-    "MinimumY": -20.0,
+    "MinimumY": LOW - 20.0,
     "SpawnPoint": {"Position": v3(*spawn), "Rotation": SPAWN_ROT},
     "AmbienceId": "",
     "Temperature": PLACE.get("Temperature", 20.0),
@@ -2677,6 +2927,8 @@ map_data = {
     "VoxelResolution": 1.0,
     "OcclusionFloor": 0.1,
     "GeoOrigin": {"Lat": LAT0, "Lon": LON0},
+    # Where the map's (0, 0) is on the world's grid: the map is the world's tiles moved by this, never turned.
+    "Utm": {"Zone": UTM_ZONE, "North": UTM_NORTH, "Easting": UTM_E0, "Northing": UTM_N0},
     "TileMetres": TILE,
     "Roads": ROADS,
     "Junctions": JUNCTIONS,
@@ -2684,9 +2936,20 @@ map_data = {
     "Vehicles": VEHICLES,
     "Entities": entities,
 }
+ELEV_FILE = PLACE["Id"] + ".elevation"
+if HAS_GROUND:
+    # The ground's posts, for the server's terrain (MapElevation, TerrainBuilder): elevation.json as it
+    # is, beside the map, with where its first post is in the map's metres and its heights over y = 0.
+    map_data["Elevation"] = {
+        "OriginX": EX0, "OriginZ": EZ0, "Spacing": ELEV_STEP, "Columns": ECOLS, "Rows": EROWS,
+        "BaseY": EBASE, "SeaLevelY": round(-SEA_Y, 2), "File": ELEV_FILE,
+        "Source": ELEV.get("source", "USGS 3DEP")}
 os.makedirs(os.path.dirname(OUT) or ".", exist_ok=True)
 with open(OUT, "w") as f:
     json.dump(map_data, f, indent=1)
+if HAS_GROUND:
+    with open(os.path.join(PLACE_DIR, "elevation.json"), "rb") as src, open(os.path.join(os.path.dirname(OUT) or ".", ELEV_FILE), "wb") as dst:
+        dst.write(src.read())
 
 by_prefab = defaultdict(int)
 for e in entities:

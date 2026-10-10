@@ -326,22 +326,7 @@ public static class TailSteadySpike
     // ── Rendering ──────────────────────────────────────────────────────────────────────────────
 
     /// <summary>The partitions of an IR back to time.</summary>
-    internal static float[] ToTime(LateTailIr? ir)
-    {
-        if (ir == null) return Array.Empty<float>();
-        int blk = ir.Block, nfft = 2 * blk;
-        var fft = new Fft(nfft);
-        var y = new float[ir.Partitions * blk];
-        var re = new float[nfft]; var im = new float[nfft];
-        for (int p = 0; p < ir.Partitions; p++)
-        {
-            for (int k = 0; k < ir.Bins; k++) { re[k] = ir.Re[p * ir.Bins + k]; im[k] = ir.Im[p * ir.Bins + k]; }
-            for (int k = 1; k < blk; k++) { re[nfft - k] = re[k]; im[nfft - k] = -im[k]; }
-            fft.Inverse(re, im);
-            Array.Copy(re, 0, y, p * blk, blk);
-        }
-        return y;
-    }
+    internal static float[] ToTime(LateTailIr? ir) => ir?.ToTime() ?? Array.Empty<float>();
 
     /// <summary>The late part and every direction's, as one response. The raw parts are pieces of the
     /// same samples and add as they are; the smooth ones are independent noise and add as they are too

@@ -147,6 +147,10 @@ public struct SpatialEmitter
     /// <summary>How rough the surface an echo came off is, 0..1 — how much the renderer smears it.
     /// See EngineEchoState.Scattering.</summary>
     public float EchoScattering;
+    /// <summary>A recording's copy off a wall (not an engine's echo): the share of its pressure that stays a
+    /// clean mirror copy, the rest smeared by <see cref="EchoScattering"/> (EchoWashState). Zero: all
+    /// smeared, for a wash voice placed beside its mirror.</summary>
+    public float EchoMirrorShare;
     /// <summary>The height of the surface the ground reflection bounces off, world metres (where its
     /// image is); meaningful only when the ground gains are above zero.</summary>
     public float GroundHeight;

@@ -135,6 +135,14 @@ public sealed class AuthService
         }
 
         _strikes.TryRemove(name, out _);
+        // Only after the password: a ban says the account exists, which a stranger is not told.
+        if (user.IsBannedAt(now))
+        {
+            Log.Warning("Auth: login REFUSED for '{User}' from {Address}: banned by {By}.", ForLog(name), ForLog(address), ForLog(user.BannedBy ?? ""));
+            return new AuthOutcome(false, Bans.Refusal(user.BannedUntilUtc, user.BanReason, now));
+        }
+        if (user.BannedUtc != null && _users.ClearBan(name))
+            Log.Information("Auth: the ban on '{User}' ended and is lifted.", ForLog(name));
         _users.RecordLogin(name, address, now);
         return new AuthOutcome(true, "Authenticated", _users.GetUser(name) ?? user);
     }

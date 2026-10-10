@@ -11,7 +11,7 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [root=DIR/]
+/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [explain] [emitters] [overlays=DIR] [root=DIR/]
 ///
 /// What the game's occlusion worker hands the mixer for one source and one ear on a real map: occlusion
 /// and the three band gains in dB, with what each part of the answer says on its own — the one-shot
@@ -27,6 +27,10 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// swings=N swings them open, shut, open... N times, measuring after each rebuild has been handed over
 /// (with tile scenes, each swing lands in the other pair of top scenes). traced also says what the traced
 /// reverb at the ear and the first source's traced echoes give the two ears each time (TracedBinaural).
+/// explain spells out the barrier search for each source: every box on the line, the routes round the
+/// worst, what each ran into, and the way over the top (OpeningRoutes.ExplainBarrier).
+/// emitters lists the sounding entities within 3 m of each source as the client is handed them; overlays=DIR
+/// lays the world editor's edits in DIR over the map, as the server does (read only).
 /// legcost times the straight leg from each source to the ear instead: the one-box barrier search and the
 /// whole leg, which is what a route query costs when its way to a door is blocked.
 /// </summary>
@@ -43,11 +47,12 @@ public static class PathProbeSpike
         string root = args.FirstOrDefault(a => a.StartsWith("root="))?[5..] ?? AppContext.BaseDirectory;
 
         var sw = Stopwatch.StartNew();
-        var world = LoadAsClient(root, mapId);
+        var world = LoadAsClient(root, mapId, args.FirstOrDefault(a => a.StartsWith("overlays="))?[9..]);
         Console.WriteLine($"  {mapId}: {world.Entities.Count} entities, {world.AcousticMap?.Regions.Count ?? 0} regions, "
                         + $"{world.AcousticMap?.Portals.Count ?? 0} portals ({sw.ElapsedMilliseconds} ms)");
 
         var acoustics = new SpatialAcoustics();
+        if (args.Contains("emitters")) DescribeEmitters(world, acoustics, srcs);
         using var worker = new AsyncAcousticWorker(acoustics);
         worker.UpdateWorld(world);
         worker.Start();
@@ -72,6 +77,8 @@ public static class PathProbeSpike
         }
         int id = 1;
         bool traced = args.Contains("traced");
+        Explain = args.Contains("explain");
+        AsyncAcousticWorker.TraceProvenance = Explain;
         void Ask(Vector3 at) => worker.EnqueueRequest(new AcousticRequest { EntityId = 997, ListenerPos = at, SourcePos = at + Vector3.UnitX, SourceRadius = 0.1f });
         Measure(worker, acoustics, world, ear, srcs, ref id);
         if (traced && srcs.Count > 0) TracedBinaural.Report(ear, srcs[0], Ask);
@@ -139,11 +146,13 @@ public static class PathProbeSpike
 
     /// <summary>The map as the client gets it: the server's loader, its static definitions, and the acoustic
     /// map the client generates from them (ClientGameSession.GenerateAcoustics).</summary>
-    internal static WorldSnapshot LoadAsClient(string root, string mapId)
+    internal static WorldSnapshot LoadAsClient(string root, string mapId, string? overlays = null)
     {
         var prefabs = new PrefabRepository(Path.Combine(root, "prefabs"));
         var maps = new MapRepository(Path.Combine(root, "maps"));
         var manager = new MapManager(maps, prefabs);
+        // The world editor's edits laid over the map as the server lays them (read, never written here).
+        if (overlays != null) manager.Overlays = new OpenFPS.Server.Editor.MapOverlayStore(overlays);
         manager.Initialize();
         if (!manager.TryGetMap(mapId, out var ecs, out Vector3 size, out _, out _) || !manager.TryGetMapData(mapId, out var data))
             throw new InvalidOperationException($"no map '{mapId}' under {root}");
@@ -158,6 +167,28 @@ public static class PathProbeSpike
         }
         world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
         return world;
+    }
+
+    /// <summary>emitters: every sounding entity within 3 m of a source point as the client is handed it —
+    /// whether it is in the Steam Audio scene (a source must not be its own wall), its region, where it
+    /// sounds from — so a placed thing can be set beside an authored one.</summary>
+    private static void DescribeEmitters(WorldSnapshot world, SpatialAcoustics acoustics, List<Vector3> srcs)
+    {
+        var inScene = SteamAudioScene.BoxesFromWorld(world).Select(b => b.EntityId).ToHashSet();
+        foreach (var src in srcs)
+            foreach (var e in world.Entities.Values)
+            {
+                var def = e.Definition;
+                if (string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
+                if (Vector3.Distance(e.Transform.Position, src) > 3f) continue;
+                var at = AudioEmission.PointFor(e);
+                Console.WriteLine($"  emitter {e.Id} '{def.Identity.Name}' {def.Type} {def.SoundEmitter.SoundId}: sounds from ({at.X:F2}, {at.Y:F2}, {at.Z:F2}), "
+                                + $"probe radius {AudioEmission.OcclusionRadiusFor(e):F2} m, in {RegionName(world, acoustics, at)}; "
+                                + $"solid {def.Collider.IsSolid}, moves {def.Moves}, in the Steam Audio scene {inScene.Contains(e.Id)}; "
+                                + $"range {def.SoundEmitter.Range}, min distance {def.SoundEmitter.MinDistance}, volume {def.SoundEmitter.Volume}, "
+                                + $"cone {def.SoundEmitter.ConeInsideAngle}/{def.SoundEmitter.ConeOutsideAngle} x{def.SoundEmitter.ConeOutsideVolume}, "
+                                + $"aim ({Vector3.Transform(Vector3.UnitZ, e.Transform.Rotation).X:F2}, {Vector3.Transform(Vector3.UnitZ, e.Transform.Rotation).Z:F2})");
+            }
     }
 
     private static void Settle(AsyncAcousticWorker worker, Vector3 ear)
@@ -199,6 +230,9 @@ public static class PathProbeSpike
                             + $"{Room(o.NodeA)} - {Room(o.NodeB)}" + (o.Problem != null ? $"  PROBLEM: {o.Problem}" : ""));
         }
     }
+
+    /// <summary>explain: the barrier search spelled out for each source (OpeningRoutes.ExplainBarrier).</summary>
+    private static bool Explain;
 
     private static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
     private static string Bands(float l, float m, float h) => $"{Db(l),6:F1} {Db(m),6:F1} {Db(h),6:F1}";
@@ -243,14 +277,23 @@ public static class PathProbeSpike
             float len = Vector3.Distance(ear, src);
             float sl = 0, sm = 0, sh = 0;
             int walls = 0;
+            var crossings = new List<Constructions.Crossing>();
             foreach (var b in SteamAudioScene.BoxesFromWorld(world))
             {
                 if (!GeometryUtils.RayIntersectsOBB(ear, dir, b.Center, b.Size, b.Rotation, out float at) || at > len) continue;
+                if (!GeometryUtils.RayIntersectsOBB(src, -dir, b.Center, b.Size, b.Rotation, out float back)) continue;
                 var (gl, gm, gh) = WallTransmission.BandGains(b.Material, b.Size, b.Build);
                 sl += Db(gl); sm += Db(gm); sh += Db(gh);
                 walls++;
+                bool layer = !b.Hung && b.Form == null && Constructions.IsSheet(b.Size);
+                crossings.Add(Constructions.Of(at, len - back, AcousticRegistry.GetProperties(b.Material), b.Size, b.Build, 1,
+                                               layer ? Constructions.Normal(b.Size, b.Rotation) : Vector3.Zero));
             }
-            Console.WriteLine($"      {walls} wall(s) on the line        {sl,6:F1} {sm,6:F1} {sh,6:F1}");
+            Console.WriteLine($"      {walls} wall(s) on the line        {sl,6:F1} {sm,6:F1} {sh,6:F1}  each on its own");
+            var c = Constructions.Through(crossings, dir);
+            Console.WriteLine($"      the same as constructions   {Bands(c.X, c.Y, c.Z)}  layers in contact one panel");
+            if (Explain && worker.Provenance.TryGetValue(id, out var made)) Console.WriteLine($"      worker's answer came from: {made}");
+            if (Explain && routes != null) Console.Write(routes.ExplainBarrier(src, ear));
             id++;
         }
     }

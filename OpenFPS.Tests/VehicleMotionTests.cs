@@ -629,11 +629,16 @@ public class VehicleMotionTests : IDisposable
     }
 
     /// <summary>
-    /// A door somebody already has open is left as they found it, going in and coming out: a rider
-    /// shut Brandt Court's front door on Cody, who had opened it to listen to the street (2026-10-02).
+    /// An outside door found open is shut behind them, whoever is about (Cody, 2026-10-08: "An outside door
+    /// without a closer: an NPC shuts it behind them"; 2026-10-10: "regardless of a player is around or
+    /// not"). This reverses 2026-10-02, when a door found open was left because a rider had shut Brandt
+    /// Court's front door on Cody, who had opened it to listen to the street. Only a body in the doorway
+    /// holds it, and a player five metres in from it is not in the doorway.
     /// </summary>
-    [Fact]
-    public void ADoorFoundOpenIsLeftOpen()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ADoorFoundOpenIsShutBehindThemWhoeverIsAbout(bool playerNear)
     {
         var rig = Build(Stadium(60f, 400f), Car(topKmh: 40f, corneringG: 1.0f, brake: 3f), life: ParkNow,
                         entities: new() { DoorAt(68f, 200f) });
@@ -642,15 +647,19 @@ public class VehicleMotionTests : IDisposable
         int tick = 0;
         for (; rig.State.Park != "Parked"; tick++) { Assert.True(tick < 30 * 120, "it never parked"); rig.Tick(); }
         Assert.True(DoorSystem.Set(rig.World, door, open: true));
-        bool wentIn = false;
+        // Inside, five metres in from the doorway, listening to the street.
+        if (playerNear)
+            rig.World.Create(new PlayerComponent { Username = "cody" }, new Transform { Position = new Vector3(73f, 0.1f, 200f), Rotation = Quaternion.Identity });
+        bool wentIn = false, everShut = false;
         for (int t = 0; rig.State.Park != "" && t < 30 * 400; t++)
         {
             rig.Tick();
             if (!Spawned().TryGetValue("driver of Car", out var pe) || !rig.World.IsAlive(pe)) wentIn = true;
-            Assert.True(rig.World.Get<DoorComponent>(door).Target > 0f, "the door somebody had open was shut");
+            everShut |= rig.World.Get<DoorComponent>(door).Target <= 0f;
         }
         Assert.True(wentIn);
         Assert.Equal("", rig.State.Park);
+        Assert.True(everShut, "an outside door found open was left open");
     }
 
     /// <summary>An automatic door opens for the driver coming up to it, either way, and shuts itself; a door

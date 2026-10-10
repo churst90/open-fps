@@ -134,6 +134,81 @@ public class GameServer
         return due;
     }
 
+    /// <summary>The one world (docs/WORLD_STREAMING.md, stage 2): its frames, tiles and places. Null on a
+    /// server started without it (a test's).</summary>
+    public OpenFPS.Server.OneWorld.WorldMaps? World { get; private set; }
+
+    /// <summary>The world's store and the service that makes its tiles, from the server's world.json. A test
+    /// gives its own survey, land cover and features; with no survey given, the real ones are asked over the
+    /// network (and the land cover and roads too, as world.json says).</summary>
+    public void StartWorld(OpenFPS.Server.OneWorld.WorldSettings settings, OpenFPS.Server.OneWorld.IElevationSource? survey = null,
+                           OpenFPS.Server.OneWorld.ILandCoverSource? landCover = null, OpenFPS.Server.OneWorld.WorldFeatures? features = null)
+    {
+        try
+        {
+            var store = new OpenFPS.Server.OneWorld.WorldStore(settings.StorePath, settings.CapBytes);
+            bool real = survey == null && settings.Generate;
+            survey ??= settings.Generate ? new OpenFPS.Server.OneWorld.Usgs3Dep() : new OpenFPS.Server.OneWorld.NoNewTiles();
+            var service = new OpenFPS.Server.OneWorld.WorldTileService(store, survey, settings.MaxAtOnce);
+            // The ground's materials from ESA WorldCover, its blocks kept in the store's regional cache.
+            if (landCover == null && real && settings.LandCover)
+                landCover = new OpenFPS.Server.OneWorld.EsaWorldCover(Path.Combine(store.Root, "sources", "worldcover"));
+            service.LandCover = landCover;
+            // The roads from OpenStreetMap, its regions kept in the same cache.
+            if (features == null && real && settings.OpenStreetMap)
+                features = new OpenFPS.Server.OneWorld.WorldFeatures(
+                    new OpenFPS.Server.OneWorld.OverpassRegions(Path.Combine(store.Root, "sources", "osm")),
+                    _maps!.Prefabs.ToDictionary(kv => kv.Key, kv => kv.Value.ColliderSize ?? Vector3.One, StringComparer.OrdinalIgnoreCase));
+            // The maps of real places, copied into the world's tiles; tiles copied from an older map go.
+            var copied = OpenFPS.Server.OneWorld.WorldPlaces.FromMaps(_maps);
+            if (features != null) features.IsPlaced = k => copied.TryGetPlace(k, out _);
+            service.Features = features;
+            int stale = copied.DropStale(store);
+            if (stale > 0) Log.Information("World: {Count} stored tile(s) of the places will be copied again from their maps.", stale);
+            World = new OpenFPS.Server.OneWorld.WorldMaps(_maps, service, () => _sessions.GetAllSessions(),
+                                                        OpenFPS.Server.OneWorld.WorldMaps.LoadPlaces(_maps), copied);
+            // A frame over a real place has its traffic.
+            World.FrameMade += mapId => EnqueueCommand(() => _vehicles?.SpawnMap(_maps, _composites, mapId));
+            // The rings round the listed places, made after anything a player wants.
+            if (settings.Generate && settings.Prebuild) World.Prebuild();
+            Log.Information("World: tiles kept in {Path}, at most {Cap:F1} GB ({Have:F2} GB in {Count} tiles now); {Places} place(s) to arrive at; {Making}.",
+                            store.Root, store.CapBytes / 1073741824.0, store.TotalBytes / 1073741824.0, store.Count, World.Places.Count,
+                            !settings.Generate ? "no new tiles made"
+                            : "new tiles made from USGS 3DEP" + (service.LandCover != null ? ", ESA WorldCover" : "") + (features != null ? " and OpenStreetMap" : ""));
+            // A cap the disk cannot hold fills the disk before the cap is reached.
+            try
+            {
+                long free = new DriveInfo(store.Root).AvailableFreeSpace;
+                if (free + store.TotalBytes < store.CapBytes)
+                    Log.Warning("World: the disk under {Path} has {Free:F1} GB free, less than the store's cap of {Cap:F1} GB; "
+                                + "set CapGigabytes in world.json below what the disk can spare, or StorePath to a bigger disk.",
+                                store.Root, free / 1073741824.0, store.CapBytes / 1073741824.0);
+            }
+            catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException) { }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "World: could not be started; the maps work as before.");
+            World = null;
+        }
+    }
+
+    /// <summary>A player into a frame of the world, stood where they arrive.</summary>
+    private void ArriveInWorld(UserSession session, string mapId, Vector3 at)
+    {
+        session.ArriveAt = (mapId, at, true);
+        MoveToMap(session, mapId);
+    }
+
+    /// <summary>The world's part of a tick, and the commands it queues: for a test without the loop.</summary>
+    internal void WorldTickForTest()
+    {
+        DrainCommandBuffer();
+        World?.Update(ArriveInWorld);
+        World?.SettleForTest();
+        DrainCommandBuffer();
+    }
+
     /// <summary>Gives an unstarted server the maps and sessions a test built, so <see cref="MoveToMap"/>
     /// and spawning run without a socket.</summary>
     public void Attach(MapManager maps, SessionManager sessions, OccupancyService? seats = null, HandsService? hands = null)
@@ -384,6 +459,7 @@ public class GameServer
         _seats = new OccupancyService(_maps, EmitWorldAudio);
         _hands = new HandsService(_maps) { Carried = SyncAudioComponent, Removed = BroadcastRemoval };
         _store = new PlayerStore(_userRepo, _maps, _hands);
+        StartWorld(OpenFPS.Server.OneWorld.WorldSettings.Load());
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
         _friends = new FriendRepository("friends.json");
@@ -410,9 +486,11 @@ public class GameServer
             return (state.Temperature, state.AirPressure, state.WindVelocity, state.WindGustiness);
         };
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends, combat);
+        // Vehicles parked with the world editor are kept in its overlays, not the map files.
+        _commands.Editor.ParkKeptVehicles();
 
         // These register their handlers with the dispatcher, which is what keeps them alive.
-        _ = new DiscoveryService(_dispatcher, _sessions, _maps);
+        _ = new DiscoveryService(_dispatcher, _sessions, _maps, () => World);
         _ = new SocialService(_dispatcher, _sessions, _friends);
         
         RegisterHandlers();
@@ -467,6 +545,10 @@ public class GameServer
         try { _maps?.Shutdown(); }
         catch (Exception ex) { Log.Warning(ex, "Error tearing down map worlds."); }
 
+        // When each tile was last visited, for the store's cap after the restart.
+        try { World?.Service.Store.SaveIndex(); }
+        catch (Exception ex) { Log.Warning(ex, "Error writing the world store's index."); }
+
         Log.Information("Server stopped cleanly.");
     }
 
@@ -491,11 +573,7 @@ public class GameServer
             return;
         }
         Log.Information("[CHAT {Channel}] {User}: {Text}", channel, from.Username, text);
-        var line = new ChatMessage
-        {
-            Sender = from.Username, Text = text, Channel = channel,
-            FromStaff = from.Role is UserRole.Admin or UserRole.Dev or UserRole.Moderator,
-        };
+        var line = ChatFrom(from, text, channel);
         var to = channel switch
         {
             ChatChannel.All => _sessions.GetAllSessions(),
@@ -504,6 +582,19 @@ public class GameServer
         };
         foreach (var s in to) SendToSession(s, line);
     }
+
+    /// <summary>
+    /// A player's line as everybody gets it: their name, their team and their role's title, which each
+    /// client puts together ("admin [Mafia] Owner: hello"). A team line leaves the team out: everybody
+    /// hearing it is in it.
+    /// </summary>
+    public ChatMessage ChatFrom(UserSession from, string text, ChatChannel channel) => new()
+    {
+        Sender = from.Username, Text = text, Channel = channel,
+        FromStaff = OpenFPS.Server.Core.Permissions.IsStaff(from.Role),
+        Team = channel == ChatChannel.Team ? "" : Teams?.NameOf(from.Username) ?? "",
+        Title = OpenFPS.Server.Core.Permissions.ChatTitle(from.Role, from.CustomRole),
+    };
 
     /// <summary>The server speaking to everyone: an announcement, sent as "Server".</summary>
     public void Announce(string text, bool fromStaff)
@@ -766,6 +857,21 @@ public class GameServer
             // Horns whose key has not been reported down for a few ticks are let go.
             VehicleSignals.Update(dt);
 
+            // The world's tiles round its players, every quarter of a second, before the maps are walked:
+            // an arrival may make a frame.
+            if (World != null && tick % 8 == 0)
+            {
+                using var _world = PerfProbe.Measure("server.world");
+                World.Update(ArriveInWorld);
+                if (tick % (TickRate * 30) == 0) World.Service.Store.SaveIndex();
+            }
+            // Tiles read since, into their frames, a few milliseconds' worth a tick.
+            if (World != null)
+            {
+                using var _pump = PerfProbe.Measure("server.world.pump");
+                World.Pump(OpenFPS.Server.OneWorld.WorldMaps.PumpBudget);
+            }
+
             foreach (var entry in _maps.GetAllMaps())
             {
                 try
@@ -842,7 +948,10 @@ public class GameServer
                     stage.Dispose();
                     stage = PerfProbe.Measure("server.driving+doors+parents");
                     DrivingSystem.Update(world, grid, entry.Value.data.WalkMin, entry.Value.data.WalkMax, dt,
-                                         (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds), entry.Key);
+                                         (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds), entry.Key,
+                                         _maps.TryGetTiles(entry.Key, out var driveTiles) && driveTiles.Dynamic
+                                             ? new DrivingSystem.TileFence(driveTiles.IsReady, driveTiles.TileMetres) : null,
+                                         root => TellDriver(world, root, "The road ahead is not built yet. Stopping here until it is."));
                     // The glass in every car's windows, toward wherever it was last sent.
                     WindowSystem.Update(world, dt);
                     // Doors swing before ParentSystem places the parts, or the swing of a door in a
@@ -1021,8 +1130,25 @@ public class GameServer
             return;
         }
 
+        // Left in the world: back to the same spot, through the loading screen, or the landing map if it
+        // cannot be built in time.
+        if (World != null && session.Saved?.Map is { } left && session.Saved.PlaceOn(left) is { } saved
+            && OpenFPS.Server.OneWorld.WorldMaps.WhereSaved(left, new Vector3(saved.X, saved.Y, saved.Z), (float)(World.BaseYOf(left) ?? 0)) is { } spot)
+        {
+            Log.Information("{User} left in the world at {Frame}; arriving there again.", session.Username, left);
+            // Under the height they left at if the frame's base is known; on top of whatever is there if not.
+            World.ArriveAt(session, World.NearestPlace(spot.Zone, spot.North, spot.Easting, spot.Northing), spot.Zone, spot.North,
+                           spot.Easting, spot.Northing, World.BaseYOf(left) is null ? null : spot.OverSea, LoginToWorldTimeout,
+                           text => SendToSession(session, new TextEvent { Text = text }), () => SendManifest(session));
+            return;
+        }
+
         SendManifest(session);
     }
+
+    /// <summary>How long a login back into the world waits for the ground where they left before landing them
+    /// on the landing map instead.</summary>
+    private static readonly TimeSpan LoginToWorldTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>Leaving on purpose: the clean-up of a dropped connection, now rather than at the timeout,
     /// so everyone is told they logged out rather than lost the connection.</summary>
@@ -1146,6 +1272,15 @@ public class GameServer
             manifest.AirPressure = mapData.AirPressure;
             manifest.AirAbsorptionMultiplier = mapData.AirAbsorptionMultiplier;
         }
+        if (World != null && World.TryGetFrame(mapId, out var frame))
+        {
+            manifest.IsWorld = true;
+            manifest.WorldZone = frame.Origin.Zone;
+            manifest.WorldNorth = frame.Origin.North;
+            manifest.FrameEasting = frame.Origin.Easting;
+            manifest.FrameNorthing = frame.Origin.Northing;
+            manifest.FrameBaseY = frame.BaseY;
+        }
         else
         {
             Log.Warning("Login for {User}: no authored data for map '{Map}'; sending defaults.", session.Username, mapId);
@@ -1172,7 +1307,36 @@ public class GameServer
             return;
         }
         session.AwaitingMapData = false;
+        if (request.FullDetailMetres > 0f || request.FarMetres > 0f)
+            session.Tiles.Radii = StreamRadii.Clamp(request.FullDetailMetres, request.FarMetres);
+        // On the world the join waits, on the loading screen, for the tiles round where they will stand.
+        if (World != null && World.Hold(session, ArrivalPoint(session, session.CurrentMapId),
+                                        () => SendMapData(session, request), (done, total, speak) => SayWorldLoading(session, done, total, speak)))
+            return;
         SendMapData(session, request);
+    }
+
+    /// <summary>Says something to whoever is driving a vehicle, if a player is.</summary>
+    private void TellDriver(World world, int rootId, string text)
+    {
+        var q = new QueryDescription().WithAll<OccupantComponent, PlayerComponent>();
+        int connection = -1;
+        world.Query(in q, (ref OccupantComponent o, ref PlayerComponent p) =>
+        {
+            if (o.RootEntityId == rootId && o.Controls) connection = p.ConnectionId;
+        });
+        if (connection >= 0 && _sessions.TryGetSession(connection, out var session))
+            SendToSession(session, new TextEvent { Text = text });
+    }
+
+    /// <summary>How far the building of the world round an arriving player has got: on the loading screen,
+    /// said aloud when <paramref name="speak"/>; to a text session, only what is said.</summary>
+    private void SayWorldLoading(UserSession session, int done, int total, bool speak)
+    {
+        string text = done >= total ? "The world is built round you." : $"Building the world: {done} of {total} tiles.";
+        if (_mudGateway?.IsMudConnection(session.ConnectionId) != true)
+            SendToSession(session, new WorldLoading { Done = done, Total = total, Text = text, Speak = speak });
+        else if (speak) SendToSession(session, new TextEvent { Text = text });
     }
 
     /// <summary>
@@ -1223,7 +1387,7 @@ public class GameServer
         var batch = new EntityDefinitionBatch();
         foreach (var e in staticEntities)
         {
-            batch.Definitions.Add(CreateDefinition(world, e));
+            batch.Definitions.Add(streamed ? TileStreamer.Definition(world, e, tiles, session.Tiles) : CreateDefinition(world, e));
             session.KnownEntities.Add(e.Id);
             if (batch.Definitions.Count < EntityDefinitionBatch.Size) continue;
             bytes += SendCounted(session, EntityDefinitionPack.Pack(batch));
@@ -1428,7 +1592,10 @@ public class GameServer
 
         var peer = _network.GetPeer(session.ConnectionId);
         if (peer != null) SendManifest(session);
-        else HandlePlayerReady(session.ConnectionId); // a text session has nothing to load
+        // A text session has nothing to load, but on the world it waits for the ground round it all the same.
+        else if (World == null || !World.Hold(session, ArrivalPoint(session, mapId), () => HandlePlayerReady(session.ConnectionId),
+                                              (done, total, speak) => SayWorldLoading(session, done, total, speak)))
+            HandlePlayerReady(session.ConnectionId);
     }
 
     // One implementation for the broadcast, the streamer and the tests: a divergence would only show as a
@@ -1486,6 +1653,15 @@ public class GameServer
     /// moved static it went reliably every tick and a lost packet held up everything behind it).</summary>
     private static bool Moves(World world, Entity e)
         => world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<HeldComponent>(e);
+
+    /// <summary>Whether <paramref name="e"/> is something the player <paramref name="body"/> is part of: the
+    /// composite they ride or drive (<paramref name="riding"/>) and its parts, or a thing in their hands.</summary>
+    internal static bool Involved(World world, Entity e, Entity body, int riding)
+    {
+        if (riding >= 0 && (e.Id == riding || world.Has<ParentComponent>(e) && world.Get<ParentComponent>(e).ParentEntityId == riding))
+            return true;
+        return world.Has<HeldComponent>(e) && world.Get<HeldComponent>(e).HolderEntityId == body.Id;
+    }
 
     /// <summary>One message of the broadcast, to a session's socket, and to <see cref="Broadcasted"/> when a test watches.</summary>
     private void Deliver(NetPeer? peer, UserSession session, IMessage message, DeliveryMethod delivery)
@@ -1616,7 +1792,11 @@ public class GameServer
                         // (RestingStates): two thirds of the city.
                         if (isDynamic)
                         {
-                            if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity))
+                            // A far moving thing goes less often (DistantMotion); what this player rides,
+                            // drives or carries always goes every tick, however far its middle is.
+                            float distance = session.DistantLessOften && !Involved(world, e, session.Entity, riding)
+                                ? Vector3.Distance(t.Position, pPos) : 0f;
+                            if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity, distance))
                                 _reusableBroadcast.States.Add(state);
                             else PerfProbe.Count("server.broadcast.resting");
                             session.SentStates[e.Id].Riding = seatedIn;
@@ -1822,20 +2002,30 @@ public class GameServer
             // the key from a door across the room, and a door five metres off would otherwise always win.
             if (ToggleTapInReach(world, position, Say)) return;
 
+            // A gas hob you are standing at, the same way: its knobs are under your hand.
+            if (TurnHobInReach(world, position, Say)) return;
+
             // Then a shut door in reach, from a seat the one beside you: once to open it, again to get
             // in or out.
-            if (OpenDoorInReach(world, position, session.Entity, Say)) return;
-
+            var door = ShutDoorInReach(world, position, out Vector3 doorAt, out string doorName);
             if (world.Has<OccupantComponent>(session.Entity))
             {
+                if (door != null && OpenDoor(world, door.Value, doorName, position, session.Entity, Say)) return;
                 _seats.Exit(session, out string leaving);
                 Say(leaving);
                 return;
             }
             // Beside a car the client usually points at one of its doors; either names the car.
             int root = -1;
-            if (interact.TargetEntityId.HasValue) root = RootOf(session.CurrentMapId, interact.TargetEntityId.Value);
-            if (root < 0) root = _seats.NearestEnterable(session.CurrentMapId, position, OccupancyService.BoardingRange);
+            Vector3 carAt = default;
+            if (interact.TargetEntityId.HasValue) root = RootOf(session.CurrentMapId, interact.TargetEntityId.Value, out carAt);
+            if (root < 0) root = _seats.NearestEnterable(session.CurrentMapId, position, OccupancyService.BoardingRange, out carAt);
+
+            // A shut door and a car both in reach: the one you face wins, else the nearer (Cody,
+            // 2026-10-08: E beside a car opened the apartment door behind him).
+            float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;
+            if (door != null && (root < 0 || Prefer(position, yaw, doorAt, carAt))
+                && OpenDoor(world, door.Value, doorName, position, session.Entity, Say)) return;
 
             if (root >= 0)
             {
@@ -1864,30 +2054,59 @@ public class GameServer
         });
     }
 
-    /// <summary>Opens the shut door within arm's length, if there is one, and says so. Only shut doors, so
-    /// once one is open the key moves on to getting in or out.</summary>
-    private static bool OpenDoorInReach(World world, Vector3 position, Entity who, Action<string> say)
+    /// <summary>The nearest shut door within arm's length that opens by hand. Only shut doors, so once one
+    /// is open the key moves on to getting in or out.</summary>
+    private static Entity? ShutDoorInReach(World world, Vector3 position, out Vector3 at, out string name)
     {
         Entity? nearest = null;
         float best = PhysicsConstants.InteractionRange;
-        string name = "door";
+        Vector3 found = default;
+        string named = "door";
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
         {
             if (d.Target > 0f) return;                    // already open, or on its way
             if (!DoorSystem.OpensByHand(d)) return;       // it opens for you, or for the lift
             float distance = Vector3.Distance(position, t.Position);
             if (distance > best) return;
-            best = distance; nearest = e;
-            name = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
-                 ? world.Get<IdentityComponent>(e).Name : "door";
+            best = distance; nearest = e; found = t.Position;
+            named = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
+                  ? world.Get<IdentityComponent>(e).Name : "door";
         });
+        at = found; name = named;
+        return nearest;
+    }
 
-        if (nearest == null) return false;
-        if (!DoorSystem.Set(world, nearest.Value, open: true, by: position, who: who)) return false;
-        var opened = world.Get<DoorComponent>(nearest.Value);
+    /// <summary>Opens a door and says so.</summary>
+    private static bool OpenDoor(World world, Entity door, string name, Vector3 position, Entity who, Action<string> say)
+    {
+        if (!DoorSystem.Set(world, door, open: true, by: position, who: who)) return false;
+        var opened = world.Get<DoorComponent>(door);
         say(DoorSystem.OpenedPhrase(opened, name) + "."
-            + (DoorSystem.InTheWay(world, nearest.Value, 1f, who) != null ? " Someone is in the way of it." : ""));
+            + (DoorSystem.InTheWay(world, door, 1f, who) != null ? " Someone is in the way of it." : ""));
         return true;
+    }
+
+    /// <summary>How far either side of where you face something counts as in front of you, radians.</summary>
+    internal const float FacingHalfAngle = MathF.PI / 3f;
+
+    /// <summary>
+    /// Whether <paramref name="a"/> is meant over <paramref name="b"/> by someone at <paramref name="from"/>
+    /// facing <paramref name="yaw"/>: the one in front of you, and when both or neither are, the nearer.
+    /// Measured across the floor, so a door's height does not count against it.
+    /// </summary>
+    internal static bool Prefer(Vector3 from, float yaw, Vector3 a, Vector3 b)
+    {
+        bool aAhead = InFront(from, yaw, a), bAhead = InFront(from, yaw, b);
+        if (aAhead != bAhead) return aAhead;
+        return Flat(a - from).LengthSquared() <= Flat(b - from).LengthSquared();
+
+        static Vector3 Flat(Vector3 v) => new(v.X, 0f, v.Z);
+        static bool InFront(Vector3 from, float yaw, Vector3 to)
+        {
+            var toward = Flat(to - from);
+            if (toward.LengthSquared() < 1e-4f) return true;   // standing on it
+            return Vector3.Dot(Vector3.Normalize(toward), Flat(ScopeMath.Forward(yaw, 0f))) >= MathF.Cos(FacingHalfAngle);
+        }
     }
 
     /// <summary>How close you must stand to a tap to turn it, m, measured along the floor: at the sink.</summary>
@@ -1917,6 +2136,34 @@ public class GameServer
         string name = world.Has<IdentityComponent>(nearest.Value) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(nearest.Value).Name)
             ? world.Get<IdentityComponent>(nearest.Value).Name : "tap";
         say($"You turn the {name.ToLowerInvariant()} {(tap.SynthRunning ? "on" : "off")}.");
+        return true;
+    }
+
+    /// <summary>
+    /// Lights the next burner of the hob you are standing at, or with every burner lit turns them all off
+    /// (HobControls). The hob's state is its emitter's key: the settings, and when they changed on the shared
+    /// clock, so every client hears the knob turned, the sparks and the light-up at the same moment.
+    /// </summary>
+    private bool TurnHobInReach(World world, Vector3 position, Action<string> say)
+    {
+        Entity? nearest = null;
+        float best = TapReach;
+        world.Query(new QueryDescription().WithAll<Transform, SoundEmitterComponent>(), (Entity e, ref Transform t, ref SoundEmitterComponent em) =>
+        {
+            if (!HobKey.IsKey(em.SoundId)) return;
+            float dx = t.Position.X - position.X, dz = t.Position.Z - position.Z;
+            float distance = MathF.Sqrt(dx * dx + dz * dz);
+            if (distance > best || MathF.Abs(t.Position.Y - position.Y) > 2.5f) return;
+            best = distance; nearest = e;
+        });
+        if (nearest == null) return false;
+        ref var hob = ref world.Get<SoundEmitterComponent>(nearest.Value);
+        string line;
+        try { line = HobControls.Press(hob.SoundId, WindField.Now(), out string key); hob.SoundId = key; }
+        catch (ArgumentException) { return false; }
+        hob.SynthRunning = HobKey.TryParse(hob.SoundId, out var state) && state.AnyOn;
+        SyncAudioComponent(nearest.Value.Id);
+        if (line.Length > 0) say(line);
         return true;
     }
 
@@ -1965,11 +2212,13 @@ public class GameServer
     }
 
     /// <summary>The composite an entity is or is part of, else -1: pointing at a door is pointing at the car,
-    /// whose root is in the middle where nobody stands.</summary>
-    private int RootOf(string mapId, int entityId)
+    /// whose root is in the middle where nobody stands. <paramref name="at"/> is where the part pointed at is.</summary>
+    private int RootOf(string mapId, int entityId, out Vector3 at)
     {
+        at = default;
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return -1;
         if (!lookup.TryGetValue(entityId, out var e) || !world.IsAlive(e)) return -1;
+        if (world.Has<Transform>(e)) at = world.Get<Transform>(e).Position;
         if (world.Has<OccupancyComponent>(e)) return e.Id;
         if (world.Has<ParentComponent>(e))
         {

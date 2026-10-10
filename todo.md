@@ -13,27 +13,62 @@ the honest tests, the probable bugs and the trains fix are merged and shipped (V
 
 1-3. Done: the batch, its test run, and push, VPS and Windows zip (2026-10-07/08).
 4. Geometry stage 3, terrain from real elevation (docs/GEOMETRY.md section 7), with world streaming
-   stage 2, one world in UTM tiles generated on demand (docs/WORLD_STREAMING.md).
+   stage 2, one world in UTM tiles generated on demand (docs/WORLD_STREAMING.md). T1, T2, W1, W2 merged;
+   2026-10-09 (unheard): the world built before you get there, Magnolia and Albany copied into it, 8 m
+   ground in the far ring, the places' elevation at 2 m on the UTM grid, a login back to where you left.
+   2026-10-10 (unheard, unmerged branch): the ground's materials from ESA WorldCover; roads and woods on
+   the world's tiles outside the places. Next on this item: buildings on the world's tiles (needs Cody's
+   choice of footprint source: Parquet.Net in the server, or the Python downloader on the VPS; plan in
+   docs/WORLD_STREAMING.md "Buildings: the plan"), then the world's roads as RoadData for traffic.
 5. Sound library stage 3 alongside: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`
    (docs/SOUND_LIBRARY_BOUNDARY.md section 8).
 6. World editor phase 3: people, roads and routes, map versions, baking an overlay into a map file
    (docs/WORLD_EDITOR.md section 9).
 
-Before items 4-6: the three bugs of 2026-10-08 (E picks the door when facing a car, NPCs leave doors
-open, rain while the weather says clear), and the two cheap reflection steps (measure "Mixer load"
-with echoes on and off; nice the trace threads). See "Reflections in their own process".
+Before items 4-6: the two cheap reflection steps (measure "Mixer load" with echoes on and off; nice
+the trace threads). See "Reflections in their own process". The three bugs of 2026-10-08 are fixed
+(2026-10-09, unheard): E weighs a shut door against a car by facing; Alex waits in a lobby clear of
+the doorway, which had held the closer off; /weather says "Clearing" while a cleared front's rain
+still falls, and that rain now stops. A new front is drawn every five minutes on average (Cody,
+2026-10-09; it was about once a minute).
+NPC doors (CODY_ASKS section 9) done 2026-10-10, unheard: Alex and the drivers from parked cars let
+a closer shut its door, shut an outside door without one behind them, leave an inside door as found
+going in and shut it going out, out of the doorway and never on anybody in it (DoorManners,
+docs/DOOR_TYPES_EVENTS.md "What the server's people do with a door"). Cody 2026-10-10: the rule
+holds whoever is about (no player exceptions), and closers start back 1 s after the doorway clears
+(was 3 s).
+Cody's world decisions of 2026-10-09: no faster tile fetching for now (a car above about 65 m/s still
+stops short of unbuilt ground); the places laid on UTM grid north are fine; placed tiles stay pinned
+against the store's cap, and player-built tiles will follow the same rule; close the crack between
+coarse and full ground (agent running). The engine CPU savings that change the sound: approved, agent
+running, renders to inbox/engine-cpu-2026-10-09.
 
 After items 1-6 (agreed with Cody 2026-10-08): performance and distant updates come before new content,
 because the one world costs CPU and bandwidth first.
-7. Reflections in their own process, only if the measurement shows tracing is the cost.
-8. Distant updates (CODY_ASKS item 4), while the server-tile code is fresh.
-9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3.
-10. Chat names and roles (item 8) and the editor dialog and wording (item 7). Both are small; fit them
-    between the big items.
+7. Dropped 2026-10-09: reflections in their own process. The measurement showed the cost is the
+   reverb's convolution, not tracing; the convolution was made 38 % cheaper instead (heard, merged).
+8. Distant updates (CODY_ASKS item 4): built and merged 2026-10-10. Far moving
+   things go at most 5 times a second, with the server's own speed rate and turn, and early the tick the
+   client's prediction would stray; the acceptance test passes on a home connection (bearing within 0.010
+   degree, pitch within 0.122 %, no step bigger than every tick makes) and saves 48-54 % of the broadcast
+   (1.33 to 0.62-0.69 Mbit/s). docs/WORLD_STREAMING.md, "Far things less often". Wire change (Common): new
+   Windows zip and VPS update when merged. Cody to listen to the city before it ships (Cody).
+9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3. First step done
+   2026-10-09 (layers in contact are one panel, unheard: inbox/floors-2026-10-09); next the map's
+   double slab (Walls, below), then rooms from geometry, then sound through structure.
+10. Chat names and roles (item 8): done 2026-10-09 (protected Owner role, "admin [Mafia] Owner: hi";
+    Common changed, so a new Windows zip and VPS build go out together). The editor (item 7): the
+    typed-value text box, Control+B and the F12 dialog (tabs Place, Edit, Build, World; nothing
+    without permission) are built, untried with Orca and NVDA.
 11. Weather as a system (item 12): rain, wet roads, wind and fire tied together.
 12. Cars in full detail: the distant-car cycle cache first (also a performance win), then lopey idle,
     suspension, drivetrain, tyres and F1 steepening.
 13. Enemies, Dinosaur World, melee and NPC inventories (items 6 and 11).
+
+Matter (Cody, 2026-10-10): every material interacts with every other as in real life; wind moves things
+physically and its sound comes only from what it moves; a built thing sounds by its material, size and shape.
+The design and its order of work are in docs/MATTER.md (material table, struck things by modal synthesis,
+bumps, fire by fuel, water over terrain, weather as a system, wind on things, gases, chemistry).
 
 In every play session, clear the "Waiting on Cody's ear" list so heard work merges before it piles up.
 
@@ -44,23 +79,44 @@ Waiting on Cody's ear:
 - Trains' own horn, whistle and bell; air conditioners cycling with the weather
   (inbox/fault-fixes-2026-10-06).
 - Downpipes, round 2: the flange should be gone (inbox/water-smoothing-2026-10-06/round2).
-- The world editor in the game (F12), and `/editorkeys on` with Orca, then NVDA.
+- The world editor dialog in the game (F12: tabs, labels, Control+Tab), and `/editorkeys on` with
+  Orca, then NVDA.
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
+- (Approved 2026-10-09: the hull's blows in time.)
+- Recorded sounds' echoes smeared off rough walls: your steps and a PA (inbox/probable-bugs-2026-10-09/4-scattering).
+- (Approved 2026-10-10: the shut glass door leak fix, inbox/pa-leak-2026-10-09.)
+- Floors, heard 2026-10-10 (inbox/floors-2026-10-09): nothing audible at game level above or below; the
+  +40 dB copies are fuzzy and the sound cuts out, not a clean transfer. Being worked on.
+- Engine CPU (inbox/engine-cpu-2026-10-09), heard 2026-10-10: passby_i4_midsize_50kmh_3m sounded phased,
+  did not sweep right to left and did not sound 3 m away (the before file too). Being checked: the lab
+  capture is panned, not binaural. Not merged until heard again.
 
 ## Now
 
 ### Probable bugs
-Found by the housekeeping on 2026-10-07. The rest were fixed and merged in 246a4e1c (heard by Cody);
-these four were not part of it. Fixes go on their own branch.
-- A hull's blow lands at the start of its block, up to 2.7 ms early (`ShoreSynth.HullPlate.Blow` does
-  not read `at`).
-- The fire's fizz is scaled by `CracklePart` (FireSynth.cs 870).
-- Not heard: `AcousticPathData.ReflectionId` and `Scattering` are written and never read.
-- A new engine donor is held for 2.5 s inside the budget, so one budget car is let go once and rebuilt
-  2.5 s later (docs/COVERAGE_2026-10-06.md).
+Found by the housekeeping on 2026-10-07. The rest were fixed and merged in 246a4e1c (heard by Cody).
+The last four were handled on 2026-10-09, on their own branch (renders in inbox/probable-bugs-2026-10-09):
+- Fixed, waiting on Cody's ear: a hull's blow now lands at its own sample in the block. It landed at the
+  block's start, 0 to 2.7 ms early (1.2 ms on average).
+- Fixed, no sound change in the game: the fire's fizz has its own part (`FireSynth.FizzPart`, lab
+  `parts=fizz`). It was muted with the crackles in the lab. In the game every part is 1, so the game's
+  fire is the same to the bit.
+- `AcousticPathData.ReflectionId` is read (the reflection slots, fixed in 0e0e5ae6). `Scattering` is now
+  read too (Cody asked, 2026-10-09): a recording's copy off a rough wall keeps its mirror share clean and
+  smears the scattered share through the engines' EchoDiffuser. Your footsteps get the wash they lacked.
+  Waiting on Cody's ear (inbox/probable-bugs-2026-10-09/4-scattering).
+- Seen, not changed: a recorded loop's copy starts at its source's play position only to the nearest
+  mixer block, so its delay off one wall came out 41 ms in one run and 57 ms in another.
+- Fixed: a new engine donor is no longer held for 2.5 s inside the budget, so the car at the budget's edge
+  is not let go and rebuilt when a donor arrives.
+- Seen, not changed: a pocket's ring on a hull starts one block (2.7 ms) after the pocket itself
+  (`HullPlate.Ring` is queued after the block's drives were laid down).
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
+- The gas hob (docs/GAS_HOB.md, inbox/gas-stove-2026-10-10): heard 2026-10-10, liked; the spark tick is
+  a little too present and loud, and the sparks kept going long after the burner lit. Being fixed. Then a
+  `gas_hob` placed in a kitchen and lit with the interact key. Not yet on any map.
 - Doors: push and pull sides, the tower front doors locked from the street (key, then pull), nothing
   shutting on a person. The glass front door, glass shop door and lift door models
   (inbox/door-models-2026-10-05).
@@ -149,8 +205,7 @@ Left by the 2026-10-07 housekeeping; none changes sound.
 ### Network (Cody)
 1.75 Mbit/s for three players after the 2026-10-05 trim. The rest, with measured savings, is in
 docs/PLAN_2026-10-05.md section 6:
-1. Rate by distance (5 Hz beyond 150 m): 50-70 %. Needs per-thing interpolation, and Doppler and tyre
-   demand from the server.
+1. Rate by distance (5 Hz beyond 150 m): built, 48-54 % measured (todo item 8, waiting to merge).
 2. A byte budget per packet filled by priority: caps the worst case.
 3. Only the change, against what the client confirmed: about 30 %.
 4. Traffic run on the client from routes, with corrections from the server: most of what remains.
@@ -164,8 +219,14 @@ and the server's voice line.
 ### Walls
 - A source just behind a building corner made of two boxes gets no diffraction route (the 5 cm joint
   padding in `RouteIsClear`). Fix without reopening the shut-door crack leak.
-- Each floor is two overlapping 25 cm slabs, and carpet counts as a barrier: upstairs is about 15 dB
-  too quiet in the lows. Merge layers in contact.
+- Done 2026-10-09 (branch, unheard): layers in contact are one panel (changes.md). The city floor is
+  still 10/19/14 dB heavier than a lab-tested 15 cm slab because gen_city.py lays two 25 cm slabs
+  between storeys (each storey's floor and its ceiling). One slab of 15-20 cm per storey is a map
+  change for Cody to decide; it moves floor heights, stairs and the openings tests.
+- Upstairs footsteps need sound through the structure (impact into the slab); airborne, they are
+  silent through any real floor, before and after.
+- From upstairs, a shout in the flat below comes through about 14 dB louder than the same shout the
+  other way round, with the floor measuring the same both ways (inbox/floors-2026-10-09). Not found yet.
 - No cavity resonances or air leaks: sealed glazing is about 10 dB optimistic in the mids; door gaps
   and seals are not modelled.
 - Shut glass front doors let more in than steel doors: 17/28/43 dB against 13/48/58 (`--wall-tl`).
@@ -195,9 +256,16 @@ and the server's voice line.
 Tracing (TracedReverb, TracedEchoes, LateField, Steam Audio's own threads) runs in the client
 process. Its `ThreadPriority.BelowNormal` does nothing on Linux, and none of those threads is niced.
 Convolution runs on the FMOD mixer thread.
-- First: read "Mixer load" and "Audio: mixer at" with `/echoes on` and `off`, to learn whether the
-  cost is tracing or convolution.
-- First: call `BackgroundPriority.LowerThisThread` at the top of each trace loop.
+- Measured 2026-10-09 (city street, standing still, /tmp/openfps-client.log 11:36-11:40): the cost is
+  convolution, not tracing. Mixer load 70 % with echoes on, 62 % off. Of the mixer's time, the traced
+  reverb's convolution is 26.5 % either way and the traced echoes' 10.4 %; binaural 13 %, everything
+  else under 3 % each. The governor took voices back 17 times at 60-62 %. The trace threads themselves
+  are off the mixer (TracedReverb about a third of a core, LateField 5 %, both now nice 10). So the split
+  below would not lower Mixer load; the reverb's convolution is what to make cheaper. Also seen: the 12
+  EngineRender threads take about half a core each (6 cores), and the acoustic worker 70 % of one.
+- Done 2026-10-09: `BackgroundPriority.LowerThisThread` (+10) at the top of TracedReverb, TracedEchoes
+  and LateField's loops. Unchecked: whether Steam Audio's second worker (numThreads 2) inherits it;
+  `ps -L -o tid,ni,comm -p PID` while playing shows each thread's nice.
 - Recommended next: the split itself, if the first two do not fix it:
   - A helper (`OpenFPS.AcousticsHost`) started by the client; it dies with the client (death signal
     on Linux, job object on Windows) and is niced to +19 or set below normal, Steam Audio's threads
@@ -332,6 +400,13 @@ Also open:
 - the crown fire against a real crown-fire recording (none found);
 - the car against more than two recordings;
 - smoke explosions in a closed building.
+
+### The gas hob, the rest (2026-10-10)
+Built, measured against fifteen recordings, not heard (docs/GAS_HOB.md section 10). Open:
+- a gas hob in the city's flats and houses (tools/gen_city.py, beside the kitchen sinks);
+- changing the heat in the game: the knob's settings are in the state and the model, the interact key
+  only lights and turns off;
+- a pan on the burner, an oven and a grill, an American range (re-ignition module, no flame safety).
 
 ### Water you are in or on (asked 2026-10-06)
 After the triangle geometry and real terrain (geometry stage 3), which give water a surface and depth:

@@ -51,6 +51,10 @@ public class UserSession
     /// again every tick (<see cref="RestingStates"/>).</summary>
     public Dictionary<int, SentState> SentStates { get; } = new();
 
+    /// <summary>Whether far moving things go to this client less often (<see cref="OpenFPS.Common.Networking.DistantMotion"/>).
+    /// From <see cref="RestingStates.DistantLessOften"/>; an instrument turns it off for one client to compare.</summary>
+    public bool DistantLessOften { get; set; } = RestingStates.DistantLessOften;
+
     /// <summary>The last StatsUpdate this client was sent; another goes only when it would differ.</summary>
     public StatsUpdate? LastStats { get; set; }
 

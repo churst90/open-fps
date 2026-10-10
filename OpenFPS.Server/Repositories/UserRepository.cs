@@ -28,4 +28,14 @@ public class UserData
     /// <summary>What they carried when they last left the world, as JSON (see Core.Belongings), until
     /// they come back and it is taken out again.</summary>
     public string? Belongings { get; set; }
+
+    /// <summary>When the account was banned; null when it is not.</summary>
+    public DateTime? BannedUtc { get; set; }
+    /// <summary>When the ban ends; null, with <see cref="BannedUtc"/> set, is until it is lifted.</summary>
+    public DateTime? BannedUntilUtc { get; set; }
+    public string? BannedBy { get; set; }
+    public string? BanReason { get; set; }
+
+    /// <summary>Whether a ban holds at this moment. One past its end holds no longer, lifted or not.</summary>
+    public bool IsBannedAt(DateTime utc) => BannedUtc != null && (BannedUntilUtc == null || BannedUntilUtc > utc);
 }

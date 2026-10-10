@@ -157,12 +157,26 @@ public static class HauntFinder
             string? room = CommandHandler.PlaceAt(world, inside + new Vector3(0f, 1f, 0f));
             if (room == null || !IsLobby(room))
                 Serilog.Log.Debug("Haunts: {Door} opens onto {Room}, not a lobby.", name, room ?? "nowhere named");
+            // Where he waits: clear of the doorway, deeper in or to one side, since anybody standing in it
+            // holds the closer off and the door stands open the whole time (Cody, 2026-10-08).
+            Vector3 ClearOfTheDoorway()
+            {
+                foreach (float deep in new[] { leaf + 0.4f, leaf + 1.0f, 1.4f })
+                foreach (float side in new[] { 0f, leaf * 0.5f + 0.8f, -(leaf * 0.5f + 0.8f) })
+                {
+                    var p = centre - n * deep + along * side;
+                    if (Pavements.Blocked(solids, new Vector2(p.X, p.Z), floor)) continue;
+                    p.Y = Ground(p with { Y = floor + 0.3f });
+                    if (!DoorSystem.InDoorway(world, e, p)) return p;
+                }
+                return inside;
+            }
             if (room != null && IsLobby(room))
                 found.Add(new Haunt
                 {
                     Name = $"the lobby of {building}",
                     Kind = HauntKind.Lobby,
-                    Stand = inside,
+                    Stand = ClearOfTheDoorway(),
                     // Facing the door, as somebody waiting out of the weather does.
                     Facing = MathF.Atan2(n.X, n.Z),
                     Door = e, Outside = outside, Inside = inside,

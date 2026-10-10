@@ -109,7 +109,7 @@ public sealed class FireSynth
     public double Age = double.NaN;
 
     /// <summary>Each part's share, for the lab to take the fire apart by muting. One in the game.</summary>
-    public float RoarPart = 1f, CracklePart = 1f, SteamPart = 1f, SettlePart = 1f, TorchPart = 1f, FallPart = 1f, GlassPart = 1f, BurstPart = 1f;
+    public float RoarPart = 1f, CracklePart = 1f, FizzPart = 1f, SteamPart = 1f, SettlePart = 1f, TorchPart = 1f, FallPart = 1f, GlassPart = 1f, BurstPart = 1f;
 
     /// <summary>The wind at the flames, m/s, everywhere: what a fire of one place is read with.</summary>
     public float Wind
@@ -987,7 +987,7 @@ public sealed class FireSynth
         for (int p = 0; p < places; p++)
         {
             _roarStep[p] = (MathF.Sqrt(power[p]) - _roarAmp[p]) / Sub;
-            _fizzTarget[p] = MathF.Sqrt(fizzPower[p]) * CracklePart;
+            _fizzTarget[p] = MathF.Sqrt(fizzPower[p]) * FizzPart;
         }
     }
 

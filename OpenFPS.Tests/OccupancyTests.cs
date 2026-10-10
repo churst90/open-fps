@@ -313,6 +313,59 @@ public class OccupancyTests : IDisposable
         Assert.NotEqual(heading, f.World.Get<DriveComponent>(f.Entity(root)).Heading, 3);
     }
 
+    /// <summary>
+    /// On the world, a car driven at a tile not built yet is braked to a stop short of it however hard the
+    /// driver presses on, the driver is told once, it can back away, and when the tile is built it drives on
+    /// (docs/WORLD_STREAMING.md, At an edge that is not ready).
+    /// </summary>
+    [Fact]
+    public void ACarIsBrakedToAStopShortOfGroundNotBuiltYet()
+    {
+        var f = new Fixture(_dir);
+        int root = f.BuildCar(new Vector3(20, 0, -45));
+        var session = f.Player("edge_driver", new Vector3(21, 0, -45));
+        Assert.True(f.Seats.Enter(session, root, null, out _));
+        var e = f.Entity(root);
+        float heading = f.World.Get<DriveComponent>(e).Heading;
+        var way = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading));
+        // The edge 40 m ahead of the car, across its way.
+        const float tile = 20f;
+        var start = f.World.Get<Transform>(e).Position;
+        float edgeAt = Vector3.Dot(start, way) + 40f;
+        bool built = false;
+        f.Fence = new DrivingSystem.TileFence(k => built || Vector3.Dot(new Vector3((k.X + 0.5f) * tile, 0, (k.Z + 0.5f) * tile), way) < edgeAt - tile * 0.5f, tile);
+        int told = 0;
+        f.Stopped = _ => told++;
+
+        f.Hold(session, forward: 1f);
+        float fastest = 0f, furthest = float.MinValue;
+        for (int t = 0; t < 30 * 12; t++)
+        {
+            f.Tick(1);
+            fastest = MathF.Max(fastest, MathF.Abs(f.World.Get<DriveComponent>(e).Speed));
+            furthest = MathF.Max(furthest, Vector3.Dot(f.World.Get<Transform>(e).Position, way));
+        }
+        float stoppedAt = Vector3.Dot(f.World.Get<Transform>(e).Position, way);
+        Assert.True(fastest > 5f, $"it never got going ({fastest:F1} m/s)");
+        Assert.Equal(0f, f.World.Get<DriveComponent>(e).Speed, 2);
+        // Short of the first tile that is not there by about its margin, never past it.
+        float firstUnbuilt = MathF.Floor(edgeAt / tile) * tile;
+        Assert.True(furthest < firstUnbuilt, $"reached {furthest:F1} with the edge at {firstUnbuilt:F1}");
+        Assert.True(stoppedAt > firstUnbuilt - 15f, $"stopped at {stoppedAt:F1}, far short of the edge at {firstUnbuilt:F1}");
+        Assert.True(told == 1, $"told {told} times");
+
+        // Backing away is never stopped.
+        f.Hold(session, forward: -1f);
+        f.Tick(60);
+        Assert.True(Vector3.Dot(f.World.Get<Transform>(e).Position, way) < stoppedAt - 1f);
+
+        // Built: on it goes.
+        built = true;
+        f.Hold(session, forward: 1f);
+        f.Tick(30 * 8);
+        Assert.True(Vector3.Dot(f.World.Get<Transform>(e).Position, way) > firstUnbuilt + 5f);
+    }
+
     /// <summary>How a thing drives comes from its profile, not the driving code: the same shape with a
     /// lorry's profile (fourteen tonnes, a barn door of drag) accelerates like a lorry.</summary>
     [Fact]
@@ -903,13 +956,17 @@ public class OccupancyTests : IDisposable
                     (Entity e, ref Transform t, ref ColliderComponent c) => Grid.AddOverlapping(t.Position, c.Size, e, false));
 
                 MovementSystem.Update(World, data.MinBound, data.MaxBound, Grid, Lookup, Sessions, Maps, dt);
-                DrivingSystem.Update(World, Grid, data.MinBound, data.MaxBound, dt);
+                DrivingSystem.Update(World, Grid, data.MinBound, data.MaxBound, dt, fence: Fence, stopped: Stopped);
                 ParentSystem.Update(World, Lookup);
                 Occupancy.Update(World, Lookup);
             }
         }
 
         private long _sequence;
+
+        /// <summary>On the world: which tiles are built, and who hears of a car stopped for one that is not.</summary>
+        public DrivingSystem.TileFence? Fence;
+        public Action<int>? Stopped;
 
         /// <summary>One car of a given profile, two seconds of full throttle, and how fast it got.</summary>
         public float SpeedAfterTwoSeconds(string preset, Vector3 where, string username)

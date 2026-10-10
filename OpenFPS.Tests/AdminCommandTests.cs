@@ -170,7 +170,7 @@ public class AdminCommandTests : IDisposable
 
         Assert.Equal("You cannot change your own role.", Assert.Single(Run(admin, "setrole", "cody", "player")));
         Assert.Equal(UserRole.Admin, _users.GetUser("cody")!.Role);
-        Assert.Equal("'boss' is not a role. Roles: player, moderator, dev, admin.", Assert.Single(Run(admin, "setrole", "friend", "boss")));
+        Assert.Equal("'boss' is not a role. Roles: player, moderator, dev, admin, owner.", Assert.Single(Run(admin, "setrole", "friend", "boss")));
         Assert.Equal("There is no account called zed.", Assert.Single(Run(admin, "setrole", "zed", "dev")));
     }
 }

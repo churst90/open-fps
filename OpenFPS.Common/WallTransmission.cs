@@ -190,6 +190,12 @@ public static class WallTransmission
     public static (float Low, float Mid, float High) BandGains(MaterialProperties p, Vector3 size, WallBuild build)
     {
         Faces(size, out float t, out float a, out float b);
+        return BandGains(p, t, a, b, build);
+    }
+
+    /// <summary>A panel <paramref name="t"/> thick with a face <paramref name="a"/> by <paramref name="b"/>.</summary>
+    private static (float Low, float Mid, float High) BandGains(MaterialProperties p, float t, float a, float b, WallBuild build)
+    {
         if (p.Porous || p.DensityKgM3 <= 0f || t <= 0f)
             return (p.TransmissionLow, p.TransmissionMid, p.TransmissionHigh);
         float flank = 1f + FlankingShare(a, b);
@@ -219,8 +225,176 @@ public static class WallTransmission
         return MathF.Pow(10f, -r / 10f);
     }
 
+    // ═══ Layers in contact ═══════════════════════════════════════════════════════════════════════
+    //
+    // A floor is a slab, a ceiling under it and a carpet on top: layers in contact, which move together
+    // and are one panel. Counted as barriers in a row, each paying its own mass law, a floor of two 25 cm
+    // slabs took 80 dB in the low band where one 50 cm slab takes 49, and a carpet (a porous layer, 20 dB
+    // of table figure when it hangs free) took 20 dB more, though on a slab it adds only its weight: a
+    // soft floor covering improves impact sound, not airborne (EN ISO 12354-2; ISO 10140-3 measures it as
+    // an impact reduction).
+    //
+    // The airtight layers in contact are one plate, bonded. Its mass is theirs summed; its bending
+    // stiffness is theirs about the plate's neutral axis, D = sum E_i (t_i^3/12 + t_i (z_i - z_n)^2) (a
+    // composite plate; for one layer D = E t^3/12, and the critical frequency below is CriticalHz); its own
+    // loss factor is theirs weighted by the stiffness each brings (Ross, Kerwin and Ungar's strain-energy
+    // rule); fc = c^2 / (1.8 sqrt(12 D / m)). A porous layer on an airtight one adds its weight and its
+    // stiffness and no holes: the plate seals it. A two-leaf layer (a stud partition) keeps its cavity: the
+    // layers on either side join the leaf they touch, and the two leaves follow Sharp's double-leaf law,
+    // each with its own mass and critical frequency. Nothing airtight at all (a hedge against a fence),
+    // and each layer lets through what its holes let through, in a row.
+
+    /// <summary>One layer of a construction: what it is made of, how much of it is crossed (its thickness
+    /// where it does not overlap the layer before) and how it is built.</summary>
+    public readonly record struct Layer(MaterialProperties Props, float Thickness, WallBuild Build);
+
+    /// <summary>Whether a material stops air: dense and not porous.</summary>
+    public static bool Seals(in MaterialProperties p) => !p.Porous && p.DensityKgM3 > 0f;
+
+    /// <summary>
+    /// What layers in contact let through, per mixer band, as amplitude gains (the convention of
+    /// <see cref="BandGains(MaterialProperties, Vector3, WallBuild)"/>): one panel, its flanking that of a
+    /// face <paramref name="faceA"/> by <paramref name="faceB"/>. One layer is exactly that layer's figure.
+    /// </summary>
+    public static (float Low, float Mid, float High) LayeredBandGains(IReadOnlyList<Layer> layers, float faceA, float faceB)
+    {
+        if (layers.Count == 0) return (1f, 1f, 1f);
+        if (layers.Count == 1)
+        {
+            var only = layers[0];
+            return BandGains(only.Props, only.Thickness, faceA, faceB, only.Build);
+        }
+        if (!Airtight(layers))
+        {
+            float gl = 1f, gm = 1f, gh = 1f;
+            foreach (var l in layers)
+            {
+                if (l.Thickness <= 0f) continue;
+                gl *= l.Props.TransmissionLow; gm *= l.Props.TransmissionMid; gh *= l.Props.TransmissionHigh;
+            }
+            return (gl, gm, gh);
+        }
+        float flank = 1f + FlankingShare(faceA, faceB);
+        float Band(float[] thirds)
+        {
+            double sum = 0;
+            foreach (float hz in thirds) sum += LayeredTau(layers, faceA, faceB, hz);
+            return MathF.Sqrt((float)Math.Min(1.0, sum / thirds.Length * flank));
+        }
+        return (Band(AcousticBands.LowThirdsHz), Band(AcousticBands.MidThirdsHz), Band(AcousticBands.HighThirdsHz));
+    }
+
+    /// <summary>The transmission loss of airtight layers in contact at one frequency, dB, flanking included
+    /// (for a single layer, <see cref="BoxLossDb"/>).</summary>
+    public static float LayeredLossDb(IReadOnlyList<Layer> layers, float faceA, float faceB, float hz)
+    {
+        float tau = layers.Count == 1
+            ? DirectTau(layers[0].Props, layers[0].Thickness, faceA, faceB, layers[0].Build, hz)
+            : LayeredTau(layers, faceA, faceB, hz);
+        tau *= 1f + FlankingShare(faceA, faceB);
+        return -10f * MathF.Log10(MathF.Max(1e-30f, tau));
+    }
+
+    private static bool Airtight(IReadOnlyList<Layer> layers)
+    {
+        foreach (var l in layers) if (l.Thickness > 0f && Seals(l.Props)) return true;
+        return false;
+    }
+
+    /// <summary>One leaf of a construction: its layers bonded into one plate.</summary>
+    private readonly record struct Leaf(float Mass, float Loss, float CriticalHz)
+    {
+        /// <summary>The plate of these plies (Young's modulus Pa, density, loss factor, thickness), in order.</summary>
+        public static Leaf Of(List<(float E, float Rho, float Eta, float T)> plies)
+        {
+            float m = 0f, et = 0f, etz = 0f, z = 0f;
+            foreach (var (e, rho, _, t) in plies)
+            {
+                m += rho * t;
+                et += e * t; etz += e * t * (z + 0.5f * t);
+                z += t;
+            }
+            float zn = et > 0f ? etz / et : 0.5f * z;
+            float d = 0f, dEta = 0f, mEta = 0f;
+            z = 0f;
+            foreach (var (e, rho, eta, t) in plies)
+            {
+                float zi = z + 0.5f * t - zn;
+                float di = e * (t * t * t / 12f + t * zi * zi);
+                d += di; dEta += di * eta; mEta += rho * t * eta;
+                z += t;
+            }
+            float loss = d > 0f ? dEta / d : m > 0f ? mEta / m : 0f;
+            float fc = d > 0f && m > 0f ? SoundSpeed * SoundSpeed / (1.8f * MathF.Sqrt(12f * d / m)) : float.PositiveInfinity;
+            return new Leaf(m, loss, fc);
+        }
+
+        public float Db(float hz) => SinglePanelDb(Mass, CriticalHz, Loss, hz);
+    }
+
+    /// <summary>The direct path's transmitted energy through layers in contact at one frequency.</summary>
+    private static float LayeredTau(IReadOnlyList<Layer> layers, float faceA, float faceB, float hz)
+    {
+        // The leaves, and between each two the cavity and what bridges it.
+        var leaves = new List<Leaf>(2);
+        var cavities = new List<(float Depth, float Bridge)>(1);
+        var plies = new List<(float E, float Rho, float Eta, float T)>(layers.Count);
+        foreach (var l in layers)
+        {
+            var p = l.Props;
+            float t = l.Thickness;
+            if (t <= 0f || p.DensityKgM3 <= 0f) continue;
+            float e = p.YoungsModulusGPa * 1e9f;
+            float leaf = l.Build.LeafMetres;
+            if (Seals(p) && leaf > 0f && t >= 2f * leaf + MinCavityMetres)
+            {
+                plies.Add((e, p.DensityKgM3, p.LossFactor, leaf));
+                leaves.Add(Leaf.Of(plies));
+                plies.Clear();
+                // Without studs the leaves meet at the panel's edges, its narrower span apart.
+                cavities.Add((t - 2f * leaf, l.Build.StudSpacingMetres > 0f ? l.Build.StudSpacingMetres : MathF.Min(faceA, faceB)));
+                plies.Add((e, p.DensityKgM3, p.LossFactor, leaf));
+            }
+            else plies.Add((e, p.DensityKgM3, p.LossFactor, t));
+        }
+        if (plies.Count > 0) leaves.Add(Leaf.Of(plies));
+        if (leaves.Count == 0) return 1f;
+        if (leaves.Count == 1) return MathF.Pow(10f, -leaves[0].Db(hz) / 10f);
+        // More than one cavity: each cavity's two leaves a double wall, in a row, a leaf shared by two of
+        // them counted once (a triple-leaf wall does worse than this near its resonances).
+        float r = 0f;
+        for (int k = 0; k < cavities.Count; k++)
+        {
+            r += TwoLeafDb(leaves[k], leaves[k + 1], cavities[k].Depth, cavities[k].Bridge, hz);
+            if (k > 0) r -= leaves[k].Db(hz);
+        }
+        return MathF.Pow(10f, -MathF.Max(0f, r) / 10f);
+    }
+
+    /// <summary>
+    /// Two leaves over a cavity, dB at one frequency: <see cref="DoubleLeafDb"/> with each leaf its own mass
+    /// and critical frequency (Sharp 1978). Below the resonance the whole moves as one, at the heavier
+    /// leaf's critical frequency; the studs' term takes the leaf with the higher critical frequency as the
+    /// one they drive and the other's share of the mass. Two equal leaves give DoubleLeafDb's figure.
+    /// </summary>
+    private static float TwoLeafDb(Leaf a, Leaf b, float cavity, float bridgeSpacing, float hz)
+    {
+        float m = a.Mass + b.Mass;
+        var heavy = a.Mass >= b.Mass ? a : b;
+        float rM = SinglePanelDb(m, heavy.CriticalHz, heavy.Loss, hz);
+        if (a.Mass <= 0f || b.Mass <= 0f || cavity <= 0f) return rM;
+        if (hz < MassAirMassHz(a.Mass, b.Mass, cavity)) return rM;
+        float r1 = a.Db(hz), r2 = b.Db(hz);
+        float fl = SoundSpeed / (2f * MathF.PI * cavity);
+        float ideal = hz < fl ? r1 + r2 + 20f * MathF.Log10(hz * cavity) - 29f : r1 + r2 + 6f;
+        ideal = MathF.Max(ideal, rM);
+        var (low, high) = a.CriticalHz <= b.CriticalHz ? (a, b) : (b, a);
+        float bridge = MathF.Max(0f, 10f * MathF.Log10(bridgeSpacing * high.CriticalHz) + 20f * MathF.Log10(low.Mass / m) - 18f);
+        return MathF.Max(rM, MathF.Min(ideal, rM + bridge));
+    }
+
     /// <summary>A box's thickness (its smallest dimension) and the two sides of its face.</summary>
-    private static void Faces(Vector3 size, out float thickness, out float a, out float b)
+    internal static void Faces(Vector3 size, out float thickness, out float a, out float b)
     {
         float x = MathF.Abs(size.X), y = MathF.Abs(size.Y), z = MathF.Abs(size.Z);
         if (x <= y && x <= z) { thickness = x; a = y; b = z; }
