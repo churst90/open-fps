@@ -19,6 +19,19 @@ public enum HobGas
     Propane,
 }
 
+/// <summary>How the spark module is switched.</summary>
+public enum HobSparkModule
+{
+    /// <summary>It sparks while a knob is held pushed in (the switch at the bottom of the knob's travel) and
+    /// stops when the knob is let go: the European hob, and the North American range's "Lite" position.</summary>
+    WhileHeld,
+    /// <summary>Auto re-ignition: it sparks while any knob is on and stops when it senses that burner's flame
+    /// by rectification (the flame passes current one way between the electrode and the grounded burner);
+    /// if the flame goes out it sparks again. On higher-end North American ranges [sec: parts suppliers'
+    /// and service forums' descriptions; US patent 5,169,303].</summary>
+    Reignition,
+}
+
 /// <summary>
 /// A fuel gas's properties at 15 °C and one atmosphere. Sources are tagged as in docs/FIRE.md: [ft] read in
 /// full, [sec] read in a secondary source, [recalled] general knowledge not checked here.
@@ -179,6 +192,15 @@ public sealed record GasHobSpec
 
     // ── The spark module ─────────────────────────────────────────────────────────────────────────
 
+    /// <summary>How the module is switched: while a knob is held in, or until it senses the flame.</summary>
+    [Tunable("", 0, 0, "How the spark module is switched: sparking while a knob is held in, or auto re-ignition that stops when it senses the flame.", Label = "spark module")]
+    public HobSparkModule Module { get; init; } = HobSparkModule.WhileHeld;
+    /// <summary>How long a re-ignition module takes to see a flame on its electrode before it stops, s
+    /// [estimate: the flame reaches the electrode as it lights, and the sense circuit's filter takes a few
+    /// mains cycles].</summary>
+    [Tunable("s", 0.01, 2, "How long an auto re-ignition module takes to sense the flame and stop sparking.", Label = "flame sense time", Step = 0.01)]
+    public float FlameSenseSeconds { get; init; } = 0.1f;
+
     /// <summary>Sparks a second while a knob is held in: three to five on a working hob [sec: cookerspareparts];
     /// 3.2-5.6 in fifteen recordings measured here. The module counts mains cycles, so the rate is the
     /// mains frequency over a whole number.</summary>
@@ -194,24 +216,41 @@ public sealed record GasHobSpec
     /// What of it heats the air in the gap at once, mJ. A spark's sound is that heating: the hot channel's
     /// volume jumps by (γ-1)E/(γp), a monopole, p = (γ-1)/(4πrc²) dQ/dt, the law the flame obeys. A piezo
     /// lighter's 3 mm spark, 250 Pa at 12 cm with a 2.2 µs half-duration (Scheuer and DeCorby 2024 [ft]),
-    /// carries 0.36 mJ of it by that law; a mains module about four times that [estimate].
+    /// carries 0.36 mJ of it by that law. A hob's spark is taken as the same: the shock comes from the
+    /// breakdown, the gap's own capacitance emptying, and the gaps are alike; the rest of a mains spark's
+    /// energy goes in slowly, in its arc. Against fourteen recorded hobs, octave by octave from 1 to 8 kHz
+    /// against the flame, this sits within a few dB of their median (docs/GAS_HOB.md section 9). It was
+    /// 1.5 mJ ("four times the lighter", an estimate) until 2026-10-10: 12 dB too loud.
     /// </summary>
     [Tunable("mJ", 0.05, 20, "The part of each spark's energy that heats the air in the gap at once: the crack.", Label = "spark heat", Step = 0.05)]
-    public float SparkHeatMj { get; init; } = 1.5f;
-    /// <summary>How long the heat goes in, µs: fitted to the third-octave peak of the ticks in fifteen
-    /// recordings, 6.3-10 kHz.</summary>
-    [Tunable("µs", 2, 200, "How long the spark takes to heat the gap. Longer is a duller tick.", Label = "spark duration", Step = 1)]
-    public float SparkMicroseconds { get; init; } = 30f;
+    public float SparkHeatMj { get; init; } = 0.36f;
+    /// <summary>How long the heat goes in, µs: the lighter's N-wave is 2.2 µs a half at 12 cm and stretches
+    /// a little on its way out to a metre, so about 3 µs. Its crack then rises 6 dB an octave through the
+    /// whole of hearing, as the recordings' ticks do up to where their microphones roll off. It was 30 µs,
+    /// fitted to the recordings' third-octave peak (their microphones'), which put the crack's energy at
+    /// 2-5 kHz, the presence region.</summary>
+    [Tunable("µs", 1, 200, "How long the spark takes to heat the gap. Longer is a duller tick.", Label = "spark duration", Step = 0.5)]
+    public float SparkMicroseconds { get; init; } = 3f;
     /// <summary>The electrode's tip above the hob top, mm: the hob's steel answers every spark from its
     /// image, a hair later.</summary>
     [Tunable("mm", 2, 80, "How high the spark is above the hob's steel top.", Label = "spark height", Step = 1)]
     public float SparkHeightMm { get; init; } = 18f;
-    /// <summary>The module's own tick (its transformer and switch), dB peak at a metre, inside the hob [estimate].</summary>
-    [Tunable("dB", 20, 90, "Peak level at a metre of the spark module's own tick inside the hob.", Label = "module tick level", Step = 1)]
+    /// <summary>The module's own tick (its pulse transformer), dB peak at a metre from the module in the open [estimate].</summary>
+    [Tunable("dB", 20, 90, "Peak level at a metre of the spark module's own tick, the module in the open.", Label = "module tick level", Step = 1)]
     public float ModuleTickDb { get; init; } = 52f;
-    /// <summary>What share of a spark's crack the cap rings back, dB [estimate, the tails of the recorded ticks].</summary>
-    [Tunable("dB", -60, 0, "How loud the cap rings when the spark strikes it, against the crack.", Label = "cap ring", Step = 1)]
-    public float CapRingDb { get; init; } = -24f;
+    /// <summary>What the hob's case takes off the module's tick, dB: the module sits under the hob behind its
+    /// steel tray, heard through the tray's gaps (the burner cups, the knob spindles) [estimate], and above
+    /// that a mass law's 6 dB an octave from 1 kHz.</summary>
+    [Tunable("dB", 0, 40, "How much the hob's case muffles the spark module's tick.", Label = "module case loss", Step = 1)]
+    public float ModuleCaseLossDb { get; init; } = 15f;
+    /// <summary>
+    /// How loud the cap rings when a spark goes off beside it, against the crack, dB. Nothing strikes it but
+    /// the spark's blast, a few µN·s on its face, which moves a 160 g disc's modes at about 0.1 mm/s: near
+    /// 0 dB at a metre, some 80 dB under the crack (docs/GAS_HOB.md section 4). It was -24 dB [estimate,
+    /// from the recorded ticks' tails, which were their rooms'].
+    /// </summary>
+    [Tunable("dB", -100, 0, "How loud the cap rings when the spark strikes it, against the crack.", Label = "cap ring", Step = 1)]
+    public float CapRingDb { get; init; } = -80f;
 
     // ── The gas round the burner before it lights ───────────────────────────────────────────────
 
@@ -264,11 +303,20 @@ public sealed record GasHobSpec
 
     // ── The flame failure device ─────────────────────────────────────────────────────────────────
 
-    /// <summary>A thermocouple in the flame drives a magnet that holds the gas valve open once the knob is
-    /// let go; it takes a few seconds to heat (EN 30-1-1 allows up to 10 s on a hob [recalled]) and tens of
-    /// seconds to cool, when the armature drops with a click.</summary>
+    /// <summary>
+    /// Whether each burner has a flame safety valve: a thermocouple in the flame drives a magnet that holds
+    /// the gas valve open once the knob is let go, so the knob must be held in until it has heated. European
+    /// hobs have one on every burner (EN 30-1-1 [recalled]); North American ranges' top burners have none
+    /// [recalled], and neither do older or cheaper hobs elsewhere.
+    /// </summary>
+    [Tunable("", 0, 1, "Whether each burner has a flame safety valve, which must be held open by the knob until its thermocouple has heated.", Label = "flame safety")]
+    public bool FlameSafety { get; init; }
+    /// <summary>A first-order heating time, s: the magnet holds after 0.8 of it (at <see cref="HoldShare"/>),
+    /// 3.0 s from the flame catching. Manuals ask for 4 s (Bosch), about 8 (Miele), at least 10 (AEG,
+    /// Electrolux) [sec: the makers' support pages]; EN 30-1-1 allows a hob up to 10 s [recalled]. It cools
+    /// in tens of seconds, when the armature drops with a click.</summary>
     [Tunable("s", 0.5, 20, "How long the flame safety thermocouple takes to heat.", Label = "thermocouple heating", Step = 0.1)]
-    public float ThermocoupleHeatSeconds { get; init; } = 2.5f;
+    public float ThermocoupleHeatSeconds { get; init; } = 3.75f;
     [Tunable("s", 2, 120, "How long it takes to cool once the flame is out. The safety valve clicks shut at the end of it.", Label = "thermocouple cooling", Step = 1)]
     public float ThermocoupleCoolSeconds { get; init; } = 15f;
     /// <summary>The share of full voltage that holds the magnet, and the share it lets go under.</summary>
@@ -276,9 +324,15 @@ public sealed record GasHobSpec
     public float HoldShare { get; init; } = 0.55f;
     [Tunable("", 0.05, 0.8, "The share under which the safety magnet lets go.", Label = "drop share", Step = 0.05)]
     public float DropShare { get; init; } = 0.35f;
-    /// <summary>How long the cook keeps the knob in after the flame catches, s: manuals ask for a few seconds.</summary>
-    [Tunable("s", 0, 20, "How long the cook keeps the knob held in after the flame catches.", Label = "hold after lighting", Step = 0.5)]
-    public float HoldAfterLightSeconds { get; init; } = 3.5f;
+    /// <summary>How long after the flame catches the cook lets the knob go, s, where nothing needs it held: the
+    /// time to see the flame and let go [estimate: a visual reaction is about 0.25 s]. Each light draws it
+    /// between 0.6 and 1.4 times this, 0.36-0.84 s.</summary>
+    [Tunable("s", 0, 5, "How long after the flame catches the cook lets the knob go, where no flame safety valve needs it held.", Label = "release after lighting", Step = 0.05)]
+    public float ReleaseAfterLightSeconds { get; init; } = 0.6f;
+    /// <summary>On a hob with flame safety, how much longer than its thermocouple needs the cook holds, s: a
+    /// cook who knows the hob [estimate; with the thermocouple's 3.0 s it makes Bosch's 4 s].</summary>
+    [Tunable("s", 0, 10, "On a hob with flame safety, how much longer than the thermocouple needs the cook keeps the knob held.", Label = "hold margin", Step = 0.1)]
+    public float HoldMarginSeconds { get; init; } = 1.0f;
 
     // ── The knob's parts, dB peak at a metre [estimate: small switches and plastic on steel] ─────
 
@@ -398,7 +452,8 @@ public sealed record GasHobSpec
         },
     };
 
-    /// <summary>A 60 cm four-burner hob on natural gas, with flame failure devices and one spark module.</summary>
+    /// <summary>A 60 cm four-burner hob on natural gas, one spark module that sparks while a knob is held in,
+    /// and no flame safety: the cook lets go as soon as it catches, and the sparks stop.</summary>
     public static GasHobSpec FourBurnerNatural => new()
     {
         Name = "Four-burner gas hob, natural gas",
@@ -407,9 +462,27 @@ public sealed record GasHobSpec
         Burners = FourBurners(1f),
         // MEASURED with `--stove levels` 2026-10-10: every burner on full, Leq 47.0 dB (41.4 dB(A)) at a metre; the
         // sparks' peaks reach 89.7 dB, 42.8 dB over it. The large burner alone on full 43.3 dB, on low 22.4.
+        // Again after the spark was corrected (round 2, 2026-10-10): Leq 46.9 dB; the peaks 91.6 dB, 44.7 over
+        // (their energy now lies above 8 kHz; the 1-4 kHz octaves fell 9-13 dB).
         SourceLevelDb = 47f,
         PeakHeadroomDb = 45f,
         ExtentMetres = 0.6f,
+    };
+
+    /// <summary>The same hob with a flame safety valve on every burner, as European hobs have: the knob is held
+    /// in, and the sparks go on, until the thermocouple holds the gas on, about 4 s.</summary>
+    public static GasHobSpec FourBurnerFlameSafety => FourBurnerNatural with
+    {
+        Name = "Four-burner gas hob, natural gas, flame safety",
+        FlameSafety = true,
+    };
+
+    /// <summary>The same hob with an auto re-ignition module: it sparks until it senses the flame, whatever
+    /// the hand does, and again if the flame goes out.</summary>
+    public static GasHobSpec FourBurnerReignition => FourBurnerNatural with
+    {
+        Name = "Four-burner gas hob, natural gas, auto re-ignition",
+        Module = HobSparkModule.Reignition,
     };
 
     /// <summary>The same hob on propane at 37 mbar: injectors about two thirds the bore (CDA HCG301's set,
@@ -422,6 +495,7 @@ public sealed record GasHobSpec
         Burners = FourBurners(0.68f),
         CloudSeconds = 4f,
         // MEASURED with `--stove levels` 2026-10-10: every burner on full, Leq 45.3 dB (39.0 dB(A)); sparks 45.6 dB over.
+        // Round 2: Leq 44.8 dB; sparks 47.4 dB over.
         SourceLevelDb = 45.5f,
         PeakHeadroomDb = 47f,
     };
@@ -442,6 +516,8 @@ public sealed record GasHobSpec
         {
             ["hob4"] = () => FourBurnerNatural,
             ["hob4_propane"] = () => FourBurnerPropane,
+            ["hob4_ffd"] = () => FourBurnerFlameSafety,
+            ["hob4_reignite"] = () => FourBurnerReignition,
             ["hob1"] = () => SingleBurner,
         };
 

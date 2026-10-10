@@ -60,7 +60,7 @@ Models are in `AudioEngine/Core/Nature`; voices in `AudioEngine/Fmod/NatureVoice
 | Fountain | `FallingWaterSynth` | `WaterVoiceState`; per tap `WaterTapState` over one `WaterFeatureVoice` | `water_fountain`, "water:park_fountain"; on the city `elm_fountain_water_0..4`, "water:park_fountain/elm_park/0..4" |
 | Wood fire | `FireSynth` | `FireVoiceState` | `fire_pit`, "fire:fire_pit" |
 | Wind in a tree | `FoliageSynth` | `FoliageVoiceState` | `tree_crown`, "foliage:park_tree" (also "pine") |
-| Gas hob | `Stove/GasHobSynth` | `StoveVoiceState` | `gas_hob`, "stove:hob4" (also "hob4_propane", "hob1"); docs/GAS_HOB.md |
+| Gas hob | `Stove/GasHobSynth` | `StoveVoiceState` | `gas_hob`, "stove:hob4" (also "hob4_ffd", "hob4_reignite", "hob4_propane", "hob1"); docs/GAS_HOB.md |
 
 `EventSum` and `Resonator` are the shared building blocks.
 

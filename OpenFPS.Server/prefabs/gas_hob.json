@@ -1,7 +1,7 @@
 {
   "Id": "gas_hob",
   "Name": "Gas hob",
-  "Description": "A 60 cm four-burner gas hob on natural gas, set into the worktop (GasHobSpec.FourBurnerNatural, GasHobSynth, docs/GAS_HOB.md). Press the interact key standing at it to light the next burner, front left first: the knob is pushed in and turned to full, the spark module ticks at every electrode until the gas reaches the spark, the burner catches with a soft whoomph and the cook holds the knob in until the flame safety holds. With every burner lit, the interact key turns them all off, one knob after another; each flame goes out with a small pop, and a quarter of a minute later each safety valve clicks shut. Place it on the worktop with its back (+Z) to the wall. Not a recording and not a loop.",
+  "Description": "A 60 cm four-burner gas hob on natural gas, set into the worktop (GasHobSpec.FourBurnerNatural, GasHobSynth, docs/GAS_HOB.md). Press the interact key standing at it to light the next burner, front left first: the knob is pushed in and turned to full, the spark module ticks at every electrode until the gas reaches the spark, the burner catches with a soft whoomph and the cook lets the knob go a moment later, so the ticking stops. It has no flame safety valves (gas_hob_flame_safety has). With every burner lit, the interact key turns them all off, one knob after another; each flame goes out with a small pop. Place it on the worktop with its back (+Z) to the wall. Not a recording and not a loop.",
   "Material": "Metal",
   "ColliderSize": {
     "X": 0.58,

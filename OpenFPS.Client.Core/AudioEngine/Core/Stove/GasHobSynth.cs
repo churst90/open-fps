@@ -10,9 +10,11 @@ namespace OpenFPS.Client.AudioEngine.Core.Stove;
 /// <summary>
 /// A gas hob (GasHobSpec, docs/GAS_HOB.md), pascals at a metre. A hand works the knobs from a queue of
 /// actions; under each knob a plug valve feeds an injector, whose jet draws air down a mixing tube into
-/// the burner head and out of its ports; one spark module sparks every electrode while any knob is held in;
+/// the burner head and out of its ports; one spark module sparks every electrode while any knob is held in
+/// (or, a re-ignition module, while a burner that is on has no flame);
 /// a spark lights a burner when the mixture it crosses is rich enough for its energy, and whatever gas has
-/// gathered round the burner burns at once; a thermocouple in the flame holds the gas on. Nothing is
+/// gathered round the burner burns at once; a thermocouple in the flame holds the gas on where the hob has
+/// flame safety, and a re-ignition module stops when it senses the flame. Nothing is
 /// random but the turbulence and a spark module's jitter: whether a spark fails is the gas's doing.
 ///
 /// The sound is three things. Heat released unsteadily, p = (γ-1)/(4π r c²) dQ/dt: each spark's crack
@@ -47,6 +49,7 @@ public sealed class GasHobSynth
         public float Degrees;
         public bool Pushed, MagnetHeld;
         public float Thermocouple;
+        public float FlameSeen;         // how long the flame has been on the electrode, s (a re-ignition module senses it)
         // The gas.
         public float PortFlow;          // mixture out of the ports, m³/s
         public float HeadFraction;      // gas share of the mixture in the head
@@ -139,6 +142,8 @@ public sealed class GasHobSynth
     // ── The spark module ─────────────────────────────────────────────────────────────────────────
 
     private float _charge, _chargeStep, _breakover, _mainsPhase;
+    private float _moduleLp;
+    private readonly float _moduleAlpha;
     private bool _moduleOn;
     private readonly int _cyclesPerSpark;
     private float _mainsClock;
@@ -225,6 +230,8 @@ public sealed class GasHobSynth
         _stop.Tune(sampleRate, 1300f, 2700f, 4600f, 6900f, 0.018f);
         _magnet.Tune(sampleRate, 2600f, 4900f, 7300f, 9800f, 0.010f);
         _module.Tune(sampleRate, 1600f, 3300f, 5600f, 8100f, 0.015f, 1f, 0.6f, 0.3f, 0.15f);
+        // Heard through the hob's steel tray: its gaps, and a mass law's 6 dB an octave from 1 kHz.
+        _moduleAlpha = OnePole.AlphaFor(1000f, sampleRate);
 
         _kernels = KernelsFor(sampleRate, spec.SparkMicroseconds);
 
@@ -291,8 +298,8 @@ public sealed class GasHobSynth
     }
 
     /// <summary>The hand's actions for one knob going from one setting to another, as a cook does it: push in and
-    /// turn to the full mark, hold it in until the flame catches and a few seconds more, let go, then
-    /// turn to the setting; or turn it back to off.</summary>
+    /// turn to the full mark, hold it in until the flame catches, let go a moment later (or, with flame
+    /// safety, once its thermocouple holds the gas on), then turn to the setting; or turn it back to off.</summary>
     public void Turn(int burner, int from, int to)
     {
         if (burner < 0 || burner >= _b.Length || from == to) return;
@@ -306,13 +313,21 @@ public sealed class GasHobSynth
         {
             Enqueue(new HandAction { Act = Act.Push, Burner = burner, Seconds = 0.12f });
             Enqueue(new HandAction { Act = Act.Turn, Burner = burner, Degrees = GasHobSpec.FullDegrees, Seconds = 0.35f });
-            Enqueue(new HandAction { Act = Act.WaitLit, Burner = burner, Hold = Spec.HoldAfterLightSeconds, Seconds = 15f });
+            Enqueue(new HandAction { Act = Act.WaitLit, Burner = burner, Hold = HoldAfterCatching(), Seconds = 15f });
             Enqueue(new HandAction { Act = Act.Release, Burner = burner, Seconds = 0.15f });
             if (to != 3) Enqueue(new HandAction { Act = Act.Wait, Seconds = 0.4f });
         }
         if (to != 3 || from != 0)
             Enqueue(new HandAction { Act = Act.Turn, Burner = burner, Degrees = GasHobSpec.AngleFor(to), Seconds = 0.5f });
     }
+
+    /// <summary>
+    /// How long the cook keeps the knob in once the flame has caught, s. With flame safety, counted from when
+    /// the thermocouple can hold the gas on (the hand waits for that first, in <see cref="Act.WaitLit"/>): the
+    /// hold margin. Without, the time to see the flame and let go, a little different each light.
+    /// </summary>
+    public float HoldAfterCatching()
+        => Spec.FlameSafety ? Spec.HoldMarginSeconds : Spec.ReleaseAfterLightSeconds * (0.6f + 0.8f * Uniform());
 
     /// <summary>Adds an action to the hand's queue (the lab's scripts: a slow light, a half-turned knob).</summary>
     public void Enqueue(HandAction action)
@@ -331,7 +346,8 @@ public sealed class GasHobSynth
         b.Degrees = GasHobSpec.AngleFor(setting);
         b.Pushed = false;
         b.Share = setting > 0 ? GasHobSpec.FlowShare(b.Degrees, b.Spec.ReducedShare) : 0f;
-        b.MagnetHeld = setting > 0;
+        b.MagnetHeld = setting > 0 && Spec.FlameSafety;
+        b.FlameSeen = setting > 0 ? 10f : 0f;
         b.Thermocouple = setting > 0 ? 1f : 0f;
         b.HeadFraction = setting > 0 ? Spec.PortFraction : 0f;
         b.PortFlow = b.Share * b.FullFlow / Spec.PortFraction;
@@ -387,7 +403,9 @@ public sealed class GasHobSynth
         float pc = Spec.PortFraction;
         foreach (var b in _b)
         {
-            bool gasOn = b.Pushed || b.MagnetHeld;
+            // Without flame safety the plug alone decides; with it, the valve behind it is held open by the
+            // pushed knob or by the thermocouple's magnet.
+            bool gasOn = !Spec.FlameSafety || b.Pushed || b.MagnetHeld;
             b.Share = gasOn ? GasHobSpec.FlowShare(b.Degrees, b.Spec.ReducedShare) : 0f;
             float gasIn = b.Share * b.FullFlow;
             float mixIn = gasIn / pc;
@@ -421,9 +439,11 @@ public sealed class GasHobSynth
 
             // The thermocouple, and the safety magnet it holds.
             float target = b.Lit && b.Envelope > 0.5f ? 1f : 0f;
+            b.FlameSeen = target > 0f ? b.FlameSeen + dt : 0f;
             float tau = target > b.Thermocouple ? Spec.ThermocoupleHeatSeconds : Spec.ThermocoupleCoolSeconds;
             b.Thermocouple += (target - b.Thermocouple) * MathF.Min(1f, dt / tau);
-            if (b.Pushed) b.MagnetHeld = true;
+            if (!Spec.FlameSafety) b.MagnetHeld = false;
+            else if (b.Pushed) b.MagnetHeld = true;
             else if (b.MagnetHeld && b.Thermocouple < Spec.DropShare)
             {
                 b.MagnetHeld = false;
@@ -477,7 +497,7 @@ public sealed class GasHobSynth
                 Strike(ref _switch, Spec.SwitchClickDb - 3f, 1.06f);
                 Strike(ref _stop, Spec.StopClickDb - 8f, 1.1f);
                 // Let go too soon, the thermocouple cannot hold the magnet and the spring shuts the gas.
-                if (b.Thermocouple < Spec.HoldShare && b.MagnetHeld)
+                if (Spec.FlameSafety && b.Thermocouple < Spec.HoldShare && b.MagnetHeld)
                 {
                     b.MagnetHeld = false;
                     Strike(ref _magnet, Spec.MagnetClickDb, 1f);
@@ -518,7 +538,8 @@ public sealed class GasHobSynth
             {
                 if ((uint)act.Burner >= (uint)_b.Length) { _acting = false; break; }
                 var b = _b[act.Burner];
-                if (b.Lit && b.Envelope > 0.5f) _litFor += dt;
+                // The flame has caught; with flame safety the hand also waits until the thermocouple can hold it.
+                if (b.Lit && b.Envelope > 0.5f && (!Spec.FlameSafety || b.Thermocouple >= Spec.HoldShare)) _litFor += dt;
                 if (_litFor >= act.Hold || _actElapsed >= act.Seconds) _acting = false;
                 break;
             }
@@ -528,7 +549,13 @@ public sealed class GasHobSynth
     private void Module(float dt)
     {
         bool on = false;
-        foreach (var b in _b) on |= b.Pushed;
+        if (Spec.Module == HobSparkModule.Reignition)
+        {
+            // Its switches close at any on position of a knob; it sparks until each burner that is on has had
+            // a flame on its electrode for the sense time.
+            foreach (var b in _b) on |= b.Degrees > 15f && b.FlameSeen < Spec.FlameSenseSeconds;
+        }
+        else foreach (var b in _b) on |= b.Pushed;
         if (on && !_moduleOn) { _charge = 0f; _mainsClock = _mainsPhase; }
         _moduleOn = on;
         if (!on) return;
@@ -561,8 +588,8 @@ public sealed class GasHobSynth
         int at = (int)(inSeconds * _fs);
         if (!_silent)
         {
-            // The module's own tick, in the panel under the knobs.
-            Strike(ref _module, Spec.ModuleTickDb + 20f * MathF.Log10(voltage), 1f);
+            // The module's own tick, under the hob behind its tray.
+            Strike(ref _module, Spec.ModuleTickDb - Spec.ModuleCaseLossDb + 20f * MathF.Log10(voltage), 1f);
         }
         int duration = Math.Clamp((int)(Uniform() * KernelDurations), 0, KernelDurations - 1);
         foreach (var b in _b)
@@ -648,7 +675,8 @@ public sealed class GasHobSynth
 
         // The struck parts.
         y += (_switch.Step() + _detent.Step() + _stop.Step() + _magnet.Step()) * ClickPart;
-        y += _module.Step() * SparkPart;
+        _moduleLp += _moduleAlpha * (_module.Step() - _moduleLp);
+        y += _moduleLp * SparkPart;
 
         float heat = 0f;
         foreach (var b in _b)
@@ -788,7 +816,6 @@ public sealed class GasHobSynth
         var (rate, us) = key;
         var k = new float[KernelDurations * KernelPhases][];
         double T = 1.0 / rate, fc = 0.45 * rate;
-        const int Over = 32;
         for (int d = 0; d < KernelDurations; d++)
         {
             double tau = us * 1e-6 * (d == 0 ? 1.0 : d == 1 ? 0.85 : 1.15);
@@ -797,7 +824,7 @@ public sealed class GasHobSynth
             {
                 var kernel = new float[KernelLength];
                 double offset = ph / (double)KernelPhases * T;
-                double h = T / Over;
+                double h = Math.Min(T / 32, tau / 16);
                 for (int n = 0; n < KernelLength; n++)
                 {
                     double tn = (n - KernelLead) * T;

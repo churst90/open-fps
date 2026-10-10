@@ -1,0 +1,23 @@
+{
+  "Id": "gas_hob_reignition",
+  "Name": "Gas hob with auto re-ignition",
+  "Description": "A 60 cm four-burner gas hob on natural gas whose spark module re-ignites: it sparks while a knob is on until it senses that burner's flame, and stops by itself (GasHobSpec.FourBurnerReignition, docs/GAS_HOB.md), as on higher-end North American ranges. The interact key lights the next burner, or with every burner lit turns them all off. Place it on the worktop with its back (+Z) to the wall. Not a recording and not a loop.",
+  "Material": "Metal",
+  "ColliderSize": {
+    "X": 0.58,
+    "Y": 0.05,
+    "Z": 0.5
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "Announce": true,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "stove:hob4_reignite",
+  "Volume": 1.0,
+  "Range": 25,
+  "MinDistance": 0.5,
+  "Mode": "LoopOne",
+  "SynthRunning": false
+}
