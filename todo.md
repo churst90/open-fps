@@ -528,9 +528,19 @@ Synth video (inbox, transcribed): ours is the more physical model; these are wha
   - Buses about 5 dB under real life; a big cam's idle lope; the sports bike's pull-away surge.
 
 ### Shapes other than boxes
-Wedges, stairs and arches are built (geometry stage 2). Next is terrain (geometry stage 3); then the
-shape library and import (stage 4); diggable ground with strata (stage 5). Then forests, ocean maps and
-boats.
+Wedges, stairs and arches are built (geometry stage 2), terrain (stage 3). Stage 4, 2026-10-10 (unheard,
+unmerged branch; docs/GEOMETRY.md section 12): the shape library (round, outlined, roofed, swept), real
+footprints and roofs on Magnolia and Albany, round trunks, kerbs, glTF and OBJ import with mesh assets on the
+wire, shapes in the quick build. Left of stage 4, in order (GEOMETRY.md 12.6):
+- Rooms derived from seeds by flood: built as an instrument (`--geometry-parity only=rooms`); on the real
+  places the floods still leave about half the houses (walls at an angle to the grid), so not switched on.
+  Find the leak, then switch the acoustic map to the flood (server and client), gated by the harness.
+- Sound points on models (MATTER.md 8): where a model's sound parts are, read by machine parts and emitters;
+  struck sounds reading the shape a part has.
+- Facets as polygons for the engine echoes; per-surface materials in the image sources.
+- (Cody) try: `/edit build stairs 14 steps up north`, a roof over a floor, Control+B's Shape kind with Orca
+  and NVDA; walk round a house on Magnolia (its real outline) and onto its roof.
+Then diggable ground with strata (stage 5); forests, ocean maps and boats.
 
 ### Experience and badges
 Rules, categories and tiers in docs/PLAN_2026-10-05.md section 3: scored by difficulty and variety,
@@ -647,7 +657,7 @@ Some may already be fixed; confirm before fixing again.
 
 ## Ideas
 
-- Curved kerbs, round columns, trees as shapes, and acoustics that handle them.
+- Curved kerbs along a whole road (a swept profile per run, not per 20 m piece).
 - A real mourning dove; wing flaps when a flock is startled.
 - Walking speed: 4.5 m/s is a jog.
 - Mac client; a web version.

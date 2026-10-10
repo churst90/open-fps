@@ -4,6 +4,22 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Geometry stage 4 (docs/GEOMETRY.md section 12), unheard. Shapes other than boxes, made from a few numbers by the
+  same code on the server and every client and fitted to their collider's box: round columns and trunks, cones,
+  balls and domes, outlines stood up (with holes), roofs from the straight skeleton of any footprint (hip, gable,
+  shed, flat), profiles swept along paths. Each is a closed solid with its own surfaces (a flight's treads can be
+  carpet, a roof's slopes are roofs) and its flat faces, which the echoes now mirror from (a ramp's echo comes off
+  its slope). Magnolia and Albany regenerated: walls round each building's real footprint, the floor and a hip or
+  gable roof of the footprint itself at every detail level, round trunks, kerbs on roads with sidewalks (Albany);
+  Magnolia 13.7 to 14.7 MB, Albany 18.0 to 21.2 MB. The world's buildings (WorldBuildings) are built the same.
+  Imported meshes: glTF 2.0 and OBJ through `tools/import_mesh` into `OpenFPS.Server/meshes` (docs/AUTHORING.md
+  section 5), sent to clients and kept in their cache. The quick build has a Shape kind, and phrases:
+  `/edit build stairs 14 steps up north`, `/edit build column 0.3 by 3`, `/edit build roof gable over the floor`
+  (docs/WORLD_EDITOR.md section 19). Rooms measured by a flood from the walls exist as an instrument
+  (`--geometry-parity only=rooms`) and are not switched on. A home's ceiling is one over its whole footprint. Server
+  and both clients must be rebuilt together
+  (two messages appended; the wire hash changes).
+
 - Far things sent less often: a far moving thing's once-a-second keep-alive now counts as a change when the
   thing has strayed from what the client predicts, so it goes again the tick after, as any other far state sent
   for a change does. Before, the keep-alive took the near-thing path, which never repeats. On a poor connection
