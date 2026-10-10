@@ -226,6 +226,13 @@ RES_WALK    = RES_CARRIAGEWAY / 2 + 1.8
 
 STOREY      = 3.0
 SLAB        = 0.25
+# The structural slab between two storeys of flats: one slab, carpet on it and a plastered soffit under
+# it, which count as one construction with it (Constructions). 15 cm of concrete is 360 kg/m2, the
+# mass a solid concrete separating floor is built to (Approved Document E, floor type 1: 365 kg/m2
+# with any bonded screed), and the slab the lab tests measure: 152 mm, STC 53-54 (RAL-TL15-332; NRC
+# for Kinetics, IIC 27 bare). Each storey used to lay a floor slab and a ceiling slab of SLAB each,
+# 50 cm of concrete between flats and 10-19 dB more loss than a real floor (2026-10-09).
+FLOOR_SLAB  = 0.15
 WALL_T      = 0.35
 DOOR_W      = 1.0
 DOOR_H      = 2.1                        # a door leaf's height (prefabs/door.json); the lintel starts here
@@ -631,15 +638,16 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
 
     for s in range(storeys):
         y0 = s * STOREY
-        ceil = y0 + STOREY - SLAB
         floor_top = y0 + SLAB if s else 0.02
+        # A storey's ceiling is the underside of the slab above it, the next storey's floor (or the
+        # roof's, over the top storey): one slab between flats, not a slab each.
+        ceil = y0 + STOREY + SLAB - FLOOR_SLAB if s + 1 < storeys else y0 + STOREY
 
         floor_name, ceiling_name = f"{label} floor {s}", f"{label} ceiling, floor {s}"
         if s:
-            B_holed("concrete_floor", sx0, sx1, y0, y0 + SLAB, sz0, sz1, hole(s - 1), name=floor_name)
+            B_holed("concrete_floor", sx0, sx1, floor_top - FLOOR_SLAB, floor_top, sz0, sz1, hole(s - 1), name=floor_name)
         else:
             B("concrete_floor", sx0, sx1, -0.15, 0.02, sz0, sz1, name=floor_name)
-        B_holed("concrete_floor", sx0, sx1, ceil, y0 + STOREY, sz0, sz1, hole(s), name=ceiling_name)
 
         # The brick shell. The street face is BROKEN at the stairwell on the ground floor, and that
         # gap is the front door: a doorway is an absence, not a leaf standing against solid brick.
@@ -742,8 +750,8 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         # ── The stairwell ──────────────────────────────────────────────────────────────────────
         sa0, sa1 = near_flat
         # The stairwell is one shaft: each storey's box runs through the slabs to the next one's, so
-        # the opening a flight comes up through is in a named place all the way and not, for the half
-        # metre of the slabs' thickness, out of doors (CityOpeningsTests).
+        # the opening a flight comes up through is in a named place all the way and not, for the
+        # slab's thickness, out of doors (CityOpeningsTests).
         stair_id = R(f"{label} stairwell, floor {s}", sa0, sa1, y0 if s else floor_top, y0 + STOREY,
                      stair_b[0], stair_b[1])
         B_holed("tile_floor", sa0, sa1, floor_top - 0.02, floor_top + 0.03, stair_b[0], stair_b[1], hole(s - 1),

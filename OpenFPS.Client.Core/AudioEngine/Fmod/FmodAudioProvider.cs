@@ -2005,14 +2005,37 @@ public partial class FmodAudioProvider : IAudioProvider
         // cutting in and out as the budget shed voices). A silent bus's stage is bypassed.
         foreach (var kv in _traced)
         {
-            bool audible = _reverbVolumes.TryGetValue(kv.Key, out float v) && v > 0.001f;
+            bool audible = _reverbVolumes.TryGetValue(kv.Key, out float v) && StageRuns(v);
             // A stage about to be heard needs its own copy of its trace.
             if (audible) kv.Value.State.Trace?.EnsureReader(kv.Value.State.Reader);
             if (_tracedRunning.TryGetValue(kv.Key, out bool was) && was == audible) continue;
+            // Silenced before it is bypassed, so no block hears the room's dry sends (BusVolumeFor).
+            if (!audible && _reverbBuses.TryGetValue(kv.Key, out var silenced)) silenced.setVolume(0f);
             kv.Value.Dsp.setBypass(!audible);
             _tracedRunning[kv.Key] = audible;
         }
     }
+
+    /// <summary>The bus volume under which a room's traced stage is bypassed (-60 dB).</summary>
+    internal const float StageAudibleVolume = 0.001f;
+
+    /// <summary>Whether a room's traced stage runs at this bus volume.</summary>
+    internal static bool StageRuns(float busVolume) => busVolume > StageAudibleVolume;
+
+    /// <summary>
+    /// What a room's bus is set to: its volume while its traced stage runs, nothing while the stage is
+    /// bypassed. A bypassed stage passes its input through, and a room's sends are taken before the walls
+    /// (the room rings with what its sources radiate), so a bus easing in or out under -60 dB played the
+    /// dry sum of everything in that room at up to a thousandth (-60 dB), unfiltered by any wall. Under a
+    /// floor that is a click above 3 kHz on a step upstairs (--floor-render, 2026-10-10). A bus with no
+    /// traced stage (no Steam Audio) is left as it was.
+    /// </summary>
+    internal static float BusVolumeFor(float volume, bool hasStage, bool stageRunning)
+        => !hasStage || stageRunning ? volume : 0f;
+
+    private float BusVolume(int regionId, float volume)
+        => BusVolumeFor(volume, _traced.ContainsKey(regionId),
+                        _tracedRunning.TryGetValue(regionId, out bool running) && running);
 
     private void AddTracedStage(int regionId, FMOD.ChannelGroup bus, FMOD.DSP sfx, TracedReverb tr)
     {
@@ -3086,6 +3109,12 @@ public partial class FmodAudioProvider : IAudioProvider
 
             AttachEar(activeSound, emitter);
             AddActive(activeSound);
+
+            // The first block is heard through the voice's path. Until the next attribute pass a new voice
+            // played at the emitter's bare volume (a binaural voice gets no distance law from FMOD), with
+            // the EQ gains its pooled unit kept from the last voice and no direction: behind a floor that
+            // can be the top end 50 dB too loud for a few milliseconds (AudioLab --floor-render, 2026-10-10).
+            if (emitter.Type != EmitterType.UI) StartOnPath(activeSound);
         }
 
         // A 6 ms fade-in on one-shots (an abrupt onset on a recycled HRTF voice clicks) and on
@@ -3544,9 +3573,11 @@ public partial class FmodAudioProvider : IAudioProvider
                 {
                     var active = _activeSounds[i];
                     active.Channel.isPlaying(out bool isPlaying);
-                    if (!isPlaying) { 
-                        ReleaseActiveSoundResources(active);
-                        RemoveActiveAt(i); continue; 
+                    if (!isPlaying) {
+                        // Out of the voices now, its units taken off later (ReleaseRetired).
+                        RemoveActiveAt(i);
+                        _retiring.Add((active, OpenFPS.Common.AudioClock.Now));
+                        continue;
                     }
                     
                     if (active.Type == EmitterType.UI)
@@ -3561,6 +3592,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 }
 
                 UpdateReverbBuses(lPosVec, listenerRegionId);
+                ReleaseRetired(OpenFPS.Common.AudioClock.Now);
                 ReportEar();
             }
         }
@@ -3803,6 +3835,16 @@ public partial class FmodAudioProvider : IAudioProvider
     /// </summary>
     private static readonly int _traceEntity =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_AUDIO_TRACE"), out int t) ? t : int.MinValue;
+
+    /// <summary>
+    /// A voice's first attribute pass, run as it is made, before the channel is unpaused: its direction,
+    /// distance law, path EQ and sends, as every later pass sets them. Under the active-sound lock.
+    /// </summary>
+    private void StartOnPath(ActiveSound active)
+    {
+        UpdateSpatialPositioning(active, _listenerPos);
+        ApplyAcousticFilters(active, _listenerPos);
+    }
 
     private void UpdateSpatialPositioning(ActiveSound active, Vector3 lPosVec)
     {
@@ -4197,7 +4239,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 : _regionDecaySeconds.GetValueOrDefault(regionId, DefaultRoomDecaySeconds) / 6.91f;
             float dtBus = _attributeDt > 0f ? _attributeDt : 0.004f;
             _reverbVolumes[regionId] = current + (targetVol - current) * (1f - MathF.Exp(-dtBus / MathF.Max(0.01f, tau)));
-            bus.setVolume(_reverbVolumes[regionId]);
+            bus.setVolume(BusVolume(regionId, _reverbVolumes[regionId]));
 
             if (_audioDebug && _dbgFrame % 60 == 0)
             {
@@ -4581,6 +4623,33 @@ public partial class FmodAudioProvider : IAudioProvider
         if (voices.Count == 0) _activeById.Remove(sound.EntityId);
     }
 
+    /// <summary>Voices whose sound has ended, waiting for the mixer to be done with them, and when each ended.</summary>
+    private readonly List<(ActiveSound Voice, double EndedAt)> _retiring = new();
+
+    /// <summary>
+    /// How long a voice that has ended or been stopped keeps its units: four mixer blocks of 1024 samples
+    /// at 48 kHz. FMOD reports a one-shot not playing while it still mixes its last block, and units taken
+    /// off before that block left it to play through nothing: the end of a step heard through a floor came
+    /// out unfiltered, about 2 ms and broadband, -64 to -82 dBFS against a step peaking at -67, on the
+    /// steps whose recording ends loud ("fuzzy and the sound cuts out", Cody, 2026-10-10;
+    /// --floor-render: 30 to 42 such 8 ms windows a 7 s walk before, none after). Two blocks left one.
+    /// </summary>
+    internal const double ReleaseAfterEndSeconds = 4 * 1024 / 48000.0;
+
+    /// <summary>Whether a voice that ended at <paramref name="endedAt"/> may give its units back now.</summary>
+    internal static bool MayRelease(double endedAt, double now) => now - endedAt >= ReleaseAfterEndSeconds;
+
+    /// <summary>Gives back the units of voices that ended long enough ago. Under the active-sound lock.</summary>
+    private void ReleaseRetired(double now)
+    {
+        for (int i = _retiring.Count - 1; i >= 0; i--)
+        {
+            if (!MayRelease(_retiring[i].EndedAt, now)) continue;
+            ReleaseActiveSoundResources(_retiring[i].Voice);
+            _retiring.RemoveAt(i);
+        }
+    }
+
     private void RemoveActiveAt(int index)
     {
         var sound = _activeSounds[index];
@@ -4708,9 +4777,11 @@ public partial class FmodAudioProvider : IAudioProvider
     public void StopSound(int entityId) { 
         lock (_lock) { 
             if (!_activeById.TryGetValue(entityId, out var voices)) return;
+            double now = OpenFPS.Common.AudioClock.Now;
             foreach (var sound in voices) {
                 sound.Channel.stop();
-                ReleaseActiveSoundResources(sound);
+                // Its units come off once the mixer is done with it, as for a voice that ends.
+                _retiring.Add((sound, now));
                 _activeSounds.Remove(sound);
             }
             _activeById.Remove(entityId);
@@ -5130,6 +5201,8 @@ public partial class FmodAudioProvider : IAudioProvider
             foreach (var active in _activeSounds) {
                 ReleaseActiveSoundResources(active);
             }
+            foreach (var (voice, _) in _retiring) ReleaseActiveSoundResources(voice);
+            _retiring.Clear();
             _activeSounds.Clear();
             _activeById.Clear();
             ReturnReverbVoices();

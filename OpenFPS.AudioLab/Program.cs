@@ -218,6 +218,7 @@ string[] usage =
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
+    "  --eq-onset [out=FILE]                         THREE_EQ at a voice's start and when its gains change",
     "  --quality resampler|orbit|echo|ceiling|quant|lsb|output|limiter|thunderfile|scene=NAME [out=DIR] [tag=]",
     "                                                what the mixer does to a sound: resampler, binaural steps, limiter (tools/audio_quality.py)",
     "",
@@ -324,6 +325,11 @@ if (args.Contains("--speech-lines"))
 {
     int code = SpeechLinesSpike.Run();
     Environment.Exit(code);
+}
+
+if (args.Contains("--eq-onset"))
+{
+    Environment.Exit(EqOnsetSpike.Run(args));
 }
 
 if (args.Contains("--dsp-order"))

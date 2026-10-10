@@ -178,6 +178,37 @@ Recent work, newest first. `git log` has the rest.
   read their material. An unknown name is logged once as a warning instead of passing silently as Generic.
   The 25 materials that were there keep every figure they had: no sound changed (the render fingerprint
   and the emitter-stream replay hold). `--materials` prints the table. AcousticRegistryTests.
+- Floors, round 2 (Cody on inbox/floors-2026-10-09: "I can't hear anything on the game level ... the
+  +40db samples, it's fuzzy and the sound cuts out"). Renders and what to listen for in
+  inbox/floors-2026-10-10.
+  - Most of the fuzz was the files: the lab's capture was 16-bit without dither, a voice through the
+    floor 4 to 11 steps tall (9 to 25 sample values per file), and turned up 40 dB that is grain and
+    holes (10 to 28 runs of exact zero per file) the game does not make. `--floor-render` now also taps
+    the mix in 32-bit float (`capture-float.wav`), and renders are cut from that.
+  - A voice that ends or is stopped keeps its units for four mixer blocks (85 ms) before they go back to
+    their pools. FMOD says a one-shot has stopped while it still mixes its last block, and the units
+    taken off before it left that block unfiltered: a 2 ms broadband click at the end of a step heard
+    through a floor, often louder than the step (30 to 42 such 8 ms windows in a 7 s walk on the new
+    floor, none after; `--eq-onset` showed FMOD's EQ itself starts and changes cleanly). Every voice
+    behind a wall had it.
+  - A new voice gets its first attribute pass (direction, distance law, path EQ, sends) before it is
+    unpaused; its first block played at the emitter's bare volume through the EQ gains its pooled unit
+    kept. A room's bus is silent while its traced stage is bypassed: a bypassed stage passes its input,
+    and a room's sends are taken before the walls.
+  - The city's towers lay one 15 cm slab between storeys (`FLOOR_SLAB` in gen_city.py; Approved
+    Document E's 365 kg/m2, the 152 mm slab of RAL-TL15-332 and NRC's tests), not a floor slab and a
+    ceiling slab of 25 cm each. Floor heights and stairs are where they were; a storey's ceiling is the
+    underside of the slab above (35 cm higher). The floor between flats loses 37.9/54.0/over 80 dB
+    (low/mid/high), against 40/54/83 measured; it was 49.6/72.9/96.8. A shout overhead is 12.5 dB(A)
+    louder in the flat below, the same both ways within 1.5 dB.
+  - Levels against real flats (speech at ANSI S3.5's efforts, a 15 cm slab, a furnished room): a shout
+    upstairs reaches about 28 dB(A) below, a call 21, normal talk 8. Under the loudness law (0.45) a
+    shout sits 11 dB nearer normal talk than in life; with that the game is within 4 dB.
+  - The "14 dB louder one way" of 2026-10-09 was one such click at the end of one line.
+  - The talker in `--floor-render` is a player entity (the client follows their voice with the
+    simulator's answer every frame, as in play), the lines include a call (LoudDb), and the beacons
+    are off in memory, not through the player's beacons.json.
+
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
   and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;

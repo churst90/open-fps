@@ -56,9 +56,10 @@ because the one world costs CPU and bandwidth first.
    degree, pitch within 0.122 %, no step bigger than every tick makes) and saves 48-54 % of the broadcast
    (1.33 to 0.62-0.69 Mbit/s). docs/WORLD_STREAMING.md, "Far things less often". Wire change (Common): new
    Windows zip and VPS update when merged. Cody to listen to the city before it ships (Cody).
-9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3. First step done
-   2026-10-09 (layers in contact are one panel, unheard: inbox/floors-2026-10-09); next the map's
-   double slab (Walls, below), then rooms from geometry, then sound through structure.
+9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3. Done: layers in
+   contact are one panel (2026-10-09), one 15 cm slab between storeys and the end-of-voice clicks
+   (2026-10-10, unheard: inbox/floors-2026-10-10). Next sound through structure (Walls, below), then
+   rooms from geometry.
 10. Chat names and roles (item 8): done 2026-10-09 (protected Owner role, "admin [Mafia] Owner: hi";
     Common changed, so a new Windows zip and VPS build go out together). The editor (item 7): the
     typed-value text box, Control+B and the F12 dialog (tabs Place, Edit, Build, World; nothing
@@ -97,8 +98,10 @@ Waiting on Cody's ear:
 - (Approved 2026-10-09: the hull's blows in time.)
 - Recorded sounds' echoes smeared off rough walls: your steps and a PA (inbox/probable-bugs-2026-10-09/4-scattering).
 - (Approved 2026-10-10: the shut glass door leak fix, inbox/pa-leak-2026-10-09.)
-- Floors, heard 2026-10-10 (inbox/floors-2026-10-09): nothing audible at game level above or below; the
-  +40 dB copies are fuzzy and the sound cuts out, not a clean transfer. Being worked on.
+- Floors, round 2 (inbox/floors-2026-10-10, branch worktree-agent-a0662d8b8748e7dd2): one 15 cm slab,
+  a shout overhead 12.5 dB louder and clean, footsteps without the end-of-voice clicks. Round 1
+  (2026-10-09) was heard 10-10: silent at game level, the +40 dB copies fuzzy (16-bit capture) and
+  cutting out (the clicks).
 - Engine CPU (inbox/engine-cpu-2026-10-09), heard 2026-10-10: passby_i4_midsize_50kmh_3m sounded phased,
   did not sweep right to left and did not sound 3 m away (the before file too). Being checked: the lab
   capture is panned, not binaural. Not merged until heard again.
@@ -234,14 +237,20 @@ and the server's voice line.
 ### Walls
 - A source just behind a building corner made of two boxes gets no diffraction route (the 5 cm joint
   padding in `RouteIsClear`). Fix without reopening the shut-door crack leak.
-- Done 2026-10-09 (branch, unheard): layers in contact are one panel (changes.md). The city floor is
-  still 10/19/14 dB heavier than a lab-tested 15 cm slab because gen_city.py lays two 25 cm slabs
-  between storeys (each storey's floor and its ceiling). One slab of 15-20 cm per storey is a map
-  change for Cody to decide; it moves floor heights, stairs and the openings tests.
-- Upstairs footsteps need sound through the structure (impact into the slab); airborne, they are
-  silent through any real floor, before and after.
-- From upstairs, a shout in the flat below comes through about 14 dB louder than the same shout the
-  other way round, with the floor measuring the same both ways (inbox/floors-2026-10-09). Not found yet.
+- Done 2026-10-10 (branch, unheard): one 15 cm slab between storeys in the city's towers (37.9/54/80
+  dB against a lab slab's 40/54/83); voices keep their units until FMOD has mixed their last block (the
+  clicks at the end of every sound behind a wall); the "14 dB louder one way" was one of those clicks.
+  Other generators (houses, the terminal, the garage) were not checked for doubled slabs.
+- Footsteps through the structure. A neighbour's steps are mostly impact into the slab; the game has
+  only the airborne part, about 10 dB short on a carpeted floor and the wrong shape (a click, not a
+  thud). Plan: the slab's normalised impact level from its own airborne loss by Ver's relation,
+  Ln(f) = 38 + 30 lg f - R(f) (homogeneous slab; checks against a bare 152 mm slab's Ln,w 79, IIC 27);
+  a resilient covering's improvement 40 lg(f/f0) above f0 = (1/2 pi) sqrt(s/m) from its dynamic
+  stiffness (a material property: carpet on underlay 20-35 dB, IIC 26 bare to 60-67 carpeted,
+  McGunnigle 2002); a footfall's force against the tapping machine per footwear (heels near it above
+  100 Hz, socks and bare feet more below 100 Hz: Kylliainen et al. 2015, Acta Acustica 101(5)); the
+  result radiated from the ceiling under the foot into the room below as a second voice per step.
+  Needs footwear in the game (the bank has Carpet/barefoot; nothing chooses it).
 - No cavity resonances or air leaks: sealed glazing is about 10 dB optimistic in the mids; door gaps
   and seals are not modelled.
 - Shut glass front doors let more in than steel doors: 17/28/43 dB against 13/48/58 (`--wall-tl`).
