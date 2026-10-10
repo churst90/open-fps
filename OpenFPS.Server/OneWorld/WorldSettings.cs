@@ -7,13 +7,14 @@ namespace OpenFPS.Server.OneWorld;
 /// The world's settings, from world.json in the server's folder (beside openfps.db and motd.txt). Every
 /// field may be left out, and so may the file:
 /// <code>
-/// { "StorePath": "world", "CapGigabytes": 20, "Generate": true, "MaxAtOnce": 2, "Prebuild": true, "LandCover": true }
+/// { "StorePath": "world", "CapGigabytes": 20, "Generate": true, "MaxAtOnce": 2, "Prebuild": true, "LandCover": true, "OpenStreetMap": true }
 /// </code>
 /// StorePath is where the tiles are kept (relative to the server's folder, or a full path); CapGigabytes the
 /// most the store holds before it drops the tiles visited least recently (WorldStore); Generate false serves
 /// only tiles already made; MaxAtOnce how many tiles are made at once; Prebuild false leaves the tiles round
 /// world_places.json's places to be made when first wanted instead of at start; LandCover false leaves every
-/// new tile's ground dirt instead of reading ESA WorldCover (kept under StorePath/sources/worldcover).
+/// new tile's ground dirt instead of reading ESA WorldCover (kept under StorePath/sources/worldcover);
+/// OpenStreetMap false makes new tiles of ground alone, without their roads (kept under StorePath/sources/osm).
 /// </summary>
 public sealed class WorldSettings
 {
@@ -23,6 +24,7 @@ public sealed class WorldSettings
     public int MaxAtOnce { get; set; } = 2;
     public bool Prebuild { get; set; } = true;
     public bool LandCover { get; set; } = true;
+    public bool OpenStreetMap { get; set; } = true;
 
     public long CapBytes => (long)(Math.Max(0.01, CapGigabytes) * 1024 * 1024 * 1024);
 

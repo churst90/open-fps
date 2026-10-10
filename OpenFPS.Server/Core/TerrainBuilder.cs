@@ -76,21 +76,27 @@ public static class TerrainBuilder
             if (!c.IsSolid || c.Shape != ColliderShape.Box || c.Form != null) return;
             if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<DoorComponent>(e)) return;
             if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
-            var s = c.Size;
-            if (s.Y > 0.6f || s.X < 1f || s.Z < 1f) return;
-            var r = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
-            var up = Vector3.Transform(Vector3.UnitY, r);
-            if (up.Y < 0.866f) return;
-            var centre = t.Position;
-            var bottom = centre - up * (s.Y * 0.5f);
-            Vector2 Corner(float sx, float sz)
-            {
-                var w = centre + Vector3.Transform(new Vector3(sx * s.X * 0.5f, -s.Y * 0.5f, sz * s.Z * 0.5f), r);
-                return new Vector2(w.X, w.Z);
-            }
-            slabs.Add(new Slab(bottom, up, Corner(-1, -1), Corner(1, -1), Corner(1, 1), Corner(-1, 1)));
+            if (SlabOf(t.Position, t.Rotation, c.Size) is { } slab) slabs.Add(slab);
         });
         return slabs;
+    }
+
+    /// <summary>A box as a slab lying on the ground, or null if it is not thin and level enough to be a floor
+    /// (at most 0.6 m thick, at least a metre each way, tilted under 30 degrees): a map's slabs, and the roads a
+    /// world tile is made with (OneWorld.WorldFeatures).</summary>
+    public static Slab? SlabOf(Vector3 centre, Quaternion rotation, Vector3 s)
+    {
+        if (s.Y > 0.6f || s.X < 1f || s.Z < 1f) return null;
+        var r = rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(rotation);
+        var up = Vector3.Transform(Vector3.UnitY, r);
+        if (up.Y < 0.866f) return null;
+        var bottom = centre - up * (s.Y * 0.5f);
+        Vector2 Corner(float sx, float sz)
+        {
+            var w = centre + Vector3.Transform(new Vector3(sx * s.X * 0.5f, -s.Y * 0.5f, sz * s.Z * 0.5f), r);
+            return new Vector2(w.X, w.Z);
+        }
+        return new Slab(bottom, up, Corner(-1, -1), Corner(1, -1), Corner(1, 1), Corner(-1, 1));
     }
 
     /// <summary>

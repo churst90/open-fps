@@ -416,8 +416,9 @@ in four steps. Each leaves every map working and is committed with its tests.
 What is left after these four:
 
 - The per-tile generator for OpenStreetMap and Overture features (roads, buildings, addresses, woods)
-  that gives the same answer whichever tile is made first. Until then a world tile is terrain, except over
-  the two real places, whose maps are copied in ("Places in the world", 2026-10-09).
+  that gives the same answer whichever tile is made first. Roads and woods done 2026-10-10 ("Roads and woods
+  on the world's tiles"); buildings, addresses and the rest planned there. Over the two real places their
+  maps are copied in ("Places in the world", 2026-10-09).
 - Coarse terrain at 8 m for the far ring (done 2026-10-09, "Coarse ground in the far ring"); still to do:
   the client's tile cache, frames that rebase past 8 km, crossing a UTM zone edge.
 - Draped road meshes with kerbs and sidewalks as swept profiles, bridges and tunnels, creeks cut in
@@ -828,10 +829,113 @@ with rasterio by fetch_place.py); the tile is 70.6 % Foliage, 29.3 % Grass, 0.1 
 classes takes about 20 ms from the recording or the cache. The materials add almost nothing to a stored tile
 (the cells were already a byte each).
 
-### Left after stage 2 (as of 2026-10-09)
+### Roads and woods on the world's tiles (2026-10-10)
 
-- Outside the real places, world tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
-  the same answer whichever tile is made first; until then the real places are their maps, copied in (above).
+Outside the real places a world tile now has its roads and its woods: OpenStreetMap's roads laid as
+gen_osm.py lays a place's, the ground graded under them, and the woods from the land cover. The generator
+lives in the server, in C# (`OneWorld/WorldFeatures`): the server already makes tiles in-process (W1), and a
+Python child per tile would need a Python, shapely and a venv on the VPS, and a second copy of the road
+logic's inputs. What was ported is only what roads and woods need, and a test holds the port to gen_osm.py.
+
+Code: `OneWorld/WorldFeatures` (the generator), `OneWorld/Osm` (`OverpassRegions`, `OsmWay`),
+`WorldTileService.Features`, `IElevationSource.WindowAsync`, `TerrainBuilder.SlabOf`, `world.json`
+`"OpenStreetMap"`. Tests: `WorldFeaturesTests`.
+
+- **Data.** OpenStreetMap through the Overpass API, a region at a time: 0.05 by 0.05 degrees (about 5.5 by
+  4.8 km at 30 degrees north, a few hundred tiles), every way with a highway tag, whole, with its nodes'
+  places (`out body geom`). Kept in the regional cache (`world/sources/osm/highways-2026-10-01/`, gzip JSON,
+  130 to 220 KB a region round Tomball) and read from disk ever after, offline too. Overpass and not Geofabrik: a region is one request
+  of a few hundred kilobytes, and a state's extract is hundreds of megabytes to download and a PBF reader to
+  write before the first tile; the usage policy (about 10,000 requests a day) is far above what one server
+  asks, one request at a time, a second apart, backing off when Overpass is busy. A server that makes tiles
+  faster would read a Geofabrik extract through the same `IOsmSource`.
+- **One date for all the data.** Every region asks for the data as it stood at 2026-10-01 (Overpass's
+  `date` setting), so a road through two regions fetched a month apart is one road in both, and two tiles
+  that see it agree. A newer date is a new generator version.
+- **The same answer whichever tile is made first.** Everything is decided from the whole way in the zone's
+  metres, never from the tile: where its pieces start and end (simplified, at most 20 m each, lengthened at a
+  bend, overlapping 5 cm at the joins), their heights (the ground averaged over a 20 m square, road_y), which
+  nodes are junctions and which junctions are one. Each piece, zone and junction belongs to the one tile its
+  middle is in, which alone stores it; every tile it reaches is graded under it, because each tile works out
+  every piece that comes within its margin. The ground is asked for the tile and 50 m round it (176 posts a
+  side instead of 126) and graded as a whole, then the tile is cut out: two tiles grade their shared edge
+  from the same posts and the same pieces, so the edge is one line of posts.
+- **What a road is** (gen_osm.py's tables): motorway to service, not drives, parking aisles, areas or one-way
+  service ways; each way in its own width (its `width`, its `lanes` at 3.4 m, or its class's two-lane width)
+  and surface (asphalt, concrete, brick, gravel, dirt, grass, wood); a sidewalk where the way says it has
+  one; a named place over each road (walking along it is silent, stepping onto it says its name) and at each
+  junction ("Main Street and Elm Street junction"). Named as OpenStreetMap names it; an unnamed way is
+  "Service road", "Private road" or "Unnamed road".
+- **The woods**, from the tile's own land cover: where WorldCover has tree cover every 10 m and no road is
+  within 2 m, canopy volumes of foliage (rectangles of 10 m cells, at least 800 m², 5 to 18 m over the
+  ground), a trunk in every 40 m square on average (where, and whether, seeded from the cell's place on the
+  world's grid), and one crown for the wind in the trees in every 80 m block of woods. All within the tile,
+  so no neighbour can disagree. A place's woods take their species from the place; the world's trees are
+  "Tree", because the species of a wood are not known anywhere and differ from Texas to Oregon.
+- **The real places first.** A tile of Magnolia or Albany is the place's copy; nothing generated reaches
+  into one (a piece whose footprint touches a placed tile is not made), so the roads stop at the place's
+  tiles and the place's own roads carry on.
+- **When the roads cannot be had** (Overpass down and the region not cached), the tile is not made and is
+  tried again after 30 s, as when the survey cannot be asked: stored without its roads it would keep that
+  hole. Land cover is different (above): a tile without it is dirt and has no woods, and is stored.
+- **Not yet:** buildings (below), drives, footpaths, rail, water, verges; roads are surfaces to walk and
+  drive on, not yet roads the traffic routes on (`RoadData`), so the world's traffic is still only the
+  places'; bridges and tunnels are laid on the ground like any road.
+- **Licence.** The store is now a derived database of OpenStreetMap (ODbL 1.0): each tile with roads
+  records "(c) OpenStreetMap contributors, ODbL 1.0 (Overpass API, the data as of 2026-10-01)" in
+  `Features`, and the cache has a `SOURCE.txt`. A server that offers its tiles to others offers them under
+  the ODbL.
+- Generator version 3.
+
+Measured:
+
+| | |
+|---|---|
+| The port against Magnolia's map (the place's osm.json on the map's own survey posts, three tiles round the spawn) | 70 of 70 pieces of road and sidewalk are the map's: worst 0.03 mm across, 0.00 mm in height, the same turn (1 - dot 1.2e-7) |
+| A made-up road across a tile edge, A then B against B then A | the same bytes; no piece stored twice; the 126 posts of the shared edge equal (29 of them graded to the road); no ground above any piece's underside at 1,000-odd points on either side |
+| Downtown Tomball, 25 tiles from the recorded regions, offline (made-up hills, no survey wait) | 0.35 s for all 25, a tile 12 ms median and 64 ms at most (the first reads the regions); 1,389 pieces of road and sidewalk, 369 named places, 61 roads by name; 22.6 KB a tile median, 26 KB at most (20 KB of it the ground) |
+| Downtown Tomball, 9 real tiles over the network (3DEP, Overpass, WorldCover, cold caches) | the first 2.8 s (two Overpass regions and a WorldCover block fetched), the rest 0.6 to 3.2 s (3DEP's own time, as before); 21 to 24 KB a tile; 48 to 110 pieces and 5 to 54 trees a tile; the regional cache 555 KB after them |
+| Half a tile of woods (made-up cover, the test roads through it) | 5 canopy volumes, 17 trunks, 4 crowns; none on a road |
+
+So a tile's roads cost about 3 KB stored and a few milliseconds of the server's time; what a tile waits for is
+still the survey (and, once per region, Overpass: 3 to 10 s for a region the first time anyone goes near it,
+fetched while the tile's survey is asked).
+
+#### Buildings: the plan
+
+Not built in this step: shells need footprints, and the footprints a place uses do not come from where the
+roads do.
+
+1. **Footprints.** OpenStreetMap's buildings are sparse in the rural US (Magnolia's map takes its 4,000-odd
+   from Overture: Microsoft's footprints traced from imagery, OpenStreetMap's, USGS lidar heights). Overture is
+   GeoParquet on S3, read by bounding box; C# has no Parquet reader without a new package (Parquet.Net, MIT),
+   and the alternative is a downloader child process in its own venv (`fetch_place.py`'s overturemaps), as
+   this doc first planned. Either fills the regional cache with a region's footprints and heights (and
+   Overture's addresses, which are the National Address Database in the US, for the names). Cody's choice: a
+   new package in the server, or Python on the VPS. OpenStreetMap's own `building=*` ways can come in the same
+   Overpass region now, for towns that are mapped, as a first source.
+2. **The shell, gen_osm.py's build() at medium detail**, ported as the roads were: the footprint covered by up
+   to four rectangles (cover, largest_rect), walls round their union (exterior_runs, wall_run with the door
+   cut), a floor slab and a roof deck, one room per rectangle, a front door on the longest wall facing the
+   nearest road, a doorway joining the room to the outdoors; the shed rule (small outbuildings one solid box);
+   classify() without parcels (house, mobile home, premises, barn, shed by size, shape, Overture's class and
+   the land cover's built-up); a name from the address, else "House off Main Street".
+3. **The same answer whichever tile.** A building belongs to the tile its footprint's middle is in, which
+   stores all of it (rooms, doorway and door together, as the places' copies keep them); a tile grades its
+   ground to the floor slab of every building within its margin (a pad, as gen_osm.py's pad_of), so a house
+   across an edge sits level in both. Doors link to rooms by ids within their own tile (already how a copied
+   tile is spawned).
+4. **Then** drives and lots (lot lines decided between neighbouring addresses within the 100 m margin the doc
+   gives), interiors at high detail, and roads as RoadData so the world's traffic can use them.
+
+Estimate: footprints and shells one session once the data choice is made; lots, drives and addresses one
+more.
+
+### Left after stage 2 (as of 2026-10-10)
+
+- Outside the real places, world tiles have their roads and woods (2026-10-10, above), not yet buildings,
+  addresses, drives, paths, rail or water, and their roads are not yet roads the traffic routes on. The plan
+  for buildings is above.
 - (Done 2026-10-09: a player who logs out in the world comes back to the same spot at login, through the
   loading screen; the landing map if the ground there cannot be built within 30 s. See Building ahead.)
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.

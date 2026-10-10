@@ -670,6 +670,9 @@ def slug(name):
 # roads share a node in OpenStreetMap. Ways of the same name and class that meet end to end are one
 # road, so a street the mapper happened to split in three is still one street; a road that comes back
 # on itself (a loop, a lollipop cul-de-sac) is cut where it does, because a junction joins two roads.
+# The world's tiles lay roads with a C# port of this (OpenFPS.Server/OneWorld/WorldFeatures.cs: ROAD_CLASS,
+# SURFACE, way_width, lay_line with road_y, ground_all's pitch, the zones and junctions): change both, and
+# WorldFeaturesTests.Magnolia_s_roads_are_laid_as_gen_osm_laid_them holds them together.
 ROAD_CLASS = {
     # OSM highway: (our type, rank, two-lane width m)
     "motorway": ("arterial", 5, 7.4), "trunk": ("arterial", 5, 7.4), "primary": ("arterial", 4, 7.2),

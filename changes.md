@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- The world has its roads and woods outside the real places (docs/WORLD_STREAMING.md, "Roads and woods on the
+  world's tiles"). A world tile is made with OpenStreetMap's drivable roads, each way in its own width and
+  surface, laid in pieces on the ground as gen_osm.py lays a place's (a test holds the port to Magnolia's map:
+  70 of 70 pieces round the spawn within 0.03 mm and the same height and turn), sidewalks where tagged, a named place over each road and at each junction, the ground graded
+  under them, and the woods from the land cover (canopy volumes, trunks, the wind in the trees). Decided from
+  whole ways, never the tile, so tiles agree whichever is made first: a road across an edge is stored once and
+  graded under on both sides, and the shared edge is one line of posts. OpenStreetMap comes from Overpass a
+  0.05 degree region at a time, all at the data of 2026-10-01, kept in `world/sources/osm`; nothing generated
+  reaches into Magnolia's or Albany's tiles. Downtown Tomball: a tile 22 KB stored, 12 ms to lay; made over the network 0.6 to 3.2 s a tile, 3DEP's time as before. Generator version 3. Not yet: buildings (planned),
+  drives, paths, rail, water, and traffic on these roads. Try `/join world address 401 Market St, Tomball, TX`.
+  Unheard.
 - The world's ground has its land cover (docs/WORLD_STREAMING.md, "Land cover for the ground"). Outside the
   real places a world tile's cells were all dirt; now each 2 m cell is what ESA WorldCover 2021 says is
   there: woods are a leaf-litter floor (Foliage), grassland and wetland Grass, built-up Asphalt, lakes Water,

@@ -23,6 +23,9 @@ public sealed class WorldTile
     /// <summary>Where its ground's materials came from, with the attribution its licence asks for; null where
     /// there was no land cover (every cell dirt).</summary>
     public string? LandCover { get; set; }
+    /// <summary>Where what stands on it came from, with the attribution its licence asks for (OpenStreetMap's,
+    /// ODbL: the store is a derived database of it); null for a tile of ground alone.</summary>
+    public string? Features { get; set; }
     public TerrainData? Terrain { get; set; }
     /// <summary>What stands on it, as a map's entities, positions in the tile's own metres.</summary>
     public List<EntityData> Entities { get; set; } = new();
