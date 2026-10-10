@@ -307,7 +307,7 @@ public sealed class OpeningRoutes
         float r = 0f;
         foreach (int id in new[] { d.RegionA, d.RegionB })
             if (map.Regions.TryGetValue(id, out var region))
-                r = MathF.Max(r, MathF.Max(region.RoomSize.X, MathF.Max(region.RoomSize.Y, region.RoomSize.Z)));
+                r = MathF.Max(r, RoomAcoustics.Reach(region));
         return r;
     }
 
@@ -320,7 +320,11 @@ public sealed class OpeningRoutes
         if (d.Rotation == default && map != null)
             foreach (int r in new[] { d.RegionA, d.RegionB })
             {
-                if (map.Regions.TryGetValue(r, out var region)) { h.Add(region.RoomSize); h.Add(RoomAcoustics.OpenFaceCount(region)); }
+                if (map.Regions.TryGetValue(r, out var region))
+                {
+                    h.Add(region.RoomSize); h.Add(RoomAcoustics.OpenFaceCount(region));
+                    h.Add(RoomAcoustics.Volume(region)); h.Add(region.Extent);
+                }
                 if (map.RegionPositions.TryGetValue(r, out var c)) h.Add(c);
                 if (map.RegionRotations.TryGetValue(r, out var q)) h.Add(q);
             }
@@ -424,24 +428,13 @@ public sealed class OpeningRoutes
         var faceAbsorption = new Dictionary<int, Vector3>();
         if (map != null)
         {
-            Span<float> areas = stackalloc float[6];
             foreach (var (id, region) in map.Regions)
             {
                 if (id == AcousticConstants.GlobalRegionId || id == map.GlobalEnvironmentId) continue;
                 if (region.RoomSize.X <= 0f || RoomAcoustics.OpenFaceCount(region) == 6) continue;
-                RoomAcoustics.FaceAreas(region.RoomSize, areas);
-                Vector3 a = Vector3.Zero;
-                for (int f = 0; f < 6; f++)
-                {
-                    // An open face is a perfect absorber of its own area: what reaches it leaves.
-                    if (RoomAcoustics.FaceIsOpen(region.Materials, f)) { a += new Vector3(areas[f]); continue; }
-                    var p = region.Materials != null && f < region.Materials.Length
-                        ? AcousticRegistry.GetPropertiesByResonanceIndex(region.Materials[f])
-                        : AcousticRegistry.GetProperties("Generic");
-                    a += areas[f] * new Vector3(p.AbsorptionLow, p.AbsorptionMid, p.AbsorptionHigh);
-                }
                 model._nodeOf[id] = id;
-                faceAbsorption[id] = a;
+                // Its flood's lining where it flooded, else its box's faces; an open face absorbs all its area.
+                faceAbsorption[id] = RoomAcoustics.AbsorptionArea(region);
             }
         }
 

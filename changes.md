@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Rooms measure themselves from their floods (docs/GEOMETRY.md 12.6 item 1, "Measured from their floods"), unheard.
+  A flooded room's volume, face areas and face materials come from the walls round its air, by a ray to the surface
+  for each metre of lining, not from its box; the room lift, the routes' room absorption and the Sabine estimate read
+  them. Rooms that do not flood (yards, streets) keep their boxes. What moved: the terminal concourse's acoustic-tile
+  ceiling and the city houses' carpet and sofas are heard (the field through their doors 5.4 and 3.6 dB down), the
+  tunnel's ends are no longer counted twice (2.5 dB up), and on the real places the box survey's grass and dirt
+  ceilings are gone (a tiled bathroom 7.8 dB up). The client floods 1.5 s longer on the city (8 threads). Found: on
+  Albany and Magnolia the ground comes up through 938 rooms' floor slabs. The wire hash changes (Acoustics and Common
+  changed); no message did.
+
 - Sound library stage 4 (docs/SOUND_LIBRARY_BOUNDARY.md section 17): rooms and openings are values. `Room` and
   `Opening` in OpenFPS.Acoustics carry what `RegionComponent` and `PortalComponent` carried; the acoustic map,
   `RoomAcoustics` and the generator take them, and `EntityAcoustics` (Common) makes them from the entities in

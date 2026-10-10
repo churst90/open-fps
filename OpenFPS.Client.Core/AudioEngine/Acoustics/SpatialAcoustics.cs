@@ -243,7 +243,7 @@ public class SpatialAcoustics
         if (world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(regionId, out var region)
             && RoomAcoustics.IsEnclosure(region))
         {
-            float volume = region.RoomSize.X * region.RoomSize.Y * region.RoomSize.Z;
+            float volume = RoomAcoustics.Volume(region);   // its flood's air where it flooded
             roomGain = Math.Clamp(1000.0f / Math.Max(50.0f, volume), 0.5f, 4.0f);
             if (region.IsIndoor && listenerRegionId == regionId) roomGain *= 1.25f;
         }

@@ -209,6 +209,62 @@ public class RoomFloodTests
         Assert.True(open.Open);
     }
 
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(30f)]
+    [InlineData(45f)]
+    public void A_room_measures_its_volume_faces_and_what_lines_them_whatever_its_angle(float degrees)
+    {
+        // The 4 by 3 by 2.7 m room with a carpet 1 cm thick laid on its concrete floor: 32.4 m3; the floor and the
+        // ceiling 12 m2 each, north and south 10.8, east and west 8.1.
+        var solids = Room();
+        var carpet = new Vector3(4f, 0.01f, 3f);
+        solids.Add(SolidSpec.Of(80, new Vector3(0, 0.005f, 0), Quaternion.Identity, carpet,
+                                EntityGeometry.SurfaceOf("Carpet", carpet, 0, 0, false, 0, 0, false, false, false, null), null));
+        var q = Quaternion.CreateFromAxisAngle(Vector3.UnitY, degrees * MathF.PI / 180f);
+        var hint = Hint() with { Centre = Vector3.Transform(Hint().Centre, q), Rotation = q };
+        var r = RoomFlood.Flood(World(Turned(solids, q)), new[] { hint }, Origin, measure: true)[500];
+        var lining = r.Lining;
+        Assert.NotNull(lining);
+        Assert.InRange(lining!.Volume, 32.4f * 0.95f, 32.4f * 1.05f);
+        float[] want = { 12f, 12f, 10.8f, 10.8f, 8.1f, 8.1f };
+        string seen = string.Join(" ", Enumerable.Range(0, 6).Select(i => $"{lining.Lined(i):F2}")) + $", volume {lining.Volume:F2}";
+        // Each face within 7 % square to the grid; turned, a ray at a corner answers for faces of both walls (1 m
+        // cubes), so a wall can take a few tenths of its neighbour's area, and only their sum is held to 5 %.
+        float each = degrees == 0f ? 0.07f : 0.15f;
+        for (int f = 0; f < 6; f++)
+            Assert.True(MathF.Abs(lining.Lined(f) / want[f] - 1f) <= each, $"face {f}: {seen}");
+        Assert.True(MathF.Abs(Enumerable.Range(2, 4).Sum(lining.Lined) / 37.8f - 1f) <= 0.05f, $"walls: {seen}");
+        // The carpet, not the slab under it, is what the floor is; the walls are the concrete they are.
+        Assert.True(lining.Surfaces[0].GetValueOrDefault("Carpet") > 0.9f * lining.Lined(0));
+        Assert.True(lining.Surfaces[2].GetValueOrDefault("Concrete") > 0.9f * lining.Lined(2));
+        Assert.All(lining.Open, a => Assert.Equal(0f, a));
+
+        // As the acoustics have it: the floor's material is carpet, and Sabine's time is the box's within a few per cent.
+        AcousticRegistry.Initialize();
+        AcousticRegistry.TryGetResonanceIndex("Concrete", out int concrete);
+        AcousticRegistry.TryGetResonanceIndex("Carpet", out int carpetIndex);
+        var box = new Room { IsIndoor = true, RoomSize = new Vector3(4, 2.7f, 3), Materials = new[] { carpetIndex, concrete, concrete, concrete, concrete, concrete } };
+        var measured = RoomAcoustics.Measured(box, lining);
+        Assert.True(RoomAcoustics.IsMeasured(measured));
+        Assert.Equal(carpetIndex, measured.Materials[0]);
+        Assert.Equal(concrete, measured.Materials[1]);
+        Assert.InRange(RoomAcoustics.DecayMs(measured), RoomAcoustics.DecayMs(box) * 0.9f, RoomAcoustics.DecayMs(box) * 1.1f);
+    }
+
+    [Fact]
+    public void An_open_front_measures_as_open_and_the_air_outside_it_is_not_the_room()
+    {
+        // The room with its doorway open: the margin outside the door is under the sky, so it is not the room's
+        // volume, and the doorway is an open part of the south face.
+        var r = RoomFlood.Flood(World(Room(gap: true)), new[] { Hint() }, Origin, measure: true)[500];
+        Assert.True(r.Open);
+        var lining = r.Lining!;
+        Assert.InRange(lining.Volume, 32.4f * 0.95f, 32.4f * 1.08f);
+        Assert.InRange(lining.Open[3], 1.5f, 2.6f);   // the doorway, 1 by 2.1 m
+        Assert.True(lining.Open[0] + lining.Open[1] + lining.Open[2] + lining.Open[4] + lining.Open[5] < 0.5f);
+    }
+
     [Fact]
     public void A_roof_with_no_ceiling_under_it_closes_the_room_to_its_eaves()
     {

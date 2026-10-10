@@ -1700,6 +1700,61 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
 
    The five that differ are in houses 400 to 520 m from the spawn, where the client holds less round them than the
    server (not traced further). `RoomFloodTests` holds the city to every point the same.
+
+   **Measured from their floods (2026-10-10, unheard).** A flooded room's volume, face areas and face materials come
+   from its flood, not its box (2.7 item 4). `RoomFlood.Flood(..., measure: true)` gives each room a `Lining`: per face
+   of the box's frame (floor, ceiling, north +Z, south, east +X, west), the area of each material lining it, the area
+   open to the sky and the area that is another room's air, the volume, and the air's bounds. A ray goes from the air
+   cell to the surface for each group of faces in a 1 m cube (one face in sixteen on a wall; one for every face was 5
+   million rays and 13 s on the city): it gives the material (the carpet, not the slab under it), the surface's angle
+   (a cell's face over the normal's L1 length, so a wall at 45 degrees is not its staircase) and the gap from the
+   cells to the surface, which goes into the volume and grows each face by the gaps across it (a 2.7 m wall over a
+   carpet's cell is 2.5 m of cells). For a room open past its margin the air under the open sky is the outdoors, not
+   the room (the margin past a hangar's open front, or over a roof). A room with no air under a roof (a walled garden)
+   is not measured. Only the client measures (`RoomsByFlood(..., measure: true)`); the server floods for lookups.
+
+   `RoomAcoustics.Measured(room, lining)` puts it on the `Room` value (`Volume`, `FaceAreas`, `FaceAbsorption` per
+   band and broadband, `Extent`, and `Materials` as the main lining of each face). A face stays "None" where the box's
+   was (an open side, a portal's end) and becomes "None" where half of it or more is open sky. Another room's air
+   absorbs nothing in the measure, because the routes count what leaves by an opening at its own S·tau (the box's open
+   ends counted it twice). Readers: `RoomAcoustics.Volume`, `FaceAreas`, `AbsorptionArea`, `Reach` and `DecayMs`;
+   SpatialAcoustics' room lift; `OpeningRoutes`' room absorption, face reach and declared hash.
+   `AcousticVolumeGenerator.GenerateRegions(..., floods)` measures as it builds the map; the client measures again
+   when the geometry is published and when a room arrives (`EntityAcoustics.RoomOf`). Rooms that do not flood keep
+   their boxes.
+
+   AudioLab `--geometry-parity map=ID only=measure [sort=rt|volume|gain|field]` sets each flooded room's measure
+   against its box, with the routes' absorption before and after (the field through its openings goes as 1/A):
+
+   | | rooms | flood / with the measure (8 threads) | volume flood/box 10th / median / 90th | surface | Sabine RT60 mid | field through openings moved over 3 dB |
+   |---|---|---|---|---|---|---|
+   | city | 488 | 2.6 s / 4.3 s | 0.89 / 0.95 / 0.97 | 0.99 / 0.99 / 1.03 | 0.45 / 0.92 / 1.44 | 67 (all quieter) |
+   | Magnolia | 1,810 | 2.3 s / 3.0 s | 0.97 / 1.02 / 1.16 | 0.99 / 1.03 / 1.17 | 0.81 / 1.00 / 2.47 | 36 (22 louder) |
+   | Albany | 2,864 | 5.6 s / 7.0 s | 0.97 / 1.06 / 1.25 | 1.00 / 1.07 / 1.27 | 0.70 / 1.03 / 2.55 | 43 (7 louder) |
+
+   What moved most, and why: the terminal concourse's ceiling is acoustic tile, not the concrete over it (Sabine 6.1 to
+   1.1 s, the field through its openings 5.4 dB down); the city's houses have carpet and sofas the box survey did not
+   see (1.19 to 0.45 s, 3.6 dB down); the tunnel halves lost their ends counted twice (2.5 dB up); the corridors'
+   ceilings are plaster, not the carpet of the flat above (1.6 dB up); the hangar's 221 m2 front is open, its margin
+   outside is not (15.6 to 9.2 s). On the places the box survey had grass and dirt for ceilings and walls (a bathroom
+   "Grass, Plaster, Plaster, Plaster, Grass, Grass" is tile and plaster: 7.8 dB up). Found by it: on Albany 778 rooms
+   and on Magnolia 160 have floors mostly of the ground (Dirt or Grass): the terrain comes up through the floor slab
+   inside the footprint, and those rooms absorb as a field does. That is the generator's (the slab under the ground),
+   not the measure's. `RoomFloodTests` holds a 4 by 3 m room at 0, 30 and 45 degrees: volume within 5 %, walls within
+   5 % together, the carpet as the floor, and Sabine's time the box's within 10 %; and a room with an open door, its
+   doorway open and the air outside it not the room's.
+
+   Where to listen (`/tp` x east, y north, z height, on the floor; the field change is for a sound heard from the room
+   through its openings):
+   - city: Terminal concourse, south end, `/tp 211.2 3.3 0.3` (field 5.4 dB down); 23 Birch Street, `/tp -347.0 -34.5
+     0.3` (3.6 dB down, the city's houses alike); Tunnel, south half, `/tp 0.0 -262.5 0.3` (2.5 dB up); Union Building
+     corridor, floor 7, `/tp 20.3 67.0 21.3` (1.6 dB up); Hangar, `/tp 254.0 190.0 0.1` (1.5 dB down); Parking garage,
+     level 0, `/tp -66.8 62.0 0.3` (1.3 dB down).
+   - Magnolia: 31909 Beaver Street, bathroom, `/tp 70.8 -31.4 -1.2` (7.8 dB up); 26120 Nichols Sawmill Road, house,
+     `/tp -1065.9 420.7 3.5` (7.3 dB up); 19415 Turtle Dove Lane, barn, `/tp -88.8 -253.0 3.5` (8.4 dB down).
+   - Albany: Linn County Juvenile Detention, `/tp 1470.1 1253.4 0.3` (9.3 dB down, a dirt floor); Linn-Benton
+     Community College Cafeteria, `/tp -27.5 -345.4 0.8` (7.5 dB down); Industrial B, `/tp -55.0 -213.4 0.8` (5.3 dB
+     down).
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
    would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a

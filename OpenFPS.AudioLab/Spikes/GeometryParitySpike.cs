@@ -958,6 +958,10 @@ public static class GeometryParitySpike
         if (only.Contains("agree"))
             AgreementParity(maps, mapId, ecs, lookup, data, mapSize, show, tallies, args);
 
+        // ── Rooms measured from their floods against their boxes ─────────────────────────────────
+        if (only.Contains("measure"))
+            MeasureParity(ecs, serverWorld, data, mapSize, show, args);
+
         // ── Rooms from the walls against the rooms as drawn ──────────────────────────────────────
         if (only.Contains("rooms"))
             RoomsParity(ecs, rebuilt, data, show, lookup, args);   // with the door leaves shut in their doorways
@@ -1078,6 +1082,103 @@ public static class GeometryParitySpike
         foreach (var part in (Environment.GetEnvironmentVariable("ROOM_DEBUG") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
             if (int.TryParse(part, out int debugId) && rooms.TryGetValue(debugId, out var dbg))
                 TraceRoom(world, data, seeds.First(x => x.Id == debugId), dbg, ecs, lookup);
+    }
+
+    /// <summary>
+    /// Each flooded room measured from its flood (RoomAcoustics.Measured, docs/GEOMETRY.md 2.7 item 4) against its box
+    /// as the client had it before: volume, surface, the Sabine absorption area and reverberation time per band (low,
+    /// mid, high), the small-room lift (SpatialAcoustics' roomGain) and the change in a room's diffuse field through
+    /// its openings (OpeningRoutes' absorption, its faces' and its openings' S·tau: the field goes as 1/A), the rooms
+    /// whose measure changed most first, with where to stand in each. sort=rt|volume|gain|field.
+    /// </summary>
+    private static void MeasureParity(World ecs, TriangleWorld world, MapData data, Vector3 mapSize, int show, string[] args)
+    {
+        var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
+        int threads = int.Parse(Arg(args, "threads", "8"));
+        var clock = Stopwatch.StartNew();
+        EntityAcoustics.RoomsByFlood(world, defs, data.MinBound, threads: threads);
+        double plainMs = clock.Elapsed.TotalMilliseconds;
+        clock.Restart();
+        var cells = EntityAcoustics.RoomsByFlood(world, defs, data.MinBound, threads: threads, measure: true);
+        double measureMs = clock.Elapsed.TotalMilliseconds;
+        // The client's map as it is now (measured), and as it was (the same map, each room its box).
+        var after = ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
+                                                      streamed: data.TileMetres > 0, report: false, geometry: world);
+        var before = ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
+                                                       streamed: data.TileMetres > 0, report: false, geometry: world);
+        foreach (var def in defs) if (before.Regions.ContainsKey(def.EntityId)) before.Regions[def.EntityId] = def.Region.ToRoom();
+        OpeningRoutes Routes(AcousticMap map)
+        {
+            var snap = new WorldSnapshot { AcousticMap = map, TileMetres = data.TileMetres };
+            foreach (var def in defs)
+            {
+                snap.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
+                if (def.Region.RoomSize.X > 0) snap.RegionEntityIds.Add(def.EntityId);
+            }
+            var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+            return OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(snap, SteamAudioScene.BoxesFromWorld(snap), p => acoustics.GetRegionAt(snap, p));
+        }
+        clock.Restart();
+        var routesBefore = Routes(before);
+        var routesAfter = Routes(after);
+        double routesMs = clock.Elapsed.TotalMilliseconds;
+        static float Rt(float v, float a) => a > 1e-3f ? 0.161f * v / a : float.PositiveInfinity;
+        static float Gain(float v) => Math.Clamp(1000f / MathF.Max(50f, v), 0.5f, 4f);
+        static string Db(float x) => (20f * MathF.Log10(x)).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture);
+        static string Bands(Vector3 v, string f) => $"{v.X.ToString(f, CultureInfo.InvariantCulture)}/{v.Y.ToString(f, CultureInfo.InvariantCulture)}/{v.Z.ToString(f, CultureInfo.InvariantCulture)}";
+        var rows = new List<(double Key, string Line)>();
+        var vRatio = new List<double>(); var sRatio = new List<double>(); var rtRatio = new List<double>();
+        int flipped = 0, gainMoved = 0, materialsMoved = 0, n = 0;
+        string sort = Arg(args, "sort", "rt");
+        var names = new Dictionary<int, string>();
+        foreach (var m in AcousticRegistry.KnownMaterials()) if (AcousticRegistry.TryGetResonanceIndex(m, out int ix)) names.TryAdd(ix, m);
+        Span<float> fa = stackalloc float[6], fb = stackalloc float[6];
+        foreach (var def in defs.Where(d => d.Region.RoomSize.X > 0).OrderBy(d => d.EntityId))
+        {
+            if (!cells.TryLining(def.EntityId, out var lining)) continue;
+            n++;
+            var box = def.Region.ToRoom();
+            var flood = RoomAcoustics.Measured(box, lining);
+            float vb = RoomAcoustics.Volume(box), vf = RoomAcoustics.Volume(flood);
+            RoomAcoustics.FaceAreas(box, fb); RoomAcoustics.FaceAreas(flood, fa);
+            float sb = 0f, sf = 0f;
+            for (int f = 0; f < 6; f++) { sb += fb[f]; sf += fa[f]; }
+            var ab = RoomAcoustics.AbsorptionArea(box); var af = RoomAcoustics.AbsorptionArea(flood);
+            bool eb = RoomAcoustics.IsEnclosure(box), ef = RoomAcoustics.IsEnclosure(flood);
+            if (eb != ef) flipped++;
+            float gb = eb ? Gain(vb) : 1f, gf = ef ? Gain(vf) : 1f;
+            if (MathF.Abs(20f * MathF.Log10(gf / gb)) >= 1f) gainMoved++;
+            var mb = string.Join(",", box.Materials.Select(i => names.GetValueOrDefault(i, "#" + i)));
+            var mf = string.Join(",", flood.Materials.Select(i => names.GetValueOrDefault(i, "#" + i)));
+            if (mb != mf) materialsMoved++;
+            var rtb = new Vector3(Rt(vb, ab.X), Rt(vb, ab.Y), Rt(vb, ab.Z));
+            var rtf = new Vector3(Rt(vf, af.X), Rt(vf, af.Y), Rt(vf, af.Z));
+            vRatio.Add(vf / MathF.Max(1e-3f, vb)); sRatio.Add(sf / MathF.Max(1e-3f, sb)); rtRatio.Add(rtf.Y / MathF.Max(1e-6f, rtb.Y));
+            routesBefore.TryGetAbsorption(def.EntityId, out var rb);
+            routesAfter.TryGetAbsorption(def.EntityId, out var ra);
+            var field = rb.Y > 0f && ra.Y > 0f ? new Vector3(10f * MathF.Log10(rb.X / ra.X), 10f * MathF.Log10(rb.Y / ra.Y), 10f * MathF.Log10(rb.Z / ra.Z)) : Vector3.Zero;
+            double key = sort switch
+            {
+                "volume" => Math.Abs(Math.Log(vf / Math.Max(1e-3, vb))),
+                "gain" => Math.Abs(Math.Log(gf / gb)),
+                "field" => Math.Abs(field.Y),
+                _ => Math.Abs(Math.Log(rtf.Y / Math.Max(1e-6, rtb.Y))),
+            };
+            var c = def.Transform.Position;
+            rows.Add((key, $"{def.Region.FriendlyName} ({def.EntityId}) /tp {c.X:F1} {c.Z:F1} {lining.Min.Y + 0.05f:F1} (its floor; the box's middle at height {c.Y:F1})\n"
+                           + $"      volume {vb:F1} -> {vf:F1} m3; surface {sb:F1} -> {sf:F1} m2 (open {lining.Open.Sum():F1}, other rooms' air {lining.Meets.Sum():F1}); "
+                           + $"A L/M/H {Bands(ab, "F1")} -> {Bands(af, "F1")} m2\n"
+                           + $"      RT60 L/M/H {Bands(rtb, "F2")} -> {Bands(rtf, "F2")} s; routes' A mid {rb.Y:F1} -> {ra.Y:F1} m2, field through its openings {Bands(new Vector3(MathF.Round(field.X, 1), MathF.Round(field.Y, 1), MathF.Round(field.Z, 1)), "+0.0;-0.0;0.0")} dB; "
+                           + $"room lift {Db(gb)} -> {Db(gf)} dB{(eb != ef ? $"; enclosed {eb} -> {ef}" : "")}\n"
+                           + $"      faces {mb} -> {mf}; the floor is {string.Join(", ", lining.Surfaces[0].OrderByDescending(kv => kv.Value).Take(3).Select(kv => $"{(kv.Key.Length > 0 ? kv.Key : "?")} {kv.Value:F0} m2"))}"));
+        }
+        static double P(List<double> l, double q) { if (l.Count == 0) return 0; l.Sort(); return l[Math.Min(l.Count - 1, (int)(q * l.Count))]; }
+        Console.WriteLine();
+        Console.WriteLine($"measure: {n} flooded room(s); flood {plainMs:F0} ms, with the measure {measureMs:F0} ms ({threads} thread(s)); routes before and after {routesMs:F0} ms");
+        Console.WriteLine($"  flood/box: volume 10th {P(vRatio, 0.1):F2} median {P(vRatio, 0.5):F2} 90th {P(vRatio, 0.9):F2}; "
+                          + $"surface {P(sRatio, 0.1):F2} / {P(sRatio, 0.5):F2} / {P(sRatio, 0.9):F2}; RT60 mid {P(rtRatio, 0.1):F2} / {P(rtRatio, 0.5):F2} / {P(rtRatio, 0.9):F2}");
+        Console.WriteLine($"  {flipped} enclosed or not changed; {gainMoved} with the room lift moved 1 dB or more; {materialsMoved} with a face's material changed");
+        foreach (var (_, line) in rows.OrderByDescending(r => r.Key).Take(show)) Console.WriteLine("    " + line);
     }
 
     /// <summary>One room's way out: the path through its air from the cell nearest its middle to where it met air no
