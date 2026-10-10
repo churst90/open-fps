@@ -34,6 +34,9 @@ Recent work, newest first. `git log` has the rest.
   (a client and server from either side of this refuse each other at login, as for any edit to Common); the
   door models' fingerprint moved with them and stayed the same (978619539e83), so door render caches are still
   good. No sound changed: the 17 renders are the same to the bit and the emitter streams are the same.
+  Then (Cody, decision 4): `AcousticMap` and the octree were `[MemoryPackable]` but never sent or stored,
+  so the attributes went and OpenFPS.Acoustics no longer references MemoryPack; `TransientSound` keeps it
+  in OpenFPS.Sound.
 
 - Far things sent less often: a far moving thing's once-a-second keep-alive now counts as a change when the
   thing has strayed from what the client predicts, so it goes again the tick after, as any other far state sent
@@ -66,19 +69,19 @@ Recent work, newest first. `git log` has the rest.
   496.3 / 397.0 / 620.3 expected. No engine code changed; fingerprints unchanged.
 
 - The world has buildings outside the real places (docs/WORLD_STREAMING.md, "Buildings on the world's tiles").
-  Overture's footprints (Microsoft's, OpenStreetMap's, USGS lidar heights) are read by the server itself, by HTTP
-  byte range from Overture's GeoParquet on S3: only the footer of a file and the few columns of the row groups a tile
-  needs (about 2.3 MB covers a row group of 18,000 buildings), kept in `world/sources/overture`, all from one release
-  (2026-09-23.1). New server-only package: Parquet.Net (MIT, fully managed). Each building is built as gen_osm.py
-  builds a place's at medium detail, ported to C# (a test holds the port to Magnolia's map: 1,503 of its 1,506
-  medium-detail buildings the same in every part within 1 cm; in the other 3 two equal front walls tie and gen_osm's
-  rounding picks the other): walls, floor, roof, a ceiling
-  in a home, one room, a front door facing the nearest road, set on a level pad; sheds, garages and barns are solid
+  Overture's footprints (Microsoft's, OpenStreetMap's, USGS lidar heights) are read by the server itself, by
+  HTTP byte range from Overture's GeoParquet on S3: only the footer of a file and the few columns of the row
+  groups a tile needs (about 2.3 MB covers a row group of 18,000 buildings), kept in `world/sources/overture`,
+  all from one release (2026-09-23.1). New server-only package: Parquet.Net (MIT, fully managed). Each
+  building is built as gen_osm.py builds a place's at medium detail, ported to C# (a test holds the port to
+  Magnolia's map: 1,503 of its 1,506 medium-detail buildings the same in every part within 1 cm; in the other
+  3 two equal front walls tie and gen_osm's rounding picks the other): walls, floor, roof, a ceiling in a
+  home, one room, a front door facing the nearest road, set on a level pad; sheds, garages and barns are solid
   boxes. Without addresses a house is "House off Main Street", a shop or church by its own name. A building is
-  stored whole by the tile its middle is in and the ground is graded under it in every tile it touches, the same
-  whichever is made first. Driveways too: OpenStreetMap's, and gen_osm's made-up one for a house without. Each tile
-  records its buildings' sources and licences. Generator version 4. Not yet: addresses, lots and lawns, high detail.
-  Try `/join world address 401 Market St, Tomball, TX`. Unheard.
+  stored whole by the tile its middle is in and the ground is graded under it in every tile it touches, the
+  same whichever is made first. Driveways too: OpenStreetMap's, and gen_osm's made-up one for a house without.
+  Each tile records its buildings' sources and licences. Generator version 4. Not yet: addresses, lots and
+  lawns, high detail. Try `/join world address 401 Market St, Tomball, TX`. Unheard.
 - The loudspeaker, redone as one model (Cody: "redo this item so it's designed properly and correctly.
   Make the resulting audio actually low quality and sound like a megaphone speaker too"). Renders and
   what to listen for in inbox/loudspeaker-2026-10-10. Approved by ear 2026-10-10 (Cody: "sounds good
@@ -156,20 +159,21 @@ Recent work, newest first. `git log` has the rest.
     1 read it. GasHobTests: the hand lets go within a second, the flame safety hob is held 3.3-4.5 s, the
     re-ignition module stops itself, the crack's 2 kHz octave is under its 8 kHz, nothing rings after it.
 - Water runs over the ground (docs/RUNNING_WATER.md section 13; docs/MATTER.md step 4). Every world tile and
-  every map on the survey works out once which way each 2 m cell drains (Priority-Flood and D8, from the tile and
-  the 50 m round it its roads are graded in; a map of a real place routes its whole ground at once) and stores it
-  with the tile (generator version 4: stored tiles are made again; places copied again). The tiles are joined
-  across their edges; hollows keep water as ponds and puddles, or drain through a road's culvert where a road
-  holds them back. The rain runs off each surface by TR-55's curve number (a road nearly all of it at once, a
-  lawn or the woods nothing for the first 30 to 40 mm) and down the lines with each surface's own travel time,
-  plus groundwater base flow; the server sends the state to clients. Where enough gathers, a running-water voice
-  is placed automatically, one every 20 m: rivulets, roadside ditches, creeks and water over paving, none near
-  water a map placed by hand. Magnolia: 749 lines (128 km), 4,152 voices, its biggest creek 3.9 km² and 4.8 km
-  long; by it 8.4 L/s dry, 75 after ten minutes of heavy rain, 12 half an hour after; a roadside ditch 0, 13.3,
-  0.8. Puddles in the road's own dips splash under the wheels. For the fire: `GroundWaterSystem.AddWater` (a
-  bucket, a hose, a burst main runs downhill and soaks in), `WetnessAt`, `WaterReaching`. Renders:
-  inbox/water-over-terrain-2026-10-10. Common changed (a wire field appended): the server, both clients and the
-  Windows zip go out together. Approved by ear 2026-10-10 ("water over terrain sounds good").
+  every map on the survey works out once which way each 2 m cell drains (Priority-Flood and D8, from the tile
+  and the 50 m round it its roads are graded in; a map of a real place routes its whole ground at once) and
+  stores it with the tile (generator version 5, after the buildings' 4: stored tiles are made again; places
+  copied again). The tiles are joined across their edges; hollows keep water as ponds and puddles, or drain
+  through a road's culvert where a road holds them back. The rain runs off each surface by TR-55's curve
+  number (a road nearly all of it at once, a lawn or the woods nothing for the first 30 to 40 mm) and down the
+  lines with each surface's own travel time, plus groundwater base flow; the server sends the state to
+  clients. Where enough gathers, a running-water voice is placed automatically, one every 20 m: rivulets,
+  roadside ditches, creeks and water over paving, none near water a map placed by hand. Magnolia: 749 lines
+  (128 km), 4,152 voices, its biggest creek 3.9 km² and 4.8 km long; by it 8.4 L/s dry, 75 after ten minutes
+  of heavy rain, 12 half an hour after; a roadside ditch 0, 13.3, 0.8. Puddles in the road's own dips splash
+  under the wheels. For the fire: `GroundWaterSystem.AddWater` (a bucket, a hose, a burst main runs downhill
+  and soaks in), `WetnessAt`, `WaterReaching`. Renders: inbox/water-over-terrain-2026-10-10. Common changed (a
+  wire field appended): the server, both clients and the Windows zip go out together. Approved by ear
+  2026-10-10 ("water over terrain sounds good").
 
 - Fire that burns what is there, stage 1 (docs/FIRE.md section 12; Cody, 2026-10-10: fire driven by what
   is a fuel source, not a grid). Approved by ear 2026-10-10 ("new fire sounds good as well"); renders and
@@ -203,8 +207,8 @@ Recent work, newest first. `git log` has the rest.
     one emitter per burning part. `/spawn fire PRESET` lights a thing its neighbours can catch from;
     `/spawn fire lightning` strikes what stands highest ahead; `/spawn fire water` puts a hose on it.
   - AudioLab `--fire spread timeline|cost|game`.
-- World editor phase 3 (docs/WORLD_EDITOR.md section 18; todo item 6). Untried with Orca and NVDA:
-  tests only. Changed on this map (F12, Edit tab; `/edit changed`): the things from the map file that
+- World editor phase 3 (docs/WORLD_EDITOR.md section 18). Tried with tests; the editor dialog works with
+  Orca (Cody), NVDA untried. Changed on this map (F12, Edit tab; `/edit changed`): the things from the map file that
   were moved, turned, resized, renamed or removed, with what was done and where, each put back as the
   map file has it (`/edit putback #ID`), one undo. Versions of a map (World tab; `/edit map save NAME`,
   `versions`, `restore NUMBER`): the whole of a map's edits saved by name and restored as one undo, the
@@ -227,8 +231,8 @@ Recent work, newest first. `git log` has the rest.
   a toe and a shoulder striking it: a stud wall's board over its cavity, a glass door loose in its latch,
   a fence pale on its bolt, a car's panels. The level is anchored to the footstep takes. Shift+E with no
   door in reach knocks on whatever is in front of you; /tap taps it with a fingertip. Rendered once per
-  key on a worker. `--struck` (renders, fit, anchor). Unheard: renders in inbox/struck-things-2026-10-10.
-  StruckThingsTests.
+  key on a worker. `--struck` (renders, fit, anchor). Renders in inbox/struck-things-2026-10-10, heard by
+  Cody the same day with notes (todo.md, "Bump sounds"). StruckThingsTests.
 - The material table (docs/MATTER.md 2.4, step 1 of its order of work). AcousticRegistry has 50 materials:
   26 new ones in families (aluminium, stainless steel, cast iron, copper, brass, bronze, lead, titanium;
   granite, sandstone, laminated glass; oak, pine, maple, plywood, MDF with their grain; PVC, acrylic,
@@ -270,35 +274,37 @@ Recent work, newest first. `git log` has the rest.
     simulator's answer every frame, as in play), the lines include a call (LoudDb), and the beacons
     are off in memory, not through the player's beacons.json.
 
-- People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
-  the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
-  and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;
-  shut an outside door without a closer behind them, however they found it; leave an inside door as
-  found going in and shut it going out ("in" is more doorways from the outside, or the smaller room).
-  The shut is by hand, so it is the same swing and latch from the door's own model as a player's, 0.4
-  to 0.9 s after the doorway is clear. Who is about does not change the rule (Cody, 2026-10-10); this
-  reverses 2026-10-02, when a door found open was left because a rider had shut Brandt Court's door on
-  Cody. Only a body holds the leaf: it waits while anybody is in the doorway or the leaf's way, then
-  shuts. Closers start back 1 s after the last person leaves the doorway (Cody, 2026-10-10: "close on
-  their own after a second of them leaving"); they waited 3.00 s, measured, on the push-bar, glass
-  front and glass pull doors. A closer has no timer of its own, so the 1 s is the leaf held only while
-  somebody is in the doorway box; the sweep and latch, 3.6 to 4.1 s, are unchanged. Until somebody
-  has been in the doorway since it opened, it waits 2 s more for whoever opened it to walk up, so a
-  door opened and never gone through still starts back 3 s after it is fully open. Over an hour on the city with somebody parking every 20 s and Alex keeping a cold
-  night: 175 openings of 22 doors (17 house front doors, a patio door, the five towers' entrances), the
-  longest open 22 s, none left open, and the 352 walkers through no door. Magnolia: 1,323 doors, none
-  opened in an hour, since nobody there goes indoors yet. Server only. NpcDoorTests.
+- People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What the
+  server's people do with a door"). Alex and the drivers from parked cars note how they find a door and open
+  it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself; shut an outside
+  door without a closer behind them, however they found it; leave an inside door as found going in and shut it
+  going out ("in" is more doorways from the outside, or the smaller room). The shut is by hand, so it is the
+  same swing and latch from the door's own model as a player's, 0.4 to 0.9 s after the doorway is clear. Who
+  is about does not change the rule (Cody, 2026-10-10); this reverses 2026-10-02, when a door found open was
+  left because a rider had shut Brandt Court's door on Cody. Only a body holds the leaf: it waits while
+  anybody is in the doorway or the leaf's way, then shuts. Closers start back 1 s after the last person leaves
+  the doorway (Cody, 2026-10-10: "close on their own after a second of them leaving"); they waited 3.00 s,
+  measured, on the push-bar, glass front and glass pull doors. A closer has no timer of its own, so the 1 s is
+  the leaf held only while somebody is in the doorway box; the sweep and latch, 3.6 to 4.1 s, are unchanged.
+  Until somebody has been in the doorway since it opened, it waits 2 s more for whoever opened it to walk up,
+  so a door opened and never gone through still starts back 3 s after it is fully open. Over an hour on the
+  city with somebody parking every 20 s and Alex keeping a cold night: 175 openings of 22 doors (17 house
+  front doors, a patio door, the five towers' entrances), the longest open 22 s, none left open, and the 352
+  walkers through no door. Magnolia: 1,323 doors, none opened in an hour, since nobody there goes indoors yet.
+  Server only. NpcDoorTests.
 - The world has its roads and woods outside the real places (docs/WORLD_STREAMING.md, "Roads and woods on the
   world's tiles"). A world tile is made with OpenStreetMap's drivable roads, each way in its own width and
   surface, laid in pieces on the ground as gen_osm.py lays a place's (a test holds the port to Magnolia's map:
-  70 of 70 pieces round the spawn within 0.03 mm and the same height and turn), sidewalks where tagged, a named place over each road and at each junction, the ground graded
-  under them, and the woods from the land cover (canopy volumes, trunks, the wind in the trees). Decided from
-  whole ways, never the tile, so tiles agree whichever is made first: a road across an edge is stored once and
-  graded under on both sides, and the shared edge is one line of posts. OpenStreetMap comes from Overpass a
-  0.05 degree region at a time, all at the data of 2026-10-01, kept in `world/sources/osm`; nothing generated
-  reaches into Magnolia's or Albany's tiles. Downtown Tomball: a tile 22 KB stored, 12 ms to lay; made over the network 0.6 to 3.2 s a tile, 3DEP's time as before. Generator version 3. Not yet: buildings (planned),
-  drives, paths, rail, water, and traffic on these roads. Try `/join world address 401 Market St, Tomball, TX`.
-  Unheard.
+  70 of 70 pieces round the spawn within 0.03 mm and the same height and turn), sidewalks where tagged, a
+  named place over each road and at each junction, the ground graded under them, and the woods from the land
+  cover (canopy volumes, trunks, the wind in the trees). Decided from whole ways, never the tile, so tiles
+  agree whichever is made first: a road across an edge is stored once and graded under on both sides, and the
+  shared edge is one line of posts. OpenStreetMap comes from Overpass a 0.05 degree region at a time, all at
+  the data of 2026-10-01, kept in `world/sources/osm`; nothing generated reaches into Magnolia's or Albany's
+  tiles. Downtown Tomball: a tile 22 KB stored, 12 ms to lay; made over the network 0.6 to 3.2 s a tile,
+  3DEP's time as before. Generator version 3. Not yet: paths, rail, water, and traffic on these roads
+  (buildings and driveways followed the same day, above). Try `/join world address 401 Market St, Tomball,
+  TX`. Unheard.
 - The world's ground has its land cover (docs/WORLD_STREAMING.md, "Land cover for the ground"). Outside the
   real places a world tile's cells were all dirt; now each 2 m cell is what ESA WorldCover 2021 says is
   there: woods are a leaf-litter floor (Foliage), grassland and wetland Grass, built-up Asphalt, lakes Water,
@@ -332,7 +338,9 @@ Recent work, newest first. `git log` has the rest.
   coarse ground by its 33 posts more than 2 m apart; 2 m ground, the server's included, is unchanged.
 - Engines cost less, with the sound changed by design this time (Cody approved the four levers left by
   the bit-exact pass below). Renders and what to listen for in inbox/engine-cpu-2026-10-09. Costs are
-  `--pool-cost offline` (32 street voices on one fast core) and `--pool-cost machines`.
+  `--pool-cost offline` (32 street voices on one fast core) and `--pool-cost machines`. Merged 2026-10-10
+  (64c0f070) after Cody heard the renders: the phased pass-by that did not sweep was the lab's panned
+  capture, not the game.
   - The valve solver brackets the answer from its first guess: the residual rises at least as 1/Z, so
     one step of the residual times Z lands on the far side of the root, and two evaluations bracket it
     where the old bracket took two of its own and left thousands of pascals to search. A Newton step on
@@ -359,7 +367,7 @@ Recent work, newest first. `git log` has the rest.
     OPENFPS_ENGINE_DETAIL=0 (all full) or =always (all reduced, for listening). EngineDetailTests;
     AudioLab `--pool-cost render DIR handover`, `--pool-cost offline detail=reduced`,
     `--game-levels set=engine-solo`.
-  - The distant-car cycle cache (todo item 12), per engine for now. A reduced engine running steadily
+  - The distant-car cycle cache (todo, "Cars in full detail"), per engine for now. A reduced engine running steadily
     replays its own last six cycles (crank turns through the cycle's zero, so each holds every
     cylinder's firing once) in a random order, never one twice running, joined by crossfading each
     head into what followed the last cycle in the recording, at the same crank angle; each plays at its
@@ -372,7 +380,7 @@ Recent work, newest first. `git log` has the rest.
     rate, bands 0.14 dB apart, the same 50 ms level spread and sharpest sample changes. 32 far voices over
     40 s: 1.08 core-seconds per second, against 1.74 at half rate alone and 2.53 in full. A cruising far
     car replays about 60 % of the time, an idling diesel about half. OPENFPS_CYCLE_CACHE=0 for an A/B.
-    The shared, baked grid per engine type (todo item 12) is still to come.
+    The shared, baked grid per engine type is still to come.
   - Mowers (EngineSynth underneath) get the same: a mower 15 dB under the loudest machine runs its
     engine reduced (MachineVoiceState.Detail, SmallMachineSynth.EngineDetail). Steady is now judged on
     each cycle's mean pedal and load, since a governor moves the pedal within every cycle; a replay lets
@@ -432,7 +440,7 @@ Recent work, newest first. `git log` has the rest.
   every tab. Placing keeps the dialog open and the game says "Placed: ...". `/edit` typed still opens
   the menus, and the MUD still gets them. New commands: `/edit move to EAST NORTH UP`, `/edit face
   DEGREES`, `/edit select drop #ID`. `EditorMenuItem` gained `Section` and `Checked` (appended), so
-  Common changed: new Windows zip and server update together. Untried with Orca and NVDA.
+  Common changed: new Windows zip and server update together. Orca works (Cody, 2026-10-10); NVDA untried.
   EditorDialogTests.
 - Bans. `/ban NAME [DURATION] [REASON]` (30m, 2h, 7d or 4w; none is until lifted), `/unban NAME`,
   `/bans`. A new permission, `ban`, for Moderators and above, grantable and allowed in custom roles.
@@ -457,7 +465,7 @@ Recent work, newest first. `git log` has the rest.
   or window put in it, joined to the places either side; one undo puts the wall back whole. Placing
   keeps the dialog open with its values and focus on What; Escape, Cancel or Control+B close it.
   Values are kept per kind for the session. `/edit build KIND FIELD VALUE ...` does the same from the
-  command line. No wire change. Untried with Orca and NVDA.
+  command line. No wire change. Orca works (Cody, 2026-10-10); NVDA untried.
 - A protected Owner role (docs/CODY_ASKS_2026-10-08.md item 8). The Owner has every permission;
   the Admin has every one but the new `owners`, which makes an owner or changes an owner's role. The
   seeded `admin` account is the Owner, and a server started on an older database makes `admin` the
@@ -476,10 +484,10 @@ Recent work, newest first. `git log` has the rest.
   value now, selected; its label gives the unit and its description the range and help. Enter applies,
   Escape cancels; a value out of range is refused with the reason and the box stays open with the text.
   EditorMenuItem gained appended members, so the build hash changed (new Windows zip and server update
-  together). docs/WORLD_EDITOR.md section 14. Untried with Orca and NVDA.
+  together). docs/WORLD_EDITOR.md section 14. Orca works (Cody, 2026-10-10); NVDA untried.
 - The traced reverb of the room you are in costs 38 % less on the mixer thread, with the same sound
   (--tail-cost, fully optimised, one core: 3,051-3,104 us a 1,024-sample mixer block before,
-  1,890-1,920 after; 14.4 % of a core to 8.9 %). Two changes, each the same output as before to float
+  1,890-1,920 after; 14.4 % of a core to 8.9 %; Cody: "the reverb seems to work great now"). Two changes, each the same output as before to float
   rounding (null tests: 127-131 dB under the output, -135 to -171 dBFS at a loud room's level):
   - The directional part (SharedInputConvolver) convolves in two levels: each response's first 1,024
     samples in blocks of 256, every block, and the rest in blocks of 1,024, once a mixer block. A
@@ -507,7 +515,8 @@ Recent work, newest first. `git log` has the rest.
   scale within seconds. EngineRenderCostTests holds each change against the code it replaced.
   The hybrid CPU inflates what top shows: the pool's threads land on the 3.3 GHz cores and read about
   half as much again as the same work on one fast core.
-- The last four probable bugs from the 2026-10-07 housekeeping. Renders in inbox/probable-bugs-2026-10-09.
+- The last four probable bugs from the 2026-10-07 housekeeping. Renders in inbox/probable-bugs-2026-10-09
+  (the hull's blows approved by ear 2026-10-09; the scattered echoes not yet heard).
   - A wave's blow on a moored boat's hull lands at its own sample in the block. It landed at the start
     of the block, 0 to 2.7 ms early (1.2 ms on average, measured on the aluminium hull's blows). Levels
     are unchanged.
@@ -535,8 +544,8 @@ Recent work, newest first. `git log` has the rest.
   leak issue?" No. A placed thing is added to the map before the world is built, as an authored one is
   (MapOverlayStore.ApplyBefore). Every sustained source outside a glass front door leaked the same way,
   authored or placed. One-off sounds were not affected. Renders and what to listen for in
-  inbox/pa-leak-2026-10-09. Changing OpenFPS.Common changes the wire hash, so the server must be
-  restarted and the Windows zip rebuilt with it.
+  inbox/pa-leak-2026-10-09; approved by ear 2026-10-10. Changing OpenFPS.Common changes the wire hash,
+  so the server must be restarted and the Windows zip rebuilt with it.
   - Over the top of a shut leaf. The city's glass front door leaves are 2.10 m tall in 2.15 m doorways.
     The barrier search went round the leaf over its top edge, through the 5 cm slot, as if nothing stood
     above it: -7/-12/-20 dB from the PA into the lobby, against the leaf's -18/-28/-45
@@ -558,8 +567,6 @@ Recent work, newest first. `git log` has the rest.
     near each source as the client gets them) and `overlays=DIR` (the editor's edits laid over the map).
     `--thin-panel` measures Steam Audio's direct transmission through one panel against its construction.
     `--pa-leak` renders the PA scenes through the real provider.
-## 2026-10-09
-
 - Layers in contact are one panel. A city floor is four boxes touching: a 3 cm plaster ceiling, the
   storey's 25 cm ceiling slab, the next storey's 25 cm floor slab and 4 cm of carpet. Each was paid as
   a wall of its own, the carpet with its free-hanging table figure (20 dB in the low band), and Steam
@@ -611,7 +618,7 @@ Recent work, newest first. `git log` has the rest.
   inaudible; a state sent for a change goes once more the next tick. What a player rides, drives or carries
   goes every tick. The client carries each far thing between its states on the server's numbers and steers
   onto the next one, so Doppler, an engine's road speed and a train's notch come from the server's own
-  velocity. Not merged; Cody to listen to the city first.
+  velocity. Merged 2026-10-10 (11a3c1c5) on the acceptance test below; not yet heard in play.
   - The acceptance test (DistantUpdatesTests, and `AudioLab --distant-updates`) runs the city on the real
     server with a car passing at 108 km/h, an airliner flying over, the light rail and the walkers, and two
     players side by side, one sent everything every tick. On a home connection, everything beyond 150 m:
@@ -623,8 +630,37 @@ Recent work, newest first. `git log` has the rest.
     the same amounts (0.017 degree, and up to 23 % of pitch where the stream ran dry), the one sent less
     often never further. What is sent every tick now takes a late or lost tick the same eased way, which
     changes it on such a connection (not measured against the client before).
-  - Wire change in Common (EntityState.SpeedRate and Turn, a flag in StatePacking): a new Windows zip and a
-    VPS update when it is merged.
+  - Wire change in Common (EntityState.SpeedRate and Turn, a flag in StatePacking): the Windows zip and
+    the VPS go out together.
+- Terrain from real elevation and one world in tiles (geometry stage 3 with world streaming stage 2,
+  steps T1, T2, W1 and W2; docs/GEOMETRY.md section 11, docs/WORLD_STREAMING.md "Stage 2 as built").
+  - T1: a tile of ground is a heightfield of 2 m posts in the triangle world, with a material per cell, on
+    the wire as `TerrainTileComponent` (`ColliderShape.Terrain` appended) and in the acoustic scene; a
+    steep bank is a wall.
+  - T2: Magnolia and Albany stand on the survey's ground: houses on level pads, roads and drives pitched
+    along their run, lawns, trees and props on the ground. The 3 km dirt slab is gone.
+  - W1: the world store in the server's folder (`world/`, gitignored): 250 m tiles keyed on the UTM grid,
+    made on demand from 3DEP, two at a time, kept under a 20 GB cap (`world.json` `CapGigabytes`).
+  - W2: one world. `/join world PLACE`, `/join world address STREET, TOWN, STATE` (the Census geocoder)
+    or a latitude and longitude; frames of the world served as maps; tiles loaded round each player;
+    a tile not built yet stops you at its edge with a low tone and "Not built yet. Wait here, or turn
+    back."; F6's list has two parts, the world and maps. `MapManifest` and `MapSummary` gained appended
+    members, so Common changed.
+- The three bugs of 2026-10-08 (docs/CODY_ASKS_2026-10-08.md items 9, 10 and 11):
+  - E picks what you face: a shut door and a car in reach are weighed, the one within 60 degrees of
+    where you face first, else the nearer (it opened the apartment door behind Cody beside a car).
+  - Alex waiting in a lobby stands clear of the doorway, so the closer shuts the front door (his spot
+    was inside a leaf's width of it).
+  - `/weather` reads the sky over your own map: "Clearing." while a cleared front's rain still falls,
+    "Rain coming in." before it starts. A cleared front's rain now stops; it eased off but never reached
+    zero.
+- The weather rolling on its own draws a new front every five minutes on average (Cody); it was about
+  once a minute, so the weather never settled.
+- The trace threads (TracedReverb, TracedEchoes, LateField) lower themselves to nice +10 on Linux, where
+  `ThreadPriority.BelowNormal` does nothing. Measured first: the mixer's cost is the traced reverb's
+  convolution, not tracing, so reflections in their own process were dropped.
+- A gradient backdrop behind the main menu and the game window, in both clients (dark blue to steel blue,
+  light text above 6:1). Nothing in it is read aloud.
 
 ## 2026-10-07
 

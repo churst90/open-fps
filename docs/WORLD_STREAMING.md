@@ -9,7 +9,8 @@ Four stages:
 1. Streaming within one map. The server keeps the whole map; each client is sent only the tiles
    near it, and tiles are loaded and dropped as it moves. Built now (see "Stage 1 as built").
 2. One world in real coordinates. Tiles keyed by where they are on the Earth, generated on demand by
-   the server running the importer, stored, and streamed with stage 1's machinery.
+   the server running the importer, stored, and streamed with stage 1's machinery. Built 2026-10-09
+   and 10 with terrain (see "Stage 2 as built"); what is left is under "Left after stage 2".
 3. Seamless travel across tiles, with other players, traffic and walkers in the same world.
 4. Maps players build, stored and streamed as tiles the same way.
 
@@ -413,20 +414,8 @@ in four steps. Each leaves every map working and is committed with its tests.
 | W1 | The world store on the server: tiles keyed by UTM zone and 250 m square, versioned by generator, gzip JSON written whole, a lock per tile, and a disk cap (20 GB, a server setting). The tile generator runs in the server in the background, two at a time: terrain from 3DEP asked for in the tile's own UTM metres, nothing downloaded kept; flat open ground where there is no survey | A tile is made once and read from disk after; the cap evicts the least recently visited tiles; a second request for a tile being made waits for it |
 | W2 | One world: a map called "the world" whose tiles are the store's, loaded as players near them. The frame's origin goes on the manifest (appended). Players arrive at a place by name; the maps list has two parts, the world and maps. A tile not yet built stops a player at its edge (a short low tone and once "Not built yet. Wait here, or turn back.") | Tiles are asked for from the far radius and arrive while a player walks; nobody enters a tile that is not there |
 
-What is left after these four:
-
-- The per-tile generator for OpenStreetMap and Overture features (roads, buildings, addresses, woods)
-  that gives the same answer whichever tile is made first. Roads and woods done 2026-10-10 ("Roads and woods
-  on the world's tiles"), buildings and driveways the same day ("Buildings on the world's tiles"); addresses,
-  lots and the rest to come. Over the two real places their
-  maps are copied in ("Places in the world", 2026-10-09).
-- Coarse terrain at 8 m for the far ring (done 2026-10-09, "Coarse ground in the far ring"); still to do:
-  the client's tile cache, frames that rebase past 8 km, crossing a UTM zone edge.
-- Draped road meshes with kerbs and sidewalks as swept profiles, bridges and tunnels, creeks cut in
-  (geometry stage 4 shapes); diffraction over the terrain profile and the ground reflection reading the
-  slope.
-- Traffic, walkers and Alex follow the roads' heights where the roads carry them; anything that leaves a
-  road keeps its old flat assumptions.
+All four were built and merged on 2026-10-09 ("Stage 2 as built", below). What was left after them, and
+what of it has been done since, is kept in one place: "Left after stage 2 (as of 2026-10-10)".
 
 ## Stage 3: seamless travel
 
@@ -879,9 +868,9 @@ Code: `OneWorld/WorldFeatures` (the generator), `OneWorld/Osm` (`OverpassRegions
 - **When the roads cannot be had** (Overpass down and the region not cached), the tile is not made and is
   tried again after 30 s, as when the survey cannot be asked: stored without its roads it would keep that
   hole. Land cover is different (above): a tile without it is dirt and has no woods, and is stored.
-- **Not yet:** buildings and drives (done the same day, below), footpaths, rail, water, verges; roads are surfaces to walk and
-  drive on, not yet roads the traffic routes on (`RoadData`), so the world's traffic is still only the
-  places'; bridges and tunnels are laid on the ground like any road.
+- **Not yet:** footpaths, rail, water, verges (buildings and drives followed the same day, below); roads
+  are surfaces to walk and drive on, not yet roads the traffic routes on (`RoadData`), so the world's
+  traffic is still only the places'; bridges and tunnels are laid on the ground like any road.
 - **Licence.** The store is now a derived database of OpenStreetMap (ODbL 1.0): each tile with roads
   records "(c) OpenStreetMap contributors, ODbL 1.0 (Overpass API, the data as of 2026-10-01)" in
   `Features`, and the cache has a `SOURCE.txt`. A server that offers its tiles to others offers them under
@@ -992,7 +981,7 @@ to 60 m long, "House off Main Street driveway". Each piece is stored by the tile
 every tile it reaches, as a road's. **Lots** (yards and lawns, lot lines between neighbouring addresses) are not made:
 they need the addresses.
 
-Generator version 4 (the drainage branch also takes the next number; whichever merges second takes 5).
+Generator version 4 (the drainage, merged after it, is version 5).
 
 Measured:
 
@@ -1022,20 +1011,32 @@ Measured:
 Each tile is made with its drainage (`WorldTile.Drainage`: which way each 2 m cell drains, how deep its hollow
 fills, its surface to the rain), worked out from the window its roads are graded in (the tile and 50 m round
 it), 7 ms a tile on one core; a place's copies are routed from the whole place, as its map is. Generator
-version 4 (and WorldPlaces format 2): stored tiles are made again when next wanted. A frame joins its loaded
+version 5 (and WorldPlaces format 2): stored tiles are made again when next wanted. A frame joins its loaded
 tiles' drainage, 3 s after they stop changing, in the background, and puts the voices of its drainage lines
 in the tiles they stand in. See docs/RUNNING_WATER.md section 13.
 
 ### Left after stage 2 (as of 2026-10-10)
 
-- Outside the real places, world tiles have their roads and woods, buildings and driveways (2026-10-10, above), not
-  yet addresses, lots, paths, rail or water, and their roads are not yet roads the traffic routes on.
-- (Done 2026-10-09: a player who logs out in the world comes back to the same spot at login, through the
-  loading screen; the landing map if the ground there cannot be built within 30 s. See Building ahead.)
+Done since the four steps: the world built ahead and a login back to where you left (2026-10-09, "Building
+ahead"); Magnolia and Albany copied in ("Places in the world"); the coarse ground at 7.8 m in the far ring,
+its seam closed ("Coarse ground in the far ring"); land cover, roads and woods, buildings and driveways, and
+drainage with every tile (2026-10-10, above); swept kerbs on the places' roads with sidewalks (geometry stage
+4, docs/GEOMETRY.md 12.2). Left:
+
+- On the world's own tiles: addresses (Overture's addresses theme) and lots, then the roads as `RoadData`
+  that traffic routes on (the world's traffic is still only the places'); footpaths, rail, water features
+  and verges; high detail near a player; bridges and tunnels (laid on the ground like any road today);
+  kerbs and sidewalks on the world's roads as swept profiles. Order agreed with Cody on 2026-10-10: after
+  the sound library and geometry stages (todo.md, Next, in order, item 6).
+- Diffraction over the terrain profile and the ground reflection reading the slope; traffic, walkers and
+  Alex follow the roads' heights where the roads carry them, and anything that leaves a road keeps its old
+  flat assumptions.
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
-- (Coarse terrain at 8 m for the far ring: done, above.) The client's tile cache. (Land cover for the
-  ground's materials: done 2026-10-10, above.)
-- (Done 2026-10-09: a driven vehicle is braked to a stop before an edge that is not ready; see Building ahead.)
+- The client's tile cache.
+- Faster tile fetching: not for now (Cody, 2026-10-09). A car above about 65 m/s can still meet unbuilt
+  ground and is braked short of it.
+- A newer Overture release when 2026-09-23.1 is withdrawn, around the end of November 2026 (a new generator
+  version).
 
 ## What the broadcast chooses from
 
@@ -1087,7 +1088,8 @@ eight cars on the oval only existed along the front straight.
 A moving thing 150 m or more from a player goes to that player at most every sixth tick (5 times a second)
 instead of every tick, and only when what the client would make of it is about to be wrong
 (OpenFPS.Common/DistantMotion.cs, RestingStates.DueFar, ClientWorldState.Track). Cody's condition
-(docs/CODY_ASKS_2026-10-08.md section 4): only where it costs no realism, shown by a test.
+(docs/CODY_ASKS_2026-10-08.md section 4): only where it costs no realism, shown by a test. Merged
+2026-10-10 (11a3c1c5) on that test; not yet heard in play, and not on the VPS until the next deploy.
 
 What goes with each far state is how the thing is changing, as the server has it from one tick to the next:
 its speed's rate and its heading's turn (EntityState.SpeedRate and Turn, eight bytes, sent only when not
@@ -1103,7 +1105,10 @@ correction is never a step), a speed 0.1 % off (the engine's pitch follows it), 
 any direction (0.1 % of Doppler), a heading 1 degree off; and when the horn changes, or a tyre's demand,
 surface or water. A state that went for a change goes once more the next tick: the stream is unreliable,
 and a change lost or overtaken would be carried wrongly for a fifth of a second, where anything sent
-every tick is bridged by the tick after. A steady thing goes every sixth tick.
+every tick is bridged by the tick after. A steady thing goes every sixth tick. A far thing's once-a-second
+keep-alive (RestingStates) counts as a change when the thing has strayed, so it is repeated the next tick
+too (2026-10-10, 652c03fd: before, a lost keep-alive left a city car carried as still braking for six
+ticks on a poor connection).
 
 What a player is in, drives or carries goes every tick whatever its distance (GameServer.Involved), as does
 their own body. Crossing 150 m changes nothing that can be heard: near or far, the client goes from one state

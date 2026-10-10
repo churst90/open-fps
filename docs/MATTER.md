@@ -39,13 +39,13 @@ never per-map constants (memory: no special cases), and a sound is a model of th
 
 ## 2. Materials: one table of physical properties
 
-### 2.1 What exists
+### 2.1 What existed (before 2.4)
 
-`OpenFPS.Common/AcousticRegistry.cs` holds about 24 materials (Generic, Wood, Metal, Fence, Concrete, Marble,
+`AcousticRegistry` (now `OpenFPS.Acoustics/AcousticRegistry.cs`) held about 24 materials (Generic, Wood, Metal, Fence, Concrete, Marble,
 Carpet, Glass, Plastic, Grass, Audience, Dirt, Gravel, Brick, Asphalt, Tile, Foliage, Plaster, AcousticTile,
-Rubber, Leather, BootRubber, Skin, Water). Each already carries absorption and transmission per band,
+Rubber, Leather, BootRubber, Skin, Water). Each already carried absorption and transmission per band,
 scattering, density, Young's modulus and a loss factor (internal damping), and whether it is porous. "Metal"
-is steel. An unknown name falls back to Generic silently (memory: registry falls back silently).
+is steel. An unknown name fell back to Generic silently; since 2.4 it is logged once as a warning.
 
 ### 2.2 What a material needs
 
@@ -374,9 +374,16 @@ Complex ones (a wall struck by a body, wood with its grain, a whole door) need c
 recordings used as the spec, never played: the footstep and door work showed how many rounds that can take
 (memory: synthesis failures; doors need detail and level). Band balance is measured before anything is played.
 
-### 7.5 What was built (2026-10-10, unheard)
+### 7.5 What was built (2026-10-10, heard by Cody the same day)
 
-`OpenFPS.Common/StruckModes.cs` (the modes) and `StruckThings.cs` (strikers, contacts, rendering, keys).
+`OpenFPS.Sound/StruckModes.cs` (the modes) and `OpenFPS.Sound/StruckThings.cs` (strikers, contacts,
+rendering, keys); `OpenFPS.Client.Core/WallBumps.cs` (bumps). Merged fb9868f9; shapes read by
+`StruckThings.Describe(form:)` since geometry stage 4 (docs/GEOMETRY.md 12.6 item 2).
+
+Heard 2026-10-10, low priority (after geometry and the library reorganisation): the aluminium bar sounds
+like a bright bell; running into the car sounds crunchy and staticky; the fence and the glass door sound
+the same tonally, and the fence does not sound like a fence; the aluminium sheet is far too sustained and
+tonal. Kept in the game meanwhile (todo.md, "Bump sounds").
 
 - Shapes. A bar (Euler-Bernoulli, free-free or pinned, with Rayleigh-Timoshenko's correction, and twisting
   when struck off its centre line); a plate held at its edges (Huber's orthotropic plate, so wood's grain
@@ -453,14 +460,19 @@ Agreed direction with Cody, 2026-10-10. Each step uses the one material table.
 
 1. The material table: the properties in 2.2 for every existing material, with sources, and the families in
    2.3 started (common metals, alloys, stone and glass, woods, polymers, soils). Existing names keep working.
+   Built 2026-10-10 (section 2.4; fb9868f9); no sound changed.
 2. Struck things (section 7) for simple shapes, with a tap and knock in the builder, then bumps against walls,
-   glass doors, fences and cars; fitted against recordings as the spec.
-3. Fire driven by fuel, with water and rain putting it out and the fire's own local wind (being built now:
-   docs/FIRE.md).
+   glass doors, fences and cars; fitted against recordings as the spec. Built 2026-10-10 (section 7.5;
+   fb9868f9), heard the same day with notes; the polish waits (todo.md, Next, in order, item 6).
+3. Fire driven by fuel, with water and rain putting it out and the fire's own local wind. Stage 1 built and
+   approved by ear 2026-10-10 (docs/FIRE.md section 12); the fire's own wind is designed, not built, and
+   stage 2 (aggregation, surface fire, structures) is in todo.md, "Fire, the rest".
 4. Water draining over terrain, the cheap per-tile version (section 4.2), with the world tiles. Built
    2026-10-10, approved by ear the same day (docs/RUNNING_WATER.md 13; inbox/water-over-terrain-2026-10-10).
-5. Weather as a system (todo item 11): rain, wind, wet roads, fuel moisture and fire tied together.
-6. Wind acting on things (section 5.3): wires, gaps, flags, loose objects, all from the wind field.
+5. Weather as a system (todo.md, Next, in order, item 6): rain, wind, wet roads, fuel moisture and fire
+   tied together.
+6. Wind acting on things (section 5.3): wires, gaps, flags, loose objects, all from the wind field. With 5,
+   the first of the detail work after the sound library and geometry stages (todo.md).
 7. Released gases (smoke, steam, fuel leaks), then chemistry.
 
 ## 11. Open questions
