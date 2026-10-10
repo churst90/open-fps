@@ -89,6 +89,8 @@ FILE_RULES = [
     (CO + 'SparseAcousticOctree.cs', 'a', 'Acoustics', ''),
     (CO + 'Systems/', 'a', 'Acoustics', 'regions and openings from the solids'),
     (CO + 'WallTransmission.cs', 'a', 'Acoustics', ''),
+    (CO + 'Constructions.cs', 'a', 'Acoustics', 'solids in contact crossed as one layered panel'),
+    (CO + 'LayeredFaces.cs', 'a', 'Acoustics', "a construction's faces as a ray tracer meets them"),
     (CO + 'Localisation.cs', 'a', 'Acoustics', ''),
     # Common: sound models, presets, the ear, weather, nature
     (CO + 'Hearing/', 'a', 'Sound', 'the ear'),
