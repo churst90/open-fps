@@ -6,30 +6,40 @@ using OpenFPS.Client.AudioEngine.Fmod;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The engine render pool's speedups of 2026-10-09 must not move a sample. An engine voice is chaotic
-/// enough that a one-ulp change in one power grows to full scale within seconds (measured: replacing
-/// the orifice law's two powf calls by one log and two exps moved every render by 0 to +7 dBFS), so
-/// each change is held against the code it replaced, bit for bit.
+/// The engine render pool's speedups of 2026-10-09. The first pass must not move a sample: an engine
+/// voice is chaotic enough that a one-ulp change in one power grows to full scale within seconds
+/// (replacing the orifice law's two powf calls by one log and two exps moved every render by 0 to
+/// +7 dBFS), so each of its changes is held against the code it replaced, bit for bit. The second pass
+/// (Cody's approval, the same day) changes the sound by design and is held to what it promised: the
+/// valve solver to its tolerance.
 /// </summary>
 public class EngineRenderCostTests
 {
     // ── The valve solver ────────────────────────────────────────────────────────────────────
 
-    /// <summary>The solver with the orifice constants worked out once and the bracket's ends evaluated
-    /// only when their value is used gives the old solver's answer and flow, to the bit.</summary>
+    /// <summary>
+    /// The solver that brackets from its first guess (2026-10-09, the sound-changing pass) lands within
+    /// its stopping rule of the true root, found here by bisecting the old solver's residual to the bit:
+    /// a pascal of residual (the residual rises at least as 1/Z, so at most a pascal of b) or a bracket
+    /// two and a half pascals wide. With a slope carried from a neighbouring solve, as a valve carries it
+    /// from the last sample, and without. The old solver, ten steps of regula falsi from a bracket as wide
+    /// as the flow cap, missed by tens of kilopascals where a nearly empty cylinder meets a port at its
+    /// pressure floor; the cases where it did are counted, and the new one must hold them too.
+    /// </summary>
     [Fact]
-    public void TheValveSolverGivesTheOldSolversAnswer()
+    public void TheValveSolverFindsTheRoot()
     {
         var rng = new Random(20261009);
         float[] gammas = { Gas.GammaExhaust, Gas.GammaAir, 1.35f };
-        int above = 0, below = 0;
+        float worst = 0f;
+        int above = 0, below = 0, oldMissed = 0;
         for (int i = 0; i < 200_000; i++)
         {
             float gamma = gammas[i % gammas.Length];
             float Z = (float)(2e5 + rng.NextDouble() * 4e6);
             float area = i % 97 == 0 ? 0f : (float)(1e-6 + rng.NextDouble() * 1.5e-3);
             float pMean = (float)(2e4 + rng.NextDouble() * 2e5);
-            // Cylinders from a near vacuum to a firing peak, so both ends of the bracket are reached.
+            // Cylinders from a near vacuum to a firing peak, so the flow runs both ways and to both caps.
             float pCyl = (float)Math.Exp(Math.Log(5e3) + rng.NextDouble() * (Math.Log(8e6) - Math.Log(5e3)));
             float tCyl = (float)(280 + rng.NextDouble() * 2500);
             float pipeK = (float)(290 + rng.NextDouble() * 900);
@@ -39,19 +49,49 @@ public class EngineRenderCostTests
             float mass = (float)(1e-6 + rng.NextDouble() * 5e-3);
             float dt = i % 2 == 0 ? 1f / 48000f : 1f / 44100f;
 
-            float b = EngineSynth.SolveValve(a, bStart, Z, area, pCyl, tCyl, pipeK, gamma, mass, dt, 0f, uCap, pMean, out float m);
-            float bRef = OldSolveValve(a, bStart, Z, area, pCyl, tCyl, pipeK, gamma, mass, dt, 0f, uCap, pMean, out float mRef);
-            Assert.True(BitConverter.SingleToInt32Bits(b) == BitConverter.SingleToInt32Bits(bRef)
-                        && BitConverter.SingleToInt32Bits(m) == BitConverter.SingleToInt32Bits(mRef),
-                        $"case {i}: b {b:R} against {bRef:R}, mdot {m:R} against {mRef:R}");
-            // The residual rises with b: a first guess above the answer replaced the top of the bracket
-            // and the bottom was worked out late, and the other way round. Both must be covered.
-            if (bStart > b) above++; else if (bStart < b) below++;
+            float lo = a - Z * uCap * 1.05f, hi = a + Z * uCap * 1.05f;
+            float root = Bisect(bb => Residual(bb, a, Z, area, pCyl, tCyl, pipeK, gamma, mass, dt, uCap, pMean, onePow: true), lo, hi);
+            float oldRoot = Bisect(bb => Residual(bb, a, Z, area, pCyl, tCyl, pipeK, gamma, mass, dt, uCap, pMean, onePow: false), lo, hi);
+            float bOld = OldSolveValve(a, bStart, Z, area, pCyl, tCyl, pipeK, gamma, mass, dt, 0f, uCap, pMean, out _);
+            if (MathF.Abs(bOld - oldRoot) > 0.5f + 1e-6f * MathF.Abs(oldRoot)) oldMissed++;
+            // A neighbouring solve first, a sample's worth of wave away, to leave a slope behind.
+            float slope = 0f;
+            EngineSynth.SolveValve(a * 0.98f, bStart, Z, area, pCyl, tCyl, pipeK, gamma, mass, dt, 0f, uCap, pMean, out _, ref slope);
+            foreach (bool carried in new[] { false, true })
+            {
+                float s = carried ? slope : 0f;
+                float b = EngineSynth.SolveValve(a, bStart, Z, area, pCyl, tCyl, pipeK, gamma, mass, dt, 0f, uCap, pMean, out float m, ref s);
+                Assert.True(float.IsFinite(b) && float.IsFinite(m), $"case {i}: b {b}, mdot {m}");
+                float off = MathF.Abs(b - root);
+                worst = MathF.Max(worst, off);
+                // Float steps at the root's size bound how close anything can come to it.
+                Assert.True(off <= 2.5f * EngineSynth.ValveTolerancePa + 1e-6f * MathF.Abs(root),
+                            $"case {i} (slope {(carried ? "carried" : "none")}): b {b:R} against the root {root:R}, {off} Pa off; the old solver {bOld:R}");
+            }
+            if (bStart > root) above++; else if (bStart < root) below++;
         }
         Assert.True(above > 10_000 && below > 10_000, $"the first guess was above the answer {above} times and below it {below}");
+        Assert.True(oldMissed > 0, "the old solver never missed: these cases no longer reach the hard corner");
+        Assert.True(worst > 0f, "every answer exact: the comparison is not looking at the new solver");
     }
 
-    /// <summary>The solver as it was before 2026-10-09, kept verbatim as the reference.</summary>
+    /// <summary>The root of an increasing function between two ends, to the last float; an end when the
+    /// root is past it.</summary>
+    private static float Bisect(Func<float, float> g, float lo, float hi)
+    {
+        if (g(lo) >= 0f) return lo;
+        if (g(hi) <= 0f) return hi;
+        for (int i = 0; i < 200; i++)
+        {
+            float mid = 0.5f * (lo + hi);
+            if (mid <= lo || mid >= hi) break;
+            if (g(mid) > 0f) hi = mid; else lo = mid;
+        }
+        return MathF.Abs(g(lo)) < MathF.Abs(g(hi)) ? lo : hi;
+    }
+
+    /// <summary>The solver as it was before 2026-10-09, kept verbatim as the reference: its tight rule
+    /// (0.2 Pa) puts its answer within half a pascal of the root.</summary>
     private static float OldSolveValve(float a, float bStart, float Z, float area, float pCyl, float tCyl,
                                        float pipeK, float gamma, float cylMass, float dt, float uMean, float uCap, float pMean, out float mdot)
     {
@@ -96,7 +136,30 @@ public class EngineRenderCostTests
         }
     }
 
-    private static float OldOrificeFlow(float pUp, float tUp, float pDown, float area, float gamma)
+    /// <summary>The residual the solvers zero: the old orifice law, or with <paramref name="onePow"/> the
+    /// form the solver has used since 2026-10-09 (one power), whose root differs by rounding where the
+    /// law is steep.</summary>
+    private static float Residual(float bb, float a, float Z, float area, float pCyl, float tCyl, float pipeK, float gamma, float cylMass, float dt, float uCap, float pMean, bool onePow)
+    {
+        float equalise = 0.5f * cylMass / dt;
+        float pPort = MathF.Max(0.05f * MathF.Max(pMean, 100f), pMean + a + bb);
+        float rhoPort = Gas.Density(pPort, pipeK);
+        float m;
+        if (pCyl >= pPort)
+        {
+            m = OldOrificeFlow(pCyl, tCyl, pPort, area, gamma, onePow);
+            m = MathF.Min(m, equalise * (pCyl - pPort) / pCyl);
+        }
+        else
+        {
+            m = -OldOrificeFlow(pPort, pipeK, pCyl, area, gamma, onePow);
+            m = MathF.Max(m, -equalise * (pPort - pCyl) / pCyl);
+        }
+        float u = Math.Clamp(m / rhoPort, -uCap, uCap);
+        return (bb - a) / Z - u;
+    }
+
+    private static float OldOrificeFlow(float pUp, float tUp, float pDown, float area, float gamma, bool onePow = false)
     {
         if (area <= 0f || pUp <= pDown) return 0f;
         float pr = pDown / pUp;
@@ -107,7 +170,8 @@ public class EngineRenderCostTests
             float k = MathF.Sqrt(gamma) * MathF.Pow(2f / (gamma + 1f), (gamma + 1f) / (2f * (gamma - 1f)));
             return area * pUp * k / rt;
         }
-        float t1 = MathF.Pow(pr, 2f / gamma) - MathF.Pow(pr, (gamma + 1f) / gamma);
+        float q = onePow ? MathF.Pow(pr, 1f / gamma) : 0f;
+        float t1 = onePow ? q * (q - pr) : MathF.Pow(pr, 2f / gamma) - MathF.Pow(pr, (gamma + 1f) / gamma);
         if (t1 <= 0f) return 0f;
         return area * pUp * MathF.Sqrt(2f * gamma / (gamma - 1f) * t1) / rt;
     }

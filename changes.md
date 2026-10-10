@@ -112,6 +112,60 @@ Recent work, newest first. `git log` has the rest.
   Magnolia's seams, none of 33,274 grazing rays and 1,064 lines of sight under the seam get through (3,082
   and 22 did). Lines of sight changed by a swap: 187 of 19,600 (were 186). No wire change: a client knows
   coarse ground by its 33 posts more than 2 m apart; 2 m ground, the server's included, is unchanged.
+- Engines cost less, with the sound changed by design this time (Cody approved the four levers left by
+  the bit-exact pass below). Renders and what to listen for in inbox/engine-cpu-2026-10-09. Costs are
+  `--pool-cost offline` (32 street voices on one fast core) and `--pool-cost machines`.
+  - The valve solver brackets the answer from its first guess: the residual rises at least as 1/Z, so
+    one step of the residual times Z lands on the far side of the root, and two evaluations bracket it
+    where the old bracket took two of its own and left thousands of pascals to search. A Newton step on
+    the slope the valve's last solve ended with comes first; the first guess carries the valve's flow on
+    rather than its outgoing wave. It stops at 1 Pa (was 0.2) and halves the bracket when regula falsi
+    crawls. 2.3 evaluations a solve on a street, against 5.8. The orifice law takes one power, not two.
+    32 street voices 2.80 core-seconds per second of sound against 2.26 (19 % less); push mower 35 ms a
+    second against 31, riding mower 48 against 41. Measured against changing an engine's seed: level
+    and third-octave balance across 58 renders move by the same amount (0.11 against 0.14 dB of level,
+    0.32 against 0.40 dB a band). The old solver missed the root by tens of kilopascals where a nearly
+    empty cylinder meets a port at its pressure floor; the new one finds it (EngineRenderCostTests).
+    AudioLab `--pool-cost render DIR [wide|steady] [seed=N] [only=NAME] [secs=S]` for the comparisons,
+    `--game-levels set=engine-cpu` for the scenes.
+  - Far engines run at half the rate. An engine 15 dB or more under the loudest machine around you
+    (FmodAudioProvider.ChooseEngineDetail; back to full within 12 dB) runs as a twin at 24 kHz, its
+    outputs interpolated back up by a 16-tap windowed sinc; the tyres, fan and body stay at 48 kHz. The
+    hand-over is never a cut: the twin takes the engine's state (crank, cylinders, plenum, gas, the tones'
+    phases), runs beside it for 0.15 s with its crank held to it while its pipes fill, and the two are
+    crossfaded over 0.1 s at a gain that keeps the power of two signals as alike as the warm-up measured.
+    A reduced voice costs 36 % less (32 street voices all reduced: 1.45 core-seconds per second against
+    2.27). Sixteen street machines at a steady speed play within 0.64 dB reduced (0.19 on average), the
+    bands up to 8 kHz 0.9 dB apart, nothing from the engine above about 10 kHz; no step or click at a
+    hand-over beyond the engine's own. Never for the vehicle you ride in. `/enginedetail on|off`,
+    OPENFPS_ENGINE_DETAIL=0 (all full) or =always (all reduced, for listening). EngineDetailTests;
+    AudioLab `--pool-cost render DIR handover`, `--pool-cost offline detail=reduced`,
+    `--game-levels set=engine-solo`.
+  - The distant-car cycle cache (todo item 12), per engine for now. A reduced engine running steadily
+    replays its own last six cycles (crank turns through the cycle's zero, so each holds every
+    cylinder's firing once) in a random order, never one twice running, joined by crossfading each
+    head into what followed the last cycle in the recording, at the same crank angle; each plays at its
+    recorded length, so the cycle-to-cycle variation stays. Steady: the same pedal, load, gear, ignition
+    and governor, speed within 2 %, gas temperature, manifold and boost settled, the starter silent and
+    no pop or misfire bang in the set. A hunting idle or a lopey V8 stays live. The engine is taken up
+    again where it stopped, at the same crank angle, when anything changes, and after 4 s regardless to
+    record a fresh set; the outer engine reports the set's speed meanwhile, so the driveline and the
+    governor hold. Sixteen street machines cruising for 40 s: within 0.05 dB of the engine live at half
+    rate, bands 0.14 dB apart, the same 50 ms level spread and sharpest sample changes. 32 far voices over
+    40 s: 1.08 core-seconds per second, against 1.74 at half rate alone and 2.53 in full. A cruising far
+    car replays about 60 % of the time, an idling diesel about half. OPENFPS_CYCLE_CACHE=0 for an A/B.
+    The shared, baked grid per engine type (todo item 12) is still to come.
+  - Mowers (EngineSynth underneath) get the same: a mower 15 dB under the loudest machine runs its
+    engine reduced (MachineVoiceState.Detail, SmallMachineSynth.EngineDetail). Steady is now judged on
+    each cycle's mean pedal and load, since a governor moves the pedal within every cycle; a replay lets
+    go at half the entry's tolerance, so a load that drifts (thicker grass) is taken up live. Every
+    engine: the starter's two constants are worked out once (a power every sample, starter or not), the
+    exhaust jet keeps its band's corner until it moves a per cent and its Lighthill factor until the gas
+    temperature moves (an exponential and a double eighth power every sample), and the half-rate
+    interpolator skips silence and multiplies in vectors. Push mower 30 ms a second in full against 28,
+    reduced 12 standing and 16 pushed; riding mower 39.5 against 38, reduced 14 standing and 27 driven
+    over grass. Reduced is 0.4 dB over full on both, the replay within 0.05 dB of the half rate.
+
 - Logging out in the world and back in returns you to the same spot, through the loading screen, facing
   the way you faced; the landing map if the ground there cannot be built within 30 s.
 - Ground at 8 m in the far ring (docs/WORLD_STREAMING.md, "Coarse ground in the far ring"). A tile you have

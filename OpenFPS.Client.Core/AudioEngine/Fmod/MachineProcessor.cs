@@ -361,9 +361,16 @@ public sealed class MachineVoiceState : PhysicalVoiceState
 
     protected override void PushListener(Vector3 frame) => Machine.SetListener(frame);
 
+    /// <summary>
+    /// How much of its engine to integrate, from how loud it is against the loudest machine
+    /// (FmodAudioProvider.ChooseEngineDetail); a mower costs as much as a car. Game thread writes.
+    /// </summary>
+    public volatile OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail Detail;
+
     protected override void Control(float seconds, float dt)
     {
         Machine.Running = Running;
+        Machine.EngineDetail = Detail;
         // Slewed: positions arrive thirty times a second and a governor would hunt on the staircase.
         // A second to get going is about what a push takes.
         _groundSpeed += Math.Clamp(TargetGroundSpeed - _groundSpeed, -1.5f * dt, 1.5f * dt);

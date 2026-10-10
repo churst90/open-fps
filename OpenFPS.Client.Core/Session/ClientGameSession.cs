@@ -451,6 +451,25 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
+    /// /enginedetail on | off: whether engines far under the loudest machine run at reduced detail
+    /// (EngineDetail.Reduced), or every engine in full, to hear what the saving costs. Plain
+    /// /enginedetail says which.
+    /// </summary>
+    internal static string EngineDetailCommand(string[] args)
+    {
+        if (args.Length > 0)
+        {
+            string a = args[0].ToLowerInvariant();
+            if (a is "on") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReducedFarEngines = true;
+            else if (a is "off") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReducedFarEngines = false;
+            else return "Say /enginedetail on or /enginedetail off.";
+        }
+        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReducedFarEngines
+            ? "Engine detail on: engines far under the loudest run at half rate."
+            : "Engine detail off: every engine runs in full.";
+    }
+
+    /// <summary>
     /// /levels, /levels default, /levels 0.7 (or 70): how much of the real loudness differences reach
     /// the mix. No "real" setting (Cody, 2026-10-05): 100 percent is literal source levels, which on
     /// headphones made a parked car's idle inaudible and footsteps vanish, and the word invited it.
@@ -1719,6 +1738,11 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].Equals("valveflow", StringComparison.OrdinalIgnoreCase))
             {
                 Say(ValveFlowCommand(parts.Skip(1).ToArray()));
+                return;
+            }
+            if (parts[0].Equals("enginedetail", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(EngineDetailCommand(parts.Skip(1).ToArray()));
                 return;
             }
             // The scope is yours: what it sees is worked out here, from the world this client holds.

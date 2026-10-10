@@ -1442,6 +1442,77 @@ public partial class FmodAudioProvider : IAudioProvider
     /// do not swap every frame.</summary>
     private const float EchoHoldDb = 4f;
     private const int MaxEchoTapsPerTrain = 2;
+
+    /// <summary>
+    /// How far under the loudest machine heard an engine goes to reduced detail (EngineDetail.Reduced),
+    /// and how far it must come back up to return to full. Fifteen decibels under is a quarter of the
+    /// loudness: what the reduction changes (the top above 10 kHz, the bands a decibel either way) is
+    /// masked there, and on a street most of the render pool's engines are that far down. Three of
+    /// hysteresis, so a car at the edge is not handed over and back as the traffic moves.
+    /// </summary>
+    private const float DetailUnderDb = 15f, DetailBackDb = 12f;
+
+    /// <summary>Whether far engines run at reduced detail: OPENFPS_ENGINE_DETAIL=0 and /enginedetail off
+    /// keep every engine full, for an A/B. Read by the game thread each update.</summary>
+    public static volatile bool ReducedFarEngines = Environment.GetEnvironmentVariable("OPENFPS_ENGINE_DETAIL") != "0";
+
+    /// <summary>OPENFPS_ENGINE_DETAIL=always: every engine at reduced detail however loud, to hear one on
+    /// its own. Listening tests only.</summary>
+    private static readonly bool AllEnginesReduced = Environment.GetEnvironmentVariable("OPENFPS_ENGINE_DETAIL") == "always";
+
+    /// <summary>
+    /// Sets each engine's detail from how loud it is here against the loudest machine (engines, standing
+    /// machines, trains and aircraft alike): what it radiates at this distance, not what occlusion lets
+    /// through, as the echoes are ranked, so a car passing behind a pillar is not handed over twice.
+    /// </summary>
+    private void ChooseEngineDetail(Vector3 listener)
+    {
+        float loudest = 0f;
+        foreach (var a in _activeSounds)
+        {
+            if (a.EngineState == null && a.MachineState == null) continue;
+            if (a.IsReflection || a.FadeTarget <= 0f) continue;
+            loudest = MathF.Max(loudest, RadiatedHere(a, listener));
+        }
+        foreach (var a in _activeSounds)
+        {
+            if (a.IsReflection) continue;
+            if (a.MachineState is MachineVoiceState machine)
+            {
+                // A machine with an engine (a mower): the same law.
+                float here = RadiatedHere(a, listener);
+                var was = machine.Detail;
+                machine.Detail = DetailFor(was, here, loudest, ReducedFarEngines, AllEnginesReduced);
+                if (machine.Detail != was)
+                    Log.Debug("Engine detail: machine {Id} {Detail} at {Dist:F0} m, {Db:F1} dB under the loudest.",
+                              a.EntityId, machine.Detail, Vector3.Distance(listener, a.Position), 20f * MathF.Log10(loudest / MathF.Max(1e-9f, here)));
+                continue;
+            }
+            if (a.EngineState is not { } state) continue;
+            var now = state.Detail;
+            float level = RadiatedHere(a, listener);
+            var want = DetailFor(now, level, loudest, ReducedFarEngines, AllEnginesReduced);
+            if (want == now) continue;
+            state.Detail = want;
+            Log.Debug("Engine detail: entity {Id} {Detail} at {Dist:F0} m, {Db:F1} dB under the loudest.",
+                      a.EntityId, want, Vector3.Distance(listener, a.Position), 20f * MathF.Log10(loudest / MathF.Max(1e-9f, level)));
+        }
+    }
+
+    /// <summary>The detail a voice radiating <paramref name="level"/> here should run at, against the
+    /// loudest machine's <paramref name="loudest"/> (both linear), from the detail it has now.</summary>
+    internal static OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail DetailFor(
+        OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail now, float level, float loudest, bool enabled, bool all = false)
+    {
+        if (!enabled || loudest <= 0f) return OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
+        bool reduced = now == OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced;
+        float limit = loudest * MathF.Pow(10f, -(reduced ? DetailBackDb : DetailUnderDb) / 20f);
+        return all || level < limit ? OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced
+                                    : OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
+    }
+
+    private static float RadiatedHere(ActiveSound a, Vector3 listener)
+        => a.BaseVolume * Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, Vector3.Distance(listener, a.Position));
     /// <summary>
     /// Far sources only: close to, a traced response stacked a second set of strong early reflections
     /// a few milliseconds behind the direct sound, a comb (boxy, flanged). In from this distance, out
@@ -3463,6 +3534,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 UpdateActiveReverbs(lPosVec);
                 UpdateTracedStages();
                 UpdateTracedEchoes();
+                ChooseEngineDetail(lPosVec);
                 UpdateLateField();
                 ApplySimulatedReverb();
 
@@ -4559,7 +4631,8 @@ public partial class FmodAudioProvider : IAudioProvider
             a.Channel.getPaused(out bool paused);
             return $"voice out {st.LastOutputDb:F1} dBFS, envelope {st.EnvelopeNow:F2}, lift {Db(st.LiftNow):F1} dB, "
                  + $"{(st.Running ? "running" : "off")}{(st.Interior ? ", interior" : "")}, channel volume {Db(volume):F1} dB, "
-                 + $"audibility {Db(audibility):F1} dB{(isVirtual ? ", VIRTUAL" : "")}{(paused ? ", PAUSED" : "")}";
+                 + $"audibility {Db(audibility):F1} dB{(isVirtual ? ", VIRTUAL" : "")}{(paused ? ", PAUSED" : "")}, "
+                 + $"detail {st.Detail} ({st.Engine.DetailState})";
         }
     }
 

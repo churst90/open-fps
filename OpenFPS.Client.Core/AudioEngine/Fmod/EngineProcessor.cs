@@ -115,6 +115,13 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     public volatile bool SplitVoices;
 
     /// <summary>
+    /// How much of the engine to integrate (EngineDetail), from how loud this voice is against the loudest
+    /// engine heard (FmodAudioProvider.ChooseEngineDetail). Game thread writes; the engine hands over
+    /// between the two without a step. From inside a vehicle it is always Full.
+    /// </summary>
+    public volatile EngineDetail Detail;
+
+    /// <summary>
     /// Where the voice's envelope is heading, 0 or 1. Game thread writes. An engine is never cut: there
     /// is no zero-crossing to stop at, and cars passing in and out of the voice budget clicked every few
     /// seconds ("slight popping as they drive around").
@@ -1153,6 +1160,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         float gain = 1f / MathF.Max(1f, PascalsAtFullScale);
         float target = TargetSpeed;
         Driver.Running = Running;
+        Engine.Detail = Interior ? EngineDetail.Full : Detail;
         // About 60 ms either way: no step survives it, and a car arriving is still a car arriving.
         float envStep = 1f / (0.06f * SampleRate);
         float envTarget = TargetEnvelope;
