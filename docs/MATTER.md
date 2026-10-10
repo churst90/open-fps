@@ -287,7 +287,7 @@ Agreed direction with Cody, 2026-10-10. Each step uses the one material table.
 3. Fire driven by fuel, with water and rain putting it out and the fire's own local wind (being built now:
    docs/FIRE.md).
 4. Water draining over terrain, the cheap per-tile version (section 4.2), with the world tiles. Built
-   2026-10-10, unheard (docs/RUNNING_WATER.md 13; inbox/water-over-terrain-2026-10-10).
+   2026-10-10, approved by ear the same day (docs/RUNNING_WATER.md 13; inbox/water-over-terrain-2026-10-10).
 5. Weather as a system (todo item 11): rain, wind, wet roads, fuel moisture and fire tied together.
 6. Wind acting on things (section 5.3): wires, gaps, flags, loose objects, all from the wind field.
 7. Released gases (smoke, steam, fuel leaks), then chemistry.

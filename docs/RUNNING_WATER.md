@@ -713,7 +713,8 @@ drains, the rain runs along those lines with the run-off timing above, and runni
 gathers. Code: `OpenFPS.Server/Water/` (`Drainage`, `DrainageNetwork`, `SurfaceRaster`, `MapDrainage`),
 `OpenFPS.Server/Systems/GroundWaterSystem.cs`, `OpenFPS.Common/GroundWater.cs`, `OpenFPS.Common/GroundChannels.cs`.
 Instrument: AudioLab `--ground-water map|flows|levels|game`. Tests: `GroundWaterTests`, `GroundWaterMagnoliaTests`.
-Renders: `inbox/water-over-terrain-2026-10-10/README.txt`.
+Renders: `inbox/water-over-terrain-2026-10-10/README.txt`, approved by ear 2026-10-10 (Cody: "water over terrain
+sounds good").
 
 ### 13.1 Which way each cell drains
 

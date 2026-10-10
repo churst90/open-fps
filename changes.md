@@ -18,7 +18,7 @@ Recent work, newest first. `git log` has the rest.
   0.8. Puddles in the road's own dips splash under the wheels. For the fire: `GroundWaterSystem.AddWater` (a
   bucket, a hose, a burst main runs downhill and soaks in), `WetnessAt`, `WaterReaching`. Renders:
   inbox/water-over-terrain-2026-10-10. Common changed (a wire field appended): the server, both clients and the
-  Windows zip go out together. Unheard.
+  Windows zip go out together. Approved by ear 2026-10-10 ("water over terrain sounds good").
 
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
