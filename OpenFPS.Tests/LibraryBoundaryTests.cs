@@ -270,10 +270,9 @@ public class LibraryBoundaryTests
         new object[] { typeof(OpenFPS.Common.Geometry.TriangleWorld).Assembly.GetName().Name!, new[] { "MemoryPack.Core" } },
         // FMOD's wrapper and the Steam Audio bindings. Serilog: BackgroundPriority logs (decision 5).
         new object[] { typeof(FMOD.System).Assembly.GetName().Name!, new[] { "Serilog" } },
-        // Materials, walls, diffraction, reflections, the octree. MemoryPack: the octree is in AcousticMap's
-        // attributes (decision 4). Serilog: an unknown material is logged.
+        // Materials, walls, diffraction, reflections, the octree. Serilog: an unknown material is logged.
         new object[] { typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name!,
-                       new[] { "OpenFPS.Geometry", "MemoryPack.Core", "Serilog" } },
+                       new[] { "OpenFPS.Geometry", "Serilog" } },
         // The sound models and the synthesis. MemoryPack: TransientSound is on the wire.
         new object[] { typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "MemoryPack.Core", "Serilog" } },

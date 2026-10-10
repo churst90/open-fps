@@ -1924,8 +1924,9 @@ The projects, as section 6 drew them:
 OpenFPS.Geometry <- OpenFPS.Acoustics <- OpenFPS.Sound <- OpenFPS.Common <- Server, Client.Core (-> Native)
 ```
 
-- `OpenFPS.Acoustics` references Geometry; packages MemoryPack (the octree is inside `AcousticMap`'s
-  `[MemoryPackable]`, decision 4) and Serilog (`AcousticRegistry` logs an unknown material).
+- `OpenFPS.Acoustics` references Geometry; package Serilog (`AcousticRegistry` logs an unknown material).
+  MemoryPack went 2026-10-10 (Cody, decision 4): `AcousticMap` and the octree were `[MemoryPackable]` but
+  never sent or stored (each side builds them on load), so the attributes and the package were dropped.
   `InternalsVisibleTo`: `OpenFPS.Common` (`OpeningRoutes` calls `Diffraction.MinimiseOnEdge`; goes when
   it moves in stage 4) and `OpenFPS.Tests`.
 - `OpenFPS.Sound` references Geometry and Acoustics; packages MemoryPack (`TransientSound`, decision 4)

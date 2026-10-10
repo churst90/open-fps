@@ -1,19 +1,15 @@
 using System.Numerics;
-using MemoryPack;
 
 namespace OpenFPS.Common;
 
 /// <summary>A sparse voxel octree of acoustic region ids: a uniform volume is one node.</summary>
-[MemoryPackable]
 public partial class SparseAcousticOctree
 {
-    [MemoryPackable]
     public partial class OctreeNode
     {
         public int RegionId = -1; // -1 = Mixed or None
         public OctreeNode[]? Children;
 
-        [MemoryPackIgnore]
         public bool IsLeaf => Children == null;
     }
 
@@ -22,11 +18,9 @@ public partial class SparseAcousticOctree
     private float _size;
     private float _minVoxel;
 
-    // The acoustic worker reads while the game thread writes. Private with no property, so MemoryPack
-    // ignores it; the parameterless constructor makes it again.
+    // The acoustic worker reads while the game thread writes.
     private readonly object _treeLock = new();
 
-    [MemoryPackConstructor]
     public SparseAcousticOctree()
     {
         _root = new OctreeNode();
@@ -42,7 +36,7 @@ public partial class SparseAcousticOctree
         _root = new OctreeNode();
     }
 
-    // For MemoryPack.
+    // The tree's state, for the tests and the lab.
     public OctreeNode Root { get => _root; set => _root = value; }
     public Vector3 Min { get => _min; set => _min = value; }
     public float Size { get => _size; set => _size = value; }

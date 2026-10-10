@@ -1,11 +1,10 @@
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common.Components;
-using MemoryPack;
 
 namespace OpenFPS.Common;
 
-[MemoryPackable]
+/// <summary>A map's acoustic regions, portals and voxel grid, built on load by each side; never sent.</summary>
 public partial class AcousticMap
 {
     public float VoxelResolution { get; set; } = 0.5f;
@@ -26,10 +25,8 @@ public partial class AcousticMap
     /// through) and its width, height and the thickness of the wall it is cut through. Derived on load,
     /// never sent.
     /// </summary>
-    [MemoryPackIgnore]
     public Dictionary<int, OpeningFrame> OpeningFrames { get; set; } = new();
 
-    [MemoryPackConstructor]
     public AcousticMap()
     {
         VoxelGrid = new SparseAcousticOctree();

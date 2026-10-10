@@ -19,9 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- SparseAcousticOctree keeps its [MemoryPackable]: AcousticMap (OpenFPS.Common) holds one and is
-         [MemoryPackable] itself (decision 4: the attributes stay until it is decided they can go). -->
-    <PackageReference Include="MemoryPack" Version="1.21.4" />
     <!-- AcousticRegistry logs an unknown material (decision 5: Serilog's static Log stays). -->
     <PackageReference Include="Serilog" Version="4.2.0" />
   </ItemGroup>
