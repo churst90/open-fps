@@ -257,7 +257,7 @@ OpenFPS.Common/LockCylinder.cs	lib	Sound
 OpenFPS.Common/Loudness.cs	lib	Sound	
 OpenFPS.Common/Loudspeakers.cs	lib	Sound	
 OpenFPS.Common/Machines.cs	lib	Sound	
-OpenFPS.Common/Messages.cs	mixed	Sound	WheelState
+OpenFPS.Common/Messages.cs	host		
 OpenFPS.Common/ModelLibrary.cs	lib	Sound	
 OpenFPS.Common/MoverPoses.cs	host		
 OpenFPS.Common/NatureModels.cs	lib	Sound	
@@ -312,6 +312,7 @@ OpenFPS.Common/Waves.cs	lib	Sound
 OpenFPS.Common/WeaponHandling.cs	lib	Sound	
 OpenFPS.Common/Weapons.cs	mixed	Sound	FireMode,WeaponAction,WeaponDefinition,WeaponFeed,WeaponRegistry
 OpenFPS.Common/WheelDynamics.cs	lib	Sound	
+OpenFPS.Common/WheelState.cs	lib	Sound	
 OpenFPS.Common/Wind.cs	lib	Sound	
 OpenFPS.Common/WindModel.cs	lib	Sound	
 OpenFPS.Common/WoodChorus.cs	lib	Sound	
