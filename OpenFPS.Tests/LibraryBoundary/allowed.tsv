@@ -28,7 +28,6 @@ OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.Compon
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.EntitySnapshot	6
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.Networking.EntityDefinition	3
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.WorldSnapshot	2
-OpenFPS.Client.Core/AudioEngine/Fmod/EngineProcessor.cs	OpenFPS.Common.RoadData	2
 OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.cs	OpenFPS.Common.Components.PortalComponent	12
 OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.cs	OpenFPS.Common.Components.RegionComponent	7
 OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	OpenFPS.Client.Core.Platform.VoiceCodec	16
@@ -67,4 +66,3 @@ OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	OpenFPS.Common.Components.Regi
 OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	OpenFPS.Common.Components.SoundEmitterComponent	1
 OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	OpenFPS.Common.Components.Transform	12
 OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	OpenFPS.Common.Networking.EntityDefinition	50
-OpenFPS.Common/WheelDynamics.cs	OpenFPS.Common.RoadData	2

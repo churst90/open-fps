@@ -284,7 +284,7 @@ public sealed class WheelDynamics
             {
                 X = x, Y = y, Axle = k, Front = _axleFront[k], Steered = ax.Steered, Driven = ax.Driven,
                 Radius = MathF.Max(0.05f, ax.Tyre.RollingRadiusMetres), StaticLoad = each, Load = each,
-                Surface = RoadSurfaces.IndexOf(RoadData.DefaultSurface), SurfaceGrip = 1f, WetGrip = 1f,
+                Surface = RoadSurfaces.IndexOf(RoadSurfaces.Default), SurfaceGrip = 1f, WetGrip = 1f,
             });
             if (ax.TrackMetres > 0f) { Add(-0.5f * ax.TrackMetres); Add(0.5f * ax.TrackMetres); }
             else Add(0f);

@@ -239,6 +239,9 @@ public static class RoadSurfaces
     /// <summary>Not on the ground, or a material the table does not know.</summary>
     public const byte Unknown = 0;
 
+    /// <summary>What a road is made of where nothing says otherwise.</summary>
+    public const string Default = "Asphalt";
+
     // StickSlip: whether a fully sliding tyre keeps sticking and slipping. On a dry coherent surface it
     // screeches on at a fundamental near 800 Hz with its harmonic, rising with braking (Tan Li, "Tire
     // Braking/Cornering Noise Analysis: Stick/Slip Mechanism", NOISE-CON 2019); loose or icy ground
