@@ -27,7 +27,7 @@ public class SpeedwayZoneTests
 
         var data = manager.GetAllMaps().First(kv => kv.Key == "speedway").Value.data;
         var defs = EntityDefinitionFactory.StaticDefinitions(world);
-        var acoustic = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, 1.0f);
+        var acoustic = EntityAcoustics.GenerateRegions(defs, size, data.MinBound, 1.0f);
         return (defs, acoustic);
     }
 

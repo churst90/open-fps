@@ -46,7 +46,7 @@ public class OpeningRoutesBarrierTests
         var world = new WorldSnapshot();
         foreach (var d in defs)
             world.Entities[d.EntityId] = new EntitySnapshot { Id = d.EntityId, Definition = d, Transform = d.Transform };
-        world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, new Vector3(600, 60, 600), new Vector3(-300, -5, -300));
+        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, new Vector3(600, 60, 600), new Vector3(-300, -5, -300));
         return new SpatialAcoustics().RoutesFor(world)!;
     }
 

@@ -363,14 +363,14 @@ public class ClientWorldState
             var map = AcousticMap;
             if (map == null) return;   // still loading; the bake will pick it up from the stream
 
-            map.Regions = new Dictionary<int, RegionComponent>(map.Regions) { [def.EntityId] = def.Region };
+            map.Regions = new Dictionary<int, Room>(map.Regions) { [def.EntityId] = def.Region.ToRoom() };
             map.RegionPositions = new Dictionary<int, Vector3>(map.RegionPositions) { [def.EntityId] = def.Transform.Position };
             map.RegionRotations = new Dictionary<int, Quaternion>(map.RegionRotations) { [def.EntityId] = def.Transform.Rotation };
 
             // Its open sides are openings, as the bake makes a map room's. Not for a room that moves: an
             // opening is a fixed place, and a car would leave its windows behind at the kerb.
             if (!def.Moves)
-                OpenFPS.Common.Systems.AcousticVolumeGenerator.AddFaceOpenings(map, _definitions.Values, new[] { def.EntityId });
+                OpenFPS.Common.EntityAcoustics.AddFaceOpenings(map, _definitions.Values, new[] { def.EntityId });
         }
     }
 
@@ -392,8 +392,8 @@ public class ClientWorldState
             bool known = map.Portals.ContainsKey(def.EntityId);
             if (!openable && !known) return;
 
-            var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
-            if (openable) portals[def.EntityId] = (def.Portal, def.Transform.Position);
+            var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
+            if (openable) portals[def.EntityId] = (def.Portal.ToOpening(), def.Transform.Position);
             else portals.Remove(def.EntityId);
             map.Portals = portals;
         }
@@ -414,7 +414,7 @@ public class ClientWorldState
 
             // The voxel grid still has them: the next refresh makes it again.
             _tablesDirty = true;
-            var regions = new Dictionary<int, RegionComponent>(map.Regions);
+            var regions = new Dictionary<int, Room>(map.Regions);
             var positions = new Dictionary<int, Vector3>(map.RegionPositions);
             var rotations = new Dictionary<int, Quaternion>(map.RegionRotations);
             foreach (int id in present) { regions.Remove(id); positions.Remove(id); rotations.Remove(id); }
@@ -429,7 +429,7 @@ public class ClientWorldState
                 if (gone.Contains(frame.Room)) (openings ??= new List<int>()).Add(id);
             if (openings != null)
             {
-                var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+                var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
                 var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
                 foreach (int id in openings) { portals.Remove(id); frames.Remove(id); }
                 map.Portals = portals;
@@ -451,7 +451,7 @@ public class ClientWorldState
                 if (map.Portals.ContainsKey(id)) (present ??= new List<int>()).Add(id);
             if (present == null) return;
 
-            var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+            var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
             foreach (int id in present) portals.Remove(id);
             map.Portals = portals;
         }
@@ -1014,7 +1014,7 @@ public class ClientWorldState
     public static AcousticMap BuildAcousticMap(IEnumerable<EntityDefinition> definitions, Vector3 mapSize, Vector3 min,
                                                float voxelResolution, float occlusionFloor, bool streamed, bool report)
     {
-        var map = OpenFPS.Common.Systems.AcousticVolumeGenerator.GenerateRegions(definitions, mapSize, min,
+        var map = OpenFPS.Common.EntityAcoustics.GenerateRegions(definitions, mapSize, min,
                       voxelResolution, occlusionFloor, report: report);
         if (streamed) DropDanglingPortals(map);
         return map;
@@ -1026,7 +1026,7 @@ public class ClientWorldState
         foreach (var (id, (portal, _)) in map.Portals)
             if (!Holds(map, portal.RegionAId) || !Holds(map, portal.RegionBId)) (dangling ??= new List<int>()).Add(id);
         if (dangling == null) return;
-        var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+        var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
         var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
         foreach (int id in dangling) { portals.Remove(id); frames.Remove(id); }
         map.Portals = portals;
@@ -1136,7 +1136,7 @@ public class ClientWorldState
         foreach (int id in _regionEntityIds.Keys)
         {
             if (built.Regions.ContainsKey(id) || !_definitions.TryGetValue(id, out var def)) continue;
-            built.Regions[id] = def.Region;
+            built.Regions[id] = def.Region.ToRoom();
             built.RegionPositions[id] = def.Transform.Position;
             built.RegionRotations[id] = def.Transform.Rotation;
         }
@@ -1153,7 +1153,7 @@ public class ClientWorldState
             if (def.Portal.RegionAId == def.Portal.RegionBId) continue;
             bool ends = (def.Portal.RegionAId == AcousticConstants.GlobalRegionId || built.Regions.ContainsKey(def.Portal.RegionAId))
                      && (def.Portal.RegionBId == AcousticConstants.GlobalRegionId || built.Regions.ContainsKey(def.Portal.RegionBId));
-            if (def.Portal.ApertureSize > 0f && (ends || TileMetres <= 0f)) built.Portals[def.EntityId] = (def.Portal, def.Transform.Position);
+            if (def.Portal.ApertureSize > 0f && (ends || TileMetres <= 0f)) built.Portals[def.EntityId] = (def.Portal.ToOpening(), def.Transform.Position);
             else built.Portals.Remove(def.EntityId);
         }
     }

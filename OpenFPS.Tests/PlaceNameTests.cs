@@ -22,7 +22,7 @@ public class PlaceNameTests
     private readonly ITestOutputHelper _o;
     public PlaceNameTests(ITestOutputHelper o) => _o = o;
 
-    private static AcousticMap EmptyMap() => AcousticVolumeGenerator.GenerateRegions(
+    private static AcousticMap EmptyMap() => EntityAcoustics.GenerateRegions(
         new List<EntityDefinition>(), new Vector3(100, 20, 100), new Vector3(-50, -5, -50), 1.0f);
 
     /// <summary>With no named place over you, the ground names it — never the outdoor region's "Outside".</summary>
@@ -42,7 +42,7 @@ public class PlaceNameTests
     public void ANamedPlaceStillWins()
     {
         var map = EmptyMap();
-        map.Regions[42] = new RegionComponent { FriendlyName = "Market Square", RoomSize = new Vector3(10, 5, 10) };
+        map.Regions[42] = new Room { FriendlyName = "Market Square", RoomSize = new Vector3(10, 5, 10) };
         Assert.Equal("Market Square", ClientAudioSystem.NameOfPlace(map, 42, "Concrete", 0f));
     }
 
@@ -67,7 +67,7 @@ public class PlaceNameTests
         client.Clear(data.Size);
         var defs = EntityDefinitionFactory.StaticDefinitions(world).ToList();
         foreach (var def in defs) client.RegisterDefinition(def);
-        client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound,
+        client.SetAcousticMap(EntityAcoustics.GenerateRegions(defs, size, data.MinBound,
                                                                       data.VoxelResolution, data.OcclusionFloor));
         var snap = client.GetSnapshot();
         var spatial = new SpatialService();
@@ -96,7 +96,7 @@ public class PlaceNameTests
         client.Clear(data.Size);
         var defs = EntityDefinitionFactory.StaticDefinitions(world).ToList();
         foreach (var def in defs) client.RegisterDefinition(def);
-        client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound,
+        client.SetAcousticMap(EntityAcoustics.GenerateRegions(defs, size, data.MinBound,
                                                                       data.VoxelResolution, data.OcclusionFloor));
         var snap = client.GetSnapshot();
         var spatial = new SpatialService();

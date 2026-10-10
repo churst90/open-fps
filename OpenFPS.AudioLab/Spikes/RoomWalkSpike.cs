@@ -338,7 +338,7 @@ public static class RoomWalkSpike
             GlobalEnvironmentId = AcousticConstants.GlobalRegionId
         };
         int wood = AcousticRegistry.GetProperties("Wood").ResonanceIndex;
-        map.Regions[RoomId] = new RegionComponent
+        map.Regions[RoomId] = new Room
         {
             FriendlyName = "Wood Room",
             IsIndoor = true,
@@ -348,7 +348,7 @@ public static class RoomWalkSpike
         };
         map.RegionPositions[RoomId] = RoomCentre;
         map.RegionRotations[RoomId] = Quaternion.Identity;
-        map.Portals[311] = (new PortalComponent
+        map.Portals[311] = (new Opening
         {
             RegionAId = AcousticConstants.GlobalRegionId,
             RegionBId = RoomId,

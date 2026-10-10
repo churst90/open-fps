@@ -511,7 +511,7 @@ public static class ClapRoomSpike
     {
         var map = new AcousticMap(new Vector3(100, 40, 100), new Vector3(-50, 0, -50)) { GlobalEnvironmentId = AcousticConstants.GlobalRegionId };
         int I(string m) => AcousticRegistry.GetProperties(m).ResonanceIndex;
-        map.Regions[RoomId] = new RegionComponent
+        map.Regions[RoomId] = new Room
         {
             FriendlyName = "Marlow Tower flat 01F",
             IsIndoor = true,

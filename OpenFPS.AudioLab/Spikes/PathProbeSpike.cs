@@ -165,7 +165,7 @@ public static class PathProbeSpike
                 world.StaticGrid.AddOverlapping(def.Transform.Position, def.Collider.Size, def.Transform.Rotation, def.EntityId, isStatic: true);
             if (def.Region.RoomSize.X > 0) world.RegionEntityIds.Add(def.EntityId);
         }
-        world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
+        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
         return world;
     }
 

@@ -91,7 +91,7 @@ public class OpeningRoutesTests
         var world = new WorldSnapshot();
         foreach (var d in defs)
             world.Entities[d.EntityId] = new EntitySnapshot { Id = d.EntityId, Definition = d, Transform = d.Transform };
-        world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
+        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
         return world;
     }
 
@@ -205,9 +205,9 @@ public class OpeningRoutesTests
     {
         var world = Building(frontDoorOpen: false);
         var map = world.AcousticMap!;
-        var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals)
+        var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals)
         {
-            [-1500] = (new PortalComponent { RegionAId = Corridor, RegionBId = Flat, ApertureSize = 1f }, new Vector3(4.85f, 1.05f, 12f)),
+            [-1500] = (new Opening { RegionAId = Corridor, RegionBId = Flat, ApertureSize = 1f }, new Vector3(4.85f, 1.05f, 12f)),
         };
         map.Portals = portals;
         var (model, _) = Graph(world);

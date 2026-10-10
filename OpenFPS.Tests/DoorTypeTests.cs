@@ -373,7 +373,7 @@ public class DoorTypeTests : IDisposable
         var world = new WorldSnapshot();
         foreach (var d in defs)
             world.Entities[d.EntityId] = new EntitySnapshot { Id = d.EntityId, Definition = d, Transform = d.Transform };
-        world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
+        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
         return world;
     }
 

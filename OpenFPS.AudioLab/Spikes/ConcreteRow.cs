@@ -124,7 +124,7 @@ public static class ConcreteRow
         var map = new AcousticMap(new Vector3(400f, 60f, 400f), new Vector3(-200f, 0f, -100f),
                                   AcousticConstants.DefaultVoxelResolution);
         map.GlobalEnvironmentId = AcousticConstants.GlobalRegionId;
-        map.Regions[AcousticConstants.GlobalRegionId] = new RegionComponent
+        map.Regions[AcousticConstants.GlobalRegionId] = new Room
         {
             FriendlyName = "Concrete Row",
             IsIndoor = false,

@@ -625,7 +625,7 @@ public partial class ClientAudioSystem
                             if (Vector3.Distance(snap.Transform.Position, oldSnap.Transform.Position) > 0.1f || 
                                 Math.Abs(Quaternion.Dot(snap.Transform.Rotation, oldSnap.Transform.Rotation)) < 0.999f)
                             {
-                                OpenFPS.Common.Systems.AcousticVolumeGenerator.UpdateRegion(world.AcousticMap, snap.Id, snap.Transform.Position, snap.Transform.Rotation, snap.Definition.Region);
+                                OpenFPS.Common.Systems.AcousticVolumeGenerator.UpdateRegion(world.AcousticMap, snap.Id, snap.Transform.Position, snap.Transform.Rotation, snap.Definition.Region.ToRoom());
                             }
                         }
                     }
@@ -1019,7 +1019,7 @@ public partial class ClientAudioSystem
     /// </summary>
     internal static string NameOfPlace(AcousticMap? map, int regionId, string material, float shelter)
     {
-        RegionComponent? global = null;
+        Room? global = null;
         if (map != null && map.Regions.TryGetValue(regionId, out var reg))
         {
             if (regionId != AcousticConstants.GlobalRegionId && !string.IsNullOrWhiteSpace(reg.FriendlyName))

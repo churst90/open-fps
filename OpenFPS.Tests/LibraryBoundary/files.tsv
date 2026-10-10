@@ -8,7 +8,9 @@ OpenFPS.Acoustics/Enclosure.cs	lib	Acoustics
 OpenFPS.Acoustics/ImageSource.cs	lib	Acoustics	
 OpenFPS.Acoustics/LayeredFaces.cs	lib	Acoustics	
 OpenFPS.Acoustics/Localisation.cs	lib	Acoustics	
+OpenFPS.Acoustics/Opening.cs	lib	Acoustics	
 OpenFPS.Acoustics/PanelAcoustics.cs	lib	Acoustics	
+OpenFPS.Acoustics/Room.cs	lib	Acoustics	
 OpenFPS.Acoustics/SparseAcousticOctree.cs	lib	Acoustics	
 OpenFPS.Acoustics/WallTransmission.cs	lib	Acoustics	
 OpenFPS.Client.Core/AudioDiagnostics.cs	host		
@@ -145,6 +147,7 @@ OpenFPS.Common/Components.cs	mixed	Geometry	ColliderShape
 OpenFPS.Common/DirectionWords.cs	host		
 OpenFPS.Common/DistantMotion.cs	host		
 OpenFPS.Common/DrivingCuePlanner.cs	host		
+OpenFPS.Common/EntityAcoustics.cs	host		
 OpenFPS.Common/EntityGeometry.cs	host		
 OpenFPS.Common/GroundProbeMemo.cs	host		
 OpenFPS.Common/JsonConverters.cs	host		

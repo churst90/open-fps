@@ -54,7 +54,7 @@ public class OpeningRoutesOutAndBackTests
         var map = new AcousticMap();
         foreach (var r in rooms)
         {
-            map.Regions[r.Id] = new RegionComponent { RoomSize = r.Size, Materials = [brick, brick, brick, brick, brick, brick], IsIndoor = true, FriendlyName = $"r{r.Id}" };
+            map.Regions[r.Id] = new Room { RoomSize = r.Size, Materials = [brick, brick, brick, brick, brick, brick], IsIndoor = true, FriendlyName = $"r{r.Id}" };
             map.RegionPositions[r.Id] = r.Centre;
         }
         int RegionAt(Vector3 p)

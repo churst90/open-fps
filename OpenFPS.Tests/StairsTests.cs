@@ -259,7 +259,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
     public void TheRoofIsOutdoorsAndItsHousingIsARoom()
     {
         var defs = EntityDefinitionFactory.StaticDefinitions(_city.World);
-        var map = OpenFPS.Common.Systems.AcousticVolumeGenerator.GenerateRegions(defs, _city.Size, _city.Data.MinBound,
+        var map = OpenFPS.Common.EntityAcoustics.GenerateRegions(defs, _city.Size, _city.Data.MinBound,
                                                                                   _city.Data.VoxelResolution, _city.Data.OcclusionFloor);
         foreach (var tower in _city.Towers)
         {

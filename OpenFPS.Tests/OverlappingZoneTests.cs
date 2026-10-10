@@ -29,7 +29,7 @@ public class OverlappingZoneTests
         var big = Zone(10, "Calder Avenue", new Vector3(0, 2, 0), new Vector3(20, 4, 100));
         var small = Zone(11, "Bus stop", new Vector3(0, 2, 5), new Vector3(4, 4, 6));
         var defs = bigFirst ? new List<EntityDefinition> { big, small } : new List<EntityDefinition> { small, big };
-        var map = AcousticVolumeGenerator.GenerateRegions(defs, new Vector3(200, 20, 200), new Vector3(-100, -1, -100));
+        var map = EntityAcoustics.GenerateRegions(defs, new Vector3(200, 20, 200), new Vector3(-100, -1, -100));
         var world = new WorldSnapshot { AcousticMap = map };
         foreach (var d in defs)
             world.Entities[d.EntityId] = new EntitySnapshot { Id = d.EntityId, Definition = d, Transform = d.Transform };
@@ -54,7 +54,7 @@ public class OverlappingZoneTests
         // A house whose east wall face is not on a voxel boundary.
         var house = Zone(20, "64 Alder Street", new Vector3(-214.75f, 1.34f, 130.55f), new Vector3(10.5f, 2.52f, 8.0f));
         var defs = new List<EntityDefinition> { house };
-        var map = AcousticVolumeGenerator.GenerateRegions(defs, new Vector3(600, 20, 600), new Vector3(-300, -1, -300));
+        var map = EntityAcoustics.GenerateRegions(defs, new Vector3(600, 20, 600), new Vector3(-300, -1, -300));
         var world = new WorldSnapshot { AcousticMap = map };
         world.Entities[20] = new EntitySnapshot { Id = 20, Definition = house, Transform = house.Transform };
         var spatial = new SpatialService();
