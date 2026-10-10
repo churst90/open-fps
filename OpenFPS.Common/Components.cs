@@ -8,7 +8,6 @@ namespace OpenFPS.Common.Components;
 /// off the server's last owner (docs/SERVER_SECURITY.md).</summary>
 public enum UserRole { Player, Dev, Admin, Moderator, Owner }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
-public enum WeatherType { Clear, Rain, Snow, Storm }
 /// <summary>Terrain is a tile of ground (TerrainTileComponent); its collider is not solid, so the readers of
 /// boxes pass it by, and the triangle world takes it as a heightfield. Append new shapes only.</summary>
 public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon, Terrain }
@@ -231,8 +230,6 @@ public partial struct MaterialComponent
     public string Variant { get; set; } = "0";
     public MaterialComponent() { }
 }
-
-public enum PlaybackMode { Single, LoopOne, LoopFolder, Sequential, StateMachine }
 
 [MemoryPackable]
 public partial struct SoundEmitterComponent 

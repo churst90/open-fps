@@ -202,7 +202,7 @@ OpenFPS.Common/BulletImpact.cs	lib	Sound
 OpenFPS.Common/CarDoor.cs	lib	Sound	
 OpenFPS.Common/CarWindow.cs	lib	Sound	
 OpenFPS.Common/Chassis.cs	lib	Sound	
-OpenFPS.Common/Components.cs	mixed	Geometry,Sound	ColliderShape,PlaybackMode,WeatherType
+OpenFPS.Common/Components.cs	mixed	Geometry	ColliderShape
 OpenFPS.Common/Constructions.cs	lib	Sound	
 OpenFPS.Common/CrossingGates.cs	lib	Sound	
 OpenFPS.Common/DesignedSoundKit.cs	lib	Sound	
@@ -265,6 +265,7 @@ OpenFPS.Common/OpeningRoutes.cs	lib	Acoustics
 OpenFPS.Common/PanelAcoustics.cs	lib	Acoustics	
 OpenFPS.Common/PhysicsConstants.cs	host		
 OpenFPS.Common/PhysicsUtils.cs	host		
+OpenFPS.Common/PlaybackMode.cs	lib	Sound	
 OpenFPS.Common/PlayerCoordinates.cs	host		
 OpenFPS.Common/Pneumatics.cs	lib	Sound	
 OpenFPS.Common/Precipitation.cs	lib	Sound	
@@ -311,6 +312,7 @@ OpenFPS.Common/WallTransmission.cs	lib	Acoustics
 OpenFPS.Common/Waves.cs	lib	Sound	
 OpenFPS.Common/WeaponHandling.cs	lib	Sound	
 OpenFPS.Common/Weapons.cs	mixed	Sound	FireMode,WeaponAction,WeaponDefinition,WeaponFeed,WeaponRegistry
+OpenFPS.Common/WeatherType.cs	lib	Sound	
 OpenFPS.Common/WheelDynamics.cs	lib	Sound	
 OpenFPS.Common/WheelState.cs	lib	Sound	
 OpenFPS.Common/Wind.cs	lib	Sound	
