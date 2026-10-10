@@ -135,14 +135,14 @@ public static class Loudness
     // spectrum), the law above places that line, and the source plays as loud as the line plays.
     //
     // Two conventions of declared level: a recording or render declares its buffer's full scale at a
-    // metre (Speech.LevelDb: a line sits 28 dB under it), a physical voice its RMS, played
+    // metre (ReferenceVoice.LevelDb: a line sits 28 dB under it), a physical voice its RMS, played
     // PeakHeadroomDb under full scale. Timbre.RealOffsetDb and DigitalRmsDb carry which.
 
     /// <summary>Where a physical voice's RMS sits under full scale, dB (VehicleProfile.PeakHeadroomDb).</summary>
     public const float PhysicalRmsDbfs = -VehicleProfile.PeakHeadroomDb;
 
-    /// <summary>Where the reference sound, a speech line, sits under its full scale (Speech.BufferRmsDbfs).</summary>
-    public const float ReferenceRmsDbfs = Speech.BufferRmsDbfs;
+    /// <summary>Where the reference sound, a speech line, sits under its full scale (Hearing.ReferenceVoice.BufferRmsDbfs).</summary>
+    public const float ReferenceRmsDbfs = Hearing.ReferenceVoice.BufferRmsDbfs;
 
     /// <summary>
     /// The designed playback, dB SPL at the ear for 0 dB rendered: where a normal voice at a metre (ANSI
@@ -153,10 +153,10 @@ public static class Loudness
 
     private static float DesignFullScale()
     {
-        float declared = Speech.LevelDb(Speech.NormalDb);
+        float declared = Hearing.ReferenceVoice.LevelDb(Hearing.ReferenceVoice.NormalDb);
         float reference = Math.Clamp(MathF.Pow(10f, (declared - ShippedCeilingDb) / 20f), MinReferenceDistance, MaxReferenceDistance);
         float rendered = (declared - 20f * MathF.Log10(reference) - ShippedCeilingDb) * DefaultCompression;
-        return Speech.NormalDb - rendered - ReferenceRmsDbfs;
+        return Hearing.ReferenceVoice.NormalDb - rendered - ReferenceRmsDbfs;
     }
 
     /// <summary>

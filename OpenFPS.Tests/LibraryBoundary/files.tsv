@@ -237,6 +237,7 @@ OpenFPS.Common/Hearing/BandAnalyser.cs	lib	Sound
 OpenFPS.Common/Hearing/EarModel.cs	lib	Sound	
 OpenFPS.Common/Hearing/EqualLoudness.cs	lib	Sound	
 OpenFPS.Common/Hearing/LoudnessCompensation.cs	lib	Sound	
+OpenFPS.Common/Hearing/ReferenceVoice.cs	lib	Sound	
 OpenFPS.Common/Hearing/Timbre.cs	lib	Sound	
 OpenFPS.Common/Hearing/ZwickerLoudness.cs	lib	Sound	
 OpenFPS.Common/Honk.cs	lib	Sound	

@@ -37,7 +37,7 @@ public static class EarModel
     }
     private static float _listening = FromEnvironment();
 
-    public const float DefaultListeningLevelDb = Speech.NormalDb, MinListeningLevelDb = 40f, MaxListeningLevelDb = 90f;
+    public const float DefaultListeningLevelDb = ReferenceVoice.NormalDb, MinListeningLevelDb = 40f, MaxListeningLevelDb = 90f;
 
     private static float FromEnvironment()
         => float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_LISTENING_LEVEL"), NumberStyles.Float, CultureInfo.InvariantCulture, out float v)

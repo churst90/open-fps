@@ -9,11 +9,11 @@ public sealed class LoudspeakerRender
     public required string Key { get; init; }
     public required LoudspeakerSpec Spec { get; init; }
     /// <summary>The on-axis pressure at one metre, scaled so its gated RMS is
-    /// <see cref="Speech.BufferRmsDbfs"/>, at <see cref="Rate"/>.</summary>
+    /// <see cref="ReferenceVoice.BufferRmsDbfs"/>, at <see cref="Rate"/>.</summary>
     public required float[] Pcm { get; init; }
     public required int Rate { get; init; }
     /// <summary>The level the buffer's full scale stands for at one metre on the axis, dB: what the
-    /// loudness law places it by, as a speech line's (Speech.LevelDb).</summary>
+    /// loudness law places it by, as a speech line's (ReferenceVoice.LevelDb).</summary>
     public required float LevelDb { get; init; }
     /// <summary>The program's gated RMS at one metre on the axis, dB SPL: the speaker's speech level.</summary>
     public required float SplDb { get; init; }
@@ -74,7 +74,7 @@ public static class LoudspeakerChain
         float peakSpl = 20f * MathF.Log10(MathF.Max(1e-12f, peak) / (float)RefPascals);
 
         // As a speech line is kept: its gated RMS at -28 dBFS, its full scale declared.
-        float scale = MathF.Pow(10f, (Speech.BufferRmsDbfs - gated) / 20f);
+        float scale = MathF.Pow(10f, (ReferenceVoice.BufferRmsDbfs - gated) / 20f);
         if (peak * scale > 0.99f) scale = 0.99f / MathF.Max(1e-12f, peak);
         var pcm = new float[pascals.Length];
         for (int i = 0; i < pcm.Length; i++) pcm[i] = pascals[i] * scale;

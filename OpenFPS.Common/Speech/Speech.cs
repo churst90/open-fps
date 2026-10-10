@@ -17,8 +17,8 @@ public static class Speech
     // ANSI S3.5-1997, Table 3: the overall speech level one metre in front of a talker, for each vocal
     // effort. These are long-term levels, the speech's own RMS.
 
-    /// <summary>Talking to someone beside you.</summary>
-    public const float NormalDb = 62.35f;
+    /// <summary>Talking to someone beside you: the reference voice the levels are calibrated by.</summary>
+    public const float NormalDb = Hearing.ReferenceVoice.NormalDb;
     /// <summary>Calling to someone a few metres off, or telling someone to watch it.</summary>
     public const float RaisedDb = 68.34f;
     /// <summary>Calling across a street.</summary>
@@ -27,11 +27,11 @@ public static class Speech
     public const float ShoutDb = 82.3f;
 
     /// <summary>
-    /// Where a loaded line sits on average, dBFS RMS: lines are brought to <see cref="BufferLoudnessLufs"/>,
-    /// which for the shipped set is this within a decibel or so. -28 leaves room for the peakiest take
-    /// (26.3 dB from RMS to peak, --speech-lines, 2026-09-27) with 1.7 dB to spare.
+    /// Where a loaded line sits on average, dBFS RMS (<see cref="Hearing.ReferenceVoice.BufferRmsDbfs"/>):
+    /// lines are brought to <see cref="BufferLoudnessLufs"/>, which for the shipped set is this within a
+    /// decibel or so.
     /// </summary>
-    public const float BufferRmsDbfs = -28f;
+    public const float BufferRmsDbfs = Hearing.ReferenceVoice.BufferRmsDbfs;
 
     /// <summary>
     /// The loudness a line is brought to, LUFS (ITU-R BS.1770 K-weighted, ungated: a few seconds of
@@ -72,7 +72,7 @@ public static class Speech
     /// scale at one metre, and a line at <see cref="BufferRmsDbfs"/> has its full scale that far above
     /// its speech level.
     /// </summary>
-    public static float LevelDb(float effortDb) => effortDb - BufferRmsDbfs;
+    public static float LevelDb(float effortDb) => Hearing.ReferenceVoice.LevelDb(effortDb);
 
     /// <summary>The key a world sound carries to name a recorded line: <c>voice:maria/greet_hi</c>.</summary>
     public static string Key(string voice, string line) => $"voice:{voice}/{line}";

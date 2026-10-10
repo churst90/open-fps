@@ -37,7 +37,7 @@ public sealed class Timbre
     /// For a recording or a rendered buffer: where the sound sits under its buffer's full scale, dBFS,
     /// as a gated RMS (the mean square of its 125 ms blocks within 20 dB of the loudest: the sound while
     /// it sounds, its pauses and its silent tail left out). A world sound declares its level as its
-    /// buffer's full scale at a metre (Speech.LevelDb), so its real level is the declared level plus
+    /// buffer's full scale at a metre (ReferenceVoice.LevelDb), so its real level is the declared level plus
     /// this. NaN for a live voice, whose declared level is its RMS level and which plays it
     /// <see cref="Loudness.PhysicalRmsDbfs"/> under full scale.
     /// </summary>
@@ -132,7 +132,7 @@ public sealed class Timbre
         }
         for (int i = 7; i >= 0; i--) levels[i] = levels[i + 1] - 4f;
         for (int i = 26; i < Bands; i++) levels[i] = levels[i - 1] - 4f;
-        // A speech line in the game sits 28 dB under its full scale (Speech.BufferRmsDbfs).
+        // A speech line in the game sits 28 dB under its full scale (ReferenceVoice.BufferRmsDbfs).
         var t = FromBandLevels(levels, "speech (ANSI S3.5 normal)").WithGatedRms(Loudness.ReferenceRmsDbfs);
         t.BuildTable();
         return t;
