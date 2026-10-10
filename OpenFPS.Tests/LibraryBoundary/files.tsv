@@ -190,7 +190,7 @@ OpenFPS.Common/Aircraft.cs	lib	Sound
 OpenFPS.Common/AircraftGroundRun.cs	lib	Sound	
 OpenFPS.Common/Applause.cs	lib	Sound	
 OpenFPS.Common/AudioClock.cs	lib	Sound	
-OpenFPS.Common/AudioEmission.cs	lib	Acoustics	
+OpenFPS.Common/AudioEmission.cs	lib	Sound	
 OpenFPS.Common/AudioEvents.cs	mixed	Sound	SoundCharacter,TransientSound
 OpenFPS.Common/Ballistics.cs	lib	Sound	
 OpenFPS.Common/Beacons.cs	host		

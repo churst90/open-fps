@@ -89,7 +89,6 @@ FILE_RULES = [
     (CO + 'SparseAcousticOctree.cs', 'a', 'Acoustics', ''),
     (CO + 'Systems/', 'a', 'Acoustics', 'regions and openings from the solids'),
     (CO + 'WallTransmission.cs', 'a', 'Acoustics', ''),
-    (CO + 'AudioEmission.cs', 'a', 'Acoustics', ''),
     (CO + 'Localisation.cs', 'a', 'Acoustics', ''),
     # Common: sound models, presets, the ear, weather, nature
     (CO + 'Hearing/', 'a', 'Sound', 'the ear'),
@@ -97,6 +96,9 @@ FILE_RULES = [
     (CO + 'Spectrum.cs', 'a', 'Sound', ''),
     (CO + 'ShapedNoise.cs', 'a', 'Sound', ''),
     (CO + 'AudioClock.cs', 'a', 'Sound', 'becomes an instance the host passes in'),
+    # Where a source's sound comes out: it reads the vehicle and machine presets, so Sound, not Acoustics. It
+    # reads entity snapshots too, so it stays in Common until the world input (stage 6).
+    (CO + 'AudioEmission.cs', 'a', 'Sound', 'stays in Common until stage 6: reads entity snapshots'),
     (CO + 'Speech/', 'b', '', "open-fps's recorded lines; Loudness reads its levels"),
     (CO + 'Beacons.cs', 'b', '', 'game feature'),
     (CO + 'DirectionWords.cs', 'b', '', 'speech UI'),
