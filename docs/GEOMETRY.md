@@ -1673,9 +1673,33 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    where it opens by design, median IoU over 0.8) and `RealPlaceMapTests.Rooms_flood_shut_and_as_drawn` (each place:
    only barns open, no room without a start, median IoU over 0.8). The largest block is Albany's 640 m house, 646 by
    356 m with its reach, 77 million cells (about 460 MB while it floods): a block per room's bounds, or pages, before
-   the client floods a world tile. Next: the acoustic map marking each room's flood
-   (`AcousticVolumeGenerator.GenerateRegions`, and the server's region lookups, so both agree), region ids passing
-   through unchanged.
+   the client floods a world tile.
+
+   **Switched on (2026-10-10, unheard).** `EntityAcoustics.RoomsByFlood` floods every indoor room of a list of
+   definitions through a triangle world with each door leaf at its shut pose (`Portal.OpeningCentre/OpeningRotation`;
+   both sides move leaves in their worlds), and `RoomCells` says which room's flood holds a point. The server
+   (`MapManager.RoomsOf`, after every change to the fixed geometry, in the background on the game's server) and the
+   client (`ClientWorldState`: in each refresh of the acoustic map, and again whenever the geometry is published) call
+   it with the same definitions, so both put a point in the same room. A point's region is the room whose flood holds
+   it, else the smallest box of the regions that did not flood (yards, streets, a room whose middle is in a solid),
+   else the outside: the client's `SpatialService.GetRegionAt`, and the server's `MapManager.RegionAt`, which
+   `DoorManners`, the editor's doors and `PlaceAt` now ask. `GenerateRegions(..., floods)` marks a flooded room's
+   voxels where its flood holds the voxel's middle, not its box, and the map carries the cells (`AcousticMap.RoomCells`).
+   Region ids are the entity ids, as before. The boxes serve until the first flood lands. Groups of rooms whose seeds
+   and nearby pieces have not changed are not flooded again (`RoomFlood.Cache`).
+
+   AudioLab `--geometry-parity map=ID only=agree` sets the server's lookup against a client's at 24 random points in
+   and round every indoor room the client holds (the whole city; the tiles a medium detail setting holds round the
+   spawn on the places):
+
+   | | points | the same | moved against the boxes alone | server flood | client map |
+   |---|---|---|---|---|---|
+   | city | 11,784 | 11,784 | 1,341 | 2.5 s | 3.1 s (489 rooms) |
+   | Magnolia | 10,512 | 10,510 | 979 | 2.5 s | 0.6 s (438 rooms held) |
+   | Albany | 22,512 | 22,509 | 2,355 | 6.1 s | 2.2 s (938 rooms held) |
+
+   The five that differ are in houses 400 to 520 m from the spawn, where the client holds less round them than the
+   server (not traced further). `RoomFloodTests` holds the city to every point the same.
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
    would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a

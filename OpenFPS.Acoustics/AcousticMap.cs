@@ -27,6 +27,13 @@ public partial class AcousticMap
     /// </summary>
     public Dictionary<int, OpeningFrame> OpeningFrames { get; set; } = new();
 
+    /// <summary>
+    /// Where each room is, from the walls (docs/GEOMETRY.md 12.6): the cells of every room's flood. A point a flood
+    /// holds is in that room; a flooded room's box says nothing. Null until the rooms have been flooded (the boxes
+    /// serve meanwhile).
+    /// </summary>
+    public OpenFPS.Common.Geometry.RoomCells? RoomCells { get; set; }
+
     public AcousticMap()
     {
         VoxelGrid = new SparseAcousticOctree();

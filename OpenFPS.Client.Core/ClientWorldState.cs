@@ -893,7 +893,7 @@ public class ClientWorldState
         // The static solids as triangles, as far as the last build has them (ClientGeometry).
         if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled)
         {
-            if (!_geometryHooked) { Geometry.Published = Touch; _geometryHooked = true; }
+            if (!_geometryHooked) { Geometry.Published = GeometryPublished; _geometryHooked = true; }
             var (world, stale, unindexed) = Geometry.ForSnapshot(
                 CollectForGeometry,
                 id => _definitions.ContainsKey(id),
@@ -1012,12 +1012,64 @@ public class ClientWorldState
     /// room is in the next tile) are left out: there is nothing on the far side to hear into.
     /// </summary>
     public static AcousticMap BuildAcousticMap(IEnumerable<EntityDefinition> definitions, Vector3 mapSize, Vector3 min,
-                                               float voxelResolution, float occlusionFloor, bool streamed, bool report)
+                                               float voxelResolution, float occlusionFloor, bool streamed, bool report,
+                                               OpenFPS.Common.Geometry.TriangleWorld? geometry = null,
+                                               OpenFPS.Common.Geometry.RoomFlood.Cache? rooms = null)
     {
-        var map = OpenFPS.Common.EntityAcoustics.GenerateRegions(definitions, mapSize, min,
-                      voxelResolution, occlusionFloor, report: report);
+        // The rooms from the walls (docs/GEOMETRY.md 12.6), as the server floods them: until the geometry is
+        // built the boxes serve.
+        var defs = definitions as IReadOnlyCollection<EntityDefinition> ?? definitions.ToList();
+        var floods = geometry == null ? null
+            : OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, rooms, RoomFloodThreads);
+        var map = OpenFPS.Common.EntityAcoustics.GenerateRegions(defs, mapSize, min,
+                      voxelResolution, occlusionFloor, report: report, floods: floods);
         if (streamed) DropDanglingPortals(map);
         return map;
+    }
+
+    /// <summary>Threads a client floods its rooms on, off the game thread: a few, so the frame keeps its cores.</summary>
+    public static int RoomFloodThreads => Math.Clamp(Environment.ProcessorCount / 4, 1, 4);
+
+    /// <summary>Each group of rooms' flood, kept from one refresh to the next; one flood at a time uses it.</summary>
+    private readonly OpenFPS.Common.Geometry.RoomFlood.Cache _roomFloods = new();
+    private readonly object _floodLock = new();
+
+    /// <summary>Times the rooms were flooded again after the geometry was built, with the rest of the map left as it was.</summary>
+    public int RoomRefreshes { get; private set; }
+
+    /// <summary>
+    /// A build of the static geometry was published: the rooms are flooded again through it, off this thread, and
+    /// only the rooms' cells are swapped in (a tile's walls arrive after its rooms; the next refresh of the whole
+    /// map floods with them too).
+    /// </summary>
+    private void GeometryPublished()
+    {
+        Touch();
+        if (AcousticMap == null || !OpenFPS.Common.Geometry.TriangleGeometry.Enabled) return;
+        RefreshRunner(() =>
+        {
+            try
+            {
+                AcousticMap? live;
+                long epoch;
+                Vector3 min;
+                lock (_metaLock) { live = AcousticMap; epoch = _mapEpoch; min = _acousticMin; }
+                var geometry = Geometry.Built;
+                if (live == null || geometry == null) return;
+                var defs = _definitions.Values.ToList();
+                OpenFPS.Common.Geometry.RoomCells cells;
+                lock (_floodLock) cells = OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, _roomFloods, RoomFloodThreads);
+                lock (_metaLock)
+                {
+                    if (!ReferenceEquals(AcousticMap, live) || epoch != _mapEpoch) return;
+                    live.RoomCells = cells;
+                }
+                RoomRefreshes++;
+                Interlocked.Increment(ref _geometryVersion);
+                Touch();
+            }
+            catch (Exception ex) { Serilog.Log.Error(ex, "Rooms from the walls: the flood failed; the rooms stay as they were."); }
+        });
     }
 
     private static void DropDanglingPortals(AcousticMap map)
@@ -1097,7 +1149,10 @@ public class ClientWorldState
         // Cleared before the definitions are read: a room that arrives while this runs sets it again.
         _tablesDirty = false;
         var defs = _definitions.Values.ToList();
-        var built = BuildAcousticMap(defs, size, min, res, floor, streamed: TileMetres > 0f, report: false);
+        AcousticMap built;
+        lock (_floodLock)
+            built = BuildAcousticMap(defs, size, min, res, floor, streamed: TileMetres > 0f, report: false,
+                                     geometry: OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? Geometry.Built : null, rooms: _roomFloods);
 
         lock (_metaLock)
         {
@@ -1110,6 +1165,7 @@ public class ClientWorldState
             live.RegionRotations = built.RegionRotations;
             live.OpeningFrames = built.OpeningFrames;
             live.Portals = built.Portals;
+            live.RoomCells = built.RoomCells;
         }
         Interlocked.Increment(ref _geometryVersion);
         AcousticRefreshes++;

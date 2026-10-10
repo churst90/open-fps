@@ -94,6 +94,33 @@ public partial class SparseAcousticOctree
         node.Children = null;
     }
 
+    /// <summary>The smallest voxel holding <paramref name="pos"/>, to <paramref name="regionId"/>: straight down to it,
+    /// splitting on the way, and joined up again where its siblings agree.</summary>
+    public void SetRegionAt(Vector3 pos, int regionId)
+    {
+        if (!IsInBounds(pos)) return;
+        lock (_treeLock) SetRegionAtRecursive(_root, _min, _size, pos, regionId);
+    }
+
+    private void SetRegionAtRecursive(OctreeNode node, Vector3 nodeMin, float nodeSize, Vector3 pos, int regionId)
+    {
+        if (node.IsLeaf && node.RegionId == regionId) return;
+        if (nodeSize <= _minVoxel) { node.RegionId = regionId; node.Children = null; return; }
+        if (node.IsLeaf)
+        {
+            node.Children = new OctreeNode[8];
+            for (int i = 0; i < 8; i++) node.Children[i] = new OctreeNode { RegionId = node.RegionId };
+        }
+        float halfSize = nodeSize / 2f;
+        int index = 0;
+        Vector3 childMin = nodeMin;
+        if (pos.X >= nodeMin.X + halfSize) { index |= 1; childMin.X += halfSize; }
+        if (pos.Y >= nodeMin.Y + halfSize) { index |= 2; childMin.Y += halfSize; }
+        if (pos.Z >= nodeMin.Z + halfSize) { index |= 4; childMin.Z += halfSize; }
+        SetRegionAtRecursive(node.Children![index], childMin, halfSize, pos, regionId);
+        TryCollapse(node);
+    }
+
     public int GetRegionAt(Vector3 pos)
     {
         lock (_treeLock)

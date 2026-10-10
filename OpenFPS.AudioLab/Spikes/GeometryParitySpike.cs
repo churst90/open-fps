@@ -954,6 +954,10 @@ public static class GeometryParitySpike
         if (only.Contains("routes"))
             RoutesParity(maps, mapId, ecs, lookup, data, mapSize, n, show, tallies, args);
 
+        // ── The server's rooms against the client's ─────────────────────────────────────────────
+        if (only.Contains("agree"))
+            AgreementParity(maps, mapId, ecs, lookup, data, mapSize, show, tallies, args);
+
         // ── Rooms from the walls against the rooms as drawn ──────────────────────────────────────
         if (only.Contains("rooms"))
             RoomsParity(ecs, rebuilt, data, show, lookup, args);   // with the door leaves shut in their doorways
@@ -1135,6 +1139,94 @@ public static class GeometryParitySpike
                               + $"{(world.IsTerrain(r) ? " ground" : "")} bounds {V(world.BoundsOf(r).Min)}..{V(world.BoundsOf(r).Max)}");
         }
         }
+    }
+
+    // ═══ Server and client agree ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Rooms from the walls switched on (docs/GEOMETRY.md 12.6): the server's region lookup (MapManager.RegionAt, its
+    /// own floods) against the client's (SpatialService.GetRegionAt on the map ClientWorldState builds from what it
+    /// is sent, through a triangle world built from those definitions as the client builds it), at random points in
+    /// and round every room both hold. Also how many points the switch moved against the boxes alone, and the
+    /// rooms where it moved most (where to listen first).
+    /// </summary>
+    private static void AgreementParity(MapManager maps, string mapId, World ecs, Dictionary<int, Entity> lookup, MapData data,
+                                        Vector3 mapSize, int show, List<Tally> tallies, string[] args)
+    {
+        var clock = Stopwatch.StartNew();
+        var serverRooms = maps.RoomsOf(mapId);
+        double serverMs = clock.Elapsed.TotalMilliseconds;
+        if (serverRooms == null) { Console.WriteLine("agree: the server has no rooms from the walls (no triangle world)"); return; }
+
+        // What the client is sent: the tiles a medium detail setting holds round the spawn, or the whole map.
+        var defs = new List<EntityDefinition>();
+        var spawn = maps.GetSpawnPoint(mapId).Position;
+        if (data.TileMetres > 0 && maps.TryGetTiles(mapId, out var tiles))
+        {
+            var interest = new TileInterest { Radii = StreamRadii.Default };
+            foreach (int id in TileStreamer.Begin(interest, tiles, spawn))
+                if (lookup.TryGetValue(id, out var e) || tiles.TryGetGlobal(id, out e)) defs.Add(EntityDefinitionFactory.From(ecs, e));
+        }
+        else defs = EntityDefinitionFactory.StaticDefinitions(ecs);
+        clock.Restart();
+        var statics = new List<SolidSpec>(); var movers = new List<SolidSpec>();
+        foreach (var def in defs)
+        {
+            var role = EntityGeometry.RoleOf(def);
+            if (role is GeometryRole.Static or GeometryRole.SightOnly) statics.Add(EntityGeometry.SpecOf(def, def.Transform, role));
+            else if (role == GeometryRole.Mover) movers.Add(EntityGeometry.SpecOf(def, def.Transform, role));
+        }
+        var clientGeometry = new TriangleWorldBuilder(data.TileMetres > 0 ? data.TileMetres : 250f) { Parallel = true }.Build(statics, movers);
+        double geometryMs = clock.Elapsed.TotalMilliseconds;
+        clock.Restart();
+        var map = OpenFPS.Client.Core.ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
+                                                                        streamed: data.TileMetres > 0, report: false, geometry: clientGeometry);
+        double clientMs = clock.Elapsed.TotalMilliseconds;
+        var world = new WorldSnapshot { AcousticMap = map };
+        foreach (var def in defs)
+        {
+            world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
+            if (def.Region.RoomSize.X > 0) world.RegionEntityIds.Add(def.EntityId);
+        }
+        var spatial = new OpenFPS.Client.Core.SpatialService();
+        var boxesOnly = new WorldSnapshot { AcousticMap = EntityAcoustics.GenerateRegions(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor, report: false) };
+        foreach (var (id, s) in world.Entities) boxesOnly.Entities[id] = s;
+
+        var tally = new Tally("Region at a point: server (MapManager) against client (SpatialService)");
+        tallies.Add(tally);
+        var rng = new Random(int.Parse(Arg(args, "seed", "1")));
+        int perRoom = int.Parse(Arg(args, "per-room", "24"));
+        long moved = 0, asked = 0;
+        var byRoom = new List<(double Share, string Line)>();
+        var held = map.RoomCells?.Flooded ?? new HashSet<int>();
+        foreach (var def in defs.Where(d => d.Region.RoomSize.X > 0 && d.Region.IsIndoor).OrderBy(d => d.EntityId))
+        {
+            var t = def.Transform;
+            var rot = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
+            int movedHere = 0;
+            for (int k = 0; k < perRoom; k++)
+            {
+                var local = new Vector3((float)(rng.NextDouble() - 0.5), (float)(rng.NextDouble() - 0.5), (float)(rng.NextDouble() - 0.5))
+                            * (def.Region.RoomSize + new Vector3(2f));
+                var p = t.Position + Vector3.Transform(local, rot);
+                int server = MapManager.RegionAt(ecs, p);
+                int client = spatial.GetRegionAt(world, p);
+                tally.Probes++;
+                if (server == client) tally.Same++;
+                else tally.Differ(held.Contains(def.EntityId) ? "differ" : "differ (room not flooded on the client)",
+                                  $"{def.Region.FriendlyName} ({def.EntityId}) at {V(p)}: server {server}, client {client}", show);
+                asked++;
+                if (spatial.GetRegionAt(boxesOnly, p) != client) { moved++; movedHere++; }
+            }
+            var c = t.Position;
+            byRoom.Add(((double)movedHere / perRoom, $"{def.Region.FriendlyName} ({def.EntityId}): {movedHere} of {perRoom} points in another place than its box said;"
+                                                     + $" /tp {c.X:F1} {c.Z:F1} {c.Y:F1}, box {V(def.Region.RoomSize)}"));
+        }
+        Console.WriteLine();
+        Console.WriteLine($"agree: server flooded {serverRooms.Flooded.Count} room(s) in {serverMs:F0} ms; the client holds {defs.Count:N0} definitions, "
+                          + $"its triangle world in {geometryMs:F0} ms and its map with {held.Count} flooded room(s) in {clientMs:F0} ms");
+        Console.WriteLine($"  {tally.Same} of {tally.Probes} points the same on both; {moved} of {asked} in another place than the boxes alone put them");
+        foreach (var (_, line) in byRoom.OrderByDescending(r => r.Share).Take(show)) Console.WriteLine("    " + line);
     }
 
     // ═══ Routes ════════════════════════════════════════════════════════════════════════════════
