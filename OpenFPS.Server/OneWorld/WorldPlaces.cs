@@ -27,8 +27,10 @@ namespace OpenFPS.Server.OneWorld;
 /// </summary>
 public sealed class WorldPlaces
 {
-    /// <summary>What a copied tile holds and how: a change copies every place again.</summary>
-    public const int FormatVersion = 2;
+    /// <summary>What a copied tile holds and how: a change copies every place again. 3: the ground graded under the
+    /// floors, which are prisms of their footprints since geometry stage 4 and had been left out (the ground came up
+    /// through them).</summary>
+    public const int FormatVersion = 3;
 
     public sealed class Place
     {
@@ -243,9 +245,7 @@ public sealed class WorldPlaces
             // Moved so (0, 0) is the corner of the place's first tile, and up so heights are over the sea.
             double dx = p.Easting - p.Min.Easting, dz = p.Northing - p.Min.Northing, dy = p.SeaY;
             var elevation = p.Map.Elevation!.Moved(dx, dy, dz);
-            var off2 = new Vector2((float)dx, (float)dz);
-            var slabs = p.Slabs.Select(s => new TerrainBuilder.Slab(s.Point + new Vector3((float)dx, (float)dy, (float)dz), s.Up,
-                                                                     s.A + off2, s.B + off2, s.C + off2, s.D + off2)).ToList();
+            var slabs = p.Slabs.Select(s => s.Moved(new Vector3((float)dx, (float)dy, (float)dz))).ToList();
             var size = new Vector3((p.Max.X - p.Min.X + 1) * (float)WorldTileKey.TileMetres, 0f, (p.Max.Z - p.Min.Z + 1) * (float)WorldTileKey.TileMetres);
             var ground = new Dictionary<WorldTileKey, float[]>();
             var laid = TerrainBuilder.Lay(elevation, slabs, Vector3.Zero, size, WorldTileService.Spacing);

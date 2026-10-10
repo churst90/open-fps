@@ -958,6 +958,10 @@ public static class GeometryParitySpike
         if (only.Contains("agree"))
             AgreementParity(maps, mapId, ecs, lookup, data, mapSize, show, tallies, args);
 
+        // ── What a footstep stands on inside every room ──────────────────────────────────────────
+        if (only.Contains("floors"))
+            FloorsParity(ecs, serverWorld, show);
+
         // ── Rooms measured from their floods against their boxes ─────────────────────────────────
         if (only.Contains("measure"))
             MeasureParity(ecs, serverWorld, data, mapSize, show, args);
@@ -1082,6 +1086,49 @@ public static class GeometryParitySpike
         foreach (var part in (Environment.GetEnvironmentVariable("ROOM_DEBUG") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
             if (int.TryParse(part, out int debugId) && rooms.TryGetValue(debugId, out var dbg))
                 TraceRoom(world, data, seeds.First(x => x.Id == debugId), dbg, ecs, lookup);
+    }
+
+    /// <summary>
+    /// What the ground probe (a footstep, the material under a player) finds inside every indoor room: nine points
+    /// over its box's footprint, the highest floor under each from a metre over the box's bottom. A room where the
+    /// probe meets the terrain has the ground up through its floor.
+    /// </summary>
+    private static void FloorsParity(World ecs, TriangleWorld world, int show)
+    {
+        int rooms = 0, through = 0, mostly = 0, probes = 0, onGround = 0;
+        var materials = new Dictionary<string, int>();
+        var shown = new List<string>();
+        var all = new AcceptAll();
+        ecs.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (Entity e, ref Transform t, ref RegionComponent r) =>
+        {
+            if (!r.IsIndoor || r.RoomSize.X <= 0f || r.RoomSize.Y <= 0f || r.RoomSize.Z <= 0f) return;
+            rooms++;
+            var q = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
+            int hits = 0;
+            Vector3? first = null;
+            for (int i = 0; i < 3; i++)
+                for (int k = 0; k < 3; k++)
+                {
+                    var local = new Vector3((0.25f + 0.25f * i - 0.5f) * r.RoomSize.X, -0.5f * r.RoomSize.Y + 1f, (0.25f + 0.25f * k - 0.5f) * r.RoomSize.Z);
+                    var p = t.Position + Vector3.Transform(local, q);
+                    float y = world.FloorAt(p.X, p.Z, p.Y, GeometryLayers.Ground, ref all, out var hit);
+                    probes++;
+                    if (hit.Triangle < 0 && y < -999f) continue;
+                    string m = world.SurfaceOf(hit).Material ?? "";
+                    bool ground = world.IsTerrain(hit.Solid);
+                    materials[(ground ? "ground: " : "") + m] = materials.GetValueOrDefault((ground ? "ground: " : "") + m) + 1;
+                    if (ground) { hits++; onGround++; first ??= new Vector3(p.X, y, p.Z); }
+                }
+            if (hits > 0) through++;
+            if (hits >= 5) mostly++;
+            if (hits > 0 && shown.Count < show)
+                shown.Add($"{r.FriendlyName} ({e.Id}): {hits} of 9 on the ground, /tp {first!.Value.X:F1} {first.Value.Z:F1} {first.Value.Y + 0.05f:F1}");
+        });
+        Console.WriteLine();
+        Console.WriteLine($"floors: {rooms} indoor rooms, {through} with the ground probe meeting the terrain somewhere inside, {mostly} at five points of nine or more; "
+                          + $"{onGround} of {probes} probes on the terrain");
+        Console.WriteLine("  under the probes: " + string.Join(", ", materials.OrderByDescending(kv => kv.Value).Take(12).Select(kv => $"{kv.Key} {kv.Value}")));
+        foreach (var line in shown) Console.WriteLine("    " + line);
     }
 
     /// <summary>

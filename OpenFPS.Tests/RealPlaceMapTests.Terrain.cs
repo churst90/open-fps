@@ -173,8 +173,26 @@ public partial class RealPlaceMapTests
             checkedSlabs++;
             if (hit.Triangle < 0 || terrain.Contains(hit.Owner)) bad.Add($"{e.Name ?? e.PrefabId} ({e.Layer}) at ({e.Position.X:F1}, {e.Position.Z:F1})");
         }
+        // And under every room, at nine points over its box: the floor, not the ground. Floors are their footprints'
+        // prisms since geometry stage 4, and the grading left them out: footsteps in 1,253 of Albany's rooms and 377
+        // of Magnolia's were on dirt somewhere, and the rooms measured their floors as a field.
+        int checkedRooms = 0;
+        p.Ecs.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (Entity e, ref Transform t, ref RegionComponent r) =>
+        {
+            if (!r.IsIndoor || r.RoomSize.X <= 0f) return;
+            var q = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
+            checkedRooms++;
+            for (int i = 0; i < 3; i++)
+                for (int k = 0; k < 3; k++)
+                {
+                    var at = t.Position + Vector3.Transform(new Vector3((0.25f * i - 0.25f) * r.RoomSize.X, -0.5f * r.RoomSize.Y + 1f,
+                                                                        (0.25f * k - 0.25f) * r.RoomSize.Z), q);
+                    world.FloorAt(at.X, at.Z, at.Y, GeometryLayers.Ground, ref all, out var hit);
+                    if (hit.Triangle >= 0 && terrain.Contains(hit.Owner)) { bad.Add($"{r.FriendlyName} ({e.Id}) at ({at.X:F1}, {at.Z:F1})"); return; }
+                }
+        });
         foreach (var b in bad.Take(15)) _o.WriteLine(b);
-        _o.WriteLine($"{id}: {checkedRoads} points of road and {checkedSlabs} lawns and drives, {bad.Count} with the ground on top");
+        _o.WriteLine($"{id}: {checkedRoads} points of road, {checkedSlabs} lawns and drives and {checkedRooms} rooms, {bad.Count} with the ground on top");
         Assert.Empty(bad);
     }
 

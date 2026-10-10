@@ -695,7 +695,8 @@ map load's own path), `MapTiles.AddPlaced`, `WorldMaps.Pump`, `VehicleSystem.Spa
   client with every tile it overlaps (as on a map). Rooms carry what the map's load measured (their
   materials by name, indoors or not), so a tile needs no survey when it loads.
 - **Its ground** is the map's: the same posts graded to the same slabs (`TerrainBuilder`), laid over
-  whole world tiles. A place's tiles never ask the survey.
+  whole world tiles. A place's tiles never ask the survey. The slabs include the floors, prisms of their
+  footprints (format 3, 2026-10-10: before it the ground came up through them).
 - **Roads, junctions, traffic and street life are not cut**: a road network is one thing. A frame of the
   world that wholly contains a place takes them, moved into the frame, when it is made; the place's
   vehicles are spawned on it then.

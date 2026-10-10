@@ -29,8 +29,9 @@ public static class TerrainBuilder
     public const float MaxFill = 1.5f, MaxCut = 3f;
 
     /// <summary>A slab lying on the ground: its underside's plane (a point on it and its upward normal)
-    /// and the four corners of its underside seen from above.</summary>
-    public readonly record struct Slab(Vector3 Point, Vector3 Up, Vector2 A, Vector2 B, Vector2 C, Vector2 D)
+    /// and the four corners of its underside seen from above; for a floor of a footprint's own outline (a prism),
+    /// that outline seen from above, the four corners its box's.</summary>
+    public readonly record struct Slab(Vector3 Point, Vector3 Up, Vector2 A, Vector2 B, Vector2 C, Vector2 D, Vector2[]? Outline = null)
     {
         /// <summary>The underside's height at (x, z).</summary>
         public float HeightAt(float x, float z) => Point.Y - (Up.X * (x - Point.X) + Up.Z * (z - Point.Z)) / Up.Y;
@@ -38,6 +39,16 @@ public static class TerrainBuilder
         public bool Covers(float x, float z)
         {
             var p = new Vector2(x, z);
+            if (Outline != null)
+            {
+                bool inside = false;
+                for (int i = 0, j = Outline.Length - 1; i < Outline.Length; j = i++)
+                {
+                    var a = Outline[i]; var b = Outline[j];
+                    if ((a.Y > p.Y) != (b.Y > p.Y) && p.X < (b.X - a.X) * (p.Y - a.Y) / (b.Y - a.Y) + a.X) inside = !inside;
+                }
+                return inside;
+            }
             float s1 = Cross(B - A, p - A), s2 = Cross(C - B, p - B), s3 = Cross(D - C, p - C), s4 = Cross(A - D, p - D);
             return (s1 >= 0 && s2 >= 0 && s3 >= 0 && s4 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0 && s4 <= 0);
         }
@@ -47,10 +58,23 @@ public static class TerrainBuilder
         {
             if (Covers(x, z)) return 0f;
             var p = new Vector2(x, z);
+            if (Outline != null)
+            {
+                float d = float.MaxValue;
+                for (int i = 0, j = Outline.Length - 1; i < Outline.Length; j = i++) d = MathF.Min(d, Edge(Outline[j], Outline[i], p));
+                return d;
+            }
             return MathF.Min(MathF.Min(Edge(A, B, p), Edge(B, C, p)), MathF.Min(Edge(C, D, p), Edge(D, A, p)));
         }
 
         public (Vector2 Min, Vector2 Max) Bounds => (Vector2.Min(Vector2.Min(A, B), Vector2.Min(C, D)), Vector2.Max(Vector2.Max(A, B), Vector2.Max(C, D)));
+
+        /// <summary>The same slab moved by <paramref name="by"/>.</summary>
+        public Slab Moved(Vector3 by)
+        {
+            var off = new Vector2(by.X, by.Z);
+            return new Slab(Point + by, Up, A + off, B + off, C + off, D + off, Outline?.Select(o => o + off).ToArray());
+        }
 
         private static float Cross(Vector2 a, Vector2 b) => a.X * b.Y - a.Y * b.X;
 
@@ -65,18 +89,21 @@ public static class TerrainBuilder
     /// <summary>One tile of laid ground: its south-west corner and its heights, row by row.</summary>
     public sealed record Tile(int X, int Z, float CornerX, float CornerZ, int Posts, float Spacing, float[] Heights);
 
-    /// <summary>The slabs of a world that could rest on the ground: fixed, solid, boxes, thin and level
-    /// enough to be a floor (at most 0.6 m thick, at least a metre each way, tilted under 30 degrees).</summary>
+    /// <summary>The slabs of a world that could rest on the ground: fixed, solid, boxes or a footprint's outline
+    /// stood up (a prism), thin and level enough to be a floor (at most 0.6 m thick, at least a metre each way,
+    /// tilted under 30 degrees). The prisms are the real places' floors: left out, the ground came up through
+    /// 1,253 rooms' floors on Albany (and footsteps indoors were on dirt).</summary>
     public static List<Slab> Slabs(World world)
     {
         var slabs = new List<Slab>();
         var q = new QueryDescription().WithAll<Transform, ColliderComponent>();
         world.Query(in q, (Entity e, ref Transform t, ref ColliderComponent c) =>
         {
-            if (!c.IsSolid || c.Shape != ColliderShape.Box || c.Form != null) return;
+            if (!c.IsSolid || c.Shape != ColliderShape.Box) return;
+            if (c.Form != null && (c.Form.Kind != OpenFPS.Common.Geometry.ShapeKind.Prism || c.Form.Outline is not { Length: >= 6 })) return;
             if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<DoorComponent>(e)) return;
             if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
-            if (SlabOf(t.Position, t.Rotation, c.Size) is { } slab) slabs.Add(slab);
+            if (SlabOf(t.Position, t.Rotation, c.Size, c.Form?.Outline) is { } slab) slabs.Add(slab);
         });
         return slabs;
     }
@@ -84,7 +111,7 @@ public static class TerrainBuilder
     /// <summary>A box as a slab lying on the ground, or null if it is not thin and level enough to be a floor
     /// (at most 0.6 m thick, at least a metre each way, tilted under 30 degrees): a map's slabs, and the roads a
     /// world tile is made with (OneWorld.WorldFeatures).</summary>
-    public static Slab? SlabOf(Vector3 centre, Quaternion rotation, Vector3 s)
+    public static Slab? SlabOf(Vector3 centre, Quaternion rotation, Vector3 s, float[]? outline = null)
     {
         if (s.Y > 0.6f || s.X < 1f || s.Z < 1f) return null;
         var r = rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(rotation);
@@ -96,7 +123,18 @@ public static class TerrainBuilder
             var w = centre + Vector3.Transform(new Vector3(sx * s.X * 0.5f, -s.Y * 0.5f, sz * s.Z * 0.5f), r);
             return new Vector2(w.X, w.Z);
         }
-        return new Slab(bottom, up, Corner(-1, -1), Corner(1, -1), Corner(1, 1), Corner(-1, 1));
+        Vector2[]? ring = null;
+        if (outline is { Length: >= 6 })
+        {
+            // A prism's outline, x and z pairs in metres about its middle in its own frame.
+            ring = new Vector2[outline.Length / 2];
+            for (int i = 0; i < ring.Length; i++)
+            {
+                var w = centre + Vector3.Transform(new Vector3(outline[2 * i], -s.Y * 0.5f, outline[2 * i + 1]), r);
+                ring[i] = new Vector2(w.X, w.Z);
+            }
+        }
+        return new Slab(bottom, up, Corner(-1, -1), Corner(1, -1), Corner(1, 1), Corner(-1, 1), ring);
     }
 
     /// <summary>
