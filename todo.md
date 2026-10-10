@@ -112,7 +112,9 @@ old PA in --loudspeaker game).
 
 Approved 2026-10-09 and 10, so off this list: the hull's blows in time; the cheaper reverb tail; the
 shut glass door leak fix (inbox/pa-leak-2026-10-09); the loudspeaker (inbox/loudspeaker-2026-10-10); the
-gas hob round 2 (inbox/gas-stove-2026-10-10/round2, "sounds great now"); water over the ground
+gas hob round 2 (inbox/gas-stove-2026-10-10/round2, "sounds great now"); the four probable-bug
+fixes of 2026-10-09 with recorded sounds' echoes smeared off rough walls (inbox/probable-bugs-2026-10-09,
+"the probable bugs sound good"); water over the ground
 (inbox/water-over-terrain-2026-10-10); fire by fuel, stage 1 (inbox/fire-fuel-2026-10-10).
 Heard, with notes and nothing to listen to again: the engine CPU renders (inbox/engine-cpu-2026-10-09;
 the phased pass-by that did not sweep was the lab's panned capture, not the game); struck things and
@@ -123,8 +125,6 @@ Renders not yet heard:
   louder and clean, footsteps without the end-of-voice clicks. Round 1 (inbox/floors-2026-10-09) was
   heard 10-10: silent at game level, the +40 dB copies fuzzy (16-bit capture) and cutting out (the
   clicks).
-- Recorded sounds' echoes smeared off rough walls: your steps and a PA
-  (inbox/probable-bugs-2026-10-09/4-scattering; merged 7a9b6c85).
 - The probable-bug fixes of 2026-10-07, before and after (inbox/probable-bugs-2026-10-07).
 - Driving cues and horns: H horn, U siren, J and L indicators, the brake cue, line rumble, the speed
   limit, rails, gates, aircraft roll-out (inbox/driving-2026-10-06). The brake cue's notes, the rail
