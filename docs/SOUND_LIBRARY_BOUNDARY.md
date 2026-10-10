@@ -2153,7 +2153,9 @@ By `git mv`, namespaces unchanged (decision 6):
 ### 17.7 Left for stage 5 and after
 
 - The flood (docs/GEOMETRY.md 12.6 item 1): `GenerateRegions` onto the rooms flooded from the walls, region
-  ids unchanged, on the other branch.
+  ids unchanged, on the other branch. Done 2026-10-10; then `Room` gained what the flood measures (`Volume`,
+  `FaceAreas`, `FaceAbsorption`, `Extent`), set by `RoomAcoustics.Measured` from a `RoomFlood.Lining`, so the
+  library's room is no longer only the component's six fields.
 - Stage 5: the statics in the moved files are `OpeningRoutes.ReverseGridOrderForParity` and `DebugOverTheTop`
   (lab levers), two thread-static scratch lists in `OpeningRoutes`, and `RoomAcoustics.FaceNames` (a table).
 - Stage 6, the world input: all 384 references left. `RainField` 104, `SpatialAcoustics` 68,

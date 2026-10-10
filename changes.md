@@ -15,6 +15,27 @@ Recent work, newest first. `git log` has the rest.
   same, unregenerated. The wire hash changes (the weather files are in it), so server and clients are rebuilt
   together; nothing sent changed, and the door fingerprint is the same.
 
+- The ground no longer comes up through the floors on Magnolia and Albany, unheard. Since geometry stage 4 their
+  floors are their footprints' prisms, and the grading of the ground under slabs took only boxes, so on a slope the
+  dirt rose through the back of every house: footsteps were on dirt somewhere in 1,253 of Albany's rooms and 377 of
+  Magnolia's, and those rooms measured their floors as a field. The ground is cut level under a prism's outline now,
+  as under a road; the copies of the places in the world are made again (`WorldPlaces.FormatVersion` 3).
+
+- Server and client agree on every room point on all three maps (docs/GEOMETRY.md 12.6 item 1). Rooms whose
+  floods reach the same air past their margins flood as one; rooms that flood together are sent together across a
+  tile's edge, as rooms joined by doorways were. Albany's 640 m "house" round 34414 Highway 99e (a bare
+  `building=yes` way) is a building: a home is under a hectare in gen_osm. Albany regenerated. A flood over 64
+  million cells keeps its boxes, and flooding takes 3 bytes a cell, not 5.
+
+- Rooms measure themselves from their floods (docs/GEOMETRY.md 12.6 item 1, "Measured from their floods"), unheard.
+  A flooded room's volume, face areas and face materials come from the walls round its air, by a ray to the surface
+  for each metre of lining, not from its box; the room lift, the routes' room absorption and the Sabine estimate read
+  them. Rooms that do not flood (yards, streets) keep their boxes. What moved: the terminal concourse's acoustic-tile
+  ceiling and the city houses' carpet and sofas are heard (the field through their doors 5.4 and 3.6 dB down), the
+  tunnel's ends are no longer counted twice (2.5 dB up), and on the real places the box survey's grass and dirt
+  ceilings are gone (a tiled bathroom 7.8 dB up). The client floods 1.5 s longer on the city (8 threads). The wire hash changes (Acoustics and Common
+  changed); no message did.
+
 - Sound library stage 4 (docs/SOUND_LIBRARY_BOUNDARY.md section 17): rooms and openings are values. `Room` and
   `Opening` in OpenFPS.Acoustics carry what `RegionComponent` and `PortalComponent` carried; the acoustic map,
   `RoomAcoustics` and the generator take them, and `EntityAcoustics` (Common) makes them from the entities in

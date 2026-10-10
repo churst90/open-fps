@@ -1698,8 +1698,129 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    | Magnolia | 10,512 | 10,510 | 979 | 2.5 s | 0.6 s (438 rooms held) |
    | Albany | 22,512 | 22,509 | 2,355 | 6.1 s | 2.2 s (938 rooms held) |
 
-   The five that differ are in houses 400 to 520 m from the spawn, where the client holds less round them than the
-   server (not traced further). `RoomFloodTests` holds the city to every point the same.
+   The five that differed were in houses 400 to 520 m from the spawn. Traced (2026-10-10, `agreedebug=ID` and the
+   cells holding each point, both sides), two causes, both fixed:
+   - **Two floods over the same air** (Magnolia 17423 Oak Lane, Albany 1240 Alandale Avenue). Two rooms of a house
+     whose boxes grown by the margin did not overlap flooded in separate groups, and each reached the other's air
+     past its margin. Both held the cells; which one a lookup found depended on the order of the spans, which
+     differs with how many rooms a side holds. Now groups whose air reaches into another group's reach flood again
+     as one (`RoomFlood.Overlapping`, as many passes as it takes), so a cell is one room's.
+   - **A house's rooms sent apart** (Albany 5790 Mike Street, 5592 Pacific Boulevard). A living room and a kitchen
+     open to each other through an archway with no door are joined by no doorway, so `MapTiles` grouped them with
+     nothing: across a tile's edge the client held one, and its flood took the other's air. Rooms that flood
+     together (`RoomFlood.Groups`, half a metre more generous) now go together, as rooms joined by doorways did
+     (`MapTiles.FloodTogether`, in `Build` and `AddPlaced`). The client now holds 947 rooms round Albany's spawn,
+     not 938.
+
+   After: the city 11,784 of 11,784 points the same, Magnolia 10,512 of 10,512, Albany 22,728 of 22,728.
+   `RoomFloodTests.Rooms_that_reach_the_same_air_past_their_margins_flood_as_one` and
+   `WorldStreamingTests.Every_entity_of_a_real_place_is_in_the_tiles_it_overlaps` (rooms that flood together share
+   their tiles) hold them; `RoomFloodTests` holds the city to every point the same.
+
+   **Albany's 640 by 193 m house** was OSM way 125102808, tagged `building=yes` and nothing else: an L of six points,
+   643 by 355 m (13.7 ha), round the address point of 34414 Highway 99e, so gen_osm made it that address's house
+   with a 640 m living room. A home is now under a hectare (`HOME_MAX_M2`; the largest in both places is 3,721 m2):
+   it is a "building" now, and Albany is regenerated (one entity fewer, ids after it moved down one; Magnolia byte
+   for byte the same). Its block is still 88 million cells, so floods are bounded: a group whose block is over
+   `RoomFlood.MaxBlockCells` (64 million) is not flooded and its rooms keep their boxes (`Room.TooBig`, told to the
+   report). A cell's claim is a 16-bit index now, 3 bytes a cell while flooding instead of 5, so the largest group
+   flooded (Albany's college, 52 million cells with its reach) takes about 160 MB.
+
+   **Measured from their floods (2026-10-10, unheard).** A flooded room's volume, face areas and face materials come
+   from its flood, not its box (2.7 item 4). `RoomFlood.Flood(..., measure: true)` gives each room a `Lining`: per face
+   of the box's frame (floor, ceiling, north +Z, south, east +X, west), the area of each material lining it, the area
+   open to the sky and the area that is another room's air, the volume, and the air's bounds. A ray goes from the air
+   cell to the surface for each group of faces in a 1 m cube (one face in sixteen on a wall; one for every face was 5
+   million rays and 13 s on the city): it gives the material (the carpet, not the slab under it), the surface's angle
+   (a cell's face over the normal's L1 length, so a wall at 45 degrees is not its staircase) and the gap from the
+   cells to the surface, which goes into the volume and grows each face by the gaps across it (a 2.7 m wall over a
+   carpet's cell is 2.5 m of cells). For a room open past its margin the air under the open sky is the outdoors, not
+   the room (the margin past a hangar's open front, or over a roof). A room with no air under a roof (a walled garden)
+   is not measured. Only the client measures (`RoomsByFlood(..., measure: true)`); the server floods for lookups.
+
+   `RoomAcoustics.Measured(room, lining)` puts it on the `Room` value (`Volume`, `FaceAreas`, `FaceAbsorption` per
+   band and broadband, `Extent`, and `Materials` as the main lining of each face). A face stays "None" where the box's
+   was (an open side, a portal's end) and becomes "None" where half of it or more is open sky. Another room's air
+   absorbs nothing in the measure, because the routes count what leaves by an opening at its own S·tau (the box's open
+   ends counted it twice). Readers: `RoomAcoustics.Volume`, `FaceAreas`, `AbsorptionArea`, `Reach` and `DecayMs`;
+   SpatialAcoustics' room lift; `OpeningRoutes`' room absorption, face reach and declared hash.
+   `AcousticVolumeGenerator.GenerateRegions(..., floods)` measures as it builds the map; the client measures again
+   when the geometry is published and when a room arrives (`EntityAcoustics.RoomOf`). Rooms that do not flood keep
+   their boxes.
+
+   AudioLab `--geometry-parity map=ID only=measure [sort=rt|volume|gain|field]` sets each flooded room's measure
+   against its box, with the routes' absorption before and after (the field through its openings goes as 1/A):
+
+   | | rooms | flood / with the measure (8 threads) | volume flood/box 10th / median / 90th | surface | Sabine RT60 mid | field through openings moved over 3 dB |
+   |---|---|---|---|---|---|---|
+   | city | 488 | 2.6 s / 4.3 s | 0.89 / 0.95 / 0.97 | 0.99 / 0.99 / 1.03 | 0.45 / 0.92 / 1.44 | 67 (all quieter) |
+   | Magnolia | 1,810 | 2.3 s / 3.1 s | 0.98 / 1.02 / 1.16 | 1.00 / 1.03 / 1.16 | 0.95 / 1.00 / 2.54 | 26 (23 louder) |
+   | Albany | 2,862 | 6.8 s / 9.4 s | 0.98 / 1.07 / 1.27 | 1.00 / 1.08 / 1.27 | 0.96 / 1.12 / 2.89 | 12 (8 louder) |
+
+   (The places' rows are after the ground was graded under their floors, below; before it Magnolia had 36 rooms over
+   3 dB and Albany 43, most of them quieter for a floor of dirt.)
+
+   What moved most, and why: the terminal concourse's ceiling is acoustic tile, not the concrete over it (Sabine 6.1 to
+   1.1 s, the field through its openings 5.4 dB down); the city's houses have carpet and sofas the box survey did not
+   see (1.19 to 0.45 s, 3.6 dB down); the tunnel halves lost their ends counted twice (2.5 dB up); the corridors'
+   ceilings are plaster, not the carpet of the flat above (1.6 dB up); the hangar's 221 m2 front is open, its margin
+   outside is not (15.6 to 9.2 s). On the places the box survey had grass and dirt for ceilings and walls (a bathroom
+   "Grass, Plaster, Plaster, Plaster, Grass, Grass" is tile and plaster: 7.8 dB up).
+
+   Found by it, and fixed: on Albany 778 rooms and on Magnolia 160 measured floors mostly of the ground. The floors of
+   the places are their footprints' prisms since stage 4, and `TerrainBuilder.Slabs` took only boxes, so the ground
+   was graded under no floor and came up through the slab wherever the pad (the ground at the front wall) was below
+   it: on a slope, the back of every house. A footstep there was on dirt: the ground probe met the terrain in 1,253 of
+   Albany's 2,864 rooms (7,624 of 25,776 probes, nine a room) and 377 of Magnolia's 1,810 (1,694 of 16,290). A prism
+   is a slab of its outline now (`TerrainBuilder.Slab.Outline`), and the ground is cut to its underside as under a
+   road: the world is dirt and the floor is laid on it, the dirt dug level for it where the slope rises (up to
+   `MaxCut`, 3 m) and filled where it falls (`MaxFill`, 1.5 m). Raising each floor over the highest ground of its
+   footprint was the other way; it would have stood houses on stilts on their low side and moved every room, door
+   and pad the generator set. After: the probe meets the terrain in no room on either place
+   (`AudioLab --geometry-parity only=floors`; `RealPlaceMapTests.The_ground_never_rises_through_what_lies_on_it`
+   checks nine points a room). No room measures a floor mostly of the ground; four have a few square metres of it
+   where their air reaches out of an open door (two barns on Magnolia, two garages on Albany). The places copied into
+   the world are graded by the same slabs, and `WorldPlaces.FormatVersion` is 3, so stored copies are made again.
+   `RoomFloodTests` holds a 4 by 3 m room at 0, 30 and 45 degrees: volume within 5 %, walls within
+   5 % together, the carpet as the floor, and Sabine's time the box's within 10 %; and a room with an open door, its
+   doorway open and the air outside it not the room's.
+
+   Where to listen (`/tp` x east, y north, z height, on the floor; the field change is for a sound heard from the room
+   through its openings):
+   - city: Terminal concourse, south end, `/tp 211.2 3.3 0.3` (field 5.4 dB down); 23 Birch Street, `/tp -347.0 -34.5
+     0.3` (3.6 dB down, the city's houses alike); Tunnel, south half, `/tp 0.0 -262.5 0.3` (2.5 dB up); Union Building
+     corridor, floor 7, `/tp 20.3 67.0 21.3` (1.6 dB up); Hangar, `/tp 254.0 190.0 0.1` (1.5 dB down); Parking garage,
+     level 0, `/tp -66.8 62.0 0.3` (1.3 dB down).
+   - Magnolia (after the ground was graded under the floors): 19415 Turtle Dove Lane, barn, `/tp -88.8 -253.0 3.5`
+     (8.5 dB down, its open door); 31909 Beaver Street, bathroom, `/tp 70.8 -31.4 -1.2` (7.8 dB up); 26120 Nichols
+     Sawmill Road, house, `/tp -1065.9 420.7 3.5` (7.3 dB up); 19609 Turtle Dove Lane, house, `/tp -282.3 -233.4 4.6`
+     (6.7 dB down).
+   - Albany (the same): 34435 Highway 99e, house, `/tp 317.9 -1070.6 2.3` (6.6 dB down); 777 College Park Drive
+     Southwest, building, `/tp 36.2 969.2 -1.5` (4.9 dB up); 5095 Pacific Boulevard Southwest, house, `/tp 53.0 795.7
+     -0.9` (4.6 dB up); 6251 Lanier Street Southwest, bathroom, `/tp 89.1 -68.8 -0.7` (3.4 dB up).
+
+   **Regions become places: the plan (not started).** More than a session, so it waits for part A to be heard. In
+   order, each its own commit:
+   1. The ambience beds go: `ClientAudioSystem.SetMapAmbience` and the region bed, `PlayAmbientBed`/`StopAmbientBed`
+      in `IAudioProvider`, `FmodAudioProvider` and `AudioEngineFacade`, `PrefabTemplate.AmbienceId`, the manifest's
+      ambience in Program.cs and ClientGameSession.cs, `Room.AmbienceId`; `MapManifest`'s field and
+      `RegionComponent.AmbienceId` stay on the wire, unread, with a one-line comment. Tests: AmbienceAndWeather,
+      ClientAudioHarness, EmitterStreamReplay, SteelDoorSound, VoiceLifecycle, Speedway, PrefabSpec, BeaconAids.
+   2. The flood from a point: a seed is a point; step 1 and 2 (own box, then the margin) become one flood out from
+      the seeds together, a cell to the room nearest it by the flood's own path, stopped by walls, shut leaves and air
+      under the open sky (the sky test of step 3 and the measure). The indoor flag is "flooded and closed".
+   3. Openings from the floods: where two floods meet (`Lining.Meets`, with where) and where one meets the sky, grouped
+      by plane into rectangles, in place of `FaceOpenings` on box faces and of `OpeningRoutes.FaceOfRoom`; then
+      portals derived where floods meet through a door leaf (the leaf's frame is the opening).
+   4. The readers of `RoomSize` (83 in the game, 24 test files) onto the flood: `SpatialService.GetRegionAt`,
+      `MapManager.RegionAt`, `MapTiles` footprints, `DoorManners`, `PlaceAt` and `/tp`, `MapTracker`, the voxel
+      marks, `RoomAcoustics`; the server's `SurveyRegions` box survey goes (the lining measures).
+   5. Authoring: `RoomSize`, `Materials` and `ReverbTimeScale` out of the editor (EntitySettings, WorldEditor menus and
+      build, ModelCatalog), PrefabTemplate/PrefabRepository/PrefabValidator, and gen_city.py, gen_osm.py,
+      gen_speedway.py, WorldBuildings and WorldPlaces; maps regenerated, city.json byte-identical to gen_city.py.
+   A box stays where nothing floods: an outdoor place (a name over an area, a yard, a street, a park), a vehicle's
+   cabin (it moves; its box comes from the vehicle), a room whose block is over `MaxBlockCells`, and every room until
+   the first flood lands at load (or the load waits for it).
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
    would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a

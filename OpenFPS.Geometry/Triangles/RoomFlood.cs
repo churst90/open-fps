@@ -31,6 +31,14 @@ public static class RoomFlood
     /// house, a bay deeper than the margin.</summary>
     public const float EnclosedReach = 4f;
 
+    /// <summary>
+    /// The most cells a group of rooms floods in as one block: 3 bytes a cell while it floods (5 with a room open past
+    /// its margin), so 190 to 320 MB at most. A group whose block is bigger is not flooded and its rooms keep their
+    /// boxes. The largest on the three maps is Albany's college, 52 million; Albany's 640 by 193 m footprint round
+    /// 34414 Highway 99e is 88 million (it took 460 MB at 5 bytes a cell).
+    /// </summary>
+    public const long MaxBlockCells = 64_000_000;
+
     /// <summary>How far up nothing may be for air to be under the open sky, metres.</summary>
     public const float SkyReach = 500f;
 
@@ -71,11 +79,15 @@ public static class RoomFlood
         /// <summary>Where it met that air: the first few cells past its margin (to trace a way out).</summary>
         public List<Vector3> OpenAt { get; } = new();
         public bool Unseeded { get; internal set; }
+        /// <summary>Its group's block was more than <see cref="MaxBlockCells"/>: not flooded, its box serves.</summary>
+        public bool TooBig { get; internal set; }
         /// <summary>How many of its air's cells lie past its margin, in air the walls close in that no box holds.</summary>
         public int BeyondCount { get; internal set; }
         /// <summary>The rooms whose air its air meets: an opening between them.</summary>
         public HashSet<int> Meets { get; } = new();
         public float Volume => AirCount * Cell * Cell * Cell;
+        /// <summary>What lines its air, measured when the flood was asked to (<see cref="Flood"/>'s measure): null otherwise.</summary>
+        public Lining? Lining { get; internal set; }
         public IEnumerable<Vector3> Cells => Centres(AirRuns);
         public IEnumerable<Vector3> Edge => Centres(EdgeRuns);
 
@@ -86,14 +98,48 @@ public static class RoomFlood
         }
     }
 
+    /// <summary>
+    /// What lines a room's air (docs/GEOMETRY.md 2.7 item 4), per face of its box's frame in RoomAcoustics' order
+    /// (floor, ceiling, north +Z, south, east +X, west): from a ray out of each air cell that has a solid next to it, the
+    /// surface it meets, its material, and its true area (a cell's face over the surface normal's L1 length, so a wall at
+    /// 45 degrees to the grid is not counted as its staircase).
+    /// </summary>
+    public sealed class Lining
+    {
+        /// <summary>Area of each material on each face, m² (material "" where the ray met nothing it could name).</summary>
+        public Dictionary<string, float>[] Surfaces { get; } = { new(), new(), new(), new(), new(), new() };
+        /// <summary>Area of each face that is air under the open sky, m²: what reaches it leaves.</summary>
+        public float[] Open { get; } = new float[6];
+        /// <summary>Area of each face that is another room's air, m²: an opening with no door.</summary>
+        public float[] Meets { get; } = new float[6];
+        /// <summary>The air's volume, m³: its cells, and the air between the last cells and the surfaces the rays met.</summary>
+        public float Volume { get; internal set; }
+        /// <summary>The air's bounds in the world.</summary>
+        public Vector3 Min { get; internal set; }
+        public Vector3 Max { get; internal set; }
+
+        public float Lined(int face) { float a = 0f; foreach (var v in Surfaces[face].Values) a += v; return a; }
+
+        /// <summary>The face a direction from the air towards a surface is, in the room's own frame.</summary>
+        public static int FaceOf(Vector3 local)
+        {
+            var a = Vector3.Abs(local);
+            if (a.Y >= a.X && a.Y >= a.Z) return local.Y < 0f ? 0 : 1;
+            if (a.Z >= a.X) return local.Z > 0f ? 2 : 3;
+            return local.X > 0f ? 4 : 5;
+        }
+    }
+
     /// <summary>Floods every seed through <paramref name="world"/>'s solids of <paramref name="layers"/>. Cells
     /// are on a grid through <paramref name="origin"/> (the acoustic map's corner, so a voxel is a whole number
     /// of cells). Rooms that cannot meet flood apart, on up to <paramref name="threads"/> threads; each group that
     /// takes longer than <paramref name="slowMs"/> is told to <paramref name="report"/>. With <paramref name="cache"/>,
-    /// groups that have not changed since the last flood with it are taken from it.</summary>
+    /// groups that have not changed since the last flood with it are taken from it. With <paramref name="measure"/>,
+    /// each room's <see cref="Room.Lining"/> is measured too.</summary>
     public static Dictionary<int, Room> Flood(TriangleWorld world, IReadOnlyList<Seed> seeds, Vector3 origin,
                                               float margin = DefaultMargin, GeometryLayers layers = GeometryLayers.Acoustics,
-                                              int threads = 1, Action<string>? report = null, double slowMs = 250, Cache? cache = null)
+                                              int threads = 1, Action<string>? report = null, double slowMs = 250, Cache? cache = null,
+                                              bool measure = false)
     {
         var rooms = new Dictionary<int, Room>();
         if (seeds.Count == 0) return rooms;
@@ -113,7 +159,7 @@ public static class RoomFlood
             ulong key = 0;
             if (cache != null)
             {
-                key = Signature(world, c, seeds, origin, margin, layers);
+                key = Signature(world, c, seeds, origin, margin, layers, measure);
                 Room[]? kept;
                 lock (cache) cache.Groups.TryGetValue(key, out kept);
                 if (kept != null)
@@ -123,7 +169,9 @@ public static class RoomFlood
                     return;
                 }
             }
-            FloodCluster(world, layers, origin, c, seeds, hints, rooms);
+            FloodCluster(world, layers, origin, c, seeds, hints, rooms, measure);
+            if (report != null && rooms[seeds[c.Seeds[0]].Id].TooBig)
+                lock (report) report($"{c.Seeds.Count} room(s) from {seeds[c.Seeds[0]].Id} reach {(c.Hi.X - c.Lo.X + 1) * Cell:F0} by {(c.Hi.Y - c.Lo.Y + 1) * Cell:F0} by {(c.Hi.Z - c.Lo.Z + 1) * Cell:F0} m: more than {MaxBlockCells:N0} cells to flood, so their boxes serve");
             if (cache != null)
             {
                 var made = c.Seeds.Select(i => rooms[seeds[i].Id]).ToArray();
@@ -137,11 +185,91 @@ public static class RoomFlood
                                      + $"{(c.Hi.Y - c.Lo.Y + 1) * Cell:F0} by {(c.Hi.Z - c.Lo.Z + 1) * Cell:F0} m ({c.Cells:N0} cells, air {air:N0}): {ms:F0} ms");
             }
         }
-        if (threads <= 1) foreach (var c in clusters) One(c);
-        else Parallel.ForEach(clusters, new ParallelOptions { MaxDegreeOfParallelism = threads }, One);
-        foreach (var r in taken) rooms[r.Id] = r;
+        var pending = clusters;
+        for (int pass = 0; pending.Count > 0; pass++)
+        {
+            if (threads <= 1) foreach (var c in pending) One(c);
+            else Parallel.ForEach(pending, new ParallelOptions { MaxDegreeOfParallelism = threads }, One);
+            foreach (var r in taken) rooms[r.Id] = r;
+            taken.Clear();
+            // Groups whose air went into another's reach flood again as one, so no two floods claim the same air: two
+            // rooms of a house flooded apart each took the other's air past their margins, and the server and a client
+            // holding fewer rooms round them answered differently there (Magnolia, 17423 Oak Lane).
+            pending = pass < 8 ? Overlapping(clusters, hints, seeds, rooms) : new List<Cluster>();
+            foreach (var c in pending)
+                foreach (int i in c.Seeds) rooms[seeds[i].Id] = new Room { Id = seeds[i].Id, Origin = origin };
+        }
         if (cache != null) cache.Groups = cache.Used;
         return rooms;
+    }
+
+    /// <summary>
+    /// The groups whose rooms' air (a cell further, for the wall cells round it) reaches into another group's reach,
+    /// joined: they replace their parts in <paramref name="clusters"/> and are returned to flood again. Only air past
+    /// a room's margin can (two groups' reaches do not overlap), so only rooms with some are looked at.
+    /// </summary>
+    private static List<Cluster> Overlapping(List<Cluster> clusters, Hint[] hints, IReadOnlyList<Seed> seeds, Dictionary<int, Room> rooms)
+    {
+        var groupOf = new int[hints.Length];
+        for (int g = 0; g < clusters.Count; g++) foreach (int i in clusters[g].Seeds) groupOf[i] = g;
+        var parent = Enumerable.Range(0, clusters.Count).ToArray();
+        int Find(int i) { while (parent[i] != i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
+        bool any = false;
+        for (int g = 0; g < clusters.Count; g++)
+            foreach (int i in clusters[g].Seeds)
+            {
+                var room = rooms[seeds[i].Id];
+                if (room.BeyondCount == 0 || room.AirRuns.Count == 0) continue;
+                int x0 = int.MaxValue, y0 = int.MaxValue, z0 = int.MaxValue, x1 = int.MinValue, y1 = int.MinValue, z1 = int.MinValue;
+                foreach (var r in room.AirRuns)
+                {
+                    x0 = Math.Min(x0, r.X); x1 = Math.Max(x1, r.X + r.Length - 1);
+                    y0 = Math.Min(y0, r.Y); y1 = Math.Max(y1, r.Y); z0 = Math.Min(z0, r.Z); z1 = Math.Max(z1, r.Z);
+                }
+                x0--; y0--; z0--; x1++; y1++; z1++;
+                for (int j = 0; j < hints.Length; j++)
+                {
+                    if (groupOf[j] == g) continue;
+                    ref readonly var h = ref hints[j];
+                    if (h.Hi.X < x0 || h.Lo.X > x1 || h.Hi.Y < y0 || h.Lo.Y > y1 || h.Hi.Z < z0 || h.Lo.Z > z1) continue;
+                    int a = Find(g), b = Find(groupOf[j]);
+                    if (a != b) { parent[a] = b; any = true; }
+                }
+            }
+        if (!any) return new List<Cluster>();
+        var joined = new Dictionary<int, Cluster>();
+        var members = new Dictionary<int, int>();
+        for (int g = 0; g < clusters.Count; g++)
+        {
+            int root = Find(g);
+            members[root] = members.GetValueOrDefault(root) + 1;
+        }
+        var kept = new List<Cluster>();
+        for (int g = 0; g < clusters.Count; g++)
+        {
+            int root = Find(g);
+            if (members[root] == 1) { kept.Add(clusters[g]); continue; }
+            if (!joined.TryGetValue(root, out var c)) joined[root] = c = new Cluster();
+            c.Seeds.AddRange(clusters[g].Seeds);
+            c.Lo = (Math.Min(c.Lo.X, clusters[g].Lo.X), Math.Min(c.Lo.Y, clusters[g].Lo.Y), Math.Min(c.Lo.Z, clusters[g].Lo.Z));
+            c.Hi = (Math.Max(c.Hi.X, clusters[g].Hi.X), Math.Max(c.Hi.Y, clusters[g].Hi.Y), Math.Max(c.Hi.Z, clusters[g].Hi.Z));
+        }
+        var fresh = joined.Values.ToList();
+        foreach (var c in fresh) c.Seeds.Sort();
+        fresh.Sort((a, b) => b.Cells.CompareTo(a.Cells));
+        clusters.Clear();
+        clusters.AddRange(kept);
+        clusters.AddRange(fresh);
+        return fresh;
+    }
+
+    /// <summary>The ids of the seeds that flood as one group, before any group is joined for air it reached in
+    /// another's (<see cref="Flood"/>): those whose boxes grown by <paramref name="margin"/> overlap.</summary>
+    public static List<List<int>> Groups(IReadOnlyList<Seed> seeds, Vector3 origin, float margin = DefaultMargin)
+    {
+        var hints = new Hint[seeds.Count];
+        for (int i = 0; i < seeds.Count; i++) hints[i] = new Hint(seeds[i], margin, origin);
+        return Clusters(hints).Select(c => c.Seeds.Select(i => seeds[i].Id).ToList()).ToList();
     }
 
     /// <summary>Whether the cell holding <paramref name="p"/> is solid, as a flood would find it.</summary>
@@ -238,13 +366,13 @@ public static class RoomFlood
     }
 
     /// <summary>What a group's flood depends on: its seeds, the margin, and every piece its block touches where it is.</summary>
-    private static ulong Signature(TriangleWorld world, Cluster c, IReadOnlyList<Seed> seeds, Vector3 origin, float margin, GeometryLayers layers)
+    private static ulong Signature(TriangleWorld world, Cluster c, IReadOnlyList<Seed> seeds, Vector3 origin, float margin, GeometryLayers layers, bool measure)
     {
         ulong h = 14695981039346656037UL;
         void Mix(ulong v) { h ^= v; h *= 1099511628211UL; h ^= h >> 29; }
         void MixF(float v) => Mix((ulong)BitConverter.SingleToUInt32Bits(v));
         void MixV(Vector3 v) { MixF(v.X); MixF(v.Y); MixF(v.Z); }
-        MixF(margin); Mix((ulong)layers); MixV(origin);
+        MixF(margin); Mix((ulong)layers); MixV(origin); Mix(measure ? 1UL : 0UL);
         foreach (int i in c.Seeds)
         {
             var s = seeds[i];
@@ -266,18 +394,21 @@ public static class RoomFlood
     // ═══ The flood ══════════════════════════════════════════════════════════════════════════════
 
     private static void FloodCluster(TriangleWorld world, GeometryLayers layers, Vector3 origin, Cluster cluster,
-                                     IReadOnlyList<Seed> seeds, Hint[] hints, Dictionary<int, Room> rooms)
+                                     IReadOnlyList<Seed> seeds, Hint[] hints, Dictionary<int, Room> rooms, bool measure)
     {
         int pad = (int)MathF.Ceiling(EnclosedReach / Cell);
         var (lx, ly, lz) = (cluster.Lo.X - pad, cluster.Lo.Y - pad, cluster.Lo.Z - pad);
         int nx = cluster.Hi.X + pad - lx + 1, ny = cluster.Hi.Y + pad - ly + 1, nz = cluster.Hi.Z + pad - lz + 1;
-        if ((long)nx * ny * nz > int.MaxValue / 2)
-            throw new InvalidOperationException($"rooms reaching {nx * Cell:F0} by {ny * Cell:F0} by {nz * Cell:F0} m flood as one block: too big");
+        if ((long)nx * ny * nz > MaxBlockCells || cluster.Seeds.Count >= ushort.MaxValue)
+        {
+            foreach (int i in cluster.Seeds) rooms[seeds[i].Id].TooBig = true;
+            return;
+        }
         var block = new Block(lx, ly, lz, nx, ny, nz);
         var raster = new Raster(world, layers, origin, block);
         int n = nx * ny * nz, sx = 1, sy = nx, sz = nx * ny;
         // Which seed (its index in the cluster, plus one) holds each cell: air, or a wall cell its air reached.
-        var claim = new int[n];
+        var claim = new ushort[n];
         var local = cluster.Seeds;
         Vector3 CentreAt(int i) { int x = i % nx, y = i / nx % ny, z = i / sz; return CentreOf(lx + x, ly + y, lz + z, origin); }
         int Index(int x, int y, int z) => (x - lx) + nx * ((y - ly) + ny * (z - lz));
@@ -311,7 +442,7 @@ public static class RoomFlood
                 if (!found) { rooms[s.Id].Unseeded = true; continue; }
             }
             int i0 = Index(x, y, z);
-            claim[i0] = k + 1;
+            claim[i0] = (ushort)(k + 1);
             queue.Add(i0);
         }
 
@@ -330,7 +461,7 @@ public static class RoomFlood
                 foreach (var (c, k) in deferred)
                 {
                     if (claim[c] != 0) { Meet(claim[c] - 1, k); continue; }
-                    claim[c] = k + 1;
+                    claim[c] = (ushort)(k + 1);
                     queue.Add(c);
                 }
             }
@@ -359,7 +490,7 @@ public static class RoomFlood
                     bool inBox = h.InBox(CentreAt(m), out bool inGrown);
                     if (!inGrown) { escapes.Add((m, k)); continue; }
                     if (step == 1 && !inBox) { deferred.Add((m, k)); continue; }
-                    claim[m] = k + 1;
+                    claim[m] = (ushort)(k + 1);
                     queue.Add(m);
                 }
             }
@@ -419,7 +550,7 @@ public static class RoomFlood
             if (claim[c] != 0) { Meet(claim[c] - 1, k); continue; }
             if ((tag[c] == Place.Unknown ? Classify(c) : tag[c]) == Place.Enclosed)
             {
-                claim[c] = k + 1;
+                claim[c] = (ushort)(k + 1);
                 queue.Add(c);
                 continue;
             }
@@ -439,14 +570,14 @@ public static class RoomFlood
                 if (raster.Blocked(m)) { walls.Add((m, k)); continue; }
                 if (claim[m] != 0) { Meet(claim[m] - 1, k); continue; }
                 if (tag[m] != Place.Enclosed) continue;
-                claim[m] = k + 1;
+                claim[m] = (ushort)(k + 1);
                 queue.Add(m);
             }
         }
         for (int k = 0; k < local.Count; k++) rooms[seeds[local[k]].Id].BeyondCount = beyond[k];
         // Each room's air takes the wall cells next to it (the first room to reach one), so it reaches its walls.
         foreach (var (c, k) in walls)
-            if (claim[c] == 0) claim[c] = k + 1;
+            if (claim[c] == 0) claim[c] = (ushort)(k + 1);
         foreach (long pair in meets)
         {
             int a = local[(int)(pair >> 32)], b = local[(int)(pair & 0xFFFFFFFF)];
@@ -478,6 +609,194 @@ public static class RoomFlood
             var room = rooms[seeds[local[k]].Id];
             room.AirCount = counts[k * 2];
             room.EdgeCount = counts[k * 2 + 1];
+        }
+        if (measure) MeasureLinings(world, layers, origin, block, raster, claim, local, hints, seeds, rooms);
+    }
+
+    /// <summary>
+    /// Where a block's air is under the open sky (nothing above it in its column, and a ray up from the block's top meets
+    /// nothing), for a group with a room open past its margin: the margin the flood took past an open front, or over a
+    /// roof, is the outdoors, not the room. Null when no room of the group is open.
+    /// </summary>
+    private static bool[]? UnderTheSky(TriangleWorld world, GeometryLayers layers, Vector3 origin, Block block, Raster raster,
+                                       ushort[] claim, List<int> local, Dictionary<int, Room> rooms, IReadOnlyList<Seed> seeds)
+    {
+        bool any = false;
+        foreach (int i in local) any |= rooms[seeds[i].Id].Open;
+        if (!any) return null;
+        int nx = block.Nx, ny = block.Ny, nz = block.Nz;
+        var outside = new bool[claim.Length];
+        var all = new AcceptAll();
+        for (int z = 0; z < nz; z++)
+            for (int x = 0; x < nx; x++)
+            {
+                // Only columns some open room's air is in.
+                bool wanted = false;
+                for (int y = 0; y < ny && !wanted; y++)
+                {
+                    int c = x + nx * (y + ny * z);
+                    wanted = claim[c] != 0 && block.State[c] != Solidity.Solid && rooms[seeds[local[claim[c] - 1]].Id].Open;
+                }
+                if (!wanted) continue;
+                var top = CentreOf(block.Lx + x, block.Ly + ny - 1, block.Lz + z, origin);
+                if (world.Any(top, Vector3.UnitY, SkyReach, layers, RayFaces.Both, ref all)) continue;
+                for (int y = ny - 1; y >= 0; y--)
+                {
+                    int c = x + nx * (y + ny * z);
+                    if (raster.Blocked(c)) break;
+                    outside[c] = true;
+                }
+            }
+        return outside;
+    }
+
+    /// <summary>The faces of air against a solid that one ray answers for, cells a side: the faces of a room in one grid
+    /// direction within a cube this size are one sample, cast from the face nearest the cube's middle. Each ray costs
+    /// about 2 µs: one for every face was 5 million rays and 13 s on the city (a cube of 4 cells, 1.5 s).</summary>
+    private const int SampleCells = 4;
+
+    /// <summary>One sample's faces: how many, and the one nearest the cube's middle.</summary>
+    private struct Group
+    {
+        public int Count, Cell, Dir;
+        public float Distance;
+    }
+
+    /// <summary>
+    /// Each room's <see cref="Lining"/>: every face of its air against something else, a solid (a ray to the surface,
+    /// one for the faces of a <see cref="SampleCells"/> cube), the open sky or another room's air. The cells stop short
+    /// of a surface by up to a cell (a finish a centimetre thick fills the cell it lies in), so the rays' gaps to the
+    /// surfaces are added to the volume, and each face's area is grown by the gaps across it: a 2.7 m wall over a
+    /// carpet's cell was 2.5 m of cells.
+    /// </summary>
+    private static void MeasureLinings(TriangleWorld world, GeometryLayers layers, Vector3 origin, Block block, Raster raster,
+                                       ushort[] claim, List<int> local, Hint[] hints, IReadOnlyList<Seed> seeds, Dictionary<int, Room> rooms)
+    {
+        int nx = block.Nx, ny = block.Ny, nz = block.Nz, sz = nx * ny;
+        int rc = local.Count;
+        var linings = new Lining[rc];
+        var air = new long[rc];
+        var faces = new long[rc * 6];                         // every face of a room's air against something else, by direction
+        var lo = new Vector3[rc];
+        var hi = new Vector3[rc];
+        for (int k = 0; k < rc; k++) { linings[k] = new Lining(); lo[k] = new Vector3(float.MaxValue); hi[k] = new Vector3(float.MinValue); }
+        var outside = UnderTheSky(world, layers, origin, block, raster, claim, local, rooms, seeds);
+        var groups = new Dictionary<long, Group>();
+        var openings = new List<(int Room, int Dir, int Face, bool Meets)>();
+        const float face = Cell * Cell, reach = 1.5f * Cell + 1e-3f;
+        var dirs = new[] { Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY, Vector3.UnitZ, -Vector3.UnitZ };
+        for (int z = 0; z < nz; z++)
+            for (int y = 0; y < ny; y++)
+                for (int x = 0; x < nx; x++)
+                {
+                    int c = x + nx * (y + ny * z);
+                    int own = claim[c];
+                    if (own == 0 || block.State[c] == Solidity.Solid || (outside != null && outside[c])) continue;
+                    int k = own - 1;
+                    var at = CentreOf(block.Lx + x, block.Ly + y, block.Lz + z, origin);
+                    lo[k] = Vector3.Min(lo[k], at); hi[k] = Vector3.Max(hi[k], at);
+                    air[k]++;
+                    for (int d = 0; d < 6; d++)
+                    {
+                        int m;
+                        switch (d)
+                        {
+                            case 0: if (x + 1 >= nx) continue; m = c + 1; break;
+                            case 1: if (x == 0) continue; m = c - 1; break;
+                            case 2: if (y + 1 >= ny) continue; m = c + nx; break;
+                            case 3: if (y == 0) continue; m = c - nx; break;
+                            case 4: if (z + 1 >= nz) continue; m = c + sz; break;
+                            default: if (z == 0) continue; m = c - sz; break;
+                        }
+                        bool sky = outside != null && outside[m];
+                        if (claim[m] == own && block.State[m] != Solidity.Solid && !sky) continue;
+                        faces[k * 6 + d]++;
+                        if (!raster.Blocked(m))
+                        {
+                            // Air no room holds (past every reach), or air under the open sky: what reaches it leaves.
+                            openings.Add((k, d, Lining.FaceOf(Vector3.TransformNormal(dirs[d], hints[local[k]].Inv)), claim[m] != 0 && !sky));
+                            continue;
+                        }
+                        int gx = x / SampleCells, gy = y / SampleCells, gz = z / SampleCells;
+                        long key = ((((long)k * 6 + d) * 16384 + gz) * 16384 + gy) * 16384 + gx;
+                        float dx = x - (gx + 0.5f) * SampleCells + 0.5f, dy = y - (gy + 0.5f) * SampleCells + 0.5f, dz = z - (gz + 0.5f) * SampleCells + 0.5f;
+                        float distance = dx * dx + dy * dy + dz * dz;
+                        groups.TryGetValue(key, out var g);
+                        if (g.Count == 0 || distance < g.Distance) { g.Cell = c; g.Dir = d; g.Distance = distance; }
+                        g.Count++;
+                        groups[key] = g;
+                    }
+                }
+
+        // One ray a group: what it met, and how far short of it the cells stop.
+        var all = new AcceptAll();
+        var met = new List<(int Room, int Dir, int Face, string Material, float Area)>(groups.Count);
+        var gap = new double[rc * 6];
+        var cast = new long[rc * 6];
+        foreach (var (key, g) in groups)
+        {
+            int k = (int)(key / (6L * 16384 * 16384 * 16384));
+            var inv = hints[local[k]].Inv;
+            int x = g.Cell % nx, y = g.Cell / nx % ny, z = g.Cell / sz;
+            var at = CentreOf(block.Lx + x, block.Ly + y, block.Lz + z, origin);
+            var dir = dirs[g.Dir];
+            if (world.Closest(at, dir, reach, layers, RayFaces.Both, ref all, out var hit))
+            {
+                var n = hit.Normal;
+                float l1 = MathF.Abs(n.X) + MathF.Abs(n.Y) + MathF.Abs(n.Z);
+                met.Add((k, g.Dir, Lining.FaceOf(Vector3.TransformNormal(hit.Front ? -n : dir, inv)), world.SurfaceOf(hit).Material ?? "",
+                         g.Count * face / MathF.Max(1f, l1)));
+                gap[k * 6 + g.Dir] += g.Count * Math.Clamp(hit.T - Cell * 0.5f, -Cell * 0.5f, Cell);
+                cast[k * 6 + g.Dir] += g.Count;
+            }
+            else met.Add((k, g.Dir, Lining.FaceOf(Vector3.TransformNormal(dir, inv)), "", g.Count * face));
+        }
+
+        // Each axis's extent, as cells (the air over its faces across that axis) and as far as the surfaces; a face
+        // across one axis is grown by how much further the other two reach.
+        var grow = new float[rc * 3];
+        var volume = new double[rc];
+        for (int k = 0; k < rc; k++)
+        {
+            double cells = air[k] * (double)Cell * Cell * Cell;
+            double volumeGap = 0;
+            Span<double> stretch = stackalloc double[3];
+            for (int a = 0; a < 3; a++)
+            {
+                double across = 0.5 * (faces[k * 6 + 2 * a] + faces[k * 6 + 2 * a + 1]) * face;
+                double extent = across > 0 ? cells / across : 0;
+                double gaps = 0;
+                for (int side = 0; side < 2; side++)
+                {
+                    int i = k * 6 + 2 * a + side;
+                    gaps += gap[i] / Math.Max(1, faces[i]);   // the mean gap over the side, open parts of it none
+                    volumeGap += gap[i] * face;
+                }
+                stretch[a] = extent > 0 ? Math.Max(0.5, (extent + gaps) / extent) : 1.0;
+            }
+            for (int a = 0; a < 3; a++) grow[k * 3 + a] = (float)(stretch[(a + 1) % 3] * stretch[(a + 2) % 3]);
+            volume[k] = cells + volumeGap;
+        }
+        foreach (var (k, d, f, material, area) in met)
+        {
+            var surfaces = linings[k].Surfaces[f];
+            surfaces[material] = surfaces.GetValueOrDefault(material) + area * grow[k * 3 + d / 2];
+        }
+        foreach (var (k, d, f, meets) in openings)
+        {
+            if (meets) linings[k].Meets[f] += face * grow[k * 3 + d / 2];
+            else linings[k].Open[f] += face * grow[k * 3 + d / 2];
+        }
+        for (int k = 0; k < rc; k++)
+        {
+            var room = rooms[seeds[local[k]].Id];
+            // No air under a roof (a walled garden): an outdoor place, not a room to measure.
+            if (room.AirCount == 0 || air[k] == 0) continue;
+            var lining = linings[k];
+            lining.Volume = (float)volume[k];
+            lining.Min = lo[k] - new Vector3(Cell * 0.5f);
+            lining.Max = hi[k] + new Vector3(Cell * 0.5f);
+            room.Lining = lining;
         }
     }
 
