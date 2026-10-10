@@ -137,7 +137,8 @@ rejected, because the loader would otherwise attach no emitter and the object wo
 - **Physical models.** An `IsSynth` emitter whose `SoundId` has a model prefix is rendered by that
   model on the client, not by the `Synth*` oscillator: `machine:` (`ac_window`, `ac_condenser`,
   `mower_push`, `mower_riding`), `water:` (`park_fountain`), `fire:` (`fire_pit`), `foliage:`
-  (`park_tree`, `pine`) and `bell:`. The part after the colon is a preset name in the model library.
+  (`park_tree`, `pine`), `bell:` and `stove:` (`hob4`, `hob4_propane`, `hob1`: a gas hob, whose key also
+  carries its knobs' settings, docs/GAS_HOB.md). The part after the colon is a preset name in the model library.
   A water feature with several landing places (`WaterFeatureSpec.Taps`) can instead be placed as one
   emitter per tap, `water:<preset>/<feature>/<tap>`: one synth feeds them all, each tap plays the
   water that lands there, and `<feature>` keeps two fountains of the same preset apart.
@@ -303,6 +304,7 @@ for a flight of stairs, a landing, a garden gate. Where named places overlap, th
 | `rock_boulder` | a boulder, scaled to size; material Concrete (there is no Stone material) |
 | `water_surface` | standing water: a solid box of material `Water`, a hard reflector |
 | `fire_pit` | a wood fire: `fire:fire_pit`, not solid. Put it above the ring of brick round it |
+| `gas_hob`, `gas_hob_propane`, `gas_burner` | a gas hob (four burners on natural gas or propane, or one): `stove:hob4`, not solid. Put it on the worktop with its back (+Z) to the wall; the interact key lights the next burner or turns them all off (docs/GAS_HOB.md) |
 | `tree_crown` | the wind in a tree, heard from the middle of the crown: `foliage:park_tree`. Pair it with a `foliage_hedge` box for the crown and a trunk box |
 | `fence_timber` | a close-boarded wooden fence, 1.8 m, solid, `Wood` |
 | `fence_palisade` | a steel palisade, solid, `Fence` (porous: sound passes the gaps) |

@@ -100,6 +100,8 @@ string[] usage =
     "                                                water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
     "  --fire [levels|render out=DIR [places=1]|game out=DIR set=|hrtf] [preset ...] [sec= wind= age= seed= heard= parts=]",
     "                                                fires from a campfire to a crown fire, from their model (docs/FIRE.md)",
+    "  --stove [levels|render out=DIR|game out=DIR] [hob4|hob4_propane|hob1] [seed= dist= eff= turb= trim= heat= us= cloud=]",
+    "                                                a gas hob lit, turned and turned off, from its model (docs/GAS_HOB.md)",
     "  --waves [levels|render out=DIR|sea|game out=DIR set=] [preset ...] [sec= wind= fetch= heard= parts=]",
     "                                                shores from a pond's edge to surf, from their model (docs/WAVES_AND_SHORES.md)",
     "  --running-water [levels|render out=DIR|runoff|cycle PRESET|game out=DIR set=] [preset ...] [sec= rain= flow= dry=1 parts=]",
@@ -540,6 +542,11 @@ if (args.Contains("--nature"))
 if (args.Contains("--fire"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.FireSpike.Run(args));
+}
+
+if (args.Contains("--stove"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.StoveSpike.Run(args));
 }
 
 if (args.Contains("--waves"))

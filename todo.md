@@ -61,6 +61,8 @@ these four were not part of it. Fixes go on their own branch.
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
+- The gas hob (docs/GAS_HOB.md, inbox/gas-stove-2026-10-10): the five renders first, then a `gas_hob`
+  placed in a kitchen and lit with the interact key. Not yet on any map.
 - Doors: push and pull sides, the tower front doors locked from the street (key, then pull), nothing
   shutting on a person. The glass front door, glass shop door and lift door models
   (inbox/door-models-2026-10-05).
@@ -323,6 +325,13 @@ Fire at any size is built and approved (docs/FIRE.md). Open:
 - smoke explosions in a closed building;
 - spotting ahead of a crown fire;
 - fire spreading from one thing on a map to the next.
+
+### The gas hob, the rest (2026-10-10)
+Built, measured against fifteen recordings, not heard (docs/GAS_HOB.md section 10). Open:
+- a gas hob in the city's flats and houses (tools/gen_city.py, beside the kitchen sinks);
+- changing the heat in the game: the knob's settings are in the state and the model, the interact key
+  only lights and turns off;
+- a pan on the burner, an oven and a grill, an American range (re-ignition module, no flame safety).
 
 ### Water you are in or on (asked 2026-10-06)
 After the triangle geometry and real terrain (geometry stage 3), which give water a surface and depth:

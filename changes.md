@@ -2,6 +2,31 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-10
+
+- A gas hob, as a physical model (docs/GAS_HOB.md; Cody: "gas stove, tick tick tick tick whoosh").
+  Renders and what to listen for in inbox/gas-stove-2026-10-10.
+  - The knob on a plug valve, pushed in to turn from off; the injector's jet (natural gas at 61 m/s
+    through 0.72-1.28 mm, flows within 1 % of the manufacturers' tables); the mixing tube drawing in air;
+    the first gas sweeping the head; one spark module sparking every electrode 4.17 times a second
+    while a knob is held in; a spark lighting a burner only when the mixture it crosses is rich enough
+    for its energy, so sparks fail because of the gas, not by chance; whatever gas has gathered burning at
+    once in the light-up; the flames; a thermocouple holding the gas on; the pop as a flame is quenched
+    in its ports when turned off, and the safety valve's click 16 s later.
+  - The sparks, the light-up, the roar and the pop are one law, p = (γ-1)/(4πrc²) dQ/dt, the fire's. The
+    spark's crack is anchored on a measured piezo spark (Scheuer and DeCorby 2024); the hiss is
+    Lighthill's.
+  - Fitted against fifteen recordings of hobs (used as the measure only, never played): ticks 43 dB over
+    a large burner's roar (their median about 40), the flame's octaves within 1 dB of their median from
+    250 Hz to 2 kHz, light-ups 15-20 dB over the flame for 140-360 ms (theirs about 16 dB, 220 ms).
+  - Levels at a metre: every burner on full 47 dB, the large burner 43 dB on full and 22 dB on low,
+    sparks 84-90 dB peak.
+  - Prefabs `gas_hob`, `gas_hob_propane` and `gas_burner`. The interact key at one lights the next burner
+    on full, or with every burner lit turns them all off. The state is the sound key (settings and when
+    they changed), so every client hears the same light-up, and a player arriving later hears it as it
+    is. A new model kind, `gas_hob`, in the model library and the world editor.
+  - AudioLab `--stove levels|render|game`.
+
 ## 2026-10-07
 
 - Trains, the budgets and the city after Cody's session (14:44-15:40: "sounds are cutting out

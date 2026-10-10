@@ -1,0 +1,23 @@
+{
+  "Id": "gas_hob_propane",
+  "Name": "Gas hob",
+  "Description": "The four-burner gas hob on propane at 37 mbar (GasHobSpec.FourBurnerPropane, docs/GAS_HOB.md): smaller injectors, a faster flame, and unlit gas that pools in the burner wells, so a slow light is a bigger whoomph. Used like the natural gas hob. Place it with its back (+Z) to the wall. Not a recording and not a loop.",
+  "Material": "Metal",
+  "ColliderSize": {
+    "X": 0.58,
+    "Y": 0.05,
+    "Z": 0.5
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "Announce": true,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "stove:hob4_propane",
+  "Volume": 1.0,
+  "Range": 25,
+  "MinDistance": 0.5,
+  "Mode": "LoopOne",
+  "SynthRunning": false
+}

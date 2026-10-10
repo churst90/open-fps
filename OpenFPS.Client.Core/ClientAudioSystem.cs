@@ -1064,6 +1064,8 @@ public partial class ClientAudioSystem
                 h = OpenFPS.Common.FoliageSpec.ByName(woodPreset).PeakHeadroomDb;
             else if (soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]).PeakHeadroomDb;
+            else if (OpenFPS.Common.HobKey.IsKey(soundId))
+                h = OpenFPS.Common.GasHobSpec.ByName(soundId).PeakHeadroomDb;
             else if (soundId.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.ShoreSpec.ByName(soundId).PeakHeadroomDb;
             else if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
@@ -1153,6 +1155,12 @@ public partial class ClientAudioSystem
             {
                 var flow = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
                 return (flow.SourceLevelDb, flow.ExtentMetres);
+            }
+            // A gas hob (GasHobSynth): declared with every burner on full; its size is the hob.
+            if (OpenFPS.Common.HobKey.IsKey(soundId))
+            {
+                var hob = OpenFPS.Common.GasHobSpec.ByName(soundId);
+                return (hob.SourceLevelDb, hob.ExtentMetres);
             }
             // Waves at an edge (ShoreSynth): declared at its reference wind straight onshore; its size is a
             // stretch of the edge.
@@ -1314,6 +1322,13 @@ public partial class ClientAudioSystem
         {
             try { return OpenFPS.Common.ShoreSpec.ByName(soundId).CalmAt(OpenFPS.Common.WindField.MeanSpeed); }
             catch (Exception) { return false; }
+        }
+        // A gas hob with every burner off: heard for as long as its last change can still be heard (the
+        // flame going out, the safety valve's click), then nothing.
+        if (OpenFPS.Common.HobKey.IsKey(soundId))
+        {
+            if (!OpenFPS.Common.HobKey.TryParse(soundId, out var hob) || hob.AnyOn) return false;
+            return OpenFPS.Common.WindField.Now() - hob.At > OpenFPS.Common.HobKey.QuietAfterSeconds;
         }
         if (!soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
         try

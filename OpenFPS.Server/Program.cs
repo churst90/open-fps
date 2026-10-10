@@ -1810,6 +1810,9 @@ public class GameServer
             // the key from a door across the room, and a door five metres off would otherwise always win.
             if (ToggleTapInReach(world, position, Say)) return;
 
+            // A gas hob you are standing at, the same way: its knobs are under your hand.
+            if (TurnHobInReach(world, position, Say)) return;
+
             // Then a shut door in reach, from a seat the one beside you: once to open it, again to get
             // in or out.
             if (OpenDoorInReach(world, position, session.Entity, Say)) return;
@@ -1905,6 +1908,34 @@ public class GameServer
         string name = world.Has<IdentityComponent>(nearest.Value) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(nearest.Value).Name)
             ? world.Get<IdentityComponent>(nearest.Value).Name : "tap";
         say($"You turn the {name.ToLowerInvariant()} {(tap.SynthRunning ? "on" : "off")}.");
+        return true;
+    }
+
+    /// <summary>
+    /// Lights the next burner of the hob you are standing at, or with every burner lit turns them all off
+    /// (HobControls). The hob's state is its emitter's key: the settings, and when they changed on the shared
+    /// clock, so every client hears the knob turned, the sparks and the light-up at the same moment.
+    /// </summary>
+    private bool TurnHobInReach(World world, Vector3 position, Action<string> say)
+    {
+        Entity? nearest = null;
+        float best = TapReach;
+        world.Query(new QueryDescription().WithAll<Transform, SoundEmitterComponent>(), (Entity e, ref Transform t, ref SoundEmitterComponent em) =>
+        {
+            if (!HobKey.IsKey(em.SoundId)) return;
+            float dx = t.Position.X - position.X, dz = t.Position.Z - position.Z;
+            float distance = MathF.Sqrt(dx * dx + dz * dz);
+            if (distance > best || MathF.Abs(t.Position.Y - position.Y) > 2.5f) return;
+            best = distance; nearest = e;
+        });
+        if (nearest == null) return false;
+        ref var hob = ref world.Get<SoundEmitterComponent>(nearest.Value);
+        string line;
+        try { line = HobControls.Press(hob.SoundId, WindField.Now(), out string key); hob.SoundId = key; }
+        catch (ArgumentException) { return false; }
+        hob.SynthRunning = HobKey.TryParse(hob.SoundId, out var state) && state.AnyOn;
+        SyncAudioComponent(nearest.Value.Id);
+        if (line.Length > 0) say(line);
         return true;
     }
 
