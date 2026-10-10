@@ -1475,6 +1475,15 @@ public class GameServer
     private static bool Moves(World world, Entity e)
         => world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<HeldComponent>(e);
 
+    /// <summary>Whether <paramref name="e"/> is something the player <paramref name="body"/> is part of: the
+    /// composite they ride or drive (<paramref name="riding"/>) and its parts, or a thing in their hands.</summary>
+    internal static bool Involved(World world, Entity e, Entity body, int riding)
+    {
+        if (riding >= 0 && (e.Id == riding || world.Has<ParentComponent>(e) && world.Get<ParentComponent>(e).ParentEntityId == riding))
+            return true;
+        return world.Has<HeldComponent>(e) && world.Get<HeldComponent>(e).HolderEntityId == body.Id;
+    }
+
     /// <summary>One message of the broadcast, to a session's socket, and to <see cref="Broadcasted"/> when a test watches.</summary>
     private void Deliver(NetPeer? peer, UserSession session, IMessage message, DeliveryMethod delivery)
     {
@@ -1604,7 +1613,11 @@ public class GameServer
                         // (RestingStates): two thirds of the city.
                         if (isDynamic)
                         {
-                            if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity))
+                            // A far moving thing goes less often (DistantMotion); what this player rides,
+                            // drives or carries always goes every tick, however far its middle is.
+                            float distance = session.DistantLessOften && !Involved(world, e, session.Entity, riding)
+                                ? Vector3.Distance(t.Position, pPos) : 0f;
+                            if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity, distance))
                                 _reusableBroadcast.States.Add(state);
                             else PerfProbe.Count("server.broadcast.resting");
                             session.SentStates[e.Id].Riding = seatedIn;

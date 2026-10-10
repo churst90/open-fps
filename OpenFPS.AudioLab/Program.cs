@@ -218,6 +218,7 @@ string[] usage =
     "  --ended-channel                               whether a DSP stays attached to a channel that ended on its own",
     "  --foreign-disconnect                          a send disconnected through the wrong reverb unit: the city crash, isolated",
     "  --send-drift scenario=N                       a sending channel torn down one way, then the wire tripped",
+    "  --distant-updates [sec=45] [net=poor] [seed=N] [trace=ID|pass-by|fly-over] far things sent less often: the city compared both ways, bearing, pitch, steps, bytes",
     "  --send-window [sec=] [mode=client|forget|stop]",
     "                                                the window between a queued send disconnect and the channel finishing",
 };
@@ -838,6 +839,19 @@ if (args.Contains("--late-field"))
 if (args.Contains("--nan-mix"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanMixSpike.Run(args));
+}
+if (args.Contains("--distant-updates"))
+{
+    double sec = 45;
+    int trace = -1;
+    foreach (var a in args) if (a.StartsWith("sec=")) sec = double.Parse(a[4..], System.Globalization.CultureInfo.InvariantCulture);
+    foreach (var a in args) if (a.StartsWith("trace=")) trace = a[6..] == "pass-by" ? -2 : a[6..] == "fly-over" ? -3 : int.Parse(a[6..]);
+    var net = args.Contains("net=poor") ? OpenFPS.Instruments.DistantUpdatesRig.Network.Poor : OpenFPS.Instruments.DistantUpdatesRig.Network.Typical;
+    foreach (var a in args) if (a.StartsWith("seed=")) net = net with { Seed = int.Parse(a[5..]) };
+    var rig = OpenFPS.Instruments.DistantUpdatesRig.Run(sec, log: Console.WriteLine, trace: trace, network: net);
+    foreach (var line in rig.Trace) Console.WriteLine(line);
+    foreach (var line in rig.Report()) Console.WriteLine(line);
+    Environment.Exit(0);
 }
 if (args.Contains("--map-travel"))
 {

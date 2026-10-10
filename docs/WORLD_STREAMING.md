@@ -565,3 +565,94 @@ far as it can be heard.
 The radius is recomputed after everything that emits has been spawned (RefreshEarshotRanges). Measured
 at map load alone, the vehicles were not there yet, every racetrack came out at the 200 m floor, and
 eight cars on the oval only existed along the front straight.
+
+## Far things less often
+
+A moving thing 150 m or more from a player goes to that player at most every sixth tick (5 times a second)
+instead of every tick, and only when what the client would make of it is about to be wrong
+(OpenFPS.Common/DistantMotion.cs, RestingStates.DueFar, ClientWorldState.Track). Cody's condition
+(docs/CODY_ASKS_2026-10-08.md section 4): only where it costs no realism, shown by a test.
+
+What goes with each far state is how the thing is changing, as the server has it from one tick to the next:
+its speed's rate and its heading's turn (EntityState.SpeedRate and Turn, eight bytes, sent only when not
+zero). Between states the client carries the thing on those numbers, so a bend at a steady speed and a
+steady brake are followed exactly, and Doppler, an engine's road speed and a train's notch come from the
+server's own velocity, never from differences between positions. A speed and a turn rather than a vector
+acceleration: round a bend, the difference of two velocities is shorter than the arc, and read as braking
+(1 m/s² at 13 m/s on a 15 m radius).
+
+The server runs the client's prediction for every far thing and sends a state the tick it strays by more
+than a fifth of what was agreed as inaudible: a bearing of 0.1 degree, a tenth of a tick's travel (so the
+correction is never a step), a speed 0.1 % off (the engine's pitch follows it), a velocity 0.34 m/s off in
+any direction (0.1 % of Doppler), a heading 1 degree off; and when the horn changes, or a tyre's demand,
+surface or water. A state that went for a change goes once more the next tick: the stream is unreliable,
+and a change lost or overtaken would be carried wrongly for a fifth of a second, where anything sent
+every tick is bridged by the tick after. A steady thing goes every sixth tick.
+
+What a player is in, drives or carries goes every tick whatever its distance (GameServer.Involved), as does
+their own body. Crossing 150 m changes nothing that can be heard: near or far, the client goes from one state
+to the next the same way.
+
+The client keeps, for each moving thing, its last state at or before the playback point (A) and its next
+(B), the first snapshot from 'to' on that mentions it. Before B arrives it carries the thing from A. Once
+B is known it steers onto it: the velocity and heading take B's in the last tick before B, as anything
+sent every tick does (B went because they changed, and they changed then); the position makes up the
+prediction's miss steadily from when B arrived, because the mixer carries a position on its velocity
+between steps and a miss made up faster than that would be a small jump at the next step. A tick the
+buffer never got may have held a change (a change goes twice and a far moving thing goes at least every
+sixth tick, so only a lost tick just before the next state, or a longer run of them within six ticks of
+it, can have), and then the steering starts before it, as the line through a lost tick always has. When the track changes other than by playback reaching B (B turned up late, or a
+lost tick turned up after all), the two tracks are compared at the last frame's time and the difference
+is eased out: the position over 0.1 s, the velocity over a tick. For anything sent every tick all of this
+is the line from one tick to the next, as before, except on a connection that loses or reorders ticks,
+where it is now eased the same way.
+
+### The test
+
+DistantUpdatesTests.FarThingsSentLessOftenSoundTheSame, also `AudioLab --distant-updates [net=poor]
+[seed=N] [trace=ID|pass-by|fly-over]` (OpenFPS.AudioLab/Spikes/DistantUpdatesRig.cs). The city runs on the
+real server, its traffic, walkers and trains, plus a car shuttling past at 108 km/h 20 m off and an airliner
+flying over at 120 m and 100 m/s, both spawned as /spawn would. Two players stand side by side 40 m from the
+railway, one sent everything every tick and one far things less often; each one's states go through the
+wire (packed, split, read back), arrive 40 to 60 ms late (the same for both), feed a client's interpolation
+at the 30 Hz step, and between steps are carried on their velocity at the mixer's 250 Hz, as the mixer does.
+At every one of those instants, for everything beyond 150 m, the two are compared from the second player's
+ears, and each against the server's own track.
+
+45 s of the city on 2026-10-10:
+
+| scene | things | bearing | pitch | largest change per instant (position, bearing): every tick / less often |
+|---|---|---|---|---|
+| pass-by (108 km/h) | 1 | 0.000° | 0.041 % | 0.2149 / 0.2149 m, 0.0096 / 0.0096° |
+| fly-over (airliner) | 1 | 0.001° | 0.029 % | 0.7121 / 0.7125 m, 0.2229 / 0.2228° |
+| train (light rail) | 24 sources | 0.010° | 0.088 % | 0.0899 / 0.0896 m, 0.0206 / 0.0206° |
+| walkers | 352 | 0.001° | 0.002 % | 0.0113 / 0.0116 m, 0.0029 / 0.0029° |
+| traffic | 41 | 0.006° | 0.122 % | 0.1116 / 0.1116 m, 0.0358 / 0.0359° |
+
+Pitch is the Doppler times the road speed (for walkers the Doppler alone). A train's notch, which the client
+works out from the speed's change, differed on 12 of 32,400 steps, never two in a row: a notch changing one
+step earlier or later. The largest per-instant changes match to the millimetre: they are the interpolation
+clock's own steps, which both have. The test asserts the agreed limits against both references and allows a
+step no bigger than every tick ever makes but for a hundredth of a degree, a hundredth of a percent of pitch
+or a centimetre.
+
+On a poor connection (OnAPoorConnectionFarThingsAreNoFurtherOff: 30 to 90 ms, so one tick in ten overtakes
+the one before, and 2 % lost) both clients leave the server's own track by the same amounts, in bearing
+0.017 degree at most and in pitch up to 23 % (the airliner slowing at the far end of its leg, at a moment
+the buffer ran dry); the one sent less often is never further off, and the test holds it to that. An early
+version of this work, which did not ease a change of track, put the client sent every tick 1.47 degrees off
+there: an overtaken tick moved the world back and forth. The client as it was before this work was not
+measured on this connection.
+
+### What it saves
+
+Measured by the same rig, every byte the broadcast hands each player's socket, with 29 bytes of headers a
+datagram, standing still for 40 s after the first 5:
+
+| where | every tick | less often | saving |
+|---|---|---|---|
+| 40 m from the railway | 1.33 Mbit/s, 128 datagrams/s, 4,780 states/s | 0.62 Mbit/s, 65 datagrams/s, 2,059 states/s | 54 % |
+| the spawn point | 1.33 Mbit/s, 128 datagrams/s, 4,780 states/s | 0.69 Mbit/s, 73 datagrams/s, 2,280 states/s | 48 % |
+
+1.33 Mbit/s is the figure the offline replay of 2026-10-05 measured for the same stream (1.35); the live
+three-bot figure then, 1.75 Mbit/s, also counted LiteNetLib's acknowledgements and the reliable channel.

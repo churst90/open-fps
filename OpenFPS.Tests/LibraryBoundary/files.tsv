@@ -194,6 +194,7 @@ OpenFPS.Common/CrossingGates.cs	lib	Sound
 OpenFPS.Common/DesignedSoundKit.cs	lib	Sound	
 OpenFPS.Common/Diffraction.cs	lib	Acoustics	
 OpenFPS.Common/DirectionWords.cs	host		
+OpenFPS.Common/DistantMotion.cs	host		
 OpenFPS.Common/DoorKnock.cs	lib	Sound	
 OpenFPS.Common/DoorPhysics.cs	lib	Sound	
 OpenFPS.Common/Doors.cs	lib	Sound	
