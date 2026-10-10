@@ -104,6 +104,8 @@ public sealed partial class WorldEditor
             "placed" => PlacedMenu(s, parts.Length > 1 ? string.Join(":", parts[1..]) : HandOf(s).PlacedFilter),
             "placedone" when parts.Length > 1 && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int placedId)
                 => PlacedOneMenu(s, placedId),
+            "people" => PeopleMenu(s),
+            "person" when parts.Length > 1 => PersonMenu(s, parts[1]),
             "routes" => RoutesMenu(s),
             "route" when parts.Length > 1 => RouteMenu(s, parts[1]),
             "mapversions" => VersionsMenu(s),
@@ -163,6 +165,7 @@ public sealed partial class WorldEditor
         var overlay = Overlays.Get(s.CurrentMapId);
         items.Add(Opens($"Changed on this map, {overlay.Changed.Count + overlay.Removed.Count}", "changed"));
         items.Add(Opens(HandOf(s).Route is { } laying ? $"Roads, paths and railways: laying {laying.Name}" : $"Roads, paths and railways, {overlay.Routes?.Count ?? 0}", "routes"));
+        items.Add(Opens("People", "people"));
         items.Add(Opens("Places and rooms", "places"));
         items.Add(Opens("Library", "library"));
         items.Add(Opens("Test tools", "test"));

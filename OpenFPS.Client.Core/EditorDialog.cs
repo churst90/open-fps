@@ -308,6 +308,15 @@ public sealed class EditorDialog : ModalDialog
             else if (things.Selected < 0 && server != null) things.Select(server);
             _serverThing = server;
         }
+        if (tab.Id == "world" && tab.Find("world.people") is { } people)
+        {
+            // The person the server has chosen (one just put on) is chosen in the list; an answer to what
+            // the player chose leaves it alone.
+            string? server = Items("world.personinfo").FirstOrDefault().Value is { Length: > 0 } v ? v : null;
+            if (server != null && server != _serverPerson && server != _askedPerson) people.Select(server);
+            else if (people.Selected < 0 && server != null) people.Select(server);
+            _serverPerson = server;
+        }
         if (tab.Id == "world" && tab.Find("world.routes") is { } routes && routes.Selected < 0 && _routeNext != null)
         {
             // A road taken up: the one after it is chosen.
@@ -875,6 +884,8 @@ public sealed class EditorDialog : ModalDialog
     private int _changedIndex = -1;
     /// <summary>The laid road to choose once the one being taken up has gone.</summary>
     private string? _routeNext;
+    /// <summary>The person the server has chosen, and the one the player last chose.</summary>
+    private string? _serverPerson, _askedPerson;
 
     private static string Suggest(string id)
     {
@@ -955,6 +966,7 @@ public sealed class EditorDialog : ModalDialog
             Button("world.routegoto", "Go to it", laid.Count > 0, "Takes you to stand beside its nearest point."),
             Button("world.routeremove", "Take it up", laid.Count > 0, "Takes up its pieces and its data, and its train. Asks first. Undo lays it again."),
         }));
+        sections.Add(PeopleSection());
 
         var rooms = Items("world.room").ToList();
         sections.Add(new DialogSection("rooms", "Rooms and areas", new[]
@@ -995,6 +1007,36 @@ public sealed class EditorDialog : ModalDialog
             Button("world.scan", "What is around me"),
         }));
         return sections;
+    }
+
+    /// <summary>People: how many walk the pavements, the people who live on the map, the chosen one's places.</summary>
+    private DialogSection PeopleSection()
+    {
+        var controls = new List<DialogControl>();
+        if (Items("world.walkers").FirstOrDefault() is { Command.Length: > 0 } walkers)
+            controls.Add(Field("world.f.", walkers, "", "world.walkersset"));
+        controls.Add(Button("world.walkersset", "Set walkers"));
+        var info = Items("world.personinfo").FirstOrDefault();
+        string chosen = info.Value ?? "";
+        var people = Items("world.person").ToList();
+        controls.Add(LocalList("world.people", "People on this map",
+            "Each with the life they lead, their voice and where they go. Choose one to tick their places below; the map's own are from the map file and are not changed here.",
+            people.Count > 0 ? people.Select(p => new DialogItem(p.Label, p.Value)) : new[] { new DialogItem("Nobody lives on this map", "") }));
+        var places = Items("world.place").ToList();
+        var placeList = LocalList("world.places", "Places the chosen person goes",
+            chosen.Length > 0 ? $"Space ticks the places in {chosen}'s day; with none ticked they go to any place the map has."
+                              : "Choose somebody put on with the editor to tick their places.",
+            places.Count > 0 ? places.Select(p => new DialogItem(p.Label, p.Value, p.Checked))
+                             : new[] { new DialogItem(chosen.Length > 0 ? "The map has no bus stops, front entrances, lobbies or squares yet" : "Nobody chosen", "") });
+        // Always a ticking list: a head draws the kind of list once.
+        placeList.Checkable = true;
+        controls.Add(placeList);
+        controls.Add(LocalBox("world.personname", "Name of a new person", "What they are called, 1 to 40 letters.", enter: "world.personadd"));
+        controls.Add(LocalChoice("world.personvoice", "Voice", "The voice they speak in. A voice that recorded a character's lines comes first.",
+                                 Items("world.voice").Select(v => new DialogItem(v.Label, v.Value)), enter: "world.personadd"));
+        controls.Add(Button("world.personadd", "Put the person on the map", description: "A homeless person, the one life written so far, who goes to the places the map has."));
+        controls.Add(Button("world.personremove", "Take the chosen person off the map", chosen.Length > 0, "Asks first. Undo puts them back."));
+        return new DialogSection("people", "People", controls);
     }
 
     /// <summary>Versions of the map's edits: saved by name, restored, and written into the map file.</summary>
@@ -1051,6 +1093,13 @@ public sealed class EditorDialog : ModalDialog
             case "edit.changed":
                 _changedIndex = c.Selected;
                 return;
+            case "world.people":
+                if (c.SelectedValue is { Length: > 0 } person && person != _serverPerson)
+                {
+                    _askedPerson = person;
+                    _send($"/edit person choose {person} dialog");
+                }
+                return;
             case "edit.things":
                 if (c.SelectedValue is { } thing && thing != _serverThing)
                 {
@@ -1090,6 +1139,12 @@ public sealed class EditorDialog : ModalDialog
         if (!list.Checkable || index < 0 || index >= list.Items.Count) return;
         var row = list.Items[index];
         if (row.Value.Length == 0) return;
+        if (list.Id == "world.places")
+        {
+            // A place in the chosen person's day, kept by the server, which says what changed.
+            _send($"/edit person place {(row.Ticked ? "drop" : "add")} {row.Value} dialog");
+            return;
+        }
         // The server holds the ticks, so a thing ticked in one list is ticked in the other.
         _send(row.Ticked ? $"/edit select drop #{row.Value} dialog" : $"/edit select add #{row.Value} dialog");
     }
@@ -1315,6 +1370,22 @@ public sealed class EditorDialog : ModalDialog
                 if (Get("world.versions")?.SelectedValue is not { Length: > 0 } number) { Said?.Invoke("Choose a version first."); FocusAsked?.Invoke("world.versions"); return; }
                 string name = Items("world.version").FirstOrDefault(v => v.Value == number).Prompt is { Length: > 0 } vname ? $", {vname}" : "";
                 ConfirmAsked?.Invoke($"Restore version {number}{name}? What the map has now is saved as a version first.", () => _send($"/edit map restore {number}"));
+                return;
+            }
+            case "world.walkersset":
+                ApplyFields(tab.Controls.Where(c => c.Source?.Section == "world.walkers"));
+                return;
+            case "world.personadd":
+            {
+                if (Text("world.personname") is not { Length: > 0 } newName) { Said?.Invoke("Type the person's name."); FocusAsked?.Invoke("world.personname"); return; }
+                string voice = Get("world.personvoice")?.SelectedValue is { Length: > 0 } v ? $" voice {v}" : "";
+                _send($"/edit person add {newName}{voice}");
+                return;
+            }
+            case "world.personremove":
+            {
+                if (Get("world.people")?.SelectedValue is not { Length: > 0 } gone) { Said?.Invoke("Choose somebody put on with the editor first."); FocusAsked?.Invoke("world.people"); return; }
+                ConfirmAsked?.Invoke($"Take {gone} off the map?", () => _send($"/edit person remove {gone}"));
                 return;
             }
             case "world.routegoto":

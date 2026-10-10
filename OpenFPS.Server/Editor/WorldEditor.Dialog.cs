@@ -380,6 +380,7 @@ public sealed partial class WorldEditor
 
         items.AddRange(DialogVersions(s));
         items.AddRange(DialogLaid(s));
+        items.AddRange(DialogPeople(s));
 
         foreach (var name in d.Editors) items.Add(Line("world.editor", name, name));
 

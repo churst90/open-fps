@@ -38,6 +38,7 @@ public sealed partial class WorldEditor
         if (o.Settings is { Count: > 0 } s) parts.Add(Plural(s.Count, "map setting"));
         if (o.Pins.Count > 0) parts.Add(Plural(o.Pins.Count, "pin"));
         if (o.Routes is { Count: > 0 } routes) parts.Add(RoutesSaid(routes.Count));
+        if (o.People is { Count: > 0 } people) parts.Add(people.Count == 1 ? "1 person" : $"{people.Count} people");
         return string.Join(", ", parts);
     }
 
@@ -212,6 +213,17 @@ public sealed partial class WorldEditor
         foreach (var r in wantRoutes.Where(r => !nowRoutes.Any(w => MapVersionStore.Same(w, r))))
             ops.Add(new RouteOp(mapId, MapVersionStore.CopyOf(r), Adding: true));
 
+        // People: each by name, put on, changed or taken off.
+        var nowPeople = now.People ?? new List<CharacterData>();
+        var wantPeople = target.People ?? new List<CharacterData>();
+        foreach (var name in nowPeople.Select(p => p.Name).Concat(wantPeople.Select(p => p.Name)).Distinct(StringComparer.OrdinalIgnoreCase).ToList())
+        {
+            var have = nowPeople.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            var want = wantPeople.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (SamePerson(have, want)) continue;
+            ops.Add(new PersonOp(mapId, name, have == null ? null : CopyPerson(have), want == null ? null : CopyPerson(want)));
+        }
+
         // The spawn point, the map's settings and its pins.
         bool sameSpawn = (now.Spawn == null && target.Spawn == null)
                          || (now.Spawn != null && target.Spawn != null && new Pose(now.Spawn.Position, now.Spawn.Rotation, System.Numerics.Vector3.One)
@@ -271,11 +283,13 @@ public sealed partial class WorldEditor
         Push(s, batch);
         var saved = Versions.Save(mapId, before, $"before restoring version {version.Number}", s.Username, automatic: true);
         int routes = ops.OfType<RouteOp>().Count();
-        int other = ops.Count - away - down - routes;
+        int people = ops.OfType<PersonOp>().Count();
+        int other = ops.Count - away - down - routes - people;
         var said = new List<string>();
         if (away > 0) said.Add($"{Plural(away, "thing")} taken away");
         if (down > 0) said.Add($"{Plural(down, "thing")} put down or back");
         if (routes > 0) said.Add($"{RoutesSaid(routes)} taken up or laid");
+        if (people > 0) said.Add(people == 1 ? "1 person put on, changed or taken off" : $"{people} people put on, changed or taken off");
         if (other > 0) said.Add(Plural(other, "map setting") + " changed");
         Say(reply, $"Restored version {version.Number}, {version.Name}: {string.Join(", ", said)}."
                  + (notes.Count > 0 ? $" {Capital(string.Join("; ", notes))}." : "")
@@ -413,6 +427,7 @@ public sealed partial class WorldEditor
         o.Settings = residual.Settings;
         // Roads and railways are the file's own roads and tracks now.
         o.Routes = null;
+        o.People = null;
         Overlays.Save(mapId);
         _files.Remove(mapId);
         _data.Remove(mapId);

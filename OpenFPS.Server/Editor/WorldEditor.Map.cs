@@ -274,6 +274,7 @@ public sealed partial class WorldEditor
         MapSettings.Apply(map, path, stored);
         if (path == MapSettings.Ground) RelayGround(mapId, stored ?? MapManager.NaturalGroundPrefab);
         if (path == MapSettings.Size) Resized(mapId, map);
+        if (path == WalkersSetting) MakeWalkers(mapId);
         if (path.StartsWith(MapSettings.BeaconPrefix, StringComparison.OrdinalIgnoreCase) || path == MapSettings.Size)
         {
             var update = new MapSettingsUpdate
