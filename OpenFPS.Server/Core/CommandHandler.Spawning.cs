@@ -25,7 +25,7 @@ public partial class CommandHandler
         "Usage: /spawn walker [NAME], /spawn vehicle PRESET, /spawn train PRESET, /spawn train out [NAME], /spawn fire PRESET, /spawn fire out, or /spawn Box|Cylinder MATERIAL X Y Z.";
 
     /// <summary>The only jet. No jets are given or spawned.</summary>
-    private const string Jet = "airliner";
+    internal const string Jet = "airliner";
 
     private void HandleSpawn(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -312,7 +312,7 @@ public partial class CommandHandler
     /// feet, nothing solid anywhere on the footprint, and with <paramref name="openSky"/> nothing over it
     /// for twelve metres either.
     /// </summary>
-    private static Vector3? ClearGroundBeside(World world, SpatialGrid<Entity> grid, Vector3 feet, float yaw, Vector3 size, bool openSky)
+    internal static Vector3? ClearGroundBeside(World world, SpatialGrid<Entity> grid, Vector3 feet, float yaw, Vector3 size, bool openSky)
     {
         var forward = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
         var right = new Vector3(forward.Z, 0f, -forward.X);

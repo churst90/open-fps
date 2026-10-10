@@ -488,7 +488,8 @@ The dialog:
 - Tab and Shift+Tab move through the controls. Each box, list and drop-down is labelled, and its
   description has the range and a line of help.
 - Enter in a box or a list presses the button it belongs to (Place in the prefab list, Apply in a
-  setting's box). Space ticks a row of the things-near-you list.
+  setting's box). Space ticks a row of the things-near-you list or the placed-on-this-map list. Delete
+  on the placed-on-this-map list removes the chosen thing, asking first.
 - Undo, Redo and Close are under every tab. Undo and Redo say what they would undo or redo.
 - F12, Escape or Close shuts it. Placing, applying and the other buttons keep it open, and the game
   says what happened ("Placed: Concrete Wall, 2 by 0.5 by 3 metres high, 0.65 metres in front of you,
@@ -497,8 +498,8 @@ The dialog:
 
 | Tab | What is in it, in Tab order |
 |---|---|
-| Place | Search; Category; Prefabs (each with its size and description); Where it goes (at your feet, at the build cursor, or preview only); Place; Preview; Place again. Then "Build a piece": What (floor, wall, roof, door, window) and its fields as in Control+B, and Place the piece |
-| Edit | Things near you (nearest first; Space ticks); Find by name or number; Find. Then the chosen thing: Position (east, north, up), Facing in degrees, and its settings; Apply changes; Bring to me; Duplicate; Row of copies (how many, and spacing); Delete (asks first). With things ticked: move them together, turn them together, group them, untick all |
+| Place | Search; Category (Buildings and Vehicles first); Prefabs (each with its size and description; vehicles and saved buildings and groups are in the same list); Where it goes (at your feet, at the build cursor, or preview only); Place; Preview; Place again. Then "Build a piece": What (floor, wall, roof, door, window) and its fields as in Control+B, and Place the piece |
+| Edit | Things near you (nearest first; Space ticks); Find by name or number; Find. Then "Placed on this map": Filter placed things, Filter, the list (everything placed with the editor, wherever it is, nearest first; Space ticks, Delete removes), Remove it, Go to it, Edit it, Tick all shown. Then the chosen thing: Position (east, north, up), Facing in degrees, and its settings; Apply changes; Bring to me; Duplicate; Row of copies (how many, and spacing); Delete (asks first). With things ticked: move them together, turn them together, group them, save them as a building, delete them all (asks first), untick all |
 | Build | Kind; Category (prefabs); Models. For the chosen one: Id for the copy and Duplicate; Fields and the value of the field chosen, with Set; Versions, with Use on every map, Pin on this map, Lift this map's pin; Where it is used; Replace it with, on this map or everywhere. Changes apply to every map that uses it, so duplicate first to try things |
 | World | Weather, Time of day, Natural ground, Apply changes, Set spawn here; Map size (owner, not on the server's own maps); Rooms and areas, with Edit it; Beacon rules, one drop-down per kind of beacon, and Apply beacon rules; Editors (add and remove); Model versions pinned to this map; Map information and What is around me |
 
@@ -545,7 +546,28 @@ holding a placed group). Items that need a number or a name open a small dialog 
   where you stand. A row makes copies of the selected thing in a line the way you face.
 - The build cursor: `/origin` sets it where you stand, `/at` moves it. With "Where it goes" set to the
   build cursor, Place puts the prefab there, for places you cannot walk to (a roof).
-- Groups: tick some things on the Edit tab, type a group name and press Group them. The group is a
+- Place lists, by category: Buildings, Vehicles, Walls and fences, Floors, roads and roofs, Doors,
+  Stairs and ramps, Furniture and seating, Machines, Water, Fire, Trees and plants, Sounds, Places and
+  markers, Things to carry, then Groups. A prefab's category comes from what it is (a door, a machine's
+  sound, a room, its name), not from a list kept by hand.
+- Vehicles: every vehicle `/spawn vehicle` takes, by its plain name ("1.6 hatchback", "Helicopter").
+  Placing one parks it beside you on clear ground, facing your way, as `/spawn vehicle` does, or at the
+  build cursor. It belongs to the map: anyone may get in and drive it. One undo takes it away. It is kept
+  in the map's edits, not the map file, and parked again where it was put when the server restarts (a
+  car somebody drove off goes back to its spot). A vehicle somebody is sitting in is not removed.
+- Placed on this map (Edit tab, or `/edit placed`): everything placed with the editor on the map you
+  are on, wherever it is, nearest first. Each row says what it is, how far and which way ("104 metres
+  north east"), who placed it and when ("placed by cody, 9 October 14:02"; things placed before
+  2026-10-09 say "placed earlier"). Type words in Filter placed things and press Enter to keep only what
+  has every word in its name, kind or who placed it; "within 20" keeps what is within 20 metres. Remove
+  it (or Delete in the list) takes the chosen one away after asking, and the next one is chosen, so
+  Delete again removes the next. Go to it puts you beside it, facing it (on your own map, or with the
+  move permission). Edit it chooses it, with its fields under Chosen. Tick all shown ticks every row,
+  and "Delete the ticked things" removes them together. Every removal is one undo.
+- Groups and buildings: tick some things on the Edit tab, type a group name and press Group them, or
+  Save as a building. A building is a group listed under Buildings instead of Groups: build a house with
+  Control+B, tick its pieces (Filter "within 20" and Tick all shown is quick when you stand in it), and
+  save it as a building to place it again from Place, Buildings. Making either needs edit-models. The group is a
   model; on the Place tab the Groups category puts its things down in front of you, turned the way you
   face. A
   placed group is its things, each its own, and they are held as it is placed. Later, select any one of
@@ -579,14 +601,19 @@ command for each:
 | `/edit nudge DIRECTION [METRES]`, `/edit step METRES` | Move by the step (0.5 m to start with) |
 | `/edit turn DEGREES`, `/edit face DIRECTION`, `/edit face DEGREES` | Turn clockwise (negative: anticlockwise), or to a compass direction, or to degrees from north (the dialog's Facing box) |
 | `/edit bring`, `/edit duplicate`, `/edit delete` | Bring to you, copy, delete |
+| `/edit placed [WORDS]` | Everything placed with the editor on this map, nearest first, with numbers, who and when; WORDS filter it (name, kind, who; `within 20`) |
+| `/edit remove #ID [#ID ...]`, `/edit remove held` | Remove things wherever they are, by number, or everything ticked; one undo puts them back |
+| `/edit goto #ID` | Stand beside a thing, facing it (your own map, or the move permission) |
+| `/edit select add placed [WORDS]` | Tick everything the placed list shows |
 | `/edit set FIELD VALUE`, `/edit up FIELD`, `/edit down FIELD` | A setting: Name, Width, Height, Depth, Model, Volume, Range, MinDistance, KeyedSide (neither, front, back), PushSide (front, back), Indoor, Floor, Ceiling, North, South, East, West |
 | `/edit place PREFAB [at cursor]`, `/edit prefabs [CATEGORY]` | Place a prefab, at your feet or at the build cursor; list them |
+| `/edit place vehicle:PRESET [at cursor]`, `/edit place vehicle PRESET` | Park a vehicle beside you, or at the build cursor |
 | `/edit find WORDS`, `/edit preview PREFAB`, `/edit again` | Search; hear a prefab; place the last one again |
 | `/edit row COUNT [SPACING]` | Copies of the selected thing in a line the way you face |
 | `/edit select add nearest\|NAME\|#ID`, `/edit select drop #ID`, `/edit select clear` | Hold things together (the dialog's ticks); let one go; let go of all |
 | `/edit select group` | Hold every part of the placed group the selected thing belongs to |
 | `/edit held move EAST NORTH UP`, `/edit held nudge DIRECTION [METRES]`, `/edit held turn DEGREES` | Move or turn everything held together, one undo; turning is about their middle |
-| `/edit group NAME`, `/edit place group NAME` | Make a group of what you hold; place one |
+| `/edit group NAME`, `/edit building NAME`, `/edit place group NAME` | Make a group, or a building, of what you hold; place one |
 | `/edit map settings`, `/edit map set weather server\|clear\|rain\|snow\|storm`, `/edit map set time server\|HOUR`, `/edit map set ground PREFAB`, `/edit map set beacon CATEGORY on\|off\|always\|never` | The map's own settings |
 | `/edit spawn here`, `/edit info` | Move the map's spawn point to you; map information |
 | `/edit model show KIND ID`, `/edit model versions KIND ID` | A model and its versions |

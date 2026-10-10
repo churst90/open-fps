@@ -52,6 +52,8 @@ public sealed class DialogControl
     public bool Checkable { get; set; }
     /// <summary>The button Enter presses here, if any.</summary>
     public string? Enter { get; set; }
+    /// <summary>The button the Delete key presses here, if any (a list's Remove).</summary>
+    public string? Delete { get; set; }
     /// <summary>The player's own state (a search, a choice of where): kept as it is when the tab is made again.</summary>
     public bool Local { get; set; }
 
@@ -305,6 +307,17 @@ public sealed class EditorDialog : ModalDialog
             if (server != _serverThing && server != _askedThing) things.Select(server);
             else if (things.Selected < 0 && server != null) things.Select(server);
             _serverThing = server;
+        }
+        if (tab.Id == "edit" && tab.Find("edit.placed") is { } placed)
+        {
+            // The chosen row was removed: the next one is chosen, so the focus stays in the list where it was.
+            if (placed.Selected < 0 && _placedNext != null)
+            {
+                placed.Select(_placedNext);
+                _placedNext = null;
+            }
+            if (placed.Selected < 0 && _placedIndex >= 0 && placed.Items.Count > 0) placed.Selected = Math.Min(_placedIndex, placed.Items.Count - 1);
+            _placedIndex = placed.Selected;
         }
         else if (tab.Id == "build" && tab.Find("build.kind") is { } kind && tab.Find("build.category") is { } category)
         {
@@ -594,6 +607,7 @@ public sealed class EditorDialog : ModalDialog
                 LocalBox("edit.find", "Find by name or number", "A name, or # and a number such as #1002. The nearest match is chosen and put in the list.", enter: "edit.findgo"),
                 Button("edit.findgo", "Find"),
             }),
+            PlacedSection(),
         };
 
         bool has = chosen.Label is { Length: > 0 };
@@ -620,11 +634,41 @@ public sealed class EditorDialog : ModalDialog
                 Button("edit.heldmovego", "Move them"),
                 LocalBox("edit.heldturn", "Turn them together, in degrees", "Positive turns them clockwise about their middle, negative anticlockwise.", enter: "edit.heldturngo"),
                 Button("edit.heldturngo", "Turn them"),
-                LocalBox("edit.groupname", "Group name", "The ticked things become a group with this name, to place again from Place.", enter: "edit.group"),
+                LocalBox("edit.groupname", "Group name", "The ticked things become a group, or a building, with this name, to place again from Place.", enter: "edit.group"),
                 Button("edit.group", "Group them"),
+                Button("edit.building", "Save as a building", description: "The ticked things become a building with the group name above, listed in Place under Buildings."),
+                Button("edit.deleteticked", "Delete the ticked things", description: "Wherever they are. Asks first. One undo puts them all back."),
                 Button("edit.untick", "Untick all"),
             }));
         return sections;
+    }
+
+    /// <summary>Everything placed on the map with the editor, wherever it is: filtered, removed, gone to.</summary>
+    private DialogSection PlacedSection()
+    {
+        var info = Items("edit.placedinfo").FirstOrDefault();
+        var rows = Items("edit.placed").ToList();
+        bool any = rows.Count > 0;
+        bool mayGo = (info.Prompt ?? "").Split(' ').Contains("goto");
+        string summary = info.Label is { Length: > 0 } l ? l : "Nothing has been placed on this map with the editor";
+        var list = LocalList("edit.placed", "Placed on this map",
+            Join(summary + ".", "Each with where it is from you and who placed it. Space ticks one; Delete removes the chosen one, asking first."),
+            any ? rows.Select(r => new DialogItem(r.Label, r.Value, r.Checked)) : new[] { new DialogItem(summary, "") }, enter: "edit.placedchoose");
+        // Always a ticking list: a head draws the kind of list once, before any rows may have come.
+        list.Checkable = true;
+        list.Delete = "edit.placedremove";
+        return new DialogSection("placed", "Placed on this map", new[]
+        {
+            LocalBox("edit.placedfilter", "Filter placed things",
+                "Words in a name, a kind or who placed it; within 20 keeps those within 20 metres. Enter filters; nothing typed shows them all.",
+                info.Value ?? "", "edit.placedfiltergo"),
+            Button("edit.placedfiltergo", "Filter"),
+            list,
+            Button("edit.placedremove", "Remove it", any, "Removes the one chosen in the list, wherever it is. Asks first. Undo puts it back."),
+            Button("edit.placedgoto", "Go to it", any && mayGo, mayGo ? "Takes you to stand beside it, facing it." : "Needs the move permission on this map."),
+            Button("edit.placedchoose", "Edit it", any, "Chooses it: its fields are under Chosen."),
+            Button("edit.placedtickall", "Tick all shown", any, "Ticks every thing the list shows, to move, group, save as a building or delete together."),
+        });
     }
 
     private DialogControl? Chosen(string tab, string list) => _tabs[Array.IndexOf(TabIds, tab)].Find(list);
@@ -693,6 +737,9 @@ public sealed class EditorDialog : ModalDialog
 
     private string? _pendingModel;
     private Dictionary<string, DialogControl>? _previous;
+    /// <summary>The placed row to choose once the one being removed has gone, and where the choice was.</summary>
+    private string? _placedNext;
+    private int _placedIndex = -1;
 
     private static string Suggest(string id)
     {
@@ -825,6 +872,9 @@ public sealed class EditorDialog : ModalDialog
                 if (c.SelectedValue is { } kind && kind != _pieceForm?.Kind) _pieceForm?.SetKind(kind);
                 RefreshPiece();
                 return;
+            case "edit.placed":
+                _placedIndex = c.Selected;
+                return;
             case "edit.things":
                 if (c.SelectedValue is { } thing && thing != _serverThing)
                 {
@@ -862,9 +912,10 @@ public sealed class EditorDialog : ModalDialog
     public void Toggle(DialogControl list, int index)
     {
         if (!list.Checkable || index < 0 || index >= list.Items.Count) return;
-        string id = list.Items[index].Value;
-        bool ticked = Items("edit.thing").Any(t => t.Value == id && t.Checked);
-        _send(ticked ? $"/edit select drop #{id} dialog" : $"/edit select add #{id} dialog");
+        var row = list.Items[index];
+        if (row.Value.Length == 0) return;
+        // The server holds the ticks, so a thing ticked in one list is ticked in the other.
+        _send(row.Ticked ? $"/edit select drop #{row.Value} dialog" : $"/edit select add #{row.Value} dialog");
     }
 
     /// <summary>A button, or Enter on a control that presses one.</summary>
@@ -934,6 +985,41 @@ public sealed class EditorDialog : ModalDialog
                 _send($"/edit group {group}");
                 return;
             case "edit.untick": _send("/edit select clear dialog"); return;
+            case "edit.building":
+                if (Text("edit.groupname") is not { Length: > 0 } building) { Said?.Invoke("Type a name for the building in Group name."); FocusAsked?.Invoke("edit.groupname"); return; }
+                _send($"/edit building {building}");
+                return;
+            case "edit.deleteticked":
+            {
+                int ticked = Items("edit.thing").Count(t => t.Checked);
+                ConfirmAsked?.Invoke(ticked == 1 ? "Delete the ticked thing?" : $"Delete the {ticked} ticked things?", () => _send("/edit remove held dialog"));
+                return;
+            }
+
+            case "edit.placedfiltergo":
+                _send(string.Join(" ", new[] { "/edit placed", Text("edit.placedfilter"), "dialog" }.Where(w => w.Length > 0)));
+                return;
+            case "edit.placedremove":
+            {
+                var list = Get("edit.placed");
+                if (list?.SelectedValue is not { Length: > 0 } removeId) { Said?.Invoke("Choose a thing in the list first."); FocusAsked?.Invoke("edit.placed"); return; }
+                int at = list.Selected;
+                // After it has gone, the one after it is chosen, or the one before if it was the last.
+                _placedNext = list.Items.ElementAtOrDefault(at + 1)?.Value ?? list.Items.ElementAtOrDefault(at - 1)?.Value;
+                string name = Items("edit.placed").FirstOrDefault(r => r.Value == removeId).Help is { Length: > 0 } n ? n : "it";
+                ConfirmAsked?.Invoke($"Remove {name}?", () => _send($"/edit remove #{removeId} dialog"));
+                return;
+            }
+            case "edit.placedgoto":
+                if (Get("edit.placed")?.SelectedValue is not { Length: > 0 } goId) { Said?.Invoke("Choose a thing in the list first."); FocusAsked?.Invoke("edit.placed"); return; }
+                _send($"/edit goto #{goId}");
+                return;
+            case "edit.placedchoose":
+                if (Get("edit.placed")?.SelectedValue is not { Length: > 0 } chooseId) { Said?.Invoke("Choose a thing in the list first."); FocusAsked?.Invoke("edit.placed"); return; }
+                _askedThing = null;
+                _send($"/edit select #{chooseId}");
+                return;
+            case "edit.placedtickall": _send("/edit select add placed dialog"); return;
 
             case "build.duplicate":
             {

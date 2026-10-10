@@ -132,21 +132,20 @@ public sealed partial class WorldEditor
 
     private IEnumerable<EditorMenuItem> DialogPlace(UserSession s)
     {
-        foreach (var t in Placeable(s).OrderBy(t => Array.IndexOf(Categories, CategoryOf(t))).ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase))
+        // One stream in category order, so the client's categories come in that order. A group's value is
+        // "group:ID" and a vehicle's "vehicle:PRESET", which /edit place takes as it takes a prefab.
+        foreach (var r in PlaceRows(s))
         {
-            string size = t.ColliderSize is { } z ? $", {FieldDescriptor.Format(z.X)} by {FieldDescriptor.Format(z.Z)} by {FieldDescriptor.Format(z.Y)} high" : "";
             // Count 1: it has a sound of its own, so it can be previewed.
             yield return new EditorMenuItem
             {
-                Section = "place.prefab", Kind = EditorItemKind.Info, Label = t.Name + size, Value = t.Id, Prompt = CategoryOf(t),
-                Help = t.Description ?? "", Count = (byte)(t.HasEmitter ? 1 : 0),
+                Section = "place.prefab", Kind = EditorItemKind.Info, Label = r.Label, Value = r.Value, Prompt = r.Category,
+                Help = r.Help, Count = (byte)(r.Previewable ? 1 : 0),
             };
         }
-        foreach (var id in GroupIds().OrderBy(i => i, StringComparer.OrdinalIgnoreCase))
-            yield return Line("place.group", $"{ModelName(GroupKind.KindId, id)}, {Plural(GroupOf(id)?.Parts.Length ?? 0, "part")}", id, prompt: GroupsCategory);
         var hand = HandOf(s);
-        if (hand.LastPlaced is { } last && _maps.Prefabs.TryGetValue(last.ToLowerInvariant(), out var lt))
-            yield return new EditorMenuItem { Section = "place.again", Kind = EditorItemKind.Action, Label = lt.Name, Command = "edit again" };
+        if (hand.LastPlaced is { } last && PlaceName(last) is { } lastName)
+            yield return new EditorMenuItem { Section = "place.again", Kind = EditorItemKind.Action, Label = lastName, Command = "edit again" };
     }
 
     // ── Edit ────────────────────────────────────────────────────────────────────────────────────
@@ -169,6 +168,17 @@ public sealed partial class WorldEditor
                     Section = "edit.thing", Kind = EditorItemKind.Info, Label = $"{NameOf(world, e)}, {Where(world, e, feet, yaw)}",
                     Value = id.ToString(CultureInfo.InvariantCulture), Checked = hand.Held.Contains(id),
                 });
+
+        // Everything placed with the editor, wherever it is. The line's Value is the filter in force and
+        // its Prompt says whether Go to it is allowed.
+        var placed = Placed(s, hand.PlacedFilter, out int total);
+        items.Add(Line("edit.placedinfo", PlacedSummary(placed.Count, total, hand.PlacedFilter), hand.PlacedFilter, prompt: MayGo(s) ? "goto" : ""));
+        foreach (var one in placed.Take(PlacedListed))
+            items.Add(new EditorMenuItem
+            {
+                Section = "edit.placed", Kind = EditorItemKind.Info, Label = one.Label, Value = one.Id.ToString(CultureInfo.InvariantCulture),
+                Prompt = one.Kind, Help = one.Name, Checked = hand.Held.Contains(one.Id),
+            });
 
         if (!Holding(s, out _, out var chosen, out int chosenId)) return items;
         items.Add(Line("edit.chosen", NameOf(world, chosen), chosenId.ToString(CultureInfo.InvariantCulture), Summary(s, world, chosen, chosenId)));

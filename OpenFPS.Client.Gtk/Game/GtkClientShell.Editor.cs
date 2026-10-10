@@ -8,7 +8,7 @@ namespace OpenFPS.Client.Gtk.Game;
 /// <summary>The F12 editor dialog, drawn from the shared <see cref="EditorDialog"/>.</summary>
 internal sealed partial class GtkClientShell
 {
-    private const uint GdkTab = 0xff09, GdkIsoLeftTab = 0xfe20, GdkPageUp = 0xff55, GdkPageDown = 0xff56, GdkSpace = 0x20;
+    private const uint GdkTab = 0xff09, GdkIsoLeftTab = 0xfe20, GdkPageUp = 0xff55, GdkPageDown = 0xff56, GdkSpace = 0x20, GdkDelete = 0xffff;
 
     /// <summary>One drawn section: its frame, the box its controls are in, and the shape it was drawn for.</summary>
     private sealed record DrawnSection(string Id, Widget Frame, Box Box, string Shape);
@@ -435,6 +435,13 @@ internal sealed partial class GtkClientShell
 
             var c = ModelOf(focus);
             if (c == null) return false;
+            // Delete on a list that has a Remove presses it for the row chosen (it asks first).
+            if (e.Keyval == GdkDelete && modifiers == KeyModifiers.None && c.Delete != null)
+            {
+                if (c.Kind == DialogControlKind.List && Ancestor<ListBoxRow>(focus) is { } chosenRow) c.Selected = chosenRow.GetIndex();
+                editor.Press(c.Delete);
+                return true;
+            }
             var drop = Ancestor<DropDown>(focus);
             if (e.Keyval is GdkReturn or GdkKpEnter)
             {

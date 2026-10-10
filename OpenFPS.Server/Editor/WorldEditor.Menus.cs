@@ -101,6 +101,9 @@ public sealed partial class WorldEditor
             "select.within" when parts.Length > 1 && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float r)
                 => Listing(s, $"Within {Metres(r)}", Within(s, r)),
             "held" => HeldMenu(s),
+            "placed" => PlacedMenu(s, parts.Length > 1 ? string.Join(":", parts[1..]) : HandOf(s).PlacedFilter),
+            "placedone" when parts.Length > 1 && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int placedId)
+                => PlacedOneMenu(s, placedId),
             "held.nudge" => HeldNudgeMenu(s),
             "held.turn" => HeldTurnMenu(),
             "places" => PlacesMenu(s),
@@ -148,6 +151,7 @@ public sealed partial class WorldEditor
             && _maps.AuthoredEntities(s.CurrentMapId).TryGetValue(id, out var e) && Editable(world, e))
             items.Add(Opens($"Selected: {NameOf(world, e)}", "selected"));
         if (HandOf(s).Held.Count > 0) items.Add(Opens($"Held, {Plural(HandOf(s).Held.Count, "thing")}", "held"));
+        items.Add(Opens($"Placed on this map, {Overlays.Get(s.CurrentMapId).Added.Count}", "placed"));
         items.Add(Opens("Places and rooms", "places"));
         items.Add(Opens("Library", "library"));
         items.Add(Opens("Test tools", "test"));
@@ -411,11 +415,21 @@ public sealed partial class WorldEditor
 
     // ── Place ───────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>The categories prefabs are browsed by, in the order they are listed.</summary>
+    /// <summary>The category saved buildings, and the building prefab, are listed under.</summary>
+    public const string BuildingsCategory = "Buildings";
+
+    /// <summary>The category groups are listed under (a group saved as a building is under Buildings).</summary>
+    public const string GroupsCategory = "Groups";
+
+    /// <summary>What /edit place takes for a saved group: "group:" and its id.</summary>
+    public const string GroupPrefix = "group:";
+
+    /// <summary>The categories Place lists, in order: buildings and vehicles first, groups last.</summary>
     public static readonly string[] Categories =
     {
-        "Walls and fences", "Floors, roads and roofs", "Doors", "Machines", "Water", "Fire", "Trees and plants",
-        "Sounds", "Places and markers", "Things to carry", "Other",
+        BuildingsCategory, VehiclesCategory, "Walls and fences", "Floors, roads and roofs", "Doors", "Stairs and ramps",
+        "Furniture and seating", "Machines", "Water", "Fire", "Trees and plants", "Sounds", "Places and markers",
+        "Things to carry", "Other", GroupsCategory,
     };
 
     /// <summary>Which category a prefab is browsed under: from what it is, never a list kept by hand.</summary>
@@ -429,34 +443,73 @@ public sealed partial class WorldEditor
         if (sound.StartsWith("water:") || sound.StartsWith("flow:") || sound.StartsWith("shore:") || id.Contains("water") || id.StartsWith("shore_")) return "Water";
         if (sound.StartsWith("fire:")) return "Fire";
         if (sound.StartsWith("foliage:") || id.Contains("tree") || id.Contains("foliage") || id.Contains("hedge")) return "Trees and plants";
+        // A place is a room, a region, a doorway, a name or a trigger; a beacon is a thing that sounds.
         if (t.RoomSize.HasValue || t.RegionAId.HasValue || id.Contains("region") || id.Contains("portal") || id.Contains("marker")
-            || id.Contains("named_place") || t.Type is EntityType.Trigger or EntityType.Beacon) return "Places and markers";
+            || id.Contains("named_place") || t.Type == EntityType.Trigger) return "Places and markers";
+        if (id.Contains("building")) return BuildingsCategory;
+        if (id.Contains("stair") || id.Contains("ramp")) return "Stairs and ramps";
+        // Audience is upholstery with people or air behind it: seats and soft furniture.
+        if (t.Material.Equals("Audience", StringComparison.OrdinalIgnoreCase) || id.Contains("furniture") || id.Contains("seat")) return "Furniture and seating";
         if (id.Contains("floor") || id.Contains("road") || id.Contains("roof") || id.Contains("ground") || id.Contains("ceiling")) return "Floors, roads and roofs";
-        if (id.Contains("wall") || id.Contains("fence") || id.Contains("pillar") || id.Contains("building") || id.Contains("boulder")) return "Walls and fences";
-        if (t.HasEmitter) return "Sounds";
+        if (id.Contains("wall") || id.Contains("fence") || id.Contains("pillar") || id.Contains("arch") || id.Contains("boulder")) return "Walls and fences";
+        if (t.HasEmitter || t.Type == EntityType.Beacon || id.Contains("emitter")) return "Sounds";
         return "Other";
     }
-
-    /// <summary>The category groups are listed under.</summary>
-    public const string GroupsCategory = "Groups";
 
     private IEnumerable<PrefabTemplate> Placeable(UserSession s)
         => _maps.Prefabs.Values.Where(t => MayPlace(s, t, out _) && !Models.IsRetired(PrefabKind.KindId, t.Id));
 
+    /// <summary>One thing Place offers: its category, its name, the name with its size, what /edit place
+    /// takes for it, a line about it, and whether it can be previewed.</summary>
+    internal sealed record PlaceRow(string Category, string Name, string Label, string Value, string Help, bool Previewable);
+
+    private static string SizeWords(System.Numerics.Vector3? size)
+        => size is { } z ? $", {FieldDescriptor.Format(z.X)} by {FieldDescriptor.Format(z.Z)} by {FieldDescriptor.Format(z.Y)} high" : "";
+
+    /// <summary>Everything Place offers this player, in category order: prefabs, vehicles and saved groups.</summary>
+    internal List<PlaceRow> PlaceRows(UserSession s)
+    {
+        var rows = new List<PlaceRow>();
+        foreach (var t in Placeable(s))
+            rows.Add(new PlaceRow(CategoryOf(t), t.Name, t.Name + SizeWords(t.ColliderSize), t.Id, t.Description ?? "", t.HasEmitter));
+        if (Composites != null)
+            foreach (var preset in VehiclePresets().Where(p => !Models.IsRetired(ModelLibrary.Kinds.Vehicle, p)))
+            {
+                var (name, size, help) = VehicleOf(preset);
+                rows.Add(new PlaceRow(VehiclesCategory, name, name + SizeWords(size), VehiclePrefix + preset, help, false));
+            }
+        foreach (var id in GroupIds())
+        {
+            var spec = GroupOf(id);
+            bool building = spec?.Building == true;
+            string name = ModelName(GroupKind.KindId, id);
+            rows.Add(new PlaceRow(building ? BuildingsCategory : GroupsCategory, name, $"{name}, {Plural(spec?.Parts.Length ?? 0, "part")}",
+                                  GroupPrefix + id, building ? "A building saved in the editor, placed in front of you as its parts." : "A group saved in the editor, placed in front of you as its parts.", false));
+        }
+        return rows.OrderBy(r => Array.IndexOf(Categories, r.Category)).ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+                   .ThenBy(r => r.Value, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>What a place id is called: a prefab's name, a vehicle's, a group's.</summary>
+    private string? PlaceName(string value)
+    {
+        if (IsVehicleId(value, out string preset)) return KnownVehicle(preset) ? VehicleOf(preset).Name : null;
+        if (value.StartsWith(GroupPrefix, StringComparison.OrdinalIgnoreCase)) return ModelName(GroupKind.KindId, value[GroupPrefix.Length..]);
+        return _maps.Prefabs.TryGetValue(value.ToLowerInvariant(), out var t) ? t.Name : null;
+    }
+
     private EditorMenu PlaceMenu(UserSession s)
     {
         var hand = HandOf(s);
-        var groups = Placeable(s).GroupBy(CategoryOf).ToDictionary(g => g.Key, g => g.Count());
+        var counts = PlaceRows(s).GroupBy(r => r.Category).ToDictionary(g => g.Key, g => g.Count());
         var items = new List<EditorMenuItem>
         {
             Opens($"Choosing a prefab {PlaceModeWords(hand.Mode)}. Change", "place.mode"),
             Typed("Search, typed", "/edit find ", "words to search for", "Prefabs whose name has every word."),
         };
-        if (hand.LastPlaced is { } last && _maps.Prefabs.TryGetValue(last.ToLowerInvariant(), out var lt))
-            items.Add(Act($"Again: {lt.Name}, where you stand", "edit again"));
-        items.AddRange(Categories.Where(groups.ContainsKey).Select(c => Opens($"{c}, {groups[c]}", $"place.cat:{c}")));
-        int groupCount = GroupIds().Count();
-        if (groupCount > 0) items.Add(Opens($"{GroupsCategory}, {groupCount}", $"place.cat:{GroupsCategory}"));
+        if (hand.LastPlaced is { } last && PlaceName(last) is { } lastName)
+            items.Add(Act($"Again: {lastName}, where you stand", "edit again"));
+        items.AddRange(Categories.Where(counts.ContainsKey).Select(c => Opens($"{c}, {counts[c]}", $"place.cat:{c}")));
         return Menu("Place", items);
     }
 
@@ -475,48 +528,42 @@ public sealed partial class WorldEditor
         _ => "places it at your feet",
     };
 
-    /// <summary>The command choosing a prefab sends, by the mode the editor's place is in.</summary>
-    private static string PlaceCommand(PlaceMode mode, string prefab) => mode switch
-    {
-        PlaceMode.Cursor => $"edit place {prefab} at cursor",
-        PlaceMode.Preview => $"edit preview {prefab}",
-        _ => $"edit place {prefab}",
-    };
-
-    private EditorMenuItem PrefabItem(UserSession s, PrefabTemplate t)
-    {
-        string size = t.ColliderSize is { } z ? $", {FieldDescriptor.Format(z.X)} by {FieldDescriptor.Format(z.Z)} by {FieldDescriptor.Format(z.Y)} high" : "";
-        return Act($"{t.Name}{size}", PlaceCommand(HandOf(s).Mode, t.Id));
-    }
+    /// <summary>The command choosing a row sends, by the mode the editor's place is in. A group is
+    /// always placed in front of you.</summary>
+    private static string PlaceCommand(PlaceMode mode, string value) => value.StartsWith(GroupPrefix, StringComparison.OrdinalIgnoreCase)
+        ? $"edit place group {value[GroupPrefix.Length..]}"
+        : mode switch
+        {
+            PlaceMode.Cursor => $"edit place {value} at cursor",
+            PlaceMode.Preview => $"edit preview {value}",
+            _ => $"edit place {value}",
+        };
 
     private EditorMenu? CategoryMenu(UserSession s, string category)
     {
-        if (category == GroupsCategory)
-            return Menu(GroupsCategory, GroupIds().OrderBy(i => i, StringComparer.OrdinalIgnoreCase)
-                .Select(id => Act($"{ModelName(GroupKind.KindId, id)}, {Plural(GroupOf(id)?.Parts.Length ?? 0, "part")}", $"edit place group {id}")));
         if (!Categories.Contains(category)) return null;
-        var items = Placeable(s).Where(t => CategoryOf(t) == category).OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ThenBy(t => t.Id)
-            .Select(t => PrefabItem(s, t));
-        return Menu(category, items);
+        var mode = HandOf(s).Mode;
+        return Menu(category, PlaceRows(s).Where(r => r.Category == category).Select(r => Act(r.Label, PlaceCommand(mode, r.Value))));
     }
 
-    /// <summary>Prefabs whose name or id has every word searched for, best first.</summary>
-    internal List<PrefabTemplate> Find(UserSession s, string words)
+    /// <summary>What Place offers whose name, id or category has every word searched for, best first.</summary>
+    internal List<PlaceRow> Find(UserSession s, string words)
     {
         var terms = words.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                          .Select(w => w.ToLowerInvariant()).ToArray();
         if (terms.Length == 0) return new();
-        bool Has(PrefabTemplate t, string w) => t.Name.Contains(w, StringComparison.OrdinalIgnoreCase) || t.Id.Contains(w, StringComparison.OrdinalIgnoreCase)
-                                               || CategoryOf(t).Contains(w, StringComparison.OrdinalIgnoreCase);
-        return Placeable(s).Where(t => terms.All(w => Has(t, w)))
-            .OrderBy(t => t.Name.StartsWith(terms[0], StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-            .ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase).Take(40).ToList();
+        bool Has(PlaceRow r, string w) => r.Name.Contains(w, StringComparison.OrdinalIgnoreCase) || r.Value.Contains(w, StringComparison.OrdinalIgnoreCase)
+                                         || r.Category.Contains(w, StringComparison.OrdinalIgnoreCase);
+        return PlaceRows(s).Where(r => terms.All(w => Has(r, w)))
+            .OrderBy(r => r.Name.StartsWith(terms[0], StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase).Take(40).ToList();
     }
 
     private EditorMenu FindMenu(UserSession s, string words)
     {
         var found = Find(s, words);
-        var items = found.Select(t => PrefabItem(s, t)).ToList();
+        var mode = HandOf(s).Mode;
+        var items = found.Select(r => Act(r.Label, PlaceCommand(mode, r.Value))).ToList();
         if (items.Count == 0) items.Add(Info($"Nothing is called {words}."));
         items.Add(Typed("Search again, typed", "/edit find ", "words to search for", "Prefabs whose name has every word."));
         return Menu($"Found for {words}, {found.Count}", items);
@@ -524,16 +571,16 @@ public sealed partial class WorldEditor
 
     private void SayPrefabs(UserSession s, string[] args, Action<IMessage> reply)
     {
+        var rows = PlaceRows(s);
         string? category = args.Length > 0 ? Categories.FirstOrDefault(c => c.StartsWith(string.Join(" ", args), StringComparison.OrdinalIgnoreCase)) : null;
         if (category == null)
         {
-            var groups = Placeable(s).GroupBy(CategoryOf).ToDictionary(g => g.Key, g => g.Count());
-            Say(reply, "Categories: " + string.Join("; ", Categories.Where(groups.ContainsKey).Select(c => $"{c}, {groups[c]}"))
+            var counts = rows.GroupBy(r => r.Category).ToDictionary(g => g.Key, g => g.Count());
+            Say(reply, "Categories: " + string.Join("; ", Categories.Where(counts.ContainsKey).Select(c => $"{c}, {counts[c]}"))
                      + ". /edit prefabs CATEGORY lists one; /edit find WORDS searches; /edit place PREFAB puts one at your feet.");
             return;
         }
-        var list = Placeable(s).Where(t => CategoryOf(t) == category).OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase);
-        Say(reply, $"{category}: " + string.Join("; ", list.Select(t => $"{t.Id}, {t.Name}")) + ".");
+        Say(reply, $"{category}: " + string.Join("; ", rows.Where(r => r.Category == category).Select(r => $"{r.Value}, {r.Name}")) + ".");
     }
 
     // ── Library ─────────────────────────────────────────────────────────────────────────────────

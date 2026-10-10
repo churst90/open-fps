@@ -932,7 +932,8 @@ moved Fountain"); with nothing to undo the button says so and is dimmed.
 **Place**
 
 - Place a prefab: Search (words in a prefab's name or category; the list shows those with every
-  word); Category (All categories, then the editor's categories, and Groups if there are any);
+  word); Category (All categories, then the editor's categories in the order of section 17, with
+  Buildings and Vehicles first and Groups last);
   Prefabs (each "Name, width by depth by height high: its description"); Where it goes (at your feet,
   or just in front of you if it is solid; at the build cursor; preview only); Place; Preview (things
   with a sound of their own); Place again (names the last thing placed).
@@ -942,6 +943,8 @@ moved Fountain"); with nothing to undo the button says so and is dimmed.
 
 **Edit** (what used to be Select, Selected and Held)
 
+- Placed on this map (section 17): a filter, the list of everything placed with the editor wherever
+  it is, and Remove it, Go to it, Edit it, Tick all shown. It comes after Things near you.
 - Things near you: what is within 20 metres (up to 40), what you stand on or in first, then nearest;
   each "Name, distance and direction". Arrowing chooses one (`/edit select #ID dialog`, said by
   nobody: the screen reader reads the row). Space ticks it (`/edit select add #ID dialog` or
@@ -955,7 +958,8 @@ moved Fountain"); with nothing to undo the button says so and is dimmed.
   Row of copies: how many, and spacing in metres; Row of copies; Delete (asks "Delete NAME?", No
   first).
 - N ticked (only when something is ticked): Move them together (east, north, up), Move them; Turn
-  them together (degrees), Turn them; Group name, Group them; Untick all.
+  them together (degrees), Turn them; Group name, Group them, Save as a building; Delete the ticked
+  things (asks first); Untick all.
 
 **Build** (the Library)
 
@@ -1022,3 +1026,133 @@ moved Fountain"); with nothing to undo the button says so and is dimmed.
   MainWindow.Editor.cs draw any section from its controls, update a section in place when its
   controls are the same, and draw it again (keeping the focus) when they are not.
 - Tests: EditorDialogTests.
+
+## 17. Buildings, vehicles, and everything placed on a map
+
+Built 2026-10-09 (Cody: "aren't vehicles considered prefabs too? What about buildings?" and "can I get a
+list of items I placed manually on the map and filter them down to remove them without being near the
+item?"). Untried with Orca and NVDA: tests only.
+
+### Place's categories
+
+In this order: Buildings, Vehicles, Walls and fences, Floors roads and roofs, Doors, Stairs and ramps,
+Furniture and seating, Machines, Water, Fire, Trees and plants, Sounds, Places and markers, Things to
+carry, Other, Groups. A category with nothing in it is not listed. `CategoryOf` decides a prefab's from
+what it is, never from a list of ids, and the first rule that holds wins:
+
+1. carried (IsItem): Things to carry; a door (IsDoor): Doors;
+2. its sound: `machine:` Machines; `water:`, `flow:`, `shore:` (or "water", "shore_" in the id) Water;
+   `fire:` Fire; `foliage:` (or tree, foliage, hedge) Trees and plants;
+3. a room, a region, a doorway, a name or a trigger: Places and markers (a beacon is not: it sounds);
+4. "building" in the id: Buildings; "stair" or "ramp": Stairs and ramps; the Audience material (seats
+   and upholstery) or "furniture" or "seat": Furniture and seating;
+5. floor, road, roof, ground, ceiling: Floors, roads and roofs; wall, fence, pillar, arch, boulder:
+   Walls and fences;
+6. a sound of its own, a beacon, or "emitter" in the id: Sounds; anything else: Other (no prefab today).
+
+Moved by the audit of the 88 prefabs: building_box to Buildings (was Walls and fences); the four stairs
+and ramps to Stairs and ramps (were Other); furniture_soft and grandstand_seating to Furniture and
+seating (were Other); brick_arch to Walls and fences (was Other); sound_emitter to Sounds (was Other);
+pa_speaker, space_megaphone and chirp_beacon to Sounds (were Places and markers, by their beacon type).
+The rest stayed where they were.
+
+### Vehicles
+
+- Vehicles are not prefabs: a vehicle is a composite shell built from its profile (VehicleShell), parked
+  by CompositeService. Place lists every preset `/spawn vehicle` takes (the parkable aircraft, then
+  MachineRegistry's road vehicles, the parts lists in machines/ included; retired ones are left out), by
+  the vehicle's own name ("1.6 hatchback", "Helicopter") and size. Their place id is `vehicle:PRESET`:
+  `/edit place vehicle:v8_muscle`, or `/edit place vehicle v8_muscle` typed.
+- Where it goes follows the place mode: at your feet means clear ground beside you, facing your way,
+  found as `/spawn vehicle` finds it (`CommandHandler.ClearGroundBeside`, open sky for an aircraft); at
+  the build cursor means there, facing the build heading. Preview says a parked vehicle's engine is off.
+- It belongs to the map (no owner), so anyone may drive it. It costs one against the 5,000 placed by
+  owners, and one undo takes it away.
+- Kept in the overlay as an addition whose prefab is `vehicle:PRESET`, with where it was put. The map
+  loader leaves such additions out of the map's entities, so `/savemap` never writes a vehicle into the
+  map file; `WorldEditor.ParkKeptVehicles`, called once at start after the map's composites
+  (Program), parks each again where it was put. The editor's index (AuthoredEntities) names its root,
+  so it is listed, removed, undone and redone like any placed thing. A car somebody drove off goes back
+  to where it was put after a restart.
+- A vehicle somebody is sitting in is not removed, and its undo or redo is refused while they are in it.
+  An undo or a removal counts a parked vehicle as unmoved within a metre across the ground, since it
+  settles on its wheels.
+- A drivable vehicle is not selectable or tickable (it has a velocity, as in phase 1), so it cannot be
+  moved or grouped; a parked aircraft is a still body and can be.
+
+### Buildings
+
+- building_box, and any group saved as a building. `GroupSpec.Building` (a JSON field, false on every
+  group made before) files a group under Buildings instead of Groups. `/edit building NAME` makes one
+  from what you hold, as `/edit group NAME` does (edit-models); the dialog's ticked section has Save as a
+  building beside Group them. `/edit model set group ID Building on` refiles an existing group.
+- A house built with Control+B: stand in it, Filter placed things "within 20", Tick all shown, type a
+  name, Save as a building. Place, Buildings puts it down again in front of you.
+- In the dialog's Place list a group's value is `group:ID`, and `/edit place group:ID` places it as
+  `/edit place group ID` does.
+
+### Placed on this map
+
+- The overlay's additions on the map you are on that are still there, nearest first, up to 200 (the
+  filter finds the rest). Each row: name (and kind, when the name was changed), distance and a compass
+  word ("104 metres north east"; "6 metres up" when well above you), who placed it and when ("placed by
+  cody, 9 October 14:02", the server's local time). Additions kept before 2026-10-09 have no one
+  recorded and say "placed earlier".
+- `OverlayAddition.PlacedBy` and `PlacedAt` (UTC) are new JSON members, absent on old files. A new
+  placing (any place, copy, row, group, build, replace) records the editor and the time; an undone
+  removal keeps what it had.
+- Filter: every word must be in the name, the kind, the prefab id, or who placed it ("earlier" for the
+  old ones); `within 20` (or `20m`) keeps what is within 20 metres. The filter is the server's, held per
+  editor, so the dialog, `/edit placed` and Tick all shown agree.
+- Dialog (Edit tab, section "Placed on this map", after Things near you): Filter placed things (a box;
+  Enter or Filter sends `/edit placed WORDS dialog`), the list Placed on this map (its description
+  starts with the count: "12 things placed on this map, nearest first."), Remove it, Go to it, Edit it,
+  Tick all shown. Space ticks a row (the same held things as Things near you); Delete in the list presses
+  Remove it. Remove it asks "Remove Megaphone?" (No first); once it has gone the row after it is chosen
+  (the one before if it was the last), so the focus stays in the list and Delete again goes on down it.
+  Go to it is dimmed, with "Needs the move permission on this map." as its description, for a player who
+  may not go. With nothing placed the list's one row says so and the buttons are dimmed.
+- Removing is a DeleteOp each (a BatchOp for several), undone as any deletion, told to the other editors
+  ("cody removed Megaphone.") and logged by the server ("WorldEditor: cody removed Megaphone
+  (#900000012) on 'mine'."). The answer is spoken: "Removed Megaphone, 104 metres north east. Undo puts
+  it back."
+- Go to it (`/edit goto #ID`): a spot beside it, out from its side nearest you first and then round it,
+  on whatever floor is there, facing it. Allowed as `/move` is (your own map, or the move permission) or
+  with tp-free; an invited editor may not.
+- Menus: the root menu has "Placed on this map, N"; each row opens Remove it, Go to it, Select it.
+
+### Commands
+
+| Command | |
+|---|---|
+| `/edit placed [WORDS]` | the list (a menu; numbered lines for a text client); WORDS become the filter |
+| `/edit remove #ID [#ID ...]` | remove things wherever they are, all or none, one undo |
+| `/edit remove held` | remove every held (ticked) thing |
+| `/edit goto #ID` | stand beside a thing |
+| `/edit select add placed [WORDS]` | hold everything the list shows |
+| `/edit place vehicle:PRESET [at cursor]` | park a vehicle |
+| `/edit building NAME` | a group listed under Buildings |
+
+`/edit remove` with no number is `/edit delete`, as before. Every one is checked as `/edit` is: `edit`
+here, or the map's owner, or an editor the owner named.
+
+### Code and wire
+
+- Server: WorldEditor.Placed.cs (the list, removing, going), WorldEditor.Vehicles.cs (parking and
+  keeping), Menus.cs (`PlaceRows`: prefabs, vehicles and groups as one ordered list for the menus,
+  Find and the dialog). CommandHandler's editor is given the CompositeService.
+- Client.Core: EditorDialog's placed section, `DialogControl.Delete` (the button the Delete key presses
+  on a control); both heads press it (GtkClientShell.Editor.cs, MainWindow.Editor.cs) with no modifier.
+  GTK takes the main Delete only, not the keypad's; WinForms cannot tell them apart, so on Windows the
+  keypad's Delete (Num Lock off), if NVDA lets it through, also asks to remove. Ticks on either list go
+  through the server.
+- Wire: unchanged. The new rows are EditorMenuItems with Sections "edit.placedinfo" and "edit.placed"
+  (Help is the thing's name, for the question); Place's rows are all "place.prefab" now, groups
+  included, so "place.group" is no longer sent. The overlay file gained two members.
+
+### Not done: things changed or removed from the map file
+
+The list holds what the editor added. Things from the map file that were moved, changed or removed are
+in the overlay's Changed and Removed, and are not listed. A "Changed on this map" list beside it (put
+back as the map file has it, or bring back a removed one) would use the same rows and the same undo;
+recommended next if Cody wants to find his edits to a generated map.

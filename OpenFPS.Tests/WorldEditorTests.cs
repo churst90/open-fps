@@ -579,7 +579,7 @@ public class WorldEditorTests : IDisposable
         rig.On("mine");
         var root = rig.Menu("menu")!;
         Assert.Equal("World editor, mine", root.Title);
-        Assert.Equal(new[] { "Map", "Place", "Select", "Places and rooms", "Library", "Test tools", "Nothing to undo", "Nothing to redo" }, root.Items.Select(i => i.Label));
+        Assert.Equal(new[] { "Map", "Place", "Select", "Placed on this map, 0", "Places and rooms", "Library", "Test tools", "Nothing to undo", "Nothing to redo" }, root.Items.Select(i => i.Label));
 
         var place = rig.Menu("menu", "place")!;
         Assert.Contains(place.Items, i => i.Label.StartsWith("Walls and fences, ") && i.Kind == EditorItemKind.Menu && i.Command == "place.cat:Walls and fences");
@@ -701,6 +701,7 @@ public class WorldEditorTests : IDisposable
     {
         public readonly MapManager Maps;
         public readonly PrefabRepository Prefabs;
+        public readonly CompositeService? Composites;
         public readonly GameServer Server;
         public readonly FakeUsers Users = new();
         public readonly UserSession Tester, Other;
@@ -711,7 +712,7 @@ public class WorldEditorTests : IDisposable
         private readonly CommandHandler _commands;
         private readonly SessionManager _sessions = new();
 
-        public Rig(string root, UserRole role, string? mapDir = null, bool overlays = true, bool models = false)
+        public Rig(string root, UserRole role, string? mapDir = null, bool overlays = true, bool models = false, bool composites = false)
         {
             string dir = Path.Combine(root, Guid.NewGuid().ToString("N"));
             MapDir = mapDir ?? Path.Combine(dir, "maps");
@@ -745,7 +746,9 @@ public class WorldEditorTests : IDisposable
                 if (!_sentTo.TryGetValue(to.Username, out var list)) _sentTo[to.Username] = list = new List<IMessage>();
                 list.Add(message);
             };
-            _commands = new CommandHandler(_sessions, Maps, Server, users: Users);
+            // Composites park vehicles, as /spawn vehicle does; most tests have none.
+            Composites = composites ? new CompositeService(Maps, Prefabs, new CompositeRepository(Path.Combine(dir, "composites"))) : null;
+            _commands = new CommandHandler(_sessions, Maps, Server, Composites, users: Users);
 
             Users.Add("tester", role);
             Users.Add("other", UserRole.Player);
