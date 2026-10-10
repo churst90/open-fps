@@ -63,8 +63,12 @@ public class WorldEnvironmentSystem
     /// (<see cref="Rainfall.DrizzleRate"/>).</summary>
     public const float StoppedBelowMmPerHour = Rainfall.DrizzleRate * 0.1f;
 
+    /// <summary>How long the weather rolling on its own waits for a new front, on average, in seconds:
+    /// five minutes (Cody, 2026-10-09; it was about one, and the weather never settled).</summary>
+    public const double MeanSecondsBetweenFronts = 300.0;
+
     /// <summary>The chance per tick of a new front, when the weather is rolling on its own.</summary>
-    public const double DefaultFrontProbabilityPerTick = 0.0005;
+    public const double DefaultFrontProbabilityPerTick = 1.0 / (MeanSecondsBetweenFronts * PhysicsConstants.TickRate);
 
     /// <summary>The weather front currently in effect.</summary>
     public WeatherType CurrentScenario => _currentScenario;

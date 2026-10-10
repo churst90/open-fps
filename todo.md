@@ -25,8 +25,13 @@ Before items 4-6: the two cheap reflection steps (measure "Mixer load" with echo
 the trace threads). See "Reflections in their own process". The three bugs of 2026-10-08 are fixed
 (2026-10-09, unheard): E weighs a shut door against a car by facing; Alex waits in a lobby clear of
 the doorway, which had held the closer off; /weather says "Clearing" while a cleared front's rain
-still falls, and that rain now stops. Open for Cody: a new front is drawn about once a minute
-(0.0005 a tick at 30 ticks a second), so the weather rarely settles; slower, or wait for item 11?
+still falls, and that rain now stops. A new front is drawn every five minutes on average (Cody,
+2026-10-09; it was about once a minute).
+Cody's world decisions of 2026-10-09: no faster tile fetching for now (a car above about 65 m/s still
+stops short of unbuilt ground); the places laid on UTM grid north are fine; placed tiles stay pinned
+against the store's cap, and player-built tiles will follow the same rule; close the crack between
+coarse and full ground (agent running). The engine CPU savings that change the sound: approved, agent
+running, renders to inbox/engine-cpu-2026-10-09.
 
 After items 1-6 (agreed with Cody 2026-10-08): performance and distant updates come before new content,
 because the one world costs CPU and bandwidth first.
