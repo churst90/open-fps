@@ -57,13 +57,15 @@ var projects = new (string Name, string Dir, string[] Refs, string[] Extra)[]
     // The library's projects first, lowest first (docs/SOUND_LIBRARY_BOUNDARY.md, section 6).
     ("OpenFPS.Geometry", "OpenFPS.Geometry", Array.Empty<string>(), Array.Empty<string>()),
     ("OpenFPS.Native", "OpenFPS.Native", Array.Empty<string>(), Array.Empty<string>()),
-    ("OpenFPS.Common", "OpenFPS.Common", new[] { "OpenFPS.Geometry" }, Array.Empty<string>()),
-    ("OpenFPS.Client.Core", "OpenFPS.Client.Core", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native" }, Array.Empty<string>()),
-    ("OpenFPS.Server", "OpenFPS.Server", new[] { "OpenFPS.Geometry", "OpenFPS.Common" }, Array.Empty<string>()),
-    ("OpenFPS.Client", "OpenFPS.Client", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core" }, Array.Empty<string>()),
-    ("OpenFPS.Client.Gtk", "OpenFPS.Client.Gtk", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core" }, Array.Empty<string>()),
-    ("OpenFPS.AudioLab", "OpenFPS.AudioLab", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core", "OpenFPS.Server" }, Array.Empty<string>()),
-    ("OpenFPS.Tests", "OpenFPS.Tests", new[] { "OpenFPS.Geometry", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core", "OpenFPS.Server" },
+    ("OpenFPS.Acoustics", "OpenFPS.Acoustics", new[] { "OpenFPS.Geometry" }, Array.Empty<string>()),
+    ("OpenFPS.Sound", "OpenFPS.Sound", new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics" }, Array.Empty<string>()),
+    ("OpenFPS.Common", "OpenFPS.Common", new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound" }, Array.Empty<string>()),
+    ("OpenFPS.Client.Core", "OpenFPS.Client.Core", new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Common", "OpenFPS.Native" }, Array.Empty<string>()),
+    ("OpenFPS.Server", "OpenFPS.Server", new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Common" }, Array.Empty<string>()),
+    ("OpenFPS.Client", "OpenFPS.Client", new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core" }, Array.Empty<string>()),
+    ("OpenFPS.Client.Gtk", "OpenFPS.Client.Gtk", new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core" }, Array.Empty<string>()),
+    ("OpenFPS.AudioLab", "OpenFPS.AudioLab", new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core", "OpenFPS.Server" }, Array.Empty<string>()),
+    ("OpenFPS.Tests", "OpenFPS.Tests", new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Client.Core", "OpenFPS.Server" },
         new[] { "OpenFPS.Client.Gtk/Game/GtkKeyMap.cs" }),
 };
 
@@ -82,15 +84,20 @@ foreach (var (name, dir, refs, extra) in projects)
     var trees = files.Select(f => CSharpSyntaxTree.ParseText(File.ReadAllText(f), parse, Rel(f), Encoding.UTF8)).ToList();
     ownTrees[name] = trees;
     var all = new List<SyntaxTree>(trees) { CSharpSyntaxTree.ParseText(implicitUsings, parse, $"<{name}>/GlobalUsings.g.cs") };
+    // What the project files generate: the wire hash (Common) and the door models' fingerprint (Sound).
     if (name == "OpenFPS.Common")
         all.Add(CSharpSyntaxTree.ParseText(
-            "namespace OpenFPS.Common; public static class WireContract { public const string Hash = \"survey\"; }\n" +
-            "public static class DoorModelFingerprint { public const string Hash = \"survey\"; }", parse, "<OpenFPS.Common>/Generated.g.cs"));
+            "namespace OpenFPS.Common; public static class WireContract { public const string Hash = \"survey\"; }", parse, "<OpenFPS.Common>/Generated.g.cs"));
+    if (name == "OpenFPS.Sound")
+        all.Add(CSharpSyntaxTree.ParseText(
+            "namespace OpenFPS.Common; public static class DoorModelFingerprint { public const string Hash = \"survey\"; }", parse, "<OpenFPS.Sound>/Generated.g.cs"));
     // The InternalsVisibleTo items of each project file.
     string[] friends = name switch
     {
         "OpenFPS.Native" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Common" => new[] { "OpenFPS.Tests" },
+        "OpenFPS.Acoustics" => new[] { "OpenFPS.Common", "OpenFPS.Tests" },
+        "OpenFPS.Sound" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Client.Core" or "OpenFPS.Server" => new[] { "OpenFPS.Tests", "OpenFPS.AudioLab" },
         _ => Array.Empty<string>(),
     };

@@ -7,8 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The geometry library (docs/SOUND_LIBRARY_BOUNDARY.md, stage 2). -->
+    <!-- The sound library's lower projects (docs/SOUND_LIBRARY_BOUNDARY.md, section 6): the geometry
+         (stage 2), the acoustics and the sound models (stage 3). Never OpenFPS.Native: the server
+         references this project and must not load FMOD. -->
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,7 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- AudioClock.UseForTest: the emitter-stream replay runs every reader of the audio clock on its own. -->
+    <!-- The tests reach the opening routes' internals (their cache, MaxChainedBoxes). AudioClock.UseForTest,
+         which this was for, moved to OpenFPS.Sound with the clock (stage 3). -->
     <InternalsVisibleTo Include="OpenFPS.Tests" />
   </ItemGroup>
 
@@ -30,55 +35,33 @@
 
   <!-- ── THE WIRE CONTRACT ────────────────────────────────────────────────────────────────────────
        Messages and components serialise positionally, so builds from different versions do not fail,
-       they misread each other. This hashes every source file of this project and its library projects
-       (sorted by path from the repository's root, line endings normalised so a Windows checkout hashes
-       the same) into WireContract.Hash; the server refuses a login whose hash differs.
+       they misread each other. This hashes every source file of this project and of the library projects
+       below (sorted by path from the repository's root, line endings normalised so a Windows checkout
+       hashes the same: tools/build/SourceHash.targets) into WireContract.Hash; the server refuses a login
+       whose hash differs.
 
-       The library is in it because its types are on the wire (a collider's ShapeSpec, TileKey) and the
-       client predicts movement with the server's geometry (docs/SOUND_LIBRARY_BOUNDARY.md, 15.3). -->
+       The library is in it because its types are on the wire and the server and the client run the same
+       models: a collider's ShapeSpec and TileKey (Geometry), and the client predicts movement with the
+       server's geometry (docs/SOUND_LIBRARY_BOUNDARY.md, 15.3); TransientSound, WheelState, PlaybackMode,
+       WeatherType, Precipitation, WindAir, LightningStrike, RoadWater and the rest of what the server
+       sends of the weather and the vehicles (Sound), and the materials and walls both sides hear through
+       (Acoustics). All of Acoustics and Sound came from this project in stage 3 and were in the hash
+       already. Not Sound's Core/: the synthesis came from OpenFPS.Client.Core, only the client runs it,
+       and it was never in the hash. -->
   <ItemGroup>
     <WireLibrarySource Include="..\OpenFPS.Geometry\**\*.cs" />
+    <WireLibrarySource Include="..\OpenFPS.Acoustics\**\*.cs" />
+    <WireLibrarySource Include="..\OpenFPS.Sound\**\*.cs" Exclude="..\OpenFPS.Sound\Core\**" />
   </ItemGroup>
-  <UsingTask TaskName="HashWireContract" TaskFactory="RoslynCodeTaskFactory"
-             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
-    <ParameterGroup>
-      <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
-      <Root ParameterType="System.String" Required="true" />
-      <Hash ParameterType="System.String" Output="true" />
-    </ParameterGroup>
-    <Task>
-      <Using Namespace="System.IO" />
-      <Using Namespace="System.Linq" />
-      <Using Namespace="System.Text" />
-      <Using Namespace="System.Security.Cryptography" />
-      <Code Type="Fragment" Language="cs"><![CDATA[
-        var root = Path.GetFullPath(Root).TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
-        var paths = Files.Select(f => Path.GetFullPath(f.ItemSpec))
-                         // Only sources under the root: the SDK's generated files live in each build's
-                         // output folder and would make two builds of the same code disagree.
-                         .Where(p => p.StartsWith(root))
-                         .Select(p => new { Full = p, Rel = p.Substring(root.Length).Replace('\\', '/') })
-                         .Where(p => !p.Rel.Split('/').Any(s => s == "obj" || s == "bin"))
-                         .OrderBy(p => p.Rel, System.StringComparer.Ordinal);
-        using (var sha = SHA256.Create())
-        {
-            var all = new StringBuilder();
-            foreach (var p in paths)
-                all.Append(p.Rel).Append('\n').Append(File.ReadAllText(p.Full).Replace("\r\n", "\n")).Append('\n');
-            byte[] h = sha.ComputeHash(Encoding.UTF8.GetBytes(all.ToString()));
-            Hash = string.Concat(h.Take(6).Select(b => b.ToString("x2")));
-        }
-      ]]></Code>
-    </Task>
-  </UsingTask>
+  <Import Project="..\tools\build\SourceHash.targets" />
 
   <!-- The project file is an input too: otherwise a change to how the hash is made leaves an old build
        folder with the old answer, and it refuses a fresh one. -->
   <Target Name="GenerateWireContract" BeforeTargets="CoreCompile" Inputs="@(Compile);@(WireLibrarySource);$(MSBuildProjectFullPath)"
           Outputs="$(IntermediateOutputPath)WireContract.g.cs">
-    <HashWireContract Files="@(Compile);@(WireLibrarySource)" Root="$(MSBuildProjectDirectory)\..">
+    <HashSources Files="@(Compile);@(WireLibrarySource)" Root="$(MSBuildProjectDirectory)\..">
       <Output TaskParameter="Hash" PropertyName="WireContractHash" />
-    </HashWireContract>
+    </HashSources>
     <WriteLinesToFile File="$(IntermediateOutputPath)WireContract.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
                       Lines="namespace OpenFPS.Common%3B;/// &lt;summary&gt;A hash of this project's sources and its library's: client and server must match it to talk.&lt;/summary&gt;;public static class WireContract { public const string Hash = &quot;$(WireContractHash)&quot;%3B }" />
   </Target>
@@ -89,27 +72,6 @@
     </ItemGroup>
   </Target>
 
-  <!-- ── THE DOOR MODELS' FINGERPRINT ─────────────────────────────────────────────────────────────
-       Names the client's door render cache (DoorRenderCache). Named by WireContract.Hash, every change
-       to this project rendered it all again (Cody, 2026-10-06: "generate them once and keep them"), so
-       this hashes only the sources a door render is made from. A new model file, or one a model starts
-       using, belongs in this list; DoorRenderCache.Version is the manual lever for anything else. -->
-  <ItemGroup>
-    <DoorModelSource Include="KnobDoor.cs;PushBarDoor.cs;SlidingDoor.cs;GlassDoor.cs;LockCylinder.cs;ElevatorDoor.cs;CarWindow.cs;GlassFracture.cs;DoorPhysics.cs;Doors.cs;Glass.cs;AcousticRegistry.cs;VehicleCabin.cs;VehicleBody.cs" />
-  </ItemGroup>
-  <Target Name="GenerateDoorModelFingerprint" BeforeTargets="CoreCompile" Inputs="@(DoorModelSource);$(MSBuildProjectFullPath)"
-          Outputs="$(IntermediateOutputPath)DoorModelFingerprint.g.cs">
-    <HashWireContract Files="@(DoorModelSource)" Root="$(MSBuildProjectDirectory)">
-      <Output TaskParameter="Hash" PropertyName="DoorModelHash" />
-    </HashWireContract>
-    <WriteLinesToFile File="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
-                      Lines="namespace OpenFPS.Common%3B;/// &lt;summary&gt;A hash of the sources a door model render is made from (OpenFPS.Common.csproj, DoorModelSource).&lt;/summary&gt;;public static class DoorModelFingerprint { public const string Hash = &quot;$(DoorModelHash)&quot;%3B }" />
-  </Target>
-  <Target Name="IncludeDoorModelFingerprint" BeforeTargets="CoreCompile" AfterTargets="GenerateDoorModelFingerprint">
-    <ItemGroup>
-      <Compile Include="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" />
-      <FileWrites Include="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" />
-    </ItemGroup>
-  </Target>
+  <!-- The door models' fingerprint (DoorModelFingerprint) moved with the door models to OpenFPS.Sound. -->
 
 </Project>
