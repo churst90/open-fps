@@ -77,7 +77,8 @@ public class EditorShapeBuildTests : IDisposable
         Assert.Equal(0.5f, c.Form!.Top);
         Assert.Equal("Wood", rig.World("mine").Get<MaterialComponent>(rig.Thing(rig.Selected)).Material);
 
-        Assert.StartsWith("Placed: ball, 0.5 metres across", rig.Run("edit", "build", "ball", "0.5"));
+        // /edit place takes a shape said as a phrase too.
+        Assert.StartsWith("Placed: ball, 0.5 metres across", rig.Run("edit", "place", "ball", "0.5"));
         Near(new Vector3(0.5f), Collider(rig, rig.Selected).Size);
 
         Assert.StartsWith("Placed: ramp, 1.5 wide, rising 0.5 metres over 6 metres", rig.Run("edit", "build", "ramp", "1.5", "by", "6", "by", "0.5"));

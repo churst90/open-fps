@@ -47,6 +47,8 @@ public sealed partial class WorldEditor
             PlaceGroup(s, args[1], reply);
             return;
         }
+        // A shape said as a phrase is built as the quick build builds it: /edit place column 0.3 by 3.
+        if (TryShapePhrase(args, out _, out _)) { BuildCommand(s, args, reply); return; }
         bool atCursor = args.Length >= 3 && args[^2].Equals("at", StringComparison.OrdinalIgnoreCase) && args[^1].Equals("cursor", StringComparison.OrdinalIgnoreCase);
         if (atCursor) args = args[..^2];
         // "vehicle v8_muscle" as typed is "vehicle:v8_muscle", as the menus send it.
