@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Struck things (docs/MATTER.md 7.5, step 2 of its order of work). A thing's tap, knock or bump is now made
+  from its own material, shape and size by modal synthesis: bars, plates (with wood's grain), free sheets,
+  tubes, sheet boxes and solid blocks (Rayleigh-Ritz), each mode's frequency, loss and radiation from the
+  material table, struck by a fingertip, a knuckle (fitted to the door-knock recording, 2.7 dB), a palm, a
+  boot's toe, a body or a steel rod through Hertz contacts. Walking or running into something is a palm,
+  a toe and a shoulder striking it: a stud wall's board over its cavity, a glass door loose in its latch,
+  a fence pale on its bolt, a car's panels. The level is anchored to the footstep takes. Shift+E with no
+  door in reach knocks on whatever is in front of you; /tap taps it with a fingertip. Rendered once per
+  key on a worker. `--struck` (renders, fit, anchor). Unheard: renders in inbox/struck-things-2026-10-10.
+  StruckThingsTests.
 - The material table (docs/MATTER.md 2.4, step 1 of its order of work). AcousticRegistry has 50 materials:
   26 new ones in families (aluminium, stainless steel, cast iron, copper, brass, bronze, lead, titanium;
   granite, sandstone, laminated glass; oak, pine, maple, plywood, MDF with their grain; PVC, acrylic,

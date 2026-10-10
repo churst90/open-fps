@@ -221,10 +221,11 @@ public class WallBumpAndNarrationTests
         Assert.Empty(drop.Bumps);
     }
 
-    /// <summary>The knock is the impact model's: a body against plasterboard, placed on the wall at
-    /// about shoulder height, and no louder than a firm footstep's neighbourhood.</summary>
+    /// <summary>The bump is a body striking the wall (StruckThings, docs/MATTER.md 7.3): placed on the wall at about
+    /// shoulder height, the wall's own plasterboard as the struck thing, and a glancing blow is a slower, quieter
+    /// one.</summary>
     [Fact]
-    public void TheKnockIsABodyAgainstTheWall()
+    public void TheBumpIsABodyStrikingTheWall()
     {
         var panel = WallAlongX(10, 3f, -1f, 1, "Partition Wall").Single();
         var c = new BodyContact(10, new Vector3(0, 0, -1), PhysicsConstants.WalkSpeed, PhysicsConstants.WalkSpeed, new Vector3(0, 0, 2.63f));
@@ -232,13 +233,22 @@ public class WallBumpAndNarrationTests
         Assert.InRange(where.Z, 2.9f, 2.95f);
         Assert.InRange(where.Y, 1.2f, 1.5f);
         var sounds = WallBumps.Sound(panel, c, where, running: false);
-        Assert.NotEmpty(sounds);
-        _o.WriteLine(string.Join("; ", sounds.Select(s => $"{s.Character} {s.Hz:F0} Hz {s.LevelDb:F1} dB {s.DecaySeconds:F2} s")));
-        Assert.Equal(SoundCharacter.Knock, sounds[0].Character);
-        Assert.InRange(sounds[0].LevelDb, 65f, 85f);
-        // A glancing blow is softer than a square one.
+        var bump = Assert.Single(sounds);
+        Assert.Equal(SoundCharacter.Knock, bump.Character);
+        Assert.True(StruckThings.TryParseKey(bump.SynthKey, out var strike), bump.SynthKey);
+        _o.WriteLine(bump.SynthKey);
+        Assert.Equal("Plaster", strike.Thing.Material);
+        Assert.Equal(3, strike.Blows.Count);
+        Assert.Contains(strike.Blows, b => b.Striker.Name == "palm");
+        Assert.Contains(strike.Blows, b => b.Striker.Name == "body");
+        // A glancing blow is a slower one, and quieter as rendered.
         var glancing = WallBumps.Sound(panel, c with { IntoSpeed = PhysicsConstants.WalkSpeed * 0.5f }, where, running: false);
-        Assert.True(glancing[0].LevelDb < sounds[0].LevelDb);
+        Assert.True(StruckThings.TryParseKey(glancing[0].SynthKey, out var soft));
+        Assert.True(soft.Blows[0].Speed < strike.Blows[0].Speed);
+        StruckThings.Render(strike, 48000, out float square);
+        StruckThings.Render(soft, 48000, out float glance);
+        _o.WriteLine($"square {square:F1} dB, glancing {glance:F1} dB");
+        Assert.True(glance < square);
     }
 
     // ── Bumping into somebody ───────────────────────────────────────────────────────────────────

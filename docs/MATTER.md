@@ -363,6 +363,57 @@ Complex ones (a wall struck by a body, wood with its grain, a whole door) need c
 recordings used as the spec, never played: the footstep and door work showed how many rounds that can take
 (memory: synthesis failures; doors need detail and level). Band balance is measured before anything is played.
 
+### 7.5 What was built (2026-10-10, unheard)
+
+`OpenFPS.Common/StruckModes.cs` (the modes) and `StruckThings.cs` (strikers, contacts, rendering, keys).
+
+- Shapes. A bar (Euler-Bernoulli, free-free or pinned, with Rayleigh-Timoshenko's correction, and twisting
+  when struck off its centre line); a plate held at its edges (Huber's orthotropic plate, so wood's grain
+  counts; each mode's radiation from Rayleigh's integral towards the listener, so the modes add coherently
+  as the approved doors' do); a free sheet (Warburton); a tube (beam modes and the wall's ring modes); a
+  closed sheet box (its face over the air inside); a solid block by Rayleigh-Ritz on Legendre polynomials,
+  split by its eight symmetry classes, solved once per aspect and Poisson's ratio (about 150 ms) and kept.
+  Checked: a slender bar is within 2 % of Euler-Bernoulli with the 1 : 2.76 : 5.40 pattern; a plate's
+  fundamental to 0.5 %; a free square's twist within 5 % of Leissa; a long Ritz block within 4 % of the
+  bar; order 8 against 10 within 1 %. Every note scales as sqrt(E / rho) over the size: a cube five times
+  bigger is five times lower, steel and aluminium alike, lead a quarter.
+- Losses. The material's loss at each mode's frequency (2.4), the radiation the mode sends out, and the
+  holding: hung (almost nothing), resting on the ground, in a hand, or built in (EN 12354-1's edge coupling
+  or the mounting loss; a pane in gaskets takes GlassDoor's measured 0.02 + 3/f).
+- Above a panel's 60th mode a dense field (DoorPhysics.DenseField) carries its modes, through a port tuned
+  an octave under it; there, below coincidence, the point-driven plate's own law (rho0 F / 2 pi m'') stands
+  in for the near field round the blow: the todo's "radiation efficiency below a panel's critical
+  frequency".
+- Strikers: fingertip, knuckle, palm, the toe of a boot, a body (the measured shoulder-check spring), a
+  steel rod, and a heel for the anchor. Hertz contacts from both moduli and the striker's radius, a loss by
+  restitution (Flores), denting where a hard striker passes the struck thing's hardness, and a pad over a
+  core: a knuckle is a millimetre of skin over bone, and the bone through the skin is the knock's crack.
+  The knuckle's mass, skin and pad are fitted to the "Heavy Door Knocks" recording: 2.7 dB rms of band
+  shape from 125 Hz to 16 kHz, held by StruckThingsTests.
+- What else sounds: each striker's own stop and a free thing's own motion (acceleration noise, cancelled
+  by its image near a surface), what a resting thing pushes into the ground (resting on three asperity
+  contacts, so a cube bounces on the floor), and a loose fit (a door's latch play, a pale's bolt, a part
+  in a car's door): a gap with mounted stops at each end, which rattles.
+- Level. Pressure at a metre in pascals, from the physics, then one anchor for every strike: the model's
+  heel on a 150 mm slab is moved to where the footstep bank plays a step on concrete (A-weighted, loudest
+  20 ms, the takes measured: median -22.0 dBFS). The anchor is -15.8 dB.
+- Cost. Rendered once per key on a worker (like the door models), never in a mixer callback: a few dozen to
+  a hundred modes stepped exactly, at four times the mixer's rate only while anything touches. A cube or
+  a bar 30 to 120 ms, a sheet or a bump into a panel 250 to 600 ms. A first hearing may wait up to 0.4 s
+  for its render, as glass does; then the buffer is cached by its key.
+- In the game. A bump (WallBumps) is now a body strike on what you walked into, as StruckThings.Describe
+  reads its box: a stud wall's board between its studs over its cavity, a glass door loose in its latch,
+  a fence's pale on its bolt, a vehicle's body panels, any thin box a plate, anything long a bar, anything
+  else a block. Bumping a person is still the old impact of two bodies. Shift+E (/knock) with no door in
+  reach knocks three times on the solid thing in front of you; /tap taps twice with a fingertip. A door
+  keeps its own knock.
+- Instruments: `--struck` (one strike, its modes and bands; `parts` shows each part alone), `--struck
+  fit`, `--struck anchor`, `--struck renders`, `--materials`. Renders in inbox/struck-things-2026-10-10.
+
+Open: the plaster wall bump is 10 to 15 dB short at 125 Hz to 1 kHz against a recorded body slam; the
+car's rattle is busier than recorded ones; joined parts (section 8) are not modelled yet; a thing's support
+when struck in the game is from its box only (resting or built), not what it stands on.
+
 ## 8. Things built from parts
 
 - A built thing is parts, each with its material and shape, joined.
