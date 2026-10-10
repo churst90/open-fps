@@ -219,6 +219,23 @@ public class GeometryShapeLibraryTests
         }
         _o.WriteLine($"{made} of {tried} star outlines made a roof");
         Assert.True(made >= tried * 0.98, $"{made} of {tried}");
+
+        // Traced footprints are a hair off square: rectangles and L's with their corners moved by a hundredth of a
+        // millimetre to two centimetres, whose ridges kink by micrometres. Every one is a closed roof.
+        int squareish = 0;
+        for (int i = 0; i < 400; i++)
+        {
+            double j = Math.Pow(10, -5 + 3.3 * rng.NextDouble());
+            var basis = i % 2 == 0 ? new[] { (0.0, 0.0), (16.2, 0.0), (16.2, 8.5), (0.0, 8.5) }
+                                   : new[] { (0.0, 0.0), (12.0, 0.0), (12.0, 4.0), (6.0, 4.0), (6.0, 8.0), (0.0, 8.0) };
+            var outline = basis.SelectMany(p => new[] { (float)(p.Item1 + j * (rng.NextDouble() * 2 - 1)), (float)(p.Item2 + j * (rng.NextDouble() * 2 - 1)) }).ToArray();
+            var spec = new ShapeSpec { Kind = ShapeKind.Roof, Style = i % 4 < 2 ? RoofStyle.Hip : RoofStyle.Gable, Outline = outline };
+            var mesh = Shapes.Make(spec, new Vector3(16, 4, 8.5f))!;
+            var report = MeshCheck.Check(mesh.Outer);
+            Assert.True(report.Closed && report.Degenerate == 0, $"near-square {i} (moved {j:E1} m): {report}");
+            if (mesh.Outer.Facets.Items.Length > 2) squareish++;
+        }
+        Assert.Equal(400, squareish);
     }
 
     [Fact]

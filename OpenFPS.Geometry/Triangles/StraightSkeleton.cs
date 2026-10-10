@@ -171,13 +171,16 @@ public static class StraightSkeleton
         }
         if (!done) return null;
 
-        // Nodes in the same place are one (simultaneous events made several).
+        // Nodes in the same place are one (simultaneous events made several, and a footprint a hair off square makes
+        // a ridge kinked by micrometres): within a millimetre, or a millionth of the outline's size if that is more,
+        // so no two nodes become one float vertex or a sliver between them.
+        double merge = Math.Max(1e-6, 1e-3 / scale);
         var canon = new int[nodes.Count];
         for (int i = 0; i < nodes.Count; i++)
         {
             canon[i] = i;
             for (int j = 0; j < i; j++)
-                if (canon[j] == j && (nodes[i] - nodes[j]).Length < 1e-8 && Math.Abs(times[i] - times[j]) < 1e-8) { canon[i] = j; break; }
+                if (canon[j] == j && (nodes[i] - nodes[j]).Length < merge && Math.Abs(times[i] - times[j]) < merge) { canon[i] = j; break; }
         }
 
         var faces = new List<List<int>>(n);
