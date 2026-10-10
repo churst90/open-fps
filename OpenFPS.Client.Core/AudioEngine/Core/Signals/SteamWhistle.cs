@@ -39,7 +39,7 @@ public sealed class SteamWhistle
     public float Out { get; private set; }
     public float SoundSpeed => MathF.Sqrt(1.33f * 461.5f * MathF.Max(280f, _kelvin));
 
-    public SteamWhistle(WhistleSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 23)
+    public SteamWhistle(WhistleSpec spec, float rate = RenderRate.Default, int seed = 23)
     {
         _spec = spec; _rate = rate; _rng = new Random(seed); _wobbleStep = At44k.Step(0.0009f, rate);
         _kelvin = IdleKelvin;

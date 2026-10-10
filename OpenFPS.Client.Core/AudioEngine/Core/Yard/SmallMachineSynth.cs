@@ -96,7 +96,7 @@ public sealed class SmallMachineSynth
     private int _slowTick;
     private const int SlowEvery = 64;
 
-    public SmallMachineSynth(SmallMachineSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 17)
+    public SmallMachineSynth(SmallMachineSpec spec, float rate = RenderRate.Default, int seed = 17)
     {
         Spec = spec;
         _rate = rate;

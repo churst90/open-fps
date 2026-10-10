@@ -37,7 +37,7 @@ public sealed class ChimeHorn
     /// <summary>Output, pascals at one metre on the horn's axis, valid after Step().</summary>
     public float Out { get; private set; }
 
-    public ChimeHorn(ChimeHornSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
+    public ChimeHorn(ChimeHornSpec spec, float rate = RenderRate.Default, int seed = 11)
     {
         _spec = spec; _rate = rate;
         _bells = new Bell[spec.Bells.Length];

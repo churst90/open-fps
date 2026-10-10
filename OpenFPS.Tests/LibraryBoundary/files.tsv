@@ -52,6 +52,7 @@ OpenFPS.Client.Core/AudioEngine/Core/Rail/RailNoise.cs	lib	Sound
 OpenFPS.Client.Core/AudioEngine/Core/Rail/SteamFrontEnd.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Rail/TrainSynth.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Rail/TrainVoicing.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/RenderRate.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/ReportMeasure.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/ChimeHorn.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/ElectricHorn.cs	lib	Sound	

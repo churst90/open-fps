@@ -42,7 +42,7 @@ public sealed class ElectricHorn
     /// <summary>Output, pascals at one metre on the horn's axis, valid after Step().</summary>
     public float Out { get; private set; }
 
-    public ElectricHorn(ElectricHornSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
+    public ElectricHorn(ElectricHornSpec spec, float rate = RenderRate.Default, int seed = 11)
     {
         if (spec.Units == null || spec.Units.Length == 0) throw new ArgumentException("An electric horn needs at least one unit.", nameof(spec));
         _spec = spec; _rate = rate; _seed = seed;

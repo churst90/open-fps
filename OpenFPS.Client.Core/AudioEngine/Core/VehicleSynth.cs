@@ -46,7 +46,7 @@ public sealed class VehicleRender
 public static class VehicleSynth
 {
     /// <summary>The bench's rate: the rate the game mixes at, so a bench render is what the live voice makes.</summary>
-    public const int SampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+    public const int SampleRate = RenderRate.Default;
 
     /// <summary>Renders a whole drive. Deterministic given the seed.</summary>
     /// <param name="v">The vehicle.</param>

@@ -132,7 +132,7 @@ public static class Footsteps
     // AudioLab --footsteps. Its renders measured about 20 dB too bright against real steps (session 10,
     // "gravel sounds like walking on broken glass"): docs/FOOTSTEP_SYNTHESIS_RESEARCH.md, "Session 10".
 
-    public const int SampleRate = 48000;   // the rate the game mixes at (MixerQuality.DefaultRate)
+    public const int SampleRate = 48000;   // the rate the game mixes at (RenderRate.Default)
 
     /// <summary>
     /// The fraction of a walker's mass moving downward when the heel lands: the leg and the share of

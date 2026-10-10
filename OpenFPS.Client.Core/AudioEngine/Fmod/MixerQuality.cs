@@ -38,11 +38,10 @@ public static class MixerQuality
     };
 
     /// <summary>
-    /// 48 kHz: the sound servers, almost every device, the one-shots, door renders, speech and voice chat
-    /// all run at it, so nothing is resampled on the way in or out. OPENFPS_MIXER_RATE (22050-192000)
-    /// asks for another, for an A/B.
+    /// The rate the synthesised sources render at by default (<see cref="Core.RenderRate.Default"/>, 48 kHz).
+    /// OPENFPS_MIXER_RATE (22050-192000) asks for another, for an A/B.
     /// </summary>
-    public const int DefaultRate = 48000;
+    public const int DefaultRate = Core.RenderRate.Default;
 
     /// <summary>What FmodAudioProvider asks FMOD for (setSoftwareFormat). See <see cref="DefaultRate"/>.</summary>
     public static int RequestedRate

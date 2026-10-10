@@ -35,7 +35,7 @@ public sealed class ElectronicSiren
     private bool _hiHalf;
     private float _hp1, _hp2, _lp1, _lp2, _hpA, _lpA;
 
-    public ElectronicSiren(SirenSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate) : this(spec, rate, measuring: false) { }
+    public ElectronicSiren(SirenSpec spec, float rate = RenderRate.Default) : this(spec, rate, measuring: false) { }
 
     private ElectronicSiren(SirenSpec spec, float rate, bool measuring)
     {

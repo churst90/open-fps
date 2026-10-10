@@ -47,7 +47,7 @@ public sealed class StruckBell
     /// <summary>Output, pascals at one metre, valid after Step().</summary>
     public float Out { get; private set; }
 
-    public StruckBell(StruckBellSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 31)
+    public StruckBell(StruckBellSpec spec, float rate = RenderRate.Default, int seed = 31)
     {
         _spec = spec; _rate = rate; _rng = new Random(seed);
         float a = 0.5f * spec.DiameterMetres, h = spec.ThicknessMetres;

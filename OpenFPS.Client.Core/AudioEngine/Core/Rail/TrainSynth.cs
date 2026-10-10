@@ -80,7 +80,7 @@ public sealed class TrainSynth
 
     public IReadOnlyList<Source> Sources => _sources;
 
-    public TrainSynth(TrainProfile p, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 41, double headAt = 0)
+    public TrainSynth(TrainProfile p, float rate = RenderRate.Default, int seed = 41, double headAt = 0)
     {
         Profile = p; _rate = rate; _dt = 1f / rate;
         HeadMetres = headAt;

@@ -181,7 +181,7 @@ public sealed class AirSystem
         _compressorAtFront = compressorAtFront;
     }
 
-    public AirSystem(AirSystemSpec s, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 61)
+    public AirSystem(AirSystemSpec s, float rate = RenderRate.Default, int seed = 61)
     {
         _s = s; _dt = 1f / rate; _rng = new Random(seed); _knockDecay = At44k.Decay(0.994f, rate);
         _reservoir = s.CutOutKPa;

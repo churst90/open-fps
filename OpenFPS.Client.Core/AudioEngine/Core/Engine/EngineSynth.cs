@@ -252,7 +252,7 @@ public sealed partial class EngineSynth
         public float PressurePrev;
     }
 
-    public EngineSynth(EngineProfile e, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
+    public EngineSynth(EngineProfile e, float rate = RenderRate.Default, int seed = 11)
     {
         Profile = e;
         _rate = rate;
