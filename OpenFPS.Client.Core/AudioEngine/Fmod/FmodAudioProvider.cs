@@ -1410,8 +1410,12 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Which traced stages are running (not bypassed) right now.</summary>
     private readonly Dictionary<int, bool> _tracedRunning = new();
 
+    /// <summary>The places traced for this mixer's world, on the acoustic worker's Steam Audio context
+    /// (the worker is handed this set and configures it once its scene is built).</summary>
+    internal TracedReverbSet Traced { get; } = new();
+
     /// <summary>Whether there is a trace to play yet (the scene is built after the map loads).</summary>
-    internal static bool TracedActive => TracedReverbSet.Listener != null;
+    internal bool TracedActive => Traced.Listener != null;
 
     // Traced echoes: the loudest few sustained sources are traced from where they are (TracedEchoes),
     // because mirror images of a moving source jump from facade to facade. Each rig is a capture at
@@ -1612,6 +1616,7 @@ public partial class FmodAudioProvider : IAudioProvider
         rig.NeedsReset = true;
         rig.LastInputGain = -1f;
         rig.Fresh = false;
+        rig.Echoes = echoes;
         rig.Slot = slot;
         a.EchoRig = rig;
     }
@@ -1630,7 +1635,7 @@ public partial class FmodAudioProvider : IAudioProvider
             a.Channel.removeDSP(rig.MixDsp);
             a.Channel.removeDSP(rig.CaptureDsp);
         }
-        TracedReverbSet.Echoes?.Release(slot);
+        Traced.Echoes?.Release(slot);
     }
 
     // Each source's own late sound (LateField).
@@ -1653,7 +1658,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// </summary>
     private void UpdateLateField()
     {
-        var lf = TracedReverbSet.LateField;
+        var lf = Traced.LateField;
         if (lf == null || !TracedActive || !_steamAudioEnabled) { _lateLawK = float.NaN; _tailBias = Vector3.Zero; return; }
         _lateCandidates.Clear();
         foreach (var a in _activeSounds)
@@ -1705,11 +1710,11 @@ public partial class FmodAudioProvider : IAudioProvider
         _lateLawKNow = _lateLawK; _tailLeanNow = _tailBias.Length();
     }
 
-    private static volatile float _lateLawKNow = float.NaN, _tailLeanNow;
+    private volatile float _lateLawKNow = float.NaN, _tailLeanNow;
 
-    private static string LateFieldStatus()
+    private string LateFieldStatus()
     {
-        var lf = TracedReverbSet.LateField;
+        var lf = Traced.LateField;
         if (lf == null) return "No per-source late trace yet.";
         float k = _lateLawKNow;
         string law = float.IsNaN(k) ? "no law fitted yet" : $"the place's tail falls as distance to the -{k:F1}";
@@ -1724,7 +1729,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// </summary>
     private float LateSend(ActiveSound a, float d)
     {
-        var lf = TracedReverbSet.LateField;
+        var lf = Traced.LateField;
         if (lf != null && lf.TryGet(a.EntityId, out var ans)
             && ans.When >= DateTime.UtcNow.Ticks - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond)
             && float.IsFinite(ans.Ratio))
@@ -1736,7 +1741,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private void UpdateTracedEchoes()
     {
-        var echoes = TracedReverbSet.Echoes;
+        var echoes = Traced.Echoes;
         if (echoes == null || !TracedEchoesOn || !TracedActive || !_steamAudioEnabled)
         {
             foreach (var a in _activeSounds) if (a.EchoRig != null) DetachEchoRig(a);
@@ -1851,9 +1856,9 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    public static string TracedEchoesStatus()
+    public string TracedEchoesStatus()
     {
-        var e = TracedReverbSet.Echoes;
+        var e = Traced.Echoes;
         string mode = TracedEchoesOn ? "on" : "off";
         if (e == null) return $"Echoes {mode}. No tracer yet — the scene is still being built.";
         return $"Echoes {mode}, {TailDb:F0} dB against physical (the tail level). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
@@ -1897,10 +1902,10 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>For the /reverb readout: how the tracing is doing and the two trims.</summary>
-    public static string TracedReverbStatus()
+    public string TracedReverbStatus()
     {
-        if (TracedReverbSet.Listener == null) return "No trace yet — the scene is still being built.";
-        var (rooms, runs, ms) = TracedReverbSet.Stats();
+        if (Traced.Listener == null) return "No trace yet — the scene is still being built.";
+        var (rooms, runs, ms) = Traced.Stats();
         return $"Traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Tail {TailDb:F0} dB, copies {CopiesDb:F0} dB. {LateFieldStatus()}";
     }
 
@@ -1958,7 +1963,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// as, and runs only the audible ones. Audio update thread.</summary>
     private void UpdateTracedStages()
     {
-        var listenerTrace = TracedReverbSet.Listener;
+        var listenerTrace = Traced.Listener;
         if (listenerTrace == null || !_steamAudioEnabled || _saContext == IntPtr.Zero) return;
         foreach (var kv in _reverbDsps)
         {
@@ -1969,20 +1974,20 @@ public partial class FmodAudioProvider : IAudioProvider
 
         // The room you are in: yours (the cabin's, riding in one). Any other room: its own, from its
         // middle. Open ground elsewhere: yours too, the open air having no middle to trace.
-        var cabin = TracedReverbSet.Cabin;
+        var cabin = Traced.Cabin;
         foreach (var kv in _traced)
         {
             TracedReverb? trace = kv.Key == _listenerRegionId && cabin != null ? cabin : listenerTrace;
             if (kv.Key != _listenerRegionId && IsEnclosure(kv.Key) && _acousticMap != null
                 && _acousticMap.RegionPositions.TryGetValue(kv.Key, out var centre)
                 && _reverbVolumes.TryGetValue(kv.Key, out float vol) && vol > 0.001f)
-                trace = TracedReverbSet.ForRoom(kv.Key, centre) ?? listenerTrace;
+                trace = Traced.ForRoom(kv.Key, centre) ?? listenerTrace;
             // Open ground heard from indoors: traced from just outside the opening it comes in by.
             // Traced at the listener it was the street with the lobby's echoes in it.
             else if (kv.Key != _listenerRegionId && !IsEnclosure(kv.Key) && IsEnclosure(_listenerRegionId)
                      && _fieldHere.TryGetValue(kv.Key, out var field) && field.Region == _listenerRegionId && field.Gain > 0f
                      && _reverbVolumes.TryGetValue(kv.Key, out float openVol) && openVol > 0.001f)
-                trace = TracedReverbSet.ForRoom(kv.Key, field.InField) ?? listenerTrace;
+                trace = Traced.ForRoom(kv.Key, field.InField) ?? listenerTrace;
             kv.Value.State.Trace = trace;
             // Your own place plays the late tail alone, its early part being placed copies
             // (WorldAudioPlayer.QueueEarlyEchoes). A cabin keeps its whole response: nothing is placed

@@ -24,15 +24,15 @@ internal static class TracedBinaural
     /// <summary>Both traces measured where they stand now, after they have run on the scene in use.
     /// <paramref name="ask"/> asks the worker something with the ear where it is given: the worker moves
     /// the listener's trace to the ear of what it is asked.</summary>
-    public static void Report(Vector3 ear, Vector3 source, Action<Vector3> ask, string indent = "      ")
+    public static void Report(TracedReverbSet traced, Vector3 ear, Vector3 source, Action<Vector3> ask, string indent = "      ")
     {
         // Steam Audio keeps averaging a trace while listener, source and scene version stand still, and
         // every whole scene is version 1: a millimetre's move restarts both traces on the scene in use.
         // Twice: the first traces after a whole-scene swap sometimes still gave the old room (2026-10-06).
         var until = DateTime.UtcNow.AddSeconds(30);
-        while (TracedReverbSet.Reconfiguring && DateTime.UtcNow < until) Thread.Sleep(20);
-        var listener = TracedReverbSet.Listener;
-        var echoes = TracedReverbSet.Echoes;
+        while (traced.Reconfiguring && DateTime.UtcNow < until) Thread.Sleep(20);
+        var listener = traced.Listener;
+        var echoes = traced.Echoes;
         if (listener == null) { Console.WriteLine($"{indent}traced reverb: none (no listener trace)"); return; }
         listener.EnsureReader(1);
         int slot = -1;
@@ -42,7 +42,7 @@ internal static class TracedBinaural
             var at = ear + new Vector3(d, 0f, 0f);
             var src = source + new Vector3(0f, 0f, d);
             ask(at);
-            TracedReverbSet.SetListener(at);
+            traced.SetListener(at);
             if (echoes != null)
             {
                 slot = _slot >= 0 ? _slot : (_slot = echoes.Acquire(src));

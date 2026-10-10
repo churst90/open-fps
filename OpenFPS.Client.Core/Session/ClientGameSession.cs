@@ -425,10 +425,10 @@ public sealed partial class ClientGameSession : IDisposable
     /// /reverb: how the trace is doing. The tail is the place's own impulse response traced through
     /// the map, everywhere; there is no other mode to switch to.
     /// </summary>
-    internal static string ReverbCommand(string[] args)
+    internal string ReverbCommand(string[] args)
     {
         if (args.Length > 0) return "Traced everywhere now; there is no room mode. /reflections sets the level.";
-        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus();
+        return _audioEngine.TracedReverbStatus();
     }
 
     /// <summary>
@@ -1714,7 +1714,7 @@ public sealed partial class ClientGameSession : IDisposable
                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
                 }
                 else if (a != null) { Say("Say /echoes on or /echoes off; /tail sets the level."); return; }
-                Say(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesStatus());
+                Say(_audioEngine.TracedEchoesStatus());
                 return;
             }
             // Reflections against the direct sound, in two kinds (FmodAudioProvider.TailDb): /tail for

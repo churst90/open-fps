@@ -492,12 +492,12 @@ public static class ProbableBugsSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var saScene = new SteamAudioScene(ctx);
         saScene.Build(boxes);
-        TracedReverbSet.Configure(ctx, saScene);
-        TracedReverbSet.SetListener(ear);
+        var provider = new FmodAudioProvider();
+        provider.Traced.Configure(ctx, saScene);
+        provider.Traced.SetListener(ear);
 
         string wav = Path.Combine(outDir, $"capture-{room}{(stereoVoice ? "-stereo" : "")}.wav");
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
-        var provider = new FmodAudioProvider();
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         var placed = Loudness.Place(92f);
         try
@@ -601,10 +601,10 @@ public static class ProbableBugsSpike
             }
             var meter = provider.TracedMeter(RoomId);
             Console.WriteLine($"  the room's bus carried {meter.Channels} channel(s) into the traced stage");
-            Console.WriteLine($"  {region.FriendlyName}: listener trace {(TracedReverbSet.Listener != null ? "ready" : "MISSING")}, "
+            Console.WriteLine($"  {region.FriendlyName}: listener trace {(provider.Traced.Listener != null ? "ready" : "MISSING")}, "
                             + $"tail {FmodAudioProvider.TailDb:F0} dB, copies {FmodAudioProvider.CopiesDb:F0} dB, {plan.Count} planned copies");
         }
-        finally { provider.Dispose(); TracedReverbSet.Dispose(); saScene.Dispose(); Phonon.iplContextRelease(ref ctx); }
+        finally { provider.Dispose(); provider.Traced.Release(); saScene.Dispose(); Phonon.iplContextRelease(ref ctx); }
         Console.WriteLine($"Wrote {wav}");
         return 0;
     }

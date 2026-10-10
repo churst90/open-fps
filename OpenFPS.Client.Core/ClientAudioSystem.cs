@@ -400,7 +400,7 @@ public partial class ClientAudioSystem
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
-        _acousticWorker = new AsyncAcousticWorker(_acoustics) { Manual = manualAcoustics };
+        _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced) { Manual = manualAcoustics };
         WorldAudio.Worker = _acousticWorker;
         _acousticWorker.Start();
     }
@@ -553,7 +553,7 @@ public partial class ClientAudioSystem
                 preset = rideSound[7..];
                 local = Vector3.Transform(visualEyePos - ride.Transform.Position, Quaternion.Inverse(ride.Transform.Rotation));
             }
-            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.RideIn(preset, local);
+            _acousticWorker.Traced.RideIn(preset, local);
         }
         _groundWorld = world;
 

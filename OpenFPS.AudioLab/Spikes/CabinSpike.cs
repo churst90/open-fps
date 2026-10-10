@@ -211,9 +211,9 @@ public static class CabinSpike
             new(new Vector3(0f, 7.5f, FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
             new(new Vector3(0f, 7.5f, -FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
         });
-        TracedReverbSet.Configure(ctx, scene);
-
         var provider = new FmodAudioProvider();
+        provider.Traced.Configure(ctx, scene);
+
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -271,7 +271,7 @@ public static class CabinSpike
             Pump(seconds);
             segments.Add(new Segment(name, start, seconds, note));
             Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  {note}");
-            Console.WriteLine($"           cabin trace {(TracedReverbSet.Cabin != null ? "ready" : "none")}, listener trace {(TracedReverbSet.Listener != null ? "ready" : "none")}, HRTF voices free {provider.SpatialVoicesFree}, "
+            Console.WriteLine($"           cabin trace {(provider.Traced.Cabin != null ? "ready" : "none")}, listener trace {(provider.Traced.Listener != null ? "ready" : "none")}, HRTF voices free {provider.SpatialVoicesFree}, "
                               + $"cabin tap blocks in line {EngineTapState.AlignedBlocks} / on their own clock {EngineTapState.UnalignedBlocks}");
         }
         void Weather(float rain, RoadWater road)
@@ -438,7 +438,7 @@ public static class CabinSpike
         finally
         {
             facade.Dispose();
-            TracedReverbSet.Dispose();
+            provider.Traced.Release();
             scene.Dispose();
             Phonon.iplContextRelease(ref ctx);
         }

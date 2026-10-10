@@ -81,7 +81,7 @@ public static class PathProbeSpike
         AsyncAcousticWorker.TraceProvenance = Explain;
         void Ask(Vector3 at) => worker.EnqueueRequest(new AcousticRequest { EntityId = 997, ListenerPos = at, SourcePos = at + Vector3.UnitX, SourceRadius = 0.1f });
         Measure(worker, acoustics, world, ear, srcs, ref id);
-        if (traced && srcs.Count > 0) TracedBinaural.Report(ear, srcs[0], Ask);
+        if (traced && srcs.Count > 0) TracedBinaural.Report(worker.Traced, ear, srcs[0], Ask);
 
         var openArg = args.FirstOrDefault(a => a.StartsWith("open="));
         var doorArgs = args.Where(a => a.StartsWith("door=")).Select(a => P(a[5..])).ToList();
@@ -137,7 +137,7 @@ public static class PathProbeSpike
                 Console.WriteLine($"  --- doors {(open ? "open" : "shut")} (swing {s}; {worker.SceneSwaps} scene swap(s)"
                                 + (worker.TileScenesState is { } state ? $"; tile scenes: {state}" : "") + ") ---");
                 Measure(worker, acoustics, world, ear, srcs, ref id);
-                if (traced && srcs.Count > 0) TracedBinaural.Report(ear, srcs[0], Ask);
+                if (traced && srcs.Count > 0) TracedBinaural.Report(worker.Traced, ear, srcs[0], Ask);
             }
         }
         Console.WriteLine($"  worker: {worker.RouteCostSummary}");

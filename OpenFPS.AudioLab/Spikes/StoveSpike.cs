@@ -322,9 +322,9 @@ public static class StoveSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
         scene.Build(boxes.Select(b => new SteamAudioScene.Box(b.C, b.S, Quaternion.Identity, b.M)).ToList());
-        TracedReverbSet.Configure(ctx, scene);
-
         var provider = new FmodAudioProvider();
+        provider.Traced.Configure(ctx, scene);
+
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
