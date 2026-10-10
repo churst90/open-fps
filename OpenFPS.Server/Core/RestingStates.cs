@@ -116,12 +116,17 @@ public static class RestingStates
 
         bool keepAlive = (tick + id) % KeepAliveTicks == 0;
         bool send, wheels;
-        if (!fresh && !force && !keepAlive && distance >= DistantMotion.FullRateMetres && velocity != Vector3.Zero)
+        if (!fresh && distance >= DistantMotion.FullRateMetres && velocity != Vector3.Zero)
         {
-            send = DueFar(last, state, velocity, tick, distance, out bool changed);
+            // A keep-alive or a forced state of a far thing is asked whether it went for a change too: one
+            // that falls on the tick the thing changes and is lost would otherwise leave the client carrying
+            // it wrongly until the next interval (a car pulling away read as still braking, 2026-10-10).
+            bool due = DueFar(last, state, velocity, tick, distance, out bool changed);
+            send = due || force || keepAlive;
             last.RepeatNext = changed;
             // With a far state the wheels go if they are not what the client has.
-            wheels = send && state.Wheels != null && (last.ToldWheels == null || !SameWheels(last.ToldWheels, state.Wheels));
+            wheels = send && state.Wheels != null
+                  && (force || keepAlive || last.ToldWheels == null || !SameWheels(last.ToldWheels, state.Wheels));
         }
         else
         {
