@@ -1,0 +1,5 @@
+A trimmed extract of Overture Maps Foundation's buildings theme, release 2026-09-23.1: the 468 buildings reaching
+downtown Tomball, Texas's nine world tiles round (30.09715, -95.61606), only the columns a footprint is made of, the geometry
+rounded to a ten millionth of a degree, in six row groups west to east. Recorded by
+WorldBuildingsTests.Record_the_overture_fixture_from_the_network. Each building's sources and licences are its own
+(OpenStreetMap ODbL-1.0, (c) OpenStreetMap contributors; Microsoft ML Buildings ODbL-1.0; USGS Lidar).

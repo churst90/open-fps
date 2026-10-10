@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
+    <!-- Overture's buildings are GeoParquet: read by byte range in the server (OneWorld/Overture.cs). MIT, fully managed. -->
+    <PackageReference Include="Parquet.Net" Version="6.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.4">
