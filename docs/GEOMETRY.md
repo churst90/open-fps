@@ -1754,18 +1754,34 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    | | rooms | flood / with the measure (8 threads) | volume flood/box 10th / median / 90th | surface | Sabine RT60 mid | field through openings moved over 3 dB |
    |---|---|---|---|---|---|---|
    | city | 488 | 2.6 s / 4.3 s | 0.89 / 0.95 / 0.97 | 0.99 / 0.99 / 1.03 | 0.45 / 0.92 / 1.44 | 67 (all quieter) |
-   | Magnolia | 1,810 | 2.3 s / 3.0 s | 0.97 / 1.02 / 1.16 | 0.99 / 1.03 / 1.17 | 0.81 / 1.00 / 2.47 | 36 (22 louder) |
-   | Albany | 2,862 | 5.7 s / 8.9 s | 0.97 / 1.06 / 1.24 | 1.00 / 1.07 / 1.26 | 0.71 / 1.03 / 2.55 | 43 (7 louder) |
+   | Magnolia | 1,810 | 2.3 s / 3.1 s | 0.98 / 1.02 / 1.16 | 1.00 / 1.03 / 1.16 | 0.95 / 1.00 / 2.54 | 26 (23 louder) |
+   | Albany | 2,862 | 6.8 s / 9.4 s | 0.98 / 1.07 / 1.27 | 1.00 / 1.08 / 1.27 | 0.96 / 1.12 / 2.89 | 12 (8 louder) |
+
+   (The places' rows are after the ground was graded under their floors, below; before it Magnolia had 36 rooms over
+   3 dB and Albany 43, most of them quieter for a floor of dirt.)
 
    What moved most, and why: the terminal concourse's ceiling is acoustic tile, not the concrete over it (Sabine 6.1 to
    1.1 s, the field through its openings 5.4 dB down); the city's houses have carpet and sofas the box survey did not
    see (1.19 to 0.45 s, 3.6 dB down); the tunnel halves lost their ends counted twice (2.5 dB up); the corridors'
    ceilings are plaster, not the carpet of the flat above (1.6 dB up); the hangar's 221 m2 front is open, its margin
    outside is not (15.6 to 9.2 s). On the places the box survey had grass and dirt for ceilings and walls (a bathroom
-   "Grass, Plaster, Plaster, Plaster, Grass, Grass" is tile and plaster: 7.8 dB up). Found by it: on Albany 778 rooms
-   and on Magnolia 160 have floors mostly of the ground (Dirt or Grass): the terrain comes up through the floor slab
-   inside the footprint, and those rooms absorb as a field does. That is the generator's (the slab under the ground),
-   not the measure's. `RoomFloodTests` holds a 4 by 3 m room at 0, 30 and 45 degrees: volume within 5 %, walls within
+   "Grass, Plaster, Plaster, Plaster, Grass, Grass" is tile and plaster: 7.8 dB up).
+
+   Found by it, and fixed: on Albany 778 rooms and on Magnolia 160 measured floors mostly of the ground. The floors of
+   the places are their footprints' prisms since stage 4, and `TerrainBuilder.Slabs` took only boxes, so the ground
+   was graded under no floor and came up through the slab wherever the pad (the ground at the front wall) was below
+   it: on a slope, the back of every house. A footstep there was on dirt: the ground probe met the terrain in 1,253 of
+   Albany's 2,864 rooms (7,624 of 25,776 probes, nine a room) and 377 of Magnolia's 1,810 (1,694 of 16,290). A prism
+   is a slab of its outline now (`TerrainBuilder.Slab.Outline`), and the ground is cut to its underside as under a
+   road: the world is dirt and the floor is laid on it, the dirt dug level for it where the slope rises (up to
+   `MaxCut`, 3 m) and filled where it falls (`MaxFill`, 1.5 m). Raising each floor over the highest ground of its
+   footprint was the other way; it would have stood houses on stilts on their low side and moved every room, door
+   and pad the generator set. After: the probe meets the terrain in no room on either place
+   (`AudioLab --geometry-parity only=floors`; `RealPlaceMapTests.The_ground_never_rises_through_what_lies_on_it`
+   checks nine points a room). No room measures a floor mostly of the ground; four have a few square metres of it
+   where their air reaches out of an open door (two barns on Magnolia, two garages on Albany). The places copied into
+   the world are graded by the same slabs, and `WorldPlaces.FormatVersion` is 3, so stored copies are made again.
+   `RoomFloodTests` holds a 4 by 3 m room at 0, 30 and 45 degrees: volume within 5 %, walls within
    5 % together, the carpet as the floor, and Sabine's time the box's within 10 %; and a room with an open door, its
    doorway open and the air outside it not the room's.
 
@@ -1775,11 +1791,13 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      0.3` (3.6 dB down, the city's houses alike); Tunnel, south half, `/tp 0.0 -262.5 0.3` (2.5 dB up); Union Building
      corridor, floor 7, `/tp 20.3 67.0 21.3` (1.6 dB up); Hangar, `/tp 254.0 190.0 0.1` (1.5 dB down); Parking garage,
      level 0, `/tp -66.8 62.0 0.3` (1.3 dB down).
-   - Magnolia: 31909 Beaver Street, bathroom, `/tp 70.8 -31.4 -1.2` (7.8 dB up); 26120 Nichols Sawmill Road, house,
-     `/tp -1065.9 420.7 3.5` (7.3 dB up); 19415 Turtle Dove Lane, barn, `/tp -88.8 -253.0 3.5` (8.4 dB down).
-   - Albany: Linn County Juvenile Detention, `/tp 1470.1 1253.4 0.3` (9.3 dB down, a dirt floor); Linn-Benton
-     Community College Cafeteria, `/tp -27.5 -345.4 0.8` (7.6 dB down); Industrial B, `/tp -55.0 -213.4 0.8` (5.3 dB
-     down).
+   - Magnolia (after the ground was graded under the floors): 19415 Turtle Dove Lane, barn, `/tp -88.8 -253.0 3.5`
+     (8.5 dB down, its open door); 31909 Beaver Street, bathroom, `/tp 70.8 -31.4 -1.2` (7.8 dB up); 26120 Nichols
+     Sawmill Road, house, `/tp -1065.9 420.7 3.5` (7.3 dB up); 19609 Turtle Dove Lane, house, `/tp -282.3 -233.4 4.6`
+     (6.7 dB down).
+   - Albany (the same): 34435 Highway 99e, house, `/tp 317.9 -1070.6 2.3` (6.6 dB down); 777 College Park Drive
+     Southwest, building, `/tp 36.2 969.2 -1.5` (4.9 dB up); 5095 Pacific Boulevard Southwest, house, `/tp 53.0 795.7
+     -0.9` (4.6 dB up); 6251 Lanier Street Southwest, bathroom, `/tp 89.1 -68.8 -0.7` (3.4 dB up).
 
    **Regions become places: the plan (not started).** More than a session, so it waits for part A to be heard. In
    order, each its own commit:

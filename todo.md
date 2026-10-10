@@ -28,8 +28,9 @@ other at login. The server and the Windows zip go out together.
    before regions become places ship; the /tp list is in docs/GEOMETRY.md 12.6 item 1, "Measured from their
    floods"). The 5 server/client disagreements are fixed (two floods over the same air; a house's rooms sent
    apart across a tile edge) and Albany's 640 m "house" (a bare `building=yes` way round an address point) is a
-   building; floods over 64 million cells keep their boxes. Open: on the places the ground comes up through the
-   floor slab in 778 Albany and 160 Magnolia rooms (their floors measure as dirt).
+   building; floods over 64 million cells keep their boxes. The ground no longer comes up through the places'
+   floors (the prism floors were left out of the grading since stage 4; footsteps in 1,253 Albany and 377
+   Magnolia rooms were on dirt).
    Then regions become places. An indoor room is a name
    and a seed point, its shape, indoor flag and materials measured from the walls; an outdoor place (yard,
    street, park) is a name over an area. Drop the box (`RoomSize`), `Materials` and `ReverbTimeScale`
