@@ -170,6 +170,34 @@ Recent work, newest first. `git log` has the rest.
   - A preset's donor engine is no longer held as a new engine. Held, it ranked first for 2.5 s, took a
     slot inside the budget, and the car at the budget's edge was let go and rebuilt (with every borrowed
     voice restarted) each time a donor arrived.
+- The PA through a shut glass front door. Cody: "I'm in the Selby lobby and I hear the megaphone I put
+  outside clear as day through the apartment building door. Do all manually placed items have a sound
+  leak issue?" No. A placed thing is added to the map before the world is built, as an authored one is
+  (MapOverlayStore.ApplyBefore). Every sustained source outside a glass front door leaked the same way,
+  authored or placed. One-off sounds were not affected. Renders and what to listen for in
+  inbox/pa-leak-2026-10-09. Changing OpenFPS.Common changes the wire hash, so the server must be
+  restarted and the Windows zip rebuilt with it.
+  - Over the top of a shut leaf. The city's glass front door leaves are 2.10 m tall in 2.15 m doorways.
+    The barrier search went round the leaf over its top edge, through the 5 cm slot, as if nothing stood
+    above it: -7/-12/-20 dB from the PA into the lobby, against the leaf's -18/-28/-45
+    (`--path-probe explain`). A way round a leaf that stands in its doorway is no longer taken. Going
+    round it means going through the doorway, and the opening's own transmission already covers that
+    (OpeningRoutes.BarrierPathDifference).
+  - Thin panels in Steam Audio. Its transmission rays step about 2 cm past each hit (`--thin-panel`:
+    19 mm of glass lost a third of its decibels, 21 mm the whole). A thinner box was crossed as two
+    faces where SteamAudioScene counts on three. The 12 mm glass leaf passed -12/-19/-30. Boxes thinner
+    than 3 cm are now traced 3 cm thick, and what they let through still comes from their true size. In
+    the city: five glass front doors, four automatic sliding doors and two sheet-metal roofs.
+  - Into the lobby, door shut, sustained voice: -7.0/-12.2/-20.1 dB before, -18.1/-28.0/-44.6 after.
+    The one-shot path and the routes by the openings already gave -18/-29/-45. Rendered through the
+    game's mixer, the lobby was 3.4 dB under the pavement outside the door and is now 16 dB under it.
+  - The "Voice 8955 was placed at a position NNNN ms old" warnings are a false alarm. A repeating
+    one-shot is submitted once each time it starts and not between starts, so its placement ages through
+    its 2.5 s announcement. Its path is updated every frame, and it does not move.
+  - Lab: `--path-probe` takes `explain` (the barrier search spelled out), `emitters` (sounding entities
+    near each source as the client gets them) and `overlays=DIR` (the editor's edits laid over the map).
+    `--thin-panel` measures Steam Audio's direct transmission through one panel against its construction.
+    `--pa-leak` renders the PA scenes through the real provider.
 
 ## 2026-10-07
 

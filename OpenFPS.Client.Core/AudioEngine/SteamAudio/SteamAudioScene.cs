@@ -321,11 +321,15 @@ public sealed class SteamAudioScene : IDisposable
             if (surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.OpenGround) != openGround) continue;
             int mi = MaterialIndex(surface.Material, surface.Construction.PanelSize, surface.Construction.Build, materials, matIndexByName);
             int first = verts.Count, unique = 0;
+            // Traced no thinner than Steam Audio's step past a hit (MinTracedThicknessMetres).
+            bool box = rec.BoxSize.X > 0f && rec.BoxSize.Y > 0f && rec.BoxSize.Z > 0f;
+            Vector3 boxCentre = rec.BoxCentre, boxSize = rec.BoxSize;
+            Quaternion boxTurn = rec.BoxRotation;
             int Corner(Vector3 v, Span<Vector3> seen, ref int n)
             {
                 for (int k = 0; k < n; k++) if (seen[k] == v) return first + k;
                 if (n < seen.Length) seen[n] = v;
-                verts.Add(Phonon.World(v));
+                verts.Add(Phonon.World(box ? TracedPoint(v, boxCentre, boxSize, boxTurn) : v));
                 return first + n++;
             }
             foreach (int t in piece.TrianglesOf(s))
@@ -387,7 +391,8 @@ public sealed class SteamAudioScene : IDisposable
     /// from listener and source, multiplies every face's transmission and takes the square root of the
     /// product (core/src/core/direct_simulator.cpp), so a single box is three hits and one wall loses
     /// exactly its own figure. n boxes in a row lose (2n + 1)/3 of one each: two walls 5/3 (measured),
-    /// not 2. (open-fps-patches 5.)
+    /// not 2. (open-fps-patches 5.) Three hits only if the box is thicker than the rays' step past a hit:
+    /// see <see cref="MinTracedThicknessMetres"/>.
     /// </summary>
     private static int MaterialIndex(in Box b, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
         => MaterialIndex(b.Material, b.Size, b.Build, materials, byName);
@@ -430,10 +435,41 @@ public sealed class SteamAudioScene : IDisposable
         3,2,6, 3,6,7,   // +Y
     };
 
+    /// <summary>
+    /// The thinnest a box is traced, metres. Steam Audio's transmission rays step about 2 cm past each hit
+    /// (AudioLab --thin-panel: a glass panel 19 mm thick lost a third of its decibels, one 21 mm thick the
+    /// whole), so a thinner box was crossed as two faces where <see cref="MaterialIndex"/> counts on three:
+    /// a 12 mm glass front door passed -12/-19/-30 dB against its -18/-28/-45. A thinner box is traced this
+    /// thick about its middle, which a ray at any angle crosses in more than the step; what it lets through
+    /// stays its true size's.
+    /// </summary>
+    internal const float MinTracedThicknessMetres = 0.03f;
+
+    /// <summary>A box's size as traced: its thinnest side raised to <see cref="MinTracedThicknessMetres"/>.</summary>
+    internal static Vector3 TracedSize(Vector3 size)
+    {
+        if (size.X <= size.Y && size.X <= size.Z) size.X = MathF.Max(size.X, MinTracedThicknessMetres);
+        else if (size.Y <= size.Z) size.Y = MathF.Max(size.Y, MinTracedThicknessMetres);
+        else size.Z = MathF.Max(size.Z, MinTracedThicknessMetres);
+        return size;
+    }
+
+    /// <summary>A point of a solid moved as <see cref="TracedSize"/> grows its box (centre, size and turn in
+    /// one frame): stretched along the thin side about the middle, unchanged when the box is thick enough.</summary>
+    internal static Vector3 TracedPoint(Vector3 point, Vector3 centre, Vector3 size, Quaternion rotation)
+    {
+        var traced = TracedSize(size);
+        if (traced == size) return point;
+        var q = rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(rotation);
+        var local = Vector3.Transform(point - centre, Quaternion.Inverse(q));
+        local *= new Vector3(traced.X / MathF.Max(1e-6f, size.X), traced.Y / MathF.Max(1e-6f, size.Y), traced.Z / MathF.Max(1e-6f, size.Z));
+        return centre + Vector3.Transform(local, q);
+    }
+
     private static void AppendBox(Box b, List<PV> verts, List<Phonon.IPLTriangle> tris, List<int> triMat, int mi)
     {
         int baseIdx = verts.Count;
-        Vector3 half = b.Size * 0.5f;
+        Vector3 half = TracedSize(b.Size) * 0.5f;
         for (int c = 0; c < 8; c++)
         {
             Vector3 local = _corner[c] * half;

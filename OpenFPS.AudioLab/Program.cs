@@ -791,6 +791,14 @@ if (args.Contains("--pop-hunt"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PopHuntSpike.Run(args));
 }
+if (args.Contains("--pa-leak"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PaLeakSpike.Run(args));
+}
+if (args.Contains("--thin-panel"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.ThinPanelSpike.Run(args));
+}
 if (args.Contains("--path-probe"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
