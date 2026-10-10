@@ -81,7 +81,9 @@ public class GroundWaterMagnoliaTests : IDisposable
         var ditch = net.Voices.Where(v => v.Kind == GroundChannelKind.Ditch).OrderByDescending(v => v.Catchment.AreaSquareMetres[(int)GroundSurface.Impervious]).First();
         GroundWaterSystem.Settle(Id, 0f);
         float creekDry = GroundWaterSystem.FlowAt(Id, creek.Position), ditchDry = GroundWaterSystem.FlowAt(Id, ditch.Position);
+        var tick = Stopwatch.StartNew();
         for (int t = 0; t < 600; t++) GroundWaterSystem.Update(Id, Rainfall.HeavyRate, 0.05f, 1f);
+        _o.WriteLine($"a second of the map's ground water (the ladders, {net.Ponds.Count} ponds): {tick.Elapsed.TotalMilliseconds / 600:F2} ms");
         float creekWet = GroundWaterSystem.FlowAt(Id, creek.Position), ditchWet = GroundWaterSystem.FlowAt(Id, ditch.Position);
         for (int t = 0; t < 1800; t++) GroundWaterSystem.Update(Id, 0f, 0.05f, 1f);
         float creekAfter = GroundWaterSystem.FlowAt(Id, creek.Position), ditchAfter = GroundWaterSystem.FlowAt(Id, ditch.Position);

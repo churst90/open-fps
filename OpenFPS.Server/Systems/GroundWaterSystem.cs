@@ -47,6 +47,7 @@ public static class GroundWaterSystem
     private sealed class Parcel
     {
         public int Cell;
+        public int From = -1;   // the cell it came from (-1: poured here)
         public float Litres;
         public float Along;     // m into the step out of its cell
     }
@@ -71,8 +72,10 @@ public static class GroundWaterSystem
 
         public readonly List<Parcel> Parcels = new();
         public readonly List<Pour> Pours = new();
-        /// <summary>Water poured that reached each cell in the last full second, litres, and in this one.</summary>
-        public Dictionary<int, float> Arrived = new(), Arriving = new();
+        /// <summary>Poured water arriving at cells, from the cell it came from (-1: poured there), litres: the last
+        /// full second's, and this one's.</summary>
+        public List<(int From, int To, float Litres)> Arrived = new(), Arriving = new();
+        public float ArrivedSeconds = 1f;
         public float SecondClock, StepClock;
         /// <summary>Water poured that soaked in at each cell: litres, and when.</summary>
         public readonly Dictionary<int, (float Litres, double At)> Soaked = new();
@@ -211,7 +214,7 @@ public static class GroundWaterSystem
             {
                 (m.Arrived, m.Arriving) = (m.Arriving, m.Arrived);
                 m.Arriving.Clear();
-                foreach (var k in m.Arrived.Keys.ToList()) m.Arrived[k] /= m.SecondClock;
+                m.ArrivedSeconds = m.SecondClock;
                 m.SecondClock = 0f;
             }
         }
@@ -325,7 +328,7 @@ public static class GroundWaterSystem
                     parcel.Litres -= soak;
                     float before = m.Soaked.TryGetValue(c, out var s0) && m.Clock - s0.At < PouredMemorySeconds ? s0.Litres : 0f;
                     m.Soaked[c] = (before + soak, m.Clock);
-                    m.Arriving[c] = m.Arriving.GetValueOrDefault(c) + parcel.Litres + soak;
+                    m.Arriving.Add((parcel.From, c, parcel.Litres + soak));
                     int pond = net.PondOf(c);
                     if (pond >= 0)
                     {
@@ -342,6 +345,7 @@ public static class GroundWaterSystem
                 if (need > time) { parcel.Along += speed * time; time = 0f; break; }
                 time -= need;
                 parcel.Along = 0f;
+                parcel.From = c;
                 parcel.Cell = n;
             }
             if (gone) m.Parcels.RemoveAt(k);
@@ -403,7 +407,10 @@ public static class GroundWaterSystem
                 int n = net.Next(c);
                 if (n >= 0 && inside.Contains(n)) runOn += FlowOut(m, c);
             }
-            foreach (int c in inside) poured += m.Arrived.GetValueOrDefault(c);
+            // Poured water entering the patch: arriving at a cell in it from one outside it, or poured in it.
+            foreach (var (from, to, litres) in m.Arrived)
+                if (inside.Contains(to) && !inside.Contains(from)) poured += litres;
+            poured /= MathF.Max(0.25f, m.ArrivedSeconds);
             return new WaterReach(rain, runOn, poured);
         }
     }

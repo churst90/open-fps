@@ -108,7 +108,8 @@ public sealed class DrainageNetwork
         public float[] Lags = new float[GroundHydrology.Surfaces];
         /// <summary>What it takes from the rain, as a catchment of the map's water (no base flow: the groundwater
         /// comes out into the channels below, GroundCatchment.BaseSquareMetres).</summary>
-        public GroundCatchment RainCatchment => new(Catchment, Lags, Array.Empty<int>(), 0f);
+        public GroundCatchment RainCatchment => _rain ??= new(Catchment, Lags, Array.Empty<int>(), 0f);
+        private GroundCatchment? _rain;
         /// <summary>All the ground draining to it, m².</summary>
         public float TotalSquareMetres => Total.Sum();
         /// <summary>The surface of its lowest cell: a puddle on a road, or a pond on open ground.</summary>
@@ -206,6 +207,9 @@ public sealed class DrainageNetwork
         FindHollows(fill);
         Accumulate();
         FindLines(placedWater?.ToList() ?? new List<Vector3>());
+        // Only the building needs these: tens of megabytes on a town.
+        _order = Array.Empty<int>();
+        _toEnd = Array.Empty<float>();
         BuildTime = clock.Elapsed;
         return this;
     }
@@ -620,8 +624,6 @@ public sealed class DrainageNetwork
     public bool IsLine(int c) => _area[c] * CellArea >= LineSquareMetres;
     /// <summary>Each surface's ground draining to a line cell not through a pond, m²; null off the lines.</summary>
     public float[]? LineAreas(int c) => _lineAreas.TryGetValue(c, out var a) ? a : null;
-    /// <summary>The cells in the order water passes them: every cell after all that drain into it.</summary>
-    public IReadOnlyList<int> Order => _order;
 
     /// <summary>The catchment of any cell: a line cell's own (each surface's ground not through a pond, its mean
     /// travel time, the ponds overflowing into it, and all its ground for the base flow); off the lines, its ground

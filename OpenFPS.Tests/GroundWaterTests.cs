@@ -467,7 +467,7 @@ public class GroundWaterTests : IDisposable
         float paved = Run(GroundSurface.Impervious, out float pavedReached);
         float grass = Run(GroundSurface.Lawn, out float grassReached);
         _o.WriteLine($"10 L poured: 10 m below it {pavedReached:F1} L passed on paving, {grassReached:F1} L on grass; 6 m below wetted {paved:F2} / {grass:F2} mm");
-        Assert.True(pavedReached > 3f, "most of a bucket on paving runs 10 m");
+        Assert.True(pavedReached > 2f, "a good share of a bucket on paving runs 20 m");
         Assert.True(grassReached < pavedReached);
         Assert.True(paved > 0f);
     }
