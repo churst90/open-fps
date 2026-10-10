@@ -27,6 +27,9 @@ public class RoadData
     public List<string>? Tiles { get; set; }
 
     public const string DefaultSurface = RoadSurfaces.Default;
+
+    /// <summary>The road as the puddles along its kerbs need it (PuddleField).</summary>
+    public Carriageway ToCarriageway() => new(Id, Centreline, WidthMetres);
 }
 
 /// <summary>One lane of a road.</summary>

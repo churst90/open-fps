@@ -390,6 +390,13 @@ public sealed class RoadWater
 }
 
 /// <summary>
+/// A carriageway as the puddles need it: the id its puddles are drawn from, the middle of the road in
+/// order (x east, z north; y is not read) and its width kerb to kerb, metres. The host builds one from
+/// its map's roads.
+/// </summary>
+public readonly record struct Carriageway(string Id, IReadOnlyList<Vector3> Centreline, float WidthMetres);
+
+/// <summary>
 /// A map's carriageways indexed by place, and the puddles along their kerbs: where on which road a
 /// point is, how far from its crown and from its kerb, and how deep a puddle is there.
 ///
@@ -406,16 +413,16 @@ public sealed class PuddleField
     public const float PuddleChance = 0.4f;
     private const float GridMetres = 16f;
 
-    private readonly IReadOnlyList<RoadData> _roads;
+    private readonly IReadOnlyList<Carriageway> _roads;
     private readonly float[][] _along;                     // cumulative length at each centreline point
     private readonly Dictionary<(int, int), List<(int Road, int Seg)>> _grid = new();
     private readonly List<Puddle>[] _puddles;
 
     public readonly record struct Puddle(int Road, int Side, float Along, float Length, float Reach, float DepthMm);
 
-    public PuddleField(IReadOnlyList<RoadData>? roads)
+    public PuddleField(IReadOnlyList<Carriageway>? roads)
     {
-        _roads = roads ?? Array.Empty<RoadData>();
+        _roads = roads ?? Array.Empty<Carriageway>();
         _along = new float[_roads.Count][];
         _puddles = new List<Puddle>[_roads.Count];
         for (int r = 0; r < _roads.Count; r++)
@@ -484,7 +491,7 @@ public sealed class PuddleField
     }
 
     /// <summary>The road at an index.</summary>
-    public RoadData Road(int index) => _roads[index];
+    public Carriageway Road(int index) => _roads[index];
 
     /// <summary>
     /// The water a puddle holds at this place on a road, mm, with the puddles <paramref name="fill"/>
