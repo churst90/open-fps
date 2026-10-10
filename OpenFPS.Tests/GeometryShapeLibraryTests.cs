@@ -324,6 +324,24 @@ public class GeometryShapeLibraryTests
         Assert.True(off.HitPoint.Y < 1.9f);
     }
 
+    /// <summary>A shape is struck as the part it has: a pitched roof its deck, a flight one step, not the box round it.</summary>
+    [Fact]
+    public void A_shape_is_struck_as_the_part_it_has()
+    {
+        var roofSize = new Vector3(12, 2, 8);
+        var roof = StruckThings.Describe("Wood", roofSize, Vector3.UnitY, 0, 0, false, false, out _,
+                                         form: new ShapeSpec { Kind = ShapeKind.Roof, Outline = Pairs((0, 0), (12, 0), (12, 8), (0, 8)) });
+        Assert.Equal(StruckShape.Plate, roof.Shape);
+        Assert.Equal(Shapes.RoofDeckMetres, roof.Thickness, 4);
+        var asBox = StruckThings.Describe("Wood", roofSize, Vector3.UnitY, 0, 0, false, false, out _);
+        Assert.NotEqual(StruckShape.Plate, asBox.Shape);
+        var flight = StruckThings.Describe("Concrete", new Vector3(1.2f, 2.8f, 4.48f), Vector3.UnitY, 0, 0, false, false, out _,
+                                           form: new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 });
+        Assert.Equal(StruckShape.Block, flight.Shape);
+        Assert.Equal(0.175f, flight.Thickness, 3);
+        Assert.Equal(0.28f, flight.Width, 3);
+    }
+
     [Fact]
     public void Bad_numbers_are_refused()
     {

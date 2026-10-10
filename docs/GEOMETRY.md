@@ -1609,8 +1609,11 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    room's flood (`AcousticVolumeGenerator.GenerateRegions`, and the server's region lookups, so both agree),
    region ids passing through unchanged, gated on the harness: no house open past its margin, IoU over 0.8.
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
-   directivity) read by machine parts and emitters; struck sounds (`StruckThings.Describe`) reading the shape a
-   part has (a column a bar, a dome a shell, a roof's slope a plate) instead of its box.
+   directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
+   would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a
+   plate the deck's thickness over the slope, and a flight as one step (a block of a tread's going and a riser's
+   height), not as the box round them; round things, balls and swept profiles are what their boxes say already (a
+   column is long and narrow: a bar). Unheard.
 3. Facets as polygons for the engine echoes (their rectangles overreach a triangle's corners); per-facet materials
    in the image sources (a shape's slots).
 4. Doors' remaining misses (16 on Albany): footprints whose rooms sit far from every wall, where the cover grid's
