@@ -221,7 +221,10 @@ OpenFPS.Common/Engines.cs	lib	Sound
 OpenFPS.Common/EntityGeometry.cs	host		
 OpenFPS.Common/ExternalBallistics.cs	lib	Sound	
 OpenFPS.Common/Fire.cs	lib	Sound	
+OpenFPS.Common/FireShape.cs	lib	Sound	
+OpenFPS.Common/FireSpread.cs	lib	Sound	
 OpenFPS.Common/Footsteps.cs	lib	Sound	
+OpenFPS.Common/Fuel.cs	lib	Sound	
 OpenFPS.Common/GasHob.cs	lib	Sound	
 OpenFPS.Common/Glass.cs	lib	Sound	
 OpenFPS.Common/GlassDoor.cs	lib	Sound	

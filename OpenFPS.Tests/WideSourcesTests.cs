@@ -73,7 +73,8 @@ public class WideSourcesTests
         float reach = ExtendedSources.Reach(tree);
         _o.WriteLine($"tree: {tree.Length} places, reach {reach:F2} m");
         Assert.InRange(reach, 2f, FoliageSpec.ParkTree.CrownRadiusMetres);
-        Assert.Equal(1 + ExtendedSources.FirePlaces, ExtendedSources.Layout("fire:fire_pit")!.Length);
+        // The bed's places and the flames' above them (docs/FIRE.md 12.2).
+        Assert.Equal(1 + ExtendedSources.FirePlaces + FireSynth.FlamePlaces, ExtendedSources.Layout("fire:fire_pit")!.Length);
         Assert.Equal(1 + ExtendedSources.WaterTapPlaces, ExtendedSources.Layout("water:park_fountain/elm_park/3")!.Length);
         Assert.Null(ExtendedSources.Layout("water:park_fountain"));
         Assert.Null(ExtendedSources.Layout("machine:ac_window"));

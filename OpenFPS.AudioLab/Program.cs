@@ -100,7 +100,7 @@ string[] usage =
     "                                                mowers and air conditioners, measured and walked past",
     "  --nature [levels|render out=DIR|live] [preset ...] [sec= wind= turb= steady= tap= parts= dist=]",
     "                                                water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
-    "  --fire [levels|render out=DIR [places=1]|game out=DIR set=|hrtf] [preset ...] [sec= wind= age= seed= heard= parts=]",
+    "  --fire [levels|render out=DIR [places=1]|game out=DIR set=|hrtf|spread timeline|game scene=] [preset ...] [sec= wind= age= seed= heard= parts=]",
     "                                                fires from a campfire to a crown fire, from their model (docs/FIRE.md)",
     "  --stove [levels|render out=DIR|game out=DIR] [hob4|hob4_propane|hob1] [seed= dist= eff= turb= trim= heat= us= cloud=]",
     "                                                a gas hob lit, turned and turned off, from its model (docs/GAS_HOB.md)",

@@ -2272,6 +2272,7 @@ public partial class FmodAudioProvider : IAudioProvider
             : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(preset), places, rate,
                                     emitter.EntityId * 43 + 17, emitter.Position);
         voice.TargetSpread = emitter.Spread;
+        voice.TargetQuench = emitter.Quench;
         return new NaturePlaceState(voice, 0, rate, emitter.Position);
     }
 
@@ -3180,6 +3181,7 @@ public partial class FmodAudioProvider : IAudioProvider
                         // The middle carries how much its other places play, and a wood's how many
                         // trees it stands for now (WoodChorus).
                         middle.Shared.TargetSpread = emitter.Spread;
+                        middle.Shared.TargetQuench = emitter.Quench;
                         if (middle.Shared.WindPlaces != null) middle.Shared.TargetTrees = emitter.Trees;
                     }
                     else if (active.MachineState is WaterTapState { Place: 0 } tapMiddle)

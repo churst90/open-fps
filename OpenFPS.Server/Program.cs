@@ -28,6 +28,10 @@ public class GameServer
     public WorldEnvironmentSystem WorldEnvironment => _environment;
     /// <summary>When and where the storm flashes. The thunder is each client's own (see EmitStrike).</summary>
     private readonly LightningSystem _lightning = new();
+
+    private FireSystem? _fires;
+    /// <summary>Fire on every map: what can burn, what is burning and what catches (docs/FIRE.md 12).</summary>
+    public FireSystem Fires => _fires ??= new FireSystem(SyncAudioComponent);
     private MapRepository _mapRepo = null!;
     private MapManager _maps = null!;
     private readonly IUserRepository _userRepo;
@@ -371,6 +375,12 @@ public class GameServer
             var world = entry.Value.world;
             var centre = (data.MinBound + data.MaxBound) * 0.5f;
             var placed = strike.Offset(new Vector3(centre.X, 0f, centre.Z));
+            // A ground flash strikes whatever its leader reaches first, and may set it going.
+            if (placed.Kind == FlashKind.CloudToGround)
+            {
+                try { Fires.Strike(_maps, entry.Key, world, placed.Centre); }
+                catch (Exception ex) { Log.Warning(ex, "Fire: a lightning strike on {Map} failed", entry.Key); }
+            }
             WorldAudioEvent? message = null;
             foreach (var session in _sessions.GetSessionsInMap(entry.Key))
             {
@@ -892,6 +902,8 @@ public class GameServer
                     // And over the ground: the drainage lines, the ponds, water poured out (docs/RUNNING_WATER.md 13).
                     GroundWaterSystem.Update(entry.Key, _environment.RainRate(roadWeather),
                                              RoadWaterSystem.WaterOf(entry.Key)?.EvaporationMmPerHour ?? 0f, dt);
+                    // Fire in the same weather: the rain that wets the roads wets the fuel.
+                    Fires.Update(_maps, entry.Key, world, roadWeather, _environment.RainRate(roadWeather), dt);
                     _vehicles.Update(entry.Key, world, dt);
                     // Before the seats carry anybody: Alex gets on and off the bus here.
                     if (_characters.Count > 0)

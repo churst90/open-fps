@@ -61,30 +61,37 @@ public class FireTests : IDisposable
     private static double Db(float[] x) => 10 * Math.Log10(x.Average(v => (double)v * v) / 4e-10);
 
     [Fact]
-    public void EveryFireIsHeardFromItsPlacesAndNoMoreThanEight()
+    public void EveryFireIsHeardFromItsBedAndItsFlames()
     {
         foreach (var (name, make) in FireSpec.Presets)
         {
             var spec = make();
-            var layout = ExtendedSources.Layout("fire:" + name);
-            Assert.NotNull(layout);
-            Assert.Equal(Math.Clamp(spec.Places, 1, FireSynth.MaxPlaces), layout!.Length);
-            Assert.True(layout.Length <= ExtendedSources.MaxPlaces, $"{name} has {layout.Length} places; a source has {ExtendedSources.MaxPlaces} voice ids");
-            // The places, each an equal share, spread across and along as the burning area does (w²/12, d²/12),
-            // a front along its length; so the ears hear the fire as wide as it is.
-            double vx = layout.Average(p => (double)p.X * p.X), vz = layout.Average(p => (double)p.Z * p.Z);
+            var all = ExtendedSources.Layout("fire:" + name);
+            Assert.NotNull(all);
+            int bed = FireSynth.BedPlaces(spec);
+            Assert.Equal(bed + Math.Min(FireSynth.FlamePlaces, FireSynth.MaxPlaces - bed), all!.Length);
+            Assert.True(all.Length <= ExtendedSources.MaxPlaces, $"{name} has {all.Length} places; a source has {ExtendedSources.MaxPlaces} voice ids");
+            // The bed's places at the bed, the flames' above it by the middle of the flames over the middle of the fuel.
+            Assert.All(all.Take(bed), p => Assert.Equal(0f, p.Y));
+            Assert.All(all.Skip(bed), p => Assert.Equal(spec.RoarRiseMetres, p.Y, 3));
+            // The places of each, each an equal share, spread across and along as the burning area does (w²/12,
+            // d²/12), a front along its length; so the ears hear the fire as wide as it is.
             double ax = spec.AreaWidth * spec.AreaWidth / 12.0, az = spec.AreaDepth * spec.AreaDepth / 12.0;
-            _o.WriteLine($"  spread across {Math.Sqrt(vx):F2} m against the area's {Math.Sqrt(ax):F2}, along {Math.Sqrt(vz):F2} against {Math.Sqrt(az):F2}");
-            Assert.InRange(vx / ax, 0.8, 1.2);
-            if (spec.AreaWidth < 2.5f * spec.AreaDepth) Assert.InRange(vz / az, 0.8, 1.2);
-            Assert.Equal(Vector3.Zero, layout[0]);
+            foreach (var layout in new[] { all.Take(bed).ToArray(), all.Skip(bed).ToArray() })
+            {
+                double vx = layout.Average(p => (double)p.X * p.X), vz = layout.Average(p => (double)p.Z * p.Z);
+                _o.WriteLine($"  spread across {Math.Sqrt(vx):F2} m against the area's {Math.Sqrt(ax):F2}, along {Math.Sqrt(vz):F2} against {Math.Sqrt(az):F2}");
+                Assert.InRange(vx / ax, 0.8, 1.2);
+                if (spec.AreaWidth < 2.5f * spec.AreaDepth) Assert.InRange(vz / az, 0.8, 1.2);
+            }
+            Assert.Equal(Vector3.Zero, all[0]);
             // Every place over the burning area.
-            foreach (var p in layout)
+            foreach (var p in all)
                 Assert.True(MathF.Abs(p.X) <= 0.5f * spec.AreaWidth + 0.01f && MathF.Abs(p.Z) <= 0.5f * spec.AreaDepth + 0.01f,
                             $"{name}: a place at {p} is off its {spec.AreaWidth} x {spec.AreaDepth} m");
             var (nx, nz, d) = FireSynth.CellGrid(spec);
             Assert.InRange(nx * nz, 1, FireSynth.MaxCells);
-            _o.WriteLine($"{name}: {layout.Length} places, {nx * nz} bodies of {d:F1} m");
+            _o.WriteLine($"{name}: {all.Length} places, {nx * nz} bodies of {d:F1} m");
         }
         // A key with its lighting time has the same places.
         Assert.Equal(ExtendedSources.Layout("fire:house_fire")!.Length, ExtendedSources.Layout(FireSpec.KeyFor("house_fire", 1234.5))!.Length);
@@ -410,6 +417,47 @@ public class FireTests : IDisposable
         Assert.Contains("is out", Run("fire", "out"));
         Assert.Equal(before, Fires().Count);
         Assert.Contains("no fire lit", Run("fire", "out"));
+    }
+
+    /// <summary>The server's fire: an emitter for what is burning, its water sent as Quench, and out when
+    /// the water has put it out (docs/FIRE.md 12.7, 12.10).</summary>
+    [Fact]
+    public void TheServersFireSendsWhatWaterDoesToIt()
+    {
+        string mapDir = Path.Combine(_dir, "maps");
+        Directory.CreateDirectory(mapDir);
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "maps", "default.json"), Path.Combine(mapDir, "default.json"));
+        var maps = new MapManager(new MapRepository(mapDir), new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("default", out var world, out _, out _, out _));
+        double clock = 1000;
+        var fires = new OpenFPS.Server.Systems.FireSystem { Background = false, Clock = () => clock };
+        var at = new Vector3(140f, 0f, 140f);
+        fires.Light(maps, "default", world, "campfire", at, 0f);
+        SoundEmitterComponent Emitter()
+        {
+            SoundEmitterComponent found = default;
+            int n = 0;
+            world.Query(new QueryDescription().WithAll<SoundEmitterComponent>(), (ref SoundEmitterComponent em) =>
+            {
+                if (em.SoundId.StartsWith("fire:campfire/lit=", StringComparison.Ordinal)) { found = em; n++; }
+            });
+            Assert.Equal(1, n);
+            return found;
+        }
+        Assert.True(Emitter().SynthRunning);
+        Assert.True(fires.Water("default", at, 5f, 2f, 120f));
+        var env = new WorldEnvironmentComponent();
+        float most = 0f;
+        for (int i = 0; i < 60; i++)
+        {
+            clock += 1;
+            fires.Update(maps, "default", world, env, 0f, 1f);
+            most = MathF.Max(most, Emitter().Quench);
+        }
+        _o.WriteLine($"quench at most {most:F2}; running {Emitter().SynthRunning}");
+        Assert.True(most > 0.8f);
+        Assert.False(Emitter().SynthRunning);
     }
 
     private sealed class NoUsers : IUserRepository

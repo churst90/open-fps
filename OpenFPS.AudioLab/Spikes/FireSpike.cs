@@ -35,6 +35,7 @@ public static class FireSpike
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
+        if (args.Contains("spread")) return FireSpreadSpike.Run(args);
         if (args.Contains("game")) return Game(args);
         if (args.Contains("hrtf")) return FireHrtfProbe.Run(args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..] ?? "/tmp/openfps-fire-hrtf");
         float sec = Arg(args, "sec=", 30f);

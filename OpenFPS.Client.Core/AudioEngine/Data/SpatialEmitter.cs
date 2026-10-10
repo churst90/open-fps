@@ -189,6 +189,8 @@ public struct SpatialEmitter
     /// <summary>For a wood heard as one (WoodChorus): how many of its trees its synth stands for now.
     /// Read only for a wood's voice.</summary>
     public float Trees;
+    /// <summary>A fire: how much of its heat release water is taking now, 0 to 1 (SoundEmitterComponent.Quench).</summary>
+    public float Quench;
     /// <summary>How hard the road is working this vehicle's tyres, as a fraction of their grip: zero
     /// rolling, one the limit where a tyre squeals, above it sliding. From the server's
     /// <see cref="OpenFPS.Common.Networking.EntityState.TyreDemand"/>.</summary>

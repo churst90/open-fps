@@ -406,12 +406,21 @@ rest scattered. A perfect mirror copy is what flanged, which is why speech has n
 bodies go into the acoustic scene with Bodies and wheels stage 2.
 
 ### Fire, the rest
-Fire at any size is built and approved (docs/FIRE.md). Open:
+Fire at any size is built and approved (docs/FIRE.md). Fire that burns what is there, stage 1, is built
+(docs/FIRE.md section 12, 2026-10-10; approved by ear 2026-10-10, inbox/fire-fuel-2026-10-10): a fire over a
+shape, fuel as a property of things, catching by heat and brands, lightning, rain and water. Stage 2, in order:
+- aggregation by audibility, so a forest burning is tens of emitters (FIRE.md 12.8);
+- surface fire over the ground: fronts of marker points at Rothermel's rate where land cover and zones say
+  there is fuel (12.5);
+- structures: a house as a zone with its fuel load, rooms, windows and roof as parts; fences and floors;
+- the fire's own wind round a big fire, heard (12.6);
+- the roar's places following the flame height as a fire grows; slope on terrain;
+- litter and grass fitted to the prescribed burns among the recordings;
+- water as a substance (hoses, buckets, water over the ground) through FireSpread.AddWater; a grease fire.
+Also open:
 - the crown fire against a real crown-fire recording (none found);
 - the car against more than two recordings;
-- smoke explosions in a closed building;
-- spotting ahead of a crown fire;
-- fire spreading from one thing on a map to the next.
+- smoke explosions in a closed building.
 
 ### The gas hob, the rest (2026-10-10)
 Built, measured against fifteen recordings, not heard (docs/GAS_HOB.md section 10). Open:
