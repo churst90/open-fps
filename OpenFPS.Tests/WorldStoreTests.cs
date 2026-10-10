@@ -102,7 +102,7 @@ public class WorldStoreTests : IDisposable
         Assert.Equal(tile.Terrain.BaseY, back.Terrain.BaseY);
         Assert.Equal("15N/1023/13345", back.Key);
         Assert.Empty(Directory.EnumerateFiles(_dir, "*.tmp", SearchOption.AllDirectories));
-        Assert.True(File.Exists(Path.Combine(_dir, "tiles", "v1", "15N", "1023", "13345", "full.json.gz")));
+        Assert.True(File.Exists(Path.Combine(_dir, "tiles", "v" + WorldStore.GeneratorVersion, "15N", "1023", "13345", "full.json.gz")));
         long total = store.TotalBytes;
         Assert.True(total > 0);
         _o.WriteLine($"a tile of hills: {total / 1024.0:F1} KB on disk");

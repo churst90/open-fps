@@ -784,6 +784,50 @@ Measured (`WorldStreamingTests`, `WorldPlacesTests`):
 
 Walking 700 m east on Magnolia now streams 429 KB (was 608 KB): 10 KB a tile.
 
+### Land cover for the ground (2026-10-10)
+
+Outside the real places every cell of a world tile was dirt. Now each 2 m cell takes a material from ESA
+WorldCover 2021 v200, the land cover gen_osm.py already reads for a place's woods.
+
+Code: `OneWorld/LandCover` (`EsaWorldCover`, `LandCoverMaterials`, `HttpRanges`), `WorldTileService.LandCover`,
+`WorldTile.LandCover`, `world.json` `"LandCover"`. Tests: `WorldLandCoverTests`.
+
+- **Why WorldCover and not NLCD.** WorldCover is global (the world is not only the US), 10 m (NLCD is 30 m),
+  in plain latitude and longitude (NLCD is in its own Albers projection), CC BY 4.0, and the same data the
+  places' woods come from, so a place and the world round it agree. NLCD's classes are richer for the US
+  (developed low to high intensity, deciduous or evergreen forest, pasture apart from crops); that is a
+  possible later layer over the same table, not a reason to give up the rest of the world.
+- **Reading it.** WorldCover is one Cloud-Optimised GeoTIFF per 3 x 3 degrees on S3, 36,000 pixels a side,
+  in deflated blocks of 1,024 pixels (about 8.5 by 9.3 km at 30 degrees north). Only the blocks a tile's
+  cells fall in are fetched, by HTTP byte range: the file's header once (its list of blocks), then each
+  block once. Nothing outside .NET is needed (a TIFF directory reader and `ZLibStream`). A cell's class is
+  the pixel its middle is in, so it is deterministic.
+- **The regional cache** (`world/sources/worldcover/` beside the tiles): each file's header as JSON, and each
+  block as it came, deflated (40 KB on average over N30W096's 1,296 blocks, 122 KB at most; Bobcat Lane's is
+  67 KB). A block serves the thousand-odd world tiles in it, and is read from disk ever after, offline as
+  well. A file that does not exist (the open sea) is remembered by a `.none` marker. The cache is outside
+  the tile store's cap: Texas is about 9,000 blocks, some 400 MB.
+- **The table** (`LandCoverMaterials`), onto the registry's own materials (an unknown name would quietly be
+  Generic): tree cover and mangroves Foliage (the forest floor; footsteps in leaves), grassland, wetland and
+  moss Grass, shrubland, cropland, bare ground and permanent snow Dirt (the registry has no snow), built-up
+  Asphalt (footsteps as cement), permanent water Water (the survey's lakes are flat at the water). A tile
+  lists only the materials it has, in a fixed order, so the same cover is the same bytes.
+- **When it cannot be had** (no network and nothing cached), the tile is made anyway, every cell dirt as
+  before, and the log says "no land cover for tile ... its ground is dirt". Unlike the survey, a tile
+  without land cover is not a hole, so it is not held back.
+- **Licence**: CC BY 4.0. Each tile records the attribution (`LandCover`: "(c) ESA WorldCover project 2021 /
+  Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium"), and the cache
+  has a `SOURCE.txt`.
+- The generator version is 2: tiles made by version 1 (all dirt) are made again when next wanted, and are
+  the first the cap drops. Placed tiles (Magnolia, Albany) are copied again too; their cells stay what the
+  maps have (dirt under lawns and roads).
+
+Measured (`WorldLandCoverTests`, a recording of the four byte ranges one reading of Bobcat Lane's tile asks
+S3 for, 77 KB): every one of its 15,625 cells has the class Magnolia's own landcover.json has there (read
+with rasterio by fetch_place.py); the tile is 70.6 % Foliage, 29.3 % Grass, 0.1 % Asphalt. Reading a tile's
+classes takes about 20 ms from the recording or the cache. The materials add almost nothing to a stored tile
+(the cells were already a byte each).
+
 ### Left after stage 2 (as of 2026-10-09)
 
 - Outside the real places, world tiles hold ground only. The per-tile generator of roads, buildings, addresses and woods that gives
@@ -791,8 +835,8 @@ Walking 700 m east on Magnolia now streams 429 KB (was 608 KB): 10 KB a tile.
 - (Done 2026-10-09: a player who logs out in the world comes back to the same spot at login, through the
   loading screen; the landing map if the ground there cannot be built within 30 s. See Building ahead.)
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
-- (Coarse terrain at 8 m for the far ring: done, above.) The client's tile cache; land cover for the ground's
-  materials (every cell is dirt).
+- (Coarse terrain at 8 m for the far ring: done, above.) The client's tile cache. (Land cover for the
+  ground's materials: done 2026-10-10, above.)
 - (Done 2026-10-09: a driven vehicle is braked to a stop before an edge that is not ready; see Building ahead.)
 
 ## What the broadcast chooses from

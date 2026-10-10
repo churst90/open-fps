@@ -2,6 +2,17 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-10
+
+- The world's ground has its land cover (docs/WORLD_STREAMING.md, "Land cover for the ground"). Outside the
+  real places a world tile's cells were all dirt; now each 2 m cell is what ESA WorldCover 2021 says is
+  there: woods are a leaf-litter floor (Foliage), grassland and wetland Grass, built-up Asphalt, lakes Water,
+  fields, scrub and bare ground Dirt. Read by byte range from WorldCover's Cloud-Optimised GeoTIFFs, a 1,024
+  pixel block at a time, and kept in the store's regional cache (`world/sources/worldcover`), so a block is
+  fetched once and the tiles in it are made offline after. With no land cover to be had the tile is dirt and
+  the log says so. Each tile carries WorldCover's attribution (CC BY 4.0). Generator version 2: stored tiles
+  are made again when next wanted. `world.json` `"LandCover": false` turns it off. Unheard.
+
 ## 2026-10-09
 
 - No crack where far-ring ground meets 2 m ground (docs/WORLD_STREAMING.md, "Coarse ground in the far

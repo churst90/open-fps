@@ -27,6 +27,10 @@ public sealed class WorldTileService
 
     public WorldStore Store { get; }
     public IElevationSource Elevation { get; }
+
+    /// <summary>What covers the ground, for the cells' materials; null leaves every cell dirt. When it cannot
+    /// be had for a tile (no network and nothing cached), the tile is made with dirt and the log says so.</summary>
+    public ILandCoverSource? LandCover { get; set; }
     public int MaxAtOnce { get; }
     public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(2);
     public TimeSpan RetryAfter { get; set; } = TimeSpan.FromSeconds(30);
@@ -190,8 +194,10 @@ public sealed class WorldTileService
                 if (tile == null)
                 {
                     using var cts = new CancellationTokenSource(Timeout);
+                    var cover = CoverAsync(key, cts.Token);
                     var heights = await Elevation.HeightsAsync(key, Posts, Spacing, cts.Token).ConfigureAwait(false);
-                    tile = Make(key, heights, heights == null ? "none" : Elevation.Name);
+                    var (classes, coverName) = await cover.ConfigureAwait(false);
+                    tile = Make(key, heights, heights == null ? "none" : Elevation.Name, classes, coverName);
                 }
                 Store.Write(key, tile, InUse);
                 Interlocked.Increment(ref _made);
@@ -210,9 +216,27 @@ public sealed class WorldTileService
         }
     }
 
+    /// <summary>The land cover's classes for a tile's cells, and its name; (null, null) with no source, where it
+    /// covers nothing, or when it cannot be had now (logged: the tile's ground is dirt).</summary>
+    private async Task<(byte[]? Classes, string? Name)> CoverAsync(WorldTileKey key, CancellationToken ct)
+    {
+        if (LandCover == null) return (null, null);
+        try
+        {
+            var classes = await LandCover.ClassesAsync(key, Posts - 1, Spacing, ct).ConfigureAwait(false);
+            return (classes, classes == null ? null : LandCover.Name);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("World: no land cover for tile {Key} ({Error}); its ground is dirt.", key, ex.Message);
+            return (null, null);
+        }
+    }
+
     /// <summary>A tile from its posts' heights (null: the survey has nothing here, flat open ground at sea
-    /// level), every cell dirt. Posts the survey misses are at sea level too.</summary>
-    public static WorldTile Make(WorldTileKey key, float[]? heights, string source)
+    /// level) and its cells' land cover classes (null: every cell dirt; LandCoverMaterials). Posts the survey
+    /// misses are at sea level too.</summary>
+    public static WorldTile Make(WorldTileKey key, float[]? heights, string source, byte[]? classes = null, string? landCover = null)
     {
         var h = new float[Posts * Posts];
         if (heights != null)
@@ -220,18 +244,19 @@ public sealed class WorldTileService
         float lo = float.MaxValue;
         foreach (float v in h) lo = MathF.Min(lo, v);
         float baseY = MathF.Floor(lo * 100f) / 100f;
+        var (cells, materials) = LandCoverMaterials.Cells(classes, (Posts - 1) * (Posts - 1));
         return new WorldTile
         {
             Key = key.ToString(),
             Generator = WorldStore.GeneratorVersion,
             MadeUtc = DateTime.UtcNow,
             Source = source,
+            LandCover = classes == null ? null : landCover,
             Terrain = new WorldTile.TerrainData
             {
                 Posts = Posts, Spacing = Spacing, BaseY = baseY,
                 HeightsCm = OpenFPS.Common.Geometry.Heightfield.ToCentimetres(h, baseY),
-                Cells = new byte[(Posts - 1) * (Posts - 1)],
-                Materials = new[] { "Dirt" },
+                Cells = cells, Materials = materials,
             },
         };
     }
