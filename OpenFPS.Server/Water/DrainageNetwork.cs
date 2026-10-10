@@ -199,8 +199,16 @@ public sealed class DrainageNetwork
             {
                 int c = s * per + k;
                 byte d = k < t.Drainage.Flow.Length ? t.Drainage.Flow[k] : Drainage.Sink;
-                _next[c] = _surface[c] == (byte)GroundSurface.Water || d >= Drainage.Sink ? Holds : Neighbour(c, d);
+                _next[c] = _surface[c] == (byte)GroundSurface.Water ? Holds : d >= Drainage.Sink ? Holds : Neighbour(c, d);
             }
+        }
+        // A cell with nowhere to drain on the known ground's outer edge drains off it (its window's edge was the
+        // outlet); only one inside holds its water.
+        for (int c = 0; c < CellCount; c++)
+        {
+            if (_next[c] != Holds || _surface[c] == (byte)GroundSurface.Water) continue;
+            for (int d = 0; d < 8; d++)
+                if (Neighbour(c, d) == Leaves) { _next[c] = Leaves; break; }
         }
 
         BreakLoops();

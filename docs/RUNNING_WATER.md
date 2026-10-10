@@ -763,7 +763,7 @@ Every hollow is found (cells whose fill is over nothing, joined across tile edge
 - **A map of a real place** (Magnolia, Albany) routes its whole ground at once and cuts it into tiles, as its
   ground is graded at once (TerrainBuilder: "Graded over the whole map at once, so the posts on a tile's edge
   are the same for both tiles"). Its copies in the world are routed the same way over the world's grid, so a
-  place's world tiles drain as its map: 1,764 of 1,764 sampled cells of nine Magnolia tiles drain the same way.
+  place's world tiles drain as its map: 15,866 of 15,876 sampled cells of nine Magnolia tiles drain the same way.
 - **Joining** (Barnes 2017, Environmental Modelling and Software 92, 202 [recalled]: tiles' own directions,
   linked at their edges and accumulated over the whole): `DrainageNetwork` links each edge cell to the cell it
   drains into in the next tile. Two margins can see a big flat or hollow differently and make a pair of edge
@@ -904,7 +904,8 @@ Through a storm (`--ground-water flows`), L/s:
 | the ditch with the most road, 16.4 ha (1003, -241) | 0 | 13.3 | 0.8 |
 
 Cost: Magnolia's load is 1.5 to 3.9 s longer (the place routed whole 1.1-1.4 s, the network 1.5-2.5 s, the voices
-spawned), on top of about 5 s; a world tile's routing 7.3 ms on one core, its stored drainage a few kilobytes.
+spawned), on top of about 5 s; a world tile's routing 7.3 ms on one core, its stored drainage a few kilobytes; a
+second of Magnolia's ground water on the server (the ladders and 2,210 ponds) 0.46 ms.
 
 ### 13.9 Not built
 

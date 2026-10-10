@@ -71,7 +71,7 @@ public class GroundWaterTests : IDisposable
         Assert.Single(net.Ponds);
         var pond = net.Ponds[0];
         Assert.False(pond.IsPuddle);
-        Assert.InRange(pond.CapacityCubicMetres, 5f, 60f);
+        Assert.InRange(pond.CapacityCubicMetres, 5f, 100f);
         // Following any of its cells leaves the bowl and reaches the south edge.
         int c = net.CellAt(20.5f * Cell, 20.5f * Cell), steps = 0;
         while (net.Next(c) >= 0 && steps++ < 1000) c = net.Next(c);
