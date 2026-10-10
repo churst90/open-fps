@@ -609,7 +609,11 @@ public sealed partial class WorldEditor
             if (c != null) o.Changed.Remove(c);
             data.TryGetValue(id, out var entry);
             o.Removed.RemoveAll(r => r.Id == id);
-            o.Removed.Add(new OverlayRemoval { Id = id, Prefab = c?.Prefab ?? entry?.PrefabId ?? PrefabOf(world, e), Was = c?.Was ?? entry?.Position ?? PoseOf(world, e).Position });
+            o.Removed.Add(new OverlayRemoval
+            {
+                Id = id, Prefab = c?.Prefab ?? entry?.PrefabId ?? PrefabOf(world, e), Was = c?.Was ?? entry?.Position ?? PoseOf(world, e).Position,
+                Name = NameOf(world, e),
+            });
         }
         if (data.Remove(id, out var gone) && _maps.TryGetMapData(mapId, out var map)) map.Entities.Remove(gone);
         int runtime = e.Id;
@@ -638,6 +642,9 @@ public sealed partial class WorldEditor
         catch (Exception ex) { why = ex.Message; return false; }
         if (e == Entity.Null) { why = "it could not be made."; return false; }
         if (d.Form != null) MapManager.ApplyForm(world, e, d, mapId);
+        // A door's sides, a room's materials and indoors, as the map entry says: a thing put back as the
+        // map has it, or a deletion undone, is what the loader made.
+        MapManager.ApplyEntryExtras(world, e, d, mapId);
         if (thing.Settings != null)
             foreach (var (path, value) in thing.Settings) EntitySettings.TrySet(world, e, path, value, out _);
         // A doorway's places, by the map's numbers, as the loader joins them.

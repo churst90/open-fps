@@ -104,6 +104,9 @@ public sealed partial class WorldEditor
             "placed" => PlacedMenu(s, parts.Length > 1 ? string.Join(":", parts[1..]) : HandOf(s).PlacedFilter),
             "placedone" when parts.Length > 1 && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int placedId)
                 => PlacedOneMenu(s, placedId),
+            "changed" => ChangedMenu(s, parts.Length > 1 ? string.Join(":", parts[1..]) : HandOf(s).ChangedFilter),
+            "changedone" when parts.Length > 1 && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int changedId)
+                => ChangedOneMenu(s, changedId),
             "held.nudge" => HeldNudgeMenu(s),
             "held.turn" => HeldTurnMenu(),
             "places" => PlacesMenu(s),
@@ -152,6 +155,8 @@ public sealed partial class WorldEditor
             items.Add(Opens($"Selected: {NameOf(world, e)}", "selected"));
         if (HandOf(s).Held.Count > 0) items.Add(Opens($"Held, {Plural(HandOf(s).Held.Count, "thing")}", "held"));
         items.Add(Opens($"Placed on this map, {Overlays.Get(s.CurrentMapId).Added.Count}", "placed"));
+        var overlay = Overlays.Get(s.CurrentMapId);
+        items.Add(Opens($"Changed on this map, {overlay.Changed.Count + overlay.Removed.Count}", "changed"));
         items.Add(Opens("Places and rooms", "places"));
         items.Add(Opens("Library", "library"));
         items.Add(Opens("Test tools", "test"));

@@ -272,11 +272,22 @@ public sealed partial class WorldEditor
         { Say(reply, "Say /edit goto #NUMBER. /edit placed lists what was placed, with numbers."); return; }
         if (!TryBody(s, reply, out var world, out var feet, out _)) return;
         if (!_maps.TryGetMap(s.CurrentMapId, out _, out _, out var grid, out _)) return;
-        if (!_maps.AuthoredEntities(s.CurrentMapId).TryGetValue(id, out var e) || !world.IsAlive(e) || !world.Has<Transform>(e))
-        { Say(reply, $"There is nothing numbered {id} on this map."); return; }
-        string name = NameOf(world, e);
-        if (SpotBeside(world, grid, e, feet) is not { } spot) { Say(reply, $"There is no room to stand beside {name}."); return; }
-        var (lo, hi) = Box(world, e);
+        Vector3 lo, hi;
+        string name;
+        if (_maps.AuthoredEntities(s.CurrentMapId).TryGetValue(id, out var e) && world.IsAlive(e) && world.Has<Transform>(e))
+        {
+            name = NameOf(world, e);
+            (lo, hi) = Box(world, e);
+        }
+        else if (Overlays.Get(s.CurrentMapId).Removed.FirstOrDefault(r => r.Id == id) is { } removed)
+        {
+            // Something from the map file the editor removed: where it stood.
+            name = $"where {removed.Name ?? KindName(removed.Prefab)} was";
+            var half = SizeAt(removed.Prefab, Vector3.One) * 0.5f;
+            (lo, hi) = (removed.Was - half, removed.Was + half);
+        }
+        else { Say(reply, $"There is nothing numbered {id} on this map."); return; }
+        if (SpotBeside(world, grid, lo, hi, feet) is not { } spot) { Say(reply, $"There is no room to stand beside {name}."); return; }
         var centre = (lo + hi) * 0.5f;
         float face = MathF.Atan2(centre.X - spot.X, centre.Z - spot.Z);
         if (world.Has<OccupantComponent>(s.Entity)) CompositeService.Disembark(world, s.Entity);
@@ -292,9 +303,8 @@ public sealed partial class WorldEditor
 
     /// <summary>Where a body can stand beside a thing: out from its side nearest you first, then round it an
     /// eighth of a turn at a time, on whatever floor is there.</summary>
-    private static Vector3? SpotBeside(World world, SpatialGrid<Entity> grid, Entity e, Vector3 from)
+    private static Vector3? SpotBeside(World world, SpatialGrid<Entity> grid, Vector3 lo, Vector3 hi, Vector3 from)
     {
-        var (lo, hi) = Box(world, e);
         var centre = (lo + hi) * 0.5f;
         float reach = MathF.Max(hi.X - lo.X, hi.Z - lo.Z) * 0.5f + PhysicsConstants.PlayerRadius + 0.5f;
         var away = new Vector3(from.X - centre.X, 0f, from.Z - centre.Z);

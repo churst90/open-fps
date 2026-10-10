@@ -43,6 +43,9 @@ public sealed class OverlayRemoval
     public int Id { get; set; }
     public string Prefab { get; set; } = "";
     public Vector3 Was { get; set; }
+    /// <summary>What it was called when it was removed, for the list of things changed on the map. Null on
+    /// entries kept before 2026-10-10: the prefab's name is said instead.</summary>
+    public string? Name { get; set; }
 }
 
 /// <summary>A thing the editor placed: the whole of it, as a map file would have it, and its settings.</summary>
@@ -295,7 +298,7 @@ public sealed class MapOverlayStore
     /// where the entry says the file had it (or already where the change put it); otherwise any thing of
     /// that prefab at that place; otherwise none.
     /// </summary>
-    private static EntityData? Find(MapData map, Dictionary<int, EntityData> byId, int id, string prefab, Vector3 was, Vector3? now)
+    internal static EntityData? Find(MapData map, Dictionary<int, EntityData> byId, int id, string prefab, Vector3 was, Vector3? now)
     {
         bool Same(EntityData e, Vector3 at) => e.PrefabId.Equals(prefab, StringComparison.OrdinalIgnoreCase)
                                               && Vector3.Distance(e.Position, at) <= FindTolerance;

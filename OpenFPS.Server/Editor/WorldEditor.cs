@@ -64,6 +64,8 @@ public sealed partial class WorldEditor
         public (string Kind, string Id)? DialogModel;
         /// <summary>The words the list of things placed on this map is filtered by.</summary>
         public string PlacedFilter = "";
+        /// <summary>The words the list of things changed from the map file is filtered by.</summary>
+        public string ChangedFilter = "";
     }
 
     private readonly Dictionary<string, Hand> _hands = new(StringComparer.OrdinalIgnoreCase);
@@ -81,6 +83,7 @@ public sealed partial class WorldEditor
             h.Held.Clear();
             h.LastMenu = "root";
             h.PlacedFilter = "";
+            h.ChangedFilter = "";
         }
         return h;
     }
@@ -109,6 +112,7 @@ public sealed partial class WorldEditor
         + "/edit move EAST NORTH UP, /edit move to EAST NORTH UP, /edit nudge DIRECTION [METRES], /edit turn DEGREES, "
         + "/edit face DIRECTION|DEGREES, /edit bring, /edit duplicate, /edit row COUNT [SPACING], /edit delete, /edit set FIELD VALUE, "
         + "/edit placed [WORDS], /edit remove #ID [#ID ...], /edit remove held, /edit goto #ID, "
+        + "/edit changed [WORDS], /edit putback #ID [#ID ...], "
         + "/edit up FIELD, /edit down FIELD, /edit settings, /edit place PREFAB [at cursor], /edit place vehicle:PRESET [at cursor], "
         + "/edit place group ID, /edit building NAME, /edit again, "
         + "/edit build floor|wall|roof|door|window|prefab [FIELD VALUE ...], "
@@ -124,10 +128,11 @@ public sealed partial class WorldEditor
         switch (Word(0))
         {
             case "menu": case "info": case "selected": case "settings": case "fields": case "prefabs":
-            case "find": case "search": case "select": case "hold": case "step": case "dialog": case "placed":
+            case "find": case "search": case "select": case "hold": case "step": case "dialog": case "placed": case "changed":
                 return 0;
             case "delete":
             case "remove":
+            case "putback":
                 // Several at once cost as a row of them does.
                 return 1 + args.Count(a => a.StartsWith('#')) / 10.0 + (Word(1) == "held" ? 4 : 0);
             case "map":
@@ -232,6 +237,8 @@ public sealed partial class WorldEditor
                 else RemoveCommand(s, rest, reply);
                 return;
             case "placed": PlacedCommand(s, rest, reply); return;
+            case "changed": ChangedCommand(s, rest, reply); return;
+            case "putback": PutBackCommand(s, rest, reply); return;
             case "goto": GoTo(s, rest, reply); return;
             case "building": MakeGroup(s, rest, reply, building: true); return;
             case "set": SetField(s, rest, reply, 0); return;

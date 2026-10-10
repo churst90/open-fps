@@ -308,6 +308,17 @@ public sealed class EditorDialog : ModalDialog
             else if (things.Selected < 0 && server != null) things.Select(server);
             _serverThing = server;
         }
+        if (tab.Id == "edit" && tab.Find("edit.changed") is { } changed)
+        {
+            // As the placed list: a row put back has gone, so the one after it is chosen.
+            if (changed.Selected < 0 && _changedNext != null)
+            {
+                changed.Select(_changedNext);
+                _changedNext = null;
+            }
+            if (changed.Selected < 0 && _changedIndex >= 0 && changed.Items.Count > 0) changed.Selected = Math.Min(_changedIndex, changed.Items.Count - 1);
+            _changedIndex = changed.Selected;
+        }
         if (tab.Id == "edit" && tab.Find("edit.placed") is { } placed)
         {
             // The chosen row was removed: the next one is chosen, so the focus stays in the list where it was.
@@ -608,6 +619,7 @@ public sealed class EditorDialog : ModalDialog
                 Button("edit.findgo", "Find"),
             }),
             PlacedSection(),
+            ChangedSection(),
         };
 
         bool has = chosen.Label is { Length: > 0 };
@@ -668,6 +680,32 @@ public sealed class EditorDialog : ModalDialog
             Button("edit.placedgoto", "Go to it", any && mayGo, mayGo ? "Takes you to stand beside it, facing it." : "Needs the move permission on this map."),
             Button("edit.placedchoose", "Edit it", any, "Chooses it: its fields are under Chosen."),
             Button("edit.placedtickall", "Tick all shown", any, "Ticks every thing the list shows, to move, group, save as a building or delete together."),
+        });
+    }
+
+    /// <summary>Things from the map file the editor changed or removed, wherever they are: filtered, put
+    /// back as the map has them, gone to.</summary>
+    private DialogSection ChangedSection()
+    {
+        var info = Items("edit.changedinfo").FirstOrDefault();
+        var rows = Items("edit.changed").ToList();
+        bool any = rows.Count > 0;
+        bool mayGo = (info.Prompt ?? "").Split(' ').Contains("goto");
+        string summary = info.Label is { Length: > 0 } l ? l : "Nothing from the map file has been changed or removed with the editor";
+        var list = LocalList("edit.changed", "Changed on this map",
+            Join(summary + ".", "Things from the map file that were moved, turned, resized, renamed or removed, each with what was done and where it is from you."),
+            any ? rows.Select(r => new DialogItem(r.Label, r.Value)) : new[] { new DialogItem(summary, "") }, enter: "edit.changedchoose");
+        return new DialogSection("changed", "Changed on this map", new[]
+        {
+            LocalBox("edit.changedfilter", "Filter changed things",
+                "Words in a name or a kind, or what was done: moved, turned, removed. within 20 keeps those within 20 metres. Enter filters; nothing typed shows them all.",
+                info.Value ?? "", "edit.changedfiltergo"),
+            Button("edit.changedfiltergo", "Filter"),
+            list,
+            Button("edit.changedputback", "Put it back as the map has it", any,
+                   "Puts the one chosen back where and as the map file has it, or brings back one that was removed. Asks first. Undo changes it again."),
+            Button("edit.changedgoto", "Go to it", any && mayGo, mayGo ? "Takes you to stand beside it, or where it was, facing it." : "Needs the move permission on this map."),
+            Button("edit.changedchoose", "Edit it", any, "Chooses it: its fields are under Chosen. A removed thing must be put back first."),
         });
     }
 
@@ -740,6 +778,9 @@ public sealed class EditorDialog : ModalDialog
     /// <summary>The placed row to choose once the one being removed has gone, and where the choice was.</summary>
     private string? _placedNext;
     private int _placedIndex = -1;
+    /// <summary>The same for the list of things changed from the map file.</summary>
+    private string? _changedNext;
+    private int _changedIndex = -1;
 
     private static string Suggest(string id)
     {
@@ -874,6 +915,9 @@ public sealed class EditorDialog : ModalDialog
                 return;
             case "edit.placed":
                 _placedIndex = c.Selected;
+                return;
+            case "edit.changed":
+                _changedIndex = c.Selected;
                 return;
             case "edit.things":
                 if (c.SelectedValue is { } thing && thing != _serverThing)
@@ -1020,6 +1064,35 @@ public sealed class EditorDialog : ModalDialog
                 _send($"/edit select #{chooseId}");
                 return;
             case "edit.placedtickall": _send("/edit select add placed dialog"); return;
+
+            case "edit.changedfiltergo":
+                _send(string.Join(" ", new[] { "/edit changed", Text("edit.changedfilter"), "dialog" }.Where(w => w.Length > 0)));
+                return;
+            case "edit.changedputback":
+            {
+                var list = Get("edit.changed");
+                if (list?.SelectedValue is not { Length: > 0 } backId) { Said?.Invoke("Choose a thing in the list first."); FocusAsked?.Invoke("edit.changed"); return; }
+                int at = list.Selected;
+                _changedNext = list.Items.ElementAtOrDefault(at + 1)?.Value ?? list.Items.ElementAtOrDefault(at - 1)?.Value;
+                var row = Items("edit.changed").FirstOrDefault(r => r.Value == backId);
+                string name = row.Help is { Length: > 0 } n ? n : "it";
+                ConfirmAsked?.Invoke(row.Prompt == "removed" ? $"Bring back {name} as the map has it?" : $"Put {name} back as the map has it?",
+                                     () => _send($"/edit putback #{backId} dialog"));
+                return;
+            }
+            case "edit.changedgoto":
+                if (Get("edit.changed")?.SelectedValue is not { Length: > 0 } toId) { Said?.Invoke("Choose a thing in the list first."); FocusAsked?.Invoke("edit.changed"); return; }
+                _send($"/edit goto #{toId}");
+                return;
+            case "edit.changedchoose":
+            {
+                if (Get("edit.changed")?.SelectedValue is not { Length: > 0 } pickId) { Said?.Invoke("Choose a thing in the list first."); FocusAsked?.Invoke("edit.changed"); return; }
+                var row = Items("edit.changed").FirstOrDefault(r => r.Value == pickId);
+                if (row.Prompt == "removed") { Said?.Invoke($"{(row.Help is { Length: > 0 } n ? n : "It")} has been removed. Put it back first to change it."); return; }
+                _askedThing = null;
+                _send($"/edit select #{pickId}");
+                return;
+            }
 
             case "build.duplicate":
             {

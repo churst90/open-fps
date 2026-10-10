@@ -180,6 +180,16 @@ public sealed partial class WorldEditor
                 Prompt = one.Kind, Help = one.Name, Checked = hand.Held.Contains(one.Id),
             });
 
+        // Things from the map file changed or removed: the same, with "removed" or "changed" in the row's Prompt.
+        var changed = ChangedList(s, hand.ChangedFilter, out int changedTotal, out int lost);
+        items.Add(Line("edit.changedinfo", ChangedSummary(changed.Count, changedTotal, lost, hand.ChangedFilter), hand.ChangedFilter, prompt: MayGo(s) ? "goto" : ""));
+        foreach (var one in changed.Take(PlacedListed))
+            items.Add(new EditorMenuItem
+            {
+                Section = "edit.changed", Kind = EditorItemKind.Info, Label = one.Label, Value = one.Id.ToString(CultureInfo.InvariantCulture),
+                Prompt = one.Removed ? "removed" : "changed", Help = one.Name,
+            });
+
         if (!Holding(s, out _, out var chosen, out int chosenId)) return items;
         items.Add(Line("edit.chosen", NameOf(world, chosen), chosenId.ToString(CultureInfo.InvariantCulture), Summary(s, world, chosen, chosenId)));
         var t = world.Get<Transform>(chosen);

@@ -400,6 +400,26 @@ public class MapManager
     }
 
     /// <summary>
+    /// What a map entry says over its prefab besides its place and form, laid on a thing made again
+    /// from it after load (the world editor's undo and "put it back as the map has it"): a room's
+    /// materials, which side of a door is locked and which way it is pushed, whether a place is indoors.
+    /// The same as the loader lays them.
+    /// </summary>
+    public static void ApplyEntryExtras(World world, Entity entity, Repositories.EntityData entityData, string mapId)
+    {
+        ApplyRoomMaterials(world, entity, entityData, mapId);
+        if (world.Has<DoorComponent>(entity) && (entityData.KeyedSide.HasValue || entityData.PushSide.HasValue))
+        {
+            ref var door = ref world.Get<DoorComponent>(entity);
+            if (entityData.KeyedSide.HasValue)
+                door.KeyedSide = entityData.KeyedSide > 0 ? 1f : entityData.KeyedSide < 0 ? -1f : 0f;
+            if (entityData.PushSide.HasValue) door.PushSide = entityData.PushSide < 0 ? -1f : 1f;
+        }
+        if (entityData.IsIndoor.HasValue && world.Has<RegionComponent>(entity))
+            world.Get<RegionComponent>(entity).IsIndoor = entityData.IsIndoor.Value;
+    }
+
+    /// <summary>
     /// Things copied from a map into a live map (a world tile, OneWorld.WorldPlaces): each spawned at its
     /// place moved by <paramref name="offset"/>, its doorways linked to the rooms among them by the ids in
     /// the file, every one indexed. Their rooms carry what was measured on the map (no survey here). The
@@ -1117,6 +1137,36 @@ public class MapManager
 
     /// <summary>A map's road network, if it has roads.</summary>
     public bool TryGetRoads(string id, out RoadNetwork roads) => _roads.TryGetValue(id, out roads!);
+
+    /// <summary>The file a loaded map was read from (or would be written to); null for a map that is not
+    /// loaded or is a frame of the world.</summary>
+    public string? FileOf(string mapId) => TryGetMapData(mapId, out var data) && !data.IsWorld ? _mapRepo.PathFor(data) : null;
+
+    /// <summary>
+    /// A loaded map's own file, read again as it is on disk now, without the world editor's overlay: what
+    /// "as the map has it" means. Things without ids are numbered as the loader numbers them. Null if the
+    /// map has no file or it does not read.
+    /// </summary>
+    public MapData? ReadOwnFile(string mapId)
+    {
+        string? path = FileOf(mapId);
+        if (path == null || !File.Exists(path)) return null;
+        try
+        {
+            var data = MapRepository.LoadFromFile(path);
+            if (data != null) Editor.MapOverlayStore.AssignMissingIds(data);
+            return data;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("MapManager: could not read {Path} again: {Error}", path, ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>Writes a map's data to its own file (the world editor's bake). The caller has said which
+    /// maps may be written.</summary>
+    public void WriteOwnFile(MapData data) => _mapRepo.Save(data);
 
     /// <summary>A loaded map's data, from memory.</summary>
     public bool TryGetMapData(string id, out MapData data)
