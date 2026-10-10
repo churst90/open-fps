@@ -751,8 +751,10 @@ value.
   tail level.
 - `/reverb`: how the tracing is doing. The tail is traced from the geometry everywhere.
 - `/valveflow on|off`: the rush of gas through each exhaust valve as it opens, on every engine.
+- `/enginedetail on|off`: whether engines far under the loudest machine run at reduced detail (on, the
+  default), or every engine in full.
 
-`/tail`, `/copies`, `/reflections`, `/cabin`, `/echoes` and `/valveflow` last until you quit.
+`/tail`, `/copies`, `/reflections`, `/cabin`, `/echoes`, `/valveflow` and `/enginedetail` last until you quit.
 `/levels`, `/listening`, `/beacons`, `/narrate`, `/bumps`, `/aimassist`, `/detail`, `/track` and `/drivecues` are saved.
 
 `/track KIND` chooses what comma and period step through, like Shift+comma and Shift+period.

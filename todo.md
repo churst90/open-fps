@@ -62,7 +62,9 @@ because the one world costs CPU and bandwidth first.
     without permission) are built, untried with Orca and NVDA.
 11. Weather as a system (item 12): rain, wet roads, wind and fire tied together.
 12. Cars in full detail: the distant-car cycle cache first (also a performance win), then lopey idle,
-    suspension, drivetrain, tyres and F1 steepening.
+    suspension, drivetrain, tyres and F1 steepening. 2026-10-09, waiting on Cody's ear
+    (inbox/engine-cpu-2026-10-09): each far engine replays its own last cycles while steady (the cache
+    per engine); the shared grid per engine type, below, is what is left of it.
 13. Enemies, Dinosaur World, melee and NPC inventories (items 6 and 11).
 
 Matter (Cody, 2026-10-10): every material interacts with every other as in real life; wind moves things
@@ -419,6 +421,10 @@ Synth video (inbox, transcribed): ours is the more physical model; these are wha
   a grid of rpm and load, denser at low rpm where the sound changes fastest, several cycles per point so the
   variation survives. Made at first launch and kept on disk per build, like the door renders, and shipped in
   the Windows zip. Near and driven cars stay live; distant and borrowed cars play the stored cycles.
+  Done per engine (2026-10-09, EngineSynth.Detail.cs, CycleCache): a far engine running steadily replays its
+  own last six cycles, and runs live at half rate otherwise; a cruising far car replays about 60 % of the
+  time. Left: the grid per type, so a far car accelerating, braking or hunting at idle replays too (the
+  live half-rate engine covers those now), with the crank's speed from the grid's mean torque.
 - Cycle-to-cycle combustion variation: peak pressure, timing and burn rate vary from cycle to cycle and
   cylinder to cylinder, more at idle, light load and with big cam overlap; occasional misfires. The lopey,
   choppy idle of a cammed V8 comes from this.

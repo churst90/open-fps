@@ -47,6 +47,17 @@ public sealed class SmallMachineSynth
     /// model turn at quite the same speed.</summary>
     public float FanSpeedFraction { get; set; } = 1f;
 
+    /// <summary>How much of the engine, if it has one, is integrated (EngineDetail): a mower far under
+    /// the loudest machine runs it at half rate, or replays its cycles while it stands steady.</summary>
+    public OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail EngineDetail
+    {
+        get => _engine?.Detail ?? OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
+        set { if (_engine != null) _engine.Detail = value; }
+    }
+
+    /// <summary>What the engine's detail is doing, for instruments.</summary>
+    internal string EngineDetailState => _engine?.DetailState ?? "none";
+
     // ── What it is doing, after Step() ──────────────────────────────────────────────────────────
 
     public float Engine { get; private set; }
@@ -246,7 +257,8 @@ public sealed class SmallMachineSynth
         // ── The deck ────────────────────────────────────────────────────────────────────────────
         // The blade's noise leaves the open bottom, and the pan adds some back at its two resonances
         // (a quarter wave over its depth, a half wave across).
-        if (Spec.Deck != null)
+        // "is not null", not "!= null": a record's != is its Equals, every sample.
+        if (Spec.Deck is not null)
         {
             // The pan adds: as a blend of direct and filtered the deck was a five decibel loss.
             blades += _deckWet * (_deckDepth.Process(blades) + 0.7f * _deckWidth.Process(blades)) * 2.4f;
