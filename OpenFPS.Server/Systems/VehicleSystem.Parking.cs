@@ -41,8 +41,9 @@ internal sealed class ParkState
     public bool Chirped;
     /// <summary>Ridden, not sat in: two tyres and no doors to open or a fob to chirp.</summary>
     public bool Ridden;
-    /// <summary>Somebody had the door open already when they got to it, so they leave it open.</summary>
-    public bool FoundOpen;
+    /// <summary>Their way through the building's door, in or out: how they found it, and so what they do
+    /// with it behind them (<see cref="DoorManners"/>).</summary>
+    public DoorManners.Passage? Passage;
 }
 
 /// <summary>
@@ -61,6 +62,7 @@ public sealed partial class VehicleSystem
 
     private readonly HashSet<string> _spotsFound = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _doorsInUse = new();
+    private readonly DoorManners _manners = new();
 
     /// <summary>Walking pace, m/s.</summary>
     private const float WalkSpeed = 1.35f;
@@ -247,35 +249,35 @@ public sealed partial class VehicleSystem
                 pk.Leg = 0; pk.Step++; break;
             case 3:                                            // round the back of it to the door
                 if (pk.Chirp && pk.Clock >= 5.0f) { pk.Chirp = false; pk.Chirped = true; ChirpLock(world, v); }
-                if (Walk(world, pk, dt)) { pk.FoundOpen = OpenFor(world, pk.Spot.Door, pk.Spot.Outside, pk.Driver); pk.Clock = 0f; pk.Step++; }
+                if (Walk(world, pk, dt))
+                {
+                    pk.Passage = _manners.Reach(world, pk.Spot.Door, pk.Spot.Outside, pk.Spot.Inside, pk.Driver);
+                    pk.Clock = 0f; pk.Step++;
+                }
                 break;
             // Through it, once it is open: a door with a sensor opens as they come up to it, and takes
             // its own time about it.
             case 4 when pk.Clock >= 1.3f && (DoorSystem.OpenEnough(world, pk.Spot.Door) || pk.Clock >= 8f):
                 pk.Route = new[] { pk.Spot.Inside }; pk.Leg = 0; pk.Step++; break;
             case 5:
-                if (Walk(world, pk, dt)) { pk.Clock = 0f; pk.Step++; }
+                // Through: the door is theirs to shut behind them or not (DoorManners), once they are
+                // out of the doorway, and never on anybody in it.
+                if (Walk(world, pk, dt)) { _manners.Through(v.MapId, world, pk.Passage, pk.Driver); pk.Clock = 0f; pk.Step++; }
                 break;
-            case 6 when pk.Clock >= 1.0f:                      // shut it behind them, and they are in
-                // As they found it, and never on a person standing in it: a rider once shut a door
-                // Cody had opened (2026-10-02).
-                if (!pk.FoundOpen && !ClosesItself(world, pk.Spot.Door) && !SomeoneAt(world, pk.Spot.Door))
-                    DoorSystem.Set(world, pk.Spot.Door, false, who: pk.Driver);
+            case 6 when pk.Clock >= 1.0f:                      // and they are in
                 RemovePerson(v, pk);
                 pk.Clock = 0f; pk.Step++; break;
-            case 7 when pk.Clock >= pk.Away:                   // and back out
-                pk.FoundOpen = OpenFor(world, pk.Spot.Door, pk.Spot.Inside, pk.Driver);
+            case 7 when pk.Clock >= pk.Away:                   // and back out, opening it from inside
+                pk.Passage = _manners.Reach(world, pk.Spot.Door, pk.Spot.Inside, pk.Spot.Outside, pk.Driver);
                 pk.Clock = 0f; pk.Step++; break;
             case 8 when pk.Clock >= 1.3f:
                 pk.Driver = SpawnPerson(v, pk.Spot.Inside, heading);
                 pk.Route = new[] { pk.Spot.Outside }; pk.Leg = 0; pk.Step++; break;
             case 9:
                 if (!DoorSystem.OpenEnough(world, pk.Spot.Door) && pk.Clock < 8f) break;
-                if (Walk(world, pk, dt)) { pk.Clock = 0f; pk.Step++; }
+                if (Walk(world, pk, dt)) { _manners.Through(v.MapId, world, pk.Passage, pk.Driver); pk.Clock = 0f; pk.Step++; }
                 break;
             case 10 when pk.Clock >= 0.8f:
-                if (!pk.FoundOpen && !ClosesItself(world, pk.Spot.Door) && !SomeoneAt(world, pk.Spot.Door))
-                    DoorSystem.Set(world, pk.Spot.Door, false, who: pk.Driver);
                 // Unlocked from the pavement as they come back to it: two short chirps.
                 if (pk.Chirped && v.Horn.Length > 0) Honk(v.MapId, world, v, new[] { 0.04f, 0.12f, 0.04f });
                 pk.Route = new[] { kerb, roadBehind, standBy }; pk.Leg = 0; pk.Step++; break;
@@ -381,38 +383,4 @@ public sealed partial class VehicleSystem
         if (v.Horn.Length == 0) return;
         Honk(v.MapId, world, v, new[] { 0.045f });
     }
-
-    /// <summary>
-    /// Opens a door for somebody standing at <paramref name="at"/>: by hand, or, for a door with a
-    /// sensor, by being there. True when it is not theirs to shut afterwards: somebody had it open
-    /// already, or it opens and shuts itself.
-    /// </summary>
-    private static bool OpenFor(World world, Entity door, Vector3 at, Entity who)
-    {
-        if (!world.IsAlive(door) || !world.Has<DoorComponent>(door)) return true;
-        if (!DoorSystem.OpensByHand(world.Get<DoorComponent>(door))) return true;
-        return !DoorSystem.Set(world, door, true, by: at, who: who);
-    }
-
-    /// <summary>A door with a closer or a motor shuts itself; nobody pulls it to behind them.</summary>
-    private static bool ClosesItself(World world, Entity door)
-        => world.IsAlive(door) && world.Has<DoorComponent>(door) && world.Get<DoorComponent>(door).CloseAfterSeconds > 0f;
-
-    /// <summary>Whether a player stands within reach of a door's doorway: it is not shut on them.</summary>
-    private static bool SomeoneAt(World world, Entity door)
-    {
-        if (!world.IsAlive(door) || !world.Has<Transform>(door)) return false;
-        var at = world.Get<Transform>(door).Position;
-        // Where it shuts, in the world: a door in a building keeps its shut pose in the building's frame.
-        if (world.Has<DoorComponent>(door)) DoorSystem.Doorway(world, door, out at, out _);
-        bool near = false;
-        world.Query(new QueryDescription().WithAll<Transform, PlayerComponent>(), (ref Transform t) =>
-        {
-            if (!near && Vector3.Distance(t.Position, at) < DoorwayReach) near = true;
-        });
-        return near;
-    }
-
-    /// <summary>How near a person has to be to a doorway for it not to be shut on them, metres.</summary>
-    private const float DoorwayReach = 2.0f;
 }

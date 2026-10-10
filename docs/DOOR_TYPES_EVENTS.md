@@ -122,6 +122,40 @@ No leaf moves into a space a person occupies, whatever moves it: a hand, a close
 `DoorSystem.InTheWay(world, door, to, who)` says who is in the way. `DoorSystem.Set` refuses a hand
 close by itself, so every caller (E, `/close`, parked drivers) gets the rule.
 
+## What the server's people do with a door
+
+Cody, 2026-10-08 (docs/CODY_ASKS_2026-10-08.md section 9). `DoorManners` in `OpenFPS.Server/Systems`.
+It covers everybody the server walks through a door: Alex going in and out of a lobby, and the driver
+of a parked car going into a building and coming back out. The 352 city walkers keep to the
+pavements and go through no door.
+
+When they reach a door they note whether it is open, and open it if it is shut and opens by hand (a
+door with a sensor opens for them by itself). Once they are through, what they do depends on the door:
+
+| The door | What they do |
+|---|---|
+| Shuts itself: a closer, a motor or a sensor (push bar, glass front, glass pull, automatic, lift) | Let it go. The closer shuts it once nobody is in the doorway |
+| Outside door with no closer (one side is the outside or a region that is not indoors) | Shut it behind them, however they found it |
+| Inside door, going in | Leave it as they found it: shut again if they opened it, open if it was open |
+| Inside door, going out | Shut it behind them |
+
+"In" is away from the street. The side further from the outside, counted in doorways through the
+map's portals, is in; if both sides are the same number of doorways from the outside, the smaller
+room is in. A door that cannot be told about is treated as going in, so it is left as found.
+
+They shut it by hand, the way a player does (`DoorSystem.Set`), so it makes the same swing and latch
+sounds from the same door model. The shut comes 0.4 to 0.9 s after they are out of the doorway (the
+`DoorSystem.InDoorway` box), the pause fixed for each person and door. A door is never shut while:
+
+- they are still in the doorway. After 10 s of that, they are standing in it, and it is left;
+- anybody else is in the doorway, or a player is within 2 m of its middle. It is left for them;
+- they found it open and a player is within 8 m of it. Somebody has it open on purpose: a rider once
+  shut Brandt Court's front door on Cody, who had opened it to listen to the street (2026-10-02);
+- anybody is in the way of the leaf (`DoorSystem.InTheWay`);
+- somebody else has shut it or has hold of it already.
+
+A person killed on the way shuts nothing.
+
 ## Event keys
 
 Each event is a world sound whose label is `door:KIND:EVENT`. An event with no sound yet is
