@@ -374,8 +374,11 @@ public partial class ClientAudioSystem
     /// jitter). Null: unseeded, as in the game.</param>
     /// <param name="prewarm">Render the city's doors in the background at start (<see cref="WorldAudioPlayer"/>).
     /// A test that plays no door has no use for minutes of a core.</param>
+    /// <param name="beacons">The beacon choices; null reads the player's beacons.json. A lab render passes
+    /// its own, so the player's settings neither colour it nor are written.</param>
     internal ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state,
-                               Func<double> clock, bool manualAcoustics = false, int? seed = null, bool prewarm = true)
+                               Func<double> clock, bool manualAcoustics = false, int? seed = null, bool prewarm = true,
+                               BeaconPreferences? beacons = null)
     {
         _now = clock;
         _audio = audio;
@@ -385,7 +388,7 @@ public partial class ClientAudioSystem
         _spatial = new SpatialService();
         _acoustics = new SpatialAcoustics(_spatial);
         // After the acoustics, which it needs: a beacon behind a wall is not blipped.
-        _beacons = new BeaconAids(audio, acoustics: _acoustics);
+        _beacons = new BeaconAids(audio, beacons, acoustics: _acoustics);
         // Shares this system's acoustics, so a rendered latch takes exactly the path a recorded one would.
         WorldAudio = new WorldAudioPlayer(_audio, _acoustics, prewarm: prewarm && !manualAcoustics);
         WorldAudio.HornReceived = StartHorn;
@@ -3476,6 +3479,11 @@ public partial class ClientAudioSystem
         step.EffectiveDistance = path.EffectiveDistance;
         if (path.RegionId >= 0) step.TargetRegionId = path.RegionId;
         step.CarriesPath = true;
+        // OPENFPS_AUDIO_DEBUG=1: the path somebody else's step starts on, on the audio clock.
+        if (_footTrace)
+            Serilog.Log.Information("[STEP] other {Id} at ({X:F2},{Y:F2},{Z:F2}) occ {Occ:F2} eq {L:F4}/{M:F4}/{H:F4} bleed {B:F2} aperture {A:F2} apparent ({AX:F1},{AY:F1},{AZ:F1}) region {R} t {T:F3}",
+                step.EntityId, at.X, at.Y, at.Z, path.Occlusion, path.EqLow, path.EqMid, path.EqHigh, path.TransmissionBleed,
+                path.ApertureFactor, path.ApparentPosition.X, path.ApparentPosition.Y, path.ApparentPosition.Z, path.RegionId, OpenFPS.Common.AudioClock.Now);
     }
 
     /// <summary>
