@@ -71,6 +71,13 @@ A parallel piece of work is turning `WindField` and `Runoff` from statics into a
 that the host feeds. This design feeds that instance and calls it **the per-world weather the host feeds**.
 It needs nothing more from it than a place to put conditions in.
 
+Built 2026-10-10 (docs/SOUND_LIBRARY_BOUNDARY.md section 18), on the sound side: `WorldWeather`
+(`OpenFPS.Sound/WorldWeather.cs`), one per audio world, which fetches nothing. Its members are `Wind` (the
+`WindWeather` ramp, swapped whole), `Runoff` (advanced with the rain falling, `Update(rainMmPerHour, now)`),
+`Ground` (the server's `GroundWater` state, `Load`), the lab's `MeanSpeed`, `FromDegrees` and `Turbulence`, and
+`SpeedAt`. The client fills it from each `WorldStateUpdate` as before, so whatever this design puts in the
+broadcast reaches it unchanged; a host with weather of its own sets those members directly.
+
 On the world, each frame (a map made by the server, 6 km each way, `MapData.IsWorld`) is already its own map
 id, so the per-map broadcast is already per frame. That is the unit real weather is fed at.
 
