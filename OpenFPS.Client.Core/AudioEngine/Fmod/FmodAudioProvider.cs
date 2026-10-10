@@ -356,6 +356,56 @@ public partial class FmodAudioProvider : IAudioProvider
         return wash;
     }
 
+    /// <summary>A loudspeaker's beam unit and the state its callback reads, pooled with its handle.</summary>
+    private sealed class PooledRadiatorDsp
+    {
+        public FMOD.DSP Dsp;
+        public System.Runtime.InteropServices.GCHandle Handle;
+        public readonly RadiatorState State = new();
+    }
+    private readonly System.Collections.Concurrent.ConcurrentStack<PooledRadiatorDsp> _radiatorPool = new();
+
+    /// <summary>A beam unit at unity. Pooled units are detached, so the state is safe to change.</summary>
+    private PooledRadiatorDsp? GetRadiatorDsp()
+    {
+        if (!_radiatorPool.TryPop(out var unit))
+        {
+            unit = new PooledRadiatorDsp();
+            if (RadiatorProcessor.CreateDSP(_system, unit.State, out unit.Dsp, out unit.Handle) != RESULT.OK) return null;
+        }
+        _system.getSoftwareFormat(out int rate, out _, out _);
+        unit.State.Configure(rate);
+        return unit;
+    }
+
+    private void ReleaseRadiatorDsp(ActiveSound active)
+    {
+        ReleaseRadiatorUnit(active.Channel, active.RadiatorDsp);
+        ReleaseRadiatorUnit(active.Channel, active.RadiatorPowerDsp);
+        active.RadiatorDsp = null;
+        active.RadiatorPowerDsp = null;
+    }
+
+    private void ReleaseRadiatorUnit(FMOD.Channel channel, PooledRadiatorDsp? unit)
+    {
+        if (unit == null) return;
+        if (!Detach(channel, unit.Dsp, "loudspeaker beam"))
+        {
+            unit.Dsp.setUserData(IntPtr.Zero);
+            if (unit.Handle.IsAllocated) _retiredHandles.Add(unit.Handle);
+            return;
+        }
+        _radiatorPool.Push(unit);
+    }
+
+    /// <summary>The cosine off a loudspeaker's axis toward the listener, or 1 when there is no telling.</summary>
+    private static float OffAxis(Vector3 direction, Vector3 source, Vector3 listener)
+    {
+        Vector3 toListener = listener - source;
+        if (toListener.LengthSquared() < 1e-6f || direction.LengthSquared() < 1e-6f) return 1f;
+        return Vector3.Dot(Vector3.Normalize(direction), Vector3.Normalize(toListener));
+    }
+
     private void ReleaseWashDsp(ActiveSound active)
     {
         var wash = active.Wash;
@@ -481,6 +531,15 @@ public partial class FmodAudioProvider : IAudioProvider
         public FMOD.DSP DiffractionDsp;
         /// <summary>A recording's copy off a rough wall: its smear (EchoWashState), pooled.</summary>
         public PooledWashDsp? Wash;
+        /// <summary>A loudspeaker's beam, band by band (RadiatorState), pooled; with the model it is aimed
+        /// from, the program's band energies, and the share of the on-axis level a room is fed with.</summary>
+        public PooledRadiatorDsp? RadiatorDsp;
+        /// <summary>Ahead of the own-room send: the power it radiates all round, band by band. With it the
+        /// beam unit carries the beam over that power.</summary>
+        public PooledRadiatorDsp? RadiatorPowerDsp;
+        public OpenFPS.Common.Radiator? Radiator;
+        public float[]? RadiatorBandEnergy;
+        public float RadiatedGain = 1f;
         
         // Granular state
         public FMOD.DSP GranularDsp;
@@ -1769,7 +1828,8 @@ public partial class FmodAudioProvider : IAudioProvider
             if (a.EchoLeaving && a.EchoWeight <= 0f) { (gone ??= new()).Add(a); continue; }
             float d = MathF.Max(1f, Vector3.Distance(_listenerPos, a.CurrentApparentPosition));
             float law = Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, d) * d;   // the law over 1/d
-            rig.InputGain = a.BaseVolume * a.FadeGain * law * a.EchoWeight * TailTrim;
+            // A loudspeaker feeds the walls with what it radiates all round, not its on-axis level.
+            rig.InputGain = a.BaseVolume * a.FadeGain * law * a.EchoWeight * TailTrim * a.RadiatedGain;
             rig.Orientation = orient;
             echoes.SetSource(rig.Slot, a.CurrentApparentPosition);
             // The mirror images give way once the trace carries most of it, and come back first.
@@ -2792,6 +2852,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 emitter.EntityId, emitter.SoundId, emitter.Position.X, emitter.Position.Y, emitter.Position.Z, emitter.Range);
 
         FMOD.DSP threeEqDsp = default, diffractionDsp = default;
+        PooledRadiatorDsp? radiatorDsp = null;
         SteamAudioVoiceState? saState = null;
         FMOD.DSP saDsp = default;
         System.Runtime.InteropServices.GCHandle saHandle = default;
@@ -2829,12 +2890,30 @@ public partial class FmodAudioProvider : IAudioProvider
                 channel.setMode((fallbackMode & ~Rolloff.Either) | MODE._3D | MODE._3D_INVERSEROLLOFF);
                 channel.set3DLevel(1.0f);
             }
+            // A loudspeaker's beam, band by band, on either path; ahead of the HRTF, so the binaural
+            // stage and FMOD's panner get the same shaped voice. Aimed before its first block.
+            if (emitter.Radiator != null && !emitter.IsReflection)
+            {
+                radiatorDsp = GetRadiatorDsp();
+                if (radiatorDsp != null)
+                {
+                    Span<float> aim = stackalloc float[OpenFPS.Common.Radiator.Bands];
+                    emitter.Radiator.Gains(OffAxis(emitter.Direction, emitter.Position, _listenerPos), aim);
+                    radiatorDsp.State.Start(aim);
+                    if (channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, radiatorDsp.Dsp) != RESULT.OK)
+                    {
+                        _radiatorPool.Push(radiatorDsp);
+                        radiatorDsp = null;
+                    }
+                }
+            }
             // Never 3D calls on a channel made 2D: FMOD refuses with ERR_NEEDS3D, 113,228 times in a
             // 25 s run (91 % of its log), each taking FMOD's lock on the game thread against the mixer.
             if (saState == null)
             {
                 channel.set3DMinMaxDistance(emitter.MinDistance, emitter.Range);
-                if (emitter.ConeInside < 360f)
+                // A loudspeaker's beam is its radiator's, not a flat cone.
+                if (emitter.ConeInside < 360f && emitter.Radiator == null)
                 {
                     channel.set3DConeSettings(emitter.ConeInside, emitter.ConeOutside, emitter.ConeOutsideVolume);
                     FMOD.VECTOR fdir = FmodHelpers.ToFmodVec(emitter.Direction);
@@ -2914,6 +2993,9 @@ public partial class FmodAudioProvider : IAudioProvider
                 EntityId = emitter.EntityId, SoundId = emitter.SoundId, Type = emitter.Type, 
                 OverloadExempt = overDb > 0f,
                 Channel = channel, ThreeEqDsp = threeEqDsp, DiffractionDsp = diffractionDsp, Wash = wash,
+                RadiatorDsp = radiatorDsp, Radiator = emitter.IsReflection ? null : emitter.Radiator,
+                RadiatorBandEnergy = emitter.RadiatorBandEnergy,
+                RadiatedGain = emitter.Radiator != null && !emitter.IsReflection ? Math.Clamp(emitter.RadiatedGain, 0.01f, 1f) : 1f,
                 GranularDsp = granularDsp, GranularHandle = granularHandle, GranularState = granularState,
                 SynthDsp = synthDsp, SynthHandle = synthHandle, SynthState = synthState,
                 EngineDsp = engineDsp, EngineHandle = engineHandle, EngineState = engineState, EchoState = echoState,
@@ -2977,6 +3059,27 @@ public partial class FmodAudioProvider : IAudioProvider
                     activeSound.ReverbConnection.setMix(AcousticConstants.ReverbSendMix * AcousticConstants.ReverbCrossSendScale);
                     activeSound.ReverbMix = 1f;
                     activeSound.CurrentRegionId = _listenerRegionId;
+                }
+            }
+
+            // A loudspeaker's power all round, ahead of its own room's send: the room is fed with what
+            // the speaker radiates band by band (dark, from a horn), and the beam after the tap makes up
+            // the rest toward you. Ahead of the tap, so added after it.
+            if (activeSound.RadiatorDsp != null && activeSound.Radiator != null)
+            {
+                var power = GetRadiatorDsp();
+                if (power != null)
+                {
+                    Span<float> share = stackalloc float[OpenFPS.Common.Radiator.Bands];
+                    activeSound.Radiator.PowerGains(share);
+                    power.State.Start(share);
+                    if (activeSound.Channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, power.Dsp) == RESULT.OK)
+                    {
+                        activeSound.RadiatorPowerDsp = power;
+                        activeSound.Radiator.BeamOverPower(OffAxis(emitter.Direction, emitter.Position, _listenerPos), share);
+                        activeSound.RadiatorDsp.State.Start(share);
+                    }
+                    else _radiatorPool.Push(power);
                 }
             }
 
@@ -3139,7 +3242,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 if (active.SaState == null)
                 {
                     active.Channel.set3DMinMaxDistance(active.MinDistance, emitter.Range);
-                    if (emitter.ConeInside < 360f)
+                    if (emitter.ConeInside < 360f && active.Radiator == null)
                     {
                         active.Channel.set3DConeSettings(emitter.ConeInside, emitter.ConeOutside, emitter.ConeOutsideVolume);
                         FMOD.VECTOR fdir = FmodHelpers.ToFmodVec(emitter.Direction);
@@ -3488,6 +3591,7 @@ public partial class FmodAudioProvider : IAudioProvider
         ReleaseThreeEqDsp(active.Channel, active.ThreeEqDsp);
         ReleaseDiffractionDsp(active.Channel, active.DiffractionDsp);
         ReleaseWashDsp(active);
+        ReleaseRadiatorDsp(active);
         ReleaseSendTapDsp(active);
         ReleaseEar(active);
         // The owned units too: FMOD refuses to release an attached unit ("Failed to release because
@@ -3857,7 +3961,22 @@ public partial class FmodAudioProvider : IAudioProvider
         // the inner cone, ConeOutsideVolume past the outer, smooth between.
         float coneAtten = 1.0f;
         float coneOffAxis = 0.0f; // 0 = on-axis, 1 = fully outside the cone (drives the off-axis timbre)
-        if (active.SaState != null && active.ConeInside < 360f && active.Direction != Vector3.Zero)
+        // A loudspeaker: its beam toward you band by band, on either path, and the whole program's gain
+        // that way for the sends below. Where it points is a fact about the horn, as for the cone.
+        float beamToYou = 1.0f;
+        if (active.Radiator != null)
+        {
+            float cos = OffAxis(active.Direction, active.Position, lPosVec);
+            if (active.RadiatorDsp != null)
+            {
+                Span<float> beam = stackalloc float[OpenFPS.Common.Radiator.Bands];
+                if (active.RadiatorPowerDsp != null) active.Radiator.BeamOverPower(cos, beam);
+                else active.Radiator.Gains(cos, beam);
+                active.RadiatorDsp.State.SetTargets(beam);
+            }
+            beamToYou = active.Radiator.Broadband(cos, active.RadiatorBandEnergy);
+        }
+        else if (active.SaState != null && active.ConeInside < 360f && active.Direction != Vector3.Zero)
         {
             // Where the horn points is a fact about the horn, not about the route the sound took.
             Vector3 toListener = lPosVec - active.Position;
@@ -3945,8 +4064,18 @@ public partial class FmodAudioProvider : IAudioProvider
         WatchForPops(active, lPosVec);
 
         float sourceDist = Vector3.Distance(lPosVec, active.Position);
-        // A room rings with what the source radiates, not what its cone lets through to you.
+        // A room rings with what the source radiates, not what its cone lets through to you. A
+        // loudspeaker radiates a share of its on-axis level all round (Radiator.RadiatedGain): the own-room
+        // send is taken ahead of its beam, the listener's room's after it.
         float radiated = 1f / MathF.Max(coneAtten, 0.05f);
+        float ownRadiated = radiated;
+        if (active.Radiator != null)
+        {
+            radiated = active.RadiatedGain / MathF.Max(beamToYou, 0.05f);
+            // Behind the power unit, the tap already carries what is radiated, band by band.
+            ownRadiated = !active.SendTap.hasHandle() ? radiated
+                        : active.RadiatorPowerDsp != null ? 1f : active.RadiatedGain;
+        }
         // The sends carry the source to its room's traced stage at unity: the trace is the room's
         // answer to a source at a metre. In the listener's own room the send is scaled by the distance
         // the direct sound has already fallen over (LateSend); through a doorway the other room's stage
@@ -3969,7 +4098,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // A source traced from where it is carries its whole reverberation in its own IR.
         if (active.EchoRig != null) { ownMix *= 1f - active.EchoWeight; crossMix *= 1f - active.EchoWeight; }
         if (active.SourceReverbConnection.hasHandle())
-            active.SourceReverbConnection.setMix(ownMix * radiated * active.SourceReverbMix * SourceSendLevel(active));
+            active.SourceReverbConnection.setMix(ownMix * ownRadiated * active.SourceReverbMix * SourceSendLevel(active));
         if (active.ReverbConnection.hasHandle())
             active.ReverbConnection.setMix(crossMix * radiated * active.ReverbMix);
 
@@ -5063,6 +5192,7 @@ public partial class FmodAudioProvider : IAudioProvider
         foreach (var h in _retiredHandles) if (h.IsAllocated) h.Free();
         _retiredHandles.Clear();
         while (_washPool.TryPop(out var wash)) if (wash.Handle.IsAllocated) wash.Handle.Free();
+        while (_radiatorPool.TryPop(out var beam)) if (beam.Handle.IsAllocated) beam.Handle.Free();
         if (_isInitialized) _system.release();
     }
 }

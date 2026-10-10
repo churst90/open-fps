@@ -64,6 +64,7 @@ string[] usage =
     "  --binaural-input                              a mono voice through the binaural stage in FMOD against the HRTF alone",
     "  --game-levels [out=DIR] [set=measure|render|compare|all|ear|wind|faults|faults-ac|faults-squeal|faults-landing] [cars=a,b] [ear=on|off] [listening=] [calm=]",
     "                                                one thing at a time through the real mixer, captured; spectra [preset ...] for an engine's bass",
+    "  --loudspeaker bench|game [out=DIR]               the loudspeaker model: datasheet numbers and renders; game: the PA and megaphone through the real mixer",
     "  --probable-bugs scene=pa|landing|bell|yard|rooms|upmix|scatter [out=DIR] [room=flat|stair|street] [wall=Glass|Brick]",
     "                                                the 2026-10-07 probable bugs through the real mixer, captured",
     "  --wide-sources [out=DIR] [set=measure|roofs|tree|render|level|all] [wide=on|off] [sec=] [turbulence=] [collapse=on] [spread=] | cost",
@@ -682,6 +683,11 @@ if (args.Contains("--binaural-input"))
 if (args.Contains("--game-levels"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.GameLevelsSpike.Run(args));
+}
+
+if (args.Contains("--loudspeaker"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.LoudspeakerSpike.Run(args));
 }
 
 if (args.Contains("--probable-bugs"))

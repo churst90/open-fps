@@ -219,6 +219,18 @@ public struct SpatialEmitter
     /// path update to bring these in, so they ride on the emitter from the start.</summary>
     public float AirLowDb, AirMidDb, AirHighDb;
 
+    /// <summary>
+    /// A loudspeaker's mouth (Radiator): the voice is shaped per band toward the listener from
+    /// <see cref="Direction"/>, in place of the cone, and a room is fed with what it radiates all round
+    /// (<see cref="RadiatedGain"/> of the on-axis level). Null for everything else.
+    /// </summary>
+    public OpenFPS.Common.Radiator? Radiator;
+    /// <summary>The program's energy per radiator band, which weights the beam where one gain stands for
+    /// several bands (a room's send, a copy off a wall).</summary>
+    public float[]? RadiatorBandEnergy;
+    /// <summary>The share of the on-axis pressure a loudspeaker radiates all round (Radiator.RadiatedGain).</summary>
+    public float RadiatedGain;
+
     public SpatialEmitter()
     {
         EntityId = 0;

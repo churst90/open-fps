@@ -300,6 +300,10 @@
       "minimum": 0,
       "description": "Replay the sound every N seconds with silence between (0 = not a repeater). Unlike LoopOne, the GAP is the point: an announcement you can wait for is a landmark; a drone is furniture."
     },
+    "Loudspeaker": {
+      "type": "string",
+      "description": "The loudspeaker the recording is played through, a loudspeaker model (pa_horn, megaphone, megaphone_shouted). Its amplifier, driver and horn colour and distort the recording, its own level places it (MinDistance is ignored), and its mouth's directivity band by band replaces the cone."
+    },
     "IsGranular": {
       "type": "boolean",
       "description": "Play SoundId as a grain cloud. Mutually exclusive with IsSynth."

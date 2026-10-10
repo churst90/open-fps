@@ -46,6 +46,7 @@ public class ModelLibraryTests : IDisposable
                     ModelLibrary.Kinds.GasHob => ModelLibrary.GasHob(id),
                     ModelLibrary.Kinds.Engine => ModelLibrary.Get<EngineProfile>(kind, id),
                     ModelLibrary.Kinds.Vehicle => ModelLibrary.Get<VehicleSpec>(kind, id),
+                    ModelLibrary.Kinds.Loudspeaker => ModelLibrary.Loudspeaker(id),
                     _ => throw new InvalidOperationException($"no accessor for kind '{kind}'"),
                 };
                 bool ok = ModelLibrary.RoundTrips(kind, spec, out string before, out string after);

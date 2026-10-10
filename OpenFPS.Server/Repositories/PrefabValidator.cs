@@ -156,6 +156,7 @@ public static class PrefabValidator
         Emitter("ConeOutsideVolume", t.ConeOutsideVolume.HasValue);
         Emitter("IsGranular", t.IsGranular == true);
         Emitter("IsSynth", t.IsSynth == true);
+        Emitter("Loudspeaker", !string.IsNullOrEmpty(t.Loudspeaker));
 
         if (!t.HasEmitter && emitterFields.Count > 0)
             r.Errors.Add($"HasEmitter is false but {string.Join(", ", emitterFields)} " +
@@ -193,9 +194,24 @@ public static class PrefabValidator
             {
                 if (t.EmitterDirection.Value.LengthSquared() <= 0f)
                     r.Errors.Add("EmitterDirection is the zero vector, which points nowhere. Omit it for the default forward (0,0,1).");
-                else if (inside >= 360f && outside >= 360f)
+                else if (inside >= 360f && outside >= 360f && string.IsNullOrEmpty(t.Loudspeaker))
                     r.Warnings.Add("EmitterDirection is set on an omnidirectional emitter (both cone angles 360), so it is inaudible. " +
                                    "Narrow ConeInsideAngle/ConeOutsideAngle to make the direction matter.");
+            }
+
+            if (!string.IsNullOrEmpty(t.Loudspeaker))
+            {
+                // A loudspeaker's level and beam come from the model: a reference distance or a cone as
+                // well would be a second, made-up answer to the same question.
+                if (!ModelLibrary.Knows(ModelLibrary.Kinds.Loudspeaker, t.Loudspeaker))
+                    r.Errors.Add($"Loudspeaker '{t.Loudspeaker}' is not a loudspeaker model. Known: " +
+                                 string.Join(", ", ModelLibrary.Ids(ModelLibrary.Kinds.Loudspeaker)) + ".");
+                if (synth || t.IsGranular == true)
+                    r.Errors.Add("Loudspeaker plays a recording (SoundId); it cannot be on a synth or granular emitter.");
+                if (t.MinDistance.HasValue)
+                    r.Warnings.Add("MinDistance is ignored with a Loudspeaker: the speaker's own level places it.");
+                if (t.ConeInsideAngle.HasValue || t.ConeOutsideAngle.HasValue || t.ConeOutsideVolume.HasValue)
+                    r.Warnings.Add("The cone is ignored with a Loudspeaker: its mouth's directivity, band by band, replaces it.");
             }
 
             if (t.IsGranular == true)

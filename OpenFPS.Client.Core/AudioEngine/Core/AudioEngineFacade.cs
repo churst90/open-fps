@@ -28,6 +28,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     private readonly ConcurrentQueue<KeyValuePair<int, AcousticPathData>> _acousticPaths = new();
     private readonly ConcurrentQueue<SpatialEmitter> _directPlayQueue = new();
     private readonly ConcurrentQueue<SpatialEmitter> _updateAttributesQueue = new();
+    private readonly ConcurrentQueue<SpatialEmitter> _refreshQueue = new();
 
     // Under _stateLock.
     private Vector3 _listenerPos;
@@ -183,6 +184,11 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             _voiceManager?.Submit(emitter);
         }
 
+        while (_refreshQueue.TryDequeue(out var emitter))
+        {
+            _voiceManager?.Refresh(emitter);
+        }
+
         while (_ambientBedCommands.TryDequeue(out var cmd))
         {
             if (cmd.Stop) _provider.StopAmbientBed(cmd.Id);
@@ -336,6 +342,18 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
 
         _submissionQueue.Enqueue(emitter);
+    }
+
+    /// <summary>
+    /// A fresh placement for a voice the budget already holds, which never starts one: a repeating
+    /// one-shot between its firings (a PA mid-announcement) is placed and occluded from where it is now,
+    /// and a play that has ended is not begun again. Without it the budget re-applied the submission it
+    /// started with, and its placement stamp aged by the length of the line.
+    /// </summary>
+    public void Refresh(SpatialEmitter emitter)
+    {
+        if (!_isInitialized) return;
+        _refreshQueue.Enqueue(emitter);
     }
 
     /// <summary>Plays outside the voice budget (echoes and the like); such a voice must be stopped by

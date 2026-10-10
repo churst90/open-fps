@@ -196,6 +196,11 @@ public class PrefabTemplate
     /// at once. Zero is not a repeater.</summary>
     public float? RepeatIntervalSeconds { get; set; }
 
+    /// <summary>The loudspeaker the recording is played through, a "loudspeaker" model (pa_horn,
+    /// megaphone): its amplifier, driver and horn colour and distort it, its level places it, and its
+    /// mouth's directivity replaces the cone. See SoundEmitterComponent.Loudspeaker.</summary>
+    public string? Loudspeaker { get; set; }
+
     // --- Granular synthesis (SoundEmitterComponent) --------------------------------------------------
 
     /// <summary>Play <see cref="SoundId"/> as a grain cloud rather than a sample.</summary>

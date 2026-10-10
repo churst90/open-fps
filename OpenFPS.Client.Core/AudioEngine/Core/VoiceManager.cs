@@ -103,6 +103,16 @@ public class VoiceManager
         _activeSubmissions[emitter.EntityId] = emitter;
     }
 
+    /// <summary>Replaces a held submission's placement without asking for a new play (see
+    /// AudioEngineFacade.Refresh). Nothing happens for a voice the manager does not hold.</summary>
+    public void Refresh(SpatialEmitter emitter)
+    {
+        if (!_activeSubmissions.TryGetValue(emitter.EntityId, out var held)) return;
+        // The delay it started with stays: it is the flight time of a play already under way.
+        emitter.DelayMs = held.DelayMs;
+        _activeSubmissions[emitter.EntityId] = emitter;
+    }
+
     /// <summary>
     /// Asks for a voice to stop: true if this manager owns it, false if not, and then the caller must
     /// stop it. Voices started directly (engine reflections, floor slapback) bypass this manager; when

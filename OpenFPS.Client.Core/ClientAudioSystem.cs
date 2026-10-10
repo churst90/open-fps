@@ -396,6 +396,7 @@ public partial class ClientAudioSystem
         _stepRandom = seed is int s ? new Random(s) : Random.Shared;
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
+        _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
         _acousticWorker = new AsyncAcousticWorker(_acoustics) { Manual = manualAcoustics };
         WorldAudio.Worker = _acousticWorker;
         _acousticWorker.Start();
@@ -427,6 +428,14 @@ public partial class ClientAudioSystem
         foreach (var (entityId, entity) in snapshot.Entities)
         {
             string sound = entity.Definition?.SoundEmitter.SoundId ?? "";
+            // A loudspeaker is named beside the recording it plays, not in its sound id.
+            if (kind == OpenFPS.Common.ModelLibrary.Kinds.Loudspeaker
+                && id.Equals(entity.Definition?.SoundEmitter.Loudspeaker ?? "", StringComparison.OrdinalIgnoreCase))
+            {
+                ForgetEntity(entityId);
+                restarted.Add(entityId);
+                continue;
+            }
             if (!OpenFPS.Common.Editing.ModelKinds.TryModelOfSound(sound, out var k, out var i)) continue;
             if (k != kind || !i.Equals(id, StringComparison.OrdinalIgnoreCase)) continue;
             ForgetEntity(entityId);
@@ -463,6 +472,7 @@ public partial class ClientAudioSystem
         if (_heldHorns.Remove(entityId)) _audio.StopSound(HeldHornVoiceBase - Math.Abs(entityId));
         _frontRetiring.Remove(entityId);
         _placed.Remove(entityId);
+        _speakerOf.Remove(entityId);
         for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
             _audio.StopSound(ReflectionVoiceId(entityId, slot));
 
@@ -757,10 +767,23 @@ public partial class ClientAudioSystem
                         ? p : (originalSnap.Definition.SoundEmitter.Volume, originalSnap.Definition.SoundEmitter.MinDistance);
                     var echo = LoopEchoLevel(path, placed.Volume, placed.MinDistance, dist);
 
+                    // A loudspeaker's copy is its render, thrown toward the wall by its beam: the band
+                    // gains the mouth gives the way the sound left it for that wall. None before the
+                    // render is in, or it would be the bare recording.
+                    string copySound = _sounds.ResolvePath(originalSnap.Definition.SoundEmitter.SoundId);
+                    if (!string.IsNullOrEmpty(originalSnap.Definition.SoundEmitter.Loudspeaker))
+                    {
+                        if (!_speakerOf.TryGetValue(id, out var speakerRender)) continue;
+                        copySound = speakerRender.Key;
+                        var (bL, bM, bH) = CopyBeam(speakerRender, originalSnap, path.ApparentPosition, visualEyePos);
+                        float mid = MathF.Max(1e-3f, bM);
+                        echo = (echo.Volume * bM, echo.MinDistance, echo.EqLow * bL / mid, echo.EqMid, echo.EqHigh * bH / mid);
+                    }
+
                     var reflectEmitter = new SpatialEmitter
                     {
                         EntityId = reflectId,
-                        SoundId = _sounds.ResolvePath(originalSnap.Definition.SoundEmitter.SoundId),
+                        SoundId = copySound,
                         Mode = originalSnap.Definition.SoundEmitter.Mode,
                         Position = path.ApparentPosition,
                         ApparentPosition = path.ApparentPosition,
@@ -1831,12 +1854,35 @@ public partial class ClientAudioSystem
     private double _lastCensus;
     private readonly List<(float D2, int Id)> _censusOrder = new();
 
+    /// <summary>Recordings played through loudspeakers, rendered once each (LoudspeakerVoices).</summary>
+    private readonly LoudspeakerVoices _loudspeakers;
+    /// <summary>The loudspeaker render each entity voice is playing, for its walls' copies.</summary>
+    private readonly Dictionary<int, OpenFPS.Client.AudioEngine.Core.Signals.LoudspeakerRender> _speakerOf = new();
+
     /// <summary>When each repeating emitter is next due to speak. See RepeatIntervalSeconds.</summary>
     private readonly Dictionary<int, double> _repeatDue = new();
 
     /// <summary>Each entity voice's volume and reference distance as last submitted, which its walls'
     /// copies are placed against.</summary>
     private readonly Dictionary<int, (float Volume, float MinDistance)> _placed = new();
+
+    /// <summary>
+    /// A loudspeaker's beam toward the wall a copy came off, on the mixer's three bands. The image sits
+    /// mirrored through the wall, so the way the sound left the speaker is the image's line to the
+    /// listener mirrored back: d - 2 (d·n) n, with n from the speaker to its image.
+    /// </summary>
+    internal static (float Low, float Mid, float High) CopyBeam(OpenFPS.Client.AudioEngine.Core.Signals.LoudspeakerRender speaker,
+                                                               EntitySnapshot source, Vector3 image, Vector3 listener)
+    {
+        Vector3 at = OpenFPS.Common.AudioEmission.PointFor(source);
+        var local = source.Definition.SoundEmitter.Direction;
+        Vector3 axis = Vector3.Transform(local.LengthSquared() > 0f ? Vector3.Normalize(local) : Vector3.UnitZ, source.Transform.Rotation);
+        Vector3 n = image - at, d = listener - image;
+        if (n.LengthSquared() < 1e-6f || d.LengthSquared() < 1e-6f) return (1f, 1f, 1f);
+        n = Vector3.Normalize(n); d = Vector3.Normalize(d);
+        Vector3 left = d - 2f * Vector3.Dot(d, n) * n;
+        return speaker.Radiator.ThreeBand(Vector3.Dot(axis, left), speaker.BandEnergy);
+    }
 
     /// <summary>
     /// A wall's copy of a recorded loop: the copy law at the loop's own reference distance
@@ -2801,6 +2847,8 @@ public partial class ClientAudioSystem
         float chorusTrees = 1f;
         // The declared level, for the ear model; 0 for an authored source with only a volume.
         float earLevel = 0f;
+        // A recording played through a loudspeaker: its render, level and beam.
+        OpenFPS.Client.AudioEngine.Core.Signals.LoudspeakerRender? speaker = null;
         // An authored source with a size (a fountain, a grille): as for a machine, the reference widens to
         // its radius and the gain is paid down, so only the near field changes.
         if (engineExtent > 0f && !def.SoundEmitter.IsSynth)
@@ -2934,6 +2982,23 @@ public partial class ClientAudioSystem
             resolvedSoundId = _sounds.ResolvePath(def.SoundEmitter.SoundId);
             if (string.IsNullOrEmpty(resolvedSoundId)) return;
 
+            // A recording played through a loudspeaker: its render through the speaker's chain, placed
+            // by the level that comes out of it (a paging horn's speech is 106 dB at a metre, not "full scale to 12 m"),
+            // beaming as its mouth does. Silent until the render is in.
+            if (!string.IsNullOrEmpty(def.SoundEmitter.Loudspeaker) && !def.SoundEmitter.IsGranular)
+            {
+                if (!_loudspeakers.TryGet(def.SoundEmitter.Loudspeaker, resolvedSoundId,
+                                          loop: def.SoundEmitter.Mode != PlaybackMode.Single, out var render))
+                    return;
+                speaker = render;
+                resolvedSoundId = render.Key;
+                var (gain, reference) = OpenFPS.Common.Loudness.Place(render.LevelDb, engineExtent);
+                engineVolume = gain * def.SoundEmitter.Volume;
+                engineMinDistance = reference;
+                engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(render.LevelDb));
+                earLevel = render.LevelDb;
+            }
+
             // A granular emitter needs its sample decoded into memory.
             if (def.SoundEmitter.IsGranular && !_preloadedSounds.Contains(resolvedSoundId))
             {
@@ -2977,9 +3042,13 @@ public partial class ClientAudioSystem
             IsReflection = false,
             // Inside, its room is yours (the cabin), whatever room the car's middle is in.
             TargetRegionId = interior ? _listenerRegion : acousticPath.RegionId,
-            ConeInside = def.SoundEmitter.ConeInsideAngle,
-            ConeOutside = def.SoundEmitter.ConeOutsideAngle,
-            ConeOutsideVolume = def.SoundEmitter.ConeOutsideVolume,
+            // A loudspeaker's beam is its mouth's, band by band (Radiator), not a flat cone.
+            ConeInside = speaker != null ? 360f : def.SoundEmitter.ConeInsideAngle,
+            ConeOutside = speaker != null ? 360f : def.SoundEmitter.ConeOutsideAngle,
+            ConeOutsideVolume = speaker != null ? 1f : def.SoundEmitter.ConeOutsideVolume,
+            Radiator = speaker?.Radiator,
+            RadiatorBandEnergy = speaker?.BandEnergy,
+            RadiatedGain = speaker?.RadiatedGain ?? 0f,
             MinDistance = engineMinDistance,
             ExtentMetres = engineExtent,
             EngineKey = engineKey,
@@ -3042,10 +3111,20 @@ public partial class ClientAudioSystem
                 _repeatDue[snap.Id] = now + (Math.Abs(snap.Id) % 7) * 0.9;
                 return;
             }
-            if (now < due) return;
+            // Between its firings, or still saying the last one: placed from where it is now, never
+            // started. The budget had re-applied the submission it started with, and its placement
+            // stamp aged the length of the line ("placed at a position 2400 ms old").
+            if (now < due || _audio.IsPlaying(snap.Id))
+            {
+                if (now >= due) _repeatDue[snap.Id] = now + repeat;
+                // A play the budget holds (under way, or waiting on its file) is placed afresh; nothing
+                // else is touched (AudioEngineFacade.Refresh never starts one).
+                _audio.Refresh(emitter);
+                return;
+            }
             _repeatDue[snap.Id] = now + repeat;
-            if (_audio.IsPlaying(snap.Id)) return;    // still saying the last one
         }
+        if (speaker != null) _speakerOf[snap.Id] = speaker; else _speakerOf.Remove(snap.Id);
 
         // The road under a machine hands its sound back a moment later; see GroundReflection. Engines and
         // physical models only: a sustained recording (a PA's speech) gets none, as speech flanged with

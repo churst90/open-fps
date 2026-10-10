@@ -76,6 +76,14 @@ bumps, fire by fuel, water over terrain, weather as a system, wind on things, ga
 
 In every play session, clear the "Waiting on Cody's ear" list so heard work merges before it piles up.
 
+Loudspeakers (the PA horn and the megaphone as amplifier, driver and horn; approved by ear 2026-10-10,
+inbox/loudspeaker-2026-10-10). The sound is settled; open, without changing it: a column speaker and a
+ceiling speaker as presets (a datasheet each; the Baffled mounting is built); the traced echoes are fed
+the speaker's on-axis spectrum at its radiated level, not band by band; one-off world sounds
+(WorldSound) cannot name a loudspeaker yet; the first play of a recording not yet loaded is started by
+the provider after the budget has let it go, and its placement goes stale for the line (seen once on the
+old PA in --loudspeaker game).
+
 Waiting on Cody's ear:
 - Driving cues and horns: H horn, U siren, J and L indicators, the brake cue, line rumble, the speed
   limit, rails, gates, aircraft roll-out (inbox/driving-2026-10-06). The brake cue's notes, the rail

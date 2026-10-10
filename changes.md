@@ -18,6 +18,54 @@ Recent work, newest first. `git log` has the rest.
   whichever is made first. Driveways too: OpenStreetMap's, and gen_osm's made-up one for a house without. Each tile
   records its buildings' sources and licences. Generator version 4. Not yet: addresses, lots and lawns, high detail.
   Try `/join world address 401 Market St, Tomball, TX`. Unheard.
+- The loudspeaker, redone as one model (Cody: "redo this item so it's designed properly and correctly.
+  Make the resulting audio actually low quality and sound like a megaphone speaker too"). Renders and
+  what to listen for in inbox/loudspeaker-2026-10-10. Approved by ear 2026-10-10 (Cody: "sounds good
+  as I heard it").
+  - Before: the PA played its recording clean and full-band, placed as "full scale out to 12 m"
+    (its speech stood for 117 dB SPL at a metre), and its cone was one flat gain, so behind the horn
+    was the same voice 9 dB down. The megaphone's cone took 26 dB off behind it and nothing else.
+  - Now a recording names the loudspeaker it is played through (`Loudspeaker` on a prefab's emitter,
+    appended to SoundEmitterComponent; a "loudspeaker" model in the library, so the editor can make
+    more). The client renders the program once through the speaker's chain (LoudspeakerChain, a
+    worker, 0.3 s for the PA's line, 0.9 s for the megaphone's loop): a voice compressor and the
+    volume control; an amplifier that clips at its rail, with a battery's sag on the megaphone; a
+    driver as a mass on a spring under the horn's load with a travel limit (a stiffening suspension, a
+    force factor that falls off) and a coil whose resistance rises as it heats; a horn whose mouth
+    stops coupling below c/(πD) and sends part of the wave back down its folded path (the ripple and
+    honk), and the fold's resonance. Nonlinear stages at four times the mixer's rate.
+  - Calibrated, not fitted: one watt gives the datasheet's sensitivity over its band, and the drive
+    puts the diaphragm at its travel headroom at rated power at the horn's cutoff. Presets, cited in
+    the code: `pa_horn` (Atlas AP-15T: 15 W, 106 dB 1 W/1 m and 116 dB at 15 W over 500-6000 Hz,
+    ±5 dB, 70 degrees at 2 kHz), `megaphone` (TOA ER-1206: 6 W rated, 10 W max on six AA cells,
+    450-6000 Hz at -20 dB; 110 dB 1 W/1 m from the Monacor TM-17M), `megaphone_shouted` (the same
+    with the peaks 16 dB into the clip). Measured: the PA's response is inside ±5 dB but for 500 Hz
+    (6.3 dB under the band's mean, under its 546 Hz cutoff); its coverage 76 degrees against 70; the
+    megaphone 19 dB down at 450 Hz and 16 dB at 6 kHz.
+  - Declared levels come out of the model: the PA's speech 106.0 dB SPL at a metre (gated; peaks
+    124), declared at 134.0 dB full scale with the buffer kept as a speech line is (-28 dBFS); the law
+    places it with a 12.6 m reference. The megaphone 105.3 dB (clipping 8.6 % of samples), shouted
+    109.0 dB (22.5 %). Against before: the PA's speech 11 dB quieter at every distance (at 5 m on the
+    axis 92 dB against 103; 100 m down the street 66 against 77, before air and ground); the
+    megaphone's 6 dB louder (105.3 against 99.6 at a metre).
+  - The beam per band (Radiator): the mouth as a piston of its own diameter, 2 J1(x)/x (Kinsler and
+    Frey), with the unflanged pipe's all-round share 1/(1+(ka)²) that ExhaustRadiation uses, and the
+    housing under both; six octave bands. Behind the PA, against its axis: 250 Hz -0.2 dB, 500 Hz
+    -2.4, 1 kHz -10, 2 kHz -22, 4 kHz -33. It replaces the cone for these voices on both paths (a
+    band-split unit ahead of the HRTF, so FMOD's fallback panner gets the same voice) and the flat
+    cone is not set. A room is fed with what the speaker radiates all round, band by band: a second
+    unit ahead of the voice's own-room send carries the power, the beam unit after it the beam over
+    that power. Copies off walls get the beam the way the sound left for that wall (mirrored through
+    the wall), and the traced echoes the radiated share. The bands are a Linkwitz-Riley tree (one-pole
+    splits leaked, and the two units in a row came out 3 dB loud and bright). Cost: 42 us per
+    1,024-sample block per unit in a Release build, 0.2 % of a core, two units a loudspeaker voice;
+    nothing allocated in the callback; timed in "Mixer time" as "loudspeakers".
+  - A repeating one-shot (the PA) between its firings is placed afresh (AudioEngineFacade.Refresh):
+    the budget had re-applied the submission it started with, and the "placed at a position ... ms old"
+    warning came up the length of the line. Refresh never starts a play.
+  - Lab: `--loudspeaker bench|game`. Tests: LoudspeakerTests. The emitter stream replay is regenerated:
+    SpatialEmitter gained Radiator, RadiatorBandEnergy and RadiatedGain, and nothing else in the
+    streams moved.
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
   and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;
