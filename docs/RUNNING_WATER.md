@@ -6,7 +6,8 @@ Until now only falling and splashing water existed: the Elm Park fountain (`Fall
 the rain (`RainSynth`, `RainPatch`, `NearDrops`). Nothing flowed. This document is the research and
 the design for a model of water that runs: creeks, street gutters, drain grates, downpipes, a
 fountain basin's overflow, run-off after rain. Code: `OpenFPS.Common/RunningWater.cs`,
-`OpenFPS.Common/Runoff.cs`, `OpenFPS.Client.Core/AudioEngine/Core/Nature/RunningWaterSynth.cs`.
+`OpenFPS.Common/Runoff.cs`, `OpenFPS.Client.Core/AudioEngine/Core/Nature/RunningWaterSynth.cs`. Water running over the
+ground from its shape and the rain (drainage lines, ponds, water poured at a point): section 13.
 
 Tags on facts below: **[ft]** read in the full text, **[abs]** read in the abstract only,
 **[recalled]** general knowledge not checked against a source. Section 9 lists the sources.
@@ -703,3 +704,219 @@ spectrum held. The plunge's air share was fitted with the first two. Re-fit them
 - `MaxImpactsPerBlock`: impacts are not thinned as the bubbles are. Thinned, they were grain in the
   whoosh: twelve clicks a block each twice as loud as a drop stand out of the sum where fifty clicks of
   their own size merge into it.
+
+## 13. Water over the ground, 2026-10-10
+
+Cody, 2026-10-10 (docs/MATTER.md, order of work step 4): water should run down a hill, fill a hollow and
+reach a fire. This is the cheap version that runs everywhere: each tile works out once which way its ground
+drains, the rain runs along those lines with the run-off timing above, and running water is heard where it
+gathers. Code: `OpenFPS.Server/Water/` (`Drainage`, `DrainageNetwork`, `SurfaceRaster`, `MapDrainage`),
+`OpenFPS.Server/Systems/GroundWaterSystem.cs`, `OpenFPS.Common/GroundWater.cs`, `OpenFPS.Common/GroundChannels.cs`.
+Instrument: AudioLab `--ground-water map|flows|levels|game`. Tests: `GroundWaterTests`, `GroundWaterMagnoliaTests`.
+Renders: `inbox/water-over-terrain-2026-10-10/README.txt`.
+
+### 13.1 Which way each cell drains
+
+- **Cells.** The tile's own 2 m cells (125 a side), each the mean of its four posts, each with its surface.
+- **Hollows filled, flats crossed: Priority-Flood** (Barnes, Lehman and Mulla 2014, Computers and Geosciences
+  62, 117 [recalled]). The window's edge is the outlet; cells are taken lowest first, and a cell reached from
+  one no higher than itself is under the water level, filled to it and taken from a plain queue. Each cell
+  remembers the neighbour that reached it.
+- **Directions: D8** (O'Callaghan and Mark 1984 [recalled]). A cell with a lower neighbour on the filled surface
+  drains to the steepest (drop over distance, √2 for a diagonal); a cell on a flat or in a filled hollow drains
+  back along the flood to the neighbour that reached it, toward the hollow's spill point. Steepest descent always
+  falls and the flood's links follow the order cells were taken in, so nothing within a window drains in a
+  circle (a test walks every cell to the edge). D8 rather than D-infinity (Tarboton 1997, multiple directions):
+  what is heard is where flow gathers into lines, where both agree, and one receiver a cell is what joins tiles
+  simply (13.3). On open slopes D8 makes parallel lines a sheet would not; nothing is placed there.
+- **Stored** with each world tile (`WorldTile.Drainage`, appended; generator version 4, so stored tiles are made
+  again): the direction (a byte), how deep the cell's hollow fills (whole centimetres) and its surface (a byte)
+  for each cell, and the method's version. A place's copies in the world carry theirs too (WorldPlaces format 2).
+
+### 13.2 Hollows: kept, filled, or drained through a culvert
+
+Every hollow is found (cells whose fill is over nothing, joined across tile edges) and is one of three:
+
+- **Filled** (no storage) when it is shallower than 3 cm or holds under a cubic metre. The curve number's
+  initial abstraction already counts "surface depression storage" (TR-55 ch. 2), and the survey's own noise is
+  a few centimetres; filling them leaves that storage where the method counts it.
+- **Drained through a culvert** when a road holds it back: its spill is on a road or a drive and its bottom is
+  not. The 2 m survey is bare earth; a road crossing a hollow or a creek is an embankment in it, and in the real
+  world there is a pipe through it. Treating such hollows as ponds would hold a creek's water behind every road
+  crossing (the hybrid breach-fill idea of Lindsay 2016, Hydrological Processes 30, 846 [recalled], decided
+  here by what the land cover says is a road). Magnolia: 245.
+- **Kept** as a pond (or, on paving, a puddle from 1 cm deep) otherwise: it holds water until full and then
+  passes on what reaches it (fill and spill: Barnes, Callaghan and Wickert 2021, Earth Surface Dynamics 9, 105
+  [recalled]). Each pond knows its cells lowest first, so its level, wet area and the depth at any cell follow
+  from its volume exactly. It loses water through its bed at the ground's own rate (sealed paving 0.3 mm/h, as
+  the puddles in docs/WET_ROADS.md), none where it lies on a line that carries base flow (the water table is at
+  the surface there and feeds it), and to the air at the road model's Penman rate. Ponds on such lines start
+  full; the rest start empty and dry.
+
+### 13.3 Tiles and their edges
+
+- **A world tile** is decided from its window: the tile and 50 m round it, the window its roads are graded in
+  (WorldFeatures.WindowPosts, 176 posts a side), so it needs nothing it does not already fetch. Its cells are
+  its own: a cell is stored once, in its tile, and its direction never depends on which tile was made first (a
+  test makes two tiles each way round: the same bytes).
+- **A map of a real place** (Magnolia, Albany) routes its whole ground at once and cuts it into tiles, as its
+  ground is graded at once (TerrainBuilder: "Graded over the whole map at once, so the posts on a tile's edge
+  are the same for both tiles"). Its copies in the world are routed the same way over the world's grid, so a
+  place's world tiles drain as its map: 1,764 of 1,764 sampled cells of nine Magnolia tiles drain the same way.
+- **Joining** (Barnes 2017, Environmental Modelling and Software 92, 202 [recalled]: tiles' own directions,
+  linked at their edges and accumulated over the whole): `DrainageNetwork` links each edge cell to the cell it
+  drains into in the next tile. Two margins can see a big flat or hollow differently and make a pair of edge
+  cells drain into each other; the network finds such loops (Kahn's order never reaches them) and lets the
+  lowest cell of each hold the water. Counted.
+
+How well a margin does, measured on Magnolia's ground (AudioLab `--ground-water map`): every tile routed
+alone from its window, joined, against the whole place routed at once.
+
+| margin | a tile alone, one core | directions unlike the whole's | on tile edges | loops broken | big lines' ground within 10 % | within 25 % |
+|---|---|---|---|---|---|---|
+| none | 5.6 ms | 3.95 % | 39.3 % | 0 | 0.0 % | 0.1 % |
+| 20 m | 5.6 ms | 1.81 % | 2.96 % | 186 | 36.5 % | 41.1 % |
+| 50 m (the world's) | 7.3 ms (worst 13) | 1.14 % | 1.60 % | 89 | 57.0 % | 61.3 % |
+| 100 m | 11.7 ms | 0.67 % | 0.87 % | 25 | 74.3 % | 75.0 % |
+| 250 m | 35.2 ms | 0.21 % | 0.24 % | 32 | 87.7 % | 92.5 % |
+| the whole place (the maps) | 1.1-1.4 s for 3.06 million cells | 0 | 0 | 0 | 100 % | 100 % |
+
+"Big lines": the 14,416 cells of the whole place's lines draining over 5 ha; a tiled cell counts when it or a
+neighbour has the same ground draining through it. Magnolia is flat coastal plain: a flat or a shallow hollow
+can span hundreds of metres, and a window that cuts one drains it to the cut. So the margin matters most here
+and least on hills. The world's tiles keep 50 m for now (the window they already have); a wider window, or
+Barnes's tiled Priority-Flood (2016, the hollows resolved over the tiles' edges after each tile is filled
+alone), is the next step for the world (todo.md).
+
+What drains through a place depends on what is upstream of it. On a map that is the whole map. In a frame of the
+world it is the tiles loaded round the players (their far radius and 100 m more); a creek whose catchment reaches
+further gathers more as its upstream tiles load, and its voice's key changes then (13.5).
+
+### 13.4 Rain running along it
+
+- **What runs off: the curve number** (USDA SCS 1986, TR-55, ch. 2 [recalled]). Run-off Q = (P − Ia)² / (P − Ia
+  + S), S = 25400/CN − 254 mm, Ia = 0.2 S. The game feeds it continuously: the share of the rain falling now that
+  runs off is dQ/dP at the rain since the ground was last dry, and that event depth falls by e every two days
+  without rain (an assumption; NEH-630 ch. 10 judges a soil's wetness by five days' rain). Curve numbers, soil
+  group B (no soil survey is read yet: one group stands for everywhere, an assumption): sealed (roofs, roads,
+  drives, paving) 98; gravel road 85; dirt road 82; lawn ("open space, good") 61; open ground ("pasture, fair":
+  the game's dirt, WorldCover's grass, shrub, crops and bare ground) 69; woods ("good") 55; water 100. A road
+  sheds 60 % of the rain four minutes into a downpour and 97 % after 25 mm; a lawn nothing until 32 mm, the
+  woods nothing until 42 mm.
+- **What each cell is** (`SurfaceRaster`): on a map, the top of the highest fixed solid thing whose footprint
+  covers the cell's middle (a roof, a road, a drive, a lawn, a water surface), else the woods where a canopy
+  volume is over it, else the ground (a place's ground is dirt: open). On a world tile, the road or sidewalk
+  under the cell, else its WorldCover class (trees woods, built-up sealed, water and wetland water, the rest open).
+- **How long it takes to arrive** (TR-55 ch. 3 [recalled]): sheet flow for the first 30 m (100 ft, NEH-630 ch.
+  15) by the kinematic wave, t = (n L / √S)^0.6 / i^0.4 at the game's heavy rain (Woolhiser and Liggett 1967;
+  HEC-22 eq. 3-4), with TR-55 Table 3-1's n: smooth surfaces 0.011, natural range 0.13, short grass 0.15, woods
+  0.40; then shallow concentrated flow, V = 4.92 √S unpaved and 6.20 √S paved (TR-55 Figure 3-1 in metres);
+  from 5 ha a channel, Manning in a bed as wide as the hydraulic geometry gives (13.5). Each cell's time to the
+  network's end is summed down its line.
+- **The flow at a place** is each surface's area upstream (not through a pond) through that surface's own ladder
+  of linear reservoirs (`Runoff.Rungs`, Nash 1957), read at that surface's mean travel time to the place: the lag
+  of a time-area response (Clark 1945 [recalled]). So the road beside a ditch arrives in minutes and the woods
+  behind it in an hour, from one ladder per surface for the whole map (7 x 8 numbers), whatever the number of
+  places. Plus the overflow of the ponds that reach it, and base flow.
+- **Base flow**: groundwater, fed by a share (0.3) of what soaks in and by the climate's recharge between storms
+  (80 mm a year, an assumption of the size of humid eastern US base flow, Santhi et al. 2008 [recalled]),
+  draining over 30 days. It comes out only where a channel has cut down to the water table: catchments of a
+  square kilometre and over, ramping from a quarter of that (an assumption). Magnolia's biggest creek: 8.4 L/s
+  in dry weather.
+- **One state, sent to everyone.** The server advances each map's (`GroundWaterSystem`, every tick, its ponds
+  every 0.25 s) and sends it in `WorldStateUpdate.GroundWater` (appended): the rain, the event depth, the
+  groundwater, the seven ladders, and the overflow of the ponds some voice names. A client's voices read it
+  (`GroundWater.Shared`), so what a client hears and what the server's fire is put out by are the same water.
+
+### 13.5 Voices where it gathers
+
+- **Lines**: cells draining half a hectare or more, from each head down to where they join a bigger line.
+- **A voice every 20 m** of line (`GroundChannels.SegmentMetres`), heard from five places along it, laid along
+  the line (the entity's x axis), its sound id saying everything about it:
+  `flow:ground/KIND/WIDTH_CM/SLOPE_PERMILLE/LENGTH_M/REFERENCE_ML_PER_S/CATCHMENT` (each surface's area and mean
+  travel time, the ponds, the ground for base flow). Not where water stands (a pond, a lake) and not within 15 m
+  of running or falling water a map placed by hand (its creeks, gutters, drains, fountains, shores): that water
+  is already there as the map made it, so the two never double. The city has no survey, so it has no lines.
+- **What it is**: a creek where 20 ha or more drains through it; water running over paving where most of the
+  stretch is sealed; a ditch where most of it runs within 6 m of a road; a rivulet otherwise.
+- **Its bed** is shaped by the flow of its catchment's reference storm (two hours of heavy rain, 50 mm, run off
+  per surface by the curve number): width by downstream hydraulic geometry, w = 3 Q^0.5 (Leopold and Maddock
+  1953 [recalled]), held to what each kind can be (a rill 0.1-0.5 m, a ditch's bed 0.3-1.5 m, a creek 0.8-8 m);
+  Manning's n from Chow (1959) Table 5-6 [recalled] (natural stream with stones 0.045, grassed channel 0.033,
+  asphalt 0.016). What breaks the surface is the running-water model's obstacles: a creek's are the creek
+  preset's cobbles, a rill's twigs and roots, a ditch's grass tufts, a runnel's grit (judgements), and a natural
+  bed's grow with the depth its reference flow runs at (0.4 of it, a relative submergence of a few stone heights,
+  Bathurst 1985 [recalled]), so a deep creek still breaks its surface.
+- **Its level** (`GroundChannels.LevelDb`) is measured (`--ground-water levels`, 20 s each) for each kind over
+  six flows (0.05 to 600 L/s) and four slopes (0.3 to 8 %), each flow in the bed made for it, and declared as the
+  loudest at or under its reference flow. Only the mixer's ranking reads it; its headroom is 30 dB over it (the
+  running water's 18 and 12 more, since a flood carries more than the reference), so a voice is never squared off.
+  Deep slow water in a smooth bed drowns its obstacles and is silent (a full grassy ditch at 0.3 %), as it is.
+- **Dry**: under 2 mL/s a line makes no sound and gets no voice (a film that thin beads and soaks in; a judgement).
+- **On the wire** a voice is a fixed entity on the `runoff` layer, sent with a tile's full detail only, never from
+  the far ring. A map's are spawned at load; a frame of the world's are put in when its network is built again
+  (3 s after its tiles stop changing, in the background): one already there with the same key stays, one that
+  went goes, a new one comes, and a tile's go with it.
+
+### 13.6 Water added at a point, and asking how wet a place is
+
+For the fire by fuel (another agent's) and anything else that pours or asks:
+
+- `GroundWaterSystem.AddWater(mapId, at, litres, overSeconds = 0)`: a bucket (all at once), a hose or a burst
+  main (spread over the seconds). The water runs down the drainage at the speed of shallow concentrated flow,
+  each cell it reaches soaking up the surface's wetting depth over a 0.5 m strip (sealed 0.7 mm, gravel 3, a
+  dirt road 2, open ground 4, lawn 5, woods 8: judgements), into any pond on its way, until it has all soaked in
+  or left the map. A bucket on paving runs on down a slope; on grass it is gone in a few metres. False where the
+  map has no ground of its own.
+- `GroundWaterSystem.WetnessAt(mapId, at)` → `Wetness(Surface, RainMmPerHour, EventMm, SoilWetness, WaterDepthMm,
+  FlowLitresPerSecond, PouredMm)`: what the ground is, the rain on it, the rain since it was last dry, how near
+  its retention is to full (0..1, the rain and anything poured over that plus S), the water on the surface there
+  (a pond's or puddle's depth, a line's by Manning in its bed, or the sheet off the slope above), the water
+  running past it, and water poured on it in the last hour.
+- `GroundWaterSystem.WaterReaching(mapId, centre, radius)` → `WaterReach(RainLitresPerSecond, RunOnLitresPerSecond,
+  PouredLitresPerSecond)` and `Total`: the water arriving at a round patch now, the rain on it, what runs onto it
+  from the cells round it that drain into it, and poured water that entered it in the last second.
+- `GroundWaterSystem.StandingMm(mapId, at)`: water standing in a hollow (RoadWaterSystem puts it under the wheels).
+
+### 13.7 Puddles
+
+A hollow whose bottom is on a road, a drive or paving and is at least 1 cm deep is a puddle: it fills from what
+drains to it and empties through its cracks and to the air. RoadWaterSystem gives a wheel the deeper of the
+kerb's puddle (PuddleField, which stands for the low spots the 2 m survey cannot see) and the ground's, so a
+dip in a road the survey shows splashes. Magnolia: 132.
+
+### 13.8 What Magnolia drains like
+
+749 lines draining half a hectare or more, 128 km in all (143 ending at 0.5-2 ha, 414 at 2-20 ha, 156 at 20-100
+ha, 36 over 100 ha). The biggest creek drains 386 ha (3.9 km²) and runs 4.8 km east across the whole place, from
+the west edge near (-1545, -153) to the east edge at (1749, 837), falling 18.6 m; creeks of 100 to 340 ha join it
+from the south in the east half. 10,566 hollows: 2,210 kept (2,078 ponds holding 262,000 m³ in all, 132 puddles),
+245 behind roads drained through culverts. 4,152 voices: 2,845 rivulets (60 km), 958 ditches (20 km), 218
+stretches of creek (4.5 km), 131 runs over paving (2.7 km). A coarse map and the list of lines:
+`inbox/water-over-terrain-2026-10-10/map.txt` and `lines.csv`.
+
+Through a storm (`--ground-water flows`), L/s:
+
+| | dry | 10 min of 25 mm/h | 30 min after |
+|---|---|---|---|
+| the biggest creek's voice, 330 ha (1315, 599) | 8.4 | 75 (83 a minute after it stops) | 12.2 |
+| the ditch with the most road, 16.4 ha (1003, -241) | 0 | 13.3 | 0.8 |
+
+Cost: Magnolia's load is 1.5 to 3.9 s longer (the place routed whole 1.1-1.4 s, the network 1.5-2.5 s, the voices
+spawned), on top of about 5 s; a world tile's routing 7.3 ms on one core, its stored drainage a few kilobytes.
+
+### 13.9 Not built
+
+- The full model near players: a shallow-water simulation on a local grid (the 2D shallow-water equations, a
+  finite-volume scheme on the 2 m cells) for water thrown, poured, burst or hosed, and for flood depths. It would
+  plug in where `AddWater`'s parcels are now: a grid of a few hundred metres round each player, its boundary
+  taking the network's line flows as inflows and handing what leaves back to the lines downstream, its depths
+  answering `WetnessAt` and `StandingMm` inside it, and the cheap model everywhere else. The two must agree
+  where they meet (docs/MATTER.md 1).
+- Poured water is not heard (a burst main running down a ditch is silent until the next rain); its parcels
+  would add to a line's flow on the wire.
+- Soil by place (SSURGO's hydrologic soil groups for the US) instead of group B everywhere; infiltration by
+  Green-Ampt where the soil is known; frozen ground and snowmelt.
+- Culverts as sound (the fall out of the pipe at each driveway is a ditch's loudest place), weirs and steps.
+- A wider world window or Barnes's tiled Priority-Flood (13.3). Base flow from the climate when the weather has one.
+- Other liquids (oil, fuel) on the same lines with their own density and viscosity.

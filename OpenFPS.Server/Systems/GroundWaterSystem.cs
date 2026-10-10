@@ -58,11 +58,11 @@ public static class GroundWaterSystem
         public float SecondsLeft;
     }
 
-    private sealed class MapGround
+    private sealed class MapGround(GroundWater water)
     {
         public readonly object Gate = new();
         public DrainageNetwork Net = null!;
-        public readonly GroundWater Water = new();
+        public readonly GroundWater Water = water;
         public float[] PondVolume = Array.Empty<float>();
         public float[] PondSpill = Array.Empty<float>();
         public int[] PondsByRank = Array.Empty<int>();
@@ -82,10 +82,95 @@ public static class GroundWaterSystem
 
     private static readonly ConcurrentDictionary<string, MapGround> _maps = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Puts a map's drainage network in place (replacing any before it), dry.</summary>
-    public static void Register(string mapId, DrainageNetwork net)
+    // ── A frame of the world: tiles that come and go ────────────────────────────────────────────
+
+    /// <summary>How long a frame's tiles must stay as they are before its network is built again, s: tiles
+    /// arrive in bursts as somebody travels.</summary>
+    public const double RebuildQuietSeconds = 3.0;
+
+    private sealed class FrameTiles
     {
-        var m = new MapGround { Net = net };
+        public readonly object Gate = new();
+        public readonly Dictionary<(int X, int Z), DrainageNetwork.TileInput> Tiles = new();
+        public bool Dirty;
+        public double ChangedAt;
+        public Task<DrainageNetwork>? Building;
+        public DrainageNetwork? Rebuilt;
+    }
+
+    private static readonly ConcurrentDictionary<string, FrameTiles> _frames = new(StringComparer.OrdinalIgnoreCase);
+    private static double FrameClock => Environment.TickCount64 / 1000.0;
+
+    /// <summary>A tile of a frame of the world loaded (OneWorld.WorldMaps): its ground and its drainage join the
+    /// frame's network when it is next built.</summary>
+    public static void TileArrived(string mapId, DrainageNetwork.TileInput tile)
+    {
+        var f = _frames.GetOrAdd(mapId, _ => new FrameTiles());
+        lock (f.Gate)
+        {
+            f.Tiles[(tile.X, tile.Z)] = tile;
+            f.Dirty = true;
+            f.ChangedAt = FrameClock;
+        }
+    }
+
+    /// <summary>A tile of a frame let go.</summary>
+    public static void TileLeft(string mapId, int x, int z)
+    {
+        if (!_frames.TryGetValue(mapId, out var f)) return;
+        lock (f.Gate)
+        {
+            if (!f.Tiles.Remove((x, z))) return;
+            f.Dirty = true;
+            f.ChangedAt = FrameClock;
+        }
+    }
+
+    /// <summary>A frame's network built again since it was last asked: its voices to put in place (WorldMaps).
+    /// Null when nothing changed.</summary>
+    public static DrainageNetwork? TakeRebuilt(string mapId)
+    {
+        if (!_frames.TryGetValue(mapId, out var f)) return null;
+        lock (f.Gate)
+        {
+            var net = f.Rebuilt;
+            f.Rebuilt = null;
+            return net;
+        }
+    }
+
+    /// <summary>Starts a frame's network building once its tiles have been still a moment, and puts a finished one
+    /// in place, keeping the map's water as it was (the ponds settled to the weather now).</summary>
+    private static void PumpFrame(string mapId, FrameTiles f, float rainMmPerHour)
+    {
+        DrainageNetwork? done = null;
+        lock (f.Gate)
+        {
+            if (f.Building is { IsCompleted: true } b)
+            {
+                if (b.IsCompletedSuccessfully) done = b.Result;
+                f.Building = null;
+            }
+            if (f.Building == null && f.Dirty && FrameClock - f.ChangedAt >= RebuildQuietSeconds)
+            {
+                f.Dirty = false;
+                var tiles = f.Tiles.Values.ToList();
+                f.Building = Task.Run(() => new DrainageNetwork().Build(tiles));
+            }
+        }
+        if (done == null) return;
+        var old = _maps.TryGetValue(mapId, out var was) ? was : null;
+        Register(mapId, done, old?.Water);
+        if (old != null || rainMmPerHour > 0f) Settle(mapId, rainMmPerHour, keepWater: true);
+        lock (f.Gate) f.Rebuilt = done;
+    }
+
+    /// <summary>Puts a map's drainage network in place (replacing any before it), dry.</summary>
+    public static void Register(string mapId, DrainageNetwork net) => Register(mapId, net, null);
+
+    private static void Register(string mapId, DrainageNetwork net, GroundWater? water)
+    {
+        var m = new MapGround(water ?? new GroundWater()) { Net = net };
         m.PondVolume = net.Ponds.Select(p => FullWhenDry(p) ? p.CapacityCubicMetres : 0f).ToArray();
         m.PondSpill = new float[net.Ponds.Count];
         m.PondsByRank = net.Ponds.OrderBy(p => p.Rank).Select(p => p.Id).ToArray();
@@ -108,6 +193,7 @@ public static class GroundWaterSystem
     /// </summary>
     public static void Update(string mapId, float rainMmPerHour, float evaporationMmPerHour, float dt)
     {
+        if (_frames.TryGetValue(mapId, out var frame)) PumpFrame(mapId, frame, rainMmPerHour);
         if (!_maps.TryGetValue(mapId, out var m)) return;
         lock (m.Gate)
         {
@@ -131,13 +217,14 @@ public static class GroundWaterSystem
         }
     }
 
-    /// <summary>Settles a map's water as if the weather had been like this for an hour (tests, the lab).</summary>
-    public static void Settle(string mapId, float rainMmPerHour)
+    /// <summary>Settles a map's water as if the weather had been like this for an hour (tests, the lab); with
+    /// <paramref name="keepWater"/>, only its ponds (a network built again).</summary>
+    public static void Settle(string mapId, float rainMmPerHour, bool keepWater = false)
     {
         if (!_maps.TryGetValue(mapId, out var m)) return;
         lock (m.Gate)
         {
-            m.Water.Settle(rainMmPerHour);
+            if (!keepWater) m.Water.Settle(rainMmPerHour);
             for (int p = 0; p < m.PondVolume.Length; p++)
             {
                 var pond = m.Net.Ponds[p];
@@ -405,5 +492,18 @@ public static class GroundWaterSystem
     }
 
     /// <summary>Tests: forgets every map.</summary>
-    internal static void Reset() => _maps.Clear();
+    internal static void Reset() { _maps.Clear(); _frames.Clear(); }
+
+    /// <summary>Tests: waits for a frame's network to be built from the tiles it has now.</summary>
+    internal static DrainageNetwork? BuildFrameNow(string mapId)
+    {
+        if (!_frames.TryGetValue(mapId, out var f)) return null;
+        lock (f.Gate) { f.ChangedAt = double.NegativeInfinity; }
+        PumpFrame(mapId, f, 0f);
+        Task<DrainageNetwork>? b;
+        lock (f.Gate) b = f.Building;
+        b?.Wait(TimeSpan.FromMinutes(2));
+        PumpFrame(mapId, f, 0f);
+        return NetworkOf(mapId);
+    }
 }

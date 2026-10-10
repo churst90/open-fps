@@ -109,8 +109,19 @@ impact material, transmission per band, absorption and reflection. Still to add,
 Water is sound and a budget, not a substance: rain falls (rate, drop size), run-off fills gutters, drains and
 downpipes and keeps them running after the rain stops (`Runoff`: a timed reservoir per roof or street, the
 rational method), puddles form on roads (wet tyres, spray), and creeks, fountains, sinks and shores are placed
-sources (docs/RUNNING_WATER.md, docs/WAVES_AND_SHORES.md, docs/WET_ROADS.md). Water does not move over the
-ground: it cannot run down a hill, fill a hollow or reach a fire.
+sources (docs/RUNNING_WATER.md, docs/WAVES_AND_SHORES.md, docs/WET_ROADS.md).
+
+Built 2026-10-10 (docs/RUNNING_WATER.md section 13), the cheap version of 4.2's first two points: every world
+tile and every map on the survey works out once which way each 2 m cell drains (Priority-Flood and D8, from the
+tile and a margin round it; a map's whole place at once) and stores it with the tile; the map joins its tiles,
+keeps the hollows that hold water as ponds and puddles (a hollow a road holds back drains through its culvert),
+and the rain on each surface runs off by TR-55's curve number down the lines with each surface's own travel
+time (Manning's n per surface), plus groundwater base flow. Where enough gathers, a running-water voice is placed
+automatically (a rivulet, a roadside ditch, a creek, water over paving); Magnolia has 749 lines and 4,152 voices.
+Water can be added at a point (`GroundWaterSystem.AddWater`: a bucket, a hose, a burst main) and runs downhill
+soaking in; `WetnessAt` and `WaterReaching` say how wet a place is and how much water is reaching a burning thing.
+Not yet: the full shallow-water model near players (13.9 says how it plugs in), poured water heard, soil by
+place, other liquids.
 
 ### 4.2 How it should work
 
@@ -275,7 +286,8 @@ Agreed direction with Cody, 2026-10-10. Each step uses the one material table.
    glass doors, fences and cars; fitted against recordings as the spec.
 3. Fire driven by fuel, with water and rain putting it out and the fire's own local wind (being built now:
    docs/FIRE.md).
-4. Water draining over terrain, the cheap per-tile version (section 4.2), with the world tiles.
+4. Water draining over terrain, the cheap per-tile version (section 4.2), with the world tiles. Built
+   2026-10-10, unheard (docs/RUNNING_WATER.md 13; inbox/water-over-terrain-2026-10-10).
 5. Weather as a system (todo item 11): rain, wind, wet roads, fuel moisture and fire tied together.
 6. Wind acting on things (section 5.3): wires, gaps, flags, loose objects, all from the wind field.
 7. Released gases (smoke, steam, fuel leaks), then chemistry.

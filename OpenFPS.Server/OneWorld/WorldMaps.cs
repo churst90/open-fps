@@ -82,6 +82,9 @@ public sealed class WorldMaps
         public readonly Dictionary<TileKey, (Task<WorldTile?> Read, double Soon)> Reading = new();
         /// <summary>The real places whose roads and traffic this frame took (WorldPlaces.ForFrame).</summary>
         public List<string> PlacesTaken = new();
+        /// <summary>The voices of the frame's drainage lines in each tile, by sound id and place
+        /// (GroundWaterSystem.TakeRebuilt; docs/RUNNING_WATER.md 13).</summary>
+        public readonly Dictionary<TileKey, Dictionary<string, Entity>> Runoff = new();
 
         /// <summary>The world tile under one of the frame's own tiles.</summary>
         public WorldTileKey WorldKeyOf(TileKey local) => Origin.Offset(local.X, local.Z);
@@ -515,6 +518,8 @@ public sealed class WorldMaps
                     if (now - since < UnloadAfter) continue;
                     tiles.RemoveEntities(frame.Loaded[k].Select(e => e.Id));
                     foreach (var e in frame.Loaded[k]) _maps.DestroyEntity(frame.Id, e);
+                    DropRunoff(frame, tiles, k);
+                    Systems.GroundWaterSystem.TileLeft(frame.Id, k.X, k.Z);
                     tiles.RemoveTile(k);
                     frame.Loaded.Remove(k);
                     frame.UnwantedSince.Remove(k);
@@ -675,6 +680,7 @@ public sealed class WorldMaps
                 }
             if (changed) _maps.RefreshGrid(frame.Id);
         }
+        foreach (var frame in frames) SyncRunoff(frame);
     }
 
     /// <summary>Waits for every tile being read and puts them all in: a test's tick.</summary>
@@ -704,6 +710,78 @@ public sealed class WorldMaps
         tiles.AddPlaced(world, local, members);
         frame.Loaded[local] = members.Select(m => m.Entity).ToList();
         _service.Store.Touch(frame.WorldKeyOf(local));
+        if (tile.Terrain is { Posts: >= 2 } ground) Systems.GroundWaterSystem.TileArrived(frame.Id, DrainageInput(frame, local, tiles.TileMetres, ground, tile.Drainage));
         return true;
+    }
+
+    /// <summary>A tile's ground and drainage as its frame's drainage network takes them: its cells' heights in the
+    /// frame's metres, and the drainage it was made with (or, for a tile made before generator 4, worked out from
+    /// its own ground alone).</summary>
+    private static Water.DrainageNetwork.TileInput DrainageInput(Frame frame, TileKey local, float tileMetres, WorldTile.TerrainData t,
+                                                                 Water.TileDrainage? drainage)
+    {
+        var posts = new float[t.Posts * t.Posts];
+        for (int k = 0; k < posts.Length; k++) posts[k] = t.BaseY - frame.BaseY + t.HeightsCm[k] * 0.01f;
+        int cells = t.Posts - 1;
+        if (drainage == null || drainage.Flow.Length != cells * cells)
+        {
+            var surfaces = new byte[cells * cells];
+            for (int k = 0; k < surfaces.Length; k++)
+                surfaces[k] = Water.SurfaceRaster.OfGround(k < t.Cells.Length && t.Cells[k] < t.Materials.Length ? t.Materials[t.Cells[k]] : null);
+            drainage = Water.Drainage.OfWindow(posts, t.Posts, t.Posts, 0, 0, cells, t.Spacing, surfaces, 0);
+        }
+        return new Water.DrainageNetwork.TileInput(local.X, local.Z, local.X * tileMetres, local.Z * tileMetres,
+                                                   Water.Drainage.CellHeights(posts, t.Posts, t.Posts), drainage);
+    }
+
+    /// <summary>
+    /// A frame's drainage built again (GroundWaterSystem): its voices put in the tiles they stand in. A voice
+    /// already there with the same sound id at the same place stays (a sound restarted is heard); one the network
+    /// no longer has goes; a new one comes. On the tick thread.
+    /// </summary>
+    private void SyncRunoff(Frame frame)
+    {
+        if (Systems.GroundWaterSystem.TakeRebuilt(frame.Id) is not { } net) return;
+        if (!_maps.TryGetMap(frame.Id, out var world, out _, out _, out _) || !_maps.TryGetTiles(frame.Id, out var tiles)) return;
+        var wanted = new Dictionary<TileKey, Dictionary<string, Water.DrainageNetwork.Voice>>();
+        foreach (var v in net.Voices)
+        {
+            var owner = TileKey.Of(v.Position, tiles.TileMetres);
+            if (!frame.Loaded.ContainsKey(owner)) continue;
+            string key = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{v.SoundId}@{v.Position.X:F1},{v.Position.Z:F1}");
+            if (!wanted.TryGetValue(owner, out var list)) wanted[owner] = list = new();
+            list[key] = v;
+        }
+        foreach (var (k, had) in frame.Runoff.ToList())
+        {
+            var keep = wanted.TryGetValue(k, out var w) ? w : null;
+            var gone = had.Where(kv => keep == null || !keep.ContainsKey(kv.Key) || !world.IsAlive(kv.Value)).ToList();
+            if (gone.Count == 0) continue;
+            tiles.RemoveEntities(gone.Select(g => g.Value.Id));
+            foreach (var (key, e) in gone) { if (world.IsAlive(e)) _maps.DestroyEntity(frame.Id, e); had.Remove(key); }
+        }
+        foreach (var (k, list) in wanted)
+        {
+            if (!frame.Runoff.TryGetValue(k, out var had)) frame.Runoff[k] = had = new();
+            var added = new List<(Entity Entity, string? Layer)>();
+            foreach (var (key, v) in list)
+            {
+                if (had.ContainsKey(key)) continue;
+                var e = _maps.SpawnEntity(frame.Id, w => Water.MapDrainage.SpawnVoice(w, v));
+                if (e == Entity.Null) continue;
+                had[key] = e;
+                added.Add((e, Water.MapDrainage.Layer));
+            }
+            if (added.Count > 0) tiles.AddPlaced(world, k, added);
+        }
+    }
+
+    /// <summary>A tile let go: the voices of its drainage lines go with it.</summary>
+    private void DropRunoff(Frame frame, MapTiles tiles, TileKey k)
+    {
+        if (!frame.Runoff.Remove(k, out var had)) return;
+        tiles.RemoveEntities(had.Values.Select(e => e.Id));
+        if (!_maps.TryGetMap(frame.Id, out var world, out _, out _, out _)) return;
+        foreach (var e in had.Values) if (world.IsAlive(e)) _maps.DestroyEntity(frame.Id, e);
     }
 }

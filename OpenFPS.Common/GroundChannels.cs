@@ -89,36 +89,64 @@ public static class GroundChannels
     };
 
     /// <summary>
-    /// The level at a metre the voice is declared at, dB, for its kind and slope at <paramref name="litresPerSecond"/>:
-    /// measured with AudioLab --ground-water levels (2026-10-10, docs/RUNNING_WATER.md 13.6) at 0.1 to 300 L/s and
-    /// slopes of 0.5 to 8 %, and interpolated in log flow; the slope's effect as measured at the middle flow.
-    /// Only the mixer's ranking and the voice's headroom read it: what is heard is the model at its flow.
+    /// What breaks the surface of a natural bed (a creek, a rill) is sized by the bed: a channel carrying more
+    /// water has bigger stones, roots and snags in it, the median standing this share of the depth its reference
+    /// flow runs at (gravel and cobble beds run at a relative submergence of a few stone heights at bankfull,
+    /// Bathurst 1985, recalled; a judgement within it), spaced further apart in step. Never smaller than the
+    /// kind's own. A ditch's grass and a runnel's grit do not grow with the water.
+    /// </summary>
+    public const float ObstacleShareOfDepth = 0.4f;
+
+    /// <summary>
+    /// The level at a metre the voice is declared at, dB, at <paramref name="litresPerSecond"/> (its reference flow,
+    /// in the bed made for it) and its slope: measured with AudioLab --ground-water levels (2026-10-10,
+    /// docs/RUNNING_WATER.md 13.6) over flows and slopes and interpolated in log flow and log slope, the loudest at
+    /// or under this flow (deep water drowns its obstacles, and a voice is declared by what it can do). Only the
+    /// mixer's ranking reads it, and the voice's headroom is over it: what is heard is the model at its flow.
     /// </summary>
     public static float LevelDb(GroundChannelKind kind, float litresPerSecond, float slope)
     {
-        var (flows, levels, perDoubling) = Levels(kind);
-        float lq = MathF.Log10(Math.Clamp(litresPerSecond, flows[0], flows[^1]));
-        float level = levels[^1];
+        var (flows, slopes, levels) = Levels(kind);
+        float ls = MathF.Log(Math.Clamp(slope, slopes[0], slopes[^1]));
+        int sj = 0;
+        while (sj < slopes.Length - 2 && ls > MathF.Log(slopes[sj + 1])) sj++;
+        float ts = Math.Clamp((ls - MathF.Log(slopes[sj])) / (MathF.Log(slopes[sj + 1]) - MathF.Log(slopes[sj])), 0f, 1f);
+        float At(int fi) => levels[fi, sj] + (levels[fi, sj + 1] - levels[fi, sj]) * ts;
+        float q = Math.Clamp(litresPerSecond, flows[0], flows[^1]);
+        float best = At(0);
         for (int k = 1; k < flows.Length; k++)
         {
-            float a = MathF.Log10(flows[k - 1]), b = MathF.Log10(flows[k]);
-            if (lq > b) continue;
-            float t = (lq - a) / (b - a);
-            level = levels[k - 1] + (levels[k] - levels[k - 1]) * t;
+            if (q >= flows[k]) { best = MathF.Max(best, At(k)); continue; }
+            float t = (MathF.Log(q) - MathF.Log(flows[k - 1])) / (MathF.Log(flows[k]) - MathF.Log(flows[k - 1]));
+            best = MathF.Max(best, At(k - 1) + (At(k) - At(k - 1)) * t);
             break;
         }
-        float s = Math.Clamp(slope, 0.002f, 0.2f);
-        return level + perDoubling * MathF.Log2(s / 0.02f);
+        return best;
     }
 
-    // MEASURED with `--ground-water levels`: see LevelDb. Flows L/s, Leq at a metre dB, dB per doubling of slope.
-    private static (float[] Flows, float[] Levels, float SlopeDbPerDoubling) Levels(GroundChannelKind kind) => kind switch
+    /// <summary>How far a line's loudest moments can stand over its declared level, dB: the running water's own 18,
+    /// and twelve more because its flow is not its reference flow (a flood carries more, and a shallower stage can
+    /// break the surface more) and the voice must never be squared off.</summary>
+    public const float HeadroomDb = 30f;
+
+    // MEASURED with `--ground-water levels`: see LevelDb. Leq at a metre, dB, each flow in its own bed, by slope.
+    private static readonly float[] TableFlows = { 0.05f, 0.3f, 2f, 15f, 100f, 600f };
+    private static readonly float[] TableSlopes = { 0.003f, 0.01f, 0.03f, 0.08f };
+
+    private static (float[] Flows, float[] Slopes, float[,] Levels) Levels(GroundChannelKind kind) => kind switch
     {
-        GroundChannelKind.Creek => (new[] { 1f, 10f, 40f, 160f, 600f }, new[] { 45f, 59f, 67f, 73f, 78f }, 1.5f),
-        GroundChannelKind.Ditch => (new[] { 0.1f, 1f, 10f, 100f }, new[] { 38f, 50f, 60f, 68f }, 1.5f),
-        GroundChannelKind.Runnel => (new[] { 0.05f, 0.3f, 3f, 30f }, new[] { 40f, 51f, 60f, 66f }, 1.5f),
-        _ => (new[] { 0.05f, 0.5f, 5f, 50f }, new[] { 35f, 47f, 57f, 65f }, 1.5f),
+        GroundChannelKind.Creek => (TableFlows, TableSlopes, CreekLevels),
+        GroundChannelKind.Ditch => (TableFlows, TableSlopes, DitchLevels),
+        GroundChannelKind.Runnel => (TableFlows, TableSlopes, RunnelLevels),
+        _ => (TableFlows, TableSlopes, RillLevels),
     };
+
+    // Rows are TableFlows, columns TableSlopes. MEASURED 2026-10-10 (20 s at each, seed 7); 20 marks a bed so deep
+    // for its stones that nothing breaks the surface (silent: the envelope in LevelDb steps over it).
+    private static readonly float[,] RillLevels = { { 54, 50, 47, 45 }, { 59, 57, 56, 55 }, { 68, 64, 62, 64 }, { 75, 69, 65, 68 }, { 81, 78, 76, 81 }, { 86, 84, 20, 82 } };
+    private static readonly float[,] DitchLevels = { { 44, 41, 39, 39 }, { 54, 51, 49, 49 }, { 60, 59, 61, 62 }, { 55, 55, 61, 73 }, { 20, 20, 64, 82 }, { 20, 20, 20, 90 } };
+    private static readonly float[,] RunnelLevels = { { 47, 46, 46, 48 }, { 51, 51, 54, 56 }, { 56, 58, 63, 65 }, { 55, 59, 71, 75 }, { 20, 61, 80, 86 }, { 20, 60, 88, 94 } };
+    private static readonly float[,] CreekLevels = { { 40, 39, 37, 36 }, { 55, 51, 48, 45 }, { 64, 60, 57, 55 }, { 72, 70, 69, 70 }, { 79, 75, 75, 82 }, { 82, 79, 80, 87 } };
 
     /// <summary>The sound id of a line's voice.</summary>
     public static string Key(GroundChannelKind kind, float widthMetres, float slope, float lengthMetres, float referenceLitresPerSecond, GroundCatchment catchment)
@@ -157,7 +185,25 @@ public static class GroundChannels
                                            float referenceLitresPerSecond, GroundCatchment catchment)
     {
         float s = Math.Clamp(slope, 0.001f, 0.5f);
-        return new RunningWaterSpec
+        var bed = new RunningWaterSpec
+        {
+            Channel = kind == GroundChannelKind.Runnel ? FlowChannel.KerbGutter : FlowChannel.Stream,
+            WidthMetres = Math.Clamp(widthMetres, 0.05f, 100f), Slope = s, CrossSlope = 0.02f, ManningN = ManningN(kind), SourceLevelDb = 0f,
+        };
+        var obstacles = ObstaclesOf(kind);
+        if (kind is GroundChannelKind.Creek or GroundChannelKind.Rill)
+        {
+            float depth = Hydraulics.Of(bed, MathF.Max(0.001f, referenceLitresPerSecond)).DepthMetres;
+            float drop = MathF.Max(obstacles.MedianDropMetres, ObstacleShareOfDepth * depth);
+            float grow = drop / obstacles.MedianDropMetres;
+            obstacles = obstacles with
+            {
+                MedianDropMetres = drop,
+                PerMetre = obstacles.PerMetre / grow,
+                WidthMetres = MathF.Min(obstacles.WidthMetres * grow, 0.5f * bed.WidthMetres),
+            };
+        }
+        return bed with
         {
             Name = kind switch
             {
@@ -166,19 +212,14 @@ public static class GroundChannels
                 GroundChannelKind.Runnel => "Water running over paving",
                 _ => "Rivulet",
             },
-            Channel = kind == GroundChannelKind.Runnel ? FlowChannel.KerbGutter : FlowChannel.Stream,
-            WidthMetres = Math.Clamp(widthMetres, 0.05f, 100f),
-            Slope = s,
-            CrossSlope = 0.02f,
-            ManningN = ManningN(kind),
             LengthMetres = Math.Clamp(lengthMetres, 0.5f, 500f),
-            Obstacles = ObstaclesOf(kind),
+            Obstacles = obstacles,
             // The fields the dry test reads: fed by rain over this much ground, no flow of its own.
             CatchmentSquareMetres = MathF.Max(1f, catchment.TotalSquareMetres),
             Ground = catchment,
             GroundReferenceLitresPerSecond = MathF.Max(0.001f, referenceLitresPerSecond),
             SourceLevelDb = LevelDb(kind, referenceLitresPerSecond, s),
-            PeakHeadroomDb = 18f,
+            PeakHeadroomDb = HeadroomDb,
             ExtentMetres = 2f,
             Places = 5,
             Layout = FlowLayout.Line,

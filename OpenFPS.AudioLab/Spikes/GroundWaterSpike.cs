@@ -339,31 +339,32 @@ public static class GroundWaterSpike
     private static int Levels(string[] args)
     {
         float sec = ArgF(args, "sec=", 20f);
-        var kinds = new (GroundChannelKind Kind, float[] Flows)[]
-        {
-            (GroundChannelKind.Rill, new[] { 0.05f, 0.5f, 5f, 50f }),
-            (GroundChannelKind.Ditch, new[] { 0.1f, 1f, 10f, 100f }),
-            (GroundChannelKind.Runnel, new[] { 0.05f, 0.3f, 3f, 30f }),
-            (GroundChannelKind.Creek, new[] { 1f, 10f, 40f, 160f, 600f }),
-        };
+        float[] flows = { 0.05f, 0.3f, 2f, 15f, 100f, 600f };
+        float[] slopes = { 0.003f, 0.01f, 0.03f, 0.08f };
         var catchment = new GroundCatchment(new float[GroundHydrology.Surfaces], 600f);
-        foreach (var (kind, flows) in kinds)
+        foreach (var kind in Enum.GetValues<GroundChannelKind>())
         {
-            Console.WriteLine($"== {kind}");
-            foreach (float slope in new[] { 0.005f, 0.02f, 0.08f })
+            Console.WriteLine($"== {kind}: Leq at a metre, dB, each flow in the bed made for it (rows flows L/s, columns slopes {string.Join(", ", slopes.Select(x => $"{x * 100:0.#} %"))})");
+            var table = new StringBuilder();
+            foreach (float q in flows)
             {
-                var row = new StringBuilder($"  slope {slope * 100,4:F1} %:");
-                foreach (float q in flows)
+                var row = new StringBuilder($"  {q,6:0.##} L/s:");
+                table.Append("{ ");
+                foreach (float slope in slopes)
                 {
                     var spec = GroundChannels.SpecFor(kind, GroundChannels.WidthFor(kind, q), slope, GroundChannels.SegmentMetres, q, catchment);
                     var pa = RunningWaterSpike.Render(spec, q, sec, 7);
                     double sum = 0; foreach (float v in pa) sum += (double)v * v;
                     double leq = 10 * Math.Log10(Math.Max(1e-24, sum / pa.Length) / (20e-6 * 20e-6));
                     var st = Hydraulics.Of(spec, q);
-                    row.Append(CultureInfo.InvariantCulture, $"  {q:0.###} L/s {leq:F1} dB (w {spec.WidthMetres:F2} m, y {st.DepthMetres * 1000:F0} mm, Fr {st.Froude:F2})");
+                    row.Append(CultureInfo.InvariantCulture, $"  {leq,5:F1} dB (w {spec.WidthMetres:F2} m, y {st.DepthMetres * 1000:F0} mm, Fr {st.Froude:F2}, stones {spec.Obstacles!.MedianDropMetres * 100:F0} cm)");
+                    table.Append(CultureInfo.InvariantCulture, $"{Math.Round(Math.Max(20, leq))}, ");
                 }
+                table.Length -= 2;
+                table.Append(" }, ");
                 Console.WriteLine(row);
             }
+            Console.WriteLine("  table: { " + table.ToString().TrimEnd(' ', ',') + " }");
         }
         return 0;
     }
