@@ -69,8 +69,8 @@ public static class EntityGeometry
         if (role == GeometryRole.SightOnly) surface = SightOnly(surface);
         if (def.Collider.Shape == Components.ColliderShape.Terrain)
             return def.Terrain is { Posts: >= 2 } terrain ? TerrainSpec(def.EntityId, transform.Position, terrain, surface) : default;
-        return SolidSpec.Of(def.EntityId, transform.Position, transform.Rotation, def.Collider.Size, surface,
-                            Shapes.Make(def.Collider.Form, def.Collider.Size));
+        return SolidSpec.OfShape(def.EntityId, transform.Position, transform.Rotation, def.Collider.Size, surface,
+                                 def.Collider.Form);
     }
 
     /// <summary>A tile of ground as a solid: its heightfield, from the entity's position (the middle of the

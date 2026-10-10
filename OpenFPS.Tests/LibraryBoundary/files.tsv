@@ -319,10 +319,14 @@ OpenFPS.Geometry/PerfProbe.cs	lib	Geometry
 OpenFPS.Geometry/SpatialGrid.cs	lib	Geometry	
 OpenFPS.Geometry/TileKey.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Bvh.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Facets.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/GeometryPiece.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Heightfield.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Polygons.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Shapes.More.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Shapes.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/SolidContact.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/StraightSkeleton.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Surfaces.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/TriangleGeometry.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorld.cs	lib	Geometry	

@@ -89,6 +89,10 @@ public sealed class MeshAsset
     public Vector3 BoundsMin { get; }
     public Vector3 BoundsMax { get; }
 
+    private FacetSet? _facets;
+    /// <summary>Its flat faces (<see cref="FacetSet"/>), worked out the first time they are asked for.</summary>
+    public FacetSet Facets => _facets ??= FacetSet.Of(this);
+
     public MeshAsset(Vector3[] vertices, int[] indices, byte[] triangleSurface, bool closed, bool convex)
     {
         if (indices.Length % 3 != 0) throw new ArgumentException("indices must come in threes", nameof(indices));

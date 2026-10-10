@@ -14,7 +14,7 @@ public static class EarlyReflections
 {
     /// <summary>A surface sound can come off, in the shape the acoustic scene and
     /// <see cref="Enclosure"/> use.</summary>
-    public readonly record struct Solid(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material);
+    public readonly record struct Solid(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material, Geometry.MeshAsset? Shape = null);
 
     /// <summary>One arrival: where it appears to come from, how far it travelled, what survived.</summary>
     /// <param name="ImagePosition">The mirrored source, where the ear should place this arrival.</param>
@@ -161,7 +161,7 @@ public static class EarlyReflections
                 {
                     var (c, size, rot) = World.BoxOf(r);
                     if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) continue;
-                    into.Add(new Solid(c, size, rot, World.SurfaceOf(r).Material));
+                    into.Add(new Solid(c, size, rot, World.SurfaceOf(r).Material, World.ShapeOf(r)));
                     ids.Add(World.OwnerOf(r));
                 }
                 return;
@@ -229,7 +229,7 @@ public static class EarlyReflections
             float keepHigh = Keep(p.AbsorptionHigh);
             if (MathF.Max(keepLow, MathF.Max(keepMid, keepHigh)) < MinRelativeAmplitude) continue;
 
-            for (int f = 0; f < 6; f++)
+            for (int f = 0, faces = FaceCount(s); f < faces; f++)
             {
                 if (!FacePlane(s, f, out Vector3 faceCentre, out Vector3 normal, out Vector3 uAxis,
                                out Vector3 vAxis, out float halfU, out float halfV)) continue;
@@ -249,6 +249,7 @@ public static class EarlyReflections
                 Vector3 local = hit - faceCentre;
                 if (MathF.Abs(Vector3.Dot(local, uAxis)) > halfU) continue;
                 if (MathF.Abs(Vector3.Dot(local, vAxis)) > halfV) continue;
+                if (s.Shape != null && !OnFacet(s, f, hit)) continue;    // in the rectangle round a facet, not on it
 
                 float pathLength = Vector3.Distance(source, hit) + Vector3.Distance(hit, listener);
                 if (pathLength - direct > maxExtraPathMetres) continue;   // extra path, as ImageSource.MaxPathLength
@@ -477,9 +478,9 @@ public static class EarlyReflections
             if (s.Size.X <= 0f || s.Size.Y <= 0f || s.Size.Z <= 0f) continue;
             float reach = 60f + s.Size.Length() * 0.5f;
             if (DistanceSquaredToSegment(s.Center, source, listener) > reach * reach) continue;
-            for (int f = 0; f < 6; f++)
+            for (int f = 0, faces = FaceCount(s); f < faces; f++)
             {
-                if (f == 2 || f == 3) continue;                               // tops and bottoms
+                if (s.Shape == null && (f == 2 || f == 3)) continue;        // tops and bottoms
                 if (!FacePlane(s, f, out var c, out var n, out var u, out var v, out float hu, out float hv)) continue;
                 if (MathF.Abs(n.Y) > 0.2f) continue;                          // walls, not floors
                 if (Vector3.Dot(source - c, n) <= 0.01f || Vector3.Dot(listener - c, n) <= 0.01f) continue;
@@ -687,12 +688,35 @@ public static class EarlyReflections
 
     /// <summary>A surface's identity for the life of a scene, box and face, so a wall's reflection keeps
     /// its voice as the listener moves.</summary>
-    public static int SurfaceId(int solidIndex, int face) => solidIndex * 6 + face;
+    public static int SurfaceId(int solidIndex, int face)
+        => face < 6 ? solidIndex * 6 + face : (1 << 27) | (int)((uint)unchecked(solidIndex * 4099 + face) % (1u << 27));
 
-    /// <summary>One face of a box in world space: centre, outward normal, in-plane axes and half extents.</summary>
+    /// <summary>How many faces a solid mirrors from: a box's six, or a shape's facets (docs/GEOMETRY.md 3.4).</summary>
+    private static int FaceCount(in Solid s) => s.Shape?.Facets.Items.Length ?? 6;
+
+    /// <summary>Whether a point on a facet's plane is on the facet itself, not only in the rectangle round it.</summary>
+    private static bool OnFacet(in Solid s, int face, Vector3 world)
+    {
+        var local = Vector3.Transform(world - s.Center, Quaternion.Conjugate(s.Rotation));
+        return s.Shape!.Facets.Contains(face, local, 1e-3f);
+    }
+
+    /// <summary>One face of a box in world space: centre, outward normal, in-plane axes and half extents; for a
+    /// shape, one facet's plane and the rectangle round it.</summary>
     private static bool FacePlane(in Solid s, int face, out Vector3 centre, out Vector3 normal,
                                   out Vector3 uAxis, out Vector3 vAxis, out float halfU, out float halfV)
     {
+        if (s.Shape is { } shape)
+        {
+            var f = shape.Facets.Items[face];
+            halfU = f.HalfU.Length(); halfV = f.HalfV.Length();
+            if (halfU <= 0f || halfV <= 0f) { centre = default; normal = default; uAxis = default; vAxis = default; return false; }
+            normal = Vector3.Transform(f.Normal, s.Rotation);
+            uAxis = Vector3.Transform(f.HalfU / halfU, s.Rotation);
+            vAxis = Vector3.Transform(f.HalfV / halfV, s.Rotation);
+            centre = s.Center + Vector3.Transform(f.RectCentre, s.Rotation);
+            return true;
+        }
         Vector3 h = s.Size * 0.5f;
         Vector3 ln, lu, lv;
         switch (face)

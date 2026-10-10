@@ -85,11 +85,24 @@ public struct GeometryTriangle
 /// </summary>
 public readonly record struct SolidSpec(int Owner, Vector3 Position, Quaternion Rotation, Vector3 BoxSize,
                                         Surface Surface, MeshAsset? Mesh = null, MeshAsset[]? Parts = null,
-                                        Heightfield? Terrain = null)
+                                        Heightfield? Terrain = null, Surface[]? Slots = null)
 {
     /// <summary>A solid of a shape from the library (null for a box), filling a box of <paramref name="size"/>.</summary>
     public static SolidSpec Of(int owner, Vector3 position, Quaternion rotation, Vector3 size, Surface surface, ShapeMesh? shape)
         => new(owner, position, rotation, size, surface, shape?.Outer, shape?.Parts);
+
+    /// <summary>
+    /// A solid of a form (null or a box: a box of <paramref name="size"/>), with the shape's own surfaces: each
+    /// of <see cref="Shapes.SurfaceNames"/> is <paramref name="surface"/> with the form's material for it, a
+    /// roof's slopes are roof, and a roof's panel is its deck (<see cref="Shapes.PanelOf"/>).
+    /// </summary>
+    public static SolidSpec OfShape(int owner, Vector3 position, Quaternion rotation, Vector3 size, Surface surface, ShapeSpec? form)
+    {
+        var mesh = Shapes.Make(form, size);
+        if (mesh == null || form == null) return Of(owner, position, rotation, size, surface, null);
+        var main = surface with { Construction = surface.Construction with { PanelSize = Shapes.PanelOf(form, size) } };
+        return new(owner, position, rotation, size, main, mesh.Outer, mesh.Parts, Slots: Shapes.SlotSurfaces(form, main));
+    }
 
     /// <summary>A terrain tile whose middle is at <paramref name="centre"/> (heights are its own, in the
     /// world): <paramref name="surface"/> gives its layers and flags; each cell's material is its own.</summary>
@@ -269,6 +282,7 @@ public sealed class GeometryPiece
         var parts = new List<SolidPart>();
         var partTris = new List<GeometryTriangle>();
         Span<Vector3> corners = stackalloc Vector3[8];
+        Span<int> slotIndex = stackalloc int[16];
         int t = 0;
         for (int si = 0; si < solids.Count; si++)
         {
@@ -309,11 +323,20 @@ public sealed class GeometryPiece
                     verts[v] = at + Vector3.TransformNormal(m.Vertices[v], turn);
                     lo = Vector3.Min(lo, verts[v]); hi = Vector3.Max(hi, verts[v]);
                 }
+                // Each triangle on its shape's surface (a roof's slopes, a stair's treads); the solid's own when
+                // the shape has one surface.
+                int slots = Math.Min(slotIndex.Length, s.Slots?.Length ?? 0);
+                for (int k = 0; k < slots; k++)
+                {
+                    slotIndex[k] = SurfaceIndex(s.Slots![k]);
+                    if (slotIndex[k] > ushort.MaxValue) throw new InvalidOperationException("more than 65,536 surfaces in one piece");
+                }
                 for (int k = 0; k < m.Indices.Length; k += 3, t++)
                 {
                     Vector3 a = verts[m.Indices[k]], b = verts[m.Indices[k + 1]], c = verts[m.Indices[k + 2]];
                     tris[t] = new GeometryTriangle { V0 = a, E1 = b - a, E2 = c - a, Solid = si };
-                    triSurface[t] = (ushort)surface;   // stage 1: one surface a solid; slots come with meshes
+                    int slot = m.TriangleSurface[k / 3];
+                    triSurface[t] = (ushort)(slot < slots ? slotIndex[slot] : surface);
                 }
             }
             rec.TriCount = t - rec.TriStart;
@@ -388,10 +411,19 @@ public sealed class GeometryPiece
             if (surfaces.Count > ushort.MaxValue) throw new InvalidOperationException("more than 65,536 surfaces in one piece");
         }
 
-        return new GeometryPiece(key, origin, signature, sortedTris, sortedSurface, triNodes, records, solidTris,
-                                 planes.ToArray(), solidNodes, solidOrder, surfaces.ToArray(), parts.ToArray(), partTris.ToArray(),
-                                 field, offset, terrainOwner, terrainSurfaces);
+        var piece = new GeometryPiece(key, origin, signature, sortedTris, sortedSurface, triNodes, records, solidTris,
+                                      planes.ToArray(), solidNodes, solidOrder, surfaces.ToArray(), parts.ToArray(), partTris.ToArray(),
+                                      field, offset, terrainOwner, terrainSurfaces);
+        for (int si = 0; si < solids.Count; si++)
+            if (solids[si].Mesh != null) (piece._shapes ??= new MeshAsset?[solids.Count])[si] = solids[si].Mesh;
+        return piece;
     }
+
+    private MeshAsset?[]? _shapes;
+
+    /// <summary>The shape a solid was made of, in its box's frame (null for a box or terrain): its facets are the
+    /// mirrors the image sources use (docs/GEOMETRY.md 3.4).</summary>
+    public MeshAsset? ShapeOfSolid(int solid) => _shapes != null && solid < _shapes.Length ? _shapes[solid] : null;
 
     /// <summary>The distinct face planes of a convex solid, from its triangles.</summary>
     private static void AddPlanes(IReadOnlyList<GeometryTriangle> tris, int start, int count, List<Vector4> planes)

@@ -342,6 +342,26 @@ public static class ImageSource
         => v.LengthSquared() > 1e-12f ? Vector3.Normalize(v) : Vector3.UnitY;
 
     /// <summary>
+    /// The facets of a shape (docs/GEOMETRY.md 3.4) at <paramref name="centre"/>, turned by
+    /// <paramref name="rotation"/>, each the rectangle round it: a wedge's slope mirrors as a slope and a
+    /// column's narrow sides as narrow sides, not as the faces of the box round them. Appended to
+    /// <paramref name="into"/>; returns how many.
+    /// </summary>
+    public static int FacesOfShape(Geometry.MeshAsset shape, Vector3 centre, Quaternion rotation, float absorption,
+                                   int baseId, List<ReflectingSurface> into, float scattering = 0f)
+    {
+        var facets = shape.Facets.Items;
+        for (int i = 0; i < facets.Length; i++)
+        {
+            var f = facets[i];
+            into.Add(new ReflectingSurface(centre + Vector3.Transform(f.RectCentre, rotation), Norm(Vector3.Transform(f.Normal, rotation)),
+                                           Vector3.Transform(f.HalfU, rotation), Vector3.Transform(f.HalfV, rotation),
+                                           absorption, baseId + i, scattering));
+        }
+        return facets.Length;
+    }
+
+    /// <summary>
     /// Second-order reflections, source to surface A to surface B to listener: the slap between two
     /// facades that every street has (two parallel walls give only one first-order bounce each). Ordered
     /// pairs, since A then B and B then A arrive at different times. Quadratic in the surface count, so

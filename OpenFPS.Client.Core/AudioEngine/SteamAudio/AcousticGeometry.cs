@@ -156,7 +156,7 @@ public sealed class AcousticGeometry
     {
         var flags = (openGround ? SurfaceFlags.OpenGround : SurfaceFlags.None) | (leaf ? SurfaceFlags.DoorLeaf : SurfaceFlags.None);
         var surface = new Surface(b.Material ?? "", new Construction(b.Size, b.Build), GeometryLayers.Acoustics, flags);
-        return SolidSpec.Of(b.EntityId, b.Center, b.Rotation, b.Size, surface, Shapes.Make(b.Form, b.Size));
+        return SolidSpec.OfShape(b.EntityId, b.Center, b.Rotation, b.Size, surface, b.Form);
     }
 
     private static long Hash(in SteamAudioScene.Box b)
