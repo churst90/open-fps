@@ -465,7 +465,8 @@ public partial struct RegionComponent
     public Vector3 RoomSize { get; set; }
     public float ReverbTimeScale { get; set; } = 1.0f;
     public int[] Materials { get; set; } = new int[6]; 
-    public string AmbienceId { get; set; } = ""; 
+    /// <summary>Unread and always empty since the ambience beds went (2026-10-10); kept for the positional wire.</summary>
+    public string AmbienceId { get; set; } = "";
     public RegionComponent() { }
 }
 [MemoryPackable]

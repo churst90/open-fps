@@ -3247,7 +3247,6 @@ map_data = {
     "PlayMax": v3(XMAX, MAP_MAX[1], ZMAX),
     "MinimumY": LOW - 20.0,
     "SpawnPoint": {"Position": v3(*spawn), "Rotation": SPAWN_ROT},
-    "AmbienceId": "",
     "Temperature": PLACE.get("Temperature", 20.0),
     "Humidity": PLACE.get("Humidity", 0.5),
     "VoxelResolution": 1.0,

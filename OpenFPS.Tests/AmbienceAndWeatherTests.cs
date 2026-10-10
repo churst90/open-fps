@@ -9,30 +9,28 @@ using Arch.Core;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// An ambience id reaching the client, and the weather staying put when asked. `AmbienceId` was once a
-/// dead field (in the spec, the component and the wire, and read by no client), so the value is walked
-/// the whole way rather than checked at any one link.
+/// No ambience beds, and the weather staying put when asked. A bed is a recorded loop made by nothing in the world:
+/// it cannot be occluded or walked round and says nothing about where you are. The map's outdoor bed went on
+/// 2026-09-18 ("it doesn't add anything"), and the region beds with the rest of the machinery on 2026-10-10 (Cody:
+/// no beds at all). The fields stay on the wire, unread.
 /// </summary>
 public class AmbienceAndWeatherTests
 {
     private static string MapDirectory => System.IO.Path.Combine(AppContext.BaseDirectory, "maps");
 
-    /// <summary>
-    /// No shipped map lays a recorded loop over the world (Cody, 2026-09-18: the outdoor loop "needs to
-    /// come out, it doesn't add anything"; docs/SOUND_INVENTORY.md, "Not wanted"). A bed is made by
-    /// nothing, so it cannot be occluded or walked round and says nothing about where you are. A region
-    /// may still name an ambience: that is a sound with a place in it.
-    /// </summary>
+    /// <summary>No shipped map file or prefab names an ambience bed.</summary>
     [Fact]
-    public void NoShippedMapLaysARecordedBedOverTheWorld()
+    public void NoShippedMapOrPrefabNamesABed()
     {
-        foreach (var data in new MapRepository(MapDirectory).LoadAll())
-            Assert.True(string.IsNullOrWhiteSpace(data.AmbienceId),
-                $"map '{data.Id}' names the ambience bed '{data.AmbienceId}'; what a place sounds like has to come from what is in it");
+        var named = new System.Text.RegularExpressions.Regex("\"AmbienceId\"\\s*:\\s*\"[^\"]");
+        foreach (var dir in new[] { MapDirectory, System.IO.Path.Combine(AppContext.BaseDirectory, "prefabs") })
+            foreach (var file in System.IO.Directory.EnumerateFiles(dir, "*.json", System.IO.SearchOption.AllDirectories))
+                Assert.False(named.IsMatch(System.IO.File.ReadAllText(file)), $"{file} names an ambience bed");
     }
 
+    /// <summary>A prefab that still names an ambience is refused at load, as any field the loader does not read is.</summary>
     [Fact]
-    public void ARegionsAmbienceSurvivesTheTripFromPrefabToEntityDefinition()
+    public void APrefabNamingABedIsRefused()
     {
         string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "openfps-amb-" + Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
@@ -44,26 +42,18 @@ public class AmbienceAndWeatherTests
               "IsIndoor": true, "RoomSize": { "X": 10, "Y": 5, "Z": 10 },
               "AmbienceId": "AMBIENCE/machine_hum" }
             """);
-
             var repo = new PrefabRepository(dir);
             using var world = World.Create();
-            var entity = repo.Spawn(world, "hum_room", Vector3.Zero);
-
-            // On the component...
-            Assert.Equal("AMBIENCE/machine_hum", world.Get<RegionComponent>(entity).AmbienceId);
-
-            // ...and on the wire.
-            var defs = EntityDefinitionFactory.StaticDefinitions(world);
-            Assert.Contains(defs, d => d.Region.AmbienceId == "AMBIENCE/machine_hum");
+            var e = Assert.ThrowsAny<Exception>(() => repo.Spawn(world, "hum_room", Vector3.Zero));
+            Assert.Contains("REJECTED", e.Message);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    /// <summary>The manifest's field is sent empty.</summary>
     [Fact]
-    public void TheMapsAmbienceIsCarriedOnTheManifest()
+    public void TheManifestCarriesNoBed()
     {
-        // The manifest is the only thing the client sees before the world arrives, so an outdoor bed
-        // that is not on it cannot start until something else happens to mention it.
         string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "openfps-amb-" + Guid.NewGuid().ToString("N"));
         string mapDir = System.IO.Path.Combine(dir, "maps");
         System.IO.Directory.CreateDirectory(mapDir);
@@ -71,26 +61,13 @@ public class AmbienceAndWeatherTests
         {
             var maps = new MapManager(new MapRepository(mapDir), new PrefabRepository(System.IO.Path.Combine(AppContext.BaseDirectory, "prefabs")));
             maps.Initialize();
-            var woods = MapTemplates.Flat("woods", "tester");
-            woods.AmbienceId = "AMBIENCE/woods_mid_day";
-            Assert.True(maps.CreateMap(woods, out string e1), e1);
-            Assert.True(maps.CreateMap(MapTemplates.Flat("bare", "tester"), out string e2), e2);
-
-            var sessions = new SessionManager();
+            Assert.True(maps.CreateMap(MapTemplates.Flat("bare", "tester"), out string e), e);
             var server = new OpenFPS.Server.GameServer(new NoUsers());
-            server.Attach(maps, sessions, new OccupancyService(maps), new HandsService(maps));
+            server.Attach(maps, new SessionManager(), new OccupancyService(maps), new HandsService(maps));
             var sent = new List<IMessage>();
             server.Sent = (_, m) => sent.Add(m);
-
-            MapManifest ManifestFor(string mapId)
-            {
-                sent.Clear();
-                server.SendManifest(new UserSession { ConnectionId = 1, Username = "tester", CurrentMapId = mapId });
-                return Assert.Single(sent.OfType<MapManifest>());
-            }
-
-            Assert.Equal("AMBIENCE/woods_mid_day", ManifestFor("woods").AmbienceId);
-            Assert.Equal("", ManifestFor("bare").AmbienceId);
+            server.SendManifest(new UserSession { ConnectionId = 1, Username = "tester", CurrentMapId = "bare" });
+            Assert.Equal("", Assert.Single(sent.OfType<MapManifest>()).AmbienceId);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }

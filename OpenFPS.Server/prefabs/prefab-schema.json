@@ -394,10 +394,6 @@
       "$ref": "#/definitions/vector3",
       "description": "Interior dimensions in metres — the volume and surface areas the reverb time is computed from."
     },
-    "AmbienceId": {
-      "type": "string",
-      "description": "Ambience loop crossfaded in while the listener is inside."
-    },
     "ReverbScale": {
       "type": "number",
       "exclusiveMinimum": 0,

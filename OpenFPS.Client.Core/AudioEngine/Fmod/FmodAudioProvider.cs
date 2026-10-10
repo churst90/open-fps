@@ -701,17 +701,6 @@ public partial class FmodAudioProvider : IAudioProvider
     /// and a copy off one surface round them (ClientAudioSystem.UpdateOwnVoice).</summary>
     public const string OwnVoiceRoomKey = "ownvoice:room", OwnVoiceCopyKey = "ownvoice:copy";
 
-    /// <summary>One playing ambisonic ambience bed. Several can be live, so beds can cross-fade.</summary>
-    private sealed class AmbientBed
-    {
-        public required AmbisonicBedState State;
-        public FMOD.DSP Dsp;
-        public FMOD.Channel Channel;
-        public System.Runtime.InteropServices.GCHandle Handle;
-    }
-
-    private readonly Dictionary<string, AmbientBed> _ambientBeds = new();
-
     // Near-field boundary reflections (see BoundaryProximityProcessor). Held for the provider's life.
     private FMOD.DSP _boundaryDsp;
     private System.Runtime.InteropServices.GCHandle _boundaryHandle;
@@ -4404,13 +4393,6 @@ public partial class FmodAudioProvider : IAudioProvider
         if (!_isInitialized) return;
         _listenerPos = position; _listenerRot = rotation; _listenerVel = velocity; _listenerRegionId = regionId;
 
-        // Every ambisonic bed is rotated by this on the mixer thread: the field stays fixed in the
-        // world while the listener turns, which is why the beds are ambisonic.
-        if (_ambientBeds.Count > 0)
-        {
-            var frame = Phonon.ListenerFrame(rotation);
-            foreach (var bed in _ambientBeds.Values) bed.State.Orientation = frame;
-        }
         if (_traced.Count > 0)
         {
             var frame = Phonon.ListenerFrame(rotation);
@@ -4482,128 +4464,6 @@ public partial class FmodAudioProvider : IAudioProvider
                 s.TargetGainR[i] = 0f;
             }
         }
-    }
-
-    /// <summary>
-    /// Starts an ambisonic ambience bed, or re-aims a playing one at a new level. Only a full-sphere
-    /// recording (4, 9 or 16 channels) is taken: anything else would play as a soundfield pointing
-    /// anywhere, with nothing to say so.
-    /// </summary>
-    /// <param name="soundId">Path under ASSETS/SOUNDS.</param>
-    /// <param name="layout">The file's channel layout, AmbiX unless known otherwise; see
-    /// <see cref="AmbisonicFormat"/> for why guessing wrong is silently awful.</param>
-    /// <param name="volume">The level the bed glides to.</param>
-    /// <param name="loop">Whether it loops.</param>
-    public bool PlayAmbientBed(string soundId, AmbisonicLayout layout, float volume, bool loop = true)
-    {
-        if (!_isInitialized) return false;
-
-        if (_ambientBeds.TryGetValue(soundId, out var existing))
-        {
-            existing.State.TargetVolume = volume;
-            return true;
-        }
-
-        if (!_steamAudioEnabled || _saContext == IntPtr.Zero || _saHrtf == IntPtr.Zero)
-        {
-            Log.Warning("Ambience bed '{Id}' not started: Steam Audio is unavailable, so a soundfield " +
-                        "cannot be decoded. The world will be quieter, not wrong.", soundId);
-            return false;
-        }
-
-        if (!_granularBank.TryGetPcmData(soundId, out var pcm, out int channels, out int sampleRate))
-        {
-            Log.Warning("Ambience bed '{Id}' not found or could not be decoded.", soundId);
-            return false;
-        }
-
-        int order = AmbisonicFormat.OrderForChannels(channels);
-        if (order < 1)
-        {
-            Log.Warning("Ambience bed '{Id}' has {Channels} channel(s), which is not a full-sphere " +
-                        "ambisonic layout (4, 9 or 16). Refusing to decode it as a soundfield.",
-                        soundId, channels);
-            return false;
-        }
-
-        // Converted once, on the bed's own copy, not per block on the mixer thread.
-        var converted = new float[pcm.Length];
-        Array.Copy(pcm, converted, pcm.Length);
-        AmbisonicFormat.ConvertToN3d(converted, channels, layout);
-
-        var state = new AmbisonicBedState
-        {
-            Pcm = converted,
-            Channels = channels,
-            Order = order,
-            SourceSampleRate = sampleRate > 0 ? sampleRate : MixerQuality.MixerRate,
-            FrameSize = _saFrameSize,
-            Loop = loop,
-            Context = _saContext,
-            Hrtf = _saHrtf,
-            Scratch = new float[_saFrameSize * channels],
-            StereoScratch = new float[_saFrameSize * 2],
-            TargetVolume = volume,
-            CurrentVolume = 0f, // fade in from silence; a bed that starts at full level thumps
-            Orientation = Phonon.ListenerFrame(_listenerRot)
-        };
-
-        var au = new Phonon.IPLAudioSettings { samplingRate = MixerQuality.MixerRate, frameSize = _saFrameSize };
-        var settings = new Phonon.IPLAmbisonicsDecodeEffectSettings
-        {
-            speakerLayout = Phonon.StereoLayout(),
-            hrtf = _saHrtf,
-            maxOrder = order
-        };
-        if (Phonon.iplAmbisonicsDecodeEffectCreate(_saContext, ref au, ref settings, out state.Effect) != Phonon.IPL_STATUS_SUCCESS)
-        {
-            Log.Warning("Ambience bed '{Id}': Steam Audio refused to create an order-{Order} decode effect.", soundId, order);
-            return false;
-        }
-
-        Phonon.iplAudioBufferAllocate(_saContext, channels, _saFrameSize, ref state.InBuf);
-        Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref state.OutBuf);
-
-        if (AmbisonicBedDsp.CreateDSP(_system, state, out var dsp, out var handle) != RESULT.OK)
-        {
-            ReleaseBedResources(state, handle);
-            Log.Warning("Ambience bed '{Id}': the FMOD DSP could not be created.", soundId);
-            return false;
-        }
-
-        if (_system.playDSP(dsp, default, false, out var channel) != RESULT.OK)
-        {
-            dsp.release();
-            ReleaseBedResources(state, handle);
-            Log.Warning("Ambience bed '{Id}': FMOD would not play the DSP.", soundId);
-            return false;
-        }
-
-        // 2D: the bed is already a finished binaural pair and FMOD must not pan it again.
-        channel.setMode(MODE._2D);
-        _ambientBeds[soundId] = new AmbientBed { State = state, Dsp = dsp, Channel = channel, Handle = handle };
-        Log.Information("Ambience bed '{Id}' playing: order {Order}, {Channels}ch, {Rate} Hz, {Layout}.",
-            soundId, order, channels, sampleRate, layout);
-        return true;
-    }
-
-    /// <summary>Stops a bed and frees it, at once: there is no fade here.</summary>
-    public void StopAmbientBed(string soundId)
-    {
-        if (!_ambientBeds.TryGetValue(soundId, out var bed)) return;
-        _ambientBeds.Remove(soundId);
-
-        if (bed.Channel.hasHandle()) bed.Channel.stop();
-        if (bed.Dsp.hasHandle()) bed.Dsp.release();
-        ReleaseBedResources(bed.State, bed.Handle);
-    }
-
-    private void ReleaseBedResources(AmbisonicBedState state, System.Runtime.InteropServices.GCHandle handle)
-    {
-        if (state.Effect != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectRelease(ref state.Effect);
-        if (state.InBuf.data != IntPtr.Zero) Phonon.iplAudioBufferFree(_saContext, ref state.InBuf);
-        if (state.OutBuf.data != IntPtr.Zero) Phonon.iplAudioBufferFree(_saContext, ref state.OutBuf);
-        if (handle.IsAllocated) handle.Free();
     }
 
     // Every change to _activeSounds goes through these, so the index and the list cannot drift apart.
@@ -5207,7 +5067,6 @@ public partial class FmodAudioProvider : IAudioProvider
             _activeById.Clear();
             ReturnReverbVoices();
             ReleaseReverbUnits();
-            foreach (var id in new List<string>(_ambientBeds.Keys)) StopAmbientBed(id);
             if (_earWindChannel.hasHandle()) _earWindChannel.stop();
             if (_earWindDsp.hasHandle()) _earWindDsp.release();
             // The master's units come off before they are freed: FMOD refuses to release an attached unit.

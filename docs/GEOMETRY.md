@@ -1799,9 +1799,11 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      Southwest, building, `/tp 36.2 969.2 -1.5` (4.9 dB up); 5095 Pacific Boulevard Southwest, house, `/tp 53.0 795.7
      -0.9` (4.6 dB up); 6251 Lanier Street Southwest, bathroom, `/tp 89.1 -68.8 -0.7` (3.4 dB up).
 
-   **Regions become places: the plan (not started).** More than a session, so it waits for part A to be heard. In
-   order, each its own commit:
-   1. The ambience beds go: `ClientAudioSystem.SetMapAmbience` and the region bed, `PlayAmbientBed`/`StopAmbientBed`
+   **Regions become places: the plan (started 2026-10-10, after part A was approved by ear).** In order, each its
+   own commit:
+   1. DONE. The ambience beds go (and the map-level `AmbienceId` from MapData and the three generators, the maps
+      regenerated with only that line gone; `AmbisonicFormat` and `AmbisonicBedDsp` stay, for the lab and their
+      tests): `ClientAudioSystem.SetMapAmbience` and the region bed, `PlayAmbientBed`/`StopAmbientBed`
       in `IAudioProvider`, `FmodAudioProvider` and `AudioEngineFacade`, `PrefabTemplate.AmbienceId`, the manifest's
       ambience in Program.cs and ClientGameSession.cs, `Room.AmbienceId`; `MapManifest`'s field and
       `RegionComponent.AmbienceId` stay on the wire, unread, with a one-line comment. Tests: AmbienceAndWeather,

@@ -554,7 +554,6 @@ map_data = {
     "MaxBound": v3(BOUND_MAX[0], 60, BOUND_MAX[2]),
     "MinimumY": -20.0,
     "SpawnPoint": {"Position": v3(*SPAWN), "Rotation": {"X": 0, "Y": 0, "Z": 0, "W": 1}},
-    "AmbienceId": "",
     # Race day, not a blizzard. Temperature and Humidity are read as OFFSETS from the sim's baselines
     # (20 C / 0.5), and the world's calendar starts on day 1 — deep winter — so a map that authors
     # nothing sits below freezing. The client picks its footstep material from the weather, so an

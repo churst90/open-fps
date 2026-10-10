@@ -12,7 +12,6 @@
   // everything the map was built to demonstrate — "all I hear is the outdoors ambiance loop which is
   // loud and needs to come out, it doesn't add anything". What a place sounds like has to come from
   // what is in it.
-  "AmbienceId": "",
   // A big-block muscle car drives the road in front of the spawn point, four and a half metres out,
   // east to west and back, at 30, 60 and 90 km/h in turn. The client synthesizes its engine live.
   "Vehicles": [

@@ -248,8 +248,6 @@ public class PrefabTemplate
     public bool? IsIndoor { get; set; }
     /// <summary>Interior dimensions in metres, used for the room's volume and surface areas.</summary>
     public Vector3? RoomSize { get; set; }
-    /// <summary>Ambience loop crossfaded in while the listener is inside this region.</summary>
-    public string? AmbienceId { get; set; }
     /// <summary>Multiplier on the computed reverb time (&gt; 0).</summary>
     public float? ReverbScale { get; set; }
 

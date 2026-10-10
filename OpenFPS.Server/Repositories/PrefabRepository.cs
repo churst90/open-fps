@@ -340,8 +340,7 @@ public class PrefabRepository
         }
 
         // Any region field declares a region; the validator insists on the RoomSize the reverb needs.
-        if (t.IsIndoor.HasValue || t.RoomSize.HasValue ||
-            !string.IsNullOrEmpty(t.AmbienceId) || t.ReverbScale.HasValue || t.RoomMaterials != null)
+        if (t.IsIndoor.HasValue || t.RoomSize.HasValue || t.ReverbScale.HasValue || t.RoomMaterials != null)
         {
             var region = new RegionComponent
             {
@@ -349,7 +348,6 @@ public class PrefabRepository
                 IsIndoor = t.IsIndoor ?? true,
                 // The room scales with the entity, as the collider does.
                 RoomSize = (t.RoomSize ?? Vector3.Zero) * (scale ?? Vector3.One),
-                AmbienceId = t.AmbienceId ?? "",
                 ReverbTimeScale = t.ReverbScale ?? 1.0f,
                 Materials = ResolveRoomMaterials(t.RoomMaterials)
             };

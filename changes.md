@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- No ambience beds at all (Cody, 2026-10-10): the map's outdoor bed and the region beds, their provider calls
+  (`PlayAmbientBed`, `StopAmbientBed`), `SetMapAmbience`, `PrefabTemplate.AmbienceId` and the map file's
+  `AmbienceId` are gone; the maps are regenerated with that one line out. `RegionComponent.AmbienceId` and
+  `MapManifest.AmbienceId` stay on the wire, unread and empty. No shipped map named a bed, so nothing heard
+  changes. A prefab that names one is refused at load, as any field the loader does not read is.
+
 - The ground no longer comes up through the floors on Magnolia and Albany, unheard. Since geometry stage 4 their
   floors are their footprints' prisms, and the grading of the ground under slabs took only boxes, so on a slope the
   dirt rose through the back of every house: footsteps were on dirt somewhere in 1,253 of Albany's rooms and 377 of

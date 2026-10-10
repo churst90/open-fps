@@ -34,9 +34,9 @@ other at login. The server and the Windows zip go out together.
    and a seed point, its shape, indoor flag and materials measured from the walls; an outdoor place (yard,
    street, park) is a name over an area. Drop the box (`RoomSize`), `Materials` and `ReverbTimeScale`
    from authoring, the editor, prefabs and the generators; derive portals where floods meet through a
-   door. Remove the ambience bed machinery (`SetMapAmbience`, the region bed, `PlayAmbientBed`,
-   `PrefabTemplate.AmbienceId`): no beds at all, region beds included (Cody, 2026-10-10). The component
-   and manifest fields stay unread (positional wire) unless the wire version is bumped.
+   door. The ambience bed machinery is gone (2026-10-10; Cody: no beds at all, region beds included); the
+   component and manifest fields stay unread (positional wire). Part A approved by ear 2026-10-10 ("everything
+   sounds great"); regions-become-places steps in docs/GEOMETRY.md 12.6 item 1.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below).
 4. Sound library stages 6 to 8: the world input and `OpenFPS.Audio`, splitting `ClientAudioSystem`,

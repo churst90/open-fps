@@ -21,7 +21,6 @@ public static class EntityAcoustics
         RoomSize = region.RoomSize,
         ReverbTimeScale = region.ReverbTimeScale,
         Materials = region.Materials,
-        AmbienceId = region.AmbienceId,
     };
 
     public static Opening ToOpening(this in PortalComponent portal) => new()

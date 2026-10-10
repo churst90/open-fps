@@ -2404,7 +2404,6 @@ map_data = {
     "SpawnPoint": {"Position": v3(*SPAWN), "Rotation": {"X": 0, "Y": 0, "Z": 0, "W": 1}},
     # No ambience bed. See no-ambience-beds: a recorded loop has no source, no distance and no
     # geometry, and on a map built to demonstrate exactly those three it buries all of them.
-    "AmbienceId": "",
     # A warm, dry afternoon. Temperature and Humidity are read as OFFSETS from the sim's baselines
     # (20 C / 0.5), and the world's calendar starts on day 1 — deep winter, about -5 C before the
     # daily swing. Twenty-two degrees over puts the whole daily swing clear of freezing, under which

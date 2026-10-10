@@ -41,9 +41,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     private readonly BoundaryProbe[] _boundariesOut = new BoundaryProbe[BoundaryVoiceState.MaxTaps];
     private int _boundaryCount;
 
-    /// <summary>Ambience bed commands, applied on the audio thread: starting a bed decodes a file and
-    /// creates a Steam Audio effect, not work for the game thread.</summary>
-    private readonly ConcurrentQueue<(string Id, AmbisonicLayout Layout, float Volume, bool Loop, bool Stop)> _ambientBedCommands = new();
     private float _listenerShelter = 0.0f;
     private AcousticMap? _acousticMap;
     private readonly object _stateLock = new();
@@ -189,12 +186,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             _voiceManager?.Refresh(emitter);
         }
 
-        while (_ambientBedCommands.TryDequeue(out var cmd))
-        {
-            if (cmd.Stop) _provider.StopAmbientBed(cmd.Id);
-            else _provider.PlayAmbientBed(cmd.Id, cmd.Layout, cmd.Volume, cmd.Loop);
-        }
-
         while (_directPlayQueue.TryDequeue(out var emitter))
         {
             _provider.PlaySpatialSound(emitter);
@@ -244,14 +235,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             _listenerRegionId = regionId;
         }
     }
-
-    /// <summary>Starts an ambisonic ambience bed, or re-aims a playing one. See
-    /// <see cref="IAudioProvider.PlayAmbientBed"/>; the work happens on the audio thread.</summary>
-    public void PlayAmbientBed(string soundId, AmbisonicLayout layout, float volume, bool loop = true)
-        => _ambientBedCommands.Enqueue((soundId, layout, volume, loop, false));
-
-    public void StopAmbientBed(string soundId)
-        => _ambientBedCommands.Enqueue((soundId, AmbisonicLayout.AmbiX, 0f, false, true));
 
     public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes)
     {

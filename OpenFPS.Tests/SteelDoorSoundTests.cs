@@ -83,8 +83,6 @@ public class SteelDoorSoundTests
         public void UpdateListener(Vector3 p, Quaternion r, Vector3 v, int region) { }
         public void UpdateShelter(float f) { }
         public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) { }
-        public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) => true;
-        public void StopAmbientBed(string id) { }
         public void SetAcousticMap(AcousticMap map) { }
         public void PlaySpatialSound(SpatialEmitter e) { Emitters.Add(e); _live.Add(e.EntityId); }
         public void UpdateSpatialAttributes(SpatialEmitter e) { }

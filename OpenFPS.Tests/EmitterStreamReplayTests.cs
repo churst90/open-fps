@@ -604,8 +604,6 @@ internal sealed class StreamMixer : IAudioProvider
     public void SetListenerEnclosure(float lowDb, float midDb, float highDb) => Log("Enclosure", lowDb, midDb, highDb);
     public void SetEarWind(EarWindListener? listener) => Log("EarWind", listener);
     public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) => Log("Boundaries", probes.ToArray());
-    public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) { Log("PlayBed", id, l, v, loop); return true; }
-    public void StopAmbientBed(string id) => Log("StopBed", id);
     public void SetAcousticMap(AcousticMap map) => Log("AcousticMap");
     public void PlaySpatialSound(SpatialEmitter e) { LogDelta("Play", e.EntityId, e, _emitterFields, whole: true); _latest[e.EntityId] = e; _live.Add(e.EntityId); }
     public void UpdateSpatialAttributes(SpatialEmitter e) { LogDelta("Place", e.EntityId, e, _emitterFields, whole: false); _latest[e.EntityId] = e; }
