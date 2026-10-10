@@ -20,14 +20,14 @@ other at login. The server and the Windows zip go out together.
 1. Ship: push, the VPS and the Windows zip, together, once the work in flight has landed, and only when
    Cody says so (each time). Restart the server and update the clients first; what is in it is the
    "Landed since the last deploy" list below.
-2. Switch rooms from walls on. Sound library stage 4 is built (2026-10-10, 9f9bf5ab: `Room`, `Opening`,
-   the rooms and openings in OpenFPS.Acoustics, docs/SOUND_LIBRARY_BOUNDARY.md 17). The rooms flooded from
-   the walls (docs/GEOMETRY.md 12.6 item 1) are built as an instrument and not switched on: first fix the
-   floods' leaks out of houses and the narrow rooms they lose (quarter-metre cells with a cell index, the
-   leaks traced with `ROOM_DEBUG`), then switch the acoustic map to the flood on the server and the client,
-   region ids unchanged, gated by `--geometry-parity only=rooms` (no house open past its margin, IoU over
-   0.8). Do it while no audio branch is open.
-   After it is switched on and heard (Cody, 2026-10-10): regions become places. An indoor room is a name
+2. Hear rooms from walls (switched on 2026-10-10, 25a328b9, unheard): a point's room is the room whose
+   flood holds it, server and client alike, region ids unchanged (docs/GEOMETRY.md 12.6 item 1). Leak fixes
+   in the generators came with it (97730e32: door heads lap their leaves, roof-access doorways the door's
+   width). Open: a room's volume and face areas still come from its box (`RoomSize`), not its flood; 5 of
+   44,808 server/client lookups disagree in houses 400-520 m from the spawn (not traced); Albany's
+   640 m "34414 Highway 99e, house" floods in a 460 MB block.
+   After it is heard (Cody, 2026-10-10): rooms measure volume and faces from their floods, then regions
+   become places. An indoor room is a name
    and a seed point, its shape, indoor flag and materials measured from the walls; an outdoor place (yard,
    street, park) is a name over an area. Drop the box (`RoomSize`), `Materials` and `ReverbTimeScale`
    from authoring, the editor, prefabs and the generators; derive portals where floods meet through a
