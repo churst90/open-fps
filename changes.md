@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- The material table (docs/MATTER.md 2.4, step 1 of its order of work). AcousticRegistry has 50 materials:
+  26 new ones in families (aluminium, stainless steel, cast iron, copper, brass, bronze, lead, titanium;
+  granite, sandstone, laminated glass; oak, pine, maple, plywood, MDF with their grain; PVC, acrylic,
+  polycarbonate, nylon, foam; sand, clay, ice, snow; fabric), and every material now also carries its
+  family, Poisson's ratio, how its loss moves with frequency, its stiffness across the grain, hardness,
+  roughness, strength, specific heat, conductivity, melting point, water uptake and vapour resistance, each
+  with its source. Fuel fields wait for the fire work. Aliases (Steel, Aluminum, Soil, Porcelain and so on)
+  read their material. An unknown name is logged once as a warning instead of passing silently as Generic.
+  The 25 materials that were there keep every figure they had: no sound changed (the render fingerprint
+  and the emitter-stream replay hold). `--materials` prints the table. AcousticRegistryTests.
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
   and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;

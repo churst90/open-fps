@@ -90,6 +90,126 @@ The periodic table is the right starting point for chemistry (section 9) and for
 the library above is what the game's things are made of. Existing names stay valid and map to entries (Metal
 to mild steel, and so on).
 
+### 2.4 The material table (built 2026-10-10)
+
+`AcousticRegistry` holds 50 materials (51 with None). Every existing name kept every figure it had, to the
+bit: `AcousticRegistryTests.TheMaterialsThatSoundedBeforeAreUnchanged` pins all 25 rows, and the render
+fingerprint and the emitter-stream replay did not move. Added to every row: family, Poisson's ratio, how the
+loss factor moves with frequency, the modulus across the grain, hardness, roughness, strength, specific heat,
+conductivity, melting point, water uptake and vapour resistance. The fuel fields (`PyrolysisC`,
+`HeatOfCombustionMJKg`) are there and empty, for the fire work to fill.
+
+- 26 new materials in families: metals (Aluminium, StainlessSteel, CastIron, Copper, Brass, Bronze, Lead,
+  Titanium; Metal is mild steel), stone, ceramic and glass (Granite, Sandstone, LaminatedGlass), woods (Oak,
+  Pine, Maple, Plywood, MDF, with the grain: E along it, E across it in brackets), polymers (PVC, Acrylic,
+  Polycarbonate, Nylon, Foam), ground (Sand, Clay, Ice, Snow) and soft (Fabric). New indices 32 to 57.
+- A new material's face (absorption, scattering, transmission, porosity) is the existing material whose
+  surface it shares (aluminium's is Metal's, oak's Wood's), except Foam, Snow and Fabric, which absorb in
+  their own way and carry their own published curves.
+- Aliases: Steel and MildSteel are Metal, Aluminum is Aluminium, SodaLimeGlass is Glass, Soil is Dirt,
+  Porcelain and CeramicTile are Tile, Plasterboard and Gypsum are Plaster, Stainless is StainlessSteel.
+  An alias reads its material; lists show only the table's own names.
+- `LossFactor` is the loss at 1 kHz, and `LossAt(f)` is it times (f / 1 kHz) to the `LossExponent`: 0 for
+  metal, glass and stone, 0.8 for wood (the Rayleigh fit DoorPhysics.WoodLoss already used), 0.3 for
+  polymers. Nothing that read `LossFactor` before reads it differently.
+- An unknown name is still Generic (a plastic) at run time, but now it is logged once per name as a
+  warning (`[MATERIAL]`, naming the table), as is an unknown resonance index; `PrefabValidator` still refuses
+  one when authoring.
+- `--materials` in AudioLab prints this table.
+
+| Material | Family | rho kg/m3 | E GPa (across) | Poisson | loss at 1 kHz (exp) | c_L m/s | hardness MPa | Ra mm | strength MPa | cp J/kgK | k W/mK | melts C | water % | mu |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Aluminium | metal | 2700 | 69 | 0.33 | 0.0001 | 5055 | 1050 | 0.0008 | 310 | 896 | 167 | 650 | 0 | inf |
+| Titanium | metal | 4430 | 114 | 0.34 | 0.0002 | 5073 | 3420 | 0.0008 | 950 | 526 | 6.7 | 1650 | 0 | inf |
+| CastIron | metal | 7200 | 100 | 0.26 | 0.005 | 3727 | 2160 | 0.0063 | 214 | 490 | 46 | 1200 | 0 | inf |
+| Fence | metal | 7850 | 200 | 0.29 | 0.0004 | 5048 | 1270 | 0.0016 | 440 | 486 | 51.9 | 1450 | 0 | inf |
+| Metal | metal | 7850 | 200 | 0.29 | 0.0002 | 5048 | 1270 | 0.0016 | 440 | 486 | 51.9 | 1450 | 0 | inf |
+| StainlessSteel | metal | 8000 | 193 | 0.29 | 0.0002 | 4912 | 1270 | 0.0004 | 505 | 500 | 16.2 | 1400 | 0 | inf |
+| Brass | metal | 8530 | 110 | 0.35 | 0.0008 | 3591 | 980 | 0.0008 | 340 | 375 | 120 | 915 | 0 | inf |
+| Bronze | metal | 8800 | 110 | 0.34 | 0.0003 | 3536 | 1270 | 0.0016 | 300 | 380 | 50 | 950 | 0 | inf |
+| Copper | metal | 8940 | 117 | 0.34 | 0.002 | 3618 | 490 | 0.0008 | 220 | 385 | 391 | 1083 | 0 | inf |
+| Lead | metal | 11340 | 16 | 0.44 | 0.015 | 1188 | 49 | 0.0032 | 17 | 129 | 35 | 327 | 0 | inf |
+| Brick | stone | 1900 | 15 | 0.15 | 0.02 | 2810 | 150 | 1 | 3 | 1000 | 0.77 | no | 12 | 10 |
+| Sandstone | stone | 2300 | 15 | 0.2 | 0.02 | 2554 | 300 | 0.5 | 5 | 1000 | 2.3 | 1650 | 5 | 40 |
+| Tile | stone | 2300 | 60 | 0.25 | 0.005 | 5108 | 6000 | 0.0005 | 35 | 840 | 1.3 | 1300 | 0.5 | inf |
+| Concrete | stone | 2400 | 30 | 0.2 | 0.015 | 3536 | 120 | 0.5 | 3 | 1000 | 2 | no | 5 | 100 |
+| Granite | stone | 2700 | 50 | 0.25 | 0.004 | 4303 | 6000 | 0.001 | 15 | 1000 | 2.8 | 1250 | 0.2 | 10000 |
+| Marble | stone | 2700 | 60 | 0.27 | 0.002 | 4714 | 1300 | 0.0005 | 15 | 1000 | 3.5 | no | 0.2 | 10000 |
+| Glass | glass | 2500 | 70 | 0.22 | 0.001 | 5292 | 5400 | 0.00001 | 45 | 720 | 1 | 726 | 0 | inf |
+| LaminatedGlass | glass | 2500 | 70 | 0.22 | 0.04 | 5292 | 5400 | 0.00001 | 45 | 760 | 0.9 | 726 | 0 | inf |
+| Pine | wood | 570 | 12.3 (0.96) | 0.33 | 0.01 (0.8) | 4645 | 16 | 0.01 | 88 | 1600 | 0.13 | no | 30 | 50 |
+| Plywood | wood | 600 | 5.4 (3.2) | 0.2 | 0.013 (0.8) | 3000 | 25 | 0.01 | 40 | 1600 | 0.13 | no | 30 | 200 |
+| Wood | wood | 650 | 11 (0.8) | 0.37 | 0.03 (0.8) | 4114 | 25 | 0.01 | 80 | 1600 | 0.13 | no | 30 | 50 |
+| Maple | wood | 705 | 12.6 (0.82) | 0.42 | 0.008 (0.8) | 4228 | 40 | 0.01 | 109 | 1600 | 0.18 | no | 30 | 50 |
+| MDF | wood | 750 | 3.5 | 0.25 | 0.025 (0.8) | 2160 | 40 | 0.005 | 30 | 1700 | 0.18 | no | 12 | 20 |
+| Oak | wood | 760 | 12.3 (0.89) | 0.37 | 0.012 (0.8) | 4023 | 34 | 0.01 | 105 | 1600 | 0.18 | no | 30 | 50 |
+| Foam | polymer | 30 | 0.00005 | 0.3 | 0.3 | 41 | 0.02 | 0.5 | 0.1 | 1400 | 0.04 | no | 1000 | 3 |
+| Plastic | polymer | 1100 | 2.5 | 0.37 | 0.05 (0.3) | 1508 | 100 | 0.0008 | 40 | 1500 | 0.2 | 220 | 0.3 | 10000 |
+| Rubber | polymer | 1100 | 0.02 | 0.48 | 0.25 (0.3) | 135 | 3 | 0.005 | 15 | 1100 | 0.13 | no | 1 | 10000 |
+| Nylon | polymer | 1140 | 2.5 | 0.39 | 0.03 (0.3) | 1481 | 120 | 0.0008 | 75 | 1700 | 0.25 | 255 | 1.3 | 50000 |
+| Acrylic | polymer | 1190 | 3.2 | 0.37 | 0.03 (0.3) | 1640 | 200 | 0.0002 | 70 | 1500 | 0.2 | 160 | 0.3 | 10000 |
+| Generic | polymer | 1200 | 5 | 0.35 | 0.02 (0.3) | 2041 | 100 | 0.001 | 40 | 1500 | 0.2 | 220 | 0.5 | 10000 |
+| Polycarbonate | polymer | 1200 | 2.3 | 0.37 | 0.015 (0.3) | 1384 | 150 | 0.0002 | 65 | 1200 | 0.2 | 260 | 0.15 | 5000 |
+| BootRubber | polymer | 1250 | 0.2 | 0.48 | 0.2 (0.3) | 400 | 10 | 0.005 | 15 | 1400 | 0.17 | no | 1 | 10000 |
+| PVC | polymer | 1400 | 3 | 0.38 | 0.02 (0.3) | 1464 | 150 | 0.0008 | 50 | 1000 | 0.17 | 200 | 0.1 | 50000 |
+| AcousticTile | building | 250 | 0.05 | 0.2 | 0.3 | 447 | 0.5 | 1 | 0.5 | 1030 | 0.04 | no | 1 | 1 |
+| Plaster | building | 800 | 3 | 0.2 | 0.03 | 1936 | 20 | 0.05 | 5 | 1000 | 0.25 | no | 10 | 8 |
+| Snow | ground | 300 | 0.002 | 0.2 | 0.2 | 82 | 0.05 | 1 | 0.02 | 2050 | 0.13 | 0 | 5 | 2 |
+| Grass | ground | 400 | 0.005 | 0.3 | 0.6 | 112 | 0.5 | 20 | 0 | 1670 | 1.5 | no | 30 | 50 |
+| Ice | ground | 917 | 9 | 0.33 | 0.005 | 3133 | 60 | 0.0001 | 1.5 | 2000 | 2.3 | 0 | 0 | inf |
+| Dirt | ground | 1600 | 0.05 | 0.3 | 0.5 | 177 | 1 | 2 | 0.01 | 1670 | 1.5 | no | 25 | 50 |
+| Sand | ground | 1600 | 0.03 | 0.3 | 0.1 | 137 | 0.3 | 0.5 | 0 | 910 | 2 | 1700 | 22 | 50 |
+| Gravel | ground | 1700 | 0.35 | 0.3 | 0.55 | 454 | 1 | 20 | 0 | 910 | 2 | 1250 | 3 | 50 |
+| Clay | ground | 1800 | 0.03 | 0.4 | 0.06 | 129 | 0.2 | 0.5 | 0.02 | 1670 | 1.5 | no | 40 | 50 |
+| Asphalt | ground | 2300 | 3 | 0.35 | 0.18 (0.3) | 1142 | 10 | 1 | 2 | 1000 | 0.7 | 50 | 0.5 | 50000 |
+| Carpet | soft | 200 | 0.01 | 0.3 | 0.4 | 224 | 0.1 | 2 | 5 | 1300 | 0.06 | 220 | 20 | 5 |
+| Audience | soft | 300 | 0.01 | 0.45 | 0.5 | 183 | 0.1 | 10 | 1 | 3500 | 0.37 | no | 0 | 100 |
+| Fabric | soft | 300 | 0.0001 | 0.3 | 0.3 | 18 | 0.05 | 0.5 | 10 | 1300 | 0.06 | no | 25 | 5 |
+| Foliage | soft | 500 | 0.01 | 0.3 | 0.6 | 141 | 0.1 | 5 | 1 | 2000 | 0.3 | no | 100 | 10 |
+| Leather | soft | 900 | 0.45 | 0.4 | 0.12 (0.3) | 707 | 20 | 0.02 | 20 | 1500 | 0.16 | no | 30 | 1000 |
+| Skin | soft | 1050 | 0.0015 | 0.49 | 0.45 | 38 | 0.05 | 0.03 | 15 | 3500 | 0.37 | no | 5 | 100 |
+| Water | liquid | 1000 | 2.2 | 0.5 | 0.5 | 1483 | 0 | 0 | 0 | 4182 | 0.6 | 0 | 0 | 0 |
+
+"melts C": no means it chars, burns, calcines or decomposes before it would melt (wood, concrete, gypsum);
+glass and bitumen give their softening point. mu: EN ISO 10456's vapour resistance factor, inf for metal
+and glass. Density, modulus and loss of the 25 rows that were there before are as they were, including
+where a handbook would now say otherwise (concrete's loss of 0.015 is three times the handbook's 0.005):
+changing them would change sounds that were heard and approved.
+
+#### Sources
+
+Each value's source is on the line that sets it in `AcousticRegistry.AddMatter`, by these keys. EST marks an
+estimate, and the line says from what.
+
+- BH: Bies and Hansen, Engineering Noise Control, 4th ed. (2009), Appendix C, properties of materials:
+  density, Young's modulus, Poisson's ratio and loss factor of aluminium, steel, copper, lead, glass, brick,
+  concrete, plywood, plexiglass.
+- CHP: Cremer, Heckl and Petersson, Structure-Borne Sound, 3rd ed. (2005), chapter 3: loss factors of metals,
+  glass, building materials and plastics.
+- ASM: ASM Handbook vol. 2 and the MatWeb data sheets for the named alloys (6061-T6, AISI 1018, 304, grey
+  iron A48 class 30, C11000, C26000, C51000/C90700, pure lead, Ti-6Al-4V): hardness, strength, specific
+  heat, conductivity, melting range.
+- WH: USDA Forest Products Laboratory, Wood Handbook, FPL-GTR-190 (2010): specific gravity, modulus of
+  elasticity and of rupture (tables 5-3), the elastic ratios and Poisson's ratios (tables 5-1 and 5-2), fibre
+  saturation (chapter 4).
+- ON: Ono and Norimoto, Jpn. J. Appl. Phys. 22 (1983) 611: wood's loss along the grain, 0.005 to 0.015.
+- RYL: Ren, Yeh and Lin's Rayleigh-form wood loss, alpha/w + beta w, as DoorPhysics.WoodLoss already used it.
+- ISO: EN ISO 10456:2007, table 3: conductivity, specific heat and vapour resistance of building materials.
+- EN572: EN 572-1:2012, soda-lime silicate glass.
+- ASHBY: Ashby, Materials Selection in Mechanical Design, 4th ed. (2011), appendix C: polymers, foams and
+  elastomers.
+- D570: ASTM D570, 24 h water absorption, MatWeb's typical values.
+- ROCK: Toksoz and Johnston (eds.), Seismic Wave Attenuation (SEG, 1981): rock Q of 30 to 400, loss 1/Q.
+- SOIL: Hardin and Drnevich, J. Soil Mech. Found. Div. 98 (1972): soil damping ratios of 2 to 10 %.
+- ICE: Petrenko and Whitworth, Physics of Ice (1999); Schulson, JOM 51(2) (1999).
+- SNOW: Mellor, A review of basic snow mechanics, IAHS 114 (1975); Sturm et al., J. Glaciol. 43 (1997).
+- DUCK: Duck, Physical Properties of Tissue (1990).
+- FIN: typical surface finishes (ISO 1302 and machinists' Ra tables).
+
+The estimates worth checking first, because a struck sound leans on them: cast iron's loss (0.005, from its
+damping capacity), bronze's (0.0003, from bell partials' Q), laminated glass's (0.04, the middle of
+published PVB measurements), MDF's (0.025), and every soft and ground material's hardness.
+
 ## 3. Solids
 
 A solid is geometry (triangles, docs/GEOMETRY.md) plus its material. It has today: collision, footstep and
