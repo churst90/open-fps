@@ -6,6 +6,8 @@ the National Address Database's addresses, and satellite land cover for the tree
     python3 tools/gen_osm.py tools/places/magnolia_tx                 writes OpenFPS.Server/maps/places/magnolia_tx.json
     python3 tools/gen_osm.py tools/places/magnolia_tx --detail=low    a lighter map (see DETAIL)
     python3 tools/gen_osm.py tools/places/magnolia_tx --out=FILE      writes FILE instead
+    python3 tools/gen_osm.py tools/places/magnolia_tx --decisions=FILE  also writes what build() decided for each
+                                                                       building (for WorldBuildingsTests)
 
 Run from the repository root. A place is a folder under tools/places with a place.json (what it is
 called, its area, where its origin and spawn are) and the inputs tools/fetch_place.py prepared from the
@@ -1943,6 +1945,13 @@ WALLS = {"brick": "brick_wall", "siding": "siding_wall", "metal": "metal_wall", 
 STATS = defaultdict(int)
 
 
+# What build() decided for each building, written by --decisions=FILE for the test that holds the world's port of
+# build() (OpenFPS.Server/OneWorld/WorldBuildings.cs, WorldBuildingsTests) to this one: what to build is decided here
+# from addresses and lots, the world decides it from the footprint and the roads, and the shell is the same code.
+# KEEP THE TWO THE SAME: a change to build() at medium detail is a change to WorldBuildings.Build.
+DECIDED = {}
+
+
 def build(bd):
     """Walls, floor, roof, rooms and doors for one building."""
     a = bd.addr
@@ -1956,6 +1965,8 @@ def build(bd):
         (f"{label}, {word}" if (a or bd.place) else label)
     detail = detail_at(bd.cx, bd.cz)
     STATS[kind] += 1
+    DECIDED[id(bd)] = {"label": label, "name": name, "detail": detail,
+                       "place": bd.place["kind"] if bd.place else None}
 
     # Small sheds, and every outbuilding at the lowest detail, are one solid box: you walk into the
     # shed, you hear "shed".
@@ -2002,6 +2013,7 @@ def build(bd):
         nr = nearest_road(bd.cx, bd.cz, 400.0)
         sx, sz = nr[4] if nr else (bd.cx, bd.cz - 10)
     to_street = (sx - bd.cx, sz - bd.cz)
+    DECIDED[id(bd)]["street"] = [sx, sz]
 
     def facing(run):
         axis, line, s0, s1, out = run
@@ -2503,6 +2515,8 @@ for bd in sorted(BLD, key=lambda b: (round(b.cx, 2), round(b.cz, 2))):
     _TILE_PIN[0] = tile_of(bd.cx, bd.cz)
     _Y_PIN[0] = pad_of(bd)
     build(bd)
+    if id(bd) in DECIDED:
+        DECIDED[id(bd)].update({"id": bd.src.get("id"), "kind": bd.kind, "pad": _Y_PIN[0], "entities": [first, len(entities)]})
     _Y_PIN[0] = None
     _TILE_PIN[0] = None
     if len({tile_of(e["Position"]["X"], e["Position"]["Z"]) for e in entities[first:]}) > 1:
@@ -2947,6 +2961,9 @@ if HAS_GROUND:
 os.makedirs(os.path.dirname(OUT) or ".", exist_ok=True)
 with open(OUT, "w") as f:
     json.dump(map_data, f, indent=1)
+if OPTS.get("decisions"):
+    with open(OPTS["decisions"], "w") as f:
+        json.dump([DECIDED[id(bd)] for bd in sorted(BLD, key=lambda b: (round(b.cx, 2), round(b.cz, 2))) if id(bd) in DECIDED], f)
 if HAS_GROUND:
     with open(os.path.join(PLACE_DIR, "elevation.json"), "rb") as src, open(os.path.join(os.path.dirname(OUT) or ".", ELEV_FILE), "wb") as dst:
         dst.write(src.read())
