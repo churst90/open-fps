@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- No crack where far-ring ground meets 2 m ground (docs/WORLD_STREAMING.md, "Coarse ground in the far
+  ring"). The 7.8 m ground's edge posts are raised until its edge is nowhere under the 2 m edge, and it
+  hangs a skirt from its edges down to its floor, for rays and in the Steam Audio scene. On all 364 of
+  Magnolia's seams, none of 33,274 grazing rays and 1,064 lines of sight under the seam get through (3,082
+  and 22 did). Lines of sight changed by a swap: 187 of 19,600 (were 186). No wire change: a client knows
+  coarse ground by its 33 posts more than 2 m apart; 2 m ground, the server's included, is unchanged.
 - Logging out in the world and back in returns you to the same spot, through the loading screen, facing
   the way you faced; the landing map if the ground there cannot be built within 30 s.
 - Ground at 8 m in the far ring (docs/WORLD_STREAMING.md, "Coarse ground in the far ring"). A tile you have

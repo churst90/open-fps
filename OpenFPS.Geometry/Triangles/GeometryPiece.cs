@@ -195,12 +195,12 @@ public sealed class GeometryPiece
         int k = triangle - Tris.Length;
         var t = Terrain!.Triangle(k);
         t.V0 += TerrainOffset;
-        t.Solid = Solids.Length + k;
+        t.Solid = Solids.Length + Terrain.PrismOf(k);
         return t;
     }
 
     /// <summary>The solid a triangle belongs to.</summary>
-    public int SolidOfTriangle(int triangle) => triangle < Tris.Length ? Tris[triangle].Solid : Solids.Length + (triangle - Tris.Length);
+    public int SolidOfTriangle(int triangle) => triangle < Tris.Length ? Tris[triangle].Solid : Solids.Length + Terrain!.PrismOf(triangle - Tris.Length);
 
     private int TerrainSurfaceOf(int k) => _terrainSurfaces + Terrain!.Cells[Terrain.CellOfTriangle(k)];
 
@@ -500,11 +500,13 @@ public sealed class GeometryPiece
         float footprint = field.Size * field.Size;
         var lo = o - TerrainOffset;
         var walk = field.Walk(lo, d, tMin, MathF.Min(tMax, best + TieSlack(best)));
+        Span<int> ks = stackalloc int[MaxTerrainTrianglesInCell];
         while (walk.Next(out int i, out int j, out float leave))
         {
-            for (int half = 0; half < 2; half++)
+            int n = TerrainTrianglesIn(field, i, j, ks);
+            for (int q = 0; q < n; q++)
             {
-                int k = field.TriangleOf(i, j, half);
+                int k = ks[q];
                 var tr = field.Triangle(k);
                 float slack = TieSlack(best);
                 if (!HitTriangle(tr, lo, d, tMin, MathF.Min(tMax, best + slack), out float t, out bool f)) continue;
@@ -528,10 +530,11 @@ public sealed class GeometryPiece
         int owner = ownerOverride >= 0 ? ownerOverride : TerrainOwner;
         var lo = o - TerrainOffset;
         var walk = field.Walk(lo, d, tMin, tMax);
+        Span<int> ks = stackalloc int[MaxTerrainTrianglesInCell];
         while (walk.Next(out int i, out int j, out _))
-            for (int half = 0; half < 2; half++)
+            for (int q = 0, n = TerrainTrianglesIn(field, i, j, ks); q < n; q++)
             {
-                int k = field.TriangleOf(i, j, half);
+                int k = ks[q];
                 if (!HitTriangle(field.Triangle(k), lo, d, tMin, tMax, out _, out bool f)) continue;
                 if ((faces & (f ? RayFaces.Front : RayFaces.Back)) == 0) continue;
                 ref readonly var surface = ref Surfaces[TerrainSurfaceOf(k)];
@@ -550,16 +553,27 @@ public sealed class GeometryPiece
         int owner = ownerOverride >= 0 ? ownerOverride : TerrainOwner;
         var lo = o - TerrainOffset;
         var walk = field.Walk(lo, d, tMin, tMax);
+        Span<int> ks = stackalloc int[MaxTerrainTrianglesInCell];
         while (walk.Next(out int i, out int j, out _))
-            for (int half = 0; half < 2; half++)
+            for (int q = 0, n = TerrainTrianglesIn(field, i, j, ks); q < n; q++)
             {
-                int k = field.TriangleOf(i, j, half);
+                int k = ks[q];
                 if (!HitTriangle(field.Triangle(k), lo, d, tMin, tMax, out float t, out bool f)) continue;
                 ref readonly var surface = ref Surfaces[TerrainSurfaceOf(k)];
                 if ((surface.Layers & layers) == 0) continue;
                 if (!filter.Accept(owner, surface)) continue;
-                into.Add(new GeometryCrossing(t, f, new SolidRef(instance, Solids.Length + k), Tris.Length + k, owner));
+                into.Add(new GeometryCrossing(t, f, new SolidRef(instance, Solids.Length + field.PrismOf(k)), Tris.Length + k, owner));
             }
+    }
+
+    // A cell's two surface triangles and, on a skirted tile's edge, the skirt under each side on the edge.
+    private const int MaxTerrainTrianglesInCell = 6;
+
+    private static int TerrainTrianglesIn(Heightfield field, int i, int j, Span<int> into)
+    {
+        into[0] = field.TriangleOf(i, j, 0);
+        into[1] = field.TriangleOf(i, j, 1);
+        return 2 + field.SkirtsOf(i, j, into[2..]);
     }
 
     /// <summary>How close two hits are to be the same place, metres: a few millionths of the distance

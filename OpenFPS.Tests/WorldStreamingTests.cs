@@ -411,7 +411,7 @@ public class WorldStreamingTests
         Assert.Equal(196, grounds.Count);
         var rng = new Random(11);
         var diffs = new List<float>();
-        int lines = 0, changed = 0, blockedFine = 0;
+        int lines = 0, changed = 0, blockedFine = 0, changedUnskirted = 0;
         var byCorner = new Dictionary<(int, int), (TerrainTileComponent C, float Base)>();
         foreach (var (at, t) in grounds)
         {
@@ -420,6 +420,7 @@ public class WorldStreamingTests
             Assert.Equal(t.Size, c.Size, 3);
             var fine = t.Field(0f);
             var coarse = c.Field(0f);
+            var unskirted = GeometryTerrainTests.UnskirtedCoarse(t, 0f);
             byCorner[((int)MathF.Round(at.X - t.Size / 2), (int)MathF.Round(at.Z - t.Size / 2))] = (c, at.Y);
             for (int k = 0; k < 400; k++)
             {
@@ -446,6 +447,7 @@ public class WorldStreamingTests
                 lines++;
                 if (a) blockedFine++;
                 if (a != b) changed++;
+                if (a != Blocked(unskirted)) changedUnskirted++;
             }
         }
         // Two coarse tiles side by side share the posts of their edge.
@@ -460,9 +462,69 @@ public class WorldStreamingTests
         diffs.Sort();
         _o.WriteLine($"7.8 m ground against 2 m over 196 tiles: median {diffs[diffs.Count / 2] * 100:F1} cm, 99th {diffs[(int)(diffs.Count * 0.99)] * 100:F1} cm, " +
                      $"worst {diffs[^1] * 100:F0} cm; {edges} shared edges checked; of {lines} lines from 1 m to 1.6 m over the ground in a tile, " +
-                     $"{blockedFine} blocked by the 2 m ground and {changed} ({100.0 * changed / lines:F2} %) changed by the swap");
+                     $"{blockedFine} blocked by the 2 m ground and {changed} ({100.0 * changed / lines:F2} %) changed by the swap " +
+                     $"({changedUnskirted} with the edges as they were before the skirt)");
         Assert.True(diffs[diffs.Count / 2] < 0.05f);
         Assert.True(changed < lines / 50, $"{changed} of {lines} lines of sight changed");
+    }
+
+    /// <summary>
+    /// Every seam of Magnolia's ground (364 between its 196 tiles), each with one tile at 7.8 m and its neighbour
+    /// at 2 m, either way round: grazing rays and lines of sight that pass the seam under the ground all meet
+    /// it (GeometryTerrainTests.AcrossSeam). The coarse ground as it was, unskirted, let some through.
+    /// </summary>
+    [Fact]
+    public void Coarse_ground_meets_full_ground_without_a_crack()
+    {
+        var maps = LoadPlace("magnolia_tx");
+        Assert.True(maps.TryGetMap("magnolia_tx", out var world, out _, out _, out var lookup));
+        var surface = EntityGeometry.SurfaceOf("Dirt", Vector3.One, 0, 0, false, 0, 0, false, false, false, "Ground");
+        var tiles = new Dictionary<(int, int), (Vector3 At, TerrainTileComponent T)>();
+        foreach (var e in lookup.Values.Where(e => world.Has<TerrainTileComponent>(e)))
+        {
+            var at = world.Get<Transform>(e).Position;
+            var t = world.Get<TerrainTileComponent>(e);
+            tiles[((int)MathF.Round(at.X - t.Size / 2), (int)MathF.Round(at.Z - t.Size / 2))] = (at, t);
+        }
+        Assert.Equal(196, tiles.Count);
+        var builder = new OpenFPS.Common.Geometry.TriangleWorldBuilder(250f);
+        OpenFPS.Common.Geometry.SolidSpec Fine((Vector3 At, TerrainTileComponent T) x, int id) => EntityGeometry.TerrainSpec(id, x.At, x.T, surface);
+        OpenFPS.Common.Geometry.SolidSpec Coarse((Vector3 At, TerrainTileComponent T) x, int id) => EntityGeometry.TerrainSpec(id, x.At, x.T.Coarse(), surface);
+        OpenFPS.Common.Geometry.SolidSpec Old((Vector3 At, TerrainTileComponent T) x, int id)
+            => OpenFPS.Common.Geometry.SolidSpec.OfTerrain(id, x.At, GeometryTerrainTests.UnskirtedCoarse(x.T, x.At.Y), surface);
+        int seams = 0, rays = 0, leaks = 0, sights = 0, sightLeaks = 0, oldLeaks = 0, oldSightLeaks = 0, fullLeaks = 0;
+        foreach (var ((x, z), a) in tiles)
+            foreach (bool alongX in new[] { false, true })
+            {
+                if (!tiles.TryGetValue(alongX ? (x, z + 250) : (x + 250, z), out var b)) continue;
+                seams++;
+                float seam = alongX ? z + 250f : x + 250f, v0 = (alongX ? x : z) + 1f, v1 = v0 + 248f;
+                var fa = Fine(a, 1); var fb = Fine(b, 2);
+                var truthA = GeometryTerrainTests.GroundOf(fa.Terrain!, fa.TerrainCorner);
+                var truthB = GeometryTerrainTests.GroundOf(fb.Terrain!, fb.TerrainCorner);
+                Func<float, float, float> truth = (wx, wz) => (alongX ? wz : wx) < seam ? truthA(wx, wz) : truthB(wx, wz);
+                GeometryTerrainTests.SeamRays Probe(OpenFPS.Common.Geometry.SolidSpec lo, OpenFPS.Common.Geometry.SolidSpec hi)
+                    => GeometryTerrainTests.AcrossSeam(builder.Build(new[] { lo, hi }, Array.Empty<OpenFPS.Common.Geometry.SolidSpec>()),
+                                                       GeometryTerrainTests.GroundOf(lo.Terrain!, lo.TerrainCorner),
+                                                       GeometryTerrainTests.GroundOf(hi.Terrain!, hi.TerrainCorner),
+                                                       truth, alongX, seam, v0, v1, seams, 200, 100);
+                var full = Probe(fa, fb);
+                fullLeaks += full.Leaks + full.LineLeaks;
+                foreach (var r in new[] { Probe(Coarse(a, 1), fb), Probe(fa, Coarse(b, 2)) })
+                {
+                    rays += r.Rays; leaks += r.Leaks; sights += r.Lines; sightLeaks += r.LineLeaks;
+                }
+                foreach (var r in new[] { Probe(Old(a, 1), fb), Probe(fa, Old(b, 2)) })
+                {
+                    oldLeaks += r.Leaks; oldSightLeaks += r.LineLeaks;
+                }
+            }
+        _o.WriteLine($"{seams} seams, 7.8 m beside 2 m either way round: {leaks} of {rays} grazing rays and {sightLeaks} of {sights} " +
+                     $"lines of sight under the seam got through (unskirted: {oldLeaks} and {oldSightLeaks}); 2 m beside 2 m: {fullLeaks}");
+        Assert.Equal(364, seams);
+        Assert.Equal(0, fullLeaks);
+        Assert.Equal(0, leaks + sightLeaks);
+        Assert.True(oldLeaks > 0, "the unskirted coarse ground should let some rays through, or the probe cannot see a crack");
     }
 
     [Fact]

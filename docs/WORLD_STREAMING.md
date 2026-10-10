@@ -739,8 +739,22 @@ at 2 m once the tile comes within the full radius.
 - **The coarse ground** (`TerrainTileComponent.Coarse`): 32 cells a side, so posts 7.8 m apart that land
   on both edges of the tile; each post's height read off the tile's own 2 m triangles, over the same base;
   each cell the material under its middle. Two coarse tiles side by side share their edge posts (within the
-  centimetre). Where a coarse tile meets a full one their edges differ between the coarse posts (a hairline
-  crack 300 m or more from the listener); not closed.
+  centimetre).
+- **No crack where it meets full ground** (closed 2026-10-09). Between two coarse posts a coarse edge is a
+  straight line and the 2 m edge beside it is not, which left a hairline crack a ray could pass through. Now
+  each edge post of the coarse ground is raised (whole centimetres, rounded up) until the coarse edge is
+  nowhere under the 2 m edge; the corners stay on the 2 m corners, and a post depends only on its edge's own
+  2 m posts, which the neighbour shares, so two coarse tiles still meet. And coarse ground hangs a skirt: the
+  outer sides of its edge prisms, from the edge down to its floor, met by rays (`Heightfield.Skirted`) and
+  laid in the Steam Audio scene. A client tells coarse ground from the wire's own fields (33 posts, further
+  apart than 2 m; `TerrainTileComponent.IsCoarse`), so the wire is unchanged; 2 m ground never has a skirt,
+  so the server's ground and every 2 m seam are as they were. Measured: on all 364 of Magnolia's seams, one
+  side at 7.8 m and the other at 2 m either way round, none of 33,274 grazing rays and 1,064 lines of sight
+  that pass the seam under the ground get through (front faces only); before, 3,082 and 22 did
+  (`GeometryTerrainTests.CoarseGroundBesideFullGroundLeavesNoCrack`, `WorldStreamingTests`). The raised edges
+  move the 7.8 m ground from the 2 m by a median of 2.2 cm (was 2.1), 43 cm at 99 points in a hundred (was
+  41) and 3.2 m at worst (was 2.1, a creek bank by a corner, where the post next to the corner carries the
+  whole lift); the lines of sight changed by a swap are 187 of 19,600 (were 186).
 - **What is sent** (`TileStreamer.Definition`): the same entity either way. The join and every tile
   arriving later carry a tile's ground coarse if the client has that tile at coarse; when the tile comes up
   to full, its ground is sent again whole and the client's triangle world, acoustic map and Steam Audio
@@ -753,9 +767,9 @@ at 2 m once the tile comes within the full radius.
 - **What changes for the ear**: a sound whose path grazes the ground in the tile being swapped. Over all of
   Magnolia's 196 tiles, the 7.8 m ground lies from the 2 m by a median of 2.1 cm, 41 cm at 99 points in a
   hundred and 2.1 m at worst (a creek bank); of 19,600 lines from 1 m to 1.6 m over the ground within a
-  tile, 1,145 are blocked by the 2 m ground and 186 (0.95 %) change when the tile is swapped. Each tile
-  swaps once as a player approaches (the 50 m hysteresis), so such a change is a single step in one far
-  sound's occlusion, not a flutter.
+  tile, 1,145 are blocked by the 2 m ground and 186 (0.95 %) change when the tile is swapped (187 with the
+  raised edges above). Each tile swaps once as a player approaches (the 50 m hysteresis), so such a change
+  is a single step in one far sound's occlusion, not a flutter.
 
 Measured (`WorldStreamingTests`, `WorldPlacesTests`):
 
