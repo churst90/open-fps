@@ -579,7 +579,7 @@ public class WorldEditorTests : IDisposable
         rig.On("mine");
         var root = rig.Menu("menu")!;
         Assert.Equal("World editor, mine", root.Title);
-        Assert.Equal(new[] { "Map", "Place", "Select", "Placed on this map, 0", "Places and rooms", "Library", "Test tools", "Nothing to undo", "Nothing to redo" }, root.Items.Select(i => i.Label));
+        Assert.Equal(new[] { "Map", "Place", "Select", "Placed on this map, 0", "Changed on this map, 0", "Roads, paths and railways, 0", "People", "Places and rooms", "Library", "Test tools", "Nothing to undo", "Nothing to redo" }, root.Items.Select(i => i.Label));
 
         var place = rig.Menu("menu", "place")!;
         Assert.Contains(place.Items, i => i.Label.StartsWith("Walls and fences, ") && i.Kind == EditorItemKind.Menu && i.Command == "place.cat:Walls and fences");

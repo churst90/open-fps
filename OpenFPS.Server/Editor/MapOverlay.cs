@@ -43,6 +43,9 @@ public sealed class OverlayRemoval
     public int Id { get; set; }
     public string Prefab { get; set; } = "";
     public Vector3 Was { get; set; }
+    /// <summary>What it was called when it was removed, for the list of things changed on the map. Null on
+    /// entries kept before 2026-10-10: the prefab's name is said instead.</summary>
+    public string? Name { get; set; }
 }
 
 /// <summary>A thing the editor placed: the whole of it, as a map file would have it, and its settings.</summary>
@@ -84,9 +87,14 @@ public sealed class MapOverlay
     public Dictionary<string, int> Pins { get; set; } = new();
     /// <summary>The map's own settings (MapSettings): "Weather", "Hour", "Ground", "Beacon.door". Null when none.</summary>
     public Dictionary<string, string>? Settings { get; set; }
+    /// <summary>Roads, paths and railways laid with the editor (OverlayRoute). Null when none.</summary>
+    public List<OverlayRoute>? Routes { get; set; }
+    /// <summary>People with lives of their own put on the map with the editor (CharacterSystem). Null when none.</summary>
+    public List<CharacterData>? People { get; set; }
 
     [JsonIgnore] public bool IsEmpty => Spawn == null && Changed.Count == 0 && Removed.Count == 0 && Added.Count == 0 && Pins.Count == 0
-                                        && (Settings == null || Settings.Count == 0);
+                                        && (Settings == null || Settings.Count == 0) && (Routes == null || Routes.Count == 0)
+                                        && (People == null || People.Count == 0);
 
     public OverlayChange? ChangeFor(int id) => Changed.FirstOrDefault(c => c.Id == id);
     public OverlayAddition? AdditionFor(int id) => Added.FirstOrDefault(a => a.Entity.EntityId == id);
@@ -220,7 +228,12 @@ public sealed class MapOverlayStore
     public void ApplyBefore(MapData map)
     {
         AssignMissingIds(map);
-        var o = Get(map.Id);
+        Lay(map, Get(map.Id));
+    }
+
+    /// <summary>An overlay laid over a map's data: what loading does, and what baking writes into a file.</summary>
+    internal static void Lay(MapData map, MapOverlay o)
+    {
         if (o.IsEmpty) return;
 
         if (o.Spawn != null)
@@ -258,6 +271,15 @@ public sealed class MapOverlayStore
             map.Entities.Add(copy);
             byId[copy.EntityId] = copy;
         }
+        // Roads and railways as the map's own data, so traffic and trains find them as they always do.
+        WorldEditor.LayRoutes(map, o);
+        // People put on with the editor, beside the map's own, each once.
+        foreach (var p in o.People ?? new List<CharacterData>())
+            if (!(map.Characters ?? new List<CharacterData>()).Any(c => c.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase)))
+                (map.Characters ??= new List<CharacterData>()).Add(new CharacterData
+                {
+                    Name = p.Name, Voice = p.Voice, Kind = p.Kind, Description = p.Description, Places = p.Places?.ToList(),
+                });
         Log.Information("MapOverlayStore: '{Map}' has the editor's changes: {Changed} changed, {Removed} removed, {Added} added{Spawn}{Skipped}.",
             map.Id, o.Changed.Count, o.Removed.Count, o.Added.Count, o.Spawn != null ? ", spawn moved" : "",
             skipped > 0 ? $", {skipped} not found" : "");
@@ -295,7 +317,7 @@ public sealed class MapOverlayStore
     /// where the entry says the file had it (or already where the change put it); otherwise any thing of
     /// that prefab at that place; otherwise none.
     /// </summary>
-    private static EntityData? Find(MapData map, Dictionary<int, EntityData> byId, int id, string prefab, Vector3 was, Vector3? now)
+    internal static EntityData? Find(MapData map, Dictionary<int, EntityData> byId, int id, string prefab, Vector3 was, Vector3? now)
     {
         bool Same(EntityData e, Vector3 at) => e.PrefabId.Equals(prefab, StringComparison.OrdinalIgnoreCase)
                                               && Vector3.Distance(e.Position, at) <= FindTolerance;

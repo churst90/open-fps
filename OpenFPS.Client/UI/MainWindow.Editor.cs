@@ -251,6 +251,10 @@ public sealed partial class MainWindow
                     if (b.Text != c.Label) b.Text = c.Label;
                     b.AccessibleDescription = c.Description;
                     break;
+                case Label t:
+                    // A line of words (what is being laid): its words change where it stands.
+                    if (t.Text != c.Label) t.Text = c.Label;
+                    break;
             }
         }
 

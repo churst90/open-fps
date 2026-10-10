@@ -64,6 +64,15 @@ public sealed partial class WorldEditor
         public (string Kind, string Id)? DialogModel;
         /// <summary>The words the list of things placed on this map is filtered by.</summary>
         public string PlacedFilter = "";
+        /// <summary>The words the list of things changed from the map file is filtered by.</summary>
+        public string ChangedFilter = "";
+        /// <summary>The road, path or railway being laid, where the last point was dropped (null: none
+        /// dropped yet, so walking drops none), and how far it had come when last said.</summary>
+        public OverlayRoute? Route;
+        public Vector3? RouteLast;
+        public float RouteSaid;
+        /// <summary>The person chosen (People), whose places are ticked.</summary>
+        public string? Person;
     }
 
     private readonly Dictionary<string, Hand> _hands = new(StringComparer.OrdinalIgnoreCase);
@@ -81,6 +90,10 @@ public sealed partial class WorldEditor
             h.Held.Clear();
             h.LastMenu = "root";
             h.PlacedFilter = "";
+            h.ChangedFilter = "";
+            h.Route = null;
+            h.RouteLast = null;
+            h.Person = null;
         }
         return h;
     }
@@ -109,11 +122,16 @@ public sealed partial class WorldEditor
         + "/edit move EAST NORTH UP, /edit move to EAST NORTH UP, /edit nudge DIRECTION [METRES], /edit turn DEGREES, "
         + "/edit face DIRECTION|DEGREES, /edit bring, /edit duplicate, /edit row COUNT [SPACING], /edit delete, /edit set FIELD VALUE, "
         + "/edit placed [WORDS], /edit remove #ID [#ID ...], /edit remove held, /edit goto #ID, "
+        + "/edit changed [WORDS], /edit putback #ID [#ID ...], "
+        + "/edit route start|new road|path|railway [FIELD VALUE ...], /edit route point|points|back|set|station|crossing|finish|cancel|remove|goto ..., /edit routes, "
+        + "/edit person add NAME [voice VOICE], /edit person choose NAME, /edit person place add|drop PLACE, /edit person voice VOICE, /edit person remove NAME, "
+        + "/edit people, /edit walkers NUMBER, "
         + "/edit up FIELD, /edit down FIELD, /edit settings, /edit place PREFAB [at cursor], /edit place vehicle:PRESET [at cursor], "
         + "/edit place group ID, /edit building NAME, /edit again, "
         + "/edit build floor|wall|roof|door|window|prefab [FIELD VALUE ...], "
         + "/edit find WORDS, /edit preview PREFAB, /edit prefabs [CATEGORY], /edit group NAME, /edit spawn here, /edit step METRES, "
         + "/edit info, /edit map settings, /edit map set weather|time|ground|beacon CATEGORY VALUE, "
+        + "/edit map save NAME, /edit map versions, /edit map restore NUMBER|NAME, /edit map bake [now], "
         + "/edit model show|set|up|down|versions|where|use|pin|unpin|new|copy|replace|retire|restore|remove KIND ID ..., /edit undo, /edit redo.";
 
     /// <summary>What an /edit costs against MessageLimits.Edits: 0 to look, 1 to change, more to change many things.</summary>
@@ -124,14 +142,25 @@ public sealed partial class WorldEditor
         switch (Word(0))
         {
             case "menu": case "info": case "selected": case "settings": case "fields": case "prefabs":
-            case "find": case "search": case "select": case "hold": case "step": case "dialog": case "placed":
+            case "find": case "search": case "select": case "hold": case "step": case "dialog": case "placed": case "changed": case "routes":
+            case "people":
                 return 0;
+            case "person":
+                return Word(1) is "add" or "remove" or "place" or "voice" ? 1 : 0;
+            case "walkers":
+                // Making people walk is many spawns at once.
+                return args.Length > 1 ? 5 : 0;
+            case "route":
+                // Laying is points in hand; what is laid or taken up changes many things at once.
+                return Word(1) is "finish" or "lay" or "remove" ? 5 : 0;
             case "delete":
             case "remove":
+            case "putback":
                 // Several at once cost as a row of them does.
                 return 1 + args.Count(a => a.StartsWith('#')) / 10.0 + (Word(1) == "held" ? 4 : 0);
             case "map":
-                return Word(1) == "set" ? 1 : 0;
+                // Restoring a version or baking changes every thing the map's edits touch.
+                return Word(1) switch { "set" or "save" => 1, "restore" => 10, "bake" => Word(2) == "now" ? 10 : 0, _ => 0 };
             case "model":
                 return Word(1) switch
                 {
@@ -232,6 +261,13 @@ public sealed partial class WorldEditor
                 else RemoveCommand(s, rest, reply);
                 return;
             case "placed": PlacedCommand(s, rest, reply); return;
+            case "changed": ChangedCommand(s, rest, reply); return;
+            case "route": RouteCommand(s, rest, reply); return;
+            case "routes": SayRoutes(s, reply); return;
+            case "person": PersonCommand(s, rest, reply); return;
+            case "people": SayPeople(s, reply); return;
+            case "walkers": WalkersCommand(s, rest, reply); return;
+            case "putback": PutBackCommand(s, rest, reply); return;
             case "goto": GoTo(s, rest, reply); return;
             case "building": MakeGroup(s, rest, reply, building: true); return;
             case "set": SetField(s, rest, reply, 0); return;

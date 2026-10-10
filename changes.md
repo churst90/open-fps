@@ -142,6 +142,22 @@ Recent work, newest first. `git log` has the rest.
     one emitter per burning part. `/spawn fire PRESET` lights a thing its neighbours can catch from;
     `/spawn fire lightning` strikes what stands highest ahead; `/spawn fire water` puts a hose on it.
   - AudioLab `--fire spread timeline|cost|game`.
+- World editor phase 3 (docs/WORLD_EDITOR.md section 18; todo item 6). Untried with Orca and NVDA:
+  tests only. Changed on this map (F12, Edit tab; `/edit changed`): the things from the map file that
+  were moved, turned, resized, renamed or removed, with what was done and where, each put back as the
+  map file has it (`/edit putback #ID`), one undo. Versions of a map (World tab; `/edit map save NAME`,
+  `versions`, `restore NUMBER`): the whole of a map's edits saved by name and restored as one undo, the
+  map's state saved first; on a map of your own, `/edit map bake now` writes the edits into its file
+  (refused for the server's maps, which programs write: city.json stays byte for byte gen_city.py's).
+  Roads, paths and railways (Place tab; `/edit route`): laid by walking them (a point every metre, the
+  straight stretches joined) or typing points, with width and surface; a railway on the ground, raised
+  on pillars or underground in a tunnel of its own, with stations, level crossings and a train that
+  runs at once; they are the map's own RoadData and TrackData at load. Not joined to other roads, and a
+  railway is a loop: what the road and rail code cannot carry is listed in the doc. People (World tab;
+  `/edit person`, `/edit walkers`): characters with a name and voice whose day keeps to places chosen
+  from the map's bus stops, entrances, lobbies and squares, and how many people walk the pavements per
+  100 metres. A thing made again from its map entry now keeps the entry's door sides and room
+  materials. Both clients' dialogs update a line of words in place. WorldEditorPhase3Tests.
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
   and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;

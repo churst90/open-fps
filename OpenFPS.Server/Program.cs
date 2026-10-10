@@ -490,6 +490,8 @@ public class GameServer
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends, combat);
         // Vehicles parked with the world editor are kept in its overlays, not the map files.
         _commands.Editor.ParkKeptVehicles();
+        // ...and the people the maps' settings set walking their pavements.
+        _commands.Editor.WalkKeptWalkers();
 
         // These register their handlers with the dispatcher, which is what keeps them alive.
         _ = new DiscoveryService(_dispatcher, _sessions, _maps, () => World);
@@ -854,6 +856,8 @@ public class GameServer
             }
 
             float dt = FixedDeltaTime;
+            // A road or railway being laid by walking it drops its points as the editor walks.
+            if (tick % 8 == 0) _commands?.Editor.Tick();
             _environment.Update(dt);
             Lightning(dt);
             // Horns whose key has not been reported down for a few ticks are let go.

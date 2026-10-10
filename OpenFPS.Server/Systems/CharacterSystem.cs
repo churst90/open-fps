@@ -125,6 +125,52 @@ public sealed class CharacterSystem
 
     public int Count => _all.Count;
 
+    /// <summary>A character put on a running map (the world editor): their body is made once the map's
+    /// places are found, as at start.</summary>
+    public void AddLive(MapManager maps, string mapId, CharacterData data)
+    {
+        _maps = maps;
+        _all.RemoveAll(c => c.MapId == mapId && c.Data.Name.Equals(data.Name, StringComparison.OrdinalIgnoreCase) && c.Entity == Entity.Null);
+        _all.Add(new Character { MapId = mapId, Data = data });
+        Log.Information("Map {Map}: {Name} ({Kind}) lives here now.", mapId, data.Name, data.Kind);
+    }
+
+    /// <summary>A character taken off a running map: their body's runtime id, to tell the clients it has
+    /// gone, or null if they had none.</summary>
+    public int? RemoveLive(MapManager maps, string mapId, string name)
+    {
+        var c = _all.FirstOrDefault(x => x.MapId == mapId && x.Data.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (c == null) return null;
+        _all.Remove(c);
+        if (c.Entity == Entity.Null || !maps.TryGetMap(mapId, out var world, out _, out _, out _) || !world.IsAlive(c.Entity)) return null;
+        int id = c.Entity.Id;
+        maps.DestroyEntity(mapId, c.Entity);
+        return id;
+    }
+
+    /// <summary>A character's voice or places changed: their places are found again, and the next place
+    /// they go to is one of them; where they are now they finish.</summary>
+    public void Change(string mapId, CharacterData data)
+    {
+        var c = _all.FirstOrDefault(x => x.MapId == mapId && x.Data.Name.Equals(data.Name, StringComparison.OrdinalIgnoreCase));
+        if (c == null) return;
+        c.Data = data;
+        if (c.Entity != Entity.Null && _maps != null && _maps.TryGetMap(mapId, out var world, out _, out _, out _)
+            && world.IsAlive(c.Entity) && world.Has<Pedestrian>(c.Entity))
+            world.Get<Pedestrian>(c.Entity).Voice = data.Voice;
+        if (c.Ready) c.Ready = false;
+    }
+
+    /// <summary>The places a character's day keeps to: those named, if any of them is on the map.</summary>
+    private static List<Haunt> KeptTo(Character c, List<Haunt> found)
+    {
+        if (c.Data.Places is not { Count: > 0 } names) return found;
+        var kept = found.Where(h => names.Contains(h.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+        if (kept.Count > 0) return kept;
+        Log.Warning("CHARACTER {Name} on {Map}: none of the places named ({Places}) is on the map; they go anywhere.", c.Data.Name, c.MapId, string.Join("; ", names));
+        return found;
+    }
+
     // ── Each tick ───────────────────────────────────────────────────────────────────────────────
 
     public void Update(string mapId, World world, SpatialGrid<Entity> grid, float dt, WorldEnvironmentComponent env, WeatherType weather)
@@ -176,7 +222,7 @@ public sealed class CharacterSystem
         c.Ready = true;
         c.Paths = Pavements.Build(Pavements.StripsOf(world));
         c.Solids = Pavements.SolidsOf(world);
-        c.Haunts = HauntFinder.Find(world, grid, data, c.Paths, c.Solids);
+        c.Haunts = KeptTo(c, HauntFinder.Find(world, grid, data, c.Paths, c.Solids));
         Log.Information("CHARACTER {Name} on {Map}: {Count} places ({Kinds}) on {Nodes} pavement corners: {Names}",
                         c.Data.Name, c.MapId, c.Haunts.Count,
                         string.Join(", ", c.Haunts.GroupBy(h => h.Kind).Select(g => $"{g.Count()} {g.Key}")),

@@ -376,6 +376,10 @@ public class CharacterData
     public string Kind { get; set; } = "homeless";
     /// <summary>How they are described when looked at: "a homeless man".</summary>
     public string Description { get; set; } = "";
+    /// <summary>The places their day keeps to, by the names CharacterSystem finds them by ("the bus stop,
+    /// Main Street", "the lobby of Tower 1"); null or empty is every place the map has. Chosen in the world
+    /// editor from the places the map has.</summary>
+    public List<string>? Places { get; set; }
 }
 
 /// <summary>A vehicle on a map: which car, which road, how fast on each pass.</summary>

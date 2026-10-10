@@ -146,6 +146,7 @@ public sealed partial class WorldEditor
         var hand = HandOf(s);
         if (hand.LastPlaced is { } last && PlaceName(last) is { } lastName)
             yield return new EditorMenuItem { Section = "place.again", Kind = EditorItemKind.Action, Label = lastName, Command = "edit again" };
+        foreach (var item in DialogRoutes(s)) yield return item;
     }
 
     // ── Edit ────────────────────────────────────────────────────────────────────────────────────
@@ -178,6 +179,16 @@ public sealed partial class WorldEditor
             {
                 Section = "edit.placed", Kind = EditorItemKind.Info, Label = one.Label, Value = one.Id.ToString(CultureInfo.InvariantCulture),
                 Prompt = one.Kind, Help = one.Name, Checked = hand.Held.Contains(one.Id),
+            });
+
+        // Things from the map file changed or removed: the same, with "removed" or "changed" in the row's Prompt.
+        var changed = ChangedList(s, hand.ChangedFilter, out int changedTotal, out int lost);
+        items.Add(Line("edit.changedinfo", ChangedSummary(changed.Count, changedTotal, lost, hand.ChangedFilter), hand.ChangedFilter, prompt: MayGo(s) ? "goto" : ""));
+        foreach (var one in changed.Take(PlacedListed))
+            items.Add(new EditorMenuItem
+            {
+                Section = "edit.changed", Kind = EditorItemKind.Info, Label = one.Label, Value = one.Id.ToString(CultureInfo.InvariantCulture),
+                Prompt = one.Removed ? "removed" : "changed", Help = one.Name,
             });
 
         if (!Holding(s, out _, out var chosen, out int chosenId)) return items;
@@ -366,6 +377,10 @@ public sealed partial class WorldEditor
             items.Add(Box("world.beacon", field with { Choices = MapSettings.Policies.Select(p => p.Stored).ToArray() }, MapSettings.Get(d, path), command));
             items.AddRange(Choices("world.choice", command, MapSettings.Policies.Select(p => (Capital(p.Words), p.Stored))));
         }
+
+        items.AddRange(DialogVersions(s));
+        items.AddRange(DialogLaid(s));
+        items.AddRange(DialogPeople(s));
 
         foreach (var name in d.Editors) items.Add(Line("world.editor", name, name));
 

@@ -498,10 +498,10 @@ The dialog:
 
 | Tab | What is in it, in Tab order |
 |---|---|
-| Place | Search; Category (Buildings and Vehicles first); Prefabs (each with its size and description; vehicles and saved buildings and groups are in the same list); Where it goes (at your feet, at the build cursor, or preview only); Place; Preview; Place again. Then "Build a piece": What (floor, wall, roof, door, window) and its fields as in Control+B, and Place the piece |
-| Edit | Things near you (nearest first; Space ticks); Find by name or number; Find. Then "Placed on this map": Filter placed things, Filter, the list (everything placed with the editor, wherever it is, nearest first; Space ticks, Delete removes), Remove it, Go to it, Edit it, Tick all shown. Then the chosen thing: Position (east, north, up), Facing in degrees, and its settings; Apply changes; Bring to me; Duplicate; Row of copies (how many, and spacing); Delete (asks first). With things ticked: move them together, turn them together, group them, save them as a building, delete them all (asks first), untick all |
+| Place | Search; Category (Buildings and Vehicles first); Prefabs (each with its size and description; vehicles and saved buildings and groups are in the same list); Where it goes (at your feet, at the build cursor, or preview only); Place; Preview; Place again. Then "Build a piece": What (floor, wall, roof, door, window) and its fields as in Control+B, and Place the piece. Then "Lay a road, path or railway": What, Name, Width, Surface, A railway runs (on the ground, raised on pillars, underground), Height or depth, Train on it, a line saying what is being laid, Start here then walk it, Points typed and Add the points, Drop a point where you stand, Add a station or a level crossing where you stand, Take back the last point, Lay it, Cancel |
+| Edit | Things near you (nearest first; Space ticks); Find by name or number; Find. Then "Placed on this map": Filter placed things, Filter, the list (everything placed with the editor, wherever it is, nearest first; Space ticks, Delete removes), Remove it, Go to it, Edit it, Tick all shown. Then "Changed on this map": Filter changed things, Filter, the list (things from the map file that were moved, changed or removed, with what was done and where), Put it back as the map has it (asks first), Go to it, Edit it. Then the chosen thing: Position (east, north, up), Facing in degrees, and its settings; Apply changes; Bring to me; Duplicate; Row of copies (how many, and spacing); Delete (asks first). With things ticked: move them together, turn them together, group them, save them as a building, delete them all (asks first), untick all |
 | Build | Kind; Category (prefabs); Models. For the chosen one: Id for the copy and Duplicate; Fields and the value of the field chosen, with Set; Versions, with Use on every map, Pin on this map, Lift this map's pin; Where it is used; Replace it with, on this map or everywhere. Changes apply to every map that uses it, so duplicate first to try things |
-| World | Weather, Time of day, Natural ground, Apply changes, Set spawn here; Map size (owner, not on the server's own maps); Rooms and areas, with Edit it; Beacon rules, one drop-down per kind of beacon, and Apply beacon rules; Editors (add and remove); Model versions pinned to this map; Map information and What is around me |
+| World | Weather, Time of day, Natural ground, Apply changes, Set spawn here; Map size (owner, not on the server's own maps); Versions of this map: Name for a new version, Save a version, the list, Restore the chosen version (asks first), Write the edits into the map file (your own map; asks first); Roads, paths and railways laid, with Go to it and Take it up; People: Walkers per 100 metres of pavement and Set walkers, People on this map, Places the chosen person goes (Space ticks), Name of a new person, Voice, Put the person on the map, Take the chosen person off the map; Rooms and areas, with Edit it; Beacon rules, one drop-down per kind of beacon, and Apply beacon rules; Editors (add and remove); Model versions pinned to this map; Map information and What is around me |
 
 `/edit` typed on its own still opens the old menus as lists, with everything the dialog leaves out
 (nudging by the step, a list's items added or taken out, retiring a model, new models from a template,
@@ -580,6 +580,30 @@ holding a placed group). Items that need a number or a name open a small dialog 
   on, always, or never). The players on the map hear the change at once. A map that holds a weather
   has its own lightning: a held storm flashes over it whatever the server's sky is doing, and a held
   clear sky has none while the server storms.
+- Changed on this map (Edit tab, or `/edit changed`): the things from the map file you or others moved,
+  turned, resized, renamed, set or removed, nearest first, each saying what was done ("Old Wall,
+  Concrete Wall, moved 2 metres east, turned 90 degrees clockwise, 7 metres north east"; "Brick Wall,
+  removed, it was 15 metres north"). Filter as the placed list. Put it back as the map has it makes it
+  what the map file says again, or brings a removed one back; one undo changes it again. Go to it takes
+  you beside it, or where it was.
+- Versions of this map (World tab, or `/edit map save NAME`, `/edit map versions`, `/edit map restore
+  NUMBER`): a version is everything the editor has changed on the map, saved under a name. Restoring one
+  makes the map's edits what it has, and one undo takes the restore back; what the map had is saved as a
+  version first. On a map of your own, "Write the edits into the map file" (`/edit map bake now`) puts
+  them into the map's file for good; a sound's volume, range and model, parked vehicles and pins stay
+  in the edits. The file as it was is kept beside it. Undo cannot take that back, and the server's own
+  maps cannot be written this way: their files are made by programs.
+- Roads, paths and railways (Place tab, or `/edit route`): choose what, then Start here and walk it with
+  the editor closed (a point every metre; every 20 metres you hear how far), or type the points. Lay it
+  joins the straight stretches and lays it: a road or path is its surface (a path is pavement people
+  walk); a railway is a loop with a gravel bed, or a deck on pillars, or a tunnel of its own underground,
+  with platforms at its stations and its train running at once. Roads are the map's roads for traffic
+  from the next start, but are not joined to other roads, and no traffic is put on them. One undo takes
+  it all up; World tab lists them, to go to or take up.
+- People (World tab, or `/edit person`, `/edit people`, `/edit walkers NUMBER`): put somebody on the
+  map with a name and a voice; tick the places in their day from the places the map has (bus stops,
+  front entrances, lobbies, squares); with none ticked they go anywhere. Walkers is how many people walk
+  the map's pavements, per 100 metres, besides its own (the city has about 3).
 - Undo and redo are your own. An undo is refused if somebody else has changed the thing since, and
   says who.
 - A solid thing is never placed or moved into a player.
@@ -605,6 +629,14 @@ command for each:
 | `/edit remove #ID [#ID ...]`, `/edit remove held` | Remove things wherever they are, by number, or everything ticked; one undo puts them back |
 | `/edit goto #ID` | Stand beside a thing, facing it (your own map, or the move permission) |
 | `/edit select add placed [WORDS]` | Tick everything the placed list shows |
+| `/edit changed [WORDS]`, `/edit putback #ID [#ID ...]` | Things from the map file changed or removed; put them back as the map has them |
+| `/edit map save NAME`, `/edit map versions`, `/edit map restore NUMBER\|NAME`, `/edit map bake [now]` | Versions of the map's edits; write them into your own map's file |
+| `/edit route start road\|path\|railway [FIELD VALUE ...]`, `/edit route new ...` | Start laying one where you stand and walk it, or with no point, to type them. Fields: width, surface, level (ground, raised, underground), height, depth, train, speed, name |
+| `/edit route points EAST NORTH; EAST NORTH ...`, `/edit route point`, `/edit route back` | Points typed, one where you stand, the last taken back |
+| `/edit route station [NAME]`, `/edit route crossing [NAME]` | A railway's station or level crossing, at the point of the line nearest you |
+| `/edit route finish [FIELD VALUE ...]`, `/edit route cancel`, `/edit routes`, `/edit route remove NAME`, `/edit route goto NAME` | Lay it; drop it; list those laid; take one up; go to one |
+| `/edit person add NAME [voice VOICE]`, `/edit person choose NAME`, `/edit person place add\|drop PLACE`, `/edit person voice VOICE`, `/edit person remove NAME`, `/edit people` | People who live on the map, and their places |
+| `/edit walkers NUMBER` | People walking the pavements, per 100 metres, besides the map's own |
 | `/edit set FIELD VALUE`, `/edit up FIELD`, `/edit down FIELD` | A setting: Name, Width, Height, Depth, Model, Volume, Range, MinDistance, KeyedSide (neither, front, back), PushSide (front, back), Indoor, Floor, Ceiling, North, South, East, West |
 | `/edit place PREFAB [at cursor]`, `/edit prefabs [CATEGORY]` | Place a prefab, at your feet or at the build cursor; list them |
 | `/edit place vehicle:PRESET [at cursor]`, `/edit place vehicle PRESET` | Park a vehicle beside you, or at the build cursor |
