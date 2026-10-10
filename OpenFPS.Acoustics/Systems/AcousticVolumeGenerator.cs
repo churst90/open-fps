@@ -1,12 +1,12 @@
 using System.Numerics;
-using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 using System;
 using System.Linq;
 
 namespace OpenFPS.Common.Systems;
 
-/// <summary>Builds an AcousticMap from the world's entities, voxelising only the regions' own volumes.</summary>
+/// <summary>Builds an AcousticMap from the world's rooms, openings and solids, voxelising only the regions'
+/// own volumes. The host lists them (open-fps: EntityAcoustics, from the entities, in entity order); the order
+/// decides which of two equal rooms holds their overlap and which ids openings found in faces take.</summary>
 public static class AcousticVolumeGenerator
 {
     /// <param name="autoDiscoverPortals">Give every boundary the map did not describe a portal at the face's
@@ -14,7 +14,8 @@ public static class AcousticVolumeGenerator
     /// wall, worse than none (walls still transmit and occlude). Undescribed boundaries are always reported.</param>
     /// <param name="report">Write what was found and what is missing to the console: a streamed map rebuilds
     /// this as tiles arrive and says it once, at the first build.</param>
-    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true)
+    public static AcousticMap GenerateRegions(IEnumerable<PlacedRoom> rooms, IEnumerable<PlacedOpening> openings, IEnumerable<FaceOpenings.Box> solids,
+                                              Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true)
     {
         var console = report ? Console.Out : System.IO.TextWriter.Null;
         var acousticMap = new AcousticMap(mapSize, minBound, voxelResolution);
@@ -25,16 +26,16 @@ public static class AcousticVolumeGenerator
 
         // Everything not in a region is "Outside": no flood fill of the outdoor void.
         int outsideRegionId = AcousticConstants.GlobalRegionId;
-        var globalDef = entities.FirstOrDefault(e => e.EntityId == outsideRegionId && e.Region.RoomSize.X > 0);
+        var globalDef = rooms.Where(r => r.Id == outsideRegionId && r.Room.RoomSize.X > 0).Cast<PlacedRoom?>().FirstOrDefault();
         
-        if (globalDef != null)
+        if (globalDef is { } global)
         {
-            acousticMap.Regions[outsideRegionId] = globalDef.Region;
-            acousticMap.RegionPositions[outsideRegionId] = globalDef.Transform.Position;
+            acousticMap.Regions[outsideRegionId] = global.Room;
+            acousticMap.RegionPositions[outsideRegionId] = global.Position;
         }
         else
         {
-            acousticMap.Regions[outsideRegionId] = new RegionComponent {
+            acousticMap.Regions[outsideRegionId] = new Room {
                 FriendlyName = "Outside",
                 IsIndoor = false,
                 RoomSize = mapSize,
@@ -49,23 +50,23 @@ public static class AcousticVolumeGenerator
 
         // Largest first, so where two overlap the smaller holds the overlap (a room inside a hall), the
         // rule SpatialService.GetRegionAt applies; in entity order the map's last listed won.
-        foreach (var def in entities.Where(d => d.Region.RoomSize.X > 0)
-                                    .OrderByDescending(d => d.Region.RoomSize.X * d.Region.RoomSize.Y * d.Region.RoomSize.Z))
+        foreach (var def in rooms.Where(d => d.Room.RoomSize.X > 0)
+                                 .OrderByDescending(d => d.Room.RoomSize.X * d.Room.RoomSize.Y * d.Room.RoomSize.Z))
         {
-            if (def.Region.RoomSize.X > 0)
+            if (def.Room.RoomSize.X > 0)
             {
-                int regionId = def.EntityId;
-                acousticMap.Regions[regionId] = def.Region;
-                acousticMap.RegionPositions[regionId] = def.Transform.Position;
-                acousticMap.RegionRotations[regionId] = def.Transform.Rotation;
+                int regionId = def.Id;
+                acousticMap.Regions[regionId] = def.Room;
+                acousticMap.RegionPositions[regionId] = def.Position;
+                acousticMap.RegionRotations[regionId] = def.Rotation;
 
                 // Indoors with no surfaces is as dry as the field outside, and nothing else would say so.
-                if (def.Region.IsIndoor && RoomAcoustics.OpenFaceCount(def.Region) == 6)
+                if (def.Room.IsIndoor && RoomAcoustics.OpenFaceCount(def.Room) == 6)
                     console.WriteLine(
-                        $"[WARNING] AcousticVolumeGenerator: region '{def.Region.FriendlyName}' (entity {regionId}) " +
+                        $"[WARNING] AcousticVolumeGenerator: region '{def.Room.FriendlyName}' (entity {regionId}) " +
                         "is marked indoors but declares no RoomMaterials, so it has no surfaces and cannot reverberate.");
 
-                grid.SetRegionOBB(def.Transform.Position, def.Region.RoomSize, def.Transform.Rotation, regionId);
+                grid.SetRegionOBB(def.Position, def.Room.RoomSize, def.Rotation, regionId);
             }
         }
 
@@ -78,23 +79,23 @@ public static class AcousticVolumeGenerator
 
         // Authored portals first: placed by hand at the real doorway, before anything is found or guessed.
         int authoredCount = 0;
-        foreach (var def in entities)
+        foreach (var def in openings)
         {
-            if (def.Portal.ApertureSize <= 0) continue;
+            if (def.Opening.ApertureSize <= 0) continue;
 
-            int rA = def.Portal.RegionAId;
-            int rB = def.Portal.RegionBId;
+            int rA = def.Opening.RegionAId;
+            int rB = def.Opening.RegionBId;
 
             // Unlinked (the prefab default): take the first two regions found just past the opening.
             if (rA == rB)
             {
-                Vector3 forward = Vector3.Transform(Vector3.UnitZ, def.Transform.Rotation);
+                Vector3 forward = Vector3.Transform(Vector3.UnitZ, def.Rotation);
                 Vector3[] searchDirs = { forward, -forward, Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY };
 
                 var foundRegions = new List<int>();
                 foreach (var dir in searchDirs)
                 {
-                    int r = grid.GetRegionAt(def.Transform.Position + dir * 0.5f);
+                    int r = grid.GetRegionAt(def.Position + dir * 0.5f);
                     if (!foundRegions.Contains(r)) foundRegions.Add(r);
                     if (foundRegions.Count >= 2) break;
                 }
@@ -103,16 +104,16 @@ public static class AcousticVolumeGenerator
                 else if (foundRegions.Count == 1) { rA = foundRegions[0]; rB = AcousticConstants.GlobalRegionId; }
 
                 console.WriteLine(rA != rB
-                    ? $"[AcousticMap] Portal {def.EntityId} had no region link; probed the voxel grid and joined region {rA} to {rB}."
-                    : $"[AcousticMap] WARNING: portal {def.EntityId} at {def.Transform.Position} has no region link and probing found no rooms — it will be ignored. Set RegionAId/RegionBId on the map entity.");
+                    ? $"[AcousticMap] Portal {def.Id} had no region link; probed the voxel grid and joined region {rA} to {rB}."
+                    : $"[AcousticMap] WARNING: portal {def.Id} at {def.Position} has no region link and probing found no rooms — it will be ignored. Set RegionAId/RegionBId on the map entity.");
             }
 
             if (rA == rB) continue;
 
-            var portalComp = def.Portal;
+            var portalComp = def.Opening;
             portalComp.RegionAId = rA;
             portalComp.RegionBId = rB;
-            acousticMap.Portals[def.EntityId] = (portalComp, def.Transform.Position);
+            acousticMap.Portals[def.Id] = (portalComp, def.Position);
             authoredCount++;
         }
 
@@ -121,7 +122,7 @@ public static class AcousticVolumeGenerator
         // it is not found twice. One per gap, not per pair of rooms: a lobby with a front door and an open
         // side onto one street is heard through both (2026-10-02). Only for regions with a wall, never the
         // floor (FaceOpenings).
-        int openingCount = AddFaceOpenings(acousticMap, entities);
+        int openingCount = AddFaceOpenings(acousticMap, solids);
         if (openingCount > 0)
             console.WriteLine($"[AcousticMap] {openingCount} opening(s) from the gaps in rooms' faces (open sides, tunnel mouths, doorways with no door).");
 
@@ -179,7 +180,7 @@ public static class AcousticVolumeGenerator
                                   $"Add a portal entity at the real doorway with RegionAId={r1}, RegionBId={r2}.");
 
                 acousticMap.Portals[virtualPortalId--] = (
-                    new PortalComponent { RegionAId = r1, RegionBId = r2, ApertureSize = 2.0f },
+                    new Opening { RegionAId = r1, RegionBId = r2, ApertureSize = 2.0f },
                     edgePos);
                 discoveredCount++;
             }
@@ -196,30 +197,20 @@ public static class AcousticVolumeGenerator
 
     /// <summary>
     /// Puts on the map an opening for every gap in the faces of its structures (or of only
-    /// <paramref name="rooms"/>, replacing what those rooms had), from the solid boxes in
-    /// <paramref name="entities"/>. Returns how many it added. The aperture is the side of a square of the
-    /// gap's area (pressure through an opening goes as the root of its area); the gap's own rectangle is
-    /// in <see cref="AcousticMap.OpeningFrames"/>.
+    /// <paramref name="rooms"/>, replacing what those rooms had), from <paramref name="boxes"/>: the scene's
+    /// fixed solid boxes, each door's leaf standing shut in its doorway (open-fps: EntityAcoustics.Solids).
+    /// Returns how many it added. The aperture is the side of a square of the gap's area (pressure through an
+    /// opening goes as the root of its area); the gap's own rectangle is in <see cref="AcousticMap.OpeningFrames"/>.
     /// </summary>
-    public static int AddFaceOpenings(AcousticMap map, IEnumerable<EntityDefinition> entities, IReadOnlyCollection<int>? rooms = null)
+    public static int AddFaceOpenings(AcousticMap map, IEnumerable<FaceOpenings.Box> boxes, IReadOnlyCollection<int>? rooms = null)
     {
         float res = map.VoxelResolution;
 
-        // The solid boxes, as the scene has them, with each door's leaf standing shut in its doorway.
         var solids = new List<(FaceOpenings.Box Box, Vector3 Min, Vector3 Max)>();
-        foreach (var def in entities)
+        foreach (var box in boxes)
         {
-            if (def == null || !def.Collider.IsSolid || def.Collider.Shape != ColliderShape.Box) continue;
-            if (def.Region.RoomSize.X > 0f || def.Moves) continue;
-            if (!string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
-            var size = def.Collider.Size;
-            if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) continue;
-            bool leaf = def.Portal.RegionAId != 0 || def.Portal.RegionBId != 0;
-            Vector3 at = def.Transform.Position;
-            Quaternion rot = def.Transform.Rotation == default ? Quaternion.Identity : def.Transform.Rotation;
-            if (leaf && def.Portal.OpeningRotation != default) { at = def.Portal.OpeningCentre; rot = def.Portal.OpeningRotation; }
-            var half = FaceOpenings.AxisAlignedHalfExtents(size * 0.5f, rot);
-            solids.Add((new FaceOpenings.Box(at, size, rot), at - half, at + half));
+            var half = FaceOpenings.AxisAlignedHalfExtents(box.Size * 0.5f, box.Rotation);
+            solids.Add((box, box.Centre - half, box.Centre + half));
         }
 
         var places = new List<(FaceOpenings.Place Place, Vector3 Min, Vector3 Max)>();
@@ -235,7 +226,7 @@ public static class AcousticVolumeGenerator
 
         // What is already there: the authored portals, and the openings of rooms not being redone.
         var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
-        var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+        var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
         if (rooms != null)
             foreach (var (id, frame) in map.OpeningFrames)
                 if (rooms.Contains(frame.Room)) { frames.Remove(id); portals.Remove(id); }
@@ -296,7 +287,7 @@ public static class AcousticVolumeGenerator
                 if (seen) continue;
                 list.Add((frame.Centre, frame));
                 int id = nextId--;
-                portals[id] = (new PortalComponent { RegionAId = room.Id, RegionBId = gap.Beyond, ApertureSize = MathF.Sqrt(gap.Area) }, gap.Centre);
+                portals[id] = (new Opening { RegionAId = room.Id, RegionBId = gap.Beyond, ApertureSize = MathF.Sqrt(gap.Area) }, gap.Centre);
                 frames[id] = frame;
                 added++;
             }
@@ -330,7 +321,7 @@ public static class AcousticVolumeGenerator
     private static (int, int) PairKey(int a, int b) => a <= b ? (a, b) : (b, a);
 
     /// <summary>Updates one region that has moved or changed.</summary>
-    public static void UpdateRegion(AcousticMap map, int regionId, Vector3 pos, Quaternion rot, RegionComponent reg)
+    public static void UpdateRegion(AcousticMap map, int regionId, Vector3 pos, Quaternion rot, Room reg)
     {
         var grid = map.VoxelGrid;
 

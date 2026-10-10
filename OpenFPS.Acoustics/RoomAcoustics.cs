@@ -1,5 +1,4 @@
 using System.Numerics;
-using OpenFPS.Common.Components;
 
 namespace OpenFPS.Common;
 
@@ -27,7 +26,7 @@ public static class RoomAcoustics
         areas[4] = eastWest; areas[5] = eastWest;
     }
 
-    /// <summary>Whether this face is an opening: an explicit "None", as <see cref="RegionComponent"/> and
+    /// <summary>Whether this face is an opening: an explicit "None", as <see cref="Room"/> and
     /// the prefab loader give a region that declares no surfaces. A face the map never set is Generic.</summary>
     public static bool FaceIsOpen(int[]? materials, int face)
         => materials != null && face < materials.Length && materials[face] == OpenFaceMaterial;
@@ -41,7 +40,7 @@ public static class RoomAcoustics
     }
 
     /// <summary>How many of the six faces are not there.</summary>
-    public static int OpenFaceCount(in RegionComponent region)
+    public static int OpenFaceCount(in Room region)
     {
         int open = 0;
         for (int f = 0; f < 6; f++) if (FaceIsOpen(region.Materials, f)) open++;
@@ -50,7 +49,7 @@ public static class RoomAcoustics
 
     /// <summary>The fraction of this region's boundary that is a surface, by area: a 220 by 210 m infield's
     /// open sky is nearly half of it, a 30 by 6 m end wall a rounding error.</summary>
-    public static float Enclosure(in RegionComponent region)
+    public static float Enclosure(in Room region)
     {
         Span<float> areas = stackalloc float[6];
         FaceAreas(region.RoomSize, areas);
@@ -65,14 +64,14 @@ public static class RoomAcoustics
 
     /// <summary>Whether this region is a closed room: one open face disqualifies it. A doorway is not an
     /// open face but a portal, a leak between two closed rooms.</summary>
-    public static bool IsEnclosure(in RegionComponent region)
+    public static bool IsEnclosure(in Room region)
         => region.RoomSize.X > 0f && OpenFaceCount(region) == 0;
 
     /// <summary>
     /// Sabine's reverberation time for the region, ms, or zero where there is no enclosure to estimate
     /// (the ray tracer's then). A closed boundary that absorbs nothing rings as long as the clamp allows.
     /// </summary>
-    public static float DecayMs(in RegionComponent region)
+    public static float DecayMs(in Room region)
     {
         if (!IsEnclosure(region)) return 0f;
         if (region.ReverbTimeScale <= 0f) return 0f;

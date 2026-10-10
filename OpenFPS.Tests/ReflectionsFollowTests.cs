@@ -37,7 +37,7 @@ public class ReflectionsFollowTests
         for (int k = 0; k < 2; k++)
         {
             int id = k == 0 ? Floor0Room : Floor1Room;
-            map.Regions[id] = new RegionComponent
+            map.Regions[id] = new Room
             {
                 FriendlyName = $"stair, floor {k}", IsIndoor = true,
                 RoomSize = new Vector3(2 * HalfX, Storey - Slab, 2 * HalfZ),

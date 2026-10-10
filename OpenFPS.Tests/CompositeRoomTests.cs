@@ -196,7 +196,7 @@ public class CompositeRoomTests : IDisposable
         f.Shed(Fixture.Clear);
 
         var definitions = EntityDefinitionFactory.StaticDefinitions(f.World);
-        var map = AcousticVolumeGenerator.GenerateRegions(definitions, new Vector3(400, 60, 400),
+        var map = EntityAcoustics.GenerateRegions(definitions, new Vector3(400, 60, 400),
                                                           new Vector3(-200, -10, -200), 0.5f, 0.15f);
 
         int inside = map.VoxelGrid.GetRegionAt(Fixture.Clear + new Vector3(0, 1.7f, 0));
@@ -225,7 +225,7 @@ public class CompositeRoomTests : IDisposable
             if (face != east) Assert.NotEqual(RoomAcoustics.OpenFaceMaterial, room.Value.Materials[face]);
 
         var definitions = EntityDefinitionFactory.StaticDefinitions(f.World);
-        var map = AcousticVolumeGenerator.GenerateRegions(definitions, new Vector3(400, 60, 400),
+        var map = EntityAcoustics.GenerateRegions(definitions, new Vector3(400, 60, 400),
                                                           new Vector3(-200, -10, -200), 0.5f, 0.15f);
         int roomId = f.RoomEntityId(root);
         var (position, _, size) = f.RoomVolume(root);
@@ -252,7 +252,7 @@ public class CompositeRoomTests : IDisposable
         int roomId = f.RoomEntityId(root);
 
         var client = new ClientWorldState();
-        client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(
+        client.SetAcousticMap(EntityAcoustics.GenerateRegions(
             new List<EntityDefinition>(), new Vector3(400, 60, 400), new Vector3(-200, -10, -200), 0.5f, 0.15f));
         foreach (var part in CompositeService.PartsOf(f.World, root))
             client.RegisterDefinition(EntityDefinitionFactory.From(f.World, part));
@@ -277,7 +277,7 @@ public class CompositeRoomTests : IDisposable
         int roomId = f.RoomEntityId(root);
 
         var client = new ClientWorldState();
-        client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(
+        client.SetAcousticMap(EntityAcoustics.GenerateRegions(
             new List<EntityDefinition>(), new Vector3(400, 60, 400), new Vector3(-200, -10, -200), 0.5f, 0.15f));
         Assert.False(client.AcousticMap!.Regions.ContainsKey(roomId), "it was baked after all; this proves nothing");
 

@@ -33,7 +33,7 @@ public class CityZoneTests
             world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
             if (OpenFPS.Client.Core.ClientWorldState.IsMarker(def)) world.MarkerEntityIds.Add(def.EntityId);
         }
-        world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
+        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
         return world;
     }
 

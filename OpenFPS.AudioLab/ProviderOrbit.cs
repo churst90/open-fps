@@ -274,7 +274,7 @@ public static class ProviderOrbit
         var map = new OpenFPS.Common.AcousticMap(new Vector3(2000, 200, 2000), new Vector3(-1000, 0, -1000), 1f);
         for (int i = 0; i < regions; i++)
         {
-            map.Regions[9000 + i] = new OpenFPS.Common.Components.RegionComponent
+            map.Regions[9000 + i] = new Room
             {
                 FriendlyName = $"Room {i}", IsIndoor = true,
                 RoomSize = new Vector3(6f, 3f, 8f),
@@ -382,7 +382,7 @@ public static class ProviderOrbit
         var map = new OpenFPS.Common.AcousticMap(new Vector3(400, 50, 400), new Vector3(-200, 0, -200), 1f);
         for (int i = 0; i < regions; i++)
         {
-            map.Regions[9000 + i] = new OpenFPS.Common.Components.RegionComponent
+            map.Regions[9000 + i] = new Room
             {
                 FriendlyName = $"Room {i}", IsIndoor = true,
                 RoomSize = new Vector3(6f, 3f, 8f),
@@ -395,7 +395,7 @@ public static class ProviderOrbit
             // The city's outdoors is a region, so the global id has a bus, and a stale region id
             // resolves to it. Without it TryGetReverbInput(-1) is false and the wrong-bus disconnect
             // (see DropSend) never happens.
-            map.Regions[AcousticConstants.GlobalRegionId] = new OpenFPS.Common.Components.RegionComponent
+            map.Regions[AcousticConstants.GlobalRegionId] = new Room
             {
                 FriendlyName = "Outside", IsIndoor = false,
                 RoomSize = new Vector3(200f, 50f, 200f),

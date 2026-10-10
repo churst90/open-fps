@@ -62,7 +62,7 @@ public partial class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
             }
             p.ClientGrid = sw.Elapsed;
             sw.Restart();
-            world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
+            world.AcousticMap = EntityAcoustics.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
             p.AcousticBake = sw.Elapsed;
             p.World = world;
             return p;

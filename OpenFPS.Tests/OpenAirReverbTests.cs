@@ -24,15 +24,15 @@ public class OpenAirReverbTests
         Assert.True(manager.TryGetMap(mapId, out World world, out Vector3 size, out _, out _), $"maps/{mapId}.json failed to load.");
         var data = manager.GetAllMaps().First(kv => kv.Key == mapId).Value.data;
         var defs = EntityDefinitionFactory.StaticDefinitions(world);
-        return (defs, AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, 1.0f));
+        return (defs, EntityAcoustics.GenerateRegions(defs, size, data.MinBound, 1.0f));
     }
 
-    private static RegionComponent Box(float x, float y, float z, params string[] faces)
+    private static Room Box(float x, float y, float z, params string[] faces)
     {
         var materials = new int[6];
         for (int f = 0; f < 6 && f < faces.Length; f++)
             materials[f] = AcousticRegistry.TryGetResonanceIndex(faces[f], out int i) ? i : 0;
-        return new RegionComponent { RoomSize = new Vector3(x, y, z), Materials = materials, ReverbTimeScale = 1.0f };
+        return new Room { RoomSize = new Vector3(x, y, z), Materials = materials, ReverbTimeScale = 1.0f };
     }
 
     /// <summary>A face made of nothing takes everything that reaches it and returns none of it.</summary>
@@ -67,7 +67,7 @@ public class OpenAirReverbTests
     [Fact]
     public void ABoundaryThatAbsorbsNothingIsAHallOfMirrorsAndNotA500msRoom()
     {
-        var mirrors = new RegionComponent
+        var mirrors = new Room
         {
             RoomSize = new Vector3(10, 5, 10),
             // Not "None" — a real surface that happens to absorb nothing.
@@ -86,14 +86,14 @@ public class OpenAirReverbTests
 
         foreach (var def in defs.Where(d => d.Region.RoomSize.X > 0))
         {
-            Assert.False(RoomAcoustics.IsEnclosure(def.Region),
+            Assert.False(RoomAcoustics.IsEnclosure(def.Region.ToRoom()),
                 $"'{def.Region.FriendlyName}' is a closed boundary; a stretch of racetrack has no ceiling.");
-            Assert.Equal(0f, RoomAcoustics.DecayMs(def.Region));
+            Assert.Equal(0f, RoomAcoustics.DecayMs(def.Region.ToRoom()));
         }
 
         // Including the one you land in on login.
         var infield = defs.Single(d => d.Region.FriendlyName == "Infield");
-        Assert.Equal(0f, RoomAcoustics.DecayMs(infield.Region));
+        Assert.Equal(0f, RoomAcoustics.DecayMs(infield.Region.ToRoom()));
 
         // And the outdoors itself, once given six real materials and kept dry only by a test for its id.
         Assert.False(RoomAcoustics.IsEnclosure(map.Regions[map.GlobalEnvironmentId]));
@@ -109,15 +109,15 @@ public class OpenAirReverbTests
 
         foreach (var room in rooms)
         {
-            Assert.True(RoomAcoustics.IsEnclosure(room.Region),
+            Assert.True(RoomAcoustics.IsEnclosure(room.Region.ToRoom()),
                 $"'{room.Region.FriendlyName}' stopped being a room.");
-            float decay = RoomAcoustics.DecayMs(room.Region);
+            float decay = RoomAcoustics.DecayMs(room.Region.ToRoom());
             Assert.True(decay >= AcousticConstants.MinReverbDecayMs,
                 $"'{room.Region.FriendlyName}' went dry: {decay:F0} ms.");
         }
 
         // The carpeted room is still much deader than the concrete one: the material decides.
-        float[] decays = rooms.Select(r => RoomAcoustics.DecayMs(r.Region)).OrderBy(d => d).ToArray();
+        float[] decays = rooms.Select(r => RoomAcoustics.DecayMs(r.Region.ToRoom())).OrderBy(d => d).ToArray();
         Assert.True(decays[^1] > decays[0] * 4f);
     }
 }
@@ -132,7 +132,7 @@ public class UnderfootMaterialTests
     [Fact]
     public void AFloorUnderfootDoesNotMakeARoom()
     {
-        var sector = new RegionComponent
+        var sector = new Room
         {
             FriendlyName = "Front straight",
             IsIndoor = false,
@@ -160,11 +160,11 @@ public class UnderfootMaterialTests
             "carpeting the floor of a sealed room should shorten its decay.");
     }
 
-    private static RegionComponent Box(float x, float y, float z, params string[] faces)
+    private static Room Box(float x, float y, float z, params string[] faces)
     {
         var materials = new int[6];
         for (int f = 0; f < 6 && f < faces.Length; f++)
             materials[f] = AcousticRegistry.TryGetResonanceIndex(faces[f], out int i) ? i : 0;
-        return new RegionComponent { RoomSize = new Vector3(x, y, z), Materials = materials, ReverbTimeScale = 1.0f };
+        return new Room { RoomSize = new Vector3(x, y, z), Materials = materials, ReverbTimeScale = 1.0f };
     }
 }

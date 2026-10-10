@@ -41,7 +41,7 @@ public class OpeningsFromGapsTests
             var world = new WorldSnapshot();
             foreach (var d in Defs)
                 world.Entities[d.EntityId] = new EntitySnapshot { Id = d.EntityId, Definition = d, Transform = d.Transform };
-            world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(Defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
+            world.AcousticMap = EntityAcoustics.GenerateRegions(Defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
             return world;
         }
     }
@@ -55,11 +55,11 @@ public class OpeningsFromGapsTests
         Material = new MaterialComponent { Material = material },
     };
 
-    private static IEnumerable<(int Id, PortalComponent Portal, Vector3 Position)> FaceOpenings(AcousticMap map)
+    private static IEnumerable<(int Id, Opening Portal, Vector3 Position)> FaceOpenings(AcousticMap map)
         => map.Portals.Where(p => p.Key <= AcousticVolumeGenerator.FirstFaceOpeningId)
                       .Select(p => (p.Key, p.Value.Portal, p.Value.Position));
 
-    private static bool Joins(PortalComponent p, int a, int b)
+    private static bool Joins(Opening p, int a, int b)
         => (p.RegionAId == a && p.RegionBId == b) || (p.RegionAId == b && p.RegionBId == a);
 
     // ── A lobby with a front door AND an open side, both onto the street ──────────────────────────
@@ -176,7 +176,7 @@ public class OpeningsFromGapsTests
         };
         oneShut.Entities[999] = new EntitySnapshot { Id = 999, Definition = shutAt, Transform = shutAt.Transform };
         var defs = oneShut.Entities.Values.Select(e => e.Definition).ToList();
-        oneShut.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
+        oneShut.AcousticMap = EntityAcoustics.GenerateRegions(defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
         var single = Assert.Single(FaceOpenings(oneShut.AcousticMap));
         Assert.Equal(2f, single.Position.Z, 2);
     }

@@ -27,7 +27,7 @@ public class OpeningsFromOpenFacesTests
     private static AcousticMap Build(params EntityDefinition[] defs)
     {
         AcousticRegistry.EnsureInitialized();
-        return AcousticVolumeGenerator.GenerateRegions(defs, new Vector3(200f, 40f, 200f), new Vector3(-100f, -10f, -100f));
+        return EntityAcoustics.GenerateRegions(defs, new Vector3(200f, 40f, 200f), new Vector3(-100f, -10f, -100f));
     }
 
     [Fact]

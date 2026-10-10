@@ -426,7 +426,7 @@ public static class ProbableBugsSpike
         var q = Quaternion.Identity;
         List<SteamAudioScene.Box> boxes;
         Vector3 ear;
-        RegionComponent region;
+        Room region;
         int I(string m) => AcousticRegistry.GetProperties(m).ResonanceIndex;
         if (room == "street")
         {
@@ -438,7 +438,7 @@ public static class ProbableBugsSpike
                 new(new Vector3(12f, 6f, 0), new Vector3(10f, 12f, 80f), q, "Brick"),
             };
             ear = new Vector3(2f, 1.7f, 0f);
-            region = new RegionComponent
+            region = new Room
             {
                 FriendlyName = "Street", IsIndoor = false, RoomSize = new Vector3(14f, 12f, 80f), ReverbTimeScale = 1f,
                 Materials = new[] { I("Asphalt"), I("Asphalt"), I("Brick"), I("Brick"), I("Brick"), I("Brick") },
@@ -460,7 +460,7 @@ public static class ProbableBugsSpike
                 new(new Vector3(0.75f, 4.5f, -0.5f), new Vector3(1.4f, 0.2f, 3.5f), q, "Tile"),
             };
             ear = new Vector3(0.6f, 1.7f, -2f);
-            region = new RegionComponent
+            region = new Room
             {
                 FriendlyName = "Tiled stairwell", IsIndoor = true, RoomSize = new Vector3(W, H, D), ReverbTimeScale = 1f,
                 Materials = new[] { I("Concrete"), I("Concrete"), I("Tile"), I("Concrete"), I("Concrete"), I("Concrete") },
@@ -480,7 +480,7 @@ public static class ProbableBugsSpike
                 new(new Vector3(3.2f, 0.32f, -3.4f), new Vector3(1.8f, 0.6f, 1.8f), q, "Audience"),
             };
             ear = new Vector3(0.175f, 1.7f, 0.16f);
-            region = new RegionComponent
+            region = new Room
             {
                 FriendlyName = "Carpeted flat", IsIndoor = true, RoomSize = new Vector3(8.65f, 2.7f, 17.86f), ReverbTimeScale = 1f,
                 Materials = new[] { I("Plaster"), I("Brick"), I("Carpet"), I("Plaster"), I("Plaster"), I("Plaster") },

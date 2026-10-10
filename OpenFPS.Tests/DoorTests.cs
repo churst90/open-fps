@@ -268,7 +268,7 @@ public class DoorTests : IDisposable
         var door = CompositeService.PartsOf(f.World, root).Single(e => f.World.Has<DoorComponent>(e));
 
         var client = new ClientWorldState();
-        client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(
+        client.SetAcousticMap(EntityAcoustics.GenerateRegions(
             new List<EntityDefinition>(), new Vector3(400, 60, 400), new Vector3(-200, -10, -200), 0.5f, 0.15f));
 
         // Shut, it is not an opening at all.

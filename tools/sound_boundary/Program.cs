@@ -95,8 +95,7 @@ foreach (var (name, dir, refs, extra) in projects)
     string[] friends = name switch
     {
         "OpenFPS.Native" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
-        "OpenFPS.Common" => new[] { "OpenFPS.Tests" },
-        "OpenFPS.Acoustics" => new[] { "OpenFPS.Common", "OpenFPS.Tests" },
+        "OpenFPS.Acoustics" => new[] { "OpenFPS.Tests" },
         "OpenFPS.Sound" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Client.Core" or "OpenFPS.Server" => new[] { "OpenFPS.Tests", "OpenFPS.AudioLab" },
         _ => Array.Empty<string>(),

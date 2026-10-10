@@ -36,7 +36,7 @@ public class CityOpeningsTests
         foreach (var def in defs)
             world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
+        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
         long genMs = sw.ElapsedMilliseconds;
 
         var acoustics = new SpatialAcoustics();

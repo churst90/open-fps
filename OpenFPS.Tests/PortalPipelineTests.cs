@@ -100,7 +100,7 @@ public class PortalPipelineTests
     public void DefaultMap_AcousticMap_RegistersEveryAuthoredPortalAndGuessesNothing()
     {
         var m = Map.Value;
-        var acoustic = AcousticVolumeGenerator.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f);
+        var acoustic = EntityAcoustics.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f);
 
         Assert.Equal(4, acoustic.Portals.Count);
         // Synthesized portals use negative keys from -1000 down; authored ones keep their entity id.
@@ -114,7 +114,7 @@ public class PortalPipelineTests
     public void DefaultMap_AcousticMap_FindsTheFourRoomsPlusTheOutside()
     {
         var m = Map.Value;
-        var acoustic = AcousticVolumeGenerator.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f);
+        var acoustic = EntityAcoustics.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f);
 
         Assert.Equal(5, acoustic.Regions.Count); // 4 rooms + the global "Outside" environment
         Assert.True(acoustic.Regions.ContainsKey(AcousticConstants.GlobalRegionId));
@@ -124,7 +124,7 @@ public class PortalPipelineTests
     public void ListenerInsideARoom_ResolvesToThatRoomsRegion()
     {
         var m = Map.Value;
-        var acoustic = AcousticVolumeGenerator.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f);
+        var acoustic = EntityAcoustics.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f);
 
         int roomA = RegionAt(m.Definitions, RoomAConcrete).EntityId;
         Assert.Equal(roomA, acoustic.VoxelGrid.GetRegionAt(new Vector3(-7, 1.7f, 15)));
@@ -166,7 +166,7 @@ public class PortalPipelineTests
             Portal = new PortalComponent { RegionAId = -1, RegionBId = -1, ApertureSize = 2f }
         };
 
-        var acoustic = AcousticVolumeGenerator.GenerateRegions(
+        var acoustic = EntityAcoustics.GenerateRegions(
             new[] { region, portal }, new Vector3(100, 40, 100), new Vector3(-50, 0, -50));
 
         Assert.True(acoustic.Portals.TryGetValue(43, out var linked), "Unlinked portal was dropped instead of probed.");
@@ -180,8 +180,8 @@ public class PortalPipelineTests
     {
         var m = Map.Value;
 
-        var off = AcousticVolumeGenerator.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f);
-        var on = AcousticVolumeGenerator.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f, autoDiscoverPortals: true);
+        var off = EntityAcoustics.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f);
+        var on = EntityAcoustics.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f, autoDiscoverPortals: true);
 
         Assert.Equal(4, off.Portals.Count);
         // The carpet half of the lab has no authored opening outside, so the guess adds one on a wall:
