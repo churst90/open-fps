@@ -1878,7 +1878,14 @@ FLOOR_TOP = 0.12          # slab top 0.10, a finished floor 2 cm on it
 CEIL = 2.68               # underside of the ceiling
 WALL_T = 0.25
 PART_T = 0.12
-DOOR_TOP = FLOOR_TOP + 2.13
+DOOR_TOP = FLOOR_TOP + 2.13           # the head of a doorway with no leaf in it (a barn's, an archway)
+
+
+def head_over(prefab):
+    """The head of a doorway with `prefab`'s leaf in it: it laps the leaf by DOOR_LAP, as a jamb does and as
+    gen_city's do. 3 cm over the leaf, it was a slot every house's rooms got out to the street by
+    (docs/GEOMETRY.md 12.6)."""
+    return FLOOR_TOP + BASE[prefab][1] - DOOR_LAP
 
 
 def exterior_runs(rects, grid):
@@ -2386,7 +2393,7 @@ def build(bd):
             doors_out.append((k, s, width, prefab, room, dname))
 
     for (k, s, width, prefab, room, dname) in doors_out:
-        cuts[k].append((s - width / 2, s + width / 2, DOOR_TOP if prefab != "garage" else FLOOR_TOP + 2.25))
+        cuts[k].append((s - width / 2, s + width / 2, FLOOR_TOP + 2.25 if prefab == "garage" else head_over(prefab) if prefab else DOOR_TOP))
 
     for k, (E, L, reflex0, reflex1) in enumerate(edges):
         edge_wall(E, L, reflex0, reflex1, wall_prefab, wall_h, f"{name} {edge_word(E)} wall", cuts.get(k, []))
@@ -2670,7 +2677,7 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
             kind_, wdt = lk
             wdt = min(wdt, s1 - s0 - 0.3)
             sm = (s0 + s1) / 2
-            cut = [(sm - wdt / 2, sm + wdt / 2, DOOR_TOP)]
+            cut = [(sm - wdt / 2, sm + wdt / 2, head_over("door") if kind_ == "door" else DOOR_TOP)]
             x, z = F.w(line, sm) if axis == "u" else F.w(sm, line)
             phi = F.a + math.pi / 2 if axis == "u" else F.a
             if kind_ == "door":
