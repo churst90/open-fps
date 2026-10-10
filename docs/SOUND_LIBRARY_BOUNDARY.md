@@ -2283,7 +2283,8 @@ game loop's dead reckoning and the server; `ClientWorldState` among them); `Audi
     RoadWater, GroundWater: 323 passed, 1 failed. The one,
     `DspCallbackTests.AGrainIsAHannWindowOfItsSourceAtTheVoicesTrim`, counted 1,896 bytes allocated over its
     callbacks with other classes running beside it; it passed on its own, with the rest of DspCallbackTests
-    (59 passed). It renders a granular voice, which none of this touches.
+    (59 passed). It renders a granular voice, which none of this touches. Under the same filter it then passed
+    three times on the branch merged with main (862b747f) and three times on main (259f1ad3): seen once in seven.
   - Nature, Foliage, EarWind, Ambience, Fire, Waves, WideSources, MixerRate, WoodChorus, RankingByLoudness:
     155 passed.
   - Reverb, SteamAudio, TracedEcho, ClientAudio, DistantUpdates, BorrowedVoice, AsyncAcousticWorker,
