@@ -27,6 +27,13 @@ other at login. The server and the Windows zip go out together.
    leaks traced with `ROOM_DEBUG`), then switch the acoustic map to the flood on the server and the client,
    region ids unchanged, gated by `--geometry-parity only=rooms` (no house open past its margin, IoU over
    0.8). Do it while no audio branch is open.
+   After it is switched on and heard (Cody, 2026-10-10): regions become places. An indoor room is a name
+   and a seed point, its shape, indoor flag and materials measured from the walls; an outdoor place (yard,
+   street, park) is a name over an area. Drop the box (`RoomSize`), `Materials` and `ReverbTimeScale`
+   from authoring, the editor, prefabs and the generators; derive portals where floods meet through a
+   door. Remove the ambience bed machinery (`SetMapAmbience`, the region bed, `PlayAmbientBed`,
+   `PrefabTemplate.AmbienceId`): no beds at all, region beds included (Cody, 2026-10-10). The component
+   and manifest fields stay unread (positional wire) unless the wire version is bumped.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below).
 4. Sound library stages 6 to 8: the world input and `OpenFPS.Audio`, splitting `ClientAudioSystem`,
