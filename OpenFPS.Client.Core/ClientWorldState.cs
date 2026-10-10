@@ -363,7 +363,7 @@ public class ClientWorldState
             var map = AcousticMap;
             if (map == null) return;   // still loading; the bake will pick it up from the stream
 
-            map.Regions = new Dictionary<int, Room>(map.Regions) { [def.EntityId] = def.Region.ToRoom() };
+            map.Regions = new Dictionary<int, Room>(map.Regions) { [def.EntityId] = OpenFPS.Common.EntityAcoustics.RoomOf(def, def.Moves ? null : map.RoomCells) };
             map.RegionPositions = new Dictionary<int, Vector3>(map.RegionPositions) { [def.EntityId] = def.Transform.Position };
             map.RegionRotations = new Dictionary<int, Quaternion>(map.RegionRotations) { [def.EntityId] = def.Transform.Rotation };
 
@@ -1020,7 +1020,7 @@ public class ClientWorldState
         // built the boxes serve.
         var defs = definitions as IReadOnlyCollection<EntityDefinition> ?? definitions.ToList();
         var floods = geometry == null ? null
-            : OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, rooms, RoomFloodThreads);
+            : OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, rooms, RoomFloodThreads, measure: true);
         var map = OpenFPS.Common.EntityAcoustics.GenerateRegions(defs, mapSize, min,
                       voxelResolution, occlusionFloor, report: report, floods: floods);
         if (streamed) DropDanglingPortals(map);
@@ -1039,8 +1039,8 @@ public class ClientWorldState
 
     /// <summary>
     /// A build of the static geometry was published: the rooms are flooded again through it, off this thread, and
-    /// only the rooms' cells are swapped in (a tile's walls arrive after its rooms; the next refresh of the whole
-    /// map floods with them too).
+    /// only the rooms' cells and their measures are swapped in (a tile's walls arrive after its rooms; the next refresh
+    /// of the whole map floods with them too).
     /// </summary>
     private void GeometryPublished()
     {
@@ -1058,10 +1058,16 @@ public class ClientWorldState
                 if (live == null || geometry == null) return;
                 var defs = _definitions.Values.ToList();
                 OpenFPS.Common.Geometry.RoomCells cells;
-                lock (_floodLock) cells = OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, _roomFloods, RoomFloodThreads);
+                lock (_floodLock) cells = OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, _roomFloods, RoomFloodThreads, measure: true);
                 lock (_metaLock)
                 {
                     if (!ReferenceEquals(AcousticMap, live) || epoch != _mapEpoch) return;
+                    // Replaced whole, as a refresh does: readers walk the dictionary they found.
+                    var regions = new Dictionary<int, Room>(live.Regions);
+                    foreach (var id in live.Regions.Keys)
+                        if (_definitions.TryGetValue(id, out var def) && def.Region.RoomSize.X > 0f && !def.Moves)
+                            regions[id] = OpenFPS.Common.EntityAcoustics.RoomOf(def, cells);
+                    live.Regions = regions;
                     live.RoomCells = cells;
                 }
                 RoomRefreshes++;
@@ -1192,7 +1198,7 @@ public class ClientWorldState
         foreach (int id in _regionEntityIds.Keys)
         {
             if (built.Regions.ContainsKey(id) || !_definitions.TryGetValue(id, out var def)) continue;
-            built.Regions[id] = def.Region.ToRoom();
+            built.Regions[id] = OpenFPS.Common.EntityAcoustics.RoomOf(def, built.RoomCells);
             built.RegionPositions[id] = def.Transform.Position;
             built.RegionRotations[id] = def.Transform.Rotation;
         }

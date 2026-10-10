@@ -9,20 +9,25 @@ namespace OpenFPS.Common.Geometry;
 /// </summary>
 public sealed class RoomCells
 {
-    public static readonly RoomCells Empty = new(Array.Empty<Span>(), new HashSet<int>(), Vector3.Zero);
+    public static readonly RoomCells Empty = new(Array.Empty<Span>(), new HashSet<int>(), new Dictionary<int, RoomFlood.Lining>(), Vector3.Zero);
 
     /// <summary>Cells x0 to x1 of row (y, z), the room's id.</summary>
     private readonly record struct Span(long Row, int X0, int X1, int Room);
 
     private readonly Span[] _spans;
     private readonly HashSet<int> _flooded;
+    private readonly Dictionary<int, RoomFlood.Lining> _linings;
 
     public Vector3 Origin { get; }
     /// <summary>The rooms that flooded: their floods, not their boxes, say where they are.</summary>
     public IReadOnlySet<int> Flooded => _flooded;
     public int SpanCount => _spans.Length;
 
-    private RoomCells(Span[] spans, HashSet<int> flooded, Vector3 origin) { _spans = spans; _flooded = flooded; Origin = origin; }
+    private RoomCells(Span[] spans, HashSet<int> flooded, Dictionary<int, RoomFlood.Lining> linings, Vector3 origin)
+    { _spans = spans; _flooded = flooded; _linings = linings; Origin = origin; }
+
+    /// <summary>What lines a flooded room's air, where the flood measured it.</summary>
+    public bool TryLining(int room, out RoomFlood.Lining lining) => _linings.TryGetValue(room, out lining!);
 
     private static long RowOf(int y, int z) => ((long)z << 32) | (uint)y;
 
@@ -31,11 +36,13 @@ public sealed class RoomCells
     {
         var spans = new List<Span>();
         var flooded = new HashSet<int>();
+        var linings = new Dictionary<int, RoomFlood.Lining>();
         Vector3 origin = Vector3.Zero;
         foreach (var (id, room) in rooms)
         {
             if (room.Unseeded || room.AirCount == 0) continue;
             flooded.Add(id);
+            if (room.Lining != null) linings[id] = room.Lining;
             origin = room.Origin;
             foreach (var r in room.AirRuns.Concat(room.EdgeRuns)) spans.Add(new Span(RowOf(r.Y, r.Z), r.X, r.X + r.Length - 1, id));
         }
@@ -48,7 +55,7 @@ public sealed class RoomCells
                 merged[^1] = last with { X1 = s.X1 };
             else merged.Add(s);
         }
-        return new RoomCells(merged.ToArray(), flooded, origin);
+        return new RoomCells(merged.ToArray(), flooded, linings, origin);
     }
 
     /// <summary>Every span: its room, its row's y and z, and its first and last x, in cells from the origin.</summary>

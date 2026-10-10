@@ -15,7 +15,8 @@ public static class AcousticVolumeGenerator
     /// <param name="report">Write what was found and what is missing to the console: a streamed map rebuilds
     /// this as tiles arrive and says it once, at the first build.</param>
     /// <param name="floods">The rooms' floods (RoomFlood): a flooded room's voxels are where its flood is, not its
-    /// box, and the map carries them for "which room is this in".</param>
+    /// box, the map carries them for "which room is this in", and a room whose flood was measured is measured
+    /// (<see cref="RoomAcoustics.Measured"/>).</param>
     public static AcousticMap GenerateRegions(IEnumerable<PlacedRoom> rooms, IEnumerable<PlacedOpening> openings, IEnumerable<FaceOpenings.Box> solids,
                                               Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true,
                                               OpenFPS.Common.Geometry.RoomCells? floods = null)
@@ -59,7 +60,8 @@ public static class AcousticVolumeGenerator
             if (def.Room.RoomSize.X > 0)
             {
                 int regionId = def.Id;
-                acousticMap.Regions[regionId] = def.Room;
+                acousticMap.Regions[regionId] = floods != null && floods.TryLining(regionId, out var lining)
+                    ? RoomAcoustics.Measured(def.Room, lining) : def.Room;
                 acousticMap.RegionPositions[regionId] = def.Position;
                 acousticMap.RegionRotations[regionId] = def.Rotation;
 
