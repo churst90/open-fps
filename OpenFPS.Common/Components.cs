@@ -333,6 +333,15 @@ public partial struct SoundEmitterComponent
     /// client from this one number, so it is sent once per press, not every tick.
     /// </summary>
     public float WindowsOpen { get; set; }
+
+    /// <summary>
+    /// The loudspeaker the recording is played through (a "loudspeaker" model: pa_horn, megaphone), or
+    /// empty for a recording heard as it is. With one, the client renders the program through the
+    /// speaker's amplifier, driver and horn, places it by the level that comes out, and gives it the
+    /// mouth's directivity per band in place of the cone and <see cref="MinDistance"/>
+    /// (OpenFPS.Common.LoudspeakerSpec).
+    /// </summary>
+    public string Loudspeaker { get; set; } = "";
 }
 
 [MemoryPackable]

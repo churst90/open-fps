@@ -54,6 +54,8 @@ public static class ModelLibrary
         /// <summary>A road vehicle, as the world editor edits one (VehicleSpec): MachineRegistry's
         /// vehicles, with the engine, chassis, outlets, tyres, body and gearbox as data.</summary>
         public const string Vehicle = "vehicle";
+        /// <summary>A loudspeaker that plays a recording into the world: a paging horn, a megaphone.</summary>
+        public const string Loudspeaker = "loudspeaker";
     }
 
     private sealed class ModelFile
@@ -107,6 +109,7 @@ public static class ModelLibrary
         [Kinds.Shore] = ShoreSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Engine] = EngineProfile.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Vehicle] = VehicleProfile.Presets.Keys.ToDictionary(k => k, k => (Func<object>)(() => VehicleSpec.Of(k)), StringComparer.OrdinalIgnoreCase),
+        [Kinds.Loudspeaker] = LoudspeakerSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.RailVehicle] = new(StringComparer.OrdinalIgnoreCase)
         {
             ["genesis_p42"] = () => TrainProfile.GenesisP42,
@@ -146,6 +149,7 @@ public static class ModelLibrary
         [Kinds.Shore] = typeof(ShoreSpec),
         [Kinds.Engine] = typeof(EngineProfile),
         [Kinds.Vehicle] = typeof(VehicleSpec),
+        [Kinds.Loudspeaker] = typeof(LoudspeakerSpec),
     };
 
     // ── Loading ─────────────────────────────────────────────────────────────────────────────────
@@ -321,6 +325,7 @@ public static class ModelLibrary
     public static FoliageSpec Foliage(string id) => Get<FoliageSpec>(Kinds.Foliage, id);
     public static RunningWaterSpec Flow(string id) => Get<RunningWaterSpec>(Kinds.Flow, id);
     public static ShoreSpec Shore(string id) => Get<ShoreSpec>(Kinds.Shore, id);
+    public static LoudspeakerSpec Loudspeaker(string id) => Get<LoudspeakerSpec>(Kinds.Loudspeaker, id);
 
     // ── Writing ─────────────────────────────────────────────────────────────────────────────────
 

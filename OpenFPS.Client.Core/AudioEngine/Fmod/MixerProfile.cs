@@ -10,12 +10,12 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// </summary>
 internal static class MixerProfile
 {
-    public enum Kind { Binaural, Engine, EngineTap, EngineEcho, Physical, Granular, Synth, Ear, TracedReverb, TracedEchoes, Boundary, Bed, OwnVoice, EarWind, Master }
+    public enum Kind { Binaural, Engine, EngineTap, EngineEcho, Physical, Granular, Synth, Ear, TracedReverb, TracedEchoes, Boundary, Bed, OwnVoice, EarWind, Master, Loudspeaker }
 
     private static readonly string[] Names =
     {
         "binaural", "engines", "engine taps", "engine echoes", "physical voices", "samples", "synths", "ear stage",
-        "traced reverb", "traced echoes", "boundary", "beds", "own voice", "ear wind", "master",
+        "traced reverb", "traced echoes", "boundary", "beds", "own voice", "ear wind", "master", "loudspeakers",
     };
 
     private static readonly long[] _ticks = new long[Names.Length];

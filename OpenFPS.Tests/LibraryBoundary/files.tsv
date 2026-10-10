@@ -56,6 +56,7 @@ OpenFPS.Client.Core/AudioEngine/Core/Signals/ChimeHorn.cs	lib	Sound
 OpenFPS.Client.Core/AudioEngine/Core/Signals/ElectricHorn.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/ElectronicSiren.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/HeadShadow.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/LoudspeakerChain.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/Modes.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/SteamWhistle.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/StruckBell.cs	lib	Sound	
@@ -92,6 +93,7 @@ OpenFPS.Client.Core/AudioEngine/Fmod/MixerQuality.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/NatureVoices.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/NonFinite.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/OwnVoice.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/RadiatorProcessor.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/RailVoice.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/RainVoices.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/SynthProcessor.cs	lib	Audio	
@@ -137,6 +139,7 @@ OpenFPS.Client.Core/ListMenu.cs	host
 OpenFPS.Client.Core/ListeningCalibration.cs	host		
 OpenFPS.Client.Core/LocalPlayerController.cs	host		
 OpenFPS.Client.Core/LocalPlayerState.cs	host		
+OpenFPS.Client.Core/LoudspeakerVoices.cs	host		
 OpenFPS.Client.Core/MapTracker.cs	host		
 OpenFPS.Client.Core/NamedPlaces.cs	host		
 OpenFPS.Client.Core/NearDrops.cs	lib	Audio	
@@ -237,6 +240,7 @@ OpenFPS.Common/LineFollower.cs	host
 OpenFPS.Common/Localisation.cs	lib	Acoustics	
 OpenFPS.Common/LockCylinder.cs	lib	Sound	
 OpenFPS.Common/Loudness.cs	lib	Sound	
+OpenFPS.Common/Loudspeakers.cs	lib	Sound	
 OpenFPS.Common/Machines.cs	lib	Sound	
 OpenFPS.Common/Messages.cs	mixed	Sound	WheelState
 OpenFPS.Common/ModelLibrary.cs	lib	Sound	

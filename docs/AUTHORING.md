@@ -124,8 +124,14 @@ rejected, because the loader would otherwise attach no emitter and the object wo
 - `Range` is where the voice stops being submitted; `MinDistance` is where it stops getting louder as you
   approach. `MinDistance` must be less than `Range`.
 - **Directivity:** `ConeInsideAngle` / `ConeOutsideAngle` (degrees, inner ≤ outer) and `ConeOutsideVolume`.
-  `360 / 360` — the default — is omnidirectional. `space_megaphone` uses `40 / 110 / 0.05`: full volume in
-  the beam, almost nothing behind it, and an off-axis timbre change in between.
+  `360 / 360` — the default — is omnidirectional. A flat cone is a fiction: for anything that is a
+  loudspeaker, use `Loudspeaker` below instead.
+- **Loudspeakers.** `Loudspeaker` names a `loudspeaker` model (`pa_horn`, `megaphone`,
+  `megaphone_shouted`) the recording in `SoundId` is played through: the client renders it through the
+  speaker's amplifier, driver and horn, places it by the level that comes out (`MinDistance` is ignored),
+  and beams it per band from its mouth toward `EmitterDirection` (the cone is ignored). `pa_speaker` and
+  `space_megaphone` use it. A new kind of speaker is a new `loudspeaker` model with its datasheet's
+  numbers (OpenFPS.Common/Loudspeakers.cs).
 - **Aim:** `EmitterDirection` is a **local** direction, rotated into the world by the map instance's
   `Rotation`. Omit it for the default forward `(0, 0, 1)` and aim the entity with `Rotation`, which is what
   the rooms map does. It has no audible effect on an omnidirectional emitter.

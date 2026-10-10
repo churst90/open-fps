@@ -145,8 +145,8 @@ Folders are under `OpenFPS.Client/ASSETS/SOUNDS`.
 | Footsteps and landings | `FOOTSTEPS`, `LANDING` | Folder by material (`SoundMappingService`). `TakeLevels` evens out each take. Kept as recordings by measurement: the impact model was 31 dB off on wood. |
 | Speech | `VOICES` | Cody's TTS lines. `Speech` keys from `PedestrianSpeech` and drivers (`VehicleSystem.Drivers.cs`). |
 | Birds | `BIRDS` | One call per file; `BirdLife` places them by habitat. |
-| Announcements | `ANNOUNCE` | The `pa_speaker` prefab. |
-| Authored beacons | `BEACONS` | Prefabs such as `chirp_beacon`, `space_megaphone`. |
+| Announcements | `ANNOUNCE` | The `pa_speaker` prefab, played through the `pa_horn` loudspeaker model. |
+| Authored beacons | `BEACONS` | Prefabs such as `chirp_beacon`, `space_megaphone` (through the `megaphone` loudspeaker model). |
 | Music | `music` | |
 
 Live audio, not files:

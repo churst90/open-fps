@@ -324,6 +324,7 @@ public class PrefabRepository
                 SynthFilterResonance = t.SynthFilterResonance ?? 0.0f,
                 SynthPulseWidth = t.SynthPulseWidth ?? 0.5f,
                 SynthRunning = t.SynthRunning ?? true,
+                Loudspeaker = t.Loudspeaker ?? "",
             });
         }
 
