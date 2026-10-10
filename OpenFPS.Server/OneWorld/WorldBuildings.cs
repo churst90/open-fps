@@ -20,6 +20,7 @@ public static class WorldBuildings
 {
     // gen_osm.py's constants.
     public const double StoreyH = 2.75, FloorTop = 0.12, Ceil = 2.68, WallT = 0.25, DoorLap = 0.05;
+    /// <summary>The head of a doorway with no leaf in it (gen_osm.py DOOR_TOP); one with a leaf laps it (head_over).</summary>
     public const double DoorTop = FloorTop + 2.13;
     public const double BrickShare = 0.55;
 
@@ -467,7 +468,8 @@ public static class WorldBuildings
         else { width = 0.95; doorPrefab = "door"; doorName = $"{name} door"; }
         width = Math.Max(0.8, Math.Min(width, L - 0.6));
         var (roomId, roomXz) = RoomAt(ids, F, E.W(s, DoorDepth));
-        var cut = (C0: s - width / 2, C1: s + width / 2, Top: DoorTop);
+        // gen_osm.py head_over: the head laps the leaf by DoorLap, as a jamb does.
+        var cut = (C0: s - width / 2, C1: s + width / 2, Top: doorPrefab != null ? FloorTop + Math.Round(Base(doorPrefab).Y, 4) - DoorLap : DoorTop);
 
         for (int i = 0; i < edges.Count; i++)
             EdgeWall(edges[i], wallPrefab, wallH, $"{name} {EdgeWord(edges[i].F)} wall", i == k ? new[] { cut } : Array.Empty<(double, double, double)>());

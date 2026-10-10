@@ -663,8 +663,9 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         if entrance:
             B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, sz0, entrance[0], name=street_name)
             B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, entrance[1], sz1, name=street_name)
-            B("brick_wall", street_wall[0], street_wall[1], floor_top + 2.15, ceil, entrance[0], entrance[1],
-              name=street_name)
+            # The head laps the leaf by DOOR_LAP: 5 cm over it, it was a slot the stairwell got out to the street by.
+            B("brick_wall", street_wall[0], street_wall[1], floor_top + BASE["glass_front_door"][1] - DOOR_LAP, ceil,
+              entrance[0], entrance[1], name=street_name)
         else:
             B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, sz0, sz1, name=street_name)
         B("brick_wall", sx0, sx1, floor_top, ceil, sz0, sz0 + WALL_T, name=wall(compass("b", False)))
@@ -898,9 +899,11 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     B("brick_wall", street_wall[0], street_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T, name=housing)
     B("brick_wall", inner_wall[0], inner_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T, name=housing)
     B("brick_wall", ha0, ha1, roof_y, top, hb0 - BULK_T, hb0, name=housing)
-    B("brick_wall", ha0, la[0], roof_y, top, hb1, hb1 + BULK_T, name=housing)
-    B("brick_wall", la[1], ha1, roof_y, top, hb1, hb1 + BULK_T, name=housing)
-    B("brick_wall", la[0], la[1], roof_y + DOOR_H, top, hb1, hb1 + BULK_T, name=housing)
+    # The doorway is the door's width: cut the lane wide, it left a gap each side of the leaf onto the roof.
+    da0, da1 = ca - DOOR_W / 2, ca + DOOR_W / 2
+    B("brick_wall", ha0, da0, roof_y, top, hb1, hb1 + BULK_T, name=housing)
+    B("brick_wall", da1, ha1, roof_y, top, hb1, hb1 + BULK_T, name=housing)
+    B("brick_wall", da0, da1, roof_y + DOOR_H, top, hb1, hb1 + BULK_T, name=housing)
     B("concrete_floor", ha0, ha1, top, top + SLAB, hb0 - BULK_T, hb1 + BULK_T, name=f"{label} roof access roof")
     access_id = R(f"{label} roof access", la[0], la[1], storeys * STOREY, top, hb0, hb1)
 
