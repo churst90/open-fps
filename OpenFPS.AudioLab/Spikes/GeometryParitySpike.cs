@@ -956,7 +956,7 @@ public static class GeometryParitySpike
 
         // ── Rooms from the walls against the rooms as drawn ──────────────────────────────────────
         if (only.Contains("rooms"))
-            RoomsParity(ecs, rebuilt, data, show);   // with the door leaves shut in their doorways
+            RoomsParity(ecs, rebuilt, data, show, lookup, args);   // with the door leaves shut in their doorways
 
         // ── The report ───────────────────────────────────────────────────────────────────────────
         Console.WriteLine();
@@ -985,11 +985,14 @@ public static class GeometryParitySpike
 
     /// <summary>
     /// Each indoor room flooded from its box's middle through the server's triangle world (RoomFlood,
-    /// docs/GEOMETRY.md 12.6) against its box as drawn, in quarter-metre cells: how much of each is in both, what
+    /// docs/GEOMETRY.md 12.6) against its box as drawn, in the flood's own cells: how much of each is in both, what
     /// only the flood reaches (a bay, a porch inside the walls, a box drawn short), what only the box holds (a box
     /// through its walls, a column in the room), rooms open past their margin, and rooms whose middle is in a solid.
+    /// The air is set against the box (a box is drawn to its walls' inner faces, and the wall cells round the air
+    /// lie outside it); the region, the air with those wall cells, is given beside it. threads=N floods on N
+    /// threads; ROOM_DEBUG=ID[,ID...] traces rooms' ways out.
     /// </summary>
-    private static void RoomsParity(World ecs, TriangleWorld world, MapData data, int show)
+    private static void RoomsParity(World ecs, TriangleWorld world, MapData data, int show, Dictionary<int, Entity> lookup, string[] args)
     {
         var seeds = new List<RoomFlood.Seed>();
         var names = new Dictionary<int, string>();
@@ -1000,100 +1003,137 @@ public static class GeometryParitySpike
             names[e.Id] = string.IsNullOrEmpty(r.FriendlyName) ? $"room {e.Id}" : r.FriendlyName;
         });
         seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
+        int threads = int.Parse(Arg(args, "threads", "1"));
         var clock = Stopwatch.StartNew();
-        var rooms = RoomFlood.Flood(world, seeds, data.MinBound);
+        var slow = new List<string>();
+        var rooms = RoomFlood.Flood(world, seeds, data.MinBound, threads: threads, report: slow.Add);
         double ms = clock.Elapsed.TotalMilliseconds;
         const float c = RoomFlood.Cell;
-        var ious = new List<double>();
-        long both = 0, onlyFlood = 0, onlyBox = 0;
-        int open = 0, unseeded = 0, grew = 0, shrank = 0;
+        double v = c * c * c;
+        var airIous = new List<double>();
+        var regionIous = new List<double>();
+        long airBoth = 0, airOnly = 0, boxOnlyAir = 0, regionBoth = 0, regionOnly = 0, boxOnlyRegion = 0;
+        int open = 0, unseeded = 0, grew = 0, shrank = 0, meeting = 0, past = 0;
+        long beyond = 0;
         var worst = new List<(double Iou, string Line)>();
+        var missed = new List<(long Cells, string Line)>();
+        var opened = new List<string>();
         foreach (var s in seeds)
         {
             var room = rooms[s.Id];
-            if (room.Unseeded) { unseeded++; continue; }
-            if (room.Open) open++;
+            if (room.Unseeded) { unseeded++; worst.Add((-1, $"{names[s.Id]} ({s.Id}): its middle in a solid")); continue; }
+            if (room.Open) { open++; opened.Add($"{names[s.Id]} ({s.Id}) at {string.Join(" ", room.OpenAt.Take(2).Select(V))}"); }
+            if (room.Meets.Count > 0) meeting++;
+            if (room.BeyondCount > 0) { past++; beyond += room.BeyondCount; }
             var inv = Quaternion.Conjugate(Quaternion.Normalize(s.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : s.Rotation));
             var h = s.Size * 0.5f;
             bool InBox(Vector3 p) { var l = Vector3.Transform(p - s.Centre, inv); return MathF.Abs(l.X) <= h.X && MathF.Abs(l.Y) <= h.Y && MathF.Abs(l.Z) <= h.Z; }
-            // The room as the acoustic map would hold it: its air and the wall cells next to it.
-            var region = room.Cells.Concat(room.Edge).ToList();
-            long inBoth = region.Count(InBox);
+            long airIn = room.Cells.Count(InBox), edgeIn = room.Edge.Count(InBox);
             // The box's own cells, on the same grid: its bounds' cells whose middles it holds.
             var ax = Vector3.Abs(Vector3.Transform(new Vector3(h.X, 0, 0), s.Rotation)) + Vector3.Abs(Vector3.Transform(new Vector3(0, h.Y, 0), s.Rotation))
                      + Vector3.Abs(Vector3.Transform(new Vector3(0, 0, h.Z), s.Rotation));
             long boxCells = 0;
-            var lo = s.Centre - ax; var hi = s.Centre + ax;
-            for (float z = MathF.Floor((lo.Z - data.MinBound.Z) / c) * c + data.MinBound.Z + c / 2; z <= hi.Z; z += c)
-                for (float y = MathF.Floor((lo.Y - data.MinBound.Y) / c) * c + data.MinBound.Y + c / 2; y <= hi.Y; y += c)
-                    for (float x = MathF.Floor((lo.X - data.MinBound.X) / c) * c + data.MinBound.X + c / 2; x <= hi.X; x += c)
-                        if (InBox(new Vector3(x, y, z))) boxCells++;
-            long fl = region.Count - inBoth, bx = boxCells - inBoth;
-            both += inBoth; onlyFlood += fl; onlyBox += bx;
-            double iou = (double)inBoth / Math.Max(1, inBoth + fl + bx);
-            ious.Add(iou);
-            if (region.Count > 1.25 * boxCells) grew++;
-            if (region.Count < 0.75 * boxCells) shrank++;
-            worst.Add((iou, $"{names[s.Id]} ({s.Id}): region {region.Count * c * c * c:F1} m3 (air {room.Volume:F1}), box {boxCells * c * c * c:F1} m3, both {inBoth * c * c * c:F1}, IoU {iou:F2}{(room.Open ? ", open" : "")}"));
+            var (x0, y0, z0) = RoomFlood.CellOf(s.Centre - ax, data.MinBound);
+            var (x1, y1, z1) = RoomFlood.CellOf(s.Centre + ax, data.MinBound);
+            for (int z = z0; z <= z1; z++)
+                for (int y = y0; y <= y1; y++)
+                    for (int x = x0; x <= x1; x++)
+                        if (InBox(RoomFlood.CentreOf(x, y, z, data.MinBound))) boxCells++;
+            long air = room.AirCount, region = air + room.EdgeCount, regionIn = airIn + edgeIn;
+            airBoth += airIn; airOnly += air - airIn; boxOnlyAir += boxCells - airIn;
+            regionBoth += regionIn; regionOnly += region - regionIn; boxOnlyRegion += boxCells - regionIn;
+            double iou = (double)airIn / Math.Max(1, air + boxCells - airIn);
+            airIous.Add(iou);
+            regionIous.Add((double)regionIn / Math.Max(1, region + boxCells - regionIn));
+            if (air > 1.25 * boxCells) grew++;
+            if (air < 0.75 * boxCells) shrank++;
+            missed.Add((boxCells - airIn, $"{names[s.Id]} ({s.Id}): {(boxCells - airIn) * v:F1} m3 of its box {boxCells * v:F1} m3 not reached, box at {V(s.Centre)} size {V(s.Size)}"));
+            worst.Add((iou, $"{names[s.Id]} ({s.Id}): air {air * v:F1} m3, box {boxCells * v:F1} m3, both {airIn * v:F1}, IoU {iou:F2}"
+                            + $"{(room.Open ? ", open" : "")}{(room.BeyondCount > 0 ? $", {room.BeyondCount * v:F1} m3 past its margin" : "")}{(room.Meets.Count > 0 ? $", meets {string.Join(",", room.Meets)}" : "")}"));
         }
-        ious.Sort();
-        double P(double q) => ious.Count == 0 ? 0 : ious[Math.Min(ious.Count - 1, (int)(q * ious.Count))];
-        double v = c * c * c;
+        airIous.Sort();
+        regionIous.Sort();
+        static double P(List<double> l, double q) => l.Count == 0 ? 0 : l[Math.Min(l.Count - 1, (int)(q * l.Count))];
         Console.WriteLine();
-        Console.WriteLine($"rooms: {seeds.Count} indoor rooms flooded in {ms:F0} ms; {unseeded} with their middle in a solid; {open} open past their margin; "
-                          + $"{grew} more than a quarter bigger than their box, {shrank} more than a quarter smaller");
-        Console.WriteLine($"  volume in both {both * v:F0} m3, only the flood {onlyFlood * v:F0} m3, only the box {onlyBox * v:F0} m3; "
-                          + $"IoU 10th {P(0.1):F2}, median {P(0.5):F2}, 90th {P(0.9):F2}");
+        Console.WriteLine($"rooms: {seeds.Count} indoor rooms flooded in {ms:F0} ms on {threads} thread(s) at {c} m; {unseeded} with their middle in a solid; "
+                          + $"{open} open past their margin; {past} reaching past it into air the walls close in ({beyond * v:F0} m3); {meeting} meeting another room's air; "
+                          + $"{grew} with air more than a quarter more than their box, {shrank} more than a quarter less");
+        Console.WriteLine($"  air: in both {airBoth * v:F0} m3, only the flood {airOnly * v:F0} m3, only the box {boxOnlyAir * v:F0} m3; "
+                          + $"IoU 10th {P(airIous, 0.1):F2}, median {P(airIous, 0.5):F2}, 90th {P(airIous, 0.9):F2}");
+        Console.WriteLine($"  region (air and its wall cells): in both {regionBoth * v:F0} m3, only the flood {regionOnly * v:F0} m3, only the box {boxOnlyRegion * v:F0} m3; "
+                          + $"IoU 10th {P(regionIous, 0.1):F2}, median {P(regionIous, 0.5):F2}, 90th {P(regionIous, 0.9):F2}");
         foreach (var (_, line) in worst.OrderBy(w => w.Iou).Take(show)) Console.WriteLine("    " + line);
-        // One room's air in its box's frame, by layer: where a flood went that its box did not.
-        if (int.TryParse(Environment.GetEnvironmentVariable("ROOM_DEBUG"), out int debugId) && rooms.TryGetValue(debugId, out var dbg))
+        Console.WriteLine("  most of their box not reached:");
+        foreach (var (_, line) in missed.OrderByDescending(w => w.Cells).Take(show)) Console.WriteLine("    " + line);
+        foreach (var line in slow) Console.WriteLine("  slow: " + line);
+        if (opened.Count > 0)
         {
-            var s = seeds.First(x => x.Id == debugId);
-            var inv = Quaternion.Conjugate(Quaternion.Normalize(s.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : s.Rotation));
-            Console.WriteLine($"room {debugId}: box at {V(s.Centre)} size {V(s.Size)}");
-            var instances = world.Instances.ToArray();
-            for (int i = 0; i < instances.Length; i++)
-                if (instances[i].Owner >= 0 && Vector3.Distance(instances[i].Position, s.Centre) < 12f)
-                    Console.WriteLine($"  mover {instances[i].Owner} at {V(instances[i].Position)}, {instances[i].Piece.SolidCount} solid(s), bounds {V(instances[i].Piece.BoundsMin)}..{V(instances[i].Piece.BoundsMax)}");
-            var near = new List<SolidRef>();
-            var all = new AcceptAll();
-            world.Overlapping(s.Centre - s.Size / 2 - new Vector3(6), s.Centre + s.Size / 2 + new Vector3(6), GeometryLayers.Acoustics, ref all, near);
-            foreach (var r in near.Where(r => world.BoxOf(r).Size.X > 0 && MathF.Min(world.BoxOf(r).Size.X, world.BoxOf(r).Size.Z) < 0.12f).Take(30))
+            Console.WriteLine($"  open past their margin ({opened.Count}):");
+            foreach (var line in opened.Take(Math.Max(show, 40))) Console.WriteLine("    " + line);
+        }
+        foreach (var part in (Environment.GetEnvironmentVariable("ROOM_DEBUG") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
+            if (int.TryParse(part, out int debugId) && rooms.TryGetValue(debugId, out var dbg))
+                TraceRoom(world, data, seeds.First(x => x.Id == debugId), dbg, ecs, lookup);
+    }
+
+    /// <summary>One room's way out: the path through its air from the cell nearest its middle to where it met air no
+    /// room holds, each step in the box's frame, and the solids round the first step out of its box.</summary>
+    private static void TraceRoom(TriangleWorld world, MapData data, RoomFlood.Seed s, RoomFlood.Room room, World ecs, Dictionary<int, Entity> lookup)
+    {
+        string Name(int id) => lookup.TryGetValue(id, out var e) && ecs.Has<IdentityComponent>(e) ? ecs.Get<IdentityComponent>(e).Name : "";
+        var inv = Quaternion.Conjugate(Quaternion.Normalize(s.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : s.Rotation));
+        var h = s.Size * 0.5f;
+        Vector3 Local(Vector3 p) => Vector3.Transform(p - s.Centre, inv);
+        bool InBox(Vector3 p) { var l = Vector3.Abs(Local(p)); return l.X <= h.X && l.Y <= h.Y && l.Z <= h.Z; }
+        Console.WriteLine($"room {s.Id}: box at {V(s.Centre)} size {V(s.Size)}; air {room.Volume:F1} m3, open {room.Open} at {string.Join(" ", room.OpenAt.Select(V))}; meets {string.Join(",", room.Meets)}");
+        var air = room.Cells.Select(p => RoomFlood.CellOf(p, data.MinBound)).ToHashSet();
+        if (air.Count == 0) return;
+        foreach (var g in room.Cells.Select(Local).GroupBy(l => MathF.Round(l.Y * 2) / 2).OrderBy(g => g.Key))
+            Console.WriteLine($"  y {g.Key,6:F2}: {g.Count(),6} cells, x {g.Min(l => l.X):F2}..{g.Max(l => l.X):F2}, z {g.Min(l => l.Z):F2}..{g.Max(l => l.Z):F2}");
+        if (room.OpenAt.Count == 0) return;
+        var start = air.OrderBy(k => Vector3.DistanceSquared(RoomFlood.CentreOf(k.X, k.Y, k.Z, data.MinBound), s.Centre)).First();
+        var goal = RoomFlood.CellOf(room.OpenAt[0], data.MinBound);
+        var from = new Dictionary<(int, int, int), (int, int, int)> { [start] = start };
+        var q = new Queue<(int X, int Y, int Z)>();
+        q.Enqueue(start);
+        (int, int, int)? end = null;
+        while (q.Count > 0 && end == null)
+        {
+            var k = q.Dequeue();
+            foreach (var (dx, dy, dz) in new[] { (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1) })
             {
-                var (bc, bs, br) = world.BoxOf(r);
-                Console.WriteLine($"  solid {world.OwnerOf(r)}: centre {V(bc)} size {V(bs)} {world.SurfaceOf(r).Material} layers {world.SurfaceOf(r).Layers} shape {world.ShapeOf(r)?.TriangleCount ?? 0}"
-                                  + $", its middle's cell solid {RoomFlood.Solid(world, bc, data.MinBound)}, origin {V(data.MinBound)}");
+                var nk = (k.X + dx, k.Y + dy, k.Z + dz);
+                if (nk == goal) { end = k; break; }
+                if (air.Contains(nk) && from.TryAdd(nk, k)) q.Enqueue(nk);
             }
-            // The way the flood went from its start to its furthest cell out along the box's Z: where it got out.
-            var cellSet = dbg.Cells.Select(p => (MathF.Floor(p.X * 2), MathF.Floor(p.Y * 2), MathF.Floor(p.Z * 2))).ToHashSet();
-            var start = dbg.Cells[0];
-            var far = dbg.Cells.OrderByDescending(p => Vector3.Transform(p - s.Centre, inv).Z).First();
-            var from = new Dictionary<(float, float, float), (float, float, float)>();
-            var q = new Queue<(float, float, float)>();
-            var k0 = (MathF.Floor(start.X * 2), MathF.Floor(start.Y * 2), MathF.Floor(start.Z * 2));
-            q.Enqueue(k0); from[k0] = k0;
-            while (q.Count > 0)
-            {
-                var k = q.Dequeue();
-                foreach (var (dx, dy, dz) in new[] { (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1) })
-                {
-                    var nk = (k.Item1 + dx, k.Item2 + dy, k.Item3 + dz);
-                    if (cellSet.Contains(nk) && from.TryAdd(nk, k)) q.Enqueue(nk);
-                }
-            }
-            var path = new List<Vector3>();
-            var at = (MathF.Floor(far.X * 2), MathF.Floor(far.Y * 2), MathF.Floor(far.Z * 2));
-            while (from.TryGetValue(at, out var prev) && prev != at) { path.Add(new Vector3(at.Item1, at.Item2, at.Item3) / 2); at = prev; }
-            path.Reverse();
-            foreach (var p in path)
-            {
-                var inside = new List<SolidRef>();
-                var any = new AcceptAll();
-                world.Containing(p, GeometryLayers.Acoustics, ref any, inside);
-                Console.WriteLine($"  path {V(p)} local {V(Vector3.Transform(p - s.Centre, inv))} solid {RoomFlood.Solid(world, p, data.MinBound)} in {string.Join(",", inside.Select(r => world.OwnerOf(r)))}");
-            }
-            foreach (var g in dbg.Cells.Select(p => Vector3.Transform(p - s.Centre, inv)).GroupBy(l => MathF.Round(l.Y * 2) / 2).OrderBy(g => g.Key))
-                Console.WriteLine($"  y {g.Key,6:F2}: {g.Count(),5} cells, x {g.Min(l => l.X):F2}..{g.Max(l => l.X):F2}, z {g.Min(l => l.Z):F2}..{g.Max(l => l.Z):F2}");
+        }
+        if (end == null) { Console.WriteLine("  no path through its air to where it met the open"); return; }
+        var path = new List<Vector3> { RoomFlood.CentreOf(goal.X, goal.Y, goal.Z, data.MinBound) };
+        for (var at = end.Value; ; at = from[at])
+        {
+            path.Add(RoomFlood.CentreOf(at.Item1, at.Item2, at.Item3, data.MinBound));
+            if (at == start) break;
+        }
+        path.Reverse();
+        int leave = path.FindIndex(p => !InBox(p));
+        if (leave < 0) leave = path.Count - 1;
+        for (int i = Math.Max(0, leave - 2); i < path.Count; i++)
+            Console.WriteLine($"  path {V(path[i])} local {V(Local(path[i]))}{(InBox(path[i]) ? "" : " out of its box")}");
+        Near(path[leave], "the first step out of its box");
+        Near(path[^1], "where it met the open");
+        void Near(Vector3 o, string what)
+        {
+        var near = new List<SolidRef>();
+        var all = new AcceptAll();
+        world.Overlapping(o - new Vector3(0.75f), o + new Vector3(0.75f), GeometryLayers.Acoustics, ref all, near);
+        Console.WriteLine($"  solids within 0.75 m of {what}, {V(o)}:");
+        foreach (var r in near.Take(40))
+        {
+            var (bc, bs, br) = world.BoxOf(r);
+            int owner = world.OwnerOf(r);
+            Console.WriteLine($"    #{owner} '{Name(owner)}' {world.SurfaceOf(r).Material} centre {V(bc)} size {V(bs)}{(world.ShapeOf(r) != null ? " shape" : "")}"
+                              + $"{(world.IsTerrain(r) ? " ground" : "")} bounds {V(world.BoundsOf(r).Min)}..{V(world.BoundsOf(r).Max)}");
+        }
         }
     }
 

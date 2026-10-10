@@ -1602,14 +1602,24 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
 
 ### 12.6 Left of stage 4, and the plan for it
 
-1. **Rooms derived from seeds by flood (2.7)**, built as an instrument and not switched on.
-   `OpenFPS.Geometry/Triangles/RoomFlood.cs`: every indoor room floods at once from its box's middle through
-   half-metre cells (the acoustic grid's own voxels), each cell to the room that reaches it first; a solid box is
-   a cell's diagonal thick at least (so a 25 cm wall at an angle, a door leaf or a pane stops a 6-connected flood),
-   a shape or the ground is asked cell by cell; a room may reach its box grown by a metre, and is open where it
-   tried to go further; its air takes the wall cells next to it, so it reaches its walls as its box did. AudioLab
-   `--geometry-parity map=ID only=rooms` sets each room's flood against its box (`ROOM_DEBUG=ID` traces one room's
-   way out):
+1. **Rooms derived from seeds by flood (2.7)**, built as an instrument and not switched on yet.
+   `OpenFPS.Geometry/Triangles/RoomFlood.cs`. Quarter-metre cells (a whole number to an acoustic voxel: the three maps' grids are 1 m). Rooms
+   whose reaches overlap flood together in one dense block of cells (an array index per cell, not a hash key), and
+   the blocks flood on as many threads as are given. In three steps: each room fills what of its own box it can reach
+   (all at once, a cell to the first room there); then on into its box grown by a metre, into what no other room
+   reached; then past that, into air the walls close in (a wing of a footprint no box holds, a bay deeper than the
+   margin), as far as 4 m past the rooms' reach. A room is open where its air meets air under the open sky (a ray up
+   from where it leaves the block meets nothing); air meeting another room's air is an opening between them
+   (`Room.Meets`). A box is solid where a cell's middle is in it; a box thinner than a cell along an axis is taken as
+   thick as a 6-connected flood needs whatever its angle (a digital plane's least thickness: a cell times the
+   axis's largest component, half the "a cell's diagonal" of the first version). A shape (a floor, a ceiling, a roof)
+   is its convex pieces, each face put out by the same half-thickness for its angle, each piece within its bounds
+   and half a cell: sampled at seven points a cell, as first written, a roof's eave a few centimetres thick let every
+   room with no ceiling under its roof out. The ground is its prisms as they are. AudioLab `--geometry-parity
+   map=ID only=rooms [threads=N]` sets each room's flood against its box; `ROOM_DEBUG=ID[,ID]` traces a room's way out
+   (the path from its middle to the open, and the solids where it left its box and where it met the open).
+
+   Before (2026-10-10, half-metre cells, the region = air and its wall cells):
 
    | | rooms | time | open past the margin | IoU 10th / median / 90th | only the flood / only the box |
    |---|---|---|---|---|---|
@@ -1617,14 +1627,55 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    | Magnolia | 1,810 | 17.7 s | 874 | 0.57 / 0.76 / 0.85 | 171,134 / 13,759 m3 |
    | Albany | 2,864 | 41 s | 2,106 | 0.52 / 0.72 / 0.82 | 379,945 / 52,296 m3 |
 
-   On the city the floods are the rooms (the open ones are stairwells, roof accesses and the tunnel, which are
-   open). On the real places they are not yet: half-metre cells with walls a diagonal thick lose a narrow room (a
-   1.1 m hall has no air left), and floods still find ways out of houses (traced: the gap between two room
-   rectangles' ceilings into the eaves, closed now by one ceiling over the footprint; the rest not traced). Next:
-   quarter-metre cells (the flood takes 26 s on the city at a quarter metre as first written: keep a cell
-   index instead of hash sets), the remaining leaks traced with `ROOM_DEBUG`, then the acoustic map marking each
-   room's flood (`AcousticVolumeGenerator.GenerateRegions`, and the server's region lookups, so both agree),
-   region ids passing through unchanged, gated on the harness: no house open past its margin, IoU over 0.8.
+   Now (quarter-metre cells, the leaks below fixed; one thread, then eight; IoU of the air against the box, then of
+   the region; only the flood / only the box for the air):
+
+   | | rooms | time | open past the margin | IoU air | IoU region | only the flood / only the box |
+   |---|---|---|---|---|---|---|
+   | city | 491 | 2.5 s / 2.1 s | 7 | 0.80 / 0.88 / 0.91 | 0.82 / 0.86 / 0.93 | 17,112 / 38,868 m3 |
+   | Magnolia | 1,810 | 6.4 s / 1.6 s | 3 | 0.73 / 0.84 / 0.96 | 0.69 / 0.81 / 0.92 | 34,057 / 59,025 m3 |
+   | Albany | 2,864 | 13.4 s / 3.6 s | 0 | 0.68 / 0.81 / 0.92 | 0.64 / 0.78 / 0.89 | 121,383 / 214,630 m3 |
+
+   The IoU is of the air now: a box is drawn to its walls' inner faces, so at a quarter metre the wall cells round
+   the air lie outside it, and a perfect flood of a 3 by 3 m room scored 0.65 on the region. What the air does not
+   reach of a box is mostly the cells that must hold its floor, its ceiling and a lining a few centimetres thick (a
+   2.58 m room keeps about 2.25 m of air; a 1.29 m bathroom lined on one side 1.0 m), and boxes drawn past their
+   footprint: Albany's "34414 Highway 99e, house", 640 by 193 m, is 98,153 m3 of the 214,630. What the flood holds
+   beyond its box is mostly a footprint's parts no rectangle covers (430 rooms on Magnolia, 1,356 on Albany, reach
+   past their margin into closed-in air).
+
+   The leaks, traced with `ROOM_DEBUG`, and fixed where they were made:
+   - **A 3 cm slot over every door on the real places.** gen_osm's doorway head was `FLOOR_TOP + 2.13` over a leaf
+     2.1 m tall standing on `FLOOR_TOP`. The head now laps the leaf by `DOOR_LAP` (`head_over`, and the same in
+     `WorldBuildings`), as gen_city's do. Magnolia's open rooms 570 to 469 at once.
+   - **A 5 cm slot over the city towers' glass front entrances** (lintel at `floor_top + 2.15`, leaf to 2.12): the
+     five ground-floor stairwells. Laps the leaf now.
+   - **A 25 cm gap each side of the roof access doors** on the city: the housing's end was cut the lane wide (1.6 m)
+     for a 1 m door. The doorway is the door's width now: the five roof accesses.
+   - **Air under the open sky was not told from air closed in.** Most "open" rooms on the places reached past their
+     margin into a part of the house no room's rectangle covers (a detail-1 house has at most two), or past the
+     edge of the block of cells; told apart by a ray to the sky, that air is the room's now (Magnolia 469 to 41).
+   - **Roofs with no ceiling under them.** A barn's, a workshop's, a church's, a shop's room is closed by its roof
+     form, whose eave is a wedge thinning to nothing; the seven points sampled a cell missed it (Magnolia 41 to 3).
+   - Before all these, in stage 4: the gap between two room rectangles' ceilings into the eaves, closed by one
+     ceiling over the footprint.
+
+   Open past the margin now, and why: on the city the three parking garage levels (open sides), the tunnel's south
+   portal, the hangar (its front is an opening with no door), 58 Alder Street's back garden (walled, under the sky)
+   and Main Street block 2 (the street cut down to the tunnel); on Magnolia three barns (gen_osm builds a barn's
+   doorway with no leaf); on Albany none. The two "Main Street sidewalk" rooms on the city have their middles in a
+   solid. Narrow rooms keep their air: every hall on Magnolia (0.98 m wide inside) has four cells across, IoU 0.69 to
+   0.86 (0.00 to 0.34 before). Left alone: eight rooms on the places under 0.7 m wide (the narrowest 0.16 m, a
+   rectangle `grow_side` pulled in), which the flood gives what the walls give them.
+
+   Gated in tests: `RoomFloodTests` (a bay deeper than the margin is the room's, a hall 1.1 m wide wherever the grid
+   falls, a shut leaf stops it at six wall angles, a hip roof with no ceiling closes a room, and the city: open only
+   where it opens by design, median IoU over 0.8) and `RealPlaceMapTests.Rooms_flood_shut_and_as_drawn` (each place:
+   only barns open, no room without a start, median IoU over 0.8). The largest block is Albany's 640 m house, 646 by
+   356 m with its reach, 77 million cells (about 460 MB while it floods): a block per room's bounds, or pages, before
+   the client floods a world tile. Next: the acoustic map marking each room's flood
+   (`AcousticVolumeGenerator.GenerateRegions`, and the server's region lookups, so both agree), region ids passing
+   through unchanged.
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
    would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a
