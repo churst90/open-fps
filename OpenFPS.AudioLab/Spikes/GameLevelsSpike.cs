@@ -664,6 +664,18 @@ public static class GameLevelsSpike
                 Steady("mower_push", "machine:mower_push", 35f, 0.4f, 10.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
                 Unidle();
             }
+            if (set is "mowers")
+            {
+                // A push mower standing alone at 5 m; then one 30 m away in a garden while a pickup idles
+                // 4 m from you (the mower runs reduced under it). A second mower of the same kind nearer you
+                // would lend it its voice instead (ChooseLiveEngines), at no cost at all.
+                float range = Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb);
+                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 12.0, range);
+                Stand(new Vector3(-30f, 0f, -30f), 0f);
+                Idle("pickup_v8", new Vector3(-30f + 3f, 0f, -30f - 2.5f));
+                Steady("mower_push", "machine:mower_push", 30f, 0.4f, 14.0, range);
+                Unidle();
+            }
             if (set is "engine-solo")
             {
                 // Each machine alone, close: with OPENFPS_ENGINE_DETAIL=always it plays at reduced detail

@@ -1147,7 +1147,12 @@ public sealed partial class EngineSynth
     /// A DC motor's torque falls linearly to its free speed and settles where it meets the engine's
     /// friction; the free speed is placed to make that the declared cranking speed.</summary>
     private float StarterFreeOmega
-        => Profile.CrankingRpm * MathF.Tau / 60f / MathF.Max(0.2f, 1f - Friction(Profile.CrankingRpm) / StarterTorque());
+        => float.IsNaN(_starterFreeOmega)
+            ? _starterFreeOmega = Profile.CrankingRpm * MathF.Tau / 60f / MathF.Max(0.2f, 1f - Friction(Profile.CrankingRpm) / StarterTorque())
+            : _starterFreeOmega;
+    // The starter's two constants, worked out once: StarterSound asked for both every sample of every
+    // engine, a power each time, with the starter long since thrown out.
+    private float _starterFreeOmega = float.NaN, _starterTorque = float.NaN;
 
     /// <summary>
     /// One sample of the crank while the starter is in: motor and crank locked through the one-way
@@ -1267,7 +1272,9 @@ public sealed partial class EngineSynth
         return y;
     }
 
-    private float StarterTorque()
+    private float StarterTorque() => float.IsNaN(_starterTorque) ? _starterTorque = RatedStarterTorque() : _starterTorque;
+
+    private float RatedStarterTorque()
     {
         // Rated above the peak static compression torque (slow-cranking compression pressure on the
         // piston times the crank lever near its worst), with margin: it must push a cylinder over.

@@ -154,6 +154,32 @@ public class EngineDetailTests
         Assert.Contains("Twin", r.State);
     }
 
+    /// <summary>A far mower runs its engine reduced: standing, it replays its cycles for much of the time,
+    /// and plays within a decibel of the same mower in full.</summary>
+    [Fact]
+    public void AFarMowerRunsReducedWithinADecibel()
+    {
+        double Level(EngineDetail detail, out int replayed)
+        {
+            var m = new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, 11, 11 * 31 + 7) { Detail = detail };
+            m.SetListener(new Vector3(3f, 1.6f, 8f));
+            var buf = new float[Block];
+            double sum = 0; long n = 0; replayed = 0;
+            for (int b = 0; b < 20 * Rate / Block; b++)
+            {
+                m.Produce(); m.Consume(buf);
+                if (m.Machine.EngineDetailState == "Replay") replayed++;
+                if (b < 5 * Rate / Block) continue;
+                foreach (var x in buf) { sum += (double)x * x; n++; }
+            }
+            return 10 * Math.Log10(sum / n + 1e-30);
+        }
+        double full = Level(EngineDetail.Full, out _);
+        double reduced = Level(EngineDetail.Reduced, out int replayedBlocks);
+        Assert.True(replayedBlocks > 4 * Rate / Block, $"replayed only {replayedBlocks} blocks in 20 s");
+        Assert.True(Math.Abs(reduced - full) < 1.0, $"reduced {reduced:F2} dB against full {full:F2}");
+    }
+
     /// <summary>From inside a vehicle its engine is always in full, whatever the provider asked.</summary>
     [Fact]
     public void TheEngineYouRideInIsAlwaysFull()

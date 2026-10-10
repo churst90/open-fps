@@ -63,9 +63,12 @@ public static class PoolCostSpike
         if (rest.Contains("offline")) return Offline(voices, IntArg(rest, "sec", 4));
         if (rest.Contains("machines")) return Machines(IntArg(rest, "sec", 4));
         if (rest.Contains("steadiness")) return Steadiness();
+        if (rest.Contains("engines")) return EnginesAlone(rest.FirstOrDefault(x => x.StartsWith("engine="))?[7..] ?? "mower_single");
         if (rest.Contains("render") && rest.Contains("handover"))
             return RenderHandover(rest.SkipWhile(a => a != "render").Skip(1).First(), IntArg(rest, "seed", 0));
         _steadySpeed = IntArg(rest, "speed", -1);
+        if (rest.Contains("render") && rest.Contains("mowers"))
+            return RenderMowers(rest.SkipWhile(a => a != "render").Skip(1).First(), IntArg(rest, "seed", 0), IntArg(rest, "secs", 30));
         if (rest.Contains("render") && rest.Contains("steady")) return RenderSteady(rest.SkipWhile(a => a != "render").Skip(1).First(), IntArg(rest, "seed", 0), IntArg(rest, "secs", 8));
         if (rest.Contains("render")) return RenderSet(rest.SkipWhile(a => a != "render").Skip(1).First(), rest.Contains("wide"), IntArg(rest, "seed", 0));
         if (rest.Contains("diff"))
@@ -186,13 +189,14 @@ public static class PoolCostSpike
         foreach (var (name, make) in makers)
         {
             var v = make();
+            if (v is MachineVoiceState mv) mv.Detail = _detail;
             v.SetListener(new Vector3(3f, 1.6f, 8f));
             for (int b = 0; b < Rate / Block; b++) { v.Produce(); v.Consume(buf); }
             int blocks = seconds * Rate / Block;
             var sw = Stopwatch.StartNew();
             for (int b = 0; b < blocks; b++) { v.Produce(); v.Consume(buf); }
             double audio = blocks * Block / (double)Rate;
-            Console.WriteLine($"    {name,-24} {sw.Elapsed.TotalSeconds * 1000 / audio,6:F1} ms per voice-second");
+            Console.WriteLine($"    {name,-24} {sw.Elapsed.TotalSeconds * 1000 / audio,6:F1} ms per voice-second{(v is MachineVoiceState mvs ? $", engine {mvs.Machine.EngineDetailState}" : "")}");
         }
         return 0;
     }
@@ -330,6 +334,57 @@ public static class PoolCostSpike
     /// <summary>The steady scenes' speed for every voice (speed=, m/s; 0 idles them), or each its own.</summary>
     private static int _steadySpeed = -1;
 
+    /// <summary>One engine alone, 20 s at a fixed pedal, at the full rate and at half: what an engine
+    /// costs a step at each, to tell the engine from the rest of a voice.</summary>
+    private static int EnginesAlone(string key)
+    {
+        var p = OpenFPS.Common.EngineProfile.ByName(key);
+        foreach (int rate in new[] { 48000, 24000, 48000, 24000 })
+        {
+            var e = new OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth(p, rate, 5) { Throttle = 0.4f };
+            e.SpinTo(p.IdleRpm * 2.5f);
+            e.LoadTorque = 0.3f * p.PeakTorqueNm;
+            e.ExternalInertia = 0.05f;
+            for (int i = 0; i < rate; i++) e.Step();
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < 20 * rate; i++) e.Step();
+            Console.WriteLine($"    {key} at {rate} Hz: {sw.Elapsed.TotalMilliseconds / 20:F1} ms a second, {sw.Elapsed.TotalMilliseconds * 1e6 / (20.0 * rate):F0} ns a step, {e.Rpm:F0} rpm");
+        }
+        return 0;
+    }
+
+    /// <summary>The two mowers standing and pushed along, the listener 8.7 m off, at the benches' detail:
+    /// what a mower's own changes do to it.</summary>
+    private static int RenderMowers(string dir, int seedOffset, int seconds)
+    {
+        Directory.CreateDirectory(dir);
+        int blocks = seconds * Rate / Block;
+        foreach (var (key, id) in new[] { ("mower_push", 11), ("mower_riding", 12) })
+            foreach (float ground in new[] { 0f, key == "mower_push" ? 0.9f : 2f })
+            {
+                var v = new MachineVoiceState(SmallMachineSpec.ByName(key), Rate, id, id * 31 + 7 + seedOffset)
+                {
+                    Detail = _detail,
+                    TargetGroundSpeed = ground,
+                };
+                v.SetListener(new Vector3(3f, 1.6f, 8f));
+                var all = new float[blocks * Block];
+                var buf = new float[Block];
+                var phases = new Dictionary<string, int>();
+                var sw = Stopwatch.StartNew();
+                for (int b = 0; b < blocks; b++)
+                {
+                    v.Produce(); v.Consume(buf); buf.CopyTo(all, b * Block);
+                    phases[v.Machine.EngineDetailState] = phases.GetValueOrDefault(v.Machine.EngineDetailState) + 1;
+                }
+                double ms = sw.Elapsed.TotalMilliseconds / seconds;
+                string name = $"{key}_{(ground > 0f ? "moving" : "standing")}";
+                Write(dir, name, all);
+                Console.WriteLine($"    {name,-22} {ms,5:F1} ms per voice-second; " + string.Join(", ", phases.Select(p => $"{p.Key} {100.0 * p.Value / blocks:F0} %")));
+            }
+        return 0;
+    }
+
     private static string? _only;
     private static int _sceneSeconds = 6;
 
@@ -401,6 +456,7 @@ public static class PoolCostSpike
         foreach (var (name, make) in physical)
         {
             var v = make();
+            if (v is MachineVoiceState mv) mv.Detail = _detail;
             v.SetListener(new Vector3(3f, 1.6f, 8f));
             var all = new float[blocks * Block];
             var buf = new float[Block];

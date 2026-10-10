@@ -1417,7 +1417,19 @@ public partial class FmodAudioProvider : IAudioProvider
         }
         foreach (var a in _activeSounds)
         {
-            if (a.EngineState is not { } state || a.IsReflection) continue;
+            if (a.IsReflection) continue;
+            if (a.MachineState is MachineVoiceState machine)
+            {
+                // A machine with an engine (a mower): the same law.
+                float here = RadiatedHere(a, listener);
+                var was = machine.Detail;
+                machine.Detail = DetailFor(was, here, loudest, ReducedFarEngines, AllEnginesReduced);
+                if (machine.Detail != was)
+                    Log.Debug("Engine detail: machine {Id} {Detail} at {Dist:F0} m, {Db:F1} dB under the loudest.",
+                              a.EntityId, machine.Detail, Vector3.Distance(listener, a.Position), 20f * MathF.Log10(loudest / MathF.Max(1e-9f, here)));
+                continue;
+            }
+            if (a.EngineState is not { } state) continue;
             var now = state.Detail;
             float level = RadiatedHere(a, listener);
             var want = DetailFor(now, level, loudest, ReducedFarEngines, AllEnginesReduced);

@@ -491,6 +491,7 @@ internal sealed class JetNoise
         _hpA = OnePole.AlphaFor(40f, rate);
     }
     private readonly float _hpA;
+    private float _fc = -1f, _a = 1f, _norm = 1f, _gasK = float.NaN, _perU4;
 
     /// <summary>Forgets its band and its slow velocity (WaveLine.Clear).</summary>
     public void Clear() => _lp1 = _lp2 = _hp = _uSlow = 0f;
@@ -539,16 +540,33 @@ internal sealed class JetNoise
         _uSlow += (uInst - _uSlow) * MathF.Min(1f, 1f / (mixTime * _rate));
         float uAbs = _uSlow;
         float uRef = MathF.Max(8f, 0.5f * meanVelocity + 0.5f * uAbs);
-        // Band centred on St = 0.2, two poles wide.
+        // Band centred on St = 0.2, two poles wide. Its corner moves with the mixing velocity, slowly:
+        // worked out again when it has moved a per cent, not with an exponential every sample.
         float fc = Math.Clamp(0.2f * uRef / _diameter, 60f, 6000f);
-        float a = OnePole.AlphaFor(fc, _rate);
+        if (MathF.Abs(fc - _fc) > 0.01f * _fc)
+        {
+            _fc = fc;
+            _a = OnePole.AlphaFor(fc, _rate);
+            _norm = 1f / BandNormaliser(_a);
+        }
+        float a = _a;
         float n = (float)(_rng.NextDouble() * 2 - 1);
         _lp1 += a * (n - _lp1);
         _lp2 += a * (_lp1 - _lp2);
-        float bp = (_lp1 - _lp2) / BandNormaliser(a);
+        float bp = (_lp1 - _lp2) * _norm;
         // A steady floor from the mean flow, plus the pulsating part: the slugs.
         float amp = 0.7f * meanVelocity + 0.6f * uAbs;
-        float p = LighthillPressure(_diameter, amp, gasKelvin) * level * bp;
+        // Lighthill's pressure is the velocity to the fourth times a factor of the gas and the nozzle
+        // (LighthillPressure, which takes the eighth power in double every call); the factor only moves
+        // with the gas temperature, on the slow tick.
+        if (gasKelvin != _gasK)
+        {
+            _gasK = gasKelvin;
+            _perU4 = LighthillPressure(_diameter, 1f, gasKelvin);
+        }
+        float u2 = MathF.Min(MathF.Abs(amp), 600f);
+        u2 *= u2;
+        float p = _perU4 * u2 * u2 * level * bp;
         // Nothing below 40 Hz belongs to a jet.
         _hp += _hpA * (p - _hp);
         return p - _hp;

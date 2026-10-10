@@ -47,6 +47,16 @@ Recent work, newest first. `git log` has the rest.
     40 s: 1.08 core-seconds per second, against 1.74 at half rate alone and 2.53 in full. A cruising far
     car replays about 60 % of the time, an idling diesel about half. OPENFPS_CYCLE_CACHE=0 for an A/B.
     The shared, baked grid per engine type (todo item 12) is still to come.
+  - Mowers (EngineSynth underneath) get the same: a mower 15 dB under the loudest machine runs its
+    engine reduced (MachineVoiceState.Detail, SmallMachineSynth.EngineDetail). Steady is now judged on
+    each cycle's mean pedal and load, since a governor moves the pedal within every cycle; a replay lets
+    go at half the entry's tolerance, so a load that drifts (thicker grass) is taken up live. Every
+    engine: the starter's two constants are worked out once (a power every sample, starter or not), the
+    exhaust jet keeps its band's corner until it moves a per cent and its Lighthill factor until the gas
+    temperature moves (an exponential and a double eighth power every sample), and the half-rate
+    interpolator skips silence and multiplies in vectors. Push mower 30 ms a second in full against 28,
+    reduced 12 standing and 16 pushed; riding mower 39.5 against 38, reduced 14 standing and 27 driven
+    over grass. Reduced is 0.4 dB over full on both, the replay within 0.05 dB of the half rate.
 
 - Logging out in the world and back in returns you to the same spot, through the loading screen, facing
   the way you faced; the landing map if the ground there cannot be built within 30 s.

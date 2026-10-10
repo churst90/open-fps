@@ -356,8 +356,8 @@ public sealed partial class EngineSynth
             _odd = !_odd;
         }
 
-        /// <summary>The twin's interpolated sample, mixed with the outer's own at the outer's weight
-        /// <paramref name="own"/>, onto the outer's outputs.</summary>
+        /// <summary>The twin's interpolated sample at <paramref name="twinGain"/>, mixed with the outer's own
+        /// at <paramref name="ownGain"/>, onto the outer's outputs.</summary>
         private void Emit(float twinGain, float ownGain = 0f)
         {
             bool even = _odd;   // StepTwin has already flipped the parity for this sample
@@ -479,7 +479,10 @@ public sealed partial class EngineSynth
         private long _cycleStart = -1;          // the cycle being recorded; -1 before the first boundary
         private double _omegaSum;
         private float _ctMin, _ctMax, _clMin, _clMax, _cInertia, _cGoverned;
-        private double _portSum, _mapSum, _spoolSum;
+        private double _portSum, _mapSum, _spoolSum, _tSum, _lSum;
+        // Each cycle's mean pedal and load: a governor moves the pedal within every cycle, chasing the
+        // firing, and only the cycle's mean says whether the engine is where it was.
+        private readonly float[] _tMean = new float[Cycles + 1], _lMean = new float[Cycles + 1];
         private bool _cClean, _cPopped;
         private float _cPeak;
         private readonly float[] _peak = new float[Cycles + 1];
@@ -526,7 +529,7 @@ public sealed partial class EngineSynth
                 if (_cycleStart >= 0) Close();
                 _cycleStart = _at;
                 _omegaSum = 0;
-                _portSum = _mapSum = _spoolSum = 0;
+                _portSum = _mapSum = _spoolSum = _tSum = _lSum = 0;
                 _ctMin = _ctMax = o.Throttle;
                 _clMin = _clMax = o.LoadTorque;
                 _cInertia = o.ExternalInertia;
@@ -542,6 +545,7 @@ public sealed partial class EngineSynth
             _omegaSum += o._omega;
             _portSum += o._portK; _mapSum += o._map; _spoolSum += o._spool;
             float t = o.Throttle, l = o.LoadTorque;
+            _tSum += t; _lSum += l;
             if (t < _ctMin) _ctMin = t; else if (t > _ctMax) _ctMax = t;
             if (l < _clMin) _clMin = l; else if (l > _clMax) _clMax = l;
             if (starter != 0f || !o.Ignition || o.Starter || o.ExternalInertia != _cInertia || o.GovernedRpm != _cGoverned) _cClean = false;
@@ -568,6 +572,8 @@ public sealed partial class EngineSynth
             _portK[n] = (float)(_portSum / Math.Max(1, len));
             _map[n] = (float)(_mapSum / Math.Max(1, len));
             _spool[n] = (float)(_spoolSum / Math.Max(1, len));
+            _tMean[n] = (float)(_tSum / Math.Max(1, len));
+            _lMean[n] = (float)(_lSum / Math.Max(1, len));
             _tMin[n] = _ctMin; _tMax[n] = _ctMax; _lMin[n] = _clMin; _lMax[n] = _clMax;
             _inertia[n] = _cInertia; _governed[n] = _cGoverned; _clean[n] = _cClean && !_cPopped;
             _peak[n] = _cPeak;
@@ -580,6 +586,7 @@ public sealed partial class EngineSynth
             _tMin[j] = _tMin[j + 1]; _tMax[j] = _tMax[j + 1]; _lMin[j] = _lMin[j + 1]; _lMax[j] = _lMax[j + 1];
             _inertia[j] = _inertia[j + 1]; _governed[j] = _governed[j + 1]; _clean[j] = _clean[j + 1];
             _portK[j] = _portK[j + 1]; _map[j] = _map[j + 1]; _spool[j] = _spool[j + 1]; _peak[j] = _peak[j + 1];
+            _tMean[j] = _tMean[j + 1]; _lMean[j] = _lMean[j + 1];
         }
 
         /// <summary>How far an input may move from what the set was recorded at before the engine must
@@ -615,7 +622,13 @@ public sealed partial class EngineSynth
             for (int j = first; j < _count; j++)
                 if (MathF.Abs(_omega[j] - mean) > SpeedSpread * mean) return false;
             float tTol = ThrottleTolerance(0.5f * (tLo + tHi)), lTol = LoadTolerance(o, 0.5f * (lLo + lHi));
-            if (tHi - tLo > tTol || lHi - lLo > lTol) return false;
+            float tmLo = float.MaxValue, tmHi = float.MinValue, lmLo = float.MaxValue, lmHi = float.MinValue;
+            for (int j = first; j < _count; j++)
+            {
+                tmLo = MathF.Min(tmLo, _tMean[j]); tmHi = MathF.Max(tmHi, _tMean[j]);
+                lmLo = MathF.Min(lmLo, _lMean[j]); lmHi = MathF.Max(lmHi, _lMean[j]);
+            }
+            if (tmHi - tmLo > tTol || lmHi - lmLo > lTol) return false;
             // The slow state settled too, since it stops with the engine: across the set, a tenth of a per
             // cent of the gas temperature, half a per cent of the manifold, a hundredth of the boost.
             int last = _count - 1;
@@ -626,7 +639,9 @@ public sealed partial class EngineSynth
             for (int j = 0; j < Cycles; j++) { _setStart[j] = _start[first + j]; _setLen[j] = _len[first + j]; }
             SetOmega = mean;
             SetTorque = o.Torque;
-            _tLo = tLo - tTol; _tHi = tHi + tTol; _lLo = lLo - lTol; _lHi = lHi + lTol;
+            // Let go at half the entry's tolerance past what the set was recorded through: a load that drifts (a
+            // mower into longer grass) is taken up live before the replay has held it far from where it went.
+            _tLo = tLo - 0.5f * tTol; _tHi = tHi + 0.5f * tTol; _lLo = lLo - 0.5f * lTol; _lHi = lHi + 0.5f * lTol;
             _inertiaSet = _inertia[first]; _governedSet = _governed[first];
             _tail = Math.Max(16, shortest / 4);
             _rho = Likeness();
@@ -734,14 +749,31 @@ public sealed partial class EngineSynth
             return h;
         }
 
+        /// <summary>Zeros pushed in a row: past the taps the output is silence, worked out for nothing
+        /// (the starter's sound, most of an engine's life).</summary>
+        private int _zeros = Taps;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Push(float v)
         {
+            if (v == 0f && _zeros >= Taps) { Even = Odd = 0f; return; }
+            _zeros = v == 0f ? _zeros + 1 : 0;
             _at = _at == 0 ? Taps - 1 : _at - 1;
             _x[_at] = v;
             _x[_at + Taps] = v;
-            float acc = 0f;
-            for (int k = 0; k < Taps; k++) acc += H[k] * _x[_at + k];
+            float acc;
+            if (Vector.IsHardwareAccelerated && Taps % Vector<float>.Count == 0)
+            {
+                var sum = Vector<float>.Zero;
+                for (int k = 0; k < Taps; k += Vector<float>.Count)
+                    sum += new Vector<float>(H, k) * new Vector<float>(_x, _at + k);
+                acc = Vector.Sum(sum);
+            }
+            else
+            {
+                acc = 0f;
+                for (int k = 0; k < Taps; k++) acc += H[k] * _x[_at + k];
+            }
             // Newest at _at: the even output is the one Taps/2 old, the odd one half a sample newer.
             Even = _x[_at + Taps / 2];
             Odd = acc;
@@ -751,6 +783,7 @@ public sealed partial class EngineSynth
         {
             Array.Clear(_x);
             Even = Odd = 0f;
+            _zeros = Taps;
         }
     }
 }
