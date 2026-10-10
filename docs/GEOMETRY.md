@@ -77,7 +77,11 @@ The queries, by consumer (full list with line numbers in the appendix):
   from the boxes around them at load, and openings are found as gaps in the boxes round each room's
   faces. The voxel grid (0.5 m, sparse octree) only marks which region a point is in.
 - **Wall transmission** (`WallTransmission.BandGains(material, panelSize, WallBuild)`): the panel's
-  thickness is the box's smallest dimension; leaf and stud spacing come from the prefab.
+  thickness is the box's smallest dimension; leaf and stud spacing come from the prefab. Sheets in
+  contact (facing the same way, faces touching or overlapping, sharing some face) are one construction
+  (`Constructions`, `WallTransmission.LayeredBandGains`): the tracer and the legs of routes group what a
+  line crosses one straight after another, and the Steam Audio scene shows a construction's outer faces
+  only, cut where its layers change, each with the whole construction's figure (`LayeredFaces`).
 
 Steam Audio already takes triangles. Everything else takes boxes.
 
@@ -389,7 +393,7 @@ geometry version per tile instead of the grid's `StaticVersion`.
 | `TrackClearance` | track points against solid boxes | a swept box along the track through `Overlap` |
 | `OpeningRoutes` | segments through a 4 m 3D grid of boxes | `Any` through the BVH; the route search itself is unchanged |
 | `FaceOpenings`, `CompositeAcoustics.SurveyBox` | gaps in boxes round a room | the derived room grid (2.7) |
-| `WallTransmission` | panel = the box's smallest side | panel thickness = the chord between entry and exit of a closed mesh, or the surface's nominal thickness; leaf and studs from the surface's `Construction` |
+| `WallTransmission` | panel = the box's smallest side; sheets in contact one construction (`Constructions`, `LayeredFaces`) | panel thickness = the chord between entry and exit of a closed mesh, or the surface's nominal thickness; leaf and studs from the surface's `Construction`; solids in contact still one construction, found from the triangles' shared faces |
 | `VehicleShadow` | Maekawa over a moving body's box | unchanged until stage 6 |
 
 ### 3.5 Raycasts, occlusion and line of sight (`SpatialService`)

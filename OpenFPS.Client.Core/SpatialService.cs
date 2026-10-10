@@ -136,12 +136,26 @@ public class SpatialService
         geo.Containing(nudgedStart, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, inside);
         foreach (var s in inside) crossed.TryAdd(s, 0);
         if (crossed.Count == 0) return;
+        // Where the segment goes into and comes out of each: solids in contact, crossed one straight after
+        // another, are one construction (Constructions.Through).
+        var spans = _spans ??= new Dictionary<OpenFPS.Common.Geometry.SolidRef, (float In, float Out)>();
+        spans.Clear();
+        foreach (var s in inside) spans[s] = (0f, -1f);
+        foreach (var c in crossings)
+        {
+            var (tin, tout) = spans.TryGetValue(c.Solid, out var had) ? had : (len, -1f);
+            if (c.Front) tin = MathF.Min(tin, c.T); else tout = MathF.Max(tout, c.T);
+            spans[c.Solid] = (tin, tout);
+        }
+        var list = _crossingList ??= new List<Constructions.Crossing>(8);
+        list.Clear();
         foreach (var solid in crossed.Keys)
         {
             ref readonly var surface = ref geo.SurfaceOf(solid);
             var panel = surface.Construction.PanelSize;
             int layers = 1;
-            if (surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.Hollow))
+            bool hollow = surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.Hollow);
+            if (hollow)
             {
                 // A hollow shell is walls of its shell thickness round an empty inside: one wall in and
                 // one out, or one if either end is inside it.
@@ -152,10 +166,25 @@ public class SpatialService
                 bool startIn = Contains(geo, solid, nudgedStart), endIn = Contains(geo, solid, nudgedEnd);
                 layers = (startIn ? 0 : 1) + (endIn ? 0 : 1);
             }
-            var (gl, gm, gh) = WallTransmission.BandGains(surface.Material, panel, surface.Construction.Build);
-            for (int k = 0; k < layers; k++) { eqLow *= gl; eqMid *= gm; eqHigh *= gh; }
+            var (tin, tout) = spans.TryGetValue(solid, out var span) ? span : (0f, -1f);
+            if (tout < 0f) tout = len;   // it ends inside
+            var normal = Vector3.Zero;
+            if (!hollow && !surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.DoorLeaf))
+            {
+                var (_, size, rotation) = geo.BoxOf(solid);
+                int owner = geo.OwnerOf(solid);
+                bool hung = world.Entities.TryGetValue(owner, out var e) && OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(e.Definition);
+                if (!hung && size.X > 0f && Constructions.IsSheet(size)) normal = Constructions.Normal(size, rotation);
+            }
+            list.Add(Constructions.Of(tin, tout, AcousticRegistry.GetProperties(surface.Material), panel, surface.Construction.Build, layers, normal));
         }
+        var g = Constructions.Through(list, rayDir);
+        eqLow *= g.X; eqMid *= g.Y; eqHigh *= g.Z;
     }
+
+    [ThreadStatic] private static Dictionary<OpenFPS.Common.Geometry.SolidRef, (float In, float Out)>? _spans;
+    [ThreadStatic] private static List<Constructions.Crossing>? _crossingList;
+    [ThreadStatic] private static List<Constructions.Crossing>? _boxCrossings;
 
     private static bool Contains(OpenFPS.Common.Geometry.TriangleWorld geo, OpenFPS.Common.Geometry.SolidRef solid, Vector3 p)
     {
@@ -254,6 +283,9 @@ public class SpatialService
         }
         else entitiesToTest = GetEntitiesToTest(world, center, (dist / 2.0f) + 10.0f);
 
+        var crossed = _boxCrossings ??= new List<Constructions.Crossing>(8);
+        crossed.Clear();
+        float span = dist - 0.1f;
         foreach (var entitySnap in entitiesToTest)
         {
             if (entitySnap.Id == ignoreEntityId) continue;
@@ -268,6 +300,7 @@ public class SpatialService
                 // two its face) and how many times it goes through it.
                 Vector3 panel = def.Collider.Size;
                 int layers = 1;
+                float tIn = 0f, tOut = span;
 
                 if (def.Collider.Shape == ColliderShape.Box)
                 {
@@ -278,6 +311,7 @@ public class SpatialService
                         if (exitFromStart > entry)
                         {
                             intersected = true;
+                            tIn = entry; tOut = span - exitFromEnd;
                             if (def.Acoustics.IsHollow)
                             {
                                 // A hollow shell is walls of its shell thickness round an empty inside:
@@ -305,7 +339,7 @@ public class SpatialService
                     {
                         float clampedEx = Math.Min(ex, dist);
                         // A round thing is as thick as the chord the sound crosses it by.
-                        if (clampedEx > en) { panel = new Vector3(clampedEx - en, def.Collider.Size.X, def.Collider.Size.Y); }
+                        if (clampedEx > en) { panel = new Vector3(clampedEx - en, def.Collider.Size.X, def.Collider.Size.Y); tIn = en; tOut = clampedEx; }
                         else intersected = false;
                     }
                 }
@@ -317,12 +351,18 @@ public class SpatialService
                 {
                     // The Steam Audio scene's panel model (WallTransmission), so the fallback and the
                     // simulator answer with one model. The prefab's own Transmission figures are not read.
-                    var (gl, gm, gh) = WallTransmission.BandGains(def.Material.Material, panel,
-                                                                  new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres));
-                    for (int k = 0; k < layers; k++) { eqLow *= gl; eqMid *= gm; eqHigh *= gh; }
+                    // A fixed sheet can be a layer of a construction (Constructions); what moves, hangs in a
+                    // doorway, is hollow or is round never is.
+                    bool layer = def.Collider.Shape == ColliderShape.Box && !def.Acoustics.IsHollow && !def.Moves
+                                 && !OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(def) && Constructions.IsSheet(def.Collider.Size);
+                    crossed.Add(Constructions.Of(tIn, tOut, AcousticRegistry.GetProperties(def.Material.Material), panel,
+                                                 new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), layers,
+                                                 layer ? Constructions.Normal(def.Collider.Size, transform.Rotation) : Vector3.Zero));
                 }
             }
         }
+        var through = Constructions.Through(crossed, rayDir);
+        eqLow *= through.X; eqMid *= through.Y; eqHigh *= through.Z;
 
         // No floor lets sound through whatever the walls are. Blocked is what the loudest band lost;
         // bleed is the bands' mean.

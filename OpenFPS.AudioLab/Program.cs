@@ -178,6 +178,8 @@ string[] usage =
     "  --room-echoes [map=city] ear= src=            the placed reflections a one-off sound gets",
     "  --shot-echoes [map=city] at=x,z [shot=x,z]    every echo a shot makes there, and what it came off",
     "  --wall-tl                                     the city's constructions' transmission loss per band",
+    "  --layers [map=city]                           layers in contact against walls apart: Steam Audio, tracer, model",
+    "  --floor-render [out=DIR]                      steps and a voice in the flat above heard below, and back, through the client",
     "  --traced-reverb / --traced-echoes             the traced reverb and per-source echoes, headless",
     "  --sa-frame                                    which way Steam Audio's traced soundfield faces (SA_MIRROR=0: unflipped)",
     "  --tail-bands / --tail-iacc / --late-field [place=flat|tunnel|street]",
@@ -782,6 +784,14 @@ if (args.Contains("--presence-sounds"))
 if (args.Contains("--room-echoes"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
+}
+if (args.Contains("--floor-render"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.FloorRenderSpike.Run(args));
+}
+if (args.Contains("--layers"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.LayersSpike.Run(args));
 }
 if (args.Contains("--wall-tl"))
 {
