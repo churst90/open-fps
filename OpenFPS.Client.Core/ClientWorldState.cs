@@ -71,6 +71,16 @@ public class ClientWorldState
     /// <summary>The static solids as a triangle world (docs/GEOMETRY.md stage 1), built off the game
     /// thread and handed to every snapshot.</summary>
     public ClientGeometry Geometry { get; } = new(250f);
+
+    /// <summary>The mesh assets the definitions name (docs/GEOMETRY.md 4.4).</summary>
+    public MeshAssetFetcher Meshes { get; } = new();
+
+    /// <summary>Mesh assets arrived: the things made of them are built again with their own shapes.</summary>
+    public void MeshesArrived(IEnumerable<int> entityIds)
+    {
+        foreach (int id in entityIds) Geometry.Invalidate(id);
+        Touch();
+    }
     private bool _geometryHooked;
     private bool _gridNeedsRebuild = false;
 
@@ -290,6 +300,7 @@ public class ClientWorldState
         _definitions.TryGetValue(def.EntityId, out var before);
         _definitions[def.EntityId] = def;
         _serverTransforms[def.EntityId] = def.Transform;
+        if (def.Collider.Form is { Kind: OpenFPS.Common.Geometry.ShapeKind.Mesh } meshForm) Meshes.Want(meshForm.Mesh, def.EntityId);
         Geometry.Note(before, def);
 
         // A room that arrived after the map was baked: a building put down in play, or a car's inside,

@@ -303,6 +303,12 @@ public sealed partial class ClientGameSession
 
     // ── Loading ───────────────────────────────────────────────────────────────────────────────
 
+    /// <summary>The mesh assets the definitions name that are neither here nor cached, asked for once.</summary>
+    private void AskForMeshes()
+    {
+        while (_world.Meshes.TakeRequest() is { } request) _network.Send(request);
+    }
+
     private void ReportEntityProgress()
     {
         if (_expectedEntityCount <= 0) return;

@@ -57,7 +57,11 @@ public class MapManager
         if (entityData.Form != null) col.Form = entityData.Form;
         if (col.Form == null) return;
         if (col.Form.Kind == OpenFPS.Common.Geometry.ShapeKind.Box) { col.Form = null; return; }
-        if (OpenFPS.Common.Geometry.Shapes.Problem(col.Form, col.Size, PhysicsConstants.StepHeight) is { } problem)
+        var problem = OpenFPS.Common.Geometry.Shapes.Problem(col.Form, col.Size, PhysicsConstants.StepHeight);
+        if (problem == null && col.Form.Kind == OpenFPS.Common.Geometry.ShapeKind.Mesh
+            && !OpenFPS.Common.Geometry.MeshLibrary.Shared.Contains(col.Form.Mesh!))
+            problem = $"no mesh {col.Form.Mesh} in the server's meshes folder";
+        if (problem != null)
         {
             Log.Warning("MapManager: '{Map}' entity {Id} ({Prefab}): its form ({Form}) cannot be made: {Problem}. It is a box.",
                         mapId, entityData.EntityId, entityData.PrefabId, col.Form, problem);

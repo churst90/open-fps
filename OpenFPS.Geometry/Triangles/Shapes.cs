@@ -31,6 +31,9 @@ public enum ShapeKind : byte
     /// <summary>A profile (<see cref="ShapeSpec.Profile"/>) drawn along a path (<see cref="ShapeSpec.Path"/>):
     /// a kerb, a rail, a gutter, a moulding.</summary>
     Swept = 10,
+    /// <summary>An imported mesh asset (<see cref="ShapeSpec.Mesh"/>, docs/GEOMETRY.md 4.3) fitted to the box: a
+    /// fountain, a statue, a church made in Blender. Its box until the asset has arrived.</summary>
+    Mesh = 11,
 }
 
 /// <summary>What a roof's slopes do (<see cref="ShapeKind.Roof"/>). Append only: on the wire.</summary>
@@ -83,16 +86,20 @@ public sealed partial class ShapeSpec : IEquatable<ShapeSpec>
     /// <summary>A material for each of the shape's surfaces in turn (<see cref="Shapes.SurfaceNames"/>); an
     /// empty or missing one is the thing's own material.</summary>
     public string[]? Materials { get; set; }
+    /// <summary>Mesh: the asset's id, sixteen hex digits (<see cref="MeshLibrary"/>).</summary>
+    public string? Mesh { get; set; }
 
     public bool Equals(ShapeSpec? o) => o is not null && Kind == o.Kind && Steps == o.Steps && Landing.Equals(o.Landing)
                                         && Thickness.Equals(o.Thickness) && Segments == o.Segments && Top.Equals(o.Top)
                                         && Same(Outline, o.Outline) && SameHoles(Holes, o.Holes) && Style == o.Style
-                                        && Same(Profile, o.Profile) && Same(Path, o.Path) && SameStrings(Materials, o.Materials);
+                                        && Same(Profile, o.Profile) && Same(Path, o.Path) && SameStrings(Materials, o.Materials)
+                                        && string.Equals(Mesh ?? "", o.Mesh ?? "", StringComparison.OrdinalIgnoreCase);
     public override bool Equals(object? obj) => obj is ShapeSpec s && Equals(s);
     public override int GetHashCode()
     {
         var h = new HashCode();
         h.Add(Kind); h.Add(Steps); h.Add(Landing); h.Add(Thickness); h.Add(Segments); h.Add(Top); h.Add(Style);
+        h.Add((Mesh ?? "").ToLowerInvariant());
         foreach (var a in new[] { Outline, Profile, Path }) { h.Add(a?.Length ?? 0); if (a != null) foreach (float f in a) h.Add(f); }
         h.Add(Holes?.Length ?? 0);
         return h.ToHashCode();
@@ -121,7 +128,7 @@ public sealed partial class ShapeSpec : IEquatable<ShapeSpec>
     {
         Kind = Kind, Steps = Steps, Landing = Landing, Thickness = Thickness, Segments = Segments, Top = Top,
         Outline = (float[]?)Outline?.Clone(), Holes = Holes?.Select(h => (float[])h.Clone()).ToArray(), Style = Style,
-        Profile = (float[]?)Profile?.Clone(), Path = (float[]?)Path?.Clone(), Materials = (string[]?)Materials?.Clone(),
+        Profile = (float[]?)Profile?.Clone(), Path = (float[]?)Path?.Clone(), Materials = (string[]?)Materials?.Clone(), Mesh = Mesh,
     };
 
     public override string ToString() => Kind switch
@@ -133,6 +140,7 @@ public sealed partial class ShapeSpec : IEquatable<ShapeSpec>
         ShapeKind.Prism => $"prism, {(Outline?.Length ?? 0) / 2} corners" + (Holes is { Length: > 0 } ? $", {Holes.Length} holes" : ""),
         ShapeKind.Roof => $"{Style.ToString().ToLowerInvariant()} roof",
         ShapeKind.Swept => $"swept profile, {(Path?.Length ?? 0) / 3} points along",
+        ShapeKind.Mesh => $"mesh {Mesh}",
         _ => Kind.ToString().ToLowerInvariant(),
     };
 }
@@ -191,7 +199,22 @@ public static partial class Shapes
     /// </summary>
     public static ShapeMesh? Make(ShapeSpec? spec, Vector3 size)
     {
-        if (spec == null || spec.Kind == ShapeKind.Box || Problem(spec, size, float.MaxValue) != null) return null;
+        if (spec == null || spec.Kind == ShapeKind.Box) return null;
+        // A mesh not here yet is its box until it is (and that is not kept).
+        if (spec.Kind == ShapeKind.Mesh && !MeshLibrary.Shared.Contains(spec.Mesh ?? "")) return null;
+        // Kept with the spec it was made from: a roof's skeleton is worth making once, and the geometry, the
+        // acoustic store and the echoes each ask for the same thing's shape. A spec changed in place is made again.
+        if (Made.TryGetValue(spec, out var had) && had.Size == size && had.Spec.Equals(spec)) return had.Mesh;
+        var mesh = Problem(spec, size, float.MaxValue) != null ? null : MakeNew(spec, size);
+        Made.AddOrUpdate(spec, new MadeShape(size, spec.Copy(), mesh));
+        return mesh;
+    }
+
+    private sealed record MadeShape(Vector3 Size, ShapeSpec Spec, ShapeMesh? Mesh);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ShapeSpec, MadeShape> Made = new();
+
+    private static ShapeMesh? MakeNew(ShapeSpec spec, Vector3 size)
+    {
         return spec.Kind switch
         {
             ShapeKind.Wedge => Wedge(size),
@@ -248,6 +271,9 @@ public static partial class Shapes
             return new MeshAsset(verts.ToArray(), idx, S.ToArray(), closed: true, convex);
         }
     }
+
+    /// <summary>A closed convex box from <paramref name="lo"/> to <paramref name="hi"/>: a convex piece.</summary>
+    internal static MeshAsset BoxPiece(Vector3 lo, Vector3 hi) => BoxPart(lo, hi);
 
     /// <summary>A box from <paramref name="lo"/> to <paramref name="hi"/>, in a shape's frame.</summary>
     private static MeshAsset BoxPart(Vector3 lo, Vector3 hi)

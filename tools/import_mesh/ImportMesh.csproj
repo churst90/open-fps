@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The mesh importer (docs/GEOMETRY.md 4.3, docs/AUTHORING.md): an offline tool, never the server at run
+       time. Reads glTF 2.0 and OBJ with the small readers in OpenFPS.Geometry (MeshImport.cs; no third-party
+       parser), checks and readies the triangles, and writes OpenFPS.Server/meshes/HASH.mesh.
+       Build it with tools/build-local.sh and run the built dll; see docs/AUTHORING.md. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ImportMesh</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../OpenFPS.Common/OpenFPS.Common.csproj" />
+  </ItemGroup>
+</Project>

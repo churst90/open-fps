@@ -34,7 +34,7 @@ public class MessageDispatcher : IMessageDispatcher
         typeof(ClientInputUpdate), typeof(ChatMessage), typeof(LoginRequest), typeof(TextCommand),
         typeof(InteractRequest), typeof(VoiceData), typeof(RegisterRequest), typeof(LogoutRequest),
         typeof(MapDataRequest), typeof(PlayerListRequest), typeof(FriendListRequest), typeof(MapListRequest),
-        typeof(ScopedShot), typeof(InventoryRequest),
+        typeof(ScopedShot), typeof(InventoryRequest), typeof(MeshAssetRequest),
     };
 
     /// <summary>What a connection may send before it has logged in.</summary>
@@ -137,7 +137,7 @@ public class MessageDispatcher : IMessageDispatcher
             }
             case VoiceData:
                 return !Refuse(Limits.Voice, "voice", null);
-            case InteractRequest or ScopedShot or PlayerListRequest or FriendListRequest or MapListRequest or InventoryRequest:
+            case InteractRequest or ScopedShot or PlayerListRequest or FriendListRequest or MapListRequest or InventoryRequest or MeshAssetRequest:
                 return !Refuse(Limits.Requests, "request", null);
             default:
                 return true;

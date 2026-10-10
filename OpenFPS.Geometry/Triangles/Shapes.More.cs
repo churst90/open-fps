@@ -49,13 +49,16 @@ public static partial class Shapes
     /// material for it, and a roof's slopes marked roof; null when every one is <paramref name="main"/>.</summary>
     public static Surface[]? SlotSurfaces(ShapeSpec form, in Surface main)
     {
-        var names = SurfaceNames(form.Kind);
+        var names = SurfaceNames(form);
+        // An imported mesh's surfaces come with the materials its import gave them.
+        var given = form.Kind == ShapeKind.Mesh && MeshLibrary.Shared.TryGet(form.Mesh, out var asset) ? asset.Data.SurfaceMaterials : null;
         var slots = new Surface[names.Length];
         bool differ = false;
         for (int i = 0; i < names.Length; i++)
         {
             var s = main;
-            string? mat = form.Materials != null && i < form.Materials.Length && !string.IsNullOrWhiteSpace(form.Materials[i]) ? form.Materials[i] : null;
+            string? mat = form.Materials != null && i < form.Materials.Length && !string.IsNullOrWhiteSpace(form.Materials[i]) ? form.Materials[i]
+                        : given != null && i < given.Length && !string.IsNullOrWhiteSpace(given[i]) ? given[i] : null;
             if (mat != null && !string.Equals(mat, main.Material, StringComparison.OrdinalIgnoreCase))
             {
                 var flags = string.Equals(mat, "Glass", StringComparison.OrdinalIgnoreCase) ? s.Flags | SurfaceFlags.Glass : s.Flags & ~SurfaceFlags.Glass;
@@ -86,6 +89,8 @@ public static partial class Shapes
                 return OutlineProblem(spec.Outline, null);
             case ShapeKind.Swept:
                 return SweptProblem(spec.Profile, spec.Path);
+            case ShapeKind.Mesh:
+                return spec.Mesh is { Length: 16 } id && id.All(Uri.IsHexDigit) ? null : "a mesh is named by its sixteen-digit id";
             default:
                 return $"no shape called {spec.Kind}";
         }
@@ -172,8 +177,30 @@ public static partial class Shapes
             ShapeKind.Prism => Prism(size, Ring(spec.Outline)!, spec.Holes?.Select(h => Ring(h)!).ToList()),
             ShapeKind.Roof => Roof(size, Ring(spec.Outline)!, spec.Style),
             ShapeKind.Swept => Sweep(size, Ring(spec.Profile)!, PathOf(spec.Path)!),
+            ShapeKind.Mesh => MeshLibrary.Shared.TryGet(spec.Mesh, out var entry) ? FitMesh(entry, size) : null,
             _ => null,
         };
+    }
+
+    /// <summary>A shape's surfaces by name (<see cref="SurfaceNames(ShapeKind)"/>; an imported mesh's are its own).</summary>
+    public static string[] SurfaceNames(ShapeSpec spec)
+        => spec.Kind == ShapeKind.Mesh && MeshLibrary.Shared.TryGet(spec.Mesh, out var e) && e.Data.SurfaceNames.Length > 0
+            ? e.Data.SurfaceNames : SurfaceNames(spec.Kind);
+
+    /// <summary>An imported mesh stretched to the box, with its convex pieces stretched the same.</summary>
+    private static ShapeMesh FitMesh(MeshLibrary.Entry entry, Vector3 size)
+    {
+        var m = entry.Mesh;
+        var ext = m.BoundsMax - m.BoundsMin;
+        var mid = (m.BoundsMin + m.BoundsMax) * 0.5f;
+        var s = new Vector3(ext.X > 0 ? size.X / ext.X : 1f, ext.Y > 0 ? size.Y / ext.Y : 1f, ext.Z > 0 ? size.Z / ext.Z : 1f);
+        MeshAsset Fit(MeshAsset a, bool convex)
+        {
+            var v = new Vector3[a.Vertices.Length];
+            for (int i = 0; i < v.Length; i++) v[i] = (a.Vertices[i] - mid) * s;
+            return new MeshAsset(v, a.Indices, a.TriangleSurface, a.Closed, convex);
+        }
+        return new ShapeMesh(Fit(m, false), entry.Parts?.Select(p => Fit(p, true)).ToArray() ?? Array.Empty<MeshAsset>());
     }
 
     // ── Round things ────────────────────────────────────────────────────────────────────────────

@@ -164,6 +164,8 @@ public sealed class AcousticGeometry
         var h = new HashCode();
         h.Add(b.Center); h.Add(b.Size); h.Add(b.Rotation);
         h.Add(b.Material); h.Add(b.Build); h.Add(b.EntityId); h.Add(b.Form);
+        // A mesh is its box until its asset arrives: the tile is built again then.
+        if (b.Form is { Kind: ShapeKind.Mesh } m) h.Add(MeshLibrary.Shared.Contains(m.Mesh ?? ""));
         return h.ToHashCode();
     }
 }

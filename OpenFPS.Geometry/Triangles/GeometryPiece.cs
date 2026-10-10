@@ -101,6 +101,8 @@ public readonly record struct SolidSpec(int Owner, Vector3 Position, Quaternion 
         var mesh = Shapes.Make(form, size);
         if (mesh == null || form == null) return Of(owner, position, rotation, size, surface, null);
         var main = surface with { Construction = surface.Construction with { PanelSize = Shapes.PanelOf(form, size) } };
+        // A mesh a body cannot be met against (a sheet of more triangles than it has pieces for) is not in its way.
+        if (!mesh.Outer.Convex && (mesh.Parts == null || mesh.Parts.Length == 0)) main = main with { Layers = main.Layers & ~GeometryLayers.Movement };
         return new(owner, position, rotation, size, main, mesh.Outer, mesh.Parts, Slots: Shapes.SlotSurfaces(form, main));
     }
 
