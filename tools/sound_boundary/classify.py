@@ -129,6 +129,7 @@ FILE_RULES = [
     (CO + 'AudioEvents.cs', 'b', '', 'network: the message carrying TransientSounds'),
     (CO + 'TransientSound.cs', 'c', 'Sound', 'a short sound by its physics; on the wire in WorldAudioEvent'),
     (CO + 'Weapons.cs', 'c', 'Sound', 'weapon numbers the sound reads'),
+    (CO + 'Ammunition.cs', 'b', '', 'game rules: the fire selector and the ammunition a player carries'),
     (CO + 'ExternalBallistics.cs', 'a', 'Sound', 'bullet flight; the server flies rounds with it too'),
     (CO, 'a', 'Sound', 'models and presets'),
 ]

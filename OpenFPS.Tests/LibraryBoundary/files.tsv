@@ -188,6 +188,7 @@ OpenFPS.Common/AcousticRegistry.cs	lib	Acoustics
 OpenFPS.Common/AdminGun.cs	lib	Sound	
 OpenFPS.Common/Aircraft.cs	lib	Sound	
 OpenFPS.Common/AircraftGroundRun.cs	lib	Sound	
+OpenFPS.Common/Ammunition.cs	host		
 OpenFPS.Common/Applause.cs	lib	Sound	
 OpenFPS.Common/AudioClock.cs	lib	Sound	
 OpenFPS.Common/AudioEmission.cs	lib	Sound	
@@ -311,7 +312,7 @@ OpenFPS.Common/Vehicles.cs	lib	Sound
 OpenFPS.Common/WallTransmission.cs	lib	Acoustics	
 OpenFPS.Common/Waves.cs	lib	Sound	
 OpenFPS.Common/WeaponHandling.cs	lib	Sound	
-OpenFPS.Common/Weapons.cs	mixed	Sound	FireMode,WeaponAction,WeaponDefinition,WeaponFeed,WeaponRegistry
+OpenFPS.Common/Weapons.cs	lib	Sound	
 OpenFPS.Common/WeatherType.cs	lib	Sound	
 OpenFPS.Common/WheelDynamics.cs	lib	Sound	
 OpenFPS.Common/WheelState.cs	lib	Sound	
