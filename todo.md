@@ -27,7 +27,9 @@ After items 1-6 (agreed with Cody 2026-10-08): performance and distant updates c
 because the one world costs CPU and bandwidth first.
 7. Reflections in their own process, only if the measurement shows tracing is the cost.
 8. Distant updates (CODY_ASKS item 4), while the server-tile code is fresh.
-9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3.
+9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3. First step done
+   2026-10-09 (layers in contact are one panel, unheard: inbox/floors-2026-10-09); next the map's
+   double slab (Walls, below), then rooms from geometry, then sound through structure.
 10. Chat names and roles (item 8) and the editor dialog and wording (item 7). Both are small; fit them
     between the big items.
 11. Weather as a system (item 12): rain, wet roads, wind and fire tied together.
@@ -46,6 +48,8 @@ Waiting on Cody's ear:
 - Downpipes, round 2: the flange should be gone (inbox/water-smoothing-2026-10-06/round2).
 - The world editor in the game (F12), and `/editorkeys on` with Orca, then NVDA.
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
+- Floors: layers in contact are one panel; a shout through the floor, before and after
+  (inbox/floors-2026-10-09).
 
 ## Now
 
@@ -164,8 +168,14 @@ and the server's voice line.
 ### Walls
 - A source just behind a building corner made of two boxes gets no diffraction route (the 5 cm joint
   padding in `RouteIsClear`). Fix without reopening the shut-door crack leak.
-- Each floor is two overlapping 25 cm slabs, and carpet counts as a barrier: upstairs is about 15 dB
-  too quiet in the lows. Merge layers in contact.
+- Done 2026-10-09 (branch, unheard): layers in contact are one panel (changes.md). The city floor is
+  still 10/19/14 dB heavier than a lab-tested 15 cm slab because gen_city.py lays two 25 cm slabs
+  between storeys (each storey's floor and its ceiling). One slab of 15-20 cm per storey is a map
+  change for Cody to decide; it moves floor heights, stairs and the openings tests.
+- Upstairs footsteps need sound through the structure (impact into the slab); airborne, they are
+  silent through any real floor, before and after.
+- From upstairs, a shout in the flat below comes through about 14 dB louder than the same shout the
+  other way round, with the floor measuring the same both ways (inbox/floors-2026-10-09). Not found yet.
 - No cavity resonances or air leaks: sealed glazing is about 10 dB optimistic in the mids; door gaps
   and seals are not modelled.
 - Shut glass front doors let more in than steel doors: 17/28/43 dB against 13/48/58 (`--wall-tl`).

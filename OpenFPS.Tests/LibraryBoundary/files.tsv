@@ -190,6 +190,7 @@ OpenFPS.Common/CarDoor.cs	lib	Sound
 OpenFPS.Common/CarWindow.cs	lib	Sound	
 OpenFPS.Common/Chassis.cs	lib	Sound	
 OpenFPS.Common/Components.cs	mixed	Geometry,Sound	ColliderShape,PlaybackMode,WeatherType
+OpenFPS.Common/Constructions.cs	lib	Sound	
 OpenFPS.Common/CrossingGates.cs	lib	Sound	
 OpenFPS.Common/DesignedSoundKit.cs	lib	Sound	
 OpenFPS.Common/Diffraction.cs	lib	Acoustics	
@@ -227,6 +228,7 @@ OpenFPS.Common/JsonConverters.cs	host
 OpenFPS.Common/KnobDoor.cs	lib	Sound	
 OpenFPS.Common/LaneGuide.cs	host		
 OpenFPS.Common/LaneRoutes.cs	host		
+OpenFPS.Common/LayeredFaces.cs	lib	Sound	
 OpenFPS.Common/Lightning.cs	lib	Sound	
 OpenFPS.Common/LineFollower.cs	host		
 OpenFPS.Common/Localisation.cs	lib	Acoustics	

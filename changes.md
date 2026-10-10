@@ -2,6 +2,31 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-09
+
+- Layers in contact are one panel. A city floor is four boxes touching: a 3 cm plaster ceiling, the
+  storey's 25 cm ceiling slab, the next storey's 25 cm floor slab and 4 cm of carpet. Each was paid as
+  a wall of its own, the carpet with its free-hanging table figure (20 dB in the low band), and Steam
+  Audio lost faces where two boxes touch, so the floor took 53 dB in the low band for a voice upstairs
+  and 67 dB for footsteps on the same floor (the "15 dB too quiet in the lows"); the hand-rolled tracer
+  took over 100. Now solids in contact count as one construction (`Constructions`): sheets facing the
+  same way whose faces touch or overlap and share some of their face. Fixed solids only: a door leaf is
+  hung, and a block (a bed, a sofa) is not a sheet. The airtight layers are one bonded plate (masses
+  summed, bending stiffness about the common neutral axis, loss factor by the stiffness each brings); a
+  porous layer on an airtight one adds its weight and nothing else; a stud wall keeps its cavity
+  (`WallTransmission.LayeredBandGains`). The tracer and the legs of routes group the solids they cross
+  one straight after another. Steam Audio, which only multiplies what each face it meets lets through,
+  is given each construction's outer faces only, cut where the layers change, each carrying the whole
+  construction's figure (`LayeredFaces`), so a construction is met exactly as one box. The city floor is
+  now 49.6/72.9/96.8 dB (low/mid/high) everywhere and both ways; one stud wall (17.6/41.1/49.3) and two
+  walls with a corridor between (29.7/68.9/82.5) are unchanged. The city has 506 constructions; the
+  scene has 11 % more triangles (77,232 to 85,908) and takes 130-200 ms more to build at load.
+  Measured against a lab-tested 152 mm slab (RAL-TL15-332, STC 54: 40/54/83 dB on the same bands), the
+  floor is still 10/19/14 dB heavier: the map lays 50 cm of concrete between storeys (a slab per
+  storey's floor and another per its ceiling). Lab: `--layers` (and `--layers map=city`),
+  `--floor-render`; `--path-probe` prints the line's walls as constructions. Renders in
+  inbox/floors-2026-10-09.
+
 ## 2026-10-07
 
 - Trains, the budgets and the city after Cody's session (14:44-15:40: "sounds are cutting out

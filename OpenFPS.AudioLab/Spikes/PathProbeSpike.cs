@@ -243,14 +243,21 @@ public static class PathProbeSpike
             float len = Vector3.Distance(ear, src);
             float sl = 0, sm = 0, sh = 0;
             int walls = 0;
+            var crossings = new List<Constructions.Crossing>();
             foreach (var b in SteamAudioScene.BoxesFromWorld(world))
             {
                 if (!GeometryUtils.RayIntersectsOBB(ear, dir, b.Center, b.Size, b.Rotation, out float at) || at > len) continue;
+                if (!GeometryUtils.RayIntersectsOBB(src, -dir, b.Center, b.Size, b.Rotation, out float back)) continue;
                 var (gl, gm, gh) = WallTransmission.BandGains(b.Material, b.Size, b.Build);
                 sl += Db(gl); sm += Db(gm); sh += Db(gh);
                 walls++;
+                bool layer = !b.Hung && b.Form == null && Constructions.IsSheet(b.Size);
+                crossings.Add(Constructions.Of(at, len - back, AcousticRegistry.GetProperties(b.Material), b.Size, b.Build, 1,
+                                               layer ? Constructions.Normal(b.Size, b.Rotation) : Vector3.Zero));
             }
-            Console.WriteLine($"      {walls} wall(s) on the line        {sl,6:F1} {sm,6:F1} {sh,6:F1}");
+            Console.WriteLine($"      {walls} wall(s) on the line        {sl,6:F1} {sm,6:F1} {sh,6:F1}  each on its own");
+            var c = Constructions.Through(crossings, dir);
+            Console.WriteLine($"      the same as constructions   {Bands(c.X, c.Y, c.Z)}  layers in contact one panel");
             id++;
         }
     }
