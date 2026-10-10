@@ -22,8 +22,10 @@ the honest tests, the probable bugs and the trains fix are merged and shipped (V
    Next on this item: addresses (Overture's addresses theme) and lots, then the world's roads as RoadData for
    traffic. Overture release 2026-09-23.1 will be withdrawn around the end of November 2026: moving to a newer
    one is a new generator version.
-5. Sound library stage 3 alongside: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`
-   (docs/SOUND_LIBRARY_BOUNDARY.md section 8).
+5. Sound library: stage 3 done 2026-10-10 (unmerged branch; docs/SOUND_LIBRARY_BOUNDARY.md section 16):
+   `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`. Next, stage 4: rooms and openings as values
+   (`Room`, `Opening`), then `AcousticMap`, `RoomAcoustics`, `OpeningRoutes`, `FaceOpenings` and
+   `AcousticVolumeGenerator` into Acoustics (section 16.7). Do it while no audio branch is open.
 6. World editor phase 3: built 2026-10-10, unheard and untried with Orca and NVDA (docs/WORLD_EDITOR.md
    section 18): Changed on this map, map versions and baking, roads, paths and railways, people. (Cody)
    to try in the F12 dialog with Orca, then NVDA.

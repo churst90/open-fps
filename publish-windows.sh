@@ -6,9 +6,10 @@
 # Release, always: engines are synthesised inside the mixer callback, and a Debug build renders about
 # a third as fast, which is heard as dropouts. Self-contained: the zip carries the .NET runtime.
 #
-# <build> is WireContract.Hash, the hash of OpenFPS.Common the server checks at login. A zip only
-# talks to a server built from the same OpenFPS.Common, so rebuild this whenever the server is
-# updated, and the name says which server it is for.
+# <build> is WireContract.Hash, the hash of OpenFPS.Common and the library it is built on (Geometry,
+# Acoustics, Sound but its synthesis) that the server checks at login. A zip only talks to a server
+# built from the same sources, so rebuild this whenever the server is updated, and the name says which
+# server it is for.
 set -e
 
 REPO="$(cd "$(dirname "$0")" && pwd)"
@@ -23,7 +24,7 @@ for f in fmod.dll fmodstudio.dll phonon.dll nvdaControllerClient64.dll; do
   [ -f "$REPO/lib/$f" ] || { echo "!! lib/$f is missing; the zip would not start." >&2; exit 1; }
 done
 
-rm -rf "$OUT" "$ART/obj/OpenFPS.Common"   # one WireContract.g.cs, so the name is this build's
+rm -rf "$OUT" "$ART/obj/OpenFPS.Common" "$ART/obj/OpenFPS.Sound"   # one WireContract.g.cs and one DoorModelFingerprint.g.cs, this build's
 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
   "$DOTNET" publish "$REPO/OpenFPS.Client/OpenFPS.Client.csproj" -c Release -r win-x64 --self-contained true \
   --artifacts-path "$ART" -nodeReuse:false -p:UseSharedCompilation=false -v minimal
@@ -36,16 +37,18 @@ for f in OpenFPS.Client.exe fmod.dll phonon.dll nvdaControllerClient64.dll machi
 done
 # Every door model sound the client renders at start, rendered here and shipped: a door's simulation
 # takes seconds (a glass door up to forty), and a first hearing that is not ready is silent. The lab is
-# built from the same OpenFPS.Common, so its renders are this build's (DoorRenderCache checks the name).
+# built from the same sources, so its renders are this build's (DoorRenderCache checks the name).
 LAB_ART="$ART/lab"
-rm -rf "$LAB_ART/obj/OpenFPS.Common"   # one WireContract.g.cs here too
+rm -rf "$LAB_ART/obj/OpenFPS.Common" "$LAB_ART/obj/OpenFPS.Sound"   # the same here
 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
   "$DOTNET" build "$REPO/OpenFPS.AudioLab/OpenFPS.AudioLab.csproj" -c Release \
   --artifacts-path "$LAB_ART" -nodeReuse:false -p:UseSharedCompilation=false -v minimal
 # The renders are named by the door models' fingerprint (DoorRenderCache.Name), not the build, so a
 # zip made after a change elsewhere reuses the renders already made here.
-DOORHASH=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/*/DoorModelFingerprint.g.cs | head -1 | tr -d '"')
-LAB_DOORHASH=$(grep -rho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Common/*/DoorModelFingerprint.g.cs | head -1 | tr -d '"')
+# OpenFPS.Sound writes it, beside the door models (stage 3 of docs/SOUND_LIBRARY_BOUNDARY.md).
+DOORHASH=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Sound/*/DoorModelFingerprint.g.cs | head -1 | tr -d '"')
+LAB_DOORHASH=$(grep -rho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Sound/*/DoorModelFingerprint.g.cs | head -1 | tr -d '"')
+[ -n "$DOORHASH" ] || { echo "!! no DoorModelFingerprint.g.cs under $ART/obj/OpenFPS.Sound." >&2; exit 1; }
 [ "$LAB_DOORHASH" = "$DOORHASH" ] || { echo "!! the lab's door models are $LAB_DOORHASH, the client's $DOORHASH: renders would not be used." >&2; exit 1; }
 DOORVER=$(grep -o 'const int Version = [0-9]*' "$REPO/OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs" | grep -o '[0-9]*$')
 DOORS="$DOORHASH-v$DOORVER"

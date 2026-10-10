@@ -337,7 +337,7 @@ public class ClientAudioSelectionTests
         }
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Id), 30), $"{soundId} was never voiced");
 
-        string placed = FireSpec.KeyForPlaced(soundId, ColliderShape.Box, new Vector3(4f, 1f, 4f));
+        string placed = FireSpec.KeyForPlaced(soundId, ColliderShape.Box.IsRound(), new Vector3(4f, 1f, 4f));
         var (level, extent) = Declared(placed);
         var (gain, reference) = Loudness.Place(level, extent);
         var e = h.Mixer.Latest[Id];

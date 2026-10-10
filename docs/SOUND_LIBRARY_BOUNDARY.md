@@ -26,6 +26,7 @@ library that open-fps and Resonance both reference. Step 1 of
 13. Stage 0 as built: the guards, and how to regenerate them
 14. Stage 1 as built: OpenFPS.Native
 15. Stage 2 as built: OpenFPS.Geometry
+16. Stage 3 as built: OpenFPS.Sound and the first half of OpenFPS.Acoustics
 
 ---
 
@@ -783,6 +784,7 @@ Risks:
 - Work in flight on these files will conflict with the moves. At the time of the survey every named
   branch except `geometry-stage-2` is merged, but agents land audio work most days: do each move
   when no audio branch is open, and say so before starting.
+- As built: section 16. Five more fixes were needed for what landed after the survey (16.2).
 
 ### Stage 4: rooms and openings as values (2 sessions)
 
@@ -901,9 +903,9 @@ to `Geometry/` and to `SharedMovementEngine`.
 ## 10. Risks
 
 - **Silent wire mismatch**: the wire hash covers Common only (stage 3). Fix in the same commit as
-  the first wire type moves.
+  the first wire type moves. Done: it covers Geometry, Acoustics and Sound but its synthesis (16.4).
 - **Stale door renders**: the door fingerprint lists Common files (stage 3). The build fails loudly
-  if left; move the list with the files.
+  if left; move the list with the files. Done: the list is in OpenFPS.Sound, hashed by file name (16.4).
 - **Branches in flight**: each move conflicts with every branch that edits a moved file. Today only
   `geometry-stage-2` is unmerged, but audio branches open most days. `git mv` and unchanged
   namespaces keep the conflicts to renames, which git follows when the content is unchanged, but a
@@ -1844,6 +1846,178 @@ are going away. If a library type is wanted later, it is the geometry's own shap
   itself); it is a process-wide static (section 4.2's diagnostics exception).
 - `MoverPoses` stays host: the server's count of door leaves moved, read by `ServerGeometry` and the
   client's geometry adapter. The triangle world takes the poses as a function (`WithMoverPoses`).
+
+---
+
+## 16. Stage 3 as built (2026-10-10): `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`
+
+Done while no other audio branch was open (geometry stage 4 ran in parallel and was told to follow moved
+files). The survey was run again first, at 17ca6c53: 608 crossings in 77 allowance rows (76 file and host
+type pairs), 53 layering references. Since the survey of 2026-10-06 the materials table, struck things,
+fire by fuel, the loudspeakers, the gas hob, ground water, layered constructions and distant motion had
+landed; every new file was already sorted (files.tsv matched the survey), but four of them crossed in ways
+the plan did not list (16.2).
+
+### 16.1 The ten fixes
+
+Each its own commit, each with the render fingerprint (17 renders, bit for bit), the three emitter streams
+and the ratchet unchanged except for the allowance it lowered.
+
+| Fix | What changed | Crossings |
+|---|---|---:|
+| 1 | `Hearing.ReferenceVoice` holds `NormalDb`, `BufferRmsDbfs` and `LevelDb`; `Speech`'s are those constants. `Loudness`, `EarModel` and `LoudspeakerChain` read them there | 608 to 596 |
+| 2 | `BodyConstants` (Gravity, PersonHeight, WalkSpeed, SprintMultiplier, SprintSpeed); `PhysicsConstants`' five are those constants. `Glass`, `Breathing`, `EarWind`, `ExternalBallistics` read them there | 596 to 584 |
+| 3 | `RoadSurfaces.Default`; `RoadData.DefaultSurface` is it. `WheelDynamics` and `EngineProcessor` read it | 584 to 580 |
+| 4 | `WheelState.EncodeDemand`; `EntityState.EncodeTyreDemand` calls it | 580 to 578 |
+| 5 | `Core.RenderRate.Default` (48000); `MixerQuality.DefaultRate` is it. Eleven synths' default rate argument | layering 53 to 31 |
+| 6 | `AudioEmission` sorted into Sound (it reads the vehicle and machine presets); it stays in Common until stage 6 (it reads snapshots) | layering 31 to 26 |
+| 7 | `PuddleField` takes `Carriageway`s (id, centreline points, width); `RoadData.ToCarriageway` builds one, sharing the centreline list | 578 to 566 |
+| 8 | `TransientSound` and `SoundCharacter` into `TransientSound.cs`; `AudioEvents.cs` keeps `WorldAudioEvent` and is host | 566 |
+| 9 | `WheelState` into `WheelState.cs` | 566 |
+| 10 | `PlaybackMode` and `WeatherType` each into a file of its own, namespace `Components` unchanged | 566 |
+
+The door fingerprint moved once in these fixes, with fix 2 (`Glass.cs` is one of its sources:
+`f9ef642251b2` to `978619539e83`); no door render changed, the fingerprint test says so.
+
+### 16.2 Found on the way: five more fixes
+
+What had landed since the survey, or what the survey's counts could not see, and would have stopped the
+projects compiling:
+
+- **Weapons.cs** was mixed: the weapons' numbers the sound reads (`WeaponDefinition`, `FireMode`,
+  `WeaponFeed`, `WeaponAction`, `WeaponRegistry`) and three game rules (`FireSelector`, `AmmoType`,
+  `Ammunition`). The rules went to `Ammunition.cs` (host); `Weapons.cs` is all library and moved.
+- **Vector3Converter** (`JsonConverters.cs`, host) was read by `ModelLibrary` (13.1 had left it for
+  stage 3). Into `Vector3Converter.cs`, namespace unchanged, and moved with Sound. 565.
+- **The fire models** (fire by fuel, new) took the entity model's `ColliderShape` to tell round from
+  square. The ratchet never counted it (the enum is sorted as a value both need), but Sound cannot see
+  Common. `FireShape.Footprint`, `FireSpec.KeyForPlaced` and `FuelCatalog.ForThing` take `bool round`;
+  the host says what is round (`ColliderShapes.IsRound` in `Components.cs`: a cylinder, a sphere or a
+  cone, as before). `ColliderShape` stays in Common (15.2).
+- **LoudspeakerChain** (new) rendered through `MixerQuality.Resample` and `RadiatorBands`, both in the
+  FMOD folder though neither touches FMOD. `SincResampler` (Core) holds the resampler, and
+  `MixerQuality.Resample` calls it; `RadiatorBands` is in a file of its own beside the chain, namespace
+  unchanged. Layering 26 to 18.
+- **Constructions and LayeredFaces** (layered constructions, new) are what a wall or a floor lets
+  through as one panel, over `WallTransmission`, and read no sound model. The default rule had put them
+  in Sound, which left `OpeningRoutes` (Acoustics, stage 4) using Sound in 18 places. Sorted into
+  Acoustics and moved with it. Layering 18 to 0.
+
+### 16.3 What moved
+
+By `git mv`, namespaces unchanged (decision 6), 165 files:
+
+| From | To | Files |
+|---|---|---:|
+| `OpenFPS.Common/` (every file sorted into Sound but `AudioEmission.cs`; `Hearing/` and `Editing/` keep their folders) | `OpenFPS.Sound/` | 92 |
+| `OpenFPS.Client.Core/AudioEngine/Core/` (the synthesis: every file but the five Audio ones) | `OpenFPS.Sound/Core/` | 61 |
+| `OpenFPS.Common/` `AcousticConstants`, `AcousticRegistry`, `Diffraction`, `EarlyReflections`, `Enclosure`, `ImageSource`, `Localisation`, `PanelAcoustics`, `SparseAcousticOctree`, `WallTransmission`, `Constructions`, `LayeredFaces` | `OpenFPS.Acoustics/` | 12 |
+
+Left behind on purpose: the rooms and openings (`AcousticMap`, `RoomAcoustics`, `OpeningRoutes`,
+`Systems/FaceOpenings`, `Systems/AcousticVolumeGenerator`) for stage 4; `AudioEmission` for stage 6; the
+five Audio files of `AudioEngine/Core` (`AmbisonicFormat`, `AudioBank`, `AudioEngineFacade`,
+`DoorRenderCache`, `VoiceManager`) for stage 6. OpenFPS.Common is down to 35 files.
+
+The projects, as section 6 drew them:
+
+```
+OpenFPS.Geometry <- OpenFPS.Acoustics <- OpenFPS.Sound <- OpenFPS.Common <- Server, Client.Core (-> Native)
+```
+
+- `OpenFPS.Acoustics` references Geometry; packages MemoryPack (the octree is inside `AcousticMap`'s
+  `[MemoryPackable]`, decision 4) and Serilog (`AcousticRegistry` logs an unknown material).
+  `InternalsVisibleTo`: `OpenFPS.Common` (`OpeningRoutes` calls `Diffraction.MinimiseOnEdge`; goes when
+  it moves in stage 4) and `OpenFPS.Tests`.
+- `OpenFPS.Sound` references Geometry and Acoustics; packages MemoryPack (`TransientSound`, decision 4)
+  and Serilog. `InternalsVisibleTo`: `OpenFPS.Client.Core` (the rail voice drives `BogieVoice`,
+  `BodyDrum` and `AxleSchedule`, the engine processor an aircraft's `BladeRow`; this becomes
+  `OpenFPS.Audio` in stage 6), `OpenFPS.Tests`, `OpenFPS.AudioLab`. No `AllowUnsafeBlocks`: the synths
+  use `stackalloc` into spans only.
+- `OpenFPS.Common` references Geometry, Acoustics and Sound. The server references Common only, and
+  never Native: it loads no FMOD.
+- Nothing else changed its references: Client.Core, the clients, the lab and the tests get the new
+  projects through Common.
+
+### 16.4 The wire hash and the door fingerprint
+
+- `WireContract.Hash` covers Common and, by `WireLibrarySource`, all of Geometry, all of Acoustics and
+  all of Sound but `Core/`. Every file of Acoustics and of Sound outside `Core/` came from Common and was
+  in the hash already; `Core/` came from Client.Core, only the client runs it, and it never was. The wire
+  types that moved are all in it: `TransientSound`, `SoundCharacter`, `WheelState`, `PlaybackMode`,
+  `WeatherType`, `Precipitation`, `WindAir`, `LightningStrike`, `FlashKind`, `RoadWater`, `DoorKind`,
+  `CrowdApplause`, `AdminGunMode`, the weapons' numbers, and the models the server and the client both
+  run (vehicles, wheels, doors, glass). Checked by appending a comment and building: to `Precipitation.cs`,
+  `TransientSound.cs`, `WheelState.cs`, `AcousticRegistry.cs` or `KnobDoor.cs` changes the hash, to
+  `Core/VehicleSynth.cs` does not, and taking the comment out gives the hash back. The hash moved with the
+  stage (`d055f5fd65eb` at 17ca6c53 to `c98f59c6ec5c`), as it does with any edit to Common: a client and
+  a server from either side refuse each other at login.
+- The hashing task is in one place, `tools/build/SourceHash.targets`, imported by Common (the wire) and
+  Sound (the doors). An item may carry `HashName` metadata to be hashed under that name wherever it is.
+- `DoorModelFingerprint` is generated by `OpenFPS.Sound` now, beside the door models, in the same
+  namespace. Its list names thirteen files of Sound and `..\OpenFPS.Acoustics\AcousticRegistry.cs`, each
+  hashed under its file name (`HashName`), so the move did not change it: `978619539e83` before and after,
+  and every player's door render cache stays good. Checked: a comment in `KnobDoor.cs` or
+  `AcousticRegistry.cs` changes it; a listed file that is missing fails the build (`HashSources` cannot
+  read it).
+- `publish-windows.sh` and `run-gtk-client.sh` read the door fingerprint from `obj/OpenFPS.Sound/`;
+  `publish-windows.sh` clears that folder as it clears Common's, so there is one of each.
+
+### 16.5 The ratchet
+
+| | Before (17ca6c53) | After |
+|---|---:|---:|
+| Crossings (references) | 608 | 565 |
+| Allowance rows (file, host type) | 76 | 64 |
+| Layering references (a lower project using a higher) | 53 | 0 |
+| Files in `files.tsv` | 339 | 350 |
+
+- `allowed.tsv` only shrank: every line that changed went down or went away, in the commit that fixed it.
+  The move itself changed no line: no moved file had a crossing left.
+- `files.tsv` is regenerated from the survey: the move changed 165 paths, and the fixes added eleven
+  files (`ReferenceVoice`, `BodyConstants`, `RenderRate`, `TransientSound`, `WheelState`, `PlaybackMode`,
+  `WeatherType`, `Ammunition`, `Vector3Converter`, `SincResampler`, `RadiatorBands`); `AudioEvents`,
+  `Messages` and `Weapons` stopped being mixed, and `Components` holds one library value instead of three.
+- `LibraryReferencesOnlyLibrary` has two more cases: Acoustics references only the runtime, Geometry,
+  MemoryPack.Core and Serilog; Sound only the runtime, Geometry, Acoustics, MemoryPack.Core and Serilog.
+- The survey reads the two new projects (`Program.cs`: their compilations, references and grants; the
+  door fingerprint is generated into Sound's compilation, as the build does).
+
+### 16.6 Checks
+
+- Every project builds: Geometry, Native, Acoustics, Sound, Common, the server, Client.Core, the GTK
+  client, the Windows client (`EnableWindowsTargeting`), the lab, the tests.
+- The render fingerprint: 17 renders bit for bit after every step. The emitter streams: unchanged after
+  every step. The ratchet: passes after every step with the counts above. None of the three was
+  regenerated.
+- The broad filter after the move (the guards and every test class whose name holds WireContract, Engine,
+  Vehicle, Door, Rain, Weather, Fire, Water, Wind, Footstep, Loudness, Hearing, Ear, Acoustic, Wall, Panel,
+  Material, Struck, Loudspeaker, GasHob, Train, Aircraft, Siren, Horn, Machine, Bird, Speech, Glass, Gun or
+  Applause): 1,753 tests, 1,748 passed, 5 skipped, 0 failed (36 minutes on twelve cores).
+  A second filter (ClientAudio, Geometry, SteamAudio, NetworkTrim, Opening, Reverb): 208 tests, 205 passed,
+  2 skipped, 1 failed, the fire:campfire case that failed on main too (16.7). After merging main (652c03fd,
+  which fixed that test) the guards, ClientAudioSelection, DistantUpdates and every Fire class: 149 passed.
+- CI: `.github/workflows/tests.yml` builds `OpenFPS.Tests`, which brings the new projects in;
+  `tools/ci/shard_tests.py` deals out test classes, which did not change. Nothing to edit. The publish
+  scripts build their executables' projects, which reference the new ones through Common.
+
+### 16.7 Left for stage 4
+
+- Rooms and openings as values (`Room`, `Opening`), then move `AcousticMap`, `RoomAcoustics`,
+  `OpeningRoutes`, `FaceOpenings` and `AcousticVolumeGenerator` into Acoustics. They hold 152 of the 565
+  references left (`AcousticVolumeGenerator` 120, `RoomAcoustics` 15, `OpeningRoutes` 15, `AcousticMap` 2);
+  `OpeningGraph` (50) and `FmodAudioProvider`'s 19 take the same values. When `OpeningRoutes` moves,
+  Acoustics' grant to Common goes.
+- `AcousticMap` and `SparseAcousticOctree` keep `[MemoryPackable]` (decision 4 said it can probably go:
+  nothing sends them). Deciding that would let Acoustics drop MemoryPack.
+- `ColliderShape` stays in Common (15.2); since 16.2 no library file needs it but the three stage 6
+  readers of `ColliderComponent`.
+- The rest of the 565 belongs to stage 6 (the world input): `RainField` 104, `SpatialAcoustics` 73,
+  `AsyncAcousticWorker` 50, `SteamAudioScene` 27, `CabinWalls` 20, `AudioEmission` 18, `EarlyCopies` 17,
+  `TalkerVoice` 16, `VehicleShadow` 15, `EngineReflections` 4.
+- Unrelated, seen while checking: `ClientAudioSelectionTests.EveryKindOfPhysicalSourceIsPlacedAtItsOwnDeclaredLevel("fire:campfire")`
+  failed on main as here (the test placed the fire on a 4 m box, which `KeyForPlaced` keys as a bigger fire,
+  and expected the preset's level). Main fixed the test in b4496206; the merge passes `IsRound()` for its
+  `ColliderShape.Box`.
 
 ---
 

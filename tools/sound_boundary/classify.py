@@ -89,7 +89,8 @@ FILE_RULES = [
     (CO + 'SparseAcousticOctree.cs', 'a', 'Acoustics', ''),
     (CO + 'Systems/', 'a', 'Acoustics', 'regions and openings from the solids'),
     (CO + 'WallTransmission.cs', 'a', 'Acoustics', ''),
-    (CO + 'AudioEmission.cs', 'a', 'Acoustics', ''),
+    (CO + 'Constructions.cs', 'a', 'Acoustics', 'solids in contact crossed as one layered panel'),
+    (CO + 'LayeredFaces.cs', 'a', 'Acoustics', "a construction's faces as a ray tracer meets them"),
     (CO + 'Localisation.cs', 'a', 'Acoustics', ''),
     # Common: sound models, presets, the ear, weather, nature
     (CO + 'Hearing/', 'a', 'Sound', 'the ear'),
@@ -97,6 +98,9 @@ FILE_RULES = [
     (CO + 'Spectrum.cs', 'a', 'Sound', ''),
     (CO + 'ShapedNoise.cs', 'a', 'Sound', ''),
     (CO + 'AudioClock.cs', 'a', 'Sound', 'becomes an instance the host passes in'),
+    # Where a source's sound comes out: it reads the vehicle and machine presets, so Sound, not Acoustics. It
+    # reads entity snapshots too, so it stays in Common until the world input (stage 6).
+    (CO + 'AudioEmission.cs', 'a', 'Sound', 'stays in Common until stage 6: reads entity snapshots'),
     (CO + 'Speech/', 'b', '', "open-fps's recorded lines; Loudness reads its levels"),
     (CO + 'Beacons.cs', 'b', '', 'game feature'),
     (CO + 'DirectionWords.cs', 'b', '', 'speech UI'),
@@ -124,8 +128,10 @@ FILE_RULES = [
     (CO + 'Components.cs', 'b', '', 'entity model'),
     (CO + 'WorldSnapshot.cs', 'b', '', 'snapshots'),
     (CO + 'Tiles.cs', 'b', '', 'streaming interest'),
-    (CO + 'AudioEvents.cs', 'c', 'Sound', ''),
+    (CO + 'AudioEvents.cs', 'b', '', 'network: the message carrying TransientSounds'),
+    (CO + 'TransientSound.cs', 'c', 'Sound', 'a short sound by its physics; on the wire in WorldAudioEvent'),
     (CO + 'Weapons.cs', 'c', 'Sound', 'weapon numbers the sound reads'),
+    (CO + 'Ammunition.cs', 'b', '', 'game rules: the fire selector and the ammunition a player carries'),
     (CO + 'ExternalBallistics.cs', 'a', 'Sound', 'bullet flight; the server flies rounds with it too'),
     (CO, 'a', 'Sound', 'models and presets'),
 ]

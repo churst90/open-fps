@@ -19,6 +19,22 @@ Recent work, newest first. `git log` has the rest.
   (`--geometry-parity only=rooms`) and are not switched on. A home's ceiling is one over its whole footprint. Server
   and both clients must be rebuilt together (two messages appended; the wire hash changes).
 
+- Sound library stage 3 (docs/SOUND_LIBRARY_BOUNDARY.md section 16): two new projects. `OpenFPS.Sound` holds
+  every sound model and preset that was in OpenFPS.Common (92 files: vehicles, wheels, doors, glass, weather,
+  nature, the ear, the loudness law, the weapons' numbers) and the synthesis from Client.Core's
+  `AudioEngine/Core` (61 files, now `OpenFPS.Sound/Core`). `OpenFPS.Acoustics` holds the materials, walls,
+  panels, layered constructions, diffraction, reflections, enclosure and the octree (12 files); the rooms and
+  openings follow in stage 4. Geometry <- Acoustics <- Sound <- Common, and the server still never loads FMOD.
+  Files moved unchanged, namespaces unchanged. First fifteen small fixes, each its own commit: the reference
+  voice's levels in `Hearing.ReferenceVoice`, the body constants in `BodyConstants`, `RoadSurfaces.Default`,
+  `WheelState.EncodeDemand`, `RenderRate.Default` for the synths, puddles from carriageways, the fire models
+  told whether a thing is round instead of reading the collider enum, the loudspeaker's resampler and band split
+  out of the FMOD folder, and five types out of mixed files. The library's references to the game went from 608
+  to 565, and its references against its own layering from 53 to 0. The wire hash now covers the moved files
+  (a client and server from either side of this refuse each other at login, as for any edit to Common); the
+  door models' fingerprint moved with them and stayed the same (978619539e83), so door render caches are still
+  good. No sound changed: the 17 renders are the same to the bit and the emitter streams are the same.
+
 - Far things sent less often: a far moving thing's once-a-second keep-alive now counts as a change when the
   thing has strayed from what the client predicts, so it goes again the tick after, as any other far state sent
   for a change does. Before, the keep-alive took the near-thing path, which never repeats. On a poor connection

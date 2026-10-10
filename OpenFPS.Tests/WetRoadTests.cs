@@ -156,8 +156,8 @@ public class WetRoadTests
     [Fact]
     public void Puddles_are_the_same_wherever_the_roads_are_loaded()
     {
-        var a = new PuddleField(Street());
-        var b = new PuddleField(Street());
+        var a = new PuddleField(Street().Select(r => r.ToCarriageway()).ToList());
+        var b = new PuddleField(Street().Select(r => r.ToCarriageway()).ToList());
         Assert.NotEmpty(a.PuddlesOn(0));
         Assert.Equal(a.PuddlesOn(0), b.PuddlesOn(0));
         _o.WriteLine($"{a.PuddlesOn(0).Count} puddles along 600 m of kerbs");
@@ -166,7 +166,7 @@ public class WetRoadTests
     [Fact]
     public void A_puddle_is_at_the_kerb_and_fills_and_spreads()
     {
-        var field = new PuddleField(Street());
+        var field = new PuddleField(Street().Select(r => r.ToCarriageway()).ToList());
         var p = field.PuddlesOn(0)[0];
         float lateral = p.Side * 3.5f;                                   // at the kerb face
         Assert.Equal(p.DepthMm, field.PuddleMm(0, p.Along, lateral * 0.9999f, 1f), 0);
