@@ -460,6 +460,8 @@ public class GameServer
             return (state.Temperature, state.AirPressure, state.WindVelocity, state.WindGustiness);
         };
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends, combat);
+        // Vehicles parked with the world editor are kept in its overlays, not the map files.
+        _commands.Editor.ParkKeptVehicles();
 
         // These register their handlers with the dispatcher, which is what keeps them alive.
         _ = new DiscoveryService(_dispatcher, _sessions, _maps, () => World);

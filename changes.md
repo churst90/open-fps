@@ -4,6 +4,20 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- World editor: Place lists Buildings and Vehicles first (docs/WORLD_EDITOR.md section 17). Vehicles are
+  every preset /spawn vehicle takes, by name; placing one parks it beside you (or at the build cursor),
+  one undo takes it away, and it is kept in the map's overlay and parked again on restart, never written
+  into the map file. Buildings holds building_box and groups saved as a building (/edit building NAME,
+  or Save as a building in the F12 dialog). Category audit of the 88 prefabs: building_box to Buildings,
+  stairs and ramps to a new Stairs and ramps, seating and soft furniture to Furniture and seating,
+  brick_arch to Walls and fences, sound_emitter and the three beacons to Sounds.
+- World editor: everything placed on a map, wherever it is. The Edit tab's "Placed on this map" (and
+  /edit placed [WORDS]) lists it nearest first with distance, compass direction, who placed it and when;
+  a filter keeps what has every word (or is within N metres). Remove it (or Delete in the list, asking
+  first) and /edit remove #ID [#ID ...] take things away from anywhere, one undo; Go to it (/edit goto
+  #ID) puts you beside one, on your own map or with the move permission. The overlay records PlacedBy
+  and PlacedAt on new additions; older ones say "placed earlier". No wire change.
+
 - No crack where far-ring ground meets 2 m ground (docs/WORLD_STREAMING.md, "Coarse ground in the far
   ring"). The 7.8 m ground's edge posts are raised until its edge is nowhere under the 2 m edge, and it
   hangs a skirt from its edges down to its floor, for rays and in the Steam Audio scene. On all 364 of

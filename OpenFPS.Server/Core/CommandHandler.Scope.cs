@@ -22,7 +22,7 @@ public partial class CommandHandler
            || (Permissions.ForMapEditors(permission) && _maps.IsEditor(session.CurrentMapId, session.Username));
 
     /// <summary>The world editor, made on first use (docs/WORLD_EDITOR.md).</summary>
-    public OpenFPS.Server.Editor.WorldEditor Editor => _editor ??= new OpenFPS.Server.Editor.WorldEditor(_maps, _server, _sessions);
+    public OpenFPS.Server.Editor.WorldEditor Editor => _editor ??= new OpenFPS.Server.Editor.WorldEditor(_maps, _server, _sessions) { Composites = _composites };
     private OpenFPS.Server.Editor.WorldEditor? _editor;
 
     /// <summary>

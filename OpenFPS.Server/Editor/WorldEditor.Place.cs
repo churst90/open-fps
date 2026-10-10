@@ -48,7 +48,10 @@ public sealed partial class WorldEditor
             return;
         }
         bool atCursor = args.Length >= 3 && args[^2].Equals("at", StringComparison.OrdinalIgnoreCase) && args[^1].Equals("cursor", StringComparison.OrdinalIgnoreCase);
-        Place(s, atCursor ? args[..^2] : args, reply, atCursor);
+        if (atCursor) args = args[..^2];
+        // "vehicle v8_muscle" as typed is "vehicle:v8_muscle", as the menus send it.
+        if (args.Length >= 2 && args[0].Equals("vehicle", StringComparison.OrdinalIgnoreCase)) args = new[] { VehiclePrefix + args[1] };
+        Place(s, args, reply, atCursor);
     }
 
     /// <summary>Where a thing put down now goes: at your feet (in front of you if solid), or at the build cursor.</summary>
@@ -73,6 +76,8 @@ public sealed partial class WorldEditor
     private void Place(UserSession s, string[] args, Action<IMessage> reply, bool atCursor)
     {
         if (args.Length == 0) { Say(reply, "Say /edit place PREFAB, and at cursor to put it at the build cursor. /edit find WORDS searches."); return; }
+        if (args[0].StartsWith(GroupPrefix, StringComparison.OrdinalIgnoreCase)) { PlaceGroup(s, args[0][GroupPrefix.Length..], reply); return; }
+        if (IsVehicleId(args[0], out string vehicle)) { PlaceVehicle(s, vehicle, reply, atCursor); return; }
         string prefab = args[0].ToLowerInvariant();
         if (!_maps.Prefabs.TryGetValue(prefab, out var t)) { Say(reply, $"There is no prefab called {args[0]}. /edit find WORDS searches."); return; }
         if (Models.IsRetired(PrefabKind.KindId, t.Id)) { Say(reply, $"{t.Name} is retired, so it is not offered for new things."); return; }
@@ -124,6 +129,8 @@ public sealed partial class WorldEditor
     private void Preview(UserSession s, string[] args, Action<IMessage> reply)
     {
         if (args.Length == 0) { Say(reply, "Say /edit preview PREFAB."); return; }
+        if (IsVehicleId(args[0], out _)) { Say(reply, "A parked vehicle has its engine off, so there is nothing to hear until somebody starts it."); return; }
+        if (args[0].StartsWith(GroupPrefix, StringComparison.OrdinalIgnoreCase)) { Say(reply, "A group is heard by placing it: there is no preview of one."); return; }
         if (!_maps.Prefabs.TryGetValue(args[0].ToLowerInvariant(), out var t)) { Say(reply, $"There is no prefab called {args[0]}."); return; }
         if (!TryBody(s, reply, out _, out var feet, out float yaw)) return;
         if (!t.HasEmitter) { Say(reply, $"{t.Name} makes no sound of its own, so there is nothing to hear. Place it to hear how it sounds when struck or walked on."); return; }
@@ -205,6 +212,11 @@ public sealed partial class WorldEditor
         if (args.Length == 2 && args[0].ToLowerInvariant() is "drop" or "remove")
         {
             LetGo(s, args[1], dialog, reply);
+            return;
+        }
+        if (args.Length > 0 && args[0].Equals("placed", StringComparison.OrdinalIgnoreCase))
+        {
+            HoldPlaced(s, string.Join(" ", args[1..]), dialog, reply);
             return;
         }
         if (args.Length == 1 && args[0].Equals("clear", StringComparison.OrdinalIgnoreCase))

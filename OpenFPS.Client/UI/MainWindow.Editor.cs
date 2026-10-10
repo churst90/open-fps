@@ -414,6 +414,14 @@ public sealed partial class MainWindow
                 editor.NextTab(e.KeyCode == Keys.PageUp || (e.KeyCode == Keys.Tab && e.Shift) ? -1 : 1);
                 return;
             }
+            // Delete on a list that has a Remove presses it for the row chosen (it asks first).
+            if (e.KeyCode == Keys.Delete && e.Modifiers == Keys.None && !dropped && ModelOf(focus) is { Delete: { } remove } removing)
+            {
+                e.SuppressKeyPress = true;
+                if (focus is ListBox chosenList) removing.Selected = chosenList.SelectedIndex;
+                editor.Press(remove);
+                return;
+            }
             if (e.KeyCode != Keys.Enter || dropped || focus is Button) return;
             // Enter presses the button the control names: Place from the prefab list, Apply from a field.
             if (ModelOf(focus) is { Enter: { } press } c)

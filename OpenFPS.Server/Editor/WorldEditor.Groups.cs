@@ -42,6 +42,8 @@ public sealed record GroupSpec
     [Tunable("", 0, 0, "What the group is called.")]
     public string Name { get; init; } = "";
     public GroupPart[] Parts { get; init; } = Array.Empty<GroupPart>();
+    [Tunable("", 0, 1, "On: listed in Place under Buildings. Off: under Groups.", Label = "a building")]
+    public bool Building { get; init; }
 }
 
 /// <summary>Groups as a kind: made in the editor only, kept in the model store, held by the server alone.</summary>
@@ -100,22 +102,25 @@ public sealed partial class WorldEditor
     private static float Degrees(float yaw) => yaw * 180f / MathF.PI;
 
     /// <summary>
-    /// /edit group NAME: the held things (or the selected one) kept as a group, a model of their own,
-    /// with their places from an origin at the middle of them on the ground, in the frame of the way you
-    /// face. The things stay where they are.
+    /// /edit group NAME, /edit building NAME: the held things (or the selected one) kept as a group, a model
+    /// of their own, with their places from an origin at the middle of them on the ground, in the frame of
+    /// the way you face. The things stay where they are. A building is a group listed under Buildings.
     /// </summary>
-    private void MakeGroup(UserSession s, string[] args, Action<IMessage> reply)
+    private void MakeGroup(UserSession s, string[] args, Action<IMessage> reply, bool building = false)
     {
-        if (args.Length == 0) { Say(reply, "Say /edit group NAME: the things you hold become a group of that name."); return; }
+        string what = building ? "building" : "group";
+        if (args.Length == 0) { Say(reply, $"Say /edit {what} NAME: the things you hold become a {what} of that name."); return; }
         string id = string.Join("_", args).ToLowerInvariant();
-        if (!ModelStore.IsSafeId(id)) { Say(reply, "A group's name is letters, digits, _ and -, up to 64."); return; }
-        if (!s.Can(Permissions.EditModels)) { Say(reply, "A group is a model every map can place, so making one needs edit-models."); return; }
+        if (!ModelStore.IsSafeId(id)) { Say(reply, $"A {what}'s name is letters, digits, _ and -, up to 64."); return; }
+        if (!s.Can(Permissions.EditModels)) { Say(reply, $"A {what} is a model every map can place, so making one needs edit-models."); return; }
         var kind = Catalog.Get(GroupKind.KindId)!;
-        if (kind.Knows(id)) { Say(reply, $"There is already a group called {id}."); return; }
+        if (kind.Knows(id)) { Say(reply, $"There is already a group or building called {id}."); return; }
         if (!TryBody(s, reply, out var world, out _, out float yaw)) return;
         var hand = HandOf(s);
         var ids = hand.Held.Count > 0 ? hand.Held.ToList() : hand.Selected is int one ? new List<int> { one } : new List<int>();
-        var things = ids.Select(i => (Id: i, Found: _maps.AuthoredEntities(s.CurrentMapId).TryGetValue(i, out var e) && Editable(world, e), E: e))
+        // A group is made of prefabs: a parked vehicle in the hand is left out of it.
+        var things = ids.Select(i => (Id: i, Found: _maps.AuthoredEntities(s.CurrentMapId).TryGetValue(i, out var e) && Editable(world, e)
+                                                     && _maps.Prefabs.ContainsKey(PrefabOf(world, e).ToLowerInvariant()), E: e))
                         .Where(x => x.Found).Select(x => (x.Id, x.E)).ToList();
         if (things.Count == 0) { Say(reply, "Hold some things first: /edit select add nearest, or by name or number."); return; }
 
@@ -148,13 +153,14 @@ public sealed partial class WorldEditor
                 Settings = settings == null ? null : new Dictionary<string, string>(settings),
             };
         }).ToArray();
-        var spec = new GroupSpec { Name = Capital(id.Replace('_', ' ').Replace('-', ' ')), Parts = parts };
+        var spec = new GroupSpec { Name = Capital(id.Replace('_', ' ').Replace('-', ' ')), Parts = parts, Building = building };
         ModelUpdate update;
         try { update = Models.Commit(GroupKind.KindId, id, JsonSerializer.Serialize(spec, GroupKind.Json), s.Username, $"made from {Plural(parts.Length, "thing")} on {_maps.DisplayName(s.CurrentMapId)}"); }
         catch (Exception ex) { Say(reply, $"Not made: {Reason(ex)}"); return; }
         Push(s, new CreateOp(s.CurrentMapId, GroupKind.KindId, id));
-        Say(reply, $"Made the group {id} from {Plural(parts.Length, "thing")}. The things stay where they are. Place it from Place, Groups, or /edit place group {id}.");
-        Notify(s, $"{s.Username} made the group {id}.");
+        string listed = building ? BuildingsCategory : GroupsCategory;
+        Say(reply, $"Made the {what} {id} from {Plural(parts.Length, "thing")}. The things stay where they are. Place it from Place, {listed}, or /edit place group {id}.");
+        Notify(s, $"{s.Username} made the {what} {id}.");
         Refresh(s, reply);
     }
 

@@ -54,6 +54,13 @@ public sealed class OverlayAddition
     /// first part), shared by every part of that placing so they can be held and moved as one. Null for a
     /// thing placed on its own.</summary>
     public string? Placement { get; set; }
+    /// <summary>Who placed it, and when (UTC). Null on entries kept before 2026-10-09: "placed earlier".</summary>
+    public string? PlacedBy { get; set; }
+    public DateTime? PlacedAt { get; set; }
+
+    /// <summary>A parked vehicle ("vehicle:PRESET" as its prefab): made by the editor after the map's
+    /// composites, never laid into the map's entities.</summary>
+    [JsonIgnore] public bool IsVehicle => WorldEditor.IsVehicleId(Entity.PrefabId, out _);
 }
 
 /// <summary>
@@ -244,11 +251,12 @@ public sealed class MapOverlayStore
         }
         foreach (var a in o.Added)
         {
+            if (a.Entity.EntityId >= o.NextId) o.NextId = a.Entity.EntityId + 1;
+            if (a.IsVehicle) continue;   // parked by WorldEditor.ParkKeptVehicles, after the composites
             if (byId.ContainsKey(a.Entity.EntityId)) continue;   // already in the file (/savemap'd)
             var copy = Clone(a.Entity);
             map.Entities.Add(copy);
             byId[copy.EntityId] = copy;
-            if (a.Entity.EntityId >= o.NextId) o.NextId = a.Entity.EntityId + 1;
         }
         Log.Information("MapOverlayStore: '{Map}' has the editor's changes: {Changed} changed, {Removed} removed, {Added} added{Spawn}{Skipped}.",
             map.Id, o.Changed.Count, o.Removed.Count, o.Added.Count, o.Spawn != null ? ", spawn moved" : "",
