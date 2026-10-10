@@ -199,6 +199,10 @@ public sealed class BuildForm
         if (word == "distance") return !Fitting && Text("where") == "ahead";
         if (Kind == "prefab" && word is "width" or "height" or "depth")
             return _catalog.OptionsOf(Kind, "prefab").FirstOrDefault(o => o.Value == Text("prefab"))?.Sized == true;
+        // A shape uses the fields its choice lists (in its Category): stairs their steps, a roof its style.
+        if (Kind == "shape" && word is not ("shape" or "material")
+            && _catalog.OptionsOf(Kind, "shape").FirstOrDefault(o => o.Value == Text("shape")) is { } shape)
+            return shape.Category.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(word);
         return true;
     }
 

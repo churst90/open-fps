@@ -1355,3 +1355,62 @@ No change: no message, member or union tag. The new dialog rows are EditorMenuIt
 OverlayRemoval.Name; a map file's characters gained Places. OpenFPS.Common is unchanged, so the build
 hash is the same; the client heads changed (a line of words updated in place), so both clients and the
 server should be rebuilt together.
+
+## 19. Shapes in the quick build
+
+Built 2026-10-10 with geometry stage 4 (docs/GEOMETRY.md 12). Untried with Orca and NVDA: tests only.
+
+### The Shape kind
+
+Control+B's What list, and the F12 dialog's Build a piece, have **Shape** after Window: stairs, a ramp,
+a round column, a cone, a ball, a dome, an arch or a roof, made of a wall's material at the size given,
+placed as any piece is (in front of you, at your feet, at the build cursor; facing the way you face or a
+compass direction). Its fields, top to bottom: Shape, Width, Length, Height, Steps, Landing at the top,
+Top, Thickness of the arch, Roof style, Roof over, Height above the floor, Rise to the ridge, Material,
+then Where, Distance and Facing.
+
+- Choosing a shape puts its own sizes in the fields (stairs: 14 steps, 1 by 3.92 by 2.52 metres) and
+  brings its own fields into use; the rest are dimmed and skipped by Tab, as a prefab's size is: stairs
+  use width, length, height, steps and landing; a column width and height; a cone those and Top; a ball
+  its width; a dome width and height; an arch width, length, height and thickness; a roof its style,
+  what it is over, the height above the floor, the rise, and width and length when it is over the size
+  given. Both clients take this from the same form (BuildForm), so GTK and Windows behave alike.
+- Stairs climb the way they face. Each rise is the height over the steps and may not be over 0.4 m.
+- A column, a cone, a ball and a dome are as deep as they are wide.
+- A roof **over the floor you stand on** takes that floor's own outline and turn (a footprint's outline,
+  or a box's rectangle), its eaves the height above the floor over the floor's top. Its rise is the one
+  given, or a quarter of its narrow side (6 in 12). Gable, hip, shed or flat.
+- The game says what was made: "Placed: stairs, 14 steps of 18 centimetres on 28 centimetres goings, 1
+  wide, concrete, 1 metre in front of you, facing north." A shape that cannot be made is refused and said
+  ("Not built: each rise is 0.667 m, over the 0.4 m a body can step."), and the dialog stays open.
+- One undo takes it away: "Undid: built stairs, 14 steps."
+
+### Said as a phrase
+
+`/edit build` takes a shape's word first and its numbers in the order it is said:
+
+```
+/edit build stairs 14 steps up north          14 steps of 18 cm on 28 cm, climbing north
+/edit build column 0.3 by 3                   0.3 m across, 3 m high
+/edit build ramp 1.5 by 6 by 0.5 wood         across, along, high
+/edit build cone 1 by 2 top 0.5
+/edit build ball 0.5 here
+/edit build arch 3 by 0.6 by 3.5 thickness 0.5
+/edit build roof gable over the floor
+/edit build roof hip 8 by 10 by 2 cursor      across, along and the rise, at the build cursor
+```
+
+Words a phrase reads: a number before "steps"; "up NORTH" or a compass word for which way it faces; a
+roof style; "over the floor"; here, cursor, ahead METRES; any field word and its value; a material's
+name (or its start). "roof" with no style is the roof slab it always was. Stairs said with a count and
+no sizes are a comfortable flight: 18 cm rises on 28 cm goings, a metre wide.
+
+### Code and wire
+
+- Server: WorldEditor.Shapes.cs (the fields, choices, phrases and building), with WorldEditor.Build.cs
+  (the Shape kind) and PlaceOne (a thing placed with a form). The overlay keeps the form (EntityData.Form;
+  its copy is deep now, so an outline is not lost when a thing is made again).
+- Client.Core: BuildForm.IsEnabled reads which fields a shape uses from its choice's category.
+- Wire: no new message or member. The shape choices are Info items of the "build.form" menu (Command
+  "shape.shape", Prompt the fields they set, Help the fields they use).
+- Tests: EditorShapeBuildTests.

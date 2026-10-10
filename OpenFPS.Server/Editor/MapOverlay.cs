@@ -333,7 +333,7 @@ public sealed class MapOverlayStore
         ApertureSize = e.ApertureSize, KeyedSide = e.KeyedSide, PushSide = e.PushSide,
         RoomMaterials = e.RoomMaterials?.ToArray(), Materials = e.Materials?.ToArray(), Tile = e.Tile, Layer = e.Layer,
         Form = e.Form is { } f
-            ? new OpenFPS.Common.Geometry.ShapeSpec { Kind = f.Kind, Steps = f.Steps, Landing = f.Landing, Thickness = f.Thickness, Segments = f.Segments }
+            ? f.Copy()
             : null,
     };
 }
