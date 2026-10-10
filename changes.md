@@ -4,6 +4,18 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- The borrowed-voice Doppler test failed after the engine CPU merge, but nothing in the sound was wrong. An
+  engine synthesizes the same stream to the bit whether its channel takes it at 0.8, 1 or 1.25 times real time,
+  before the merge and after. The test measured the "true" pitch half a second after placing a stock car at
+  200 km/h, while the driver was still settling it (5815 to 6015 to 5803 rpm). With the crank's period smeared,
+  the exhaust's own resonance near 316 Hz came within 0.005 of it in autocorrelation, and the valve solver's
+  change (78058077, sound changed within the seed's spread by design) tipped the pick to the pipe. The two
+  readings at 1.25 were right all along: following the play position gave 397 samples (the revolution's 496
+  over 1.25), the own cursor 492. The test now lets the engine settle for 2.7 s and checks it has. A new test
+  holds the stream bit-identical at all three rates and each reader at the crank's measured pitch: own cursor
+  496 / 492 / 501 samples at 1 / 1.25 / 0.8 (within the cursor's 1 % pull), following 496 / 397 / 620 against
+  496.3 / 397.0 / 620.3 expected. No engine code changed; fingerprints unchanged.
+
 - The world has buildings outside the real places (docs/WORLD_STREAMING.md, "Buildings on the world's tiles").
   Overture's footprints (Microsoft's, OpenStreetMap's, USGS lidar heights) are read by the server itself, by HTTP
   byte range from Overture's GeoParquet on S3: only the footer of a file and the few columns of the row groups a tile
