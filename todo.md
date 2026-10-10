@@ -60,7 +60,7 @@ Waiting on Cody's ear:
 - The world editor dialog in the game (F12: tabs, labels, Control+Tab), and `/editorkeys on` with
   Orca, then NVDA.
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
-- The hull's blows in time (inbox/probable-bugs-2026-10-09/1-hull).
+- (Approved 2026-10-09: the hull's blows in time.)
 - Recorded sounds' echoes smeared off rough walls: your steps and a PA (inbox/probable-bugs-2026-10-09/4-scattering).
 
 ## Now
