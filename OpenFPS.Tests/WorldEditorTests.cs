@@ -220,7 +220,8 @@ public class WorldEditorTests : IDisposable
 
         Assert.Equal("Width of Fire, 1.2 m.", rig.Run("edit", "set", "width", "1.2"));
         Assert.Equal(1.2f, rig.World("mine").Get<ColliderComponent>(e).Size.X, 4);
-        Assert.Equal(2f, rig.PoseOf(id).Scale.X, 4);
+        // The fire pit's collider is its 0.9 m bed (docs/FIRE.md 12).
+        Assert.Equal(1.2f / 0.9f, rig.PoseOf(id).Scale.X, 4);
 
         Assert.Equal("Name, Camp fire.", rig.Run("edit", "set", "name", "Camp", "fire"));
         Assert.Equal("Camp fire", rig.World("mine").Get<IdentityComponent>(e).Name);
@@ -228,7 +229,7 @@ public class WorldEditorTests : IDisposable
         Assert.Equal("Undid: set name of Fire.", rig.Run("edit", "undo"));
         Assert.Equal("Fire", rig.World("mine").Get<IdentityComponent>(e).Name);
         Assert.Equal("Undid: resized Fire.", rig.Run("edit", "undo"));
-        Assert.Equal(0.6f, rig.World("mine").Get<ColliderComponent>(e).Size.X, 4);
+        Assert.Equal(0.9f, rig.World("mine").Get<ColliderComponent>(e).Size.X, 4);
         Assert.StartsWith("Undid", rig.Run("edit", "undo"));
         Assert.StartsWith("Undid", rig.Run("edit", "undo"));
         Assert.Equal(1f, rig.World("mine").Get<SoundEmitterComponent>(e).Volume);
@@ -296,7 +297,8 @@ public class WorldEditorTests : IDisposable
         rig.Run("edit", "place", "fire_pit");
         int fire = rig.Selected;
         rig.Run("edit", "move", "3", "0", "0");
-        Assert.StartsWith("Selected Fire, 2.7 metres right", rig.Run("edit", "select", "nearest"));
+        // 3 m to its middle, less half its 0.9 m bed.
+        Assert.StartsWith("Selected Fire, 2.55 metres right", rig.Run("edit", "select", "nearest"));
         Assert.Equal(fire, rig.Selected);
         Assert.StartsWith("Selected Fire", rig.Run("edit", "select", "fire"));
         Assert.StartsWith("Selected Ground, under you", rig.Run("edit", "select", "#1"));

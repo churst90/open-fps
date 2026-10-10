@@ -92,8 +92,7 @@ Waiting on Cody's ear:
 - Trains' own horn, whistle and bell; air conditioners cycling with the weather
   (inbox/fault-fixes-2026-10-06).
 - Downpipes, round 2: the flange should be gone (inbox/water-smoothing-2026-10-06/round2).
-- The world editor dialog in the game (F12: tabs, labels, Control+Tab), and `/editorkeys on` with
-  Orca, then NVDA.
+- The world editor dialog in the game: Orca works well (Cody, 2026-10-10); NVDA still to try.
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
 - (Approved 2026-10-09: the hull's blows in time.)
 - Recorded sounds' echoes smeared off rough walls: your steps and a PA (inbox/probable-bugs-2026-10-09/4-scattering).
@@ -127,6 +126,7 @@ The last four were handled on 2026-10-09, on their own branch (renders in inbox/
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
+- (Approved 2026-10-10: the gas hob round 2, "sounds great now".)
 - The gas hob (docs/GAS_HOB.md, inbox/gas-stove-2026-10-10): round 1 heard 2026-10-10, liked; the tick
   too present and loud, the sparks went on long after it lit. Round 2 (inbox/gas-stove-2026-10-10/round2):
   the cook lets go as soon as it catches, the spark 9-13 dB lower at 1-4 kHz, a furnished kitchen; a flame
@@ -367,6 +367,10 @@ through their pad to the bone, and the level anchored to the footstep takes (-15
 inbox/struck-things-2026-10-10. Still open: the plaster stud wall bump is 10-15 dB short at 125 Hz-1 kHz
 against a recorded body slam into plaster; the car's rattle is busier than recorded ones; bumping a
 person is still the old impact.
+Heard by Cody 2026-10-10 (low priority, after geometry and the library reorganisation): the aluminium
+bar sounds like a bright bell; running into the car sounds crunchy and staticky; the fence and the glass
+door sound the same tonally, and the fence does not sound like a fence; the aluminium sheet is far too
+sustained and tonal. Kept in the game meanwhile.
 
 ## Next
 

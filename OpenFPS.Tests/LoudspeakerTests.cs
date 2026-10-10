@@ -261,8 +261,10 @@ public class LoudspeakerTests
         var back = MemoryPackSerializer.Deserialize<SoundEmitterComponent>(MemoryPackSerializer.Serialize(e));
         Assert.Equal("pa_horn", back.Loudspeaker);
         Assert.Equal(0.5f, back.WindowsOpen);
-        var last = typeof(SoundEmitterComponent).GetProperties().Where(p => p.CanWrite).OrderBy(p => p.MetadataToken).Last();
-        Assert.Equal(nameof(SoundEmitterComponent.Loudspeaker), last.Name);
+        // Appended after what was there before it (later members, such as a fire's Quench, follow it).
+        var order = typeof(SoundEmitterComponent).GetProperties().Where(p => p.CanWrite).OrderBy(p => p.MetadataToken)
+            .Select(p => p.Name).ToList();
+        Assert.True(order.IndexOf(nameof(SoundEmitterComponent.Loudspeaker)) > order.IndexOf(nameof(SoundEmitterComponent.WindowsOpen)));
     }
 
     /// <summary>
