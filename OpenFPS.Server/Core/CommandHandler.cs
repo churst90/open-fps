@@ -187,6 +187,9 @@ public partial class CommandHandler
             case "knock":
                 HandleKnock(session, args, reply);
                 break;
+            case "tap":
+                HandleTap(session, reply);
+                break;
             // A gun in your hands is the permission to fire it; naming a weapon out of the air needs fire-any.
             case "fire":
             case "shoot":

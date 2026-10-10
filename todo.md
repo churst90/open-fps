@@ -361,9 +361,12 @@ physics are done.
   car park) stays a box; a zone inside a zone is said as the inner one, the outer on the where-am-I key.
 
 ### Bump sounds
-Walking into something (`--bumps`) is always the same woofy, hollow thunk. Missing: radiation
-efficiency below a panel's critical frequency, and a hard contact of about a millisecond. Then anchor
-the level to the footstep takes.
+Built 2026-10-10, unheard (docs/MATTER.md 7.5): a bump is a body (palm, boot toe, shoulder) striking what
+you walked into by modal synthesis, with the near-field radiation below coincidence, the palm and knuckle
+through their pad to the bone, and the level anchored to the footstep takes (-15.8 dB). Renders in
+inbox/struck-things-2026-10-10. Still open: the plaster stud wall bump is 10-15 dB short at 125 Hz-1 kHz
+against a recorded body slam into plaster; the car's rattle is busier than recorded ones; bumping a
+person is still the old impact.
 
 ## Next
 

@@ -158,6 +158,26 @@ Recent work, newest first. `git log` has the rest.
   from the map's bus stops, entrances, lobbies and squares, and how many people walk the pavements per
   100 metres. A thing made again from its map entry now keeps the entry's door sides and room
   materials. Both clients' dialogs update a line of words in place. WorldEditorPhase3Tests.
+- Struck things (docs/MATTER.md 7.5, step 2 of its order of work). A thing's tap, knock or bump is now made
+  from its own material, shape and size by modal synthesis: bars, plates (with wood's grain), free sheets,
+  tubes, sheet boxes and solid blocks (Rayleigh-Ritz), each mode's frequency, loss and radiation from the
+  material table, struck by a fingertip, a knuckle (fitted to the door-knock recording, 2.7 dB), a palm, a
+  boot's toe, a body or a steel rod through Hertz contacts. Walking or running into something is a palm,
+  a toe and a shoulder striking it: a stud wall's board over its cavity, a glass door loose in its latch,
+  a fence pale on its bolt, a car's panels. The level is anchored to the footstep takes. Shift+E with no
+  door in reach knocks on whatever is in front of you; /tap taps it with a fingertip. Rendered once per
+  key on a worker. `--struck` (renders, fit, anchor). Unheard: renders in inbox/struck-things-2026-10-10.
+  StruckThingsTests.
+- The material table (docs/MATTER.md 2.4, step 1 of its order of work). AcousticRegistry has 50 materials:
+  26 new ones in families (aluminium, stainless steel, cast iron, copper, brass, bronze, lead, titanium;
+  granite, sandstone, laminated glass; oak, pine, maple, plywood, MDF with their grain; PVC, acrylic,
+  polycarbonate, nylon, foam; sand, clay, ice, snow; fabric), and every material now also carries its
+  family, Poisson's ratio, how its loss moves with frequency, its stiffness across the grain, hardness,
+  roughness, strength, specific heat, conductivity, melting point, water uptake and vapour resistance, each
+  with its source. Fuel fields wait for the fire work. Aliases (Steel, Aluminum, Soil, Porcelain and so on)
+  read their material. An unknown name is logged once as a warning instead of passing silently as Generic.
+  The 25 materials that were there keep every figure they had: no sound changed (the render fingerprint
+  and the emitter-stream replay hold). `--materials` prints the table. AcousticRegistryTests.
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
   and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;

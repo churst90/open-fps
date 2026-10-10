@@ -75,7 +75,8 @@ public sealed class WorldAudioPlayer
     internal const double GlassRenderLateness = 0.4;
 
     private static double LatenessFor(in TransientSound sound)
-        => sound.SynthKey != null && sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)
+        => sound.SynthKey != null && (sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)
+                                      || sound.SynthKey.StartsWith(StruckThings.KeyPrefix, StringComparison.Ordinal))
             ? GlassRenderLateness : MaxRenderLateness;
     /// <summary>Finished renders with the rate each carries, which is registered as it is: a door
     /// prewarmed before the mixer existed may not be at the mixer's rate.</summary>
@@ -1321,6 +1322,14 @@ public sealed class WorldAudioPlayer
         // The simulated models (doors, the key in a lock, a lift door, a car window, breaking glass).
         if (IsDoorModelKey(sound.SynthKey))
             return RenderDoorKey(sound.SynthKey!, _fullScaleDb);
+        // A struck thing (a bump, a knock or a tap on anything): its own modes, from its key (StruckThings),
+        // placed at its own render's level.
+        if (StruckThings.TryParseKey(sound.SynthKey, out var struck))
+        {
+            var pcm = StruckThings.Render(struck, TransientSynth.SampleRate, out float struckDb);
+            _fullScaleDb[sound.SynthKey!] = struckDb;
+            return pcm;
+        }
 
         return TransientSynth.Render(sound, seed);
     }
@@ -1455,6 +1464,9 @@ public sealed class WorldAudioPlayer
         if (Speech.TryParseKey(sound.SynthKey, out _)) return $"synth:{sound.SynthKey}";
         if (BulletFlyby.TryParseCrack(sound.SynthKey, out _)) return $"synth:{sound.SynthKey}";
         if (IsDoorModelKey(sound.SynthKey))
+            return $"synth:{sound.SynthKey}";
+        // A strike's key carries its own variant.
+        if (sound.SynthKey != null && sound.SynthKey.StartsWith(StruckThings.KeyPrefix, StringComparison.Ordinal))
             return $"synth:{sound.SynthKey}";
         if (!string.IsNullOrEmpty(sound.SynthKey)) return $"synth:{sound.SynthKey}:{seed & 3}";
         return $"synth:{sound.Character}:{hz}:{level}:{decay}:{noise}:{seed & 3}";

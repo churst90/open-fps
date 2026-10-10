@@ -133,10 +133,64 @@ public sealed class WallBumps
     }
 
     /// <summary>
-    /// The knock, from the impact model every other collision uses: a body (Skin) against the thing's
-    /// own material, the face it met deciding the note and its mass the weight.
+    /// The bump: a body striking the thing (docs/MATTER.md 7.3), a palm, the toe of a shoe and the shoulder on
+    /// the thing's own modes from its material, shape and size (StruckThings.Describe: a stud wall's board between
+    /// its studs, a glass door loose in its latch, a fence's pale on its bolt, a car's panels). A person met is
+    /// still the plain impact of two bodies (<see cref="PersonSound"/>).
     /// </summary>
-    public static List<TransientSound> Sound(in EntitySnapshot struck, BodyContact c, Vector3 where, bool running)
+    public static List<TransientSound> Sound(in EntitySnapshot struck, BodyContact c, Vector3 where, bool running, int seed = 0)
+    {
+        if (Sightline.IsPerson(struck)) return PersonSound(struck, c, where, running);
+        var strike = StrikeOf(struck, c, where, running, seed, out _);
+        return new List<TransientSound>
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock,
+                Position = where,
+                // What the client's render of the key puts it at (WorldAudioPlayer.AtOwnLevel); this is a
+                // starting figure for anything that reads the level before the render is back.
+                LevelDb = BumpLevelDb,
+                Hz = 200f, DecaySeconds = 0.5f, Noisiness = 0.6f,
+                SynthKey = StruckThings.Key(strike),
+            },
+        };
+    }
+
+    /// <summary>A bump's level before its render is back, dB SPL at a metre: about a walking bump into a
+    /// wall as the struck model and its anchor put it (`--struck renders`).</summary>
+    public const float BumpLevelDb = 85f;
+
+    /// <summary>
+    /// The strike a bump is: the thing as StruckThings.Describe reads its box, the body's blows near where it was
+    /// touched (the hand at shoulder height), at the closing speed. Quantised so a wall of one kind is a few
+    /// renders, not one per bump: speed to 0.2 m/s, places to tenths of the face.
+    /// </summary>
+    public static Strike StrikeOf(in EntitySnapshot struck, BodyContact c, Vector3 where, bool running, int seed, out StruckThing thing)
+    {
+        var def = struck.Definition;
+        var local = Vector3.Transform(c.Normal, Quaternion.Inverse(struck.Transform.Rotation));
+        thing = StruckThings.Describe(def.Material.Material, def.Collider.Size, local, def.Acoustics.LeafMetres,
+                                      def.Acoustics.StudSpacingMetres, def.Moves, isVehicle: struck.Wheels != null, out bool lengthIsUp);
+        // Where on the face: across from the box's own centre along the face, up from its bottom.
+        var (min, max) = Sightline.WorldBounds(struck);
+        float upFrac = max.Y - min.Y > 0.05f ? Math.Clamp((c.Feet.Y + 1.4f - min.Y) / (max.Y - min.Y), 0.05f, 0.95f) : 0.5f;
+        Vector3 n = Vector3.Normalize(new Vector3(c.Normal.X, 0f, c.Normal.Z) + new Vector3(1e-6f, 0f, 0f));
+        Vector3 along = new(-n.Z, 0f, n.X);
+        Vector3 centre = (min + max) * 0.5f;
+        float half = MathF.Max(0.05f, MathF.Abs(along.X) * (max.X - min.X) * 0.5f + MathF.Abs(along.Z) * (max.Z - min.Z) * 0.5f);
+        float acrossFrac = Math.Clamp(0.5f + Vector3.Dot(where - centre, along) / (2f * half), 0.05f, 0.95f);
+        float closing = (running ? RunningPace : WalkingPace) * Math.Clamp(c.Intent, 0f, 1f);
+        closing = MathF.Max(ImpactAcoustics.MinimumSpeed + 0.1f, MathF.Round(closing / 0.2f) * 0.2f);
+        float Tenth(float v) => MathF.Round(v * 10f) / 10f;
+        return new Strike(thing, StruckThings.BodyBump(closing, Tenth(acrossFrac), Tenth(upFrac), lengthIsUp, 0f), seed & 3);
+    }
+
+    /// <summary>
+    /// Walking into a person: the impact model every collision used before the struck things (ImpactAcoustics), a
+    /// body (Skin) against them, weighing what a person weighs.
+    /// </summary>
+    public static List<TransientSound> PersonSound(in EntitySnapshot struck, BodyContact c, Vector3 where, bool running)
     {
         var def = struck.Definition;
         var body = AcousticRegistry.GetProperties("Skin");
