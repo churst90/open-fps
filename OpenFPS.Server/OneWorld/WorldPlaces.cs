@@ -28,7 +28,7 @@ namespace OpenFPS.Server.OneWorld;
 public sealed class WorldPlaces
 {
     /// <summary>What a copied tile holds and how: a change copies every place again.</summary>
-    public const int FormatVersion = 1;
+    public const int FormatVersion = 2;
 
     public sealed class Place
     {
@@ -44,6 +44,11 @@ public sealed class WorldPlaces
         public readonly Dictionary<WorldTileKey, List<EntityData>> Things = new();
         public List<TerrainBuilder.Slab> Slabs = new();
         internal Dictionary<WorldTileKey, float[]>? Ground;
+        /// <summary>Each tile's drainage, worked out with its ground (docs/RUNNING_WATER.md 13).</summary>
+        internal Dictionary<WorldTileKey, Water.TileDrainage>? Drainage;
+        /// <summary>What covers each 2 m cell of the place's tiles, read off the map's things when it was copied
+        /// (Water.SurfaceRaster), row by row from the first tile's south-west corner.</summary>
+        internal byte[] Surfaces = Array.Empty<byte>();
         internal readonly object Gate = new();
 
         public bool Covers(WorldTileKey k)
@@ -97,6 +102,11 @@ public sealed class WorldPlaces
         p.Min = WorldTileKey.Of(u.Zone, u.North, e0 + 1, n0 + 1);
         p.Max = WorldTileKey.Of(u.Zone, u.North, e1 - 1, n1 - 1);
         p.Slabs = TerrainBuilder.Slabs(world);
+        // What covers the ground, for the rain: read now, while the map's world is at hand (the tick thread).
+        int cellsPerTile = (int)Math.Round(WorldTileKey.TileMetres / WorldTileService.Spacing);
+        p.Surfaces = Water.SurfaceRaster.Of(world, (float)(p.Min.Easting - p.Easting), (float)(p.Min.Northing - p.Northing),
+                                            (p.Max.X - p.Min.X + 1) * cellsPerTile, (p.Max.Z - p.Min.Z + 1) * cellsPerTile,
+                                            WorldTileService.Spacing);
 
         var measured = maps.AuthoredEntities(id);
         var names = MaterialNames();
@@ -215,6 +225,7 @@ public sealed class WorldPlaces
                 HeightsCm = terrain.HeightsCm, Cells = terrain.Cells, Materials = terrain.Materials,
             },
             Entities = p.Things.TryGetValue(key, out var things) ? things : new List<EntityData>(),
+            Drainage = p.Drainage != null && p.Drainage.TryGetValue(key, out var drainage) ? drainage : null,
         };
     }
 
@@ -237,12 +248,45 @@ public sealed class WorldPlaces
                                                                      s.A + off2, s.B + off2, s.C + off2, s.D + off2)).ToList();
             var size = new Vector3((p.Max.X - p.Min.X + 1) * (float)WorldTileKey.TileMetres, 0f, (p.Max.Z - p.Min.Z + 1) * (float)WorldTileKey.TileMetres);
             var ground = new Dictionary<WorldTileKey, float[]>();
-            foreach (var t in TerrainBuilder.Lay(elevation, slabs, Vector3.Zero, size, WorldTileService.Spacing))
+            var laid = TerrainBuilder.Lay(elevation, slabs, Vector3.Zero, size, WorldTileService.Spacing);
+            foreach (var t in laid)
                 ground[p.Min.Offset(t.X, t.Z)] = t.Heights;
+            p.Drainage = DrainageOf(p, laid);
             Log.Information("World: '{Map}' ground laid over {Tiles} tiles of the world, graded to {Slabs} slabs ({Ms} ms).",
                             p.MapId, ground.Count, slabs.Count, clock.ElapsedMilliseconds);
             return p.Ground = ground;
         }
+    }
+
+    /// <summary>The drainage of every tile of a place, the place's whole ground routed at once as the map's own is
+    /// (Water.MapDrainage), so the place's tiles agree with each other and with the map.</summary>
+    private static Dictionary<WorldTileKey, Water.TileDrainage> DrainageOf(Place p, List<TerrainBuilder.Tile> laid)
+    {
+        var result = new Dictionary<WorldTileKey, Water.TileDrainage>();
+        if (laid.Count == 0) return result;
+        int posts = laid[0].Posts, cells = posts - 1;
+        int ntx = laid.Max(t => t.X) + 1, ntz = laid.Max(t => t.Z) + 1;
+        int px = ntx * cells + 1, pz = ntz * cells + 1;
+        var grid = new float[px * pz];
+        foreach (var t in laid)
+            for (int j = 0; j < posts; j++) Array.Copy(t.Heights, j * posts, grid, (t.Z * cells + j) * px + t.X * cells, posts);
+        int cx = px - 1;
+        var perTile = Water.Drainage.OfGrid(grid, px, pz, cells, WorldTileService.Spacing, (tx, tz) =>
+        {
+            var s = new byte[cells * cells];
+            for (int j = 0; j < cells; j++)
+                for (int i = 0; i < cells; i++)
+                {
+                    int k = (tz * cells + j) * cx + tx * cells + i;
+                    byte v = k < p.Surfaces.Length ? p.Surfaces[k] : Water.SurfaceRaster.Uncovered;
+                    s[j * cells + i] = v == Water.SurfaceRaster.Uncovered ? (byte)GroundSurface.Open : v;
+                }
+            return s;
+        }, Water.Drainage.WholeGrid);
+        for (int tx = 0; tx < perTile.GetLength(0); tx++)
+            for (int tz = 0; tz < perTile.GetLength(1); tz++)
+                result[p.Min.Offset(tx, tz)] = perTile[tx, tz];
+        return result;
     }
 
     // ═══ A frame of the world over a place ═════════════════════════════════════════════════════════

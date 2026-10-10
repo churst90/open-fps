@@ -34,6 +34,10 @@ public sealed class WorldTile
     public string? Place { get; set; }
     /// <summary>Which version of that map it was copied from: a tile of an older one is copied again.</summary>
     public string? PlaceVersion { get; set; }
+    /// <summary>Which way each cell drains, how deep its hollow fills and what its surface is to the rain,
+    /// worked out when the tile was made from its ground and the margin round it (docs/RUNNING_WATER.md 13);
+    /// null for a tile made before generator 4.</summary>
+    public OpenFPS.Server.Water.TileDrainage? Drainage { get; set; }
 
     /// <summary>A tile of ground: posts a side, spacing, heights in whole centimetres over BaseY (metres over
     /// the sea), row by row from the south-west, and a material per cell.</summary>

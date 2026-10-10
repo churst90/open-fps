@@ -887,6 +887,9 @@ public class GameServer
                         : MapAtmosphere.Default);
                     RoadWaterSystem.Update(entry.Key, roadWeather, _environment.RainRate(roadWeather),
                                            _maps.TryGetRoads(entry.Key, out var waterRoads) ? waterRoads : null, dt);
+                    // And over the ground: the drainage lines, the ponds, water poured out (docs/RUNNING_WATER.md 13).
+                    GroundWaterSystem.Update(entry.Key, _environment.RainRate(roadWeather),
+                                             RoadWaterSystem.WaterOf(entry.Key)?.EvaporationMmPerHour ?? 0f, dt);
                     _vehicles.Update(entry.Key, world, dt);
                     // Before the seats carry anybody: Alex gets on and off the bus here.
                     if (_characters.Count > 0)
@@ -2249,6 +2252,7 @@ public class GameServer
                     RainMedianDropMm = falling.MedianDropMm,
                     HailDiameterMm = falling.HailMm,
                     RoadWater = RoadWaterSystem.WaterOf(session.CurrentMapId)?.Save(),
+                    GroundWater = GroundWaterSystem.WaterOf(session.CurrentMapId)?.Save(),
                 };
                 perMap[session.CurrentMapId] = update;
             }

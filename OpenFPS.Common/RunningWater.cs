@@ -265,8 +265,18 @@ public sealed record RunningWaterSpec
     [Tunable("", 0, 0, "How its places are laid out: along its length for a channel, or round its middle for a grate or a downpipe's splash.")]
     public FlowLayout Layout { get; init; } = FlowLayout.Line;
 
+    /// <summary>A drainage line of the ground (GroundChannels): what drains to it, through the map's own
+    /// state (GroundWater.Shared), instead of the catchment fields above. Null for every placed source.</summary>
+    public GroundCatchment? Ground { get; init; }
+    /// <summary>For a drainage line, the flow its level was declared at, L/s (GroundChannels.ReferenceFlow).</summary>
+    public float GroundReferenceLitresPerSecond { get; init; }
+
     /// <summary>Under this a rain-fed source is dry, L/s: a drop every few seconds off a downpipe's shoe.</summary>
     public const float DryLitresPerSecond = 2e-5f;
+
+    /// <summary>Under this flow the source is dry, L/s: a drainage line's own threshold, or a drop every few
+    /// seconds for the rest.</summary>
+    public float DryBelowLitresPerSecond => Ground != null ? GroundChannels.DryLitresPerSecond : DryLitresPerSecond;
 
     /// <summary>The flow now, L/s, for this much run-off through its catchment (Runoff.Through).</summary>
     public float FlowFor(float runoffMmPerHour)
@@ -274,13 +284,15 @@ public sealed record RunningWaterSpec
            * Math.Clamp(RunoffCoefficient, 0f, 1f) * MathF.Max(0f, runoffMmPerHour) / 3600f;
 
     /// <summary>The flow the declared level was measured at.</summary>
-    public float ReferenceFlow => Tap is { } tap ? tap.OpenLitresPerSecond : FlowFor(CatchmentSquareMetres > 0f ? ReferenceRainMmPerHour : 0f);
+    public float ReferenceFlow => Ground != null ? GroundReferenceLitresPerSecond
+        : Tap is { } tap ? tap.OpenLitresPerSecond : FlowFor(CatchmentSquareMetres > 0f ? ReferenceRainMmPerHour : 0f);
 
     /// <summary>The flow now, L/s, from the world's rain through both of the catchment's stores (Runoff),
     /// or a tap's (on, or leaking).</summary>
     public float FlowNow(bool tapOn = true)
     {
         if (Tap is { } tap) return tapOn ? tap.OpenLitresPerSecond : tap.LeakLitresPerSecond;
+        if (Ground is { } ground) return GroundWater.Shared.FlowLitresPerSecond(ground);
         if (CatchmentSquareMetres <= 0f) return BaseFlowLitresPerSecond;
         float slow = Math.Clamp(SlowShare, 0f, 1f);
         float through = (1f - slow) * Runoff.Through(CatchmentSeconds) + (slow > 0f ? slow * Runoff.Through(SlowSeconds) : 0f);
@@ -591,8 +603,10 @@ public sealed record RunningWaterSpec
             ["shower"] = () => Shower,
         };
 
-    /// <summary>A preset by name, through the <see cref="ModelLibrary"/> so a map's own wins.</summary>
-    public static RunningWaterSpec ByName(string key) => ModelLibrary.Flow(key);
+    /// <summary>A preset by name, through the <see cref="ModelLibrary"/> so a map's own wins; or a drainage
+    /// line of the ground, whose key says what it is ("ground/...", GroundChannels).</summary>
+    public static RunningWaterSpec ByName(string key)
+        => GroundChannels.TryParse(key, out var ground) ? ground : ModelLibrary.Flow(key);
 }
 
 /// <summary>

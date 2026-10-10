@@ -259,6 +259,9 @@ public sealed class WorldTileService
         // surveyed with roads: the same ground, graded to them.
         var tile = Make(key, window == null && laid.Pieces == 0 ? null : laid.Heights, window == null ? "none" : Elevation.Name,
                         classes, coverName);
+        // Which way each cell drains, decided from the window round it as its roads are, so neighbours agree.
+        if (laid.Window != null && laid.Surfaces != null)
+            tile.Drainage = Water.Drainage.OfWindow(laid.Window, n, n, o, o, Posts - 1, Spacing, laid.Surfaces, o);
         tile.Entities = laid.Entities;
         if (laid.Entities.Count > 0) tile.Features = Features.Name;
         return tile;
@@ -293,8 +296,13 @@ public sealed class WorldTileService
         foreach (float v in h) lo = MathF.Min(lo, v);
         float baseY = MathF.Floor(lo * 100f) / 100f;
         var (cells, materials) = LandCoverMaterials.Cells(classes, (Posts - 1) * (Posts - 1));
+        // Its drainage from its own posts alone (no margin: a tile made without the window round it).
+        var surfaces = new byte[(Posts - 1) * (Posts - 1)];
+        for (int k = 0; k < surfaces.Length; k++)
+            surfaces[k] = classes != null && k < classes.Length ? Water.SurfaceRaster.OfLandCover(classes[k]) : (byte)OpenFPS.Common.GroundSurface.Open;
         return new WorldTile
         {
+            Drainage = Water.Drainage.OfWindow(h, Posts, Posts, 0, 0, Posts - 1, Spacing, surfaces, 0),
             Key = key.ToString(),
             Generator = WorldStore.GeneratorVersion,
             MadeUtc = DateTime.UtcNow,
