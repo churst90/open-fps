@@ -1403,7 +1403,8 @@ bits, open ground on raised terrain).
   Magnolia is 1,388 KB packed (was 530 KB): about 17 KB a tile of ground, 49 tiles.
 - **Not done**: road cross-sections (crown, kerb, gutter) and draped road meshes, bridges and tunnels,
   creeks cut in, the coarse ring's terrain at 8 m, a grade limit on roads (12 %, 6 % on a highway),
-  ground materials from the land cover (every cell is dirt, as the slab was).
+  ground materials from the land cover on the places' maps (every cell is dirt, as the slab was; the world's
+  own tiles take theirs from ESA WorldCover since 2026-10-10, docs/WORLD_STREAMING.md).
 
 ### 11.3 The places on the world's grid at 2 m (2026-10-09)
 

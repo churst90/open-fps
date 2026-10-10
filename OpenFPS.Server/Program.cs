@@ -134,16 +134,31 @@ public class GameServer
     /// server started without it (a test's).</summary>
     public OpenFPS.Server.OneWorld.WorldMaps? World { get; private set; }
 
-    /// <summary>The world's store and the service that makes its tiles, from the server's world.json.</summary>
-    public void StartWorld(OpenFPS.Server.OneWorld.WorldSettings settings, OpenFPS.Server.OneWorld.IElevationSource? survey = null)
+    /// <summary>The world's store and the service that makes its tiles, from the server's world.json. A test
+    /// gives its own survey, land cover and features; with no survey given, the real ones are asked over the
+    /// network (and the land cover and roads too, as world.json says).</summary>
+    public void StartWorld(OpenFPS.Server.OneWorld.WorldSettings settings, OpenFPS.Server.OneWorld.IElevationSource? survey = null,
+                           OpenFPS.Server.OneWorld.ILandCoverSource? landCover = null, OpenFPS.Server.OneWorld.WorldFeatures? features = null)
     {
         try
         {
             var store = new OpenFPS.Server.OneWorld.WorldStore(settings.StorePath, settings.CapBytes);
+            bool real = survey == null && settings.Generate;
             survey ??= settings.Generate ? new OpenFPS.Server.OneWorld.Usgs3Dep() : new OpenFPS.Server.OneWorld.NoNewTiles();
             var service = new OpenFPS.Server.OneWorld.WorldTileService(store, survey, settings.MaxAtOnce);
+            // The ground's materials from ESA WorldCover, its blocks kept in the store's regional cache.
+            if (landCover == null && real && settings.LandCover)
+                landCover = new OpenFPS.Server.OneWorld.EsaWorldCover(Path.Combine(store.Root, "sources", "worldcover"));
+            service.LandCover = landCover;
+            // The roads from OpenStreetMap, its regions kept in the same cache.
+            if (features == null && real && settings.OpenStreetMap)
+                features = new OpenFPS.Server.OneWorld.WorldFeatures(
+                    new OpenFPS.Server.OneWorld.OverpassRegions(Path.Combine(store.Root, "sources", "osm")),
+                    _maps!.Prefabs.ToDictionary(kv => kv.Key, kv => kv.Value.ColliderSize ?? Vector3.One, StringComparer.OrdinalIgnoreCase));
             // The maps of real places, copied into the world's tiles; tiles copied from an older map go.
             var copied = OpenFPS.Server.OneWorld.WorldPlaces.FromMaps(_maps);
+            if (features != null) features.IsPlaced = k => copied.TryGetPlace(k, out _);
+            service.Features = features;
             int stale = copied.DropStale(store);
             if (stale > 0) Log.Information("World: {Count} stored tile(s) of the places will be copied again from their maps.", stale);
             World = new OpenFPS.Server.OneWorld.WorldMaps(_maps, service, () => _sessions.GetAllSessions(),
@@ -154,7 +169,8 @@ public class GameServer
             if (settings.Generate && settings.Prebuild) World.Prebuild();
             Log.Information("World: tiles kept in {Path}, at most {Cap:F1} GB ({Have:F2} GB in {Count} tiles now); {Places} place(s) to arrive at; {Making}.",
                             store.Root, store.CapBytes / 1073741824.0, store.TotalBytes / 1073741824.0, store.Count, World.Places.Count,
-                            settings.Generate ? "new tiles made from USGS 3DEP" : "no new tiles made");
+                            !settings.Generate ? "no new tiles made"
+                            : "new tiles made from USGS 3DEP" + (service.LandCover != null ? ", ESA WorldCover" : "") + (features != null ? " and OpenStreetMap" : ""));
             // A cap the disk cannot hold fills the disk before the cap is reached.
             try
             {
