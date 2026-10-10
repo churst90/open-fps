@@ -1755,7 +1755,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    |---|---|---|---|---|---|---|
    | city | 488 | 2.6 s / 4.3 s | 0.89 / 0.95 / 0.97 | 0.99 / 0.99 / 1.03 | 0.45 / 0.92 / 1.44 | 67 (all quieter) |
    | Magnolia | 1,810 | 2.3 s / 3.0 s | 0.97 / 1.02 / 1.16 | 0.99 / 1.03 / 1.17 | 0.81 / 1.00 / 2.47 | 36 (22 louder) |
-   | Albany | 2,864 | 5.6 s / 7.0 s | 0.97 / 1.06 / 1.25 | 1.00 / 1.07 / 1.27 | 0.70 / 1.03 / 2.55 | 43 (7 louder) |
+   | Albany | 2,862 | 5.7 s / 8.9 s | 0.97 / 1.06 / 1.24 | 1.00 / 1.07 / 1.26 | 0.71 / 1.03 / 2.55 | 43 (7 louder) |
 
    What moved most, and why: the terminal concourse's ceiling is acoustic tile, not the concrete over it (Sabine 6.1 to
    1.1 s, the field through its openings 5.4 dB down); the city's houses have carpet and sofas the box survey did not
@@ -1778,8 +1778,31 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    - Magnolia: 31909 Beaver Street, bathroom, `/tp 70.8 -31.4 -1.2` (7.8 dB up); 26120 Nichols Sawmill Road, house,
      `/tp -1065.9 420.7 3.5` (7.3 dB up); 19415 Turtle Dove Lane, barn, `/tp -88.8 -253.0 3.5` (8.4 dB down).
    - Albany: Linn County Juvenile Detention, `/tp 1470.1 1253.4 0.3` (9.3 dB down, a dirt floor); Linn-Benton
-     Community College Cafeteria, `/tp -27.5 -345.4 0.8` (7.5 dB down); Industrial B, `/tp -55.0 -213.4 0.8` (5.3 dB
+     Community College Cafeteria, `/tp -27.5 -345.4 0.8` (7.6 dB down); Industrial B, `/tp -55.0 -213.4 0.8` (5.3 dB
      down).
+
+   **Regions become places: the plan (not started).** More than a session, so it waits for part A to be heard. In
+   order, each its own commit:
+   1. The ambience beds go: `ClientAudioSystem.SetMapAmbience` and the region bed, `PlayAmbientBed`/`StopAmbientBed`
+      in `IAudioProvider`, `FmodAudioProvider` and `AudioEngineFacade`, `PrefabTemplate.AmbienceId`, the manifest's
+      ambience in Program.cs and ClientGameSession.cs, `Room.AmbienceId`; `MapManifest`'s field and
+      `RegionComponent.AmbienceId` stay on the wire, unread, with a one-line comment. Tests: AmbienceAndWeather,
+      ClientAudioHarness, EmitterStreamReplay, SteelDoorSound, VoiceLifecycle, Speedway, PrefabSpec, BeaconAids.
+   2. The flood from a point: a seed is a point; step 1 and 2 (own box, then the margin) become one flood out from
+      the seeds together, a cell to the room nearest it by the flood's own path, stopped by walls, shut leaves and air
+      under the open sky (the sky test of step 3 and the measure). The indoor flag is "flooded and closed".
+   3. Openings from the floods: where two floods meet (`Lining.Meets`, with where) and where one meets the sky, grouped
+      by plane into rectangles, in place of `FaceOpenings` on box faces and of `OpeningRoutes.FaceOfRoom`; then
+      portals derived where floods meet through a door leaf (the leaf's frame is the opening).
+   4. The readers of `RoomSize` (83 in the game, 24 test files) onto the flood: `SpatialService.GetRegionAt`,
+      `MapManager.RegionAt`, `MapTiles` footprints, `DoorManners`, `PlaceAt` and `/tp`, `MapTracker`, the voxel
+      marks, `RoomAcoustics`; the server's `SurveyRegions` box survey goes (the lining measures).
+   5. Authoring: `RoomSize`, `Materials` and `ReverbTimeScale` out of the editor (EntitySettings, WorldEditor menus and
+      build, ModelCatalog), PrefabTemplate/PrefabRepository/PrefabValidator, and gen_city.py, gen_osm.py,
+      gen_speedway.py, WorldBuildings and WorldPlaces; maps regenerated, city.json byte-identical to gen_city.py.
+   A box stays where nothing floods: an outdoor place (a name over an area, a yard, a street, a park), a vehicle's
+   cabin (it moves; its box comes from the vehicle), a room whose block is over `MaxBlockCells`, and every room until
+   the first flood lands at load (or the load waits for it).
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
    would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a
