@@ -104,6 +104,27 @@ public class RoomFloodTests
     }
 
     [Fact]
+    public void Its_cells_say_which_room_a_point_is_in_and_a_cache_floods_only_what_changed()
+    {
+        var world = World(Room(gap: true));
+        var cache = new RoomFlood.Cache();
+        var rooms = RoomFlood.Flood(world, new[] { Hint() }, Origin, cache: cache);
+        Assert.Equal(1, cache.Misses);
+        var cells = RoomCells.From(rooms);
+        Assert.Contains(500, cells.Flooded);
+        Assert.All(rooms[500].Cells.Concat(rooms[500].Edge), p => Assert.True(cells.TryRoomAt(p, out int id) && id == 500));
+        Assert.True(cells.TryRoomAt(new Vector3(1.9f, 2.5f, 1.4f), out _));       // a hand's width from two walls
+        Assert.False(cells.TryRoomAt(new Vector3(0, 1, 5f), out _));             // out in the street
+        Assert.False(cells.TryRoomAt(new Vector3(0, 1, -1.5f - 1.25f - 0.5f), out _));
+        var again = RoomFlood.Flood(world, new[] { Hint() }, Origin, cache: cache);
+        Assert.Equal((1, 0), (cache.Hits, cache.Misses));
+        Assert.Same(rooms[500], again[500]);
+        // The leaf shut: the walls round the room changed, so it floods again.
+        RoomFlood.Flood(World(Room(gap: true, leaf: true)), new[] { Hint() }, Origin, cache: cache);
+        Assert.Equal((0, 1), (cache.Hits, cache.Misses));
+    }
+
+    [Fact]
     public void Two_rooms_through_an_archway_share_it_by_distance()
     {
         // The room with its south doorway open, and a second room south of it of the same size.

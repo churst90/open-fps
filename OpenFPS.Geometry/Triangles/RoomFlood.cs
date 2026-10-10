@@ -37,6 +37,19 @@ public static class RoomFlood
     /// <summary>A room to flood: its id, and its hint box.</summary>
     public readonly record struct Seed(int Id, Vector3 Centre, Vector3 Size, Quaternion Rotation);
 
+    /// <summary>
+    /// The floods of groups of rooms kept from one flood to the next: a group whose seeds and whose geometry (every
+    /// piece of the world its block touches, where it stands) are as they were is not flooded again. A flood keeps
+    /// only the groups it used.
+    /// </summary>
+    public sealed class Cache
+    {
+        internal Dictionary<ulong, Room[]> Groups = new();
+        internal Dictionary<ulong, Room[]> Used = new();
+        public int Hits { get; internal set; }
+        public int Misses { get; internal set; }
+    }
+
     /// <summary>Cells along x from (X, Y, Z), in cells from the flood's origin.</summary>
     public readonly record struct Run(int X, int Y, int Z, int Length);
 
@@ -76,10 +89,11 @@ public static class RoomFlood
     /// <summary>Floods every seed through <paramref name="world"/>'s solids of <paramref name="layers"/>. Cells
     /// are on a grid through <paramref name="origin"/> (the acoustic map's corner, so a voxel is a whole number
     /// of cells). Rooms that cannot meet flood apart, on up to <paramref name="threads"/> threads; each group that
-    /// takes longer than <paramref name="slowMs"/> is told to <paramref name="report"/>.</summary>
+    /// takes longer than <paramref name="slowMs"/> is told to <paramref name="report"/>. With <paramref name="cache"/>,
+    /// groups that have not changed since the last flood with it are taken from it.</summary>
     public static Dictionary<int, Room> Flood(TriangleWorld world, IReadOnlyList<Seed> seeds, Vector3 origin,
                                               float margin = DefaultMargin, GeometryLayers layers = GeometryLayers.Acoustics,
-                                              int threads = 1, Action<string>? report = null, double slowMs = 250)
+                                              int threads = 1, Action<string>? report = null, double slowMs = 250, Cache? cache = null)
     {
         var rooms = new Dictionary<int, Room>();
         if (seeds.Count == 0) return rooms;
@@ -91,10 +105,30 @@ public static class RoomFlood
         }
         var clusters = Clusters(hints);
         clusters.Sort((a, b) => b.Cells.CompareTo(a.Cells));
+        if (cache != null) { cache.Used = new Dictionary<ulong, Room[]>(); cache.Hits = cache.Misses = 0; }
+        var taken = new List<Room>();   // put in when every group is done: the others read the rooms meanwhile
         void One(Cluster c)
         {
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            ulong key = 0;
+            if (cache != null)
+            {
+                key = Signature(world, c, seeds, origin, margin, layers);
+                Room[]? kept;
+                lock (cache) cache.Groups.TryGetValue(key, out kept);
+                if (kept != null)
+                {
+                    lock (cache) { cache.Used[key] = kept; cache.Hits++; }
+                    lock (taken) taken.AddRange(kept);
+                    return;
+                }
+            }
             FloodCluster(world, layers, origin, c, seeds, hints, rooms);
+            if (cache != null)
+            {
+                var made = c.Seeds.Select(i => rooms[seeds[i].Id]).ToArray();
+                lock (cache) { cache.Used[key] = made; cache.Misses++; }
+            }
             double ms = System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
             if (report != null && ms > slowMs)
             {
@@ -105,6 +139,8 @@ public static class RoomFlood
         }
         if (threads <= 1) foreach (var c in clusters) One(c);
         else Parallel.ForEach(clusters, new ParallelOptions { MaxDegreeOfParallelism = threads }, One);
+        foreach (var r in taken) rooms[r.Id] = r;
+        if (cache != null) cache.Groups = cache.Used;
         return rooms;
     }
 
@@ -199,6 +235,32 @@ public static class RoomFlood
         }
         foreach (var c in byRoot.Values) c.Seeds.Sort();
         return byRoot.Values.ToList();
+    }
+
+    /// <summary>What a group's flood depends on: its seeds, the margin, and every piece its block touches where it is.</summary>
+    private static ulong Signature(TriangleWorld world, Cluster c, IReadOnlyList<Seed> seeds, Vector3 origin, float margin, GeometryLayers layers)
+    {
+        ulong h = 14695981039346656037UL;
+        void Mix(ulong v) { h ^= v; h *= 1099511628211UL; h ^= h >> 29; }
+        void MixF(float v) => Mix((ulong)BitConverter.SingleToUInt32Bits(v));
+        void MixV(Vector3 v) { MixF(v.X); MixF(v.Y); MixF(v.Z); }
+        MixF(margin); Mix((ulong)layers); MixV(origin);
+        foreach (int i in c.Seeds)
+        {
+            var s = seeds[i];
+            Mix((ulong)(uint)s.Id); MixV(s.Centre); MixV(s.Size);
+            MixF(s.Rotation.X); MixF(s.Rotation.Y); MixF(s.Rotation.Z); MixF(s.Rotation.W);
+        }
+        int pad = (int)MathF.Ceiling(EnclosedReach / Cell);
+        var lo = origin + new Vector3(c.Lo.X - pad, c.Lo.Y - pad, c.Lo.Z - pad) * Cell;
+        var hi = origin + new Vector3(c.Hi.X + pad + 1, c.Hi.Y + pad + 1, c.Hi.Z + pad + 1) * Cell;
+        foreach (ref readonly var inst in world.Instances)
+        {
+            if (inst.Max.X < lo.X || inst.Max.Y < lo.Y || inst.Max.Z < lo.Z || inst.Min.X > hi.X || inst.Min.Y > hi.Y || inst.Min.Z > hi.Z) continue;
+            Mix(inst.Piece.Signature); Mix((ulong)(uint)inst.Owner); MixV(inst.Position);
+            MixF(inst.Rotation.X); MixF(inst.Rotation.Y); MixF(inst.Rotation.Z); MixF(inst.Rotation.W);
+        }
+        return h;
     }
 
     // ═══ The flood ══════════════════════════════════════════════════════════════════════════════
