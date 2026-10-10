@@ -2,6 +2,41 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-10
+
+- Fire that burns what is there, stage 1 (docs/FIRE.md section 12; Cody, 2026-10-10: fire driven by what
+  is a fuel source, not a grid). Approved by ear 2026-10-10 ("new fire sounds good as well"); renders and
+  what to listen for in inbox/fire-fuel-2026-10-10.
+  - A fire fills the shape it is given: a rectangle, a circle or an outline (`FireShape`), its bodies laid
+    inside it and its places spread by its own second moments. The key says the shape
+    (`fire:<preset>/lit=<s>/shape=c0.9`); a placed fire takes it from its collider, so a fire pit scaled up
+    is a bigger fire and a round collider is a round bed. The fire pit prefab's collider is now its 0.9 m
+    bed: the pit at 58 Alder Street is unchanged.
+  - Crackle at the bed, roar in the flames: nine places at the burning fuel (crackle, fizz, events, as
+    approved) and three above them at the middle of the flames (the roar). The approved presets keep
+    their heat release, life and events; their roar comes from the three places above (FIRE.md 12.9).
+  - Fuel is a property of things (`FuelCatalog`, from sound, material and size): a Foliage box off the
+    ground is a tree (its litter, its crown, its branches), Wood on the ground a trunk, a stump or a pile
+    by its proportions, a vehicle a car, a map's fire a fire always burning. Land cover has a hook.
+  - Things catch by the heat they receive (radiation from the flames, flames leaning in the wind touching
+    them), kept by each fuel's own law (thick wood's flux-time product, thin fuel's mass and water), by
+    brands the plume lofts and the wind carries onto receptive dry fuel, by a surface fire under a crown
+    intense enough to take it (Van Wagner), and by lightning (every ground flash is offered to its map's
+    fire). A gap with no fuel stops a fire; brands jump it downwind (`FireSpread`).
+  - Weather: dead fuel follows the air's equilibrium moisture and the rain; living fuel keeps its water.
+    Rain on a fire is boiled off by tall flames and reaches a small fire's fuel: a cloudburst puts a
+    campfire out, light rain barely touches it. Heard as the roar collapsing, steam hissing and drops
+    popping, then the char ticking as it cools (`FireSynth.Quench`, `SoundEmitterComponent.Quench`,
+    appended). `FireSpread.AddWaterAt` / `AddWater` / `WaterOn` are the interface for hoses, buckets and
+    water over the terrain (water at a point, and how much reached a burning thing); water on oil makes it
+    flare. The fire's own wind round a big fire is designed, not built (FIRE.md 12.6).
+  - New presets for what burning things burn as: `stump`, `wood_pile`, `tree_crown`, `tree_trunk`,
+    `litter` (a new `FireFuel.Litter`: light crackle, nothing settling or falling).
+  - The server runs the spread per map (`FireSystem`, stepped once a second off the tick thread) and keeps
+    one emitter per burning part. `/spawn fire PRESET` lights a thing its neighbours can catch from;
+    `/spawn fire lightning` strikes what stands highest ahead; `/spawn fire water` puts a hose on it.
+  - AudioLab `--fire spread timeline|cost|game`.
+
 ## 2026-10-07
 
 - Trains, the budgets and the city after Cody's session (14:44-15:40: "sounds are cutting out

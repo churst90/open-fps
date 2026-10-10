@@ -273,6 +273,8 @@ public sealed class PlacedNatureVoice
 
     public volatile float TargetSpread;
     public volatile bool Running = true;
+    /// <summary>A fire's share of its heat taken by water now (the server's, SoundEmitterComponent.Quench).</summary>
+    public volatile float TargetQuench;
     /// <summary>For a wood heard as one (WoodChorus): the places its wind is read at, one a bough, and how
     /// many trees it stands for now (the client's, eased here so it never steps). Null for a tree.</summary>
     public Vector3[]? WindPlaces;
@@ -374,6 +376,7 @@ public sealed class PlacedNatureVoice
         {
             Fire.Spread = spread;
             Fire.Lit = Running;
+            Fire.Quench = TargetQuench;
             // The wind at each of its places: a gust crosses a big fire as it crosses a wood.
             Fire.ReadWind(Position.X, Position.Z, now);
             if (_litAt is double lit) Fire.Age = now - lit;

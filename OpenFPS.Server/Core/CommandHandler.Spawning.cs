@@ -22,7 +22,7 @@ namespace OpenFPS.Server.Core;
 public partial class CommandHandler
 {
     private const string SpawnUsage =
-        "Usage: /spawn walker [NAME], /spawn vehicle PRESET, /spawn train PRESET, /spawn train out [NAME], /spawn fire PRESET, /spawn fire out, or /spawn Box|Cylinder MATERIAL X Y Z.";
+        "Usage: /spawn walker [NAME], /spawn vehicle PRESET, /spawn train PRESET, /spawn train out [NAME], /spawn fire PRESET|lightning|water|out, or /spawn Box|Cylinder MATERIAL X Y Z.";
 
     /// <summary>The only jet. No jets are given or spawned.</summary>
     private const string Jet = "airliner";
@@ -77,46 +77,47 @@ public partial class CommandHandler
     /// /spawn fire PRESET: a fire lit now in front of you, for testing (docs/FIRE.md): a campfire, a
     /// bonfire, a car, a house, a stand of trees or a crown fire's front, far enough ahead that you are not
     /// standing in it. It grows from the moment it is lit, burns, dies down and smoulders, as its preset's
-    /// life says; every client hears it at the same point of its life (FireSpec.KeyFor). Not kept by
-    /// /savemap. /spawn fire out puts out the nearest one lit this way within 400 m.
+    /// life says; every client hears it at the same point of its life (FireSpec.KeyFor). It is a thing
+    /// burning on the map (FireSystem): what is near it can catch from it. Not kept by /savemap.
+    /// /spawn fire out puts out the nearest one within 400 m; /spawn fire lightning strikes whatever
+    /// stands highest 15 m ahead and sets it going; /spawn fire water puts a hose's worth on the nearest
+    /// thing ahead.
     /// </summary>
     private void SpawnFire(UserSession session, string preset, Action<IMessage> reply)
     {
         string list = string.Join(", ", FireSpec.Presets.Keys);
-        if (preset.Length == 0) { Say(reply, $"Usage: /spawn fire PRESET, or /spawn fire out. Fires: {list}."); return; }
+        if (preset.Length == 0) { Say(reply, $"Usage: /spawn fire PRESET, /spawn fire lightning, /spawn fire water, or /spawn fire out. Fires: {list}."); return; }
         if (!TryGetBody(session, reply, out var world, out _, out var feet)) return;
+        float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;
+        var forward = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
+        var fires = _server.Fires;
         if (preset is "out" or "off")
         {
-            Entity? nearest = null;
-            float best = 400f;
-            world.Query(new QueryDescription().WithAll<Transform, SoundEmitterComponent>(), (Entity e, ref Transform t, ref SoundEmitterComponent em) =>
-            {
-                if (!em.SoundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase) || !em.SoundId.Contains("/lit=", StringComparison.Ordinal)) return;
-                float d = Vector3.Distance(feet, t.Position);
-                if (d < best) { best = d; nearest = e; }
-            });
-            if (nearest is not { } fire) { Say(reply, "There is no fire lit with /spawn fire within 400 metres."); return; }
-            _maps.DestroyEntity(session.CurrentMapId, fire);
-            Say(reply, $"The fire {best:F0} metres away is out.");
+            float d = fires.PutOutNearest(_maps, session.CurrentMapId, world, feet, 400f);
+            Say(reply, float.IsNaN(d) ? "There is no fire lit with /spawn fire within 400 metres." : $"The fire {d:F0} metres away is out.");
+            return;
+        }
+        if (preset is "lightning")
+        {
+            // Down over a point 15 m ahead: it strikes whatever its leader reaches first, and sets it going.
+            string? struck = fires.Strike(_maps, session.CurrentMapId, world, feet + forward * 15f, force: true);
+            Say(reply, struck == null ? "Lightning struck the ground 15 metres ahead: nothing there to burn." : $"Lightning struck {struck}.");
+            return;
+        }
+        if (preset is "water")
+        {
+            // A hose's worth, two kilograms a second for a minute, on whatever is nearest ahead.
+            bool wet = fires.Water(session.CurrentMapId, feet + forward * 3f, 10f, 2f, 60f);
+            Say(reply, wet ? "Water on the nearest thing ahead, two litres a second for a minute." : "There is nothing near enough ahead to put water on.");
             return;
         }
         if (!FireSpec.Presets.ContainsKey(preset)) { Say(reply, $"There is no fire called {preset}. Fires: {list}."); return; }
         var spec = FireSpec.ByName(preset);
-        float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;
-        var forward = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
         // Its near edge a few metres ahead (a crown fire's front a hundred), its width across your way.
         float ahead = 0.5f * spec.AreaDepth + (spec.Fuel == FireFuel.Crown ? 100f : 3f);
-        var at = feet + forward * ahead + new Vector3(0f, MathF.Max(0.4f, MathF.Min(spec.FlameHeightMetres * 0.5f, MathF.Max(0.4f, spec.FuelHeightMetres))), 0f);
-        string key = FireSpec.KeyFor(preset, WindField.Now());
-        var e = _maps.SpawnEntity(session.CurrentMapId, w => w.Create(
-            new Transform { Position = at, Rotation = Quaternion.CreateFromYawPitchRoll(yaw, 0f, 0f), IsDirty = true },
-            new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(spec.AreaWidth, MathF.Max(0.5f, spec.FlameHeightMetres), spec.AreaDepth), IsSolid = false },
-            new IdentityComponent { Name = "Fire", Description = spec.Name + ", lit with /spawn fire." },
-            new SoundEmitterComponent { IsSynth = true, SoundId = key, Mode = PlaybackMode.LoopOne, Volume = 1f, Range = 3000f, MinDistance = 1f },
-            EntityType.StaticObject));
-        if (e == Entity.Null) { Say(reply, "The fire could not be lit: the map is not loaded."); return; }
-        _server.SyncAudioComponent(e.Id);
-        Say(reply, $"{spec.Name}, lit {ahead:F0} metres ahead of you. It grows over {spec.GrowthSeconds / 60f:F0} minutes. /spawn fire out puts it out; /savemap does not keep it.");
+        var ground = feet + forward * ahead;
+        fires.Light(_maps, session.CurrentMapId, world, preset, ground, yaw);
+        Say(reply, $"{spec.Name}, lit {ahead:F0} metres ahead of you. It grows over {spec.GrowthSeconds / 60f:F0} minutes, and what is near it can catch. /spawn fire out puts it out; /savemap does not keep it.");
     }
 
     private static string VehiclePresetList()

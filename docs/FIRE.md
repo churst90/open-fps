@@ -529,13 +529,14 @@ At a metre, fully developed, every place summed (`SourceLevelDb`, measured; see 
 - `/spawn fire PRESET` (the spawn permission: staff anywhere, a map's owner on their own map) lights a fire
   a few metres ahead of you; a crown fire's front is placed 100 m ahead. It grows from the moment it is lit.
 - `/spawn fire out` puts out the nearest one lit that way within 400 m. `/savemap` does not keep them.
+- Since 2026-10-10 a fire lit with `/spawn fire` is a thing burning on the map, and what is near it can
+  catch from it; `/spawn fire lightning` and `/spawn fire water` strike and douse (section 12).
 
 ## 10. Next
 
 - Smoke explosions and backdraft cycles in a closed building.
-- Spotting ahead of a crown fire.
-- Fire spreading on a map from one thing to the next: a car to the house beside it, a crown fire through
-  the trees the map has.
+- Fire spreading on a map from one thing to the next, and spotting: stage 1 built, section 12; its stage 2
+  (a house as a zone, a crown fire through a forest, surface fire over the ground) is listed in 12.10.
 - The fire's sound inside a burning building; a door opened onto a fire.
 
 ## 11. Sources
@@ -571,3 +572,351 @@ At a metre, fully developed, every place summed (`SourceLevelDb`, measured; see 
 - Werth et al. 2011. Synthesis of knowledge of extreme fire behavior, vol. I. PNW-GTR-854. doi:10.2737/PNW-GTR-854
 - Yedinak et al. 2017. J. Acoust. Soc. Am. 141, 557-562. doi:10.1121/1.4974199
 - Zhang et al. 2019. Sensors 19, 5093. doi:10.3390/s19235093
+
+## 12. Fire that burns what is there (2026-10-10)
+
+Stage 1 approved by Cody's ear 2026-10-10 ("new fire sounds good as well", inbox/fire-fuel-2026-10-10).
+
+Cody, 2026-10-10: "should the fire be driven not by a predefined grid but rather by what is a fuel source,
+not whether it is necessarily next to something else that can catch fire? For example, a series of stumps
+next to each other, they'll catch, but if lightning strikes a tree, the next one should catch not because it
+is merely close, but because it is itself flammable and could either have a spark land on it or wind catch
+it, etc. The fires sound good but they need to be dynamic, change type based on what it is burning and have
+the sound change accordingly." He agreed that a fire fills a shape it is given (a circle, a rectangle, an
+outline, or a zone), with the crackle at the fuel bed and the roar at the right height in the flame, and that
+zones carry properties, fuel among them. Later the same day he added water and the weather (12.6, 12.7).
+
+Code:
+- `OpenFPS.Common/FireShape.cs`: the shape a fire burns over.
+- `OpenFPS.Common/Fuel.cs`: `FuelPart`, `FuelSpec`, `FuelCatalog`: fuel as a property of things.
+- `OpenFPS.Common/FireSpread.cs`: things catching, burning, going out.
+- `OpenFPS.Server/Systems/FireSystem.cs`: the spread on each map, and its emitters.
+- `FireSynth`: the places at the bed and in the flames, water on the fire, cooling.
+- AudioLab `--fire spread timeline|game`.
+
+### 12.1 The idea
+
+- Nothing is a grid of fire. Every thing that can burn carries its own fuel: what it is made of, how much,
+  how wet, what it takes to catch, what it gives off once it has. It is derived from the thing's material,
+  kind and size, never listed per map.
+- A thing catches when the heat it has received is enough for its own fuel, or when a glowing brand lands
+  on it and it is dry and fine enough to take it. Being near a fire is not itself a reason: a gap with no
+  fuel in it stops a fire unless the wind carries brands across.
+- Each burning thing burns its own fuel with its own heat release curve, as one or more bodies of the
+  approved fire model with its fuel's character. As what is burning changes, the sound changes with it,
+  because the sound is made from what is burning.
+- The server decides what burns (deterministic, seeded); every client renders the sound.
+
+### 12.2 A fire over a shape (built)
+
+- A fire's ground is a shape (`FireShape`): a rectangle, a circle or an outline. Its bodies of fire are laid
+  on a jittered grid over its bounds and only those inside it are kept, so a round pit has no corners and a
+  bent hedge has no inside.
+- Its places spread as the shape does, by the shape's own second moments: a rectangle w × d has variances
+  w²/12 and d²/12, a circle of radius R has R²/4 each way, an outline its own (Green's theorem). An outline
+  whose spread is not along its axes is laid along its principal axes and turned back. For a rectangle this
+  is exactly the approved layout.
+- Given a shape, a preset burns as hard per square metre as it was declared: heat release, power (10 log of
+  the area ratio, docs/FIRE.md 1.5) and size follow the area. A one-body preset (a hearth, a pile) takes the
+  bed's narrowest width as its body, up to 4 m (the widest bed measured puffing as one, Johnson et al. 2025),
+  and its flames grow as Q^(2/5), Heskestad's leading term.
+- A placed fire takes its size from its collider (`FireSpec.KeyForPlaced`): a box is its rectangle, a
+  cylinder its circle. The fire pit prefab's collider is now its 0.9 m bed, so the pit at 58 Alder Street is
+  exactly the approved fire; scaled to 1.8 m it is four times the fire (+6 dB); made round, a round bed.
+- The key carries an explicit shape when it has one: `fire:<preset>/lit=<s>/shape=c0.9` (circle),
+  `r3.5x2` (rectangle) or `p` and its corners `x,z;x,z;...`. A key without one is the preset's own shape.
+- Crackle at the bed and roar in the flames. The places are now the bed's (nine, as approved, at the
+  burning fuel's middle: crackle, fizz, steam and every event) and three in the flames, spread the same way,
+  `FireSpec.RoarRiseMetres` above: the middle of the flames over the middle of the fuel, half of flame height
+  less fuel height. The combustion noise is the turbulent flame's (section 1); the crackle is the fuel's
+  (section 4). For the pit the roar sits 0.25 m above the crackle, for a torching crown 3.5 m, for a crown
+  fire's front 12.5 m. Twelve places is the most a source has (`ExtendedSources.MaxPlaces`).
+- The flame height used is the fully developed one. A growing fire's roar is placed as high as it will be;
+  following the heat release (L ∝ Q^(2/5)) needs the client to move places at run time: stage 2.
+
+### 12.3 Fuel as a property of things (built for trees, stumps, piles of logs and cars)
+
+A thing is one or more `FuelPart`s. Each has:
+- what it burns as (a `FireSpec` preset: heat release, life, sound) over its own footprint, and its bottom
+  and top above the thing's ground;
+- how it heats (`FuelHeating`): thick (logs, a stump, a car's panels and tyres) or thin (needles, leaves,
+  grass);
+- its critical flux, under which it never catches: wood piloted 12-13 kW/m² (Drysdale; Babrauskas 2003),
+  needles and litter about 8-10, polymers 10-20 (a car: 15);
+- its dose: thick, its flux-time product (π/4) kρc (T_ig − T₀)², about 17 000 (kW/m²)²s for wood
+  (kρc ≈ 0.2, T_ig ≈ 350 °C), 8 000 for a car's polymers [estimate]; thin, its dry mass per area heated
+  (needles 0.15-0.3 kg/m²);
+- its moisture: living (foliage about 100 %, a living trunk 50 %) held by the plant; dead, following the air
+  and the rain with its timelag (1 h needles and grass, 10 h twigs, 100 h branches and stacked logs, 1000 h
+  stumps and logs: Fosberg 1970, the NFDRS classes), and its moisture of extinction (fine dead fuel about
+  0.3: Rothermel 1972);
+- its receptivity to brands and the brands it sends up per MJ (estimates by kind, 12.4);
+- for a crown over surface fuel, its crown base height (Van Wagner 1977); for a bed of surface fuel, its
+  load and surface-to-volume ratio (Rothermel 1972);
+- whether water makes it flare instead of going out (oil and fat).
+
+What things are (`FuelCatalog.ForThing`, by sound, material and size, never by name):
+- a Foliage box standing at least a metre off the ground: a tree. Three parts: the needles shed under it
+  (litter, dead, 1 h, 0.5 kg/m²), its crown (living needles, thin, from the box's bottom to its top) and its
+  branches with the trunk among them (living wood, thick, in the crown);
+- a Wood box on the ground, by its proportions: tall and slender a trunk, small a stump, bulky a pile of
+  logs. Thin wood (a floor, a fence board) is part of a structure: stage 2;
+- a vehicle (an `engine:` emitter): a car;
+- a map's fire (a `fire:` emitter): a fire that is always burning, which can set things near it going and
+  never goes out of itself;
+- land cover (`FuelCatalog.ForLandCover`): the hook the world's tiles will give grass, meadow and woodland
+  through. Not used yet.
+
+A thing catches part by part: lightning or a brand starts the litter under a tree; the crown catches from it
+only if the surface fire is intense enough (12.4); the branches catch from the crown's flames. Its sound
+follows: the litter's light quick crackle, then the crown torching (the roar 3.5 m up), then the branches
+and trunk burning on for most of an hour as wood does.
+
+### 12.4 How things catch (built)
+
+Every second, for every part burning, the heat it sends to every part near it (`FireSpread.Flux`):
+
+- Radiation: a point source, q = χ_r Q / 4πR², χ_r = 0.35 (0.3-0.4 for wood and vegetation: Tewarson, SFPE
+  Handbook; Drysdale), R from the middle of the flames to the nearest point of the other part, at most
+  50 kW/m² (half a flame's emissive power: σT⁴ ≈ 118 kW/m² at 1200 K, Butler and Cohen 1998).
+- Flame contact: the flame is its base's own shape carried up an axis as long as the flame (L ∝ Q^(2/5)
+  from the preset's), leaning with the wind: cos θ = 1 for u* ≤ 1, u*^(−1/2) above, u* the wind at mid-flame over the plume's
+  own buoyant velocity (g Q / ρ c_p T D)^(1/3) (the AGA correlation for wind-blown fires, SFPE Handbook,
+  Beyler; its velocity scale taken from Q* [estimate]). A part inside the flame, out to a quarter of a flame
+  radius beyond it, gets 100 kW/m² [estimate: the emissive power and the convection together], scaled by how
+  much of its height the flame covers: knee-high flames at the foot of a twelve-metre trunk scorch it and do
+  not set it burning. Slope tilts the flame the same way (Rothermel's slope factor is the same physics); the
+  maps are flat so far: stage 2 with terrain.
+- What a part receives from several flames is never more than being inside one (100 kW/m²).
+- It keeps that heat by its own law: thick, ∫(q − q_cr)² dt against its flux-time product times the heat of
+  preignition wet over dry, (250 + 1116 M) / 250 (Rothermel 1972); thin, ∫(q − q_cr) dt against warming its
+  mass about 280 K (1.4 kJ/kgK) and boiling its water (2.59 MJ/kg). With nothing heating it, what it had
+  gathered falls away over 90 s [estimate]. When it has had enough, it catches.
+- Brands: a part burning sends up BrandsPerMJ × its MJ of brands (foliage 3, a building 2, logs 0.5-1, a car
+  0.05 a MJ: estimates by kind; NIST's burning trees and structures send up hundreds to thousands). The plume
+  lofts each until the plume's speed, 1.1 Q^(1/3) z^(−1/3) m/s (McCaffrey 1979), falls to its falling speed
+  (2.5-7 m/s, Tohidi et al. 2015); most go only part of the way. The wind at their height carries them while
+  they rise and fall, scattered sideways by a quarter of the drift [estimate]. A brand glows for about
+  10 (v/2.5)² s [estimate]. One landing on a part with receptivity sets it going with a chance of its glow left
+  times its receptivity times its dryness, (1 − M / M_x)² (Schroeder 1969: a brand's chance on fine dead fuel
+  falls to nothing near 30 % moisture). Receptivity: dry litter 0.4, a pile of logs with its bark and
+  splinters 0.25, a stump 0.08, a living crown 0.01, a car 0.005 [estimates]. A drawn brand stands for as many
+  real ones as there are, so a torching crown's thousands cost eight a second.
+- A crown over a surface fire (Van Wagner 1977): it catches when the surface fire's intensity reaches
+  I₀ = (0.010 CBH (460 + 25.9 FMC))^1.5 kW/m (CBH m, FMC %): 476 kW/m for a crown 2 m up at 100 % foliar
+  moisture. The surface fire's intensity is Byram's I = H w r, its rate of spread Rothermel's (1972): the calm,
+  dry rate (needle litter 0.5 m/min, an estimate from the field's 0.3-1) times (1 + φ_w), φ_w = C U^B with C
+  and B from the fuel's surface-to-volume ratio, times the moisture damping 1 − 2.59 r + 5.11 r² − 3.52 r³.
+  A tree whose litter burns in still air (75 kW/m) keeps its crown; in a 6 m/s wind (about 500-700 kW/m) it
+  torches.
+- Lightning: the flash attaches to whatever its leader reaches first: the rolling sphere, radius
+  10 I^0.65 m for a peak current of I kA (IEC 62305; Golde), 91 m at 30 kA, so the tallest thing within
+  reach. Only a flash with a long continuing current sets fuel going (about a third of ground flashes:
+  Latham and Williams 2001), at the foot of what it struck, by that fuel's receptivity and dryness.
+  `/spawn fire lightning` strikes and always lights.
+
+### 12.5 Fire over the ground (stage 2)
+
+Grass and litter that cover the ground are not things, so they cannot be parts. The plan:
+- Where fuel exists, sample the ground at about a metre where a surface fire's front is, not everywhere: the
+  front is a line of points (marker points along the perimeter, as FARSITE and Prometheus do with Huygens'
+  principle: Finney 1998), each moving outward at Rothermel's rate for its fuel, wind and slope, the line
+  re-sampled as it grows. The fuel under each point is asked of the land cover (`FuelCatalog.ForLandCover`)
+  and of zones; where there is none (a road, bare earth, water), that point stops.
+- A burnt-out area is remembered as polygons, so fire does not run back over it.
+- The front is heard as a long fire: its parts aggregated into stretches (12.8), each a `litter` or grass
+  fire over its outline, the crackle at the ground and the roar a metre up.
+- Zones (a field, a lawn, a yard of litter) carry a fuel the same way as land cover, with their outline: the
+  world editor's zones gain a fuel property.
+
+### 12.6 Weather and fire
+
+Weather on fire (built):
+- Wind: the flames lean with it (12.4), brands go where it goes, surface fires run with it (Rothermel's
+  φ_w) and a crown torches over a surface fire it has driven hard enough. Read from the map's weather on the
+  server; the same field the clients hear the gusts from.
+- Humidity and temperature: dead fuel moves toward Simard's (1968) equilibrium moisture content at its
+  timelag, so a hot dry afternoon dries the litter in an hour and the logs over weeks.
+- Rain: wets dead fuel toward fibre saturation (0.35) about four times as fast as dry air dries it, faster in
+  heavier rain [estimate]; living fuel keeps its own water. Wet litter will not take a brand, and wet wood
+  needs more heat to catch (the heat of preignition). Rain on a fire: 12.7. The rain is the server's own
+  (`WorldEnvironmentSystem.RainRate`), the one the roads get wet from.
+- Lightning: 12.4. Every ground flash on a map (LightningSystem) is offered to its fire.
+
+Fire on weather (stage 2):
+- A big fire makes its own wind: air drawn in toward its base (2-40 m/s measured round large fires: Trelles
+  and Pagni 1997), the plume rising, gusts. It is audible as wind round the listener and in the trees near
+  the fire, and it leans nearby flames inward. The plan: a local wind field per burning cluster, its indraft
+  at the base from the plume's entrainment (Morton, Taylor and Turner 1956: entrainment speed about α times
+  the plume's speed, α ≈ 0.1) falling with distance, added to `WindField` for things near the fire (the
+  trees' voices, the listener's ear wind, the brands, the flames' lean).
+- Regional effects (a pyrocumulus cloud, its rain and lightning, a fire's smoke shading the ground) are out
+  of scope for now.
+
+### 12.7 Water on a fire (rain built; a hook for the rest)
+
+- Water takes heat from the fuel: 4.18 kJ/kgK to 100 °C and 2.26 MJ/kg to boil, 2.59 MJ/kg in all. That
+  cools the fuel's surface below where it gives off burnable gas, so the flames lose their fuel; the steam
+  dilutes the oxygen near it; wet fuel nearby needs far more heat to catch.
+- `FireSpread.Douse`: the water reaching the fuel (rain falling through the flames, e^(−L/3 m) of it getting
+  through, a tall flame boiling most of it off first [estimate]; water by hand all of it) times 2.59 MJ/kg,
+  against the heat the flames feed back to their own fuel (about 30 kW/m² for wood, Drysdale ch. 5), is the
+  share of its burning that goes (`Quench`), over about ten seconds. Held over 85 % for half a minute it is
+  out, and its fuel is wet.
+- Light rain (2 mm/h) takes about 4 % of a campfire's burning and nothing of a torching crown. A heavy shower
+  (20 mm/h) takes about 40 % of a campfire's. A cloudburst (60 mm/h) puts a campfire out in under a
+  minute. Rain that has fallen for a while wets the fuel round a fire and stops it spreading.
+- Oil and fat (`FuelPart.WaterFlares`): water sinks under the burning liquid, flashes to steam and throws it:
+  a flare and brands, not an end. Nothing on the maps burns as oil yet.
+- The interface for water a player or the world brings (a hose, a bucket, water running over the ground),
+  needing nothing of whatever brings it: `FireSpread.AddWaterAt(point, kg a second, seconds)` gives water
+  landing at a point to the thing whose plan it is in; `FireSpread.AddWater(thing, ...)` to a thing;
+  `FireSpread.WaterOn(thing)` says how much water is reaching its fuel now (kg/m²s, rain through its flames
+  and water by hand) and what share of its burning it takes. On the server, `FireSystem.Water(map, point,
+  reach, kg/s, s)`. `/spawn fire water` puts a hose's 2 kg/s on the nearest thing for a minute.
+- Heard (`FireSynth.Quench`, sent as `SoundEmitterComponent.Quench`): the flames lose the share the water
+  takes, so the roar falls with the heat release squared and the crackle thins with it; the heat the water
+  takes comes back as steam through the char (the fizz's band, four times the fizz's power for the same heat
+  [estimate]) and as small pops of drops bursting (25 a second per 100 kW taken [estimate]). Out
+  (`SynthRunning` false), the flames die over twenty seconds and the char ticks as it cools, a few a second
+  at first, falling away over a few minutes [estimate]. The emitter stays three minutes after it is out.
+
+### 12.8 The sound follows what is burning
+
+- Each burning part is one emitter, its key its preset, its lighting moment and its shape. Its heat release
+  and its life are its preset's (`FireSpec.LifeShare`, the one curve both the server's spread and the
+  client's sound read), and so its character is: needles torching (`tree_crown`), wood burning on
+  (`tree_trunk`, `stump`, `wood_pile`), litter running (`litter`), a car's plastics, struts, tyres and tank
+  (`burning_car`).
+- New presets, measured (`--fire levels`, wind 3 m/s, 60 s, every place summed, fully developed):
+
+| preset | what | heat release | life | dB at 1 m | dB(A) |
+|---|---|---|---|---|---|
+| stump | a 0.6 m stump burning on top and in its cracks | 40 kW | 5 min, 1 h, 1 h | 66 | 57 |
+| wood_pile | a stack of split logs 2 × 1 × 1 m | 1.5 MW | 7 min, 50 min, 40 min | 89 | 75 |
+| tree_crown | a conifer's crown torching | 10 MW | 6 s, 8 s, 25 s, nothing left | 94 | 79 |
+| tree_trunk | its branches and trunk burning on | 300 kW | 1.5 min, 25 min, 40 min | 78 | 70 |
+| litter | needles on the ground under a tree | 400 kW | 40 s, 1 min, 1.5 min | 70 | 64 |
+
+- Grass and litter (`FireFuel.Litter`): light crackle (0.35 of logs' per kW: straw and litter carry almost
+  none, shrubs a strong one, Viegas et al. 2008), no steam jets, nothing settling or falling. Not yet fitted
+  to the prescribed burns among the recordings: stage 2. Against the campfire recordings its statistics sit
+  13 of 14 inside, which says little.
+- Scale: the client ranks and budgets fire voices as it does every physical voice, so a forest burning is
+  heard by its loudest parts. That is enough for a row of trees, not for a forest: stage 2 aggregates by
+  audibility as distant traffic is. The server groups the parts burning within a cell (about 25 m, the
+  places' spacing at a few hundred metres) into one emitter whose key lists its parts' presets, shares and
+  lighting moments; the client builds one FireSynth whose bodies are those parts, each with its own fuel and
+  life, heard from places spread over the cell. Near the listener the cell splits back into its parts. A
+  forest of thousands of trees is then tens of emitters.
+
+### 12.9 What changed in the approved presets
+
+- Their heat release, life, bodies, crackle, fizz and events are unchanged.
+- Their roar moved from the nine bed places to three places in the flames above them, spread as the area.
+  The roar's power is the same; its places are fewer and higher. At 125-500 Hz, where the roar is, the ears
+  were near one anyway for a fire in front of the listener (section 7.2).
+- The places' random streams are drawn in a different order, so a render is not the same sample for sample.
+- Before and after, four minutes of each preset, fully developed, every place summed (`--fire levels
+  sec=240 wind=3`): see 12.11.
+
+### 12.10 The server, the wire, how it scales and how it ends
+
+- The server (`FireSystem`) reads a map's fuel once, the first time anything there is lit or struck (the
+  city: every tree, stump, pile and parked car), steps its spread once a second in the map's own weather
+  (wind, rain, temperature, humidity), and keeps one emitter for every part burning. `/spawn fire PRESET`
+  lights a thing burning as that preset, so what is near it can catch. `/spawn fire out` puts out the
+  nearest at once.
+- The ground under a thing is taken as the map's datum (the maps are flat); stage 2 asks the terrain.
+- On the wire: nothing new but one appended field, `SoundEmitterComponent.Quench`. Everything else is in the
+  key (preset, lighting moment, shape) and in `SynthRunning`. Every client renders the same fire at the same
+  point of its life.
+- Cost: the spread visits only parts burning and the parts within their reach (an 8 m grid), and every part's
+  moisture once a second. Brands are drawn at most eight a second a part and 400 a second in all, each standing
+  for as many real ones as there are. A forest of 3,000 trees crowning steps in about 12 ms on average and
+  43 ms at worst (12.11), so the server steps it off the tick thread; its sound needs the aggregation above.
+- A fire ends when its fuel is used (a crown has nothing left; logs smoulder on), when water puts it out
+  (12.7), or when a person does.
+
+Stage 2, in order:
+1. Aggregation by audibility (12.8), so a forest is tens of emitters.
+2. Surface fire over the ground (12.5): fronts of marker points, land cover and zones with fuel.
+3. Structures: a house as a zone with a fuel load (dwellings about 780 MJ/m² of floor, Eurocode 1 part 1-2,
+   annex E) and its rooms, windows and roof as parts; fences and floors as its thin wood.
+4. The fire's own wind (12.6), heard round big fires.
+5. Flame height following the heat release in the places (12.2), and slope on terrain.
+6. Litter and grass fitted to the prescribed burns among the recordings.
+7. Water as a substance: hoses, buckets and water running over the ground through `AddWater`; a grease fire
+   on a map.
+
+### 12.11 Results
+
+Renders through the game (client, mixer, HRTF, ear model, loudness law; AudioLab `--fire spread game`):
+inbox/fire-fuel-2026-10-10, with README.txt (what to listen for), levels.txt and the spread's own timeline.
+Nothing clips (loudest peak −1.0 dBFS). Mixer load stayed under 40 % with 42 HRTF voices while the row of
+trees crowned.
+
+The timelines (`--fire spread timeline`, deterministic):
+
+- Lightning on the first of eight conifers in a row, crowns a metre apart, in a 6 m/s wind; 25 m of bare
+  ground; three more trees; one upwind:
+  - 00:00 the strike sets the litter at its foot going;
+  - 00:40 its crown torches over its litter fire (885 kW/m against Van Wagner's 476);
+  - 00:51-01:34 the crowns downwind catch one after another from the flames leaning onto them, the litter
+    under them from brands;
+  - 01:14 a brand crosses the gap and sets the litter under tree 9 going; 01:54 its crown torches over it
+    (569 kW/m), and trees 10 and 11 follow from its flames by 02:08;
+  - 01:19-02:47 the crowns burn out; branches and trunks burn on; the upwind tree never catches.
+  - In still air the litter fire (about 75 kW/m) never takes a crown, and nothing crosses the gap.
+- Six stumps 0.4 m apart, the first lit: in a 6 m/s wind each catches from the one upwind by its leaning
+  flames, at 03:43, 07:40, 11:39, 15:16 and 19:01; in still air none does in an hour.
+- A car 1.5 m from a pile of logs, a 3 m/s breeze toward the pile: the pile catches at 22:23 from the car's
+  radiant heat (23 kW/m² at its face once the car had passed about 4 MW).
+- A campfire in rain: light (2 mm/h) takes 4 % of its burning, heavy (20 mm/h) about 40 %, a cloudburst
+  (60 mm/h) puts it out 43 s after it starts.
+
+The approved presets before and after (`--fire levels sec=240 wind=3`, every place summed at a metre, same
+seed; the places' random streams are drawn in a different order, so the two are not the same sample for
+sample):
+
+| preset | Leq before / after | dB(A) before / after | statistics inside, before / after |
+|---|---|---|---|
+| campfire | 63.4 / 63.4 | 57.5 / 57.6 | 14 / 14 |
+| fire pit | 68.6 / 68.5 | 60.4 / 59.3 | 14 / 13 (mod mid 0.236 against 0.238) |
+| bonfire | 91.4 / 91.2 | 79.9 / 79.8 | 14 / 14 |
+| burning car | 93.6 / 93.4 | 78.0 / 77.9 | 14 / 14 |
+| house | 97.7 / 97.8 | 87.3 / 87.2 | 11 / 11 |
+| stand of trees | 93.7 / 92.7 | 82.0 / 81.3 | 14 / 12 (corr octave 0.682 against 0.668, mod mid 0.144 against 0.149) |
+| crown fire | 116.7 / 116.8 | 101.8 / 101.9 | 8 / 9 |
+
+The differences are those of one random stream against another, not of the change: the code before the change,
+with seed 8 instead of 7, measures the fire pit at 59.2 dB(A) with mod mid 0.237 just outside, and the stand
+of trees at 82.4 dB(A) with corr octave 0.682 and mod mid 0.140 outside, the same as after.
+
+Cost of the spread (`--fire spread cost`): 3,000 trees six metres apart, struck in the middle in a 6 m/s
+wind, crowning through the forest with up to 2,600 parts burning at once: a step of 12 ms on average and 43 ms
+at worst, once a second (measured while other work ran on the machine). The server runs it off the tick
+thread. Its sound would be hundreds of emitters, which is why aggregation is first in stage 2.
+
+### 12.12 Sources for this section
+
+- Albini 1979. Spot fire distance from burning trees: a predictive model. USDA Forest Service GTR INT-56 [recalled].
+- Andrews 2018. The Rothermel surface fire spread model and associated developments. RMRS-GTR-371 [recalled].
+- Babrauskas 2003. Ignition Handbook. Fire Science Publishers [recalled].
+- Beyler, Fire hazard calculations for large, open hydrocarbon fires. SFPE Handbook of Fire Protection Engineering (the AGA flame tilt correlation) [recalled].
+- Butler, Cohen 1998. Firefighter safety zones: a theoretical model based on radiative heating. Int. J. Wildland Fire 8, 73-77 [recalled].
+- Drysdale 2011. An Introduction to Fire Dynamics, 3rd ed., ch. 5-6 [recalled].
+- Eurocode 1, EN 1991-1-2, annex E (fire load densities) [recalled].
+- Finney 1998. FARSITE: Fire Area Simulator. RMRS-RP-4 [recalled].
+- Fosberg 1970. Drying rates of heartwood below fiber saturation. Forest Science 16, 57-63 [recalled].
+- IEC 62305-3 (the rolling sphere); Golde 1977, Lightning, vol. 1 [recalled].
+- Latham, Williams 2001. Lightning and forest fires. In Forest Fires: Behavior and Ecological Effects, 375-418 [recalled].
+- McCaffrey 1979. Purely buoyant diffusion flames: some experimental results. NBSIR 79-1910 [recalled].
+- Morton, Taylor, Turner 1956. Turbulent gravitational convection from maintained and instantaneous sources. Proc. R. Soc. A 234, 1-23 [recalled].
+- Rothermel 1972. A mathematical model for predicting fire spread in wildland fuels. USDA Forest Service RP INT-115 [recalled].
+- Schroeder 1969. Ignition probability. USDA Forest Service Office Report 2106-1 [recalled].
+- Simard 1968. The moisture content of forest fuels. Canadian Dept. of Forestry FF-X-14 [recalled].
+- Tewarson, Generation of heat and gaseous, liquid and solid products in fires. SFPE Handbook [recalled].
+- Tohidi, Kaye, Bridges 2015. Statistical description of firebrand size and shape distribution from coniferous trees. Fire Safety J. 77, 21-35 [recalled].
+- Van Wagner 1977. Conditions for the start and spread of crown fire. Can. J. For. Res. 7, 23-34 [recalled].
+- Johnson, Anderson, Yedinak 2025; Trelles and Pagni 1997; Viegas et al. 2008: section 11.

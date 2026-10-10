@@ -1,9 +1,9 @@
 {
   "Id": "fire_pit",
   "Name": "Fire",
-  "Description": "A wood fire burning in a garden fire pit. The flames puff at the rate their width sets and roar harder in a gust; the wood crackles as the water and resin in its cells burst, the big ones throwing an ember onto the brick; steam hisses out of the log ends; now and then a log gives way (FireSpec.GardenFirePit, FireSynth). The ring of brick round it is separate boxes.",
+  "Description": "A wood fire burning in a garden fire pit. The flames puff at the rate their width sets and roar harder in a gust; the wood crackles as the water and resin in its cells burst, the big ones throwing an ember onto the brick; steam hisses out of the log ends; now and then a log gives way (FireSpec.GardenFirePit, FireSynth). The ring of brick round it is separate boxes. Its collider is the bed: placed bigger the fire is bigger, and a round collider makes a round bed (FireSpec.KeyForPlaced).",
   "Material": "None",
-  "ColliderSize": { "X": 0.6, "Y": 0.6, "Z": 0.6 },
+  "ColliderSize": { "X": 0.9, "Y": 0.6, "Z": 0.9 },
   "Type": "StaticObject",
   "IsSolid": false,
   "IsItem": false,

@@ -1042,6 +1042,24 @@ public partial class ClientAudioSystem
         return true;
     }
 
+    /// <summary>
+    /// The key a placed thing's voice is made and ranked with: its emitter's own, but a fire takes the
+    /// shape its collider gives it (FireSpec.KeyForPlaced), so a fire pit scaled up is a bigger fire.
+    /// Memoised: asked several times a frame per source.
+    /// </summary>
+    private string VoiceKey(OpenFPS.Common.Networking.EntityDefinition def)
+    {
+        string id = def.SoundEmitter.SoundId ?? "";
+        if (!id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase)) return id;
+        var k = (id, def.Collider.Shape, def.Collider.Size);
+        if (_voiceKeys.TryGetValue(k, out var key)) return key;
+        key = OpenFPS.Common.FireSpec.KeyForPlaced(id, def.Collider.Shape, def.Collider.Size);
+        if (_voiceKeys.Count > 4096) _voiceKeys.Clear();
+        _voiceKeys[k] = key;
+        return key;
+    }
+    private readonly Dictionary<(string, OpenFPS.Common.Components.ColliderShape, Vector3), string> _voiceKeys = new();
+
     /// <summary>The headroom a physical voice renders with, dB: its spec's own for water, fire, foliage
     /// and bells, the shared one for the rest. Memoised like the level.</summary>
     private readonly Dictionary<string, float> _physicalHeadroom = new(StringComparer.OrdinalIgnoreCase);
@@ -1377,7 +1395,7 @@ public partial class ClientAudioSystem
             if (!world.Entities.TryGetValue(entityId, out var snap)) continue;
             var em = snap.Definition.SoundEmitter;
             if (!em.IsSynth || em.SoundId == null) continue;
-            if (!PhysicalLevel(em.SoundId, out float levelDb, out float extent)) continue;
+            if (!PhysicalLevel(VoiceKey(snap.Definition), out float levelDb, out float extent)) continue;
             if (Dry(em.SoundId, entityId, em.SynthRunning, now)) continue;
             // A train's horn or bell that nobody is sounding.
             if (SilentSignal(em.SoundId, now)) continue;
@@ -2060,7 +2078,7 @@ public partial class ClientAudioSystem
         foreach (int id in _liveMachines)
         {
             if (!world.Entities.TryGetValue(id, out var snap)) continue;
-            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(snap.Definition.SoundEmitter.SoundId);
+            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(VoiceKey(snap.Definition));
             if (layout == null) continue;
             var at = OpenFPS.Common.AudioEmission.PointFor(snap);
             float d2 = Vector3.DistanceSquared(at, eyePos);
@@ -2748,7 +2766,7 @@ public partial class ClientAudioSystem
         // A physical model outside the budget (ChooseLiveMachines, this frame) is not worked out either:
         // this bails before the path is read, or the city's 116 unvoiced machines cost a frame's work each.
         if (def.SoundEmitter.IsSynth
-            && def.SoundEmitter.SoundId is { } sid
+            && VoiceKey(def) is { Length: > 0 } sid
             && PhysicalLevel(sid, out _, out _)
             && !_liveMachines.Contains(snap.Id))
             return;
@@ -2785,7 +2803,7 @@ public partial class ClientAudioSystem
                 OpenFPS.Common.Loudness.Widen(engineVolume, engineMinDistance, engineExtent);
         if (def.SoundEmitter.IsSynth)
         {
-            resolvedSoundId = def.SoundEmitter.SoundId;
+            resolvedSoundId = VoiceKey(def);
             if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH";
             // The ranking's own lookup, not a second prefix list: with two, the crossing bell won a voice
             // and then fell through here as a nameless synth, placed every frame and rendered by nothing.
@@ -2978,6 +2996,7 @@ public partial class ClientAudioSystem
             // client sees; a crossing's bell rings for a train the listener may be a kilometre from, so
             // it comes down the wire (true for everything else).
             EngineRunning = def.SoundEmitter.SynthRunning,
+            Quench = def.SoundEmitter.Quench,
             ServingStop = def.SoundEmitter.ServingStop,
             WindowsOpen = _cabins.WindowsOpen(snap, _now()),
             // From the server, which knows the corner's banking. Differentiated here from the velocity

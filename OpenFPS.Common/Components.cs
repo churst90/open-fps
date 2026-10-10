@@ -198,6 +198,13 @@ public partial struct SoundEmitterComponent
     /// client from this one number, so it is sent once per press, not every tick.
     /// </summary>
     public float WindowsOpen { get; set; }
+
+    /// <summary>
+    /// A fire: how much of its heat release water is taking now, 0 none to 1 all (the server's
+    /// FireSpread, from the rain and water put on it). Its flames lose that share and the water hisses
+    /// to steam on the fuel; out, <see cref="SynthRunning"/> goes false (docs/FIRE.md 12.7).
+    /// </summary>
+    public float Quench { get; set; }
 }
 
 [MemoryPackable]

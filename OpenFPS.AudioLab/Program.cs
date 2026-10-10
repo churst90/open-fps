@@ -98,7 +98,7 @@ string[] usage =
     "                                                mowers and air conditioners, measured and walked past",
     "  --nature [levels|render out=DIR|live] [preset ...] [sec= wind= turb= steady= tap= parts= dist=]",
     "                                                water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
-    "  --fire [levels|render out=DIR [places=1]|game out=DIR set=|hrtf] [preset ...] [sec= wind= age= seed= heard= parts=]",
+    "  --fire [levels|render out=DIR [places=1]|game out=DIR set=|hrtf|spread timeline|game scene=] [preset ...] [sec= wind= age= seed= heard= parts=]",
     "                                                fires from a campfire to a crown fire, from their model (docs/FIRE.md)",
     "  --waves [levels|render out=DIR|sea|game out=DIR set=] [preset ...] [sec= wind= fetch= heard= parts=]",
     "                                                shores from a pond's edge to surf, from their model (docs/WAVES_AND_SHORES.md)",

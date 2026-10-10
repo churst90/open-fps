@@ -148,6 +148,10 @@ public sealed class FireSynth
     private readonly Cell[] _cells;
     /// <summary>Each cell's weight at each place, cell-major, every cell's summing to one.</summary>
     private readonly float[] _weights;
+    /// <summary>The same for the roar: over the flames' places.</summary>
+    private readonly float[] _roarWeights;
+    /// <summary>How many of the places are the bed's; the rest are the flames'.</summary>
+    private readonly int _bedPlaces;
 
     // Per place: the roar, the fizz and the crackle noise, and how loud each is now.
     private readonly PowerLawNoise[] _roar;
@@ -237,22 +241,22 @@ public sealed class FireSynth
         for (int k = 1; k < places; k++) _sums[k] = new EventSum(sampleRate, seed * 7919 + k * 104729 + 1);
         _windAt = new float[places];
 
-        // The bodies of fire over the area.
+        // The bodies of fire over the area: a grid over its bounds, jittered, those inside its shape kept.
         var (nx, nz, d) = CellGrid(spec);
         _cellDiameter = d;
-        _cells = new Cell[nx * nz];
+        var outline = spec.Outline;
+        var grid = new Cell[nx * nz];
         _puffHz = 1.5f / MathF.Sqrt(MathF.Max(0.1f, d));
         float w = spec.AreaWidth, dep = spec.AreaDepth;
-        float shareSum = 0f;
+        int kept = 0;
         for (int i = 0; i < nx; i++)
             for (int j = 0; j < nz; j++)
             {
-                ref var c = ref _cells[i * nz + j];
+                var c = new Cell();
                 float jx = nx > 1 ? 0.2f * _sum.Signed() : 0f, jz = nz > 1 ? 0.2f * _sum.Signed() : 0f;
                 c.X = -0.5f * w + w * (i + 0.5f + jx) / nx;
                 c.Z = -0.5f * dep + dep * (j + 0.5f + jz) / nz;
-                c.Share = _cells.Length > 1 ? 0.7f + 0.6f * _sum.Uniform() : 1f;
-                shareSum += c.Share;
+                c.Share = nx * nz > 1 ? 0.7f + 0.6f * _sum.Uniform() : 1f;
                 c.PuffHz = _puffHz * (1f + 0.08f * _sum.Signed());
                 c.Phase = _sum.Uniform();
                 c.Depth = 0.2f;
@@ -262,34 +266,27 @@ public sealed class FireSynth
                 // Catching: from one end of the area to the other, as fire spreads; a crown fire's front is
                 // already running, and catches across its depth.
                 float r = MathF.Sqrt(MathF.Pow((c.X + 0.5f * w) / MathF.Max(1f, w), 2f) + MathF.Pow((c.Z + 0.5f * dep) / MathF.Max(1f, dep), 2f)) / MathF.Sqrt(2f);
-                c.CatchAt = _cells.Length > 1 ? 0.75f * Math.Clamp(r + 0.1f * _sum.Signed(), 0f, 1f) : 0f;
+                c.CatchAt = nx * nz > 1 ? 0.75f * Math.Clamp(r + 0.1f * _sum.Signed(), 0f, 1f) : 0f;
+                // A body whose middle is outside the shape (a round pit's corners, a bent hedge's inside) is not there.
+                if (outline.Contains(c.X, c.Z)) grid[kept++] = c;
             }
+        if (kept == 0) { grid[0].X = 0f; grid[0].Z = 0f; kept = 1; }
+        _cells = grid.AsSpan(0, kept).ToArray();
+        if (_cells.Length == 1) { _cells[0].Share = 1f; _cells[0].CatchAt = 0f; }
+        float shareSum = 0f;
+        for (int i = 0; i < _cells.Length; i++) shareSum += _cells[i].Share;
         for (int i = 0; i < _cells.Length; i++) _cells[i].Share /= shareSum;
 
+        // The places: the bed's (the crackle, the fizz, every event) and, above them, the flames' (the roar).
+        _bedPlaces = Math.Min(places, BedPlaces(spec));
         // Each cell's weight at each place: near ones by distance, wide enough that a cell between two
-        // places is heard from both, and a single body (a fire pit) from all of its places at once.
+        // places is heard from both, and a single body (a fire pit) from all of its places at once. The bed's
+        // weights are over the bed's places, the roar's over the flames' (or the bed's, with none above).
         _weights = new float[_cells.Length * places];
-        float spacing = float.MaxValue;
-        for (int a = 0; a < places; a++)
-            for (int b = a + 1; b < places; b++)
-                spacing = MathF.Min(spacing, Vector2.Distance(new(_layout[a].X, _layout[a].Z), new(_layout[b].X, _layout[b].Z)));
-        float sigma = MathF.Max(0.5f * (spacing == float.MaxValue ? 1f : spacing), 0.5f * d);
-        for (int c = 0; c < _cells.Length; c++)
-        {
-            float sum = 0f, best = float.MaxValue;
-            for (int p = 0; p < places; p++)
-            {
-                float dx = _cells[c].X - _layout[p].X, dz = _cells[c].Z - _layout[p].Z;
-                float dd = dx * dx + dz * dz;
-                // One body of fire (a hearth, a pile) burns all over its bed, so it is heard from every place
-                // alike; a fire of many bodies, each from the places near it.
-                float wgt = _cells.Length == 1 ? 1f : MathF.Exp(-0.5f * dd / (sigma * sigma));
-                _weights[c * places + p] = wgt;
-                sum += wgt;
-                if (dd < best) { best = dd; _cells[c].NearestPlace = p; }
-            }
-            for (int p = 0; p < places; p++) _weights[c * places + p] /= MathF.Max(1e-9f, sum);
-        }
+        _roarWeights = new float[_cells.Length * places];
+        Weigh(_weights, 0, _bedPlaces, places, d, nearest: true);
+        if (places > _bedPlaces) Weigh(_roarWeights, _bedPlaces, places, places, d, nearest: false);
+        else Array.Copy(_weights, _roarWeights, _weights.Length);
 
         // The roar: the turbulent tail of dQ/dt, heard from 20 Hz up.
         _roar = new PowerLawNoise[places];
@@ -401,6 +398,38 @@ public sealed class FireSynth
                                                                spec.PaneThicknessMm * 1e-3f, 0.004f, 25f, 1, spec.PaneDropMetres, spec.Surround, seed & 3), (int)sampleRate);
     }
 
+    /// <summary>Normalised Gaussian weights of every cell over places [from, to), into a cell-major table.</summary>
+    private void Weigh(float[] table, int from, int to, int places, float d, bool nearest)
+    {
+        float spacing = float.MaxValue;
+        for (int a = from; a < to; a++)
+            for (int b = a + 1; b < to; b++)
+                spacing = MathF.Min(spacing, Vector2.Distance(new(_layout[a].X, _layout[a].Z), new(_layout[b].X, _layout[b].Z)));
+        float sigma = MathF.Max(0.5f * (spacing == float.MaxValue ? 1f : spacing), 0.5f * d);
+        for (int c = 0; c < _cells.Length; c++)
+        {
+            float sum = 0f, best = float.MaxValue;
+            for (int p = from; p < to; p++)
+            {
+                float dx = _cells[c].X - _layout[p].X, dz = _cells[c].Z - _layout[p].Z;
+                float dd = dx * dx + dz * dz;
+                // One body of fire (a hearth, a pile) burns all over its bed, so it is heard from every place
+                // alike; a fire of many bodies, each from the places near it.
+                float wgt = _cells.Length == 1 ? 1f : MathF.Exp(-0.5f * dd / (sigma * sigma));
+                table[c * places + p] = wgt;
+                sum += wgt;
+                if (nearest && dd < best) { best = dd; _cells[c].NearestPlace = p; }
+            }
+            for (int p = from; p < to; p++) table[c * places + p] /= MathF.Max(1e-9f, sum);
+        }
+    }
+
+    /// <summary>How many places above the bed carry the roar (docs/FIRE.md 12.2), when the source has room.</summary>
+    public const int FlamePlaces = 3;
+
+    /// <summary>The bed's places of a fire heard from its spec's places.</summary>
+    public static int BedPlaces(FireSpec spec) => Math.Clamp(spec.Places, 1, MaxPlaces);
+
     /// <summary>
     /// The roar's PSD at 100 Hz per kW² of one body of fire puffing at <paramref name="puffHz"/>, Pa²/Hz at a
     /// metre: its dQ/dt's variance (the monopole's, at the puffing rate) spread over the puffing peak, down
@@ -430,17 +459,33 @@ public sealed class FireSynth
     }
 
     /// <summary>
-    /// Where a fire's places are, m from its middle (x across, y up, z along), place 0 the middle: along a
-    /// long front, every place a stretch of it; round anything else, an ellipse that spreads as the
-    /// area does.
+    /// Where a fire's places are, m from its middle (x across, y up, z along), place 0 the middle. First
+    /// the bed's (<see cref="FireSpec.Places"/>): along a long front, every place a stretch of it; round
+    /// anything else, an ellipse that spreads as its shape does. Then, if there is room, the flames'
+    /// (<see cref="FlamePlaces"/>), <see cref="FireSpec.RoarRiseMetres"/> above, spread the same way:
+    /// the crackle comes from the fuel, the roar from the flames over it (docs/FIRE.md 12.2).
     /// </summary>
     public static Vector3[] Layout(FireSpec spec)
     {
-        int n = Math.Clamp(spec.Places, 1, MaxPlaces);
-        var places = new Vector3[n];
+        int n = BedPlaces(spec);
+        int flames = n > 1 ? Math.Min(FlamePlaces, MaxPlaces - n) : 0;
+        var places = new Vector3[n + flames];
         int outer = n - 1;
-        float w = spec.AreaWidth, dep = spec.AreaDepth;
         if (outer <= 0) return places;
+        // The shape's spread: a uniform w x d rectangle has variances w²/12 and d²/12, so its "width" each
+        // way is √(12 var). A shape whose spread is not along x and z (an outline) is laid along its own
+        // principal axes and turned back.
+        var (vx, vz, cxz) = spec.Outline.Moments();
+        float turn = 0f;
+        if (MathF.Abs(cxz) > 1e-4f * (vx + vz))
+        {
+            turn = 0.5f * MathF.Atan2(2f * cxz, vx - vz);
+            float mid = 0.5f * (vx + vz), half = MathF.Sqrt(0.25f * (vx - vz) * (vx - vz) + cxz * cxz);
+            vx = mid + half;
+            vz = mid - half;
+        }
+        float w = MathF.Sqrt(12f * MathF.Max(0f, vx)), dep = MathF.Sqrt(12f * MathF.Max(0f, vz));
+        float rise = spec.RoarRiseMetres;
         if (w >= 2.5f * dep)
         {
             // A front: the middle and its places in pairs out to either side, evenly along it.
@@ -450,17 +495,37 @@ public sealed class FireSynth
                 int k = j / 2 + 1;
                 places[1 + j] = new Vector3((j % 2 == 0 ? -1f : 1f) * k * step, 0f, 0f);
             }
-            return places;
+            // The flames over it: the middle and a pair out at ±w/√8, which spread as the front does.
+            if (flames > 0) places[n] = new Vector3(0f, rise, 0f);
+            for (int j = 1; j < flames; j++)
+                places[n + j] = new Vector3((j % 2 == 1 ? -1f : 1f) * ((j + 1) / 2) * w / MathF.Sqrt(8f), rise, 0f);
         }
-        // An ellipse whose places spread as the area does: a uniform w x d area has variance w²/12 and
-        // d²/12, and the middle and m places on half-axes k w, k d have m k² w² / 2(m + 1), so
-        // k = √((m + 1) / 6m), 0.87-0.94 of the half-widths. At 0.75 the ears were 0.1-0.2 more alike
-        // at 1-4 kHz than the area makes them (docs/FIRE.md 7.2).
-        float spreadK = MathF.Sqrt((outer + 1f) / (6f * outer));
-        for (int j = 0; j < outer; j++)
+        else
         {
-            float a = MathF.Tau * (j + 0.25f) / outer;
-            places[1 + j] = new Vector3(MathF.Cos(a) * spreadK * w, 0f, MathF.Sin(a) * spreadK * dep);
+            // An ellipse whose places spread as the area does: a uniform w x d area has variance w²/12 and
+            // d²/12, and the middle and m places on half-axes k w, k d have m k² w² / 2(m + 1), so
+            // k = √((m + 1) / 6m), 0.87-0.94 of the half-widths. At 0.75 the ears were 0.1-0.2 more alike
+            // at 1-4 kHz than the area makes them (docs/FIRE.md 7.2).
+            float spreadK = MathF.Sqrt((outer + 1f) / (6f * outer));
+            for (int j = 0; j < outer; j++)
+            {
+                float a = MathF.Tau * (j + 0.25f) / outer;
+                places[1 + j] = new Vector3(MathF.Cos(a) * spreadK * w, 0f, MathF.Sin(a) * spreadK * dep);
+            }
+            // The flames': m places on a ring with no middle spread as the area at k = 1/√6, set between the
+            // bed's in angle.
+            float flameK = 1f / MathF.Sqrt(6f);
+            for (int j = 0; j < flames; j++)
+            {
+                float a = MathF.Tau * (j + 0.75f) / flames;
+                places[n + j] = new Vector3(MathF.Cos(a) * flameK * w, rise, MathF.Sin(a) * flameK * dep);
+            }
+        }
+        if (turn != 0f)
+        {
+            float c = MathF.Cos(turn), sn = MathF.Sin(turn);
+            for (int i = 0; i < places.Length; i++)
+                places[i] = new Vector3(c * places[i].X - sn * places[i].Z, places[i].Y, sn * places[i].X + c * places[i].Z);
         }
         return places;
     }
@@ -477,6 +542,7 @@ public sealed class FireSynth
         FireFuel.Crown => CrownCrackle,
         FireFuel.Structure => StructureCrackle,
         FireFuel.Vehicle => VehicleCrackle,
+        FireFuel.Litter => LitterCrackle,
         _ => 1f,
     };
 
@@ -497,28 +563,74 @@ public sealed class FireSynth
     /// <summary>A car's fizz over wood's, in power: molten plastics boiling and their gas jetting, where wood
     /// has its water. FITTED (section 8).</summary>
     public static float VehicleFizz = 10f;
+    /// <summary>Crackles per kW of burning grass and litter, over seasoned logs': straw and litter fires carry
+    /// almost no crackle, shrubs a strong 1-10 kHz one (Viegas et al. 2008). ESTIMATE, not yet fitted to
+    /// the prescribed burns (docs/FIRE.md 12.9).</summary>
+    public static float LitterCrackle = 0.35f;
+    /// <summary>Drops bursting on hot fuel, pops a second per 100 kW the water is taking. ESTIMATE.</summary>
+    public static float SizzlePopsPer100Kw = 25f;
+
+    /// <summary>
+    /// After it is out, the char cools and checks: ticks, at first a few a second for the coals of
+    /// 100 kW, falling away over a minute or two. ESTIMATE (docs/FIRE.md 12.7). Drawn as crackles of the
+    /// smallest sizes at the bed.
+    /// </summary>
+    private void Cooling(float dt)
+    {
+        float burning = Spec.HeatReleaseKw * _life;
+        if (Lit && _burn > 0.5f) { _hotQ = burning; _cooling = 0f; return; }
+        if (_hotQ <= 0f) return;
+        _cooling += dt;
+        float rate = 3f * MathF.Sqrt(_hotQ / 100f) * MathF.Exp(-_cooling / 60f) * CracklePart;
+        if (rate < 0.01f) { _hotQ = 0f; return; }
+        _tickClock -= dt * rate;
+        Span<float> hz = stackalloc float[2];
+        Span<float> tau = stackalloc float[] { 0.002f, 0.001f };
+        Span<float> amp = stackalloc float[2];
+        while (_tickClock <= 0f)
+        {
+            _tickClock += -MathF.Log(MathF.Max(1e-6f, _sum.Uniform()));
+            var at = _sums[PlaceOf(PickCell())];
+            int when = (int)(_sum.Uniform() * Block);
+            float p = SmallestCracklePascals * (0.3f + 0.7f * _sum.Uniform());
+            hz[0] = 4000f + 3000f * _sum.Uniform();
+            hz[1] = 9000f + 2000f * _sum.Signed();
+            amp[0] = 0.5f * p;
+            amp[1] = 0.3f * p;
+            at.Pulse(when, 30e-6f, p);
+            at.Ring(when, hz, tau, amp);
+        }
+    }
 
     /// <summary>The share of the full heat release a fire lit <paramref name="age"/> seconds ago burns at:
     /// t² growth, full, linear decay, then a smoulder.</summary>
-    public static float LifeShare(FireSpec spec, double age)
-    {
-        if (double.IsNaN(age)) return 1f;
-        float t = (float)Math.Max(0, age);
-        float g = MathF.Max(1f, spec.GrowthSeconds);
-        if (t < g) return MathF.Max(0.01f, (t / g) * (t / g));
-        t -= g;
-        if (t < spec.SteadySeconds) return 1f;
-        t -= spec.SteadySeconds;
-        float smoulder = 0.03f;
-        if (t < spec.DecaySeconds) return smoulder + (1f - smoulder) * (1f - t / MathF.Max(1f, spec.DecaySeconds));
-        return smoulder;
-    }
+    public static float LifeShare(FireSpec spec, double age) => FireSpec.LifeShare(spec, age);
+
+    /// <summary>
+    /// How much of its heat release water is taking from it now, 0 to 1 (the server's
+    /// FireSpread: rain or a hose cooling the fuel below where it gives off gas). Its flames lose that
+    /// share, and the water flashing to steam on the hot fuel sizzles. Out (<see cref="Lit"/> false) the
+    /// flames die over twenty seconds and the char ticks as it cools.
+    /// </summary>
+    public float Quench;
+    private float _quench;
+    private float _sizzleTarget, _sizzleAmp;
+    private float _cooling;      // seconds since it went out, while its char is still hot
+    private float _hotQ;         // the heat release it had when it went out, kW: how much char is cooling
+    private float _tickClock;
+
+    /// <summary>The steam's power over the fizz's for the same heat taken by water: water flashing on hot
+    /// char is a louder gas jet than the char's own volatiles. ESTIMATE (docs/FIRE.md 12.7).</summary>
+    public static float SizzleOverFizz = 4f;
 
     public void Control(float dt)
     {
         _clock += dt;
         _burn += Math.Clamp((Lit ? 1f : 0f) - _burn, -dt / 20f, dt / 5f);
+        // Water takes the flames' heat over the fuel surface's own time, seconds, not at once.
+        _quench += (Math.Clamp(Quench, 0f, 1f) - _quench) * MathF.Min(1f, dt / 4f);
         _life = LifeShare(Spec, Age);
+        Cooling(dt);
         _flare *= MathF.Exp(-dt / 8f);
         float growth = double.IsNaN(Age) ? 1f : (float)Math.Clamp(Age / MathF.Max(1f, Spec.GrowthSeconds), 0, 1);
         int places = _sums.Length;
@@ -560,8 +672,8 @@ public sealed class FireSynth
                 cell.Cluster = busy ? 2.2f + 1.5f * _sum.Uniform() : 0.25f + 0.3f * _sum.Uniform();
                 cell.ClusterClock = busy ? 0.6f + 2f * _sum.Uniform() : 1.5f + 4f * _sum.Uniform();
             }
-            // Torching: a tree's foliage catching all at once (docs/FIRE.md 5.2).
-            if (Spec.Fuel is FireFuel.Trees or FireFuel.Crown)
+            // Torching: a tree's foliage catching all at once (docs/FIRE.md 5.2), in turn across a stand.
+            if (Spec.Fuel is FireFuel.Trees or FireFuel.Crown && Spec.TorchesInTurn)
             {
                 if (cell.TorchLife > 0f)
                 {
@@ -589,6 +701,9 @@ public sealed class FireSynth
             float life = _cells.Length > 1 && growth < 1f ? caught * caught : _life;
             // What is burning: its share, how far into its life, how lit, a tree torching, the crown's wind.
             float heat = Spec.HeatReleaseKw * cell.Share * life * _burn * (1f + cell.Torch) * (Spec.Fuel == FireFuel.Crown ? _windGrowth : 1f);
+            // Water on it takes its share of the heat: what is left burns; what was taken is steam.
+            float taken = heat * _quench;
+            heat -= taken;
             cell.Q = heat * cell.Vigour * (1f + _flare);
             total += cell.Q;
 
@@ -600,9 +715,14 @@ public sealed class FireSynth
             // pockets reaching temperature together that the crackles come in.
             float fizz = FizzPascals * FizzPascals * (heat / 80f) * MathF.Min(2f, Spec.Moisture / 0.2f) * cell.Cluster
                        * (Spec.Fuel == FireFuel.Vehicle ? VehicleFizz : 1f);
+            // The steam the water makes as it flashes on the hot fuel: a gas jet through the char like the
+            // fizz, its power the heat it is taking.
+            fizz += FizzPascals * FizzPascals * (taken / 80f) * SizzleOverFizz;
             cell.Fizz = fizz;
             float crackles = CracklesPer100Kw * 0.8f * MathF.Pow(MathF.Max(0f, heat) / 80f, CrackleHeatExponent) * FuelCrackle * cell.Vigour * cell.Cluster * (1f + 1.5f * _flare)
-                           * (1f + 2f * cell.Torch) * (1f + 0.2f * MathF.Max(0f, cell.Wind - 2f));
+                           * (1f + 2f * cell.Torch) * (1f + 0.2f * MathF.Max(0f, cell.Wind - 2f))
+                           // Drops bursting into steam on the hot surface pop like small crackles.
+                           + SizzlePopsPer100Kw * taken / 100f;
             rateTotal += crackles / MathF.Max(1e-3f, cell.Cluster);
             for (int p = 0; p < places; p++)
             {
@@ -858,10 +978,10 @@ public sealed class FireSynth
             float fz = cell.Fizz * cell.Flick * cell.Flick;
             for (int p = 0; p < places; p++)
             {
-                float wgt = _weights[c * places + p];
-                float here = p == 0 ? (1f - s) + s * wgt : s * wgt;
-                power[p] += here * pw;
-                fizzPower[p] += here * fz;
+                // The roar from the flames' places, the gas out of the fuel from the bed's.
+                float wgt = _weights[c * places + p], rw = _roarWeights[c * places + p];
+                power[p] += (p == 0 ? (1f - s) + s * rw : s * rw) * pw;
+                fizzPower[p] += (p == 0 ? (1f - s) + s * wgt : s * wgt) * fz;
             }
         }
         for (int p = 0; p < places; p++)
