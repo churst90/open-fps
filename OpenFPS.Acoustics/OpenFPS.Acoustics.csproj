@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The sound library's acoustics (docs/SOUND_LIBRARY_BOUNDARY.md, stage 3): the materials and what a
-       wall, a panel and a layered construction let through, diffraction over an edge, reflections and
-       image sources, how enclosed a place is, the voxel octree, and the constants they share. Rooms and
-       openings (AcousticMap, RoomAcoustics, OpeningRoutes, FaceOpenings, AcousticVolumeGenerator) join it in
-       stage 4, once they are values rather than entity components. It uses only the geometry.
+  <!-- The sound library's acoustics (docs/SOUND_LIBRARY_BOUNDARY.md, stages 3 and 4): the materials and what
+       a wall, a panel and a layered construction let through, diffraction over an edge, reflections and
+       image sources, how enclosed a place is, the voxel octree, the constants they share, and the rooms and
+       openings (Room, Opening, AcousticMap, RoomAcoustics, OpeningRoutes, FaceOpenings,
+       AcousticVolumeGenerator), which the host fills from its own entities. It uses only the geometry.
 
        Namespaces are those the files had in OpenFPS.Common (decision 6). -->
 
@@ -24,10 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- OpeningRoutes, still in OpenFPS.Common until stage 4, finds the least path over an edge with
-         Diffraction.MinimiseOnEdge. -->
-    <InternalsVisibleTo Include="OpenFPS.Common" />
-    <!-- The tests reach the walls' internals (WallTransmission.Faces). -->
+    <!-- The tests reach the walls' internals (WallTransmission.Faces) and the opening routes' (their cache,
+         MaxChainedBoxes). -->
     <InternalsVisibleTo Include="OpenFPS.Tests" />
   </ItemGroup>
 

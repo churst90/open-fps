@@ -1,5 +1,6 @@
 file	group	projects	library_types
 OpenFPS.Acoustics/AcousticConstants.cs	lib	Acoustics	
+OpenFPS.Acoustics/AcousticMap.cs	lib	Acoustics	
 OpenFPS.Acoustics/AcousticRegistry.cs	lib	Acoustics	
 OpenFPS.Acoustics/Constructions.cs	lib	Acoustics	
 OpenFPS.Acoustics/Diffraction.cs	lib	Acoustics	
@@ -9,9 +10,13 @@ OpenFPS.Acoustics/ImageSource.cs	lib	Acoustics
 OpenFPS.Acoustics/LayeredFaces.cs	lib	Acoustics	
 OpenFPS.Acoustics/Localisation.cs	lib	Acoustics	
 OpenFPS.Acoustics/Opening.cs	lib	Acoustics	
+OpenFPS.Acoustics/OpeningRoutes.cs	lib	Acoustics	
 OpenFPS.Acoustics/PanelAcoustics.cs	lib	Acoustics	
 OpenFPS.Acoustics/Room.cs	lib	Acoustics	
+OpenFPS.Acoustics/RoomAcoustics.cs	lib	Acoustics	
 OpenFPS.Acoustics/SparseAcousticOctree.cs	lib	Acoustics	
+OpenFPS.Acoustics/Systems/AcousticVolumeGenerator.cs	lib	Acoustics	
+OpenFPS.Acoustics/Systems/FaceOpenings.cs	lib	Acoustics	
 OpenFPS.Acoustics/WallTransmission.cs	lib	Acoustics	
 OpenFPS.Client.Core/AudioDiagnostics.cs	host		
 OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	lib	Audio	
@@ -138,7 +143,6 @@ OpenFPS.Client.Core/UiSounds.cs	host
 OpenFPS.Client.Core/WallBumps.cs	host		
 OpenFPS.Client.Core/WorldAudioPlayer.cs	host		
 OpenFPS.Client.Core/ZoneSettle.cs	host		
-OpenFPS.Common/AcousticMap.cs	lib	Acoustics	
 OpenFPS.Common/Ammunition.cs	host		
 OpenFPS.Common/AudioEmission.cs	lib	Sound	
 OpenFPS.Common/AudioEvents.cs	host		
@@ -156,20 +160,16 @@ OpenFPS.Common/LaneRoutes.cs	host
 OpenFPS.Common/LineFollower.cs	host		
 OpenFPS.Common/Messages.cs	host		
 OpenFPS.Common/MoverPoses.cs	host		
-OpenFPS.Common/OpeningRoutes.cs	lib	Acoustics	
 OpenFPS.Common/PhysicsConstants.cs	host		
 OpenFPS.Common/PhysicsUtils.cs	host		
 OpenFPS.Common/PlayerCoordinates.cs	host		
 OpenFPS.Common/RaceLine.cs	host		
 OpenFPS.Common/RoadMapData.cs	host		
 OpenFPS.Common/Roads.cs	host		
-OpenFPS.Common/RoomAcoustics.cs	lib	Acoustics	
 OpenFPS.Common/Scopes.cs	host		
 OpenFPS.Common/SharedMovementEngine.cs	host		
 OpenFPS.Common/Speech/Speech.cs	host		
 OpenFPS.Common/StatePacking.cs	host		
-OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	lib	Acoustics	
-OpenFPS.Common/Systems/FaceOpenings.cs	lib	Acoustics	
 OpenFPS.Common/Tiles.cs	host		
 OpenFPS.Common/TrackClearance.cs	host		
 OpenFPS.Common/UpdateThrottle.cs	host		

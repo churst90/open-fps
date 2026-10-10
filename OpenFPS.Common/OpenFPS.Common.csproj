@@ -23,12 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The tests reach the opening routes' internals (their cache, MaxChainedBoxes). AudioClock.UseForTest,
-         which this was for, moved to OpenFPS.Sound with the clock (stage 3). -->
-    <InternalsVisibleTo Include="OpenFPS.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
     <EmbeddedResource Include="Speech\voices.csv" LogicalName="OpenFPS.Common.Speech.voices.csv" />
     <EmbeddedResource Include="Speech\scripts.json" LogicalName="OpenFPS.Common.Speech.scripts.json" />
   </ItemGroup>
