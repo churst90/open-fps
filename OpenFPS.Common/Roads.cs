@@ -26,7 +26,10 @@ public class RoadData
     /// <summary>On a tiled map, the tiles the centreline passes through (EntityData.Tile). Nothing reads it yet.</summary>
     public List<string>? Tiles { get; set; }
 
-    public const string DefaultSurface = "Asphalt";
+    public const string DefaultSurface = RoadSurfaces.Default;
+
+    /// <summary>The road as the puddles along its kerbs need it (PuddleField).</summary>
+    public Carriageway ToCarriageway() => new(Id, Centreline, WidthMetres);
 }
 
 /// <summary>One lane of a road.</summary>

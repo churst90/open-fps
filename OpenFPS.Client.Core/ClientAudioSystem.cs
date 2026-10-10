@@ -1083,7 +1083,7 @@ public partial class ClientAudioSystem
         if (!id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase)) return id;
         var k = (id, def.Collider.Shape, def.Collider.Size);
         if (_voiceKeys.TryGetValue(k, out var key)) return key;
-        key = OpenFPS.Common.FireSpec.KeyForPlaced(id, def.Collider.Shape, def.Collider.Size);
+        key = OpenFPS.Common.FireSpec.KeyForPlaced(id, def.Collider.Shape.IsRound(), def.Collider.Size);
         if (_voiceKeys.Count > 4096) _voiceKeys.Clear();
         _voiceKeys[k] = key;
         return key;

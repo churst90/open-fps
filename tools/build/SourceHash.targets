@@ -1,0 +1,43 @@
+<Project>
+
+  <!-- ── A HASH OF SOURCE FILES ───────────────────────────────────────────────────────────────────
+       Used by OpenFPS.Common (WireContract: the wire) and OpenFPS.Sound (DoorModelFingerprint: the door
+       renders). Every file's path and text, sorted by path, line endings normalised so a Windows checkout
+       hashes the same; the first six bytes of the SHA-256, as hex.
+
+       A file's path is its path from Root, and a file outside Root is left out (the SDK's generated files
+       live in each build's output folder and would make two builds of the same code disagree). An item
+       with HashName metadata is hashed under that name wherever it is: the door fingerprint names its files
+       by their file names, so moving a door model between projects does not re-render every door. -->
+  <UsingTask TaskName="HashSources" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <Root ParameterType="System.String" Required="true" />
+      <Hash ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Security.Cryptography" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var root = Path.GetFullPath(Root).TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
+        var paths = Files.Select(f => new { Full = Path.GetFullPath(f.ItemSpec), Name = f.GetMetadata("HashName") })
+                         .Where(p => p.Name.Length > 0 || p.Full.StartsWith(root))
+                         .Select(p => new { Full = p.Full, Rel = p.Name.Length > 0 ? p.Name : p.Full.Substring(root.Length).Replace('\\', '/') })
+                         .Where(p => !p.Rel.Split('/').Any(s => s == "obj" || s == "bin"))
+                         .OrderBy(p => p.Rel, System.StringComparer.Ordinal);
+        using (var sha = SHA256.Create())
+        {
+            var all = new StringBuilder();
+            foreach (var p in paths)
+                all.Append(p.Rel).Append('\n').Append(File.ReadAllText(p.Full).Replace("\r\n", "\n")).Append('\n');
+            byte[] h = sha.ComputeHash(Encoding.UTF8.GetBytes(all.ToString()));
+            Hash = string.Concat(h.Take(6).Select(b => b.ToString("x2")));
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+</Project>

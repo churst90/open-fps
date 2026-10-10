@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The sound library's acoustics (docs/SOUND_LIBRARY_BOUNDARY.md, stage 3): the materials and what a
+       wall, a panel and a layered construction let through, diffraction over an edge, reflections and
+       image sources, how enclosed a place is, the voxel octree, and the constants they share. Rooms and
+       openings (AcousticMap, RoomAcoustics, OpeningRoutes, FaceOpenings, AcousticVolumeGenerator) join it in
+       stage 4, once they are values rather than entity components. It uses only the geometry.
+
+       Namespaces are those the files had in OpenFPS.Common (decision 6). -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SparseAcousticOctree keeps its [MemoryPackable]: AcousticMap (OpenFPS.Common) holds one and is
+         [MemoryPackable] itself (decision 4: the attributes stay until it is decided they can go). -->
+    <PackageReference Include="MemoryPack" Version="1.21.4" />
+    <!-- AcousticRegistry logs an unknown material (decision 5: Serilog's static Log stays). -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- OpeningRoutes, still in OpenFPS.Common until stage 4, finds the least path over an edge with
+         Diffraction.MinimiseOnEdge. -->
+    <InternalsVisibleTo Include="OpenFPS.Common" />
+    <!-- The tests reach the walls' internals (WallTransmission.Faces). -->
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+  </ItemGroup>
+
+</Project>

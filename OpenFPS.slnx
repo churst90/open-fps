@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="OpenFPS.Acoustics/OpenFPS.Acoustics.csproj" />
   <Project Path="OpenFPS.AudioLab/OpenFPS.AudioLab.csproj" />
   <Project Path="OpenFPS.Client/OpenFPS.Client.csproj" />
   <Project Path="OpenFPS.Client.Core/OpenFPS.Client.Core.csproj" />
@@ -7,5 +8,6 @@
   <Project Path="OpenFPS.Geometry/OpenFPS.Geometry.csproj" />
   <Project Path="OpenFPS.Native/OpenFPS.Native.csproj" />
   <Project Path="OpenFPS.Server/OpenFPS.Server.csproj" />
+  <Project Path="OpenFPS.Sound/OpenFPS.Sound.csproj" />
   <Project Path="OpenFPS.Tests/OpenFPS.Tests.csproj" />
 </Solution>

@@ -80,15 +80,15 @@ public class FireSpreadTests
     public void APlacedFirePitTakesItsSize()
     {
         // At the prefab's own size (0.9 m), the preset; scaled, a bigger fire; round, a round bed.
-        Assert.Equal("fire:fire_pit", FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Box, new Vector3(0.9f, 0.6f, 0.9f)));
-        string scaled = FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Box, new Vector3(1.8f, 1.2f, 1.8f));
+        Assert.Equal("fire:fire_pit", FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Box.IsRound(), new Vector3(0.9f, 0.6f, 0.9f)));
+        string scaled = FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Box.IsRound(), new Vector3(1.8f, 1.2f, 1.8f));
         Assert.Equal("fire:fire_pit/shape=r1.8x1.8", scaled);
-        string round = FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Cylinder, new Vector3(1.2f, 0.6f, 1.2f));
+        string round = FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Cylinder.IsRound(), new Vector3(1.2f, 0.6f, 1.2f));
         Assert.Equal("fire:fire_pit/shape=c1.2", round);
         // A key that says its shape keeps it.
-        Assert.Equal("fire:bonfire/lit=5.0/shape=c2", FireSpec.KeyForPlaced("fire:bonfire/lit=5.0/shape=c2", ColliderShape.Box, new Vector3(9f, 1f, 9f)));
+        Assert.Equal("fire:bonfire/lit=5.0/shape=c2", FireSpec.KeyForPlaced("fire:bonfire/lit=5.0/shape=c2", ColliderShape.Box.IsRound(), new Vector3(9f, 1f, 9f)));
         // Not a fire: untouched.
-        Assert.Equal("foliage:park_tree", FireSpec.KeyForPlaced("foliage:park_tree", ColliderShape.Box, Vector3.One));
+        Assert.Equal("foliage:park_tree", FireSpec.KeyForPlaced("foliage:park_tree", ColliderShape.Box.IsRound(), Vector3.One));
         // And the places follow the shape: a round bed's ring is narrower than its square's.
         var square = ExtendedSources.Layout("fire:fire_pit")!;
         var circle = ExtendedSources.Layout(round)!;
@@ -332,20 +332,20 @@ public class FireSpreadTests
     public void WhatAThingBurnsAsComesFromWhatItIs()
     {
         // A crown of foliage off the ground: a tree, with litter under it.
-        var tree = FuelCatalog.ForThing("", "Foliage", ColliderShape.Box, new Vector3(8f, 8f, 8f), 3f);
+        var tree = FuelCatalog.ForThing("", "Foliage", ColliderShape.Box.IsRound(), new Vector3(8f, 8f, 8f), 3f);
         Assert.NotNull(tree);
         Assert.Equal(new[] { "litter", "crown", "branches" }, tree!.Parts.Select(p => p.Name));
         Assert.Equal(3f, tree.Parts[1].CrownBaseMetres);
         // Wood on the ground by its proportions.
-        Assert.Equal("stump", FuelCatalog.ForThing("", "Wood", ColliderShape.Box, new Vector3(0.6f, 0.4f, 0.6f), 0f)!.Parts[0].Preset);
-        Assert.Equal("wood_pile", FuelCatalog.ForThing("", "Wood", ColliderShape.Box, new Vector3(2f, 1f, 1f), 0f)!.Parts[0].Preset);
-        Assert.Equal("tree_trunk", FuelCatalog.ForThing("", "Wood", ColliderShape.Box, new Vector3(0.5f, 3f, 0.5f), 0f)!.Parts[0].Preset);
+        Assert.Equal("stump", FuelCatalog.ForThing("", "Wood", ColliderShape.Box.IsRound(), new Vector3(0.6f, 0.4f, 0.6f), 0f)!.Parts[0].Preset);
+        Assert.Equal("wood_pile", FuelCatalog.ForThing("", "Wood", ColliderShape.Box.IsRound(), new Vector3(2f, 1f, 1f), 0f)!.Parts[0].Preset);
+        Assert.Equal("tree_trunk", FuelCatalog.ForThing("", "Wood", ColliderShape.Box.IsRound(), new Vector3(0.5f, 3f, 0.5f), 0f)!.Parts[0].Preset);
         // A floor and a fence board are structures, a later stage; brick does not burn.
-        Assert.Null(FuelCatalog.ForThing("", "Wood", ColliderShape.Box, new Vector3(5f, 0.1f, 5f), 0f));
-        Assert.Null(FuelCatalog.ForThing("", "Brick", ColliderShape.Box, new Vector3(1f, 1f, 1f), 0f));
+        Assert.Null(FuelCatalog.ForThing("", "Wood", ColliderShape.Box.IsRound(), new Vector3(5f, 0.1f, 5f), 0f));
+        Assert.Null(FuelCatalog.ForThing("", "Brick", ColliderShape.Box.IsRound(), new Vector3(1f, 1f, 1f), 0f));
         // A vehicle by its engine; a map's fire as itself, burning.
-        Assert.Equal("burning_car", FuelCatalog.ForThing("engine:sedan", "Metal", ColliderShape.Box, new Vector3(1.8f, 1.4f, 4.5f), 0f)!.Parts[0].Preset);
-        var pit = FuelCatalog.ForThing("fire:fire_pit", "None", ColliderShape.Box, new Vector3(0.9f, 0.6f, 0.9f), 0.3f)!;
+        Assert.Equal("burning_car", FuelCatalog.ForThing("engine:sedan", "Metal", ColliderShape.Box.IsRound(), new Vector3(1.8f, 1.4f, 4.5f), 0f)!.Parts[0].Preset);
+        var pit = FuelCatalog.ForThing("fire:fire_pit", "None", ColliderShape.Box.IsRound(), new Vector3(0.9f, 0.6f, 0.9f), 0.3f)!;
         Assert.True(pit.AlwaysBurning);
         Assert.Equal("fire:fire_pit", pit.Parts[0].Preset);
         // Land cover's hook.

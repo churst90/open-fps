@@ -32,7 +32,7 @@ public static class RoadWaterSystem
         var m = _maps.GetOrAdd(mapId, _ => new MapWater());
         if (!ReferenceEquals(m.Built, roads))
         {
-            m.Field = roads != null ? new PuddleField(roads.Roads) : null;
+            m.Field = roads != null ? new PuddleField(roads.Roads.Select(r => r.ToCarriageway()).ToList()) : null;
             m.RoadIndex.Clear();
             if (roads != null) for (int i = 0; i < roads.Roads.Count; i++) m.RoadIndex[roads.Roads[i]] = i;
             m.Built = roads;

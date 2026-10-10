@@ -41,7 +41,7 @@ public static class ThunderSpike
         var report = new List<string>();
         void Say(string s) { Console.WriteLine(s); report.Add(s); }
 
-        Say("THUNDER, measured from the model (OpenFPS.Client.Core/AudioEngine/Core/Thunder.cs)");
+        Say("THUNDER, measured from the model (OpenFPS.Sound/Core/Thunder.cs)");
         Say($"air {air.TemperatureC} C, {air.Humidity * 100:F0} % RH, wind ({air.Wind.X}, {air.Wind.Z}) m/s gusting {air.Gustiness}; listener 1.7 m up, ground reflection {Thunder.GroundReflection}; seed {seed}");
         {
             float mu2 = Thunder.TurbulenceVariance(air, AudioPhysics.SpeedOfSoundAt(air.TemperatureC));

@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The sound library's models (docs/SOUND_LIBRARY_BOUNDARY.md, stage 3): every sound source as physics
+       and its presets (engines, vehicles, wheels and tyres, signals, trains, aircraft, machines, doors,
+       glass, weapons' acoustic numbers, bullets, footsteps, applause, fire, water, wind, rain, lightning),
+       the ear and the loudness law, and the synthesis that renders them (Core/, from Client.Core's
+       AudioEngine/Core). It uses the geometry and the acoustics, and nothing of the game: the server
+       simulates with it and never loads FMOD.
+
+       Namespaces are those the files had (decision 6): OpenFPS.Common.* for what came from OpenFPS.Common,
+       OpenFPS.Client.AudioEngine.Core.* for the synthesis. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TransientSound travels in WorldAudioEvent, positionally (decision 4: the attribute stays, the
+         bytes stay). Its sources are in OpenFPS.Common's wire hash. -->
+    <PackageReference Include="MemoryPack" Version="1.21.4" />
+    <!-- The models log what they could not load (decision 5: Serilog's static Log stays). -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The mixer's voices (OpenFPS.Client.Core today, OpenFPS.Audio from stage 6) drive the synths'
+         internal parts directly: the rail voice its bogies and body drum, the engine processor the
+         aircraft's blade rows. -->
+    <InternalsVisibleTo Include="OpenFPS.Client.Core" />
+    <!-- The tests reach the models' parts and hooks (a track's response, AudioClock.UseForTest). -->
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <!-- The lab's spikes drive the synths' internals directly (an intake network on its own): that is what
+         a spike is. -->
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+  </ItemGroup>
+
+  <!-- ── THE DOOR MODELS' FINGERPRINT ─────────────────────────────────────────────────────────────
+       Names the client's door render cache (DoorRenderCache). Named by WireContract.Hash, every change
+       to the wire rendered it all again (Cody, 2026-10-06: "generate them once and keep them"), so this
+       hashes only the sources a door render is made from, each by its file name: moving one between
+       projects changes nothing (it moved from OpenFPS.Common in stage 3 with the same hash). A new model
+       file, or one a model starts using, belongs in this list; DoorRenderCache.Version is the manual
+       lever for anything else. A listed file that is gone fails the build. -->
+  <Import Project="..\tools\build\SourceHash.targets" />
+  <ItemGroup>
+    <DoorModelSource Include="KnobDoor.cs;PushBarDoor.cs;SlidingDoor.cs;GlassDoor.cs;LockCylinder.cs;ElevatorDoor.cs;CarWindow.cs;GlassFracture.cs;DoorPhysics.cs;Doors.cs;Glass.cs;VehicleCabin.cs;VehicleBody.cs;..\OpenFPS.Acoustics\AcousticRegistry.cs"
+                     HashName="%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="GenerateDoorModelFingerprint" BeforeTargets="CoreCompile" Inputs="@(DoorModelSource);$(MSBuildProjectFullPath)"
+          Outputs="$(IntermediateOutputPath)DoorModelFingerprint.g.cs">
+    <HashSources Files="@(DoorModelSource)" Root="$(MSBuildProjectDirectory)">
+      <Output TaskParameter="Hash" PropertyName="DoorModelHash" />
+    </HashSources>
+    <WriteLinesToFile File="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="namespace OpenFPS.Common%3B;/// &lt;summary&gt;A hash of the sources a door model render is made from (OpenFPS.Sound.csproj, DoorModelSource).&lt;/summary&gt;;public static class DoorModelFingerprint { public const string Hash = &quot;$(DoorModelHash)&quot;%3B }" />
+  </Target>
+  <Target Name="IncludeDoorModelFingerprint" BeforeTargets="CoreCompile" AfterTargets="GenerateDoorModelFingerprint">
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" />
+      <FileWrites Include="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" />
+    </ItemGroup>
+  </Target>
+
+</Project>
