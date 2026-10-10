@@ -26,7 +26,8 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class PoolCostSpike
 {
-    private const int Rate = MixerQuality.DefaultRate, Block = 1024;
+    private static readonly int Rate = int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_LAB_RATE"), out int r) ? r : MixerQuality.DefaultRate;
+    private const int Block = 1024;
 
     /// <summary>A street: cars, a bus, vans, a truck, a bike.</summary>
     private static readonly string[] StreetMix =
@@ -46,10 +47,13 @@ public static class PoolCostSpike
             prctl(0x59616d61, ulong.MaxValue, 0, 0, 0);
             Console.WriteLine($"pid {Environment.ProcessId}");
         }
+        _only = rest.FirstOrDefault(a => a.StartsWith("only="))?[5..];
+        _sceneSeconds = IntArg(rest, "secs", 6);
         if (rest.Contains("cpu")) return Cpu(voices, IntArg(rest, "sec", 10));
         if (rest.Contains("offline")) return Offline(voices, IntArg(rest, "sec", 4));
         if (rest.Contains("machines")) return Machines(IntArg(rest, "sec", 4));
-        if (rest.Contains("render")) return RenderSet(rest.SkipWhile(a => a != "render").Skip(1).First(), rest.Contains("wide"));
+        if (rest.Contains("render") && rest.Contains("steady")) return RenderSteady(rest.SkipWhile(a => a != "render").Skip(1).First(), IntArg(rest, "seed", 0), IntArg(rest, "secs", 8));
+        if (rest.Contains("render")) return RenderSet(rest.SkipWhile(a => a != "render").Skip(1).First(), rest.Contains("wide"), IntArg(rest, "seed", 0));
         if (rest.Contains("diff"))
         {
             var dirs = rest.SkipWhile(a => a != "diff").Skip(1).Take(2).ToArray();
@@ -191,14 +195,43 @@ public static class PoolCostSpike
         new("pickup_inside", "pickup_v8", t => (float)Math.Min(25, t * 5), null, Inside: true),
     };
 
-    private static int RenderSet(string dir, bool wide)
+    /// <summary>The street's sixteen machines at a steady speed each, the listener 10 m off their side:
+    /// the scenes a far voice spends most of its time in, long enough for the level to mean something.</summary>
+    private static int RenderSteady(string dir, int seedOffset, int seconds)
     {
         Directory.CreateDirectory(dir);
-        if (wide) RenderWide(dir);
-        const double seconds = 6.0;
+        int blocks = seconds * Rate / Block;
+        for (int i = 0; i < StreetMix.Length; i++)
+        {
+            if (_only != null && !StreetMix[i].Contains(_only)) continue;
+            float speed = 4f + (i * 7 % 11) * 1.5f;
+            var v = new EngineVoiceState(MachineRegistry.VehicleFor(StreetMix[i]), Rate, 1000 + i + seedOffset)
+            {
+                TargetSpeed = speed,
+                CompensateLevel = true,
+                };
+            v.PlaceAtSpeed(speed);
+            v.SetListener(new Vector3(10f, 1.6f, 0f));
+            var all = new float[blocks * Block];
+            var buf = new float[Block];
+            for (int b = 0; b < blocks; b++) { v.Produce(); v.Consume(buf); buf.CopyTo(all, b * Block); }
+            Write(dir, $"steady_{i:00}_{StreetMix[i]}", all);
+        }
+        return 0;
+    }
+
+    private static string? _only;
+    private static int _sceneSeconds = 6;
+
+    private static int RenderSet(string dir, bool wide, int seedOffset)
+    {
+        Directory.CreateDirectory(dir);
+        if (wide) RenderWide(dir, seedOffset);
+        double seconds = _sceneSeconds;
         foreach (var s in Scenes)
         {
-            var v = new EngineVoiceState(MachineRegistry.VehicleFor(s.Preset), Rate, 7)
+            if (_only != null && !s.Name.Contains(_only)) continue;
+            var v = new EngineVoiceState(MachineRegistry.VehicleFor(s.Preset), Rate, 7 + seedOffset)
             {
                 TargetSpeed = s.Speed(0),
                 CompensateLevel = true,
@@ -228,13 +261,13 @@ public static class PoolCostSpike
 
     /// <summary>Every vehicle preset revving through its gears, and the physical voices built on an
     /// engine (mowers, a piston aeroplane), three seconds each.</summary>
-    private static void RenderWide(string dir)
+    private static void RenderWide(string dir, int seedOffset)
     {
         const double seconds = 3.0;
         int blocks = (int)(seconds * Rate / Block);
         foreach (var key in VehicleProfile.Presets.Keys.OrderBy(k => k))
         {
-            var v = new EngineVoiceState(MachineRegistry.VehicleFor(key), Rate, 3) { CompensateLevel = true };
+            var v = new EngineVoiceState(MachineRegistry.VehicleFor(key), Rate, 3 + seedOffset) { CompensateLevel = true };
             v.PlaceAtSpeed(2f);
             v.SetListener(new Vector3(4f, 1.4f, -6f));
             var all = new float[blocks * Block];
@@ -250,10 +283,10 @@ public static class PoolCostSpike
         }
         var physical = new (string Name, Func<PhysicalVoiceState> Make)[]
         {
-            ("mower_push", () => new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, 11, 11 * 31 + 7)),
-            ("mower_riding", () => new MachineVoiceState(SmallMachineSpec.ByName("mower_riding"), Rate, 12, 12 * 31 + 7)),
-            ("ac_condenser", () => new MachineVoiceState(SmallMachineSpec.ByName("ac_condenser"), Rate, 13, 13 * 31 + 7)),
-            ("piston_single", () => new AircraftVoiceState(AircraftProfile.ByName("piston_single"), Rate, 5)),
+            ("mower_push", () => new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, 11, 11 * 31 + 7 + seedOffset)),
+            ("mower_riding", () => new MachineVoiceState(SmallMachineSpec.ByName("mower_riding"), Rate, 12, 12 * 31 + 7 + seedOffset)),
+            ("ac_condenser", () => new MachineVoiceState(SmallMachineSpec.ByName("ac_condenser"), Rate, 13, 13 * 31 + 7 + seedOffset)),
+            ("piston_single", () => new AircraftVoiceState(AircraftProfile.ByName("piston_single"), Rate, 5 + seedOffset)),
         };
         foreach (var (name, make) in physical)
         {

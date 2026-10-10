@@ -4,6 +4,23 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-09
 
+- Engines cost less, with the sound changed by design this time (Cody approved the four levers left by
+  the bit-exact pass below). Renders and what to listen for in inbox/engine-cpu-2026-10-09. Costs are
+  `--pool-cost offline` (32 street voices on one fast core) and `--pool-cost machines`.
+  - The valve solver brackets the answer from its first guess: the residual rises at least as 1/Z, so
+    one step of the residual times Z lands on the far side of the root, and two evaluations bracket it
+    where the old bracket took two of its own and left thousands of pascals to search. A Newton step on
+    the slope the valve's last solve ended with comes first; the first guess carries the valve's flow on
+    rather than its outgoing wave. It stops at 1 Pa (was 0.2) and halves the bracket when regula falsi
+    crawls. 2.3 evaluations a solve on a street, against 5.8. The orifice law takes one power, not two.
+    32 street voices 2.80 core-seconds per second of sound against 2.26 (19 % less); push mower 35 ms a
+    second against 31, riding mower 48 against 41. Measured against changing an engine's seed: level
+    and third-octave balance across 58 renders move by the same amount (0.11 against 0.14 dB of level,
+    0.32 against 0.40 dB a band). The old solver missed the root by tens of kilopascals where a nearly
+    empty cylinder meets a port at its pressure floor; the new one finds it (EngineRenderCostTests).
+    AudioLab `--pool-cost render DIR [wide|steady] [seed=N] [only=NAME] [secs=S]` for the comparisons,
+    `--game-levels set=engine-cpu` for the scenes.
+
 - Logging out in the world and back in returns you to the same spot, through the loading screen, facing
   the way you faced; the landing map if the ground there cannot be built within 30 s.
 - Ground at 8 m in the far ring (docs/WORLD_STREAMING.md, "Coarse ground in the far ring"). A tile you have

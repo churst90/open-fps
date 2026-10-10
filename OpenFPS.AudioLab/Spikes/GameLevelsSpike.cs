@@ -12,7 +12,7 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --game-levels [out=DIR] [set=measure|render|compare|all|ear|wind|faults|faults-ac|faults-squeal|faults-landing]
+/// --game-levels [out=DIR] [set=measure|render|compare|all|ear|wind|faults|faults-ac|faults-squeal|faults-landing|engine-cpu]
 /// [cars=a,b,..] [ear=on|off] [listening=DB] [calm=SPEED,TURBULENCE]: what the game's own mixer puts out
 /// for one thing at a time, captured from the real output. set=faults is the Resonance faults of 2026-10-06:
 /// a light single and an airliner landing, a train blowing for a crossing, two window units side by side.
@@ -84,6 +84,8 @@ public static class GameLevelsSpike
 
         var segments = new List<Segment>();
         Action<double>? perFrame = null;
+        // A source kept going under the scenes (a car idling down the street), as the server keeps it fresh.
+        Action<double>? background = null;
         int nextId = 100;
 
         void Pump(double seconds)
@@ -91,6 +93,7 @@ public static class GameLevelsSpike
             var until = clock.Elapsed.TotalSeconds + seconds;
             while (clock.Elapsed.TotalSeconds < until)
             {
+                background?.Invoke(clock.Elapsed.TotalSeconds);
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
                 audio.Update(world.GetSnapshot());
                 facade.PumpForTest();
@@ -187,6 +190,24 @@ public static class GameLevelsSpike
             perFrame = null;
             Remove(id);
             Pump(1.5);
+        }
+
+        // A car idling twelve metres from where you stand, kept until Unidle: the louder voice a street
+        // always has, which the engines' detail is chosen against (FmodAudioProvider.ChooseEngineDetail).
+        int idlerId = 0;
+        void Idle(string preset, Vector3 at)
+        {
+            idlerId = AddCar(preset, at, Vector3.Zero);
+            int id = idlerId;
+            background = _ => Move(id, at, Quaternion.Identity, Vector3.Zero);
+            Pump(3.0);
+        }
+        void Unidle()
+        {
+            background = null;
+            if (idlerId != 0) Remove(idlerId);
+            idlerId = 0;
+            Pump(1.0);
         }
 
         void PassBy(string preset, float kmh, float lateral, double seconds)
@@ -610,6 +631,26 @@ public static class GameLevelsSpike
             }
             if (set is "wind")
                 foreach (var w in new[] { 2.2f, 4.5f, 7f }) Wind(w, 14.0);
+            if (set is "engine-cpu")
+            {
+                // The engine CPU levers of 2026-10-09 (inbox/engine-cpu-2026-10-09): near voices alone,
+                // then far ones under a car idling 12 m away, as a street has.
+                IdleCar("pickup_v8", new[] { ("rear", 3f) }, 8.0);
+                PassBy("i4_midsize", 50f, 3f, 10.0);
+                Idle("i4_midsize", new Vector3(7f, 0f, 90f + 10f));
+                PassBy("pickup_v8", 50f, 90f, 14.0);
+                Unidle();
+                // From about 300 m to 3 m and away again: the far voice handing over to the near one.
+                Idle("i4_midsize", new Vector3(7f, 0f, 3f + 10f));
+                PassBy("pickup_v8", 50f, 3f, 44.0);
+                PassBy("transit_bus", 40f, 3f, 44.0);
+                Unidle();
+                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
+                Stand(new Vector3(-30f, 0f, -30f), 0f);
+                Idle("i4_midsize", new Vector3(-30f + 7f, 0f, -30f - 10f));
+                Steady("mower_push", "machine:mower_push", 35f, 0.4f, 10.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
+                Unidle();
+            }
             if (set is "compare")
             {
                 Footsteps(6.0);

@@ -234,7 +234,10 @@ public sealed class EngineSynth
         public float Volume, Pressure, Temp;
         public float Phase;                    // degrees after this cylinder's firing TDC
         public float LiftE, LiftI;             // metres
-        public float ExhaustB, IntakeB;        // last outgoing wave, for the Newton start
+        public float ExhaustB, IntakeB;        // last outgoing wave
+        // Each valve's last two volume velocities and the residual's slope its last solve ended on: the
+        // next solve's first guess and first step (SolveValve).
+        public float ExhaustU1, ExhaustU2, IntakeU1, IntakeU2, ExhaustSlope, IntakeSlope;
         public float RunnerBurnt;              // burnt fraction of the gas in this cylinder's runner, 0..1
         public float ExhaustUMean, IntakeUMean; // slow mean volume velocity through each valve, m^3/s
         public float PortE, PortI, FlowE, FlowI; // diagnostics: port acoustic pressure, valve mass flow
@@ -715,8 +718,13 @@ public sealed class EngineSynth
                 float Z = _exhaust.PrimaryImpedance(c);
                 float rhoPipeK = _portK;
                 float capE = 0.6f * _exhaust.PrimarySoundSpeed(c) * _primaryArea;
-                bE = SolveValve(aE, cy.ExhaustB, Z, area, cy.Pressure, cy.Temp, rhoPipeK, Gas.GammaExhaust, cy.Mass, _dt, 0f, capE, Gas.Atmosphere, out float mdot);
+                // The flow through the valve moves smoothly where the arriving wave may jump (a shock
+                // front), so the guess carries the flow on, not the outgoing wave.
+                float guessE = aE + Z * (2f * cy.ExhaustU1 - cy.ExhaustU2);
+                bE = SolveValve(aE, guessE, Z, area, cy.Pressure, cy.Temp, rhoPipeK, Gas.GammaExhaust, cy.Mass, _dt, 0f, capE, Gas.Atmosphere, out float mdot, ref cy.ExhaustSlope);
                 cy.ExhaustB = bE;
+                cy.ExhaustU2 = cy.ExhaustU1;
+                cy.ExhaustU1 = (bE - aE) / Z;
                 cy.ExhaustUMean += (mdot / Gas.Density(Gas.Atmosphere, rhoPipeK) - cy.ExhaustUMean) * _dt * MeanFlowRate;
                 cy.PortE = aE + bE; cy.FlowE = mdot;
                 // mdot > 0 leaves the cylinder.
@@ -745,6 +753,7 @@ public sealed class EngineSynth
             {
                 bE = aE;                                   // shut: a wall
                 cy.ExhaustB = aE;
+                cy.ExhaustU1 = cy.ExhaustU2 = cy.ExhaustSlope = 0f;
                 cy.ExhaustUMean -= cy.ExhaustUMean * _dt * MeanFlowRate;
             }
             // Overrun pops: unburnt charge lighting off in the hot pipe, entered at the port as a pulse
@@ -771,8 +780,11 @@ public sealed class EngineSynth
                 float area = ValveArea(e.IntakeValve, liftI);
                 float Z = _intake.RunnerImpedance(c);
                 float capI = 0.3f * 350f * _runnerArea;
-                bI = SolveValve(aI, cy.IntakeB, Z, area, cy.Pressure, cy.Temp, intakeK, Gas.GammaAir, cy.Mass, _dt, 0f, capI, _map, out float mdotOut);
+                float guessI = aI + Z * (2f * cy.IntakeU1 - cy.IntakeU2);
+                bI = SolveValve(aI, guessI, Z, area, cy.Pressure, cy.Temp, intakeK, Gas.GammaAir, cy.Mass, _dt, 0f, capI, _map, out float mdotOut, ref cy.IntakeSlope);
                 cy.IntakeB = bI;
+                cy.IntakeU2 = cy.IntakeU1;
+                cy.IntakeU1 = (bI - aI) / Z;
                 cy.IntakeUMean += (mdotOut / Gas.Density(_map, intakeK) - cy.IntakeUMean) * _dt * MeanFlowRate;
                 cy.PortI = aI + bI; cy.FlowI = mdotOut;
                 intakeFlow += mdotOut;
@@ -805,6 +817,7 @@ public sealed class EngineSynth
             {
                 bI = aI;
                 cy.IntakeB = aI;
+                cy.IntakeU1 = cy.IntakeU2 = cy.IntakeSlope = 0f;
                 cy.IntakeUMean -= cy.IntakeUMean * _dt * MeanFlowRate;
                 // What was pushed into the runner mixes on into the plenum and is gone.
                 cy.RunnerBurnt *= 1f - 2.5f * _dt;
@@ -1418,13 +1431,12 @@ public sealed class EngineSynth
     /// </summary>
     private readonly struct OrificeGas
     {
-        public readonly float Crit, Choked, PowLow, PowHigh, Subsonic;
+        public readonly float Crit, Choked, InvGamma, Subsonic;
         public OrificeGas(float gamma)
         {
             Crit = MathF.Pow(2f / (gamma + 1f), gamma / (gamma - 1f));
             Choked = MathF.Sqrt(gamma) * MathF.Pow(2f / (gamma + 1f), (gamma + 1f) / (2f * (gamma - 1f)));
-            PowLow = 2f / gamma;
-            PowHigh = (gamma + 1f) / gamma;
+            InvGamma = 1f / gamma;
             Subsonic = 2f * gamma / (gamma - 1f);
         }
     }
@@ -1440,9 +1452,27 @@ public sealed class EngineSynth
         if (area <= 0f || pUp <= pDown) return 0f;
         float pr = pDown / pUp;
         if (pr <= g.Crit) return area * pUp * g.Choked / rt;
-        float t1 = MathF.Pow(pr, g.PowLow) - MathF.Pow(pr, g.PowHigh);
+        // pr^(2/g) - pr^((g+1)/g) as q(q - pr) with q = pr^(1/g): one power, not two.
+        float q = MathF.Pow(pr, g.InvGamma);
+        float t1 = q * (q - pr);
         if (t1 <= 0f) return 0f;
         return area * pUp * MathF.Sqrt(g.Subsonic * t1) / rt;
+    }
+
+    /// <summary>
+    /// The valve solver's stopping rule: the residual worth this much pressure, pascals. Waves at the
+    /// valve run from hundreds of pascals (an idling intake) to a hundred thousand (a blowdown), so a
+    /// pascal is 50-100 dB under them. The rule until 2026-10-09 was 0.2 Pa, which cost about half an
+    /// evaluation more a solve and changed nothing measurable (inbox/engine-cpu-2026-10-09/1-valve-solver).
+    /// </summary>
+    internal const float ValveTolerancePa = 1f;
+
+    /// <summary>The solver with no slope carried from a last sample: for the lab and the tests.</summary>
+    internal static float SolveValve(float a, float bStart, float Z, float area, float pCyl, float tCyl,
+                                    float pipeK, float gamma, float cylMass, float dt, float uMean, float uCap, float pMean, out float mdot)
+    {
+        float slope = 0f;
+        return SolveValve(a, bStart, Z, area, pCyl, tCyl, pipeK, gamma, cylMass, dt, uMean, uCap, pMean, out mdot, ref slope);
     }
 
     /// <summary>
@@ -1450,12 +1480,21 @@ public sealed class EngineSynth
     ///
     /// The pipe end sees an incoming wave a and returns b; its pressure is p0 + a + b and its volume
     /// velocity into the pipe (b - a)/Z, which must equal the valve's orifice flow over the port
-    /// density. One monotone nonlinear equation in b, bracketed and solved by regula falsi from last
-    /// sample's answer. Returns b; mdot is positive out of the cylinder.
+    /// density. One monotone nonlinear equation in b. Returns b; mdot is positive out of the cylinder.
+    ///
+    /// The residual g(b) = (b - a)/Z - u(b) rises with a slope of at least 1/Z, because the valve's flow
+    /// only falls as the port pressure rises. So from any b0 the step b0 - g(b0) Z lands on the root or
+    /// past it: two evaluations bracket the root. Bracketing by the largest flow either way, as until
+    /// 2026-10-09, took two evaluations of its own and left a bracket thousands of pascals wide. First
+    /// comes a Newton step on the slope this valve's last solve ended with, which usually lands inside
+    /// the tolerance; regula falsi (Illinois) finishes. About 2.3 evaluations a solve on a street,
+    /// against 5.8; the solver was a third of an engine's cost.
+    /// <paramref name="slope"/> is the valve's own, carried between samples; zero means unknown.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     internal static float SolveValve(float a, float bStart, float Z, float area, float pCyl, float tCyl,
-                                    float pipeK, float gamma, float cylMass, float dt, float uMean, float uCap, float pMean, out float mdot)
+                                    float pipeK, float gamma, float cylMass, float dt, float uMean, float uCap, float pMean,
+                                    out float mdot, ref float slope)
     {
         if (DebugRigidValves) { mdot = 0f; return a; }   // Stryker disable once all : lab switch
         // uMean is kept at zero: subtracting a running mean of the valve flow injected a false ram
@@ -1470,32 +1509,63 @@ public sealed class EngineSynth
         float equalise = 0.5f * cylMass / dt;
         var gas = OrificeFor(gamma);
         float rtCyl = MathF.Sqrt(Gas.R * tCyl), rtPipe = MathF.Sqrt(Gas.R * pipeK);
-        // Bracketed by the largest volume velocity either way, then regula falsi. Newton could not be
-        // trusted near p_port = p_cyl, where the orifice law's slope is infinite.
+        // The answers the flow can reach. With uMean zero the root is always inside, u being capped
+        // below uMax; with a mean it may lie past an end, and then that end is the answer.
         float uMax = uCap * 1.05f;
         float lo = a - Z * uMax, hi = a + Z * uMax;
-        // An end's residual is wanted for its sign, and for its value only while it still bounds the
-        // root. Past the cap the sign is known without the orifice law, since u is clamped to the cap;
-        // so the end the first guess replaces is never worked out. Same answer, one evaluation fewer.
-        bool loKnown = !(uMean == 0f && (lo - a) / Z < -uCap);
-        bool hiKnown = !(uMean == 0f && (hi - a) / Z > uCap);
-        float gLo = loKnown ? Residual(lo, out _) : 0f, gHi = hiKnown ? Residual(hi, out _) : 0f;
-        if (loKnown && gLo >= 0f) { Residual(lo, out mdot); return lo; }
-        if (hiKnown && gHi <= 0f) { Residual(hi, out mdot); return hi; }
-        float b = Math.Clamp(bStart, lo, hi);
-        float gB = Residual(b, out mdot);
-        if (gB > 0f) { hi = b; gHi = gB; if (!loKnown) gLo = Residual(lo, out _); }
-        else { lo = b; gLo = gB; if (!hiKnown) gHi = Residual(hi, out _); }
-        int side = 0;
-        for (int it = 0; it < 10; it++)
+        float tol = ValveTolerancePa / Z, minSlope = 1f / Z;
+
+        float b0 = Math.Clamp(bStart, lo, hi);
+        float g0 = Residual(b0, out mdot);
+        if (MathF.Abs(g0) < tol) return b0;
+        float b1, g1;
+        if (slope > minSlope)
         {
-            b = (gLo * hi - gHi * lo) / (gLo - gHi);
-            if (!float.IsFinite(b)) b = 0.5f * (lo + hi);
-            gB = Residual(b, out mdot);
-            if (MathF.Abs(gB) * Z < 0.2f || hi - lo < 0.5f) break;
-            if (gB > 0f) { hi = b; gHi = gB; if (side == 1) gLo *= 0.5f; side = 1; }
-            else { lo = b; gLo = gB; if (side == -1) gHi *= 0.5f; side = -1; }
+            // Shorter than the bracketing step, so it stays on the near side of the root's far bound.
+            b1 = Math.Clamp(b0 - g0 / slope, lo, hi);
+            g1 = Residual(b1, out mdot);
+            if (MathF.Abs(g1) < tol) { slope = MathF.Max(minSlope, (g1 - g0) / (b1 - b0)); return b1; }
+            if ((g1 > 0f) == (g0 > 0f))
+            {
+                // Still short of the root: bracket it from here.
+                b0 = b1; g0 = g1;
+                b1 = Math.Clamp(b0 - g0 * Z, lo, hi);
+                g1 = Residual(b1, out mdot);
+                if (MathF.Abs(g1) < tol) { slope = MathF.Max(minSlope, (g1 - g0) / (b1 - b0)); return b1; }
+            }
         }
+        else
+        {
+            b1 = Math.Clamp(b0 - g0 * Z, lo, hi);
+            g1 = Residual(b1, out mdot);
+            if (MathF.Abs(g1) < tol) { slope = MathF.Max(minSlope, (g1 - g0) / (b1 - b0)); return b1; }
+        }
+        // No change of sign only where the step was held at an end: the root is past it.
+        if ((g1 > 0f) == (g0 > 0f)) { slope = 0f; return b1; }
+
+        float bLo, gLo, bHi, gHi;
+        if (g0 > 0f) { bHi = b0; gHi = g0; bLo = b1; gLo = g1; } else { bLo = b0; gLo = g0; bHi = b1; gHi = g1; }
+        float b = b1;
+        int side = 0;
+        float width1 = float.MaxValue, width2 = float.MaxValue;
+        for (int it = 0; it < 40 && bHi - bLo > 2.5f * ValveTolerancePa; it++)
+        {
+            float width = bHi - bLo;
+            // Regula falsi crawls along the orifice law's square-root corner (a nearly empty cylinder
+            // against a port at its pressure floor): halve whenever two steps have not halved the bracket.
+            bool halve = width > 0.5f * width2;
+            width2 = width1; width1 = width;
+            b = halve ? 0.5f * (bLo + bHi) : (gLo * bHi - gHi * bLo) / (gLo - gHi);
+            if (!float.IsFinite(b)) b = 0.5f * (bLo + bHi);
+            float gB = Residual(b, out mdot);
+            if (MathF.Abs(gB) < tol) break;
+            if (halve) side = 0;
+            if (gB > 0f) { bHi = b; gHi = gB; if (side == 1) gLo *= 0.5f; side = 1; }
+            else { bLo = b; gLo = gB; if (side == -1) gHi *= 0.5f; side = -1; }
+        }
+        // The secant across what is left of the bracket. The Illinois halving makes it a little low,
+        // which only shortens the next Newton step.
+        slope = MathF.Max(minSlope, (gHi - gLo) / MathF.Max(1e-20f, bHi - bLo));
         return b;
 
         float Residual(float bb, out float m)
