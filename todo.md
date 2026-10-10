@@ -34,7 +34,9 @@ still falls, and that rain now stops. A new front is drawn every five minutes on
 NPC doors (CODY_ASKS section 9) done 2026-10-10, unheard: Alex and the drivers from parked cars let
 a closer shut its door, shut an outside door without one behind them, leave an inside door as found
 going in and shut it going out, out of the doorway and never on anybody in it (DoorManners,
-docs/DOOR_TYPES_EVENTS.md "What the server's people do with a door").
+docs/DOOR_TYPES_EVENTS.md "What the server's people do with a door"). Cody 2026-10-10: the rule
+holds whoever is about (no player exceptions), and closers start back 1 s after the doorway clears
+(was 3 s).
 Cody's world decisions of 2026-10-09: no faster tile fetching for now (a car above about 65 m/s still
 stops short of unbuilt ground); the places laid on UTM grid north are fine; placed tiles stay pinned
 against the store's cap, and player-built tiles will follow the same rule; close the crack between
