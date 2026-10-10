@@ -1235,7 +1235,12 @@ public class AsyncAcousticWorker : IDisposable
             _saListenerScene?.Dispose();
             _saListenerScene = assembledListener;
             if (_tileScenes != null)
+            {
                 Console.WriteLine($"[AcousticWorker] {_tileScenes.TileCount} tile sub-scene(s) built in {_tileScenes.LastUpdateMs:F0} ms, assembled in {_tileScenes.LastAssembleMs:F1} ms.");
+                var layers = _tileScenes.LayerPlan;
+                Console.WriteLine($"[AcousticWorker] {layers.Constructions} construction(s) of layers in contact, {layers.Members.Count} layer(s), "
+                                + $"{layers.Faces} face(s) ({layers.Milliseconds:F0} ms).");
+            }
         }
         else
         {

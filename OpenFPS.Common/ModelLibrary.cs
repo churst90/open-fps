@@ -48,6 +48,8 @@ public static class ModelLibrary
         public const string Flow = "flow";
         /// <summary>Waves at an edge: a beach, a rocky shore, a harbour wall, a river bank, a boat's side.</summary>
         public const string Shore = "shore";
+        /// <summary>A gas hob: its burners, spark module and flame safety (docs/GAS_HOB.md).</summary>
+        public const string GasHob = "gas_hob";
 
         /// <summary>A road vehicle's engine: EngineProfile. Every vehicle built on it has the change.</summary>
         public const string Engine = "engine";
@@ -107,6 +109,7 @@ public static class ModelLibrary
         [Kinds.Foliage] = FoliageSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Flow] = RunningWaterSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Shore] = ShoreSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.GasHob] = GasHobSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Engine] = EngineProfile.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Vehicle] = VehicleProfile.Presets.Keys.ToDictionary(k => k, k => (Func<object>)(() => VehicleSpec.Of(k)), StringComparer.OrdinalIgnoreCase),
         [Kinds.Loudspeaker] = LoudspeakerSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
@@ -147,6 +150,7 @@ public static class ModelLibrary
         [Kinds.Foliage] = typeof(FoliageSpec),
         [Kinds.Flow] = typeof(RunningWaterSpec),
         [Kinds.Shore] = typeof(ShoreSpec),
+        [Kinds.GasHob] = typeof(GasHobSpec),
         [Kinds.Engine] = typeof(EngineProfile),
         [Kinds.Vehicle] = typeof(VehicleSpec),
         [Kinds.Loudspeaker] = typeof(LoudspeakerSpec),
@@ -326,6 +330,7 @@ public static class ModelLibrary
     public static RunningWaterSpec Flow(string id) => Get<RunningWaterSpec>(Kinds.Flow, id);
     public static ShoreSpec Shore(string id) => Get<ShoreSpec>(Kinds.Shore, id);
     public static LoudspeakerSpec Loudspeaker(string id) => Get<LoudspeakerSpec>(Kinds.Loudspeaker, id);
+    public static GasHobSpec GasHob(string id) => Get<GasHobSpec>(Kinds.GasHob, id);
 
     // ── Writing ─────────────────────────────────────────────────────────────────────────────────
 

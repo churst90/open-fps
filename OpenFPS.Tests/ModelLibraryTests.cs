@@ -43,6 +43,7 @@ public class ModelLibraryTests : IDisposable
                     ModelLibrary.Kinds.Foliage => ModelLibrary.Foliage(id),
                     ModelLibrary.Kinds.Flow => ModelLibrary.Flow(id),
                     ModelLibrary.Kinds.Shore => ModelLibrary.Shore(id),
+                    ModelLibrary.Kinds.GasHob => ModelLibrary.GasHob(id),
                     ModelLibrary.Kinds.Engine => ModelLibrary.Get<EngineProfile>(kind, id),
                     ModelLibrary.Kinds.Vehicle => ModelLibrary.Get<VehicleSpec>(kind, id),
                     ModelLibrary.Kinds.Loudspeaker => ModelLibrary.Loudspeaker(id),

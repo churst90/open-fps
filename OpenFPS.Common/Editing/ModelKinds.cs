@@ -47,6 +47,7 @@ public static class ModelKinds
         ModelLibrary.Kinds.Water => "water feature",
         ModelLibrary.Kinds.Flow => "running water",
         ModelLibrary.Kinds.Air => "air system",
+        ModelLibrary.Kinds.GasHob => "gas hob",
         _ => kind.Replace('_', ' '),
     };
 
@@ -342,6 +343,7 @@ public static class ModelKinds
             "flow" => ModelLibrary.Kinds.Flow,
             "bell" => ModelLibrary.Kinds.Bell,
             "shore" => ModelLibrary.Kinds.Shore,
+            "stove" => ModelLibrary.Kinds.GasHob,
             // A vehicle's sound is its engine: "engine:school_bus" is the vehicle school_bus.
             "engine" => ModelLibrary.Kinds.Vehicle,
             _ => "",

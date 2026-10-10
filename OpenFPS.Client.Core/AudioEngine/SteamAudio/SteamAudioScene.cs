@@ -15,10 +15,11 @@ public sealed class SteamAudioScene : IDisposable
 {
     /// <summary>An axis-box collider in world space (size = full extents) with an acoustic material name,
     /// and how it is built (solid, or two leaves over a cavity: <see cref="WallBuild"/>). <paramref name="EntityId"/>
-    /// is the entity it was taken from, 0 for one made by hand.</summary>
+    /// is the entity it was taken from, 0 for one made by hand. <paramref name="Hung"/>: a door leaf, which
+    /// hangs in its frame and is never a layer of the wall round it (LayeredFaces).</summary>
     public readonly record struct Box(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material,
                                       WallBuild Build = default, int EntityId = 0,
-                                      OpenFPS.Common.Geometry.ShapeSpec? Form = null);
+                                      OpenFPS.Common.Geometry.ShapeSpec? Form = null, bool Hung = false);
 
     private readonly IntPtr _context;
     private IntPtr _scene;
@@ -127,7 +128,8 @@ public sealed class SteamAudioScene : IDisposable
             var size = def.Collider.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
             boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material,
-                              new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), snap.Id, def.Collider.Form));
+                              new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), snap.Id, def.Collider.Form,
+                              OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(def)));
         }
         return boxes;
     }
@@ -249,11 +251,20 @@ public sealed class SteamAudioScene : IDisposable
         var materials = new List<Phonon.IPLMaterial>();
         var matIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var b in boxes)
+        var plan = PlanOf(boxes);
+        for (int i = 0; i < boxes.Count; i++)
         {
+            var b = boxes[i];
             if (b.Size.X <= 0 || b.Size.Y <= 0 || b.Size.Z <= 0) continue;
             int mi = MaterialIndex(b, materials, matIndexByName);
-            AppendBox(b, verts, tris, triMat, mi);
+            if (!plan.Members.TryGetValue(i, out var member))
+            {
+                AppendBox(b, verts, tris, triMat, mi);
+                continue;
+            }
+            // A layer of a construction: its narrow sides as they are, its broad faces as the plan has them.
+            AppendBox(b, verts, tris, triMat, mi, member.Axis);
+            AppendFaces(b.Material, member, Vector3.Zero, verts, tris, triMat, materials, matIndexByName);
         }
         if (terrains != null)
             foreach (var t in terrains)
@@ -306,7 +317,7 @@ public sealed class SteamAudioScene : IDisposable
     /// corner), each solid's corners shared by its triangles, the same materials the boxes made. Zero if
     /// there are none. The triangles are wound as the box mesh was in Steam Audio's frame.
     /// </summary>
-    internal static IntPtr AddPieceMesh(IntPtr scene, OpenFPS.Common.Geometry.GeometryPiece piece, bool openGround)
+    internal static IntPtr AddPieceMesh(IntPtr scene, OpenFPS.Common.Geometry.GeometryPiece piece, bool openGround, LayerLookup? layers = null)
     {
         var verts = new List<PV>();
         var tris = new List<Phonon.IPLTriangle>();
@@ -320,23 +331,31 @@ public sealed class SteamAudioScene : IDisposable
             var surface = piece.Surfaces[rec.Surface];
             if (surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.OpenGround) != openGround) continue;
             int mi = MaterialIndex(surface.Material, surface.Construction.PanelSize, surface.Construction.Build, materials, matIndexByName);
+            var member = layers?.Of(rec.Owner, rec.PlacedAt, rec.BoxSize);
             int first = verts.Count, unique = 0;
+            // Traced no thinner than Steam Audio's step past a hit (MinTracedThicknessMetres).
+            bool box = rec.BoxSize.X > 0f && rec.BoxSize.Y > 0f && rec.BoxSize.Z > 0f;
+            Vector3 boxCentre = rec.BoxCentre, boxSize = rec.BoxSize;
+            Quaternion boxTurn = rec.BoxRotation;
             int Corner(Vector3 v, Span<Vector3> seen, ref int n)
             {
                 for (int k = 0; k < n; k++) if (seen[k] == v) return first + k;
                 if (n < seen.Length) seen[n] = v;
-                verts.Add(Phonon.World(v));
+                verts.Add(Phonon.World(box ? TracedPoint(v, boxCentre, boxSize, boxTurn) : v));
                 return first + n++;
             }
             foreach (int t in piece.TrianglesOf(s))
             {
                 ref readonly var tr = ref piece.Triangle(t);
+                // A layer of a construction shows its broad faces as the plan has them (added below).
+                if (member != null && Constructions.Parallel(Vector3.Normalize(tr.Normal), member.Normal)) continue;
                 int a = Corner(tr.V0, corners, ref unique), b = Corner(tr.V0 + tr.E1, corners, ref unique), c = Corner(tr.V0 + tr.E2, corners, ref unique);
                 // Outward in the game's frame; Steam Audio's frame is mirrored, and the box mesh was wound
                 // for that frame: the same triangle the other way round.
                 tris.Add(new Phonon.IPLTriangle { i0 = a, i1 = c, i2 = b });
                 triMat.Add(mi);
             }
+            if (member != null) AppendFaces(surface.Material, member, piece.Origin, verts, tris, triMat, materials, matIndexByName);
         }
         // The tile's ground is open ground.
         if (openGround && piece.Terrain != null)
@@ -387,15 +406,20 @@ public sealed class SteamAudioScene : IDisposable
     /// from listener and source, multiplies every face's transmission and takes the square root of the
     /// product (core/src/core/direct_simulator.cpp), so a single box is three hits and one wall loses
     /// exactly its own figure. n boxes in a row lose (2n + 1)/3 of one each: two walls 5/3 (measured),
-    /// not 2. (open-fps-patches 5.)
+    /// not 2. (open-fps-patches 5.) Three hits only if the box is thicker than the rays' step past a hit:
+    /// see <see cref="MinTracedThicknessMetres"/>.
     /// </summary>
     private static int MaterialIndex(in Box b, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
         => MaterialIndex(b.Material, b.Size, b.Build, materials, byName);
 
     private static int MaterialIndex(string? material, Vector3 size, WallBuild build, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
+        => MaterialIndex(material, WallTransmission.BandGains(string.IsNullOrEmpty(material) ? "Generic" : material, size, build), materials, byName);
+
+    /// <summary>A material of this name's surface letting through <paramref name="gains"/> (a construction's).</summary>
+    private static int MaterialIndex(string? material, (float Low, float Mid, float High) gains, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
     {
         string name = string.IsNullOrEmpty(material) ? "Generic" : material;
-        var (tl, tm, th) = WallTransmission.BandGains(name, size, build);
+        var (tl, tm, th) = gains;
         // Keyed on what it does, to a hundredth of a decibel: boxes that let the same through share one.
         static string Q(float g) => MathF.Round(20f * MathF.Log10(MathF.Max(1e-9f, g)), 2)
                                         .ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -430,10 +454,47 @@ public sealed class SteamAudioScene : IDisposable
         3,2,6, 3,6,7,   // +Y
     };
 
-    private static void AppendBox(Box b, List<PV> verts, List<Phonon.IPLTriangle> tris, List<int> triMat, int mi)
+    /// <summary>
+    /// The thinnest a box is traced, metres. Steam Audio's transmission rays step about 2 cm past each hit
+    /// (AudioLab --thin-panel: a glass panel 19 mm thick lost a third of its decibels, one 21 mm thick the
+    /// whole), so a thinner box was crossed as two faces where <see cref="MaterialIndex"/> counts on three:
+    /// a 12 mm glass front door passed -12/-19/-30 dB against its -18/-28/-45. A thinner box is traced this
+    /// thick about its middle, which a ray at any angle crosses in more than the step; what it lets through
+    /// stays its true size's.
+    /// </summary>
+    internal const float MinTracedThicknessMetres = 0.03f;
+
+    /// <summary>A box's size as traced: its thinnest side raised to <see cref="MinTracedThicknessMetres"/>.</summary>
+    internal static Vector3 TracedSize(Vector3 size)
+    {
+        if (size.X <= size.Y && size.X <= size.Z) size.X = MathF.Max(size.X, MinTracedThicknessMetres);
+        else if (size.Y <= size.Z) size.Y = MathF.Max(size.Y, MinTracedThicknessMetres);
+        else size.Z = MathF.Max(size.Z, MinTracedThicknessMetres);
+        return size;
+    }
+
+    /// <summary>A point of a solid moved as <see cref="TracedSize"/> grows its box (centre, size and turn in
+    /// one frame): stretched along the thin side about the middle, unchanged when the box is thick enough.</summary>
+    internal static Vector3 TracedPoint(Vector3 point, Vector3 centre, Vector3 size, Quaternion rotation)
+    {
+        var traced = TracedSize(size);
+        if (traced == size) return point;
+        var q = rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(rotation);
+        var local = Vector3.Transform(point - centre, Quaternion.Inverse(q));
+        local *= new Vector3(traced.X / MathF.Max(1e-6f, size.X), traced.Y / MathF.Max(1e-6f, size.Y), traced.Z / MathF.Max(1e-6f, size.Z));
+        return centre + Vector3.Transform(local, q);
+    }
+
+
+    /// <summary>The local axis each face of <see cref="_faceIdx"/> faces along: -Z, +Z, -X, +X, -Y, +Y.</summary>
+    private static readonly int[] _faceAxis = { 2, 2, 0, 0, 1, 1 };
+
+    /// <summary>A box's twelve triangles, or without the two faces across <paramref name="skipAxis"/> (a
+    /// layer of a construction, whose broad faces come from its plan).</summary>
+    private static void AppendBox(Box b, List<PV> verts, List<Phonon.IPLTriangle> tris, List<int> triMat, int mi, int skipAxis = -1)
     {
         int baseIdx = verts.Count;
-        Vector3 half = b.Size * 0.5f;
+        Vector3 half = TracedSize(b.Size) * 0.5f;
         for (int c = 0; c < 8; c++)
         {
             Vector3 local = _corner[c] * half;
@@ -442,9 +503,69 @@ public sealed class SteamAudioScene : IDisposable
         }
         for (int f = 0; f < _faceIdx.Length; f += 3)
         {
+            if (_faceAxis[f / 6] == skipAxis) continue;
             tris.Add(new Phonon.IPLTriangle { i0 = baseIdx + _faceIdx[f], i1 = baseIdx + _faceIdx[f + 1], i2 = baseIdx + _faceIdx[f + 2] });
             triMat.Add(mi);
         }
+    }
+
+    /// <summary>
+    /// A construction's layer's broad faces as its plan has them (LayeredFaces): each rectangle open to
+    /// the air, with the layer's own surface and what the whole construction lets through there.
+    /// <paramref name="origin"/> is subtracted (a tile's piece is in its own frame).
+    /// </summary>
+    private static void AppendFaces(string? material, LayeredFaces.Member member, Vector3 origin, List<PV> verts,
+                                    List<Phonon.IPLTriangle> tris, List<int> triMat,
+                                    List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
+    {
+        foreach (var f in member.Faces)
+        {
+            int mi = MaterialIndex(material, (f.Gains.X, f.Gains.Y, f.Gains.Z), materials, byName);
+            Vector3 a = f.A, b = f.B, c = f.C, d = f.D;
+            // Wound outward in the game's frame, then turned round for Steam Audio's mirrored one.
+            if (Vector3.Dot(Vector3.Cross(b - a, c - a), f.Outward) < 0f) (b, d) = (d, b);
+            int i = verts.Count;
+            verts.Add(Phonon.World(a - origin)); verts.Add(Phonon.World(b - origin));
+            verts.Add(Phonon.World(c - origin)); verts.Add(Phonon.World(d - origin));
+            tris.Add(new Phonon.IPLTriangle { i0 = i, i1 = i + 2, i2 = i + 1 });
+            tris.Add(new Phonon.IPLTriangle { i0 = i, i1 = i + 3, i2 = i + 2 });
+            triMat.Add(mi); triMat.Add(mi);
+        }
+    }
+
+    /// <summary>The constructions among a scene's boxes (LayeredFaces): door leaves and shaped solids are
+    /// never layers.</summary>
+    internal static LayeredFaces.Plan PlanOf(IReadOnlyList<Box> boxes, ISet<int>? leaves = null)
+    {
+        var solids = new LayeredFaces.Solid[boxes.Count];
+        for (int i = 0; i < boxes.Count; i++)
+        {
+            var b = boxes[i];
+            bool hung = b.Hung || (leaves != null && b.EntityId != 0 && leaves.Contains(b.EntityId));
+            solids[i] = new LayeredFaces.Solid(b.Center, b.Size, b.Rotation, string.IsNullOrEmpty(b.Material) ? "Generic" : b.Material,
+                                               b.Build, Bonds: !hung && b.Form == null);
+        }
+        return LayeredFaces.Make(solids);
+    }
+
+    /// <summary>
+    /// A plan's layers found by the solid a tile's piece holds (its owner, where it was placed, its size),
+    /// for <see cref="AddPieceMesh"/>.
+    /// </summary>
+    internal sealed class LayerLookup
+    {
+        private readonly Dictionary<(int, Vector3, Vector3), LayeredFaces.Member> _byPlace = new();
+        public LayeredFaces.Plan Plan { get; }
+        public static readonly LayerLookup Empty = new(new List<Box>(), LayeredFaces.Plan.Empty);
+
+        public LayerLookup(IReadOnlyList<Box> boxes, LayeredFaces.Plan plan)
+        {
+            Plan = plan;
+            foreach (var (i, m) in plan.Members) _byPlace[(boxes[i].EntityId, boxes[i].Center, boxes[i].Size)] = m;
+        }
+
+        public LayeredFaces.Member? Of(int owner, Vector3 placedAt, Vector3 size)
+            => _byPlace.Count > 0 && _byPlace.TryGetValue((owner, placedAt, size), out var m) ? m : null;
     }
 
     private void Release()

@@ -2650,6 +2650,9 @@ public partial class FmodAudioProvider : IAudioProvider
                                 && rainPart < RainParts(rainSlot)
                         ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23 + rainPart * 7919, rainPart, RainParts(rainSlot))
                         : null,
+                    // A gas hob: its knobs' settings and when they were turned are in the key (HobKey).
+                    "stove" => new StoveVoiceState(OpenFPS.Common.GasHobSpec.ByName(emitter.PhysicalKey), emitter.PhysicalKey,
+                                                   mrate, emitter.EntityId * 59 + 29),
                     // The rhythm of the hand on the horn is in the key (Honk).
                     "horn" => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
                         ? new HornVoiceState(hornKey, rhythm, mrate, emitter.EntityId * 29 + 1)
@@ -3088,6 +3091,11 @@ public partial class FmodAudioProvider : IAudioProvider
                     else if (active.MachineState is MachineVoiceState mach)
                     {
                         mach.TargetGroundSpeed = emitter.Velocity.Length();
+                    }
+                    else if (active.MachineState is StoveVoiceState stove)
+                    {
+                        // A knob turned: the server sends the hob's key again with the change in it.
+                        stove.SetKey(emitter.PhysicalKey);
                     }
                     else if (active.MachineState is TrainSlotState trainVoice)
                     {

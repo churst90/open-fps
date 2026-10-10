@@ -9,7 +9,7 @@
   "Type": "StaticObject",
   "IsDoor": true,
   "DoorKind": "pushbar",
-  "CloseAfterSeconds": 3,
+  "CloseAfterSeconds": 1,
   "CloseSeconds": 4.5,
   "SwingSeconds": 1.4,
   "SwingDegrees": 90,

@@ -20,6 +20,8 @@ namespace OpenFPS.Common.Networking;
 /// differentiated (a train's notch, a tyre's demand) a step of 0.03 m/s², under every threshold;</item>
 /// <item>the tyre demand byte, when it is not zero;</item>
 /// <item>the horn and siren byte (EntityState.Signals), when it is not zero;</item>
+/// <item>how a far thing is changing (EntityState.SpeedRate and the turn), four 16-bit numbers, when any
+/// is not zero (<see cref="DistantMotion"/>);</item>
 /// <item>the wheels, a count and <see cref="WheelBytes"/> each, when they are sent.</item>
 /// </list>
 ///
@@ -32,15 +34,15 @@ public static class StatePacking
     public const float MillimetreRange = short.MaxValue / 1000f;
 
     private const byte VelocityNone = 0, VelocityMillimetres = 1, VelocityFloats = 2, VelocityMask = 3;
-    private const byte HasTyreDemand = 4, HasWheels = 8, HasSignals = 16;
+    private const byte HasTyreDemand = 4, HasWheels = 8, HasSignals = 16, HasRates = 32;
 
     /// <summary>One wheel on the wire, as its bytes: the struct's own size, which grows when a field is
     /// appended to it (WheelState.Water made it ten).</summary>
     private static readonly int WheelBytes = System.Runtime.CompilerServices.Unsafe.SizeOf<WheelState>();
 
     /// <summary>The largest one state can pack to: id, flags, position, rotation, float velocity,
-    /// demand, and a count. Wheels are on top of this.</summary>
-    private const int MaxFixedBytes = 5 + 1 + 12 + 6 + 12 + 1 + 1 + 1;
+    /// demand, signals, rates and a count. Wheels are on top of this.</summary>
+    private const int MaxFixedBytes = 5 + 1 + 12 + 6 + 12 + 1 + 1 + 8 + 1;
 
     /// <summary>
     /// The velocity the client will be given, so the server compares what it sends with what it last
@@ -116,6 +118,14 @@ public static class StatePacking
         }
         if (s.TyreDemand != 0) { flags |= HasTyreDemand; into[at++] = s.TyreDemand; }
         if (s.Signals != 0) { flags |= HasSignals; into[at++] = s.Signals; }
+        if (s.SpeedRate != 0 || s.TurnX != 0 || s.TurnY != 0 || s.TurnZ != 0)
+        {
+            flags |= HasRates;
+            BinaryPrimitives.WriteInt16LittleEndian(into[at..], s.SpeedRate); at += 2;
+            BinaryPrimitives.WriteInt16LittleEndian(into[at..], s.TurnX); at += 2;
+            BinaryPrimitives.WriteInt16LittleEndian(into[at..], s.TurnY); at += 2;
+            BinaryPrimitives.WriteInt16LittleEndian(into[at..], s.TurnZ); at += 2;
+        }
         if (s.Wheels != null)
         {
             flags |= HasWheels;
@@ -166,6 +176,14 @@ public static class StatePacking
             }
             if ((flags & HasTyreDemand) != 0) s.TyreDemand = data[at++];
             if ((flags & HasSignals) != 0) s.Signals = data[at++];
+            if ((flags & HasRates) != 0)
+            {
+                s.SpeedRate = BinaryPrimitives.ReadInt16LittleEndian(data[at..]);
+                s.TurnX = BinaryPrimitives.ReadInt16LittleEndian(data[(at + 2)..]);
+                s.TurnY = BinaryPrimitives.ReadInt16LittleEndian(data[(at + 4)..]);
+                s.TurnZ = BinaryPrimitives.ReadInt16LittleEndian(data[(at + 6)..]);
+                at += 8;
+            }
             if ((flags & HasWheels) != 0)
             {
                 int n = data[at++];

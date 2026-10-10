@@ -458,6 +458,8 @@ public sealed partial class VehicleSystem
     public void Update(string mapId, World world, float dt)
     {
         UpdateStreetLife(mapId, world, dt);
+        // Building doors pulled to behind the people from parked cars.
+        _manners.Update(mapId, world, dt);
         IndexLanes(mapId);
         IndexCrosswalks(mapId);
         foreach (var v in _vehicles)

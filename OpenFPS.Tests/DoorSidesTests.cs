@@ -205,12 +205,12 @@ public class DoorSidesTests : IDisposable
         Assert.InRange(keyed[3].At - start, DoorSystem.KeySequenceSeconds - 0.05f, DoorSystem.KeySequenceSeconds + 0.01f);
 
         // The closer shuts it, and it is locked again: the key, again.
-        TickSeconds(D(e).CloseAfterSeconds + D(e).CloseSeconds + 1f);
+        TickSeconds(D(e).CloseAfterSeconds + DoorSystem.ReachSeconds + D(e).CloseSeconds + 1f);
         Assert.Equal(0f, D(e).Openness);
         _heard.Clear();
         Assert.True(DoorSystem.Set(_world, e, open: true, by: street));
         Assert.True(D(e).KeyTurned);
-        TickSeconds(D(e).CloseAfterSeconds + D(e).CloseSeconds + D(e).SwingSeconds + 2f);
+        TickSeconds(D(e).CloseAfterSeconds + DoorSystem.ReachSeconds + D(e).CloseSeconds + D(e).SwingSeconds + 2f);
         Assert.StartsWith("key-insert+ key-turn unlock pull+", Events());
         Assert.Equal(0f, D(e).Openness);
 
@@ -443,10 +443,10 @@ public class DoorSidesTests : IDisposable
         TickSeconds(D(e).SwingSeconds + 0.2f);
         // Through the doorway further than the old doorway box reached (1 m), inside the leaf's reach.
         var waiting = Walker(new Vector3(-0.1f, 1f, 1.1f));
-        TickSeconds(D(e).CloseAfterSeconds + D(e).CloseSeconds + 2f);
+        TickSeconds(D(e).CloseAfterSeconds + DoorSystem.ReachSeconds + D(e).CloseSeconds + 2f);
         Assert.True(D(e).Openness > 0.3f, $"the closer swept through them: {D(e).Openness:F2}");
         MoveTo(waiting, new Vector3(4f, 1f, 4f));
-        TickSeconds(D(e).CloseAfterSeconds + D(e).CloseSeconds + 2f);
+        TickSeconds(D(e).CloseAfterSeconds + DoorSystem.ReachSeconds + D(e).CloseSeconds + 2f);
         Assert.Equal(0f, D(e).Openness);
     }
 

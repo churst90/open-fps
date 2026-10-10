@@ -134,16 +134,31 @@ public class GameServer
     /// server started without it (a test's).</summary>
     public OpenFPS.Server.OneWorld.WorldMaps? World { get; private set; }
 
-    /// <summary>The world's store and the service that makes its tiles, from the server's world.json.</summary>
-    public void StartWorld(OpenFPS.Server.OneWorld.WorldSettings settings, OpenFPS.Server.OneWorld.IElevationSource? survey = null)
+    /// <summary>The world's store and the service that makes its tiles, from the server's world.json. A test
+    /// gives its own survey, land cover and features; with no survey given, the real ones are asked over the
+    /// network (and the land cover and roads too, as world.json says).</summary>
+    public void StartWorld(OpenFPS.Server.OneWorld.WorldSettings settings, OpenFPS.Server.OneWorld.IElevationSource? survey = null,
+                           OpenFPS.Server.OneWorld.ILandCoverSource? landCover = null, OpenFPS.Server.OneWorld.WorldFeatures? features = null)
     {
         try
         {
             var store = new OpenFPS.Server.OneWorld.WorldStore(settings.StorePath, settings.CapBytes);
+            bool real = survey == null && settings.Generate;
             survey ??= settings.Generate ? new OpenFPS.Server.OneWorld.Usgs3Dep() : new OpenFPS.Server.OneWorld.NoNewTiles();
             var service = new OpenFPS.Server.OneWorld.WorldTileService(store, survey, settings.MaxAtOnce);
+            // The ground's materials from ESA WorldCover, its blocks kept in the store's regional cache.
+            if (landCover == null && real && settings.LandCover)
+                landCover = new OpenFPS.Server.OneWorld.EsaWorldCover(Path.Combine(store.Root, "sources", "worldcover"));
+            service.LandCover = landCover;
+            // The roads from OpenStreetMap, its regions kept in the same cache.
+            if (features == null && real && settings.OpenStreetMap)
+                features = new OpenFPS.Server.OneWorld.WorldFeatures(
+                    new OpenFPS.Server.OneWorld.OverpassRegions(Path.Combine(store.Root, "sources", "osm")),
+                    _maps!.Prefabs.ToDictionary(kv => kv.Key, kv => kv.Value.ColliderSize ?? Vector3.One, StringComparer.OrdinalIgnoreCase));
             // The maps of real places, copied into the world's tiles; tiles copied from an older map go.
             var copied = OpenFPS.Server.OneWorld.WorldPlaces.FromMaps(_maps);
+            if (features != null) features.IsPlaced = k => copied.TryGetPlace(k, out _);
+            service.Features = features;
             int stale = copied.DropStale(store);
             if (stale > 0) Log.Information("World: {Count} stored tile(s) of the places will be copied again from their maps.", stale);
             World = new OpenFPS.Server.OneWorld.WorldMaps(_maps, service, () => _sessions.GetAllSessions(),
@@ -154,7 +169,8 @@ public class GameServer
             if (settings.Generate && settings.Prebuild) World.Prebuild();
             Log.Information("World: tiles kept in {Path}, at most {Cap:F1} GB ({Have:F2} GB in {Count} tiles now); {Places} place(s) to arrive at; {Making}.",
                             store.Root, store.CapBytes / 1073741824.0, store.TotalBytes / 1073741824.0, store.Count, World.Places.Count,
-                            settings.Generate ? "new tiles made from USGS 3DEP" : "no new tiles made");
+                            !settings.Generate ? "no new tiles made"
+                            : "new tiles made from USGS 3DEP" + (service.LandCover != null ? ", ESA WorldCover" : "") + (features != null ? " and OpenStreetMap" : ""));
             // A cap the disk cannot hold fills the disk before the cap is reached.
             try
             {
@@ -1626,6 +1642,15 @@ public class GameServer
     private static bool Moves(World world, Entity e)
         => world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<HeldComponent>(e);
 
+    /// <summary>Whether <paramref name="e"/> is something the player <paramref name="body"/> is part of: the
+    /// composite they ride or drive (<paramref name="riding"/>) and its parts, or a thing in their hands.</summary>
+    internal static bool Involved(World world, Entity e, Entity body, int riding)
+    {
+        if (riding >= 0 && (e.Id == riding || world.Has<ParentComponent>(e) && world.Get<ParentComponent>(e).ParentEntityId == riding))
+            return true;
+        return world.Has<HeldComponent>(e) && world.Get<HeldComponent>(e).HolderEntityId == body.Id;
+    }
+
     /// <summary>One message of the broadcast, to a session's socket, and to <see cref="Broadcasted"/> when a test watches.</summary>
     private void Deliver(NetPeer? peer, UserSession session, IMessage message, DeliveryMethod delivery)
     {
@@ -1755,7 +1780,11 @@ public class GameServer
                         // (RestingStates): two thirds of the city.
                         if (isDynamic)
                         {
-                            if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity))
+                            // A far moving thing goes less often (DistantMotion); what this player rides,
+                            // drives or carries always goes every tick, however far its middle is.
+                            float distance = session.DistantLessOften && !Involved(world, e, session.Entity, riding)
+                                ? Vector3.Distance(t.Position, pPos) : 0f;
+                            if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity, distance))
                                 _reusableBroadcast.States.Add(state);
                             else PerfProbe.Count("server.broadcast.resting");
                             session.SentStates[e.Id].Riding = seatedIn;
@@ -1961,6 +1990,9 @@ public class GameServer
             // the key from a door across the room, and a door five metres off would otherwise always win.
             if (ToggleTapInReach(world, position, Say)) return;
 
+            // A gas hob you are standing at, the same way: its knobs are under your hand.
+            if (TurnHobInReach(world, position, Say)) return;
+
             // Then a shut door in reach, from a seat the one beside you: once to open it, again to get
             // in or out.
             var door = ShutDoorInReach(world, position, out Vector3 doorAt, out string doorName);
@@ -2092,6 +2124,34 @@ public class GameServer
         string name = world.Has<IdentityComponent>(nearest.Value) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(nearest.Value).Name)
             ? world.Get<IdentityComponent>(nearest.Value).Name : "tap";
         say($"You turn the {name.ToLowerInvariant()} {(tap.SynthRunning ? "on" : "off")}.");
+        return true;
+    }
+
+    /// <summary>
+    /// Lights the next burner of the hob you are standing at, or with every burner lit turns them all off
+    /// (HobControls). The hob's state is its emitter's key: the settings, and when they changed on the shared
+    /// clock, so every client hears the knob turned, the sparks and the light-up at the same moment.
+    /// </summary>
+    private bool TurnHobInReach(World world, Vector3 position, Action<string> say)
+    {
+        Entity? nearest = null;
+        float best = TapReach;
+        world.Query(new QueryDescription().WithAll<Transform, SoundEmitterComponent>(), (Entity e, ref Transform t, ref SoundEmitterComponent em) =>
+        {
+            if (!HobKey.IsKey(em.SoundId)) return;
+            float dx = t.Position.X - position.X, dz = t.Position.Z - position.Z;
+            float distance = MathF.Sqrt(dx * dx + dz * dz);
+            if (distance > best || MathF.Abs(t.Position.Y - position.Y) > 2.5f) return;
+            best = distance; nearest = e;
+        });
+        if (nearest == null) return false;
+        ref var hob = ref world.Get<SoundEmitterComponent>(nearest.Value);
+        string line;
+        try { line = HobControls.Press(hob.SoundId, WindField.Now(), out string key); hob.SoundId = key; }
+        catch (ArgumentException) { return false; }
+        hob.SynthRunning = HobKey.TryParse(hob.SoundId, out var state) && state.AnyOn;
+        SyncAudioComponent(nearest.Value.Id);
+        if (line.Length > 0) say(line);
         return true;
     }
 

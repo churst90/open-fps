@@ -16,6 +16,14 @@ public interface IElevationSource
     /// is not "nothing here", and the tile is tried again later.
     /// </summary>
     Task<float[]?> HeightsAsync(WorldTileKey key, int posts, double spacing, CancellationToken ct);
+
+    /// <summary>
+    /// The same for any square of a zone, its first post at (<paramref name="west"/>, <paramref name="south"/>):
+    /// a tile and the margin round it (WorldFeatures). A source that cannot is answered for the tile alone,
+    /// held at its edge.
+    /// </summary>
+    Task<float[]?> WindowAsync(int zone, bool north, double west, double south, int posts, double spacing, CancellationToken ct)
+        => throw new NotSupportedException();
 }
 
 /// <summary>
@@ -38,13 +46,16 @@ public sealed class Usgs3Dep : IElevationSource
         return c;
     }
 
-    public async Task<float[]?> HeightsAsync(WorldTileKey key, int posts, double spacing, CancellationToken ct)
+    public Task<float[]?> HeightsAsync(WorldTileKey key, int posts, double spacing, CancellationToken ct)
+        => WindowAsync(key.Zone, key.North, key.Easting, key.Northing, posts, spacing, ct);
+
+    public async Task<float[]?> WindowAsync(int zone, bool north, double west, double south, int posts, double spacing, CancellationToken ct)
     {
-        // Cells as wide as the spacing, centred on the posts: half a cell past the tile on every side.
+        // Cells as wide as the spacing, centred on the posts: half a cell past the posts on every side.
         double half = spacing / 2;
-        double w = key.Easting - half, s = key.Northing - half;
+        double w = west - half, s = south - half;
         double e = w + posts * spacing, n = s + posts * spacing;
-        int sr = Utm.Epsg(key.Zone, key.North);
+        int sr = Utm.Epsg(zone, north);
         string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
         string url = $"{Service}?bbox={F(w)},{F(s)},{F(e)},{F(n)}&bboxSR={sr}&imageSR={sr}&size={posts},{posts}"
                      + "&format=tiff&pixelType=F32&interpolation=RSP_BilinearInterpolation&f=image";
