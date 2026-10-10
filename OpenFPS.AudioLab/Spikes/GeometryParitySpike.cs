@@ -1314,8 +1314,21 @@ public static class GeometryParitySpike
                 int client = spatial.GetRegionAt(world, p);
                 tally.Probes++;
                 if (server == client) tally.Same++;
-                else tally.Differ(held.Contains(def.EntityId) ? "differ" : "differ (room not flooded on the client)",
-                                  $"{def.Region.FriendlyName} ({def.EntityId}) at {V(p)}: server {server}, client {client}", show);
+                else
+                {
+                    // Every room whose cells hold the point, each side: more than one is two floods over the same air.
+                    string Holding(RoomCells? cells)
+                    {
+                        if (cells == null) return "-";
+                        var (cx, cy, cz) = RoomFlood.CellOf(p, cells.Origin);
+                        var found = new List<int>();
+                        cells.ForEachSpan((room, y, z, x0, x1) => { if (y == cy && z == cz && cx >= x0 && cx <= x1) found.Add(room); });
+                        return string.Join("+", found);
+                    }
+                    tally.Differ(held.Contains(def.EntityId) ? "differ" : "differ (room not flooded on the client)",
+                                 $"{def.Region.FriendlyName} ({def.EntityId}) at {V(p)}: server {server}, client {client}; "
+                                 + $"cells holding it: server {Holding(serverRooms)}, client {Holding(map.RoomCells)}", show);
+                }
                 asked++;
                 if (spatial.GetRegionAt(boxesOnly, p) != client) { moved++; movedHere++; }
             }
@@ -1328,6 +1341,55 @@ public static class GeometryParitySpike
                           + $"its triangle world in {geometryMs:F0} ms and its map with {held.Count} flooded room(s) in {clientMs:F0} ms");
         Console.WriteLine($"  {tally.Same} of {tally.Probes} points the same on both; {moved} of {asked} in another place than the boxes alone put them");
         foreach (var (_, line) in byRoom.OrderByDescending(r => r.Share).Take(show)) Console.WriteLine("    " + line);
+
+        // agreedebug=ID[,ID]: the two sides' floods of these rooms, and the solids round them each side has.
+        if (args.FirstOrDefault(a => a.StartsWith("agreedebug=")) is { } dbgArg && maps.TryGetGeometry(mapId, out var serverGeometry))
+        {
+            var ids = dbgArg[11..].Split(',').Select(int.Parse).ToHashSet();
+            var serverDefs = EntityDefinitionFactory.StaticDefinitions(ecs);
+            static (List<RoomFlood.Seed> Seeds, TriangleWorld Shut) Seeds(TriangleWorld w, List<EntityDefinition> ds)
+            {
+                var seeds = new List<RoomFlood.Seed>();
+                var shut = new Dictionary<int, (Vector3, Quaternion)>();
+                foreach (var def in ds)
+                {
+                    if (def.Region.IsIndoor && def.Region.RoomSize.X > 0f && def.Region.RoomSize.Y > 0f && def.Region.RoomSize.Z > 0f)
+                        seeds.Add(new RoomFlood.Seed(def.EntityId, def.Transform.Position, def.Region.RoomSize, def.Transform.Rotation));
+                    if (def.Portal.OpeningRotation != default) shut[def.EntityId] = (def.Portal.OpeningCentre, def.Portal.OpeningRotation);
+                }
+                seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
+                return (seeds, w.WithMoverPoses(id => shut.TryGetValue(id, out var p) ? (true, p.Item1, p.Item2) : (false, default, default)));
+            }
+            var (ss, sw) = Seeds(serverGeometry.World, serverDefs);
+            var (cs, cw) = Seeds(clientGeometry, defs);
+            foreach (int id in ids)
+            {
+                var s0 = ss.FirstOrDefault(x => x.Id == id); var c0 = cs.FirstOrDefault(x => x.Id == id);
+                Console.WriteLine($"  room {id}: server seed {V(s0.Centre)} {V(s0.Size)} {s0.Rotation}; client seed {V(c0.Centre)} {V(c0.Size)} {c0.Rotation}");
+                // The seeds whose reach (box and margin and a cell) overlaps this one's, each side.
+                bool Near(RoomFlood.Seed a, RoomFlood.Seed b)
+                {
+                    float ra = (a.Size * 0.5f).Length() + RoomFlood.DefaultMargin + 0.5f, rb = (b.Size * 0.5f).Length() + RoomFlood.DefaultMargin + 0.5f;
+                    return Vector3.Distance(a.Centre, b.Centre) < ra + rb;
+                }
+                var sn = ss.Where(x => Near(x, s0)).Select(x => x.Id).ToList(); var cn = cs.Where(x => Near(x, c0)).Select(x => x.Id).ToList();
+                Console.WriteLine($"    near seeds: server {string.Join(",", sn)}; client {string.Join(",", cn)}; only server {string.Join(",", sn.Except(cn))}; only client {string.Join(",", cn.Except(sn))}");
+                var sr = RoomFlood.Flood(sw, ss, data.MinBound, threads: 4); var cr = RoomFlood.Flood(cw, cs, data.MinBound, threads: 4);
+                foreach (int n in sn.Union(cn))
+                    Console.WriteLine($"    {n}: server air {(sr.TryGetValue(n, out var a) ? a.AirCount : -1)} edge {(a?.EdgeCount ?? -1)} open {a?.Open}; "
+                                      + $"client air {(cr.TryGetValue(n, out var b) ? b.AirCount : -1)} edge {(b?.EdgeCount ?? -1)} open {b?.Open}");
+                // The solids within the room's reach, each side.
+                var lo = s0.Centre - s0.Size * 0.5f - new Vector3(5f); var hi = s0.Centre + s0.Size * 0.5f + new Vector3(5f);
+                string Key(TriangleWorld w, SolidRef r) { var (c, sz, q) = w.BoxOf(r); return $"#{w.OwnerOf(r)} {w.SurfaceOf(r).Material} {V(c)} {V(sz)}{(w.ShapeOf(r) != null ? " shape" : "")}{(w.IsTerrain(r) ? " ground" : "")}"; }
+                var all = new AcceptAll();
+                var a1 = new List<SolidRef>(); sw.Overlapping(lo, hi, GeometryLayers.Acoustics, ref all, a1);
+                var b1 = new List<SolidRef>(); cw.Overlapping(lo, hi, GeometryLayers.Acoustics, ref all, b1);
+                var ka = a1.Select(r => Key(sw, r)).ToHashSet(); var kb = b1.Select(r => Key(cw, r)).ToHashSet();
+                Console.WriteLine($"    solids within 5 m: server {ka.Count}, client {kb.Count}");
+                foreach (var k in ka.Except(kb).Take(30)) Console.WriteLine($"      only server: {k}");
+                foreach (var k in kb.Except(ka).Take(30)) Console.WriteLine($"      only client: {k}");
+            }
+        }
     }
 
     // ═══ Routes ════════════════════════════════════════════════════════════════════════════════

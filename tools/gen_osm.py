@@ -1537,13 +1537,18 @@ for bd in sorted(BLD, key=lambda b: (round(b.cx, 2), round(b.cz, 2))):
             a.buildings.append(bd)
             INTERPOLATED += 1
 
+# A home's footprint is under a hectare (the largest in both places is 3,721 m2, a block of flats). A bigger one
+# is never an address's house, wherever the point falls: Albany's way 125102808, building=yes and nothing else,
+# 643 by 355 m round 34414 Highway 99e, was a "house" whose living room was 640 by 193 m.
+HOME_MAX_M2 = 10000.0
+
 # The house on each lot: the building the address point is in, or the biggest house-sized one.
 for key in sorted(ADDR):
     a = ADDR[key]
     if not a.buildings:
         continue
-    inside = [b for b in a.buildings if pip(a.x, a.z, b.ring)]
-    houses = [b for b in a.buildings if b.area >= 45]
+    inside = [b for b in a.buildings if pip(a.x, a.z, b.ring) and b.area <= HOME_MAX_M2]
+    houses = [b for b in a.buildings if 45 <= b.area <= HOME_MAX_M2]
     main = inside[0] if inside and inside[0].area >= 30 else \
         (max(houses, key=lambda b: (b.area - 2.0 * math.dist((b.cx, b.cz), (a.x, a.z)), b.cx)) if houses else None)
     a.main = main

@@ -1698,8 +1698,33 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    | Magnolia | 10,512 | 10,510 | 979 | 2.5 s | 0.6 s (438 rooms held) |
    | Albany | 22,512 | 22,509 | 2,355 | 6.1 s | 2.2 s (938 rooms held) |
 
-   The five that differ are in houses 400 to 520 m from the spawn, where the client holds less round them than the
-   server (not traced further). `RoomFloodTests` holds the city to every point the same.
+   The five that differed were in houses 400 to 520 m from the spawn. Traced (2026-10-10, `agreedebug=ID` and the
+   cells holding each point, both sides), two causes, both fixed:
+   - **Two floods over the same air** (Magnolia 17423 Oak Lane, Albany 1240 Alandale Avenue). Two rooms of a house
+     whose boxes grown by the margin did not overlap flooded in separate groups, and each reached the other's air
+     past its margin. Both held the cells; which one a lookup found depended on the order of the spans, which
+     differs with how many rooms a side holds. Now groups whose air reaches into another group's reach flood again
+     as one (`RoomFlood.Overlapping`, as many passes as it takes), so a cell is one room's.
+   - **A house's rooms sent apart** (Albany 5790 Mike Street, 5592 Pacific Boulevard). A living room and a kitchen
+     open to each other through an archway with no door are joined by no doorway, so `MapTiles` grouped them with
+     nothing: across a tile's edge the client held one, and its flood took the other's air. Rooms that flood
+     together (`RoomFlood.Groups`, half a metre more generous) now go together, as rooms joined by doorways did
+     (`MapTiles.FloodTogether`, in `Build` and `AddPlaced`). The client now holds 947 rooms round Albany's spawn,
+     not 938.
+
+   After: the city 11,784 of 11,784 points the same, Magnolia 10,512 of 10,512, Albany 22,728 of 22,728.
+   `RoomFloodTests.Rooms_that_reach_the_same_air_past_their_margins_flood_as_one` and
+   `WorldStreamingTests.Every_entity_of_a_real_place_is_in_the_tiles_it_overlaps` (rooms that flood together share
+   their tiles) hold them; `RoomFloodTests` holds the city to every point the same.
+
+   **Albany's 640 by 193 m house** was OSM way 125102808, tagged `building=yes` and nothing else: an L of six points,
+   643 by 355 m (13.7 ha), round the address point of 34414 Highway 99e, so gen_osm made it that address's house
+   with a 640 m living room. A home is now under a hectare (`HOME_MAX_M2`; the largest in both places is 3,721 m2):
+   it is a "building" now, and Albany is regenerated (one entity fewer, ids after it moved down one; Magnolia byte
+   for byte the same). Its block is still 88 million cells, so floods are bounded: a group whose block is over
+   `RoomFlood.MaxBlockCells` (64 million) is not flooded and its rooms keep their boxes (`Room.TooBig`, told to the
+   report). A cell's claim is a 16-bit index now, 3 bytes a cell while flooding instead of 5, so the largest group
+   flooded (Albany's college, 52 million cells with its reach) takes about 160 MB.
 
    **Measured from their floods (2026-10-10, unheard).** A flooded room's volume, face areas and face materials come
    from its flood, not its box (2.7 item 4). `RoomFlood.Flood(..., measure: true)` gives each room a `Lining`: per face

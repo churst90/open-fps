@@ -253,6 +253,41 @@ public class RoomFloodTests
     }
 
     [Fact]
+    public void Rooms_that_reach_the_same_air_past_their_margins_flood_as_one()
+    {
+        // A closed building 14 m long, a room's box at each end and 6 m of air no box holds between them: each box
+        // grown by its margin stops 4 m short of the other's, so they start apart, and each reaches the middle past
+        // its margin. Flooded apart, both took it; flooded as one, every cell is one room's.
+        int id = 1;
+        var solids = new List<SolidSpec>
+        {
+            Box(id++, new Vector3(-10, -0.2f, -10), new Vector3(10, 0, 10)),
+            Box(id++, new Vector3(-7.25f, 2.7f, -1.75f), new Vector3(7.25f, 2.9f, 1.75f)),
+            Box(id++, new Vector3(-7.25f, 0, 1.5f), new Vector3(7.25f, 2.7f, 1.75f)),
+            Box(id++, new Vector3(-7.25f, 0, -1.75f), new Vector3(7.25f, 2.7f, -1.5f)),
+            Box(id++, new Vector3(-7.25f, 0, -1.5f), new Vector3(-7f, 2.7f, 1.5f)),
+            Box(id++, new Vector3(7f, 0, -1.5f), new Vector3(7.25f, 2.7f, 1.5f)),
+        };
+        var seeds = new[]
+        {
+            new RoomFlood.Seed(500, new Vector3(-5f, 1.35f, 0), new Vector3(4, 2.7f, 3), Quaternion.Identity),
+            new RoomFlood.Seed(501, new Vector3(5f, 1.35f, 0), new Vector3(4, 2.7f, 3), Quaternion.Identity),
+        };
+        Assert.Equal(2, RoomFlood.Groups(seeds, Origin).Count);
+        var rooms = RoomFlood.Flood(World(solids), seeds, Origin);
+        var a = rooms[500].Cells.Select(p => RoomFlood.CellOf(p, Origin)).ToHashSet();
+        var b = rooms[501].Cells.Select(p => RoomFlood.CellOf(p, Origin)).ToHashSet();
+        Assert.Empty(a.Intersect(b));
+        // Between them they hold the whole 14 by 3 m inside, the middle shared by distance.
+        Assert.InRange((rooms[500].Volume + rooms[501].Volume) / (14f * 3f * 2.7f), 0.85f, 1.02f);
+        Assert.InRange(rooms[500].Volume / rooms[501].Volume, 0.9f, 1.1f);
+        Assert.Contains(501, rooms[500].Meets);
+        var cells = RoomCells.From(rooms);
+        Assert.True(cells.TryRoomAt(new Vector3(-1f, 1.3f, 0), out int left) && left == 500);
+        Assert.True(cells.TryRoomAt(new Vector3(1f, 1.3f, 0), out int right) && right == 501);
+    }
+
+    [Fact]
     public void An_open_front_measures_as_open_and_the_air_outside_it_is_not_the_room()
     {
         // The room with its doorway open: the margin outside the door is under the sky, so it is not the room's

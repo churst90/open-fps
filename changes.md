@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Server and client agree on every room point on all three maps (docs/GEOMETRY.md 12.6 item 1). Rooms whose
+  floods reach the same air past their margins flood as one; rooms that flood together are sent together across a
+  tile's edge, as rooms joined by doorways were. Albany's 640 m "house" round 34414 Highway 99e (a bare
+  `building=yes` way) is a building: a home is under a hectare in gen_osm. Albany regenerated. A flood over 64
+  million cells keeps its boxes, and flooding takes 3 bytes a cell, not 5.
+
 - Rooms measure themselves from their floods (docs/GEOMETRY.md 12.6 item 1, "Measured from their floods"), unheard.
   A flooded room's volume, face areas and face materials come from the walls round its air, by a ray to the surface
   for each metre of lining, not from its box; the room lift, the routes' room absorption and the Sabine estimate read

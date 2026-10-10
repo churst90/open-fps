@@ -210,6 +210,22 @@ public class WorldStreamingTests
             Assert.Contains(TileKey.Of(at, tiles.TileMetres), m.Tiles);
         }
         Assert.True(doors > 100 && rooms > 100, $"{doors} doors, {rooms} rooms");
+
+        // Rooms that flood together share their tiles too: an archway with no door is no doorway, and a client
+        // holding one room of a house but not the other flooded the one into the other's air.
+        var seeds = new List<OpenFPS.Common.Geometry.RoomFlood.Seed>();
+        foreach (var e in lookup.Values)
+            if (world.Has<RegionComponent>(e) && world.Get<RegionComponent>(e) is { IsIndoor: true } r && r.RoomSize.X > 0f)
+                seeds.Add(new(e.Id, world.Get<Transform>(e).Position, r.RoomSize, world.Get<Transform>(e).Rotation));
+        seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
+        int together = 0;
+        foreach (var g in OpenFPS.Common.Geometry.RoomFlood.Groups(seeds, data.MinBound).Where(g => g.Count > 1))
+        {
+            Assert.True(tiles.TryGet(g[0], out var first));
+            foreach (int id2 in g.Skip(1)) { Assert.True(tiles.TryGet(id2, out var m)); Assert.Equal(first.Tiles, m.Tiles); }
+            together++;
+        }
+        Assert.True(together > 100, $"{together} groups of rooms flooding together");
         _o.WriteLine($"  {crowns} tree crowns, coarse");
     }
 

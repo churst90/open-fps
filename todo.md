@@ -26,9 +26,10 @@ other at login. The server and the Windows zip go out together.
    in the generators came with it (97730e32: door heads lap their leaves, roof-access doorways the door's
    width). Rooms measure volume, faces and their materials from their floods (2026-10-10, UNHEARD: listen
    before regions become places ship; the /tp list is in docs/GEOMETRY.md 12.6 item 1, "Measured from their
-   floods"). Open: 5 of 44,808 server/client lookups disagree in houses 400-520 m from the spawn (not
-   traced); Albany's 640 m "34414 Highway 99e, house" floods in a 460 MB block; on the places the ground comes
-   up through the floor slab in 778 Albany and 160 Magnolia rooms (their floors measure as dirt).
+   floods"). The 5 server/client disagreements are fixed (two floods over the same air; a house's rooms sent
+   apart across a tile edge) and Albany's 640 m "house" (a bare `building=yes` way round an address point) is a
+   building; floods over 64 million cells keep their boxes. Open: on the places the ground comes up through the
+   floor slab in 778 Albany and 160 Magnolia rooms (their floors measure as dirt).
    Then regions become places. An indoor room is a name
    and a seed point, its shape, indoor flag and materials measured from the walls; an outdoor place (yard,
    street, park) is a name over an area. Drop the box (`RoomSize`), `Materials` and `ReverbTimeScale`

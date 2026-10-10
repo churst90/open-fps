@@ -112,15 +112,12 @@ public sealed class MapTiles
         }
         var parent = new Dictionary<int, int>();
         int Find(int x) { while (parent.TryGetValue(x, out var p) && p != x) x = parent[x] = parent.GetValueOrDefault(p, p); return x; }
+        void Union(int a, int b) { parent.TryAdd(a, a); parent.TryAdd(b, b); int r1 = Find(a), r2 = Find(b); if (r1 != r2) parent[r1] = r2; }
         foreach (var (id, ra, rb) in doorways)
             foreach (int room in new[] { ra, rb })
-                if (pending.ContainsKey(room))
-                {
-                    parent.TryAdd(id, id);
-                    parent.TryAdd(room, room);
-                    int r1 = Find(id), r2 = Find(room);
-                    if (r1 != r2) parent[r1] = r2;
-                }
+                if (pending.ContainsKey(room)) Union(id, room);
+        foreach (var group in FloodTogether(world, pending.Values.Select(p => p.Entity)))
+            for (int k = 1; k < group.Count; k++) Union(group[0], group[k]);
         var groups = new Dictionary<int, HashSet<TileKey>>();
         foreach (int id in parent.Keys)
         {
@@ -201,6 +198,15 @@ public sealed class MapTiles
         foreach (var (id, ra, rb) in doorways)
             foreach (int room in new[] { ra, rb })
                 if (pending.ContainsKey(room) && pending.ContainsKey(id)) { parent.TryAdd(id, id); parent.TryAdd(room, room); Union(id, room); }
+        // Rooms that flood together go together too: a living room and a kitchen open to each other through an
+        // archway with no door were sent apart across a tile's edge, and the client's flood of the one it held
+        // took the other's air (Albany, 5790 Mike Street and 5592 Pacific Boulevard).
+        foreach (var group in FloodTogether(world, pending.Values.Select(p => p.Entity)))
+            for (int k = 1; k < group.Count; k++)
+            {
+                parent.TryAdd(group[0], group[0]); parent.TryAdd(group[k], group[k]);
+                Union(group[0], group[k]);
+            }
         var groups = new Dictionary<int, HashSet<TileKey>>();
         foreach (int id in parent.Keys)
         {
@@ -212,6 +218,26 @@ public sealed class MapTiles
         foreach (var (e, keys, needs) in pending.Values)
             tiles.Add(e, keys.OrderBy(k => k.X).ThenBy(k => k.Z).ToArray(), needs);
         return tiles;
+    }
+
+    /// <summary>
+    /// The indoor rooms among <paramref name="entities"/> that flood as one group (RoomFlood.Groups, half a metre
+    /// more generous, since the cells' grid here is not the map's), by entity id: groups of two or more.
+    /// </summary>
+    private static List<List<int>> FloodTogether(World world, IEnumerable<Entity> entities)
+    {
+        var seeds = new List<OpenFPS.Common.Geometry.RoomFlood.Seed>();
+        foreach (var e in entities)
+        {
+            if (!world.IsAlive(e) || !world.Has<RegionComponent>(e) || !world.Has<Transform>(e)) continue;
+            var r = world.Get<RegionComponent>(e);
+            if (!r.IsIndoor || r.RoomSize.X <= 0f || r.RoomSize.Y <= 0f || r.RoomSize.Z <= 0f) continue;
+            var t = world.Get<Transform>(e);
+            seeds.Add(new OpenFPS.Common.Geometry.RoomFlood.Seed(e.Id, t.Position, r.RoomSize, t.Rotation));
+        }
+        seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
+        return OpenFPS.Common.Geometry.RoomFlood.Groups(seeds, Vector3.Zero, OpenFPS.Common.Geometry.RoomFlood.DefaultMargin + 0.5f)
+                       .Where(g => g.Count > 1).ToList();
     }
 
     /// <summary>
