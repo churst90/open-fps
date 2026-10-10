@@ -850,6 +850,8 @@ public sealed class EditorDialog : ModalDialog
         if (Items("world.size").FirstOrDefault() is { Command.Length: > 0 } size)
             sections.Add(new DialogSection("size", "Map size", new[] { Field("world.f.", size, "", "world.resize"), Button("world.resize", "Change the size") }));
 
+        sections.Add(VersionsSection());
+
         var rooms = Items("world.room").ToList();
         sections.Add(new DialogSection("rooms", "Rooms and areas", new[]
         {
@@ -889,6 +891,27 @@ public sealed class EditorDialog : ModalDialog
             Button("world.scan", "What is around me"),
         }));
         return sections;
+    }
+
+    /// <summary>Versions of the map's edits: saved by name, restored, and written into the map file.</summary>
+    private DialogSection VersionsSection()
+    {
+        var info = Items("world.versioninfo").FirstOrDefault();
+        var rows = Items("world.version").ToList();
+        bool bake = info.Value == "bake";
+        string summary = info.Label is { Length: > 0 } l ? l : "No versions saved yet";
+        return new DialogSection("versions", "Versions of this map", new[]
+        {
+            LocalBox("world.versionname", "Name for a new version", "A few words to know it by, such as before the market. Save keeps the map's edits as they are now.",
+                     enter: "world.versionsave"),
+            Button("world.versionsave", "Save a version"),
+            LocalList("world.versions", "Versions of this map",
+                      Join(summary + ".", "Each with who saved it and when, and what it holds. Restore asks first."),
+                      rows.Count > 0 ? rows.Select(r => new DialogItem(r.Label, r.Value)) : new[] { new DialogItem(summary, "") }, "world.versionrestore"),
+            Button("world.versionrestore", "Restore the chosen version", rows.Count > 0,
+                   "The map's edits become what the version has, as one step undo takes back. What the map has now is saved as a version first."),
+            Button("world.bake", "Write the edits into the map file", bake, info.Help ?? ""),
+        });
     }
 
     // ── What the player does ────────────────────────────────────────────────────────────────────
@@ -1156,6 +1179,21 @@ public sealed class EditorDialog : ModalDialog
                 _send("/edit dialog tab world");
                 return;
             case "world.scan": _send("/scan"); return;
+            case "world.versionsave":
+                if (Text("world.versionname") is not { Length: > 0 } versionName) { Said?.Invoke("Type a name for the version."); FocusAsked?.Invoke("world.versionname"); return; }
+                _send($"/edit map save {versionName}");
+                return;
+            case "world.versionrestore":
+            {
+                if (Get("world.versions")?.SelectedValue is not { Length: > 0 } number) { Said?.Invoke("Choose a version first."); FocusAsked?.Invoke("world.versions"); return; }
+                string name = Items("world.version").FirstOrDefault(v => v.Value == number).Prompt is { Length: > 0 } vname ? $", {vname}" : "";
+                ConfirmAsked?.Invoke($"Restore version {number}{name}? What the map has now is saved as a version first.", () => _send($"/edit map restore {number}"));
+                return;
+            }
+            case "world.bake":
+                ConfirmAsked?.Invoke("Write this map's edits into its file? Undo cannot take it back; the file as it was is kept beside it.",
+                                     () => _send("/edit map bake now"));
+                return;
         }
     }
 

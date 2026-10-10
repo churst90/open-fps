@@ -175,6 +175,7 @@ public sealed partial class WorldEditor
                 if (!Models.SetRetired(c.Kind, c.Id, !forward)) { why = $"the {ModelKinds.Spoken(c.Kind)} {c.Id} has been {(forward ? "brought back" : "retired")} since."; return false; }
                 return true;
             }
+            case SpawnSetOp ss: return ReverseSpawnSet(ss, forward, out why);
             case MapSetOp ms:
             {
                 var settings = Overlays.Get(ms.MapId).Settings;

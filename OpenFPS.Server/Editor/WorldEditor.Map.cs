@@ -177,6 +177,7 @@ public sealed partial class WorldEditor
     private void MapCommand(UserSession s, string[] args, Action<IMessage> reply)
     {
         if (!_maps.TryGetMapData(s.CurrentMapId, out var map)) { Say(reply, $"Map '{s.CurrentMapId}' is not loaded."); return; }
+        if (VersionCommand(s, args, reply)) return;
         if (args.Length == 0 || args[0].Equals("settings", StringComparison.OrdinalIgnoreCase))
         {
             Say(reply, "Map settings: " + string.Join("; ", SettingPaths().Select(p => $"{MapSettings.Field(p, GroundChoices()).Label}, {SaySetting(p, MapSettings.Get(map, p))}"))

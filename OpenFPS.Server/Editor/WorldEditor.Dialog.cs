@@ -377,6 +377,8 @@ public sealed partial class WorldEditor
             items.AddRange(Choices("world.choice", command, MapSettings.Policies.Select(p => (Capital(p.Words), p.Stored))));
         }
 
+        items.AddRange(DialogVersions(s));
+
         foreach (var name in d.Editors) items.Add(Line("world.editor", name, name));
 
         foreach (var (key, version) in Overlays.Get(s.CurrentMapId).Pins)

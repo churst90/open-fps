@@ -104,6 +104,9 @@ public sealed partial class WorldEditor
             "placed" => PlacedMenu(s, parts.Length > 1 ? string.Join(":", parts[1..]) : HandOf(s).PlacedFilter),
             "placedone" when parts.Length > 1 && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int placedId)
                 => PlacedOneMenu(s, placedId),
+            "mapversions" => VersionsMenu(s),
+            "mapversion" when parts.Length > 1 => VersionMenu(s, parts[1]),
+            "mapbake" => BakeMenu(s),
             "changed" => ChangedMenu(s, parts.Length > 1 ? string.Join(":", parts[1..]) : HandOf(s).ChangedFilter),
             "changedone" when parts.Length > 1 && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int changedId)
                 => ChangedOneMenu(s, changedId),
@@ -185,6 +188,7 @@ public sealed partial class WorldEditor
             items.Add(Act("Set spawn here", "edit spawn here"));
             items.Add(Opens("Settings: weather, time, ground", "mapsettings"));
             items.Add(Opens("Beacon rules", "beacons"));
+            items.Add(Opens($"Versions of this map, {Versions.Of(s.CurrentMapId).Count}", "mapversions"));
             int pins = Overlays.Get(s.CurrentMapId).Pins.Count;
             items.Add(Info(pins == 0 ? "No models pinned to a version of their own" : $"{Plural(pins, "model")} pinned: " + string.Join(", ", Overlays.Get(s.CurrentMapId).Pins.Select(p => $"{p.Key} at version {p.Value}"))));
             items.Add(Info(d.Editors.Count == 0 ? "Editors: none besides the owner" : $"Editors: {string.Join(", ", d.Editors)}"));

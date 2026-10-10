@@ -223,7 +223,12 @@ public sealed class MapOverlayStore
     public void ApplyBefore(MapData map)
     {
         AssignMissingIds(map);
-        var o = Get(map.Id);
+        Lay(map, Get(map.Id));
+    }
+
+    /// <summary>An overlay laid over a map's data: what loading does, and what baking writes into a file.</summary>
+    internal static void Lay(MapData map, MapOverlay o)
+    {
         if (o.IsEmpty) return;
 
         if (o.Spawn != null)

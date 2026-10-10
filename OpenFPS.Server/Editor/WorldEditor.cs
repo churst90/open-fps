@@ -118,6 +118,7 @@ public sealed partial class WorldEditor
         + "/edit build floor|wall|roof|door|window|prefab [FIELD VALUE ...], "
         + "/edit find WORDS, /edit preview PREFAB, /edit prefabs [CATEGORY], /edit group NAME, /edit spawn here, /edit step METRES, "
         + "/edit info, /edit map settings, /edit map set weather|time|ground|beacon CATEGORY VALUE, "
+        + "/edit map save NAME, /edit map versions, /edit map restore NUMBER|NAME, /edit map bake [now], "
         + "/edit model show|set|up|down|versions|where|use|pin|unpin|new|copy|replace|retire|restore|remove KIND ID ..., /edit undo, /edit redo.";
 
     /// <summary>What an /edit costs against MessageLimits.Edits: 0 to look, 1 to change, more to change many things.</summary>
@@ -136,7 +137,8 @@ public sealed partial class WorldEditor
                 // Several at once cost as a row of them does.
                 return 1 + args.Count(a => a.StartsWith('#')) / 10.0 + (Word(1) == "held" ? 4 : 0);
             case "map":
-                return Word(1) == "set" ? 1 : 0;
+                // Restoring a version or baking changes every thing the map's edits touch.
+                return Word(1) switch { "set" or "save" => 1, "restore" => 10, "bake" => Word(2) == "now" ? 10 : 0, _ => 0 };
             case "model":
                 return Word(1) switch
                 {
