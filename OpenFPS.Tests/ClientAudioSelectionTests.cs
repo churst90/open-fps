@@ -317,7 +317,9 @@ public class ClientAudioSelectionTests
     /// Every kind of physical source is placed by its own declared level and size from the lookup the
     /// ranking used: Loudness.Place's reference distance, the size as extent, the level for the ear
     /// model, and (unless spread over places) the placed gain times its headroom's return. A kind the
-    /// lookup did not know would be unvoiced, as the crossing bell once was.
+    /// lookup did not know would be unvoiced, as the crossing bell once was. A fire's collider is its bed
+    /// (FireSpec.KeyForPlaced, docs/FIRE.md 12.2): on this 4 x 4 m box a campfire is a 16 m² fire, 15 dB
+    /// over the preset's 0.7 m bed, so its declared level is the placed key's.
     /// </summary>
     [Theory]
     [MemberData(nameof(Kinds))]
@@ -335,10 +337,12 @@ public class ClientAudioSelectionTests
         }
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Id), 30), $"{soundId} was never voiced");
 
-        var (level, extent) = Declared(soundId);
+        string placed = FireSpec.KeyForPlaced(soundId, ColliderShape.Box.IsRound(), new Vector3(4f, 1f, 4f));
+        var (level, extent) = Declared(placed);
         var (gain, reference) = Loudness.Place(level, extent);
         var e = h.Mixer.Latest[Id];
         _o.WriteLine($"{soundId}: {level:F1} dB, extent {extent:F2} m -> {gain:F4} at {reference:F2} m; voiced {e.Volume:F4} at {e.MinDistance:F2} m, key {e.PhysicalKey}");
+        if (soundId.StartsWith("fire:", StringComparison.Ordinal)) Assert.Equal(placed, e.PhysicalKey);
         Assert.StartsWith(soundId.Split(':')[0] + ":", e.PhysicalKey);
         Assert.Equal(level, e.EarLevelDb, 3);
         Assert.Equal(reference, e.MinDistance, 4);
@@ -349,6 +353,42 @@ public class ClientAudioSelectionTests
             Assert.Equal(gain * PhysicalVoiceState.HeadroomGain(Headroom(soundId)), e.Volume, 5);
         else
             Assert.True(e.Volume > 0f && float.IsFinite(e.Volume));
+    }
+
+    public static IEnumerable<object[]> FirePresets() => FireSpec.Presets.Keys.Select(k => new object[] { k });
+
+    /// <summary>
+    /// Every fire preset, placed on a collider the size of its own bed (as the fire pit prefab is, and as
+    /// /spawn fire and a thing burning are), is voiced as the preset: its key unchanged, its own declared
+    /// level and size, which is what the approved renders were made at. Twice the bed is twice the fire, 3 dB.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(FirePresets))]
+    public void EveryFirePresetOnItsOwnBedIsPlacedAtItsOwnDeclaredLevel(string preset)
+    {
+        using var wind = WindField.Hold(WindWeather.Steady(6f, 270f, 0f));
+        var spec = FireSpec.ByName(preset);
+        foreach (float areaRatio in new[] { 1f, 2f })
+        {
+            var h = new ClientAudioHarness();
+            h.StandAt(Vector3.Zero);
+            const int Id = 78;
+            float side = MathF.Sqrt(areaRatio);
+            var bed = new Vector3(spec.AreaWidth * side, 1f, spec.AreaDepth * side);
+            AddSource(h, Id, "fire:" + preset, new Vector3(0f, 1f, 12f + 0.5f * bed.Z), bed);
+            Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Id), 30), $"{preset} was never voiced");
+            var e = h.Mixer.Latest[Id];
+            float level = spec.SourceLevelDb + 10f * MathF.Log10(areaRatio);
+            float extent = spec.ExtentMetres * MathF.Sqrt(areaRatio);
+            var (_, reference) = Loudness.Place(level, extent);
+            _o.WriteLine($"{preset} x{areaRatio}: declared {spec.SourceLevelDb:F1} dB; voiced {e.EarLevelDb:F2} dB, extent {e.ExtentMetres:F2} m, key {e.PhysicalKey}");
+            // The bigger bed's key carries its size to the centimetre: within 0.05 dB and half a percent.
+            if (areaRatio == 1f) Assert.Equal("fire:" + preset, e.PhysicalKey);
+            Assert.Equal(level, e.EarLevelDb, areaRatio == 1f ? 1e-3f : 0.05f);
+            Assert.Equal(extent, e.ExtentMetres, extent * (areaRatio == 1f ? 1e-4f : 5e-3f));
+            Assert.Equal(reference, e.MinDistance, reference * (areaRatio == 1f ? 1e-4f : 5e-3f));
+            Assert.True(e.Volume > 0f && float.IsFinite(e.Volume));
+        }
     }
 
     /// <summary>

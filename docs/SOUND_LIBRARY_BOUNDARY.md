@@ -1994,7 +1994,8 @@ OpenFPS.Geometry <- OpenFPS.Acoustics <- OpenFPS.Sound <- OpenFPS.Common <- Serv
   Material, Struck, Loudspeaker, GasHob, Train, Aircraft, Siren, Horn, Machine, Bird, Speech, Glass, Gun or
   Applause): 1,753 tests, 1,748 passed, 5 skipped, 0 failed (36 minutes on twelve cores).
   A second filter (ClientAudio, Geometry, SteamAudio, NetworkTrim, Opening, Reverb): 208 tests, 205 passed,
-  2 skipped, 1 failed, the fire:campfire case that fails on main too (16.7).
+  2 skipped, 1 failed, the fire:campfire case that failed on main too (16.7). After merging main (652c03fd,
+  which fixed that test) the guards, ClientAudioSelection, DistantUpdates and every Fire class: 149 passed.
 - CI: `.github/workflows/tests.yml` builds `OpenFPS.Tests`, which brings the new projects in;
   `tools/ci/shard_tests.py` deals out test classes, which did not change. Nothing to edit. The publish
   scripts build their executables' projects, which reference the new ones through Common.
@@ -2014,8 +2015,9 @@ OpenFPS.Geometry <- OpenFPS.Acoustics <- OpenFPS.Sound <- OpenFPS.Common <- Serv
   `AsyncAcousticWorker` 50, `SteamAudioScene` 27, `CabinWalls` 20, `AudioEmission` 18, `EarlyCopies` 17,
   `TalkerVoice` 16, `VehicleShadow` 15, `EngineReflections` 4.
 - Unrelated, seen while checking: `ClientAudioSelectionTests.EveryKindOfPhysicalSourceIsPlacedAtItsOwnDeclaredLevel("fire:campfire")`
-  fails on main as here: the test places the fire on a 4 m box, `KeyForPlaced` keys it as a bigger fire
-  (`fire:campfire/shape=r4x4`, 78 dB) and the test expects the preset's declared 63 dB.
+  failed on main as here (the test placed the fire on a 4 m box, which `KeyForPlaced` keys as a bigger fire,
+  and expected the preset's level). Main fixed the test in b4496206; the merge passes `IsRound()` for its
+  `ColliderShape.Box`.
 
 ---
 

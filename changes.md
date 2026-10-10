@@ -20,6 +20,24 @@ Recent work, newest first. `git log` has the rest.
   door models' fingerprint moved with them and stayed the same (978619539e83), so door render caches are still
   good. No sound changed: the 17 renders are the same to the bit and the emitter streams are the same.
 
+- Far things sent less often: a far moving thing's once-a-second keep-alive now counts as a change when the
+  thing has strayed from what the client predicts, so it goes again the tick after, as any other far state sent
+  for a change does. Before, the keep-alive took the near-thing path, which never repeats. On a poor connection
+  (DistantUpdatesTests, `--distant-updates net=poor`) a city car 543 m off turned from braking to pulling away
+  on its keep-alive tick, that tick was lost, and the client carried it as still braking for six ticks: 0.74 m/s
+  against 1.76, 43.2 % of its pitch off the server's track against 5.5 % for a client sent every tick. Now
+  5.530 % / 5.530 %. The fault was there since the distant-updates merge (11a3c1c5); the floors round 2 merge
+  (8406509a) regenerated city.json, which renumbered the entities and put that car's keep-alive (tick + id,
+  modulo 30) on its turn. The client and the wire are unchanged; only which ticks a far state is repeated on.
+
+- The physical-source placement test failed for the campfire (78.1 dB voiced against 63 declared) since the
+  fire merge (b9b2991f), but the game was right. A placed fire's collider is its bed (FireSpec.KeyForPlaced,
+  docs/FIRE.md 12.2), and the test puts every kind on a 4 x 4 m box: 16 m² against the campfire's 0.7 m bed is
+  10 log(16 / 0.49) = 15.1 dB more fire. The test now reads the level from the placed key. A new test places
+  every fire preset on its own bed (as the fire pit prefab, /spawn fire and a burning thing are) and finds each
+  at its own declared level and size with its key unchanged, and twice the bed 3 dB up. The city's one fire,
+  the pit at 58 Alder Street, is the approved 0.9 m fire at 67 dB.
+
 - The borrowed-voice Doppler test failed after the engine CPU merge, but nothing in the sound was wrong. An
   engine synthesizes the same stream to the bit whether its channel takes it at 0.8, 1 or 1.25 times real time,
   before the merge and after. The test measured the "true" pitch half a second after placing a stock car at
