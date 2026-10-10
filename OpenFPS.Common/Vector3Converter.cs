@@ -2,26 +2,21 @@ using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+// Namespace unchanged (docs/SOUND_LIBRARY_BOUNDARY.md, decision 6): the network's JSON and the model
+// library's both write vectors with it.
 namespace OpenFPS.Common.Networking;
 
-public class QuaternionConverter : JsonConverter<Quaternion>
+/// <summary>A vector as {"X":..,"Y":..,"Z":..}: its numbers are fields, which the serializer does not write.</summary>
+public class Vector3Converter : JsonConverter<Vector3>
 {
-    public override Quaternion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override Vector3 Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        float x = 0, y = 0, z = 0, w = 0; // W defaults to 1 when absent (wSet)
-        bool wSet = false;
-
+        float x = 0, y = 0, z = 0;
         if (reader.TokenType != JsonTokenType.StartObject) throw new JsonException();
 
         while (reader.Read())
         {
-            if (reader.TokenType == JsonTokenType.EndObject) 
-            {
-                var q = new Quaternion(x, y, z, wSet ? w : 1.0f);
-                // Never an all-zero quaternion.
-                if (q.LengthSquared() < 0.001f) return Quaternion.Identity;
-                return q;
-            }
+            if (reader.TokenType == JsonTokenType.EndObject) return new Vector3(x, y, z);
             if (reader.TokenType != JsonTokenType.PropertyName) throw new JsonException();
 
             string? propertyName = reader.GetString()?.ToLower();
@@ -31,19 +26,17 @@ public class QuaternionConverter : JsonConverter<Quaternion>
                 case "x": x = reader.GetSingle(); break;
                 case "y": y = reader.GetSingle(); break;
                 case "z": z = reader.GetSingle(); break;
-                case "w": w = reader.GetSingle(); wSet = true; break;
             }
         }
         throw new JsonException();
     }
 
-    public override void Write(Utf8JsonWriter writer, Quaternion value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, Vector3 value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
         writer.WriteNumber("X", value.X);
         writer.WriteNumber("Y", value.Y);
         writer.WriteNumber("Z", value.Z);
-        writer.WriteNumber("W", value.W);
         writer.WriteEndObject();
     }
 }

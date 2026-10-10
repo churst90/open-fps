@@ -55,7 +55,6 @@ OpenFPS.Common/AudioEmission.cs	OpenFPS.Common.Components.SoundEmitterComponent	
 OpenFPS.Common/AudioEmission.cs	OpenFPS.Common.Components.Transform	4
 OpenFPS.Common/AudioEmission.cs	OpenFPS.Common.EntitySnapshot	7
 OpenFPS.Common/AudioEmission.cs	OpenFPS.Common.Networking.EntityDefinition	4
-OpenFPS.Common/ModelLibrary.cs	OpenFPS.Common.Networking.Vector3Converter	1
 OpenFPS.Common/OpeningRoutes.cs	OpenFPS.Common.Components.RegionComponent	15
 OpenFPS.Common/RoomAcoustics.cs	OpenFPS.Common.Components.RegionComponent	15
 OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	OpenFPS.Common.Components.ColliderComponent	3

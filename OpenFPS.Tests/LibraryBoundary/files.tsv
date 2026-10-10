@@ -304,6 +304,7 @@ OpenFPS.Common/Trains.cs	lib	Sound
 OpenFPS.Common/TransientSound.cs	lib	Sound	
 OpenFPS.Common/TyreFriction.cs	lib	Sound	
 OpenFPS.Common/UpdateThrottle.cs	host		
+OpenFPS.Common/Vector3Converter.cs	lib	Sound	
 OpenFPS.Common/VehicleBody.cs	lib	Sound	
 OpenFPS.Common/VehicleCabin.cs	lib	Sound	
 OpenFPS.Common/VehicleSignalBits.cs	lib	Sound	
