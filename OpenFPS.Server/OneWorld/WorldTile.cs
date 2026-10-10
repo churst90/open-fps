@@ -26,6 +26,9 @@ public sealed class WorldTile
     /// <summary>Where what stands on it came from, with the attribution its licence asks for (OpenStreetMap's,
     /// ODbL: the store is a derived database of it); null for a tile of ground alone.</summary>
     public string? Features { get; set; }
+    /// <summary>Where its buildings came from: the source and each dataset with its licence as the source records
+    /// them (Overture: OpenStreetMap ODbL, Microsoft ML Buildings, USGS lidar); null for a tile with none.</summary>
+    public string? Buildings { get; set; }
     public TerrainData? Terrain { get; set; }
     /// <summary>What stands on it, as a map's entities, positions in the tile's own metres.</summary>
     public List<EntityData> Entities { get; set; } = new();

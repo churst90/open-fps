@@ -23,7 +23,7 @@ namespace OpenFPS.Server.OneWorld;
 /// verges, the drives, paths, rail, water, buildings, lots, addresses and woods; and no road becomes a road to
 /// route traffic on (RoadData) yet.</para>
 /// </summary>
-public sealed class WorldFeatures
+public sealed partial class WorldFeatures
 {
     /// <summary>How far round a tile its roads are worked out, and its ground asked for, metres: a piece of a
     /// neighbour's road reaches about 35 m in at most (20 m long, lengthened at a bend by up to its width) and
@@ -39,7 +39,7 @@ public sealed class WorldFeatures
     // gen_osm.py's constants.
     public const double LaneWidth = 3.4, Verge = 2.5, SidewalkWidth = 1.5;
     public const double SegMax = 20.0, Seam = 0.05, RoadSmooth = 10.0, ZoneHeight = 4.0;
-    public const float YRoad = 0.08f, YWalk = 0.12f;
+    public const float YRoad = 0.08f, YWalk = 0.12f, YDrive = 0.06f;
 
     public IOsmSource Osm { get; }
     private readonly IReadOnlyDictionary<string, Vector3> _sizes;
@@ -50,10 +50,17 @@ public sealed class WorldFeatures
     public string Name => Osm.Name;
 
     /// <param name="prefabSizes">Each prefab's collider size: a box's scale is its size over this.</param>
-    public WorldFeatures(IOsmSource osm, IReadOnlyDictionary<string, Vector3> prefabSizes)
+    /// <param name="buildings">Where the buildings come from (Overture), or null for roads and woods alone.</param>
+    /// <param name="prefabs">What the buildings' prefabs are (sizes, materials, which doors swing); needed with
+    /// <paramref name="buildings"/>.</param>
+    public WorldFeatures(IOsmSource osm, IReadOnlyDictionary<string, Vector3> prefabSizes, IBuildingSource? buildings = null,
+                         IReadOnlyDictionary<string, WorldBuildings.Prefab>? prefabs = null)
     {
         Osm = osm;
         _sizes = prefabSizes;
+        Buildings = buildings;
+        _prefabs = prefabs ?? prefabSizes.ToDictionary(kv => kv.Key, kv => new WorldBuildings.Prefab(kv.Value, "None", kv.Key is "door" or "glass_pull_door"),
+                                                       StringComparer.OrdinalIgnoreCase);
     }
 
     // ═══ What a road is (gen_osm.py ROAD_CLASS, SURFACE, way_width) ═════════════════════════════════════
@@ -96,9 +103,11 @@ public sealed class WorldFeatures
                && !(hw == "service" && w.Tag("oneway") is "yes" or "-1") && w.Nodes.Length >= 2;
     }
 
-    public static double WidthOf(OsmWay w)
+    public static double WidthOf(OsmWay w) => WidthOf(w, w.Tag("highway"));
+
+    /// <summary>gen_osm.py way_width: a way's width as if it were a <paramref name="hw"/>.</summary>
+    public static double WidthOf(OsmWay w, string hw)
     {
-        string hw = w.Tag("highway");
         if (w.Tags.TryGetValue("width", out var ws))
         {
             var m = System.Text.RegularExpressions.Regex.Match(ws, @"^[0-9.]+");
@@ -113,6 +122,15 @@ public sealed class WorldFeatures
     }
 
     /// <summary>What a road is called: its name, or what kind of road it is.</summary>
+    /// <summary>A driveway, parking aisle or private service way (gen_osm.py ways_by_kind["drive"]): a surface, not a
+    /// road to route on.</summary>
+    public static bool IsDrive(OsmWay w)
+    {
+        string hw = w.Tag("highway");
+        if (w.Nodes.Length < 2 || IsRoad(w)) return false;
+        return hw == "service" || (RoadClass.ContainsKey(hw) && NotRoads.Contains(w.Tag("service")));
+    }
+
     public static string NameOf(OsmWay w)
     {
         if (w.Tag("name") is { Length: > 0 } n) return n;
@@ -125,8 +143,10 @@ public sealed class WorldFeatures
     /// <summary>The roads reaching into a tile and its margin, from the source, whole.</summary>
     public Task<IReadOnlyList<OsmWay>> WaysAsync(WorldTileKey key, CancellationToken ct)
     {
-        double w = key.Easting - MarginMetres - 50, s = key.Northing - MarginMetres - 50;
-        double e = key.Easting + WorldTileKey.TileMetres + MarginMetres + 50, n = key.Northing + WorldTileKey.TileMetres + MarginMetres + 50;
+        // With buildings, far enough for the road a building near the tile faces (BuildingRoadReach).
+        double reach = Buildings != null ? BuildingRoadReach : MarginMetres + 50;
+        double w = key.Easting - reach, s = key.Northing - reach;
+        double e = key.Easting + WorldTileKey.TileMetres + reach, n = key.Northing + WorldTileKey.TileMetres + reach;
         double lat0 = 90, lat1 = -90, lon0 = 180, lon1 = -180;
         foreach (var (pe, pn) in new[] { (w, s), (e, s), (w, n), (e, n), ((w + e) / 2, s), ((w + e) / 2, n) })
         {
@@ -141,12 +161,16 @@ public sealed class WorldFeatures
 
     /// <summary>A tile laid: what stands on it (in its own metres, y over the sea), its ground graded to the
     /// roads (<see cref="WorldTileService.Posts"/> a side, over the sea), and how many roads reach into it.</summary>
-    public sealed record Laid(List<EntityData> Entities, float[] Heights, int Roads, int Pieces, int Trees = 0);
+    public sealed record Laid(List<EntityData> Entities, float[] Heights, int Roads, int Pieces, int Trees = 0, int Buildings = 0,
+                              string? BuildingSources = null);
+
+    /// <summary>The posts a side of a window reaching <paramref name="margin"/> metres round a tile.</summary>
+    public static int PostsFor(double margin) => (int)Math.Round((WorldTileKey.TileMetres + 2 * margin) / WorldTileService.Spacing) + 1;
 
     /// <summary>The ground of the window, posts every 2 m from its south-west corner, over the sea.</summary>
-    private sealed class Ground(double west, double south, float[] h)
+    private sealed class Ground(double west, double south, float[] h, int n)
     {
-        private readonly int _n = WindowPosts;
+        private readonly int _n = n;
         private const double S = WorldTileService.Spacing;
 
         /// <summary>gen_osm.py ground(): bilinear between posts, held at the edge.</summary>
@@ -176,16 +200,20 @@ public sealed class WorldFeatures
                                          float Y0, float Y1, double Ext0, double Ext1, double Hp, double Hq, string Name, string Layer);
 
     /// <summary>
-    /// Lays a tile from the ways that reach it, the ground of its window (<see cref="WindowPosts"/> a side
-    /// from <see cref="MarginMetres"/> south-west of its corner, over the sea; NaN where nothing was surveyed),
-    /// and its cells' land cover classes (null: no woods).
+    /// Lays a tile from the ways that reach it, the ground of its window (<see cref="PostsFor"/> a side from
+    /// <paramref name="margin"/> metres south-west of its corner, over the sea; NaN where nothing was surveyed;
+    /// <see cref="WindowPosts"/> a side for the usual <see cref="MarginMetres"/>), its cells' land cover classes
+    /// (null: no woods), and the buildings near it (null: none; <see cref="MarginFor"/> says how wide a window they need).
     /// </summary>
-    public Laid Lay(WorldTileKey key, IReadOnlyList<OsmWay> ways, float[] window, byte[]? classes = null)
+    public Laid Lay(WorldTileKey key, IReadOnlyList<OsmWay> ways, float[] window, byte[]? classes = null,
+                    IReadOnlyList<Footprint>? footprints = null, double margin = MarginMetres)
     {
-        double west = key.Easting - MarginMetres, south = key.Northing - MarginMetres;
-        double winEast = west + (WindowPosts - 1) * WorldTileService.Spacing, winNorth = south + (WindowPosts - 1) * WorldTileService.Spacing;
+        int windowPosts = PostsFor(margin);
+        if (window.Length != windowPosts * windowPosts) throw new ArgumentException($"a window of {window.Length} posts for a margin of {margin} m");
+        double west = key.Easting - margin, south = key.Northing - margin;
+        double winEast = west + (windowPosts - 1) * WorldTileService.Spacing, winNorth = south + (windowPosts - 1) * WorldTileService.Spacing;
         var raw = window.Select(v => float.IsFinite(v) ? v : 0f).ToArray();
-        var ground = new Ground(west, south, raw);
+        var ground = new Ground(west, south, raw, windowPosts);
 
         var entities = new List<EntityData>();
         var slabs = new List<TerrainBuilder.Slab>();
@@ -272,6 +300,19 @@ public sealed class WorldFeatures
             if (pieces > before) roads++;
         }
 
+        // Driveways, parking aisles and private service ways (gen_osm.py DRIVES), on the ground under them.
+        foreach (var w in ways)
+        {
+            if (!IsDrive(w)) continue;
+            var pts = PointsOf(w, key);
+            if (pts.Count < 2) continue;
+            double reach = 30;
+            if (pts.Max(p => p.E) < west - reach || pts.Min(p => p.E) > winEast + reach || pts.Max(p => p.N) < south - reach || pts.Min(p => p.N) > winNorth + reach) continue;
+            bool driveway = w.Tag("service") == "driveway";
+            LayLine(pts, driveway ? 3.6 : WidthOf(w, "service"), SurfaceOf(w, driveway ? "concrete" : "asphalt"), YDrive,
+                    w.Tag("service") == "parking_aisle" ? "Parking aisle" : "Driveway", "drives", ground.At, Place, tol: 0.6);
+        }
+
         // The zones over the roads: walking along one says nothing, stepping onto it from elsewhere says its name.
         foreach (var (w, pts, _) in lines)
         {
@@ -320,15 +361,21 @@ public sealed class WorldFeatures
             });
         }
 
-        int trees = classes == null ? 0 : Woods(key, classes, ground, strips, entities);
+        // The buildings near the tile: those whose middle is in it stored whole, every one near graded under.
+        var boxes = new List<(WorldBuildings.Frame F, double U0, double U1, double V0, double V1)>();
+        var (built, sources) = footprints is { Count: > 0 }
+            ? LayBuildings(key, footprints, ways, ground, west, south, InPlace, entities, slabs, boxes, Place)
+            : (0, null);
 
-        // The tile's ground: the window graded to every road reaching it, then the tile cut out of it.
-        var graded = TerrainBuilder.Grade(raw, WindowPosts, WindowPosts, 0f, 0f, WorldTileService.Spacing, slabs);
-        int posts = WorldTileService.Posts, o = WindowOffset;
+        int trees = classes == null ? 0 : Woods(key, classes, ground, strips, boxes, entities);
+
+        // The tile's ground: the window graded to every road and floor reaching it, then the tile cut out of it.
+        var graded = TerrainBuilder.Grade(raw, windowPosts, windowPosts, 0f, 0f, WorldTileService.Spacing, slabs);
+        int posts = WorldTileService.Posts, o = (int)Math.Round(margin / WorldTileService.Spacing);
         var heights = new float[posts * posts];
         for (int j = 0; j < posts; j++)
-            Array.Copy(graded, (o + j) * WindowPosts + o, heights, j * posts, posts);
-        return new Laid(entities, heights, roads, pieces, trees);
+            Array.Copy(graded, (o + j) * windowPosts + o, heights, j * posts, posts);
+        return new Laid(entities, heights, roads, pieces, trees, built, sources);
     }
 
     // ═══ The woods (gen_osm.py "The woods", a tile at a time) ══════════════════════════════════════════
@@ -352,7 +399,7 @@ public sealed class WorldFeatures
     /// the tile, from the tile's own cells, so no neighbour can disagree. How many things were made.
     /// </summary>
     private int Woods(WorldTileKey key, byte[] classes, Ground ground, List<(double Ax, double Az, double Bx, double Bz, double Half)> strips,
-                      List<EntityData> into)
+                      List<(WorldBuildings.Frame F, double U0, double U1, double V0, double V1)> boxes, List<EntityData> into)
     {
         int n = WorldTileService.Posts - 1, per = WoodCell / (int)WorldTileService.Spacing;
         var wooded = new bool[WoodCells, WoodCells];
@@ -364,6 +411,12 @@ public sealed class WorldFeatures
                 if (Math.Min(ax, bx) - half - pad > e || Math.Max(ax, bx) + half + pad < e
                     || Math.Min(az, bz) - half - pad > nn || Math.Max(az, bz) + half + pad < nn) continue;
                 if (SegPoint((e, nn), (ax, az), (bx, bz)).D < half + pad) return false;
+            }
+            // gen_osm.py is_clear's boxes: nothing in a building, or within the pad of one.
+            foreach (var (f, u0, u1, v0, v1) in boxes)
+            {
+                var (u, v) = f.L(e, nn);
+                if (u0 - pad < u && u < u1 + pad && v0 - pad < v && v < v1 + pad) return false;
             }
             return true;
         }
@@ -553,6 +606,19 @@ public sealed class WorldFeatures
         double cy = p.Hp + g * uc + (p.Y0 + p.Y1) / 2.0;
         return new Box(cx, (float)Math.Round(cy, 4), cz, Turn(f.A, g, 0), new Vector3((float)(u1 - u0), p.Y1 - p.Y0, (float)(v1 - v0)),
                        f.Bounds(u0, u1, v0, v1));
+    }
+
+    /// <summary>A way's nodes in the zone's metres, no point twice.</summary>
+    private static List<(double E, double N)> PointsOf(OsmWay w, WorldTileKey key)
+    {
+        var pts = new List<(double E, double N)>(w.Nodes.Length);
+        for (int k = 0; k < w.Nodes.Length; k++)
+        {
+            var (pe, pn) = Utm.FromLatLon(w.Lat[k], w.Lon[k], key.Zone, key.North);
+            if (pts.Count > 0 && Math.Abs(pe - pts[^1].E) + Math.Abs(pn - pts[^1].N) < 1e-6) continue;
+            pts.Add((pe, pn));
+        }
+        return pts;
     }
 
     // ═══ Junctions (gen_osm.py make_junctions) ═════════════════════════════════════════════════════════

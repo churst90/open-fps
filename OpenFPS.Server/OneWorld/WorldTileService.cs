@@ -32,9 +32,9 @@ public sealed class WorldTileService
     /// be had for a tile (no network and nothing cached), the tile is made with dirt and the log says so.</summary>
     public ILandCoverSource? LandCover { get; set; }
 
-    /// <summary>What stands on a tile outside the real places (roads, from OpenStreetMap), or null for ground
-    /// alone. When its data cannot be had now the tile is not made, and is tried again after
-    /// <see cref="RetryAfter"/>: a tile stored without its roads would keep that hole.</summary>
+    /// <summary>What stands on a tile outside the real places (roads from OpenStreetMap, buildings from Overture), or
+    /// null for ground alone. When its data cannot be had now the tile is not made, and is tried again after
+    /// <see cref="RetryAfter"/>: a tile stored without its roads or buildings would keep that hole.</summary>
     public WorldFeatures? Features { get; set; }
     public int MaxAtOnce { get; }
     public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(2);
@@ -226,42 +226,54 @@ public sealed class WorldTileService
     }
 
     /// <summary>
-    /// A tile with what stands on it: the roads near it from OpenStreetMap and the woods from its land cover, its
-    /// ground and the margin round it from the survey (WorldFeatures.WindowPosts), the ground graded to the roads
-    /// and the tile cut out of it.
+    /// A tile with what stands on it: the roads near it from OpenStreetMap, its buildings, and the woods from its land
+    /// cover, its ground and the margin round it from the survey (WorldFeatures.WindowPosts, or wider where a building
+    /// near it is set on ground further out: WorldFeatures.MarginFor), the ground graded to the roads and floors and the
+    /// tile cut out of it.
     /// </summary>
     private async Task<WorldTile> MakeWithFeaturesAsync(WorldTileKey key, Task<(byte[]?, string?)> cover, CancellationToken ct)
     {
         var ways = Features!.WaysAsync(key, ct);
-        int n = WorldFeatures.WindowPosts, o = WorldFeatures.WindowOffset;
-        float[]? window;
-        try
-        {
-            window = await Elevation.WindowAsync(key.Zone, key.North, key.Easting - WorldFeatures.MarginMetres,
-                                                 key.Northing - WorldFeatures.MarginMetres, n, Spacing, ct).ConfigureAwait(false);
-        }
-        catch (NotSupportedException)
-        {
-            // A survey that answers whole tiles only: the tile's posts, held at its edge.
-            var own = await Elevation.HeightsAsync(key, Posts, Spacing, ct).ConfigureAwait(false);
-            window = null;
-            if (own != null)
-            {
-                window = new float[n * n];
-                for (int j = 0; j < n; j++)
-                    for (int i = 0; i < n; i++)
-                        window[j * n + i] = own[Math.Clamp(j - o, 0, Posts - 1) * Posts + Math.Clamp(i - o, 0, Posts - 1)];
-            }
-        }
+        var footprints = Features.FootprintsAsync(key, ct);
+        var first = WindowAsync(key, WorldFeatures.MarginMetres, ct);
+        var near = await ways.ConfigureAwait(false);
+        var buildings = await footprints.ConfigureAwait(false);
+        double margin = Features.MarginFor(key, buildings, near);
+        float[]? window = await first.ConfigureAwait(false);
+        if (margin > WorldFeatures.MarginMetres && window != null) window = await WindowAsync(key, margin, ct).ConfigureAwait(false);
+        else margin = WorldFeatures.MarginMetres;
+        int n = WorldFeatures.PostsFor(margin);
         var (classes, coverName) = await cover.ConfigureAwait(false);
-        var laid = Features.Lay(key, await ways.ConfigureAwait(false), window ?? new float[n * n], classes);
+        var laid = Features.Lay(key, near, window ?? new float[n * n], classes, buildings, margin);
         // Nothing surveyed and nothing on it: open ground at sea level, as without the generator. Nothing
         // surveyed with roads: the same ground, graded to them.
-        var tile = Make(key, window == null && laid.Pieces == 0 ? null : laid.Heights, window == null ? "none" : Elevation.Name,
+        var tile = Make(key, window == null && laid.Pieces == 0 && laid.Buildings == 0 ? null : laid.Heights, window == null ? "none" : Elevation.Name,
                         classes, coverName);
         tile.Entities = laid.Entities;
         if (laid.Entities.Count > 0) tile.Features = Features.Name;
+        tile.Buildings = laid.BuildingSources;
         return tile;
+    }
+
+    /// <summary>The survey's posts round a tile, <paramref name="margin"/> metres out (WorldFeatures.PostsFor a side),
+    /// or null where it has nothing. A survey that answers whole tiles only gives the tile's posts, held at its edge.</summary>
+    private async Task<float[]?> WindowAsync(WorldTileKey key, double margin, CancellationToken ct)
+    {
+        int n = WorldFeatures.PostsFor(margin), o = (int)Math.Round(margin / Spacing);
+        try
+        {
+            return await Elevation.WindowAsync(key.Zone, key.North, key.Easting - margin, key.Northing - margin, n, Spacing, ct).ConfigureAwait(false);
+        }
+        catch (NotSupportedException)
+        {
+            var own = await Elevation.HeightsAsync(key, Posts, Spacing, ct).ConfigureAwait(false);
+            if (own == null) return null;
+            var window = new float[n * n];
+            for (int j = 0; j < n; j++)
+                for (int i = 0; i < n; i++)
+                    window[j * n + i] = own[Math.Clamp(j - o, 0, Posts - 1) * Posts + Math.Clamp(i - o, 0, Posts - 1)];
+            return window;
+        }
     }
 
     /// <summary>The land cover's classes for a tile's cells, and its name; (null, null) with no source, where it
