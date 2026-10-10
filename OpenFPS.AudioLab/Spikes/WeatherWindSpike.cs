@@ -345,8 +345,8 @@ public static class WeatherWindSpike
         string cap = Path.Combine(Path.GetTempPath(), "openfps-earwind-live.wav");
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
         var weather = WindWeather.Steady(WindAir.FromCompass(10f, 90f, 0f));
-        WindField.Weather = weather;
         var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+        provider.Weather.Wind = weather;
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
         provider.UpdateListener(new Vector3(0f, 1.7f, 0f), Quaternion.Identity, Vector3.Zero, -1);
         var listener = new EarWindListener(new Vector3(0f, 1.7f, 0f), 1.7f, Vector2.Zero, 0f, 1f);

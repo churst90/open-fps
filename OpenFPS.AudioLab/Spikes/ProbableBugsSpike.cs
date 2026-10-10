@@ -68,7 +68,7 @@ public static class ProbableBugsSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
-        WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
 
         // The ground: asphalt, as a street or a platform is.
         world.RegisterDefinition(new EntityDefinition

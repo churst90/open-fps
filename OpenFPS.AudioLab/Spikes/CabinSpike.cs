@@ -247,7 +247,7 @@ public static class CabinSpike
                 Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(900f, 15f, 0.4f), IsSolid = true },
                 Material = new MaterialComponent { Material = "Brick" },
             });
-        WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
 
         var segments = new List<Segment>();
         Action<double>? perFrame = null;

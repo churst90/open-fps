@@ -97,12 +97,12 @@ public sealed class FoliageSynth
     /// A gust crosses a crown in a second or two, upwind boughs first. Read at the middle for all of
     /// them, every gust arrived everywhere at once and was heard as a change of setting rather than as
     /// air moving through a tree.</summary>
-    public void ReadWind(float x, float z, double seconds)
+    public void ReadWind(WindWeather wind, float x, float z, double seconds)
     {
         for (int b = 0; b < Boughs; b++)
         {
             var at = BoughOffset(Spec, b);
-            _boughWindIn[b] = WindField.SpeedAt(x + at.X, Spec.CrownHeightMetres, z + at.Z, seconds);
+            _boughWindIn[b] = WindField.SpeedAt(wind, x + at.X, Spec.CrownHeightMetres, z + at.Z, seconds);
         }
     }
 
@@ -111,12 +111,12 @@ public sealed class FoliageSynth
     /// source (WoodChorus), whose "boughs" stand across the whole wood, so a gust crosses it from its
     /// upwind side to its downwind side as it crosses the trees.
     /// </summary>
-    public void ReadWindAt(float x, float z, double seconds, ReadOnlySpan<Vector3> boughOffsets)
+    public void ReadWindAt(WindWeather wind, float x, float z, double seconds, ReadOnlySpan<Vector3> boughOffsets)
     {
         for (int b = 0; b < Boughs; b++)
         {
             var at = boughOffsets.Length > 0 ? boughOffsets[b % boughOffsets.Length] : Vector3.Zero;
-            _boughWindIn[b] = WindField.SpeedAt(x + at.X, Spec.CrownHeightMetres, z + at.Z, seconds);
+            _boughWindIn[b] = WindField.SpeedAt(wind, x + at.X, Spec.CrownHeightMetres, z + at.Z, seconds);
         }
     }
 

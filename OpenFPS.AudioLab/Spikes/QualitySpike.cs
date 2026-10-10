@@ -829,9 +829,9 @@ public static class QualitySpike
             string kind = key[..key.IndexOf(':')], preset = key[(key.IndexOf(':') + 1)..];
             PhysicalVoiceState v = kind switch
             {
-                "water" => new WaterVoiceState(WaterFeatureSpec.ByName(preset), sr, 11, Vector3.Zero),
-                "foliage" => new FoliageVoiceState(FoliageSpec.ByName(preset), sr, 11, Vector3.Zero),
-                "fire" => new FireVoiceState(FireSpec.ByName(preset), sr, 11, Vector3.Zero),
+                "water" => new WaterVoiceState(WaterFeatureSpec.ByName(preset), sr, 11, Vector3.Zero, new WorldWeather()),
+                "foliage" => new FoliageVoiceState(FoliageSpec.ByName(preset), sr, 11, Vector3.Zero, new WorldWeather()),
+                "fire" => new FireVoiceState(FireSpec.ByName(preset), sr, 11, Vector3.Zero, new WorldWeather()),
                 _ => new MachineVoiceState(SmallMachineSpec.ByName(preset), sr, 5, 11),
             };
             var block = new float[1024];

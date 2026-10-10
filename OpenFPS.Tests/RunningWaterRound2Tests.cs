@@ -261,19 +261,15 @@ public class RunningWaterRound2Tests
     [Fact]
     public void A_roof_drips_long_after_the_rain_through_its_slow_store()
     {
-        try
-        {
-            var spec = RunningWaterSpec.Downpipe;
-            var single = spec with { SlowShare = 0f };
-            Runoff.Reset();
-            Runoff.Update(Rainfall.HeavyRate, 0);
-            for (int t = 1; t <= 1200; t++) Runoff.Update(0f, t);
-            float two = spec.FlowNow(), one = single.FlowNow();
-            _o.WriteLine($"  20 min after heavy rain: one store {one * 1000:F4} mL/s, two {two * 1000:F3} mL/s");
-            Assert.True(one < RunningWaterSpec.DryLitresPerSecond);
-            Assert.True(two > 10 * RunningWaterSpec.DryLitresPerSecond);
-        }
-        finally { Runoff.Reset(); }
+        var spec = RunningWaterSpec.Downpipe;
+        var single = spec with { SlowShare = 0f };
+        var weather = new WorldWeather();
+        weather.Runoff.Update(Rainfall.HeavyRate, 0);
+        for (int t = 1; t <= 1200; t++) weather.Runoff.Update(0f, t);
+        float two = spec.FlowNow(weather), one = single.FlowNow(weather);
+        _o.WriteLine($"  20 min after heavy rain: one store {one * 1000:F4} mL/s, two {two * 1000:F3} mL/s");
+        Assert.True(one < RunningWaterSpec.DryLitresPerSecond);
+        Assert.True(two > 10 * RunningWaterSpec.DryLitresPerSecond);
     }
 
     // ── On the city ────────────────────────────────────────────────────────────────────────────

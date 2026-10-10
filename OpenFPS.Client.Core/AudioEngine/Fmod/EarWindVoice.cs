@@ -34,7 +34,14 @@ public sealed class EarWindState : IGuardedUnit
     /// <summary>Mixer-thread scratch so the callback never allocates.</summary>
     internal readonly float[] Left = new float[DspCallback.MaxBlock], Right = new float[DspCallback.MaxBlock];
 
-    public EarWindState(float sampleRate) { Synth = new EarWindSynth(sampleRate, 0x5EED); }
+    /// <summary>The weather of the world whose wind this is.</summary>
+    private readonly WorldWeather _weather;
+
+    public EarWindState(float sampleRate, WorldWeather weather)
+    {
+        Synth = new EarWindSynth(sampleRate, 0x5EED);
+        _weather = weather;
+    }
 
     public void ResetAfterFault() => Synth.Reset();
 
@@ -52,7 +59,7 @@ public sealed class EarWindState : IGuardedUnit
         float target = Math.Clamp(listener.Exposure, 0f, 1f);
         if (_exposure < 0f) _exposure = target;
         _exposure += (target - _exposure) * (1f - MathF.Exp(-dt / ExposureSeconds));
-        var ears = EarWind.Hear(WindField.Weather, listener with { Exposure = _exposure }, WindField.Now());
+        var ears = EarWind.Hear(_weather.Wind, listener with { Exposure = _exposure }, WindField.Now());
         Synth.Control(ears);
     }
 }

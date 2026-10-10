@@ -257,7 +257,7 @@ public static class FireSpreadSpike
             {
                 if (name == "pit") { Pits(); continue; }
                 var sc = Get(name);
-                WindField.Weather = sc.Weather.Wind;
+                facade.Weather.Wind = sc.Weather.Wind;
                 var s = new FireSpread(7);
                 var ids = sc.Build(s);
                 sc.Start(s, ids, 0);
@@ -331,7 +331,7 @@ public static class FireSpreadSpike
         // twice as wide: what the placed size does.
         void Pits()
         {
-            WindField.Weather = WindWeather.Steady(3f, 270f, 0.25f);
+            facade.Weather.Wind = WindWeather.Steady(3f, 270f, 0.25f);
             foreach (var (label, shape) in new (string, FireShape?)[] { ("pit square 0.9 m (approved)", null), ("pit round 0.9 m", FireShape.Circle(0.9f)), ("pit round 1.8 m", FireShape.Circle(1.8f)) })
             {
                 var own = FireSpec.GardenFirePit;

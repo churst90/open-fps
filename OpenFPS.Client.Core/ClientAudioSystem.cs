@@ -843,7 +843,7 @@ public partial class ClientAudioSystem
         {
             var p = world.Precipitation;
             float wet = p.Falling ? (p.Kind == OpenFPS.Common.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : world.RainRateMmPerHour;
-            OpenFPS.Common.Runoff.Update(wet, OpenFPS.Common.AudioClock.Now);
+            _audio.Weather.Runoff.Update(wet, OpenFPS.Common.AudioClock.Now);
         }
         ChooseLiveMachines(world, visualEyePos);
         ChoosePlaces(world, visualEyePos);
@@ -1368,7 +1368,7 @@ public partial class ClientAudioSystem
         // Still water: no wind to raise waves, no swell, no current. It makes no sound.
         if (soundId.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
         {
-            try { return OpenFPS.Common.ShoreSpec.ByName(soundId).CalmAt(OpenFPS.Common.WindField.MeanSpeed); }
+            try { return OpenFPS.Common.ShoreSpec.ByName(soundId).CalmAt(_audio.Weather.MeanSpeed); }
             catch (Exception) { return false; }
         }
         // A gas hob with every burner off: heard for as long as its last change can still be heard (the
@@ -1393,7 +1393,7 @@ public partial class ClientAudioSystem
                 return !_tapOnAt.TryGetValue(entityId, out double on) || now - on > TapDrainSeconds;
             }
             if (spec.BaseFlowLitresPerSecond > 0f || spec.CatchmentSquareMetres <= 0f) return false;
-            return spec.FlowNow() < spec.DryBelowLitresPerSecond;
+            return spec.FlowNow(_audio.Weather) < spec.DryBelowLitresPerSecond;
         }
         catch (Exception) { return false; }
     }

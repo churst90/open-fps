@@ -66,7 +66,6 @@ public class RankingByLoudnessProbe
         foreach (var g in defs.GroupBy(d => d.SoundEmitter.SoundId).OrderByDescending(g => g.Count()))
             Say($"  {g.Count(),5}  {g.Key}");
 
-        using var wind = WindField.Hold(WindWeather.Steady(4.5f, 270f, 0f));
         bool wasOn = EarModel.Enabled;
         try
         {
@@ -132,18 +131,21 @@ public class RankingByLoudnessProbe
     private static readonly Vector3 Somewhere = new(-300f, 0f, 150f);
 
     /// <summary>A voice of this kind, as the provider would build it, for measuring.</summary>
+    /// <summary>A steady breeze, so each kind's spectrum does not follow the gusts.</summary>
+    private static readonly WorldWeather Breeze = new() { Wind = WindWeather.Steady(4.5f, 270f, 0f) };
+
     private static PhysicalVoiceState? Voice(string id)
     {
         if (id.StartsWith("machine:", StringComparison.OrdinalIgnoreCase))
             return new MachineVoiceState(SmallMachineSpec.ByName(id[8..]), Rate, entityId: 4242, seed: 11);
         if (id.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
-            return new FoliageVoiceState(FoliageSpec.ByName(id[8..]), Rate, 9, Somewhere);
+            return new FoliageVoiceState(FoliageSpec.ByName(id[8..]), Rate, 9, Somewhere, Breeze);
         if (id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
-            return new FireVoiceState(FireSpec.ByName(id[5..]), Rate, 13, Somewhere);
+            return new FireVoiceState(FireSpec.ByName(id[5..]), Rate, 13, Somewhere, Breeze);
         if (WaterFeatureVoice.ParseKey(id, out string preset, out string feature, out int tap))
-            return new WaterTapState(new WaterFeatureVoice(preset + "/" + feature, WaterFeatureSpec.ByName(preset), Rate, 1), tap, Rate, Somewhere);
+            return new WaterTapState(new WaterFeatureVoice(preset + "/" + feature, WaterFeatureSpec.ByName(preset), Rate, 1), tap, Rate, Somewhere, Breeze);
         if (id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
-            return new NaturePlaceState(new PlacedNatureVoice(id, RunningWaterSpec.ByName(id[5..]), Rate, 19, Somewhere), 0, Rate, Somewhere);
+            return new NaturePlaceState(new PlacedNatureVoice(id, RunningWaterSpec.ByName(id[5..]), Rate, 19, Somewhere, Breeze), 0, Rate, Somewhere);
         return null;
     }
 

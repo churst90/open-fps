@@ -36,7 +36,10 @@ other at login. The server and the Windows zip go out together.
    `PrefabTemplate.AmbienceId`): no beds at all, region beds included (Cody, 2026-10-10). The component
    and manifest fields stay unread (positional wire) unless the wire version is bumped.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
-   scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below).
+   scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
+   branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
+   run-off and ground water in a per-world `WorldWeather`. Next in stage 5: `AudioClock` behind `IAudioClock`
+   (its `WorldTime` is `WindField.Now()`), then the rest of section 8's order (18.3).
 4. Sound library stages 6 to 8: the world input and `OpenFPS.Audio`, splitting `ClientAudioSystem`,
    `WorldAudioPlayer` and `BirdLife`, versions and Resonance.
 5. Geometry stage 5, diggable ground with strata: held until it is wanted.

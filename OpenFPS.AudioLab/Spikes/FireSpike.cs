@@ -146,7 +146,7 @@ public static class FireSpike
             if (i % 256 == 0)
             {
                 double t = i / (double)Rate;
-                if (float.IsNaN(wind)) s.ReadWind(0f, 0f, t); else s.Wind = wind;
+                if (float.IsNaN(wind)) s.ReadWind(WindWeather.Default, 0f, 0f, t); else s.Wind = wind;
                 if (!float.IsNaN(age)) s.Age = age - Settle() + t;
                 s.Control(256f / Rate);
             }
@@ -248,7 +248,7 @@ public static class FireSpike
             Material = new MaterialComponent { Material = "Grass" },
         });
         world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 15f, Humidity = 0.7f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f });
-        WindField.Weather = WindWeather.Steady(windSpeed, 0f, 0.25f);
+        facade.Weather.Wind = WindWeather.Steady(windSpeed, 0f, 0.25f);
 
         var segments = new List<Segment>();
         int nextId = 100;

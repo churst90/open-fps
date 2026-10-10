@@ -1019,10 +1019,10 @@ public sealed partial class ClientGameSession : IDisposable
 
             case WorldStateUpdate wsu:
                 _world.UpdateAtmosphere(wsu);
-                // The one wind the trees, the fires and your ears read.
-                OpenFPS.Common.WindField.Weather = _world.Wind;
-                // The water over the ground the drainage lines' voices read (GroundWater).
-                OpenFPS.Common.GroundWater.Shared.Load(wsu.GroundWater);
+                // The one wind the trees, the fires and your ears read, and the water over the ground the
+                // drainage lines' voices read: this world's weather, as the server sends it.
+                _audioEngine.Weather.Wind = _world.Wind;
+                _audioEngine.Weather.Ground.Load(wsu.GroundWater);
                 break;
 
             case HitConfirm confirm:

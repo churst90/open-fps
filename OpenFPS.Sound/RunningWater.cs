@@ -266,7 +266,7 @@ public sealed record RunningWaterSpec
     public FlowLayout Layout { get; init; } = FlowLayout.Line;
 
     /// <summary>A drainage line of the ground (GroundChannels): what drains to it, through the map's own
-    /// state (GroundWater.Shared), instead of the catchment fields above. Null for every placed source.</summary>
+    /// state (WorldWeather.Ground), instead of the catchment fields above. Null for every placed source.</summary>
     public GroundCatchment? Ground { get; init; }
     /// <summary>For a drainage line, the flow its level was declared at, L/s (GroundChannels.ReferenceFlow).</summary>
     public float GroundReferenceLitresPerSecond { get; init; }
@@ -287,15 +287,16 @@ public sealed record RunningWaterSpec
     public float ReferenceFlow => Ground != null ? GroundReferenceLitresPerSecond
         : Tap is { } tap ? tap.OpenLitresPerSecond : FlowFor(CatchmentSquareMetres > 0f ? ReferenceRainMmPerHour : 0f);
 
-    /// <summary>The flow now, L/s, from the world's rain through both of the catchment's stores (Runoff),
-    /// or a tap's (on, or leaking).</summary>
-    public float FlowNow(bool tapOn = true)
+    /// <summary>The flow now, L/s, from a world's rain through both of the catchment's stores
+    /// (<see cref="WorldWeather.Runoff"/>), or its ground's water, or a tap's (on, or leaking).</summary>
+    public float FlowNow(WorldWeather weather, bool tapOn = true)
     {
         if (Tap is { } tap) return tapOn ? tap.OpenLitresPerSecond : tap.LeakLitresPerSecond;
-        if (Ground is { } ground) return GroundWater.Shared.FlowLitresPerSecond(ground);
+        if (Ground is { } ground) return weather.Ground.FlowLitresPerSecond(ground);
         if (CatchmentSquareMetres <= 0f) return BaseFlowLitresPerSecond;
         float slow = Math.Clamp(SlowShare, 0f, 1f);
-        float through = (1f - slow) * Runoff.Through(CatchmentSeconds) + (slow > 0f ? slow * Runoff.Through(SlowSeconds) : 0f);
+        var runoff = weather.Runoff;
+        float through = (1f - slow) * runoff.Through(CatchmentSeconds) + (slow > 0f ? slow * runoff.Through(SlowSeconds) : 0f);
         return FlowFor(through);
     }
 

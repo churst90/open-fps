@@ -106,7 +106,7 @@ public static class DrivingSpike
             // Concrete: the driving aids read any unnamed square of asphalt as a junction.
             Material = new MaterialComponent { Material = "Concrete" },
         });
-        WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
         world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 15f, Humidity = 0.6f, AirPressure = 1013.25f, AirAbsorptionMultiplier = 1f });
 
         var segments = new List<Segment>();

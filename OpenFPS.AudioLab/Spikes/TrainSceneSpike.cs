@@ -116,7 +116,7 @@ public static class TrainSceneSpike
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(4000f, 1f, 4000f), IsSolid = true },
             Material = new MaterialComponent { Material = "Concrete" },
         });
-        WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
         world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 15f, Humidity = 0.6f, AirPressure = 1013.25f, AirAbsorptionMultiplier = 1f });
         rail.Heard = (map, source, kind, list) =>
         {

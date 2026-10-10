@@ -59,7 +59,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public AudioEngineFacade(IAudioProvider provider)
     {
         _provider = provider;
+        Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather();
     }
+
+    /// <summary>The weather this world hears, for the host to fill: the mixer's when there is one
+    /// (FmodAudioProvider.Weather), so its voices read what the host writes.</summary>
+    public WorldWeather Weather { get; }
 
     /// <summary>Brings up the provider, loads the bank and starts the audio thread.</summary>
     public void Initialize()

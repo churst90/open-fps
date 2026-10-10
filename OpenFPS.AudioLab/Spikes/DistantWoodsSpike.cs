@@ -60,7 +60,7 @@ public static class DistantWoodsSpike
         var chorus = WoodChorus.Build(crowns.Select((c, i) => new WoodChorus.Crown(i + 1, c, "park_tree")).ToList(), (_, _) => nextId--);
         float[] distances = { 300f, 500f, 800f };
         var ears = distances.Select(d => new Vector3(0f, 1.7f, -d)).ToArray();
-        WindField.Weather = WindWeather.Steady(4.5f, 250f, 0.25f);
+        var wind = WindWeather.Steady(4.5f, 250f, 0.25f);
         double t0 = 1000.0;
         Console.WriteLine($"  {trees} park trees over 160 x 120 m, {chorus.Woods.Count} wood(s) by 200 m cell ({string.Join(", ", chorus.Woods.Select(w => $"{w.Crowns.Length} trees {w.Key}"))}); " +
                           $"wind 4.5 m/s from 250°, turbulence 0.25; {seconds:F0} s");
@@ -115,7 +115,7 @@ public static class DistantWoodsSpike
             {
                 if (k % block == 0)
                 {
-                    s.ReadWind(crowns[i].X, crowns[i].Z, t0 + k / (double)Rate);
+                    s.ReadWind(wind, crowns[i].X, crowns[i].Z, t0 + k / (double)Rate);
                     s.Control(block / (float)Rate);
                 }
                 float y = s.Next();
@@ -133,7 +133,7 @@ public static class DistantWoodsSpike
             {
                 if (k % block == 0)
                 {
-                    w.Synth.ReadWindAt(w.Wood.Centre.X, w.Wood.Centre.Z, t0 + k / (double)Rate, w.WindAt);
+                    w.Synth.ReadWindAt(wind, w.Wood.Centre.X, w.Wood.Centre.Z, t0 + k / (double)Rate, w.WindAt);
                     w.Synth.Control(block / (float)Rate);
                 }
                 float y = w.Synth.Next();
@@ -264,7 +264,7 @@ public static class DistantWoodsSpike
                 world.RegisterDefinition(def);
             }
             if (after) world.RefreshWoods();
-            WindField.Weather = WindWeather.Steady(4.5f, 250f, 0.25f);
+            facade.Weather.Wind = WindWeather.Steady(4.5f, 250f, 0.25f);
 
             void Stand(float d)
             {

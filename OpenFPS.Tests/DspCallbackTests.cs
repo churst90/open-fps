@@ -38,7 +38,7 @@ public class DspCallbackTests
 
     private static readonly Vector3 Somewhere = new(400f, 0f, -300f);
 
-    private static PhysicalVoiceState MakePhysical(string kind) => kind switch
+    private static PhysicalVoiceState MakePhysical(string kind, WorldWeather weather) => kind switch
     {
         "window unit" => new MachineVoiceState(SmallMachineSpec.ByName("ac_window"), Rate, entityId: 4242, seed: 11),
         "mower" => new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, entityId: 77, seed: 3) { TargetGroundSpeed = 0.95f },
@@ -49,14 +49,14 @@ public class DspCallbackTests
         "crossing bell" => new BellVoiceState(ModelLibrary.Bell("crossing_gong"), Rate, 5),
         "rain" => Rain(),
         "light rail" => LightRail(),
-        "fountain" => new WaterVoiceState(WaterFeatureSpec.ByName("park_fountain"), Rate, 3, Somewhere),
-        "fountain tap" => new WaterTapState(new WaterFeatureVoice("park_fountain/test", WaterFeatureSpec.ByName("park_fountain"), Rate, 1), 0, Rate, Somewhere),
-        "fire" => new FireVoiceState(FireSpec.ByName("fire_pit"), Rate, 13, Somewhere),
-        "fire place" => new NaturePlaceState(new PlacedNatureVoice("fire:fire_pit", FireSpec.ByName("fire_pit"), 3, Rate, 13, Somewhere) { TargetSpread = 1f }, 0, Rate, Somewhere),
-        "tree" => new FoliageVoiceState(FoliageSpec.ParkTree, Rate, 9, Somewhere),
-        "tree place" => new NaturePlaceState(new PlacedNatureVoice("foliage:park_tree", FoliageSpec.ParkTree, 1 + FoliageSynth.Boughs, Rate, 9, Somewhere) { TargetSpread = 1f }, 0, Rate, Somewhere),
-        "creek" => new NaturePlaceState(new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, 19, Somewhere), 0, Rate, Somewhere),
-        "shore" => new NaturePlaceState(new PlacedNatureVoice("shore:sea", ShoreSpec.SeaSand, ShoreSpec.SeaSand.DefaultGeometry, Rate, 23, Somewhere), 0, Rate, Somewhere),
+        "fountain" => new WaterVoiceState(WaterFeatureSpec.ByName("park_fountain"), Rate, 3, Somewhere, weather),
+        "fountain tap" => new WaterTapState(new WaterFeatureVoice("park_fountain/test", WaterFeatureSpec.ByName("park_fountain"), Rate, 1), 0, Rate, Somewhere, weather),
+        "fire" => new FireVoiceState(FireSpec.ByName("fire_pit"), Rate, 13, Somewhere, weather),
+        "fire place" => new NaturePlaceState(new PlacedNatureVoice("fire:fire_pit", FireSpec.ByName("fire_pit"), 3, Rate, 13, Somewhere, weather) { TargetSpread = 1f }, 0, Rate, Somewhere),
+        "tree" => new FoliageVoiceState(FoliageSpec.ParkTree, Rate, 9, Somewhere, weather),
+        "tree place" => new NaturePlaceState(new PlacedNatureVoice("foliage:park_tree", FoliageSpec.ParkTree, 1 + FoliageSynth.Boughs, Rate, 9, Somewhere, weather) { TargetSpread = 1f }, 0, Rate, Somewhere),
+        "creek" => new NaturePlaceState(new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, 19, Somewhere, weather), 0, Rate, Somewhere),
+        "shore" => new NaturePlaceState(new PlacedNatureVoice("shore:sea", ShoreSpec.SeaSand, ShoreSpec.SeaSand.DefaultGeometry, Rate, 23, Somewhere, weather), 0, Rate, Somewhere),
         // A burner being lit now: the knob, the sparks, the light-up (the twin is made in the same second, so
         // both take the change as heard as it happened).
         "gas hob" => new StoveVoiceState(GasHobSpec.FourBurnerNatural, new HobKey("hob4", "0000", "3000", WindField.Now()).Format(), Rate, 5),
@@ -97,10 +97,10 @@ public class DspCallbackTests
     [MemberData(nameof(PhysicalKinds))]
     public void APhysicalVoiceIsItsRingAtUnityInEveryChannel(string kind)
     {
-        using var wind = WindField.Hold(WindWeather.Steady(4.5f, 270f, 0f));
+        var weather = new WorldWeather { Wind = WindWeather.Steady(4.5f, 270f, 0f) };
         var read = Callback(typeof(MachineProcessor));
-        var voice = MakePhysical(kind);
-        var twin = MakePhysical(kind);
+        var voice = MakePhysical(kind, weather);
+        var twin = MakePhysical(kind, weather);
         using var dsp = new FakeDsp(voice);
         using var output = new Pinned(Block * 2);
         var direct = new float[Block];
@@ -144,7 +144,7 @@ public class DspCallbackTests
     public void AFadedVoiceEndsInSilenceThroughItsCallback()
     {
         var read = Callback(typeof(MachineProcessor));
-        var voice = MakePhysical("window unit");
+        var voice = MakePhysical("window unit", new WorldWeather());
         using var dsp = new FakeDsp(voice);
         using var output = new Pinned(Block);
         voice.Produce();
@@ -356,9 +356,8 @@ public class DspCallbackTests
     [Fact]
     public void TheWindAtTheEarsIsSilentWithNobodyThereAndFiniteWithSomebody()
     {
-        using var wind = WindField.Hold(WindWeather.Steady(8f, 270f, 0f));
         var read = Callback(typeof(EarWindProcessor));
-        var state = new EarWindState(Rate);
+        var state = new EarWindState(Rate, new WorldWeather { Wind = WindWeather.Steady(8f, 270f, 0f) });
         using var dsp = new FakeDsp(state);
         using var output = new Pinned(Block * 2);
         for (int b = 0; b < 8; b++) Run(read, dsp, IntPtr.Zero, output, Block, 0, 2);
