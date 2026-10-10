@@ -20,14 +20,13 @@ other at login. The server and the Windows zip go out together.
 1. Ship: push, the VPS and the Windows zip, together, once the work in flight has landed, and only when
    Cody says so (each time). Restart the server and update the clients first; what is in it is the
    "Landed since the last deploy" list below.
-2. Sound library stage 4 together with switching rooms from walls on. Rooms and openings as values
-   (`Room`, `Opening`), then `AcousticMap`, `RoomAcoustics`, `OpeningRoutes`, `FaceOpenings` and
-   `AcousticVolumeGenerator` into OpenFPS.Acoustics (docs/SOUND_LIBRARY_BOUNDARY.md 16.7). With it, the
-   rooms flooded from the walls (docs/GEOMETRY.md 12.6 item 1), built as an instrument and not switched on:
-   first fix the floods' leaks out of houses and the narrow rooms they lose (quarter-metre cells with a cell
-   index, the leaks traced with `ROOM_DEBUG`), then switch the acoustic map to the flood on the server and
-   the client, region ids unchanged, gated by `--geometry-parity only=rooms` (no house open past its
-   margin, IoU over 0.8). Do it while no audio branch is open.
+2. Switch rooms from walls on. Sound library stage 4 is built (2026-10-10, 9f9bf5ab: `Room`, `Opening`,
+   the rooms and openings in OpenFPS.Acoustics, docs/SOUND_LIBRARY_BOUNDARY.md 17). The rooms flooded from
+   the walls (docs/GEOMETRY.md 12.6 item 1) are built as an instrument and not switched on: first fix the
+   floods' leaks out of houses and the narrow rooms they lose (quarter-metre cells with a cell index, the
+   leaks traced with `ROOM_DEBUG`), then switch the acoustic map to the flood on the server and the client,
+   region ids unchanged, gated by `--geometry-parity only=rooms` (no house open past its margin, IoU over
+   0.8). Do it while no audio branch is open.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below).
 4. Sound library stages 6 to 8: the world input and `OpenFPS.Audio`, splitting `ClientAudioSystem`,
