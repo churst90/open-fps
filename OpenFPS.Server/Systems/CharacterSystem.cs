@@ -50,6 +50,9 @@ public sealed class CharacterSystem
         /// <summary>Walking in through a lobby's door, which is open: the walk ends inside.</summary>
         public bool EnteringLobby;
         public double DoorSince;
+        /// <summary>His way through a door, and the leg of the route that has him through it.</summary>
+        public DoorManners.Passage? Passage;
+        public int ThroughAtLeg = -1;
         public Haunt? RideTo;
         public Entity Bus = Entity.Null;
         public double BusSince;
@@ -64,6 +67,7 @@ public sealed class CharacterSystem
     }
 
     private readonly List<Character> _all = new();
+    private readonly DoorManners _manners = new();
     private readonly Dictionary<string, double> _clocks = new();
     private readonly int _seed;
     private MapManager? _maps;
@@ -164,6 +168,7 @@ public sealed class CharacterSystem
             Step(c, world, grid, dt, now, cond);
             if (world.IsAlive(c.Entity)) c.LastSeen = world.Get<Transform>(c.Entity).Position;
         }
+        _manners.Update(mapId, world, dt);
     }
 
     private void Prepare(Character c, World world, SpatialGrid<Entity> grid, MapData data)
@@ -191,6 +196,7 @@ public sealed class CharacterSystem
         var at = Choose(choices, null, null, cond, rng);
         c.At = at; c.Target = null; c.RideTo = null;
         c.Now = Doing.Lingering;
+        c.Passage = null;
         // Part way through a stay, as somebody already there would be.
         c.Until = now + LingerSeconds(at.Kind, cond, rng) * (0.3 + 0.7 * rng.NextDouble()) / Pace;
         c.FacingYaw = at.Facing;
@@ -236,7 +242,13 @@ public sealed class CharacterSystem
                     if (!DoorSystem.OpenEnough(world, c.At?.Door ?? Entity.Null) && now - c.DoorSince < 6) break;
                     c.OpeningDoor = false;
                 }
-                if (Walk(c, ref t, ref vel, dt)) Arrive(c, now, cond);
+                bool arrived = Walk(c, ref t, ref vel, dt);
+                if (c.Passage != null && c.Leg > c.ThroughAtLeg)
+                {
+                    _manners.Through(c.MapId, world, c.Passage, c.Entity);
+                    c.Passage = null;
+                }
+                if (arrived) Arrive(c, world, now, cond);
                 break;
 
             case Doing.AtDoor:
@@ -247,6 +259,7 @@ public sealed class CharacterSystem
                 {
                     c.Route = new List<Vector3> { t.Position, c.Target.Outside, c.Target.Inside, c.Target.Stand };
                     c.Leg = 1;
+                    c.ThroughAtLeg = 2;
                     c.Now = Doing.Walking;
                     c.OpeningDoor = false;
                     c.EnteringLobby = true;
@@ -410,18 +423,21 @@ public sealed class CharacterSystem
         c.OpeningDoor = leavingLobby;
         c.EnteringLobby = false;
         c.DoorSince = now;
-        if (leavingLobby && world.IsAlive(c.At!.Door) && !DoorSystem.OpenEnough(world, c.At.Door))
-            DoorSystem.Set(world, c.At.Door, true, by: c.At.Inside, who: c.Entity);
+        // Out through the lobby's door, opened from inside if it is shut; through it at the step outside.
+        c.Passage = leavingLobby ? _manners.Reach(world, c.At!.Door, c.At.Inside, c.At.Outside, c.Entity) : null;
+        c.ThroughAtLeg = 2;
         Log.Information("CHARACTER {Name}: leaving {From} for {To}, {Metres:F0} m on foot.",
                         c.Data.Name, c.At?.Name ?? "where he was", to.Name, PathLength(c.Route));
     }
 
     /// <summary>Reached the end of a walk: a lobby's door, or the place itself.</summary>
-    private void Arrive(Character c, double now, SpeechConditions cond)
+    private void Arrive(Character c, World world, double now, SpeechConditions cond)
     {
         var to = c.Target!;
         if (to.Kind == HauntKind.Lobby && !c.EnteringLobby)
         {
+            // How he finds it. It is locked from the street, so he waits for it to be opened.
+            c.Passage = _manners.Reach(world, to.Door, to.Outside, to.Inside, c.Entity, open: false);
             c.Now = Doing.AtDoor;
             c.DoorSince = now;
             c.FacingYaw = to.Facing + MathF.PI;           // facing the door

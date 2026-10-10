@@ -2,6 +2,22 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-10
+
+- People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
+  the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
+  and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;
+  shut an outside door without a closer behind them, however they found it; leave an inside door as
+  found going in and shut it going out ("in" is more doorways from the outside, or the smaller room).
+  The shut is by hand, so it is the same swing and latch from the door's own model as a player's, 0.4
+  to 0.9 s after they are out of the doorway. It is left for anybody else in the doorway or a player
+  within 2 m, and never shut on anybody. A door they found open stays open while a player is within
+  8 m of it (somebody has it open on purpose, as Cody had Brandt Court's on 2026-10-02). Closers were checked too: one is held only while somebody is in
+  the doorway. Over an hour on the city with somebody parking every 20 s and Alex keeping a cold
+  night: 175 openings of 22 doors (17 house front doors, a patio door, the five towers' entrances), the
+  longest open 22 s, none left open, and the 352 walkers through no door. Magnolia: 1,323 doors, none
+  opened in an hour, since nobody there goes indoors yet. Server only. NpcDoorTests.
+
 ## 2026-10-09
 
 - No crack where far-ring ground meets 2 m ground (docs/WORLD_STREAMING.md, "Coarse ground in the far
