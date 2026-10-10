@@ -651,6 +651,16 @@ public static class GameLevelsSpike
                 Steady("mower_push", "machine:mower_push", 35f, 0.4f, 10.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
                 Unidle();
             }
+            if (set is "engine-solo")
+            {
+                // Each machine alone, close: with OPENFPS_ENGINE_DETAIL=always it plays at reduced detail
+                // where the game would never put it, to hear what the reduction does on its own.
+                IdleCar("pickup_v8", new[] { ("rear", 3f) }, 8.0);
+                PassBy("pickup_v8", 50f, 3f, 14.0);
+                PassBy("pickup_v8", 50f, 90f, 14.0);
+                PassBy("transit_bus", 40f, 3f, 14.0);
+                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
+            }
             if (set is "compare")
             {
                 Footsteps(6.0);

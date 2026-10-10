@@ -64,6 +64,8 @@ internal sealed class ExhaustNetwork
 
         /// <summary>Splits a wave heading into the downpipe into what gets through and what comes
         /// back. The remainder — neither transmitted nor reflected — is the shaft work.</summary>
+        public void Clear() => _lp = 0f;
+
         public (float Through, float Back) Split(float incoming)
         {
             _lp += _alpha * (incoming - _lp);
@@ -258,6 +260,32 @@ internal sealed class ExhaustNetwork
             br.SpreadTarget = r > 1f ? Math.Clamp(r / MathF.Max(0.1f, path), 0.25f, 4f) : 1f;
         }
         _listenerKnown = true;
+    }
+
+    /// <summary>
+    /// Empties every pipe and the filters at its ends, and puts each tailpipe's path delay where the
+    /// listener already is rather than slewing it there: for an engine taking over from one at another
+    /// rate (EngineSynth.Detail), whose waves this network must not replay at the wrong crank angle.
+    /// The gas stays as UpdateGas left it.
+    /// </summary>
+    public void Clear()
+    {
+        foreach (var p in _primary) p.Clear();
+        foreach (var p in _collector) p.Clear();
+        _crossTube?.Clear();
+        Array.Clear(_valveArrived);
+        _portSumAcc = 0f;
+        foreach (var br in _branch)
+        {
+            foreach (var p in br.Chain) p.Clear();
+            foreach (var r in br.ResonatorAt) if (r is { } res) { res.Neck.Clear(); res.Cavity.Clear(); }
+            br.End.Clear();
+            br.Jet.Clear();
+            br.Turbine?.Clear();
+            Array.Clear(br.Path);
+            br.PathSamples = br.PathTarget;
+            br.Spread = br.SpreadTarget;
+        }
     }
 
     private static float Circle(float diameterMm)

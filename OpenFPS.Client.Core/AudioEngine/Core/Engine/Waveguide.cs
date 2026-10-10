@@ -206,6 +206,20 @@ internal sealed class WaveLine
         else { _accSlot = k; _accSum = value; _accN = 1; _buf[idx] = value; }
     }
 
+    /// <summary>Empties the line: nothing in flight, the next arrival a whole delay away, as when built.
+    /// For an engine taking over from one at another rate (EngineSynth.Detail).</summary>
+    public void Clear()
+    {
+        Array.Clear(_buf);
+        _lp = 0f;
+        _vPrev = _preV = 0f;
+        _frontN = 0;
+        _accSlot = long.MinValue;
+        // The next write follows the next read, at _time + 1: one sample after this.
+        _tauPrev = _time + _d0 - 1;
+        _preTau = _tauPrev - 1;
+    }
+
     /// <summary>What arrives at the far end now, after the traverse loss. Advances time.</summary>
     // Inlined, not AggressiveOptimization: that attribute stops a method being inlined, and this one is
     // called for both ends of every pipe every sample. Its callers carry the attribute.
@@ -316,6 +330,9 @@ internal sealed class Pipe
         _bwd.SetLoss(gain, a);
     }
 
+    /// <summary>Both directions emptied (WaveLine.Clear).</summary>
+    public void Clear() { _fwd.Clear(); _bwd.Clear(); }
+
     public void PushForward(float p) => _fwd.Write(p);
     public void PushBackward(float p) => _bwd.Write(p);
     /// <summary>The forward wave arriving at the far end. Call exactly once per sample.</summary>
@@ -401,6 +418,13 @@ internal sealed class OpenEnd
         _z = density * soundSpeed / area;
     }
 
+    /// <summary>Forgets what it was radiating (WaveLine.Clear).</summary>
+    public void Clear()
+    {
+        _reflLp = _dcLp = _uPrev = _radLp = 0f;
+        Array.Clear(_endBuf);
+    }
+
     /// <summary>Feeds the wave arriving at the end; returns (reflected wave, volume velocity leaving).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public (float Reflected, float VolumeVelocity) Process(float arriving)
@@ -467,6 +491,9 @@ internal sealed class JetNoise
         _hpA = OnePole.AlphaFor(40f, rate);
     }
     private readonly float _hpA;
+
+    /// <summary>Forgets its band and its slow velocity (WaveLine.Clear).</summary>
+    public void Clear() => _lp1 = _lp2 = _hp = _uSlow = 0f;
 
     /// <summary>Lighthill coefficient for a subsonic jet, the textbook 1e-4.</summary>
     public const float Lighthill = 1e-4f;

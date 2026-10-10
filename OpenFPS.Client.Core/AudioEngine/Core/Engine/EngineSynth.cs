@@ -18,7 +18,7 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// tone control. A few hundred operations per sample per cylinder: a few per cent of a core for a V8
 /// at 44.1 kHz. Design and history: docs/ENGINE_SYNTHESIS.md.
 /// </summary>
-public sealed class EngineSynth
+public sealed partial class EngineSynth
 {
     // ── Inputs, set by whoever is driving ───────────────────────────────────────────────────────
 
@@ -259,6 +259,7 @@ public sealed class EngineSynth
         _knockRelax = At44k.Step(0.001f, rate);
         _kp0 = At44k.Decay(0.99765f, rate); _kp1 = At44k.Decay(0.96300f, rate); _kp2 = At44k.Decay(0.57000f, rate);
         _dt = 1f / rate;
+        _seed = seed;
         _rng = new Random(seed);
         SetUpPinkBand();
         SetUpWhooshBand();
@@ -621,7 +622,15 @@ public sealed class EngineSynth
 
     // ── The step ────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>One sample of engine.</summary>
+    /// <summary>One sample of engine: live at this engine's rate, or as <see cref="Detail"/> asks for a
+    /// far voice (EngineSynth.Detail.cs).</summary>
+    public void Step()
+    {
+        if (_runner == null && Detail == EngineDetail.Full) { StepLive(); return; }
+        (_runner ??= new DetailRunner(this)).Step();
+    }
+
+    /// <summary>One sample of engine, integrated here.</summary>
     /// <remarks>
     /// AggressiveOptimization here and on every per-sample method too big to inline: during a map load
     /// the JIT keeps this at tier-0, which measured 4.0x realtime against 7.8x settled on nascar_v8
@@ -629,7 +638,7 @@ public sealed class EngineSynth
     /// which would make the JIT do more work during the load.
     /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    public void Step()
+    private void StepLive()
     {
         var e = Profile;
         float rpm = Rpm;
@@ -1607,7 +1616,15 @@ public sealed class EngineSynth
     /// <summary>Where the listener stands, in the machine's frame (x across, y up, z forward, origin
     /// at the exhaust part), so each tailpipe radiates from its own place; untold, the pipes sum at one
     /// point. See <see cref="ExhaustNetwork.SetListener"/>.</summary>
-    public void SetListener(Vector3 machineFrame) => _exhaust.SetListener(machineFrame);
+    public void SetListener(Vector3 machineFrame)
+    {
+        _exhaust.SetListener(machineFrame);
+        _listener = machineFrame;
+        _listenerSet = true;
+        _runner?.SetListener(machineFrame);
+    }
+    private Vector3 _listener;
+    private bool _listenerSet;
 
     // Stryker disable all : diagnostic text for the lab, nothing audible depends on it
     /// <summary>Diagnostic: one line per cylinder.</summary>

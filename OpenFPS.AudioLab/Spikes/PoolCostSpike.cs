@@ -16,6 +16,11 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 ///   --pool-cost render DIR                 a fixed set of scenes, Produce/Consume as the game does, written
 ///                                          as raw float32 with a hash each
 ///   --pool-cost render DIR wide            and every vehicle preset revving, and the engine-built machines
+///   --pool-cost render DIR steady          the street's sixteen machines at a steady speed, 8 s each (secs=)
+///   --pool-cost render DIR handover        the same, handed to reduced detail at 3 s and back at 9 s, beside full
+///   [seed=N] [only=NAME]                   another seed for every voice (the natural spread); one scene or preset
+///   [detail=reduced]                       every voice the benches build at reduced detail (EngineDetail)
+///   OPENFPS_LAB_RATE=24000                 the benches at another rate
 ///   --pool-cost diff DIR_A DIR_B           the largest difference between two render sets, dBFS
 ///   --pool-cost machines [sec=4]           what each standing physical voice the street has costs
 ///   ptracer                                lets eu-stack attach (Yama ptrace_scope 1) and prints the pid:
@@ -49,9 +54,13 @@ public static class PoolCostSpike
         }
         _only = rest.FirstOrDefault(a => a.StartsWith("only="))?[5..];
         _sceneSeconds = IntArg(rest, "secs", 6);
+        _detail = rest.Contains("detail=reduced") ? OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced
+                                                  : OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
         if (rest.Contains("cpu")) return Cpu(voices, IntArg(rest, "sec", 10));
         if (rest.Contains("offline")) return Offline(voices, IntArg(rest, "sec", 4));
         if (rest.Contains("machines")) return Machines(IntArg(rest, "sec", 4));
+        if (rest.Contains("render") && rest.Contains("handover"))
+            return RenderHandover(rest.SkipWhile(a => a != "render").Skip(1).First(), IntArg(rest, "seed", 0));
         if (rest.Contains("render") && rest.Contains("steady")) return RenderSteady(rest.SkipWhile(a => a != "render").Skip(1).First(), IntArg(rest, "seed", 0), IntArg(rest, "secs", 8));
         if (rest.Contains("render")) return RenderSet(rest.SkipWhile(a => a != "render").Skip(1).First(), rest.Contains("wide"), IntArg(rest, "seed", 0));
         if (rest.Contains("diff"))
@@ -73,6 +82,9 @@ public static class PoolCostSpike
         return fallback;
     }
 
+    /// <summary>The detail every voice the benches build runs at (detail=reduced).</summary>
+    private static OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail _detail;
+
     /// <summary>One street voice: a speed and a listener 5-60 m off, as the provider makes it.</summary>
     private static EngineVoiceState StreetVoice(int i)
     {
@@ -82,6 +94,7 @@ public static class PoolCostSpike
         {
             TargetSpeed = speed,
             CompensateLevel = true,
+            Detail = _detail,
         };
         v.PlaceAtSpeed(speed);
         float d = 5f + (i * 13 % 56);
@@ -209,13 +222,52 @@ public static class PoolCostSpike
             {
                 TargetSpeed = speed,
                 CompensateLevel = true,
-                };
+                Detail = _detail,
+            };
             v.PlaceAtSpeed(speed);
             v.SetListener(new Vector3(10f, 1.6f, 0f));
             var all = new float[blocks * Block];
             var buf = new float[Block];
             for (int b = 0; b < blocks; b++) { v.Produce(); v.Consume(buf); buf.CopyTo(all, b * Block); }
             Write(dir, $"steady_{i:00}_{StreetMix[i]}", all);
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// The street's machines at a steady speed, handed from Full to Reduced at 3 s and back at 9 s
+    /// (handover_*), beside the same voice left Full (full_*): the hand-over's level and spectrum
+    /// against an engine that never changed.
+    /// </summary>
+    private static int RenderHandover(string dir, int seedOffset)
+    {
+        Directory.CreateDirectory(dir);
+        const int seconds = 12;
+        int blocks = seconds * Rate / Block;
+        for (int i = 0; i < StreetMix.Length; i++)
+        {
+            if (_only != null && !StreetMix[i].Contains(_only)) continue;
+            float speed = 4f + (i * 7 % 11) * 1.5f;
+            foreach (bool hand in new[] { false, true })
+            {
+                var v = new EngineVoiceState(MachineRegistry.VehicleFor(StreetMix[i]), Rate, 1000 + i + seedOffset)
+                {
+                    TargetSpeed = speed,
+                    CompensateLevel = true,
+                };
+                v.PlaceAtSpeed(speed);
+                v.SetListener(new Vector3(10f, 1.6f, 0f));
+                var all = new float[blocks * Block];
+                var buf = new float[Block];
+                for (int b = 0; b < blocks; b++)
+                {
+                    double t = b * Block / (double)Rate;
+                    if (hand) v.Detail = t >= 3.0 && t < 9.0 ? OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced
+                                                             : OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
+                    v.Produce(); v.Consume(buf); buf.CopyTo(all, b * Block);
+                }
+                Write(dir, $"{(hand ? "handover" : "full")}_{i:00}_{StreetMix[i]}", all);
+            }
         }
         return 0;
     }

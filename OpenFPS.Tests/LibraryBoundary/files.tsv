@@ -24,6 +24,7 @@ OpenFPS.Client.Core/AudioEngine/Core/Engine/BayRadiation.cs	lib	Sound
 OpenFPS.Client.Core/AudioEngine/Core/Engine/CabinPaths.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Engine/CoolingSystem.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Engine/Driveline.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/EngineSynth.Detail.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Engine/EngineSynth.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Engine/ExhaustNetwork.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Engine/ExhaustRadiation.cs	lib	Sound	

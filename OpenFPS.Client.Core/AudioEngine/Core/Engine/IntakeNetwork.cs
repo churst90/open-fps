@@ -91,6 +91,33 @@ internal sealed class IntakeNetwork
         return MathF.PI * r * r;
     }
 
+    /// <summary>Empties the runners, the airbox and the snorkel (ExhaustNetwork.Clear); the plenum keeps its air.</summary>
+    public void Clear()
+    {
+        foreach (var r in _runner) r.Clear();
+        _airbox.Clear();
+        _snorkel.Clear();
+        _end.Clear();
+        _tnLp1 = _tnLp2 = 0f;
+    }
+
+    /// <summary>
+    /// The plenum and its means from another tract of the same engine at another rate: the air in the
+    /// manifold is what the next charges are drawn from, and an engine handed over with an empty or a
+    /// full plenum gulps or starves for a fifth of a second.
+    /// </summary>
+    public void CopyLumpedFrom(IntakeNetwork o)
+    {
+        _plenumMass = o._plenumMass;
+        _throttleOpen = o._throttleOpen;
+        _throttleFlowMean = o._throttleFlowMean;
+        _plenumMean = o._plenumMean;
+        _valveFlow = o._valveFlow;
+        _valveFlowMean = o._valveFlowMean;
+        _mouthFlowMean = o._mouthFlowMean;
+        UpdateGas(o._plenumK, o._airboxPressure);
+    }
+
     public float RunnerImpedance(int cyl) => _runner[cyl].Impedance;
 
     /// <summary>Manifold pressure, pascals absolute: the state of the plenum.</summary>

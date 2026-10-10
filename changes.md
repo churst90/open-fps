@@ -20,6 +20,19 @@ Recent work, newest first. `git log` has the rest.
     empty cylinder meets a port at its pressure floor; the new one finds it (EngineRenderCostTests).
     AudioLab `--pool-cost render DIR [wide|steady] [seed=N] [only=NAME] [secs=S]` for the comparisons,
     `--game-levels set=engine-cpu` for the scenes.
+  - Far engines run at half the rate. An engine 15 dB or more under the loudest machine around you
+    (FmodAudioProvider.ChooseEngineDetail; back to full within 12 dB) runs as a twin at 24 kHz, its
+    outputs interpolated back up by a 16-tap windowed sinc; the tyres, fan and body stay at 48 kHz. The
+    hand-over is never a cut: the twin takes the engine's state (crank, cylinders, plenum, gas, the tones'
+    phases), runs beside it for 0.15 s with its crank held to it while its pipes fill, and the two are
+    crossfaded over 0.1 s at a gain that keeps the power of two signals as alike as the warm-up measured.
+    A reduced voice costs 36 % less (32 street voices all reduced: 1.45 core-seconds per second against
+    2.27). Sixteen street machines at a steady speed play within 0.64 dB reduced (0.19 on average), the
+    bands up to 8 kHz 0.9 dB apart, nothing from the engine above about 10 kHz; no step or click at a
+    hand-over beyond the engine's own. Never for the vehicle you ride in. `/enginedetail on|off`,
+    OPENFPS_ENGINE_DETAIL=0 (all full) or =always (all reduced, for listening). EngineDetailTests;
+    AudioLab `--pool-cost render DIR handover`, `--pool-cost offline detail=reduced`,
+    `--game-levels set=engine-solo`.
 
 - Logging out in the world and back in returns you to the same spot, through the loading screen, facing
   the way you faced; the landing map if the ground there cannot be built within 30 s.
