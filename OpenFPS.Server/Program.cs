@@ -842,6 +842,8 @@ public class GameServer
             }
 
             float dt = FixedDeltaTime;
+            // A road or railway being laid by walking it drops its points as the editor walks.
+            if (tick % 8 == 0) _commands?.Editor.Tick();
             _environment.Update(dt);
             Lightning(dt);
             // Horns whose key has not been reported down for a few ticks are let go.

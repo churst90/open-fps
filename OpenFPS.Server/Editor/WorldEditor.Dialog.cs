@@ -146,6 +146,7 @@ public sealed partial class WorldEditor
         var hand = HandOf(s);
         if (hand.LastPlaced is { } last && PlaceName(last) is { } lastName)
             yield return new EditorMenuItem { Section = "place.again", Kind = EditorItemKind.Action, Label = lastName, Command = "edit again" };
+        foreach (var item in DialogRoutes(s)) yield return item;
     }
 
     // ── Edit ────────────────────────────────────────────────────────────────────────────────────
@@ -378,6 +379,7 @@ public sealed partial class WorldEditor
         }
 
         items.AddRange(DialogVersions(s));
+        items.AddRange(DialogLaid(s));
 
         foreach (var name in d.Editors) items.Add(Line("world.editor", name, name));
 

@@ -176,6 +176,7 @@ public sealed partial class WorldEditor
                 return true;
             }
             case SpawnSetOp ss: return ReverseSpawnSet(ss, forward, out why);
+            case RouteOp ro: return ReverseRoute(ro, forward, out why);
             case MapSetOp ms:
             {
                 var settings = Overlays.Get(ms.MapId).Settings;

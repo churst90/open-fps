@@ -66,6 +66,11 @@ public sealed partial class WorldEditor
         public string PlacedFilter = "";
         /// <summary>The words the list of things changed from the map file is filtered by.</summary>
         public string ChangedFilter = "";
+        /// <summary>The road, path or railway being laid, where the last point was dropped (null: none
+        /// dropped yet, so walking drops none), and how far it had come when last said.</summary>
+        public OverlayRoute? Route;
+        public Vector3? RouteLast;
+        public float RouteSaid;
     }
 
     private readonly Dictionary<string, Hand> _hands = new(StringComparer.OrdinalIgnoreCase);
@@ -84,6 +89,8 @@ public sealed partial class WorldEditor
             h.LastMenu = "root";
             h.PlacedFilter = "";
             h.ChangedFilter = "";
+            h.Route = null;
+            h.RouteLast = null;
         }
         return h;
     }
@@ -113,6 +120,7 @@ public sealed partial class WorldEditor
         + "/edit face DIRECTION|DEGREES, /edit bring, /edit duplicate, /edit row COUNT [SPACING], /edit delete, /edit set FIELD VALUE, "
         + "/edit placed [WORDS], /edit remove #ID [#ID ...], /edit remove held, /edit goto #ID, "
         + "/edit changed [WORDS], /edit putback #ID [#ID ...], "
+        + "/edit route start|new road|path|railway [FIELD VALUE ...], /edit route point|points|back|set|station|crossing|finish|cancel|remove|goto ..., /edit routes, "
         + "/edit up FIELD, /edit down FIELD, /edit settings, /edit place PREFAB [at cursor], /edit place vehicle:PRESET [at cursor], "
         + "/edit place group ID, /edit building NAME, /edit again, "
         + "/edit build floor|wall|roof|door|window|prefab [FIELD VALUE ...], "
@@ -129,8 +137,11 @@ public sealed partial class WorldEditor
         switch (Word(0))
         {
             case "menu": case "info": case "selected": case "settings": case "fields": case "prefabs":
-            case "find": case "search": case "select": case "hold": case "step": case "dialog": case "placed": case "changed":
+            case "find": case "search": case "select": case "hold": case "step": case "dialog": case "placed": case "changed": case "routes":
                 return 0;
+            case "route":
+                // Laying is points in hand; what is laid or taken up changes many things at once.
+                return Word(1) is "finish" or "lay" or "remove" ? 5 : 0;
             case "delete":
             case "remove":
             case "putback":
@@ -240,6 +251,8 @@ public sealed partial class WorldEditor
                 return;
             case "placed": PlacedCommand(s, rest, reply); return;
             case "changed": ChangedCommand(s, rest, reply); return;
+            case "route": RouteCommand(s, rest, reply); return;
+            case "routes": SayRoutes(s, reply); return;
             case "putback": PutBackCommand(s, rest, reply); return;
             case "goto": GoTo(s, rest, reply); return;
             case "building": MakeGroup(s, rest, reply, building: true); return;

@@ -94,6 +94,12 @@ public sealed class MapVersionStore
         return copy;
     }
 
+    /// <summary>A copy of anything an overlay holds, through the overlay's own JSON (vectors included).</summary>
+    public static T CopyOf<T>(T x) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(x, WriteOptions), MapRepository.JsonOptions)!;
+
+    /// <summary>Whether two things an overlay holds are the same, as the overlay would write them.</summary>
+    public static bool Same<T>(T a, T b) => JsonSerializer.Serialize(a, WriteOptions) == JsonSerializer.Serialize(b, WriteOptions);
+
     /// <summary>Keeps a copy of an overlay as the map's next version, and writes the file.</summary>
     public MapVersion Save(string mapId, MapOverlay overlay, string name, string author, bool automatic)
     {

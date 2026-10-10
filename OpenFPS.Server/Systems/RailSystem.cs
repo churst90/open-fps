@@ -113,6 +113,20 @@ public sealed class RailSystem
         return pick.Name;
     }
 
+    /// <summary>
+    /// Takes the train of this exact name off its map, whether the map's own or put on since: the train of
+    /// a railway the world editor takes up. True if there was one.
+    /// </summary>
+    public bool RemoveNamed(MapManager maps, string mapId, string name)
+    {
+        var pick = _trains.FirstOrDefault(t => t.MapId.Equals(mapId, StringComparison.OrdinalIgnoreCase) && t.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (pick == null) return false;
+        foreach (var e in pick.Entities) if (e != Entity.Null) maps.DestroyEntity(mapId, e);
+        _trains.Remove(pick);
+        Log.Information("Map {Map}: train '{Name}' taken off the track ({Sources} source(s)).", mapId, pick.Name, pick.Entities.Length);
+        return true;
+    }
+
     /// <summary>Every map's trains, or only <paramref name="only"/> on <paramref name="onlyMap"/>.</summary>
     private void Spawn(MapManager maps, string? onlyMap, IReadOnlyList<TrainData>? only)
     {

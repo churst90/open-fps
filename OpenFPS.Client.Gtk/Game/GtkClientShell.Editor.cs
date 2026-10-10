@@ -272,6 +272,10 @@ internal sealed partial class GtkClientShell
                     if (b.GetLabel() != c.Label) b.SetLabel(c.Label);
                     b.SetTooltipText(c.Description);
                     break;
+                case Label t:
+                    // A line of words (what is being laid): its words change where it stands.
+                    if (t.GetText() != c.Label) t.SetText(c.Label);
+                    break;
             }
         }
 

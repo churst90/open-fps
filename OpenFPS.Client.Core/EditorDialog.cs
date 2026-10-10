@@ -308,6 +308,12 @@ public sealed class EditorDialog : ModalDialog
             else if (things.Selected < 0 && server != null) things.Select(server);
             _serverThing = server;
         }
+        if (tab.Id == "world" && tab.Find("world.routes") is { } routes && routes.Selected < 0 && _routeNext != null)
+        {
+            // A road taken up: the one after it is chosen.
+            routes.Select(_routeNext);
+            _routeNext = null;
+        }
         if (tab.Id == "edit" && tab.Find("edit.changed") is { } changed)
         {
             // As the placed list: a row put back has gone, so the one after it is chosen.
@@ -368,7 +374,7 @@ public sealed class EditorDialog : ModalDialog
     {
         switch (tab.Id)
         {
-            case "place": DerivePlace(tab); break;
+            case "place": DerivePlace(tab); DeriveRoute(tab); break;
             case "build": DeriveBuild(tab); break;
         }
     }
@@ -516,8 +522,94 @@ public sealed class EditorDialog : ModalDialog
         };
         var sections = new List<DialogSection> { new("prefabs", "Place a prefab", controls) };
         if (_pieceForm != null) sections.Add(new DialogSection("piece", "Build a piece", PieceControls()));
+        sections.Add(RouteSection());
         return sections;
     }
+
+    // ── Laying a road, path or railway ──────────────────────────────────────────────────────────
+
+    private static readonly (string Value, string Label)[] RouteKindItems = { ("road", "Road"), ("path", "Path"), ("railway", "Railway") };
+    private static readonly (string Value, string Label)[] RouteLevelItems =
+    {
+        ("ground", "On the ground"), ("raised", "Raised on pillars"), ("underground", "Underground, in a tunnel of its own"),
+    };
+    public const string UsualSurface = "The usual for it";
+
+    /// <summary>The Place tab's route form: what to lay, how, and the buttons that walk it, type it and lay it.</summary>
+    private DialogSection RouteSection()
+    {
+        var info = Items("place.routeinfo").FirstOrDefault();
+        string laying = info.Value ?? "";
+        var kind = LocalChoice("place.routekind", "What", "A road for traffic, a path people walk, or a railway a train runs round. A railway is a loop: its last point joins its first.",
+                               RouteKindItems.Select(k => new DialogItem(k.Label, k.Value)), enter: "place.routestart");
+        var surface = LocalChoice("place.routesurface", "Surface", "What it is made of underfoot. The usual is asphalt for a road, concrete for a path and gravel for a railway's bed.",
+                                  Items("place.routesurface").Select(s => new DialogItem(s.Label, s.Value)).Prepend(new DialogItem(UsualSurface, "")), enter: "place.routestart");
+        var level = LocalChoice("place.routelevel", "A railway runs", "On the ground on a gravel bed; raised on a deck on pillars; or underground, in a tunnel of its own with no digging.",
+                                RouteLevelItems.Select(l => new DialogItem(l.Label, l.Value)), enter: "place.routestart");
+        var train = LocalChoice("place.routetrain", "Train on it", "The train that runs the railway once it is laid, or none.",
+                                Items("place.routetrain").Select(t => new DialogItem(t.Label, t.Value)).Prepend(new DialogItem("None", "none")), enter: "place.routestart");
+        var controls = new List<DialogControl>
+        {
+            kind,
+            LocalBox("place.routename", "Name", "What it is called, such as High Street or Loop line. Empty for a number.", enter: "place.routestart"),
+            LocalBox("place.routewidth", "Width in metres", "Empty for the usual: 7 for a road, 2 for a path, 4.2 for a railway. 0.5 to 60.", enter: "place.routestart"),
+            surface, level,
+            LocalBox("place.routeheight", "Height or depth in metres",
+                     "How high a raised railway's deck is over the ground, or how deep an underground one runs: 3 to 60. Empty for 6 raised and 8 underground.", enter: "place.routestart"),
+            train,
+            new DialogControl("place.routestatus", DialogControlKind.Text, info.Label is { Length: > 0 } l ? l : "Nothing is being laid"),
+            Button("place.routestart", "Start here, then walk it", laying.Length == 0,
+                   "The first point is where you stand. Close the editor and walk its way: a point is dropped every metre, and you are told how far it has come. Open the editor again to lay it."),
+            LocalBox("place.routepoints", "Points, typed: east and north in metres, apart by semicolons",
+                     "Such as 0 0; 50 0; 50 40, as F1 says where you are. A third number is a height; without it the point is on the ground there.", enter: "place.routeadd"),
+            Button("place.routeadd", "Add the points"),
+            Button("place.routepoint", "Drop a point where you stand", laying.Length > 0),
+            Button("place.routestation", "Add a station where you stand", laying == "railway", "Trains stop at the point of the line nearest you, at a platform beside it."),
+            Button("place.routecrossing", "Add a level crossing where you stand", laying == "railway", "Where a road crosses the line, at the point of it nearest you: bells and gates."),
+            Button("place.routeback", "Take back the last point", laying.Length > 0),
+            Button("place.routefinish", "Lay it", laying.Length > 0, "Lays it with what is chosen above, its straight stretches joined up. One undo takes it up."),
+            Button("place.routecancel", "Cancel: lay nothing", laying.Length > 0),
+        };
+        return new DialogSection("route", "Lay a road, path or railway", controls);
+    }
+
+    /// <summary>The route form's controls that follow its choices: what a railway has, and what is laid now.</summary>
+    private void DeriveRoute(DialogTab tab)
+    {
+        string laying = Items("place.routeinfo").FirstOrDefault().Value ?? "";
+        if (tab.Find("place.routekind") is not { } kind) return;
+        // While a route is being laid it is the kind it is.
+        if (laying.Length > 0) kind.Select(laying);
+        kind.Enabled = laying.Length == 0;
+        bool rail = kind.SelectedValue == "railway";
+        if (tab.Find("place.routelevel") is { } level)
+        {
+            level.Enabled = rail;
+            if (tab.Find("place.routeheight") is { } height) height.Enabled = rail && level.SelectedValue != "ground";
+        }
+        if (tab.Find("place.routetrain") is { } train) train.Enabled = rail;
+    }
+
+    /// <summary>What the route form says, as /edit route words: width, surface, level, height, train, name.</summary>
+    private string RouteFields(DialogTab tab)
+    {
+        var words = new List<string>();
+        string Text(string id) => tab.Find(id)?.Text.Trim() ?? "";
+        bool rail = tab.Find("place.routekind")?.SelectedValue == "railway";
+        if (Text("place.routewidth") is { Length: > 0 } width) words.Add($"width {width}");
+        if (tab.Find("place.routesurface")?.SelectedValue is { Length: > 0 } surface) words.Add($"surface {surface}");
+        if (rail)
+        {
+            string level = tab.Find("place.routelevel")?.SelectedValue ?? "ground";
+            words.Add($"level {level}");
+            if (level != "ground" && Text("place.routeheight") is { Length: > 0 } height) words.Add($"{(level == "raised" ? "height" : "depth")} {height}");
+            words.Add($"train {tab.Find("place.routetrain")?.SelectedValue ?? "none"}");
+        }
+        if (Text("place.routename") is { Length: > 0 } name) words.Add($"name {name}");
+        return string.Join(" ", words);
+    }
+
+    private static string Command(params string[] parts) => string.Join(" ", parts.Where(p => p.Length > 0));
 
     private void DerivePlace(DialogTab tab)
     {
@@ -781,6 +873,8 @@ public sealed class EditorDialog : ModalDialog
     /// <summary>The same for the list of things changed from the map file.</summary>
     private string? _changedNext;
     private int _changedIndex = -1;
+    /// <summary>The laid road to choose once the one being taken up has gone.</summary>
+    private string? _routeNext;
 
     private static string Suggest(string id)
     {
@@ -851,6 +945,16 @@ public sealed class EditorDialog : ModalDialog
             sections.Add(new DialogSection("size", "Map size", new[] { Field("world.f.", size, "", "world.resize"), Button("world.resize", "Change the size") }));
 
         sections.Add(VersionsSection());
+
+        var laid = Items("world.route").ToList();
+        sections.Add(new DialogSection("routes", "Roads, paths and railways", new[]
+        {
+            LocalList("world.routes", "Roads, paths and railways laid",
+                      "Each with what it is, where its nearest point is from you, and who laid it. Laid from the Place tab.",
+                      laid.Count > 0 ? laid.Select(r => new DialogItem(r.Label, r.Value)) : new[] { new DialogItem("None laid with the editor", "") }, "world.routegoto"),
+            Button("world.routegoto", "Go to it", laid.Count > 0, "Takes you to stand beside its nearest point."),
+            Button("world.routeremove", "Take it up", laid.Count > 0, "Takes up its pieces and its data, and its train. Asks first. Undo lays it again."),
+        }));
 
         var rooms = Items("world.room").ToList();
         sections.Add(new DialogSection("rooms", "Rooms and areas", new[]
@@ -930,6 +1034,11 @@ public sealed class EditorDialog : ModalDialog
                 return;
             case "place.where":
                 _memory.Where = Math.Max(0, c.Selected);
+                return;
+            case "place.routekind":
+            case "place.routelevel":
+                DeriveRoute(_tabs[0]);
+                TabUpdated?.Invoke(_tabs[0]);
                 return;
             case "piece.kind":
                 PullPiece();
@@ -1015,6 +1124,24 @@ public sealed class EditorDialog : ModalDialog
                 else Said?.Invoke("Choose a prefab with a sound of its own first.");
                 return;
             case "place.again": _send("/edit again"); return;
+            case "place.routestart":
+                _send(Command("/edit route start", Get("place.routekind")?.SelectedValue ?? "road", RouteFields(tab)));
+                return;
+            case "place.routeadd":
+            {
+                if (Text("place.routepoints") is not { Length: > 0 } points) { Said?.Invoke("Type the points: east and north in metres, apart by semicolons, such as 0 0; 50 0; 50 40."); FocusAsked?.Invoke("place.routepoints"); return; }
+                // Nothing laid yet: begun from the form, with no point where you stand.
+                if ((Items("place.routeinfo").FirstOrDefault().Value ?? "").Length == 0)
+                    _send(Command("/edit route new", Get("place.routekind")?.SelectedValue ?? "road", RouteFields(tab)));
+                _send($"/edit route points {points}");
+                return;
+            }
+            case "place.routepoint": _send("/edit route point"); return;
+            case "place.routestation": _send("/edit route station"); return;
+            case "place.routecrossing": _send("/edit route crossing"); return;
+            case "place.routeback": _send("/edit route back"); return;
+            case "place.routefinish": _send(Command("/edit route finish", RouteFields(tab))); return;
+            case "place.routecancel": _send("/edit route cancel"); return;
             case "piece.place":
                 PullPiece();
                 if (_piece?.Place() is { } why) Said?.Invoke(why);
@@ -1188,6 +1315,19 @@ public sealed class EditorDialog : ModalDialog
                 if (Get("world.versions")?.SelectedValue is not { Length: > 0 } number) { Said?.Invoke("Choose a version first."); FocusAsked?.Invoke("world.versions"); return; }
                 string name = Items("world.version").FirstOrDefault(v => v.Value == number).Prompt is { Length: > 0 } vname ? $", {vname}" : "";
                 ConfirmAsked?.Invoke($"Restore version {number}{name}? What the map has now is saved as a version first.", () => _send($"/edit map restore {number}"));
+                return;
+            }
+            case "world.routegoto":
+                if (Get("world.routes")?.SelectedValue is not { Length: > 0 } goRoute) { Said?.Invoke("Choose one in the list first."); FocusAsked?.Invoke("world.routes"); return; }
+                _send($"/edit route goto {goRoute}");
+                return;
+            case "world.routeremove":
+            {
+                var list = Get("world.routes");
+                if (list?.SelectedValue is not { Length: > 0 } upRoute) { Said?.Invoke("Choose one in the list first."); FocusAsked?.Invoke("world.routes"); return; }
+                string name = Items("world.route").FirstOrDefault(r => r.Value == upRoute).Prompt is { Length: > 0 } rn ? rn : "it";
+                _routeNext = list.Items.ElementAtOrDefault(list.Selected + 1)?.Value ?? list.Items.ElementAtOrDefault(list.Selected - 1)?.Value;
+                ConfirmAsked?.Invoke($"Take up {name}?", () => _send($"/edit route remove {upRoute}"));
                 return;
             }
             case "world.bake":

@@ -87,9 +87,11 @@ public sealed class MapOverlay
     public Dictionary<string, int> Pins { get; set; } = new();
     /// <summary>The map's own settings (MapSettings): "Weather", "Hour", "Ground", "Beacon.door". Null when none.</summary>
     public Dictionary<string, string>? Settings { get; set; }
+    /// <summary>Roads, paths and railways laid with the editor (OverlayRoute). Null when none.</summary>
+    public List<OverlayRoute>? Routes { get; set; }
 
     [JsonIgnore] public bool IsEmpty => Spawn == null && Changed.Count == 0 && Removed.Count == 0 && Added.Count == 0 && Pins.Count == 0
-                                        && (Settings == null || Settings.Count == 0);
+                                        && (Settings == null || Settings.Count == 0) && (Routes == null || Routes.Count == 0);
 
     public OverlayChange? ChangeFor(int id) => Changed.FirstOrDefault(c => c.Id == id);
     public OverlayAddition? AdditionFor(int id) => Added.FirstOrDefault(a => a.Entity.EntityId == id);
@@ -266,6 +268,8 @@ public sealed class MapOverlayStore
             map.Entities.Add(copy);
             byId[copy.EntityId] = copy;
         }
+        // Roads and railways as the map's own data, so traffic and trains find them as they always do.
+        WorldEditor.LayRoutes(map, o);
         Log.Information("MapOverlayStore: '{Map}' has the editor's changes: {Changed} changed, {Removed} removed, {Added} added{Spawn}{Skipped}.",
             map.Id, o.Changed.Count, o.Removed.Count, o.Added.Count, o.Spawn != null ? ", spawn moved" : "",
             skipped > 0 ? $", {skipped} not found" : "");

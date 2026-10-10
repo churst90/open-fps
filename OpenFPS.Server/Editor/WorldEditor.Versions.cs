@@ -37,8 +37,11 @@ public sealed partial class WorldEditor
         if (o.Spawn != null) parts.Add("spawn moved");
         if (o.Settings is { Count: > 0 } s) parts.Add(Plural(s.Count, "map setting"));
         if (o.Pins.Count > 0) parts.Add(Plural(o.Pins.Count, "pin"));
+        if (o.Routes is { Count: > 0 } routes) parts.Add(RoutesSaid(routes.Count));
         return string.Join(", ", parts);
     }
+
+    private static string RoutesSaid(int n) => n == 1 ? "1 road, path or railway" : $"{n} roads, paths or railways";
 
     private static string VersionLabel(MapVersion v)
         => $"Version {v.Number}, {v.Name}, by {v.Author}, {v.SavedUtc.ToLocalTime():d MMMM HH:mm}: {Counts(v.Overlay)}";
@@ -198,8 +201,16 @@ public sealed partial class WorldEditor
 
         away = deletes.Count;
         down = places.Count;
+        // Roads, paths and railways: their data and trains (their pieces are additions, above). Taken up
+        // before their pieces go, laid after their pieces are down.
+        var nowRoutes = now.Routes ?? new List<OverlayRoute>();
+        var wantRoutes = target.Routes ?? new List<OverlayRoute>();
+        foreach (var r in nowRoutes.Where(r => !wantRoutes.Any(w => MapVersionStore.Same(w, r))))
+            ops.Add(new RouteOp(mapId, MapVersionStore.CopyOf(r), Adding: false));
         ops.AddRange(deletes);
         ops.AddRange(places);
+        foreach (var r in wantRoutes.Where(r => !nowRoutes.Any(w => MapVersionStore.Same(w, r))))
+            ops.Add(new RouteOp(mapId, MapVersionStore.CopyOf(r), Adding: true));
 
         // The spawn point, the map's settings and its pins.
         bool sameSpawn = (now.Spawn == null && target.Spawn == null)
@@ -259,10 +270,12 @@ public sealed partial class WorldEditor
         Overlays.Save(mapId);
         Push(s, batch);
         var saved = Versions.Save(mapId, before, $"before restoring version {version.Number}", s.Username, automatic: true);
-        int other = ops.Count - away - down;
+        int routes = ops.OfType<RouteOp>().Count();
+        int other = ops.Count - away - down - routes;
         var said = new List<string>();
         if (away > 0) said.Add($"{Plural(away, "thing")} taken away");
         if (down > 0) said.Add($"{Plural(down, "thing")} put down or back");
+        if (routes > 0) said.Add($"{RoutesSaid(routes)} taken up or laid");
         if (other > 0) said.Add(Plural(other, "map setting") + " changed");
         Say(reply, $"Restored version {version.Number}, {version.Name}: {string.Join(", ", said)}."
                  + (notes.Count > 0 ? $" {Capital(string.Join("; ", notes))}." : "")
@@ -398,6 +411,8 @@ public sealed partial class WorldEditor
         o.Removed.Clear();
         o.Added = residual.Added;
         o.Settings = residual.Settings;
+        // Roads and railways are the file's own roads and tracks now.
+        o.Routes = null;
         Overlays.Save(mapId);
         _files.Remove(mapId);
         _data.Remove(mapId);
