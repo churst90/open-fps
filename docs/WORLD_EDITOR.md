@@ -355,10 +355,12 @@ Selecting is not an operation: it changes nothing and is per player.
 - Map settings: default weather and time, beacon rules, ground.
 - Direct keys while the editor is open, if wanted (to be tried with Orca and NVDA first).
 
-### Phase 3
+### Phase 3 (built 2026-10-10: section 18)
 
 - People: characters, walker density. Roads and routes (roads as data). Map versions and restoring one.
 - Baking an overlay into a hand-written map file on request.
+- Also: a list of the things from the map file that were changed or removed, each put back as the map
+  has it (the leftover of section 17).
 
 ## 10. Decisions for Cody
 
@@ -1150,9 +1152,206 @@ here, or the map's owner, or an editor the owner named.
   (Help is the thing's name, for the question); Place's rows are all "place.prefab" now, groups
   included, so "place.group" is no longer sent. The overlay file gained two members.
 
-### Not done: things changed or removed from the map file
+### Things changed or removed from the map file
 
 The list holds what the editor added. Things from the map file that were moved, changed or removed are
-in the overlay's Changed and Removed, and are not listed. A "Changed on this map" list beside it (put
-back as the map file has it, or bring back a removed one) would use the same rows and the same undo;
-recommended next if Cody wants to find his edits to a generated map.
+listed beside it in "Changed on this map" (section 18, built 2026-10-10).
+
+## 18. Phase 3: changed things, versions, roads and railways, people
+
+Built 2026-10-10 (todo item 6; Cody's list of 2026-10-08, section 7), in this order of value. Untried
+with Orca and NVDA: tests only (OpenFPS.Tests/WorldEditorPhase3Tests*.cs). Every new control is one of
+the dialog's existing kinds (a box, a drop-down, a list, a ticking list, a button, a line of words), so
+the two heads draw them as they draw the rest. The one head change: a line of words now changes its
+words where it stands (the route form's "Laying ..." line), the same in GTK and WinForms.
+
+### Changed on this map
+
+- The overlay's Changed and Removed: the things from the map file the editor moved, turned, resized,
+  renamed, set or removed. Listed nearest first, up to 200 (the filter finds the rest). A row: name
+  (and kind, when the name differs), what was done, and where it is from you: "Old Wall, Concrete Wall,
+  moved 2 metres east, turned 90 degrees clockwise, name Old Wall, 7 metres north east". A removed one:
+  "Brick Wall, removed, it was 15 metres north". A change the map file no longer matches (a generator
+  moved the thing) is counted in the headline, not listed: "...; 1 change the map file no longer
+  matches, kept in case it does again".
+- Filter: words in the name, the kind, the prefab, or what was done (moved, turned, removed, a setting's
+  name); "within 20". The filter is the server's, per editor.
+- Put it back as the map has it (`/edit putback #ID [#ID ...]`): the thing is made again from the map
+  file as it is on disk now (read again whenever it changes), with the file's place, turn, size, name,
+  door sides, room materials and indoors, and the overlay keeps nothing for it. A removed one is brought
+  back. One undo changes it again (a DeleteOp and a PlaceOp in one BatchOp, so nothing new had to be
+  undone). Refused, with the reason said, when somebody stands where it would go, somebody sits in it,
+  or the map file no longer has it.
+- Go to it: beside it; for a removed thing, beside where it was.
+- Edit it: chooses it on the Edit tab; for a removed one it says "Brick Wall has been removed. Put it
+  back first to change it."
+- Dialog (Edit tab, section "Changed on this map", after "Placed on this map"): Filter changed things
+  (a box; Enter filters), Filter, the list "Changed on this map" (its description starts with the
+  headline), "Put it back as the map has it" (asks "Put Old Wall back as the map has it?" or "Bring
+  back Brick Wall as the map has it?", No first), Go to it, Edit it. When a row goes, the row after it
+  is chosen (the one before if it was the last), as in the placed list. Not a ticking list: a removed
+  thing cannot be held.
+- Menus: the root menu has "Changed on this map, N"; each row opens Put it back, Go to it, Select it.
+- Found on the way and fixed: a thing made again from its map entry (undoing a deletion, putting one
+  back) now gets the entry's door sides, room materials and indoors (MapManager.ApplyEntryExtras), as
+  the loader gives them; before, an undone deletion of a door lost its locked side.
+- The overlay's removals keep the name the thing had (`OverlayRemoval.Name`; absent on old files, which
+  say the prefab's name).
+
+### Versions of a map
+
+- A version is a copy of the whole overlay, with a number, a name, who saved it and when. One file per
+  map: `maps/overlays/versions/MAPID.json` (ignored by git with the overlays). At most 100 per map; past
+  that the oldest saved by the editor itself goes first.
+- `/edit map save NAME`: "Saved version 1 of this map, before the market: 12 placed, 4 changed, 1
+  removed, 1 map setting." Any editor of the map.
+- `/edit map versions`: newest first, "Version 2, before restoring version 1, by cody, 10 October 14:02:
+  12 placed, 4 changed, 1 removed".
+- `/edit map restore NUMBER|NAME`: the map's edits become what the version has. Done with the editor's
+  own operations (things taken away and put down, things from the file put as the version has them,
+  roads and railways taken up and laid, the spawn point, the map's settings, pins), all in one BatchOp,
+  so one undo takes the whole restore back, and a failure part way puts back what was done. What the
+  map had is saved first, as "before restoring version N". The map's size is changed only for its owner
+  (or maps-any), as /setmapsize; otherwise it is left and the answer says so.
+- `/edit map bake [now]`: the map's edits written into the map's own file. Without "now" it says what
+  it will do. Only the map's owner or maps-any, and only for a map players make (maps/players/). Every
+  map that ships with the server is written by a program in tools (city.json by gen_city.py, which it
+  must stay byte for byte; the speedway; the real places by gen_osm.py), and is refused: "city is
+  written by a program in tools and must stay byte for byte what that program writes, so its edits stay
+  beside it in the overlay, where they are laid over it every time it loads. To make them part of the
+  map, change the program."
+  - What a map file holds is written: places, turns, sizes, removals, additions (with their ids),
+    names, door sides, indoors, room materials, the spawn, the weather, hour, ground, beacon rules and
+    size, roads and railways, people.
+  - What it does not hold stays in the overlay, laid on the baked places: a sound's volume, range,
+    minimum distance and model; parked vehicles; pins; the walkers setting.
+  - The file as it was is kept beside it as `NAME.json.before-bake-YYYYMMDD-HHMMSS` (not read as a
+    map), a version "before baking" is saved, and every editor's undo history on that map is cleared,
+    since it was about the overlay. Undo cannot take a bake back: the answer says so and the dialog asks
+    first.
+- Dialog (World tab, section "Versions of this map", after the map size): Name for a new version (a
+  box; Enter saves), Save a version, the list "Versions of this map" (Enter restores), Restore the chosen
+  version (asks "Restore version 1, before the market? What the map has now is saved as a version
+  first."), Write the edits into the map file (dimmed where it may not be done, with the reason as its
+  description; asks "Write this map's edits into its file? Undo cannot take it back; the file as it was
+  is kept beside it.").
+- Menus: Map, "Versions of this map, N"; each version opens Restore this version; "Write the edits into
+  the map file" opens its explanation and "Yes, write them into the file".
+
+### Roads, paths and railways
+
+A road, a path or a railway is laid by walking it or by typing its points, and becomes two things:
+
+1. Pieces: ordinary things placed with the editor, listed in "Placed on this map" with everything else.
+   A road or path: its surface, one piece per straight stretch, its width, 2 cm proud of the ground so
+   it is what you stand on, the joints overlapping by half a width so a bend has no gap. A path's
+   pieces are called "NAME, pavement", which makes them pavement to the people who walk
+   (Pavements.IsPavement) and to the characters. A railway on the ground: a gravel bed ("NAME, track
+   bed"). Raised: a concrete deck half a metre thick ("NAME, deck") on pillars at most 20 metres apart
+   ("NAME, pillar"). Underground: a concrete tunnel of its own, floor, two walls and roof, 5 metres high
+   inside and at least 5 wide, with no digging ("NAME, tunnel floor", "tunnel wall", "tunnel roof"). A
+   station on the ground or raised gets a platform beside the line, 40 metres long and 3 wide, a train's
+   floor high ("STATION, platform"). A pillar or platform where somebody stands is left out and said.
+2. Data, at load (MapOverlayStore.Lay, before the map is built): a road is a RoadData (as many 3-metre
+   lanes each way as fit, at its speed; residential below 50 km/h, collector from 50), so the road
+   network, wet roads and pedestrian crossings use it; a railway is a TrackData (its line at the rail
+   head, its stations as TrackStopData of kind platform, 30 seconds), a LevelCrossingData for each
+   crossing, and a TrainData for its train, so RailSystem and CrossingSystem run it. Live, the data goes
+   into the map's data at once, and a railway's train is put on its track at once (RailSystem.SpawnOne);
+   taking it up takes the train off (RailSystem.RemoveNamed, new).
+
+Laying:
+- `/edit route start road|path|railway [FIELD VALUE ...]`: the first point where you stand. Close the
+  editor and walk: a point is dropped every metre (WorldEditor.Tick, four times a second from the
+  server's tick), and every 20 metres you are told how far it has come ("40 metres."). `/edit route new
+  ...` starts with no point, for typing.
+- `/edit route points EAST NORTH [UP]; EAST NORTH ...`: points typed, as F1 says where you are; a point
+  without a height is on the ground there, found from your own level.
+- `/edit route point` (one where you stand), `/edit route back` (the last taken back), `/edit route set
+  FIELD VALUE`, `/edit route station [NAME]` and `/edit route crossing [NAME]` (a railway's, at the point
+  of the line nearest you), `/edit route cancel`, `/edit route` (what is in hand).
+- `/edit route finish [FIELD VALUE ...]`: laid. The straight stretches are joined first (a point is
+  kept only where the way turns more than half a metre off the line, Douglas and Peucker), so a walked
+  road is a few points, not hundreds. A road or path needs two points, a railway three not in a line:
+  a railway is a loop, its last point joined to its first, and a train must be able to run it (a
+  RaceLine is made from it first). One undo takes all of it up.
+- Fields: width (0.5 to 60 m; usually 7 road, 2 path, 4.2 railway), surface (a material a thin floor
+  or road prefab is made of: Asphalt, Concrete, Gravel and the rest; usually asphalt, concrete,
+  gravel), level (ground, raised, underground), height or depth (3 to 60 m; usually 6 raised, 8
+  underground), train (a train preset, or none), speed (km/h: a road's limit, usually 40; a train's top
+  speed, usually 60), name.
+- `/edit routes` lists what was laid; `/edit route remove NAME` takes one up with its pieces and train,
+  one undo; `/edit route goto NAME` stands you beside its nearest point.
+- Answers: "Laid a railway, Loop line: 4 points, 160 metres round, 4.2 metres wide, gravel, on the
+  ground, 1 station, 1 level crossing, a light rail train at up to 60 km/h. Loop line train runs it
+  now. One undo takes it up."
+- Kept in the overlay's Routes (OverlayRoute: id, kind, name, the points at the ground, width, surface,
+  level and metres, speed, stations by metres round, crossings, train, the pieces' numbers, who and
+  when). A version restores them; a bake writes their data into the file.
+- Dialog (Place tab, section "Lay a road, path or railway", after "Build a piece"): What (Road, Path,
+  Railway), Name, Width in metres, Surface ("The usual for it" first), A railway runs (On the ground,
+  Raised on pillars, Underground, in a tunnel of its own), Height or depth in metres, Train on it (None
+  first), a line saying what is being laid ("Laying a railway, Loop: 4 points, ..."), Start here, then
+  walk it; Points, typed (a box; Enter adds); Add the points; Drop a point where you stand; Add a
+  station where you stand; Add a level crossing where you stand; Take back the last point; Lay it;
+  Cancel: lay nothing. What does not apply is dimmed (level, depth and train for a road; the laying
+  buttons when nothing is being laid). World tab, section "Roads, paths and railways": the list of what
+  was laid, Go to it, Take it up (asks "Take up Loop line?"; the next row is chosen after).
+- Menus: the root menu has "Roads, paths and railways, N" (or "...: laying NAME").
+
+What the existing road and rail data cannot carry, so is not done:
+- A road is not joined to other roads: the tool makes no JunctionData, so traffic driving the map's
+  routes does not turn onto it, and RoadNetwork logs its ends as dead ends. No traffic is put on it.
+  The network is built at load, so a new road is in it from the next load.
+- A railway is a loop: RaceLine and RailSystem run a train round a closed line. A line with two ends
+  that a train runs back and forth on is not in the rail code.
+- A level crossing's bells and gates are made at load (CrossingSystem.Spawn), so they come with the
+  next load; the line's bed is not cut where a road crosses it (gen_city.py leaves a gap).
+- An underground station has a stop but no platform, stairs or way down from the street; nobody can
+  walk into an underground line yet. A tunnel has no named place inside it, so it is not a room.
+- One train per railway, with the line's speed as its top speed.
+- A road's surface is one material its whole length; RoadData can hold stretches, the tool does not.
+
+### People
+
+- Characters (CharacterSystem): `/edit person add NAME [voice VOICE]` puts somebody on the map, with the
+  kind of life CharacterSystem has (homeless; the only one written so far) and a voice from the speech
+  catalogue (alex, the one that recorded a character's lines, first). "Sam lives on this map now,
+  homeless, voice alex, goes to any place the map has. The map has 2 places for their day; /edit person
+  place add PLACE keeps them to some."
+- Their places: `/edit person choose NAME`, then `/edit person place add|drop PLACE`. The places offered
+  are those CharacterSystem would find for them (HauntFinder: bus stops, the pavement outside front
+  entrances, lobbies, squares), by the names it gives them ("the bus stop, Main Street"). Kept as
+  CharacterData.Places (new: a list of those names); with none, any place the map has. CharacterSystem
+  keeps their day to the named places (if none of them is on the map it logs so and they go anywhere).
+  A change finds their places again; where they are now they finish.
+- `/edit person voice VOICE`, `/edit person remove NAME`. Each is a PersonOp, undone as one step.
+- Kept in the overlay's People and laid into the map's Characters at load; live, through
+  CharacterSystem.AddLive, RemoveLive and Change (new). Only the people the editor put on are changed;
+  the map's own (Alex on the city) are listed "from the map file".
+- Walkers: `/edit walkers NUMBER` is how many people walk the map's pavements, per 100 metres, besides
+  the map's own (0 to 20; the city's generator puts about 3). Kept as the map setting Walkers. They are
+  VehicleSystem walkers, as /spawn walker makes and the city's are: spread evenly along every pavement
+  25 metres or longer (anything named a sidewalk or pavement, a path laid with the editor included),
+  half each way, each at their own pace from 4.2 to 5.4 km/h, started part way along. Changing the
+  number makes them again; undo is the setting's. Made again at start (WorldEditor.WalkKeptWalkers,
+  after the map's own vehicles, in Program). "2 people walk this map's 48 metres of pavement now, 4 per
+  100 metres, besides its own." At most 500 on a map.
+- Dialog (World tab, section "People", after the roads): Walkers per 100 metres of pavement (a box; its
+  description says how many walk now on how much pavement) and Set walkers; People on this map (each
+  "Sam, homeless, voice alex, goes to any place the map has"; the map's own say "from the map file");
+  Places the chosen person goes (a ticking list: Space ticks, through the server, which says "Sam goes
+  to the bus stop, Main Street: 1 place in their day."); Name of a new person, Voice, Put the person on
+  the map; Take the chosen person off the map (asks "Take Sam off the map?").
+- Menus: the root menu has "People": the walkers box, a typed "Put a person on the map", and each
+  person, whose menu has each place to start or stop going to, each voice, and Take them off the map.
+
+### Wire
+
+No change: no message, member or union tag. The new dialog rows are EditorMenuItems with Sections
+"edit.changedinfo", "edit.changed", "world.versioninfo", "world.version", "place.routeinfo",
+"place.routesurface", "place.routetrain", "world.route", "world.walkers", "world.personinfo",
+"world.person", "world.place", "world.voice". The overlay file gained Routes, People and
+OverlayRemoval.Name; a map file's characters gained Places. OpenFPS.Common is unchanged, so the build
+hash is the same; the client heads changed (a line of words updated in place), so both clients and the
+server should be rebuilt together.

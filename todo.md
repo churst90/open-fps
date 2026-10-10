@@ -22,8 +22,9 @@ the honest tests, the probable bugs and the trains fix are merged and shipped (V
    docs/WORLD_STREAMING.md "Buildings: the plan"), then the world's roads as RoadData for traffic.
 5. Sound library stage 3 alongside: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`
    (docs/SOUND_LIBRARY_BOUNDARY.md section 8).
-6. World editor phase 3: people, roads and routes, map versions, baking an overlay into a map file
-   (docs/WORLD_EDITOR.md section 9).
+6. World editor phase 3: built 2026-10-10, unheard and untried with Orca and NVDA (docs/WORLD_EDITOR.md
+   section 18): Changed on this map, map versions and baking, roads, paths and railways, people. (Cody)
+   to try in the F12 dialog with Orca, then NVDA.
 
 Before items 4-6: the two cheap reflection steps (measure "Mixer load" with echoes on and off; nice
 the trace threads). See "Reflections in their own process". The three bugs of 2026-10-08 are fixed
@@ -337,7 +338,11 @@ tools/gen_osm.py; docs/MAPS_FROM_REAL_PLACES.md. Magnolia and Albany are built a
 - Ground height from USGS 3DEP: geometry stage 3 (Next, in order).
 
 ### Map editor
-Phases 1 and 2 are built (docs/WORLD_EDITOR.md). Phase 3 is in Next, in order. Also missing: copy,
+Phases 1 to 3 are built (docs/WORLD_EDITOR.md). Left from phase 3 (section 18, "What the existing road
+and rail data cannot carry"): joining an editor road to the others with junctions and putting traffic on
+it; a railway with two ends; crossings' bells live, and the bed cut where a road crosses; underground
+stations with platforms and stairs, and a tunnel as a named place; more than one kind of character life.
+Also missing: copy,
 rename, delete and publish maps; checks ("this room has no door"); groups as one composite (only if
 building houses needs it); a preview of a wall being struck.
 
