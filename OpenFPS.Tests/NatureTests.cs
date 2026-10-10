@@ -28,13 +28,16 @@ public class NatureTests
 
     private const int Rate = 48000;
 
+    /// <summary>The built-in wind (WindWeather.Default), the weather every case here hears.</summary>
+    private static readonly WorldWeather Air = new();
+
     // ── The wind ───────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void TheWindIsTheSameForEveryoneWhoAsks()
     {
         for (double t = 1000; t < 1100; t += 7.3)
-            Assert.Equal(WindField.SpeedAt(12f, 7f, -40f, t), WindField.SpeedAt(12f, 7f, -40f, t));
+            Assert.Equal(Air.SpeedAt(12f, 7f, -40f, t), Air.SpeedAt(12f, 7f, -40f, t));
     }
 
     [Fact]
@@ -42,7 +45,7 @@ public class NatureTests
     {
         double sum = 0, sq = 0;
         int n = 0;
-        for (double t = 0; t < 40000; t += 0.7) { float g = WindField.Gust(-300f, 200f, t); sum += g; sq += g * g; n++; }
+        for (double t = 0; t < 40000; t += 0.7) { float g = WindField.Gust(Air.Wind, -300f, 200f, t); sum += g; sq += g * g; n++; }
         double mean = sum / n, sd = Math.Sqrt(sq / n - mean * mean);
         _o.WriteLine($"gust mean {mean:F3}, sd {sd:F3}");
         Assert.InRange(mean, -0.15, 0.15);
@@ -56,15 +59,15 @@ public class NatureTests
     [Fact]
     public void AGustTravelsDownwind()
     {
-        var (dx, dz) = WindField.Downwind;
+        var (dx, dz) = Air.Wind.At(0).Downwind;
         const float metres = 90f;
-        float lag = metres / WindField.MeanSpeed;
+        float lag = metres / Air.MeanSpeed;
         double same = 0, carried = 0, aa = 0, bb = 0, cc = 0;
         for (double t = 0; t < 6000; t += 0.5)
         {
-            float a = WindField.Gust(0f, 0f, t);
-            float b = WindField.Gust(dx * metres, dz * metres, t);
-            float c = WindField.Gust(dx * metres, dz * metres, t + lag);
+            float a = WindField.Gust(Air.Wind, 0f, 0f, t);
+            float b = WindField.Gust(Air.Wind, dx * metres, dz * metres, t);
+            float c = WindField.Gust(Air.Wind, dx * metres, dz * metres, t + lag);
             same += a * b; carried += a * c; aa += a * a; bb += b * b; cc += c * c;
         }
         double rSame = same / Math.Sqrt(aa * bb), rCarried = carried / Math.Sqrt(aa * cc);
@@ -76,9 +79,10 @@ public class NatureTests
     [Fact]
     public void TheWindFallsOffTowardTheGround()
     {
-        Assert.True(WindField.MeanAt(0.8f) < WindField.MeanAt(7f));
-        Assert.True(WindField.MeanAt(7f) < WindField.MeanAt(10f) + 1e-4f);
-        Assert.Equal(WindField.MeanSpeed, WindField.MeanAt(10f), 3);
+        float u = Air.MeanSpeed;
+        Assert.True(WindField.MeanAt(u, 0.8f) < WindField.MeanAt(u, 7f));
+        Assert.True(WindField.MeanAt(u, 7f) < WindField.MeanAt(u, 10f) + 1e-4f);
+        Assert.Equal(u, WindField.MeanAt(u, 10f), 3);
     }
 
     // ── Water ──────────────────────────────────────────────────────────────────────────────────
@@ -157,13 +161,13 @@ public class NatureTests
     public void WaterAndFireRenderAtTheLevelTheyDeclare()
     {
         var water = WaterFeatureSpec.ByName("park_fountain");
-        var (wDb, wKnee) = Measure(new WaterVoiceState(water, Rate, 5, Vector3.Zero), 8f);
+        var (wDb, wKnee) = Measure(new WaterVoiceState(water, Rate, 5, Vector3.Zero, Air), 8f);
         _o.WriteLine($"fountain {wDb:F1} dB against {water.SourceLevelDb:F1}, {wKnee:P3} on the knee");
         Assert.InRange(wDb, water.SourceLevelDb - 3f, water.SourceLevelDb + 3f);
         Assert.True(wKnee < 1e-4, $"the fountain sat on the soft ceiling {wKnee:P3} of the time");
 
         var fire = FireSpec.ByName("fire_pit");
-        var (fDb, fKnee) = Measure(new FireVoiceState(fire, Rate, 5, Vector3.Zero), 30f);
+        var (fDb, fKnee) = Measure(new FireVoiceState(fire, Rate, 5, Vector3.Zero, Air), 30f);
         _o.WriteLine($"fire {fDb:F1} dB against {fire.SourceLevelDb:F1}, {fKnee:P4} on the knee");
         Assert.InRange(fDb, fire.SourceLevelDb - 3f, fire.SourceLevelDb + 3f);
         Assert.True(fKnee < 1e-4, $"the fire sat on the soft ceiling {fKnee:P4} of the time");
@@ -373,7 +377,7 @@ public class NatureTests
         {
             if (i % 256 == 0)
             {
-                water.Wind = WindField.SpeedAt(0f, 1.5f, 0f, i / (double)TextureStatistics.Rate);
+                water.Wind = Air.SpeedAt(0f, 1.5f, 0f, i / (double)TextureStatistics.Rate);
                 water.Control(256f / TextureStatistics.Rate);
             }
             x[i] = water.Next();
@@ -511,7 +515,7 @@ public class NatureTests
         {
             if (i % 256 == 0)
             {
-                fire.Wind = WindField.SpeedAt(0f, 0.8f, 0f, i / (double)TextureStatistics.Rate);
+                fire.Wind = Air.SpeedAt(0f, 0.8f, 0f, i / (double)TextureStatistics.Rate);
                 fire.Control(256f / TextureStatistics.Rate);
             }
             x[i] = fire.Next();
@@ -561,8 +565,8 @@ public class NatureTests
     {
         var spec = WaterFeatureSpec.ByName("park_fountain");
         var shared = new WaterFeatureVoice("park_fountain/test", spec, Rate, 1);
-        var tap = new WaterTapState(shared, 2, Rate, Vector3.Zero);
-        var whole = new WaterVoiceState(spec, Rate, 1, Vector3.Zero);
+        var tap = new WaterTapState(shared, 2, Rate, Vector3.Zero, Air);
+        var whole = new WaterVoiceState(spec, Rate, 1, Vector3.Zero, Air);
         Assert.Equal(whole.PascalsAtFullScale, tap.PascalsAtFullScale);
         var (db, knee) = Measure(tap, 4f);
         _o.WriteLine($"one tap {db:F1} dB against the whole's {spec.SourceLevelDb:F1}");
@@ -624,7 +628,7 @@ public class NatureTests
         // The boughs stand round the crown (FoliageSynth.BoughOffset, where they are also heard from);
         // along the wind, the most upwind and the most downwind are most of a crown apart.
         var spec = FoliageSpec.ByName("park_tree");
-        var (dx, dz) = WindField.Downwind;
+        var (dx, dz) = Air.Wind.At(0).Downwind;
         float Along(int b) { var o = FoliageSynth.BoughOffset(spec, b); return o.X * dx + o.Z * dz; }
         int up = Enumerable.Range(0, FoliageSynth.Boughs).OrderBy(Along).First();
         int down = Enumerable.Range(0, FoliageSynth.Boughs).OrderBy(Along).Last();
@@ -633,11 +637,11 @@ public class NatureTests
         Assert.InRange(last - first, spec.CrownRadiusMetres, 2f * spec.CrownRadiusMetres);
         // What the downwind bough feels now, the upwind one felt (last - first) / U seconds ago, give or
         // take what the eddies change across the wind between their two places.
-        double t = 1234.5, lag = (last - first) / Math.Max(0.5, WindField.MeanSpeed);
+        double t = 1234.5, lag = (last - first) / Math.Max(0.5, Air.MeanSpeed);
         var tree = new FoliageSynth(spec, Rate, 1);
-        tree.ReadWind(10f, -20f, t - lag);
+        tree.ReadWind(Air.Wind, 10f, -20f, t - lag);
         float upwindEarlier = tree.BoughWind(up);
-        tree.ReadWind(10f, -20f, t);
+        tree.ReadWind(Air.Wind, 10f, -20f, t);
         Assert.InRange(tree.BoughWind(down) - upwindEarlier, -0.25f, 0.25f);
         Assert.NotEqual(tree.BoughWind(up), tree.BoughWind(down));
     }

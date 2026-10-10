@@ -25,8 +25,6 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// </summary>
 internal sealed class TracedEchoes : IDisposable
 {
-    public static volatile TracedEchoes? Current;
-
     public const int MaxSources = 6;
     public const float DurationSeconds = 1.5f;
     public const int Order = 1;
@@ -102,6 +100,11 @@ internal sealed class TracedEchoes : IDisposable
 
     public bool IsValid => _simulator != IntPtr.Zero;
 
+    /// <summary>True from the first scene until disposal: the mix plays a rig's echoes only while its
+    /// tracer is live.</summary>
+    public bool IsLive => _live;
+    private volatile bool _live;
+
     public void SetScene(SteamAudioScene scene)
     {
         if (!IsValid || !scene.IsBuilt) return;
@@ -125,7 +128,7 @@ internal sealed class TracedEchoes : IDisposable
             _thread = new Thread(Loop) { IsBackground = true, Name = "TracedEchoes", Priority = ThreadPriority.BelowNormal };
             _thread.Start();
         }
-        Current = this;
+        _live = true;
     }
 
     /// <summary>A free slot for a source, or -1. Game thread.</summary>
@@ -261,7 +264,7 @@ internal sealed class TracedEchoes : IDisposable
     {
         _running = false;
         _thread?.Join(2000);
-        if (ReferenceEquals(Current, this)) Current = null;
+        _live = false;
         lock (_simGate)
         lock (_gate)
         {
@@ -309,7 +312,9 @@ internal sealed class TracedEchoRig : IGuardedUnit
     public FMOD.DSP CaptureDsp, MixDsp;
     public GCHandle Handle;
 
-    /// <summary>The slot in <see cref="TracedEchoes"/>, -1 when the rig is idle. Game thread writes.</summary>
+    /// <summary>The tracer the rig's slot is in. Game thread writes, before <see cref="Slot"/>.</summary>
+    public volatile TracedEchoes? Echoes;
+    /// <summary>The slot in <see cref="Echoes"/>, -1 when the rig is idle. Game thread writes.</summary>
     public volatile int Slot = -1;
     /// <summary>Gain from the voice's raw samples to the source's level at a metre, the reference the
     /// trace's paths are attenuated from. Game thread writes.</summary>
@@ -420,8 +425,8 @@ internal static class TracedEchoDsp
                 for (int c = 0; c < outCh; c++) o[k * outCh + c] = c < ch ? i[k * ch + c] : 0f;
 
             var rig = RigOf(ref dsp_state);
-            var echoes = TracedEchoes.Current;
-            if (rig == null || echoes == null || rig.Slot < 0 || n != rig.FrameSize || rig.Effect == IntPtr.Zero) return RESULT.OK;
+            var echoes = rig?.Echoes;
+            if (rig == null || echoes is not { IsLive: true } || rig.Slot < 0 || n != rig.FrameSize || rig.Effect == IntPtr.Zero) return RESULT.OK;
             if (!rig.Fresh) return RESULT.OK;
             rig.Fresh = false;
             int newest = echoes.NewestBank;

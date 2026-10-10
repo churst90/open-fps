@@ -828,7 +828,7 @@ further gathers more as its upstream tiles load, and its voice's key changes the
 - **One state, sent to everyone.** The server advances each map's (`GroundWaterSystem`, every tick, its ponds
   every 0.25 s) and sends it in `WorldStateUpdate.GroundWater` (appended): the rain, the event depth, the
   groundwater, the seven ladders, and the overflow of the ponds some voice names. A client's voices read it
-  (`GroundWater.Shared`), so what a client hears and what the server's fire is put out by are the same water.
+  (the world's `WorldWeather.Ground`), so what a client hears and what the server's fire is put out by are the same water.
 
 ### 13.5 Voices where it gathers
 

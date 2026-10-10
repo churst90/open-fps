@@ -17,8 +17,8 @@ namespace OpenFPS.Tests;
 /// The weather's wind: the server's weather reaching the wind field every tree and fire reads, the
 /// wind at the listener's ears, and /weather.
 ///
-/// Nothing here sets the global <see cref="WindField.Weather"/>: the nature tests read it from other
-/// threads, so every case builds its own <see cref="WindWeather"/> and asks the pure overloads.
+/// Every case builds its own <see cref="WindWeather"/> and asks the pure overloads, as each world's
+/// voices do with theirs (<see cref="WorldWeather"/>).
 /// </summary>
 public class WeatherWindTests
 {

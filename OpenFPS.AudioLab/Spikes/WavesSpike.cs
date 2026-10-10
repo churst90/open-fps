@@ -273,7 +273,7 @@ public static class WavesSpike
         double loadSum = 0; int loadCount = 0;
         Action<double>? perFrame = null;
 
-        void Wind(float speed) => WindField.Weather = WindWeather.Steady(speed, 0f, 0.2f);
+        void Wind(float speed) => facade.Weather.Wind = WindWeather.Steady(speed, 0f, 0.2f);
         void Pump(double seconds)
         {
             var until = clock.Elapsed.TotalSeconds + seconds;

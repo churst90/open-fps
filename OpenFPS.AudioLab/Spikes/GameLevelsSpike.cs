@@ -325,13 +325,13 @@ public static class GameLevelsSpike
         void Wind(float speed, double seconds)
         {
             Stand(new Vector3(60f, 0f, 60f), 0f);
-            WindField.Weather = WindWeather.Steady(speed, 250f, 0.25f);
+            facade.Weather.Wind = WindWeather.Steady(speed, 250f, 0.25f);
             Pump(3.0);
             Record($"ear wind {speed:0.#}ms", seconds);
-            WindField.Weather = Calm;
+            facade.Weather.Wind = Calm;
             Pump(2.0);
         }
-        WindField.Weather = Calm;
+        facade.Weather.Wind = Calm;
 
         // Thunder from a ground strike d metres off, as the server sends it: one event whose key rebuilds
         // the channel. Recorded from the flash, so the record runs past the sound's travel time.

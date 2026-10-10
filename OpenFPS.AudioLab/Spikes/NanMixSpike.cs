@@ -42,11 +42,11 @@ public static class NanMixSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no context"); return 1; }
         var scene = new SteamAudioScene(ctx); scene.Build(boxes);
         var lscene = new SteamAudioScene(ctx); lscene.Build(SteamAudioScene.WithoutOpenGround(boxes));
-        TracedReverbSet.Configure(ctx, scene, lscene);
-        TracedReverbSet.SetListener(from, acoustics.GetRegionAt(world, from));
+        var provider = new FmodAudioProvider();
+        provider.Traced.Configure(ctx, scene, lscene);
+        provider.Traced.SetListener(from, acoustics.GetRegionAt(world, from));
 
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
-        var provider = new FmodAudioProvider();
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         SteamAudioScene? openScene = null, openListener = null;
         var lines = new List<string>();
@@ -92,7 +92,7 @@ public static class NanMixSpike
                 int region = acoustics.GetRegionAt(world, ear);
                 if (region != lastRegion) { lines.Add($"  {t:F2} s: region {region} at ({ear.X:F2}, {ear.Y:F2}, {ear.Z:F2})"); lastRegion = region; }
                 provider.UpdateListener(ear, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), new Vector3(-0.75f, 0, 0), region);
-                TracedReverbSet.SetListener(ear, region);
+                provider.Traced.SetListener(ear, region);
                 if (!opened && Vector3.Distance(ear, new Vector3(door.X, ear.Y, door.Z)) < 1.6f)
                 {
                     // The door opens: both scenes rebuilt without its leaf, handed over in the background.
@@ -100,7 +100,7 @@ public static class NanMixSpike
                     var rest = boxes.Where(b => !leaf.Contains(b)).ToList();
                     openScene = new SteamAudioScene(ctx); openScene.Build(rest);
                     openListener = new SteamAudioScene(ctx); openListener.Build(SteamAudioScene.WithoutOpenGround(rest));
-                    TracedReverbSet.ConfigureInBackground(ctx, openScene, openListener);
+                    provider.Traced.ConfigureInBackground(ctx, openScene, openListener);
                     lines.Add($"  {t:F2} s: the door opens");
                 }
                 if (t >= nextClap)
@@ -127,7 +127,7 @@ public static class NanMixSpike
         }
         finally
         {
-            provider.Dispose(); TracedReverbSet.Dispose();
+            provider.Dispose(); provider.Traced.Release();
             scene.Dispose(); lscene.Dispose(); openScene?.Dispose(); openListener?.Dispose();
             Phonon.iplContextRelease(ref ctx);
         }

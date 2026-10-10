@@ -120,10 +120,10 @@ public sealed class FireSynth
     private readonly float[] _windAt;
 
     /// <summary>Reads the wind field at each place, the fire's middle at (x, z).</summary>
-    public void ReadWind(float x, float z, double seconds)
+    public void ReadWind(WindWeather wind, float x, float z, double seconds)
     {
         for (int p = 0; p < _windAt.Length; p++)
-            _windAt[p] = WindField.SpeedAt(x + _layout[p].X, Spec.FlameHeightMetres, z + _layout[p].Z, seconds);
+            _windAt[p] = WindField.SpeedAt(wind, x + _layout[p].X, Spec.FlameHeightMetres, z + _layout[p].Z, seconds);
     }
 
     // ── The bodies of fire ───────────────────────────────────────────────────────────────────────

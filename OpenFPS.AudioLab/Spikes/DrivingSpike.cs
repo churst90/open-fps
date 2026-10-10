@@ -80,9 +80,9 @@ public static class DrivingSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
         scene.Build(new List<SteamAudioScene.Box> { new(new Vector3(0f, -0.5f, 0f), new Vector3(4000f, 1f, 4000f), Quaternion.Identity, "Asphalt") });
-        TracedReverbSet.Configure(ctx, scene);
-
         var provider = new FmodAudioProvider();
+        provider.Traced.Configure(ctx, scene);
+
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -106,7 +106,7 @@ public static class DrivingSpike
             // Concrete: the driving aids read any unnamed square of asphalt as a junction.
             Material = new MaterialComponent { Material = "Concrete" },
         });
-        WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
         world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 15f, Humidity = 0.6f, AirPressure = 1013.25f, AirAbsorptionMultiplier = 1f });
 
         var segments = new List<Segment>();
@@ -613,7 +613,7 @@ public static class DrivingSpike
         {
             double end = clock.Elapsed.TotalSeconds;
             facade.Dispose();
-            TracedReverbSet.Dispose();
+            provider.Traced.Release();
             scene.Dispose();
             Phonon.iplContextRelease(ref ctx);
             File.WriteAllText(Path.Combine(outDir, "clock_end.txt"), end.ToString("F3", CultureInfo.InvariantCulture));

@@ -6,8 +6,8 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
 /// The voices for things nobody made: falling water, a fire, the wind in a tree. Ranked and budgeted
-/// with the machines, and each reads the one <see cref="WindField"/> at its own fixed place, so a gust
-/// that bends the trees upwind reaches the fire and the fountain a moment later.
+/// with the machines, and each reads its world's one wind (<see cref="WorldWeather"/>) at its own fixed
+/// place, so a gust that bends the trees upwind reaches the fire and the fountain a moment later.
 /// </summary>
 public abstract class NatureVoiceState : PhysicalVoiceState
 {
@@ -17,16 +17,21 @@ public abstract class NatureVoiceState : PhysicalVoiceState
     /// <summary>Metres above its base where it feels the wind: a tree's crown, the flames.</summary>
     protected readonly float WindHeight;
 
-    protected NatureVoiceState(float sourceLevelDb, float headroomDb, float sampleRate, Vector3 position, float windHeight)
+    /// <summary>The weather of the world this voice plays in.</summary>
+    protected readonly WorldWeather Weather;
+
+    protected NatureVoiceState(float sourceLevelDb, float headroomDb, float sampleRate, Vector3 position, float windHeight,
+                               WorldWeather weather)
         : base(sourceLevelDb, sampleRate, headroomDb)
     {
         Position = position;
         WindHeight = windHeight;
+        Weather = weather;
     }
 
     /// <summary>m/s, read once a block against gusts that last seconds; each synth glides between the
     /// readings.</summary>
-    protected float WindHere() => WindField.SpeedAt(Position.X, WindHeight, Position.Z, WindField.Now());
+    protected float WindHere() => Weather.SpeedAt(Position.X, WindHeight, Position.Z, WindField.Now());
 
     protected override void PushListener(Vector3 frame) { }
 }
@@ -36,8 +41,8 @@ public sealed class WaterVoiceState : NatureVoiceState
 {
     public readonly FallingWaterSynth Water;
 
-    public WaterVoiceState(WaterFeatureSpec spec, float sampleRate, int seed, Vector3 position)
-        : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.WindHeightMetres)
+    public WaterVoiceState(WaterFeatureSpec spec, float sampleRate, int seed, Vector3 position, WorldWeather weather)
+        : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.WindHeightMetres, weather)
     {
         Water = new FallingWaterSynth(spec, sampleRate, seed);
     }
@@ -171,8 +176,8 @@ public sealed class WaterTapState : NatureVoiceState
     public readonly int Place;
     private long _cursor;
 
-    public WaterTapState(WaterFeatureVoice shared, int tap, float sampleRate, Vector3 position, int place = 0)
-        : base(shared.Spec.SourceLevelDb, shared.Spec.PeakHeadroomDb, sampleRate, position, shared.Spec.WindHeightMetres)
+    public WaterTapState(WaterFeatureVoice shared, int tap, float sampleRate, Vector3 position, WorldWeather weather, int place = 0)
+        : base(shared.Spec.SourceLevelDb, shared.Spec.PeakHeadroomDb, sampleRate, position, shared.Spec.WindHeightMetres, weather)
     {
         Shared = shared;
         Tap = tap;
@@ -204,8 +209,8 @@ public sealed class FireVoiceState : NatureVoiceState
     /// <summary>When it was lit on the shared clock (FireSpec.KeyFor), or null for one always burning.</summary>
     public double? LitAt;
 
-    public FireVoiceState(FireSpec spec, float sampleRate, int seed, Vector3 position)
-        : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.FlameHeightMetres)
+    public FireVoiceState(FireSpec spec, float sampleRate, int seed, Vector3 position, WorldWeather weather)
+        : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.FlameHeightMetres, weather)
     {
         Fire = new FireSynth(spec, sampleRate, seed);
     }
@@ -226,8 +231,8 @@ public sealed class FoliageVoiceState : NatureVoiceState
 {
     public readonly FoliageSynth Foliage;
 
-    public FoliageVoiceState(FoliageSpec spec, float sampleRate, int seed, Vector3 position)
-        : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.CrownHeightMetres)
+    public FoliageVoiceState(FoliageSpec spec, float sampleRate, int seed, Vector3 position, WorldWeather weather)
+        : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.CrownHeightMetres, weather)
     {
         Foliage = new FoliageSynth(spec, sampleRate, seed);
     }
@@ -235,7 +240,7 @@ public sealed class FoliageVoiceState : NatureVoiceState
     protected override void Control(float seconds, float dt)
     {
         // Each bough reads the wind where it is in the crown, not all of them at its middle.
-        Foliage.ReadWind(Position.X, Position.Z, WindField.Now());
+        Foliage.ReadWind(Weather.Wind, Position.X, Position.Z, WindField.Now());
         Foliage.Control(dt);
     }
 
@@ -259,6 +264,8 @@ public sealed class PlacedNatureVoice
     public readonly FireSynth? Fire;
     public readonly RunningWaterSynth? Flow;
     public readonly ShoreSynth? Shore;
+    /// <summary>The weather of the world this source plays in: its wind, and the rain running off.</summary>
+    public readonly WorldWeather Weather;
 
     private const int RingBits = 17;
     public const int RingLength = 1 << RingBits;
@@ -283,12 +290,12 @@ public sealed class PlacedNatureVoice
     /// <summary>Place voices reading this synth, for the log.</summary>
     public int Voices;
 
-    public PlacedNatureVoice(string key, FoliageSpec spec, int places, float sampleRate, int seed, Vector3 position)
-        : this(places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.CrownHeightMetres)
+    public PlacedNatureVoice(string key, FoliageSpec spec, int places, float sampleRate, int seed, Vector3 position, WorldWeather weather)
+        : this(places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.CrownHeightMetres, weather)
         => Foliage = new FoliageSynth(spec, sampleRate, seed, places);
 
-    public PlacedNatureVoice(string key, FireSpec spec, int places, float sampleRate, int seed, Vector3 position)
-        : this(places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.FlameHeightMetres)
+    public PlacedNatureVoice(string key, FireSpec spec, int places, float sampleRate, int seed, Vector3 position, WorldWeather weather)
+        : this(places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.FlameHeightMetres, weather)
     {
         Fire = new FireSynth(spec, sampleRate, seed, places);
         FireSpec.ParseKey(key, out _, out _litAt);
@@ -297,18 +304,20 @@ public sealed class PlacedNatureVoice
     /// <summary>When a fire was lit on the shared clock (its key), or null for one always burning.</summary>
     private readonly double? _litAt;
 
-    public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position)
-        : this(Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f)
+    public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position, WorldWeather weather)
+        : this(Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f, weather)
         => Flow = new RunningWaterSynth(spec, sampleRate, seed);
 
     /// <summary>Waves at an edge (ShoreSynth); fetch, lie and length come from the map's key
     /// (ShoreSpec.KeyFor).</summary>
-    public PlacedNatureVoice(string key, ShoreSpec spec, ShoreGeometry geometry, float sampleRate, int seed, Vector3 position)
-        : this(spec.TotalPlaces, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 10f)
+    public PlacedNatureVoice(string key, ShoreSpec spec, ShoreGeometry geometry, float sampleRate, int seed, Vector3 position, WorldWeather weather)
+        : this(spec.TotalPlaces, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 10f, weather)
         => Shore = new ShoreSynth(spec, sampleRate, seed, geometry);
 
-    private PlacedNatureVoice(int places, float sampleRate, Vector3 position, float levelDb, float headroomDb, float windHeight)
+    private PlacedNatureVoice(int places, float sampleRate, Vector3 position, float levelDb, float headroomDb, float windHeight,
+                              WorldWeather weather)
     {
+        Weather = weather;
         Places = Math.Max(1, places);
         Position = position;
         SourceLevelDb = levelDb;
@@ -367,9 +376,9 @@ public sealed class PlacedNatureVoice
                 float target = MathF.Max(0f, TargetTrees);
                 _trees = _trees < 0f ? target : _trees + (target - _trees) * MathF.Min(1f, dt / 0.5f);
                 Foliage.Trees = _trees;
-                Foliage.ReadWindAt(Position.X, Position.Z, now, WindPlaces);
+                Foliage.ReadWindAt(Weather.Wind, Position.X, Position.Z, now, WindPlaces);
             }
-            else Foliage.ReadWind(Position.X, Position.Z, now);
+            else Foliage.ReadWind(Weather.Wind, Position.X, Position.Z, now);
             Foliage.Control(dt);
         }
         else if (Fire != null)
@@ -378,7 +387,7 @@ public sealed class PlacedNatureVoice
             Fire.Lit = Running;
             Fire.Quench = TargetQuench;
             // The wind at each of its places: a gust crosses a big fire as it crosses a wood.
-            Fire.ReadWind(Position.X, Position.Z, now);
+            Fire.ReadWind(Weather.Wind, Position.X, Position.Z, now);
             if (_litAt is double lit) Fire.Age = now - lit;
             Fire.Control(dt);
         }
@@ -389,15 +398,15 @@ public sealed class PlacedNatureVoice
             Flow.Spread = spread;
             // A tap runs when somebody has turned it on (Running, from the server), and the basin under
             // it goes on draining after; anything else runs with its own flow and the rain.
-            Flow.Flow = spec.Tap != null ? spec.FlowNow(tapOn: Running) : Running ? spec.FlowNow() : 0f;
-            Flow.RainOnWater = Runoff.RainMmPerHour;
+            Flow.Flow = spec.Tap != null ? spec.FlowNow(Weather, tapOn: Running) : Running ? spec.FlowNow(Weather) : 0f;
+            Flow.RainOnWater = Weather.Runoff.RainMmPerHour;
             Flow.Control(dt);
         }
         else if (Shore != null)
         {
             // The sea follows the mean wind over the water (the synth glides it over minutes); a gust is
             // too short to raise waves.
-            var air = WindField.Weather.At(now);
+            var air = Weather.Wind.At(now);
             Shore.Spread = spread;
             Shore.WindSpeed = Running ? air.Speed : 0f;
             Shore.WindFromDegrees = air.FromDegrees;
@@ -416,7 +425,7 @@ public sealed class NaturePlaceState : NatureVoiceState
     /// <summary>Every place renders against the whole source's level and headroom, so the places'
     /// powers add up to the source's and the mixer places each by it.</summary>
     public NaturePlaceState(PlacedNatureVoice shared, int place, float sampleRate, Vector3 position)
-        : base(shared.SourceLevelDb, shared.HeadroomDb, sampleRate, position, shared.WindHeight)
+        : base(shared.SourceLevelDb, shared.HeadroomDb, sampleRate, position, shared.WindHeight, shared.Weather)
     {
         Shared = shared;
         Place = place;

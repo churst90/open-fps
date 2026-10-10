@@ -92,9 +92,9 @@ public static class TrainSceneSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
         scene.Build(new List<SteamAudioScene.Box> { new(new Vector3(0f, -0.5f, 0f), new Vector3(4000f, 1f, 4000f), Quaternion.Identity, "Asphalt") });
-        TracedReverbSet.Configure(ctx, scene);
-
         var provider = new FmodAudioProvider();
+        provider.Traced.Configure(ctx, scene);
+
         var facade = new AudioEngineFacade(provider);
         string sounds = OpenFPS.AudioLab.LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -116,7 +116,7 @@ public static class TrainSceneSpike
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(4000f, 1f, 4000f), IsSolid = true },
             Material = new MaterialComponent { Material = "Concrete" },
         });
-        WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
+        facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
         world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 15f, Humidity = 0.6f, AirPressure = 1013.25f, AirAbsorptionMultiplier = 1f });
         rail.Heard = (map, source, kind, list) =>
         {
@@ -238,7 +238,7 @@ public static class TrainSceneSpike
         finally
         {
             facade.Dispose();
-            TracedReverbSet.Dispose();
+            provider.Traced.Release();
             scene.Dispose();
             Phonon.iplContextRelease(ref ctx);
         }

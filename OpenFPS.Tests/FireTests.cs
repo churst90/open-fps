@@ -353,7 +353,7 @@ public class FireTests : IDisposable
             // Declared at 3 m/s at the flames; a crown fire in the field's own wind, which its spread follows.
             // Trees torch in turn, a minute or two apart: their level is a long one.
             float seconds = spec.Fuel == FireFuel.Trees ? 240f : 60f;
-            var x = spec.Fuel == FireFuel.Crown ? Render(f, seconds, each: (s, t) => s.ReadWind(0f, 0f, t)) : Render(f, seconds, wind: 3f);
+            var x = spec.Fuel == FireFuel.Crown ? Render(f, seconds, each: (s, t) => s.ReadWind(WindWeather.Default, 0f, 0f, t)) : Render(f, seconds, wind: 3f);
             double db = Db(x);
             _o.WriteLine($"{name}: {db:F1} dB against {spec.SourceLevelDb:F1}");
             Assert.InRange(db, spec.SourceLevelDb - 3, spec.SourceLevelDb + 3);

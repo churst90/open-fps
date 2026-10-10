@@ -365,18 +365,11 @@ public class GroundWaterTests : IDisposable
         Assert.Same(spec, RunningWaterSpec.ByName(key));
         Assert.Equal(GroundChannels.DryLitresPerSecond, spec.DryBelowLitresPerSecond);
         Assert.Equal(RunningWaterSpec.DryLitresPerSecond, RunningWaterSpec.ByName("gutter").DryBelowLitresPerSecond);
-        try
-        {
-            GroundWater.Shared.Settle(25f);
-            GroundWater.Held = true;
-            Assert.True(spec.FlowNow() > 0.1f);
-            Assert.Equal(GroundWater.Shared.FlowLitresPerSecond(c), spec.FlowNow());
-        }
-        finally
-        {
-            GroundWater.Held = false;
-            GroundWater.Shared.Load(null);
-        }
+        var weather = new WorldWeather();
+        weather.Ground.Settle(25f);
+        weather.Ground.Held = true;
+        Assert.True(spec.FlowNow(weather) > 0.1f);
+        Assert.Equal(weather.Ground.FlowLitresPerSecond(c), spec.FlowNow(weather));
         Assert.False(GroundChannels.TryParse("ground/rill/x", out _));
         Assert.False(GroundChannels.TryParse("creek", out _));
     }

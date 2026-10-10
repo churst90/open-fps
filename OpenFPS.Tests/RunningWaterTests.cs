@@ -90,40 +90,32 @@ public class RunningWaterTests
     [Fact]
     public void A_catchment_fills_and_runs_on_as_a_linear_reservoir()
     {
-        try
-        {
-            Runoff.Reset();
-            Runoff.Update(0f, 0);
-            // Rain starts: after one time constant 63 % of the way, after five nearly all.
-            for (int t = 1; t <= 120; t++) Runoff.Update(10f, t);
-            Assert.InRange(Runoff.Through(120f), 6.2f, 6.45f);
-            for (int t = 121; t <= 600; t++) Runoff.Update(10f, t);
-            Assert.InRange(Runoff.Through(120f), 9.9f, 10f);
-            // It stops: one time constant later a third is left, and a slower catchment keeps more.
-            for (int t = 601; t <= 720; t++) Runoff.Update(0f, t);
-            float fast = Runoff.Through(120f), slow = Runoff.Through(960f);
-            _o.WriteLine($"  2 min after: τ 120 s {fast:F2} mm/h, τ 960 s {slow:F2} mm/h");
-            Assert.InRange(fast, 3.6f, 3.75f);
-            Assert.True(slow > fast);
-            // A catchment between two rungs is read between them.
-            float between = Runoff.Through(170f), lo = MathF.Min(Runoff.Through(120f), Runoff.Through(240f)), hi = MathF.Max(Runoff.Through(120f), Runoff.Through(240f));
-            Assert.InRange(between, lo, hi);
-        }
-        finally { Runoff.Reset(); }
+        var runoff = new Runoff();
+        runoff.Update(0f, 0);
+        // Rain starts: after one time constant 63 % of the way, after five nearly all.
+        for (int t = 1; t <= 120; t++) runoff.Update(10f, t);
+        Assert.InRange(runoff.Through(120f), 6.2f, 6.45f);
+        for (int t = 121; t <= 600; t++) runoff.Update(10f, t);
+        Assert.InRange(runoff.Through(120f), 9.9f, 10f);
+        // It stops: one time constant later a third is left, and a slower catchment keeps more.
+        for (int t = 601; t <= 720; t++) runoff.Update(0f, t);
+        float fast = runoff.Through(120f), slow = runoff.Through(960f);
+        _o.WriteLine($"  2 min after: τ 120 s {fast:F2} mm/h, τ 960 s {slow:F2} mm/h");
+        Assert.InRange(fast, 3.6f, 3.75f);
+        Assert.True(slow > fast);
+        // A catchment between two rungs is read between them.
+        float between = runoff.Through(170f), lo = MathF.Min(runoff.Through(120f), runoff.Through(240f)), hi = MathF.Max(runoff.Through(120f), runoff.Through(240f));
+        Assert.InRange(between, lo, hi);
     }
 
     [Fact]
     public void Someone_arriving_in_rain_finds_the_gutters_running()
     {
-        try
-        {
-            Runoff.Reset();
-            Runoff.Update(Rainfall.HeavyRate, 1000.0);
-            var gutter = RunningWaterSpec.KerbGutter;
-            Assert.InRange(Runoff.Through(gutter.CatchmentSeconds), Rainfall.HeavyRate * 0.999f, Rainfall.HeavyRate * 1.001f);
-            Assert.True(gutter.FlowFor(Runoff.Through(gutter.CatchmentSeconds)) > 1f);
-        }
-        finally { Runoff.Reset(); }
+        var runoff = new Runoff();
+        runoff.Update(Rainfall.HeavyRate, 1000.0);
+        var gutter = RunningWaterSpec.KerbGutter;
+        Assert.InRange(runoff.Through(gutter.CatchmentSeconds), Rainfall.HeavyRate * 0.999f, Rainfall.HeavyRate * 1.001f);
+        Assert.True(gutter.FlowFor(runoff.Through(gutter.CatchmentSeconds)) > 1f);
     }
 
     [Fact]

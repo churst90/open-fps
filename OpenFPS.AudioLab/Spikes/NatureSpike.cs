@@ -48,6 +48,8 @@ public static class NatureSpike
     private static string[]? Parts;
     private static float? Steady;
     private static int? Tap;
+    /// <summary>The weather every render here hears, set from the arguments.</summary>
+    private static readonly WorldWeather Air = new();
 
     public static int Run(string[] args)
     {
@@ -55,9 +57,9 @@ public static class NatureSpike
         Tap = args.Any(a => a.StartsWith("tap=", StringComparison.Ordinal)) ? (int)Arg(args, "tap=", 0f) : null;
         Parts = args.FirstOrDefault(a => a.StartsWith("parts=", StringComparison.Ordinal))?.Substring(6).Split(',');
         float sec = Arg(args, "sec=", 30f);
-        float wind = Arg(args, "wind=", WindField.MeanSpeed);
-        WindField.MeanSpeed = wind;
-        if (args.Any(a => a.StartsWith("turb=", StringComparison.Ordinal))) WindField.Turbulence = Arg(args, "turb=", WindField.Turbulence);
+        float wind = Arg(args, "wind=", Air.MeanSpeed);
+        Air.MeanSpeed = wind;
+        if (args.Any(a => a.StartsWith("turb=", StringComparison.Ordinal))) Air.Turbulence = Arg(args, "turb=", Air.Turbulence);
         AcousticRegistry.Initialize();
 
         if (args.Contains("live")) return Live(Arg(args, "sec=", 10f), Arg(args, "dist=", 3f));
@@ -119,6 +121,7 @@ public static class NatureSpike
             string cap = Path.Combine(dir, key.Replace(':', '_') + ".wav");
             Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
             var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+            provider.Weather.Wind = Air.Wind;
             if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
             provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
             var (level, extent, headroom) = Declared(key);
@@ -206,7 +209,7 @@ public static class NatureSpike
                 Span<float> taps = stackalloc float[s.TapCount];
                 for (int i = 0; i < n; i += block)
                 {
-                    s.Wind = Steady ?? WindField.SpeedAt(x, spec.WindHeightMetres, z, i / (double)Rate);
+                    s.Wind = Steady ?? Air.SpeedAt(x, spec.WindHeightMetres, z, i / (double)Rate);
                     s.Control(block / (float)Rate);
                     for (int k = i; k < Math.Min(n, i + block); k++)
                     {
@@ -232,7 +235,7 @@ public static class NatureSpike
                 }
                 for (int i = 0; i < n; i += block)
                 {
-                    s.Wind = Steady ?? WindField.SpeedAt(x, spec.FlameHeightMetres, z, i / (double)Rate);
+                    s.Wind = Steady ?? Air.SpeedAt(x, spec.FlameHeightMetres, z, i / (double)Rate);
                     s.Control(block / (float)Rate);
                     for (int k = i; k < Math.Min(n, i + block); k++) pa[k] = s.Next();
                 }
@@ -250,11 +253,11 @@ public static class NatureSpike
                 for (int i = 0; i < n; i += block)
                 {
                     if (Steady is float still) s.Wind = still;
-                    else s.ReadWind(x, z, i / (double)Rate);
+                    else s.ReadWind(Air.Wind, x, z, i / (double)Rate);
                     s.Control(block / (float)Rate);
                     for (int k = i; k < Math.Min(n, i + block); k++) pa[k] = s.Next();
                 }
-                float mean = WindField.MeanAt(spec.CrownHeightMetres);
+                float mean = WindField.MeanAt(Air.MeanSpeed, spec.CrownHeightMetres);
                 return (pa, spec.SourceLevelDb,
                         $"  wind at the crown {mean:F1} m/s mean; {s.StrikesPerSecond(mean):F0} leaf strikes/s at the mean, {s.StrikesPerSecond(mean * 1.6f):F0} in a gust");
             }

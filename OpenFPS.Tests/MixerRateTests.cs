@@ -79,9 +79,9 @@ public class MixerRateTests
             ("engine", new EngineVoiceState(MachineRegistry.VehicleFor("i4_midsize"), rate, 1).SampleRate),
             ("machine", new MachineVoiceState(SmallMachineSpec.ByName(SmallMachineSpec.Presets.Keys.First()), rate, 1, 2).SampleRate),
             ("siren", new SirenVoiceState(SirenSpec.ByName(SirenSpec.Presets.Keys.First()), rate).SampleRate),
-            ("water", new WaterVoiceState(WaterFeatureSpec.ByName(WaterFeatureSpec.Presets.Keys.First()), rate, 1, at).SampleRate),
-            ("fire", new FireVoiceState(FireSpec.ByName(FireSpec.Presets.Keys.First()), rate, 1, at).SampleRate),
-            ("foliage", new FoliageVoiceState(FoliageSpec.ByName(FoliageSpec.Presets.Keys.First()), rate, 1, at).SampleRate),
+            ("water", new WaterVoiceState(WaterFeatureSpec.ByName(WaterFeatureSpec.Presets.Keys.First()), rate, 1, at, new WorldWeather()).SampleRate),
+            ("fire", new FireVoiceState(FireSpec.ByName(FireSpec.Presets.Keys.First()), rate, 1, at, new WorldWeather()).SampleRate),
+            ("foliage", new FoliageVoiceState(FoliageSpec.ByName(FoliageSpec.Presets.Keys.First()), rate, 1, at, new WorldWeather()).SampleRate),
         };
         foreach (var (name, r) in voices) Assert.True(r == rate, $"{name} runs at {r} Hz, given {rate}");
     }

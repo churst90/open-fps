@@ -207,7 +207,7 @@ public static class StreamWalkSpike
             // A stop is measured once everything has settled: no tile message for a second, the client's
             // acoustic map refreshed, the worker's last scene handed over to every tracer.
             if (stopSince >= 0 && now - stopSince > 2.0 && now - lastTileMessage > 1.0 && !client.AcousticRefreshPending
-                && !worker.SceneBuildPending && !TracedReverbSet.Reconfiguring)
+                && !worker.SceneBuildPending && !worker.Traced.Reconfiguring)
             {
                 MeasureStop(worker, ++stopsMade, at, walked, offsets);
                 stopSince = -1;

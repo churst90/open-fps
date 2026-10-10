@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Sound library stage 5, first slice (docs/SOUND_LIBRARY_BOUNDARY.md section 18), on its branch: the traced
+  reverb's places and the weather belong to one audio world instead of the process. `TracedReverbSet` is an
+  instance the FMOD provider holds and the acoustic worker is handed; `TracedReverb.Current` and
+  `TracedEchoes.Current` are gone (a traced echo's rig carries its tracer). `WorldWeather` holds the wind, the
+  run-off and the ground's water for one world: the session fills it from the server's broadcast, the client
+  advances the run-off, and every tree, fire, fountain, drain, shore and the wind at your ears reads it.
+  `WindField.Weather`, `MeanSpeed`, `Turbulence`, `Hold`, the static `Runoff` and `GroundWater.Shared` are gone;
+  `WindField.Now()` stays the one world time. No sound changed: the renders and the emitter streams are the
+  same, unregenerated. The wire hash changes (the weather files are in it), so server and clients are rebuilt
+  together; nothing sent changed, and the door fingerprint is the same.
+
 - The ground no longer comes up through the floors on Magnolia and Albany, unheard. Since geometry stage 4 their
   floors are their footprints' prisms, and the grading of the ground under slabs took only boxes, so on a slope the
   dirt rose through the back of every house: footsteps were on dirt somewhere in 1,253 of Albany's rooms and 377 of

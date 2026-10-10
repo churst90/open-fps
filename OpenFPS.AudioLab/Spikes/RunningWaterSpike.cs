@@ -187,17 +187,16 @@ public static class RunningWaterSpike
                     ? $", {st.DepthMetres * 1000:F0} mm deep, {st.SpeedMetresPerSecond:F2} m/s, {st.WettedWidthMetres * 100:F0} cm wide, Fr {st.Froude:F2}" : ""));
             }
             // After a heavy shower stops: the reservoir's recession.
-            Runoff.Reset();
-            Runoff.Update(Rainfall.HeavyRate, 0);
+            var runoff = new Runoff();
+            runoff.Update(Rainfall.HeavyRate, 0);
             var line = new StringBuilder("  after heavy rain stops:");
             for (int t = 0; t <= 1800; t += 1)
             {
-                if (t > 0) Runoff.Update(0f, t);
-                if (t % 300 == 0) line.Append(CultureInfo.InvariantCulture, $"  {t / 60} min {spec.FlowFor(Runoff.Through(spec.CatchmentSeconds)) * 1000:F1} mL/s");
+                if (t > 0) runoff.Update(0f, t);
+                if (t % 300 == 0) line.Append(CultureInfo.InvariantCulture, $"  {t / 60} min {spec.FlowFor(runoff.Through(spec.CatchmentSeconds)) * 1000:F1} mL/s");
             }
             Console.WriteLine(line);
         }
-        Runoff.Reset();
         return 0;
     }
 
@@ -243,7 +242,7 @@ public static class RunningWaterSpike
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(600f, 1f, 600f), IsSolid = true },
             Material = new MaterialComponent { Material = "Asphalt" },
         });
-        WindField.Weather = WindWeather.Steady(1.5f, 250f, 0.2f);
+        facade.Weather.Wind = WindWeather.Steady(1.5f, 250f, 0.2f);
 
         var segments = new List<Segment>();
         int nextId = 100;
@@ -326,8 +325,8 @@ public static class RunningWaterSpike
         // The run-off held where it is told, whatever falls: a drain heard running with or without the rain.
         void Runoff(float mmPerHour)
         {
-            OpenFPS.Common.Runoff.Settle(mmPerHour);
-            OpenFPS.Common.Runoff.Held = true;
+            facade.Weather.Runoff.Settle(mmPerHour);
+            facade.Weather.Runoff.Held = true;
         }
 
         try
@@ -422,11 +421,11 @@ public static class RunningWaterSpike
                 // ten minutes on, the roof's (a faster catchment) three.
                 float After(float seconds, string preset)
                 {
-                    OpenFPS.Common.Runoff.Held = false;
-                    OpenFPS.Common.Runoff.Reset();
-                    OpenFPS.Common.Runoff.Update(Rainfall.HeavyRate, 0);
-                    for (int t = 1; t <= seconds; t++) OpenFPS.Common.Runoff.Update(0f, t);
-                    return OpenFPS.Common.Runoff.Through(RunningWaterSpec.ByName(preset).CatchmentSeconds);
+                    facade.Weather.Runoff.Held = false;
+                    facade.Weather.Runoff.Reset();
+                    facade.Weather.Runoff.Update(Rainfall.HeavyRate, 0);
+                    for (int t = 1; t <= seconds; t++) facade.Weather.Runoff.Update(0f, t);
+                    return facade.Weather.Runoff.Through(RunningWaterSpec.ByName(preset).CatchmentSeconds);
                 }
                 float gutterAfter = After(600f, "gutter");
                 float pipeAfter = After(180f, "downpipe");
@@ -442,7 +441,7 @@ public static class RunningWaterSpike
                 // its kerb facing it: as it is, and with a basin overflow in the south kerb's inside face.
                 Runoff(0f);
                 Weather(0f);
-                WindField.Weather = WindWeather.Steady(2f, 250f, 0.2f);
+                facade.Weather.Wind = WindWeather.Steady(2f, 250f, 0.2f);
                 Vector3 centre = o + new Vector3(-120f, 0f, 60f);
                 (int Tap, Vector3 At)[] taps = { (0, new(0f, 1.9f, 0f)), (1, new(0f, 0.8f, 2.3f)), (2, new(2.3f, 0.8f, 0f)), (3, new(0f, 0.8f, -2.3f)), (4, new(-2.3f, 0.8f, 0f)) };
                 var ids = taps.Select(t => Add($"water:park_fountain/elm_park/{t.Tap}", centre + t.At, 160f, 1.5f)).ToList();
@@ -505,13 +504,13 @@ public static class RunningWaterSpike
                 // shower.
                 foreach (float minutes in new[] { 10f, 25f })
                 {
-                    OpenFPS.Common.Runoff.Held = false;
-                    OpenFPS.Common.Runoff.Reset();
-                    OpenFPS.Common.Runoff.Update(Rainfall.HeavyRate, 0);
-                    for (int t = 1; t <= minutes * 60f; t++) OpenFPS.Common.Runoff.Update(0f, t);
-                    OpenFPS.Common.Runoff.Held = true;
+                    facade.Weather.Runoff.Held = false;
+                    facade.Weather.Runoff.Reset();
+                    facade.Weather.Runoff.Update(Rainfall.HeavyRate, 0);
+                    for (int t = 1; t <= minutes * 60f; t++) facade.Weather.Runoff.Update(0f, t);
+                    facade.Weather.Runoff.Held = true;
                     var dp = RunningWaterSpec.ByName("downpipe");
-                    Console.WriteLine($"  {minutes:F0} min after heavy rain: downpipe {dp.FlowNow() * 1000:F2} mL/s");
+                    Console.WriteLine($"  {minutes:F0} min after heavy rain: downpipe {dp.FlowNow(facade.Weather) * 1000:F2} mL/s");
                     int a = Add("flow:downpipe", shoe, 50f, 0.6f);
                     Stand(garden, shoe);
                     Pump(4.0);
@@ -533,7 +532,7 @@ public static class RunningWaterSpike
         }
         finally
         {
-            OpenFPS.Common.Runoff.Held = false;
+            facade.Weather.Runoff.Held = false;
             facade.Dispose();
         }
         var sb = new StringBuilder("name,start,seconds,cpu_percent,mixer_load,hrtf_voices\n");

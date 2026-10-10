@@ -361,3 +361,4 @@ OpenFPS.Sound/WheelState.cs	lib	Sound
 OpenFPS.Sound/Wind.cs	lib	Sound	
 OpenFPS.Sound/WindModel.cs	lib	Sound	
 OpenFPS.Sound/WoodChorus.cs	lib	Sound	
+OpenFPS.Sound/WorldWeather.cs	lib	Sound	

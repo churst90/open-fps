@@ -53,8 +53,11 @@ public static class PaLeakSpike
 
         // The worker's answers, door shut, as the game asks them.
         var shut = new Dictionary<string, AcousticPathData>();
-        // Kept running while the scenes play: it traces the reverb at the ear (TracedReverbSet), as in the game.
-        using var worker = new AsyncAcousticWorker(acoustics);
+        string wav = Path.Combine(outDir, "capture.wav");
+        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
+        var provider = new FmodAudioProvider();
+        // Kept running while the scenes play: it traces the reverb at the ear into the provider's set, as in the game.
+        using var worker = new AsyncAcousticWorker(acoustics, provider.Traced);
         {
             worker.UpdateWorld(world);
             worker.Start();
@@ -99,9 +102,6 @@ public static class PaLeakSpike
             foreach (var s in scenes.Where(s => s.Name.StartsWith("lobby")).ToList())
                 scenes.Add((s.Name + "_dry", s.Ear, s.Path with { RegionId = -2 }));
 
-        string wav = Path.Combine(outDir, "capture.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
-        var provider = new FmodAudioProvider();
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         var csv = new System.Text.StringBuilder("name,start_s,seconds\n");
         try

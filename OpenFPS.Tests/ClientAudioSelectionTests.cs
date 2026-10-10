@@ -325,8 +325,8 @@ public class ClientAudioSelectionTests
     [MemberData(nameof(Kinds))]
     public void EveryKindOfPhysicalSourceIsPlacedAtItsOwnDeclaredLevel(string soundId)
     {
-        using var wind = WindField.Hold(WindWeather.Steady(6f, 270f, 0f));
         var h = new ClientAudioHarness();
+        h.Facade.Weather.Wind = WindWeather.Steady(6f, 270f, 0f);
         h.StandAt(Vector3.Zero);
         const int Id = 77;
         AddSource(h, Id, soundId, new Vector3(0f, 1f, 12f), new Vector3(4f, 1f, 4f));
@@ -366,11 +366,11 @@ public class ClientAudioSelectionTests
     [MemberData(nameof(FirePresets))]
     public void EveryFirePresetOnItsOwnBedIsPlacedAtItsOwnDeclaredLevel(string preset)
     {
-        using var wind = WindField.Hold(WindWeather.Steady(6f, 270f, 0f));
         var spec = FireSpec.ByName(preset);
         foreach (float areaRatio in new[] { 1f, 2f })
         {
             var h = new ClientAudioHarness();
+            h.Facade.Weather.Wind = WindWeather.Steady(6f, 270f, 0f);
             h.StandAt(Vector3.Zero);
             const int Id = 78;
             float side = MathF.Sqrt(areaRatio);
@@ -742,8 +742,8 @@ public class ClientAudioSelectionTests
     [Fact]
     public void ADistantWoodIsOneVoiceAndItsNearTreesLeaveItAsYouWalkIn()
     {
-        using var wind = WindField.Hold(WindWeather.Steady(5f, 270f, 0f));
         var h = new ClientAudioHarness();
+        h.Facade.Weather.Wind = WindWeather.Steady(5f, 270f, 0f);
         var trees = new List<int>();
         const int Side = 5;
         for (int i = 0; i < Side * Side; i++)
@@ -846,7 +846,6 @@ public class ClientAudioSelectionTests
         finally
         {
             h.Audio.LeaveWorld(Array.Empty<int>());
-            Runoff.Reset();
         }
     }
 
