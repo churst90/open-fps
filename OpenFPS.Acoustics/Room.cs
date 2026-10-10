@@ -14,7 +14,6 @@ public struct Room
     public float ReverbTimeScale { get; set; } = 1.0f;
     /// <summary>Resonance indices of the six faces (AcousticRegistry), in <see cref="RoomAcoustics.FaceNames"/>' order.</summary>
     public int[] Materials { get; set; } = new int[6];
-    public string AmbienceId { get; set; } = "";
     /// <summary>Its air's volume as the flood measured it, m³; 0 where it did not flood (the box serves).</summary>
     public float Volume { get; set; }
     /// <summary>Each face's area as the flood measured it (what lines it, what is open, what is another room's air), m²; null where it did not flood.</summary>

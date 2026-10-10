@@ -849,8 +849,6 @@ public sealed partial class ClientGameSession : IDisposable
                 // At once: the world-state broadcast is once a second, and until then the acoustics
                 // would use the previous map's air.
                 _world.ApplyManifestAtmosphere(manifest);
-                // Ducked by shelter, never switched off: a doorway is a change in the world, not its end.
-                _audioSystem.SetMapAmbience(manifest.AmbienceId);
                 _audioSystem.Beacons.SetMapPolicy(manifest.BeaconPolicy);
                 // A new map's roads come with its data; until then there are none.
                 _audioSystem.Driving.SetRoads(null);

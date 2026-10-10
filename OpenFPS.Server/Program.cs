@@ -1284,7 +1284,6 @@ public class GameServer
             manifest.PlayMin = mapData.WalkMin;
             manifest.PlayMax = mapData.WalkMax;
             manifest.Gravity = mapData.Gravity;
-            manifest.AmbienceId = mapData.AmbienceId ?? "";
             manifest.BeaconPolicy = mapData.BeaconPolicy == null ? Array.Empty<string>()
                 : mapData.BeaconPolicy.Select(kv => $"{kv.Key}={kv.Value}").ToArray();
             manifest.Temperature = mapData.Temperature;

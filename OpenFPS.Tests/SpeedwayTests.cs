@@ -204,7 +204,6 @@ public class SpeedwayTests
         Assert.NotNull(map);
         Assert.Equal("speedway", map!.Id);
         Assert.True(map.IsDefault, "the speedway should be where a player lands");
-        Assert.True(string.IsNullOrEmpty(map.AmbienceId), "the speedway is meant to have no ambience bed");
         Assert.NotNull(map.Tracks);
         Assert.NotNull(map.Vehicles);
         Assert.True(map.Vehicles!.Count >= 6, "a race wants a field");

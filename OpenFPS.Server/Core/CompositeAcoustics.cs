@@ -109,7 +109,6 @@ public static class CompositeAcoustics
             RoomSize = survey.Size,
             ReverbTimeScale = 1.0f,
             Materials = materials,
-            AmbienceId = "",
         };
         return true;
     }
@@ -169,7 +168,6 @@ public static class CompositeAcoustics
             RoomSize = survey.Size,
             ReverbTimeScale = 1.0f,
             Materials = materials,
-            AmbienceId = "",
         };
         return true;
     }

@@ -350,11 +350,6 @@ public partial class ClientAudioSystem
     private readonly string[] _boundaryMaterials = new string[BoundaryModel.ProbeDirections.Length];
     private readonly BoundaryProbe[] _boundaryProbes = new BoundaryProbe[BoundaryModel.ProbeDirections.Length];
 
-    // Ambience beds. The map's outdoor bed plays for the whole session and is ducked by shelter; a
-    // region that declares one of its own plays on top while the listener is inside it.
-    private string _mapAmbienceId = "";
-    private string _regionAmbienceId = "";
-    private int _ambienceRegionId = int.MinValue;
 
     /// <summary>With <paramref name="prewarm"/> false the city's doors are not rendered in the background
     /// at start: a session with no sound has nothing to play them on.</summary>
@@ -491,11 +486,6 @@ public partial class ClientAudioSystem
         foreach (int id in entityIds) ForgetEntity(id);
         ForgetTrains();
         WorldAudio.Clear();
-        if (_mapAmbienceId.Length > 0) _audio.StopAmbientBed(_mapAmbienceId);
-        if (_regionAmbienceId.Length > 0) _audio.StopAmbientBed(_regionAmbienceId);
-        _mapAmbienceId = "";
-        _regionAmbienceId = "";
-        _ambienceRegionId = int.MinValue;
         _rain.Stop();
         _audio.StopAllWorldSounds();
         // Nobody is standing anywhere: no wind at the ears until the next map.
@@ -643,9 +633,7 @@ public partial class ClientAudioSystem
         // what tells a corridor from a doorway from open air, and changes as you turn.
         UpdateBoundaryProbes(world, visualEyePos);
 
-        UpdateAmbience(world, listenerRegionId);
-
-        Stage(0, ref stageTicks);     // everything up to here: region, listener, map, probes, ambience
+        Stage(0, ref stageTicks);     // everything up to here: region, listener, map, probes
 
         // The acoustic path of every playing sound, and of every car and machine holding a live slot even
         // when the mixer is not playing it. Asking only about playing voices let an occluded-silent voice's
@@ -3862,48 +3850,6 @@ public partial class ClientAudioSystem
             EchoScattering = smear,
             EchoMirrorShare = 0f,
         });
-    }
-
-    /// <summary>The map's outdoor ambience bed, from the manifest; started by the next audio update.</summary>
-    public void SetMapAmbience(string ambienceId)
-    {
-        _mapAmbienceId = ambienceId ?? "";
-        _ambienceRegionId = int.MinValue;   // force the next update to reconsider
-    }
-
-    /// <summary>
-    /// Keeps the ambience beds in step with the listener. The outdoor bed is only ducked indoors, never
-    /// stopped, by <see cref="LocalPlayerState.ShelterFactor"/> (sky rays and the indoor flag): a room
-    /// with a door is still connected to outside. A region's own AmbienceId plays on top inside it, and
-    /// both beds glide to their levels, so a doorway cross-fades.
-    /// </summary>
-    private void UpdateAmbience(WorldSnapshot world, int listenerRegionId)
-    {
-        if (_mapAmbienceId.Length > 0)
-        {
-            float outdoor = AcousticConstants.OutdoorAmbienceLevel *
-                            (1f - _state.ShelterFactor * AcousticConstants.ShelteredAmbienceDuck);
-            _audio.PlayAmbientBed(_mapAmbienceId, AmbisonicFormat.GuessLayout(_mapAmbienceId), outdoor);
-        }
-
-        if (listenerRegionId == _ambienceRegionId) return;
-        _ambienceRegionId = listenerRegionId;
-
-        string wanted = "";
-        if (world.AcousticMap != null &&
-            listenerRegionId != AcousticConstants.GlobalRegionId &&
-            world.AcousticMap.Regions.TryGetValue(listenerRegionId, out var region))
-        {
-            wanted = region.AmbienceId ?? "";
-        }
-
-        if (wanted == _regionAmbienceId) return;
-
-        if (_regionAmbienceId.Length > 0) _audio.StopAmbientBed(_regionAmbienceId);
-        _regionAmbienceId = wanted;
-        if (_regionAmbienceId.Length > 0)
-            _audio.PlayAmbientBed(_regionAmbienceId, AmbisonicFormat.GuessLayout(_regionAmbienceId),
-                                  AcousticConstants.RegionAmbienceLevel);
     }
 
     // ── The ground ─────────────────────────────────────────────────────────────────────────────

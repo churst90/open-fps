@@ -212,7 +212,7 @@ public class PrefabSpecTests
     {
         var t = Valid();
         t.IsSolid = false;
-        t.AmbienceId = "AMBIENCE/room";
+        t.IsIndoor = true;
         Rejects(t, "RoomSize");
     }
 

@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- No ambience beds at all (Cody, 2026-10-10): the map's outdoor bed and the region beds, their provider calls
+  (`PlayAmbientBed`, `StopAmbientBed`), `SetMapAmbience`, `PrefabTemplate.AmbienceId` and the map file's
+  `AmbienceId` are gone; the maps are regenerated with that one line out. `RegionComponent.AmbienceId` and
+  `MapManifest.AmbienceId` stay on the wire, unread and empty. No shipped map named a bed, so nothing heard
+  changes. A prefab that names one is refused at load, as any field the loader does not read is.
+
 - Sound library stage 5, first slice (docs/SOUND_LIBRARY_BOUNDARY.md section 18), on its branch: the traced
   reverb's places and the weather belong to one audio world instead of the process. `TracedReverbSet` is an
   instance the FMOD provider holds and the acoustic worker is handed; `TracedReverb.Current` and
