@@ -587,8 +587,8 @@ public partial struct EntityState
     /// <summary>The demand as a fraction, 0..2.</summary>
     public float TyreDemandFraction => TyreDemand / 127.5f;
 
-    public static byte EncodeTyreDemand(float fraction)
-        => (byte)Math.Clamp((int)MathF.Round(fraction * 127.5f), 0, 255);
+    /// <summary>A demand fraction as it is sent (<see cref="WheelState.EncodeDemand"/>).</summary>
+    public static byte EncodeTyreDemand(float fraction) => WheelState.EncodeDemand(fraction);
 }
 
 /// <summary>
@@ -606,7 +606,7 @@ public struct WheelState
     public sbyte SlipAngle;
     /// <summary>The surface under it, an index into <see cref="OpenFPS.Common.RoadSurfaces"/>.</summary>
     public byte Surface;
-    /// <summary>Its share of its grip in use, 0..2 with 1 the limit, as <see cref="EntityState.TyreDemand"/>.</summary>
+    /// <summary>Its share of its grip in use, 0..2 with 1 the limit, in steps of 1/127.5 (<see cref="EncodeDemand"/>).</summary>
     public byte Demand;
     // APPEND ONLY BELOW THIS LINE: the struct is copied as its bytes.
     /// <summary>The water under it, mm from the bottom of the road's texture (RoadWater), on a square
@@ -621,6 +621,10 @@ public struct WheelState
     public float SlipAngleRad => SlipAngle / 254f;
     public float DemandFraction => Demand / 127.5f;
 
+    /// <summary>A share of grip in use, 0..2 with 1 the limit, as a byte: the vehicle's tyre demand is sent the same way.</summary>
+    public static byte EncodeDemand(float fraction)
+        => (byte)Math.Clamp((int)MathF.Round(fraction * 127.5f), 0, 255);
+
     public static WheelState Encode(float loadNewtons, float angularSpeed, float slipRatio, float slipAngle, byte surface, float demand,
                                     float waterMm = 0f)
         => new()
@@ -631,7 +635,7 @@ public struct WheelState
             SlipRatio = (sbyte)Math.Clamp((int)MathF.Round(slipRatio * 127f), -127, 127),
             SlipAngle = (sbyte)Math.Clamp((int)MathF.Round(slipAngle * 254f), -127, 127),
             Surface = surface,
-            Demand = EntityState.EncodeTyreDemand(demand),
+            Demand = EncodeDemand(demand),
         };
 }
 
