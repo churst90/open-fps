@@ -79,8 +79,12 @@ Waiting on Cody's ear:
 - The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
 - (Approved 2026-10-09: the hull's blows in time.)
 - Recorded sounds' echoes smeared off rough walls: your steps and a PA (inbox/probable-bugs-2026-10-09/4-scattering).
-- Floors: layers in contact are one panel; a shout through the floor, before and after
-  (inbox/floors-2026-10-09).
+- (Approved 2026-10-10: the shut glass door leak fix, inbox/pa-leak-2026-10-09.)
+- Floors, heard 2026-10-10 (inbox/floors-2026-10-09): nothing audible at game level above or below; the
+  +40 dB copies are fuzzy and the sound cuts out, not a clean transfer. Being worked on.
+- Engine CPU (inbox/engine-cpu-2026-10-09), heard 2026-10-10: passby_i4_midsize_50kmh_3m sounded phased,
+  did not sweep right to left and did not sound 3 m away (the before file too). Being checked: the lab
+  capture is panned, not binaural. Not merged until heard again.
 
 ## Now
 
@@ -105,8 +109,9 @@ The last four were handled on 2026-10-09, on their own branch (renders in inbox/
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
-- The gas hob (docs/GAS_HOB.md, inbox/gas-stove-2026-10-10): the five renders first, then a `gas_hob`
-  placed in a kitchen and lit with the interact key. Not yet on any map.
+- The gas hob (docs/GAS_HOB.md, inbox/gas-stove-2026-10-10): heard 2026-10-10, liked; the spark tick is
+  a little too present and loud, and the sparks kept going long after the burner lit. Being fixed. Then a
+  `gas_hob` placed in a kitchen and lit with the interact key. Not yet on any map.
 - Doors: push and pull sides, the tower front doors locked from the street (key, then pull), nothing
   shutting on a person. The glass front door, glass shop door and lift door models
   (inbox/door-models-2026-10-05).
