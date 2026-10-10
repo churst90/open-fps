@@ -420,9 +420,9 @@ public static class WorldBuildings
         var (style, rise) = RoofOf(bd, kind, mat, wallH, label, p.Height);
         Oform(roofPrefab, F, outline, wallH, wallH + rise, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Roof, Style = style }, $"{name} roof", "structure");
         var boxes = RoomBoxes(F, ring, R);
+        // One ceiling over the whole footprint (gen_osm.py: per room it left a gap up into the eaves).
         if (homes)
-            foreach (var (u0, u1, v0, v1) in boxes)
-                Obox("plaster_wall", F, u0, u1, v0, v1, Ceil, Ceil + 0.06, $"{name} ceiling", "structure");
+            Oform("plaster_wall", F, outline, Ceil, Ceil + 0.06, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism }, $"{name} ceiling", "structure");
 
         // One room per rectangle, all called the same; the gaps between them are openings.
         string suffix = p.RoomSuffix ?? "";

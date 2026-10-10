@@ -2326,8 +2326,9 @@ def build(bd):
     STATS[f"{style.lower()} roofs"] += 1
     boxes = room_boxes(F, ring, R)
     if homes:
-        for (bu0, bu1, bv0, bv1) in boxes:
-            obox("plaster_wall", F, bu0, bu1, bv0, bv1, CEIL, CEIL + 0.06, name=f"{name} ceiling", layer="structure")
+        # One ceiling over the whole footprint: per room it left a gap over the opening between two rooms,
+        # straight up into the eaves.
+        oform("plaster_wall", F, outline, CEIL, CEIL + 0.06, {"Kind": "Prism"}, name=f"{name} ceiling", layer="structure")
 
     # ── Rooms ───────────────────────────────────────────────────────────────────────────────────
     cuts = defaultdict(list)          # side of the ring -> [(s0, s1, top)]

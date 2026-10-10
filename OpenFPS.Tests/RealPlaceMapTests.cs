@@ -112,7 +112,7 @@ public partial class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
                      $"server load {p.ServerLoad.TotalSeconds:F1} s, client grid {p.ClientGrid.TotalSeconds:F1} s, " +
                      $"acoustic map {p.AcousticBake.TotalSeconds:F1} s, {p.World.AcousticMap!.Regions.Count - 1} regions, {p.World.AcousticMap.Portals.Count} openings");
         Assert.False(p.Data.IsDefault, "a real place must not claim the landing map");
-        // Albany is 50,462 since its walls follow its footprints side by side (docs/GEOMETRY.md 12): 46,013 before.
+        // Albany is 49,732 since its walls follow its footprints side by side (docs/GEOMETRY.md 12): 46,013 before.
         Assert.True(p.Data.Entities.Count < 60000, $"{p.Data.Entities.Count} entities");
     }
 
