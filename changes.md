@@ -4,6 +4,20 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- The world has buildings outside the real places (docs/WORLD_STREAMING.md, "Buildings on the world's tiles").
+  Overture's footprints (Microsoft's, OpenStreetMap's, USGS lidar heights) are read by the server itself, by HTTP
+  byte range from Overture's GeoParquet on S3: only the footer of a file and the few columns of the row groups a tile
+  needs (about 2.3 MB covers a row group of 18,000 buildings), kept in `world/sources/overture`, all from one release
+  (2026-09-23.1). New server-only package: Parquet.Net (MIT, fully managed). Each building is built as gen_osm.py
+  builds a place's at medium detail, ported to C# (a test holds the port to Magnolia's map: 1,503 of its 1,506
+  medium-detail buildings the same in every part within 1 cm; in the other 3 two equal front walls tie and gen_osm's
+  rounding picks the other): walls, floor, roof, a ceiling
+  in a home, one room, a front door facing the nearest road, set on a level pad; sheds, garages and barns are solid
+  boxes. Without addresses a house is "House off Main Street", a shop or church by its own name. A building is
+  stored whole by the tile its middle is in and the ground is graded under it in every tile it touches, the same
+  whichever is made first. Driveways too: OpenStreetMap's, and gen_osm's made-up one for a house without. Each tile
+  records its buildings' sources and licences. Generator version 4. Not yet: addresses, lots and lawns, high detail.
+  Try `/join world address 401 Market St, Tomball, TX`. Unheard.
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
   and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;

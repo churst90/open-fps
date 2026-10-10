@@ -417,7 +417,8 @@ What is left after these four:
 
 - The per-tile generator for OpenStreetMap and Overture features (roads, buildings, addresses, woods)
   that gives the same answer whichever tile is made first. Roads and woods done 2026-10-10 ("Roads and woods
-  on the world's tiles"); buildings, addresses and the rest planned there. Over the two real places their
+  on the world's tiles"), buildings and driveways the same day ("Buildings on the world's tiles"); addresses,
+  lots and the rest to come. Over the two real places their
   maps are copied in ("Places in the world", 2026-10-09).
 - Coarse terrain at 8 m for the far ring (done 2026-10-09, "Coarse ground in the far ring"); still to do:
   the client's tile cache, frames that rebase past 8 km, crossing a UTM zone edge.
@@ -878,7 +879,7 @@ Code: `OneWorld/WorldFeatures` (the generator), `OneWorld/Osm` (`OverpassRegions
 - **When the roads cannot be had** (Overpass down and the region not cached), the tile is not made and is
   tried again after 30 s, as when the survey cannot be asked: stored without its roads it would keep that
   hole. Land cover is different (above): a tile without it is dirt and has no woods, and is stored.
-- **Not yet:** buildings (below), drives, footpaths, rail, water, verges; roads are surfaces to walk and
+- **Not yet:** buildings and drives (done the same day, below), footpaths, rail, water, verges; roads are surfaces to walk and
   drive on, not yet roads the traffic routes on (`RoadData`), so the world's traffic is still only the
   places'; bridges and tunnels are laid on the ground like any road.
 - **Licence.** The store is now a derived database of OpenStreetMap (ODbL 1.0): each tile with roads
@@ -901,41 +902,125 @@ So a tile's roads cost about 3 KB stored and a few milliseconds of the server's 
 still the survey (and, once per region, Overpass: 3 to 10 s for a region the first time anyone goes near it,
 fetched while the tile's survey is asked).
 
-#### Buildings: the plan
+### Buildings on the world's tiles (2026-10-10)
 
-Not built in this step: shells need footprints, and the footprints a place uses do not come from where the
-roads do.
+Outside the real places a world tile now has its buildings: Overture's footprints (Microsoft's traced from imagery,
+OpenStreetMap's, and the rest, with USGS lidar heights) built as gen_osm.py builds a place's at medium detail, each
+stored whole in the tile its middle is in, with the ground graded under it the same whichever tile is made first;
+and driveways, mapped ones from OpenStreetMap and made-up ones for houses without.
 
-1. **Footprints.** OpenStreetMap's buildings are sparse in the rural US (Magnolia's map takes its 4,000-odd
-   from Overture: Microsoft's footprints traced from imagery, OpenStreetMap's, USGS lidar heights). Overture is
-   GeoParquet on S3, read by bounding box; C# has no Parquet reader without a new package (Parquet.Net, MIT),
-   and the alternative is a downloader child process in its own venv (`fetch_place.py`'s overturemaps), as
-   this doc first planned. Either fills the regional cache with a region's footprints and heights (and
-   Overture's addresses, which are the National Address Database in the US, for the names). Cody's choice: a
-   new package in the server, or Python on the VPS. OpenStreetMap's own `building=*` ways can come in the same
-   Overpass region now, for towns that are mapped, as a first source.
-2. **The shell, gen_osm.py's build() at medium detail**, ported as the roads were: the footprint covered by up
-   to four rectangles (cover, largest_rect), walls round their union (exterior_runs, wall_run with the door
-   cut), a floor slab and a roof deck, one room per rectangle, a front door on the longest wall facing the
-   nearest road, a doorway joining the room to the outdoors; the shed rule (small outbuildings one solid box);
-   classify() without parcels (house, mobile home, premises, barn, shed by size, shape, Overture's class and
-   the land cover's built-up); a name from the address, else "House off Main Street".
-3. **The same answer whichever tile.** A building belongs to the tile its footprint's middle is in, which
-   stores all of it (rooms, doorway and door together, as the places' copies keep them); a tile grades its
-   ground to the floor slab of every building within its margin (a pad, as gen_osm.py's pad_of), so a house
-   across an edge sits level in both. Doors link to rooms by ids within their own tile (already how a copied
-   tile is spawned).
-4. **Then** drives and lots (lot lines decided between neighbouring addresses within the 100 m margin the doc
-   gives), interiors at high detail, and roads as RoadData so the world's traffic can use them.
+Code: `OneWorld/Overture` (`OvertureBuildings`, `Footprint`, `Wkb`), `OneWorld/WorldBuildings` (the port of
+build()), `OneWorld/WorldFeatures.Buildings` (what a building is, its name, pad, front and drive; the tile's part),
+`WorldFeatures.Lay` (drives; the window's margin), `WorldTileService.MakeWithFeaturesAsync`, `WorldTile.Buildings`,
+`world.json` `"Buildings"`. Tests: `WorldBuildingsTests`; fixture `OpenFPS.Tests/Fixtures/overture`.
 
-Estimate: footprints and shells one session once the data choice is made; lots, drives and addresses one
-more.
+**Reading Overture in the server** (Cody's choice, 2026-10-10: Microsoft's footprints through Overture, read by the
+server itself rather than by the Python downloader on the VPS).
+
+- **The package.** Parquet.Net 6.1.0 (MIT; its dependencies ZstdSharp.Port, K4os.Compression.LZ4,
+  CommunityToolkit.HighPerformance and Microsoft.IO.RecyclableMemoryStream MIT, Snappier BSD-3-Clause), in the
+  server's project only (the clients never see it). Fully managed, no native libraries, so the VPS needs nothing
+  new. It reads any seekable stream, opens a file from its footer alone, exposes each row group's column statistics
+  and the byte range of each column chunk, and decodes one row group into a small class of only the columns wanted
+  (`OvertureRow`). Writing our own reader was the alternative: a Thrift footer parser, page decoding, nested levels
+  and ZSTD, about a thousand lines to keep; and .NET 10 has no ZSTD of its own, so a package was needed either way.
+- **Range reads.** A release's building files are listed with each file's bounding box in its STAC catalogue
+  (`stac.overturemaps.org/{release}/buildings/building/collection.json`, 110 KB, once; each file's item, 3 KB, once,
+  gives its URL and size). A file is about 600 MB: some five million buildings in 128 to 256 row groups, sorted by
+  place. A tile reads the footer of each file whose box reaches it (the last 8 bytes, then the footer, 1.4 MB, once
+  per file), keeps the row groups whose bbox statistics reach it, and fetches, by HTTP range, only the column chunks
+  a footprint is made of (id, names.primary, sources' dataset and licence, height, num_floors, class, subtype,
+  geometry, bbox), runs less than 64 KB apart joined into one request: about 2.3 MB for a row group of 18,000
+  buildings, which in the country round Magnolia covers some 12 by 14 km (2,600 tiles) and in a town much less.
+  Parquet.Net reads through a stream that holds only the ranges fetched (`FetchedStream`).
+- **The regional cache**: every range as it came, under `world/sources/overture/{release}/building/{file}/`
+  (`r{offset}-{length}.bin`, beside the item and the catalogue), with a `SOURCE.txt`. Outside the tile store's cap,
+  like the roads' and the land cover's. A row group fetched once serves every tile in it, offline as well; eight are
+  kept decoded in memory.
+- **One release**: `OvertureBuildings.Release` = 2026-09-23.1, as the roads pin a date, so two tiles fetched apart
+  read the same buildings. Overture keeps about two months of releases online (the bucket had 2026-08-19.0 and
+  2026-09-23.0/.1 on 2026-10-10). When this one is withdrawn, places already visited still read from the cache; a
+  tile in a new place cannot get its buildings, is not made, and is tried again (as when Overpass is down), and the
+  log says the release is gone. Moving to a newer release is a new generator version. **Expect that around the end of
+  November 2026.**
+- **Licences.** Overture records each source with its licence; each footprint keeps them ("dataset|licence"), and
+  each tile with buildings records them in `Buildings`: "Overture Maps Foundation buildings, release 2026-09-23.1:
+  (c) OpenStreetMap contributors, ODbL-1.0; Microsoft ML Buildings, ODbL-1.0; USGS Lidar" for Tomball. Overture
+  distributes Microsoft's footprints under the ODbL (Microsoft's own release is ODbL too), not CDLA; CDLA-Permissive
+  is Overture's licence for places and some address sources. USGS lidar heights carry no licence (public domain).
+- **Not used yet: Overture's addresses theme.** The same reader would read it (another `OvertureRow`-like class, the
+  same files and catalogue scheme), and a house would be named "1042 Belmont Avenue Southwest" instead of "House off
+  Belmont Avenue Southwest". Left for the lots step, which needs the addresses anyway.
+
+**The port** (`WorldBuildings.Build`, gen_osm.py's build() at medium detail; a comment in gen_osm.py says to keep the
+two the same): the footprint's smallest rectangle (hull, min_rect), the footprint covered by up to two rectangles
+(cover, largest_rect; one when it fills nine tenths of its rectangle), walls round the outside of their union
+(exterior_runs, wall_run) with the front door cut out of the longest wall facing the street, a floor slab and a roof
+deck over each rectangle (brick or siding by h01 of the label, metal for big premises), a plaster ceiling in a home,
+two storeys where lidar says 6.8 m and up, one room per rectangle, the front door joining a room to the outdoors
+(a glass pull door for premises, a hinged door turned away from its room otherwise). A shed, garage, workshop, barn
+or outbuilding is one solid box, set with its foot at the lowest ground under it. Everything else is set on the pad:
+the ground at the middle of the wall nearest the road (pad_of). Each room carries its materials (floor, ceiling, the
+walls' prefabs' materials) and is indoors, so a tile needs no survey.
+
+**What a building is, without addresses or lots** (`WorldFeatures.Classify`; gen_osm.py's classify() has both): a
+building with a name of its own is a place (a church by its class, else premises with an entrance); one Overture
+calls a home is a house, or a mobile home if it is a single-wide's shape or a static caravan; under 30 m² or called a
+shed, a shed; a garage or carport, a garage; another class, a building from 60 m²; and one with no class, as most of
+Microsoft's are, a house from 45 to 600 m² (a mobile home by its shape), an outbuilding under 45 m², a building over
+600 m². A house-sized one under 160 m² whose middle is within 30 m of a bigger one is that house's garage (under
+100 m²) or workshop, as gen_osm finds them on a lot. A "roof" (a canopy over a forecourt) is not made. Names: the
+building's own, else "House off Main Street" (the nearest road within 200 m), else "House"; the front faces the
+nearest road within 400 m (gen_osm faces an addressed house to its address's road). Buildings standing on a road's
+carriageway are not made (the road is kept), nor any reaching into a real place's tiles, nor any more than 230 m
+corner to corner (a mall, a distribution centre).
+
+**The same answer whichever tile.** A building belongs to the tile its middle is in, which stores all of it (rooms,
+door, walls, ids from 1 within the tile). Every tile works out every building within 12 m of it from the footprint
+and the roads alone (whole ways, 650 m round), and grades its ground to the floors of all of them, so a house across
+an edge sits level on both sides. The pad and the ground under a solid box are read from survey posts both tiles
+ask for: where a building near a tile is set on ground further out than the usual 50 m window, the tile asks the
+survey for a wider one (`MarginFor`, in tens of metres up to 250). Footprints are asked for 100 m round a tile, so
+the house next to a garage is seen by every tile that sees the garage. Woods keep 2 m off every building, as on a
+place.
+
+**Driveways.** OpenStreetMap's driveways, parking aisles and private service ways (gen_osm.py DRIVES) are laid on the
+ground as roads are, 3.6 m of concrete for a driveway, named "Driveway" or "Parking aisle". A house or mobile home
+with no mapped driveway ending within 15 m of it gets gen_osm's made-up one, without the lot: from the edge of the
+road it faces straight in to its front wall, 2.4 m in from the end h01 picks, square to the road or to the house; up
+to 60 m long, "House off Main Street driveway". Each piece is stored by the tile its middle is in and graded under in
+every tile it reaches, as a road's. **Lots** (yards and lawns, lot lines between neighbouring addresses) are not made:
+they need the addresses.
+
+Generator version 4 (the drainage branch also takes the next number; whichever merges second takes 5).
+
+Measured:
+
+| | |
+|---|---|
+| The port against Magnolia's map, given what gen_osm.py decided (kind, name, street, pad) for each of its 1,506 medium-detail buildings | 1,503 the same in every part: same ids, prefabs, names, rooms; worst 0.00 mm across, 0.10 mm in height, 0.03 mm in size, turn 1 - dot 1.2e-7. The other 3: the door on another wall of the same length facing the same way, a tie gen_osm.py breaks by floating-point rounding |
+| The world's own decisions on Magnolia's footprints and roads, the 9 tiles round the spawn, against the map (73 buildings) | pads: 41 of 41 within 1 cm; shells: 31 of 41 the same in every part, the other 10 facing another road than the nearest (gen_osm faces a house to its address's road); solid boxes 17 of 17 the same. Kinds differ where a lot decides (7 workshops and 4 barns on a house's lot made houses, 4 the other way) |
+| A house across an edge, A then B against B then A (made-up street, hills) | the same bytes; each building stored once; the edge one line of posts; no ground over any floor or drive at 343 points; a 150 m warehouse near B made B ask for a 90 m window (216 posts a side) |
+| Reading the trimmed extract (468 buildings round downtown Tomball, 6 row groups, 66 KB) for one tile's box | 45 buildings, the same as reading the whole file; 5 ranges, 37 KB read; a second reader over the cache asks nothing |
+| Downtown Tomball, 9 tiles, the recorded roads and the trimmed extract, offline, made-up hills | a tile 84 ms median, 177 ms most; 277 rooms, 219 front doors, 146 solid boxes; a tile 34 KB stored median, 39 KB most (was 22 KB with roads alone) |
+| Downtown Tomball, 9 real tiles over the network (3DEP, Overpass, WorldCover, Overture), cold caches | the first tile 15.2 s (the catalogue, a file's footer and one row group from Overture: 6 requests, 4,200 KB; Overpass's and WorldCover's first fetches; 3DEP); the other 8 0.3 to 1.1 s and nothing more from Overture; 28 to 36 KB a tile, 19 to 40 rooms a tile |
+| The same 9 tiles warm (the caches kept, a new store) | 0.35 to 0.62 s a tile (3DEP's time), no request to Overture |
+| Overture's cache after them | the 4.2 MB fetched, as it came: one row group of about 18,000 buildings, which serves the country round Tomball for some 12 km |
+
+#### Left for buildings
+
+- Addresses from Overture's addresses theme (the National Address Database in the US), then lots: front, back and
+  side yards and lawns as gen_osm.py makes them, a house's name from its address, and the front facing its
+  address's road.
+- High detail near a player (a house's rooms, inner and back doors, ridged roofs), as gen_osm builds within 300 m of
+  a place's spawn.
+- Buildings bigger than 230 m; building parts (Overture's building_part) for tall and stepped buildings.
+- A newer Overture release when 2026-09-23.1 is withdrawn (a new generator version).
 
 ### Left after stage 2 (as of 2026-10-10)
 
-- Outside the real places, world tiles have their roads and woods (2026-10-10, above), not yet buildings,
-  addresses, drives, paths, rail or water, and their roads are not yet roads the traffic routes on. The plan
-  for buildings is above.
+- Outside the real places, world tiles have their roads and woods, buildings and driveways (2026-10-10, above), not
+  yet addresses, lots, paths, rail or water, and their roads are not yet roads the traffic routes on.
 - (Done 2026-10-09: a player who logs out in the world comes back to the same spot at login, through the
   loading screen; the landing map if the ground there cannot be built within 30 s. See Building ahead.)
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.

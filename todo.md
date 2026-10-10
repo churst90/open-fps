@@ -17,9 +17,11 @@ the honest tests, the probable bugs and the trains fix are merged and shipped (V
    2026-10-09 (unheard): the world built before you get there, Magnolia and Albany copied into it, 8 m
    ground in the far ring, the places' elevation at 2 m on the UTM grid, a login back to where you left.
    2026-10-10 (unheard, unmerged branch): the ground's materials from ESA WorldCover; roads and woods on
-   the world's tiles outside the places. Next on this item: buildings on the world's tiles (needs Cody's
-   choice of footprint source: Parquet.Net in the server, or the Python downloader on the VPS; plan in
-   docs/WORLD_STREAMING.md "Buildings: the plan"), then the world's roads as RoadData for traffic.
+   the world's tiles outside the places; buildings (Overture read by the server with Parquet.Net, gen_osm's
+   shells at medium detail) and driveways on them (docs/WORLD_STREAMING.md "Buildings on the world's tiles").
+   Next on this item: addresses (Overture's addresses theme) and lots, then the world's roads as RoadData for
+   traffic. Overture release 2026-09-23.1 will be withdrawn around the end of November 2026: moving to a newer
+   one is a new generator version.
 5. Sound library stage 3 alongside: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`
    (docs/SOUND_LIBRARY_BOUNDARY.md section 8).
 6. World editor phase 3: people, roads and routes, map versions, baking an overlay into a map file
