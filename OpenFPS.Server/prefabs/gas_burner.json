@@ -1,0 +1,23 @@
+{
+  "Id": "gas_burner",
+  "Name": "Gas burner",
+  "Description": "A single middle-sized gas burner on natural gas, a domino hob (GasHobSpec.SingleBurner, GasHobSynth, docs/GAS_HOB.md). The interact key standing at it lights it, ticking until it catches, or turns it off. Place it on the worktop with its back (+Z) to the wall. Not a recording and not a loop.",
+  "Material": "Metal",
+  "ColliderSize": {
+    "X": 0.3,
+    "Y": 0.05,
+    "Z": 0.5
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "Announce": true,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "stove:hob1",
+  "Volume": 1.0,
+  "Range": 20,
+  "MinDistance": 0.5,
+  "Mode": "LoopOne",
+  "SynthRunning": false
+}
