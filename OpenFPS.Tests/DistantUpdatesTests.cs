@@ -159,6 +159,28 @@ public class DistantUpdatesTests
         Assert.Contains(34L, ticks);
     }
 
+    /// <summary>
+    /// A far car's keep-alive (once a second, by its id: tick 23 for entity 7) that falls on the tick it starts
+    /// to brake still goes again the tick after. Without the repeat, that keep-alive lost on a poor connection
+    /// left a car pulling away 543 m off read as still braking for a fifth of a second: 43 % of its pitch.
+    /// </summary>
+    [Fact]
+    public void AFarKeepAliveOnTheTickACarStraysGoesAgainTheTickAfter()
+    {
+        Assert.Equal(0, (23 + 7) % RestingStates.KeepAliveTicks);
+        (Vector3, Vector3, byte) Braking(long tick)
+        {
+            float t = tick * Dt, t0 = 22 * Dt;
+            if (tick < 22) return (new Vector3(0f, 0f, 20f * t), new Vector3(0f, 0f, 20f), 0);
+            float b = t - t0;
+            return (new Vector3(0f, 0f, 20f * t0 + 20f * b - 3f * b * b), new Vector3(0f, 0f, 20f - 6f * b), 0);
+        }
+        var ticks = SentTicks(300f, Braking);
+        _o.WriteLine(string.Join(",", ticks));
+        Assert.Contains(23L, ticks);   // the keep-alive, and the first tick the speed is off what was predicted
+        Assert.Contains(24L, ticks);   // ...and once more
+    }
+
     [Fact]
     public void WhatAPlayerRidesOrCarriesIsAlwaysFullRate()
     {
