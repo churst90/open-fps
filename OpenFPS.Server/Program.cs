@@ -150,11 +150,13 @@ public class GameServer
             if (landCover == null && real && settings.LandCover)
                 landCover = new OpenFPS.Server.OneWorld.EsaWorldCover(Path.Combine(store.Root, "sources", "worldcover"));
             service.LandCover = landCover;
-            // The roads from OpenStreetMap, its regions kept in the same cache.
+            // The roads from OpenStreetMap and the buildings from Overture, their regions kept in the same cache.
             if (features == null && real && settings.OpenStreetMap)
                 features = new OpenFPS.Server.OneWorld.WorldFeatures(
                     new OpenFPS.Server.OneWorld.OverpassRegions(Path.Combine(store.Root, "sources", "osm")),
-                    _maps!.Prefabs.ToDictionary(kv => kv.Key, kv => kv.Value.ColliderSize ?? Vector3.One, StringComparer.OrdinalIgnoreCase));
+                    _maps!.Prefabs.ToDictionary(kv => kv.Key, kv => kv.Value.ColliderSize ?? Vector3.One, StringComparer.OrdinalIgnoreCase),
+                    settings.Buildings ? new OpenFPS.Server.OneWorld.OvertureBuildings(Path.Combine(store.Root, "sources", "overture")) : null,
+                    OpenFPS.Server.OneWorld.WorldBuildings.PrefabsFrom(_maps.Prefabs));
             // The maps of real places, copied into the world's tiles; tiles copied from an older map go.
             var copied = OpenFPS.Server.OneWorld.WorldPlaces.FromMaps(_maps);
             if (features != null) features.IsPlaced = k => copied.TryGetPlace(k, out _);
@@ -170,7 +172,7 @@ public class GameServer
             Log.Information("World: tiles kept in {Path}, at most {Cap:F1} GB ({Have:F2} GB in {Count} tiles now); {Places} place(s) to arrive at; {Making}.",
                             store.Root, store.CapBytes / 1073741824.0, store.TotalBytes / 1073741824.0, store.Count, World.Places.Count,
                             !settings.Generate ? "no new tiles made"
-                            : "new tiles made from USGS 3DEP" + (service.LandCover != null ? ", ESA WorldCover" : "") + (features != null ? " and OpenStreetMap" : ""));
+                            : "new tiles made from USGS 3DEP" + (service.LandCover != null ? ", ESA WorldCover" : "") + (features != null ? " and OpenStreetMap" : "") + (features?.Buildings != null ? ", buildings from Overture" : ""));
             // A cap the disk cannot hold fills the disk before the cap is reached.
             try
             {

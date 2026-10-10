@@ -28,8 +28,9 @@ public sealed class WorldStore
 {
     /// <summary>What makes tiles now. A change to what a tile holds is a new version: the old tiles are kept
     /// beside the new ones, never read, and are the first the cap drops. 1: ground only, every cell dirt;
-    /// 2: the cells' materials from the land cover; 3: roads from OpenStreetMap and woods from the land cover.</summary>
-    public const int GeneratorVersion = 3;
+    /// 2: the cells' materials from the land cover; 3: roads from OpenStreetMap and woods from the land cover;
+    /// 4: buildings from Overture (release OvertureBuildings.Release), the woods kept off them.</summary>
+    public const int GeneratorVersion = 4;
 
     public const long DefaultCapBytes = 20L * 1024 * 1024 * 1024;
 
