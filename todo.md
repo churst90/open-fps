@@ -20,7 +20,8 @@ other at login. The server and the Windows zip go out together.
 1. Ship: push, the VPS and the Windows zip, together, once the work in flight has landed, and only when
    Cody says so (each time). Restart the server and update the clients first; what is in it is the
    "Landed since the last deploy" list below.
-2. Hear rooms from walls (switched on 2026-10-10, 25a328b9, unheard): a point's room is the room whose
+2. Rooms from walls: switched on 2026-10-10 (25a328b9) and APPROVED by ear the same day (Cody: "everything
+   sounds good"): a point's room is the room whose
    flood holds it, server and client alike, region ids unchanged (docs/GEOMETRY.md 12.6 item 1). Leak fixes
    in the generators came with it (97730e32: door heads lap their leaves, roof-access doorways the door's
    width). Open: a room's volume and face areas still come from its box (`RoomSize`), not its flood; 5 of
