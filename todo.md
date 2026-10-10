@@ -47,7 +47,12 @@ After items 1-6 (agreed with Cody 2026-10-08): performance and distant updates c
 because the one world costs CPU and bandwidth first.
 7. Dropped 2026-10-09: reflections in their own process. The measurement showed the cost is the
    reverb's convolution, not tracing; the convolution was made 38 % cheaper instead (heard, merged).
-8. Distant updates (CODY_ASKS item 4), while the server-tile code is fresh.
+8. Distant updates (CODY_ASKS item 4): built and merged 2026-10-10. Far moving
+   things go at most 5 times a second, with the server's own speed rate and turn, and early the tick the
+   client's prediction would stray; the acceptance test passes on a home connection (bearing within 0.010
+   degree, pitch within 0.122 %, no step bigger than every tick makes) and saves 48-54 % of the broadcast
+   (1.33 to 0.62-0.69 Mbit/s). docs/WORLD_STREAMING.md, "Far things less often". Wire change (Common): new
+   Windows zip and VPS update when merged. Cody to listen to the city before it ships (Cody).
 9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3. First step done
    2026-10-09 (layers in contact are one panel, unheard: inbox/floors-2026-10-09); next the map's
    double slab (Walls, below), then rooms from geometry, then sound through structure.
@@ -200,8 +205,7 @@ Left by the 2026-10-07 housekeeping; none changes sound.
 ### Network (Cody)
 1.75 Mbit/s for three players after the 2026-10-05 trim. The rest, with measured savings, is in
 docs/PLAN_2026-10-05.md section 6:
-1. Rate by distance (5 Hz beyond 150 m): 50-70 %. Needs per-thing interpolation, and Doppler and tyre
-   demand from the server.
+1. Rate by distance (5 Hz beyond 150 m): built, 48-54 % measured (todo item 8, waiting to merge).
 2. A byte budget per packet filled by priority: caps the worst case.
 3. Only the change, against what the client confirmed: about 30 %.
 4. Traffic run on the client from routes, with corrections from the server: most of what remains.

@@ -284,6 +284,27 @@ Recent work, newest first. `git log` has the rest.
     they changed), so every client hears the same light-up, and a player arriving later hears it as it
     is. A new model kind, `gas_hob`, in the model library and the world editor.
   - AudioLab `--stove levels|render|game`.
+- Far things are sent less often (Cody's list of 2026-10-08, item 4; docs/WORLD_STREAMING.md, "Far things
+  less often"). A moving thing 150 m or more from a player goes to that player at most 5 times a second,
+  with how it is changing as the server has it (its speed's rate and its heading's turn, eight bytes, only
+  when not zero), and early the tick the client's carrying of it would stray by a fifth of what is
+  inaudible; a state sent for a change goes once more the next tick. What a player rides, drives or carries
+  goes every tick. The client carries each far thing between its states on the server's numbers and steers
+  onto the next one, so Doppler, an engine's road speed and a train's notch come from the server's own
+  velocity. Not merged; Cody to listen to the city first.
+  - The acceptance test (DistantUpdatesTests, and `AudioLab --distant-updates`) runs the city on the real
+    server with a car passing at 108 km/h, an airliner flying over, the light rail and the walkers, and two
+    players side by side, one sent everything every tick. On a home connection, everything beyond 150 m:
+    bearing within 0.010 degree, pitch within 0.122 %, the largest change from one mixer instant to the
+    next the same to the millimetre, a train's notch a step early or late on 12 steps of 32,400.
+  - Bytes per player standing in the city: 1.33 to 0.62 Mbit/s 40 m from the railway (54 % less), 1.33 to
+    0.69 at the spawn point (48 % less); datagrams 128 to 65 and 73 a second.
+  - On a poor connection (one tick in ten out of order, 2 % lost) both clients leave the server's track by
+    the same amounts (0.017 degree, and up to 23 % of pitch where the stream ran dry), the one sent less
+    often never further. What is sent every tick now takes a late or lost tick the same eased way, which
+    changes it on such a connection (not measured against the client before).
+  - Wire change in Common (EntityState.SpeedRate and Turn, a flag in StatePacking): a new Windows zip and a
+    VPS update when it is merged.
 
 ## 2026-10-07
 
