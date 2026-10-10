@@ -20,13 +20,17 @@ namespace OpenFPS.AudioLab.Spikes;
 ///        setting (Leq, LAeq, octaves), the hiss and the roar apart, the light-ups and the pop, and what each
 ///        burner did (failed sparks, delay, joules). SourceLevelDb and PeakHeadroomDb are read from it.
 ///   render out=DIR [preset] [seed=7]   the scenes as mono float WAVs, pascals at a metre (-20 dBFS is 94 dB SPL).
-///   game out=DIR [preset] [dist=1]   through ClientAudioSystem with the HRTF, ear model, loudness law and a
-///        kitchen's room (3.6 x 2.6 x 3.2 m, tiled floor, plaster), the hob on the worktop, the listener
-///        standing at it; captured to DIR/capture.post.wav with DIR/segments.csv.
+///   game out=DIR [preset] [dist=1] [scenes=light,four]   through ClientAudioSystem with the HRTF, ear model,
+///        loudness law and a kitchen's room (3.6 x 2.6 x 3.2 m, a tiled floor, units along two walls), the hob
+///        on the worktop, the listener standing at it; captured to DIR/capture.post.wav with DIR/segments.csv.
+/// Presets: hob4 (sparks while held, no flame safety: the default), hob4_ffd (flame safety, held until the
+/// thermocouple holds), hob4_reignite (auto re-ignition), hob4_propane, hob1, and hob4_old: the hob as first
+/// heard on 2026-10-10 (a 1.5 mJ, 30 µs spark, the cap ringing at -24 dB, the module's tick unmuffled, the
+/// knob held 3.5 s after the flame caught), for comparison.
 /// Scenes: light (the knob turned and held through the ticks until it lights), slow (turned only part way,
 /// sparks failing while gas gathers, then on to full: a bigger light-up), simmer_up (low, medium, high),
 /// off (turned off from full, the pop, the safety valve's click), four (the four burners lit one after another).
-/// Fitting knobs: eff= lueff= height= slope= trim= heat= us= cloud=.
+/// Fitting knobs: eff= lueff= height= slope= trim= heat= us= cloud= cap= caseloss=.
 /// </summary>
 public static class StoveSpike
 {
@@ -45,6 +49,17 @@ public static class StoveSpike
         SparkHeatMj = Arg(args, "heat=", spec.SparkHeatMj),
         SparkMicroseconds = Arg(args, "us=", spec.SparkMicroseconds),
         CloudSeconds = Arg(args, "cloud=", spec.CloudSeconds),
+        CapRingDb = Arg(args, "cap=", spec.CapRingDb),
+        ModuleCaseLossDb = Arg(args, "caseloss=", spec.ModuleCaseLossDb),
+    };
+
+    /// <summary>The hob as Cody first heard it (2026-10-10): the old spark, cap and module, and a European hob's
+    /// hand held 3.5 s after the flame caught (the thermocouple holding at 2.0 s, and 1.5 s more).</summary>
+    public static GasHobSpec Old => GasHobSpec.FourBurnerNatural with
+    {
+        Name = "Four-burner gas hob as first heard (2026-10-10)",
+        SparkHeatMj = 1.5f, SparkMicroseconds = 30f, CapRingDb = -24f, ModuleCaseLossDb = 0f,
+        FlameSafety = true, ThermocoupleHeatSeconds = 2.5f, HoldMarginSeconds = 1.5f,
     };
 
     /// <summary>The slow light's hand: pushed in, turned only a third of the way to full and held there while
@@ -55,7 +70,7 @@ public static class StoveSpike
         h.Enqueue(new GasHobSynth.HandAction { Act = GasHobSynth.Act.Turn, Burner = burner, Degrees = 36f, Seconds = 0.9f });
         h.Enqueue(new GasHobSynth.HandAction { Act = GasHobSynth.Act.Wait, Seconds = 2.6f });
         h.Enqueue(new GasHobSynth.HandAction { Act = GasHobSynth.Act.Turn, Burner = burner, Degrees = GasHobSpec.FullDegrees, Seconds = 0.4f });
-        h.Enqueue(new GasHobSynth.HandAction { Act = GasHobSynth.Act.WaitLit, Burner = burner, Hold = h.Spec.HoldAfterLightSeconds, Seconds = 12f });
+        h.Enqueue(new GasHobSynth.HandAction { Act = GasHobSynth.Act.WaitLit, Burner = burner, Hold = h.HoldAfterCatching(), Seconds = 12f });
         h.Enqueue(new GasHobSynth.HandAction { Act = GasHobSynth.Act.Release, Burner = burner, Seconds = 0.15f });
     }
 
@@ -83,6 +98,7 @@ public static class StoveSpike
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
+        ModelLibrary.Add(ModelLibrary.Kinds.GasHob, "hob4_old", Old);
         if (args.Contains("game")) return Game(args);
         string preset = args.FirstOrDefault(a => !a.StartsWith("--") && !a.Contains('=') && a is not ("levels" or "render")) ?? "hob4";
         var spec = Tuned(GasHobSpec.ByName(preset), args);
@@ -101,11 +117,17 @@ public static class StoveSpike
         foreach (var scene in Scenes(spec.Burners.Length))
         {
             var clock = Stopwatch.StartNew();
-            var (pa, sparks, synth) = Render(spec, scene, seed, 1f, 1f, 1f, 1f, 1f);
+            var (pa, sparks, synth, litAt) = Render(spec, scene, seed, 1f, 1f, 1f, 1f, 1f);
             double cost = clock.Elapsed.TotalSeconds / scene.Seconds * 100;
             Console.WriteLine();
             Console.WriteLine($"-- {scene.Name} ({scene.Seconds:F0} s), rendering costs {cost:F1} % of a core");
             Ticks(pa, sparks);
+            if (litAt >= 0 && sparks.Count > 0)
+            {
+                int after = sparks.Count(s => s > litAt + Rate / 200);
+                double lastAfter = (sparks[^1] - litAt) / (double)Rate;
+                Console.WriteLine($"   the first burner caught at {litAt / (double)Rate:F2} s; {after} spark(s) after it, the last {Math.Max(0, lastAfter):F2} s after");
+            }
             for (int i = 0; i < synth.BurnerCount; i++)
                 if (synth.LastLightUpJoules(i) > 0f || synth.FailedSparksBeforeLight(i) > 0)
                     Console.WriteLine($"   {spec.Burners[i].Name}: lit after {synth.FailedSparksBeforeLight(i)} failed spark(s), {synth.LastLightDelay(i):F2} s of gas, light-up {synth.LastLightUpJoules(i):F0} J");
@@ -114,8 +136,8 @@ public static class StoveSpike
                 Window(pa, "low", 2f, 5f);
                 Window(pa, "medium", 7f, 10f);
                 Window(pa, "high", 12f, 16f);
-                var (hiss, _, _) = Render(spec, scene, seed, 0f, 0f, 1f, 0f, 0f);
-                var (roar, _, _) = Render(spec, scene, seed, 0f, 0f, 0f, 1f, 0f);
+                var (hiss, _, _, _) = Render(spec, scene, seed, 0f, 0f, 1f, 0f, 0f);
+                var (roar, _, _, _) = Render(spec, scene, seed, 0f, 0f, 0f, 1f, 0f);
                 Window(hiss, "high, hiss alone", 12f, 16f);
                 Window(roar, "high, roar alone", 12f, 16f);
                 Window(hiss, "low, hiss alone", 2f, 5f);
@@ -123,7 +145,7 @@ public static class StoveSpike
             }
             if (scene.Name is "light" or "slow")
             {
-                var (up, _, _) = Render(spec, scene, seed, 0f, 0f, 0f, 0f, 1f);
+                var (up, _, _, _) = Render(spec, scene, seed, 0f, 0f, 0f, 0f, 1f);
                 double peak = up.Max(v => Math.Abs((double)v));
                 int at = Array.FindIndex(up, v => Math.Abs(v) >= 0.5 * peak);
                 Console.WriteLine($"   light-up alone: peak {Db(peak):F1} dB at {at / (double)Rate:F2} s; " +
@@ -153,7 +175,7 @@ public static class StoveSpike
         return 0;
     }
 
-    private static (float[] Pa, List<int> Sparks, GasHobSynth Synth) Render(GasHobSpec spec, Scene scene, int seed,
+    private static (float[] Pa, List<int> Sparks, GasHobSynth Synth, int LitAt) Render(GasHobSpec spec, Scene scene, int seed,
         float sparkPart, float clickPart, float hissPart, float flamePart, float lightPart)
     {
         var h = new GasHobSynth(spec, Rate, seed)
@@ -164,14 +186,16 @@ public static class StoveSpike
         int n = (int)(scene.Seconds * Rate);
         var pa = new float[n];
         var sparks = new List<int>();
-        int ev = 0, last = h.Sparks;
+        int ev = 0, last = h.Sparks, litAt = -1;
+        bool litBefore = h.IsLit(0);
         for (int i = 0; i < n; i++)
         {
             while (ev < scene.Events.Length && i >= (int)(scene.Events[ev].At * Rate)) scene.Events[ev++].Do(h);
             pa[i] = h.Next();
             if (h.Sparks != last) { last = h.Sparks; sparks.Add(i); }
+            if (litAt < 0 && !litBefore && h.IsLit(0)) litAt = i;
         }
-        return (pa, sparks, h);
+        return (pa, sparks, h, litAt);
     }
 
     private static void Ticks(float[] pa, List<int> sparks)
@@ -256,6 +280,8 @@ public static class StoveSpike
         string outDir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..] ?? "/tmp/openfps-stove";
         string preset = args.FirstOrDefault(a => !a.StartsWith("--") && !a.Contains('=') && a != "game") ?? "hob4";
         float dist = Arg(args, "dist=", 1f);
+        string[] only = args.FirstOrDefault(a => a.StartsWith("scenes=", StringComparison.Ordinal))?[7..].Split(',') ?? Array.Empty<string>();
+        bool Wanted(string scene) => only.Length == 0 || only.Contains(scene);
         Directory.CreateDirectory(outDir);
         Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
@@ -266,7 +292,10 @@ public static class StoveSpike
         string off = HobKey.Off(n);
         string One(int setting) => setting + off[1..];
 
-        // The kitchen: 3.6 m across, 3.2 deep, 2.6 high; a worktop along the back wall with the hob in it.
+        // The kitchen: 3.6 m across, 3.2 deep, 2.6 high; units along the back wall with the hob in the worktop,
+        // wall cupboards over them and a hood over the hob, units along the left wall, a table. By Sabine its
+        // faces give 0.76 s; fifty measured kitchens averaged 0.68 s at 1 kHz (Jackson and Leventhall, via
+        // docs/GAS_HOB.md section 8). The bare box of tile and plaster it was until 2026-10-10 rang 1.0 s.
         var room = new Vector3(3.6f, 2.6f, 3.2f);
         var centre = new Vector3(0f, room.Y / 2f, 0.4f);
         float back = centre.Z + room.Z / 2f;
@@ -281,6 +310,13 @@ public static class StoveSpike
             (new Vector3(0f, room.Y / 2f, centre.Z - room.Z / 2f - 0.1f), new Vector3(room.X, room.Y, 0.2f), "Plaster"),
             // The worktop and the cupboards under it.
             (new Vector3(0f, 0.45f, back - 0.3f), new Vector3(room.X, 0.9f, 0.6f), "Wood"),
+            // Wall cupboards either side of the hood, and the hood.
+            (new Vector3(-1.1f, 1.85f, back - 0.175f), new Vector3(1.4f, 0.75f, 0.35f), "Wood"),
+            (new Vector3(1.1f, 1.85f, back - 0.175f), new Vector3(1.4f, 0.75f, 0.35f), "Wood"),
+            (new Vector3(0f, 1.95f, back - 0.25f), new Vector3(0.6f, 0.5f, 0.5f), "Metal"),
+            // Units along the left wall, and a table.
+            (new Vector3(-room.X / 2f + 0.3f, 0.45f, centre.Z - 0.2f), new Vector3(0.6f, 0.9f, 2.0f), "Wood"),
+            (new Vector3(0.7f, 0.74f, centre.Z - 0.9f), new Vector3(1.2f, 0.04f, 0.8f), "Wood"),
         };
         var cs = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
@@ -322,7 +358,8 @@ public static class StoveSpike
             Region = new RegionComponent
             {
                 FriendlyName = "Kitchen", IsIndoor = true, RoomSize = room, ReverbTimeScale = 1f,
-                Materials = new[] { I("Tile"), I("Plaster"), I("Tile"), I("Plaster"), I("Plaster"), I("Plaster") },
+                // Floor, ceiling, back (the units), front, right, left (the units).
+                Materials = new[] { I("Tile"), I("Plaster"), I("Wood"), I("Plaster"), I("Plaster"), I("Wood") },
             },
         });
         world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 20f, Humidity = 0.5f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f });
@@ -390,27 +427,39 @@ public static class StoveSpike
             Pump(2.0);
             Record("silence", 2.0);
             // 1. Knob turned and held through the ticks until it lights.
-            Key(off, off, 100);
-            Pump(1.0);
-            Record("light", 9.0, (0.5, () => Key(off, One(3))));
-            Gone();
+            if (Wanted("light"))
+            {
+                Key(off, off, 100);
+                Pump(1.0);
+                Record("light", 9.0, (0.5, () => Key(off, One(3))));
+                Gone();
+            }
             // 2. A slow light: the knob only part way while the sparks fail, then on to full.
-            StoveVoiceState.LabCreated = h => SlowLight(h);
-            Record("slow", 12.0, (0.5, () => Key(off, off)));
-            StoveVoiceState.LabCreated = null;
-            Gone();
+            if (Wanted("slow"))
+            {
+                StoveVoiceState.LabCreated = h => SlowLight(h);
+                Record("slow", 12.0, (0.5, () => Key(off, off)));
+                StoveVoiceState.LabCreated = null;
+                Gone();
+            }
             // 3. On low, turned up to medium and to full.
-            Key(One(1), One(1), 300);
-            Pump(1.5);
-            Record("simmer_up", 16.0, (5.0, () => Key(One(1), One(2))), (10.0, () => Key(One(2), One(3))));
-            Gone();
+            if (Wanted("simmer_up"))
+            {
+                Key(One(1), One(1), 300);
+                Pump(1.5);
+                Record("simmer_up", 16.0, (5.0, () => Key(One(1), One(2))), (10.0, () => Key(One(2), One(3))));
+                Gone();
+            }
             // 4. Turned off from full.
-            Key(One(3), One(3), 300);
-            Pump(1.5);
-            Record("off", 24.0, (2.0, () => Key(One(3), off)));
-            Gone();
+            if (Wanted("off"))
+            {
+                Key(One(3), One(3), 300);
+                Pump(1.5);
+                Record("off", 24.0, (2.0, () => Key(One(3), off)));
+                Gone();
+            }
             // 5. All four lit one after another.
-            if (n == 4)
+            if (n == 4 && Wanted("four"))
             {
                 Key(off, off, 100);
                 Pump(1.0);

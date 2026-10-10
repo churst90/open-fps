@@ -109,9 +109,11 @@ The last four were handled on 2026-10-09, on their own branch (renders in inbox/
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
-- The gas hob (docs/GAS_HOB.md, inbox/gas-stove-2026-10-10): heard 2026-10-10, liked; the spark tick is
-  a little too present and loud, and the sparks kept going long after the burner lit. Being fixed. Then a
-  `gas_hob` placed in a kitchen and lit with the interact key. Not yet on any map.
+- The gas hob (docs/GAS_HOB.md, inbox/gas-stove-2026-10-10): round 1 heard 2026-10-10, liked; the tick
+  too present and loud, the sparks went on long after it lit. Round 2 (inbox/gas-stove-2026-10-10/round2):
+  the cook lets go as soon as it catches, the spark 9-13 dB lower at 1-4 kHz, a furnished kitchen; a flame
+  safety hob and an auto re-ignition hob to compare. Then a `gas_hob` placed in a kitchen and lit with the
+  interact key. Not yet on any map.
 - Doors: push and pull sides, the tower front doors locked from the street (key, then pull), nothing
   shutting on a person. The glass front door, glass shop door and lift door models
   (inbox/door-models-2026-10-05).
@@ -393,7 +395,10 @@ Built, measured against fifteen recordings, not heard (docs/GAS_HOB.md section 1
 - a gas hob in the city's flats and houses (tools/gen_city.py, beside the kitchen sinks);
 - changing the heat in the game: the knob's settings are in the state and the model, the interact key
   only lights and turns off;
-- a pan on the burner, an oven and a grill, an American range (re-ignition module, no flame safety).
+- a pan on the burner (it shields the cap and the sparks), an oven and a grill; a North American range's
+  own mains, pressure and injectors (its switching and no flame safety are in: `hob4`, `hob4_reignite`);
+- if the tick is still too present: the hob top's image is idealised (fully coherent), and its 2 kHz octave
+  is 6.6 dB over the recordings' median (docs/GAS_HOB.md section 4).
 
 ### Water you are in or on (asked 2026-10-06)
 After the triangle geometry and real terrain (geometry stage 3), which give water a surface and depth:

@@ -7,8 +7,10 @@ namespace OpenFPS.Tests;
 
 /// <summary>
 /// The gas hob (docs/GAS_HOB.md): its injectors against the manufacturers' tables, its state on the wire and
-/// the interact key, and the hob itself: a knob turned to full lights after a tick or two, a knob left low
-/// never lights, a slow light burns more gas, a flame turned off goes out and its safety valve shuts later.
+/// the interact key, and the hob itself: a knob turned to full lights after a tick or two and the cook lets
+/// go within a second (or, with flame safety, once the thermocouple holds), a re-ignition module stops on its
+/// own, a knob left low never lights, a slow light burns more gas, a flame turned off goes out and its safety
+/// valve shuts later, and the spark's crack carries its energy above the presence region.
 /// </summary>
 public class GasHobTests
 {
@@ -103,23 +105,103 @@ public class GasHobTests
         Assert.Equal("You light the burner.", HobControls.Press("stove:hob1", 1, out _));
     }
 
-    [Fact]
-    public void TurnedToFullItLightsAfterATickOrTwoAndTheSparksStopWhenTheKnobIsLetGo()
+    /// <summary>Runs a light of the first burner and returns when it caught and when each spark came, s.</summary>
+    private static (float Caught, List<float> Sparks) Light(GasHobSynth h, float seconds)
     {
-        var h = new GasHobSynth(GasHobSpec.FourBurnerNatural, Rate, 7);
         h.Begin("0000", "3000", 0f);
-        var x = Run(h, 9f);
+        float caught = -1f;
+        var sparks = new List<float>();
+        int last = h.Sparks;
+        for (int i = 0; i < (int)(seconds * Rate); i++)
+        {
+            h.Next();
+            if (h.Sparks != last) { last = h.Sparks; sparks.Add(i / (float)Rate); }
+            if (caught < 0f && h.IsLit(0)) caught = i / (float)Rate;
+        }
+        return (caught, sparks);
+    }
+
+    [Fact]
+    public void TurnedToFullItLightsAfterATickOrTwoAndTheCookLetsGoWithinASecond()
+    {
+        // No flame safety: nothing needs the knob held once the flame has caught, so the cook lets go as
+        // soon as they see it, and the module (which sparks only while a knob is in) stops.
+        var h = new GasHobSynth(GasHobSpec.FourBurnerNatural, Rate, 7);
+        var (caught, sparks) = Light(h, 9f);
         Assert.True(h.IsLit(0));
         Assert.False(h.IsLit(1));
         Assert.InRange(h.FailedSparksBeforeLight(0), 0, 2);
         Assert.InRange(h.LastLightUpJoules(0), 50f, 600f);
-        int sparks = h.Sparks;
-        Run(h, 2f);
-        Assert.Equal(sparks, h.Sparks);
         Assert.False(h.HandBusy);
-        // The module's rate: 50 Hz over twelve cycles.
-        Assert.InRange(sparks, 12, 20);
-        _o.WriteLine($"{sparks} sparks, {h.FailedSparksBeforeLight(0)} failed, light-up {h.LastLightUpJoules(0):F0} J, flame {Leq(x, 7f, 9f):F1} dB");
+        int after = sparks.Count(t => t > caught + 0.005f);
+        _o.WriteLine($"caught at {caught:F2} s; {sparks.Count} sparks, {after} after it, the last {sparks[^1] - caught:F2} s after");
+        Assert.InRange(after, 1, 4);
+        Assert.InRange(sparks[^1] - caught, 0.1f, 1.0f);
+        // It stays lit when let go.
+        Run(h, 2f);
+        Assert.True(h.IsLit(0));
+    }
+
+    [Fact]
+    public void WithFlameSafetyTheKnobIsHeldUntilTheThermocoupleHolds()
+    {
+        // The sparks go on while the knob is held, as they do on a European hob, until the thermocouple can
+        // hold the gas on (3 s) and the cook's margin (1 s): Bosch asks for 4 s. Then the flame stays.
+        var h = new GasHobSynth(GasHobSpec.FourBurnerFlameSafety, Rate, 7);
+        var (caught, sparks) = Light(h, 9f);
+        float tail = sparks[^1] - caught;
+        _o.WriteLine($"caught at {caught:F2} s; {sparks.Count} sparks, the last {tail:F2} s after");
+        Assert.InRange(tail, 3.3f, 4.5f);
+        Assert.False(h.HandBusy);
+        Run(h, 3f);
+        Assert.True(h.IsLit(0), "the valve holds once the thermocouple has heated");
+    }
+
+    [Fact]
+    public void AReignitionModuleStopsWhenItSensesTheFlame()
+    {
+        var h = new GasHobSynth(GasHobSpec.FourBurnerReignition, Rate, 7);
+        var (caught, sparks) = Light(h, 6f);
+        _o.WriteLine($"caught at {caught:F2} s; {sparks.Count} sparks, the last at {sparks[^1]:F2} s");
+        Assert.True(h.IsLit(0));
+        Assert.DoesNotContain(sparks, t => t > caught + 0.25f);
+    }
+
+    [Fact]
+    public void TheSparksCrackCarriesItsEnergyAboveThePresenceRegion()
+    {
+        // The crack of a few-microsecond spark rises 6 dB an octave through hearing; recorded hob ticks sit
+        // 14 dB lower at 2 kHz than at 8 kHz (median of fourteen, docs/GAS_HOB.md section 9). The old 30 µs
+        // spark and its ringing cap put as much at 2 kHz as at 8. Nothing rings after it: the cap is not
+        // struck, and the module's own tick is muffled under the hob.
+        var h = new GasHobSynth(GasHobSpec.FourBurnerNatural, Rate, 7) { FlamePart = 0f, HissPart = 0f, LightUpPart = 0f, ClickPart = 0f };
+        h.Begin("0000", "0000", 0f);
+        h.Enqueue(new GasHobSynth.HandAction { Act = GasHobSynth.Act.Push, Burner = 1, Seconds = 1.2f });
+        var x = Run(h, 1.2f);
+        int at = Array.FindIndex(x, v => MathF.Abs(v) > 0.05f);
+        Assert.True(at > 0, "a spark");
+        double Band(int from, int n, double lo, double hi)
+        {
+            double e = 0;
+            for (int k = (int)Math.Ceiling(lo * n / Rate); k <= (int)(hi * n / Rate); k++)
+            {
+                double re = 0, im = 0;
+                for (int i = 0; i < n; i++)
+                {
+                    double w = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / n);
+                    re += x[from + i] * w * Math.Cos(2 * Math.PI * k * i / n);
+                    im -= x[from + i] * w * Math.Sin(2 * Math.PI * k * i / n);
+                }
+                e += re * re + im * im;
+            }
+            return e;
+        }
+        int a = at - 48;
+        double tilt = 10 * Math.Log10(Band(a, 512, 1414, 2828) / Band(a, 512, 5657, 11314));
+        double ring = 10 * Math.Log10(Band(at + 480, 960, 1000, 12000) / Band(a, 960, 1000, 12000));
+        _o.WriteLine($"2 kHz octave against 8 kHz {tilt:F1} dB; 10-30 ms after the spark against the spark {ring:F1} dB");
+        Assert.True(tilt < -4.0, $"the 2 kHz octave is {tilt:F1} dB against 8 kHz");
+        Assert.True(ring < -50.0, $"something rings after the spark: {ring:F1} dB");
     }
 
     [Fact]
@@ -166,7 +248,7 @@ public class GasHobTests
     [Fact]
     public void TurnedOffTheFlameGoesOutAndTheSafetyValveShutsLater()
     {
-        var h = new GasHobSynth(GasHobSpec.FourBurnerNatural, Rate, 5);
+        var h = new GasHobSynth(GasHobSpec.FourBurnerFlameSafety, Rate, 5);
         h.Begin("3000", "3000", 0f);
         var on = Run(h, 2f);
         Assert.True(h.IsLit(0));
@@ -179,6 +261,14 @@ public class GasHobTests
         int loud = Array.FindIndex(later, v => Math.Abs(v) > 20e-6 * Math.Pow(10, 35 / 20.0));
         Assert.InRange(loud / (float)Rate, 8f, 22f);
         Assert.True(h.Idle);
+        // A hob without flame safety has no valve to shut: nothing after the flame.
+        var plain = new GasHobSynth(GasHobSpec.FourBurnerNatural, Rate, 5);
+        plain.Begin("3000", "3000", 0f);
+        Run(plain, 1f);
+        plain.Change("3000", "0000");
+        Run(plain, 3f);
+        var quiet = Run(plain, 25f);
+        Assert.DoesNotContain(quiet, v => Math.Abs(v) > 20e-6 * Math.Pow(10, 35 / 20.0));
     }
 
     [Fact]

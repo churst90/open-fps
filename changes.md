@@ -4,6 +4,34 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- The gas hob, round 2 (docs/GAS_HOB.md section 11; Cody on round 1: the tick "a little too present",
+  "kind of loud", and "you kept the clicking going long after the burner was lit"). Renders and what to
+  listen for in inbox/gas-stove-2026-10-10/round2.
+  - The cook lets go as soon as the flame catches. Round 1's hand held every knob 3.5 s after the flame
+    caught (a European flame safety hob's hold): 14 sparks after the light, the last 3.3 s after. The
+    default hob (`hob4`, prefab `gas_hob`, what the interact key lights) now has no flame safety and the
+    cook lets go 0.36-0.84 s after it catches: 3 sparks after, the last 0.72 s after.
+  - Two more kinds, each a preset and a prefab. Flame safety (`hob4_ffd`, `gas_hob_flame_safety`): the
+    knob is held, and the sparks go on, until the thermocouple holds (3.0 s) and 1 s more, Bosch's 4 s
+    (Miele asks about 8, AEG and Electrolux at least 10). Auto re-ignition (`hob4_reignite`,
+    `gas_hob_reignition`): the module sparks while a knob is on and stops when it senses the flame by
+    rectification, 0.1 s after it reaches the electrode.
+  - The spark corrected to its anchor. Measured against fourteen recorded hobs octave by octave (tick
+    energy over the flame), round 1 had 8-15 dB too much at 1-4 kHz, where the ear is most sensitive.
+    Two estimates made it: the heat four times the measured lighter spark's (1.5 mJ) and a 30 µs
+    duration fitted to the recordings' microphone roll-off. Both now come from the lighter itself
+    (0.36 mJ, 3 µs): within 2 dB of the recordings' median over 1-8 kHz on average, 2 kHz still 6.6 dB
+    over (the hob top's image). Through the game the tick is 9-13 dB lower at 1-4 kHz, the same at 8 kHz.
+  - The cap's ring was 24 dB under the crack [estimate]; from the blast's impulse on the cap it is some
+    80 dB under, so it no longer rings. The module's own tick is heard through the hob's tray (15 dB and
+    a mass law above 1 kHz).
+  - The kitchen in the renders. Round 1's was a bare box of tile and plaster, RT60 0.93-1.0 s; real
+    kitchens average 0.68 s (Jackson and Leventhall, fifty kitchens). The lab's kitchen now has its
+    units, wall cupboards, a hood and a table: 0.67 s. The game's room model was not at fault, and the
+    game is 6-10 dB drier at a metre than a diffuse-field kitchen, as the reflections' trim makes it.
+  - The recordings' tick peak over the flame is 29.7 dB median over all fourteen, not "about 40" as round
+    1 read it. GasHobTests: the hand lets go within a second, the flame safety hob is held 3.3-4.5 s, the
+    re-ignition module stops itself, the crack's 2 kHz octave is under its 8 kHz, nothing rings after it.
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
   and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;

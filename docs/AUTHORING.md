@@ -304,7 +304,7 @@ for a flight of stairs, a landing, a garden gate. Where named places overlap, th
 | `rock_boulder` | a boulder, scaled to size; material Concrete (there is no Stone material) |
 | `water_surface` | standing water: a solid box of material `Water`, a hard reflector |
 | `fire_pit` | a wood fire: `fire:fire_pit`, not solid. Put it above the ring of brick round it |
-| `gas_hob`, `gas_hob_propane`, `gas_burner` | a gas hob (four burners on natural gas or propane, or one): `stove:hob4`, not solid. Put it on the worktop with its back (+Z) to the wall; the interact key lights the next burner or turns them all off (docs/GAS_HOB.md) |
+| `gas_hob`, `gas_hob_flame_safety`, `gas_hob_reignition`, `gas_hob_propane`, `gas_burner` | a gas hob (four burners on natural gas or propane, or one; with flame safety valves, or an auto re-ignition module): `stove:hob4`, not solid. Put it on the worktop with its back (+Z) to the wall; the interact key lights the next burner or turns them all off (docs/GAS_HOB.md) |
 | `tree_crown` | the wind in a tree, heard from the middle of the crown: `foliage:park_tree`. Pair it with a `foliage_hedge` box for the crown and a trunk box |
 | `fence_timber` | a close-boarded wooden fence, 1.8 m, solid, `Wood` |
 | `fence_palisade` | a steel palisade, solid, `Fence` (porous: sound passes the gaps) |

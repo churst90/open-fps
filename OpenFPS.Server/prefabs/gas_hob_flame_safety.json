@@ -1,0 +1,23 @@
+{
+  "Id": "gas_hob_flame_safety",
+  "Name": "Gas hob with flame safety",
+  "Description": "A 60 cm four-burner gas hob on natural gas with a flame safety valve on every burner, as European hobs have (GasHobSpec.FourBurnerFlameSafety, docs/GAS_HOB.md). The interact key lights the next burner: the knob is pushed in and turned to full, the sparks tick until it catches, and the cook keeps the knob in, ticking, until the thermocouple holds the gas on, about 4 s. With every burner lit, it turns them all off; each flame goes out with a small pop, and a quarter of a minute later each safety valve clicks shut. Place it on the worktop with its back (+Z) to the wall. Not a recording and not a loop.",
+  "Material": "Metal",
+  "ColliderSize": {
+    "X": 0.58,
+    "Y": 0.05,
+    "Z": 0.5
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "Announce": true,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "stove:hob4_ffd",
+  "Volume": 1.0,
+  "Range": 25,
+  "MinDistance": 0.5,
+  "Mode": "LoopOne",
+  "SynthRunning": false
+}
