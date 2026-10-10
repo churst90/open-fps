@@ -1243,18 +1243,27 @@ public sealed class OpeningRoutes
     /// </summary>
     public Vector3 LegGains(Vector3 a, Vector3 b, int[] ignoreA, int[] ignoreB)
     {
-        var cand = Scratch.Get(this).Candidates;
+        var scratch = Scratch.Get(this);
+        var cand = scratch.Candidates;
         _grid.Along(a, b, cand);
-        Vector3 through = Vector3.One;
-        bool blocked = false;
+        var crossed = scratch.Layers;
+        crossed.Clear();
+        float len = Vector3.Distance(a, b);
         foreach (int i in cand)
         {
             if (Array.IndexOf(ignoreA, i) >= 0 || Array.IndexOf(ignoreB, i) >= 0) continue;
-            if (!SegmentHits(i, a, b)) continue;
-            through *= _solidGains[i];
-            blocked = true;
+            if (!SegmentSpan(i, a, b, 0f, out float t0, out float t1)) continue;
+            ref readonly var s = ref _solids[i];
+            // Solids in contact crossed one after another are one construction (Constructions).
+            bool layer = !s.IsLeaf && Constructions.IsSheet(s.Size);
+            crossed.Add(new Constructions.Crossing
+            {
+                In = t0 * len, Out = t1 * len, Props = AcousticRegistry.GetProperties(s.Material), Panel = s.Size, Build = s.Build,
+                Gains = _solidGains[i], Times = 1, Normal = layer ? Constructions.Normal(s.Size, s.Rotation) : Vector3.Zero,
+            });
         }
-        if (!blocked) return Vector3.One;
+        if (crossed.Count == 0) return Vector3.One;
+        Vector3 through = Constructions.Through(crossed, len > 1e-6f ? (b - a) / len : Vector3.UnitX);
         float delta = BarrierPathDifference(a, b, out _, out bool verified, ignoreA, ignoreB);
         if (verified && delta >= 0f)
         {
@@ -1783,6 +1792,7 @@ public sealed class OpeningRoutes
         public int ChainBudget;
         public readonly List<(float S, float Y, int Box)> Profile = new(), Hull = new();
         public readonly List<(int Box, float S0, float S1, float Bottom, float Top)> Crossings = new();
+        public readonly List<Constructions.Crossing> Layers = new();
         public readonly HashSet<int> Included = new();
         public float[] ProfileBins = new float[256];
         public readonly List<(float D, Vector3 SourceSide, Vector3 Edge)>[] Ways =
@@ -1805,13 +1815,17 @@ public sealed class OpeningRoutes
 
     /// <summary>Does the segment from a to b pass through box i, made <paramref name="grow"/> metres
     /// larger on every side? A slab test in the box's own frame (Kay &amp; Kajiya 1986).</summary>
-    private bool SegmentHits(int i, Vector3 a, Vector3 b, float grow = 0f)
+    private bool SegmentHits(int i, Vector3 a, Vector3 b, float grow = 0f) => SegmentSpan(i, a, b, grow, out _, out _);
+
+    /// <summary>Whether the segment a-b passes through box i (grown by <paramref name="grow"/>), and where
+    /// it goes in and out, as fractions of the way from a to b.</summary>
+    private bool SegmentSpan(int i, Vector3 a, Vector3 b, float grow, out float t0, out float t1)
     {
+        t0 = 0f; t1 = 1f;
         var f = _frames[i];
         Vector3 la = Vector3.Transform(a - f.Centre, f.Inverse), lb = Vector3.Transform(b - f.Centre, f.Inverse);
         Vector3 h = f.Half + new Vector3(grow);
         Vector3 d = lb - la;
-        float t0 = 0f, t1 = 1f;
         for (int ax = 0; ax < 3; ax++)
         {
             float o = ax == 0 ? la.X : ax == 1 ? la.Y : la.Z;

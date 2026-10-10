@@ -55,6 +55,8 @@
     <Compile Include="..\OpenFPS.Client.Gtk\Game\GtkKeyMap.cs" Link="Linked\GtkKeyMap.cs" />
     <!-- And the Windows head's test for the keypad with Num Lock off, which is plain virtual key codes. -->
     <Compile Include="..\OpenFPS.Client\Core\KeypadKeys.cs" Link="Linked\KeypadKeys.cs" />
+    <!-- The acceptance rig for far things sent less often, which AudioLab runs as an instrument too. -->
+    <Compile Include="..\OpenFPS.AudioLab\Spikes\DistantUpdatesRig.cs" Link="Linked\DistantUpdatesRig.cs" />
   </ItemGroup>
 
   <ItemGroup>

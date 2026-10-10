@@ -629,15 +629,16 @@ public class VehicleMotionTests : IDisposable
     }
 
     /// <summary>
-    /// A door a player has open, standing a few metres in from it, is left as it was found, going in and
-    /// coming out: a rider shut Brandt Court's front door on Cody, who had opened it to listen to the
-    /// street (2026-10-02). With nobody about, an outside door found open is shut behind them (Cody,
-    /// 2026-10-08: "An outside door without a closer: an NPC shuts it behind them").
+    /// An outside door found open is shut behind them, whoever is about (Cody, 2026-10-08: "An outside door
+    /// without a closer: an NPC shuts it behind them"; 2026-10-10: "regardless of a player is around or
+    /// not"). This reverses 2026-10-02, when a door found open was left because a rider had shut Brandt
+    /// Court's front door on Cody, who had opened it to listen to the street. Only a body in the doorway
+    /// holds it, and a player five metres in from it is not in the doorway.
     /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ADoorFoundOpenIsLeftOpenForAPlayerNearItAndShutWithNobodyAbout(bool playerNear)
+    public void ADoorFoundOpenIsShutBehindThemWhoeverIsAbout(bool playerNear)
     {
         var rig = Build(Stadium(60f, 400f), Car(topKmh: 40f, corneringG: 1.0f, brake: 3f), life: ParkNow,
                         entities: new() { DoorAt(68f, 200f) });
@@ -655,11 +656,10 @@ public class VehicleMotionTests : IDisposable
             rig.Tick();
             if (!Spawned().TryGetValue("driver of Car", out var pe) || !rig.World.IsAlive(pe)) wentIn = true;
             everShut |= rig.World.Get<DoorComponent>(door).Target <= 0f;
-            if (playerNear) Assert.False(everShut, "the door somebody had open was shut");
         }
         Assert.True(wentIn);
         Assert.Equal("", rig.State.Park);
-        if (!playerNear) Assert.True(everShut, "an outside door found open was left open with nobody about");
+        Assert.True(everShut, "an outside door found open was left open");
     }
 
     /// <summary>An automatic door opens for the driver coming up to it, either way, and shuts itself; a door

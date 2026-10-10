@@ -569,6 +569,14 @@ public partial struct EntityState
     /// </summary>
     public byte Signals;
 
+    /// <summary>
+    /// How a far moving thing is changing, as the server has it, for the client to carry it between states
+    /// (<see cref="DistantMotion"/>): its speed's rate in millimetres a second squared, and the turn of its
+    /// heading as a rotation vector in milliradians a second. Zero for anything near or steady.
+    /// </summary>
+    public short SpeedRate;
+    public short TurnX, TurnY, TurnZ;
+
     public EntityState()
     {
         EntityId = 0;

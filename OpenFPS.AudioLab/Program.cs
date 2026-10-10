@@ -101,6 +101,8 @@ string[] usage =
     "                                                water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
     "  --fire [levels|render out=DIR [places=1]|game out=DIR set=|hrtf] [preset ...] [sec= wind= age= seed= heard= parts=]",
     "                                                fires from a campfire to a crown fire, from their model (docs/FIRE.md)",
+    "  --stove [levels|render out=DIR|game out=DIR] [hob4|hob4_propane|hob1] [seed= dist= eff= turb= trim= heat= us= cloud=]",
+    "                                                a gas hob lit, turned and turned off, from its model (docs/GAS_HOB.md)",
     "  --waves [levels|render out=DIR|sea|game out=DIR set=] [preset ...] [sec= wind= fetch= heard= parts=]",
     "                                                shores from a pond's edge to surf, from their model (docs/WAVES_AND_SHORES.md)",
     "  --running-water [levels|render out=DIR|runoff|cycle PRESET|game out=DIR set=] [preset ...] [sec= rain= flow= dry=1 parts=]",
@@ -180,6 +182,8 @@ string[] usage =
     "  --room-echoes [map=city] ear= src=            the placed reflections a one-off sound gets",
     "  --shot-echoes [map=city] at=x,z [shot=x,z]    every echo a shot makes there, and what it came off",
     "  --wall-tl                                     the city's constructions' transmission loss per band",
+    "  --layers [map=city]                           layers in contact against walls apart: Steam Audio, tracer, model",
+    "  --floor-render [out=DIR]                      steps and a voice in the flat above heard below, and back, through the client",
     "  --traced-reverb / --traced-echoes             the traced reverb and per-source echoes, headless",
     "  --sa-frame                                    which way Steam Audio's traced soundfield faces (SA_MIRROR=0: unflipped)",
     "  --tail-bands / --tail-iacc / --late-field [place=flat|tunnel|street]",
@@ -222,6 +226,7 @@ string[] usage =
     "  --ended-channel                               whether a DSP stays attached to a channel that ended on its own",
     "  --foreign-disconnect                          a send disconnected through the wrong reverb unit: the city crash, isolated",
     "  --send-drift scenario=N                       a sending channel torn down one way, then the wire tripped",
+    "  --distant-updates [sec=45] [net=poor] [seed=N] [trace=ID|pass-by|fly-over] far things sent less often: the city compared both ways, bearing, pitch, steps, bytes",
     "  --send-window [sec=] [mode=client|forget|stop]",
     "                                                the window between a queued send disconnect and the channel finishing",
 };
@@ -552,6 +557,11 @@ if (args.Contains("--fire"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.FireSpike.Run(args));
 }
 
+if (args.Contains("--stove"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.StoveSpike.Run(args));
+}
+
 if (args.Contains("--waves"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.WavesSpike.Run(args));
@@ -790,6 +800,14 @@ if (args.Contains("--room-echoes"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
 }
+if (args.Contains("--floor-render"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.FloorRenderSpike.Run(args));
+}
+if (args.Contains("--layers"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.LayersSpike.Run(args));
+}
 if (args.Contains("--wall-tl"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.WallTlSpike.Run());
@@ -861,6 +879,19 @@ if (args.Contains("--late-field"))
 if (args.Contains("--nan-mix"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanMixSpike.Run(args));
+}
+if (args.Contains("--distant-updates"))
+{
+    double sec = 45;
+    int trace = -1;
+    foreach (var a in args) if (a.StartsWith("sec=")) sec = double.Parse(a[4..], System.Globalization.CultureInfo.InvariantCulture);
+    foreach (var a in args) if (a.StartsWith("trace=")) trace = a[6..] == "pass-by" ? -2 : a[6..] == "fly-over" ? -3 : int.Parse(a[6..]);
+    var net = args.Contains("net=poor") ? OpenFPS.Instruments.DistantUpdatesRig.Network.Poor : OpenFPS.Instruments.DistantUpdatesRig.Network.Typical;
+    foreach (var a in args) if (a.StartsWith("seed=")) net = net with { Seed = int.Parse(a[5..]) };
+    var rig = OpenFPS.Instruments.DistantUpdatesRig.Run(sec, log: Console.WriteLine, trace: trace, network: net);
+    foreach (var line in rig.Trace) Console.WriteLine(line);
+    foreach (var line in rig.Report()) Console.WriteLine(line);
+    Environment.Exit(0);
 }
 if (args.Contains("--map-travel"))
 {

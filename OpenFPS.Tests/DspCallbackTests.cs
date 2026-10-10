@@ -33,7 +33,7 @@ public class DspCallbackTests
     public static IEnumerable<object[]> PhysicalKinds() => new[]
     {
         "window unit", "mower", "airliner", "siren", "electric horn", "air horn", "crossing bell", "rain",
-        "light rail", "fountain", "fountain tap", "fire", "fire place", "tree", "tree place", "creek", "shore",
+        "light rail", "fountain", "fountain tap", "fire", "fire place", "tree", "tree place", "creek", "shore", "gas hob",
     }.Select(k => new object[] { k });
 
     private static readonly Vector3 Somewhere = new(400f, 0f, -300f);
@@ -57,6 +57,9 @@ public class DspCallbackTests
         "tree place" => new NaturePlaceState(new PlacedNatureVoice("foliage:park_tree", FoliageSpec.ParkTree, 1 + FoliageSynth.Boughs, Rate, 9, Somewhere) { TargetSpread = 1f }, 0, Rate, Somewhere),
         "creek" => new NaturePlaceState(new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, 19, Somewhere), 0, Rate, Somewhere),
         "shore" => new NaturePlaceState(new PlacedNatureVoice("shore:sea", ShoreSpec.SeaSand, ShoreSpec.SeaSand.DefaultGeometry, Rate, 23, Somewhere), 0, Rate, Somewhere),
+        // A burner being lit now: the knob, the sparks, the light-up (the twin is made in the same second, so
+        // both take the change as heard as it happened).
+        "gas hob" => new StoveVoiceState(GasHobSpec.FourBurnerNatural, new HobKey("hob4", "0000", "3000", WindField.Now()).Format(), Rate, 5),
         _ => throw new ArgumentException(kind),
     };
 

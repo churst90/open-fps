@@ -119,6 +119,7 @@ FILE_RULES = [
     (CO + 'TrackClearance.cs', 'b', '', 'server map validation'),
     (CO + 'Messages.cs', 'b', '', 'network'),
     (CO + 'StatePacking.cs', 'b', '', 'network'),
+    (CO + 'DistantMotion.cs', 'b', '', 'network: how a far thing is carried between states'),
     (CO + 'JsonConverters.cs', 'b', '', 'network'),
     (CO + 'Components.cs', 'b', '', 'entity model'),
     (CO + 'WorldSnapshot.cs', 'b', '', 'snapshots'),

@@ -64,6 +64,8 @@ internal sealed class TileSceneSet : IDisposable
     private sealed class Piece
     {
         public ulong Signature;
+        /// <summary>The hash of what the constructions made of its layers (TileSceneSet.LayersHash).</summary>
+        public int Layers;
         public int Triangles;
         public Vector3 Origin;
         public IntPtr Ground, Rest;
@@ -127,6 +129,7 @@ internal sealed class TileSceneSet : IDisposable
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var world = Store.Update(boxes, leaves, terrains);
         LastStoreMs = clock.Elapsed.TotalMilliseconds;
+        UpdateLayers(boxes, leaves);
 
         int built = 0;
         var seen = new HashSet<TileKey>();
@@ -134,7 +137,7 @@ internal sealed class TileSceneSet : IDisposable
         {
             var piece = inst.Piece;
             seen.Add(piece.Key);
-            if (_current.TryGetValue(piece.Key, out var had) && had.Signature == piece.Signature) continue;
+            if (_current.TryGetValue(piece.Key, out var had) && had.Signature == piece.Signature && had.Layers == LayersHash(piece)) continue;
             if (had != null) _dead.Add(had);
             _current[piece.Key] = NewPiece(piece);
             built++;
@@ -231,9 +234,46 @@ internal sealed class TileSceneSet : IDisposable
         foreach (var p in _dead) yield return p;
     }
 
+    // ── Constructions (LayeredFaces) ─────────────────────────────────────────────────────────────
+    //
+    // Worked out over every box at once, since a construction can cross a tile's edge, and again only when
+    // a box that can be a layer changes: a door swinging changes none.
+
+    private SteamAudioScene.LayerLookup _layers = SteamAudioScene.LayerLookup.Empty;
+    private long _layersKey;
+
+    /// <summary>The plan of the constructions the last <see cref="Update"/> found. Diagnostic.</summary>
+    public LayeredFaces.Plan LayerPlan => _layers.Plan;
+
+    private void UpdateLayers(IReadOnlyList<SteamAudioScene.Box> boxes, ISet<int>? leaves)
+    {
+        long key = 17;
+        foreach (var b in boxes)
+        {
+            if (b.Hung || b.Form != null || (leaves != null && b.EntityId != 0 && leaves.Contains(b.EntityId))) continue;
+            key += HashCode.Combine(b.Center, b.Size, b.Rotation, b.Material, b.Build, b.EntityId);   // order-free
+        }
+        if (key == _layersKey && _layers != SteamAudioScene.LayerLookup.Empty) return;
+        _layersKey = key;
+        _layers = new SteamAudioScene.LayerLookup(boxes, SteamAudioScene.PlanOf(boxes, leaves));
+    }
+
+    /// <summary>What the constructions make of a piece's layers, hashed: a change rebuilds its sub-scenes.</summary>
+    private int LayersHash(GeometryPiece piece)
+    {
+        if (_layers.Plan.Members.Count == 0) return 0;
+        var h = new HashCode();
+        for (int s = 0; s < piece.SolidCount; s++)
+        {
+            ref readonly var rec = ref piece.Solid(s);
+            if (_layers.Of(rec.Owner, rec.PlacedAt, rec.BoxSize) is { } m) h.Add(m.Hash);
+        }
+        return h.ToHashCode();
+    }
+
     private Piece NewPiece(GeometryPiece piece)
     {
-        var p = new Piece { Signature = piece.Signature, Triangles = piece.TriangleCount,
+        var p = new Piece { Signature = piece.Signature, Layers = LayersHash(piece), Triangles = piece.TriangleCount,
                             Ground = SubScene(piece, openGround: true), Rest = SubScene(piece, openGround: false) };
         // The boxes the scene holds, for the reflection search and the bounds (SteamAudioScene.SetGeometry).
         for (int s = 0; s < piece.SolidCount; s++)
@@ -331,7 +371,7 @@ internal sealed class TileSceneSet : IDisposable
     {
         IntPtr sub = SteamAudioScene.CreateScene(_context);
         if (sub == IntPtr.Zero) return IntPtr.Zero;
-        IntPtr mesh = SteamAudioScene.AddPieceMesh(sub, piece, openGround);
+        IntPtr mesh = SteamAudioScene.AddPieceMesh(sub, piece, openGround, _layers);
         if (mesh == IntPtr.Zero) { Phonon.iplSceneRelease(ref sub); return IntPtr.Zero; }
         Phonon.iplSceneCommit(sub);
         // The scene holds the mesh; the handle is not needed past the build.

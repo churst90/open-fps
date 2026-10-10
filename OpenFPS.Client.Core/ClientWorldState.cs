@@ -19,6 +19,16 @@ public class ClientWorldState
     /// Diagnostic and test access.</summary>
     public bool TryGetInterpolatedTransform(int entityId, out Transform transform)
         => _serverTransforms.TryGetValue(entityId, out transform);
+
+    /// <summary>...with its velocity as the audio is given it. Diagnostic and test access.</summary>
+    public bool TryGetInterpolatedMotion(int entityId, out Transform transform, out Vector3 velocity)
+    {
+        velocity = _serverVelocities.GetValueOrDefault(entityId);
+        return _serverTransforms.TryGetValue(entityId, out transform);
+    }
+
+    /// <summary>Every entity that has an interpolated transform. Diagnostic and test access.</summary>
+    public ICollection<int> InterpolatedIds() => _serverTransforms.Keys;
     private readonly ConcurrentDictionary<int, Vector3> _serverVelocities = new();
     private readonly ConcurrentDictionary<int, float> _serverTyreDemand = new();
     /// <summary>Each vehicle's horn and siren switches as last sent (EntityState.Signals).</summary>
@@ -51,6 +61,9 @@ public class ClientWorldState
     /// <see cref="OpenFPS.Common.AudioClock"/>. Copied into every snapshot built from them.</summary>
     private double _positionsSampledAt;
     private double _clientInterpolationTime = 0;
+
+    /// <summary>The server time, seconds, the interpolation is playing. Diagnostic and test access.</summary>
+    public double PlaybackTime => _clientInterpolationTime;
     
     private readonly object _gridLock = new();
     private SpatialGrid<int>? _staticGrid;
@@ -72,15 +85,65 @@ public class ClientWorldState
     // world (every mutation bumps _version) and shared by everything that asks in a frame. Version and copy
     // are one immutable object, so a reader never sees a new version stamped on an old copy.
     private sealed record CachedSnapshot(long Version, WorldSnapshot Snapshot);
-    private readonly Dictionary<int, EntityState> _interpolationFrom = new();
 
-    /// <summary>Each moving thing's latest state at or before the snapshot playback is reading from, and
-    /// that snapshot's tick: what it is doing while the server is not mentioning it. See HoldThrough.
-    /// Guarded by the snapshot buffer's lock.</summary>
-    private readonly Dictionary<int, (long Tick, EntityState State)> _held = new();
+    /// <summary>Each moving thing's latest state at or before the snapshot playback is reading from, that
+    /// snapshot's tick, and how it was changing as the server sent it (DistantMotion.Rates): what it is
+    /// doing while the server is not mentioning it. See HoldThrough. Guarded by the snapshot buffer's lock.</summary>
+    private readonly Dictionary<int, Held> _held = new();
     private long _heldThrough = long.MinValue;
-    private readonly List<int> _folded = new();
-    private readonly HashSet<int> _inTo = new();
+
+    private struct Held
+    {
+        public long Tick;
+        public EntityState State;
+        public DistantMotion.Rates Rates;
+    }
+
+    /// <summary>Each thing's next state after the playback point, this frame: the first snapshot from 'to'
+    /// on that mentions it. A far thing is mentioned a few times a second (DistantMotion).</summary>
+    private readonly Dictionary<int, (long Tick, EntityState State)> _next = new();
+
+    /// <summary>Ticks the buffer has nothing for, this frame, in order: lost, or not here yet
+    /// (<see cref="FirstMissingAfter"/>).</summary>
+    private readonly List<long> _missing = new();
+
+    /// <summary>Things resting where they were put, with nothing newer on the way: not placed again until
+    /// something about them arrives.</summary>
+    private readonly HashSet<int> _settled = new();
+
+    /// <summary>What each moving thing was carried by last frame, and what is left of a correction being
+    /// eased out (<see cref="BlendSeconds"/>).</summary>
+    private readonly Dictionary<int, Carried> _carried = new();
+
+    private struct Carried
+    {
+        public Held A;
+        public long BTick;
+        public EntityState B;
+        /// <summary>The playback time B was first seen at.</summary>
+        public double Learned;
+        /// <summary>The first tick after A the buffer had nothing for.</summary>
+        public long Missing;
+        /// <summary>The playback time it was last placed at.</summary>
+        public double Time;
+        public Vector3 OffsetPosition, OffsetVelocity;
+        public Quaternion OffsetRotation;
+        public bool Offset;
+    }
+
+    /// <summary>
+    /// How long a correction takes to ease out, seconds (a time constant). A far thing's next state can
+    /// arrive late, or after one was lost, when the client has already carried the thing past where that
+    /// state would start it from; the difference is eased away rather than jumped.
+    /// </summary>
+    private const float BlendSeconds = 0.1f;
+
+    /// <summary>...and a correction to the velocity, which the pitch follows: a tick.</summary>
+    private const float VelocityBlendSeconds = PhysicsConstants.FixedDeltaTime;
+
+    /// <summary>A correction bigger than this is a jump (a teleport, a resynchronised clock), not an error to
+    /// ease: it is taken at once, as before.</summary>
+    private const float MaxBlendMetres = 5f;
 
     /// <summary>Below this (m/s, squared) a held state is resting: the server only stops sending a thing
     /// whose velocity is zero on the wire, which is under a millimetre a second.</summary>
@@ -182,7 +245,7 @@ public class ClientWorldState
         _audioEntityIds.Clear();
         _regionEntityIds.Clear();
         _markerEntityIds.Clear();
-        lock (_snapshotBuffer) _held.Clear();
+        lock (_snapshotBuffer) { _held.Clear(); _carried.Clear(); _settled.Clear(); }
 
         lock (_metaLock)
         {
@@ -404,7 +467,7 @@ public class ClientWorldState
             _regionEntityIds.TryRemove(id, out _);
             _markerEntityIds.TryRemove(id, out _);
             if (_crownIds.TryRemove(id, out _)) _crownsDirty = true;
-            lock (_snapshotBuffer) _held.Remove(id);
+            lock (_snapshotBuffer) { _held.Remove(id); _carried.Remove(id); _settled.Remove(id); }
             if (known) removed.Add(id);
         }
 
@@ -492,6 +555,7 @@ public class ClientWorldState
 
             ServerStateUpdate? from = null;
             ServerStateUpdate? to = null;
+            int toIndex = -1;
 
             for (int i = 0; i < _snapshotBuffer.Count - 1; i++)
             {
@@ -502,68 +566,43 @@ public class ClientWorldState
                 {
                     from = _snapshotBuffer[i];
                     to = _snapshotBuffer[i+1];
+                    toIndex = i + 1;
                     break;
                 }
             }
 
             if (from != null && to != null)
             {
-                double t0 = from.Tick * PhysicsConstants.FixedDeltaTime;
-                double t1 = to.Tick * PhysicsConstants.FixedDeltaTime;
-                float alpha = (float)((_clientInterpolationTime - t0) / (t1 - t0));
+                if (from.Tick != _heldThrough) HoldThrough(from, localPlayerId);
 
-                // Indexed once: a search per entity was quadratic in the entity count, every frame.
-                _interpolationFrom.Clear();
-                foreach (var stateFrom in from.States) _interpolationFrom[stateFrom.EntityId] = stateFrom;
+                // The next state of everything after the playback point: 'to' itself for whatever goes every
+                // tick, a later snapshot for a far thing between its states.
+                _next.Clear();
+                for (int i = toIndex; i < _snapshotBuffer.Count; i++)
+                    foreach (var s in _snapshotBuffer[i].States)
+                        _next.TryAdd(s.EntityId, (_snapshotBuffer[i].Tick, s));
 
-                if (from.Tick != _heldThrough) moved |= HoldThrough(from, to, localPlayerId);
+                _missing.Clear();
+                for (int i = 1; i < _snapshotBuffer.Count && _missing.Count < SnapshotHistory; i++)
+                    for (long t = _snapshotBuffer[i - 1].Tick + 1; t < _snapshotBuffer[i].Tick && _missing.Count < SnapshotHistory; t++)
+                        _missing.Add(t);
 
                 foreach (var stateTo in to.States)
                 {
-                    if (stateTo.EntityId == localPlayerId) continue; // predicted, not interpolated
+                    if (stateTo.EntityId == localPlayerId || _held.ContainsKey(stateTo.EntityId)) continue;
+                    // Never heard of before: it starts where it is.
+                    Place(stateTo.EntityId, stateTo.Transform.ToTransform(), stateTo.LinearVelocity, stateTo);
+                    if (stateTo.Wheels != null) _serverWheels[stateTo.EntityId] = stateTo.Wheels;
                     moved = true;
+                }
 
-                    // Missing from 'from' is not unknown: the server leaves out what has not moved
-                    // (RestingStates), so a car pulling away was resting where it was held. Snapping it
-                    // to 'to' would move it a tick early every time anything set off.
-                    double fromTime = t0;
-                    bool haveFrom = _interpolationFrom.TryGetValue(stateTo.EntityId, out var stateFrom) && stateFrom.EntityId != 0;
-                    if (!haveFrom && _held.TryGetValue(stateTo.EntityId, out var held))
-                    {
-                        stateFrom = held.State;
-                        haveFrom = true;
-                        // One moving when last heard of is missing because a packet was lost: it goes from
-                        // where and when it was then.
-                        if (held.State.LinearVelocity.LengthSquared() > RestingSpeedSquared)
-                            fromTime = held.Tick * PhysicsConstants.FixedDeltaTime;
-                    }
-
-                    if (haveFrom)
-                    {
-                        float a = fromTime == t0 ? alpha : (float)((_clientInterpolationTime - fromTime) / (t1 - fromTime));
-                        var transFrom = stateFrom.Transform.ToTransform();
-                        var transTo = stateTo.Transform.ToTransform();
-
-                        var lerpedPos = Vector3.Lerp(transFrom.Position, transTo.Position, a);
-                        var lerpedRot = Quaternion.Slerp(transFrom.Rotation, transTo.Rotation, a);
-
-                        _serverTransforms[stateTo.EntityId] = new Transform { Position = lerpedPos, Rotation = lerpedRot };
-                        Geometry.NoteMoved(stateTo.EntityId);
-                        _serverVelocities[stateTo.EntityId] = Vector3.Lerp(stateFrom.LinearVelocity, stateTo.LinearVelocity, a);
-                        _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
-                        _serverSignals[stateTo.EntityId] = stateTo.Signals;
-                        if (stateTo.Wheels != null) _serverWheels[stateTo.EntityId] = stateTo.Wheels;
-                    }
-                    else
-                    {
-                        // Never heard of before: it starts where it is.
-                        _serverTransforms[stateTo.EntityId] = stateTo.Transform.ToTransform();
-                        Geometry.NoteMoved(stateTo.EntityId);
-                        _serverVelocities[stateTo.EntityId] = stateTo.LinearVelocity;
-                        _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
-                        _serverSignals[stateTo.EntityId] = stateTo.Signals;
-                        if (stateTo.Wheels != null) _serverWheels[stateTo.EntityId] = stateTo.Wheels;
-                    }
+                foreach (var (id, held) in _held)
+                {
+                    if (id == localPlayerId) continue;
+                    bool hasNext = _next.TryGetValue(id, out var next);
+                    if (!hasNext && _settled.Contains(id)) continue;
+                    Carry(id, held, hasNext, next.Tick, next.State, to.Tick, FirstMissingAfter(held.Tick, hasNext ? next.Tick : long.MaxValue), dt);
+                    moved = true;
                 }
             }
         }
@@ -578,49 +617,169 @@ public class ClientWorldState
     }
 
     /// <summary>
-    /// Brings the held states up to the 'from' snapshot, and puts anything not in 'to' exactly where it
-    /// rests. Once each time playback moves into a new pair.
+    /// Brings the held states up to the 'from' snapshot: every snapshot played through is folded in, including
+    /// any a slow frame skipped. Once each time
+    /// playback moves into a new pair.
     ///
     /// <para>The server sends a resting thing only a few times as it stops, then once a second
     /// (RestingStates), so what a snapshot leaves out stays where it was last put, not a few centimetres
-    /// short where the interpolation had got to. Every snapshot played through is folded in, including
-    /// any a slow frame skipped.</para>
+    /// short where the interpolation had got to; and a far moving thing a few times a second, so between its
+    /// states it is carried (<see cref="Carry"/>).</para>
     /// </summary>
-    private bool HoldThrough(ServerStateUpdate from, ServerStateUpdate to, int localPlayerId)
+    private void HoldThrough(ServerStateUpdate from, int localPlayerId)
     {
         // Playback went backwards (the clock was resynchronised): fold again from the start of what is held.
         if (from.Tick < _heldThrough) _heldThrough = long.MinValue;
 
-        _folded.Clear();
         foreach (var snapshot in _snapshotBuffer)
         {
             if (snapshot.Tick <= _heldThrough) continue;
             if (snapshot.Tick > from.Tick) break;
             foreach (var s in snapshot.States)
             {
-                _held[s.EntityId] = (snapshot.Tick, s);
-                _folded.Add(s.EntityId);
+                _held[s.EntityId] = new Held { Tick = snapshot.Tick, State = s, Rates = DistantMotion.Rates.Of(s) };
+                _settled.Remove(s.EntityId);
                 // Wheels are not interpolated; a state without them means "as they were".
                 if (s.Wheels != null && s.EntityId != localPlayerId) _serverWheels[s.EntityId] = s.Wheels;
             }
         }
         _heldThrough = from.Tick;
+    }
 
-        _inTo.Clear();
-        foreach (var s in to.States) _inTo.Add(s.EntityId);
-        bool any = false;
-        foreach (int id in _folded)
+    /// <summary>
+    /// Where a thing is at <paramref name="time"/> from its last state at or before it (A) and, when one has
+    /// arrived, its next (B). From A it is carried on the server's own numbers (DistantMotion.Predict: the
+    /// speed and the turn it had). Once B is known it is steered onto it. Its velocity and heading take B's in
+    /// the last tick before B, as everything sent every tick does: B was sent because they changed, and they
+    /// changed then. Its position makes up the prediction's miss steadily from when B was
+    /// <paramref name="learned"/> (or from A, if later): the mixer carries a position on its velocity between
+    /// steps, and a miss made up in one tick, faster than the velocity says, would be heard as a small jump at
+    /// the next step. For anything sent every tick this is the line from A to B, as it always was; a thing at
+    /// rest stays where it was put.
+    /// </summary>
+    private static (Vector3 Position, Vector3 Velocity, Quaternion Rotation) Track(
+        in Held a, bool hasB, long bTick, in EntityState b, double learned, long missing, double time)
+    {
+        var at = a.State.Transform.ToTransform();
+        double tA = a.Tick * PhysicsConstants.FixedDeltaTime;
+        // Before A (asked only to compare with the frame before): where its velocity says it was.
+        if (time < tA) return (at.Position + a.State.LinearVelocity * (float)(time - tA), a.State.LinearVelocity, at.Rotation);
+        var predicted = DistantMotion.Predict(at.Position, a.State.LinearVelocity, at.Rotation, a.Rates, (float)(time - tA));
+        if (!hasB || bTick <= a.Tick) return predicted;
+
+        double t1 = bTick * PhysicsConstants.FixedDeltaTime;
+        // The last tick the prediction is known to have held: the one before B, or before a tick that never came
+        // (B may be the repeat of a state sent in it), as the line through a lost tick has always gone.
+        double lastTick = Math.Max(tA, (Math.Min(bTick, missing) - 1) * PhysicsConstants.FixedDeltaTime);
+        // A thing at rest was not predicted to be anywhere else: it sets off in the last tick, as it did.
+        double steer = a.State.LinearVelocity.LengthSquared() <= RestingSpeedSquared ? lastTick
+                     : Math.Min(Math.Max(tA, learned), lastTick);
+        if (time <= steer) return predicted;
+        var bt = b.Transform.ToTransform();
+        float alpha = time <= lastTick ? 0f : (float)Math.Min(1.0, (time - lastTick) / (t1 - lastTick));
+        // From A to the next tick with nothing to carry it by: the straight line it always was.
+        if (bTick - a.Tick == 1 && a.Rates.SpeedRate == 0f && a.Rates.Turn == Vector3.Zero)
+            return (Vector3.Lerp(at.Position, bt.Position, alpha),
+                    Vector3.Lerp(a.State.LinearVelocity, b.LinearVelocity, alpha),
+                    Quaternion.Slerp(at.Rotation, bt.Rotation, alpha));
+        float share = (float)Math.Min(1.0, (time - steer) / (t1 - steer));
+        var miss = DistantMotion.Predict(at.Position, a.State.LinearVelocity, at.Rotation, a.Rates, (float)(t1 - tA));
+        return (predicted.Position + (bt.Position - miss.Position) * share,
+                predicted.Velocity + (b.LinearVelocity - miss.Velocity) * alpha,
+                Quaternion.Slerp(predicted.Rotation, bt.Rotation * Quaternion.Inverse(miss.Rotation) * predicted.Rotation, alpha));
+    }
+
+    /// <summary>
+    /// Places one thing for this frame (<see cref="Track"/>), easing out any correction: when its next state
+    /// arrives too late to start from where it was carried to (a lost or late packet), the difference is
+    /// carried as an offset that dies away over <see cref="BlendSeconds"/>, so nothing steps.
+    /// </summary>
+    private void Carry(int id, in Held a, bool hasB, long bTick, in EntityState b, long toTick, long missing, float dt)
+    {
+        double time = _clientInterpolationTime;
+        long key = hasB ? bTick : -1;
+        bool known = _carried.TryGetValue(id, out var c);
+        // When this A's B was first seen: now, unless it was already being steered for.
+        double learned = known && c.A.Tick == a.Tick && c.BTick == key ? c.Learned : time;
+        var now = Track(a, hasB, bTick, b, learned, missing, time);
+        // Playback going from one state to the next it was heading for is seamless by construction; anything
+        // else (a next state that turned up, one that turned up late enough to be passed already, or a lost
+        // tick that turned up after all) may not be.
+        bool seamless = c.A.Tick == a.Tick ? c.BTick == key && c.Missing == missing : c.BTick == a.Tick;
+        if (known && !seamless)
         {
-            if (id == localPlayerId || _inTo.Contains(id)) continue;
-            var state = _held[id].State;
-            _serverTransforms[id] = state.Transform.ToTransform();
-            Geometry.NoteMoved(id);
-            _serverVelocities[id] = state.LinearVelocity;
-            _serverTyreDemand[id] = state.TyreDemandFraction;
-            _serverSignals[id] = state.Signals;
-            any = true;
+            // Where the last frame's track and this one disagree, at the last frame's time: the difference is
+            // the jump, and what moves between the two frames is this one's to make.
+            var was = Track(c.A, c.BTick >= 0, c.BTick, c.B, c.Learned, c.Missing, c.Time);
+            var then = Track(a, hasB, bTick, b, learned, missing, c.Time);
+            var offRot = c.Offset ? c.OffsetRotation : Quaternion.Identity;
+            c.OffsetPosition += was.Position - then.Position;
+            c.OffsetVelocity += was.Velocity - then.Velocity;
+            c.OffsetRotation = Quaternion.Normalize(offRot * was.Rotation * Quaternion.Inverse(then.Rotation));
+            c.Offset = c.OffsetPosition.LengthSquared() <= MaxBlendMetres * MaxBlendMetres;
         }
-        return any;
+        c.A = a;
+        c.BTick = key;
+        c.Learned = learned;
+        c.Missing = missing;
+        c.Time = time;
+        c.B = hasB ? b : default;
+
+        var position = now.Position;
+        var velocity = now.Velocity;
+        var rotation = now.Rotation;
+        if (c.Offset)
+        {
+            position += c.OffsetPosition;
+            velocity += c.OffsetVelocity;
+            rotation = Quaternion.Normalize(c.OffsetRotation * rotation);
+            float keep = MathF.Exp(-dt / BlendSeconds);
+            c.OffsetPosition *= keep;
+            // The velocity's within a tick or so, as anything sent every tick takes a change: held for a tenth
+            // of a second it is a pitch arriving late.
+            c.OffsetVelocity *= MathF.Exp(-dt / VelocityBlendSeconds);
+            c.OffsetRotation = Quaternion.Slerp(Quaternion.Identity, c.OffsetRotation, keep);
+            if (c.OffsetPosition.LengthSquared() < 1e-10f && c.OffsetVelocity.LengthSquared() < 1e-10f) c.Offset = false;
+        }
+        if (!c.Offset) { c.OffsetPosition = c.OffsetVelocity = Vector3.Zero; c.OffsetRotation = Quaternion.Identity; }
+        _carried[id] = c;
+
+        // What it is doing comes with its state: B's in the tick before B, as 'to' always gave it.
+        var said = hasB && bTick == toTick ? b : a.State;
+        Place(id, new Transform { Position = position, Rotation = rotation }, velocity, said);
+        if (hasB && bTick == toTick && b.Wheels != null) _serverWheels[id] = b.Wheels;
+        if (!hasB && !c.Offset && a.State.LinearVelocity.LengthSquared() <= RestingSpeedSquared) _settled.Add(id);
+    }
+
+    /// <summary>
+    /// The first tick after a thing's state at <paramref name="tick"/> that the buffer has nothing for and that may
+    /// have said something about it, or long.MaxValue. A change goes twice (RestingStates; a far change is
+    /// repeated the tick after) and a far moving thing goes at least every DistantMotion.IntervalTicks, so a
+    /// single lost tick hid nothing unless the thing's <paramref name="next"/> state is the tick after it, and a
+    /// longer run hid nothing unless the next state came within that interval of its end.
+    /// </summary>
+    private long FirstMissingAfter(long tick, long next)
+    {
+        for (int i = 0; i < _missing.Count; i++)
+        {
+            long first = _missing[i], last = first;
+            while (i + 1 < _missing.Count && _missing[i + 1] == last + 1) last = _missing[++i];
+            if (last <= tick || first >= next) continue;
+            first = Math.Max(first, tick + 1);
+            if (last == first ? next == last + 1 : next <= last + DistantMotion.IntervalTicks) return first;
+        }
+        return long.MaxValue;
+    }
+
+    /// <summary>Puts a thing where it is this frame, with the velocity it has and what its state says of its
+    /// tyres and horn.</summary>
+    private void Place(int id, Transform transform, Vector3 velocity, in EntityState said)
+    {
+        _serverTransforms[id] = transform;
+        Geometry.NoteMoved(id);
+        _serverVelocities[id] = velocity;
+        _serverTyreDemand[id] = said.TyreDemandFraction;
+        _serverSignals[id] = said.Signals;
     }
 
     public void SyncState(IEnumerable<EntityState> states)

@@ -9,7 +9,7 @@
   "IsDoor": true,
   "DoorKind": "glass-pushbar",
   "KeyedSide": 1,
-  "CloseAfterSeconds": 3,
+  "CloseAfterSeconds": 1,
   "CloseSeconds": 4.5,
   "SwingSeconds": 1.1,
   "SwingDegrees": 90,

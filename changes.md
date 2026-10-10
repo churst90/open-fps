@@ -26,10 +26,15 @@ Recent work, newest first. `git log` has the rest.
   shut an outside door without a closer behind them, however they found it; leave an inside door as
   found going in and shut it going out ("in" is more doorways from the outside, or the smaller room).
   The shut is by hand, so it is the same swing and latch from the door's own model as a player's, 0.4
-  to 0.9 s after they are out of the doorway. It is left for anybody else in the doorway or a player
-  within 2 m, and never shut on anybody. A door they found open stays open while a player is within
-  8 m of it (somebody has it open on purpose, as Cody had Brandt Court's on 2026-10-02). Closers were checked too: one is held only while somebody is in
-  the doorway. Over an hour on the city with somebody parking every 20 s and Alex keeping a cold
+  to 0.9 s after the doorway is clear. Who is about does not change the rule (Cody, 2026-10-10); this
+  reverses 2026-10-02, when a door found open was left because a rider had shut Brandt Court's door on
+  Cody. Only a body holds the leaf: it waits while anybody is in the doorway or the leaf's way, then
+  shuts. Closers start back 1 s after the last person leaves the doorway (Cody, 2026-10-10: "close on
+  their own after a second of them leaving"); they waited 3.00 s, measured, on the push-bar, glass
+  front and glass pull doors. A closer has no timer of its own, so the 1 s is the leaf held only while
+  somebody is in the doorway box; the sweep and latch, 3.6 to 4.1 s, are unchanged. Until somebody
+  has been in the doorway since it opened, it waits 2 s more for whoever opened it to walk up, so a
+  door opened and never gone through still starts back 3 s after it is fully open. Over an hour on the city with somebody parking every 20 s and Alex keeping a cold
   night: 175 openings of 22 doors (17 house front doors, a patio door, the five towers' entrances), the
   longest open 22 s, none left open, and the 352 walkers through no door. Magnolia: 1,323 doors, none
   opened in an hour, since nobody there goes indoors yet. Server only. NpcDoorTests.
@@ -249,6 +254,73 @@ Recent work, newest first. `git log` has the rest.
     near each source as the client gets them) and `overlays=DIR` (the editor's edits laid over the map).
     `--thin-panel` measures Steam Audio's direct transmission through one panel against its construction.
     `--pa-leak` renders the PA scenes through the real provider.
+## 2026-10-09
+
+- Layers in contact are one panel. A city floor is four boxes touching: a 3 cm plaster ceiling, the
+  storey's 25 cm ceiling slab, the next storey's 25 cm floor slab and 4 cm of carpet. Each was paid as
+  a wall of its own, the carpet with its free-hanging table figure (20 dB in the low band), and Steam
+  Audio lost faces where two boxes touch, so the floor took 53 dB in the low band for a voice upstairs
+  and 67 dB for footsteps on the same floor (the "15 dB too quiet in the lows"); the hand-rolled tracer
+  took over 100. Now solids in contact count as one construction (`Constructions`): sheets facing the
+  same way whose faces touch or overlap and share some of their face. Fixed solids only: a door leaf is
+  hung, and a block (a bed, a sofa) is not a sheet. The airtight layers are one bonded plate (masses
+  summed, bending stiffness about the common neutral axis, loss factor by the stiffness each brings); a
+  porous layer on an airtight one adds its weight and nothing else; a stud wall keeps its cavity
+  (`WallTransmission.LayeredBandGains`). The tracer and the legs of routes group the solids they cross
+  one straight after another. Steam Audio, which only multiplies what each face it meets lets through,
+  is given each construction's outer faces only, cut where the layers change, each carrying the whole
+  construction's figure (`LayeredFaces`), so a construction is met exactly as one box. The city floor is
+  now 49.6/72.9/96.8 dB (low/mid/high) everywhere and both ways; one stud wall (17.6/41.1/49.3) and two
+  walls with a corridor between (29.7/68.9/82.5) are unchanged. The city has 506 constructions; the
+  scene has 11 % more triangles (77,232 to 85,908) and takes 130-200 ms more to build at load.
+  Measured against a lab-tested 152 mm slab (RAL-TL15-332, STC 54: 40/54/83 dB on the same bands), the
+  floor is still 10/19/14 dB heavier: the map lays 50 cm of concrete between storeys (a slab per
+  storey's floor and another per its ceiling). Lab: `--layers` (and `--layers map=city`),
+  `--floor-render`; `--path-probe` prints the line's walls as constructions. Renders in
+  inbox/floors-2026-10-09.
+- A gas hob, as a physical model (docs/GAS_HOB.md; Cody: "gas stove, tick tick tick tick whoosh").
+  Renders and what to listen for in inbox/gas-stove-2026-10-10.
+  - The knob on a plug valve, pushed in to turn from off; the injector's jet (natural gas at 61 m/s
+    through 0.72-1.28 mm, flows within 1 % of the manufacturers' tables); the mixing tube drawing in air;
+    the first gas sweeping the head; one spark module sparking every electrode 4.17 times a second
+    while a knob is held in; a spark lighting a burner only when the mixture it crosses is rich enough
+    for its energy, so sparks fail because of the gas, not by chance; whatever gas has gathered burning at
+    once in the light-up; the flames; a thermocouple holding the gas on; the pop as a flame is quenched
+    in its ports when turned off, and the safety valve's click 16 s later.
+  - The sparks, the light-up, the roar and the pop are one law, p = (γ-1)/(4πrc²) dQ/dt, the fire's. The
+    spark's crack is anchored on a measured piezo spark (Scheuer and DeCorby 2024); the hiss is
+    Lighthill's.
+  - Fitted against fifteen recordings of hobs (used as the measure only, never played): ticks 43 dB over
+    a large burner's roar (their median about 40), the flame's octaves within 1 dB of their median from
+    250 Hz to 2 kHz, light-ups 15-20 dB over the flame for 140-360 ms (theirs about 16 dB, 220 ms).
+  - Levels at a metre: every burner on full 47 dB, the large burner 43 dB on full and 22 dB on low,
+    sparks 84-90 dB peak.
+  - Prefabs `gas_hob`, `gas_hob_propane` and `gas_burner`. The interact key at one lights the next burner
+    on full, or with every burner lit turns them all off. The state is the sound key (settings and when
+    they changed), so every client hears the same light-up, and a player arriving later hears it as it
+    is. A new model kind, `gas_hob`, in the model library and the world editor.
+  - AudioLab `--stove levels|render|game`.
+- Far things are sent less often (Cody's list of 2026-10-08, item 4; docs/WORLD_STREAMING.md, "Far things
+  less often"). A moving thing 150 m or more from a player goes to that player at most 5 times a second,
+  with how it is changing as the server has it (its speed's rate and its heading's turn, eight bytes, only
+  when not zero), and early the tick the client's carrying of it would stray by a fifth of what is
+  inaudible; a state sent for a change goes once more the next tick. What a player rides, drives or carries
+  goes every tick. The client carries each far thing between its states on the server's numbers and steers
+  onto the next one, so Doppler, an engine's road speed and a train's notch come from the server's own
+  velocity. Not merged; Cody to listen to the city first.
+  - The acceptance test (DistantUpdatesTests, and `AudioLab --distant-updates`) runs the city on the real
+    server with a car passing at 108 km/h, an airliner flying over, the light rail and the walkers, and two
+    players side by side, one sent everything every tick. On a home connection, everything beyond 150 m:
+    bearing within 0.010 degree, pitch within 0.122 %, the largest change from one mixer instant to the
+    next the same to the millimetre, a train's notch a step early or late on 12 steps of 32,400.
+  - Bytes per player standing in the city: 1.33 to 0.62 Mbit/s 40 m from the railway (54 % less), 1.33 to
+    0.69 at the spawn point (48 % less); datagrams 128 to 65 and 73 a second.
+  - On a poor connection (one tick in ten out of order, 2 % lost) both clients leave the server's track by
+    the same amounts (0.017 degree, and up to 23 % of pitch where the stream ran dry), the one sent less
+    often never further. What is sent every tick now takes a late or lost tick the same eased way, which
+    changes it on such a connection (not measured against the client before).
+  - Wire change in Common (EntityState.SpeedRate and Turn, a flag in StatePacking): a new Windows zip and a
+    VPS update when it is merged.
 
 ## 2026-10-07
 

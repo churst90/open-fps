@@ -59,6 +59,7 @@ OpenFPS.Client.Core/AudioEngine/Core/Signals/HeadShadow.cs	lib	Sound
 OpenFPS.Client.Core/AudioEngine/Core/Signals/Modes.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/SteamWhistle.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/StruckBell.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Stove/GasHobSynth.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Thunder.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/TransientSynth.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/VehicleSynth.cs	lib	Sound	
@@ -94,6 +95,7 @@ OpenFPS.Client.Core/AudioEngine/Fmod/NonFinite.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/OwnVoice.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/RailVoice.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/RainVoices.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/StoveVoiceState.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/SynthProcessor.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/TakeLevels.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	lib	Audio	
@@ -195,10 +197,12 @@ OpenFPS.Common/CarDoor.cs	lib	Sound
 OpenFPS.Common/CarWindow.cs	lib	Sound	
 OpenFPS.Common/Chassis.cs	lib	Sound	
 OpenFPS.Common/Components.cs	mixed	Geometry,Sound	ColliderShape,PlaybackMode,WeatherType
+OpenFPS.Common/Constructions.cs	lib	Sound	
 OpenFPS.Common/CrossingGates.cs	lib	Sound	
 OpenFPS.Common/DesignedSoundKit.cs	lib	Sound	
 OpenFPS.Common/Diffraction.cs	lib	Acoustics	
 OpenFPS.Common/DirectionWords.cs	host		
+OpenFPS.Common/DistantMotion.cs	host		
 OpenFPS.Common/DoorKnock.cs	lib	Sound	
 OpenFPS.Common/DoorPhysics.cs	lib	Sound	
 OpenFPS.Common/Doors.cs	lib	Sound	
@@ -214,6 +218,7 @@ OpenFPS.Common/EntityGeometry.cs	host
 OpenFPS.Common/ExternalBallistics.cs	lib	Sound	
 OpenFPS.Common/Fire.cs	lib	Sound	
 OpenFPS.Common/Footsteps.cs	lib	Sound	
+OpenFPS.Common/GasHob.cs	lib	Sound	
 OpenFPS.Common/Glass.cs	lib	Sound	
 OpenFPS.Common/GlassDoor.cs	lib	Sound	
 OpenFPS.Common/GlassFracture.cs	lib	Sound	
@@ -234,6 +239,7 @@ OpenFPS.Common/JsonConverters.cs	host
 OpenFPS.Common/KnobDoor.cs	lib	Sound	
 OpenFPS.Common/LaneGuide.cs	host		
 OpenFPS.Common/LaneRoutes.cs	host		
+OpenFPS.Common/LayeredFaces.cs	lib	Sound	
 OpenFPS.Common/Lightning.cs	lib	Sound	
 OpenFPS.Common/LineFollower.cs	host		
 OpenFPS.Common/Localisation.cs	lib	Acoustics	

@@ -262,7 +262,7 @@ public class DoorTypeTests : IDisposable
         TickSeconds(d.SwingSeconds + 0.2f);
         int opened = _heard.Count;
         if (d.CloseAfterSeconds <= 0f) DoorSystem.Set(_world, e, open: false);     // nothing shuts it but a hand
-        TickSeconds(d.CloseAfterSeconds + MathF.Max(d.CloseSeconds, d.SwingSeconds) + 0.5f);
+        TickSeconds(d.CloseAfterSeconds + (d.Powered ? 0f : DoorSystem.ReachSeconds) + MathF.Max(d.CloseSeconds, d.SwingSeconds) + 0.5f);
 
         string Say(IEnumerable<(string Key, int Sounds)> hs) => string.Join(" ", hs.Select(h =>
         {
