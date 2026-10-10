@@ -37,7 +37,7 @@ public class OpeningRoutesTests
     private static readonly Quaternion Across = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
     private static readonly Vector3 LeafShut = new(0.15f, 1.05f, 2.9f);
 
-    private static WorldSnapshot Building(bool frontDoorOpen)
+    private static WorldSnapshot Building(bool frontDoorOpen, float doorwayHeight = 2.1f)
     {
         AcousticRegistry.EnsureInitialized();
         var defs = new List<EntityDefinition>();
@@ -51,7 +51,7 @@ public class OpeningRoutesTests
         // Front wall, with its doorway.
         Box(0, 0.3f, 0, 2.7f, 0, 2, "Brick");
         Box(0, 0.3f, 0, 2.7f, 3.8f, 20, "Brick");
-        Box(0, 0.3f, 2.1f, 2.7f, 2, 3.8f, "Brick");
+        Box(0, 0.3f, doorwayHeight, 2.7f, 2, 3.8f, "Brick");
         Box(7.0f, 7.3f, 0, 2.7f, 0, 20, "Brick");               // back wall
         Box(0, 7.3f, 0, 2.7f, 0, 0.3f, "Brick");                // end walls
         Box(0, 7.3f, 0, 2.7f, 19.7f, 20, "Brick");
@@ -249,6 +249,31 @@ public class OpeningRoutesTests
         Assert.InRange(Loss(open.Low, shut.Low), 10f * MathF.Log10(tau.X) - 3f, 10f * MathF.Log10(tau.X) + 3f);
         Assert.InRange(Loss(open.Mid, shut.Mid), 10f * MathF.Log10(tau.Y) - 3f, 10f * MathF.Log10(tau.Y) + 3f);
         Assert.InRange(Loss(open.High, shut.High), 10f * MathF.Log10(tau.Z) - 3f, 10f * MathF.Log10(tau.Z) + 3f);
+    }
+
+    /// <summary>
+    /// A leaf a few centimetres short of its lintel, as the city's glass front doors are (a 2.10 m leaf in
+    /// a 2.15 m doorway): the way over its top edge is through the doorway, which the opening's own
+    /// transmission charges. Bent over the edge as if the leaf stood alone, it let a PA on the street into
+    /// Selby House's lobby at -7/-12/-20 dB against the leaf's -18/-28/-45 (2026-10-09).
+    /// </summary>
+    [Fact]
+    public void TheWayRoundAShutLeafIsThroughItsDoorway()
+    {
+        var world = Building(frontDoorOpen: false, doorwayHeight: 2.17f);
+        var (model, _) = Graph(world);
+        var door = model.Openings.Single(o => o.Id == FrontDoor);
+        Assert.Null(door.Problem);
+        var street = new Vector3(-10f, 0.45f, 2.9f);
+        var inside = new Vector3(2.2f, 1.7f, 2.9f);
+
+        model.BarrierPathDifference(street, inside, out _, out bool verified);
+        Assert.False(verified, "a way round the shut leaf, through the gap over it, was believed");
+
+        // The straight leg pays the leaf, not the bend over its edge.
+        var leg = model.LegGains(street, inside, Array.Empty<int>(), Array.Empty<int>());
+        Assert.True(Db(leg.Y) <= 10f * MathF.Log10(door.Tau.Y) + 1f,
+                    $"mid {Db(leg.Y):F1} dB through a leaf that passes {10f * MathF.Log10(door.Tau.Y):F1}");
     }
 
     [Fact]

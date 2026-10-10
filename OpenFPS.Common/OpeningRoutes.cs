@@ -97,6 +97,8 @@ public sealed class OpeningRoutes
     private readonly Dictionary<int, List<int>> _byNode = new();
     private readonly Dictionary<int, Vector3> _absorption = new();   // node -> Sabine absorption area per band, m²
     private readonly Dictionary<int, int> _nodeOf = new();          // region id -> node
+    /// <summary>The door leaves standing in an opening (in its <see cref="Opening.Contents"/>), by box.</summary>
+    private bool[] _leafInOpening = Array.Empty<bool>();
 
     public IReadOnlyList<Opening> Openings => _openings;
     public IReadOnlyList<Solid> Solids => _solids;
@@ -460,11 +462,14 @@ public sealed class OpeningRoutes
             openings.Add(o);
         }
 
+        model._leafInOpening = new bool[model._solids.Length];
         for (int i = 0; i < openings.Count; i++)
         {
             var o = openings[i];
             Add(model._byNode, o.NodeA, i);
             Add(model._byNode, o.NodeB, i);
+            foreach (int c in o.Contents)
+                if (c >= 0 && c < model._solids.Length && model._solids[c].IsLeaf) model._leafInOpening[c] = true;
         }
 
         // A room's absorption counts what leaves by its openings, at each opening's own S·τ.
@@ -1307,8 +1312,13 @@ public sealed class OpeningRoutes
             // Sorted, and bending round more boxes only ever adds: nothing after this can beat it.
             if (dd >= best) break;
             if (++tried > MaxRoutesTried) break;
-            // Round a door leaf is through its doorway: believed only clear as it stands, never bent on
-            // round the street (ClearedLeg), which found the crack over a shut glass door at -21 dB.
+            // Round a leaf standing in its doorway is through the doorway, which the opening's own
+            // transmission (Route) already charges: a leaf 5 cm short of its lintel, as the city's glass
+            // front doors are, let a PA on the street into Selby House's lobby at -7/-12/-20 dB over the
+            // top edge, against the leaf's -18/-28/-45 (2026-10-09, --path-probe explain).
+            if (_solids[i].IsLeaf && i < _leafInOpening.Length && _leafInOpening[i]) continue;
+            // Round a leaf swung aside is believed only clear as it stands, never bent on round the street
+            // (ClearedLeg), which found the crack over a shut glass door at -21 dB.
             int chain = _solids[i].IsLeaf ? 0 : MaxChainedBoxes;
             float extra = ClearedRoute(source, ps, p, listener, i, chain, ignoreA, ignoreB, best - dd, out Vector3 last);
             if (extra < 0f || dd + extra >= best) continue;
@@ -1582,6 +1592,11 @@ public sealed class OpeningRoutes
         routes.Sort((x, y) => x.D.CompareTo(y.D));
         foreach (var (dd, ps, p, i) in routes.Take(MaxRoutesTried))
         {
+            if (_solids[i].IsLeaf && i < _leafInOpening.Length && _leafInOpening[i])
+            {
+                sb.Append($"        route round {i}, {dd:F3} m via ({p.X:F2}, {p.Y:F2}, {p.Z:F2}): a leaf standing in its doorway, the doorway's to charge\n");
+                continue;
+            }
             string Hit(Vector3 a, Vector3 b2)
             {
                 var c = new List<int>();
