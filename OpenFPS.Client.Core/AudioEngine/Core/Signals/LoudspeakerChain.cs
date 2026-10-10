@@ -105,7 +105,7 @@ public static class LoudspeakerChain
         double peak = RobustPeak(program);
         double gain = peak > 1e-9 ? 1.0 / peak : 0.0;
 
-        float[] input = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.Resample(program, programRate, rate);
+        float[] input = SincResampler.Resample(program, programRate, rate);
         int n = input.Length;
         var chain = new Chain(spec, rate);
         var y = new float[n];
@@ -121,7 +121,7 @@ public static class LoudspeakerChain
             }
         }
         stats = new Stats(chain.Clipped / (float)Math.Max(1, n), (float)chain.MaxX, (float)chain.MaxLimitDb);
-        return OpenFPS.Client.AudioEngine.Fmod.MixerQuality.Resample(y, rate, outRate);
+        return SincResampler.Resample(y, rate, outRate);
     }
 
     /// <summary>

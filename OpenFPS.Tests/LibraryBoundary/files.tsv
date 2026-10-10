@@ -60,8 +60,10 @@ OpenFPS.Client.Core/AudioEngine/Core/Signals/ElectronicSiren.cs	lib	Sound
 OpenFPS.Client.Core/AudioEngine/Core/Signals/HeadShadow.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/LoudspeakerChain.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/Modes.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/RadiatorBands.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/SteamWhistle.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/StruckBell.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/SincResampler.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Stove/GasHobSynth.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Thunder.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/TransientSynth.cs	lib	Sound	
