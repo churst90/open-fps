@@ -17,8 +17,10 @@ namespace OpenFPS.Server.Systems;
 /// (toward the street).</item>
 /// </list>
 /// They shut it by hand, as a player does (<see cref="DoorSystem.Set"/>, so it makes the same sounds),
-/// a moment after they are out of the doorway. It is left for anybody else in the doorway, or any player
-/// within reach of it, and never shut on them; a door they found open is left while a player is near it.
+/// a moment after the doorway is clear. Who is about does not change the rule (Cody, 2026-10-10: "the
+/// rule of what the npc does should take precedence, regardless of a player is around or not"). Only a
+/// body stops it: a leaf cannot swing through anybody, so it waits while anyone is in the doorway or in
+/// the leaf's way, and shuts once they have moved.
 /// </summary>
 public sealed class DoorManners
 {
@@ -47,24 +49,9 @@ public sealed class DoorManners
         _ => goingIn && foundOpen ? Then.Leave : Then.Shut,
     };
 
-    /// <summary>How long after they are clear of the doorway the door is pulled to, seconds: a turn
-    /// and a reach back, between these two, different for each person and door.</summary>
+    /// <summary>How long after the doorway is clear the door is pulled to, seconds: a turn and a reach
+    /// back, between these two, different for each person and door.</summary>
     public const float ShortestPause = 0.4f, LongestPause = 0.9f;
-
-    /// <summary>How long they wait to be clear of the doorway before they are taken to be standing in
-    /// it, and the door is left, seconds.</summary>
-    public const float GiveUpSeconds = 10f;
-
-    /// <summary>How near the doorway a player has to be for a door not to be shut in front of them,
-    /// metres: walking up to it, or just through it.</summary>
-    public const float PlayerReachMetres = 2.0f;
-
-    /// <summary>
-    /// A door they found open is somebody's, left open on purpose, while a player is this near it,
-    /// metres: a rider shut Brandt Court's front door on Cody, who had opened it to listen to the street
-    /// from the lobby (2026-10-02).
-    /// </summary>
-    public const float FoundOpenPlayerMetres = 8.0f;
 
     private sealed class Pending
     {
@@ -73,7 +60,6 @@ public sealed class DoorManners
         public required Entity Who;
         public required float Pause;
         public float Clear;
-        public float Waited;
     }
 
     private readonly List<Pending> _pending = new();
@@ -145,20 +131,14 @@ public sealed class DoorManners
         if (p.Who != Entity.Null && world.IsAlive(p.Who) && world.Has<DeadComponent>(p.Who)) return true;
 
         Vector3? at = whoAlive && world.Has<Transform>(p.Who) ? world.Get<Transform>(p.Who).Position : null;
-        if (at is { } a && DoorSystem.InDoorway(world, door, a))
+        var hand = whoAlive ? p.Who : (Entity?)null;
+        // A body in the doorway or in the leaf's way, theirs or anybody's: the leaf cannot go through it.
+        if (AnybodyInTheDoorway(world, door) || DoorSystem.InTheWay(world, door, 0f, hand) != null)
         {
             p.Clear = 0f;
-            return (p.Waited += dt) >= GiveUpSeconds;
+            return false;
         }
         if ((p.Clear += dt) < p.Pause) return false;
-
-        if (SomebodyElseAt(world, door, p.Who, p.Passage.FoundOpen ? FoundOpenPlayerMetres : PlayerReachMetres) is { } other)
-        {
-            Log.Debug("Door manners: door {Door} left open for entity {Other}.", door.Id, other.Id);
-            return true;
-        }
-        var hand = whoAlive ? p.Who : (Entity?)null;
-        if (DoorSystem.InTheWay(world, door, 0f, hand) != null) return true;
         if (DoorSystem.Set(world, door, false, by: at, who: hand))
             Log.Debug("Door manners: entity {Who} shuts door {Door} behind them.", p.Who.Id, door.Id);
         return true;
@@ -169,17 +149,13 @@ public sealed class DoorManners
     private static readonly QueryDescription OnFoot =
         new QueryDescription().WithAll<Transform>().WithAny<PlayerComponent, Pedestrian>().WithNone<OccupantComponent, DeadComponent>();
 
-    /// <summary>Anybody but <paramref name="who"/> in the doorway, or a player within <paramref name="reach"/> of it.</summary>
-    private static Entity? SomebodyElseAt(World world, Entity door, Entity who, float reach)
+    /// <summary>Anybody on foot, player or not, in the doorway.</summary>
+    private static bool AnybodyInTheDoorway(World world, Entity door)
     {
-        DoorSystem.Doorway(world, door, out var centre, out _);
-        Entity? found = null;
+        bool found = false;
         world.Query(OnFoot, (Entity e, ref Transform t) =>
         {
-            if (found != null || e == who) return;
-            if (DoorSystem.InDoorway(world, door, t.Position)
-                || world.Has<PlayerComponent>(e) && Vector3.Distance(t.Position, centre) < reach)
-                found = e;
+            if (!found && DoorSystem.InDoorway(world, door, t.Position)) found = true;
         });
         return found;
     }

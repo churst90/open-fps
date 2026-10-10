@@ -10,10 +10,15 @@ Recent work, newest first. `git log` has the rest.
   shut an outside door without a closer behind them, however they found it; leave an inside door as
   found going in and shut it going out ("in" is more doorways from the outside, or the smaller room).
   The shut is by hand, so it is the same swing and latch from the door's own model as a player's, 0.4
-  to 0.9 s after they are out of the doorway. It is left for anybody else in the doorway or a player
-  within 2 m, and never shut on anybody. A door they found open stays open while a player is within
-  8 m of it (somebody has it open on purpose, as Cody had Brandt Court's on 2026-10-02). Closers were checked too: one is held only while somebody is in
-  the doorway. Over an hour on the city with somebody parking every 20 s and Alex keeping a cold
+  to 0.9 s after the doorway is clear. Who is about does not change the rule (Cody, 2026-10-10); this
+  reverses 2026-10-02, when a door found open was left because a rider had shut Brandt Court's door on
+  Cody. Only a body holds the leaf: it waits while anybody is in the doorway or the leaf's way, then
+  shuts. Closers start back 1 s after the last person leaves the doorway (Cody, 2026-10-10: "close on
+  their own after a second of them leaving"); they waited 3.00 s, measured, on the push-bar, glass
+  front and glass pull doors. A closer has no timer of its own, so the 1 s is the leaf held only while
+  somebody is in the doorway box; the sweep and latch, 3.6 to 4.1 s, are unchanged. Until somebody
+  has been in the doorway since it opened, it waits 2 s more for whoever opened it to walk up, so a
+  door opened and never gone through still starts back 3 s after it is fully open. Over an hour on the city with somebody parking every 20 s and Alex keeping a cold
   night: 175 openings of 22 doors (17 house front doors, a patio door, the five towers' entrances), the
   longest open 22 s, none left open, and the 352 walkers through no door. Magnolia: 1,323 doors, none
   opened in an hour, since nobody there goes indoors yet. Server only. NpcDoorTests.

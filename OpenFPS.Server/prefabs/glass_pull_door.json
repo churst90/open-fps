@@ -8,7 +8,7 @@
   "Type": "StaticObject",
   "IsDoor": true,
   "DoorKind": "glass-pull",
-  "CloseAfterSeconds": 3,
+  "CloseAfterSeconds": 1,
   "CloseSeconds": 4.0,
   "SwingSeconds": 1.0,
   "SwingDegrees": 90,

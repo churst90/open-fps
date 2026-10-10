@@ -208,6 +208,38 @@ public class NpcDoorTests : IDisposable
         Assert.Empty(_shutOnSomebody);
     }
 
+    /// <summary>A spring-loaded door starts back about a second after the last person leaves its doorway
+    /// (Cody, 2026-10-10: "should close on their own after a second of them leaving"), and its closer then
+    /// sweeps and latches at its own speeds.</summary>
+    [Theory]
+    [InlineData("steel_door")]
+    [InlineData("glass_front_door")]
+    [InlineData("glass_pull_door")]
+    public void A_closer_starts_back_about_a_second_after_the_last_person_leaves(string prefab)
+    {
+        var door = Door(prefab, outside: true);
+        var npc = Npc(InRoom);
+        _manners.Reach(_world, door, InRoom, OnStreetPast, npc);
+        for (int i = 0; i < 300 && !DoorSystem.OpenEnough(_world, door); i++) Tick();
+        double left = -1, starts = -1, latched = -1;
+        var to = OnStreetFar;
+        for (int i = 0; i < 30 * 30 && latched < 0; i++)
+        {
+            ref var t = ref _world.Get<Transform>(npc);
+            var d = to - t.Position;
+            if (d.Length() > 0.02f) t.Position += Vector3.Normalize(d) * MathF.Min(d.Length(), 1.2f * Dt);
+            bool inIt = DoorSystem.InDoorway(_world, door, t.Position);
+            Tick();
+            if (inIt) { left = -1; starts = -1; }
+            else if (left < 0) left = _now;
+            if (left >= 0 && starts < 0 && D(door).Target <= 0f) starts = _now;
+            if (starts >= 0 && D(door).Openness <= 0f) latched = _now;
+        }
+        _o.WriteLine($"{prefab}: out of the doorway at {left:F2} s; the closer starts back {starts - left:F2} s later and latches {latched - starts:F2} s after that");
+        Assert.True(starts > 0 && latched > 0, "it never shut");
+        Assert.InRange(starts - left, 0.8, 1.3);
+    }
+
     /// <summary>The closer is held off only while somebody is in the doorway: an NPC who stops there
     /// holds it, and it shuts as soon as they move on.</summary>
     [Fact]
@@ -270,11 +302,12 @@ public class NpcDoorTests : IDisposable
         Assert.Empty(_shutOnSomebody);
     }
 
-    // ── Nobody is shut out or shut on ───────────────────────────────────────────────────────────
+    // ── Who is about does not change the rule; only a body in the way does ──────────────────────
 
-    /// <summary>A player standing in the doorway: the door is left open for them, and never moved.</summary>
+    /// <summary>A player standing in the doorway: the leaf cannot go through them, so it waits, never
+    /// moving onto them, and is shut a moment after they step out.</summary>
     [Fact]
-    public void A_door_is_never_shut_on_a_player_standing_in_the_doorway()
+    public void A_door_waits_for_a_player_in_the_doorway_and_is_shut_once_they_step_out()
     {
         var door = Door("door", outside: true);
         var player = Player(new Vector3(-0.3f, 0.5f, 0.6f));
@@ -282,36 +315,33 @@ public class NpcDoorTests : IDisposable
         Pass(door, npc, InRoom, OnStreetPast, OnStreetFar);
         Assert.Equal(1f, D(door).Target);
         Assert.Equal(1f, D(door).Openness, 3);
+        Assert.Equal(1, _manners.Waiting);
+        Assert.DoesNotContain(_heard, h => h.Key == "door:knob:latch");
+        _world.Get<Transform>(player).Position = new Vector3(-0.3f, 0.5f, 4f);
+        TickSeconds(4f);
+        Assert.Equal(0f, D(door).Openness);
         Assert.Equal(0, _manners.Waiting);
         Assert.Empty(_shutOnSomebody);
-        Assert.DoesNotContain(_heard, h => h.Key == "door:knob:latch");
     }
 
-    /// <summary>A player walking up to it as they come through: it is left for them.</summary>
-    [Fact]
-    public void A_door_is_left_for_a_player_coming_up_to_it()
-    {
-        var door = Door("door", outside: true);
-        Player(new Vector3(1.2f, 0.5f, 1.3f));
-        var npc = Npc(InRoom);
-        Pass(door, npc, InRoom, OnStreetPast, OnStreetFar);
-        Assert.Equal(1f, D(door).Openness, 3);
-        Assert.Empty(_shutOnSomebody);
-    }
-
-    /// <summary>A door found open with a player a few metres from it is theirs, open on purpose, and
-    /// left; a door found shut is shut behind them with the same player there.</summary>
+    /// <summary>Players near the door but out of its way, found open or shut, going in or out: the NPC's
+    /// rule decides, and an outside door is shut (Cody, 2026-10-10; this reverses the 2026-10-02
+    /// accommodation for Brandt Court's door).</summary>
     [Theory]
-    [InlineData(true, 1f)]
-    [InlineData(false, 0f)]
-    public void A_door_found_open_is_left_while_a_player_is_near_it(bool foundOpen, float ends)
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void A_player_near_the_door_does_not_change_the_rule(bool foundOpen, bool goingIn)
     {
         var door = Door("door", outside: true);
         if (foundOpen) { DoorSystem.Set(_world, door, true); TickSeconds(2f); }
         Player(new Vector3(1.5f, 0.5f, -5f));                // in the room, listening to the street
-        var npc = Npc(OnStreet);
-        Pass(door, npc, OnStreet, InRoomPast, new Vector3(-1.5f, 0.5f, -3f));
-        Assert.Equal(ends, D(door).Openness, 3);
+        Player(new Vector3(1.4f, 0.5f, 1.3f));               // on the step outside, beside the doorway
+        var npc = Npc(goingIn ? OnStreet : InRoom);
+        if (goingIn) Pass(door, npc, OnStreet, InRoomPast, new Vector3(-1.5f, 0.5f, -3f));
+        else Pass(door, npc, InRoom, OnStreetPast, new Vector3(-1.5f, 0.5f, 4f));
+        Assert.Equal(0f, D(door).Openness);
         Assert.Empty(_shutOnSomebody);
     }
 

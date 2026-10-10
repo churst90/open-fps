@@ -18,9 +18,9 @@ their own are still sent (see the table below).
 | Kind (`DoorKind`) | Prefab | Moves | Opened by | By itself |
 |---|---|---|---|---|
 | `knob` | `door` | swings 90°, 0.9 s | hand (E, `/open`): pushed from its +Z face, pulled from the other | nothing |
-| `pushbar` | `steel_door` | swings 90°, 1.4 s | hand: bar pushed from inside (-Z face), pull handle outside (+Z face) | closer: 3 s after the doorway is clear, sweep 4.5 s, latch at 1.4 s |
-| `glass-pushbar` | `glass_front_door` | swings 90°, 1.1 s | hand: key and pull outside (+Z), bar inside | closer: 3 s, sweep 4.5 s, latch at 1.1 s |
-| `glass-pull` | `glass_pull_door` | swings 90°, 1.0 s | hand: pulled outside (+Z), pushed inside | closer: 3 s, sweep 4.0 s, latch at 1.0 s |
+| `pushbar` | `steel_door` | swings 90°, 1.4 s | hand: bar pushed from inside (-Z face), pull handle outside (+Z face) | closer: 1 s after the doorway is clear, sweep 4.5 s, latch at 1.4 s |
+| `glass-pushbar` | `glass_front_door` | swings 90°, 1.1 s | hand: key and pull outside (+Z), bar inside | closer: 1 s, sweep 4.5 s, latch at 1.1 s |
+| `glass-pull` | `glass_pull_door` | swings 90°, 1.0 s | hand: pulled outside (+Z), pushed inside | closer: 1 s, sweep 4.0 s, latch at 1.0 s |
 | `auto-slide` | `auto_sliding_door` | slides its width at its controller's speeds (0.7 m/s open, 0.3 m/s shut, a creep into each end: about 3.3 s and 5.3 s for the city's 1.15 m leaves; `SlidingDoor.AutomaticSeconds`) | anyone within 2.5 m in front, either side | shuts 2 s after clear; reverses for anyone in the doorway |
 | `patio-slide` | `patio_door` | slides its width, 1.4 s | hand | nothing |
 | `elevator` | `elevator_door` | slides its width, 1.8 s | the lift (`DoorSystem.Set`), never by hand | shuts 4 s after clear, over 2.5 s; reverses for anyone in the doorway |
@@ -134,7 +134,7 @@ door with a sensor opens for them by itself). Once they are through, what they d
 
 | The door | What they do |
 |---|---|
-| Shuts itself: a closer, a motor or a sensor (push bar, glass front, glass pull, automatic, lift) | Let it go. The closer shuts it once nobody is in the doorway |
+| Shuts itself: a closer, a motor or a sensor (push bar, glass front, glass pull, automatic, lift) | Let it go. A closer starts it back 1 s after the last person is out of the doorway; an automatic door keeps its own sensor timing |
 | Outside door with no closer (one side is the outside or a region that is not indoors) | Shut it behind them, however they found it |
 | Inside door, going in | Leave it as they found it: shut again if they opened it, open if it was open |
 | Inside door, going out | Shut it behind them |
@@ -144,17 +144,24 @@ map's portals, is in; if both sides are the same number of doorways from the out
 room is in. A door that cannot be told about is treated as going in, so it is left as found.
 
 They shut it by hand, the way a player does (`DoorSystem.Set`), so it makes the same swing and latch
-sounds from the same door model. The shut comes 0.4 to 0.9 s after they are out of the doorway (the
-`DoorSystem.InDoorway` box), the pause fixed for each person and door. A door is never shut while:
+sounds from the same door model. Who is about does not change the rule (Cody, 2026-10-10: "the rule of
+what the npc does should take precedence, regardless of a player is around or not"). This reverses
+2026-10-02, when a door found open was left open because a rider had shut Brandt Court's front door
+on Cody, who had opened it to listen to the street. Only a body stops the leaf, because it cannot
+swing through one: it waits while anybody, player or not, the person shutting it included, is in the
+doorway (the `DoorSystem.InDoorway` box) or in the leaf's way (`DoorSystem.InTheWay`). It is shut 0.4
+to 0.9 s after the doorway is clear, the pause fixed for each person and door. If somebody else has
+shut it or has hold of it meanwhile, or the person is killed on the way, nothing more is done.
 
-- they are still in the doorway. After 10 s of that, they are standing in it, and it is left;
-- anybody else is in the doorway, or a player is within 2 m of its middle. It is left for them;
-- they found it open and a player is within 8 m of it. Somebody has it open on purpose: a rider once
-  shut Brandt Court's front door on Cody, who had opened it to listen to the street (2026-10-02);
-- anybody is in the way of the leaf (`DoorSystem.InTheWay`);
-- somebody else has shut it or has hold of it already.
-
-A person killed on the way shuts nothing.
+A closer has no timer: a spring pushing oil through a valve takes the leaf as soon as nobody holds it.
+The doorway box reaches a leaf's width past the door, so the leaf is held while somebody is still in it
+and starts back 1 s after the last person leaves it (`CloseAfterSeconds`, Cody, 2026-10-10: "close on
+their own after a second of them leaving"; it was 3 s). Until somebody has come into the doorway since
+it opened, it waits 2 s more (`DoorSystem.ReachSeconds`) for whoever opened it to walk up: with 1 s
+alone, a door opened from 2.5 m away started back before the person reached it. A door opened and
+never gone through starts back 3 s after it is fully open, as before. The sweep and the latch are the closer's two
+valves, `CloseSeconds` and `SwingSeconds` over the last `DoorSystem.LatchZone`, measured at 3.6 to 4.1 s
+together.
 
 ## Event keys
 
