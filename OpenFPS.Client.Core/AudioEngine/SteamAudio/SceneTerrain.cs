@@ -40,6 +40,17 @@ public static class SceneTerrain
                 tris.Add(new Phonon.IPLTriangle { i0 = a, i1 = b, i2 = e }); triMat.Add(mi);
                 tris.Add(new Phonon.IPLTriangle { i0 = a, i1 = e, i2 = d }); triMat.Add(mi);
             }
+        // Coarse ground's skirt, its own corners each, the other way round as above.
+        var shift = new Vector3(corner.X, -origin.Y, corner.Z);
+        for (int k = f.SurfaceTriangleCount; k < f.TriangleCount; k++)
+        {
+            var t = f.Triangle(k);
+            int v = verts.Count;
+            verts.Add(Phonon.World(t.V0 + shift));
+            verts.Add(Phonon.World(t.V0 + t.E1 + shift));
+            verts.Add(Phonon.World(t.V0 + t.E2 + shift));
+            tris.Add(new Phonon.IPLTriangle { i0 = v, i1 = v + 2, i2 = v + 1 }); triMat.Add(mats[f.Cells[f.CellOfTriangle(k)]]);
+        }
     }
 }
 

@@ -41,7 +41,8 @@ public partial class TerrainTileComponent
         var f = _field;
         if (f != null && _fieldBase == baseY) return f;
         f = OpenFPS.Common.Geometry.Heightfield.FromCentimetres(Posts, Spacing, baseY, HeightsCm,
-                                                              Cells.Length > 0 ? Cells : null, Materials.Length > 0 ? Materials : null);
+                                                              Cells.Length > 0 ? Cells : null, Materials.Length > 0 ? Materials : null,
+                                                              skirted: IsCoarse);
         _fieldBase = baseY;
         _field = f;
         return f;
@@ -51,13 +52,22 @@ public partial class TerrainTileComponent
     /// of docs/GEOMETRY.md decision 1, and a post on both edges of the tile.</summary>
     public const int CoarseCells = 32;
 
+    /// <summary>Post to post of all full ground, metres (TerrainTiles and the world's tiles lay it at 2 m).</summary>
+    public const float FullSpacing = 2f;
+
+    /// <summary>Whether this is ground at the far ring's spacing (<see cref="Coarse"/>), told from the wire's own
+    /// fields: its heightfield hangs a skirt from its edges. Never true of the server's ground.</summary>
+    [MemoryPackIgnore] public bool IsCoarse => Posts == CoarseCells + 1 && Spacing > FullSpacing + 0.01f;
+
     private TerrainTileComponent? _coarse;
 
     /// <summary>
     /// The same ground with <see cref="CoarseCells"/> cells a side, for a tile a client has only in its far
     /// ring (docs/WORLD_STREAMING.md, Coarse ground): each post's height read off this tile's own triangles,
     /// over the same base, so the two lie on one another along a post's line; each cell the material under its
-    /// middle. This one if it is no finer. Made once.
+    /// middle. The edge posts are raised so the edge is nowhere under this tile's own 2 m edge (<see
+    /// cref="LiftEdge"/>), and its heightfield is skirted, so no ray passes between it and a full neighbour.
+    /// This one if it is no finer. Made once.
     /// </summary>
     public TerrainTileComponent Coarse()
     {
@@ -79,7 +89,59 @@ public partial class TerrainTileComponent
                     fine.CellAt((i + 0.5f) * spacing, (j + 0.5f) * spacing, out int fi, out int fj, out _, out _);
                     cells[j * CoarseCells + i] = Cells[fj * (Posts - 1) + fi];
                 }
+        LiftEdge(heights, 0, Posts, 0, posts);                                          // west
+        LiftEdge(heights, Posts - 1, Posts, posts - 1, posts);                          // east
+        LiftEdge(heights, 0, 1, 0, 1);                                                  // south
+        LiftEdge(heights, (Posts - 1) * Posts, 1, (posts - 1) * posts, 1);              // north
         return _coarse = new TerrainTileComponent { Posts = posts, Spacing = spacing, HeightsCm = heights, Cells = cells, Materials = Materials };
+    }
+
+    /// <summary>
+    /// One edge of the coarse ground, its posts at <paramref name="c0"/> + k <paramref name="cStep"/> in
+    /// <paramref name="coarse"/>, set so the edge lies on or over this tile's edge, posts <paramref name="f0"/>
+    /// + m <paramref name="fStep"/>. The skirt hangs down from the coarse edge, so a fine neighbour's edge (the
+    /// same posts) must never be over it, or a ray could pass between the two. Each post depends only on the
+    /// edge's own posts, which the neighbour shares, so two coarse tiles still meet; the corners stay where the
+    /// fine corner is, as all four tiles there have it. Whole centimetres, rounded up.
+    /// </summary>
+    private void LiftEdge(short[] coarse, int f0, int fStep, int c0, int cStep)
+    {
+        const int n = CoarseCells;
+        double fine = Spacing, step = (double)Size / n;
+        double F(int m) => HeightsCm[f0 + m * fStep];
+        double At(double s)
+        {
+            int m = Math.Clamp((int)Math.Floor(s / fine), 0, Posts - 2);
+            double t = (s - m * fine) / fine;
+            return F(m) + (F(m + 1) - F(m)) * t;
+        }
+        var c = new double[n + 1];
+        var lift = new double[n + 1];
+        for (int k = 0; k <= n; k++) c[k] = At(k * step);
+        for (int k = 0; k < n; k++)
+        {
+            double s0 = k * step, s1 = (k + 1) * step;
+            int mFirst = (int)Math.Floor(s0 / fine) + 1, mLast = (int)Math.Ceiling(s1 / fine) - 1;
+            for (int m = mFirst; m <= mLast; m++)
+            {
+                double t = (m * fine - s0) / step;
+                if (t <= 0 || t >= 1) continue;
+                double f = F(m);
+                if (k == 0) lift[1] = Math.Max(lift[1], c[0] + (f - c[0]) / t - c[1]);            // the corner stays
+                else if (k == n - 1) lift[n - 1] = Math.Max(lift[n - 1], c[n] + (f - c[n]) / (1 - t) - c[n - 1]);
+                else
+                {
+                    double under = f - (c[k] + (c[k + 1] - c[k]) * t);
+                    lift[k] = Math.Max(lift[k], under);
+                    lift[k + 1] = Math.Max(lift[k + 1], under);
+                }
+            }
+        }
+        for (int k = 0; k <= n; k++)
+        {
+            double cm = k == 0 || k == n ? c[k] : Math.Ceiling(c[k] + lift[k] - 1e-6);
+            coarse[c0 + k * cStep] = (short)Math.Clamp(cm, short.MinValue, short.MaxValue);
+        }
     }
 }
 

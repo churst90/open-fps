@@ -12,6 +12,9 @@ namespace OpenFPS.Common.Geometry;
 ///
 /// <para>Immutable, and built from the same centimetres on the server and every client, so both hold the
 /// same floats. Queries never use a tree: a point's height is a lookup, a ray walks the cells it crosses.</para>
+///
+/// <para>A skirted tile (<see cref="Skirted"/>) also shows the outer sides of its edge prisms to rays: a
+/// strip from each edge down to the floor, after its surface triangles in the numbering.</para>
 /// </summary>
 public sealed class Heightfield
 {
@@ -34,12 +37,20 @@ public sealed class Heightfield
     public float FloorY => MinY - Depth;
     /// <summary>A hash of the exact bits it was made from.</summary>
     public ulong Hash { get; }
-    public int TriangleCount => 2 * CellsPerSide * CellsPerSide;
+    /// <summary>
+    /// Whether its four edges hang a skirt down to <see cref="FloorY"/>: ground sent at the far ring's
+    /// spacing, whose edge lies between a finer neighbour's posts (docs/WORLD_STREAMING.md, Coarse ground).
+    /// The skirt closes the crack between the two edges; ground at full spacing never has one.
+    /// </summary>
+    public bool Skirted { get; }
+    /// <summary>Two triangles a cell, and two for each cell's side on the tile's edge when skirted.</summary>
+    public int TriangleCount => SurfaceTriangleCount + (Skirted ? 8 * CellsPerSide : 0);
+    public int SurfaceTriangleCount => 2 * CellsPerSide * CellsPerSide;
 
     // Each cell's lowest and highest corner, for the walk along a ray.
     private readonly float[] _cellMin, _cellMax;
 
-    public Heightfield(int posts, float spacing, float[] heights, byte[]? cells, string[]? materials)
+    public Heightfield(int posts, float spacing, float[] heights, byte[]? cells, string[]? materials, bool skirted = false)
     {
         if (posts < 2) throw new ArgumentOutOfRangeException(nameof(posts), "a terrain tile needs at least two posts a side");
         if (!(spacing > 0f)) throw new ArgumentOutOfRangeException(nameof(spacing));
@@ -59,26 +70,30 @@ public sealed class Heightfield
             lo = MathF.Min(lo, h); hi = MathF.Max(hi, h);
         }
         MinY = lo; MaxY = hi;
+        Skirted = skirted;
         _cellMin = new float[c * c]; _cellMax = new float[c * c];
         for (int j = 0; j < c; j++)
             for (int i = 0; i < c; i++)
             {
                 float a = heights[j * posts + i], b = heights[j * posts + i + 1];
                 float d = heights[(j + 1) * posts + i], e = heights[(j + 1) * posts + i + 1];
-                _cellMin[j * c + i] = MathF.Min(MathF.Min(a, b), MathF.Min(d, e));
+                bool edge = skirted && (i == 0 || j == 0 || i == c - 1 || j == c - 1);
+                // An edge cell's skirt reaches the floor, so the walk must visit it for a ray that low.
+                _cellMin[j * c + i] = edge ? FloorY : MathF.Min(MathF.Min(a, b), MathF.Min(d, e));
                 _cellMax[j * c + i] = MathF.Max(MathF.Max(a, b), MathF.Max(d, e));
             }
-        Hash = ContentHash(posts, spacing, heights, cells, materials);
+        Hash = ContentHash(posts, spacing, heights, cells, materials, skirted);
     }
 
     /// <summary>A tile from whole centimetres over <paramref name="baseY"/>, as the wire and the map carry
     /// it: every machine turns the same numbers into the same floats.</summary>
-    public static Heightfield FromCentimetres(int posts, float spacing, float baseY, short[] centimetres, byte[]? cells, string[]? materials)
+    public static Heightfield FromCentimetres(int posts, float spacing, float baseY, short[] centimetres, byte[]? cells, string[]? materials,
+                                             bool skirted = false)
     {
         if (centimetres.Length != posts * posts) throw new ArgumentException("one height per post", nameof(centimetres));
         var h = new float[centimetres.Length];
         for (int k = 0; k < h.Length; k++) h[k] = baseY + centimetres[k] * 0.01f;
-        return new Heightfield(posts, spacing, h, cells, materials);
+        return new Heightfield(posts, spacing, h, cells, materials, skirted);
     }
 
     /// <summary>Heights as whole centimetres over <paramref name="baseY"/>, rounded: what
@@ -142,15 +157,56 @@ public sealed class Heightfield
     public string? MaterialAt(float x, float z)
         => CellAt(x, z, out int i, out int j, out _, out _) ? Materials[Cells[j * CellsPerSide + i]] : null;
 
-    /// <summary>The cell a triangle belongs to.</summary>
-    public int CellOfTriangle(int k) => k >> 1;
+    /// <summary>The cell a triangle belongs to: a skirt's is the edge cell over it.</summary>
+    public int CellOfTriangle(int k) => PrismOf(k) >> 1;
+
+    /// <summary>The prism (the surface triangle) a triangle is a face of: itself, or for a skirt the edge
+    /// prism whose outer side it is.</summary>
+    public int PrismOf(int k)
+    {
+        int surface = SurfaceTriangleCount;
+        if (k < surface) return k;
+        SkirtOf(k, out int i, out int j, out int half, out _);
+        return TriangleOf(i, j, half);
+    }
+
+    // Skirt triangle k: side s (0 west, x = 0; 1 east; 2 south, z = 0; 3 north) of the edge cell at q along
+    // it, its first or second triangle; the cell, the surface triangle that side belongs to, and which of
+    // that triangle's three sides it is (0 a-b, 1 b-c, 2 c-a, corners as Triangle gives them).
+    private void SkirtOf(int k, out int i, out int j, out int half, out int side)
+    {
+        int c = CellsPerSide, m = (k - SurfaceTriangleCount) >> 1, s = m / c, q = m % c;
+        switch (s)
+        {
+            case 0: i = 0; j = q; half = 1; side = 0; break;          // (i, j) to (i, j+1)
+            case 1: i = c - 1; j = q; half = 0; side = 1; break;      // (i+1, j+1) to (i+1, j)
+            case 2: i = q; j = 0; half = 0; side = 2; break;          // (i+1, j) to (i, j)
+            default: i = q; j = c - 1; half = 1; side = 1; break;     // (i, j+1) to (i+1, j+1)
+        }
+    }
+
+    /// <summary>The skirt triangles under an edge cell's sides on the tile's edge (none unless skirted, two
+    /// a side), into <paramref name="into"/>; how many.</summary>
+    public int SkirtsOf(int i, int j, Span<int> into)
+    {
+        if (!Skirted) return 0;
+        int c = CellsPerSide, n = 0, b = SurfaceTriangleCount;
+        void Side(int s, int q, Span<int> to) { to[n++] = b + 2 * (s * c + q); to[n++] = b + 2 * (s * c + q) + 1; }
+        if (i == 0) Side(0, j, into);
+        if (i == c - 1) Side(1, j, into);
+        if (j == 0) Side(2, i, into);
+        if (j == c - 1) Side(3, i, into);
+        return n;
+    }
 
     /// <summary>
     /// Triangle <paramref name="k"/> of the surface, wound so its normal points up (out of the ground).
-    /// Half 0 is (i, j), (i+1, j+1), (i+1, j); half 1 is (i, j), (i, j+1), (i+1, j+1).
+    /// Half 0 is (i, j), (i+1, j+1), (i+1, j); half 1 is (i, j), (i, j+1), (i+1, j+1). A skirt's triangle
+    /// is the outer side of its edge prism, as <see cref="Prism"/> makes it, wound outward.
     /// </summary>
     public GeometryTriangle Triangle(int k)
     {
+        if (k >= SurfaceTriangleCount) return SkirtTriangle(k);
         int cell = k >> 1, c = CellsPerSide;
         int i = cell % c, j = cell / c;
         var p00 = Post(i, j);
@@ -163,6 +219,18 @@ public sealed class Heightfield
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Vector3 Post(int i, int j) => new(i * Spacing, Heights[j * Posts + i], j * Spacing);
+
+    private GeometryTriangle SkirtTriangle(int k)
+    {
+        SkirtOf(k, out int i, out int j, out int half, out int side);
+        var t = Triangle(TriangleOf(i, j, half));
+        Vector3 a = t.V0, b = t.V0 + t.E1, c = t.V0 + t.E2;
+        // The side from p to q, as the prism's: (p, p0, q0) then (p, q0, q).
+        Vector3 p = side == 0 ? a : side == 1 ? b : c, q = side == 0 ? b : side == 1 ? c : a;
+        var p0 = new Vector3(p.X, FloorY, p.Z); var q0 = new Vector3(q.X, FloorY, q.Z);
+        return (k & 1) == 0 ? new GeometryTriangle { V0 = p, E1 = p0 - p, E2 = q0 - p, Solid = k }
+                            : new GeometryTriangle { V0 = p, E1 = q0 - p, E2 = q - p, Solid = k };
+    }
 
     /// <summary>The bounds of the prism under triangle <paramref name="k"/>.</summary>
     public (Vector3 Min, Vector3 Max) PrismBounds(int k)
@@ -324,7 +392,7 @@ public sealed class Heightfield
     }
 
     /// <summary>FNV-1a over the exact bits it is made of.</summary>
-    public static ulong ContentHash(int posts, float spacing, float[] heights, byte[] cells, string[] materials)
+    public static ulong ContentHash(int posts, float spacing, float[] heights, byte[] cells, string[] materials, bool skirted = false)
     {
         ulong h = 14695981039346656037UL;
         void Mix(uint v) { h ^= v; h *= 1099511628211UL; h ^= h >> 29; }
@@ -332,6 +400,7 @@ public sealed class Heightfield
         foreach (float f in heights) Mix(BitConverter.SingleToUInt32Bits(f));
         foreach (byte b in cells) Mix(b);
         foreach (var m in materials) { Mix((uint)m.Length); foreach (char ch in m) Mix(ch); }
+        if (skirted) Mix(0x5c1u);
         return h;
     }
 }

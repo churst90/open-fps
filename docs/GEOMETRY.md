@@ -1338,6 +1338,11 @@ centimetres over the tile's base, so the server and every client turn them into 
   `Closest`, `Any`, `All`, `Containing` and `Overlapping` find the ground; `Along` and `Column` (the
   routes through openings) do not. Of a face laid flush on the ground and the ground, the face is met:
   a prism counts as covering the whole tile (Ties).
+- **The skirt.** A skirted tile (`Heightfield.Skirted`, only the far ring's coarse ground) also shows rays
+  the outer side of each edge prism, from the edge down to the floor: two triangles a cell side, numbered
+  after the surface's, each belonging to the prism it is a side of (`PrismOf`). The walk visits an edge
+  cell down to the floor. It closes the crack where coarse ground meets 2 m ground (docs/WORLD_STREAMING.md,
+  Coarse ground); 2 m ground has none.
 - **The body.** A prism is a convex solid with eight triangles and five planes, so `SolidContact` meets
   it as it meets a wedge: a walkable slope is a floor, a bank steeper than 45 degrees a wall. The movement
   gather asks for prisms only round the body (`TriangleWorld.Overlapping` with a terrain box), not under

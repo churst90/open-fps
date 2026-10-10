@@ -16,6 +16,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class GeometryTerrainTests
 {
+    private readonly Xunit.Abstractions.ITestOutputHelper _o;
+    public GeometryTerrainTests(Xunit.Abstractions.ITestOutputHelper o) => _o = o;
+
     private const int Posts = 126;
     private const float Spacing = 2f;
 
@@ -327,5 +330,193 @@ public class GeometryTerrainTests
             }
         }
         finally { World.Destroy(ecs); }
+    }
+
+    // ═══ Where coarse ground meets full ground ═════════════════════════════════════════════════════
+
+    /// <summary>The far ring's ground as it was made before the skirt (2026-10-09): every post read off the
+    /// fine triangles, edges included, and no skirt. Kept to measure the crack it left.</summary>
+    internal static Heightfield UnskirtedCoarse(TerrainTileComponent t, float baseY)
+    {
+        var fine = t.Field(0f);
+        int posts = TerrainTileComponent.CoarseCells + 1;
+        float spacing = t.Size / TerrainTileComponent.CoarseCells;
+        var cm = new short[posts * posts];
+        for (int j = 0; j < posts; j++)
+            for (int i = 0; i < posts; i++)
+                cm[j * posts + i] = (short)Math.Clamp(MathF.Round(fine.HeightAt(i * spacing, j * spacing) * 100f), short.MinValue, short.MaxValue);
+        return Heightfield.FromCentimetres(posts, spacing, baseY, cm, null, null);
+    }
+
+    /// <summary>What crossed a seam between two tiles of ground (<see cref="AcrossSeam"/>).</summary>
+    internal sealed record SeamRays(int Rays, int Leaks, int Lines, int LineLeaks, bool[] Blocked);
+
+    /// <summary>
+    /// Rays across the seam between two tiles of ground in <paramref name="world"/>, at u = <paramref name="seamU"/>
+    /// (u is x, or z when <paramref name="alongX"/>; v the other) from v0 to v1. <paramref name="low"/> and
+    /// <paramref name="high"/> are the ground of the tile on the low and the high side of u, in world (x, z);
+    /// <paramref name="truth"/> the full ground both sides, which places the lines of sight.
+    /// <list type="bullet">
+    /// <item>Grazing rays: 12 m, level to 0.15 rising or falling, up to 60 degrees off square to the seam, both
+    /// ends over the ground they are in, through the seam under the ground of one side or the other there.
+    /// Each must meet a front face: one that leaves the ground unseen got through the crack.</item>
+    /// <item>Lines of sight from 1 to 1.6 m over the ground within 30 m of the seam on one side to the same on
+    /// the other: each that passes the seam under either side's ground must meet a front face; and whether each
+    /// is blocked at all, to compare one world's ground with another's.</item>
+    /// </list>
+    /// Front faces only, the strictest a query asks (the reverb's enclosure rays): a ray that enters the ground
+    /// unseen and comes up through its underside is a leak too.
+    /// </summary>
+    internal static SeamRays AcrossSeam(TriangleWorld world, Func<float, float, float> low, Func<float, float, float> high,
+                                        Func<float, float, float> truth, bool alongX, float seamU, float v0, float v1,
+                                        int seed, int rays, int lines)
+    {
+        var rng = new Random(seed);
+        var all = new AcceptAll();
+        const GeometryLayers Layers = GeometryLayers.Sight | GeometryLayers.Acoustics;
+        Vector3 W(float u, float y, float v) => alongX ? new Vector3(v, y, u) : new Vector3(u, y, v);
+        float G(Func<float, float, float> f, float u, float v) => alongX ? f(v, u) : f(u, v);
+        float U(Vector3 p) => alongX ? p.Z : p.X;
+        float V(Vector3 p) => alongX ? p.X : p.Z;
+        float Over(Vector3 p) => U(p) < seamU ? G(low, U(p), V(p)) : G(high, U(p), V(p));
+        int made = 0, leaks = 0;
+        for (int tries = 0; made < rays && tries < rays * 20; tries++)
+        {
+            float v = v0 + (float)rng.NextDouble() * (v1 - v0);
+            float a = G(low, seamU, v), b = G(high, seamU, v);
+            float top = MathF.Max(a, b), bottom = MathF.Min(a, b) - 0.5f;
+            float h = bottom + (float)rng.NextDouble() * (top - bottom - 0.002f);
+            float th = ((float)rng.NextDouble() * 2f - 1f) * MathF.PI / 3f;
+            float sign = rng.NextDouble() < 0.5 ? 1f : -1f;
+            float rise = ((float)rng.NextDouble() * 2f - 1f) * 0.15f;
+            var d = Vector3.Normalize(W(sign * MathF.Cos(th), rise, MathF.Sin(th)));
+            var x = W(seamU, h, v);
+            const float L = 6f;
+            Vector3 p = x - d * L, q = x + d * L;
+            if (!(p.Y > Over(p) + 0.001f) || !(q.Y > Over(q) + 0.001f)) continue;
+            made++;
+            if (!world.Any(p, d, 2f * L, Layers, RayFaces.Front, ref all)) leaks++;
+        }
+        int sights = 0, lineLeaks = 0;
+        var blocked = new bool[lines];
+        for (int k = 0; k < lines; k++)
+        {
+            float pu = seamU - 0.5f - (float)rng.NextDouble() * 29.5f, qu = seamU + 0.5f + (float)rng.NextDouble() * 29.5f;
+            float pv = v0 + (float)rng.NextDouble() * (v1 - v0), qv = v0 + (float)rng.NextDouble() * (v1 - v0);
+            var p = W(pu, G(truth, pu, pv) + 1f + 0.6f * (float)rng.NextDouble(), pv);
+            var q = W(qu, G(truth, qu, qv) + 1f + 0.6f * (float)rng.NextDouble(), qv);
+            if (rng.NextDouble() < 0.5) (p, q) = (q, p);
+            var d = q - p;
+            float len = d.Length();
+            d /= len;
+            blocked[k] = world.Any(p, d, len, Layers, RayFaces.Front, ref all);
+            var at = p + (q - p) * ((seamU - U(p)) / (U(q) - U(p)));
+            bool under = at.Y < MathF.Max(G(low, seamU, V(at)), G(high, seamU, V(at)));
+            if (!under || !(p.Y > Over(p)) || !(q.Y > Over(q))) continue;
+            sights++;
+            if (!blocked[k]) lineLeaks++;
+        }
+        return new SeamRays(made, leaks, sights, lineLeaks, blocked);
+    }
+
+    /// <summary>A tile's ground as a function of world (x, z), from its own heightfield.</summary>
+    internal static Func<float, float, float> GroundOf(Heightfield f, Vector3 corner) => (x, z) => f.HeightAt(x - corner.X, z - corner.Z);
+
+    /// <summary>
+    /// Coarse ground beside full ground leaves no crack (docs/WORLD_STREAMING.md, Coarse ground): rough made-up
+    /// ground in two tiles, one sent at 7.8 m and the other at 2 m, either way round; grazing rays and lines of
+    /// sight across the seam all meet the ground where they pass under it. The coarse ground as it was let rays
+    /// through; full ground has no skirt, so a 2 m seam is what it was.
+    /// </summary>
+    [Fact]
+    public void CoarseGroundBesideFullGroundLeavesNoCrack()
+    {
+        Func<float, float, float> h = (x, z) => 20f + 3f * MathF.Sin(x / 13f) * MathF.Cos(z / 7f) + 1.5f * MathF.Sin(z / 3.1f + x / 5f)
+                                              + 0.8f * MathF.Sin(z / 1.7f) + 0.5f * MathF.Cos(x / 2.3f + z / 2.9f);
+        var west = TerrainTiles.Component(Posts, Spacing, Heights(h, 0f, 0f), out float wBase);
+        var east = TerrainTiles.Component(Posts, Spacing, Heights(h, 250f, 0f), out float eBase);
+        var wAt = new Vector3(125f, wBase, 125f);
+        var eAt = new Vector3(375f, eBase, 125f);
+        var wFine = EntityGeometry.TerrainSpec(1, wAt, west, Ground);
+        var eFine = EntityGeometry.TerrainSpec(2, eAt, east, Ground);
+        var wCoarse = EntityGeometry.TerrainSpec(1, wAt, west.Coarse(), Ground);
+        var eCoarse = EntityGeometry.TerrainSpec(2, eAt, east.Coarse(), Ground);
+        var wOld = SolidSpec.OfTerrain(1, wAt, UnskirtedCoarse(west, wBase), Ground);
+        var eOld = SolidSpec.OfTerrain(2, eAt, UnskirtedCoarse(east, eBase), Ground);
+
+        // Full ground is never skirted: the server's, and every 2 m seam, are what they were.
+        Assert.False(west.IsCoarse);
+        Assert.False(wFine.Terrain!.Skirted);
+        Assert.Equal(wFine.Terrain.SurfaceTriangleCount, wFine.Terrain.TriangleCount);
+        Assert.Equal(Heightfield.ContentHash(Posts, Spacing, wFine.Terrain.Heights, wFine.Terrain.Cells, wFine.Terrain.Materials), wFine.Terrain.Hash);
+        // Coarse ground is skirted, told from the wire's own fields after a trip through MemoryPack.
+        var sent = MemoryPackSerializer.Deserialize<TerrainTileComponent>(MemoryPackSerializer.Serialize(west.Coarse()))!;
+        Assert.True(sent.IsCoarse);
+        Assert.True(sent.Field(wBase).Skirted);
+        Assert.Equal(wCoarse.Terrain!.Hash, sent.Field(wBase).Hash);
+        var cf = wCoarse.Terrain;
+        Assert.Equal(cf.SurfaceTriangleCount + 8 * TerrainTileComponent.CoarseCells, cf.TriangleCount);
+        // The acoustic scene takes the skirt too; the full ground's triangles are as many as ever.
+        int SceneTriangles(SolidSpec spec)
+        {
+            var verts = new List<Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3>();
+            var tris = new List<Client.Core.AudioEngine.SteamAudio.Phonon.IPLTriangle>();
+            var mats = new List<int>();
+            Client.Core.AudioEngine.SteamAudio.SceneTerrain.Append(spec, Vector3.Zero, verts, tris, mats, (_, _) => 0);
+            Assert.Equal(tris.Count, mats.Count);
+            Assert.All(tris, t => Assert.True(t.i0 < verts.Count && t.i1 < verts.Count && t.i2 < verts.Count));
+            return tris.Count;
+        }
+        Assert.Equal(cf.TriangleCount, SceneTriangles(wCoarse));
+        Assert.Equal(2 * (Posts - 1) * (Posts - 1), SceneTriangles(wFine));
+
+        // Each skirt triangle stands on the tile's edge, upright, facing out of the tile, down to the floor.
+        for (int k = cf.SurfaceTriangleCount; k < cf.TriangleCount; k++)
+        {
+            var t = cf.Triangle(k);
+            var n = Vector3.Normalize(t.Normal);
+            Vector3 b = t.V0 + t.E1, c = t.V0 + t.E2;
+            Assert.Equal(cf.FloorY, MathF.Min(t.V0.Y, MathF.Min(b.Y, c.Y)), 3);
+            var mid = (t.V0 + b + c) / 3f;
+            Vector3 outward = mid.X < 1e-3f ? -Vector3.UnitX : mid.X > cf.Size - 1e-3f ? Vector3.UnitX : mid.Z < 1e-3f ? -Vector3.UnitZ : Vector3.UnitZ;
+            Assert.True(Vector3.Dot(n, outward) > 0.9999f, $"skirt triangle {k}: normal {n}, edge {outward}");
+        }
+
+        // The coarse edge is nowhere under the fine edge, and its corners are the fine corners.
+        var wf = wFine.Terrain;
+        float worstLift = 0f;
+        for (float z = 0f; z <= 250f; z += 0.25f)
+        {
+            float under = wf.HeightAt(250f, z) - cf.HeightAt(250f, z);
+            Assert.True(under <= 1e-4f, $"coarse edge {under * 100:F2} cm under the fine at z {z}");
+            worstLift = MathF.Max(worstLift, -under);
+        }
+        Assert.Equal(wf.HeightAt(250f, 0f), cf.HeightAt(250f, 0f), 4);
+        Assert.Equal(wf.HeightAt(250f, 250f), cf.HeightAt(250f, 250f), 4);
+
+        SeamRays Probe(SolidSpec a, SolidSpec b)
+            => AcrossSeam(WorldOf(a, b), GroundOf(a.Terrain!, a.TerrainCorner), GroundOf(b.Terrain!, b.TerrainCorner),
+                          (x, z) => x < 250f ? wf.HeightAt(x, z) : eFine.Terrain!.HeightAt(x - 250f, z), false, 250f, 2f, 248f, 5, 4000, 2000);
+        var full = Probe(wFine, eFine);
+        var coarseWest = Probe(wCoarse, eFine);
+        var coarseEast = Probe(wFine, eCoarse);
+        var oldWest = Probe(wOld, eFine);
+        var oldEast = Probe(wFine, eOld);
+        int changed = 0, changedOld = 0;
+        for (int k = 0; k < full.Blocked.Length; k++)
+        {
+            if (full.Blocked[k] != coarseWest.Blocked[k]) changed++;
+            if (full.Blocked[k] != oldWest.Blocked[k]) changedOld++;
+        }
+        _o.WriteLine($"coarse edge over the fine edge by at most {worstLift * 100:F1} cm");
+        foreach (var (name, r) in new[] { ("2 m | 2 m", full), ("7.8 m | 2 m", coarseWest), ("2 m | 7.8 m", coarseEast),
+                                          ("7.8 m unskirted | 2 m", oldWest), ("2 m | 7.8 m unskirted", oldEast) })
+            _o.WriteLine($"{name}: {r.Leaks} of {r.Rays} grazing rays through, {r.LineLeaks} of {r.Lines} lines of sight under the seam through");
+        _o.WriteLine($"lines of sight across the seam blocked otherwise than by the 2 m ground, of {full.Blocked.Length}: {changed} skirted, {changedOld} unskirted");
+        Assert.Equal(0, full.Leaks + full.LineLeaks);
+        Assert.Equal(0, coarseWest.Leaks + coarseWest.LineLeaks);
+        Assert.Equal(0, coarseEast.Leaks + coarseEast.LineLeaks);
+        Assert.True(oldWest.Leaks + oldEast.Leaks > 0, "the unskirted coarse ground should let some rays through, or the probe cannot see a crack");
+        Assert.True(full.Rays > 3000 && full.Lines > 100, $"{full.Rays} rays, {full.Lines} lines under the seam");
     }
 }
