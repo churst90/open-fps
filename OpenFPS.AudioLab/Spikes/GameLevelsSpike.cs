@@ -645,6 +645,19 @@ public static class GameLevelsSpike
                 PassBy("pickup_v8", 50f, 3f, 44.0);
                 PassBy("transit_bus", 40f, 3f, 44.0);
                 Unidle();
+                // A bus idling 60 m down the street at a stop, the near car idling 12 m away.
+                Stand(new Vector3(60f, 0f, -60f), 0f);
+                Idle("i4_midsize", new Vector3(60f + 7f, 0f, -60f + 10f));
+                {
+                    var bus = new Vector3(60f - 20f, 0f, -60f + 56f);
+                    int busId = AddCar("transit_bus", bus, Vector3.Zero);
+                    perFrame = _ => Move(busId, bus, Quaternion.Identity, Vector3.Zero);
+                    Pump(4.0);
+                    Record("idle transit_bus 60m", 16.0);
+                    perFrame = null;
+                    Remove(busId);
+                }
+                Unidle();
                 Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
                 Stand(new Vector3(-30f, 0f, -30f), 0f);
                 Idle("i4_midsize", new Vector3(-30f + 7f, 0f, -30f - 10f));
@@ -659,6 +672,7 @@ public static class GameLevelsSpike
                 PassBy("pickup_v8", 50f, 3f, 14.0);
                 PassBy("pickup_v8", 50f, 90f, 14.0);
                 PassBy("transit_bus", 40f, 3f, 14.0);
+                IdleCar("transit_bus", new[] { ("rear", 6f) }, 12.0);
                 Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
             }
             if (set is "compare")

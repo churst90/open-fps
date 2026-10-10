@@ -33,6 +33,20 @@ Recent work, newest first. `git log` has the rest.
     OPENFPS_ENGINE_DETAIL=0 (all full) or =always (all reduced, for listening). EngineDetailTests;
     AudioLab `--pool-cost render DIR handover`, `--pool-cost offline detail=reduced`,
     `--game-levels set=engine-solo`.
+  - The distant-car cycle cache (todo item 12), per engine for now. A reduced engine running steadily
+    replays its own last six cycles (crank turns through the cycle's zero, so each holds every
+    cylinder's firing once) in a random order, never one twice running, joined by crossfading each
+    head into what followed the last cycle in the recording, at the same crank angle; each plays at its
+    recorded length, so the cycle-to-cycle variation stays. Steady: the same pedal, load, gear, ignition
+    and governor, speed within 2 %, gas temperature, manifold and boost settled, the starter silent and
+    no pop or misfire bang in the set. A hunting idle or a lopey V8 stays live. The engine is taken up
+    again where it stopped, at the same crank angle, when anything changes, and after 4 s regardless to
+    record a fresh set; the outer engine reports the set's speed meanwhile, so the driveline and the
+    governor hold. Sixteen street machines cruising for 40 s: within 0.05 dB of the engine live at half
+    rate, bands 0.14 dB apart, the same 50 ms level spread and sharpest sample changes. 32 far voices over
+    40 s: 1.08 core-seconds per second, against 1.74 at half rate alone and 2.53 in full. A cruising far
+    car replays about 60 % of the time, an idling diesel about half. OPENFPS_CYCLE_CACHE=0 for an A/B.
+    The shared, baked grid per engine type (todo item 12) is still to come.
 
 - Logging out in the world and back in returns you to the same spot, through the loading screen, facing
   the way you faced; the landing map if the ground there cannot be built within 30 s.

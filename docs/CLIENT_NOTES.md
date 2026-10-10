@@ -301,7 +301,9 @@ FmodAudioProvider.ChooseEngineDetail), and goes back to full within 12 dB. Reduc
 at half the rate, interpolated back up (EngineSynth.Detail.cs); the voice's tyres, fan and body stay at
 the full rate. A change is a hand-over, never a cut: the new engine takes the old one's state, runs beside
 it for 0.15 s with its crank held to the old one's while its pipes fill, and the two are crossfaded at a
-level that keeps their measured power. A reduced voice costs about a third less. The engine you ride in
+level that keeps their measured power. A reduced voice costs about a third less, and while it runs
+steadily it replays its own last six cycles instead of integrating them (CycleCache):
+taken up again at the same crank angle when an input moves, and every 4 s regardless. The engine you ride in
 is always full; /enginedetail off keeps every engine full.
 
 ## The budgets: giving voices up and taking them back

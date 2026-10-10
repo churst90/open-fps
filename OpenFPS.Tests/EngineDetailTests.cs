@@ -14,7 +14,8 @@ public class EngineDetailTests
 {
     private const int Rate = 48000, Block = 1024;
 
-    private static (float[] Audio, float[] Rpm, string[] State) Render(string preset, float speed, double seconds, Func<double, EngineDetail> detail)
+    private static (float[] Audio, float[] Rpm, string[] State) Render(string preset, float speed, double seconds, Func<double, EngineDetail> detail,
+                                                                      Func<double, float>? speedAt = null)
     {
         var v = new EngineVoiceState(MachineRegistry.VehicleFor(preset), Rate, 1001) { TargetSpeed = speed, CompensateLevel = true };
         v.PlaceAtSpeed(speed);
@@ -27,6 +28,7 @@ public class EngineDetailTests
         for (int b = 0; b < blocks; b++)
         {
             v.Detail = detail(b * Block / (double)Rate);
+            if (speedAt != null) v.TargetSpeed = speedAt(b * Block / (double)Rate);
             v.Render(buf);
             buf.CopyTo(all, b * Block);
             rpm[b] = v.Engine.Rpm;
@@ -102,6 +104,54 @@ public class EngineDetailTests
         Assert.Equal(EngineDetail.Full, FmodAudioProvider.DetailFor(EngineDetail.Reduced, Under(30f), 1f, false));
         Assert.Equal(EngineDetail.Full, FmodAudioProvider.DetailFor(EngineDetail.Full, 0f, 0f, true));
         Assert.Equal(EngineDetail.Reduced, FmodAudioProvider.DetailFor(EngineDetail.Full, 1f, 1f, true, all: true));
+    }
+
+    /// <summary>
+    /// A far car cruising steadily replays its own cycles (CycleCache) for much of the time, at the level
+    /// it plays live at reduced detail, within half a decibel; when its speed is changed it is handed back
+    /// to the live engine within half a second, and the crank does not jump on the way.
+    /// </summary>
+    [Fact]
+    public void ASteadyFarEngineReplaysItsCyclesAndHandsBackWhenItChanges()
+    {
+        const double seconds = 22.0;
+        var r = Render("pickup_v8", 15f, seconds, _ => EngineDetail.Reduced, t => t < 18.0 ? 15f : 20f);
+        int from = (int)(6.0 * Rate / Block), to = (int)(18.0 * Rate / Block);
+        double replay = 0, live = 0; int nReplay = 0, nLive = 0;
+        for (int b = from; b < to; b++)
+        {
+            double db = Db(r.Audio, b * Block, (b + 1) * Block);
+            double p = Math.Pow(10, db / 10);
+            if (r.State[b] == "Replay") { replay += p; nReplay++; }
+            else if (r.State[b] == "Twin") { live += p; nLive++; }
+        }
+        Assert.True(nReplay > (to - from) / 3, $"replayed {nReplay} of {to - from} blocks");
+        Assert.True(nLive > 0, "never live between replays: the set is not being refreshed");
+        double diff = 10 * Math.Log10(replay / nReplay) - 10 * Math.Log10(live / nLive);
+        Assert.True(Math.Abs(diff) < 0.5, $"replay plays {diff:+0.00;-0.00} dB against the live engine");
+
+        // The speed asked for changes at 18 s: the replay is let go within half a second.
+        int change = (int)(18.0 * Rate / Block), gone = -1;
+        for (int b = change; b < r.State.Length; b++) if (r.State[b] is not ("Replay" or "ToReplay")) { gone = b; break; }
+        Assert.True(gone >= 0 && gone - change < (int)(0.5 * Rate / Block), $"still replaying {(gone < 0 ? "at the end" : $"{(gone - change) * Block / (double)Rate:F2} s")} after the change");
+
+        float worst = 0f, worstLive = 0f;
+        for (int b = from + 1; b < r.Rpm.Length; b++)
+        {
+            float step = MathF.Abs(r.Rpm[b] - r.Rpm[b - 1]);
+            if (r.State[b] == "Twin" && r.State[b - 1] == "Twin") worstLive = MathF.Max(worstLive, step);
+            else worst = MathF.Max(worst, step);
+        }
+        Assert.True(worst <= worstLive * 1.5f + 10f, $"the crank moved {worst:F1} rpm in a block around the replay, {worstLive:F1} live");
+    }
+
+    /// <summary>An idle that hunts is not steady: shuffled, its cycles would jump in pitch, so it stays live.</summary>
+    [Fact]
+    public void AHuntingIdleIsNeverReplayed()
+    {
+        var r = Render("i4_midsize", 0f, 12.0, _ => EngineDetail.Reduced);
+        Assert.DoesNotContain("Replay", r.State);
+        Assert.Contains("Twin", r.State);
     }
 
     /// <summary>From inside a vehicle its engine is always in full, whatever the provider asked.</summary>

@@ -1,3 +1,4 @@
+using OpenFPS.Common;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -15,7 +16,8 @@ public enum EngineDetail : byte
     /// <summary>
     /// At half the voice's rate, interpolated back up: half the cost. Measured on the street's sixteen
     /// machines at a steady speed (AudioLab --pool-cost render steady): level within 0.9 dB, the bands up
-    /// to 8 kHz 0.9 dB apart on average, and nothing above about 10 kHz.
+    /// to 8 kHz 0.9 dB apart on average, and nothing above about 10 kHz. While it runs steadily it replays
+    /// its own last cycles instead (CycleCache), within 0.05 dB of itself live.
     /// </summary>
     Reduced,
 }
@@ -28,6 +30,10 @@ public sealed partial class EngineSynth
 
     private readonly int _seed;
     private DetailRunner? _runner;
+
+    /// <summary>Whether a reduced engine may replay its own cycles while steady (CycleCache);
+    /// OPENFPS_CYCLE_CACHE=0 keeps it running at half rate, for an A/B.</summary>
+    internal static volatile bool CycleCacheOn = Environment.GetEnvironmentVariable("OPENFPS_CYCLE_CACHE") != "0";
 
     /// <summary>What the hand-over is doing, for instruments and tests: Outer, ToTwin, Twin or ToOuter.</summary>
     internal string DetailState => _runner?.State ?? "Outer";
@@ -108,7 +114,7 @@ public sealed partial class EngineSynth
         /// <summary>The crossfade, long enough that two engines a decibel apart do not step.</summary>
         private const float FadeSeconds = 0.1f;
 
-        private enum Phase : byte { Outer, ToTwin, Twin, ToOuter }
+        private enum Phase : byte { Outer, ToTwin, Twin, ToOuter, ToReplay, Replay, FromReplay }
 
         private readonly EngineSynth _o;
         private EngineSynth? _twin;
@@ -122,12 +128,30 @@ public sealed partial class EngineSynth
         private double _sxy, _sxx, _syy;
         private float _rho;
 
+        /// <summary>The twin's own last cycles (CycleCache), made the first time the twin runs.</summary>
+        private CycleCache? _cycles;
+        /// <summary>Samples the twin has run since it last took over; its first cycles are its pipes filling.</summary>
+        private int _twinRun;
+        private int _settle;
+        private double _twinTheta;
+        /// <summary>The replay has been asked to give the engine back.</summary>
+        private bool _leaving;
+        /// <summary>Samples replayed since the set was taken, and the most before a fresh one.</summary>
+        private int _replayed;
+        private readonly int _refresh;
+        private const float RefreshSeconds = 4f;
+
         public DetailRunner(EngineSynth o)
         {
             _o = o;
             _warm = (int)(WarmSeconds * o._rate);
             _fade = Math.Max(1, (int)(FadeSeconds * o._rate));
+            _settle = (int)(SettleSeconds * o._rate);
+            _refresh = (int)(RefreshSeconds * o._rate);
         }
+
+        /// <summary>How long the twin runs before its cycles are recorded: the hand-over well behind it.</summary>
+        private const float SettleSeconds = 0.5f;
 
         public string State => _phase.ToString();
 
@@ -153,13 +177,128 @@ public sealed partial class EngineSynth
                     return;
                 case Phase.Twin:
                     if (_o.Detail == EngineDetail.Full) { BeginToOuter(); StepToOuter(); return; }
-                    StepTwin(Crank.Twin);
-                    Emit(1f);
+                    StepTwinRecording(out bool boundary);
+                    if (boundary && CycleCacheOn && _twinRun > _settle && _cycles!.TrySet(_twin!)) { _phase = Phase.ToReplay; _n = 0; }
                     return;
                 case Phase.ToOuter:
                     StepToOuter();
                     return;
+                case Phase.ToReplay:
+                    StepToReplay();
+                    return;
+                case Phase.Replay:
+                    StepReplay();
+                    return;
+                case Phase.FromReplay:
+                    StepFromReplay();
+                    return;
             }
+        }
+
+        /// <summary>The twin as it runs at reduced detail, its output recorded for the cycle cache.</summary>
+        private void StepTwinRecording(out bool boundary)
+        {
+            var t = _twin!;
+            bool stepping = !_odd;
+            StepTwin(Crank.Twin);
+            Emit(1f);
+            boundary = stepping && t._theta < _twinTheta;
+            if (stepping) _twinTheta = t._theta;
+            _twinRun++;
+            if (_twinRun > _settle)
+                (_cycles ??= new CycleCache(_o.Profile, _o._rate, _o._seed)).Record(t, _o.Exhaust, _o.Intake, _o.Block, _o.StarterOut, boundary);
+        }
+
+        /// <summary>
+        /// Into the replay at a cycle boundary: the twin plays on for one join's length, recording what
+        /// follows the set's last cycle, while the replay's first cycle fades in from its head; then the
+        /// twin stops, at the same distance into its cycle as the replay is into its own.
+        /// </summary>
+        private void StepToReplay()
+        {
+            var c = _cycles!;
+            if (_o.Detail == EngineDetail.Full || !c.StillSteady(_o))
+            {
+                // Taken back before it started: the twin never stopped.
+                _phase = Phase.Twin;
+                c.Reset();
+                StepTwinRecording(out _);
+                return;
+            }
+            StepTwinRecording(out _);
+            c.Next(out float ex, out float inn, out float bl);
+            float g = Gain(++_n / (float)c.Tail, c.Rho);
+            float own = Gain(1f - _n / (float)c.Tail, c.Rho);
+            _o.Exhaust = own * _o.Exhaust + g * ex;
+            _o.Intake = own * _o.Intake + g * inn;
+            _o.Block = own * _o.Block + g * bl;
+            _o.StarterOut *= own;
+            if (_n >= c.Tail)
+            {
+                _phase = Phase.Replay;
+                _leaving = false;
+                _replayed = 0;
+                _o._omega = c.SetOmega;
+                _o.Torque = c.SetTorque;
+            }
+        }
+
+        /// <summary>
+        /// The replay alone: the twin stands still, the outer reports the set's speed (a steady crank, so the
+        /// driveline and the governor hold what they were doing) and the replay's angle. When the inputs
+        /// leave the set's, or the detail goes back to full, the twin is taken up again where it stopped,
+        /// at the next point the replay is the same distance into a cycle.
+        /// </summary>
+        private void StepReplay()
+        {
+            var c = _cycles!;
+            // Taken up again after a few seconds whatever happens: what the set cannot see (the driver's
+            // pedal creeping, the gas still warming) has had time to matter, and a fresh set is recorded.
+            if (!_leaving && (_o.Detail == EngineDetail.Full || !c.StillSteady(_o) || ++_replayed > _refresh)) _leaving = true;
+            if (_leaving && c.AtResumePoint)
+            {
+                _phase = Phase.FromReplay;
+                _n = 0;
+                StepFromReplay();
+                return;
+            }
+            c.Next(out float ex, out float inn, out float bl);
+            _o.Exhaust = ex; _o.Intake = inn; _o.Block = bl;
+            _o.StarterOut = 0f;
+            _o.ExhaustShell = _o.ExhaustPipe = 0f;
+            _o._omega = c.SetOmega;
+            _o._theta = c.Angle(_o._cycleDeg);
+        }
+
+        /// <summary>Out of the replay: the twin runs again from where it stopped, faded in over one join.</summary>
+        private void StepFromReplay()
+        {
+            var c = _cycles!;
+            StepTwin(Crank.Twin);
+            Emit(1f);
+            c.Next(out float ex, out float inn, out float bl);
+            float g = Gain(++_n / (float)c.Tail, c.Rho);
+            float old = Gain(1f - _n / (float)c.Tail, c.Rho);
+            _o.Exhaust = old * ex + g * _o.Exhaust;
+            _o.Intake = old * inn + g * _o.Intake;
+            _o.Block = old * bl + g * _o.Block;
+            _o.StarterOut *= g;
+            if (_n >= c.Tail)
+            {
+                _phase = Phase.Twin;
+                c.Reset();
+                _twinRun = 0;
+                _twinTheta = _twin!._theta;
+            }
+        }
+
+        /// <summary>The raised-cosine crossfade's gain at <paramref name="u"/> (0 to 1) toward the incoming,
+        /// normalised for two signals of correlation <paramref name="rho"/> (see Blend).</summary>
+        private static float Gain(float u, float rho)
+        {
+            float g = 0.5f - 0.5f * MathF.Cos(MathF.PI * Math.Clamp(u, 0f, 1f));
+            float h = 0.5f - 0.5f * MathF.Cos(MathF.PI * Math.Clamp(1f - u, 0f, 1f));
+            return g / MathF.Sqrt(g * g + h * h + 2f * rho * g * h);
         }
 
         private void BeginToTwin()
@@ -244,7 +383,13 @@ public sealed partial class EngineSynth
             _o.StepLive();
             StepTwin(Crank.Outer);
             Blend(towardTwin: true);
-            if (++_n >= _warm + _fade) _phase = Phase.Twin;
+            if (++_n >= _warm + _fade)
+            {
+                _phase = Phase.Twin;
+                _twinRun = 0;
+                _twinTheta = _twin!._theta;
+                _cycles?.Reset();
+            }
         }
 
         private void StepToOuter()
@@ -288,6 +433,273 @@ public sealed partial class EngineSynth
             if (towardTwin) Emit(newGain, oldGain);
             else Emit(oldGain, newGain);
         }
+    }
+
+    /// <summary>
+    /// The far engine's own last cycles, recorded as the twin plays them and replayed while nothing
+    /// changes (todo.md, "Cars in full detail": the distant-car cycle cache). A cycle is the stretch
+    /// between two turns of the crank through the cycle's zero, so every one holds each cylinder's
+    /// firing once and the firing order is kept. They are played back in a random order with no cycle
+    /// twice running, each joined to the next by crossfading the head of the next into what followed
+    /// the last in the recording, over a quarter of the shortest cycle: the joins fall where the
+    /// recording itself had a cycle boundary, so the crank angle is the same either side. Played at the
+    /// speed they were recorded at, each its own length, so the cycle-to-cycle variation of the firing
+    /// is kept and nothing is resampled.
+    ///
+    /// Steady means the last <see cref="Cycles"/> cycles came from the same inputs within a tolerance
+    /// (throttle, load, the inertia the driveline puts on the crank, ignition, starter, governor) and
+    /// at the same speed within 2 %, with the starter silent. An idle that hunts by hundreds of rpm is
+    /// not steady, and stays live: shuffled, its cycles would jump in pitch.
+    /// </summary>
+    private sealed class CycleCache
+    {
+        /// <summary>Cycles in a set: enough that the order is not heard to repeat, few enough to be
+        /// steady for.</summary>
+        public const int Cycles = 6;
+        /// <summary>A cycle's mean speed may differ from the set's by this, as a share.</summary>
+        private const float SpeedSpread = 0.02f;
+
+        private readonly float[] _ex, _in, _bl;
+        private readonly int _cap;
+        private readonly int _maxCycle;
+        private long _at;                       // outer samples recorded so far
+
+        // The cycles recorded, a ring of the last Cycles + 1: where each starts, its length, and what
+        // drove it.
+        private readonly long[] _start = new long[Cycles + 1];
+        private readonly int[] _len = new int[Cycles + 1];
+        private readonly float[] _omega = new float[Cycles + 1], _tMin = new float[Cycles + 1], _tMax = new float[Cycles + 1];
+        private readonly float[] _lMin = new float[Cycles + 1], _lMax = new float[Cycles + 1], _inertia = new float[Cycles + 1];
+        private readonly float[] _governed = new float[Cycles + 1];
+        // The engine's slow state over each cycle (gas temperature, manifold, boost): what drifts for
+        // seconds after the inputs settle, and freezes with the engine.
+        private readonly float[] _portK = new float[Cycles + 1], _map = new float[Cycles + 1], _spool = new float[Cycles + 1];
+        private readonly bool[] _clean = new bool[Cycles + 1];
+        private int _count;                     // complete cycles in the ring
+        private long _cycleStart = -1;          // the cycle being recorded; -1 before the first boundary
+        private double _omegaSum;
+        private float _ctMin, _ctMax, _clMin, _clMax, _cInertia, _cGoverned;
+        private double _portSum, _mapSum, _spoolSum;
+        private bool _cClean, _cPopped;
+        private float _cPeak;
+        private readonly float[] _peak = new float[Cycles + 1];
+
+        // The set being played: copies of the ring's entries at the start, so recording can go on
+        // while the set is entered.
+        private readonly long[] _setStart = new long[Cycles];
+        private readonly int[] _setLen = new int[Cycles];
+        public float SetOmega, SetTorque;
+        private float _tLo, _tHi, _lLo, _lHi, _inertiaSet, _governedSet;
+        private int _tail;
+        private float _rho = 0.5f;
+        /// <summary>How alike the cycles' heads are (see Likeness).</summary>
+        public float Rho => _rho;
+
+        // Playback: the cycle, the position in it, and the one being faded out of.
+        private int _cur, _prev = -1;
+        private int _pos;
+        private uint _rng;
+
+        public CycleCache(EngineProfile e, float rate, int seed)
+        {
+            // The slowest an engine is steady at: four-fifths of its idle.
+            float cyclesPerSecond = 0.8f * MathF.Max(200f, e.IdleRpm) / 60f / (e.CycleDegrees / 360f);
+            _maxCycle = (int)(rate / cyclesPerSecond) + 1;
+            _cap = (Cycles + 2) * _maxCycle;
+            _ex = new float[_cap]; _in = new float[_cap]; _bl = new float[_cap];
+            _rng = (uint)seed * 2654435761u | 1u;
+        }
+
+        /// <summary>Forgets every cycle: what follows is not steady with what went before.</summary>
+        public void Reset()
+        {
+            _count = 0;
+            _cycleStart = -1;
+        }
+
+        /// <summary>One sample of the twin as heard, and what drove it. <paramref name="boundary"/>: the
+        /// crank passed the cycle's zero on this sample, which starts a cycle here.</summary>
+        public void Record(EngineSynth o, float ex, float inn, float bl, float starter, bool boundary)
+        {
+            if (boundary)
+            {
+                if (_cycleStart >= 0) Close();
+                _cycleStart = _at;
+                _omegaSum = 0;
+                _portSum = _mapSum = _spoolSum = 0;
+                _ctMin = _ctMax = o.Throttle;
+                _clMin = _clMax = o.LoadTorque;
+                _cInertia = o.ExternalInertia;
+                _cGoverned = o.GovernedRpm;
+                _cClean = o.Ignition && !o.Starter;
+                _cPopped = false;
+                _cPeak = 0f;
+            }
+            int i = (int)(_at % _cap);
+            _ex[i] = ex; _in[i] = inn; _bl[i] = bl;
+            _at++;
+            if (_cycleStart < 0) return;
+            _omegaSum += o._omega;
+            _portSum += o._portK; _mapSum += o._map; _spoolSum += o._spool;
+            float t = o.Throttle, l = o.LoadTorque;
+            if (t < _ctMin) _ctMin = t; else if (t > _ctMax) _ctMax = t;
+            if (l < _clMin) _clMin = l; else if (l > _clMax) _clMax = l;
+            if (starter != 0f || !o.Ignition || o.Starter || o.ExternalInertia != _cInertia || o.GovernedRpm != _cGoverned) _cClean = false;
+            // A pop in the pipe is an event, not the engine's running sound: replayed, it would come back
+            // every few cycles.
+            if (!_cPopped)
+                for (int c = 0; c < o._n; c++) if (o._cyl[c].PopLeft > 0) { _cPopped = true; break; }
+            float peak = MathF.Abs(ex) + MathF.Abs(inn) + MathF.Abs(bl);
+            if (peak > _cPeak) _cPeak = peak;
+            // Slower than anything steady, or stalled: start again.
+            if (_at - _cycleStart > _maxCycle) Reset();
+        }
+
+        private void Close()
+        {
+            int len = (int)(_at - _cycleStart);
+            int k = Cycles;
+            // The ring keeps the newest Cycles + 1, oldest first.
+            if (_count == Cycles + 1)
+                for (int j = 0; j < k; j++) Shift(j);
+            int n = Math.Min(_count, Cycles);
+            _start[n] = _cycleStart; _len[n] = len;
+            _omega[n] = (float)(_omegaSum / Math.Max(1, len));
+            _portK[n] = (float)(_portSum / Math.Max(1, len));
+            _map[n] = (float)(_mapSum / Math.Max(1, len));
+            _spool[n] = (float)(_spoolSum / Math.Max(1, len));
+            _tMin[n] = _ctMin; _tMax[n] = _ctMax; _lMin[n] = _clMin; _lMax[n] = _clMax;
+            _inertia[n] = _cInertia; _governed[n] = _cGoverned; _clean[n] = _cClean && !_cPopped;
+            _peak[n] = _cPeak;
+            _count = Math.Min(Cycles + 1, _count + 1);
+        }
+
+        private void Shift(int j)
+        {
+            _start[j] = _start[j + 1]; _len[j] = _len[j + 1]; _omega[j] = _omega[j + 1];
+            _tMin[j] = _tMin[j + 1]; _tMax[j] = _tMax[j + 1]; _lMin[j] = _lMin[j + 1]; _lMax[j] = _lMax[j + 1];
+            _inertia[j] = _inertia[j + 1]; _governed[j] = _governed[j + 1]; _clean[j] = _clean[j + 1];
+            _portK[j] = _portK[j + 1]; _map[j] = _map[j + 1]; _spool[j] = _spool[j + 1]; _peak[j] = _peak[j + 1];
+        }
+
+        /// <summary>How far an input may move from what the set was recorded at before the engine must
+        /// run again: a hundredth of the pedal and a tenth of where it is; two per cent of the engine's
+        /// peak torque and a twentieth of the load.</summary>
+        private static float ThrottleTolerance(float t) => 0.01f + 0.1f * t;
+        private static float LoadTolerance(EngineSynth o, float l) => 0.02f * o.Profile.PeakTorqueNm + 0.05f * MathF.Abs(l);
+
+        /// <summary>At a boundary: the newest <see cref="Cycles"/> complete cycles are steady, and the set
+        /// is taken from them.</summary>
+        public bool TrySet(EngineSynth o)
+        {
+            if (_count < Cycles) return false;
+            int first = _count - Cycles;
+            double om = 0;
+            float tLo = float.MaxValue, tHi = float.MinValue, lLo = float.MaxValue, lHi = float.MinValue;
+            int shortest = int.MaxValue;
+            for (int j = first; j < _count; j++)
+            {
+                if (!_clean[j] || _inertia[j] != _inertia[first] || _governed[j] != _governed[first]) return false;
+                om += _omega[j];
+                tLo = MathF.Min(tLo, _tMin[j]); tHi = MathF.Max(tHi, _tMax[j]);
+                lLo = MathF.Min(lLo, _lMin[j]); lHi = MathF.Max(lHi, _lMax[j]);
+                shortest = Math.Min(shortest, _len[j]);
+            }
+            float mean = (float)(om / Cycles);
+            if (mean <= 1f) return false;
+            // No cycle with a peak twice the set's quietest: a misfire's bang or a rare spike, which a
+            // replay would bring back every few cycles.
+            float quiet = float.MaxValue;
+            for (int j = first; j < _count; j++) quiet = MathF.Min(quiet, _peak[j]);
+            for (int j = first; j < _count; j++) if (_peak[j] > 2f * quiet) return false;
+            for (int j = first; j < _count; j++)
+                if (MathF.Abs(_omega[j] - mean) > SpeedSpread * mean) return false;
+            float tTol = ThrottleTolerance(0.5f * (tLo + tHi)), lTol = LoadTolerance(o, 0.5f * (lLo + lHi));
+            if (tHi - tLo > tTol || lHi - lLo > lTol) return false;
+            // The slow state settled too, since it stops with the engine: across the set, a tenth of a per
+            // cent of the gas temperature, half a per cent of the manifold, a hundredth of the boost.
+            int last = _count - 1;
+            if (MathF.Abs(_portK[last] - _portK[first]) > 0.001f * _portK[first]
+                || MathF.Abs(_map[last] - _map[first]) > 0.005f * _map[first]
+                || MathF.Abs(_spool[last] - _spool[first]) > 0.01f) return false;
+
+            for (int j = 0; j < Cycles; j++) { _setStart[j] = _start[first + j]; _setLen[j] = _len[first + j]; }
+            SetOmega = mean;
+            SetTorque = o.Torque;
+            _tLo = tLo - tTol; _tHi = tHi + tTol; _lLo = lLo - lTol; _lHi = lHi + lTol;
+            _inertiaSet = _inertia[first]; _governedSet = _governed[first];
+            _tail = Math.Max(16, shortest / 4);
+            _rho = Likeness();
+            _prev = -1;
+            _cur = Pick(-1);
+            _pos = 0;
+            return true;
+        }
+
+        /// <summary>How alike two cycles' heads are, on average over the set's neighbours, for the joins'
+        /// crossfade.</summary>
+        private float Likeness()
+        {
+            double sxy = 0, sxx = 0, syy = 0;
+            for (int j = 0; j + 1 < Cycles; j++)
+                for (int p = 0; p < _tail; p++)
+                {
+                    float x = Sum(_setStart[j] + p), y = Sum(_setStart[j + 1] + p);
+                    sxy += (double)x * y; sxx += (double)x * x; syy += (double)y * y;
+                }
+            return sxx > 1e-20 && syy > 1e-20 ? (float)Math.Clamp(sxy / Math.Sqrt(sxx * syy), 0.0, 1.0) : 0.5f;
+        }
+
+        private float Sum(long at) { int i = (int)(at % _cap); return _ex[i] + _in[i] + _bl[i]; }
+
+        /// <summary>Whether the engine's inputs still belong to the set.</summary>
+        public bool StillSteady(EngineSynth o)
+            => o.Ignition && !o.Starter && o.Throttle >= _tLo && o.Throttle <= _tHi
+               && o.LoadTorque >= _lLo && o.LoadTorque <= _lHi
+               && MathF.Abs(o.ExternalInertia - _inertiaSet) <= 0.01f * MathF.Abs(_inertiaSet) + 1e-6f
+               && o.GovernedRpm == _governedSet;
+
+        private int Pick(int not)
+        {
+            _rng ^= _rng << 13; _rng ^= _rng >> 17; _rng ^= _rng << 5;
+            int c = (int)(_rng % (uint)(not < 0 ? Cycles : Cycles - 1));
+            return not >= 0 && c >= not ? c + 1 : c;
+        }
+
+        /// <summary>The position in the cycle being played, and its length.</summary>
+        public int Position => _pos;
+        public int Length => _setLen[_cur];
+        /// <summary>The samples a join is crossfaded over, and where the engine stopped: the same.</summary>
+        public int Tail => _tail;
+        /// <summary>A join is not under way: the engine may be taken up here.</summary>
+        public bool AtResumePoint => _pos == _tail;
+
+        /// <summary>The next sample of the replay.</summary>
+        public void Next(out float ex, out float inn, out float bl)
+        {
+            if (_pos >= _setLen[_cur])
+            {
+                _prev = _cur;
+                _cur = Pick(_cur);
+                _pos = 0;
+            }
+            int i = (int)((_setStart[_cur] + _pos) % _cap);
+            ex = _ex[i]; inn = _in[i]; bl = _bl[i];
+            if (_prev >= 0 && _pos < _tail)
+            {
+                // The last cycle's continuation as recorded, into this one's head.
+                int k = (int)((_setStart[_prev] + _setLen[_prev] + _pos) % _cap);
+                float u = (_pos + 1) / (float)_tail;
+                float g = 0.5f - 0.5f * MathF.Cos(MathF.PI * u);
+                float norm = 1f / MathF.Sqrt((1f - g) * (1f - g) + g * g + 2f * _rho * g * (1f - g));
+                float a = (1f - g) * norm, b = g * norm;
+                ex = a * _ex[k] + b * ex; inn = a * _in[k] + b * inn; bl = a * _bl[k] + b * bl;
+            }
+            _pos++;
+        }
+
+        /// <summary>The crank angle the replay is at, degrees through the cycle.</summary>
+        public double Angle(float cycleDeg) => cycleDeg * (_pos / (double)Math.Max(1, _setLen[_cur]));
     }
 
     /// <summary>

@@ -20,6 +20,9 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 ///   --pool-cost render DIR handover        the same, handed to reduced detail at 3 s and back at 9 s, beside full
 ///   [seed=N] [only=NAME]                   another seed for every voice (the natural spread); one scene or preset
 ///   [detail=reduced]                       every voice the benches build at reduced detail (EngineDetail)
+///   [speed=M]                              the steady scenes all at one speed, m/s (0 idles them)
+///   --pool-cost steadiness                 what the inputs do cycle to cycle, cruising and idling (CycleCache)
+///   OPENFPS_CYCLE_CACHE=0                  reduced detail without the cycle cache
 ///   OPENFPS_LAB_RATE=24000                 the benches at another rate
 ///   --pool-cost diff DIR_A DIR_B           the largest difference between two render sets, dBFS
 ///   --pool-cost machines [sec=4]           what each standing physical voice the street has costs
@@ -59,8 +62,10 @@ public static class PoolCostSpike
         if (rest.Contains("cpu")) return Cpu(voices, IntArg(rest, "sec", 10));
         if (rest.Contains("offline")) return Offline(voices, IntArg(rest, "sec", 4));
         if (rest.Contains("machines")) return Machines(IntArg(rest, "sec", 4));
+        if (rest.Contains("steadiness")) return Steadiness();
         if (rest.Contains("render") && rest.Contains("handover"))
             return RenderHandover(rest.SkipWhile(a => a != "render").Skip(1).First(), IntArg(rest, "seed", 0));
+        _steadySpeed = IntArg(rest, "speed", -1);
         if (rest.Contains("render") && rest.Contains("steady")) return RenderSteady(rest.SkipWhile(a => a != "render").Skip(1).First(), IntArg(rest, "seed", 0), IntArg(rest, "secs", 8));
         if (rest.Contains("render")) return RenderSet(rest.SkipWhile(a => a != "render").Skip(1).First(), rest.Contains("wide"), IntArg(rest, "seed", 0));
         if (rest.Contains("diff"))
@@ -217,7 +222,7 @@ public static class PoolCostSpike
         for (int i = 0; i < StreetMix.Length; i++)
         {
             if (_only != null && !StreetMix[i].Contains(_only)) continue;
-            float speed = 4f + (i * 7 % 11) * 1.5f;
+            float speed = _steadySpeed >= 0 ? _steadySpeed : 4f + (i * 7 % 11) * 1.5f;
             var v = new EngineVoiceState(MachineRegistry.VehicleFor(StreetMix[i]), Rate, 1000 + i + seedOffset)
             {
                 TargetSpeed = speed,
@@ -228,8 +233,14 @@ public static class PoolCostSpike
             v.SetListener(new Vector3(10f, 1.6f, 0f));
             var all = new float[blocks * Block];
             var buf = new float[Block];
-            for (int b = 0; b < blocks; b++) { v.Produce(); v.Consume(buf); buf.CopyTo(all, b * Block); }
+            var phases = new Dictionary<string, int>();
+            for (int b = 0; b < blocks; b++)
+            {
+                v.Produce(); v.Consume(buf); buf.CopyTo(all, b * Block);
+                phases[v.Engine.DetailState] = phases.GetValueOrDefault(v.Engine.DetailState) + 1;
+            }
             Write(dir, $"steady_{i:00}_{StreetMix[i]}", all);
+            Console.WriteLine($"    {StreetMix[i],-18} " + string.Join(", ", phases.Select(p => $"{p.Key} {100.0 * p.Value / blocks:F0} %")));
         }
         return 0;
     }
@@ -271,6 +282,53 @@ public static class PoolCostSpike
         }
         return 0;
     }
+
+    /// <summary>
+    /// What an engine's inputs do from one cycle to the next when nothing is happening: per cycle, the
+    /// spread of the throttle, the load torque and the speed, for a few street machines cruising and
+    /// idling and a mower. What a cycle cache may call steady.
+    /// </summary>
+    private static int Steadiness()
+    {
+        foreach (var (key, speed) in new[] { ("i4_midsize", 12f), ("pickup_v8", 15f), ("transit_bus", 9f), ("i4_midsize", 0f), ("pickup_v8", 0f), ("transit_bus", 0f) })
+        {
+            var v = new EngineVoiceState(MachineRegistry.VehicleFor(key), Rate, 1001) { TargetSpeed = speed, CompensateLevel = true };
+            v.PlaceAtSpeed(speed);
+            var e = v.Engine;
+            var buf = new float[64];
+            float prevAngle = 0f;
+            float tMin = 9, tMax = -9, lMin = 1e9f, lMax = -1e9f, rMin = 1e9f, rMax = 0;
+            var lines = new List<string>();
+            for (int n = 0; n < Rate * 8 / 64; n++)
+            {
+                v.Render(buf);
+                float ang = e.CrankDegrees;
+                tMin = MathF.Min(tMin, e.Throttle); tMax = MathF.Max(tMax, e.Throttle);
+                lMin = MathF.Min(lMin, e.LoadTorque); lMax = MathF.Max(lMax, e.LoadTorque);
+                rMin = MathF.Min(rMin, e.Rpm); rMax = MathF.Max(rMax, e.Rpm);
+                if (ang < prevAngle)
+                {
+                    if (n * 64 > Rate * 3) lines.Add($"thr {tMin:F3}-{tMax:F3} load {lMin:F1}-{lMax:F1} Nm rpm {rMin:F0}-{rMax:F0}");
+                    tMin = 9; tMax = -9; lMin = 1e9f; lMax = -1e9f; rMin = 1e9f; rMax = 0;
+                }
+                prevAngle = ang;
+            }
+            Console.WriteLine($"{key} at {speed} m/s, gear {v.Driveline.Gear}, peak torque {v.Vehicle.Engine.PeakTorqueNm} Nm:");
+            foreach (var l in lines.Take(8)) Console.WriteLine("   " + l);
+        }
+        var m = new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, 11, 11 * 31 + 7) { TargetGroundSpeed = 0.9f };
+        var mb = new float[64];
+        for (int n = 0; n < Rate * 8 / 64; n++)
+        {
+            m.Produce(); m.Consume(mb);
+            if (n % (Rate / 64 / 2) == 0)
+                Console.WriteLine($"   mower t {n * 64 / (float)Rate:F1}s thr {m.Machine.Throttle:F3} rpm {m.Machine.Rpm:F0}");
+        }
+        return 0;
+    }
+
+    /// <summary>The steady scenes' speed for every voice (speed=, m/s; 0 idles them), or each its own.</summary>
+    private static int _steadySpeed = -1;
 
     private static string? _only;
     private static int _sceneSeconds = 6;

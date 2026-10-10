@@ -4482,7 +4482,8 @@ public partial class FmodAudioProvider : IAudioProvider
             a.Channel.getPaused(out bool paused);
             return $"voice out {st.LastOutputDb:F1} dBFS, envelope {st.EnvelopeNow:F2}, lift {Db(st.LiftNow):F1} dB, "
                  + $"{(st.Running ? "running" : "off")}{(st.Interior ? ", interior" : "")}, channel volume {Db(volume):F1} dB, "
-                 + $"audibility {Db(audibility):F1} dB{(isVirtual ? ", VIRTUAL" : "")}{(paused ? ", PAUSED" : "")}";
+                 + $"audibility {Db(audibility):F1} dB{(isVirtual ? ", VIRTUAL" : "")}{(paused ? ", PAUSED" : "")}, "
+                 + $"detail {st.Detail} ({st.Engine.DetailState})";
         }
     }
 
