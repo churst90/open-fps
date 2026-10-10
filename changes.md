@@ -17,8 +17,7 @@ Recent work, newest first. `git log` has the rest.
   `/edit build stairs 14 steps up north`, `/edit build column 0.3 by 3`, `/edit build roof gable over the floor`
   (docs/WORLD_EDITOR.md section 19). Rooms measured by a flood from the walls exist as an instrument
   (`--geometry-parity only=rooms`) and are not switched on. A home's ceiling is one over its whole footprint. Server
-  and both clients must be rebuilt together
-  (two messages appended; the wire hash changes).
+  and both clients must be rebuilt together (two messages appended; the wire hash changes).
 
 - Far things sent less often: a far moving thing's once-a-second keep-alive now counts as a change when the
   thing has strayed from what the client predicts, so it goes again the tick after, as any other far state sent
