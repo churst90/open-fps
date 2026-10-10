@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using OpenFPS.Common.Components;
 
 namespace OpenFPS.Common;
 
@@ -48,10 +47,11 @@ public sealed record FireShape
         return new() { Kind = FireShapeKind.Outline, Width = maxX - minX, Depth = maxZ - minZ, Points = pts };
     }
 
-    /// <summary>The fire a placed thing's collider describes: a box its rectangle, anything round its
-    /// circle (the diameter is its x size), a polygon its box until polygons carry their corners.</summary>
-    public static FireShape FromCollider(ColliderShape shape, Vector3 size)
-        => shape is ColliderShape.Cylinder or ColliderShape.Sphere or ColliderShape.Cone
+    /// <summary>The fire a placed thing's size describes: round, its circle (the diameter is its x size);
+    /// otherwise its rectangle. The host says which is round (a polygon is its box until polygons carry
+    /// their corners).</summary>
+    public static FireShape Footprint(bool round, Vector3 size)
+        => round
             ? Circle(size.X)
             : Rectangle(size.X, size.Z);
 

@@ -534,18 +534,19 @@ public sealed record FireSpec
         => shape == null ? KeyFor(preset, litAt) : KeyFor(preset, litAt) + "/shape=" + shape.Format();
 
     /// <summary>
-    /// The key of a fire a placed thing makes: its own key, with the shape its collider gives it unless the
+    /// The key of a fire a placed thing makes: its own key, with the shape its size gives it (round or not,
+    /// <see cref="FireShape.Footprint"/>) unless the
     /// key already says one, and only when that differs from the preset's own. A fire pit placed at its
     /// prefab's size is the preset; scaled up, it is a bigger fire (docs/FIRE.md 12.2).
     /// </summary>
-    public static string KeyForPlaced(string key, ColliderShape collider, System.Numerics.Vector3 size)
+    public static string KeyForPlaced(string key, bool round, System.Numerics.Vector3 size)
     {
         if (!key.StartsWith("fire:", StringComparison.OrdinalIgnoreCase) || key.Contains("/shape=", StringComparison.OrdinalIgnoreCase)) return key;
         if (!(size.X > 0f) || !(size.Z > 0f)) return key;
         ParseKey(key, out string preset, out _);
         FireSpec own;
         try { own = ModelLibrary.Fire(preset); } catch (Exception) { return key; }
-        var shape = FireShape.FromCollider(collider, size);
+        var shape = FireShape.Footprint(round, size);
         var mine = own.Outline;
         if (shape.SameAs(mine)) return key;
         return key + "/shape=" + shape.Format();

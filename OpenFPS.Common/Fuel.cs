@@ -218,17 +218,17 @@ public static class FuelCatalog
 
     /// <summary>
     /// What a placed thing burns as, from what it is: its sound (a fire, a vehicle), its material and its
-    /// size (collider, scaled). Null for what does not burn here. A tree is its foliage over the ground and
+    /// size (collider, scaled, and whether it is round). Null for what does not burn here. A tree is its foliage over the ground and
     /// its wood: a Foliage box high off the ground is a crown with litter under it; a Wood box stands as a
     /// trunk, a stump or a pile by its proportions. Thin wood (a floor, a fence board) and buildings burn as
     /// structures, which are zones: stage 2 (docs/FIRE.md 12.10).
     /// </summary>
-    public static FuelSpec? ForThing(string soundId, string material, ColliderShape shape, Vector3 size, float baseAboveGround)
+    public static FuelSpec? ForThing(string soundId, string material, bool round, Vector3 size, float baseAboveGround)
     {
         float w = MathF.Max(0f, size.X), h = MathF.Max(0f, size.Y), d = MathF.Max(0f, size.Z);
         if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
         {
-            string key = FireSpec.KeyForPlaced(soundId, shape, size);
+            string key = FireSpec.KeyForPlaced(soundId, round, size);
             FireSpec.ParseKey(key, out _, out _, out var fs);
             return Hearth(key, fs ?? FireSpec.ByName(key).Outline);
         }

@@ -179,7 +179,7 @@ public sealed class FireSystem
             string material = world.TryGet<MaterialComponent>(e, out var mat) ? mat.Material ?? "" : "";
             // The ground under a thing is taken as the map's datum: the maps are flat so far (docs/FIRE.md 12.10).
             float bottom = t.Position.Y - 0.5f * c.Size.Y;
-            var fuel = FuelCatalog.ForThing(sound, material, c.Shape, c.Size, bottom);
+            var fuel = FuelCatalog.ForThing(sound, material, c.Shape.IsRound(), c.Size, bottom);
             if (fuel == null) return;
             float yaw = YawOf(t.Rotation);
             string name = world.TryGet<IdentityComponent>(e, out var id) && id.Name.Length > 0 ? id.Name : fuel.Name;
