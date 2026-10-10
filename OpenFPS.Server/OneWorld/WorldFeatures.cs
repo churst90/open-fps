@@ -1,3 +1,4 @@
+using OpenFPS.Common;
 using System.Numerics;
 using OpenFPS.Server.Core;
 using EntityData = OpenFPS.Server.Repositories.EntityData;
@@ -162,7 +163,13 @@ public sealed partial class WorldFeatures
     /// <summary>A tile laid: what stands on it (in its own metres, y over the sea), its ground graded to the
     /// roads (<see cref="WorldTileService.Posts"/> a side, over the sea), and how many roads reach into it.</summary>
     public sealed record Laid(List<EntityData> Entities, float[] Heights, int Roads, int Pieces, int Trees = 0, int Buildings = 0,
-                              string? BuildingSources = null);
+                              string? BuildingSources = null)
+    {
+        /// <summary>The whole window graded (<see cref="PostsFor"/> its margin a side), for the drainage's margin.</summary>
+        public float[]? Window { get; init; }
+        /// <summary>The tile's cells' surfaces to the rain (GroundSurface): the road or floor under a cell, else its land cover.</summary>
+        public byte[]? Surfaces { get; init; }
+    }
 
     /// <summary>The posts a side of a window reaching <paramref name="margin"/> metres round a tile.</summary>
     public static int PostsFor(double margin) => (int)Math.Round((WorldTileKey.TileMetres + 2 * margin) / WorldTileService.Spacing) + 1;
@@ -217,6 +224,7 @@ public sealed partial class WorldFeatures
 
         var entities = new List<EntityData>();
         var slabs = new List<TerrainBuilder.Slab>();
+        var slabSurfaces = new List<byte>();
         var strips = new List<(double Ax, double Az, double Bx, double Bz, double Half)>();
         int roads = 0, pieces = 0;
 
@@ -265,7 +273,10 @@ public sealed partial class WorldFeatures
             strips.Add((p.Ax, p.Az, p.Bx, p.Bz, p.Width / 2));
             var size = Size(p.Prefab);
             if (TerrainBuilder.SlabOf(new Vector3((float)(box.Cx - west), box.Cy, (float)(box.Cz - south)), box.Turn, box.Extent) is { } slab)
+            {
                 slabs.Add(slab);
+                slabSurfaces.Add(SurfaceOfPrefab(p.Prefab));
+            }
             if (!Mine(box.Cx, box.Cz)) return;
             entities.Add(new EntityData
             {
@@ -375,7 +386,43 @@ public sealed partial class WorldFeatures
         var heights = new float[posts * posts];
         for (int j = 0; j < posts; j++)
             Array.Copy(graded, (o + j) * windowPosts + o, heights, j * posts, posts);
-        return new Laid(entities, heights, roads, pieces, trees, built, sources);
+        return new Laid(entities, heights, roads, pieces, trees, built, sources)
+        {
+            Window = graded,
+            Surfaces = Surfaces(classes, slabs, slabSurfaces, margin),
+        };
+    }
+
+    /// <summary>What a road of this prefab is to the rain (GroundSurface): paved, gravel, a dirt track, grass.</summary>
+    public static byte SurfaceOfPrefab(string prefab) => prefab switch
+    {
+        "gravel_floor" => (byte)GroundSurface.Gravel,
+        "dirt_floor" => (byte)GroundSurface.DirtRoad,
+        "grass_floor" => (byte)GroundSurface.Lawn,
+        _ => (byte)GroundSurface.Impervious,
+    };
+
+    /// <summary>The tile's cells to the rain: under a road or a sidewalk its surface, under a building's floor sealed
+    /// (its roof sheds the rain), elsewhere the land cover's (Water.SurfaceRaster.OfLandCover; open ground without land
+    /// cover). Roads' slabs come first with their surfaces; the buildings' floors follow them with none listed.</summary>
+    private static byte[] Surfaces(byte[]? classes, List<TerrainBuilder.Slab> slabs, List<byte> slabSurfaces, double margin)
+    {
+        int n = WorldTileService.Posts - 1;
+        float cell = WorldTileService.Spacing, o = (float)margin;
+        var surfaces = new byte[n * n];
+        for (int k = 0; k < surfaces.Length; k++)
+            surfaces[k] = classes != null && k < classes.Length ? Water.SurfaceRaster.OfLandCover(classes[k]) : (byte)GroundSurface.Open;
+        for (int si = 0; si < slabs.Count; si++)
+        {
+            var (lo, hi) = slabs[si].Bounds;
+            int i0 = Math.Max(0, (int)MathF.Floor((lo.X - o) / cell)), i1 = Math.Min(n - 1, (int)MathF.Floor((hi.X - o) / cell));
+            int j0 = Math.Max(0, (int)MathF.Floor((lo.Y - o) / cell)), j1 = Math.Min(n - 1, (int)MathF.Floor((hi.Y - o) / cell));
+            for (int j = j0; j <= j1; j++)
+                for (int i = i0; i <= i1; i++)
+                    if (slabs[si].Covers(o + (i + 0.5f) * cell, o + (j + 0.5f) * cell))
+                        surfaces[j * n + i] = si < slabSurfaces.Count ? slabSurfaces[si] : (byte)GroundSurface.Impervious;
+        }
+        return surfaces;
     }
 
     // ═══ The woods (gen_osm.py "The woods", a tile at a time) ══════════════════════════════════════════

@@ -1014,6 +1014,8 @@ public sealed partial class ClientGameSession : IDisposable
                 _world.UpdateAtmosphere(wsu);
                 // The one wind the trees, the fires and your ears read.
                 OpenFPS.Common.WindField.Weather = _world.Wind;
+                // The water over the ground the drainage lines' voices read (GroundWater).
+                OpenFPS.Common.GroundWater.Shared.Load(wsu.GroundWater);
                 break;
 
             case HitConfirm confirm:

@@ -306,6 +306,13 @@ Convolution runs on the FMOD mixer thread.
   drips plink into water; the violent-rain gutter outlet 4-6 dB heavy at 250-500 Hz.
 - Not built: toilet flush and cistern refill; the plug as its own control; NPCs using taps; pipe walls
   radiating; trap seals; snowmelt.
+- Water over the ground: approved by ear 2026-10-10 (inbox/water-over-terrain-2026-10-10, "water over
+  terrain sounds good"); keep how it sounds. Next (docs/RUNNING_WATER.md 13.9): the shallow-water model near players; poured water
+  heard on the lines; soil groups by place (SSURGO) instead of B everywhere; culverts as falls; the world's
+  50 m drainage margin agrees with the whole on only 57 % of Magnolia's big-line cells (250 m: 88 %), so a
+  wider window or Barnes's tiled Priority-Flood next; base flow from a climate.
+- Magnolia keeps 2,078 ponds (262,000 m³) of 10,566 hollows: check against the aerial photos that the
+  big ones are real (stock ponds, flatwood hollows) and not grading under roads and drives.
 - AudioLab `--waves levels heard=` ignores `parts=`.
 
 ### Gunfire

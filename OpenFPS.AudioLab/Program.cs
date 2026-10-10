@@ -108,6 +108,8 @@ string[] usage =
     "                                                shores from a pond's edge to surf, from their model (docs/WAVES_AND_SHORES.md)",
     "  --running-water [levels|render out=DIR|runoff|cycle PRESET|game out=DIR set=] [preset ...] [sec= rain= flow= dry=1 parts=]",
     "                                                creeks, gutters, drains, downpipes and taps, from their model (docs/RUNNING_WATER.md)",
+    "  --ground-water [map|flows|levels|game out=DIR] [place=magnolia_tx] [sec= rain= wet= after= lines=]",
+    "                                                rain running over a real place's ground: its drainage lines, their flows and voices",
     "  --water-cost [shore|flow] [preset ...] [sec= reps= wind= out=DIR] | rain out=DIR | bubbles | null DIR_A DIR_B",
     "                                                what each water preset costs a core, and a null test between builds",
     "  --weather-wind [out=DIR] [sec=] [ears|trees] [short] [live]",
@@ -599,6 +601,11 @@ if (args.Contains("--driving"))
 if (args.Contains("--cabin"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.CabinSpike.Run(args));
+}
+
+if (args.Contains("--ground-water"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GroundWaterSpike.Run(args));
 }
 
 if (args.Contains("--running-water"))

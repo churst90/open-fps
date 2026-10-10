@@ -915,4 +915,8 @@ public partial class WorldStateUpdate : IMessage
     /// <summary>The water on this map's roads (RoadWater.Save): the texture, the running sheet and the
     /// puddles, so a client works out the same water anywhere the server does. Null from an older server.</summary>
     public float[]? RoadWater;
+    /// <summary>The water over this map's ground (GroundWater.Save): each surface's run-off through the ladder
+    /// of reservoirs, the groundwater, and the ponds overflowing into a drainage line's voice. Null from an
+    /// older server or a map without ground of its own.</summary>
+    public float[]? GroundWater;
 }

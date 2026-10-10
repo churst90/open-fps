@@ -94,6 +94,22 @@ Recent work, newest first. `git log` has the rest.
   - The recordings' tick peak over the flame is 29.7 dB median over all fourteen, not "about 40" as round
     1 read it. GasHobTests: the hand lets go within a second, the flame safety hob is held 3.3-4.5 s, the
     re-ignition module stops itself, the crack's 2 kHz octave is under its 8 kHz, nothing rings after it.
+- Water runs over the ground (docs/RUNNING_WATER.md section 13; docs/MATTER.md step 4). Every world tile and
+  every map on the survey works out once which way each 2 m cell drains (Priority-Flood and D8, from the tile and
+  the 50 m round it its roads are graded in; a map of a real place routes its whole ground at once) and stores it
+  with the tile (generator version 4: stored tiles are made again; places copied again). The tiles are joined
+  across their edges; hollows keep water as ponds and puddles, or drain through a road's culvert where a road
+  holds them back. The rain runs off each surface by TR-55's curve number (a road nearly all of it at once, a
+  lawn or the woods nothing for the first 30 to 40 mm) and down the lines with each surface's own travel time,
+  plus groundwater base flow; the server sends the state to clients. Where enough gathers, a running-water voice
+  is placed automatically, one every 20 m: rivulets, roadside ditches, creeks and water over paving, none near
+  water a map placed by hand. Magnolia: 749 lines (128 km), 4,152 voices, its biggest creek 3.9 km² and 4.8 km
+  long; by it 8.4 L/s dry, 75 after ten minutes of heavy rain, 12 half an hour after; a roadside ditch 0, 13.3,
+  0.8. Puddles in the road's own dips splash under the wheels. For the fire: `GroundWaterSystem.AddWater` (a
+  bucket, a hose, a burst main runs downhill and soaks in), `WetnessAt`, `WaterReaching`. Renders:
+  inbox/water-over-terrain-2026-10-10. Common changed (a wire field appended): the server, both clients and the
+  Windows zip go out together. Approved by ear 2026-10-10 ("water over terrain sounds good").
+
 - People the server walks treat doors as people do (Cody, 2026-10-08; docs/DOOR_TYPES_EVENTS.md, "What
   the server's people do with a door"). Alex and the drivers from parked cars note how they find a door
   and open it if it is shut. Once through, they let a door with a closer, motor or sensor shut itself;

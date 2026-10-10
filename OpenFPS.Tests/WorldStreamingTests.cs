@@ -160,7 +160,10 @@ public class WorldStreamingTests
         // Everything from the file is in a tile, and so is the ground the loader lays from the survey; what is
         // global is the loader's own handful.
         var terrain = lookup.Values.Where(e => world.Has<TerrainTileComponent>(e)).ToList();
-        Assert.Equal(data.Entities.Count + terrain.Count, tiles.TiledCount);
+        // And the voices of its drainage lines, worked out from that ground (docs/RUNNING_WATER.md 13).
+        var runoff = lookup.Values.Where(e => world.Has<SoundEmitterComponent>(e)
+                                              && world.Get<SoundEmitterComponent>(e).SoundId.StartsWith("flow:ground/", StringComparison.Ordinal)).ToList();
+        Assert.Equal(data.Entities.Count + terrain.Count + runoff.Count, tiles.TiledCount);
         Assert.InRange(tiles.Global.Count, 1, 10);
         _o.WriteLine($"{id}: {tiles.Tiles.Count()} tiles, {tiles.TiledCount} tiled ({terrain.Count} of them ground), {tiles.Global.Count} global");
 

@@ -1017,6 +1017,15 @@ Measured:
 - Buildings bigger than 230 m; building parts (Overture's building_part) for tall and stepped buildings.
 - A newer Overture release when 2026-09-23.1 is withdrawn (a new generator version).
 
+### Drainage with every tile (2026-10-10)
+
+Each tile is made with its drainage (`WorldTile.Drainage`: which way each 2 m cell drains, how deep its hollow
+fills, its surface to the rain), worked out from the window its roads are graded in (the tile and 50 m round
+it), 7 ms a tile on one core; a place's copies are routed from the whole place, as its map is. Generator
+version 4 (and WorldPlaces format 2): stored tiles are made again when next wanted. A frame joins its loaded
+tiles' drainage, 3 s after they stop changing, in the background, and puts the voices of its drainage lines
+in the tiles they stand in. See docs/RUNNING_WATER.md section 13.
+
 ### Left after stage 2 (as of 2026-10-10)
 
 - Outside the real places, world tiles have their roads and woods, buildings and driveways (2026-10-10, above), not

@@ -1372,7 +1372,7 @@ public partial class ClientAudioSystem
                 return !_tapOnAt.TryGetValue(entityId, out double on) || now - on > TapDrainSeconds;
             }
             if (spec.BaseFlowLitresPerSecond > 0f || spec.CatchmentSquareMetres <= 0f) return false;
-            return spec.FlowNow() < OpenFPS.Common.RunningWaterSpec.DryLitresPerSecond;
+            return spec.FlowNow() < spec.DryBelowLitresPerSecond;
         }
         catch (Exception) { return false; }
     }

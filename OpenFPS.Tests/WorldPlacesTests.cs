@@ -139,8 +139,11 @@ public class WorldPlacesTests : IDisposable
             if (w.Has<DoorComponent>(e)) kind += " door";
             return name + "|" + kind;
         }
+        // Not the voices of the drainage lines: a frame works out its own from its tiles, in the background
+        // (docs/RUNNING_WATER.md 13.5).
         static bool Fixed(World w, Entity e) => w.Has<Transform>(e) && !w.Has<Velocity>(e) && !w.Has<PlayerComponent>(e)
-                                                && !w.Has<TerrainTileComponent>(e) && !w.Has<ZoneComponent>(e);
+                                                && !w.Has<TerrainTileComponent>(e) && !w.Has<ZoneComponent>(e)
+                                                && !(w.Has<SoundEmitterComponent>(e) && w.Get<SoundEmitterComponent>(e).SoundId.StartsWith("flow:ground/", StringComparison.Ordinal));
         var inFrame = new Dictionary<(string What, int X, int Y, int Z), int>();
         fw.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) =>
         {

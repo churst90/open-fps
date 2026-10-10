@@ -531,6 +531,20 @@ public class MapManager
                 hasAnyFloor = hasTerrain = tiles.Count > 0;
                 Log.Information("MapManager: '{Id}' lays {Tiles} tiles of ground from its survey, graded to {Slabs} slabs ({Ms} ms).",
                                 m.Id, tiles.Count, slabs.Count, clock.ElapsedMilliseconds);
+                // Which way the rain runs over it, and the running water it makes where it gathers
+                // (docs/RUNNING_WATER.md 13).
+                try
+                {
+                    foreach (var e in OpenFPS.Server.Water.MapDrainage.AtLoad(m.Id, world, tiles))
+                    {
+                        lookup[e.Id] = e;
+                        if (layers != null) layers[e.Id] = OpenFPS.Server.Water.MapDrainage.Layer;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "MapManager: '{Id}' drainage could not be worked out; no water runs over its ground.", m.Id);
+                }
             }
             catch (Exception ex)
             {

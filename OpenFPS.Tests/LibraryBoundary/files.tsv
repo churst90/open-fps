@@ -226,7 +226,9 @@ OpenFPS.Common/GasHob.cs	lib	Sound
 OpenFPS.Common/Glass.cs	lib	Sound	
 OpenFPS.Common/GlassDoor.cs	lib	Sound	
 OpenFPS.Common/GlassFracture.cs	lib	Sound	
+OpenFPS.Common/GroundChannels.cs	lib	Sound	
 OpenFPS.Common/GroundProbeMemo.cs	host		
+OpenFPS.Common/GroundWater.cs	lib	Sound	
 OpenFPS.Common/HandOverSounds.cs	lib	Sound	
 OpenFPS.Common/Hearing/BandAnalyser.cs	lib	Sound	
 OpenFPS.Common/Hearing/EarModel.cs	lib	Sound	
