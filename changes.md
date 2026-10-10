@@ -4,6 +4,36 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Far things sent less often: a far moving thing's once-a-second keep-alive now counts as a change when the
+  thing has strayed from what the client predicts, so it goes again the tick after, as any other far state sent
+  for a change does. Before, the keep-alive took the near-thing path, which never repeats. On a poor connection
+  (DistantUpdatesTests, `--distant-updates net=poor`) a city car 543 m off turned from braking to pulling away
+  on its keep-alive tick, that tick was lost, and the client carried it as still braking for six ticks: 0.74 m/s
+  against 1.76, 43.2 % of its pitch off the server's track against 5.5 % for a client sent every tick. Now
+  5.530 % / 5.530 %. The fault was there since the distant-updates merge (11a3c1c5); the floors round 2 merge
+  (8406509a) regenerated city.json, which renumbered the entities and put that car's keep-alive (tick + id,
+  modulo 30) on its turn. The client and the wire are unchanged; only which ticks a far state is repeated on.
+
+- The physical-source placement test failed for the campfire (78.1 dB voiced against 63 declared) since the
+  fire merge (b9b2991f), but the game was right. A placed fire's collider is its bed (FireSpec.KeyForPlaced,
+  docs/FIRE.md 12.2), and the test puts every kind on a 4 x 4 m box: 16 m² against the campfire's 0.7 m bed is
+  10 log(16 / 0.49) = 15.1 dB more fire. The test now reads the level from the placed key. A new test places
+  every fire preset on its own bed (as the fire pit prefab, /spawn fire and a burning thing are) and finds each
+  at its own declared level and size with its key unchanged, and twice the bed 3 dB up. The city's one fire,
+  the pit at 58 Alder Street, is the approved 0.9 m fire at 67 dB.
+
+- The borrowed-voice Doppler test failed after the engine CPU merge, but nothing in the sound was wrong. An
+  engine synthesizes the same stream to the bit whether its channel takes it at 0.8, 1 or 1.25 times real time,
+  before the merge and after. The test measured the "true" pitch half a second after placing a stock car at
+  200 km/h, while the driver was still settling it (5815 to 6015 to 5803 rpm). With the crank's period smeared,
+  the exhaust's own resonance near 316 Hz came within 0.005 of it in autocorrelation, and the valve solver's
+  change (78058077, sound changed within the seed's spread by design) tipped the pick to the pipe. The two
+  readings at 1.25 were right all along: following the play position gave 397 samples (the revolution's 496
+  over 1.25), the own cursor 492. The test now lets the engine settle for 2.7 s and checks it has. A new test
+  holds the stream bit-identical at all three rates and each reader at the crank's measured pitch: own cursor
+  496 / 492 / 501 samples at 1 / 1.25 / 0.8 (within the cursor's 1 % pull), following 496 / 397 / 620 against
+  496.3 / 397.0 / 620.3 expected. No engine code changed; fingerprints unchanged.
+
 - The world has buildings outside the real places (docs/WORLD_STREAMING.md, "Buildings on the world's tiles").
   Overture's footprints (Microsoft's, OpenStreetMap's, USGS lidar heights) are read by the server itself, by HTTP
   byte range from Overture's GeoParquet on S3: only the footer of a file and the few columns of the row groups a tile

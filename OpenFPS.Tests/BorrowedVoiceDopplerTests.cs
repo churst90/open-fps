@@ -19,9 +19,17 @@ public class BorrowedVoiceDopplerTests
     private const float Rate = 48000f;
     private const int Block = 1024;
 
-    /// <summary>A source consumed at <paramref name="consumeRate"/> times real time with an echo reading
-    /// from it; returns the echo's output.</summary>
-    private static float[] Run(bool ownCursor, double consumeRate, int blocks)
+    /// <summary>
+    /// Blocks rendered before anything is measured: 2.7 s. PlaceAtSpeed leaves the driver to settle, and
+    /// the stock car at 200 km/h swings 5815 -> 6015 -> 5803 rpm over its first two seconds. While the
+    /// crank sweeps, its period smears and the strongest autocorrelation in a half second can be the
+    /// exhaust's fixed resonance near 316 Hz instead: after 64 blocks the two were 0.005 apart, and the
+    /// valve solver's tolerance change (2026-10-09) tipped the measure to the pipe. Settled, the crank's
+    /// period leads it by 0.35.
+    /// </summary>
+    private const int WarmBlocks = 128;
+
+    private static EngineVoiceState StockCarAt200(double consumeRate)
     {
         var profile = VehicleProfile.StockCar;
         float speed = 200f / 3.6f;
@@ -29,7 +37,14 @@ public class BorrowedVoiceDopplerTests
         // (EngineVoiceState.ConsumeRate); a reflection follows that rate rather than Played's blocks.
         var source = new EngineVoiceState(profile, Rate, 11) { TargetSpeed = speed, ConsumeRate = (float)consumeRate };
         source.PlaceAtSpeed(speed);
+        return source;
+    }
 
+    /// <summary>A source consumed at <paramref name="consumeRate"/> times real time with an echo reading
+    /// from it; returns the echo's output and the crank's speed at the end.</summary>
+    private static (float[] Output, float Rpm) Run(bool ownCursor, double consumeRate, int blocks)
+    {
+        var source = StockCarAt200(consumeRate);
         var echo = new EngineEchoState(source)
         {
             TargetDelaySeconds = 0.25f,
@@ -38,9 +53,16 @@ public class BorrowedVoiceDopplerTests
             SampleRate = Rate,
         };
 
-        // Fill the ring far enough back that the echo has something to read.
+        // Fill the ring far enough back that the echo has something to read, and let the engine settle.
         var warm = new float[Block];
-        for (int i = 0; i < 64; i++) source.Render(warm);
+        float rpmBefore = 0f;
+        for (int i = 0; i < WarmBlocks; i++)
+        {
+            if (i == WarmBlocks - 8) rpmBefore = source.Engine.Rpm;
+            source.Render(warm);
+        }
+        // Steady to a part in a thousand over the last eight blocks, or the measure below means nothing.
+        Assert.InRange(source.Engine.Rpm, rpmBefore * 0.999f, rpmBefore * 1.001f);
 
         var outBuf = new float[blocks * Block];
         var srcBlock = new float[(int)(Block * consumeRate)];
@@ -52,7 +74,7 @@ public class BorrowedVoiceDopplerTests
             echo.Render(echoBlock);
             Array.Copy(echoBlock, 0, outBuf, b * Block, Block);
         }
-        return outBuf;
+        return (outBuf, source.Engine.Rpm);
     }
 
     /// <summary>The strongest period in the signal, in samples, by autocorrelation.</summary>
@@ -77,10 +99,10 @@ public class BorrowedVoiceDopplerTests
 
         // The valves' broadband flow noise pulls the autocorrelation about; the cursor is under test, not the noise.
         var (truth, control, inherited, own) = ValveFlowSwitch.Without(() => (
-            Run(ownCursor: true, consumeRate: 1.0, blocks: 24),
-            Run(ownCursor: false, consumeRate: 1.0, blocks: 24),
-            Run(ownCursor: false, consumeRate: approaching, blocks: 24),
-            Run(ownCursor: true, consumeRate: approaching, blocks: 24)));
+            Run(ownCursor: true, consumeRate: 1.0, blocks: 24).Output,
+            Run(ownCursor: false, consumeRate: 1.0, blocks: 24).Output,
+            Run(ownCursor: false, consumeRate: approaching, blocks: 24).Output,
+            Run(ownCursor: true, consumeRate: approaching, blocks: 24).Output));
 
         // A stock car at 200 km/h fires somewhere around 200-400 Hz; look for a period between.
         int from = (int)(Rate / 600f), to = (int)(Rate / 80f);
@@ -103,5 +125,57 @@ public class BorrowedVoiceDopplerTests
             $"the old behaviour should be pitched UP by the source's consumption: {pInherited:F0} vs {pTruth:F0} samples.");
         // ...and keeping our own cursor does not.
         Assert.InRange(pOwn, pTruth * 0.93f, pTruth * 1.07f);
+    }
+
+    /// <summary>
+    /// What an engine synthesizes does not depend on how fast its channel takes it: consumed at 0.8, 1 and
+    /// 1.25 times real time (blocks of 819, 1024 and 1280, as a pitched FMOD channel asks), the stream is the
+    /// same to the bit. A reader at the synthesized rate hears the crank's own period; one following the play
+    /// position hears it scaled by the rate, which is the Doppler the channel is meant to carry. Measured
+    /// against the crank's revolution at its own rpm, so a measure that wanders to another peak fails here
+    /// rather than passing for a cursor fault.
+    /// </summary>
+    [Theory]
+    [InlineData(0.8)]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void AnEngineConsumedAtAnyRateSynthesizesTheSameStreamAtTheCranksPitch(double rate)
+    {
+        const int Samples = 160 * Block;
+        static float[] Stream(double consumeRate)
+        {
+            var source = StockCarAt200(consumeRate);
+            var all = new float[Samples];
+            var block = new float[(int)(Block * consumeRate)];
+            for (int at = 0; at < Samples; at += block.Length)
+            {
+                source.Render(block);
+                Array.Copy(block, 0, all, at, Math.Min(block.Length, Samples - at));
+            }
+            return all;
+        }
+
+        var (reference, consumed, own, following) = ValveFlowSwitch.Without(() => (
+            Stream(1.0), Stream(rate),
+            Run(ownCursor: true, consumeRate: rate, blocks: 24),
+            Run(ownCursor: false, consumeRate: rate, blocks: 24)));
+
+        int differing = 0;
+        for (int i = 0; i < Samples; i++) if (consumed[i] != reference[i]) differing++;
+        Assert.Equal(0, differing);
+
+        // One crank revolution, the strongest period of this V8 settled at speed; searched from 0.6 to 1.45
+        // revolutions, which holds the revolution at every rate here and neither the pipe's resonance nor
+        // the four-stroke cycle.
+        float rev = Rate * 60f / own.Rpm;
+        int from = (int)(0.6f * rev), to = (int)(1.45f * rev);
+        float pOwn = PeriodSamples(own.Output, from, to);
+        float pFollowing = PeriodSamples(following.Output, from, to);
+        _o.WriteLine($"consumed at {rate:F2}: crank revolution {rev:F1} samples ({own.Rpm:F0} rpm); "
+                     + $"own cursor {pOwn:F0}, following {pFollowing:F0} (expected {rev / rate:F1})");
+
+        // The own cursor may lean a per cent toward its place (EngineEchoState.MaxRateCorrection).
+        Assert.InRange(pOwn, rev * 0.97f, rev * 1.03f);
+        Assert.InRange(pFollowing, rev / rate * 0.97f, rev / rate * 1.03f);
     }
 }
