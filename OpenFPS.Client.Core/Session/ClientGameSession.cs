@@ -1097,8 +1097,10 @@ public sealed partial class ClientGameSession : IDisposable
 
         try
         {
+            // The rooms flood once the geometry is built (ClientWorldState.GeometryPublished); if it is already, now.
             var map = ClientWorldState.BuildAcousticMap(snapshot.Entities.Values.Select(e => e.Definition),
-                _world.CurrentMapSize, _mapMin, _voxelResolution, _occlusionFloor, streamed: _streamed, report: true);
+                _world.CurrentMapSize, _mapMin, _voxelResolution, _occlusionFloor, streamed: _streamed, report: true,
+                geometry: OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? _world.Geometry.Built : null);
             _world.SetAcousticMap(map);
         }
         catch (Exception ex)

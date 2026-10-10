@@ -78,10 +78,33 @@ public static class EntityAcoustics
         return solids;
     }
 
-    /// <summary>The map of these entities' rooms and openings (<see cref="AcousticVolumeGenerator.GenerateRegions"/>).</summary>
-    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true)
+    /// <summary>The map of these entities' rooms and openings (<see cref="AcousticVolumeGenerator.GenerateRegions"/>),
+    /// the indoor rooms where their floods are when <paramref name="floods"/> is given (<see cref="RoomsByFlood"/>).</summary>
+    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true,
+                                              Geometry.RoomCells? floods = null)
         => AcousticVolumeGenerator.GenerateRegions(Rooms(entities), Openings(entities), Solids(entities), mapSize, minBound,
-                                                   voxelResolution, occlusionFloor, autoDiscoverPortals, report);
+                                                   voxelResolution, occlusionFloor, autoDiscoverPortals, report, floods);
+
+    /// <summary>
+    /// Every indoor room of these entities flooded from its box through <paramref name="world"/> with each door's
+    /// leaf shut in its doorway (docs/GEOMETRY.md 12.6). The server and the client both call this, with the same
+    /// definitions and the same geometry, so both put a point in the same room.
+    /// </summary>
+    public static Geometry.RoomCells RoomsByFlood(Geometry.TriangleWorld world, IEnumerable<EntityDefinition> entities, Vector3 origin,
+                                                  Geometry.RoomFlood.Cache? cache = null, int threads = 1)
+    {
+        var seeds = new List<Geometry.RoomFlood.Seed>();
+        var shut = new Dictionary<int, (Vector3, Quaternion)>();
+        foreach (var def in entities)
+        {
+            if (def.Region.IsIndoor && def.Region.RoomSize.X > 0f && def.Region.RoomSize.Y > 0f && def.Region.RoomSize.Z > 0f)
+                seeds.Add(new Geometry.RoomFlood.Seed(def.EntityId, def.Transform.Position, def.Region.RoomSize, def.Transform.Rotation));
+            if (def.Portal.OpeningRotation != default) shut[def.EntityId] = (def.Portal.OpeningCentre, def.Portal.OpeningRotation);
+        }
+        seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
+        var shutWorld = world.WithMoverPoses(id => shut.TryGetValue(id, out var p) ? (true, p.Item1, p.Item2) : (false, default, default));
+        return Geometry.RoomCells.From(Geometry.RoomFlood.Flood(shutWorld, seeds, origin, threads: threads, cache: cache));
+    }
 
     /// <summary>The openings in the faces of the map's rooms, or of only <paramref name="rooms"/>, from these
     /// entities' solids (<see cref="AcousticVolumeGenerator.AddFaceOpenings"/>).</summary>

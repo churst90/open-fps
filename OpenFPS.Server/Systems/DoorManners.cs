@@ -218,22 +218,8 @@ public sealed class DoorManners
     private static bool IsOutside(Dictionary<int, (bool Indoor, float Volume)> regions, int regionId)
         => regionId == AcousticConstants.GlobalRegionId || regions.TryGetValue(regionId, out var r) && !r.Indoor;
 
-    /// <summary>The smallest region whose box holds a point, or the outside.</summary>
-    public static int RegionAt(World world, Vector3 p)
-    {
-        int best = AcousticConstants.GlobalRegionId;
-        float volume = float.MaxValue;
-        world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (Entity e, ref Transform t, ref RegionComponent r) =>
-        {
-            var size = r.RoomSize;
-            if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) return;
-            var local = Vector3.Transform(p - t.Position, Quaternion.Inverse(t.Rotation));
-            if (MathF.Abs(local.X) > size.X * 0.5f || MathF.Abs(local.Y) > size.Y * 0.5f || MathF.Abs(local.Z) > size.Z * 0.5f) return;
-            float v = size.X * size.Y * size.Z;
-            if (v < volume) { volume = v; best = e.Id; }
-        });
-        return best;
-    }
+    /// <summary>The region a point is in, as the client finds it (MapManager.RegionAt).</summary>
+    public static int RegionAt(World world, Vector3 p) => OpenFPS.Server.Core.MapManager.RegionAt(world, p);
 
     /// <summary>How many doorways each region is from the outside, through every portal on the map.</summary>
     private static Dictionary<int, int> DepthFromOutside(World world, Dictionary<int, (bool Indoor, float Volume)> regions)

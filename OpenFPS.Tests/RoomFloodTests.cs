@@ -242,6 +242,37 @@ public class RoomFloodTests
             string[] designed = { "Parking garage", "Tunnel, south portal", "Hangar", "back garden", "Main Street, block" };
             Assert.All(g.Open, name => Assert.Contains(designed, d => name.Contains(d)));
             Assert.True(g.MedianIou > 0.8, $"median IoU {g.MedianIou:F2}");
+
+            // The server and a client sent the whole city put every point in the same room: the client floods
+            // through a triangle world of what it is sent, as ClientWorldState does.
+            var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
+            var statics = new List<SolidSpec>(); var movers = new List<SolidSpec>();
+            foreach (var def in defs)
+            {
+                var role = EntityGeometry.RoleOf(def);
+                if (role is GeometryRole.Static or GeometryRole.SightOnly) statics.Add(EntityGeometry.SpecOf(def, def.Transform, role));
+                else if (role == GeometryRole.Mover) movers.Add(EntityGeometry.SpecOf(def, def.Transform, role));
+            }
+            var clientWorld = new TriangleWorldBuilder(250f).Build(statics, movers);
+            var map = OpenFPS.Client.Core.ClientWorldState.BuildAcousticMap(defs, data.Size, data.MinBound, data.VoxelResolution,
+                                                                            data.OcclusionFloor, streamed: false, report: false, geometry: clientWorld);
+            Assert.NotNull(map.RoomCells);
+            Assert.Equal(g.Rooms - g.Unseeded, map.RoomCells!.Flooded.Count);
+            var snap = new WorldSnapshot { AcousticMap = map };
+            foreach (var def in defs) snap.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
+            var spatial = new OpenFPS.Client.Core.SpatialService();
+            var rng = new Random(1);
+            var differ = new List<string>();
+            foreach (var def in defs.Where(d => d.Region.IsIndoor && d.Region.RoomSize.X > 0))
+                for (int k = 0; k < 8; k++)
+                {
+                    var local = new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f)
+                                * (def.Region.RoomSize + new Vector3(2f));
+                    var p = def.Transform.Position + Vector3.Transform(local, def.Transform.Rotation);
+                    int server = MapManager.RegionAt(ecs, p), client = spatial.GetRegionAt(snap, p);
+                    if (server != client) differ.Add($"{def.Region.FriendlyName} at {p}: server {server}, client {client}");
+                }
+            Assert.Empty(differ);
         }
         finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
     }

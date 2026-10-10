@@ -14,8 +14,11 @@ public static class AcousticVolumeGenerator
     /// wall, worse than none (walls still transmit and occlude). Undescribed boundaries are always reported.</param>
     /// <param name="report">Write what was found and what is missing to the console: a streamed map rebuilds
     /// this as tiles arrive and says it once, at the first build.</param>
+    /// <param name="floods">The rooms' floods (RoomFlood): a flooded room's voxels are where its flood is, not its
+    /// box, and the map carries them for "which room is this in".</param>
     public static AcousticMap GenerateRegions(IEnumerable<PlacedRoom> rooms, IEnumerable<PlacedOpening> openings, IEnumerable<FaceOpenings.Box> solids,
-                                              Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true)
+                                              Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true,
+                                              OpenFPS.Common.Geometry.RoomCells? floods = null)
     {
         var console = report ? Console.Out : System.IO.TextWriter.Null;
         var acousticMap = new AcousticMap(mapSize, minBound, voxelResolution);
@@ -66,8 +69,14 @@ public static class AcousticVolumeGenerator
                         $"[WARNING] AcousticVolumeGenerator: region '{def.Room.FriendlyName}' (entity {regionId}) " +
                         "is marked indoors but declares no RoomMaterials, so it has no surfaces and cannot reverberate.");
 
-                grid.SetRegionOBB(def.Position, def.Room.RoomSize, def.Rotation, regionId);
+                if (floods == null || !floods.Flooded.Contains(regionId))
+                    grid.SetRegionOBB(def.Position, def.Room.RoomSize, def.Rotation, regionId);
             }
+        }
+        if (floods != null)
+        {
+            acousticMap.RoomCells = floods;
+            MarkFloods(grid, floods, minBound, voxelResolution, acousticMap.Regions);
         }
 
         // Regions are optional, but a map with none answers "where am I" with "Outside" everywhere: the
@@ -189,6 +198,30 @@ public static class AcousticVolumeGenerator
         console.WriteLine($"[AcousticMap] {acousticMap.Regions.Count - 1} region(s), {authoredCount} authored portal(s), {discoveredCount} guessed.");
 
         return acousticMap;
+    }
+
+    /// <summary>Each voxel whose middle a room's flood holds, to that room: over the boxes of the places that did not
+    /// flood (a yard, a street), as a room inside a hall held the hall's voxels.</summary>
+    private static void MarkFloods(SparseAcousticOctree grid, OpenFPS.Common.Geometry.RoomCells floods, Vector3 min, float res,
+                                   Dictionary<int, Room> regions)
+    {
+        const float cell = OpenFPS.Common.Geometry.RoomFlood.Cell;
+        var o = floods.Origin;
+        // The cell holding a voxel's middle, along one axis.
+        int MiddleCell(int v, float minA, float originA) => (int)MathF.Floor(((v + 0.5f) * res + minA - originA) / cell);
+        int VoxelOf(int c, float minA, float originA) => (int)MathF.Floor(((c + 0.5f) * cell + originA - minA) / res);
+        floods.ForEachSpan((room, y, z, x0, x1) =>
+        {
+            if (!regions.ContainsKey(room)) return;
+            int vy = VoxelOf(y, min.Y, o.Y), vz = VoxelOf(z, min.Z, o.Z);
+            if (MiddleCell(vy, min.Y, o.Y) != y || MiddleCell(vz, min.Z, o.Z) != z) return;
+            for (int vx = VoxelOf(x0, min.X, o.X); vx <= VoxelOf(x1, min.X, o.X); vx++)
+            {
+                int cx = MiddleCell(vx, min.X, o.X);
+                if (cx < x0 || cx > x1) continue;
+                grid.SetRegionAt(min + new Vector3(vx + 0.5f, vy + 0.5f, vz + 0.5f) * res, room);
+            }
+        });
     }
 
     /// <summary>The first id the openings found in faces take; each next one is one lower. OpeningGraph

@@ -634,22 +634,8 @@ public sealed partial class WorldEditor
         return true;
     }
 
-    /// <summary>The smallest named place whose box holds a point, or the outside (-1).</summary>
-    private static int RegionAt(World world, Vector3 p)
-    {
-        int best = AcousticConstants.GlobalRegionId;
-        float volume = float.MaxValue;
-        world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (Entity e, ref Transform t, ref RegionComponent r) =>
-        {
-            var size = r.RoomSize;
-            if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) return;
-            var local = Vector3.Transform(p - t.Position, Quaternion.Inverse(t.Rotation));
-            if (MathF.Abs(local.X) > size.X * 0.5f || MathF.Abs(local.Y) > size.Y * 0.5f || MathF.Abs(local.Z) > size.Z * 0.5f) return;
-            float v = size.X * size.Y * size.Z;
-            if (v < volume) { volume = v; best = e.Id; }
-        });
-        return best;
-    }
+    /// <summary>The region a point is in, as the client finds it (MapManager.RegionAt), or the outside (-1).</summary>
+    private static int RegionAt(World world, Vector3 p) => MapManager.RegionAt(world, p);
 
     /// <summary>The map's own number for a live entity, or -1 (the outside) if it has none.</summary>
     private int AuthoredIdOf(string mapId, int runtimeId)

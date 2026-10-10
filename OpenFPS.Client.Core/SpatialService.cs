@@ -443,10 +443,17 @@ public class SpatialService
         }
     }
 
-    /// <summary>The acoustic region a position is in: by the regions' boxes, else the voxel grid.</summary>
+    /// <summary>The acoustic region a position is in: the room whose flood holds it, else by the boxes of the regions
+    /// that did not flood, else the voxel grid. The server asks the same (MapManager.RegionAt).</summary>
     public int GetRegionAt(WorldSnapshot world, Vector3 position)
     {
         if (world.AcousticMap == null) return AcousticConstants.GlobalRegionId;
+
+        // A room is where its walls put it (docs/GEOMETRY.md 12.6): its box no longer holds a point its flood
+        // does not, and a box drawn past its walls no longer takes in the yard.
+        var floods = world.AcousticMap.RoomCells;
+        if (floods != null && floods.TryRoomAt(position, out int flooded) && world.AcousticMap.Regions.ContainsKey(flooded))
+            return flooded;
 
         // Where boxes overlap the smallest holding the point wins (a room inside a hall), not the first
         // in the map's list, which made the room depend on authoring order (Cody, 2026-09-28).
@@ -455,6 +462,7 @@ public class SpatialService
         foreach (var regId in world.AcousticMap.Regions.Keys)
         {
             if (regId == AcousticConstants.GlobalRegionId) continue; 
+            if (floods != null && floods.Flooded.Contains(regId)) continue;
             
             Vector3 size = Vector3.Zero;
             Vector3 pos = Vector3.Zero;

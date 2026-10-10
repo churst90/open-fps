@@ -42,6 +42,9 @@ public sealed class ClientGeometry
     /// <summary>Called when a build has been published, so the next snapshot picks it up.</summary>
     public Action? Published { get; set; }
 
+    /// <summary>The last published build, its door leaves where they stood when it was built (null before the first).</summary>
+    public TriangleWorld? Built { get { lock (_lock) return _published; } }
+
     /// <summary>Builds published since the map loaded. Diagnostic.</summary>
     public int Builds { get; private set; }
 

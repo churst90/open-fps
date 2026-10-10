@@ -51,6 +51,12 @@ public sealed class RoomCells
         return new RoomCells(merged.ToArray(), flooded, origin);
     }
 
+    /// <summary>Every span: its room, its row's y and z, and its first and last x, in cells from the origin.</summary>
+    public void ForEachSpan(Action<int, int, int, int, int> each)
+    {
+        foreach (var s in _spans) each(s.Room, (int)(uint)(s.Row & 0xFFFFFFFF), (int)(s.Row >> 32), s.X0, s.X1);
+    }
+
     /// <summary>The flooded room whose cells hold <paramref name="p"/>, or false.</summary>
     public bool TryRoomAt(Vector3 p, out int room)
     {

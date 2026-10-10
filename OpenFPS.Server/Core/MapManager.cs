@@ -8,7 +8,7 @@ using Serilog;
 namespace OpenFPS.Server.Core;
 
 /// <summary>The loaded maps: each one's world, spatial grid, id lookup and data, and the one way in and out of them.</summary>
-public class MapManager
+public partial class MapManager
 {
     private readonly MapRepository _mapRepo;
     private readonly PrefabRepository _prefabRepo;
@@ -975,8 +975,11 @@ public class MapManager
         {
             known.Refresh(data.world, data.grid, g => FileStatics(data.world, g));
             if (known.LastChanged > 0)
+            {
                 Log.Information("MapManager: '{Id}': {Changed} fixed thing(s) changed, filed again in {Ms:F1} ms ({Built} tile(s) built).",
                                 mapId, known.LastChanged, known.LastRefreshMs, known.LastBuilt);
+                RoomsChanged(mapId);
+            }
             return;
         }
         data.grid.ClearAll();
@@ -991,6 +994,7 @@ public class MapManager
             if (geometry.LastBuilt > 0)
                 Log.Information("MapManager: '{Id}' as triangles: {Tris:N0} in {Tiles} tile(s), {Built} built in {Ms:F0} ms.",
                                 mapId, geometry.World.TriangleCount, geometry.Builder.TileCount, geometry.LastBuilt, geometry.LastBuildMs);
+            RoomsChanged(mapId);
         }
 
         if (gridCount == 0)

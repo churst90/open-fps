@@ -280,10 +280,22 @@ public partial class CommandHandler
             });
         if (part != null) return part;
 
+        // A room is where its walls put it (MapManager.RegionAt): the room whose flood holds the point, else the
+        // smallest named box of the regions that did not flood.
+        var floods = MapManager.RoomsOf(world);
         string? best = null;
-        float bestVolume = float.MaxValue;
-        world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (ref Transform t, ref RegionComponent r) =>
+        if (floods != null && floods.TryRoomAt(point, out int room))
         {
+            world.Query(new QueryDescription().WithAll<RegionComponent>(), (Entity e, ref RegionComponent r) =>
+            {
+                if (e.Id == room && !string.IsNullOrWhiteSpace(r.FriendlyName)) best = r.FriendlyName;
+            });
+            if (best != null) return best;
+        }
+        float bestVolume = float.MaxValue;
+        world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (Entity e, ref Transform t, ref RegionComponent r) =>
+        {
+            if (floods != null && floods.Flooded.Contains(e.Id)) return;
             var size = r.RoomSize;
             if (string.IsNullOrWhiteSpace(r.FriendlyName) || !Holds(point, t, size)) return;
             float volume = size.X * size.Y * size.Z;

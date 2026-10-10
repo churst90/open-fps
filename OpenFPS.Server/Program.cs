@@ -436,6 +436,7 @@ public class GameServer
             RequestedMapId = RequestedMapId,
             Access = new MapAccessRepository("map_access.json"),
             Overlays = new OpenFPS.Server.Editor.MapOverlayStore(_mapRepo.OverlayDirectory),
+            PrefetchRooms = true,
         };
         _maps.Initialize();
         // Composites BEFORE vehicles and before the earshot pass: a placed building is geometry that
