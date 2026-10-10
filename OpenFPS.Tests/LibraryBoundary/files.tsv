@@ -194,6 +194,7 @@ OpenFPS.Common/AudioEvents.cs	mixed	Sound	SoundCharacter,TransientSound
 OpenFPS.Common/Ballistics.cs	lib	Sound	
 OpenFPS.Common/Beacons.cs	host		
 OpenFPS.Common/Birds.cs	lib	Sound	
+OpenFPS.Common/BodyConstants.cs	lib	Sound	
 OpenFPS.Common/Breathing.cs	lib	Sound	
 OpenFPS.Common/BulletFlyby.cs	lib	Sound	
 OpenFPS.Common/BulletImpact.cs	lib	Sound	

@@ -295,7 +295,7 @@ public static class ExternalBallistics
     /// <summary>The radius of the upright cylinder a person is hit as: the 45 cm torso, halved.</summary>
     public const float BodyRadius = WeaponDefinition.BodyWidthMetres * 0.5f;
     /// <summary>A person's height, to the top of the head.</summary>
-    public const float BodyHeight = PhysicsConstants.PlayerHeight;
+    public const float BodyHeight = BodyConstants.PersonHeight;
     /// <summary>The top of a person that is the head: above this, a hit is a head shot.</summary>
     public const float HeadFrom = 1.55f;
 }

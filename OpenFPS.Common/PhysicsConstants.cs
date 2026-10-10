@@ -6,7 +6,8 @@ public static class PhysicsConstants
 {
     public static readonly Vector3 PlayerSize = new(0.6f, 1.8f, 0.6f);
     public const float PlayerRadius = 0.3f;
-    public const float PlayerHeight = 1.8f;
+    /// <summary>A person's height, metres (<see cref="BodyConstants.PersonHeight"/>).</summary>
+    public const float PlayerHeight = BodyConstants.PersonHeight;
 
     /// <summary>
     /// What a person is made of to anything that meets one: soft and lossy (AcousticRegistry "Skin").
@@ -18,16 +19,14 @@ public static class PhysicsConstants
     /// <summary>A person's mass, kilograms: an adult, what a body over your shoulder weighs.</summary>
     public const float PersonMassKg = 70f;
 
-    public const float WalkSpeed = 4.5f;
+    /// <summary>Metres per second at a walk (<see cref="BodyConstants.WalkSpeed"/>).</summary>
+    public const float WalkSpeed = BodyConstants.WalkSpeed;
 
-    /// <summary>
-    /// The run as a multiple of <see cref="WalkSpeed"/>: a claim about a body, since it decides how
-    /// often and how loud it is heard. 4.5 m/s is a brisk jog; 7.2 a hard run a fit person sustains.
-    /// </summary>
-    public const float SprintMultiplier = 1.6f;
+    /// <summary>The run as a multiple of <see cref="WalkSpeed"/> (<see cref="BodyConstants.SprintMultiplier"/>).</summary>
+    public const float SprintMultiplier = BodyConstants.SprintMultiplier;
 
-    /// <summary>Metres per second at a run, client and server.</summary>
-    public const float SprintSpeed = WalkSpeed * SprintMultiplier;
+    /// <summary>Metres per second at a run, client and server (<see cref="BodyConstants.SprintSpeed"/>).</summary>
+    public const float SprintSpeed = BodyConstants.SprintSpeed;
 
     /// <summary>
     /// Metres per second at most, walking or running, with a person over your shoulder (anything heavier
@@ -53,12 +52,8 @@ public static class PhysicsConstants
     /// </summary>
     public const float JumpPower = 3.13f;
 
-    /// <summary>
-    /// The Earth's, m/s² (Cody, 2026-10-04: "shouldn't you fall at the speed of gravity on earth?"). A
-    /// fall is heard, so it is a claim about the world: the eighteen metres off the Brandt Court roof
-    /// take 1.92 s, against 1.55 s at the 15 once chosen for how a jump felt.
-    /// </summary>
-    public const float Gravity = 9.81f;
+    /// <summary>The Earth's, m/s² (<see cref="BodyConstants.Gravity"/>).</summary>
+    public const float Gravity = BodyConstants.Gravity;
     public const float StepHeight = 0.4f;
     public const float RotationSpeed = 1.5f; // SHARED: Radians per second at full stick/key
 

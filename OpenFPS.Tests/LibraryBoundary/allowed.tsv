@@ -56,10 +56,6 @@ OpenFPS.Common/AudioEmission.cs	OpenFPS.Common.Components.SoundEmitterComponent	
 OpenFPS.Common/AudioEmission.cs	OpenFPS.Common.Components.Transform	4
 OpenFPS.Common/AudioEmission.cs	OpenFPS.Common.EntitySnapshot	7
 OpenFPS.Common/AudioEmission.cs	OpenFPS.Common.Networking.EntityDefinition	4
-OpenFPS.Common/Breathing.cs	OpenFPS.Common.PhysicsConstants	2
-OpenFPS.Common/EarWind.cs	OpenFPS.Common.PhysicsConstants	2
-OpenFPS.Common/ExternalBallistics.cs	OpenFPS.Common.PhysicsConstants	2
-OpenFPS.Common/Glass.cs	OpenFPS.Common.PhysicsConstants	6
 OpenFPS.Common/Messages.cs	OpenFPS.Common.Networking.EntityState	2
 OpenFPS.Common/ModelLibrary.cs	OpenFPS.Common.Networking.Vector3Converter	1
 OpenFPS.Common/OpeningRoutes.cs	OpenFPS.Common.Components.RegionComponent	15

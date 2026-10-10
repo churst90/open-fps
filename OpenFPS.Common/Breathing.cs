@@ -51,7 +51,7 @@ public sealed class Breathing
     /// Advances one step. <paramref name="topSpeed"/> is what this body can do flat out, so "working
     /// hard" means the same for anything that moves under its own power.
     /// </summary>
-    public bool Update(float speed, float dt, out Breath breath, float topSpeed = PhysicsConstants.SprintSpeed)
+    public bool Update(float speed, float dt, out Breath breath, float topSpeed = BodyConstants.SprintSpeed)
     {
         breath = default;
         if (dt <= 0f) return false;

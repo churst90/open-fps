@@ -118,14 +118,14 @@ public static class GlassBreak
 
     /// <summary>How long a fragment takes to fall <paramref name="height"/> metres: sqrt(2h/g), with the
     /// map's gravity.</summary>
-    public static float FallSeconds(float height, float gravity = PhysicsConstants.Gravity)
+    public static float FallSeconds(float height, float gravity = BodyConstants.Gravity)
     {
         if (height <= 0f || gravity <= 0.01f) return 0f;
         return MathF.Sqrt(2f * height / gravity);
     }
 
     /// <summary>The inverse: how high the window was, from the gap a listener heard.</summary>
-    public static float HeightFromFallDelay(float seconds, float gravity = PhysicsConstants.Gravity)
+    public static float HeightFromFallDelay(float seconds, float gravity = BodyConstants.Gravity)
         => seconds <= 0f ? 0f : 0.5f * gravity * seconds * seconds;
 
     /// <summary>Whether a hit destroys the pane or goes through it. Tempered always fails, laminated
@@ -145,7 +145,7 @@ public static class GlassBreak
     /// <summary>The whole sequence for one round striking one pane at <paramref name="impact"/>, world
     /// space. Returns how many events were written.</summary>
     public static int Resolve(GlassPane pane, Vector3 impact, WeaponDefinition weapon, int seed,
-                              Span<GlassEvent> events, float gravity = PhysicsConstants.Gravity)
+                              Span<GlassEvent> events, float gravity = BodyConstants.Gravity)
     {
         int n = 0;
         var rng = new Random(seed);

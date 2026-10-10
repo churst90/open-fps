@@ -104,14 +104,14 @@ public static class EarWind
 
     /// <summary>
     /// How much of your own speed on foot counts as air past your ears: 1.4 / 4.5. A decision, not
-    /// physics: the game's walk (PhysicsConstants.WalkSpeed) is a jog, and taken literally it is 67 dB at
+    /// physics: the game's walk (BodyConstants.WalkSpeed) is a jog, and taken literally it is 67 dB at
     /// the eardrum (55 dB(A)), played at −26 LUFS, as loud as the busy street, on every walk. As the walk
     /// it stands for it is 47 dB, about −37 LUFS, nearly all under 100 Hz (−61 dBFS A-weighted): faint,
     /// as measured for walking. Running
     /// counts the same (7.2 m/s heard as 2.2); vehicles at their real speed. If the walk is ever brought
     /// down to a real walk, this goes to one.
     /// </summary>
-    public static float OnFootShare => RealWalkMetresPerSecond / PhysicsConstants.WalkSpeed;
+    public static float OnFootShare => RealWalkMetresPerSecond / BodyConstants.WalkSpeed;
 
     /// <summary>Below this the air is still, as far as an ear is concerned, m/s.</summary>
     public const float StillAir = 0.05f;
