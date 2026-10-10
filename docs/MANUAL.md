@@ -63,7 +63,9 @@ finish; the loading window shows the same progress. Then a rising chord plays, t
 over about a second, and the client says the map and the place you are in.
 
 When you log out, the server keeps where you were, your health and what you carry. You come back
-there next time.
+there next time. If you left in the world (see "The world"), you come back to the same spot: the
+loading screen says "Building the world: 12 of 41 tiles." until the ground round you is ready. If it
+cannot be built within 30 seconds, you arrive on the server's landing map instead.
 
 ### Leaving, and losing the connection
 
@@ -77,8 +79,9 @@ there next time.
 
 ## Keys
 
-No game key uses Control or Alt, so your screen reader keys keep working. Control still silences
-speech as usual.
+No game key uses Alt, and only one uses Control: Control+B, the build dialog, on a map you may edit.
+So your screen reader keys keep working, and Control still silences speech as usual. Inside the world
+editor dialog, Control+Tab changes tab.
 
 ### Moving
 
@@ -124,8 +127,10 @@ degrees a second. You cannot turn while riding in a vehicle: you face the way it
   on your floor. The kind you chose is saved.
 - Narration (N): as you turn, look and walk, the client says what is now in front of you, and what
   passes in front of you. `/narrate on|off` does the same as N.
-- Bumps: walking into something plays a knock from where you touched it and says its name. Only you
-  hear it. `/bumps on|off` switches it.
+- Bumps: walking into something plays a knock from where you touched it and says its name. The knock
+  is your hand, foot and shoulder striking the thing, so it sounds of what it is made of and its shape
+  and size: a stud wall's board, a glass door in its latch, a car's panels. Only you hear it. `/bumps
+  on|off` switches it.
 - The client also says the name of each area as you walk into it, and the name of certain objects
   when you come within 3 m of them.
 
@@ -134,7 +139,7 @@ degrees a second. You cannot turn while riding in a vehicle: you face the way it
 | Key | Action |
 |---|---|
 | E | Interact (see below) |
-| Shift+E | Knock on the nearest door |
+| Shift+E | Knock on the nearest door. With no door in reach, knock on whatever is in front of you |
 | G | Pick up the nearest thing within reach |
 | Q | Drop what is in your hands |
 | R | With a gun in your hands: reload. In a vehicle: wind the windows. Otherwise: sling what you hold onto your back |
@@ -151,12 +156,21 @@ What E does, in order:
 1. A thing on the ground within 2 m: picks it up. It takes the one you chose with comma or period,
    else the one in front of you, else it opens a list to choose from. It then says if others are
    still within reach.
-2. A shut door within reach: opens it.
-3. In a seat: gets you out (if your door is shut, the first press opens it).
-4. Beside a vehicle: gets you in (the first press opens its door).
-5. An open door within reach: shuts it.
+2. A tap or a gas hob you are standing at (within about 1.3 m): turns the tap on or off. On a hob it
+   lights the next burner; with every burner lit it turns them all off.
+3. A shut door within reach: opens it. With a vehicle in reach too, the one you face wins, else the
+   nearer.
+4. In a seat: gets you out (if your door is shut, the first press opens it).
+5. Beside a vehicle: gets you in (the first press opens its door).
+6. An open door within reach: shuts it.
 
 Doors and vehicles are within reach up to about 5 m.
+
+**Knocking and tapping.** Shift+E (or `/knock`) knocks three times on the nearest door. With no door
+within 5 m it knocks on the solid thing in front of you instead (a wall, a fence, a car), and
+`/tap` taps it twice with a fingertip. Either sounds of what the thing is made of, its shape and its
+size, so it is a way to hear what something is. Everyone near hears it. Nothing is said when it works;
+with nothing in reach you are told so.
 
 **Voice chat (V).** It uses the microphone chosen in Settings. While it is on, everyone on your map
 can hear you, from where you stand: closer is louder, and walls muffle you as they would anyone
@@ -222,13 +236,14 @@ to reach 600 metres: set the turret for the range and aim ahead of anyone walkin
 Doors come in kinds, and each works as the real one does.
 
 - A door with a knob or lever (houses, flats): E opens it and E shuts it. It stays as you leave it.
-- A steel door with a push bar (fire, stair and service doors): E opens it. Its closer shuts it
-  3 seconds after the doorway is clear, slowly and then quickly for the latch.
+- A steel door with a push bar (fire, stair and service doors): E opens it. Its closer starts it back
+  a second after the last person leaves the doorway, slowly and then quickly for the latch. If nobody
+  goes through, it starts back 3 seconds after it is fully open.
 - A glass front door (the towers' street doors): locked from the street. E unlocks it with your key
   and you pull it open. From inside you push the bar. It swings out over the pavement. Everyone has
-  the key for now. A closer shuts it 3 seconds after the doorway is clear, and it locks again.
+  the key for now. A closer shuts it a second after the doorway is clear, and it locks again.
 - A glass door you pull (some shops; none on the city yet): pulled from outside, pushed from
-  inside; a closer shuts it after 3 seconds.
+  inside; a closer shuts it a second after the doorway is clear.
 - An automatic sliding door (the airport terminal's entrances): it opens by itself when anyone
   comes within 2.5 m of it, from either side, and shuts 2 seconds after they have gone. E does
   nothing to it.
@@ -335,7 +350,9 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/scan`: named things within 20 m (the same as Shift+P).
 - `/doors`: doors within 20 m, whether each is open or shut, which way and how far.
 - `/open [name]`, `/close [name]` (or `/shut`): a door.
-- `/knock`: knock on the nearest door (the same as Shift+E).
+- `/knock [name]`: knock on the nearest door, or the door named (the same as Shift+E). With no door in
+  reach and no name, it knocks on whatever is in front of you.
+- `/tap`: tap whatever is in front of you with a fingertip, to hear what it is made of.
 - `/clap`: clap your hands (the same as T on foot).
 - `/room [radius]`: whether the walls around you form a room, and what is missing if not. The
   radius is 12 m unless you give one.
@@ -452,18 +469,31 @@ and **Maps** (the game's maps and players' own).
 
 ## The world
 
-One world of real ground, built by the server the first time anyone goes near a place and kept after
-that. For now it is the ground itself, from the US Geological Survey's elevation survey: hills, banks
-and creek beds, but no roads or buildings yet (those are on the maps of real places).
+One world of real places, built by the server the first time anyone goes near a place and kept after
+that:
+- The ground, from the US Geological Survey's elevation survey: hills, banks and creek beds.
+- What the ground is (woods, grass, wetland, built-up land, water, fields and bare ground), from ESA
+  WorldCover, with the woods' trees.
+- OpenStreetMap's roads, each in its own width and surface, with sidewalks where they are mapped and a
+  named place over each road and junction, and driveways.
+- Buildings from Overture's footprints, each with walls, a floor, a roof, a room and a front door
+  facing the nearest road; sheds, garages and barns are solid. A house without an address is "House
+  off Main Street".
+- Magnolia and Albany are in the world as their maps have them, with their houses, roads and traffic.
+
+There is no traffic on the world's own roads yet, and no addresses, lots or lawns.
 
 - Choose a place under "The world" in F6, or type `/join world magnolia`. `/join world` on its own
   lists the places.
 - `/join world address 1042 Belmont Ave SW, Albany, OR` arrives at any US street address (the Census
   Bureau's geocoder is asked).
-- The first visit to a place takes a moment: you hear "Building the world at ...", then arrive.
-- Tiles of ground are made round you as you go, 250 m at a time. If you walk to one that is not made
-  yet, you are stopped at its edge with a short low tone and the words "Not built yet. Wait here, or
-  turn back." When it arrives you walk on.
+- The first visit to a place takes a moment: you hear "Building the world at ...". Arriving waits on the
+  loading screen ("Building the world: 12 of 41 tiles.", said every 5 seconds) until the ground round you
+  is built, then you arrive.
+- Tiles are made round you as you go, 250 m at a time, the ones you could reach soonest first. If you
+  walk to one that is not made yet, you are stopped at its edge with a short low tone and the words "Not
+  built yet. Wait here, or turn back." When it arrives you walk on. A car you drive is braked to a stop
+  short of it.
 - `/map` says where you are by the place you arrived at ("the world, 1.2 kilometres north east of
   Magnolia, Texas, 31907 Bobcat Lane"). Builders also get the grid square, and may type a latitude and
   longitude: `/join world 30.1237, -95.7409`.
@@ -498,7 +528,7 @@ The dialog:
 
 | Tab | What is in it, in Tab order |
 |---|---|
-| Place | Search; Category (Buildings and Vehicles first); Prefabs (each with its size and description; vehicles and saved buildings and groups are in the same list); Where it goes (at your feet, at the build cursor, or preview only); Place; Preview; Place again. Then "Build a piece": What (floor, wall, roof, door, window) and its fields as in Control+B, and Place the piece. Then "Lay a road, path or railway": What, Name, Width, Surface, A railway runs (on the ground, raised on pillars, underground), Height or depth, Train on it, a line saying what is being laid, Start here then walk it, Points typed and Add the points, Drop a point where you stand, Add a station or a level crossing where you stand, Take back the last point, Lay it, Cancel |
+| Place | Search; Category (Buildings and Vehicles first); Prefabs (each with its size and description; vehicles and saved buildings and groups are in the same list); Where it goes (at your feet, at the build cursor, or preview only); Place; Preview; Place again. Then "Build a piece": What (floor, wall, roof, door, window, shape) and its fields as in Control+B, and Place the piece. Then "Lay a road, path or railway": What, Name, Width, Surface, A railway runs (on the ground, raised on pillars, underground), Height or depth, Train on it, a line saying what is being laid, Start here then walk it, Points typed and Add the points, Drop a point where you stand, Add a station or a level crossing where you stand, Take back the last point, Lay it, Cancel |
 | Edit | Things near you (nearest first; Space ticks); Find by name or number; Find. Then "Placed on this map": Filter placed things, Filter, the list (everything placed with the editor, wherever it is, nearest first; Space ticks, Delete removes), Remove it, Go to it, Edit it, Tick all shown. Then "Changed on this map": Filter changed things, Filter, the list (things from the map file that were moved, changed or removed, with what was done and where), Put it back as the map has it (asks first), Go to it, Edit it. Then the chosen thing: Position (east, north, up), Facing in degrees, and its settings; Apply changes; Bring to me; Duplicate; Row of copies (how many, and spacing); Delete (asks first). With things ticked: move them together, turn them together, group them, save them as a building, delete them all (asks first), untick all |
 | Build | Kind; Category (prefabs); Models. For the chosen one: Id for the copy and Duplicate; Fields and the value of the field chosen, with Set; Versions, with Use on every map, Pin on this map, Lift this map's pin; Where it is used; Replace it with, on this map or everywhere. Changes apply to every map that uses it, so duplicate first to try things |
 | World | Weather, Time of day, Natural ground, Apply changes, Set spawn here; Map size (owner, not on the server's own maps); Versions of this map: Name for a new version, Save a version, the list, Restore the chosen version (asks first), Write the edits into the map file (your own map; asks first); Roads, paths and railways laid, with Go to it and Take it up; People: Walkers per 100 metres of pavement and Set walkers, People on this map, Places the chosen person goes (Space ticks), Name of a new person, Voice, Put the person on the map, Take the chosen person off the map; Rooms and areas, with Edit it; Beacon rules, one drop-down per kind of beacon, and Apply beacon rules; Editors (add and remove); Model versions pinned to this map; Map information and What is around me |
@@ -621,7 +651,7 @@ command for each:
 | `/edit select nearest`, `/edit select NAME`, `/edit select #ID`, `/edit select within METRES` | Select |
 | `/edit selected`, `/edit settings` | What is selected, and its settings |
 | `/edit move EAST NORTH UP` | Move by metres; negative goes west, south, down |
-| `/edit move to EAST NORTH UP` | Move to a place, as F1 says where you are (the dialog's Position box) |
+| `/edit move to EAST NORTH UP` | Move to a place, in the coordinates C says (the dialog's Position box) |
 | `/edit nudge DIRECTION [METRES]`, `/edit step METRES` | Move by the step (0.5 m to start with) |
 | `/edit turn DEGREES`, `/edit face DIRECTION`, `/edit face DEGREES` | Turn clockwise (negative: anticlockwise), or to a compass direction, or to degrees from north (the dialog's Facing box) |
 | `/edit bring`, `/edit duplicate`, `/edit delete` | Bring to you, copy, delete |
@@ -633,11 +663,13 @@ command for each:
 | `/edit map save NAME`, `/edit map versions`, `/edit map restore NUMBER\|NAME`, `/edit map bake [now]` | Versions of the map's edits; write them into your own map's file |
 | `/edit route start road\|path\|railway [FIELD VALUE ...]`, `/edit route new ...` | Start laying one where you stand and walk it, or with no point, to type them. Fields: width, surface, level (ground, raised, underground), height, depth, train, speed, name |
 | `/edit route points EAST NORTH; EAST NORTH ...`, `/edit route point`, `/edit route back` | Points typed, one where you stand, the last taken back |
+| `/edit route set FIELD VALUE ...`, `/edit route` | Change a field of the one being laid; say what is being laid |
 | `/edit route station [NAME]`, `/edit route crossing [NAME]` | A railway's station or level crossing, at the point of the line nearest you |
 | `/edit route finish [FIELD VALUE ...]`, `/edit route cancel`, `/edit routes`, `/edit route remove NAME`, `/edit route goto NAME` | Lay it; drop it; list those laid; take one up; go to one |
 | `/edit person add NAME [voice VOICE]`, `/edit person choose NAME`, `/edit person place add\|drop PLACE`, `/edit person voice VOICE`, `/edit person remove NAME`, `/edit people` | People who live on the map, and their places |
 | `/edit walkers NUMBER` | People walking the pavements, per 100 metres, besides the map's own |
 | `/edit set FIELD VALUE`, `/edit up FIELD`, `/edit down FIELD` | A setting: Name, Width, Height, Depth, Model, Volume, Range, MinDistance, KeyedSide (neither, front, back), PushSide (front, back), Indoor, Floor, Ceiling, North, South, East, West |
+| `/edit build KIND FIELD VALUE ...`, `/edit build SHAPE PHRASE` | Build a floor, wall, roof, door, window, shape or prefab at a size (see "Building quickly") |
 | `/edit place PREFAB [at cursor]`, `/edit prefabs [CATEGORY]` | Place a prefab, at your feet or at the build cursor; list them |
 | `/edit place vehicle:PRESET [at cursor]`, `/edit place vehicle PRESET` | Park a vehicle beside you, or at the build cursor |
 | `/edit find WORDS`, `/edit preview PREFAB`, `/edit again` | Search; hear a prefab; place the last one again |
@@ -669,13 +701,22 @@ Shift Z undoes and Shift Y redoes. `/editorkeys off` turns them off again.
 ### Building quickly (Control+B)
 
 Control+B opens the build dialog on a map you may edit; on any other map it does nothing. It puts down
-a floor, wall, roof, door, window or prefab at the size you type, in one go.
+a floor, wall, roof, door, window, shape or prefab at the size you type, in one go.
 
-- What: floor, wall, roof, door, window or prefab. For a prefab, its category and then the prefab.
+- What: floor, wall, roof, door, window, shape or prefab. For a prefab, its category and then the
+  prefab.
 - The size in metres. Floor: width (left to right as you face), length (away from you), thickness.
   Roof: height above the floor, width, length, thickness. Wall: length, height, thickness. Door: width
   and height. Window: width, height, and height above the floor. Each box says its range.
-- Material (floor, wall, roof), or the door type. A material puts its own thickness in the box.
+- Material (floor, wall, roof, shape), or the door type. A material puts its own thickness in the box.
+- Shape: stairs, a ramp, a round column, a cone, a ball, a dome, an arch or a roof, made of a wall's
+  material. Choosing one puts its own sizes in the boxes and brings its own fields into use; the others
+  are dimmed and skipped by Tab. Its fields are width, length, height, steps, landing at the top, top
+  (a cone's top width against its base: 0 a point, 1 a column), thickness of the arch, roof style
+  (gable, hip, shed or flat), roof over (the floor you stand on, or the width and length given), height
+  above the floor, and rise to the ridge (0 for a quarter of its narrow side). Stairs climb the way they
+  face, and each step may rise at most 0.4 m. A column, cone, ball or dome is as deep as it is wide. A
+  roof over the floor takes that floor's own outline.
 - Where: in front of you (and how far), at your feet, or at the build cursor. Facing: the way you face,
   or north, east, south, west.
 - For a door or window, "Fit into the wall in front of you", on by default: the wall you face, within
@@ -688,9 +729,37 @@ The game says what was placed: "Placed: floor, 6 by 8 metres, concrete, at your 
 the dialog opens it has the values you last placed. Undo (in the F12 dialog, or `/edit undo`) takes a placing back,
 including a wall that was cut for a door.
 
-The same from the command line: `/edit build wall length 6 height 2.7 material brick ahead 2`,
-`/edit build floor width 6 length 8 here`, `/edit build door width 1 type pushbar`. The fields are
-listed in docs/WORLD_EDITOR.md section 15.
+The same from the command line: `/edit build KIND FIELD VALUE ...`, for example
+`/edit build wall length 6 height 2.7 material brick ahead 2`, `/edit build floor width 6 length 8 here`,
+`/edit build door width 1 type pushbar`. The field words are width, length, height, thickness, depth,
+above, material, type (a door's), category and prefab, where (ahead, here or cursor), distance,
+facing (me, north, east, south, west), and fit yes or no for a door or window. Short forms: `here`,
+`cursor`, `ahead 2`, `fit`, `free`. `/edit build` on its own says all this.
+
+A shape can be said as a phrase, its word first and its sizes in the order it is said:
+
+| Phrase | What it builds |
+|---|---|
+| `/edit build stairs 14 steps up north` | 14 steps of 18 cm on 28 cm goings, a metre wide, climbing north |
+| `/edit build column 0.3 by 3` | A round column 0.3 m across and 3 m high |
+| `/edit build ramp 1.5 by 6 by 0.5 wood` | A ramp 1.5 m wide, 6 m long, rising 0.5 m, of wood |
+| `/edit build cone 1 by 2 top 0.5` | A cone 1 m across and 2 m high, its top half as wide |
+| `/edit build ball 0.5 here` | A ball 0.5 m across, at your feet |
+| `/edit build arch 3 by 0.6 by 3.5 thickness 0.5` | An arch 3 m wide, 0.6 m deep, 3.5 m high |
+| `/edit build roof gable over the floor` | A gable roof over the floor you stand on |
+| `/edit build roof hip 8 by 10 by 2 cursor` | A hip roof 8 by 10 m rising 2 m, at the build cursor |
+
+- The shape words: stairs (or staircase, steps, flight), ramp, column (or pillar, post, trunk), cone,
+  ball (or sphere), dome, arch, and roof followed by a style (gable, hip, shed, flat). `roof` with no
+  style is the plain roof slab, as before.
+- The sizes, in order: a column, cone or dome across and high; a ball across; stairs, a ramp and an
+  arch across, along and high; a roof across, along and its rise. A number before `steps` is the
+  count of steps; stairs with a count and no sizes are 18 cm rises on 28 cm goings, a metre wide.
+- Also read: `up NORTH` or a compass word for the way it faces, `over the floor`, `here`, `cursor`,
+  `ahead`, any field word with its value (`distance 2`, `landing 1`, `material brick`), and a
+  material's name on its own.
+- A shape that cannot be made is refused and the reason said ("Not built: each rise is 0.667 m, over
+  the 0.4 m a body can step."). One undo takes a shape away.
 
 ## Stairs
 
@@ -1019,10 +1088,13 @@ is loaded at start.
 ### The world's tiles
 
 The server makes the world's tiles itself and keeps them in `world/` in its folder (beside
-`openfps.db`). Nothing it downloads is kept, only the tiles. It needs the internet the first time
-anybody goes somewhere new. Settings, all optional, in `world.json` beside it:
+`openfps.db`). It needs the internet the first time anybody goes somewhere new. Besides the tiles it
+keeps what it read from the sources, so a region is fetched once: OpenStreetMap in
+`world/sources/osm`, ESA WorldCover in `world/sources/worldcover` and Overture's buildings in
+`world/sources/overture`. Settings, all optional, in `world.json` beside it:
 
-    { "StorePath": "world", "CapGigabytes": 20, "Generate": true, "MaxAtOnce": 2, "Prebuild": true }
+    { "StorePath": "world", "CapGigabytes": 20, "Generate": true, "MaxAtOnce": 2, "Prebuild": true,
+      "LandCover": true, "OpenStreetMap": true, "Buildings": true }
 
 - `StorePath`: where the tiles are kept: a folder relative to the server's folder (`world`, the
   default), or a full path such as `/var/lib/openfps/world`. The server's user must be able to write
@@ -1037,6 +1109,9 @@ anybody goes somewhere new. Settings, all optional, in `world.json` beside it:
 - `MaxAtOnce`: how many tiles are made at the same time.
 - `Prebuild`: false leaves the tiles round each place in `world_places.json` to be made when somebody
   first goes there, instead of at start.
+- `LandCover`: false makes new tiles' ground all dirt instead of reading ESA WorldCover.
+- `OpenStreetMap`: false makes new tiles of ground alone, without roads.
+- `Buildings`: false makes new tiles without buildings. Buildings need the roads.
 - The places to arrive at are in `world_places.json` (an id, a name, a latitude and a longitude each).
   Arriving waits on the loading screen ("Building the world: 12 of 41 tiles.") until the ground round you
   is built.
@@ -1062,7 +1137,9 @@ Change the generator, not `city.json`: a hand edit is undone the next time the c
 
 What the world editor changes is kept in `OpenFPS.Server/maps/overlays/MAP.json`, one file per map,
 and laid over the map file when the server starts. The editor never writes a map file, so a
-generated map stays what its generator wrote.
+generated map stays what its generator wrote. The one exception is `/edit map bake now` on a
+player's own map, which writes the edits into its file and keeps the file as it was beside it, as
+`MAP.json.before-bake-` and the date and time.
 
 - Each entry names the thing by its number in the map file, its prefab and where the file had it. If
   the map is generated again and the numbers change, the thing is found by its prefab and place; if
@@ -1071,6 +1148,9 @@ generated map stays what its generator wrote.
 - Models changed in the editor are kept in `OpenFPS.Server/model_versions/KIND.ID.json`, every
   version, and loaded at start. New models, prefab versions and groups are kept there too.
 - A map's pins and its settings (weather, time, ground, beacon rules, size) are in its overlay file.
+  So are the roads, paths and railways laid with the editor, and its people and walkers.
+- Saved versions of a map's edits (`/edit map save NAME`) are in
+  `OpenFPS.Server/maps/overlays/versions/MAP.json`, up to 100 for each map.
 - To undo every edit on a map, stop the server and delete its overlay file.
 
 ### What a map file contains
@@ -1171,6 +1251,10 @@ There are five roles:
 - **Admin** (administrator): everything except making or changing owners.
 - **Owner**: everything. The `admin` account is the owner.
 
+Making somebody an owner, or changing an owner's role, is the `owners` permission, which only owners
+have; it cannot be granted or put in a custom role. Banning is the `ban` permission, which moderators
+and everyone above them have; it can be granted and put in a custom role.
+
 What you can do comes only from your role and any single permissions granted to you.
 
 The Owner role cannot be changed, renamed or removed. Only an owner can make somebody an owner or
@@ -1200,10 +1284,11 @@ this command." `/help` lists only the commands you may use.
 - `/bring NAME`: bring a player to you.
 - `/kick NAME [reason]`: disconnect a player.
 - `/mute NAME [minutes]`: stop a player chatting, 10 minutes if not said. `/unmute NAME`.
-- `/ban NAME [DURATION] [REASON]`: ban an account. A duration is `30m`, `2h`, `7d` or `4w`; without
-  one the ban lasts until it is lifted. If they are on, they are removed at once and told why. At
-  login they are told "You are banned until 14 October, 18:00 UTC: spamming." or "You are banned:
-  no reason given." A ban that has run out lifts itself. The account need not be online.
+- `/ban NAME [DURATION] [REASON]` (the `ban` permission): ban an account. A duration is `30m`,
+  `2h`, `7d` or `4w`; without one the ban lasts until it is lifted. If they are on, they are removed
+  at once and told why. At login they are told "You are banned until 14 October, 18:00 UTC:
+  spamming." or "You are banned: no reason given." A ban that has run out lifts itself. The account
+  need not be online.
 - `/unban NAME`: lift a ban.
 - `/bans`: who is banned, one line each: by whom, when, until when, and why.
 - Go to any map, private or not (developers too).
@@ -1226,6 +1311,17 @@ Spawning:
 - `/spawn train PRESET`: onto the nearest track that already has a train. `/spawn train out` takes
   the nearest train put on that way off again (`/spawn train out NAME` the one named); the map's own
   trains stay.
+- `/spawn fire PRESET`: a fire lit now a few metres in front of you (a crown fire's front 100 m), for
+  testing. It grows, burns, dies down and smoulders as the real one does, everyone hears it at the same
+  point of its life, and what is near it can catch from it. The presets: campfire, fire_pit, bonfire,
+  burning_car, house_fire, burning_trees, crown_fire, stump, wood_pile, tree_crown, tree_trunk and
+  litter. `/spawn fire` on its own lists them.
+- `/spawn fire lightning`: lightning strikes whatever stands highest 15 m ahead and sets it burning.
+- `/spawn fire water`: a hose's worth of water (two litres a second for a minute) on the nearest thing
+  ahead. Rain reaches a small fire too: a cloudburst puts a campfire out, light rain barely touches
+  it.
+- `/spawn fire out`: puts out the nearest fire lit with `/spawn fire`, within 400 m. Fires lit this way
+  are never kept by `/savemap`.
 - On a map a player made, `/savemap` keeps walkers, vehicles, aircraft and trains spawned there. On
   the server's own maps (the city, the speedway, the real places) they last until the server
   restarts: those files are made by generators and are not written with them.
@@ -1256,10 +1352,13 @@ Sound on the nearest object:
 - `/grant NAME PERMISSION`, `/revoke NAME PERMISSION`: only to players, and only permissions you
   have yourself.
 - `/perms NAME`: a player's permissions.
-- `/weather`: the weather and the wind now. `/weather clear`, `rain`, `snow` or `storm` sets that
-  weather; `/weather wind 8 north west gusty` sets the wind (metres a second, where it blows from,
-  and steady, gusty or very gusty, the last two optional). What you set reaches everybody in a few
-  seconds and stays until `/weather auto`, which lets the weather change on its own again.
+- `/weather`: the weather over your map now, the wind and the temperature, and what is falling. It
+  names the front: "Rain coming in" (or snow, or storm) while a front has come but nothing falls yet,
+  and "Clearing" while a cleared front's rain is still falling. `/weather clear`, `rain`, `snow` or
+  `storm` sets that weather; `/weather wind 8 north west gusty` sets the wind (metres a second,
+  where it blows from, and steady, gusty or very gusty, the last two optional). What you set reaches
+  everybody in a few seconds and stays until `/weather auto`, which lets the weather change on its
+  own again.
 
 ### The administrator only
 - `/setrole NAME ROLE`: player, moderator, dev, admin, owner, or a custom role. Only an owner can
@@ -1324,6 +1423,8 @@ for each of its switches that is set, so a forgotten one shows up in the log.
 | `OPENFPS_EAR_WIND=0` | No wind at your ears (for listening without it) |
 | `OPENFPS_EAR_MODEL=0` | Start with the ear model off (`/ear on` turns it on) |
 | `OPENFPS_LISTENING_LEVEL=58` | Sets `/listening` for this run only (40 to 90); it is not saved |
+| `OPENFPS_ENGINE_DETAIL=0` | Start with every engine in full detail, as `/enginedetail off`; `always` puts every engine at reduced detail (listening tests only) |
+| `OPENFPS_CYCLE_CACHE=0` | Engines at reduced detail run without the per-engine cycle cache (for comparing) |
 | `OPENFPS_CRASHDIR=folder` | `run-gtk-client.sh` only: where crash dumps go |
 
 The rest of the client's switches are for tracking down audio faults; they are listed in

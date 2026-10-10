@@ -2,141 +2,170 @@
 
 Planned work. Finished work is in [changes.md](changes.md), `git log` and
 [docs/DONE_2026-10.md](docs/DONE_2026-10.md). "(Cody)" marks what waits on Cody's ear or decision.
-Updated 2026-10-07: every item checked against the code, the git history, changes.md and Cody's approvals.
+Updated 2026-10-10: every item checked against the code, `git log --first-parent main`, changes.md and
+Cody's approvals; what was done went to docs/DONE_2026-10.md ("Audit of 2026-10-10").
 
 ## Next, in order
 
-Cody's list of 2026-10-08 (one world, server-built tiles, distant updates, sound from geometry, enemies and
-Dinosaur World, railways and editor words, chat names and roles, NPC doors, weather as a system, cars and fighting)
-is in [docs/CODY_ASKS_2026-10-08.md](docs/CODY_ASKS_2026-10-08.md), with its suggested order. The 10-07 batch,
-the honest tests, the probable bugs and the trains fix are merged and shipped (VPS 3fc38430512b).
+The order agreed with Cody on 2026-10-10. Cody's list of 2026-10-08 and where each of its twelve items
+stands is in [docs/CODY_ASKS_2026-10-08.md](docs/CODY_ASKS_2026-10-08.md).
 
-1-3. Done: the batch, its test run, and push, VPS and Windows zip (2026-10-07/08).
-4. Geometry stage 3, terrain from real elevation (docs/GEOMETRY.md section 7), with world streaming
-   stage 2, one world in UTM tiles generated on demand (docs/WORLD_STREAMING.md). T1, T2, W1, W2 merged;
-   2026-10-09 (unheard): the world built before you get there, Magnolia and Albany copied into it, 8 m
-   ground in the far ring, the places' elevation at 2 m on the UTM grid, a login back to where you left.
-   2026-10-10 (unheard, unmerged branch): the ground's materials from ESA WorldCover; roads and woods on
-   the world's tiles outside the places; buildings (Overture read by the server with Parquet.Net, gen_osm's
-   shells at medium detail) and driveways on them (docs/WORLD_STREAMING.md "Buildings on the world's tiles").
-   Next on this item: addresses (Overture's addresses theme) and lots, then the world's roads as RoadData for
-   traffic. Overture release 2026-09-23.1 will be withdrawn around the end of November 2026: moving to a newer
-   one is a new generator version.
-5. Sound library: stage 3 done 2026-10-10 (unmerged branch; docs/SOUND_LIBRARY_BOUNDARY.md section 16):
-   `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`. Next, stage 4: rooms and openings as values
+The VPS and the Windows zip are behind: the last deploy was 3fc38430512b on 2026-10-08. Since then
+OpenFPS.Common and the wire changed many times (WorldLoading, EntityState.SpeedRate and Turn,
+EditorMenuItem's members, MapSettingsUpdate's play area, UserRole.Owner, ChatMessage.Team and Title,
+SoundEmitterComponent.Loudspeaker and Quench, the ground water field, geometry stage 4's two messages, and
+the wire hash now covering the library projects), so a client and a server from either side refuse each
+other at login. The server and the Windows zip go out together.
+
+1. Ship: push, the VPS and the Windows zip, together, once the work in flight has landed, and only when
+   Cody says so (each time). Restart the server and update the clients first; what is in it is the
+   "Landed since the last deploy" list below.
+2. Sound library stage 4 together with switching rooms from walls on. Rooms and openings as values
    (`Room`, `Opening`), then `AcousticMap`, `RoomAcoustics`, `OpeningRoutes`, `FaceOpenings` and
-   `AcousticVolumeGenerator` into Acoustics (section 16.7). Do it while no audio branch is open.
-6. World editor phase 3: built 2026-10-10, unheard and untried with Orca and NVDA (docs/WORLD_EDITOR.md
-   section 18): Changed on this map, map versions and baking, roads, paths and railways, people. (Cody)
-   to try in the F12 dialog with Orca, then NVDA.
-
-Before items 4-6: the two cheap reflection steps (measure "Mixer load" with echoes on and off; nice
-the trace threads). See "Reflections in their own process". The three bugs of 2026-10-08 are fixed
-(2026-10-09, unheard): E weighs a shut door against a car by facing; Alex waits in a lobby clear of
-the doorway, which had held the closer off; /weather says "Clearing" while a cleared front's rain
-still falls, and that rain now stops. A new front is drawn every five minutes on average (Cody,
-2026-10-09; it was about once a minute).
-NPC doors (CODY_ASKS section 9) done 2026-10-10, unheard: Alex and the drivers from parked cars let
-a closer shut its door, shut an outside door without one behind them, leave an inside door as found
-going in and shut it going out, out of the doorway and never on anybody in it (DoorManners,
-docs/DOOR_TYPES_EVENTS.md "What the server's people do with a door"). Cody 2026-10-10: the rule
-holds whoever is about (no player exceptions), and closers start back 1 s after the doorway clears
-(was 3 s).
-Cody's world decisions of 2026-10-09: no faster tile fetching for now (a car above about 65 m/s still
-stops short of unbuilt ground); the places laid on UTM grid north are fine; placed tiles stay pinned
-against the store's cap, and player-built tiles will follow the same rule; close the crack between
-coarse and full ground (agent running). The engine CPU savings that change the sound: approved, agent
-running, renders to inbox/engine-cpu-2026-10-09.
-
-After items 1-6 (agreed with Cody 2026-10-08): performance and distant updates come before new content,
-because the one world costs CPU and bandwidth first.
-7. Dropped 2026-10-09: reflections in their own process. The measurement showed the cost is the
-   reverb's convolution, not tracing; the convolution was made 38 % cheaper instead (heard, merged).
-8. Distant updates (CODY_ASKS item 4): built and merged 2026-10-10. Far moving
-   things go at most 5 times a second, with the server's own speed rate and turn, and early the tick the
-   client's prediction would stray; the acceptance test passes on a home connection (bearing within 0.010
-   degree, pitch within 0.122 %, no step bigger than every tick makes) and saves 48-54 % of the broadcast
-   (1.33 to 0.62-0.69 Mbit/s). docs/WORLD_STREAMING.md, "Far things less often". Wire change (Common): new
-   Windows zip and VPS update when merged. Cody to listen to the city before it ships (Cody).
-9. Floors at 15 dB and sound from geometry (item 5), on top of geometry stage 3. Done: layers in
-   contact are one panel (2026-10-09), one 15 cm slab between storeys and the end-of-voice clicks
-   (2026-10-10, unheard: inbox/floors-2026-10-10). Next sound through structure (Walls, below), then
-   rooms from geometry.
-10. Chat names and roles (item 8): done 2026-10-09 (protected Owner role, "admin [Mafia] Owner: hi";
-    Common changed, so a new Windows zip and VPS build go out together). The editor (item 7): the
-    typed-value text box, Control+B and the F12 dialog (tabs Place, Edit, Build, World; nothing
-    without permission) are built, untried with Orca and NVDA.
-11. Weather as a system (item 12): rain, wet roads, wind and fire tied together.
-12. Cars in full detail: the distant-car cycle cache first (also a performance win), then lopey idle,
-    suspension, drivetrain, tyres and F1 steepening. 2026-10-09, waiting on Cody's ear
-    (inbox/engine-cpu-2026-10-09): each far engine replays its own last cycles while steady (the cache
-    per engine); the shared grid per engine type, below, is what is left of it.
-13. Enemies, Dinosaur World, melee and NPC inventories (items 6 and 11).
-
-Matter (Cody, 2026-10-10): every material interacts with every other as in real life; wind moves things
-physically and its sound comes only from what it moves; a built thing sounds by its material, size and shape.
-The design and its order of work are in docs/MATTER.md (material table, struck things by modal synthesis,
-bumps, fire by fuel, water over terrain, weather as a system, wind on things, gases, chemistry).
+   `AcousticVolumeGenerator` into OpenFPS.Acoustics (docs/SOUND_LIBRARY_BOUNDARY.md 16.7). With it, the
+   rooms flooded from the walls (docs/GEOMETRY.md 12.6 item 1), built as an instrument and not switched on:
+   first fix the floods' leaks out of houses and the narrow rooms they lose (quarter-metre cells with a cell
+   index, the leaks traced with `ROOM_DEBUG`), then switch the acoustic map to the flood on the server and
+   the client, region ids unchanged, gated by `--geometry-parity only=rooms` (no house open past its
+   margin, IoU over 0.8). Do it while no audio branch is open.
+3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
+   scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below).
+4. Sound library stages 6 to 8: the world input and `OpenFPS.Audio`, splitting `ClientAudioSystem`,
+   `WorldAudioPlayer` and `BirdLife`, versions and Resonance.
+5. Geometry stage 5, diggable ground with strata: held until it is wanted.
+6. Then detail, in this order:
+   - weather as a system and wind acting on things (docs/MATTER.md 5.3 and its order of work, steps 5
+     and 6; CODY_ASKS item 12);
+   - footsteps through the structure ("Walls", below);
+   - the struck sounds, from Cody's notes ("Bump sounds", below);
+   - cars in full detail ("Cars in full detail", below);
+   - the world: lots and addresses, traffic on the world's roads, kerbs and bridges on them
+     (docs/WORLD_STREAMING.md, "Left after stage 2");
+   - enemies, Dinosaur World, melee and NPC inventories (CODY_ASKS items 6 and 11).
 
 In every play session, clear the "Waiting on Cody's ear" list so heard work merges before it piles up.
 
-Loudspeakers (the PA horn and the megaphone as amplifier, driver and horn; approved by ear 2026-10-10,
-inbox/loudspeaker-2026-10-10). The sound is settled; open, without changing it: a column speaker and a
+### Landed since the last deploy (2026-10-09 and 10, all merged on main)
+
+Details in changes.md and the docs named. "Unheard" means nobody has listened in the game yet.
+- The one world: terrain from 3DEP (T1, T2), the world store and one world in tiles (W1, W2); built
+  ahead behind a loading screen, tiles in order of time to reach; Magnolia and Albany copied in at 2 m on
+  the UTM grid; 7.8 m ground in the far ring with the seam closed; a login back to where you left;
+  land cover from ESA WorldCover; roads and woods from OpenStreetMap; buildings from Overture with
+  driveways. Unheard (docs/WORLD_STREAMING.md).
+- Geometry stage 4: the shape library, real footprints and roofs on the places, kerbs, glTF and OBJ
+  import, shapes in the quick build; rooms by flood as an instrument only. Unheard (docs/GEOMETRY.md 12).
+- Sound library stage 3: OpenFPS.Sound and OpenFPS.Acoustics; Acoustics without MemoryPack (Cody,
+  decision 4). No sound changed.
+- Water over the ground and fire by fuel, stage 1: approved by ear 2026-10-10.
+- The loudspeaker model (PA and megaphone): approved by ear 2026-10-10.
+- The gas hob, rounds 1 and 2: round 2 approved by ear 2026-10-10. Not on any map.
+- The shut glass door leak fix: approved by ear 2026-10-10.
+- Floors: layers in contact as one panel, then one 15 cm slab and the end-of-voice clicks fixed. Round 2
+  unheard (inbox/floors-2026-10-10).
+- The material table and struck things (bumps, Shift+E and /tap on things): heard 2026-10-10, notes kept
+  under "Bump sounds".
+- NPC doors: the door's mechanism first, closers start back 1 s after the doorway clears, the rule the
+  same whoever is about. Unheard in play.
+- Distant updates (far things 5 times a second, with the keep-alive repeat fix): passed the acceptance
+  test; unheard in play.
+- Engine CPU: the render pool 12 % (bit-identical), then the valve solver, far engines at half rate, the
+  per-engine cycle cache and mowers (heard; merged). The traced reverb's convolution 38 % cheaper (heard:
+  "the reverb seems to work great now").
+- The editor: the typed-value box, Control+B, the F12 dialog, Buildings and Vehicles, the placed list,
+  phase 3 (changed things, versions and baking, roads, paths and railways, people), shapes. Orca works
+  (Cody, 2026-10-10); NVDA untried.
+- Server: the protected Owner role and names in chat, bans, `/setmapsize`; E picks what you face; Alex
+  waits clear of the doorway; `/weather` says "Clearing" and a cleared front's rain stops; a front every
+  five minutes on average; the trace threads niced; a gradient backdrop behind the menus.
+
+### Decided (Cody, 2026-10-09 and 10)
+
+- Reflections in their own process: dropped. The cost was the reverb's convolution, not tracing; the
+  convolution was made 38 % cheaper instead.
+- The world: no faster tile fetching for now (a car above about 65 m/s still stops short of unbuilt
+  ground); the places laid on UTM grid north are fine; placed tiles stay pinned against the store's cap,
+  and player-built tiles will follow the same rule; the store's cap starts at 20 GB.
+- Weather: a new front every five minutes on average (it was about one).
+- NPC doors: the rule holds whoever is about (no player exceptions); closers start back 1 s after the
+  doorway clears (was 3 s).
+- Sound library decision 4: `AcousticMap` and the octree lose `[MemoryPackable]` and Acoustics its
+  MemoryPack package; `TransientSound` keeps it in Sound.
+
+### Matter
+Cody, 2026-10-10: every material interacts with every other as in real life; wind moves things
+physically and its sound comes only from what it moves; a built thing sounds by its material, size and
+shape. The design and its order of work are in docs/MATTER.md. Steps 1 (the material table), 2 (struck
+things) and 4 (water over the ground) are built, and fire by fuel (step 3) has its stage 1; next are
+weather as a system and wind on things (item 6 above), then gases and chemistry.
+
+### Loudspeakers
+The PA horn and the megaphone as amplifier, driver and horn: approved by ear 2026-10-10
+(inbox/loudspeaker-2026-10-10). The sound is settled; open, without changing it: a column speaker and a
 ceiling speaker as presets (a datasheet each; the Baffled mounting is built); the traced echoes are fed
 the speaker's on-axis spectrum at its radiated level, not band by band; one-off world sounds
 (WorldSound) cannot name a loudspeaker yet; the first play of a recording not yet loaded is started by
 the provider after the budget has let it go, and its placement goes stale for the line (seen once on the
 old PA in --loudspeaker game).
 
-Waiting on Cody's ear:
+## Waiting on Cody's ear
+
+Approved 2026-10-09 and 10, so off this list: the hull's blows in time; the cheaper reverb tail; the
+shut glass door leak fix (inbox/pa-leak-2026-10-09); the loudspeaker (inbox/loudspeaker-2026-10-10); the
+gas hob round 2 (inbox/gas-stove-2026-10-10/round2, "sounds great now"); water over the ground
+(inbox/water-over-terrain-2026-10-10); fire by fuel, stage 1 (inbox/fire-fuel-2026-10-10).
+Heard, with notes and nothing to listen to again: the engine CPU renders (inbox/engine-cpu-2026-10-09;
+the phased pass-by that did not sweep was the lab's panned capture, not the game); struck things and
+bumps (inbox/struck-things-2026-10-10; notes under "Bump sounds", low priority).
+
+Renders not yet heard:
+- Floors, round 2 (inbox/floors-2026-10-10; merged 8406509a): one 15 cm slab, a shout overhead 12.5 dB
+  louder and clean, footsteps without the end-of-voice clicks. Round 1 (inbox/floors-2026-10-09) was
+  heard 10-10: silent at game level, the +40 dB copies fuzzy (16-bit capture) and cutting out (the
+  clicks).
+- Recorded sounds' echoes smeared off rough walls: your steps and a PA
+  (inbox/probable-bugs-2026-10-09/4-scattering; merged 7a9b6c85).
+- The probable-bug fixes of 2026-10-07, before and after (inbox/probable-bugs-2026-10-07).
 - Driving cues and horns: H horn, U siren, J and L indicators, the brake cue, line rumble, the speed
   limit, rails, gates, aircraft roll-out (inbox/driving-2026-10-06). The brake cue's notes, the rail
   strike level and the gate motor and clunk are assumptions.
 - Trains' own horn, whistle and bell; air conditioners cycling with the weather
   (inbox/fault-fixes-2026-10-06).
 - Downpipes, round 2: the flange should be gone (inbox/water-smoothing-2026-10-06/round2).
-- The world editor dialog in the game: Orca works well (Cody, 2026-10-10); NVDA still to try.
-- The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
-- (Approved 2026-10-09: the hull's blows in time.)
-- Recorded sounds' echoes smeared off rough walls: your steps and a PA (inbox/probable-bugs-2026-10-09/4-scattering).
-- (Approved 2026-10-10: the shut glass door leak fix, inbox/pa-leak-2026-10-09.)
-- Floors, round 2 (inbox/floors-2026-10-10, branch worktree-agent-a0662d8b8748e7dd2): one 15 cm slab,
-  a shout overhead 12.5 dB louder and clean, footsteps without the end-of-voice clicks. Round 1
-  (2026-10-09) was heard 10-10: silent at game level, the +40 dB copies fuzzy (16-bit capture) and
-  cutting out (the clicks).
-- Engine CPU (inbox/engine-cpu-2026-10-09), heard 2026-10-10: passby_i4_midsize_50kmh_3m sounded phased,
-  did not sweep right to left and did not sound 3 m away (the before file too). Being checked: the lab
-  capture is panned, not binaural. Not merged until heard again.
+
+With a screen reader: the editor (the F12 dialog, Control+B and its Shape kind, the typed-value box,
+phase 3's controls) works with Orca (Cody, 2026-10-10); NVDA on the Windows client is untried. Direct
+keys (`/editorkeys on`) stay off until tried with Orca, then NVDA (docs/WORLD_EDITOR.md 12).
 
 ## Now
 
-### Probable bugs
-Found by the housekeeping on 2026-10-07. The rest were fixed and merged in 246a4e1c (heard by Cody).
-The last four were handled on 2026-10-09, on their own branch (renders in inbox/probable-bugs-2026-10-09):
-- Fixed, waiting on Cody's ear: a hull's blow now lands at its own sample in the block. It landed at the
-  block's start, 0 to 2.7 ms early (1.2 ms on average).
-- Fixed, no sound change in the game: the fire's fizz has its own part (`FireSynth.FizzPart`, lab
-  `parts=fizz`). It was muted with the crackles in the lab. In the game every part is 1, so the game's
-  fire is the same to the bit.
-- `AcousticPathData.ReflectionId` is read (the reflection slots, fixed in 0e0e5ae6). `Scattering` is now
-  read too (Cody asked, 2026-10-09): a recording's copy off a rough wall keeps its mirror share clean and
-  smears the scattered share through the engines' EchoDiffuser. Your footsteps get the wash they lacked.
-  Waiting on Cody's ear (inbox/probable-bugs-2026-10-09/4-scattering).
-- Seen, not changed: a recorded loop's copy starts at its source's play position only to the nearest
-  mixer block, so its delay off one wall came out 41 ms in one run and 57 ms in another.
-- Fixed: a new engine donor is no longer held for 2.5 s inside the budget, so the car at the budget's edge
-  is not let go and rebuilt when a donor arrives.
-- Seen, not changed: a pocket's ring on a hull starts one block (2.7 ms) after the pocket itself
-  (`HullPlate.Ring` is queued after the block's drives were laid down).
+### Seen, not changed (from the probable bugs of 2026-10-07)
+The rest were fixed and merged (246a4e1c, 7a9b6c85).
+- A recorded loop's copy starts at its source's play position only to the nearest mixer block, so its
+  delay off one wall came out 41 ms in one run and 57 ms in another.
+- A pocket's ring on a hull starts one block (2.7 ms) after the pocket itself (`HullPlate.Ring` is
+  queued after the block's drives were laid down).
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
-- (Approved 2026-10-10: the gas hob round 2, "sounds great now".)
-- The gas hob (docs/GAS_HOB.md, inbox/gas-stove-2026-10-10): round 1 heard 2026-10-10, liked; the tick
-  too present and loud, the sparks went on long after it lit. Round 2 (inbox/gas-stove-2026-10-10/round2):
-  the cook lets go as soon as it catches, the spark 9-13 dB lower at 1-4 kHz, a furnished kitchen; a flame
-  safety hob and an auto re-ignition hob to compare. Then a `gas_hob` placed in a kitchen and lit with the
-  interact key. Not yet on any map.
+- The world (`/join world magnolia`, `/join world address 401 Market St, Tomball, TX`): the loading
+  screen ("Building the world: 12 of 41 tiles."), the ground's land cover, the roads, woods, buildings
+  and driveways outside the places, no crack where far ground meets near ground, and logging out and
+  back in to the same spot.
+- Shapes: walk round a house on Magnolia (its real outline) and onto its roof; kerbs on Albany;
+  `/edit build stairs 14 steps up north`, a roof over a floor, Control+B's Shape kind.
+- NPC doors: Alex and the drivers from parked cars shutting doors behind them; closers starting back a
+  second after the doorway clears.
+- Far things sent less often: the city's far traffic, trains and the airliner (no audible difference by
+  the acceptance test).
+- Far engines at half rate and their replayed cycles on a busy street (`/enginedetail off` to compare).
+- Fire by fuel in the game (`/spawn fire PRESET` by trees, `/spawn fire lightning`, `/spawn fire
+  water`), water over the ground on Magnolia in rain, the PA and the megaphone in the city: approved as
+  renders, not yet heard in play.
+- The gas hob: a `gas_hob` placed in a kitchen and lit with the interact key (approved as renders; not on
+  any map).
+- The editor: Place's Buildings and Vehicles, Placed on this map, Changed on this map, map versions,
+  laying a road or railway by walking it, people and walkers.
 - Doors: push and pull sides, the tower front doors locked from the street (key, then pull), nothing
   shutting on a person. The glass front door, glass shop door and lift door models
   (inbox/door-models-2026-10-05).
@@ -180,8 +209,7 @@ Built and measured, not heard in the game. Restart the server and update the cli
 - MemoryPack's string-length overflow (one packet crashed the server) is not fixed upstream: report it
   to Cysharp?
 - Sound library: `ColliderShape` stays in Common; CI compares renders by tolerance; 430 KB per stream
-  regeneration. Recommended: yes to all three.
-- World editor: carry a map entry's `Form` through Remake and duplicate (recommended).
+  regeneration. Recommended: yes to all three. (Decision 4, MemoryPack, was taken 2026-10-10.)
 - Streaming: a menu control for `/detail`; tree counts and cost of distant woods (+0.5 core); the cab's
   own reverb adds up to 20 dB at the bottom, so it is unchanged.
 
@@ -197,8 +225,9 @@ Left by the 2026-10-07 housekeeping; none changes sound.
 - Nullable warnings: CS8602 in Spawning and MovementSystem, CA2014 in SolidContact, CS8714 in
   SpatialGrid.
 - Stale code comment: RainField.cs 33 lists gutters, downpipes and run-off as missing (built 2026-10-06).
-- `Machines.cs` 87: the declared extent is read by nothing; it should replace the car-sized
-  `MathF.Max(reference, 3f)` in ClientAudioSystem, with audibility ranking.
+- `OpenFPS.Sound/Machines.cs` 87: the TODO on a part's `ExtentMetres` still names ClientAudioSystem's
+  car-sized `MathF.Max(reference, 3f)`, which is gone (engines are placed by their outlet separation
+  through `Loudness.Place`). Check whether anything reads a part's extent, then wire it or drop the TODO.
 
 ### Doors
 - The lift's close is soft: no bump and no rebounds.
@@ -225,7 +254,8 @@ Left by the 2026-10-07 housekeeping; none changes sound.
 ### Network (Cody)
 1.75 Mbit/s for three players after the 2026-10-05 trim. The rest, with measured savings, is in
 docs/PLAN_2026-10-05.md section 6:
-1. Rate by distance (5 Hz beyond 150 m): built, 48-54 % measured (todo item 8, waiting to merge).
+1. Rate by distance (5 Hz beyond 150 m): merged 2026-10-10, 48-54 % measured (docs/WORLD_STREAMING.md,
+   "Far things less often").
 2. A byte budget per packet filled by priority: caps the worst case.
 3. Only the change, against what the client confirmed: about 30 %.
 4. Traffic run on the client from routes, with corrections from the server: most of what remains.
@@ -239,13 +269,12 @@ and the server's voice line.
 ### Walls
 - A source just behind a building corner made of two boxes gets no diffraction route (the 5 cm joint
   padding in `RouteIsClear`). Fix without reopening the shut-door crack leak.
-- Done 2026-10-10 (branch, unheard): one 15 cm slab between storeys in the city's towers (37.9/54/80
-  dB against a lab slab's 40/54/83); voices keep their units until FMOD has mixed their last block (the
-  clicks at the end of every sound behind a wall); the "14 dB louder one way" was one of those clicks.
-  Other generators (houses, the terminal, the garage) were not checked for doubled slabs.
-- Footsteps through the structure. A neighbour's steps are mostly impact into the slab; the game has
-  only the airborne part, about 10 dB short on a carpeted floor and the wrong shape (a click, not a
-  thud). Plan: the slab's normalised impact level from its own airborne loss by Ver's relation,
+- Floors: one 15 cm slab between storeys in the city's towers (37.9/54/80 dB against a lab slab's
+  40/54/83) is merged (8406509a, unheard). Other generators (houses, the terminal, the garage) were not
+  checked for doubled slabs.
+- Footsteps through the structure (Next, in order, item 6). A neighbour's steps are mostly impact into
+  the slab; the game has only the airborne part, about 10 dB short on a carpeted floor and the wrong
+  shape (a click, not a thud). Plan: the slab's normalised impact level from its own airborne loss by Ver's relation,
   Ln(f) = 38 + 30 lg f - R(f) (homogeneous slab; checks against a bare 152 mm slab's Ln,w 79, IIC 27);
   a resilient covering's improvement 40 lg(f/f0) above f0 = (1/2 pi) sqrt(s/m) from its dynamic
   stiffness (a material property: carpet on underlay 20-35 dB, IIC 26 bare to 60-67 carpeted,
@@ -277,36 +306,9 @@ and the server's voice line.
 - Furnished flats: curtains and shelves (a sofa and a bed per flat since 2026-09-29).
 - The traced decay of the tunnel and the garage against real figures.
 - Beacons: door range 12 m to 6 m, and lifting beacons when a louder sound is near (proposed, Cody).
-
-### Reflections in their own process (Cody, 2026-10-08; discuss Friday 2026-10-09)
-Tracing (TracedReverb, TracedEchoes, LateField, Steam Audio's own threads) runs in the client
-process. Its `ThreadPriority.BelowNormal` does nothing on Linux, and none of those threads is niced.
-Convolution runs on the FMOD mixer thread.
-- Measured 2026-10-09 (city street, standing still, /tmp/openfps-client.log 11:36-11:40): the cost is
-  convolution, not tracing. Mixer load 70 % with echoes on, 62 % off. Of the mixer's time, the traced
-  reverb's convolution is 26.5 % either way and the traced echoes' 10.4 %; binaural 13 %, everything
-  else under 3 % each. The governor took voices back 17 times at 60-62 %. The trace threads themselves
-  are off the mixer (TracedReverb about a third of a core, LateField 5 %, both now nice 10). So the split
-  below would not lower Mixer load; the reverb's convolution is what to make cheaper. Also seen: the 12
-  EngineRender threads take about half a core each (6 cores), and the acoustic worker 70 % of one.
-- Done 2026-10-09: `BackgroundPriority.LowerThisThread` (+10) at the top of TracedReverb, TracedEchoes
-  and LateField's loops. Unchecked: whether Steam Audio's second worker (numThreads 2) inherits it;
-  `ps -L -o tid,ni,comm -p PID` while playing shows each thread's nice.
-- Recommended next: the split itself, if the first two do not fix it:
-  - A helper (`OpenFPS.AcousticsHost`) started by the client; it dies with the client (death signal
-    on Linux, job object on Windows) and is niced to +19 or set below normal, Steam Audio's threads
-    included.
-  - The scene goes to the helper: triangles and materials at load, then doors, tile swaps and cabins.
-  - The client sends positions. The helper sends back each response as samples, extracted the way
-    `TracedReverb.ExtractLate` does it.
-  - Responses travel through double-buffered shared memory, about 50-70 MB/s (1.2 MB per order-1
-    response).
-  - The client convolves them with its own convolver (`LateTail`), because Steam Audio's responses
-    are opaque.
-  - If the helper crashes, the game falls back to the room reverb with no echoes, then restarts it.
-- What the split solves: tracing cannot take the mixer's CPU, collect garbage in the game's heap,
-  hold a lock the audio waits on, or crash the game.
-- What it does not solve: convolution cost (Mixer load), total CPU, or the 125-250 ms refresh.
+- The trace threads (TracedReverb, TracedEchoes, LateField) run at nice +10 since 2026-10-09. Unchecked:
+  whether Steam Audio's second worker (numThreads 2) inherits it; `ps -L -o tid,ni,comm -p PID` while
+  playing shows each thread's nice.
 
 ### Water
 - A big river's bank in a calm is silent: an eddy's wave never breaks (`breaks = !eddy`).
@@ -319,8 +321,8 @@ Convolution runs on the FMOD mixer thread.
 - Not built: toilet flush and cistern refill; the plug as its own control; NPCs using taps; pipe walls
   radiating; trap seals; snowmelt.
 - Water over the ground: approved by ear 2026-10-10 (inbox/water-over-terrain-2026-10-10, "water over
-  terrain sounds good"); keep how it sounds. Next (docs/RUNNING_WATER.md 13.9): the shallow-water model near players; poured water
-  heard on the lines; soil groups by place (SSURGO) instead of B everywhere; culverts as falls; the world's
+  terrain sounds good"); keep how it sounds. Next (docs/RUNNING_WATER.md 13.9): the shallow-water model
+  near players; poured water heard on the lines; soil groups by place (SSURGO) instead of B everywhere; culverts as falls; the world's
   50 m drainage margin agrees with the whole on only 57 % of Magnolia's big-line cells (250 m: 88 %), so a
   wider window or Barnes's tiled Priority-Flood next; base flow from a climate.
 - Magnolia keeps 2,078 ponds (262,000 m³) of 10,566 hollows: check against the aerial photos that the
@@ -340,7 +342,8 @@ Synthesis to spec; recordings are the yardstick only.
 Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md). Roads as data and per-wheel
 physics are done.
 - Stage 2: moving bodies in the acoustic scene (vehicles from their panels, people as soft bodies), so
-  a bus or a crowd blocks sound like a wall of its size and material (geometry stage 6).
+  a bus or a crowd blocks sound like a wall of its size and material (geometry stage 6; Next, in order,
+  item 3).
 - Stage 4: rolling noise per wheel outside the car (inside it is per wheel since 2026-10-06), left and
   right as separate directions, the surface under each, joints struck by each axle.
 - Turning paths cut over the kerb on the 7 m estate roads (a junction connector needs a kerb-aware
@@ -372,16 +375,16 @@ physics are done.
   car park) stays a box; a zone inside a zone is said as the inner one, the outer on the where-am-I key.
 
 ### Bump sounds
-Built 2026-10-10, unheard (docs/MATTER.md 7.5): a bump is a body (palm, boot toe, shoulder) striking what
+Built and merged 2026-10-10 (fb9868f9; docs/MATTER.md 7.5): a bump is a body (palm, boot toe, shoulder) striking what
 you walked into by modal synthesis, with the near-field radiation below coincidence, the palm and knuckle
 through their pad to the bone, and the level anchored to the footstep takes (-15.8 dB). Renders in
 inbox/struck-things-2026-10-10. Still open: the plaster stud wall bump is 10-15 dB short at 125 Hz-1 kHz
 against a recorded body slam into plaster; the car's rattle is busier than recorded ones; bumping a
 person is still the old impact.
-Heard by Cody 2026-10-10 (low priority, after geometry and the library reorganisation): the aluminium
-bar sounds like a bright bell; running into the car sounds crunchy and staticky; the fence and the glass
-door sound the same tonally, and the fence does not sound like a fence; the aluminium sheet is far too
-sustained and tonal. Kept in the game meanwhile.
+Heard by Cody 2026-10-10 (low priority, after geometry and the library reorganisation; Next, in order,
+item 6): the aluminium bar sounds like a bright bell; running into the car sounds crunchy and staticky;
+the fence and the glass door sound the same tonally, and the fence does not sound like a fence; the
+aluminium sheet is far too sustained and tonal. Kept in the game meanwhile.
 
 ## Next
 
@@ -393,20 +396,25 @@ than real time (find what is slow first: probably the leaf's modes and the conta
 hinge, the latch edge and the leaf. Knob door first, the approved renders as the yardstick. Large.
 
 ### Real places from open data
-tools/gen_osm.py; docs/MAPS_FROM_REAL_PLACES.md. Magnolia and Albany are built and stream by tile.
-- Whole towns: world streaming stage 2 (Next, in order).
+tools/gen_osm.py; docs/MAPS_FROM_REAL_PLACES.md. Magnolia and Albany are built, stream by tile and are
+copied into the one world. The world's own tiles are made by the server on demand from 3DEP (ground),
+ESA WorldCover (land cover), OpenStreetMap (roads and woods) and Overture (buildings and driveways);
+docs/WORLD_STREAMING.md, stage 2 as built.
+- Addresses (Overture's addresses theme) and lots on the world's tiles, then the world's roads as RoadData
+  for traffic (Next, in order, item 6). Overture release 2026-09-23.1 will be withdrawn around the end of
+  November 2026: moving to a newer one is a new generator version.
 - Real weather for real places (Open-Meteo or NOAA by latitude and longitude).
 - Traffic volumes from published counts (average daily traffic by road), with time-of-day curves.
-- Ground height from USGS 3DEP: geometry stage 3 (Next, in order).
 
 ### Map editor
 Phases 1 to 3 are built (docs/WORLD_EDITOR.md). Left from phase 3 (section 18, "What the existing road
 and rail data cannot carry"): joining an editor road to the others with junctions and putting traffic on
 it; a railway with two ends; crossings' bells live, and the bed cut where a road crosses; underground
 stations with platforms and stairs, and a tunnel as a named place; more than one kind of character life.
-Also missing: copy,
-rename, delete and publish maps; checks ("this room has no door"); groups as one composite (only if
-building houses needs it); a preview of a wall being struck.
+Also missing: copy, rename, delete and publish maps; checks ("this room has no door"); groups as one
+composite (only if building houses needs it); a preview of a wall being struck. A slip in the build
+phrases: in `/edit build column 0.3 by 3 ahead 2` the 2 is read as a size and the phrase refused
+(`WorldEditor.TryShapePhrase` adds "ahead" and counts the number with the sizes); "distance 2" works.
 
 ### Weather, the rest
 - Snow and ice underfoot: measure before synthesising (synthetic footsteps failed three times);
@@ -440,13 +448,15 @@ shape, fuel as a property of things, catching by heat and brands, lightning, rai
 - the roar's places following the flame height as a fire grows; slope on terrain;
 - litter and grass fitted to the prescribed burns among the recordings;
 - water as a substance (hoses, buckets, water over the ground) through FireSpread.AddWater; a grease fire.
+  Water over the ground is built (`GroundWaterSystem.WaterReaching`), but FireSystem does not ask it yet.
 Also open:
 - the crown fire against a real crown-fire recording (none found);
 - the car against more than two recordings;
 - smoke explosions in a closed building.
 
 ### The gas hob, the rest (2026-10-10)
-Built, measured against fifteen recordings, not heard (docs/GAS_HOB.md section 10). Open:
+Built, measured against fifteen recordings; round 2 approved by ear 2026-10-10 (docs/GAS_HOB.md
+sections 10 and 11). Open:
 - a gas hob in the city's flats and houses (tools/gen_city.py, beside the kitchen sinks);
 - changing the heat in the game: the knob's settings are in the state and the model, the interact key
   only lights and turns off;
@@ -530,19 +540,20 @@ Synth video (inbox, transcribed): ours is the more physical model; these are wha
   - Buses about 5 dB under real life; a big cam's idle lope; the sports bike's pull-away surge.
 
 ### Shapes other than boxes
-Wedges, stairs and arches are built (geometry stage 2), terrain (stage 3). Stage 4, 2026-10-10 (unheard,
-unmerged branch; docs/GEOMETRY.md section 12): the shape library (round, outlined, roofed, swept), real
-footprints and roofs on Magnolia and Albany, round trunks, kerbs, glTF and OBJ import with mesh assets on the
-wire, shapes in the quick build. Left of stage 4, in order (GEOMETRY.md 12.6):
-- Rooms derived from seeds by flood: built as an instrument (`--geometry-parity only=rooms`); on the real
-  places the floods still leave about half the houses (walls at an angle to the grid), so not switched on.
-  Find the leak, then switch the acoustic map to the flood (server and client), gated by the harness.
-- Sound points on models (MATTER.md 8): where a model's sound parts are, read by machine parts and emitters;
-  struck sounds reading the shape a part has.
+Geometry stages 1 to 4 are built and merged: the triangle world, wedges, stairs and arches (stage 2),
+terrain (stage 3), and stage 4 (eb529bfe, 2026-10-10, unheard; docs/GEOMETRY.md section 12): the shape
+library (round, outlined, roofed, swept), real footprints and roofs on Magnolia and Albany, round trunks,
+kerbs, glTF and OBJ import with mesh assets on the wire, shapes in the quick build. Left of stage 4
+(GEOMETRY.md 12.6):
+- Rooms derived from seeds by flood: built as an instrument (`--geometry-parity only=rooms`), not switched
+  on; on the real places the floods leak out of houses and lose narrow rooms. Next, in order, item 2.
+- Sound points on models (MATTER.md 8): where a model's sound parts are, read by machine parts and emitters.
+  Begun: struck sounds read the shape a part has (a pitched roof struck as its deck, a flight as one step).
 - Facets as polygons for the engine echoes; per-surface materials in the image sources.
-- (Cody) try: `/edit build stairs 14 steps up north`, a roof over a floor, Control+B's Shape kind with Orca
-  and NVDA; walk round a house on Magnolia (its real outline) and onto its roof.
-Then diggable ground with strata (stage 5); forests, ocean maps and boats.
+- Doors' remaining misses on Albany (16) and the openings found in rooms' faces (GEOMETRY.md 12.6 items 4
+  and 5).
+Then stage 6, vehicles and bodies in the acoustic scene (Next, in order, item 3); stage 5, diggable ground
+with strata, is held until wanted; forests, ocean maps and boats.
 
 ### Experience and badges
 Rules, categories and tiers in docs/PLAN_2026-10-05.md section 3: scored by difficulty and variety,
@@ -577,10 +588,10 @@ cyclic, pedals on keys). Giving jets later; the only jet is the airliner.
 
 ### Building services (Cody: after the core sounds)
 Corridor ventilation, fridges, extractor fans, pipes, lift machinery and electrical hum as physical
-sources placed by the generator; an inner lobby door in the towers. Asked 2026-10-05: gas stove burners
-(the piezo click, the gas, the flame), cookware (sizzle, boiling, a lid rattling), HVAC with ducts and
-vents, and electricity with a power grid (substations and lines as data; an outage silences fridges,
-fans and lights). Taps, sinks and showers are built.
+sources placed by the generator; an inner lobby door in the towers. Asked 2026-10-05: gas stove
+burners (built 2026-10-10 as the gas hob, not yet on a map), cookware (sizzle, boiling, a lid rattling),
+HVAC with ducts and vents, and electricity with a power grid (substations and lines as data; an outage
+silences fridges, fans and lights). Taps, sinks and showers are built.
 
 ### A map's own sounds
 A map or server carries a sound pack: named cues (login, chat, menus, beacons), each a short
@@ -589,7 +600,8 @@ the player. Anything missing uses the built-in sound.
 
 ### The new city
 Plan: [docs/NEXT_CITY_10KM.md](docs/NEXT_CITY_10KM.md): a 10 x 10 km city, shapes other than boxes,
-and building a map in the game. After streaming stage 2 and real terrain.
+and building a map in the game. Streaming stage 2, real terrain and the shape library it waited on are
+built.
 
 ### Load and stuck-voice checks
 Some may already be fixed; confirm before fixing again.
@@ -603,7 +615,7 @@ Some may already be fixed; confirm before fixing again.
 
 ### Server
 - A command to change a password (your own, and an admin resetting someone's).
-- A ban list, by name and by address.
+- Bans by address (account bans are built: `/ban`, `/unban`, `/bans`, 2026-10-09).
 - `/restart` and `/reloadmap` for admins.
 - The default admin is `admin` / `admin123` unless `OPENFPS_ADMIN_PASSWORD` is set: make the first run
   ask.

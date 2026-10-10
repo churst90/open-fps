@@ -28,12 +28,17 @@ reverb that comes from the room's actual size and materials.
 
 ### Playing
 - Walk, run and explore by sound. Footsteps change with the ground and your speed. Walking into
-  something knocks and names it, and the game can say what is ahead as you turn and move.
+  something strikes it, so it sounds of its material, size and shape, and names it; you can knock on
+  or tap what is in front of you. The game can say what is ahead as you turn and move.
 - Maps: a generated city with streets, traffic, buses, a light rail loop, level crossings, an
   airport, houses with gardens, a park with a fountain, birds, and buildings you can enter; a
   speedway with a race; a rooms map for trying doors and materials; and two real places made from
   open data, Magnolia, Texas and Albany, Oregon, with their real streets, buildings and addresses
   (listed as "magnolia tx" and "albany or").
+- The world: one continuous world on real ground (USGS 3DEP elevation), built by the server tile by
+  tile the first time anyone goes near a place, with land cover, roads, woods and buildings from open
+  data. Arrive by place or street address (`/join world magnolia`, `/join world address ...`); the
+  world round you is built behind a loading screen before you get there.
 - Doors work as real ones do: knob doors, push-bar doors with closers, keyed glass front doors,
   automatic sliding doors and patio doors. Each is pushed from one side and pulled from the other,
   and no door shuts on a person.
@@ -52,7 +57,9 @@ reverb that comes from the room's actual size and materials.
   where each player stands and muffled by walls.
 - Teams, friends and profiles. F-key lists of players, maps and friends, which you can act on.
   Travel between maps with F6 or `/join`, or carry a teleporter.
-- Maps of your own: any player can make a map, build on it, and invite people.
+- Maps of your own: any player can make a map, build on it with the world editor (F12, and Control+B
+  to build quickly: floors, walls, roofs, doors, stairs, columns and other shapes), lay roads and
+  railways, and invite people.
 - Saved servers and settings. When you log out, your place and what you carry are kept.
 
 ### The sound engine
@@ -65,14 +72,16 @@ reverb that comes from the room's actual size and materials.
 - Doppler, air absorption over distance, and horn directivity.
 - Physical synthesis of: petrol and diesel engines with their exhaust and intake systems, turbos,
   tyres, electric and air horns, sirens, trains and their horns and bells, air brakes, aircraft
-  (propellers, jets, helicopters), small machines, doors and locks, footsteps, gunfire, water,
-  fire, wind in trees, applause and crowds.
+  (propellers, jets, helicopters), small machines, doors and locks, footsteps, gunfire, water
+  (including rain running off the ground into ditches and creeks), fire that spreads by what is there
+  to burn, a gas hob, loudspeakers (a PA horn, a megaphone), things struck by hand or body by their
+  material and shape, wind in trees, applause and crowds.
 
 ### Running a server
 - One server can host several maps at once; players travel between them.
 - Maps are JSON files; objects are prefabs. Materials decide how things sound.
-- Accounts with four roles (player, moderator, developer, administrator), custom roles and single
-  permissions. On a map they own, every player can build.
+- Accounts with roles (player, moderator, developer, administrator and a protected owner), custom
+  roles and single permissions; bans. On a map they own, every player can build.
 - An admin gun for the administrator: kill, vaporize, freeze or inspect what it hits.
 - A message of the day, and a text (MUD) interface for testing a server without a client.
 - The network sends only what changed: things at rest are not sent again. Clients must be built
@@ -99,15 +108,19 @@ reverb that comes from the room's actual size and materials.
 
 - C# on .NET 10. Networking: LiteNetLib. Entities: Arch ECS. Serialisation: MemoryPack.
   Audio: FMOD Core and Steam Audio (phonon). UI: GTK 4 (GirCore).
-- Projects: `OpenFPS.Common` (shared simulation, acoustics and sound models), `OpenFPS.Server`,
+- Projects: the sound library (`OpenFPS.Geometry`, the triangle world; `OpenFPS.Acoustics`, materials,
+  walls and reflections; `OpenFPS.Sound`, the sound models and synthesis; `OpenFPS.Native`, the FMOD and
+  Steam Audio bindings), `OpenFPS.Common` (shared simulation and the wire), `OpenFPS.Server`,
   `OpenFPS.Client.Core` (client logic and the audio engine), `OpenFPS.Client.Gtk` (Linux client),
   `OpenFPS.Client` (Windows client), `OpenFPS.AudioLab` (measurement and rendering tools; `--help`
   lists them), `OpenFPS.Tests`.
 - Build with `--artifacts-path` pointing off the repository's volume (see the run scripts). Do not
   use `dotnet run`: it writes `obj/` and `bin/` into the repository.
-- Tests: `dotnet test OpenFPS.Tests` (about 1,800 test methods).
+- Tests: `dotnet test OpenFPS.Tests` (about 2,800 test methods); the full suite runs on GitHub Actions.
 - Map and prefab authoring: [docs/AUTHORING.md](docs/AUTHORING.md). Maps of real places, and how
   to make another: [docs/MAPS_FROM_REAL_PLACES.md](docs/MAPS_FROM_REAL_PLACES.md). Their map data is
   (c) OpenStreetMap contributors (ODbL), with buildings from Overture Maps, addresses from the US
   National Address Database and Census TIGER/Line, and tree cover from ESA WorldCover 2021 (CC BY 4.0).
+  The world's own tiles take their ground from USGS 3DEP, land cover from ESA WorldCover, roads from
+  OpenStreetMap and buildings from Overture Maps.
 - Planned work: [todo.md](todo.md). Recent changes: [changes.md](changes.md).

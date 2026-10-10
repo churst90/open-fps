@@ -8,9 +8,9 @@ tube, the spark module, the light-up, the flames, the flame safety, and turning 
 recording. Recordings of real hobs were used only as the measure (section 9).
 
 Code:
-- `OpenFPS.Common/GasHob.cs`: the gases, the burners, the hob, its presets, the knob's valve law, the
+- `OpenFPS.Sound/GasHob.cs`: the gases, the burners, the hob, its presets, the knob's valve law, the
   state key (`HobKey`) and what the interact key does (`HobControls`).
-- `OpenFPS.Client.Core/AudioEngine/Core/Stove/GasHobSynth.cs`: the hob, pascals at a metre.
+- `OpenFPS.Sound/Core/Stove/GasHobSynth.cs`: the hob, pascals at a metre.
 - `OpenFPS.Client.Core/AudioEngine/Fmod/StoveVoiceState.cs`: the hob as a voice.
 - Prefabs `gas_hob` (four burners, natural gas, no flame safety), `gas_hob_flame_safety`,
   `gas_hob_reignition`, `gas_hob_propane`, `gas_burner` (one burner). Presets `hob4`, `hob4_ffd`,
@@ -336,7 +336,8 @@ interquartile about 25 to 46.
 ## 10. Open
 
 - Heard by Cody: round 1 (2026-10-10): liked; "a little too present", "kind of loud", and the clicking went
-  on long after the burner lit. Round 2 answers those (section 11), not heard yet.
+  on long after the burner lit. Round 2 answers those (section 11): approved by ear 2026-10-10 ("sounds great
+  now"; merged c3a09466). Not yet on any map: a `gas_hob` in the city's kitchens (tools/gen_city.py) is open.
 - A pan on the burner (it shields the cap, changes the roar, and boils).
 - An oven and a grill under the hob. A North American range's own details (60 Hz mains, 1.0 kPa manifold
   pressure, its injectors): the hob's switching and flame safety are there now, the rest is European.

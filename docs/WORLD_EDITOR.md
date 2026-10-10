@@ -4,6 +4,14 @@ The design agreed with Cody on 2026-10-06, and how it is built. Phase 1 is the f
 selecting things, moving and turning them, settings generated from what each kind of thing says about
 itself, undo and redo, and edits that are kept.
 
+Where it stands (2026-10-10): phases 1 to 3 are built and merged (sections 9, 12, 13 and 18), with the
+typed-value box (14), Control+B (15), the F12 dialog (16), Buildings, Vehicles and the placed list (17) and
+shapes in the quick build (19). Cody tried the dialog with Orca on 2026-10-10 ("works well"); NVDA on the
+Windows client is untried, and direct keys (`/editorkeys on`) stay off until tried. What is left: section
+18's list of what the road and rail data cannot carry, copying, renaming, deleting and publishing maps,
+checks ("this room has no door"), and groups as one composite only if building houses needs it (todo.md,
+"Map editor").
+
 ## 1. What it is
 
 - F12 opens the world editor dialog, in the game, while you play (section 16; until 2026-10-09 it
@@ -106,7 +114,7 @@ existing library already is this:
 | prefab | PrefabTemplate, described from prefab-schema.json | prefabs/*.json (PrefabKind, the server's) |
 | group | GroupSpec | made in the editor (GroupKind, the server's) |
 
-`ModelKinds` (OpenFPS.Common/Editing) takes its list of kinds from `ModelLibrary.AllKinds`, so a kind
+`ModelKinds` (OpenFPS.Sound/Editing) takes its list of kinds from `ModelLibrary.AllKinds`, so a kind
 added to the library is in the editor with no further code.
 
 ### Fields
@@ -326,7 +334,7 @@ Selecting is not an operation: it changes nothing and is per player.
 
 ## 9. Phases
 
-### Phase 1 (this branch)
+### Phase 1 (built 2026-10-06)
 
 - docs/WORLD_EDITOR.md.
 - F12 and the World Editor menu, role gated; `/edit` for the command line and the MUD.
@@ -506,7 +514,7 @@ here has been tried in the game client yet, only by tests and through the MUD ga
   chosen, not typed.
 - Engines are kind `engine`; EngineProfile.ByName takes an edited engine, so a vehicle, a small
   machine, a train and an aircraft engine all have the change. Vehicles are kind `vehicle`
-  (VehicleSpec, OpenFPS.Common/VehicleSpec.cs); MachineRegistry.VehicleFor builds an edited one on its
+  (VehicleSpec, OpenFPS.Sound/VehicleSpec.cs); MachineRegistry.VehicleFor builds an edited one on its
   base and forgets what it assembled whenever the library changes. A client restarts the voices of the
   vehicles and machines on an engine that changed.
 - Prefabs are kind `prefab` (ModelCatalog.cs, PrefabKind): fields from prefab-schema.json (vectors are
@@ -622,7 +630,7 @@ Five leftovers from this list were built the same day: section 13. Still left:
   copies already placed. Not to be built unless building houses shows the need (decision 2 below); a
   placed group can be held and moved as one instead (section 13).
 - Previews are for things with a sound of their own; there is no preview of a wall being struck.
-- Phase 3 as in section 9.
+- Phase 3 as in section 9 (built 2026-10-10: section 18).
 
 ### Decisions for Cody
 
@@ -725,8 +733,8 @@ together for the vehicle library to agree (both read machines/).
 ### For Cody
 
 1. **Map-file `Form` (a ramp's shape on a map entry) is not carried by Remake or by duplicate.** Found
-   while doing item 1: `MapOverlayStore.Clone` and `Remake` copy every other map-entry field but not
-   `Form`. Recommendation: carry it; no map in the repository uses `Form` on an entry yet.
+   while doing item 1: `MapOverlayStore.Clone` and `Remake` copied every other map-entry field but not
+   `Form`. Done 2026-10-07 (3feacd3e): the form survives a remake, a copy and an undo.
 
 ## 14. Typed values in a dialog
 
@@ -1159,8 +1167,8 @@ listed beside it in "Changed on this map" (section 18, built 2026-10-10).
 
 ## 18. Phase 3: changed things, versions, roads and railways, people
 
-Built 2026-10-10 (todo item 6; Cody's list of 2026-10-08, section 7), in this order of value. Untried
-with Orca and NVDA: tests only (OpenFPS.Tests/WorldEditorPhase3Tests*.cs). Every new control is one of
+Built 2026-10-10 (Cody's list of 2026-10-08, section 7), in this order of value. Untried with Orca
+and NVDA when built: tests only (OpenFPS.Tests/WorldEditorPhase3Tests*.cs). Every new control is one of
 the dialog's existing kinds (a box, a drop-down, a list, a ticking list, a button, a line of words), so
 the two heads draw them as they draw the rest. The one head change: a line of words now changes its
 words where it stands (the route form's "Laying ..." line), the same in GTK and WinForms.
@@ -1401,7 +1409,8 @@ then Where, Distance and Facing.
 ```
 
 Words a phrase reads: a number before "steps"; "up NORTH" or a compass word for which way it faces; a
-roof style; "over the floor"; here, cursor, ahead METRES; any field word and its value; a material's
+roof style; "over the floor"; here, cursor or ahead (how far ahead is "distance METRES": a number
+after "ahead" is read as one of the sizes, a known slip in `TryShapePhrase`); any field word and its value; a material's
 name (or its start). "roof" with no style is the roof slab it always was. Stairs said with a count and
 no sizes are a comfortable flight: 18 cm rises on 28 cm goings, a metre wide.
 

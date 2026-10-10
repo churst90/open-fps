@@ -727,6 +727,21 @@ within its radius (at medium, 300 m full and 800 m coarse: about 10 full tiles a
 A session is one working session of an agent, as in the streaming plan. Each stage leaves the game
 working and boxes valid.
 
+Where the stages stand (2026-10-10, all merged on main; none of 3 and 4 heard in the game yet):
+
+| Stage | Status |
+|---|---|
+| 1. Triangle world, BVH, rays, Steam Audio, static collision | built 2026-10-06 (section 9) |
+| 2. Slopes, ramps and stairs | built 2026-10-06 (section 10) |
+| 3. Terrain from real elevation | built 2026-10-09 with streaming stage 2 (section 11) |
+| 4. Shape library, import, generators, editor | built 2026-10-10 (section 12, eb529bfe); rooms by flood built as an instrument, not switched on; sound points on models begun (12.6) |
+| 5. Diggable ground with strata | not started; held until wanted (Cody, 2026-10-10) |
+| 6. Vehicles and bodies in the acoustic scene | not started; next after the rooms, with sound library stage 5 |
+
+The order agreed with Cody on 2026-10-10: switching rooms by flood on (12.6 item 1: the leaks and narrow
+rooms fixed first, gated by the parity harness) goes with sound library stage 4
+(docs/SOUND_LIBRARY_BOUNDARY.md 16.7); then stage 6 with library stage 5; stage 5 waits.
+
 ### Stage 1: the triangle world, the BVH, rays, Steam Audio and static collision (4 to 6 sessions)
 
 - `TriangleWorld` in Common: mesh assets, the shape library's box, BLAS and TLAS, the queries (2.2),
@@ -760,8 +775,8 @@ working and boxes valid.
 
 ### Stage 3: terrain from real elevation for the real places (4 to 6 sessions)
 
-Being built with streaming stage 2 (2026-10-09): the order of work is in docs/WORLD_STREAMING.md,
-"Stage 2 with terrain".
+Built with streaming stage 2 (2026-10-09; section 11): the order of work was docs/WORLD_STREAMING.md,
+"Stage 2 with terrain". Bridges and tunnels from OSM tags and creeks cut in are not built.
 
 - `fetch_place.py`: 3DEP at 10 m and 1 m where available. `gen_osm.py`: graded terrain tiles,
   building pads, draped roads with kerbs and sidewalks, drives, bridges and tunnels from OSM tags,
@@ -1407,10 +1422,12 @@ bits, open ground on raised terrain).
   25 m of the play area. Server load: Magnolia 1.5 s (was 1.3), Albany 2.7 s. Entities: Magnolia 36,291
   (was 32,598), Albany 46,020 (was 41,327), from the roads in 20 m pieces. A join at medium detail on
   Magnolia is 1,388 KB packed (was 530 KB): about 17 KB a tile of ground, 49 tiles.
-- **Not done**: road cross-sections (crown, kerb, gutter) and draped road meshes, bridges and tunnels,
-  creeks cut in, the coarse ring's terrain at 8 m, a grade limit on roads (12 %, 6 % on a highway),
+- **Not done**: road cross-sections (crown, gutter) and draped road meshes, bridges and tunnels,
+  creeks cut in, a grade limit on roads (12 %, 6 % on a highway),
   ground materials from the land cover on the places' maps (every cell is dirt, as the slab was; the world's
-  own tiles take theirs from ESA WorldCover since 2026-10-10, docs/WORLD_STREAMING.md).
+  own tiles take theirs from ESA WorldCover since 2026-10-10, docs/WORLD_STREAMING.md). Done since: the
+  coarse ring's ground at 7.8 m (2026-10-09, docs/WORLD_STREAMING.md "Coarse ground in the far ring");
+  swept kerbs on roads with sidewalks (Albany, stage 4, 12.2).
 
 ### 11.3 The places on the world's grid at 2 m (2026-10-09)
 

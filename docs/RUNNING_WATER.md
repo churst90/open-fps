@@ -5,8 +5,9 @@ Cody, 2026-10-06: "start on the running water model so fountains and rain and su
 Until now only falling and splashing water existed: the Elm Park fountain (`FallingWaterSynth`) and
 the rain (`RainSynth`, `RainPatch`, `NearDrops`). Nothing flowed. This document is the research and
 the design for a model of water that runs: creeks, street gutters, drain grates, downpipes, a
-fountain basin's overflow, run-off after rain. Code: `OpenFPS.Common/RunningWater.cs`,
-`OpenFPS.Common/Runoff.cs`, `OpenFPS.Client.Core/AudioEngine/Core/Nature/RunningWaterSynth.cs`. Water running over the
+fountain basin's overflow, run-off after rain. Code: `OpenFPS.Sound/RunningWater.cs`,
+`OpenFPS.Sound/Runoff.cs`, `OpenFPS.Sound/Core/Nature/RunningWaterSynth.cs` (in OpenFPS.Sound since sound library
+stage 3, 2026-10-10). Water running over the
 ground from its shape and the rain (drainage lines, ponds, water poured at a point): section 13.
 
 Tags on facts below: **[ft]** read in the full text, **[abs]** read in the abstract only,
@@ -711,7 +712,7 @@ Cody, 2026-10-10 (docs/MATTER.md, order of work step 4): water should run down a
 reach a fire. This is the cheap version that runs everywhere: each tile works out once which way its ground
 drains, the rain runs along those lines with the run-off timing above, and running water is heard where it
 gathers. Code: `OpenFPS.Server/Water/` (`Drainage`, `DrainageNetwork`, `SurfaceRaster`, `MapDrainage`),
-`OpenFPS.Server/Systems/GroundWaterSystem.cs`, `OpenFPS.Common/GroundWater.cs`, `OpenFPS.Common/GroundChannels.cs`.
+`OpenFPS.Server/Systems/GroundWaterSystem.cs`, `OpenFPS.Sound/GroundWater.cs`, `OpenFPS.Sound/GroundChannels.cs`.
 Instrument: AudioLab `--ground-water map|flows|levels|game`. Tests: `GroundWaterTests`, `GroundWaterMagnoliaTests`.
 Renders: `inbox/water-over-terrain-2026-10-10/README.txt`, approved by ear 2026-10-10 (Cody: "water over terrain
 sounds good").
@@ -730,7 +731,7 @@ sounds good").
   circle (a test walks every cell to the edge). D8 rather than D-infinity (Tarboton 1997, multiple directions):
   what is heard is where flow gathers into lines, where both agree, and one receiver a cell is what joins tiles
   simply (13.3). On open slopes D8 makes parallel lines a sheet would not; nothing is placed there.
-- **Stored** with each world tile (`WorldTile.Drainage`, appended; generator version 4, so stored tiles are made
+- **Stored** with each world tile (`WorldTile.Drainage`, appended; generator version 5, so stored tiles are made
   again): the direction (a byte), how deep the cell's hollow fills (whole centimetres) and its surface (a byte)
   for each cell, and the method's version. A place's copies in the world carry theirs too (WorldPlaces format 2).
 

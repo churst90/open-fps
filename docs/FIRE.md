@@ -9,9 +9,9 @@ roar followed its width and heat release, but nothing else grew with size: no cr
 nothing falling, and a crackle stream that a big fire would have turned into one steady hiss.
 
 This document is the research and the design for fire from a campfire to a forest's crown fire.
-Code:
-- `OpenFPS.Common/Fire.cs`: the specs, the presets, the keys.
-- `OpenFPS.Client.Core/AudioEngine/Core/Nature/FireSynth.cs`: the sound.
+Code (in OpenFPS.Sound since sound library stage 3, 2026-10-10):
+- `OpenFPS.Sound/Fire.cs`: the specs, the presets, the keys.
+- `OpenFPS.Sound/Core/Nature/FireSynth.cs`: the sound.
 - `PowerLawNoise.cs` (beside it): the roar's spectrum.
 - AudioLab `--fire`: the lab.
 - `/spawn fire PRESET`: lights a fire in the game for testing.
@@ -575,7 +575,10 @@ At a metre, fully developed, every place summed (`SourceLevelDb`, measured; see 
 
 ## 12. Fire that burns what is there (2026-10-10)
 
-Stage 1 approved by Cody's ear 2026-10-10 ("new fire sounds good as well", inbox/fire-fuel-2026-10-10).
+Stage 1 approved by Cody's ear 2026-10-10 ("new fire sounds good as well", inbox/fire-fuel-2026-10-10) and
+merged (b9b2991f). Water running over the ground (docs/RUNNING_WATER.md 13) was built the same day, with
+`WaterReaching` for this, but the two are not joined yet (FireSystem never asks it); hoses and buckets do
+not exist beyond `/spawn fire water`.
 
 Cody, 2026-10-10: "should the fire be driven not by a predefined grid but rather by what is a fuel source,
 not whether it is necessarily next to something else that can catch fire? For example, a series of stumps
@@ -587,9 +590,9 @@ outline, or a zone), with the crackle at the fuel bed and the roar at the right 
 zones carry properties, fuel among them. Later the same day he added water and the weather (12.6, 12.7).
 
 Code:
-- `OpenFPS.Common/FireShape.cs`: the shape a fire burns over.
-- `OpenFPS.Common/Fuel.cs`: `FuelPart`, `FuelSpec`, `FuelCatalog`: fuel as a property of things.
-- `OpenFPS.Common/FireSpread.cs`: things catching, burning, going out.
+- `OpenFPS.Sound/FireShape.cs`: the shape a fire burns over.
+- `OpenFPS.Sound/Fuel.cs`: `FuelPart`, `FuelSpec`, `FuelCatalog`: fuel as a property of things.
+- `OpenFPS.Sound/FireSpread.cs`: things catching, burning, going out.
 - `OpenFPS.Server/Systems/FireSystem.cs`: the spread on each map, and its emitters.
 - `FireSynth`: the places at the bed and in the flames, water on the fire, cooling.
 - AudioLab `--fire spread timeline|game`.

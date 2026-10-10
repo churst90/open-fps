@@ -705,6 +705,12 @@ Rules for every stage:
 
 A session here is one working session of an agent, as in docs/GEOMETRY.md.
 
+Where the stages stand (2026-10-10): 0, 1 and 2 built 2026-10-07 (sections 13 to 15), 3 built and merged
+2026-10-10 (section 16, 563f26de), with decision 4 taken the same day (e081faf0: Acoustics without
+MemoryPack). The order agreed with Cody on 2026-10-10: stage 4 next, together with switching the rooms
+flooded from the walls on (docs/GEOMETRY.md 12.6 item 1); then stage 5 with geometry stage 6 (vehicles and
+bodies in the acoustic scene); then stages 6 to 8.
+
 ### Stage 0: guards (1 to 2 sessions)
 
 - **Ratchet test** (`LibraryBoundaryTests`): see section 9. Generated from this survey's
@@ -906,8 +912,8 @@ to `Geometry/` and to `SharedMovementEngine`.
   the first wire type moves. Done: it covers Geometry, Acoustics and Sound but its synthesis (16.4).
 - **Stale door renders**: the door fingerprint lists Common files (stage 3). The build fails loudly
   if left; move the list with the files. Done: the list is in OpenFPS.Sound, hashed by file name (16.4).
-- **Branches in flight**: each move conflicts with every branch that edits a moved file. Today only
-  `geometry-stage-2` is unmerged, but audio branches open most days. `git mv` and unchanged
+- **Branches in flight**: each move conflicts with every branch that edits a moved file. At the survey
+  only `geometry-stage-2` was unmerged (merged since), but audio branches open most days. `git mv` and unchanged
   namespaces keep the conflicts to renames, which git follows when the content is unchanged, but a
   branch that edits a file and a move of the same file still need a rebase.
 - **Bit-identical is not fully checkable**: renders on thread pools and anything stamped by the wall
@@ -937,7 +943,9 @@ to `Geometry/` and to `SharedMovementEngine`.
 4. **MemoryPack in the library.** Keep `[MemoryPackable]` on `TransientSound` and give Sound the
    attribute package (recommended: the wire bytes stay identical), or keep a wire copy in Common and
    convert. `AcousticMap` and `SparseAcousticOctree` carry the attribute too, but nothing the survey
-   found serialises them (they are not in any message); the attribute can probably go.
+   found serialises them (they are not in any message); the attribute can probably go. Decided
+   2026-10-10 (Cody): `TransientSound` keeps it in Sound; the attribute went from `AcousticMap` and the
+   octree, and Acoustics references no MemoryPack (16.3).
 5. **Logging.** Keep Serilog's static `Log` (recommended for now: no behaviour change), or put a
    small log sink on the world options.
 6. **Namespaces.** Keep them while moving (recommended), and decide later whether to rename to
@@ -1978,8 +1986,9 @@ OpenFPS.Geometry <- OpenFPS.Acoustics <- OpenFPS.Sound <- OpenFPS.Common <- Serv
   files (`ReferenceVoice`, `BodyConstants`, `RenderRate`, `TransientSound`, `WheelState`, `PlaybackMode`,
   `WeatherType`, `Ammunition`, `Vector3Converter`, `SincResampler`, `RadiatorBands`); `AudioEvents`,
   `Messages` and `Weapons` stopped being mixed, and `Components` holds one library value instead of three.
-- `LibraryReferencesOnlyLibrary` has two more cases: Acoustics references only the runtime, Geometry,
-  MemoryPack.Core and Serilog; Sound only the runtime, Geometry, Acoustics, MemoryPack.Core and Serilog.
+- `LibraryReferencesOnlyLibrary` has two more cases: Acoustics references only the runtime, Geometry
+  and Serilog (MemoryPack.Core too until decision 4 was taken, e081faf0); Sound only the runtime, Geometry,
+  Acoustics, MemoryPack.Core and Serilog.
 - The survey reads the two new projects (`Program.cs`: their compilations, references and grants; the
   door fingerprint is generated into Sound's compilation, as the build does).
 
@@ -2008,8 +2017,8 @@ OpenFPS.Geometry <- OpenFPS.Acoustics <- OpenFPS.Sound <- OpenFPS.Common <- Serv
   references left (`AcousticVolumeGenerator` 120, `RoomAcoustics` 15, `OpeningRoutes` 15, `AcousticMap` 2);
   `OpeningGraph` (50) and `FmodAudioProvider`'s 19 take the same values. When `OpeningRoutes` moves,
   Acoustics' grant to Common goes.
-- `AcousticMap` and `SparseAcousticOctree` keep `[MemoryPackable]` (decision 4 said it can probably go:
-  nothing sends them). Deciding that would let Acoustics drop MemoryPack.
+- (Done 2026-10-10, e081faf0: `AcousticMap` and `SparseAcousticOctree` lost `[MemoryPackable]`, nothing
+  having sent or stored them, and Acoustics dropped MemoryPack; decision 4.)
 - `ColliderShape` stays in Common (15.2); since 16.2 no library file needs it but the three stage 6
   readers of `ColliderComponent`.
 - The rest of the 565 belongs to stage 6 (the world input): `RainField` 104, `SpatialAcoustics` 73,
