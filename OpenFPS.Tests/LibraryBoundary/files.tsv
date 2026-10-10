@@ -271,6 +271,8 @@ OpenFPS.Common/SparseAcousticOctree.cs	lib	Acoustics
 OpenFPS.Common/Spectrum.cs	lib	Sound	
 OpenFPS.Common/Speech/Speech.cs	host		
 OpenFPS.Common/StatePacking.cs	host		
+OpenFPS.Common/StruckModes.cs	lib	Sound	
+OpenFPS.Common/StruckThings.cs	lib	Sound	
 OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	lib	Acoustics	
 OpenFPS.Common/Systems/FaceOpenings.cs	lib	Acoustics	
 OpenFPS.Common/TeleporterSounds.cs	lib	Sound	

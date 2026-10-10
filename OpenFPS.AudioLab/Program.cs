@@ -125,6 +125,8 @@ string[] usage =
     "  --breath [effort=] [seconds=] [out=]          the breathing model laid out at its own times and levels",
     "  --bumps [--speed=1.4] [--out=DIR]             a person walking into things",
     "  --materials                                   the material table, by family, as docs/MATTER.md carries it",
+    "  --struck [material=] [shape=] [size=LxWxT] [support=] [striker=] [speed=] [at=U,V] [out=]",
+    "                                                a struck thing by modal synthesis; anchor, fit, renders, cost",
     "  --applause [people=] [intensity=] [sec=] [out=]",
     "                                                a crowd on its own; compare=DIR against recordings",
     "  --door-knock [out=] [seed=] [knocks=]         knuckles on a wooden door",
@@ -693,6 +695,11 @@ if (args.Contains("--car-fronts"))
 if (args.Contains("--tap-balance"))
 {
     Environment.Exit(OpenFPS.Client.AudioEngine.Fmod.TapBalanceSpike.Run(args));
+}
+
+if (args.Contains("--struck"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.StruckSpike.Run(args));
 }
 
 if (args.Contains("--materials"))
