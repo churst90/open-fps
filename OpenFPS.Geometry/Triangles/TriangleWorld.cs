@@ -179,6 +179,9 @@ public sealed class TriangleWorld
     public ref readonly Surface SurfaceOf(in GeometryHit hit)
         => ref hit.Triangle >= 0 ? ref _instances[hit.Solid.Instance].Piece.SurfaceOfTriangle(hit.Triangle) : ref SurfaceOf(hit.Solid);
 
+    /// <summary>The shape a solid was made of, in the frame <see cref="BoxOf"/> places (null for a box or terrain).</summary>
+    public MeshAsset? ShapeOf(SolidRef s) => _instances[s.Instance].Piece.ShapeOfSolid(s.Solid);
+
     /// <summary>The box a solid was made from, in the world (size zero if it was not a box).</summary>
     public (Vector3 Centre, Vector3 Size, Quaternion Rotation) BoxOf(SolidRef s)
     {

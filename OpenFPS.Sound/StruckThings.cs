@@ -895,10 +895,33 @@ public static class StruckThings
     /// </list>
     /// </summary>
     public static StruckThing Describe(string? material, Vector3 size, Vector3 localNormal, float leafMetres, float studSpacing,
-                                       bool moves, bool isVehicle, out bool lengthIsUp, VehicleBody? body = null)
+                                       bool moves, bool isVehicle, out bool lengthIsUp, VehicleBody? body = null,
+                                       Geometry.ShapeSpec? form = null)
     {
         string mat = string.IsNullOrEmpty(material) ? "Generic" : material;
         float ax = MathF.Abs(localNormal.X), ay = MathF.Abs(localNormal.Y), az = MathF.Abs(localNormal.Z);
+        // A shape is struck as the part it has, not the box round it (docs/GEOMETRY.md 12.6): a pitched roof is its
+        // deck over the slope, a flight one step.
+        if (form is { Kind: Geometry.ShapeKind.Roof, Style: not Geometry.RoofStyle.Flat })
+        {
+            lengthIsUp = false;
+            float deck = Geometry.Shapes.PanelOf(form, size).Y;
+            return new StruckThing
+            {
+                Material = mat, Shape = StruckShape.Plate, Length = MathF.Max(size.X, size.Z), Width = MathF.Min(size.X, size.Z),
+                Thickness = MathF.Max(0.005f, deck), Support = StruckSupport.Built,
+            };
+        }
+        if (form is { Kind: Geometry.ShapeKind.Stairs, Steps: > 0 })
+        {
+            lengthIsUp = false;
+            float rise = size.Y / form.Steps, going = MathF.Max(0.05f, (size.Z - form.Landing) / form.Steps);
+            return new StruckThing
+            {
+                Material = mat, Shape = StruckShape.Block, Length = MathF.Max(size.X, going), Width = MathF.Min(size.X, going),
+                Thickness = MathF.Max(0.02f, rise), Support = StruckSupport.Built,
+            };
+        }
         // The face met: across (horizontal) and up (vertical) when it stands; both across when it is a top.
         float thick, across, up;
         bool standing = true;

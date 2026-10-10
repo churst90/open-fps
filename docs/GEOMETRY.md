@@ -31,6 +31,7 @@ AudioLab `--geometry map=<id> [terrain=<metres>]`.
 9. Stage 1 as built (2026-10-06)
 10. Stage 2 as built (2026-10-06)
 11. Stage 3 as built (2026-10-09)
+12. Stage 4 as built (2026-10-10)
 
 ---
 
@@ -788,6 +789,7 @@ Being built with streaming stage 2 (2026-10-09): the order of work is in docs/WO
   until every generator writes seeds.
 - Risks: interior layouts on irregular footprints; imported meshes that are not closed (the importer
   refuses them as solids and they can only be sheets).
+- As built (2026-10-10): section 12; rooms by flood and sound points on models are left (12.6).
 
 ### Stage 5: diggable ground with strata (5 to 8 sessions)
 
@@ -1441,6 +1443,182 @@ request.
   the walk runs along the side of a drive (1009 Belmont Avenue) standing over a roadside dip the 2 m survey
   shows and the 5 m one did not. There is ground under every 25 m of both; some creek banks are now steeper
   than a body can stand on, so they are walls, as GEOMETRY.md 11.1 says a steep bank is.
+
+## 12. Stage 4 as built (2026-10-10)
+
+The shape library, footprints and roofs in the generators, the importer and mesh assets on the wire, and shapes in
+the quick build. Rooms derived from seeds by flood (2.7) and sound points on models (MATTER.md 8) are the rest of
+the stage (12.6).
+
+### 12.1 The shape library
+
+`OpenFPS.Geometry/Triangles/Shapes.cs` (stage 2's shapes, the builder, the surfaces), `Shapes.More.cs` (the new
+ones), `Polygons.cs` (outlines: simplifying, ear clipping with holes, convex pieces; sines from arithmetic),
+`StraightSkeleton.cs` (roofs), `Facets.cs` (facets and `MeshCheck`). Every shape fills its collider's box, as
+stage 2's do, so `ColliderSize` stays the bounding box every box reader sees; `ShapeSpec` (appended fields) says
+what the size does not.
+
+| Kind | Numbers | Made as |
+|---|---|---|
+| `Cylinder` | `Segments` | an upright round column, trunk or tank; an ellipse when X and Z differ |
+| `Cone` | `Top`, `Segments` | a cone or frustum |
+| `Sphere`, `Dome` | `Segments` | a ball; the top half of one on a flat base |
+| `Prism` | `Outline`, `Holes` | an outline stood up the box's height, holes through it |
+| `Roof` | `Outline`, `Style` | solid from the eaves to the slopes: `Hip` (the straight skeleton of any outline), `Gable` (a hip whose triangular ends are stood up where the ridge meets them), `Shed`, `Flat`; the pitch is what the box's height makes it |
+| `Swept` | `Profile`, `Path` | a profile drawn along a 3D path, mitred at each bend |
+| `Mesh` | `Mesh` | an imported asset (12.3), stretched to the box |
+
+- **Closed edge for edge.** Every shape is a closed solid whose every edge two triangles share going opposite
+  ways, facing out (`MeshCheck.Check`), with no triangle without area and no sliver; its convex pieces (each a
+  closed convex solid) fill it, their volumes summing to its own; it fills its box to a tenth of a millimetre;
+  a ray from inside leaves one more face than it enters and the pieces agree on what is inside
+  (`GeometryShapeLibraryTests`, 25 shapes). Stage 2's stairs and arch met their treads and tops at T-junctions:
+  their sides (and the arch's faces) are one polygon each now, the same surface.
+- **The same bits everywhere.** Everything is worked out in doubles from the numbers and made floats once; round
+  shapes take their sines from arithmetic (`DetMath`: the C library's last bit differs between Windows and
+  Linux). Made shapes are kept with the spec they were made from (a roof's skeleton is made once, however many
+  readers ask).
+- **Sides as sound can tell them apart.** A round shape with no `Segments` takes a multiple of four: 8 under a
+  quarter metre of radius, 12 at 0.3 m, 32 from about 3 m. Sides not a multiple of four are stretched to meet the
+  box.
+- **The straight skeleton.** Edges move in at one speed, events (an edge shrinking away, a reflex corner
+  splitting the front) taken one at a time, earliest first, so a rectangle's or an L's simultaneous events are
+  just events a moment apart. Nodes within a millimetre are one (a footprint a hair off square kinks its ridge
+  by micrometres). The faces must cover the outline exactly or the roof is laid flat; on Magnolia none is
+  (12.2). 300 random star outlines and 400 near-squares and L's moved by 10 µm to 2 cm: every one closed.
+- **Surfaces.** Each shape names its surfaces (`Shapes.SurfaceNames`: stairs body and treads; a roof's slopes,
+  ends and underside; a prism's sides, top and bottom ...) and `ShapeSpec.Materials` gives each a material, the
+  thing's own where it says none. A triangle's surface is its own in the piece (`SolidSpec.Slots`), so a foot on a
+  carpeted tread is on carpet and a ray at the riser meets concrete. A roof's slopes are roofs (the scope's "on
+  a roof"); sound goes through a roof as its deck (0.2 m, or `Thickness`), not its attic (`Shapes.PanelOf`).
+- **Facets.** A mesh's facets (`MeshAsset.Facets`) are its triangles that share an edge, lie in one plane (a
+  millionth of a turn, a tenth of a millimetre) and are one surface, with their area, plane and the rectangle
+  round them. A box has 6, a wedge 5, sixteen stairs 36, a twelve-sided column 14, a hip roof 5. The image
+  sources mirror a shape from its facets: `EarlyReflections` (with the hit point checked on the facet itself,
+  not only its rectangle) and `EngineReflections` (each facet's rectangle). The first answer off a ramp comes off
+  its slope (test), not the top of its box.
+
+### 12.2 The real places: footprints, roofs, trunks, kerbs
+
+`tools/gen_osm.py` and its port `OpenFPS.Server/OneWorld/WorldBuildings.cs` (the world's buildings), kept the
+same (`WorldBuildingsTests`: Magnolia's 1,506 buildings at medium detail, every entity within a centimetre, the
+same turn and the same form).
+
+- **Walls go round the footprint itself**, simplified (a corner within 10 cm of the line through its neighbours,
+  or within 25 cm of the one before, does no work), one wall a side, inside the side, a reflex corner closed by
+  lengthening its two walls by their thickness. A 148-sided Albany building has its sides; an L is an L. Walls stay
+  boxes, so wall transmission, layers in contact, face openings and the room survey read them as before.
+- **The floor is the footprint** stood up a slab thick (`Prism`), one entity (a home's ceiling too), and **the roof is the footprint's
+  roof** (`Roof`): a house a hip or a gable by its seed at about 6 in 12 (a quarter of its narrow side, never above
+  its measured height), a metal building a low gable, a church a steep one, a brick shop flat. At every detail
+  level (the ridge was high detail only).
+- **Rooms are rectangles inside the footprint** (every footprint covered from inside, a rectangle's in one), and a
+  room's outward sides are grown to the inside face of the wall where it is near (the grid stands up to a cell off
+  a wall at an angle, and leaves a bay or a porch too small for a rectangle of its own); the corners of the
+  footprint stop them. A cell is in when its middle is in by a millimetre each way, so gen_osm and the world (each
+  projecting by its own sums) choose the same cells.
+- **The front door** is on the longest stretch of a street-facing side with a room behind it (within 0.7 m of the
+  side), its room the one there; a planned house's doors go on the side of the ring their room is behind.
+- **Solid outbuildings** (sheds, and below high detail garages, workshops, barns) are their footprints stood up.
+- **Trunks are round** (`Cylinder`, eight sides), the woods' and the single trees OpenStreetMap places.
+- **Kerbs**: a road whose tags give it a sidewalk has a kerb at the carriageway's edge each side it has one, a swept
+  profile 15 cm wide and 15 cm over the road with its top edges taken off, in the road's own pieces (none on
+  Magnolia; 537 pieces on Albany).
+- **The city** is not changed: its buildings are already their real shapes, its flights box treads that walk and
+  sound the same, its pavements kerbed by their own edges. Nothing there is clearly better as a shape.
+
+Measured (`GeometryStage4MapTests`, `RealPlaceMapTests`):
+
+| | Magnolia | Albany |
+|---|---|---|
+| Map JSON | 13.7 MB → 14.7 MB | 18.0 MB → 21.2 MB |
+| Entities | 36,374 → 36,317 | 46,013 → 49,732 |
+| Walls (entities) | 9,258 → 10,485 | 14,376 → 20,248 |
+| Regions (rooms) | 1,734 → 1,810 | 2,735 → 2,864 |
+| Openings found in rooms' faces at load | 1,788 → 2,476 | 2,873 → 5,463 |
+| Shapes | 2,604 prisms (floors, ceilings, sheds), 502 hip, 582 gable, 6 flat roofs, 3,030 trunks | 3,106 prisms, 659 hip, 770 gable, 2 flat roofs, 1,416 trunks, 537 kerbs |
+| Triangles | 239,340 of boxes + 155,026 of shapes (trunks 84,840; prisms 51,576; roofs 18,610) | 404,808 of boxes + 194,398 of shapes (prisms 99,612; roofs 44,398; trunks 39,648; kerbs 10,740) |
+| Hip or gable roofs laid flat | 0 | 1 |
+| Doors whose sides are not their rooms (the test's step either side) | 1 of 1,324 | 16 of 1,916 |
+| Server load in the tests, old map / new (shared machine, noisy) | 5.6 s / 4.5 to 7.4 s | 5.7 s / 5.9 to 6.8 s |
+| Acoustic map at the join | 1.1 s / 1.1 to 1.2 s | 2.1 s / 1.9 to 2.0 s |
+
+The openings found in rooms' faces rose (the gaps where the room rectangles of one house meet, now that every
+footprint is covered from inside, and gaps between a room's face and walls at an angle to it). Not yet looked at
+one by one: worth a listen in a house on Albany, and a run of `--geometry-parity only=routes`.
+
+### 12.3 Import, mesh assets and the wire
+
+- **Readers of our own** (`MeshImport.cs`, no dependency): OBJ (vertices, faces cut by ears in their own plane,
+  `usemtl` or the group as the surface) and glTF 2.0 (`.gltf` with data URIs or files beside it, `.glb`; the default
+  scene through its nodes' matrices or TRS, a mirroring node turning its triangles round; triangle primitives
+  only; Draco, quantised positions and sparse accessors refused by name). SharpGLTF (MIT) was the plan; glTF's
+  part we need is a few hundred lines, and the server needs no new package.
+- **Readying** (`MeshImporter.Prepare`): corners within 10 µm welded, triangles with no area and repeats dropped,
+  a solid checked closed (every edge shared by two triangles going opposite ways) and turned right way out if it
+  faced in, an open mesh refused unless it is taken as a sheet, the budget (50,000) kept, slivers and sub-centimetre
+  features noted, the whole moved about the middle of its bounds.
+- **Assets** (`MeshAssets.cs`): `MeshAssetData` (MemoryPack, then Brotli: `meshes/ID.mesh`), named by the hash of
+  its triangles, its surfaces' names and the materials the import gave them, its source and licence. `MeshLibrary`
+  (one a process) checks each asset's triangles hash to its name. A body meets a solid mesh as boxes filling it (a
+  grid of up to 32 cells on its longest side, merged greedily, at most 512) and a sheet as its triangles 4 cm thick.
+- **The tool**: `tools/import_mesh` (docs/AUTHORING.md section 5).
+- **The wire**: `MeshAssetRequest` (46) and `MeshAssetBatch` (47), appended to the union; the batch carries each
+  asset's file bytes as they are on disk. The server reads `meshes/` at start and refuses a map form naming a mesh
+  it lacks (the thing is its box). A client asks for the meshes its definitions name once each, keeps them in
+  `LocalApplicationData/OpenFPS/meshes` by id, and builds the things made of them again when they come; the
+  acoustic store's tile hash counts whether the mesh is here.
+
+### 12.4 Shapes in the quick build
+
+The quick build (Control+B, the F12 Build tab, `/edit build`) has a Shape kind: stairs, a ramp, a round column,
+a cone, a ball, a dome, an arch, a roof, made of a wall's material at the size given (docs/WORLD_EDITOR.md 19).
+A shape's own fields are in use and the rest dimmed (the shape's choice lists them), in both clients alike
+(`BuildForm` is shared). Said as phrases: `/edit build stairs 14 steps up north`, `/edit build column 0.3 by 3`,
+`/edit build roof gable over the floor`.
+
+### 12.5 Tests
+
+`GeometryShapeLibraryTests` (84), `GeometryImportTests` (6), `GeometryStage4MapTests` (2), `EditorShapeBuildTests`
+(5), `RoomFloodTests` (5); `WorldBuildingsTests` compares forms too (Magnolia's 1,506 medium-detail buildings the same
+in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
+
+### 12.6 Left of stage 4, and the plan for it
+
+1. **Rooms derived from seeds by flood (2.7)**, built as an instrument and not switched on.
+   `OpenFPS.Geometry/Triangles/RoomFlood.cs`: every indoor room floods at once from its box's middle through
+   half-metre cells (the acoustic grid's own voxels), each cell to the room that reaches it first; a solid box is
+   a cell's diagonal thick at least (so a 25 cm wall at an angle, a door leaf or a pane stops a 6-connected flood),
+   a shape or the ground is asked cell by cell; a room may reach its box grown by a metre, and is open where it
+   tried to go further; its air takes the wall cells next to it, so it reaches its walls as its box did. AudioLab
+   `--geometry-parity map=ID only=rooms` sets each room's flood against its box (`ROOM_DEBUG=ID` traces one room's
+   way out):
+
+   | | rooms | time | open past the margin | IoU 10th / median / 90th | only the flood / only the box |
+   |---|---|---|---|---|---|
+   | city | 491 | 1.6 s | 49 | 0.70 / 0.86 / 0.93 | 53,581 / 20,852 m3 |
+   | Magnolia | 1,810 | 17.7 s | 874 | 0.57 / 0.76 / 0.85 | 171,134 / 13,759 m3 |
+   | Albany | 2,864 | 41 s | 2,106 | 0.52 / 0.72 / 0.82 | 379,945 / 52,296 m3 |
+
+   On the city the floods are the rooms (the open ones are stairwells, roof accesses and the tunnel, which are
+   open). On the real places they are not yet: half-metre cells with walls a diagonal thick lose a narrow room (a
+   1.1 m hall has no air left), and floods still find ways out of houses (traced: the gap between two room
+   rectangles' ceilings into the eaves, closed now by one ceiling over the footprint; the rest not traced). Next:
+   quarter-metre cells (the flood takes 26 s on the city at a quarter metre as first written: keep a cell
+   index instead of hash sets), the remaining leaks traced with `ROOM_DEBUG`, then the acoustic map marking each
+   room's flood (`AcousticVolumeGenerator.GenerateRegions`, and the server's region lookups, so both agree),
+   region ids passing through unchanged, gated on the harness: no house open past its margin, IoU over 0.8.
+2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
+   directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
+   would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a
+   plate the deck's thickness over the slope, and a flight as one step (a block of a tread's going and a riser's
+   height), not as the box round them; round things, balls and swept profiles are what their boxes say already (a
+   column is long and narrow: a bar). Unheard.
+3. Facets as polygons for the engine echoes (their rectangles overreach a triangle's corners); per-facet materials
+   in the image sources (a shape's slots).
+4. Doors' remaining misses (16 on Albany): footprints whose rooms sit far from every wall, where the cover grid's
+   angle (the footprint's least rectangle) is not its walls'; the flood fixes them.
+5. The openings found in rooms' faces (12.2's table): look at what the new ones are.
 
 ## Appendix: box-geometry consumers today
 

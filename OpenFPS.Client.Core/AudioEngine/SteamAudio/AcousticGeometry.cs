@@ -156,7 +156,7 @@ public sealed class AcousticGeometry
     {
         var flags = (openGround ? SurfaceFlags.OpenGround : SurfaceFlags.None) | (leaf ? SurfaceFlags.DoorLeaf : SurfaceFlags.None);
         var surface = new Surface(b.Material ?? "", new Construction(b.Size, b.Build), GeometryLayers.Acoustics, flags);
-        return SolidSpec.Of(b.EntityId, b.Center, b.Rotation, b.Size, surface, Shapes.Make(b.Form, b.Size));
+        return SolidSpec.OfShape(b.EntityId, b.Center, b.Rotation, b.Size, surface, b.Form);
     }
 
     private static long Hash(in SteamAudioScene.Box b)
@@ -164,6 +164,8 @@ public sealed class AcousticGeometry
         var h = new HashCode();
         h.Add(b.Center); h.Add(b.Size); h.Add(b.Rotation);
         h.Add(b.Material); h.Add(b.Build); h.Add(b.EntityId); h.Add(b.Form);
+        // A mesh is its box until its asset arrives: the tile is built again then.
+        if (b.Form is { Kind: ShapeKind.Mesh } m) h.Add(MeshLibrary.Shared.Contains(m.Mesh ?? ""));
         return h.ToHashCode();
     }
 }

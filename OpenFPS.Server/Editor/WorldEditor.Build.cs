@@ -30,7 +30,7 @@ public sealed partial class WorldEditor
     private const float MinPiece = 0.01f;
 
     /// <summary>The words /edit build takes for a kind of piece, in the order the dialog shows them.</summary>
-    public static readonly string[] BuildKinds = { "floor", "wall", "roof", "door", "window", "prefab" };
+    public static readonly string[] BuildKinds = { "floor", "wall", "roof", "door", "window", "shape", "prefab" };
 
     private static readonly string[] WhereWords = { "ahead", "here", "cursor" };
     private static readonly string[] WhereLabels = { "In front of you", "At your feet", "At the build cursor" };
@@ -41,7 +41,9 @@ public sealed partial class WorldEditor
         "Say /edit build floor|wall|roof|door|window|prefab, then what you want of: width, length, height, thickness, above "
         + "(metres), material NAME, type KIND (a door's), prefab ID, where ahead|here|cursor (or ahead METRES, here, cursor), "
         + "distance METRES, facing me|north|east|south|west, fit yes|no (a door or window into the wall in front of you; or fit, free). "
-        + "Example: /edit build wall length 6 height 2.7 material brick ahead 2.";
+        + "Example: /edit build wall length 6 height 2.7 material brick ahead 2. "
+        + "Shapes: /edit build stairs 14 steps up north, column 0.3 by 3, ramp 1.5 by 6 by 0.5, cone, ball, dome, arch, "
+        + "roof gable over the floor.";
 
     /// <summary>One field of a kind of piece: what it is, and what it holds when nobody has said.</summary>
     private sealed record BuildField(FieldDescriptor Field, string Default);
@@ -100,6 +102,9 @@ public sealed partial class WorldEditor
                 Add(MetresField("width", "width", 0.2, 10, "The glass, left to right."), "1.2");
                 Add(MetresField("height", "height", 0.2, 10, "The glass, bottom to top."), "1.2");
                 Add(MetresField("above", "height above the floor", 0, 20, "Where the bottom of the glass is: the sill."), "0.9");
+                break;
+            case "shape":
+                AddShapeFields(s, Add);
                 break;
             case "prefab":
             {
@@ -214,7 +219,7 @@ public sealed partial class WorldEditor
                 foreach (var (material, t) in BuildMaterials(s, kind))
                 {
                     var size = t.ColliderSize!.Value;
-                    yield return Option($"{material}, {t.Name}", material, "thickness=" + FieldDescriptor.Format(kind == "wall" ? size.Z : size.Y));
+                    yield return Option($"{material}, {t.Name}", material, kind == "shape" ? "" : "thickness=" + FieldDescriptor.Format(kind == "wall" ? size.Z : size.Y));
                 }
                 break;
             case "type":
@@ -235,6 +240,9 @@ public sealed partial class WorldEditor
                 break;
             case "where":
                 for (int i = 0; i < WhereWords.Length; i++) yield return Option(WhereLabels[i], WhereWords[i]);
+                break;
+            case "shape" or "style" or "over":
+                foreach (var o in ShapeOptions(field)) yield return Option(o.Label, o.Value, o.Sets, o.Uses);
                 break;
             case "facing":
                 for (int i = 0; i < FacingWords.Length; i++) yield return Option(FacingLabels[i], FacingWords[i]);
@@ -266,9 +274,14 @@ public sealed partial class WorldEditor
         }
         var words = args.Where(a => !a.Equals("dialog", StringComparison.OrdinalIgnoreCase)).ToArray();
         if (words.Length == 0) { Answer(false, BuildUsage); return; }
+        // A shape said as a phrase: "stairs 14 steps up north", "column 0.3 by 3", "roof gable over the floor".
+        if (TryShapePhrase(words, out var phrase, out string phraseError)) words = new[] { "shape" }.Concat(phrase).ToArray();
+        else if (phraseError.Length > 0) { Answer(false, phraseError); return; }
         string kind = words[0].ToLowerInvariant();
         if (!BuildKinds.Contains(kind)) { Answer(false, $"There is nothing called {words[0]} to build. " + BuildUsage); return; }
         if (!TryReadBuild(s, kind, words[1..], out var values, out string error)) { Answer(false, error); return; }
+        if (kind == "shape")
+            FillShape(values, words.Skip(1).Select(w => w.ToLowerInvariant()).Where(w => BuildFields(s, kind).Any(f => f.Field.Path == w)).ToHashSet());
         if (Build(s, kind, values, out string said, out string notice)) { Answer(true, said); Notify(s, notice); Refresh(s, reply); }
         else Answer(false, said);
     }
@@ -327,6 +340,7 @@ public sealed partial class WorldEditor
     {
         notice = "";
         if (!TryBody(s, x => { }, out var world, out var feet, out float yaw)) { said = "You are not in the world yet."; return false; }
+        if (kind == "shape") return BuildShape(s, world, feet, yaw, v, out said, out notice);
 
         PrefabTemplate? template;
         Vector3 size;

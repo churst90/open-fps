@@ -115,6 +115,11 @@ def pip(x, z, ring):
     return inside
 
 
+def firmly_in(x, z, ring, by=0.001):
+    """Inside a ring, and still inside `by` to either side along x and along z."""
+    return pip(x, z, ring) and pip(x - by, z, ring) and pip(x + by, z, ring) and pip(x, z - by, ring) and pip(x, z + by, ring)
+
+
 def seg_point(px, pz, ax, az, bx, bz):
     """(distance, t) from a point to a segment."""
     dx, dz = bx - ax, bz - az
@@ -302,7 +307,9 @@ def cover(ring, a, cell, max_rects, min_area, stop_frac=0.06):
     nu = max(1, int(round((u1 - u0) / cell)))
     nv = max(1, int(round((v1 - v0) / cell)))
     cu, cv = (u1 - u0) / nu, (v1 - v0) / nv
-    mask = [[pip(u0 + (i + 0.5) * cu, v0 + (j + 0.5) * cv, loc) for i in range(nu)] for j in range(nv)]
+    # A cell is in when its middle is in by a millimetre each way: a middle on the line would be in or out by the
+    # last bit of its projection, which the world's generator (WorldBuildings.Cover) reaches by another way.
+    mask = [[firmly_in(u0 + (i + 0.5) * cu, v0 + (j + 0.5) * cv, loc) for i in range(nu)] for j in range(nv)]
     total = sum(sum(r) for r in mask)
     if total == 0:
         return [], (u0, v0, cu, cv, nu, nv), mask
@@ -1100,7 +1107,7 @@ def is_clear(x, z, pad=0.0):
     return True
 
 
-def lay_line(pts, width, prefab, y1, name, layer, verge=0.0, y0=0.0, tol=0.25, hfun=None):
+def lay_line(pts, width, prefab, y1, name, layer, verge=0.0, y0=0.0, tol=0.25, hfun=None, form=None):
     """Boxes along a polyline, each lengthened at a bend by as much as the bend opens on its outside, each
     pitched along its run to the heights `hfun` gives its ends (the ground under them by default) and
     level across: a road's verges, sidewalks and carriageway share its heights (road_y)."""
@@ -1130,12 +1137,17 @@ def lay_line(pts, width, prefab, y1, name, layer, verge=0.0, y0=0.0, tol=0.25, h
                 seg_box("grass_floor", px, pz, qx, qz, width + 2 * verge, 0.0, Y_VERGE,
                         f0 + (verge if k == 0 else 0.0), f1 + (verge if k == n - 1 else 0.0),
                         name=f"{name} verge" if name else "Verge", layer="verges", heights=(hp, hq))
-            seg_box(prefab, px, pz, qx, qz, width, y0, y1, f0, f1, name=name, layer=layer, heights=(hp, hq))
+            if seg_box(prefab, px, pz, qx, qz, width, y0, y1, f0, f1, name=name, layer=layer, heights=(hp, hq)) is not None and form:
+                entities[-1]["Form"] = form
         clear_strip(ax, az, bx, bz, width / 2 + verge)
 
 
 SEG_MAX = 20.0                        # the longest piece of a road laid on real ground, m
 SEAM = 0.05                           # how far the pieces of one run overlap at their joins, m
+KERB_W, KERB_UP = 0.15, 0.15          # a kerb's width, and how far it stands over the carriageway, m
+# Across and up, the top edges taken off by 2 cm; the engine fits it to the kerb's box (Shapes.Sweep).
+KERB_FORM = {"Kind": "Swept", "Profile": [-0.075, 0.0, 0.075, 0.0, 0.075, 0.21, 0.055, 0.23, -0.055, 0.23, -0.075, 0.21],
+             "Path": [0.0, 0.0, 0.0, 1.0, 0.0, 0.0]}
 
 
 # Each way in its own width and surface, once; the records above are the roads as wholes.
@@ -1156,6 +1168,11 @@ for w in sorted(ways_by_kind["road"], key=lambda w: w["id"]):
             off = side * (ww / 2 + 1.0 + sw / 2)
             lay_line(offset_line(part, off), sw, "concrete_floor", Y_WALK, f"{WAY_NAME[w['id']]} sidewalk", "paths",
                      hfun=lambda x, z, part=part: road_y(*project(part, x, z)[4]))
+            # A kerb where the carriageway meets the planting strip: a swept profile, square with its top
+            # edges taken off, standing KERB_UP over the road.
+            lay_line(offset_line(part, side * (ww / 2 + KERB_W / 2)), KERB_W, "concrete_wall", Y_ROAD + KERB_UP,
+                     f"{WAY_NAME[w['id']]} kerb", "paths", hfun=lambda x, z, part=part: road_y(*project(part, x, z)[4]),
+                     form=KERB_FORM)
 
 # Driveways, parking aisles and private service ways: surfaces only, not roads to route on.
 DRIVES = []
@@ -1941,6 +1958,278 @@ def run_phi(F, run):
     return F.a if run[0] == "v" else F.a + math.pi / 2
 
 
+# ── The footprint itself (docs/GEOMETRY.md 5.2, stage 4) ─────────────────────────────────────────────
+#
+# Walls go along the footprint's own ring, simplified, one wall a side; the floor is the ring stood up a
+# slab thick and the roof is the straight skeleton of the ring (shapes the engine makes from the outline,
+# OpenFPS.Geometry/Triangles/Shapes.More.cs). The rooms are still rectangles inside it.
+RING_TOL = 0.1            # a corner this near the line through its neighbours does no work, m
+RING_MIN_EDGE = 0.25      # nor does one this near the corner before it, m
+
+
+def simplify_ring(ring, tol=RING_TOL, min_edge=RING_MIN_EDGE):
+    """Polygons.Simplify (OpenFPS.Geometry), the same arithmetic in the same order: the ring without its
+    repeated last point, the corner doing least work removed one at a time while that is under `tol`."""
+    r = list(ring)
+    if len(r) > 1 and r[0] == r[-1]:
+        r.pop()
+    while len(r) > 3:
+        n = len(r)
+        worst, least = -1, float("inf")
+        for i in range(n):
+            a, p, b = r[(i + n - 1) % n], r[i], r[(i + 1) % n]
+            abx, abz = b[0] - a[0], b[1] - a[1]
+            apx, apz = p[0] - a[0], p[1] - a[1]
+            ab = math.sqrt(abx * abx + abz * abz)
+            off = math.sqrt(apx * apx + apz * apz) if ab < 1e-12 else abs(abx * apz - abz * apx) / ab
+            if math.sqrt(apx * apx + apz * apz) < min_edge:
+                off = min(off, 0)
+            if off < least:
+                least, worst = off, i
+        if least > tol:
+            break
+        r.pop(worst)
+    return r
+
+
+def ccw(ring):
+    """Polygons.CounterClockwise: counter-clockwise with x east and z north (the inside on the left)."""
+    r = list(ring)
+    a = 0.0
+    for i in range(len(r)):
+        p, q = r[i], r[(i + 1) % len(r)]
+        a += p[0] * q[1] - q[0] * p[1]
+    if a < 0:
+        r.reverse()
+    return r
+
+
+def wall_ring(bd):
+    return ccw(simplify_ring(bd.ring))
+
+
+def ring_edges(ring):
+    """Each side of a counter-clockwise ring: (frame along it from its start, its length, whether its start and
+    end corners are reflex). The frame's v runs into the building."""
+    n = len(ring)
+    dirs = []
+    for k in range(n):
+        (ax, az), (bx, bz) = ring[k], ring[(k + 1) % n]
+        L = math.sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az))
+        dirs.append(((bx - ax) / L, (bz - az) / L, L))
+    out = []
+    for k in range(n):
+        (ax, az), (bx, bz) = ring[k], ring[(k + 1) % n]
+        p, d, q = dirs[(k + n - 1) % n], dirs[k], dirs[(k + 1) % n]
+        reflex0 = p[0] * d[1] - p[1] * d[0] < 0
+        reflex1 = d[0] * q[1] - d[1] * q[0] < 0
+        out.append((Frame(ax, az, math.atan2(bz - az, bx - ax)), d[2], reflex0, reflex1))
+    return out
+
+
+def edge_wall(E, L, reflex0, reflex1, prefab, top, name, cuts, layer="structure", thick=WALL_T, inset=0.0):
+    """A wall along one side, inside it, with openings cut out of it and a lintel over each: lengthened at a
+    reflex corner by its thickness, so the inside of the corner is closed."""
+    s0, s1 = -(thick + inset) if reflex0 else 0.0, L + ((thick + inset) if reflex1 else 0.0)
+    pieces = []
+    s = s0
+    for c0, c1, ctop in sorted(cuts):
+        if c0 > s:
+            pieces.append((s, c0, 0.0, top))
+        if ctop < top:
+            pieces.append((c0, c1, ctop, top))
+        s = c1
+    if s < s1:
+        pieces.append((s, s1, 0.0, top))
+    for a0, a1, y0, y1 in pieces:
+        if a1 - a0 < 0.02:
+            continue
+        obox(prefab, E, a0, a1, inset, inset + thick, y0, y1, name=name, layer=layer)
+
+
+def edge_word(E):
+    """Which way a side faces out: a quarter turn clockwise from along it."""
+    ang = math.degrees(math.atan2(-E.c, E.s)) % 360
+    return ["east", "northeast", "north", "northwest", "west", "southwest", "south", "southeast"][int(((ang + 22.5) % 360) // 45)]
+
+
+def oform(prefab, F, outline, y0, y1, form, name=None, layer="structure"):
+    """A shape filling the box round `outline` ((u, v) in frame F) from y0 to y1, written as obox writes the
+    box, the outline about the box's middle (the engine fits the shape to the box)."""
+    u0, u1 = min(p[0] for p in outline), max(p[0] for p in outline)
+    v0, v1 = min(p[1] for p in outline), max(p[1] for p in outline)
+    eid = obox(prefab, F, u0, u1, v0, v1, y0, y1, name=name, layer=layer)
+    cu, cv = (u0 + u1) / 2, (v0 + v1) / 2
+    f = dict(form)
+    f["Outline"] = [round(c, 4) for p in outline for c in (p[0] - cu, p[1] - cv)]
+    entities[-1]["Form"] = f
+    return eid
+
+
+def roof_of(bd, kind, mat, wall_h, label):
+    """A roof's style and rise: a house a hip or a gable at about 6 in 12 (a quarter of its short side, never
+    above the measured height), a metal building a low gable, a church a steep one, a brick shop flat."""
+    cap = max(0.8, (bd.height or 99) - wall_h - 0.2)
+    if mat == "metal":
+        return "Gable", min(max(0.3, bd.short / 8), cap)
+    if kind == "premises":
+        return "Flat", 0.2
+    if kind == "church":
+        return "Gable", min(max(0.8, bd.short / 3), cap)
+    if kind == "mobile_home":
+        return "Gable", min(max(0.3, bd.short / 8), cap)
+    return ("Hip" if h01(label, "roof") < 0.5 else "Gable"), min(max(0.8, bd.short / 4), cap)
+
+
+def room_at(ids, F, x, z):
+    """room_for_point at a point: the room it is in, and the room's middle; the first room if none."""
+    u, v = F.l(x, z)
+    for rid, (ru0, ru1, rv0, rv1) in ids:
+        if ru0 <= u <= ru1 and rv0 <= v <= rv1:
+            return rid, F.w((ru0 + ru1) / 2, (rv0 + rv1) / 2)
+    rid, (ru0, ru1, rv0, rv1) = ids[0]
+    return rid, F.w((ru0 + ru1) / 2, (rv0 + rv1) / 2)
+
+
+DOOR_DEPTH = 0.7          # a doorway's room must reach this near its side, m: a step inside the leaf
+GROW_REACH = 1.5          # how far out a room's side may move to meet the wall round the footprint, m
+
+
+def grow_side(ring_uv, r, side):
+    """Where a room's side meets the inside of the wall round the footprint, moving straight out from it: the
+    rectangles are cut from a grid laid on the footprint, so a wall at an angle to them stands up to a cell off,
+    and a bay or a porch too small for a rectangle of its own is left beside it. The nearest the wall comes
+    along the side (looked for every half metre and at its ends), of the points where it is within GROW_REACH,
+    and no further than any corner of the footprint in the way (a rectangle of whole cells may reach a little past
+    the footprint: then the side comes back in); None when it is nowhere near. `side` is 0 to 3:
+    u0, u1, v0, v1."""
+    u0, u1, v0, v1 = r
+    axis_u = side < 2
+    sign = -1.0 if side in (0, 2) else 1.0
+    at = (u0, u1, v0, v1)[side]
+    lo, hi = (v0, v1) if axis_u else (u0, u1)
+    if hi - lo < 0.2:
+        return None
+    best = None
+    n = len(ring_uv)
+    steps = max(2, int(math.ceil((hi - lo - 0.1) / 0.5)))
+    for i in range(steps + 1):
+        w = lo + 0.05 + (hi - lo - 0.1) * i / steps
+        nearest = None
+        for k in range(n):
+            (pu, pv), (qu, qv) = ring_uv[k], ring_uv[(k + 1) % n]
+            du, dv = qu - pu, qv - pv
+            L = math.sqrt(du * du + dv * dv)
+            if L < 1e-9:
+                continue
+            mu, mv = dv / L, -du / L                       # out of the footprint
+            # Along u: the side's line v = w crosses the edge; along v, u = w.
+            a0, a1, b0, b1 = (pv, qv, pu, qu) if axis_u else (pu, qu, pv, qv)
+            if a1 == a0:
+                continue
+            s = (w - a0) / (a1 - a0)
+            if s < 0.0 or s > 1.0:
+                continue
+            t = sign * (b0 + s * (b1 - b0) - at)
+            facing = sign * (mu if axis_u else mv)
+            if t < -GROW_REACH or facing <= 0.5:
+                continue
+            inner = t - WALL_T / facing
+            if nearest is None or t < nearest[0]:
+                nearest = (t, inner)
+        if nearest is None or nearest[0] > GROW_REACH:
+            continue
+        best = nearest[1] if best is None else min(best, nearest[1])
+    if best is None:
+        return None
+    # A corner of the footprint standing in the strip the side would sweep stops it a wall short of the corner.
+    for (pu, pv) in ring_uv:
+        a, b = (pv, pu) if axis_u else (pu, pv)
+        t = sign * (b - at)
+        if lo + 0.01 < a < hi - 0.01 and -GROW_REACH < t < best + WALL_T:
+            best = min(best, t - WALL_T)
+    return at + sign * max(best, -WALL_T - 0.3)
+
+
+def room_boxes(F, ring, R):
+    """Each rectangle's room: its sides that face out of the house moved to the inside of the footprint's wall
+    where it is near, the others WALL_T in (a wall between two rectangles is a gap: an opening)."""
+    ring_uv = [F.l(x, z) for x, z in ring]
+    out = []
+    for i, r in enumerate(R):
+        box = [r[0] + WALL_T, r[1] - WALL_T, r[2] + WALL_T, r[3] - WALL_T]
+        for side in range(4):
+            u0, u1, v0, v1 = r
+            # A side another rectangle touches (along more than a centimetre of it) is inside the house.
+            touched = False
+            for j, o in enumerate(R):
+                if j == i:
+                    continue
+                facing_side = (o[1], o[0], o[3], o[2])[side]
+                lap = min(v1, o[3]) - max(v0, o[2]) if side < 2 else min(u1, o[1]) - max(u0, o[0])
+                if abs(facing_side - r[side]) < 1e-3 and lap > 0.01:
+                    touched = True
+            if touched:
+                continue
+            g = grow_side(ring_uv, r, side)
+            if g is not None:
+                box[side] = g
+        out.append(tuple(box))
+    return out
+
+
+def covered(E, L, boxes, F, depth=DOOR_DEPTH):
+    """The stretches of a side, (s0, s1) along it, whose inside `depth` in lies in one of `boxes` (rooms,
+    (u0, u1, v0, v1) in frame F), overlapping stretches merged."""
+    p0, p1 = F.l(*E.w(0.0, depth)), F.l(*E.w(L, depth))
+    du, dv = p1[0] - p0[0], p1[1] - p0[1]
+    spans = []
+    for (u0, u1, v0, v1) in boxes:
+        t0, t1, ok = 0.0, 1.0, True
+        for p, d, lo, hi in ((p0[0], du, u0, u1), (p0[1], dv, v0, v1)):
+            if abs(d) < 1e-12:
+                if p < lo or p > hi:
+                    ok = False
+                    break
+                continue
+            a, b = (lo - p) / d, (hi - p) / d
+            if a > b:
+                a, b = b, a
+            t0, t1 = max(t0, a), min(t1, b)
+        if ok and t1 > t0:
+            spans.append((t0 * L, t1 * L))
+    spans.sort()
+    merged = []
+    for s0, s1 in spans:
+        if merged and s0 <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], s1))
+        else:
+            merged.append((s0, s1))
+    return merged
+
+
+def edge_for_run(edges, F, run, s, width, box=None):
+    """The side of the ring a door planned on a rectangle's run belongs on, and where along it: the nearest side
+    facing the same way with the door's room (`box`) behind it for the door's width, or failing that the nearest
+    facing the same way, kept clear of its ends."""
+    x, z = run_point(F, run, s)
+    axis, line, s0, s1, out = run
+    nx, nz = F.w(0, out) if axis == "v" else F.w(out, 0)
+    best = None
+    for k, (E, L, _, _) in enumerate(edges):
+        u, v = E.l(x, z)
+        same = (-E.s) * nx + E.c * nz < -0.7          # its outward normal (s, -c) against the run's
+        stretches = covered(E, L, [box], F) if box else []
+        for a, b in stretches or [(0.0, L)]:
+            half = min(width / 2 + 0.05, (b - a) / 2)
+            along = min(max(u, a + half), b - half)
+            fits = bool(stretches) and b - a >= width + 0.1
+            cand = (0 if same and fits else 1 if same else 2, math.hypot(u - along, v), k, along)
+            if best is None or cand < best:
+                best = cand
+    return best[2], best[3]
+
+
 WALLS = {"brick": "brick_wall", "siding": "siding_wall", "metal": "metal_wall", "concrete": "concrete_wall"}
 STATS = defaultdict(int)
 
@@ -1968,26 +2257,22 @@ def build(bd):
     DECIDED[id(bd)] = {"label": label, "name": name, "detail": detail,
                        "place": bd.place["kind"] if bd.place else None}
 
-    # Small sheds, and every outbuilding at the lowest detail, are one solid box: you walk into the
-    # shed, you hear "shed".
+    # Small sheds, and every outbuilding at the lowest detail, are one solid of their footprint: you walk
+    # into the shed, you hear "shed".
+    ring = wall_ring(bd)
     if kind == "shed" or (detail <= 1 and kind in ("garage", "workshop", "barn", "outbuilding")):
         F = Frame(bd.cx, bd.cz, bd.angle)
-        e = extents(F, bd.ring)
         hgt = max(2.2, min(bd.height or 2.5, 6.0))
-        obox("siding_wall" if bd.area < 30 else "metal_wall", F, e[0], e[1], e[2], e[3], 0.0, hgt, name=name, layer="structure")
+        oform("siding_wall" if bd.area < 30 else "metal_wall", F, [F.l(x, z) for x, z in ring], 0.0, hgt, {"Kind": "Prism"},
+              name=name, layer="structure")
         return
 
-    # The footprint, in rectangles.
+    # The rooms, in rectangles inside the footprint (a rectangle's is one, the whole of it). The walls go round
+    # the footprint itself, so a rectangle round a footprint a little off square would reach out past them.
     cell = 0.5 if bd.area < 1500 else 1.0
-    if bd.rect_fill >= 0.9:
-        F0 = Frame(0.0, 0.0, bd.angle)
-        e = extents(F0, bd.ring)
-        rects = [(0, 1, 0, 1)]
-        grid = (e[0], e[2], e[1] - e[0], e[3] - e[2], 1, 1)
-    else:
-        rects, grid, _ = cover(bd.ring, bd.angle, cell, 4 if detail >= 2 else 2, max(9.0, 0.08 * bd.area))
-        if not rects:
-            return
+    rects, grid, _ = cover(bd.ring, bd.angle, cell, 4 if detail >= 2 else 2, max(9.0, 0.08 * bd.area))
+    if not rects:
+        return
     u0g, v0g, cu, cv, nu, nv = grid
     F = Frame(0.0, 0.0, bd.angle)
     R = [(u0g + i0 * cu, u0g + i1 * cu, v0g + j0 * cv, v0g + j1 * cv) for (i0, i1, j0, j1) in rects]
@@ -2021,37 +2306,33 @@ def build(bd):
         L = math.hypot(*to_street) or 1.0
         return (n[0] * to_street[0] + n[1] * to_street[1]) / L
 
-    # ── Slab, roof ──────────────────────────────────────────────────────────────────────────────
+    edges = ring_edges(ring)
+
+    def facing_edge(k):
+        E = edges[k][0]
+        L = math.hypot(*to_street) or 1.0
+        return (E.s * to_street[0] - E.c * to_street[1]) / L
+
+    # ── Slab, roof: the footprint itself ────────────────────────────────────────────────────────
     homes = kind in ("house", "mobile_home")
     floor_prefab = "concrete_floor"
     if homes and detail == 1:
         floor_prefab = "wood_floor" if h01(label, "floor") < 0.5 else "carpet_floor"
-    for (ru0, ru1, rv0, rv1) in R:
-        obox(floor_prefab, F, ru0, ru1, rv0, rv1, -0.15, FLOOR_TOP if floor_prefab != "concrete_floor" else 0.10,
-             name=f"{name} floor", layer="structure")
-    for (ru0, ru1, rv0, rv1) in R:
-        obox(roof_prefab, F, ru0, ru1, rv0, rv1, wall_h, wall_h + (0.2 if roof_prefab == "shingle_roof" else 0.06),
-             name=f"{name} roof", layer="structure")
-        if detail >= 2 and roof_prefab == "shingle_roof":
-            # The pitch, as a ridge: half the span wide, risen a quarter of it (a 6-in-12 roof),
-            # never above the measured height.
-            span_u, span_v = ru1 - ru0, rv1 - rv0
-            rise = min(max(0.8, min(span_u, span_v) / 4), max(0.8, (bd.height or 99) - wall_h - 0.2))
-            y0 = wall_h + 0.2
-            if span_u >= span_v:
-                q = span_v / 4
-                obox("shingle_roof", F, ru0, ru1, rv0 + q, rv1 - q, y0, y0 + rise, name=f"{name} roof", layer="structure")
-            else:
-                q = span_u / 4
-                obox("shingle_roof", F, ru0 + q, ru1 - q, rv0, rv1, y0, y0 + rise, name=f"{name} roof", layer="structure")
+    outline = [F.l(x, z) for x, z in ring]
+    oform(floor_prefab, F, outline, -0.15, FLOOR_TOP if floor_prefab != "concrete_floor" else 0.10, {"Kind": "Prism"},
+          name=f"{name} floor", layer="structure")
+    style, rise = roof_of(bd, kind, mat, wall_h, label)
+    oform(roof_prefab, F, outline, wall_h, wall_h + rise, {"Kind": "Roof", "Style": style}, name=f"{name} roof", layer="structure")
+    STATS[f"{style.lower()} roofs"] += 1
+    boxes = room_boxes(F, ring, R)
     if homes:
-        for (ru0, ru1, rv0, rv1) in R:
-            obox("plaster_wall", F, ru0 + WALL_T, ru1 - WALL_T, rv0 + WALL_T, rv1 - WALL_T, CEIL, CEIL + 0.06,
-                 name=f"{name} ceiling", layer="structure")
+        # One ceiling over the whole footprint: per room it left a gap over the opening between two rooms,
+        # straight up into the eaves.
+        oform("plaster_wall", F, outline, CEIL, CEIL + 0.06, {"Kind": "Prism"}, name=f"{name} ceiling", layer="structure")
 
     # ── Rooms ───────────────────────────────────────────────────────────────────────────────────
-    cuts = defaultdict(list)          # run index -> [(s0, s1, top)]
-    doors_out = []                    # (run index, s, width, prefab, room id, room xz, name)
+    cuts = defaultdict(list)          # side of the ring -> [(s0, s1, top)]
+    doors_out = []                    # (side of the ring, s along it, width, prefab, (room id, room xz), name)
     if kind in ("house", "mobile_home") and detail >= 2:
         rooms = plan_house(bd, F, R, runs, mask, grid, facing, label, two)
     else:
@@ -2063,16 +2344,24 @@ def build(bd):
                   "garage": "", "workshop": "", "barn": "", "outbuilding": "", "building": ""}[kind]
         top = CEIL if homes else wall_h - 0.05
         ids = []
-        for (ru0, ru1, rv0, rv1) in R:
-            ids.append((region(f"{name}{suffix}", F, ru0 + WALL_T, ru1 - WALL_T, rv0 + WALL_T, rv1 - WALL_T, FLOOR_TOP - 0.02, top,
-                               layer="rooms"), (ru0, ru1, rv0, rv1)))
-        # The front door: the longest stretch of wall facing the street, in its middle.
-        fronts = sorted(range(len(runs)), key=lambda k: (-(facing(runs[k]) > 0.5) * (runs[k][3] - runs[k][2]), -facing(runs[k])))
+        for box in boxes:
+            ids.append((region(f"{name}{suffix}", F, *box, FLOOR_TOP - 0.02, top, layer="rooms"), box))
+        # The front door: the longest stretch of a side facing the street with a room behind it, in its middle.
+        stretch = []
+        for k in range(len(edges)):
+            spans = covered(edges[k][0], edges[k][1], boxes, F)
+            stretch.append(max(spans, key=lambda sp: (sp[1] - sp[0], -sp[0])) if spans else None)
+        roomy = [k for k in range(len(edges)) if stretch[k] and stretch[k][1] - stretch[k][0] >= 1.4]
+        if not roomy:
+            roomy = list(range(len(edges)))
+            stretch = [(0.0, edges[k][1]) for k in roomy]
+        fronts = sorted(roomy, key=lambda k: (-(facing_edge(k) > 0.5) * (stretch[k][1] - stretch[k][0]), -facing_edge(k)))
         k = fronts[0]
-        run = runs[k]
-        s = (run[2] + run[3]) / 2
+        E = edges[k][0]
+        s0, s1 = stretch[k]
+        L, s = s1 - s0, (s0 + s1) / 2
         if kind == "barn":
-            width, prefab, dname = min(3.0, (run[3] - run[2]) - 1.0), None, f"{name} doorway"
+            width, prefab, dname = min(3.0, L - 1.0), None, f"{name} doorway"
         elif kind == "premises" and bd.place and bd.place["kind"] not in ("fire_station", "storage_facility", "rv_park", "self_storage"):
             width, prefab, dname = 1.0, "glass_pull_door", f"{name} entrance"
         elif kind == "church":
@@ -2081,44 +2370,44 @@ def build(bd):
             width, prefab, dname = 0.95, "door", f"{name} front door"
         else:
             width, prefab, dname = 0.95, "door", f"{name} door"
-        width = max(0.8, min(width, run[3] - run[2] - 0.6))
-        room = room_for_point(ids, F, run, s)
-        doors_out.append((k, s, width, prefab, room, dname))
+        width = max(0.8, min(width, L - 0.6))
+        doors_out.append((k, s, width, prefab, room_at(ids, F, *E.w(s, DOOR_DEPTH)), dname))
         if homes and detail >= 2:
-            backs = sorted(range(len(runs)), key=lambda k: (facing(runs[k]), -(runs[k][3] - runs[k][2])))
+            backs = sorted(range(len(edges)), key=lambda k: (facing_edge(k), -edges[k][1]))
             kb = backs[0]
-            rb = runs[kb]
-            if kb != k and rb[3] - rb[2] > 2.0:
-                sb = rb[2] + (rb[3] - rb[2]) * 0.3
-                doors_out.append((kb, sb, 0.9, "patio_door", room_for_point(ids, F, rb, sb), f"{name} back door"))
+            Eb, Lb = edges[kb][0], edges[kb][1]
+            if kb != k and Lb > 2.0:
+                sb = Lb * 0.3
+                doors_out.append((kb, sb, 0.9, "patio_door", room_at(ids, F, *Eb.w(sb, WALL_T + 0.3)), f"{name} back door"))
     else:
-        doors_out = rooms["doors"]
+        # The plan's doors are on its rectangles' runs: each goes on the side of the ring it lies on.
+        for (kr, s, width, prefab, room, dname) in rooms["doors"]:
+            k, s = edge_for_run(edges, F, runs[kr], s, width, rooms["boxes"].get(room[0]))
+            doors_out.append((k, s, width, prefab, room, dname))
 
     for (k, s, width, prefab, room, dname) in doors_out:
         cuts[k].append((s - width / 2, s + width / 2, DOOR_TOP if prefab != "garage" else FLOOR_TOP + 2.25))
 
-    for k, run in enumerate(runs):
-        wall_run(F, run, wall_prefab, wall_h, f"{name} {side_word(F, run)} wall", cuts.get(k, []))
+    for k, (E, L, reflex0, reflex1) in enumerate(edges):
+        edge_wall(E, L, reflex0, reflex1, wall_prefab, wall_h, f"{name} {edge_word(E)} wall", cuts.get(k, []))
         if homes and detail >= 2:
             # Plaster on the inside of the outer wall: the membrane that takes the bass out of a room.
-            wall_run(F, (run[0], run[1] - run[4] * WALL_T, run[2], run[3], run[4]), "plaster_wall", CEIL,
-                     f"{name} {side_word(F, run)} wall", [(c0, c1, min(ct, CEIL)) for c0, c1, ct in cuts.get(k, [])],
-                     layer="interiors", thick=0.03)
+            edge_wall(E, L, reflex0, reflex1, "plaster_wall", CEIL, f"{name} {edge_word(E)} wall",
+                      [(c0, c1, min(ct, CEIL)) for c0, c1, ct in cuts.get(k, [])], layer="interiors", thick=0.03, inset=WALL_T)
 
     for (k, s, width, prefab, room, dname) in doors_out:
-        run = runs[k]
-        x, z = run_point(F, run, s, -WALL_T / 2)
+        E = edges[k][0]
+        x, z = E.w(s, WALL_T / 2)
         rid, rxz = room
         outside = -1                      # the outdoors: yards and roads are names, not rooms
         if prefab is None:
             continue                      # an open doorway: the gap is the opening
         if prefab == "garage":
             # A sectional door, shut: a steel panel in the opening.
-            px, pz = run_point(F, run, s, -WALL_T / 2)
-            G = Frame(px, pz, run_phi(F, run))
+            G = Frame(x, z, E.a)
             obox("metal_wall", G, -width / 2, width / 2, -0.03, 0.03, 0.0, FLOOR_TOP + 2.25, name=dname, layer="structure")
             continue
-        door(prefab, x, z, FLOOR_TOP, run_phi(F, run), rid, outside, width, rxz, dname)
+        door(prefab, x, z, FLOOR_TOP, E.a, rid, outside, width, rxz, dname)
         STATS["doors"] += 1
     if rooms is not None:
         for d in rooms["inner"]:
@@ -2339,10 +2628,17 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
                     return WALL_T
         return PART_T / 2
     ids, centres, inner_rects = [], [], []
+    ring_uv = [F.l(x, z) for x, z in wall_ring(bd)]
     for nm, rr, floor, ab in rooms:
         u0, u1, v0, v1 = rr
-        iu0, iu1 = u0 + inset("u", u0, rr), u1 - inset("u", u1, rr)
-        iv0, iv1 = v0 + inset("v", v0, rr), v1 - inset("v", v1, rr)
+        sides = [u0 + inset("u", u0, rr), u1 - inset("u", u1, rr), v0 + inset("v", v0, rr), v1 - inset("v", v1, rr)]
+        # A side on the outside of the house meets the wall round the footprint (room_boxes).
+        for side, (axis, val) in enumerate((("u", u0), ("u", u1), ("v", v0), ("v", v1))):
+            if inset(axis, val, rr) == WALL_T:
+                g = grow_side(ring_uv, rr, side)
+                if g is not None:
+                    sides[side] = g
+        iu0, iu1, iv0, iv1 = sides
         rid = region(f"{label}, {nm}", F, iu0, iu1, iv0, iv1, FLOOR_TOP - 0.02, CEIL, layer="rooms")
         ids.append(rid)
         centres.append(F.w((iu0 + iu1) / 2, (iv0 + iv1) / 2))
@@ -2426,7 +2722,7 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
             g = on_run(rr, True)
             if g and g[1] >= 3.0 and not (fr and g[2] == fr[2] and abs(g[3] - fr[3]) < 3.0):
                 doors_out.append((g[2], g[3], min(4.9, g[1] - 0.6), "garage", (ids[i], centres[i]), f"{label} garage door"))
-    return {"doors": doors_out, "inner": inner}
+    return {"doors": doors_out, "inner": inner, "boxes": dict(zip(ids, inner_rects))}
 
 
 # THE OUTDOOR PLACES ARE NAMES, NOT ROOMS. A yard and a stretch of road are where you are told you
@@ -2569,8 +2865,10 @@ while True:
         for i in range(i0, i1):
             canopy[j][i] = False
 
-# Trunks.
-SPACING = {0: None, 1: float(TREES.get("SpacingMedium", 40.0)), 2: float(TREES.get("SpacingHigh", 16.0))}
+# Trunks, round (docs/GEOMETRY.md 5.5): eight sides, each narrower than a hand, which sound cannot tell
+# from a circle.
+TRUNK_FORM = {"Kind": "Cylinder", "Segments": 8}
+SPACING ={0: None, 1: float(TREES.get("SpacingMedium", 40.0)), 2: float(TREES.get("SpacingHigh", 16.0))}
 SPACING_NEAR = float(TREES.get("SpacingNear", 10.0))
 n_trunks = 0
 
@@ -2602,6 +2900,7 @@ for j in range(nz_):
         nm = species(i, j)
         d = 0.5 if "pine" in nm.lower() else 0.6
         obox("wood_floor", WORLD, x - d / 2, x + d / 2, z - d / 2, z + d / 2, 0.0, CANOPY_LO + 1.0, name=nm, layer="trees")
+        entities[-1]["Form"] = TRUNK_FORM
         n_trunks += 1
 
 # The wind in the trees: one crown for every so many metres of woods.
@@ -2624,6 +2923,7 @@ for nid in sorted(NODES, key=int):
         x, z = nxz(nid)
         if in_area(x, z) and is_clear(x, z, 0.5):
             obox("wood_floor", WORLD, x - 0.25, x + 0.25, z - 0.25, z + 0.25, 0.0, 4.0, name="Tree", layer="trees")
+            entities[-1]["Form"] = TRUNK_FORM
             n_trunks += 1
 
 

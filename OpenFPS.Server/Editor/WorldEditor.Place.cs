@@ -47,6 +47,8 @@ public sealed partial class WorldEditor
             PlaceGroup(s, args[1], reply);
             return;
         }
+        // A shape said as a phrase is built as the quick build builds it: /edit place column 0.3 by 3.
+        if (TryShapePhrase(args, out _, out _)) { BuildCommand(s, args, reply); return; }
         bool atCursor = args.Length >= 3 && args[^2].Equals("at", StringComparison.OrdinalIgnoreCase) && args[^1].Equals("cursor", StringComparison.OrdinalIgnoreCase);
         if (atCursor) args = args[..^2];
         // "vehicle v8_muscle" as typed is "vehicle:v8_muscle", as the menus send it.
@@ -100,11 +102,11 @@ public sealed partial class WorldEditor
     /// <summary>One new thing on the map, kept in its overlay as an addition; <paramref name="placement"/>
     /// names the group placing it is part of.</summary>
     private bool PlaceOne(string mapId, PrefabTemplate t, Pose pose, string? name, Dictionary<string, string>? settings, out Snapshot thing, out string why,
-                          string? placement = null)
+                          string? placement = null, OpenFPS.Common.Geometry.ShapeSpec? form = null)
     {
         var o = Overlays.Get(mapId);
         int id = o.NextId++;
-        var data = new EntityData { EntityId = id, PrefabId = t.Id, Position = pose.Position, Rotation = pose.Rotation, Scale = pose.Scale, Name = name };
+        var data = new EntityData { EntityId = id, PrefabId = t.Id, Position = pose.Position, Rotation = pose.Rotation, Scale = pose.Scale, Name = name, Form = form };
         thing = new Snapshot(id, data, settings, Added: true, Change: null, Was: pose.Position, Placement: placement);
         if (Restore(mapId, thing, out why)) return true;
         o.NextId--;

@@ -118,16 +118,21 @@ public sealed class EngineReflections
 
         _surfaces.Clear();
         Span<ReflectingSurface> six = stackalloc ReflectingSurface[6];
+        var shaped = new List<ReflectingSurface>();
         int id = 1;
         foreach (var b in boxes)
         {
             var props = AcousticRegistry.GetProperties(b.Material);
-            int n = ImageSource.FacesOfBox(b.Center, b.Size, b.Rotation, props.Absorption, id, six,
-                                           props.Scattering);
-            id += 6;
+            // A shape mirrors from its facets, a box from its six faces.
+            var shape = OpenFPS.Common.Geometry.Shapes.Make(b.Form, b.Size);
+            shaped.Clear();
+            int n = shape != null
+                ? ImageSource.FacesOfShape(shape.Outer, b.Center, b.Rotation, props.Absorption, id, shaped, props.Scattering)
+                : ImageSource.FacesOfBox(b.Center, b.Size, b.Rotation, props.Absorption, id, six, props.Scattering);
+            id += Math.Max(6, n);
             for (int i = 0; i < n; i++)
             {
-                var f = six[i];
+                var f = shape != null ? shaped[i] : six[i];
                 if (f.HalfU.Length() < MinFaceHalfExtent && f.HalfV.Length() < MinFaceHalfExtent) continue;
                 // Keyed by the plane, not the box: a long wall is a row of blocks (the speedway's
                 // grandstand is twelve), and keyed per box the bounce crossing a seam tore the voice

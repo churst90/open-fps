@@ -885,6 +885,7 @@ public sealed partial class ClientGameSession : IDisposable
             case EntityDefinition def:
                 _world.RegisterDefinition(def);
                 ReportEntityProgress();
+                AskForMeshes();
                 break;
 
             case EntityDefinitionBatch batch:
@@ -894,7 +895,13 @@ public sealed partial class ClientGameSession : IDisposable
                     bool tile = _streamed && _mapLoaded;
                     foreach (var d in batch.Definitions) _world.RegisterDefinition(d, deferAcoustics: tile);
                     if (!tile) ReportEntityProgress();
+                    AskForMeshes();
                 }
+                break;
+
+            case MeshAssetBatch meshes:
+                _world.MeshesArrived(_world.Meshes.Arrived(meshes));
+                AskForMeshes();
                 break;
 
             case EntityDefinitionPack pack:

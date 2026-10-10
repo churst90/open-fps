@@ -228,9 +228,13 @@ public sealed class TriangleWorldBuilder
         void S(string? str) { if (str == null) { Mix(0xFFFFFFFFu); return; } Mix((uint)str.Length); foreach (char c in str) Mix(c); }
         Mix((uint)s.Owner);
         V(s.Position); F(s.Rotation.X); F(s.Rotation.Y); F(s.Rotation.Z); F(s.Rotation.W); V(s.BoxSize);
-        var sf = s.Surface;
-        S(sf.Material); V(sf.Construction.PanelSize); F(sf.Construction.Build.LeafMetres); F(sf.Construction.Build.StudSpacingMetres);
-        F(sf.Construction.ShellThickness); Mix((uint)sf.Layers); Mix((uint)sf.Flags); F(sf.Absorption);
+        void Sf(in Surface sf)
+        {
+            S(sf.Material); V(sf.Construction.PanelSize); F(sf.Construction.Build.LeafMetres); F(sf.Construction.Build.StudSpacingMetres);
+            F(sf.Construction.ShellThickness); Mix((uint)sf.Layers); Mix((uint)sf.Flags); F(sf.Absorption);
+        }
+        Sf(s.Surface);
+        if (s.Slots != null) { Mix((uint)s.Slots.Length); foreach (var slot in s.Slots) Sf(slot); }
         if (s.Mesh != null) { Mix((uint)(s.Mesh.Hash >> 32)); Mix((uint)s.Mesh.Hash); }
         if (s.Terrain != null) { Mix((uint)(s.Terrain.Hash >> 32)); Mix((uint)s.Terrain.Hash); }
         if (s.Parts != null) foreach (var part in s.Parts) { Mix((uint)(part.Hash >> 32)); Mix((uint)part.Hash); }

@@ -113,7 +113,8 @@ public partial class CommandHandler
         var toYou = Vector3.Transform(from - bestPoint, Quaternion.Inverse(tr.Rotation));
         if (toYou.LengthSquared() < 1e-8f) toYou = Vector3.Transform(from - tr.Position, Quaternion.Inverse(tr.Rotation));
         var described = StruckThings.Describe(material, collider.Size, toYou, acoustics.LeafMetres, acoustics.StudSpacingMetres,
-                                              world.Has<Velocity>(thing), world.Has<VehicleComponent>(thing), out bool lengthIsUp);
+                                              world.Has<Velocity>(thing), world.Has<VehicleComponent>(thing), out bool lengthIsUp,
+                                              form: collider.Form);
         // Knuckle height, a little off the middle of the face across it.
         float bottom = tr.Position.Y - collider.Size.Y * 0.5f;
         float up = collider.Size.Y > 0.05f ? Math.Clamp((from.Y + 1.2f - bottom) / collider.Size.Y, 0.1f, 0.9f) : 0.5f;

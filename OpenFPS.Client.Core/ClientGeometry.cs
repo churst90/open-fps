@@ -101,6 +101,12 @@ public sealed class ClientGeometry
         }
     }
 
+    /// <summary>A thing's solid is to be made again though its definition did not change (its mesh asset arrived).</summary>
+    public void Invalidate(int id)
+    {
+        lock (_lock) { _dirty.Add(id); _changes++; }
+    }
+
     /// <summary>A transform changed: if it is a door leaf's, its pose follows at the next snapshot.</summary>
     public void NoteMoved(int id)
     {

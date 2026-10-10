@@ -284,7 +284,7 @@ public class QuickBuildTests : IDisposable
         var form = Assert.IsType<EditorMenu>(rig.Menu("build", "form"));
         Assert.Equal(BuildCatalog.FormPath, form.Path);
         var catalog = BuildCatalog.From(form);
-        Assert.Equal(new[] { "floor", "wall", "roof", "door", "window", "prefab" }, catalog.Kinds.Select(k => k.Word));
+        Assert.Equal(new[] { "floor", "wall", "roof", "door", "window", "shape", "prefab" }, catalog.Kinds.Select(k => k.Word));
         var materials = catalog.OptionsOf("wall", "material");
         Assert.Contains(materials, m => m.Value == "Brick" && m.Sets["thickness"] == "0.35");
         AcousticRegistry.Initialize();

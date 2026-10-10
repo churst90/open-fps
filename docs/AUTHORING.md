@@ -29,6 +29,7 @@ OpenFPS.Server/
   maps/<mapid>.json          one file per map, named after its Id
   prefabs/<prefabid>.json    one file per prefab, named after its Id
   prefabs/prefab-schema.json the schema (skipped by the loader)
+  meshes/<id>.mesh           imported mesh assets (section 5), read at start
 ```
 
 Both loaders accept `//` comments and trailing commas, so a map can be annotated in place — the rooms map,
@@ -181,6 +182,49 @@ that declares itself a room puts the room's voxels inside a volume the listener 
 **Use `Box` for anything that should block sound.** Movement collides against the bounding box whatever the
 shape, and Steam Audio's scene is built from box colliders only — so a solid sphere is walked around, hit by
 the client's raycasts, and *not heard* as an obstruction. Loading one logs a warning saying exactly that.
+For a round or shaped thing that is walked into, heard and struck as its shape, give the box a `Form`.
+
+### Forms: shapes that fill the box
+
+A box collider can carry a `Form` (docs/GEOMETRY.md 2.6 and 12): the shape the triangle world, Steam Audio,
+the echoes, the ground probe and a body all meet, made on the server and every client from a few numbers. The
+shape fills the collider's box, so `ColliderSize` (times `Scale`) is its bounding box and every older reader
+of boxes keeps working. On a prefab or on a map entity (the entity's wins):
+
+```json
+"Form": { "Kind": "Cylinder" }
+"Form": { "Kind": "Stairs", "Steps": 16, "Landing": 1.2, "Materials": ["Concrete", "Carpet"] }
+"Form": { "Kind": "Roof", "Style": "Gable", "Outline": [0,0, 12,0, 12,8, 0,8] }
+"Form": { "Kind": "Prism", "Outline": [0,0, 10,0, 10,10, 0,10], "Holes": [[3,3, 3,6, 6,6, 6,3]] }
+"Form": { "Kind": "Swept", "Profile": [-0.075,0, 0.075,0, 0.075,0.21, 0.055,0.23, -0.055,0.23, -0.075,0.21],
+          "Path": [0,0,0, 1,0,0] }
+"Form": { "Kind": "Mesh", "Mesh": "3f9a0c2b7d1e4a65" }
+```
+
+| Kind | Numbers | What it is | Surfaces (`Materials` in this order) |
+|---|---|---|---|
+| `Wedge` | | a ramp: 0 high along its -Z edge, the box's height along +Z | body |
+| `Stairs` | `Steps`, `Landing` | solid steps climbing toward +Z; each rise at most 0.4 m | body, treads |
+| `Arch` | `Thickness`, `Segments` | a block with a half-elliptical opening along Z | body |
+| `Cylinder` | `Segments` | an upright round column, trunk or tank (an ellipse if X and Z differ) | side, ends |
+| `Cone` | `Top`, `Segments` | an upright cone (`Top` 0) or frustum (`Top` the top's radius over the base's) | side, ends |
+| `Sphere` | `Segments` | a ball | body |
+| `Dome` | `Segments` | the top half of a ball on a flat base | dome, base |
+| `Prism` | `Outline`, `Holes` | an outline, x and z pairs, stood up the box's height; holes inside it | sides, top, bottom |
+| `Roof` | `Outline`, `Style` | a solid roof from the eaves (the box's bottom) to the ridge (its top): `Hip` (the outline's straight skeleton, any shape), `Gable` (a hip whose triangular ends stand up), `Shed` (one slope rising toward +Z), `Flat`; the pitch is whatever the box's height makes it; sound goes through it as a 0.2 m deck (`Thickness` to say otherwise) | slopes, ends, underside |
+| `Swept` | `Profile`, `Path` | a profile (across and up pairs, across to the right of the way the path goes) drawn along a path (x, y, z triples), mitred at each bend: a kerb, a rail, a moulding | sides, ends |
+| `Mesh` | `Mesh` | an imported mesh asset by its id (section 5), stretched to the box | its own, named at import |
+
+- Round shapes take as many sides as sound can tell apart when `Segments` is 0: 12 for a column of 0.3 m
+  radius, 32 for a tank of 5 m, 8 for anything thinner than a quarter of a metre.
+- An outline is in metres about anything (the shape is fitted to the box, so only its proportions bind);
+  it must not cross itself; holes must be inside it and apart.
+- `Materials` gives a material to each surface in turn; a missing or empty one is the thing's own
+  `Material`. A roof's slopes are roofs (the scope's "on a roof").
+- A form that cannot be made (stairs too steep, an outline that crosses itself, a mesh the server does not
+  have) is logged at load, and the thing is its box.
+- Each shape is closed and faces out, its convex pieces fill it, and the same numbers make the same bits
+  everywhere (`GeometryShapeLibraryTests`).
 
 ## 3. Maps
 
@@ -382,3 +426,62 @@ that is not a region are reported the same way. A portal linking a region to its
 
 Everything above is covered by `OpenFPS.Tests/PrefabSpecTests.cs`, including a test that every shipped
 prefab satisfies the spec and one that the shipped map uses only fields the loader reads.
+
+## 5. Importing meshes (glTF and OBJ)
+
+A shape the library has no numbers for (a fountain, a statue, a church a sighted friend modelled in
+Blender) comes in as a mesh asset (docs/GEOMETRY.md 4.2 to 4.5). The importer is an offline tool, never the
+server at run time; it reads glTF 2.0 (`.gltf` with its buffers, or `.glb`) and Wavefront OBJ with small
+readers of our own (`OpenFPS.Geometry/Triangles/MeshImport.cs`: no third-party parser).
+
+Build it once and run the built program from the repository's root:
+
+```
+flock /tmp/openfps-build.lock tools/build-local.sh /tmp/ofps-import tools/import_mesh/ImportMesh.csproj
+~/.dotnet/dotnet /tmp/ofps-import/bin/ImportMesh/debug/ImportMesh.dll fountain.glb \
+    --material Basin=Concrete --material Water=Water --source "Fountain by A. Friend, CC BY 4.0"
+```
+
+It prints what it found and writes `OpenFPS.Server/meshes/<id>.mesh`, the id being sixteen hex digits, the
+hash of the triangles. Options:
+
+| Option | What it does |
+|---|---|
+| `--material SURFACE=MATERIAL` | the acoustic material of a surface (a glTF material's name, an OBJ `usemtl`, or an OBJ group when the file names no materials); repeat for each |
+| `--materials MAP.json` | the same from a file: `{ "Basin": "Concrete", "Water": "Water" }` |
+| `--sheet` | take an open mesh (a canopy, a sail, a mesh fence) as a sheet; without it an open mesh is refused |
+| `--scale S` | the file's units to metres (0.01 for centimetres; glTF is metres already) |
+| `--budget N` | the most triangles (50,000 by default) |
+| `--source TEXT` | where it came from and its licence, kept in the file |
+| `--out DIR` | where to write (`OpenFPS.Server/meshes` by default) |
+| `--check` | read and check, write nothing |
+
+What it does to the triangles, and what it refuses:
+
+- corners within 10 µm are welded into one; triangles with no area and repeated triangles are left out;
+- glTF nodes' transforms (matrix or translation, rotation, scale) are applied, a mirroring one turning its
+  triangles back round; only triangle primitives are read (strips, points and lines are said and left out);
+  Draco, quantised positions and sparse accessors are refused by name;
+- a solid must be closed: every edge shared by two triangles going opposite ways. One that is not is
+  refused, with how many edges are open; import it with `--sheet` if it is meant to be a sheet;
+- a solid whose triangles face inward is turned right way out, and the note says so;
+- more triangles than the budget is refused; slivers (a triangle under a millimetre high) and features
+  under a centimetre are noted;
+- glTF and OBJ are y up, as the game is; the mesh is moved so its bounds' middle is its origin.
+
+Use it on a map entity or a prefab with a box collider of the size you want it, and `Form`:
+
+```json
+{ "PrefabId": "concrete_wall", "Position": { "X": 4, "Y": 1.2, "Z": 9 }, "Scale": { "X": 6, "Y": 0.8, "Z": 6 },
+  "Form": { "Kind": "Mesh", "Mesh": "3f9a0c2b7d1e4a65" } }
+```
+
+The mesh is stretched to the box. Its surfaces have the materials the import gave them; `Materials` in the
+form overrides them in the order the importer printed the surfaces. A body meets a solid mesh as boxes filling
+it (up to 32 across its longest side, at most 512), a sheet as each triangle 4 cm thick (a sheet of more than
+512 triangles is not in a body's way at all). Rays, sound, the ground and bullets meet its triangles.
+
+The server reads `meshes/` at start and logs any file it cannot read or whose triangles do not hash to its
+name. A client asks the server for the meshes its map names (`MeshAssetRequest`, `MeshAssetBatch`), keeps them
+in `LocalApplicationData/OpenFPS/meshes` by id (`OPENFPS_MESH_CACHE` moves it, `off` turns it off), and makes
+the thing as its box until its mesh has come. Tests: `GeometryImportTests`.

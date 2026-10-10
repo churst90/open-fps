@@ -423,6 +423,10 @@ public class GameServer
         Models.Catalog.Add(new OpenFPS.Server.Editor.PrefabKind(prefabRepo));
         Models.Catalog.Add(new OpenFPS.Server.Editor.GroupKind(Models, prefabRepo));
         Models.LoadAll();
+        // Imported meshes (tools/import_mesh, docs/AUTHORING.md), before a map names one.
+        var (meshCount, meshProblems) = OpenFPS.Common.Geometry.MeshLibrary.Shared.LoadFolder("meshes");
+        foreach (var problem in meshProblems) Log.Warning("Meshes: {Problem}", problem);
+        if (meshCount > 0) Log.Information("Meshes: {Count} mesh assets", meshCount);
         _mapRepo = new MapRepository("maps");
         // Who owns each map, whether it is public and who is invited: beside teams.json, and laid over
         // each map's own file as it loads (MapAccessRepository). The world editor's edits are laid over
@@ -765,6 +769,12 @@ public class GameServer
             if (!_sessions.TryGetSession(id, out var sess)) return;
             Touch(id);
             EnqueueCommand(() => reply(_hands.List(sess)));
+        });
+        // Mesh assets a client's definitions name and it has not got (docs/GEOMETRY.md 4.4): read only, so
+        // answered off the game loop.
+        _dispatcher.RegisterHandler<MeshAssetRequest>((id, req, reply) => {
+            if (!_sessions.TryGetSession(id, out _)) return;
+            reply(MeshAssetBatch.Answer(req, OpenFPS.Common.Geometry.MeshLibrary.Shared));
         });
         _dispatcher.RegisterHandler<InteractRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);

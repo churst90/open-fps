@@ -53,6 +53,9 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(44, typeof(MapRoads))]
 // The world: arriving waits on the loading screen for the tiles round you (docs/WORLD_STREAMING.md).
 [MemoryPackUnion(45, typeof(WorldLoading))]
+// Geometry stage 4: mesh assets a client lacks, asked for and sent (docs/GEOMETRY.md 4.4).
+[MemoryPackUnion(46, typeof(MeshAssetRequest))]
+[MemoryPackUnion(47, typeof(MeshAssetBatch))]
 public partial interface IMessage { }
 
 /// <summary>What choosing an item of the world editor's menu does.</summary>
@@ -875,4 +878,41 @@ public partial class WorldStateUpdate : IMessage
     /// of reservoirs, the groundwater, and the ponds overflowing into a drainage line's voice. Null from an
     /// older server or a map without ground of its own.</summary>
     public float[]? GroundWater;
+}
+
+/// <summary>
+/// The mesh assets a client has not got (docs/GEOMETRY.md 4.4): asked for once definitions name them, and not
+/// asked again while it waits. A client asks only for what it holds neither in memory nor in its cache.
+/// </summary>
+[MemoryPackable]
+public partial class MeshAssetRequest : IMessage
+{
+    /// <summary>Asset ids, sixteen hex digits each; at most <see cref="MeshAssetBatch.MostAssets"/> a request.</summary>
+    public List<string> Ids { get; set; } = new();
+}
+
+/// <summary>
+/// Mesh assets, each the bytes of its .mesh file (MemoryPack, then Brotli: packed as definitions are), and the
+/// ids asked for that the server does not have (their things stay boxes).
+/// </summary>
+[MemoryPackable]
+public partial class MeshAssetBatch : IMessage
+{
+    /// <summary>The most assets one request asks for, or one batch carries.</summary>
+    public const int MostAssets = 32;
+
+    public List<byte[]> Files { get; set; } = new();
+    public List<string> Missing { get; set; } = new();
+
+    /// <summary>The answer to a request from what <paramref name="library"/> holds.</summary>
+    public static MeshAssetBatch Answer(MeshAssetRequest request, OpenFPS.Common.Geometry.MeshLibrary library)
+    {
+        var batch = new MeshAssetBatch();
+        foreach (var id in request.Ids.Take(MostAssets))
+        {
+            if (library.TryGet(id, out var entry)) batch.Files.Add(entry.File ?? entry.Data.ToFile());
+            else batch.Missing.Add(id);
+        }
+        return batch;
+    }
 }

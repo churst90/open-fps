@@ -171,7 +171,8 @@ public sealed class WallBumps
         var def = struck.Definition;
         var local = Vector3.Transform(c.Normal, Quaternion.Inverse(struck.Transform.Rotation));
         thing = StruckThings.Describe(def.Material.Material, def.Collider.Size, local, def.Acoustics.LeafMetres,
-                                      def.Acoustics.StudSpacingMetres, def.Moves, isVehicle: struck.Wheels != null, out bool lengthIsUp);
+                                      def.Acoustics.StudSpacingMetres, def.Moves, isVehicle: struck.Wheels != null, out bool lengthIsUp,
+                                      form: def.Collider.Form);
         // Where on the face: across from the box's own centre along the face, up from its bottom.
         var (min, max) = Sightline.WorldBounds(struck);
         float upFrac = max.Y - min.Y > 0.05f ? Math.Clamp((c.Feet.Y + 1.4f - min.Y) / (max.Y - min.Y), 0.05f, 0.95f) : 0.5f;

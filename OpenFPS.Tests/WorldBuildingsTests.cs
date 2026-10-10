@@ -222,6 +222,16 @@ public class WorldBuildingsTests : IDisposable
 
     private static Vector3 Extent(EntityData e) => (Sizes.TryGetValue(e.PrefabId, out var s) ? s : Vector3.One) * e.Scale;
 
+    /// <summary>The same shape: kind, style, and an outline within a millimetre at every corner (each side rounds to
+    /// four places on its own).</summary>
+    private static bool SameForm(ShapeSpec? a, ShapeSpec? b)
+    {
+        if (a == null || b == null) return a == null && b == null;
+        if (a.Kind != b.Kind || a.Style != b.Style || (a.Outline?.Length ?? 0) != (b.Outline?.Length ?? 0)) return false;
+        for (int i = 0; i < (a.Outline?.Length ?? 0); i++) if (MathF.Abs(a.Outline![i] - b.Outline![i]) > 1e-3f) return false;
+        return true;
+    }
+
     /// <summary>
     /// The port's shell against gen_osm.py's, for every building of Magnolia built at medium detail: given what gen_osm
     /// decided for it (kind, name, the street it faces, its pad), the port makes the same entities in the same order,
@@ -261,6 +271,7 @@ public class WorldBuildingsTests : IDisposable
             kinds[kind] = kinds.GetValueOrDefault(kind) + 1;
             Assert.Equal(last - first, made.Count);
             bool whole = true, shellSame = true;
+            string? differs = null;
             for (int k = 0; k < made.Count; k++)
             {
                 var want = map.Entities[first + k];
@@ -276,7 +287,7 @@ public class WorldBuildingsTests : IDisposable
                 double dy = Math.Abs(want.Position.Y - got.Position.Y);
                 double ds = (Extent(want) - Extent(got)).Length();
                 double dturn = 1 - Math.Abs(Quaternion.Dot(Quaternion.Normalize(want.Rotation), Quaternion.Normalize(got.Rotation)));
-                bool ok = regionSame && dxz <= 0.01 && dy <= 0.01 && ds <= 0.01 && dturn < 1e-5;
+                bool ok = regionSame && dxz <= 0.01 && dy <= 0.01 && ds <= 0.01 && dturn < 1e-5 && SameForm(want.Form, got.Form);
                 if (ok)
                 {
                     matched++;
@@ -286,13 +297,18 @@ public class WorldBuildingsTests : IDisposable
                 {
                     whole = false;
                     // Walls and the door move together when the door goes to another wall; nothing else may.
-                    if (!(got.Name!.EndsWith(" wall") || got.RegionAId != null)) shellSame = false;
+                    if (!(got.Name!.EndsWith(" wall") || got.RegionAId != null))
+                    {
+                        shellSame = false;
+                        differs ??= $"{got.Name} ({got.PrefabId}): {dxz * 1000:0.#} mm across, {dy * 1000:0.#} mm up, {ds * 1000:0.#} mm in size, "
+                                    + $"turn {dturn:E1}, room {(regionSame ? "same" : "not")}, form {(SameForm(want.Form, got.Form) ? "same" : $"{want.Form} / {got.Form}")}";
+                    }
                 }
             }
             if (whole) same++;
             else
             {
-                Assert.True(shellSame, $"{kind} {fp.Id}: more than its walls and door differ");
+                Assert.True(shellSame, $"{kind} {fp.Id}: more than its walls and door differ: {differs}");
                 ties.Add($"{d.GetProperty("name").GetString()} ({fp.Id})");
             }
         }
