@@ -27,6 +27,7 @@ library that open-fps and Resonance both reference. Step 1 of
 14. Stage 1 as built: OpenFPS.Native
 15. Stage 2 as built: OpenFPS.Geometry
 16. Stage 3 as built: OpenFPS.Sound and the first half of OpenFPS.Acoustics
+17. Stage 4 as built: rooms and openings as values
 
 ---
 
@@ -707,9 +708,10 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
 
 Where the stages stand (2026-10-10): 0, 1 and 2 built 2026-10-07 (sections 13 to 15), 3 built and merged
 2026-10-10 (section 16, 563f26de), with decision 4 taken the same day (e081faf0: Acoustics without
-MemoryPack). The order agreed with Cody on 2026-10-10: stage 4 next, together with switching the rooms
-flooded from the walls on (docs/GEOMETRY.md 12.6 item 1); then stage 5 with geometry stage 6 (vehicles and
-bodies in the acoustic scene); then stages 6 to 8.
+MemoryPack). 4 built 2026-10-10 on its branch, not merged (section 17: the rooms and openings are values and
+in Acoustics; 384 crossings left). The order agreed with Cody on 2026-10-10: switching the acoustic map to the
+rooms flooded from the walls (docs/GEOMETRY.md 12.6 item 1) once stage 4 is merged; then stage 5 with geometry
+stage 6 (vehicles and bodies in the acoustic scene); then stages 6 to 8.
 
 ### Stage 0: guards (1 to 2 sessions)
 
@@ -803,6 +805,7 @@ Risks:
 - Move the rest of Acoustics.
 - Risk: region ids and iteration order. Region ids are the server's entity ids, and they appear in
   logs, the client's place names and the tests; the adapter must pass them through unchanged.
+- As built: section 17. One adapter, in Common (17.2).
 
 ### Stage 5: statics to instances (2 to 3 sessions)
 
@@ -2028,6 +2031,132 @@ OpenFPS.Geometry <- OpenFPS.Acoustics <- OpenFPS.Sound <- OpenFPS.Common <- Serv
   failed on main as here (the test placed the fire on a 4 m box, which `KeyForPlaced` keys as a bigger fire,
   and expected the preset's level). Main fixed the test in b4496206; the merge passes `IsRound()` for its
   `ColliderShape.Box`.
+
+---
+
+## 17. Stage 4 as built (2026-10-10): rooms and openings as values
+
+Done while the rooms flooded from the walls were being built on another branch (`RoomFlood`, the lab's
+`--geometry-parity`); that work leaves these files alone until this merges, then switches
+`AcousticVolumeGenerator.GenerateRegions` onto the flood where it now is. The generator's logic is unchanged,
+so the switch finds it as it was. Two commits: the values (9413a579), then the move (fafe3b89).
+
+### 17.1 The values
+
+| Type | File | What |
+|---|---|---|
+| `Room` | `OpenFPS.Acoustics/Room.cs` | the six fields of `RegionComponent`, same names and defaults: `FriendlyName`, `IsIndoor`, `RoomSize`, `ReverbTimeScale`, `Materials`, `AmbienceId` |
+| `Opening` | `OpenFPS.Acoustics/Opening.cs` | the five of `PortalComponent`: `RegionAId`, `RegionBId`, `ApertureSize`, `OpeningCentre`, `OpeningRotation` |
+| `PlacedRoom`, `PlacedOpening` | the same files | the id, position and frame the generator took from the entity, with the value |
+
+- Every field is read by the acoustics or the audio: `AmbienceId` by the region's bed (`ClientAudioSystem`),
+  `FriendlyName` by place names and the generator's warnings, the rest by the rooms and the routes.
+- The names are the components', so every reader that took a region or a portal off the map through `var`
+  compiles unchanged: `FmodAudioProvider`'s 19, `SpatialAcoustics`' 5, `OpeningGraph`'s map reads,
+  `OpeningRoutes`, `SpatialService`, `WorldAudioPlayer`, `ClientGameSession`. None of them was edited.
+- Structs with setters, as the components are. A `Room` shares its `Materials` array with the
+  `RegionComponent` it came from, as a copy of the component did: `NotifyMaterialChange` writes the floor
+  underfoot into the map's array, and the entity's definition sees it, as before.
+- Namespace `OpenFPS.Common`, as `AcousticMap`'s. Three nested types of the same names stay as they are and
+  win inside their own type: `OpeningRoutes.Opening` (an opening as the graph has it), `GlassDoor.Opening`
+  (an enum) and `RoomFlood.Room`. None of the three types uses the new values.
+
+### 17.2 The generator and the adapter
+
+- `AcousticVolumeGenerator.GenerateRegions(rooms, openings, solids, mapSize, minBound, ...)`;
+  `AddFaceOpenings(map, boxes, rooms)` takes `FaceOpenings.Box`es; `UpdateRegion` takes a `Room`. The same
+  filters (a room has `RoomSize.X > 0`; an opening with `ApertureSize <= 0` is passed over), the same stable
+  sort by volume, the same loops in the same order.
+- `EntityAcoustics` (`OpenFPS.Common/EntityAcoustics.cs`, host, beside `EntityGeometry`): `ToRoom`,
+  `ToOpening`, `Rooms`, `Openings`, `Solids` (the rule that was at the top of `AddFaceOpenings`: fixed, solid,
+  a box of some size, not a region, no sound, a door's leaf at its shut pose), and `GenerateRegions` and
+  `AddFaceOpenings` over entities. Each list is in entity order and keyed by entity id, so the octree, the
+  region ids, the portal ids and the ids of the openings found in faces (-2000 down) are what they were.
+- One adapter, in Common, not one per side as section 8 planned: the server builds no acoustic map (it uses
+  only `FaceOpenings.AxisAlignedHalfExtents` and `WallReachMetres`). The client builds its map in
+  `ClientWorldState` through `EntityAcoustics`, and its own edits to the map (a room or a door arriving,
+  `Reconcile`) convert with `ToRoom` and `ToOpening`; `ClientAudioSystem` does the same for a room that moved.
+- Callers: 31 calls of `GenerateRegions` and `AddFaceOpenings` (`ClientWorldState`, `PathProbeSpike` and 16
+  test classes) now name `EntityAcoustics`. Tests and spikes that put a region or a portal straight on a map
+  write `new Room` or `new Opening`; `OpenAirReverbTests` hands `RoomAcoustics` a `Room` (`ToRoom` where it
+  reads a map's definitions).
+
+### 17.3 What moved
+
+By `git mv`, namespaces unchanged (decision 6):
+
+| From | To |
+|---|---|
+| `OpenFPS.Common/AcousticMap.cs`, `RoomAcoustics.cs`, `OpeningRoutes.cs` | `OpenFPS.Acoustics/` |
+| `OpenFPS.Common/Systems/FaceOpenings.cs`, `AcousticVolumeGenerator.cs` (namespace `OpenFPS.Common.Systems`) | `OpenFPS.Acoustics/Systems/` |
+
+- They bind in Acoustics with nothing from Common: the values were the only thing they still took from it.
+- `InternalsVisibleTo`: Acoustics' grant to Common went (`OpeningRoutes` called `Diffraction.MinimiseOnEdge`
+  from Common); Acoustics grants the tests only, which reach `WallTransmission.Faces` and the opening routes'
+  cache and `MaxChainedBoxes`. Common's grant to the tests went too: it was for `OpeningRoutes`' internals, and
+  nothing internal is left in Common that a test uses (the tests build without it).
+- Project references unchanged. OpenFPS.Acoustics is 19 files (12, the two values and the five moved);
+  OpenFPS.Common 31 (35, `EntityAcoustics` in, five out).
+
+### 17.4 The wire hash and the door fingerprint
+
+- `WireContract.Hash` covers all of Acoustics (`WireLibrarySource` takes `..\OpenFPS.Acoustics\**\*.cs`,
+  `Systems/` with it), so the moved files are still in it, and `EntityAcoustics` is in it as part of Common. The
+  hash changes with the paths: `508e90527856` at d1013eb6, `68e0889d57c7` with the values, `bee72a307455`
+  after the move, `9cd81ded2075` with the comments of the last commit. Checked at the move: a comment appended
+  to `Systems/FaceOpenings.cs` changes it (`302c6da23d5d`), and taking it out gives `bee72a307455` back. A client and a server from either side refuse each other at login,
+  as for any edit to Common.
+- `DoorModelFingerprint` unchanged (`978619539e83`): none of its fourteen sources reads the moved files or the
+  new values, so door render caches stay good.
+
+### 17.5 The ratchet
+
+| | Before (d1013eb6) | After |
+|---|---:|---:|
+| Crossings (references) | 565 | 384 |
+| Allowance rows (file, host type) | 64 | 51 |
+| Layering references | 0 | 0 |
+| Files in `files.tsv` | 358 | 361 |
+
+- What went, 181 references: `AcousticVolumeGenerator` 120 (all of its rows: the entity reads are the
+  adapter's now), `RoomAcoustics` 15, `OpeningRoutes` 15, `AcousticMap` 2, `FmodAudioProvider` 19 (both rows),
+  `SpatialAcoustics` 5 (`RegionComponent`), `OpeningGraph` 5 (`PortalComponent` 12 to 7).
+- `OpeningGraph` keeps 7 `PortalComponent` references: the door leaves it reads off `EntityDefinition.Portal`
+  (`IsDoorLeaf`, `Declared`), with its other reads of entities and snapshots. They go with the world input
+  (stage 6).
+- `allowed.tsv` only shrank, in the commit that lowered it; the move changed no line (the moved files have no
+  crossings). `files.tsv` gained `Room.cs`, `Opening.cs` (library, by the Acoustics folder rule) and
+  `EntityAcoustics.cs` (host: a rule in `classify.py`), and five paths changed.
+- `LibraryReferencesOnlyLibrary` unchanged: Acoustics references only the runtime, Geometry and Serilog.
+- The survey follows the grants (`Program.cs`: Common grants nothing, Acoustics the tests).
+
+### 17.6 Checks
+
+- Every project builds: Geometry, Native, Acoustics, Sound, Common, the server, Client.Core, the GTK client, the
+  Windows client (`EnableWindowsTargeting`), the lab, the tests.
+- The guards after each commit: LibraryBoundary, RenderFingerprint and EmitterStreamReplay, 31 passed. None
+  of the three was regenerated.
+- After the move, in four runs: Opening, Region, Portal, Acoustic, RoomFlood, WireContract: 170 passed.
+  Reverb, ClientAudio, NetworkTrim, DistantUpdates, BorrowedVoice: 96 passed. Door, Geometry: 401 passed
+  (7 minutes). SteamAudio and TileSceneSet: 18 passed and 4 skipped without Steam Audio; with
+  `OPENFPS_STEAMAUDIO_TESTS` set, 21 passed and 1 failed.
+- That one, `AsyncAcousticWorkerTests.WithoutSteamAudioNothingSimulatedIsClaimed`, is a test of the worker
+  without Steam Audio; with the variable set, `SteamAudioEmbreeFactAttribute` loads phonon at discovery for
+  the whole test process, so the worker finds it. A wider run with the variable set also failed its two
+  neighbours and `OpeningRoutesTests.TheOneShotPathAndTheSustainedPathAgree`; all four pass without the
+  variable. Run the opt-in on `TileSceneSetTests` alone, as its comment says.
+
+### 17.7 Left for stage 5 and after
+
+- The flood (docs/GEOMETRY.md 12.6 item 1): `GenerateRegions` onto the rooms flooded from the walls, region
+  ids unchanged, on the other branch.
+- Stage 5: the statics in the moved files are `OpeningRoutes.ReverseGridOrderForParity` and `DebugOverTheTop`
+  (lab levers), two thread-static scratch lists in `OpeningRoutes`, and `RoomAcoustics.FaceNames` (a table).
+- Stage 6, the world input: all 384 references left. `RainField` 104, `SpatialAcoustics` 68,
+  `AsyncAcousticWorker` 50, `OpeningGraph` 45, `SteamAudioScene` 27, `CabinWalls` 20, `AudioEmission` 18,
+  `EarlyCopies` 17, `TalkerVoice` 16, `VehicleShadow` 15, `EngineReflections` 4.
+- `classify.py` still has its rules for the Common paths the moved files had, as it kept stage 3's; they match
+  nothing.
 
 ---
 

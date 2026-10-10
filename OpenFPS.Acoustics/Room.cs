@@ -2,12 +2,8 @@ using System.Numerics;
 
 namespace OpenFPS.Common;
 
-/// <summary>
-/// A named volume as the acoustics hear it: a box, what each of its six faces is made of (floor, ceiling,
-/// north, south, east, west; material "None" is no face at all), how long it rings and what plays in it.
-/// The host fills it from whatever it keeps its places in (open-fps: RegionComponent, through
-/// EntityAcoustics). A region is not a room: see <see cref="RoomAcoustics"/>.
-/// </summary>
+/// <summary>A named box and what its six faces are made of; the host fills it (open-fps: from RegionComponent,
+/// in EntityAcoustics). Material "None" is no face at all: see <see cref="RoomAcoustics"/>.</summary>
 public struct Room
 {
     public string FriendlyName { get; set; } = "";
@@ -20,6 +16,6 @@ public struct Room
     public Room() { }
 }
 
-/// <summary>A room where it stands: its id (open-fps: the server's entity id, passed through unchanged, as
-/// logs, place names and tests know it), its centre and its frame.</summary>
+/// <summary>A room where it stands. The id is the host's (open-fps: the server's entity id, which logs, place
+/// names and tests know), passed through unchanged.</summary>
 public readonly record struct PlacedRoom(int Id, Vector3 Position, Quaternion Rotation, Room Room);

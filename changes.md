@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Sound library stage 4 (docs/SOUND_LIBRARY_BOUNDARY.md section 17): rooms and openings are values. `Room` and
+  `Opening` in OpenFPS.Acoustics carry what `RegionComponent` and `PortalComponent` carried; the acoustic map,
+  `RoomAcoustics` and the generator take them, and `EntityAcoustics` (Common) makes them from the entities in
+  entity order with the entity ids, so every region and opening id is what it was. Then `AcousticMap`,
+  `RoomAcoustics`, `OpeningRoutes`, `FaceOpenings` and `AcousticVolumeGenerator` moved into OpenFPS.Acoustics,
+  namespaces unchanged. The library's references to the game went from 565 to 384, all of them left for the
+  world input (stage 6). No sound changed: the 17 renders and the emitter streams are the same. The wire hash
+  changes (the files moved), so server and clients are rebuilt together; the door fingerprint does not.
+
 - Geometry stage 4 (docs/GEOMETRY.md section 12), unheard. Shapes other than boxes, made from a few numbers by the
   same code on the server and every client and fitted to their collider's box: round columns and trunks, cones,
   balls and domes, outlines stood up (with holes), roofs from the straight skeleton of any footprint (hip, gable,

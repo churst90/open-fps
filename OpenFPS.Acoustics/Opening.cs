@@ -2,11 +2,8 @@ using System.Numerics;
 
 namespace OpenFPS.Common;
 
-/// <summary>
-/// A way through between two rooms: the rooms on each side (equal ids: not linked yet), how wide it is,
-/// and where the hole is and which way it faces when it has a leaf. The host fills it from whatever it
-/// keeps its doorways in (open-fps: PortalComponent, through EntityAcoustics).
-/// </summary>
+/// <summary>A way through between two rooms (equal ids: not linked yet); the host fills it (open-fps: from
+/// PortalComponent, in EntityAcoustics).</summary>
 public struct Opening
 {
     public int RegionAId { get; set; }
@@ -22,6 +19,6 @@ public struct Opening
     public Quaternion OpeningRotation { get; set; }
 }
 
-/// <summary>An opening where it stands: its id (open-fps: the server's entity id), its position and its frame
-/// (forward is local Z, the way probed for the rooms an unlinked opening joins).</summary>
+/// <summary>An opening where it stands. Its frame's local Z is where the rooms an unlinked opening joins are
+/// looked for.</summary>
 public readonly record struct PlacedOpening(int Id, Vector3 Position, Quaternion Rotation, Opening Opening);
