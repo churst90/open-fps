@@ -4,7 +4,7 @@
 #   tools/physics_boundary/run.sh [out-dir]
 #
 # Builds the sound boundary's Roslyn reader (tools/sound_boundary: the same reader, one parse of every
-# project) on tmpfs with tools/build-local.sh (the repo is on ntfs3: never build in place), reads every
+# project) on tmpfs with tools/build-local.sh (never into the checkout), reads every
 # project's sources, then sorts the physics inventory and writes physics_tables.md and
 # physics_crossings.tsv into out-dir (default /tmp/openfps-physurvey/out). Nothing in the repository is
 # built or changed. Delete the artifacts directory afterwards.

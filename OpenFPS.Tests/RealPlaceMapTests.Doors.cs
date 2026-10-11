@@ -9,6 +9,51 @@ namespace OpenFPS.Tests;
 
 public partial class RealPlaceMapTests
 {
+    /// <summary>A place's roofs are roofs by their shape (gen_osm's roof forms), as their names said (RoofsAndEntrancesTests).
+    /// The one change, on Magnolia: 15969 North Cooter Street's ceiling, which its roof form leaves under the open sky
+    /// over the house, is that house's roof where it is open.</summary>
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void A_roof_is_a_roof_by_its_shape_not_its_name(string id)
+    {
+        var m = _maps.Get(id).Manager;
+        Assert.True(m.TryGetMap(id, out var ecs, out _, out _, out _));
+        Assert.True(m.TryGetMapData(id, out var data));
+        var c = RoofsAndEntrancesTests.RoofChanges(RoofsAndEntrancesTests.ClientSnapshot(ecs, data));
+        RoofsAndEntrancesTests.Say(_o, id, c);
+        Assert.True(c.Same > 1000, $"{c.Same} tops");
+        Assert.Empty(c.Lost);
+        Assert.All(c.Gained, g => Assert.StartsWith("15969 North Cooter Street ceiling (plaster_wall)", g));
+    }
+
+    /// <summary>A place's entrances are its doors and doorways from a room to the open air, as before; the landings
+    /// named for the entrance they stand at are floors (RoofsAndEntrancesTests), and the barns' doorways with no leaf,
+    /// which a person walks through, are entrances.</summary>
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void An_entrance_is_what_an_opening_joins(string id)
+    {
+        var m = _maps.Get(id).Manager;
+        Assert.True(m.TryGetMap(id, out var ecs, out _, out _, out _));
+        Assert.True(m.TryGetMapData(id, out var data));
+        var c = RoofsAndEntrancesTests.EntranceChanges(RoofsAndEntrancesTests.ClientSnapshot(ecs, data));
+        RoofsAndEntrancesTests.SayEntrances(_o, id, c);
+        Assert.True(c.Same > 100, $"{c.Same} entrances");
+        Assert.All(c.Lost, l => Assert.Contains("entrance landing (concrete_floor", l));
+        Assert.All(c.Gained, g => Assert.Contains("barn entrance (portal", g));
+    }
+
+    /// <summary>Every door of a place is rendered as the map arrives (DoorSystem.RenderKeys): a list made of the
+    /// city's door sizes left the places' doors silent on their first swing.</summary>
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void Every_door_is_rendered_as_the_map_arrives(string id)
+    {
+        Assert.True(_maps.Get(id).Manager.TryGetMap(id, out var ecs, out _, out _, out _));
+        DoorPrewarmTests.EveryDoorIsRenderedAsTheMapArrives(ecs, 1000);
+        _o.WriteLine($"{id}: {DoorSystem.RenderKeys(ecs).Length} door renders");
+    }
+
     /// <summary>
     /// Every way into every building and room of a place can be walked to and through, with the server's own
     /// teleport check (MovementSystem.CheckCollision) and ground probe: the floor a step out from each doorway is

@@ -3,6 +3,7 @@
   "Name": "Automatic Door",
   "Description": "One glass leaf of an automatic sliding door, alone or one of a bi-parting pair (place the other turned half a turn). It slides open along its own width when anyone comes within 2.5 m in front of it, either side, holds while anyone is there, and slides shut 2 s after the way is clear. It reverses for anyone in the doorway while it is closing.",
   "Material": "Glass",
+  "Glazing": "Tempered",
   "ColliderSize": { "X": 1.0, "Y": 2.1, "Z": 0.012 },
   "IsSolid": true,
   "Type": "StaticObject",

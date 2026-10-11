@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Build + run the OpenFPS GTK client WITHOUT hitting the ntfs3 build hang.
+# Build + run the OpenFPS GTK client, the build kept out of the checkout.
 #
-# The repo lives on an ntfs3 volume whose kernel driver stalls MSBuild's output-write phase, so a plain
-# `dotnet run` (which writes obj/bin onto ntfs3) hangs. This builds with --artifacts-path on tmpfs and then
-# runs the prebuilt DLL directly. The build copies ASSETS and the FMOD/Steam-Audio .so libs
+# The repo once lived on an ntfs3 volume whose driver stalled MSBuild's output phase, so builds go to
+# --artifacts-path on tmpfs and the prebuilt DLL runs directly; the repo is on btrfs now (2026-10), and the
+# habit stays because the output is self-contained and the checkout stays clean. The build copies ASSETS and the FMOD/Steam-Audio .so libs
 # next to the DLL, so the tmpfs output is self-contained.
 #
 # Usage:

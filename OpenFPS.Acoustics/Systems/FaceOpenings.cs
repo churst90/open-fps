@@ -37,8 +37,9 @@ public static class FaceOpenings
 
     /// <summary>The narrowest gap that is an opening, metres: half a wavelength of the mixer's middle band
     /// (<see cref="Diffraction.MidBandHz"/>). Narrower is closed to the low and middle bands, and in a map
-    /// it is a misfit between two boxes.</summary>
-    public static readonly float MinimumGapMetres = 343f / Diffraction.MidBandHz * 0.5f;
+    /// it is a misfit between two boxes. At the reference speed on purpose: a map's openings must not
+    /// change with the weather.</summary>
+    public static readonly float MinimumGapMetres = AcousticConstants.SpeedOfSound / Diffraction.MidBandHz * 0.5f;
 
     /// <summary>How far from a room's face a wall may stand and still be that face's wall, metres. A
     /// region is drawn to the inside of a room; its walls are just beyond that (MapManager's survey

@@ -17,6 +17,89 @@ Recent work, newest first. `git log` has the rest.
   and `--walk-pair ears=` finds a standing spot by each ear it reports.
 - The emitter-stream replay turns vehicles and the listener as the game does (+Z forward, yaw toward east), not
   backwards; a test fix, no game change. All eight streams regenerated (docs/SPECIAL_CASES_AUDIT.md, P0).
+
+- The ground under the real places' rooms is checked over their air, not their boxes; no map or sound changed.
+  Checked with a room's cells as a whole, 21 rooms (14 on Albany, 7 on Magnolia) seemed to have the ground through
+  their floors. None does: each point was 0.1 to 0.2 m outside the footprint, in a cell of the room's wall (a wall
+  at an angle to the grid is rasterised thick enough for a flood, so it holds cells just past its outer face), where
+  only the yard's ground lies. `RoomCells` keeps a room's air and wall cells apart now (`TryAirAt` is the air
+  alone), and `RealPlaceMapTests.The_ground_never_rises_through_what_lies_on_it` checks nine points over each room's
+  air: no ground on top anywhere, so no generator or grading rule changed. AudioLab `--geometry-parity only=column
+  at=X,Z to=X,Z` says what a ray down meets and which room's cells hold each height.
+
+- The pops (part P1 of docs/SPECIAL_CASES_AUDIT.md), unheard. Measured with `--pop-hunt`, 40 cars and 30
+  still sources, 60 s:
+  - Main Street pavement before Marlow Tower's entrance: 41 to 56 pops a minute before, 0 after. Cars on
+    Wharf Avenue 200 m off, behind the multi-storey car park and the tower, went from -90 dB to -25 and back
+    in a third of a second. Not the source pool: still sources do it too, a metre of the lane with a way over
+    the top and eight without. The search over the top gave up after four boxes, and the car park is a
+    parapet and a slab a storey. It now goes on until it is clear or blocked for good.
+  - Marlow Tower's floor 1 stairwell: 4 to 11 a minute before and after; not fixed. Not the source pool either:
+    a still source on Dock Street gives the same -35/-52/-80 dB between x -19.5 and -15.5, and -57/-83/-100
+    on either side. The line from the stairwell to the street crosses the slab's edge, and on either side of
+    that stretch also the stair's 1.07 m concrete guard. The way over the guard is 3 cm, but its legs still
+    run through the brick front, so it is not believed, and the guard is charged as a whole wall: 22 to 31 dB
+    for 4 m of road. A way round one thing that passes through another is never paid as through that other
+    thing; that is a change to the barrier model (todo, Acoustics).
+  - The source pool's serving (audit S4): results are read back only for sources staged this tick, and a
+    lent source is cleared before its new owner's inputs. Neither was ever seen to happen: a full pool is all
+    served sources (64 served take all 64), so nobody turned away holds one, and a new owner's inputs replace
+    the old at once. 0 stale read-backs in 60 s with 70 or 120 sources.
+  - Every answer says what traced it (simulator, held over a full pool, hand-rolled) and for which source
+    position and ear (`AcousticPathData.SimulatedFrom`, `ListenerPosition`, `Provenance`). Every asker (the
+    path pass, a new voice's first path, horns, sirens and trains, talkers, one-shots' sources) takes an
+    answer only if it was traced within a metre of the source and three of the ear, plus 1.5 s of each one's
+    speed (`AcousticPathData.Answers`). The horn and siren check was half a second, and refused about one
+    answer in twenty, which the worker gives 380 to 470 ms behind at the median and up to 1.5 s on a busy
+    machine; each refusal went to the hand-rolled tracer. A tick traces every source from the newest ear: taken from the first
+    request, a tick that drained requests from both sides of a teleport traced them all from the old place.
+  - A patrol car with its siren off asks for no siren path (audit S5): every one asked every frame and,
+    with no engine voice, ran the hand-rolled tracer on the game thread for nothing.
+  - Path lag, a car's position against its answer's, the same within the machine's own noise (two rounds,
+    before and after run in turn): medians 400 and 333 ms before, 383 and 367 after on the pavement; 567 and
+    417 before, 400 and 500 after in the stairwell.
+  - Where to listen: `/tp -10.8 -104.2 3.28` (floor 1 stairwell, Dock Street through the front), `/tp -6.4
+    -103.5 0.12` (the pavement before the entrance, Wharf Avenue over the roofs).
+- Where the sun and the moon are, calculated, not yet said in the game (docs/SKY.md). A new project,
+  `OpenFPS.Astronomy`, with no dependencies: the sun by NOAA's solar position equations (position with
+  refraction, rise, set, solar noon, civil, nautical and astronomical twilight), the moon by Meeus's lunar series
+  with topocentric parallax (position, rise, set, phase angle, lit share, waxing or waning, the eight phase
+  names, the instants of the four phases), and the sentence the readout key and `/sky` will say: "The sun west
+  south west, twenty degrees up, sets in an hour and ten minutes; the moon ...". Polar day and night give no
+  rise or set, never NaN. Checked against the Naval Observatory and NOAA's solar calculator for Magnolia,
+  Albany and Tromsø, every rise, set and twilight of 2026 among them. The key and `/sky` come with the
+  weather's clock.
+- Physics stage 0, the guards (docs/PHYSICS_BOUNDARY.md section 14), no game code changed. A ratchet on what
+  the physics types reference (`PhysicsBoundaryTests`, 62 crossings, as the survey found); nineteen walks on the
+  city and Magnolia through the server's movement and the client's prediction, each track stored and the gap
+  held to 1 mm (`MovementReplayTests`); four drives, a minute of the city's traffic and ninety seconds of its
+  trains stored as state tracks (`DrivingReplayTests`, `RailReplayTests`); a ballistics table for every weapon
+  (`BallisticsTableTests`); `--physics-parity`, old path against new over thousands of standing points. Of
+  the survey's three parity risks one parts the two sides today: standing on a parked car (anything that
+  moves), the server stands you on its roof and the client lets you fall a centimetre a tick toward the road.
+  The ground memo and the two ways of gathering obstacles made no gap in any walk.
+- The Jolt trial in AudioLab (`--jolt-trial`, JoltPhysicsSharp 2.22.0, MIT): our city tile as a mesh and
+  Magnolia's ground as a height field go in unchanged (balls rest on our own floor), 500 bodies step in about
+  0.2 ms at 120 Hz on one thread, a stack of ten boxes sleeps, linear cast stops a bullet-sized sphere at a
+  10 cm wall, a soft ball and a cloth rest on the ground. Runs on Linux x64 with `libjoltc.so`. Its binding's
+  `BodyCreationSettings.MotionQuality` is broken in that version (worked round in the lab). No game code uses it.
+- Names and materials to properties (part P5 of docs/SPECIAL_CASES_AUDIT.md), nothing heard changed on a shipped
+  map. Unheard:
+  - One material table. A bullet's strike and ricochet, the footstep model's deck and grit, and whether a thing is
+    leaves come from the material table, so "Steel" strikes and skips as steel (it chipped like plaster), oak
+    splinters as wood and stainless rings as metal. An unknown material is an error in the log, once.
+  - Glass says what kind it is: each glass prefab has a `Glazing` (annealed, tempered, laminated), shown in the
+    editor and required by the validator, instead of a guess from its name. Every shipped pane breaks as before.
+  - The scope's "on a roof" is a roof's shape, or the open sky over you with a room under your feet, not the word
+    "roof" in a name. The two bus shelters' canopies on the city are no longer called roofs: they have no room
+    under them.
+  - An entrance is a door or an opening from a room to the open air that a person can walk through. The hangar's
+    open front and the tunnel's mouths are entrances now, said as "Hangar entrance"; the landings named after
+    their shops' entrances on the real places are not; the car park's sides over their parapets are not.
+  - Each map's doors are rendered as the map arrives, from the map itself (the server sends every sound its doors
+    can make with the map), instead of from a list of the city's door sizes: the first swing of a door on Albany or
+    Magnolia was silent. Every door model has one row in one table, and a sound none names is never played as a
+    knob door.
 - One table of model kinds (part P2 of docs/SPECIAL_CASES_AUDIT.md), no change heard. `ModelKindTable` in the
   sound library says, for any sound id, which kind of model it is, what synth makes it, how it moves (fixed,
   walks, rolls, flies, rails), its level and size, its headroom and its places. The level and headroom
@@ -56,47 +139,44 @@ Recent work, newest first. `git log` has the rest.
   - Checked and already by map or by world: rail, crossings, pedestrian speech, crowds, the panhandler, Alex,
     door manners, crosswalks, lanes, junction slots, fire, ground and road water, map tiles and geometry, the
     editor's hands, stacks and touches, build sessions, and each session's known entities.
+
 - Build warnings: the ten xUnit analyzer warnings in the tests and the four stack buffers made in a loop in the
   lab's glass and street spikes are gone; the server, the GTK client, the lab and the tests build with none.
-- The pops (part P1 of docs/SPECIAL_CASES_AUDIT.md), unheard. Measured with `--pop-hunt`, 40 cars and 30
-  still sources, 60 s:
-  - Main Street pavement before Marlow Tower's entrance: 41 to 56 pops a minute before, 0 after. Cars on
-    Wharf Avenue 200 m off, behind the multi-storey car park and the tower, went from -90 dB to -25 and back
-    in a third of a second. Not the source pool: still sources do it too, a metre of the lane with a way over
-    the top and eight without. The search over the top gave up after four boxes, and the car park is a
-    parapet and a slab a storey. It now goes on until it is clear or blocked for good.
-  - Marlow Tower's floor 1 stairwell: 4 to 11 a minute before and after; not fixed. Not the source pool either:
-    a still source on Dock Street gives the same -35/-52/-80 dB between x -19.5 and -15.5, and -57/-83/-100
-    on either side. The line from the stairwell to the street crosses the slab's edge, and on either side of
-    that stretch also the stair's 1.07 m concrete guard. The way over the guard is 3 cm, but its legs still
-    run through the brick front, so it is not believed, and the guard is charged as a whole wall: 22 to 31 dB
-    for 4 m of road. A way round one thing that passes through another is never paid as through that other
-    thing; that is a change to the barrier model (todo, Acoustics).
-  - The source pool's serving (audit S4): results are read back only for sources staged this tick, and a
-    lent source is cleared before its new owner's inputs. Neither was ever seen to happen: a full pool is all
-    served sources (64 served take all 64), so nobody turned away holds one, and a new owner's inputs replace
-    the old at once. 0 stale read-backs in 60 s with 70 or 120 sources.
-  - Every answer says what traced it (simulator, held over a full pool, hand-rolled) and for which source
-    position and ear (`AcousticPathData.SimulatedFrom`, `ListenerPosition`, `Provenance`). Every asker (the
-    path pass, a new voice's first path, horns, sirens and trains, talkers, one-shots' sources) takes an
-    answer only if it was traced within a metre of the source and three of the ear, plus 1.5 s of each one's
-    speed (`AcousticPathData.Answers`). The horn and siren check was half a second, and refused about one
-    answer in twenty, which the worker gives 380 to 470 ms behind at the median and up to 1.5 s on a busy
-    machine; each refusal went to the hand-rolled tracer. A tick traces every source from the newest ear: taken from the first
-    request, a tick that drained requests from both sides of a teleport traced them all from the old place.
-  - A patrol car with its siren off asks for no siren path (audit S5): every one asked every frame and,
-    with no engine voice, ran the hand-rolled tracer on the game thread for nothing.
-  - Path lag, a car's position against its answer's, the same within the machine's own noise (two rounds,
-    before and after run in turn): medians 400 and 333 ms before, 383 and 367 after on the pavement; 567 and
-    417 before, 400 and 500 after in the stairwell.
-  - Where to listen: `/tp -10.8 -104.2 3.28` (floor 1 stairwell, Dock Street through the front), `/tp -6.4
-    -103.5 0.12` (the pavement before the entrance, Wharf Avenue over the roofs).
-- Openings framed from where the rooms' air meets them, unheard (docs/GEOMETRY.md 12.6, "Openings from the
-  floods"). A flooded room no longer has openings found in its box's faces: on Albany 1,530 rooms had 33,342 m2 of
-  openings to the outdoors that their walls do not have (a box's face across its own house's wing, walls the face
-  finder could not see), and on Magnolia 481 rooms 9,650 m2; they are gone. An opening with no leaf is as big as the
-  air that met it, a piece per bay between piers; a stair hole is what its flight leaves open (9 to 9.6 m2, not
-  12). Heard: the real places' houses and halls closed to the street, as their walls are.
+
+- Nothing of a room is authored any more (regions become places, step 5; docs/GEOMETRY.md 12.6, "Nothing authored of
+  a room"): a prefab has no RoomSize, RoomMaterials or ReverbScale, and the editor no face materials. A region is
+  the box its collider fills; a room's shape and what lines it come from its walls. No map changed and no sound.
+
+- `tools/test-local.sh` takes two test runs at once (Cody, 2026-10-11), both pinned to the same last twelve cores,
+  so the rest of the machine is never touched; a third run waits for a slot. Slot 1 keeps the old lock file, so a
+  worktree's older copy of the script still counts against the two. It now waits for the load to fall under 24 (was
+  16).
+
+- One table of model kinds (part P2 of docs/SPECIAL_CASES_AUDIT.md), no change heard. `ModelKindTable` in the
+  sound library says, for any sound id, which kind of model it is, what synth makes it, how it moves (fixed,
+  walks, rolls, flies, rails), its level and size, its headroom and its places. The level and headroom
+  lookups, the voice factory, the places, the editor, the scope, the footsteps and the sixteen "is it a
+  vehicle" tests read it instead of each keeping its own list of prefixes, so a new kind cannot be silent in
+  one of them as the crossing bell was. A model that will not load is logged once by id instead of dropped
+  without a word, and a test loads every shipped map and prefab and checks each synthesised sound resolves
+  (they all do). The push mower says it is walked behind (`WalkedBehind`) instead of being named in the
+  footstep code. All eight replay streams and the render fingerprints are unchanged.
+
+- The readers of a room's box use its flood (regions become places, step 4; docs/GEOMETRY.md 12.6, "The readers on
+  the flood"); no lookup, measure, route or sound changed. `/tp` to a room puts you on its floor at a clear spot
+  near its middle where the server finds you in that room (`StandingSpots.InRoom`), and sizes the room by its air;
+  door manners weigh which side of a door is further in by each room's air; the client's tracker puts you in the
+  room whose flood holds you. Marlow Tower's roof access listening spot moved off the top of its flight to `/tp
+  -10.6 -105.5 24.1`. Left on the box: which tiles a room is sent with, and the indoor flag, both made at load
+  before the first flood.
+
+- Real weather (docs/REAL_WEATHER.md, a design): Cody decided the world's clock, real local time at real places
+  ("Must be realistic to the area as it is happening"); made-up maps keep their own clock. Planned the same day:
+  where the sun and the moon are for the player, worked out from the place and the real time (NOAA's solar position
+  equations, Meeus's lunar series) and said by a readout key and `/sky` in the tracker's words. The sun is not a
+  sound source; what its height changes is heard where it is physical (temperature, the wind's daily turn, the dawn
+  chorus). docs/SKY.md has the detail. The other six decisions are open. Nothing built.
+
 - The guards widened (part P0 of docs/SPECIAL_CASES_AUDIT.md), tests only. Five new emitter-stream replay
   scenarios, recorded from the code as it is, bugs included: `sirens_and_far_traffic` (a siren behind a
   building, seven borrowed cars, a held horn), `train_behind_wall`, `places_and_woods` (a tree's and a
@@ -109,17 +189,34 @@ Recent work, newest first. `git log` has the rest.
   from the code and holds today's 47 overlaps exactly; its must-pass twin is skipped as S6's known failure
   until P3. Two corrections to the audit from the streams: a borrowed voice's aperture is 1, not 0, so S3's
   400 Hz low-pass does not happen; and the replay's moving vehicles face backwards (-Z), so their grilles and
-  exhausts are swapped in every stream.
+  exhausts are swapped in every stream (fixed the same day, above).
 
-- The ambience recordings are gone (Cody: "remove those ambiences completely we simply don't need them"): the
-  three four-channel beds and six stereo ones (90 MB, never in git), every copy in the build and publish
-  folders, the ambisonic bed stage and its format helpers (`AmbisonicBedDsp`, `AmbisonicFormat`), the lab's
-  `--ambisonic` and the ingest tool's two bed categories. The client no longer decodes 10 million samples at
-  start that nothing played, and the Windows zip loses 90 MB. The traced reverb's own ambisonic decode
-  (`PhononAmbisonics`) is untouched.
-- Build warnings cleared: the server and the GTK client build with none. SQLite's native library under EF Core
-  to 3.50.3 (2.1.10 bundled SQLite before 3.50.2, CVE-2025-6965); stack buffers made once outside their loops;
-  a train voice whose group has no source this frame is skipped instead of reading an empty snapshot.
+- Openings framed from where the rooms' air meets them (regions become places, step 3), approved by ear the same
+  day (Cody: "complete, success everything sounds good"; docs/GEOMETRY.md 12.6, "Openings from the
+  floods"). A flooded room no longer has openings found in its box's faces: on Albany 1,530 rooms had 33,342 m2 of
+  openings to the outdoors that their walls do not have (a box's face across its own house's wing, walls the face
+  finder could not see), and on Magnolia 481 rooms 9,650 m2; they are gone. An opening with no leaf is as big as the
+  air that met it, a piece per bay between piers; a stair hole is what its flight leaves open (9 to 9.6 m2, not
+  12). Heard: the real places' houses and halls closed to the street, as their walls are.
+
+- The physics boundary survey (docs/PHYSICS_BOUNDARY.md, tools/physics_boundary), a doc; no engine code changed.
+  Physics is in five projects today; 62 references cross out of what would move whole; a car is simulated twice (the
+  server's drivetrain and the sound's); gravity is written 44 times (40 of them 9.81); there are no rigid bodies,
+  and the mass, friction and restitution prefabs author are read by nothing. Proposed: `OpenFPS.Physics` on
+  Geometry, stepped by the server and the client, read by Sound; stages 0 to 6, 20 to 30 sessions, each guarded.
+  Cody's decisions the same day: all ten as recommended; soft bodies as well as rigid ones; gravity a property of
+  the world (9.80665 m/s² by default, read by everything that falls, rolls or flies); the engine Jolt Physics
+  through JoltPhysicsSharp (both MIT), behind our own types, with our geometry, walk, tyres, ballistics, air, fire,
+  water and impact sounds kept ours. This replaces the 2026-10-06 placement of vehicle physics in Sound. Stage 0,
+  the guards, is under way.
+
+- The special-cases audit (docs/SPECIAL_CASES_AUDIT.md), read-only, asked by Cody after the train horn through
+  Marlow Tower's brick ("shouldn't all mobile sound sources like vehicles, trains, sirens, etc use the same path so
+  there's consistency?"). 32 findings: voices told apart by id ranges, kinds read from names and sound-id prefixes,
+  two writers for one voice, every source starting and placing its own voice; ranked by how likely each is to cause
+  the next bug, grouped into parts P0 to P8 and placed against the sound library stages. P0, P1 and P2 were done the
+  same day (above); P5, P8 and the barrier model are under way; the voice registry (P3a to P3d) is next.
+
 - Connecting holds focus and waits for a server that is not up yet, unheard (Cody, 2026-10-11: "either
   announce it's reconnecting or if it is in the process of connecting, focus shouldn't be on the menu where
   the arrows move the menu cursor"). A client started before its server said "The server did not answer"
@@ -141,8 +238,39 @@ Recent work, newest first. `git log` has the rest.
   - Saved Servers stays open while it connects with a saved password, and closes on login.
   - Both heads (GTK and Windows). ConnectRetry and ConnectHold in the client core; ConnectRetryTests (20).
 
-- What Cody heard in Marlow Tower on 2026-10-10, traced and fixed, unheard (docs/GEOMETRY.md 12.6, "Marlow
-  Tower's leaks"). Three causes, none of them the rooms' floods:
+- Cody's play on 2026-10-10 after places step 2, fixed, unheard. E between two doors opens the one you face (else
+  the nearer), measured to its doorway, and a door a storey up or down is never in reach: in Marlow Tower's floor 3
+  corridor the flats' doors face each other, and the one a hand's breadth nearer behind you took the key. On
+  Magnolia and Albany every room can be walked into (docs/MAPS_FROM_REAL_PLACES.md, "Every room can be walked
+  into"): the kitchen counter keeps clear of the back door and every way through, the back door goes toward one end
+  of its wall, sofas and beds leave every way into their room walkable, a door with a shed a step outside it moves
+  along its wall, every outside door has a landing and steps down to the ground, lawns, drives and paths are dug
+  down to the floor where they meet a house, and a room no way wide enough for a body reaches gets a side door. Both
+  maps regenerated; no id moved (two 0.28 and 0.54 m Albany leaves are plaster under the same ids); the world's
+  tiles are made again (WorldStore.GeneratorVersion 7). `RealPlaceMapTests.Every_way_in_can_be_walked_through` holds
+  both places to it with the server's own collision. Picked out with comma or period, a door behind a wall now says
+  "behind a wall" instead of a blip that never comes (the barn at 19415 Turtle Dove Lane: its doorway faces the
+  street, the house's doors were 14 to 18 m off through its metal wall). A barn has one room and a doorway by the
+  generator's rules, never a bathroom; the bathroom door heard was the house's. The /tp listening list is checked to
+  stand on (docs/LISTENING_SPOTS.md, ListeningSpotsTests), `StandingSpots.InRoom` and AudioLab `--walk-pair room=`
+  make the next one. `--walk-pair` takes one walk on the server's and the client's movement side by side: at 19617
+  Turtle Dove Lane they agree on every walk tried, so the server was not refusing moves there
+  (docs/AUDIOLAB_NOTES.md).
+
+- The ambience recordings are gone (Cody: "remove those ambiences completely we simply don't need them"): the
+  three four-channel beds and six stereo ones (90 MB, never in git), every copy in the build and publish
+  folders, the ambisonic bed stage and its format helpers (`AmbisonicBedDsp`, `AmbisonicFormat`), the lab's
+  `--ambisonic` and the ingest tool's two bed categories. The client no longer decodes 10 million samples at
+  start that nothing played, and the Windows zip loses 90 MB. The traced reverb's own ambisonic decode
+  (`PhononAmbisonics`) is untouched.
+
+- Build warnings cleared: the server and the GTK client build with none. SQLite's native library under EF Core
+  to 3.50.3 (2.1.10 bundled SQLite before 3.50.2, CVE-2025-6965); stack buffers made once outside their loops;
+  a train voice whose group has no source this frame is skipped instead of reading an empty snapshot; a moved
+  wall piece in the world's buildings keeps whatever layer it had.
+
+- What Cody heard in Marlow Tower on 2026-10-10, traced and fixed, approved by ear 2026-10-11 (docs/GEOMETRY.md
+  12.6, "Marlow Tower's leaks"). Three causes, none of them the rooms' floods:
   - **The train "clear as day" in the floor 3 corridor** was its horn, playing at 74 dB at the ear with nothing
     taken off it (his log: -5/-5/-10 dBFS low/mid/high, "blocked 95 %"). A train's voices kept the walls of
     wherever each voice started: their ids are no entity's, so the path pass skipped them, and a re-submission
@@ -164,64 +292,60 @@ Recent work, newest first. `git log` has the rest.
     corridor, its closer shuts it), as an exit stair has; with the stairwell's storeys one space since the
     floods, a siren on Main Street reached floor 3's corridor at -56 dB mid (-71 before step 2), and through
     the shut door it is under -100. 37 doors, in the doorways' place, so no id moves; city.json regenerated. The
-    short pops themselves (a car's mid band up 20 to 30 dB for a quarter second) are older and still there:
-    the simulator's own transmission jumps for a moving source, not the routes (open in todo).
+    short pops themselves (a car's mid band up 20 to 30 dB for a quarter second) are older. First put down
+    to the simulator's transmission jumping for a moving source, they turned out to be the barrier search,
+    still sources included (audit P1, above: the pavement's fixed, the floor 1 stairwell's left for the
+    barrier model).
+  - Lab: `--path-probe ... fields` gives each other place's field at the ear (`OpeningRoutes.FieldAt`, the
+    level its reverb bus is set to) for the outdoors and every room within 30 m, and the worker's reflections.
 
   The wire hash is unchanged (nothing in Common or the library moved); the map changed, so restart the server.
 
 ## 2026-10-10
 
-- Cody's play on step 2, fixed, unheard. E between two doors opens the one you face (else the nearer), measured
-  to its doorway, and a door a storey up or down is never in reach: in Marlow Tower's floor 3 corridor the
-  flats' doors face each other, and the one a hand's breadth nearer behind you took the key. On Magnolia and
-  Albany every room can be walked into (docs/MAPS_FROM_REAL_PLACES.md, "Every room can be walked into"): the
-  kitchen counter keeps clear of the back door and every way through, the back door goes toward one end of its
-  wall, sofas and beds leave every way into their room walkable, a door with a shed a step outside it moves
-  along its wall, every outside door has a landing and steps down to the ground, lawns, drives and paths are
-  dug down to the floor where they meet a house, and a room no way wide enough for a body reaches gets a side
-  door. Both maps regenerated; no id moved (two 0.28 and 0.54 m Albany leaves are plaster under the same ids);
-  the world's tiles are made again (WorldStore.GeneratorVersion 7). `RealPlaceMapTests.Every_way_in_can_be_walked_through`
-  holds both places to it with the server's own collision. Picked out with comma or period, a door behind a
-  wall now says "behind a wall" instead of a blip that never comes (the barn at 19415 Turtle Dove Lane: its
-  doorway faces the street, the house's doors were 14 to 18 m off through its metal wall). A barn has one room
-  and a doorway by the generator's rules, never a bathroom; the bathroom door heard was the house's. The /tp
-  listening list is checked to stand on (docs/LISTENING_SPOTS.md, ListeningSpotsTests), `StandingSpots.InRoom`
-  and AudioLab `--walk-pair room=` make the next one. `--walk-pair` takes one walk on the server's and the
-  client's movement side by side: at 19617 Turtle Dove Lane they agree on every walk tried, so the server was
-  not refusing moves there (docs/AUDIOLAB_NOTES.md).
+- Rooms flood from their points (regions become places, step 2), approved by ear 2026-10-11 (docs/GEOMETRY.md 12.6,
+  "The flood from a point"). No box and no margin: a room's air is what its walls, floors, ceilings, shut leaves,
+  openings and the open sky close in. The generators put an opening wherever two places meet with no wall (a
+  stairwell's storeys, the car park's open sides, the tunnel's quarters and mouths, the concourse's thirds, between
+  a house's rooms, a barn's doorway), and every part of a real place's footprint belongs to a room, on the maps and
+  in the world's tiles (stored tiles are made again). City, Magnolia and Albany regenerated; no id moved, the new
+  entities are written last. Heard most: a stairwell's storeys open to each other through the whole hole (up to 4 dB
+  more between them), the barns no longer lose their sound out of their doorways, and houses whose wings were
+  nobody's. A flood is faster (Albany 5.2 s on 8 threads): a block grows where its air reaches, keeping what it has
+  flooded.
 
-- Rooms flood from their points, unheard (docs/GEOMETRY.md 12.6, "The flood from a point"). No box and no margin:
-  a room's air is what its walls, floors, ceilings, shut leaves, openings and the open sky close in. The generators
-  put an opening wherever two places meet with no wall (a stairwell's storeys, the car park's open sides, the
-  tunnel's quarters and mouths, the concourse's thirds, between a house's rooms, a barn's doorway), and every part
-  of a real place's footprint belongs to a room, on the maps and in the world's tiles (stored tiles are made
-  again). City, Magnolia and Albany regenerated; no id moved, the new entities are written last. Heard most: a
-  stairwell's storeys open to each other through the whole hole (up to 4 dB more between them), the barns no
-  longer lose their sound out of their doorways, and houses whose wings were nobody's. A flood is faster
-  (Albany 5.2 s on 8 threads): a block grows where its air reaches, keeping what it has flooded.
+- No ambience beds at all (regions become places, step 1; Cody, 2026-10-10): the map's outdoor bed and the region
+  beds, their provider calls (`PlayAmbientBed`, `StopAmbientBed`), `SetMapAmbience`, `PrefabTemplate.AmbienceId` and
+  the map file's `AmbienceId` are gone; the maps are regenerated with that one line out.
+  `RegionComponent.AmbienceId` and `MapManifest.AmbienceId` stay on the wire, unread and empty. No shipped map named
+  a bed, so nothing heard changes. A prefab that names one is refused at load, as any field the loader does not read
+  is.
 
-- No ambience beds at all (Cody, 2026-10-10): the map's outdoor bed and the region beds, their provider calls
-  (`PlayAmbientBed`, `StopAmbientBed`), `SetMapAmbience`, `PrefabTemplate.AmbienceId` and the map file's
-  `AmbienceId` are gone; the maps are regenerated with that one line out. `RegionComponent.AmbienceId` and
-  `MapManifest.AmbienceId` stay on the wire, unread and empty. No shipped map named a bed, so nothing heard
-  changes. A prefab that names one is refused at load, as any field the loader does not read is.
-
-- Sound library stage 5, first slice (docs/SOUND_LIBRARY_BOUNDARY.md section 18), on its branch: the traced
-  reverb's places and the weather belong to one audio world instead of the process. `TracedReverbSet` is an
-  instance the FMOD provider holds and the acoustic worker is handed; `TracedReverb.Current` and
+- Sound library stage 5, first slice (docs/SOUND_LIBRARY_BOUNDARY.md section 18), merged the same day (10c1bcf7):
+  the traced reverb's places and the weather belong to one audio world instead of the process. `TracedReverbSet` is
+  an instance the FMOD provider holds and the acoustic worker is handed; `TracedReverb.Current` and
   `TracedEchoes.Current` are gone (a traced echo's rig carries its tracer). `WorldWeather` holds the wind, the
   run-off and the ground's water for one world: the session fills it from the server's broadcast, the client
   advances the run-off, and every tree, fire, fountain, drain, shore and the wind at your ears reads it.
   `WindField.Weather`, `MeanSpeed`, `Turbulence`, `Hold`, the static `Runoff` and `GroundWater.Shared` are gone;
-  `WindField.Now()` stays the one world time. No sound changed: the renders and the emitter streams are the
-  same, unregenerated. The wire hash changes (the weather files are in it), so server and clients are rebuilt
-  together; nothing sent changed, and the door fingerprint is the same.
+  `WindField.Now()` stays the one world time. No sound changed: the renders and the emitter streams are the same,
+  unregenerated. The wire hash changes (the weather files are in it), so server and clients are rebuilt together;
+  nothing sent changed, and the door fingerprint is the same.
 
-- The ground no longer comes up through the floors on Magnolia and Albany, unheard. Since geometry stage 4 their
+- The ground no longer comes up through the floors on Magnolia and Albany, approved by ear the same day with
+  the rooms' measure. Since geometry stage 4 their
   floors are their footprints' prisms, and the grading of the ground under slabs took only boxes, so on a slope the
   dirt rose through the back of every house: footsteps were on dirt somewhere in 1,253 of Albany's rooms and 377 of
   Magnolia's, and those rooms measured their floors as a field. The ground is cut level under a prism's outline now,
   as under a road; the copies of the places in the world are made again (`WorldPlaces.FormatVersion` 3).
+
+- Real weather for the world's real places, a design (docs/REAL_WEATHER.md); nothing built. Sources compared and
+  checked 2026-10-10: Open-Meteo for the conditions everywhere, METAR to correct them near the ground, the NWS API
+  later. How each real field maps onto the simulation and what has no slot yet; a 0.1 degree lattice with bicubic
+  interpolation and a Barnes correction toward stations; monotone interpolation in time, rain cells that keep the
+  hour's mean, fronts moved between hours; the server fetches and caches on disk, hands over to the simulation when
+  the data stops, and keeps `/weather`'s held values above the real ones; privacy and attribution; six stages, 8 to
+  13 sessions; seven decisions for Cody.
 
 - Server and client agree on every room point on all three maps (docs/GEOMETRY.md 12.6 item 1). Rooms whose
   floods reach the same air past their margins flood as one; rooms that flood together are sent together across a
@@ -229,7 +353,8 @@ Recent work, newest first. `git log` has the rest.
   `building=yes` way) is a building: a home is under a hectare in gen_osm. Albany regenerated. A flood over 64
   million cells keeps its boxes, and flooding takes 3 bytes a cell, not 5.
 
-- Rooms measure themselves from their floods (docs/GEOMETRY.md 12.6 item 1, "Measured from their floods"), unheard.
+- Rooms measure themselves from their floods (docs/GEOMETRY.md 12.6 item 1, "Measured from their floods"), approved
+  by ear the same day with the floors fixed (Cody: "everything sounds great. no complaints").
   A flooded room's volume, face areas and face materials come from the walls round its air, by a ray to the surface
   for each metre of lining, not from its box; the room lift, the routes' room absorption and the Sabine estimate read
   them. Rooms that do not flood (yards, streets) keep their boxes. What moved: the terminal concourse's acoustic-tile
@@ -237,6 +362,19 @@ Recent work, newest first. `git log` has the rest.
   tunnel's ends are no longer counted twice (2.5 dB up), and on the real places the box survey's grass and dirt
   ceilings are gone (a tiled bathroom 7.8 dB up). The client floods 1.5 s longer on the city (8 threads). The wire hash changes (Acoustics and Common
   changed); no message did.
+
+- Rooms from their walls, switched on, approved by ear the same day (Cody: "everything sounds good";
+  docs/GEOMETRY.md 12.6 item 1, "Switched on"). A point's room is the room whose flood holds it, on the server and
+  the client alike: every indoor room is flooded through the walls with each door leaf shut, by the server after
+  every change to its fixed geometry and by the client in each acoustic refresh. A region that does not flood (a
+  yard, a street) keeps its box, and region ids are unchanged. Server against client at 24 points round every room:
+  city 11,784 of 11,784 the same, Magnolia 10,510 of 10,512, Albany 22,509 of 22,512 (the rest fixed later the same
+  day, above); 8 to 11 % of points are in another place than the boxes alone put them. Before it, the flood went to
+  quarter-metre cells in a dense block per group of rooms, on threads, with air under the open sky told from air
+  closed in and a roof's eave able to stop it (rooms open past their margin: city 49 to 7, Magnolia 874 to 3, Albany
+  2,106 to 0; Albany 41 s to 13.4 s on one thread). The leaks it found were closed in the generators: a 3 cm slot
+  over every door on the real places, a 5 cm slot over the city towers' glass front entrances, and roof-access
+  doorways cut 1.6 m wide for a 1 m door. Magnolia, Albany and the city regenerated; the wire hash changes.
 
 - Sound library stage 4 (docs/SOUND_LIBRARY_BOUNDARY.md section 17): rooms and openings are values. `Room` and
   `Opening` in OpenFPS.Acoustics carry what `RegionComponent` and `PortalComponent` carried; the acoustic map,
@@ -259,7 +397,7 @@ Recent work, newest first. `git log` has the rest.
   section 5), sent to clients and kept in their cache. The quick build has a Shape kind, and phrases:
   `/edit build stairs 14 steps up north`, `/edit build column 0.3 by 3`, `/edit build roof gable over the floor`
   (docs/WORLD_EDITOR.md section 19). Rooms measured by a flood from the walls exist as an instrument
-  (`--geometry-parity only=rooms`) and are not switched on. A home's ceiling is one over its whole footprint. Server
+  (`--geometry-parity only=rooms`); they were switched on later the same day (above). A home's ceiling is one over its whole footprint. Server
   and both clients must be rebuilt together (two messages appended; the wire hash changes).
 
 - Sound library stage 3 (docs/SOUND_LIBRARY_BOUNDARY.md section 16): two new projects. `OpenFPS.Sound` holds
@@ -325,6 +463,7 @@ Recent work, newest first. `git log` has the rest.
   same whichever is made first. Driveways too: OpenStreetMap's, and gen_osm's made-up one for a house without.
   Each tile records its buildings' sources and licences. Generator version 4. Not yet: addresses, lots and
   lawns, high detail. Try `/join world address 401 Market St, Tomball, TX`. Unheard.
+
 - The loudspeaker, redone as one model (Cody: "redo this item so it's designed properly and correctly.
   Make the resulting audio actually low quality and sound like a megaphone speaker too"). Renders and
   what to listen for in inbox/loudspeaker-2026-10-10. Approved by ear 2026-10-10 (Cody: "sounds good
@@ -373,6 +512,7 @@ Recent work, newest first. `git log` has the rest.
   - Lab: `--loudspeaker bench|game`. Tests: LoudspeakerTests. The emitter stream replay is regenerated:
     SpatialEmitter gained Radiator, RadiatorBandEnergy and RadiatedGain, and nothing else in the
     streams moved.
+
 - The gas hob, round 2 (docs/GAS_HOB.md section 11; Cody on round 1: the tick "a little too present",
   "kind of loud", and "you kept the clicking going long after the burner was lit"). Renders and what to
   listen for in inbox/gas-stove-2026-10-10/round2.
@@ -401,6 +541,7 @@ Recent work, newest first. `git log` has the rest.
   - The recordings' tick peak over the flame is 29.7 dB median over all fourteen, not "about 40" as round
     1 read it. GasHobTests: the hand lets go within a second, the flame safety hob is held 3.3-4.5 s, the
     re-ignition module stops itself, the crack's 2 kHz octave is under its 8 kHz, nothing rings after it.
+
 - Water runs over the ground (docs/RUNNING_WATER.md section 13; docs/MATTER.md step 4). Every world tile and
   every map on the survey works out once which way each 2 m cell drains (Priority-Flood and D8, from the tile
   and the 50 m round it its roads are graded in; a map of a real place routes its whole ground at once) and
@@ -450,6 +591,7 @@ Recent work, newest first. `git log` has the rest.
     one emitter per burning part. `/spawn fire PRESET` lights a thing its neighbours can catch from;
     `/spawn fire lightning` strikes what stands highest ahead; `/spawn fire water` puts a hose on it.
   - AudioLab `--fire spread timeline|cost|game`.
+
 - World editor phase 3 (docs/WORLD_EDITOR.md section 18). Tried with tests; the editor dialog works with
   Orca (Cody), NVDA untried. Changed on this map (F12, Edit tab; `/edit changed`): the things from the map file that
   were moved, turned, resized, renamed or removed, with what was done and where, each put back as the
@@ -466,6 +608,7 @@ Recent work, newest first. `git log` has the rest.
   from the map's bus stops, entrances, lobbies and squares, and how many people walk the pavements per
   100 metres. A thing made again from its map entry now keeps the entry's door sides and room
   materials. Both clients' dialogs update a line of words in place. WorldEditorPhase3Tests.
+
 - Struck things (docs/MATTER.md 7.5, step 2 of its order of work). A thing's tap, knock or bump is now made
   from its own material, shape and size by modal synthesis: bars, plates (with wood's grain), free sheets,
   tubes, sheet boxes and solid blocks (Rayleigh-Ritz), each mode's frequency, loss and radiation from the
@@ -476,6 +619,7 @@ Recent work, newest first. `git log` has the rest.
   door in reach knocks on whatever is in front of you; /tap taps it with a fingertip. Rendered once per
   key on a worker. `--struck` (renders, fit, anchor). Renders in inbox/struck-things-2026-10-10, heard by
   Cody the same day with notes (todo.md, "Bump sounds"). StruckThingsTests.
+
 - The material table (docs/MATTER.md 2.4, step 1 of its order of work). AcousticRegistry has 50 materials:
   26 new ones in families (aluminium, stainless steel, cast iron, copper, brass, bronze, lead, titanium;
   granite, sandstone, laminated glass; oak, pine, maple, plywood, MDF with their grain; PVC, acrylic,
@@ -486,6 +630,7 @@ Recent work, newest first. `git log` has the rest.
   read their material. An unknown name is logged once as a warning instead of passing silently as Generic.
   The 25 materials that were there keep every figure they had: no sound changed (the render fingerprint
   and the emitter-stream replay hold). `--materials` prints the table. AcousticRegistryTests.
+
 - Floors, round 2 (Cody on inbox/floors-2026-10-09: "I can't hear anything on the game level ... the
   +40db samples, it's fuzzy and the sound cuts out"). Renders and what to listen for in
   inbox/floors-2026-10-10.
@@ -535,6 +680,7 @@ Recent work, newest first. `git log` has the rest.
   front doors, a patio door, the five towers' entrances), the longest open 22 s, none left open, and the 352
   walkers through no door. Magnolia: 1,323 doors, none opened in an hour, since nobody there goes indoors yet.
   Server only. NpcDoorTests.
+
 - The world has its roads and woods outside the real places (docs/WORLD_STREAMING.md, "Roads and woods on the
   world's tiles"). A world tile is made with OpenStreetMap's drivable roads, each way in its own width and
   surface, laid in pieces on the ground as gen_osm.py lays a place's (a test holds the port to Magnolia's map:
@@ -548,6 +694,7 @@ Recent work, newest first. `git log` has the rest.
   3DEP's time as before. Generator version 3. Not yet: paths, rail, water, and traffic on these roads
   (buildings and driveways followed the same day, above). Try `/join world address 401 Market St, Tomball,
   TX`. Unheard.
+
 - The world's ground has its land cover (docs/WORLD_STREAMING.md, "Land cover for the ground"). Outside the
   real places a world tile's cells were all dirt; now each 2 m cell is what ESA WorldCover 2021 says is
   there: woods are a leaf-litter floor (Foliage), grassland and wetland Grass, built-up Asphalt, lakes Water,

@@ -14,7 +14,7 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class RoomFloodTests
 {
-    private static Surface S(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false, null);
+    private static Surface S(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false);
 
     private static SolidSpec Box(int id, Vector3 lo, Vector3 hi) => Box(id, lo, hi, Quaternion.Identity);
 
@@ -263,7 +263,7 @@ public class RoomFloodTests
         var solids = Room();
         var carpet = new Vector3(4f, 0.01f, 3f);
         solids.Add(SolidSpec.Of(80, new Vector3(0, 0.005f, 0), Quaternion.Identity, carpet,
-                                EntityGeometry.SurfaceOf("Carpet", carpet, 0, 0, false, 0, 0, false, false, false, null), null));
+                                EntityGeometry.SurfaceOf("Carpet", carpet, 0, 0, false, 0, 0, false, false, false), null));
         var q = Quaternion.CreateFromAxisAngle(Vector3.UnitY, degrees * MathF.PI / 180f);
         var hint = Hint() with { Centre = Vector3.Transform(Hint().Centre, q), Rotation = q };
         var r = RoomFlood.Flood(World(Turned(solids, q)), new[] { hint }, Origin, measure: true)[500];

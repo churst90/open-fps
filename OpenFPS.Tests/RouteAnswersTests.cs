@@ -22,7 +22,7 @@ public class RouteAnswersTests
         {
             var size = new Vector3(1 + (float)rng.NextDouble() * 5, 3, 0.2f);
             solids.Add(new SolidSpec(i + 1, new Vector3((float)rng.NextDouble() * 400, 1.5f, (float)rng.NextDouble() * 400), Quaternion.Identity, size,
-                                     EntityGeometry.SurfaceOf("Brick", size, 0, 0, false, 0, 0, false, false, false, null)));
+                                     EntityGeometry.SurfaceOf("Brick", size, 0, 0, false, 0, 0, false, false, false)));
         }
         var world = builder.Build(solids, Array.Empty<SolidSpec>());
         return OpeningRoutes.Build(world, null, Array.Empty<OpeningRoutes.Declared>(), null, new OpeningRoutes.TileCache());

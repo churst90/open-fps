@@ -17,6 +17,25 @@ is present?"
 - CAS below is `OpenFPS.Client.Core/ClientAudioSystem.cs`; paths without a project are under
   `OpenFPS.Client.Core/`.
 
+Where the parts stand (2026-10-11):
+
+| Part | Status |
+|---|---|
+| P0, wider guards | done 2026-10-11 ("P0 as built"); tests only. The replay's backwards vehicles it found were fixed the same day (e5e3d0f6), all eight streams regenerated |
+| P1, the pops and the worker's answers | done 2026-10-11, unheard. The Main Street pavement's pops fixed; Marlow Tower's floor 1 stairwell's are the barrier model's |
+| P2, one table of model kinds | done 2026-10-11 ("P2 as built"); no stream changed. Two questions for Cody there |
+| P5, names and materials to properties | under way |
+| P8, laws in one place | under way |
+| The barrier model (a way round one thing that passes through another), found by P1 | under way, a part of its own (todo.md, "Acoustics") |
+| P3a to P3d, the voice registry | next, after P5 and P8 |
+| P4, one ranking | after P3 |
+| P6, one path model for every asker | after P4, or inside P3b |
+| P7, machine state from the server | last; a wire change, shipped with a server deploy |
+
+That is the order agreed with Cody on 2026-10-11 (todo.md, "Next, in order", item 2). It puts sound library
+stage 5's `AudioClock` slice after the registry; section 3 below, written first, put P3 after it. The agreed
+order stands.
+
 ## Contents
 
 1. Findings
@@ -73,7 +92,7 @@ docs and the project notes.
 |---|---|---|---|---|---|
 | S1 | CAS:663, :714-741; `FrontVoice` CAS:1998-2036; woods `ClientWorldState.cs:1240`, `OpenFPS.Sound/WoodChorus.cs:30` | The path pass serves only entity ids and five named derived voices. The front outlet (intake, -800,000 band) has no branch: its band gains, air and region are frozen at what its voice started with. The stored replay streams show it: every `-800000` voice has `Place` lines and no `Path` line in walk, drive and traffic_rain. Woods (`WoodChorus`, ids from -20,000,000) are entities with negative ids, so `id < -5000` skips them altogether; their band gains are frozen too, and their outer places have no path at all. | The same fault as the train horn through Marlow Tower's brick (2026-10-10). A car within 20 m turning behind a wall keeps its intake's open-air tone; a wood heard first from indoors keeps its through-the-wall tone outdoors, and the reverse. Unheard so far. | A | One registry of voices (part P3): every voice is an entry with an owner, and one writer hands each its path every frame. |
 | S2 | `AudioEngineFacade.cs:172-210`, `VoiceManager.cs:221`, `FmodAudioProvider.cs:3146-3158`, `:3281-3282`, `:3298-3307`; writers CAS:723-741 against `UpdateHorns` CAS:2410-2471, `HeldHornVoice` :2617-2656, `SirenVoice` :2664-2721, `DistantEngine` :2783-2830, `ProcessAudioEmitter` :2832-3191 | Two writers per voice, and one path made of two answers. The path pass writes the worker's answer, with `VehicleShadow` in the band gains; the owner writes its own reading (`VehiclePath`, CAS:2298-2320, for horns, sirens and trains: a staleness test, then the hand-rolled tracer; the cached answer or `FirstAnswer` for an entity's own voice), without the shadow, and its write wins for apparent position, occlusion, aperture and bleed. For engines and physical models the owner's apparent position is the true position (CAS:3039-3040), so the diffracted bearing the path pass writes is overwritten within the same tick. Horns and held horns still get two different apparent positions: `SirenApparent` from the owner, the path's own point from the path pass. | The siren image pulled between two bearings by two writers, fixed for sirens only (`SirenApparent`, CAS:2741-2757; docs/CLIENT_NOTES.md). A borrowed car with two Dopplers (2026-09-16, `BorrowedVoiceDopplerTests`). A horn blocked by a bus: band gains shadowed, level and bearing not. | A | One writer per voice per frame (P3): the path, the shadow and the apparent position are worked out once and handed over in one call with `CarriesPath`. |
-| S3 | `DistantEngine` CAS:2804-2826; `FmodAudioProvider.cs:2888-2891`, `:4147-4155`, `:3936-3939` | A borrowed distant voice is re-submitted every frame with `ApertureFactor`, `Occlusion`, `TransmissionBleed` and `EffectiveDistance` at their defaults (0) and `TargetRegionId` the global region. Its update beats the path pass (S2), so its aperture target is 0 every tick. A non-reflection voice carries the diffraction low-pass, which below aperture 0.98 runs at `max(400, 22000·a²)` Hz: 400 Hz at aperture 0. Its spread is `a·90/d`: none. Its bearing is the car, never the edge it is heard round. | Probable: every borrowed car (up to 12 on the city) low-passed at 400 Hz whatever its path, and never occluded. Unheard as such; it would read as distant traffic sounding muffled and placed through walls. Verify first with a replay scenario with more cars than the engine budget (P0) and a look at the `-700000` `Place` lines. | A | Folded into P3; a one-line stop-gap is to give `DistantEngine` the car's path fields as `FrontVoice` does. |
+| S3 | `DistantEngine` CAS:2804-2826; `FmodAudioProvider.cs:2888-2891`, `:4147-4155`, `:3936-3939` | (Corrected 2026-10-11 by P0, "P0 as built": the emitter's defaults for `ApertureFactor` and `TransmissionBleed` are 1, so the 400 Hz low-pass below does not happen; occlusion 0 against the path's 0.95 stands.) A borrowed distant voice is re-submitted every frame with `ApertureFactor`, `Occlusion`, `TransmissionBleed` and `EffectiveDistance` at their defaults (0) and `TargetRegionId` the global region. Its update beats the path pass (S2), so its aperture target is 0 every tick. A non-reflection voice carries the diffraction low-pass, which below aperture 0.98 runs at `max(400, 22000·a²)` Hz: 400 Hz at aperture 0. Its spread is `a·90/d`: none. Its bearing is the car, never the edge it is heard round. | Probable: every borrowed car (up to 12 on the city) low-passed at 400 Hz whatever its path, and never occluded. Unheard as such; it would read as distant traffic sounding muffled and placed through walls. Verify first with a replay scenario with more cars than the engine budget (P0) and a look at the `-700000` `Place` lines. | A | Folded into P3; a one-line stop-gap is to give `DistantEngine` the car's path fields as `FrontVoice` does. |
 | S4 | `AsyncAcousticWorker.cs:532-560`, `:1345-1361`, `:296-336` | The source pool's serving and lending. Staging skips a pending source not served this tick (`:538`), but the read-back loop reads every pending source that still holds a Steam Audio source (`:558-560`): its direct result was simulated from inputs staged on an earlier tick, against this tick's listener, and is stored as this tick's answer, labelled with this tick's source position. A lent source (`:1351-1360`) goes to its new owner without `ClearSource`. A moving source is the only kind for which a stale input differs. | Candidate for the open pops: a quarter second, 20 to 30 dB, 3 to 6 a minute with 40 cars round Marlow Tower's floor 1 stairwell, each a moving car on Dock Street whose transmission jumps from -80/-100 to -35/-52/-80 dB; no still source gives it, and 32 transmission surfaces instead of 8 changed nothing (docs/GEOMETRY.md 12.6, "Marlow Tower's leaks"; todo.md, Acoustics). The pool overrunning has popped before (2026-10-03, `--pop-hunt extra=40`). | A | P1: read back only what was staged this tick, clear a lent source, tag every result with its provenance, and measure with `--pop-hunt` before and after. |
 | S5 | `UpdateSirens` CAS:2269-2290 with `VehiclePath` CAS:2298-2320 and `SirenVoice` CAS:2676-2680; CAS:650 | Every vehicle whose model has a siren asks the worker every frame, siren on or off, and is added to the path pass: `VehiclePath` is called before the mode is read, and a car whose engine has no voice enqueues a request each call. Off and no fresh answer, it also runs the hand-rolled tracer on the game thread for nothing. | Pool pressure on the city that feeds S4; game-thread cost per patrol car. | B | P1: ask only for a siren that is sounding; in P3 a voice that is not sounding is not in the registry. |
 | S6 | Appendix; CAS:57-58; `AudioEngine/Acoustics/EngineReflections.cs:91`, `:254`, `:302`; `ClientAudioSystem.Trains.cs:38`, `:66`, `:89` | Voice-id bands overlap. A reflection slot's id is `-30000 - id·5 - slot`: it enters the transients' band (-100,000 to -499,999) at entity id 14,000, and Albany joins with 18,024 entities, Magnolia with 13,590 (docs/WORLD_STREAMING.md:150-151). The siren band `-900,000 - id` covers the driving aids (-961,000 to -967,105), the beacons (-967,000 to -967,023) and the birds (-970,000 to -970,047) for vehicle ids 61,000 to 70,047. Borrowed, intake, horn and talker bands run into the next band at ids of 100,000 to 200,000. Engine echo ids count down from -600,000 and are never reused: at the city's 2.6 echoes a second (CAS:188-191) they reach the borrowed band in about 10 hours, then the intakes, sirens and horns. Train voice ordinals grow the same way. `IsEchoVoice` (`id <= -600000`) is true for every band below the echoes; nothing calls it. | A one-shot (a step, a door) taking over a recorded loop's reflection on Albany, or the reverse; a siren moving a driving-aid tone or a bird call; after a long session, a new engine echo moving a borrowed car. Past: transient ids hashed into the echo and borrowed bands, "a footstep could take over a car's reflection or distant voice" (VoiceBudgetTests.cs:304). | B | P3: the registry allocates every id from one space and frees it; one test proves no two live voices share an id. |
@@ -157,7 +176,7 @@ Two things to keep straight while building it:
 
 ### 2.2 The parts
 
-Every part runs the guards through `tools/test-local.sh` (one run at a time on the machine), filtered to
+Every part runs the guards through `tools/test-local.sh` (two runs at most on the machine since 2026-10-11), filtered to
 the three guard classes and the tests of what it touched; the whole suite runs on GitHub Actions. A part
 that changes a stream regenerates it in the same commit and says which voices changed and why
 (`OPENFPS_REPLAY_WRITE=1`, `EmitterStreamReplayTests.cs:27-28`).
@@ -416,6 +435,61 @@ The heart of it. Four sessions, each mergeable on its own.
   the same calls). Map tests: the roof, glass and entrance answers for every entity on the three maps
   equal today's except where a name was misleading, listed.
 
+**P5 as built (2026-10-11).** No map file changed and no generator; nothing heard changed on a shipped map.
+
+- **One material table (S22).** `MaterialProperties` carries a round's strike (`StrikeBehaviour`: kind, crater
+  energy, chip, chip contact, a debris density where the debris is something else, the spray's low band) and its
+  ricochet (`RicochetFace`, null where a round goes in), and `Leaves` (a volume of leaves) and `Underfoot` (deck
+  span and thickness, grit, loose pieces). `BulletImpact.StuffOf`, `Ricochet.TryFace` and Footsteps' span, deck,
+  texture and loose-piece tables read them through `GetProperties`, so an alias is its material ("Steel" strikes,
+  skips and rings as Metal) and a material made "like" another strikes as its family does with its own density
+  (stainless, aluminium, cast iron as metal; oak, pine, plywood as wood). Debris weighs what the material does; the
+  tables' densities were the registry's but for grass (1,500, the soil under the turf, kept as its debris density).
+  Every material has a strike (an error at load if not; a test); ice, snow, fabric and foam were given theirs
+  (ice brittle and skipping as concrete, snow a soil, both EST). The registry's unknown-name message is an error
+  now, and rain no longer tests `IsKnown` to keep it quiet. `MaterialStrikeTests` holds every number of the old
+  three tables.
+- **Glazing (S9).** `PrefabTemplate.Glazing` (Annealed, Tempered, Laminated), in the schema and so in the editor;
+  the validator rejects glass without it and anything else with it. The five glass prefabs say Tempered. `GlassKind`
+  reads it (a car's glass is still chosen by where it is in the car); a pane that declares none is an error once by
+  prefab and breaks as tempered. Every pane on the four shipped maps is the glass the names made it
+  (`GlassKindTests`). Glass is the material's family (`AcousticRegistry.IsGlass`) in combat, `EntityGeometry`'s
+  flag and the sight test, so laminated glass breaks and is seen through too.
+- **Roofs (S9).** `Scope.StandsOnRoof`: the surface under you is a roof shape (`SurfaceFlags.Roof`, from the
+  shape library), or you are under the open sky, in no room, with a room's air within 3 m under what you stand on.
+  The name test in `EntityGeometry` is gone, not kept as a fallback: nothing else read the flag. Over every top
+  wide enough to stand on: the city 1,439 the same, the two bus shelters' canopies (metal_roof, no room under)
+  no longer "on a roof"; Albany 13,605 the same; Magnolia 10,768 the same and one more, 15969 North Cooter Street's
+  ceiling, which its roof form leaves under the sky. The landings called "to the roof" are inside their stairwells
+  and were never stood on as roofs.
+- **Entrances (S9).** `MapTracker.IsEntrance`: an exit beacon, or an opening joining a room and the open air (its
+  portal's two sides), a door because it is made to be walked through and an opening with no leaf where a floor
+  lies within half a metre of its sill on both sides. An opening is said by the room it is the way into ("Hangar
+  entrance"). City: 143 the same; the wall over the hangar's front ("Hangar front entrance") is not one and the
+  opening under it is; the tunnel's two mouths and the garage's street-level east side are; the garage's sides
+  over their parapets and its upper decks' east sides are not. Albany 1,521 the same, Magnolia 1,136: the 22
+  concrete landings named for their entrance are floors, and Magnolia's three barn doorways (no leaf) are
+  entrances. The server's `Haunts` still finds front entrances by name: every house door joins a room and the
+  open air, and Alex would wait at all of them, so which doors are front entrances is Cody's to say.
+- **Door models (S10).** One table in `WorldAudioPlayer` (`DoorModels`: prefix, renderer, lateness); a key no row
+  names is not a door model, and `RenderDoorKey` throws for one instead of handing it to the knob door.
+- **Door prewarm (S32).** `DoorSystem.RenderKeysOf` builds every key a door can send as its sounds build them
+  (every opening, every close and knob shut, the key in its lock), `RenderKeys` a map's, commonest first and glass
+  last; `MapManifest.DoorRenderKeys` (appended) carries them and the client renders them as the map arrives, with
+  the cars' windows after. City 87 (the old list made 140 for the city), Magnolia 120, Albany 105. The old list
+  missed every door on the places (knob doors 0.9 to 1.05 m wide, glass pull doors 1.1 m). `--prerender-doors`
+  reads every shipped map.
+- **Leaves and families.** Rain's pool and canopy, the birds' hedges, the crown that burns as a tree and the
+  foliage flag read `Leaves`; a pool is a liquid's family; the fuel trunk is any wood. Nothing shipped is made of
+  anything these widen to.
+- **Left.** The storey in `MapTracker.Floors` from the building (S32); the glass door's key still says tempered
+  in `DoorSystem` rather than reading the prefab; a declared roofing field if the shelters' canopies should be roofs
+  (it would have to reach the client); the server's `Haunts` (above).
+- **Guards.** Render fingerprints, the eight replay streams, `VoiceIdBandTests` and `ModelKindTableTests`
+  unchanged. The wire hash changes, as any change to the libraries' sources does, and the protocol by one appended
+  manifest field. `Glass.cs` and `AcousticRegistry.cs` are door model sources, so the door render cache's name
+  changes and each door is rendered once more; the renders are the same.
+
 #### P6. One path model for every asker (0.5 session, or inside P3b)
 
 - **Changes.** Birds, beacons and rain patches ask the worker under probe ids, as one-offs do
@@ -450,6 +524,35 @@ The heart of it. Four sessions, each mergeable on its own.
 - **Guards show.** walk, drive and traffic_rain change where a car is shadowed by another (drive: a car
   passes another) and in reflection delays at 12 °C (traffic_rain sets 12 °C): named. Fingerprints
   unchanged. `VehicleShadowApplyTests` and `VehicleShadowMutationTests` updated to the one law.
+- **Done 2026-10-11 (unheard), except S21.** S21 (`VehicleShadow` calls `Diffraction`) is waiting on the
+  barrier model, which is changing `Diffraction`, `OpeningRoutes` and the way over the top now; until it
+  lands `VehicleShadow` keeps its own Maekawa and its own 343. The rest:
+  - S25: a voice FMOD pans (no HRTF voice free) takes `RenderedGain` by hand, from the source's position,
+    as the binaural voices do; FMOD's own distances are set out of reach (`Rolloff.NoneMin`, 1000 km).
+    Reference 1 m, range 100 m: 90 m -39.1 dB before, -47.0 after; 100 m -40.0 before, silent after;
+    200 m -40.0 (held) before, silent after; nearer than three quarters of the range unchanged. Its Doppler
+    now runs at the world's speed too (FMOD's is 340 m/s times its Doppler scale; the scale is set from the
+    weather): a car closing at 30 m/s at 20 °C, +159.9 cents before, +158.4 after.
+  - S29: one default, `AcousticConstants.DefaultOcclusionFloor` (0.2), in all seven places. No law reads
+    the floor (walls decide), so nothing heard changes.
+  - S30: the world's speed (`AudioPhysics.CurrentSpeedOfSound`) in the hand-rolled path's reflection
+    delays, `ImageSource`'s Fresnel zone and the tailpipe's and bay's radiation aim. At 12 °C delays
+    +1.3 %, a face smaller than the zone +0.11 dB, ka -1.3 %; at 0 °C +3.5 %, +0.30 dB, -3.4 %. One
+    reference, `AcousticConstants.SpeedOfSound` (343, 20 °C), named by `AudioPhysics.SpeedOfSound` and
+    `WallTransmission.SoundSpeed`, for the defaults (`EarlyReflections.Find`, `Thunder`, `LightningPhysics`,
+    the two `Aim`s) and for what must not follow the weather: `FaceOpenings.MinimumGapMetres` (a map's
+    openings), `DistantMotion.VelocityTolerance` (a wire tolerance), `FlutterRangeMetres`, `ReportMeasure`.
+    `Diffraction`'s defaults are left to the barrier model.
+  - One law for the speed of sound itself: the mix took the linear fit 331.3 + 0.606 T and the bullets
+    the ideal gas; `AudioPhysics.SpeedOfSoundAt` now reads `Air.SpeedOfSound`. 20 °C 343.42 to 343.21 m/s,
+    40 °C 355.54 to 354.73. `thunder.ground_1500` regenerated (2.5 ms longer, total energy -0.06 dB).
+  - Streams: all eight unchanged. The changes named above for walk, drive and traffic_rain were S21's
+    (held) and the 12 °C delays, which the replay does not see: it holds the current speed at 343, and
+    the provider is not in it.
+  - Left to physics stage 2 (docs/PHYSICS_BOUNDARY.md, stage 2): gravity, air density (the 1.2 and 1.21
+    in the walls, doors, glass, pipes and hob, with the 343 beside each, which the sources' own mechanisms
+    keep: one air from the world's temperature and pressure), brakes, rolling resistance and drag, and
+    `WindModel` against `WindField`.
 
 #### Statics (inside library stage 5)
 

@@ -161,11 +161,40 @@ public static class ScopeView
         return reading is { } m ? $"{ScopeMath.RangeWords(m)}." : "No reading.";
     }
 
-    /// <summary>Whether somebody standing at <paramref name="feet"/> is on a roof: the thing under them
-    /// is named as one. The city names every roof slab "... roof".</summary>
+    /// <summary>How far under the surface somebody stands on a room's air is looked for, metres: a slab, its ceiling
+    /// void and a plenum.</summary>
+    public const float RoofDepthMetres = 3f;
+
+    /// <summary>How far up nothing must be for somebody to be under the open sky, metres: higher than any building.</summary>
+    public const float OpenSkyMetres = 1000f;
+
+    /// <summary>
+    /// Whether somebody standing at <paramref name="feet"/> is on a roof: what they stand on is a roof's own shape (a
+    /// pitched roof from the shape library), or they are under the open sky, in no room, with a room's air under it.
+    /// Not its name: "Marlow Tower stairs, floor 7 to the roof" is a landing indoors, and a roof the generator does not
+    /// call one is still a roof.
+    /// </summary>
     public static bool StandsOnRoof(WorldSnapshot snap, SpatialService spatial, Vector3 feet)
-        => spatial.CastSight(snap, feet + new Vector3(0f, 0.3f, 0f), -Vector3.UnitY, 1.5f, out var under, out _, glassBlocks: true)
-           && (under.Definition.Identity.Name ?? "").Contains("roof", StringComparison.OrdinalIgnoreCase);
+    {
+        var from = feet + new Vector3(0f, 0.3f, 0f);
+        if (!spatial.CastSight(snap, from, -Vector3.UnitY, 1.5f, out _, out float d, glassBlocks: true)) return false;
+        if (spatial.SurfaceFlagsAlong(snap, from, -Vector3.UnitY, 1.5f).HasFlag(OpenFPS.Common.Geometry.SurfaceFlags.Roof)) return true;
+        // Under the open sky and in no room: on a suspended ceiling, under the roof, is not on the roof.
+        if (Indoors(snap, spatial, feet + new Vector3(0f, 1f, 0f))) return false;
+        if (!spatial.UnderOpenSky(snap, feet + new Vector3(0f, 0.1f, 0f), OpenSkyMetres)) return false;
+        var top = from - new Vector3(0f, d, 0f);
+        for (float depth = 0.25f; depth <= RoofDepthMetres; depth += 0.25f)
+            if (Indoors(snap, spatial, top - new Vector3(0f, depth, 0f))) return true;
+        return false;
+    }
+
+    /// <summary>Whether a point is in a room (a region declared indoors).</summary>
+    private static bool Indoors(WorldSnapshot snap, SpatialService spatial, Vector3 at)
+    {
+        int region = spatial.GetRegionAt(snap, at);
+        return region != OpenFPS.Common.AcousticConstants.GlobalRegionId
+               && snap.Entities.TryGetValue(region, out var r) && r.Definition.Region.IsIndoor;
+    }
 }
 
 /// <summary>What the guidance tone should do: be silent, pulse at a closeness, or hold its note.</summary>

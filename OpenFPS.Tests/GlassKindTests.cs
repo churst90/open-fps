@@ -13,6 +13,66 @@ public class GlassKindTests
     private readonly ITestOutputHelper _out;
     public GlassKindTests(ITestOutputHelper output) { _out = output; AcousticRegistry.Initialize(); }
 
+    /// <summary>Each glass prefab and the glazing it declares; a glass prefab that declares none is missing here.</summary>
+    private static Dictionary<string, GlassType?> GlassPrefabs()
+    {
+        var glass = new Dictionary<string, GlassType?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "prefabs"), "*.json"))
+        {
+            if (path.EndsWith("prefab-schema.json")) continue;
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var p = doc.RootElement;
+            if (p.TryGetProperty("Material", out var m) && AcousticRegistry.IsGlass(m.GetString()))
+                glass[p.GetProperty("Id").GetString()!] = p.TryGetProperty("Glazing", out var g) ? Enum.Parse<GlassType>(g.GetString()!) : null;
+        }
+        return glass;
+    }
+
+    /// <summary>Every prefab of glass says what kind of glass it is.</summary>
+    [Fact]
+    public void EveryGlassPrefabDeclaresItsGlazing()
+    {
+        var glass = GlassPrefabs();
+        Assert.True(glass.Count >= 5, string.Join(", ", glass.Keys));
+        Assert.All(glass, g => Assert.True(g.Value != null, $"{g.Key} declares no Glazing"));
+    }
+
+    /// <summary>
+    /// The rule the glass followed before it was declared (2026-10-11): door prefabs tempered, a name with "window" or
+    /// "skylight" annealed, everything else tempered. Kept here only to show that declaring it changed no pane on any
+    /// shipped map.
+    /// </summary>
+    private static GlassType ByTheOldNameRule(string prefab, string name)
+    {
+        if (prefab is "glass_front_door" or "glass_pull_door" or "auto_sliding_door" or "patio_door") return GlassType.Tempered;
+        string n = name.ToLowerInvariant();
+        return n.Contains("window") || n.Contains("skylight") ? GlassType.Annealed : GlassType.Tempered;
+    }
+
+    /// <summary>On every shipped map each pane is the glass its prefab declares, and that is what its name made it
+    /// before: nothing breaks differently.</summary>
+    [Theory]
+    [InlineData("maps", "city")]
+    [InlineData("maps", "speedway")]
+    [InlineData("places", "albany_or")]
+    [InlineData("places", "magnolia_tx")]
+    public void EveryShippedPaneIsTheGlassItWas(string folder, string map)
+    {
+        var glass = GlassPrefabs();
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, folder, map + ".json")));
+        int panes = 0;
+        foreach (var e in doc.RootElement.GetProperty("Entities").EnumerateArray())
+        {
+            string prefab = e.GetProperty("PrefabId").GetString()!;
+            if (!glass.TryGetValue(prefab, out var declared)) continue;
+            string name = e.TryGetProperty("Name", out var n) ? n.GetString() ?? "" : "";
+            panes++;
+            Assert.Equal(ByTheOldNameRule(prefab, name), GlassKind.Of(new GlazedPart(prefab, declared, "", Vector3.Zero, Vector3.One)));
+        }
+        _out.WriteLine($"{map}: {panes} panes");
+        Assert.DoesNotContain(GlassKind.Undeclared, u => glass.ContainsKey(u));
+    }
+
     /// <summary>Every glazed part on the city map, and every vehicle placed on it, classified. The city has
     /// no house or flat windows as parts (its homes have patio doors), so nothing on it is annealed; every
     /// door, shelter and terminal panel is tempered, every car's side and back glass tempered, its windscreen
@@ -20,15 +80,7 @@ public class GlassKindTests
     [Fact]
     public void TheCitysGlassIsTheKindItsPartsAre()
     {
-        var glassPrefabs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var path in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "prefabs"), "*.json"))
-        {
-            if (path.EndsWith("prefab-schema.json")) continue;
-            using var doc = JsonDocument.Parse(File.ReadAllText(path));
-            var p = doc.RootElement;
-            if (p.TryGetProperty("Material", out var m) && string.Equals(m.GetString(), "Glass", StringComparison.OrdinalIgnoreCase))
-                glassPrefabs.Add(p.GetProperty("Id").GetString()!);
-        }
+        var glassPrefabs = GlassPrefabs();
         using var map = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "maps", "city.json")));
         var counts = new Dictionary<(string, GlassType), int>();
         void Count(string what, GlassType t) => counts[(what, t)] = counts.GetValueOrDefault((what, t)) + 1;
@@ -36,10 +88,8 @@ public class GlassKindTests
         foreach (var e in map.RootElement.GetProperty("Entities").EnumerateArray())
         {
             string prefab = e.GetProperty("PrefabId").GetString()!;
-            if (!glassPrefabs.Contains(prefab)) continue;
-            string name = e.TryGetProperty("Name", out var n) ? n.GetString() ?? "" : "";
-            var t = GlassKind.Of(new GlazedPart(prefab, name, "", Vector3.Zero, Vector3.One));
-            Count(prefab, t);
+            if (!glassPrefabs.TryGetValue(prefab, out var declared)) continue;
+            Count(prefab, GlassKind.Of(new GlazedPart(prefab, declared, "", Vector3.Zero, Vector3.One)));
         }
         int vehicles = 0;
         foreach (var c in map.RootElement.GetProperty("Composites").EnumerateArray())
@@ -51,7 +101,7 @@ public class GlassKindTests
             vehicles++;
             foreach (var (part, at, size) in VehicleCabin.Shell(v, g))
                 if (part == VehicleCabin.Glass)
-                    Count(template, GlassKind.Of(new GlazedPart(part, "", template, at, size)));
+                    Count(template, GlassKind.Of(new GlazedPart(part, null, template, at, size)));
         }
         foreach (var ((what, t), k) in counts.OrderBy(x => x.Key.Item1)) _out.WriteLine($"{what,-28} {t,-10} {k}");
 
@@ -66,16 +116,18 @@ public class GlassKindTests
         Assert.Equal(vehicles * 3, counts.Where(x => x.Key.Item1.StartsWith("vehicle:") && x.Key.Item2 == GlassType.Tempered).Sum(x => x.Value));
     }
 
-    /// <summary>Names decide the rest: a house or a flat's window is annealed float glass, a shop front tempered.</summary>
+    /// <summary>Anything but a car's glass is the glazing declared, whatever it is called; a pane that declares none
+    /// is said and breaks as tempered.</summary>
     [Theory]
-    [InlineData("glass_wall", "Elm Street 4 bathroom window", GlassType.Annealed)]
-    [InlineData("glass_wall", "Flat 12 kitchen window", GlassType.Annealed)]
-    [InlineData("glass_wall", "Selby House shop front", GlassType.Tempered)]
-    [InlineData("glass_wall", "Bus shelter", GlassType.Tempered)]
-    [InlineData("glass_wall", "", GlassType.Tempered)]
-    [InlineData("patio_door", "Elm Street back door", GlassType.Tempered)]
-    public void ANamedPartIsTheGlassItsNameSays(string prefab, string name, GlassType expected)
-        => Assert.Equal(expected, GlassKind.Of(new GlazedPart(prefab, name, "", Vector3.Zero, Vector3.One)));
+    [InlineData(GlassType.Annealed)]
+    [InlineData(GlassType.Tempered)]
+    [InlineData(GlassType.Laminated)]
+    public void APartIsTheGlassItsPrefabDeclares(GlassType declared)
+    {
+        Assert.Equal(declared, GlassKind.Of(new GlazedPart("glass_wall", declared, "", Vector3.Zero, Vector3.One)));
+        Assert.Equal(GlassType.Tempered, GlassKind.Of(new GlazedPart("a_pane_of_nothing", null, "", Vector3.Zero, Vector3.One)));
+        Assert.Contains("a_pane_of_nothing", GlassKind.Undeclared);
+    }
 
     /// <summary>
     /// The model scales with the pane (Cody, 2026-10-04: "hopefully those models scale with window size"): a

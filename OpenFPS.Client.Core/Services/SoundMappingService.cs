@@ -71,6 +71,8 @@ public class SoundMappingService
 
         string action = (force > LandingForce) ? "LANDING" : "FOOTSTEPS";
         
+        // The table's own name: "Steel" walks on Metal's recordings.
+        material = OpenFPS.Common.AcousticRegistry.Canonical(material);
         string materialName = string.IsNullOrEmpty(material) || material == "None" || material == "Generic" ? "Generic" : material;
         
         // The folders are capitalised: "marble" is Marble.

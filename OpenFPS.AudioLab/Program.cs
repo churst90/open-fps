@@ -176,6 +176,11 @@ string[] usage =
     "  --walk-pair [map= at=E,N,H heading= key=w|a|s|d ticks= taps= gap= sprint full from=E,N,H open=ID,... show=all] the server's and the client's step side by side",
     "  --walk-pair map= room=ID[,ID...]   a /tp spot a body stands on in each room (StandingSpots.InRoom)",
     "  --walk-pair map= ears=x,y,z[;...]   a /tp spot a body stands on nearest each ear (engine coordinates)",
+    "  --physics-replay [walks|drives|traffic|rail|ballistics|all|hills map=] [name=] [track]",
+    "                                                the physics stage 0 replays and their parity risks (docs/PHYSICS_BOUNDARY.md)",
+    "  --physics-parity [map=city] [n=4000] [movers=30] [seed=1]",
+    "                                                old physics path against new over standing points, and the cross-side risks",
+    "  --jolt-trial [map=city] [place=magnolia_tx]   Jolt Physics in our scenes: cost, stacking, tunnelling, soft bodies, memory",
     "  --stair-walk [scene=shapes|city] [sprint] [trace]",
     "                                                up and down real treads, every footfall checked (docs/GEOMETRY.md)",
     "  --enclosure [map= at= walk= step= head= dist=]",
@@ -525,6 +530,18 @@ if (args.Contains("--breath"))
     Environment.Exit(brCode);
 }
 
+if (args.Contains("--jolt-trial"))
+{
+    Environment.Exit(OpenFPS.AudioLab.JoltTrialSpike.Run(args));
+}
+if (args.Contains("--physics-parity"))
+{
+    Environment.Exit(OpenFPS.AudioLab.PhysicsParitySpike.Run(args));
+}
+if (args.Contains("--physics-replay"))
+{
+    Environment.Exit(OpenFPS.AudioLab.PhysicsReplaySpike.Run(args));
+}
 if (args.Contains("--walk-pair"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.WalkPairSpike.Run(args));

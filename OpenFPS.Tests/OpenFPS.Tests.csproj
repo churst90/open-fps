@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
+    <!-- The sun and the moon (docs/SKY.md): nothing else references it yet. -->
+    <ProjectReference Include="..\OpenFPS.Astronomy\OpenFPS.Astronomy.csproj" />
     <ProjectReference Include="..\OpenFPS.Client.Core\OpenFPS.Client.Core.csproj" />
     <!-- The map/prefab loaders live in the server. Referenced so the portal pipeline can be tested
          against the real shipped data rather than a hand-built stand-in. -->
@@ -57,6 +59,8 @@
     <Compile Include="..\OpenFPS.Client\Core\KeypadKeys.cs" Link="Linked\KeypadKeys.cs" />
     <!-- The acceptance rig for far things sent less often, which AudioLab runs as an instrument too. -->
     <Compile Include="..\OpenFPS.AudioLab\Spikes\DistantUpdatesRig.cs" Link="Linked\DistantUpdatesRig.cs" />
+    <!-- The physics guards' walks, drives, traffic, trains and ballistics, which AudioLab runs as its physics-replay instrument. -->
+    <Compile Include="..\OpenFPS.AudioLab\Spikes\PhysicsReplays*.cs" Exclude="..\OpenFPS.AudioLab\Spikes\PhysicsReplaySpike.cs" Link="Linked\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

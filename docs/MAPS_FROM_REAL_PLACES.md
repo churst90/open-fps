@@ -75,7 +75,7 @@ at the spawn address.
 
 ## Every room can be walked into
 
-Added 2026-10-10 after Cody's play on Magnolia: the kitchen counter stood across the back door on Bobcat
+Added 2026-10-11 after Cody's play on Magnolia on 2026-10-10: the kitchen counter stood across the back door on Bobcat
 Lane, the front doors of houses on a slope stood half a metre over their yards, and a few rooms had no
 way in a body fits through. The generator (and the world's port of it, WorldBuildings) now keeps to these
 rules, and `RealPlaceMapTests.Every_way_in_can_be_walked_through` holds both places to them with the

@@ -1177,8 +1177,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // Relative to where this voice is placed: the true tailpipe once the ends are split, the
             // compromise point before (VehicleProfile.ExhaustOffset).
             var placedAt = SplitVoices ? Vehicle.ExhaustSlot : Vehicle.ExhaustOffset;
-            _radiation.Aim(heard + placedAt);
-            _bayRadiation.Aim(heard + placedAt);
+            float speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentSpeedOfSound;
+            _radiation.Aim(heard + placedAt, speedOfSound);
+            _bayRadiation.Aim(heard + placedAt, speedOfSound);
         }
         else { _radiation.Aim(null); _bayRadiation.Aim(null); }
         float panelA = 1f - MathF.Exp(-2f * MathF.PI * _panelCorner * dt);

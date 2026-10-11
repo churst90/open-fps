@@ -168,7 +168,7 @@ public static class LightningPhysics
     /// Rakov and Uman 2003, eq. 11.3), the relaxation radius R_c = (E_l / (pi P0))^1/2 as a frequency: more
     /// energy per metre shocks a bigger column of air and makes a longer wave.
     /// </summary>
-    public static float PeakFrequencyHz(float energyPerMetre, float speedOfSound = 343f)
+    public static float PeakFrequencyHz(float energyPerMetre, float speedOfSound = AcousticConstants.SpeedOfSound)
         => 0.63f * speedOfSound * MathF.Sqrt(AmbientPressurePa / MathF.Max(1f, energyPerMetre));
 
     /// <summary>
@@ -177,7 +177,7 @@ public static class LightningPhysics
     /// 0.66 over its length: Lacroix (thesis, Sorbonne 2018, sec. 5.1.5) fits an N-wave of 4.47 ms to
     /// the 148 Hz wave of the channel simulation.
     /// </summary>
-    public static float NWaveSeconds(float energyPerMetre, float speedOfSound = 343f)
+    public static float NWaveSeconds(float energyPerMetre, float speedOfSound = AcousticConstants.SpeedOfSound)
         => NWavePeakProduct / PeakFrequencyHz(energyPerMetre, speedOfSound);
 
     public const float NWavePeakProduct = 0.66f;

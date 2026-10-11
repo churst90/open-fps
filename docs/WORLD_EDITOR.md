@@ -10,7 +10,10 @@ shapes in the quick build (19). Cody tried the dialog with Orca on 2026-10-10 ("
 Windows client is untried, and direct keys (`/editorkeys on`) stay off until tried. What is left: section
 18's list of what the road and rail data cannot carry, copying, renaming, deleting and publishing maps,
 checks ("this room has no door"), and groups as one composite only if building houses needs it (todo.md,
-"Map editor").
+"Map editor"). Since 2026-10-11 a room has no face materials to set or bake: a room measures what lines it
+from its walls (docs/GEOMETRY.md 12.6, "Nothing authored of a room"), and the editor tells a region by
+`IsIndoor` alone. Open (Cody): whether the editor should edit trains and woods through their sound ids
+(docs/SPECIAL_CASES_AUDIT.md, "P2 as built").
 
 ## 1. What it is
 
@@ -464,8 +467,8 @@ Written before the work (2026-10-07), in the order it is done. What was built is
 ### 11.6 Doors, rooms, named places and regions
 
 - Settings of a placed thing, when it has the part: door keyed side and push side; a room's six
-  materials (floor, ceiling, north, south, east, west) chosen from AcousticRegistry; a region's name
-  (named place). A changed room or door goes out to clients as its definition, as a move does.
+  materials (floor, ceiling, north, south, east, west) chosen from AcousticRegistry (removed 2026-10-11:
+  a room measures its own from its walls); a region's name (named place). A changed room or door goes out to clients as its definition, as a move does.
 - Streaming: a map-file thing moved into another tile has its tile membership worked out again
   (MapTiles), so a client holding the new tile is sent it.
 
@@ -570,7 +573,8 @@ here has been tried in the game client yet, only by tests and through the MUD ga
 ### Doors, rooms, places, tiles
 
 - Settings: KeyedSide (neither, front, back), PushSide (front, back), Indoor, and Floor, Ceiling, North,
-  South, East and West for a room, from AcousticRegistry's names; a region's Name is the place's name.
+  South, East and West for a room, from AcousticRegistry's names (the six face settings and their bake were
+  removed 2026-10-11: a room is measured from its walls); a region's Name is the place's name.
   The menus "Places and rooms" and "Doors near you" select them.
 - A thing from the map file on a map streamed in tiles is placed in its tiles again when it moves or is
   made again (MapTiles.Place), and sent to every player on the map who holds a tile it is now in. Things
@@ -694,8 +698,8 @@ that failed before it. Unheard: tried by tests only.
 
 ### A prefab's lists
 
-- `PrefabSchema` describes an array as a list: RoomMaterials (materials, from AcousticRegistry) and
-  MissingFaces (the face names) are lists of values (`FieldNode.IsValueList`, with the item's
+- `PrefabSchema` describes an array as a list: RoomMaterials (materials, from AcousticRegistry; gone from
+  prefabs 2026-10-11) and MissingFaces (the face names) are lists of values (`FieldNode.IsValueList`, with the item's
   description as its `Field`). A list of objects would be a list of groups.
 - `/edit model set KIND ID LIST[N] VALUE` changes one item; `/edit model add KIND ID LIST VALUE...`
   puts one or more values on the end, making the list if the model has none (a room's six materials go
@@ -1229,7 +1233,7 @@ words where it stands (the route form's "Laying ..." line), the same in GTK and 
   beside it in the overlay, where they are laid over it every time it loads. To make them part of the
   map, change the program."
   - What a map file holds is written: places, turns, sizes, removals, additions (with their ids),
-    names, door sides, indoors, room materials, the spawn, the weather, hour, ground, beacon rules and
+    names, door sides, indoors, the spawn, the weather, hour, ground, beacon rules and
     size, roads and railways, people.
   - What it does not hold stays in the overlay, laid on the baked places: a sound's volume, range,
     minimum distance and model; parked vehicles; pins; the walkers setting.

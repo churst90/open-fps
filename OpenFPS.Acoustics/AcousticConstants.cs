@@ -6,6 +6,13 @@ public static class AcousticConstants
     // --- Architecture & Hierarchy ---
     public const int GlobalRegionId = -1; // The Global Environment world ID
     public const float DefaultVoxelResolution = 0.5f;
+    /// <summary>The speed of sound in air at 20 °C, m/s: the reference, for a law's default and for what must
+    /// not follow the weather. The world's air now is <c>AudioPhysics.CurrentSpeedOfSound</c>.</summary>
+    public const float SpeedOfSound = 343f;
+    /// <summary>A map's occlusion floor when its file gives none: one value for the map file, the manifest,
+    /// the client and the generator (they had 0.2 and 0.05). Carried and not read (see
+    /// <see cref="AcousticMap.OcclusionFloor"/>).</summary>
+    public const float DefaultOcclusionFloor = 0.2f;
 
     // --- Occlusion Settings ---
     public const float OcclusionCap = 0.95f;

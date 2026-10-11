@@ -166,8 +166,9 @@ Live audio, not files:
 
 ## Not wanted
 
-- **Ambience beds.** No recorded loops over a map. The code still has a map `AmbienceId`; every
-  shipped map leaves it empty.
+- **Ambience beds.** No recorded loops over a map. The bed code went on 2026-10-10 (no map or
+  region bed, no `AmbienceId` in a map file or prefab) and the nine bed recordings on 2026-10-11 (Cody:
+  "remove those ambiences completely"). Two wire fields stay, unread.
 - **Recorded gunshots.** The takes in `WEAPONS` are the spec the synthesis is measured
   against. Nothing in the game plays them.
 

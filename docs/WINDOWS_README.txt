@@ -22,6 +22,11 @@ First connection
    Connect.
 4. Tick "Remember password" and later runs go straight in from Connect.
 
+While it connects, a Connecting window takes focus and says "Escape to cancel". A server that does
+not answer yet is tried again for 30 seconds ("Still trying"). Escape stops trying and puts you back
+where you were. After a dropped connection in game it says "Reconnecting. Escape to cancel." the
+same way.
+
 "This client does not match the server"
 ---------------------------------------
 The client and the server must be built from the same version. The server was updated; get the
@@ -49,8 +54,8 @@ Finding out:
 - I lists what you carry; Shift+I says it in one sentence.
 
 Doing things:
-- E interacts: picks up a thing at your feet, opens or shuts a door, gets in or out of a vehicle,
-  takes from a dead player's bag, lifts a body.
+- E interacts: picks up a thing at your feet, opens or shuts a door (the one you face, else the
+  nearer), gets in or out of a vehicle, takes from a dead player's bag, lifts a body.
 - Shift+E knocks on a door.
 - G picks up, Q drops, Shift+R takes the first thing on your back into your hands.
 - R: with a gun in your hands, reload; in a vehicle, the windows; otherwise put what you hold on

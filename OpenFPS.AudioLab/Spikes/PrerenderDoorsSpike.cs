@@ -6,9 +6,9 @@ using OpenFPS.Client.Core;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --prerender-doors out=DIR [threads=N]: every door render the client makes at start
-/// (WorldAudioPlayer.PrewarmKeys), as DoorRenderCache files for this build; keys already in DIR are
-/// kept. publish-windows.sh ships them as ASSETS/rendercache/BUILD, so a first door is heard at once.
+/// --prerender-doors out=DIR [threads=N]: every door render the shipped maps' doors can ask for (DoorSystem.RenderKeys,
+/// what the server sends with each map) and the cars' windows, as DoorRenderCache files for this build; keys already
+/// in DIR are kept. publish-windows.sh ships them as ASSETS/rendercache/BUILD, so a first door is heard at once.
 /// </summary>
 public static class PrerenderDoorsSpike
 {
@@ -22,7 +22,19 @@ public static class PrerenderDoorsSpike
 
         DoorRenderCache.Folder = outDir;
         DoorRenderCache.ShippedFolder = outDir;
-        var keys = WorldAudioPlayer.PrewarmKeys().Distinct().ToList();
+        var maps = new OpenFPS.Server.Core.MapManager(new OpenFPS.Server.Repositories.MapRepository(OpenFPS.AudioLab.LabPaths.Server("maps")),
+                                                      new OpenFPS.Server.Repositories.PrefabRepository(OpenFPS.AudioLab.LabPaths.Server("prefabs")));
+        maps.Initialize();
+        var keys = new List<string>();
+        foreach (var (id, _) in maps.GetAllMaps())
+            if (maps.TryGetMap(id, out var world, out _, out _, out _))
+            {
+                var mine = OpenFPS.Server.Systems.DoorSystem.RenderKeys(world);
+                Console.WriteLine($"  {id}: {mine.Length} door renders");
+                keys.AddRange(mine);
+            }
+        keys.AddRange(WorldAudioPlayer.CarWindowKeys());
+        keys = keys.Distinct().ToList();
         var levels = new ConcurrentDictionary<string, float>();
         int done = 0, failed = 0;
         var clock = Stopwatch.StartNew();

@@ -75,9 +75,38 @@ public sealed class WorldAudioPlayer
     internal const double GlassRenderLateness = 0.4;
 
     private static double LatenessFor(in TransientSound sound)
-        => sound.SynthKey != null && (sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)
-                                      || sound.SynthKey.StartsWith(StruckThings.KeyPrefix, StringComparison.Ordinal))
-            ? GlassRenderLateness : MaxRenderLateness;
+        => DoorModelOf(sound.SynthKey) is { } model ? model.Lateness
+         : sound.SynthKey != null && sound.SynthKey.StartsWith(StruckThings.KeyPrefix, StringComparison.Ordinal) ? GlassRenderLateness
+         : MaxRenderLateness;
+
+    /// <summary>One simulated model's keys: their prefix, how a key renders (with the render's own peak, dB SPL at a
+    /// metre, or 0 where the render keeps its own scale), and how late a first hearing of one may play.</summary>
+    internal readonly record struct DoorModel(string Prefix, Func<string, int, (float[] Pcm, float Db)> Render, double Lateness);
+
+    /// <summary>The simulated models, each rendered by its own key's prefix: a key no row names is not a door model,
+    /// and nothing renders it as one (through the knob door's renderer a push bar's key gave sixteen samples of
+    /// silence).</summary>
+    internal static readonly DoorModel[] DoorModels =
+    {
+        new(KnobDoor.KeyPrefix, (k, rate) => (KnobDoor.RenderKey(k, rate, out float db), db), MaxRenderLateness),
+        new(PushBarDoor.KeyPrefix, (k, rate) => (PushBarDoor.RenderKey(k, rate, out float db), db), MaxRenderLateness),
+        new(SlidingDoor.KeyPrefix, (k, rate) => (SlidingDoor.RenderKey(k, rate, out float db), db), MaxRenderLateness),
+        new(GlassDoor.KeyPrefix, (k, rate) => (GlassDoor.RenderKey(k, rate, out float db), db), MaxRenderLateness),
+        new(LockCylinder.KeyPrefix, (k, rate) => (LockCylinder.RenderKey(k, rate, out float db), db), MaxRenderLateness),
+        new(ElevatorDoor.KeyPrefix, (k, rate) => (ElevatorDoor.RenderKey(k, rate, out float db), db), MaxRenderLateness),
+        // Not peak-normalised: its own scale is its level.
+        new(CarWindow.KeyPrefix, (k, rate) => (CarWindow.RenderKey(k, rate), 0f), MaxRenderLateness),
+        new(GlassFracture.KeyPrefix, (k, rate) => (GlassFracture.RenderKey(k, rate, out float db), db), GlassRenderLateness),
+    };
+
+    /// <summary>The model a key names, if it names one.</summary>
+    internal static DoorModel? DoorModelOf(string? key)
+    {
+        if (key == null) return null;
+        foreach (var m in DoorModels)
+            if (key.StartsWith(m.Prefix, StringComparison.Ordinal)) return m;
+        return null;
+    }
     /// <summary>Finished renders with the rate each carries, which is registered as it is: a door
     /// prewarmed before the mixer existed may not be at the mixer's rate.</summary>
     private readonly System.Collections.Concurrent.ConcurrentQueue<(string Id, float[] Pcm, int Rate)> _rendered = new();
@@ -159,44 +188,69 @@ public sealed class WorldAudioPlayer
 
     /// <param name="audio">The engine the sounds are registered with and submitted to.</param>
     /// <param name="acoustics">Where a sound's path is worked out until the simulator answers.</param>
-    /// <param name="prewarm">Render the city's doors and a strike of thunder in the background now
-    /// (the game). The emitter-stream replay builds six systems a run and wants neither the load nor
-    /// renders landing whenever their threads finish.</param>
+    /// <param name="prewarm">Render a strike of thunder in the background now, and each map's doors and the cars'
+    /// windows as the map arrives (the game). The emitter-stream replay builds six systems a run and wants neither the load
+    /// nor renders landing whenever their threads finish.</param>
     public WorldAudioPlayer(AudioEngineFacade audio, SpatialAcoustics acoustics, bool prewarm = true)
     {
         _audio = audio;
         _acoustics = acoustics;
+        _prewarms = prewarm;
         if (!prewarm) return;
-        PrewarmDoors();
         PrewarmThunder();
     }
 
-    /// <summary>
-    /// A door model takes seconds of a core to render, far past <see cref="MaxRenderLateness"/>, so
-    /// every render the city's doors ask for is made at start, four at a time, commonest first
-    /// (<see cref="PrewarmKeys"/>), and kept on disk (<see cref="DoorRenderCache"/>): a published
-    /// client ships them, and a client built here renders each once per build.
-    /// </summary>
-    private void PrewarmDoors()
-    {
-        var keys = new System.Collections.Concurrent.ConcurrentQueue<string>();
-        foreach (string key in PrewarmKeys())
-            if (_rendering.Add($"synth:{key}")) keys.Enqueue(key);
+    private readonly bool _prewarms;
 
+    /// <summary>
+    /// A door model takes seconds of a core to render, far past <see cref="MaxRenderLateness"/>, so every render the
+    /// map's doors can ask for is made as the map arrives (MapManifest.DoorRenderKeys, from DoorSystem.RenderKeys),
+    /// <see cref="PrewarmThreads"/> at a time, in the order given, and kept on disk (<see cref="DoorRenderCache"/>):
+    /// a published client ships them, and a client built here renders each once per build. A list made here of the
+    /// city's door sizes left Albany's and Magnolia's doors silent on their first swing.
+    /// </summary>
+    public void PrewarmDoors(IEnumerable<string> keys)
+    {
+        if (!_prewarms) return;
+        // The cars' windows after the first map's doors: every car has them, whatever the map.
+        foreach (string key in keys.Concat(CarWindowKeys()))
+            if (IsDoorModelKey(key) && _rendering.Add($"synth:{key}")) _toPrewarm.Enqueue(key);
         // Threads of their own, never the pool: a pool thread that finished a render took the next from
         // its own queue first, so every other Task.Run (rain survey, route build, a first-heard sound)
         // waited for the doors. 71 s on twelve cores; a CI login past a 30-minute timeout (2026-10-07).
-        for (int t = 0; t < PrewarmThreads; t++)
-            new System.Threading.Thread(() =>
+        while (!_toPrewarm.IsEmpty && TryClaimPrewarmer())
+            new System.Threading.Thread(Prewarmer) { IsBackground = true, Name = "Door prewarm" }.Start();
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<string> _toPrewarm = new();
+    private int _prewarmers;
+
+    /// <summary>One more prewarm thread, if fewer than <see cref="PrewarmThreads"/> are running.</summary>
+    private bool TryClaimPrewarmer()
+    {
+        while (true)
+        {
+            int now = System.Threading.Volatile.Read(ref _prewarmers);
+            if (now >= PrewarmThreads) return false;
+            if (System.Threading.Interlocked.CompareExchange(ref _prewarmers, now + 1, now) == now) return true;
+        }
+    }
+
+    private void Prewarmer()
+    {
+        do
+        {
+            while (_toPrewarm.TryDequeue(out var key))
             {
-                while (keys.TryDequeue(out var key))
-                {
-                    string id = $"synth:{key}";
-                    try { _rendered.Enqueue(AtMixerRate(id, RenderDoorKey(key, _fullScaleDb))); }
-                    // An exception here would end the process; a door that will not render is silent.
-                    catch (Exception ex) { Serilog.Log.Warning(ex, "[DOOR] prewarm of {Key} failed", key); }
-                }
-            }) { IsBackground = true, Name = "Door prewarm" }.Start();
+                string id = $"synth:{key}";
+                try { _rendered.Enqueue(AtMixerRate(id, RenderDoorKey(key, _fullScaleDb))); }
+                // An exception here would end the process; a door that will not render is silent.
+                catch (Exception ex) { Serilog.Log.Warning(ex, "[DOOR] prewarm of {Key} failed", key); }
+            }
+            System.Threading.Interlocked.Decrement(ref _prewarmers);
+        }
+        // A key queued between the last look and leaving would wait for the next map.
+        while (!_toPrewarm.IsEmpty && TryClaimPrewarmer());
     }
 
     /// <summary>Door renders made at once while prewarming.</summary>
@@ -206,75 +260,21 @@ public sealed class WorldAudioPlayer
     internal int RendersOutstanding => _rendering.Count;
 
     /// <summary>
-    /// Every door model render the city's doors and the cars' windows ask for, commonest first: knob
-    /// doors (pulled, pushed, closed) at the prefab's width and the city's 1.1 and 1.4 m, push-bar
-    /// doors, sliders, the key in a glass front door, knob doors' gentle and hard closes (45 % of
-    /// closes), car windows, and the glass doors last, the slowest at 10-40 s each. Without the pushes
-    /// (2026-10-05) and the gentle and hard closes, the first doors Cody opened each session were
-    /// silent. No lift door: no map has one yet.
+    /// A car's windows, each character, every stroke the window command makes from a window at rest: fully down and
+    /// up, and to and from half way. Every car has them, whatever the map. A window turned round while it is moving
+    /// starts from a quarter that is rendered when first heard.
     /// </summary>
-    public static List<string> PrewarmKeys()
+    public static List<string> CarWindowKeys()
     {
         var keys = new List<string>();
-        var widths = new[] { 1.1f, 1.4f, 0.9f };
-        foreach (float width in widths)
-            for (int v = 0; v < KnobDoor.Variants; v++)
-            {
-                keys.Add(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, width, 2.1f));
-                keys.Add(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, width, 2.1f, push: true));
-                keys.Add(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, width, 2.1f));
-            }
-        // The steel push-bar door at the widths the city builds it (1.1 m) and its prefab's (1.0 m): each
-        // character's push, its pull from the lever side, and its closer's latch.
-        foreach (float width in new[] { 1.1f, 1.0f })
-            for (int v = 0; v < PushBarDoor.Variants; v++)
-            {
-                keys.Add(PushBarDoor.Key(false, v, 1.4f, width, 2.1f));
-                keys.Add(PushBarDoor.Key(false, v, 1.4f, width, 2.1f, pull: true));
-                keys.Add(PushBarDoor.Key(true, v, 1.4f, width, 2.1f));
-            }
-        // The sliding doors at the sizes the city builds them: a patio leaf 1.0 m wide slid in 1.4 s, an
-        // automatic leaf 1.15 m wide at its controller's own times.
-        foreach (bool closing in new[] { false, true })
-            for (int v = 0; v < SlidingDoor.Variants; v++)
-            {
-                keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Patio, closing, v, 1.4f, 1.0f, 2.1f));
-                keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Automatic, closing, v, SlidingDoor.AutomaticSeconds(1.15f, !closing), 1.15f, 2.1f));
-            }
-        for (int v = 0; v < LockCylinder.Variants; v++)
-            keys.Add(LockCylinder.Key(LockCylinder.Host.AluminiumStile, v));
-        foreach (var how in new[] { KnobDoor.Shut.Gentle, KnobDoor.Shut.Hard })
-            foreach (float width in widths)
-                for (int v = 0; v < KnobDoor.Variants; v++)
-                    keys.Add(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, v, 0.9f, how, width, 2.1f));
-        // A car's windows, each character, every stroke the window command makes from a window at rest:
-        // fully down and up, and to and from half way. A window turned round while it is moving starts
-        // from a quarter that is rendered when first heard.
         for (int v = 0; v < CarWindow.Variants; v++)
             foreach (var (from, to) in new[] { (0f, 1f), (1f, 0f), (0f, 0.5f), (0.5f, 0f), (0.5f, 1f), (1f, 0.5f) })
                 keys.Add(CarWindow.Key(v, from, to));
-        // The glass front door (its bar, its key-side pull, its close) at the towers' 1.9 m (the city scales
-        // the 1.0 m prefab; prewarmed at 1.0 m, no tower door ever matched) and the prefab's size, and the
-        // glass pull door (pulled, pushed, its close) at its prefab's.
-        foreach (float width in new[] { 1.9f, 1.0f })
-            for (int v = 0; v < GlassDoor.Variants; v++)
-            {
-                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, false, GlassDoor.Opening.Key, GlassDoor.Glazing.Tempered, v, 1.1f, width, 2.1f));
-                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, false, GlassDoor.Opening.Push, GlassDoor.Glazing.Tempered, v, 1.1f, width, 2.1f));
-                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.1f, width, 2.1f));
-            }
-        for (int v = 0; v < GlassDoor.Variants; v++)
-        {
-            keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, false, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
-            keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, false, GlassDoor.Opening.Push, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
-            keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
-        }
         return keys;
     }
 
-    /// <summary>A door model's sound, by its key's prefix (through the knob door's renderer a push bar's
-    /// key gave sixteen samples of silence). The render's own peak goes into <paramref name="fullScaleDb"/>,
-    /// the level the sound is placed at.</summary>
+    /// <summary>A door model's sound, by its row in <see cref="DoorModels"/>. The render's own peak goes into
+    /// <paramref name="fullScaleDb"/>, the level the sound is placed at.</summary>
     internal static float[] RenderDoorKey(string key, System.Collections.Concurrent.ConcurrentDictionary<string, float> fullScaleDb)
     {
         // Rendered before, by this build: from disk, in milliseconds (DoorRenderCache).
@@ -283,19 +283,8 @@ public sealed class WorldAudioPlayer
             if (keptDb > 0f) fullScaleDb[key] = keptDb;
             return kept;
         }
-        if (key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal))
-        {
-            var window = CarWindow.RenderKey(key, TransientSynth.SampleRate);
-            DoorRenderCache.Store(key, window, 0f);
-            return window;
-        }
-        float[] pcm = key.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal) ? GlassFracture.RenderKey(key, TransientSynth.SampleRate, out float db)
-                    : key.StartsWith(GlassDoor.KeyPrefix, StringComparison.Ordinal) ? GlassDoor.RenderKey(key, TransientSynth.SampleRate, out db)
-                    : key.StartsWith(LockCylinder.KeyPrefix, StringComparison.Ordinal) ? LockCylinder.RenderKey(key, TransientSynth.SampleRate, out db)
-                    : key.StartsWith(ElevatorDoor.KeyPrefix, StringComparison.Ordinal) ? ElevatorDoor.RenderKey(key, TransientSynth.SampleRate, out db)
-                    : key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal) ? PushBarDoor.RenderKey(key, TransientSynth.SampleRate, out db)
-                    : key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal) ? SlidingDoor.RenderKey(key, TransientSynth.SampleRate, out db)
-                    : KnobDoor.RenderKey(key, TransientSynth.SampleRate, out db);
+        if (DoorModelOf(key) is not { } model) throw new ArgumentException($"no door model renders '{key}'", nameof(key));
+        var (pcm, db) = model.Render(key, TransientSynth.SampleRate);
         if (db > 0f) fullScaleDb[key] = db;
         DoorRenderCache.Store(key, pcm, db);
         return pcm;
@@ -303,15 +292,7 @@ public sealed class WorldAudioPlayer
 
     /// <summary>A key one of the simulated models names (doors, the key in a lock, a lift door, a car window,
     /// breaking glass): rendered by <see cref="RenderDoorKey"/>, one buffer per key.</summary>
-    internal static bool IsDoorModelKey(string? key)
-        => key != null && (key.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
-                           || key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
-                           || key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)
-                           || key.StartsWith(GlassDoor.KeyPrefix, StringComparison.Ordinal)
-                           || key.StartsWith(LockCylinder.KeyPrefix, StringComparison.Ordinal)
-                           || key.StartsWith(ElevatorDoor.KeyPrefix, StringComparison.Ordinal)
-                           || key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)
-                           || key.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal));
+    internal static bool IsDoorModelKey(string? key) => DoorModelOf(key) != null;
 
     /// <summary>A door model's sound as it plays: placed at its own render's full scale, where the client has
     /// rendered it, instead of the table figure the server sent for the key.</summary>

@@ -271,7 +271,7 @@ public partial class MapManifest : IMessage
     public float MinimumY;
     public int ExpectedEntityCount;
     public float VoxelResolution = 0.5f;
-    public float OcclusionFloor = 0.2f;
+    public float OcclusionFloor = AcousticConstants.DefaultOcclusionFloor;
     public string OwnerId = "";
     public bool IsPublic = false;
 
@@ -313,6 +313,10 @@ public partial class MapManifest : IMessage
     public double FrameEasting;
     public double FrameNorthing;
     public float FrameBaseY;
+
+    /// <summary>Every door model key this map's doors can send (DoorSystem.RenderKeys): the client renders them as
+    /// the map arrives, since a first hearing cannot wait the seconds a render takes. Appended.</summary>
+    public string[] DoorRenderKeys = Array.Empty<string>();
 
     public MapManifest() { }
 }

@@ -221,7 +221,7 @@ public sealed class MapTracker
                 return Thing(e, Sightline.NameOf(e), feet);
             case TrackCategory.Entrances:
                 if (!IsEntrance(world, e)) return null;
-                return Thing(e, Sightline.NameOf(e), feet);
+                return Thing(e, EntranceName(world, e), feet);
             case TrackCategory.Stairs:
                 // A stair marker stands at handrail height over its landing and is named with its line:
                 // "Stairs up, 17 steps, to floor 3".
@@ -299,20 +299,54 @@ public sealed class MapTracker
     private static bool Is(string beacon, string category) => string.Equals(beacon, category, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// A way in or out of a building: an exit beacon, anything named an entrance, or a door with the
-    /// open air (no region, or one not indoors) on one side of its portal and a room on the other.
+    /// A way in or out of a building, from what it joins, not what it is called: an exit beacon, or an opening with
+    /// the open air (no region, or one not indoors) on one side and a room on the other. A door is made to be walked
+    /// through; an opening with no leaf is one where a person can (<see cref="WalkedThrough"/>), so a car park's open
+    /// side over its parapet is not a way in and the hangar's open front is.
     /// </summary>
     internal static bool IsEntrance(WorldSnapshot world, in EntitySnapshot e)
     {
         var def = e.Definition;
         string beacon = def.Identity.BeaconCategory ?? "";
         if (Is(beacon, Beacons.Exit)) return true;
-        string name = def.Identity.Name ?? "";
-        if (name.Contains("entrance", StringComparison.OrdinalIgnoreCase)) return true;
-        if (!Is(beacon, Beacons.Door)) return false;
         int a = def.Portal.RegionAId, b = def.Portal.RegionBId;
-        if (a == b) return false;
-        return Outdoors(world, a) != Outdoors(world, b);
+        if (a == b || Outdoors(world, a) == Outdoors(world, b)) return false;
+        return Is(beacon, Beacons.Door) || WalkedThrough(world, e);
+    }
+
+    /// <summary>How far below an opening's sill the floor may be on either side for a person to walk through it,
+    /// metres: a step.</summary>
+    public const float SillStepMetres = 0.5f;
+
+    /// <summary>Whether a person can walk through an opening: a floor within a step of its sill on both sides. Its
+    /// frame is X across, Y up and Z through.</summary>
+    internal static bool WalkedThrough(WorldSnapshot world, in EntitySnapshot e)
+    {
+        var size = e.Definition.Collider.Size;
+        if (size.Y <= 0f) return false;
+        var turn = e.Transform.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(e.Transform.Rotation);
+        var up = Vector3.Transform(Vector3.UnitY, turn);
+        var through = Vector3.Transform(Vector3.UnitZ, turn);
+        var sill = e.Transform.Position - up * (size.Y * 0.5f);
+        var spatial = new SpatialService();
+        foreach (float side in new[] { -1f, 1f })
+        {
+            var above = sill + through * (side * (size.Z * 0.5f + 0.4f)) + new Vector3(0f, SillStepMetres, 0f);
+            if (!spatial.CastSight(world, above, -Vector3.UnitY, 2f * SillStepMetres, out _, out _, glassBlocks: true)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>An entrance as it is said: a door by its name, and an opening with no leaf by the room it is the way
+    /// into (its own name is its prefab's, "Acoustic Portal").</summary>
+    internal static string EntranceName(WorldSnapshot world, in EntitySnapshot e)
+    {
+        if (Is(e.Definition.Identity.BeaconCategory ?? "", Beacons.Door) || Is(e.Definition.Identity.BeaconCategory ?? "", Beacons.Exit))
+            return Sightline.NameOf(e);
+        int a = e.Definition.Portal.RegionAId, b = e.Definition.Portal.RegionBId;
+        int room = Outdoors(world, a) ? b : a;
+        return world.Entities.TryGetValue(room, out var r) && !string.IsNullOrWhiteSpace(r.Definition.Region.FriendlyName)
+            ? $"{r.Definition.Region.FriendlyName.Trim()} entrance" : Sightline.NameOf(e);
     }
 
     private static bool Outdoors(WorldSnapshot world, int regionId)

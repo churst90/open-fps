@@ -707,14 +707,18 @@ Rules for every stage:
 
 A session here is one working session of an agent, as in docs/GEOMETRY.md.
 
-Where the stages stand (2026-10-10): 0, 1 and 2 built 2026-10-07 (sections 13 to 15), 3 built and merged
+Where the stages stand (2026-10-11): 0, 1 and 2 built 2026-10-07 (sections 13 to 15), 3 built and merged
 2026-10-10 (section 16, 563f26de), with decision 4 taken the same day (e081faf0: Acoustics without
 MemoryPack). 4 built and merged 2026-10-10 (section 17, 9f9bf5ab: the rooms and openings are values and in
 Acoustics; 384 crossings left), and the acoustic map switched to the rooms flooded from the walls the same day
-(docs/GEOMETRY.md 12.6 item 1, 25a328b9). Stage 5's first slice built 2026-10-10 on its branch, not merged
-(section 18: the traced places and the weather are per world; 28 library statics fewer, crossings unchanged).
-The order agreed with Cody on 2026-10-10: the rest of stage 5 with geometry stage 6 (vehicles and bodies in the
-acoustic scene); then stages 6 to 8.
+(docs/GEOMETRY.md 12.6 item 1, 25a328b9; approved by ear 2026-10-10). Stage 5's first slice built and merged
+2026-10-10 (section 18, 10c1bcf7: the traced places and the weather are per world; 28 library statics fewer,
+crossings unchanged). The rest of stage 5 starts with `AudioClock` (18.3).
+
+The order agreed with Cody on 2026-10-11 (todo.md, "Next, in order"): the special-cases audit's parts
+(docs/SPECIAL_CASES_AUDIT.md; P0, P1 and P2 done 2026-10-11) with the voice registry (P3a-d), then stage 5's
+`AudioClock` slice; the physics stages with geometry stage 6 (docs/PHYSICS_BOUNDARY.md); then stages 6 to 8 on
+the clean voices.
 
 ### Stage 0: guards (1 to 2 sessions)
 
@@ -2059,6 +2063,10 @@ so the switch finds it as it was. Two commits: the values (9413a579), then the m
 
 - Every field is read by the acoustics or the audio: `AmbienceId` by the region's bed (`ClientAudioSystem`),
   `FriendlyName` by place names and the generator's warnings, the rest by the rooms and the routes.
+- Since then (docs/GEOMETRY.md 12.6, "Regions become places"): `AmbienceId` went from `Room` with the beds
+  (2026-10-10, step 1); a flooded room's `Volume`, `FaceAreas`, `FaceAbsorption` and `Materials` are measured
+  from its flood (2026-10-10), and nothing authors `RoomSize`, `Materials` or `ReverbTimeScale` any more
+  (2026-10-11, step 5: a region's box is its collider's, its materials start blank, its scale is 1).
 - The names are the components', so every reader that took a region or a portal off the map through `var`
   compiles unchanged: `FmodAudioProvider`'s 19, `SpatialAcoustics`' 5, `OpeningGraph`'s map reads,
   `OpeningRoutes`, `SpatialService`, `WorldAudioPlayer`, `ClientGameSession`. None of them was edited.

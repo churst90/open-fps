@@ -3,7 +3,7 @@
 #
 #   tools/sound_boundary/run.sh [out-dir]
 #
-# Builds the Roslyn reader on tmpfs (the repo is on ntfs3: never build in place), reads every project's
+# Builds the Roslyn reader on tmpfs (never into the checkout), reads every project's
 # sources, then sorts the types and writes tables.md, crossings.tsv and the ratchet's two lists
 # (files.tsv, allowed.tsv: OpenFPS.Tests/LibraryBoundaryTests) into out-dir
 # (default /tmp/openfps-wt-survey/out). Nothing in the repository is built or changed.

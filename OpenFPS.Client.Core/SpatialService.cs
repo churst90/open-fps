@@ -684,7 +684,7 @@ public class SpatialService
             var def = e.Definition;
             if (def.Collider.Size.X <= 0f || !def.Collider.IsSolid) return false;
             if (def.Type is EntityType.Player) return false;
-            if (!glassBlocks && string.Equals(def.Material.Material, "Glass", StringComparison.OrdinalIgnoreCase)) return false;
+            if (!glassBlocks && AcousticRegistry.IsGlass(def.Material.Material)) return false;
             if (skip != null && skip(e)) return false;
             float d;
             bool hit;
@@ -742,6 +742,28 @@ public class SpatialService
             if (Test(e, ref hitDistance)) { hitEntity = e; found = true; }
         }
         return found;
+    }
+
+    /// <summary>What the first surface a look meets along a line is (<see cref="OpenFPS.Common.Geometry.SurfaceFlags"/>),
+    /// glass included; none without the triangle world, or where it meets nothing.</summary>
+    public OpenFPS.Common.Geometry.SurfaceFlags SurfaceFlagsAlong(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist)
+    {
+        if (!UsesTriangles(world)) return OpenFPS.Common.Geometry.SurfaceFlags.None;
+        var geo = world.Geometry!;
+        var filter = new PredicateFilter { Base = Filter(world, OwnEntityId), World = world, GlassBlocks = true, SkipGlass = true };
+        return geo.Enter(start, Vector3.Normalize(dir), maxDist, OpenFPS.Common.Geometry.GeometryLayers.Sight, ref filter, out var h)
+            ? geo.SurfaceOf(h).Flags : OpenFPS.Common.Geometry.SurfaceFlags.None;
+    }
+
+    /// <summary>Whether nothing a look meets is over <paramref name="at"/> for <paramref name="metres"/>, glass included:
+    /// the open sky. Inside a solid (a roof's own volume) is under it.</summary>
+    public bool UnderOpenSky(WorldSnapshot world, Vector3 at, float metres)
+    {
+        if (!UsesTriangles(world)) return !CastSight(world, at, Vector3.UnitY, metres, out _, out _, glassBlocks: true);
+        var filter = new PredicateFilter { Base = Filter(world, OwnEntityId), World = world, GlassBlocks = true, SkipGlass = true };
+        if (world.Geometry!.Any(at, Vector3.UnitY, metres, OpenFPS.Common.Geometry.GeometryLayers.Sight, OpenFPS.Common.Geometry.RayFaces.Both, ref filter))
+            return false;
+        return !CastSight(world, at, Vector3.UnitY, metres, out _, out _, glassBlocks: true);
     }
 
     public bool RaycastSingle(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist, out EntitySnapshot hitEntity, out float hitDistance)

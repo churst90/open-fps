@@ -134,7 +134,7 @@ public static class ReportMeasure
 
         float hs = 1.5f, hr = 1.5f;
         float reflected = MathF.Sqrt(metres * metres + (hs + hr) * (hs + hr));
-        int lag = (int)MathF.Round((reflected - metres) / 343f * sr);
+        int lag = (int)MathF.Round((reflected - metres) / AudioPhysics.SpeedOfSound * sr);   // 20 °C, as the air above
         float gr = 0.8f * metres / reflected;
         var y = new float[source.Length];
         for (int i = 0; i < y.Length; i++)

@@ -65,7 +65,7 @@ public sealed partial class ClientGameSession : IDisposable
 
     // From the manifest, for when the acoustics are generated.
     private float _voxelResolution = AcousticConstants.DefaultVoxelResolution;
-    private float _occlusionFloor = 0.2f;
+    private float _occlusionFloor = AcousticConstants.DefaultOcclusionFloor;
     private Vector3 _mapMin;
     /// <summary>The map's tiles are streamed (MapManifest.TileMetres), and its first load is complete: every
     /// definition batch from now on is a tile arriving.</summary>
@@ -851,6 +851,8 @@ public sealed partial class ClientGameSession : IDisposable
                 // would use the previous map's air.
                 _world.ApplyManifestAtmosphere(manifest);
                 _audioSystem.Beacons.SetMapPolicy(manifest.BeaconPolicy);
+                // The map's doors, rendered while it loads: a first swing cannot wait for a render.
+                _audioSystem.WorldAudio.PrewarmDoors(manifest.DoorRenderKeys ?? Array.Empty<string>());
                 // A new map's roads come with its data; until then there are none.
                 _audioSystem.Driving.SetRoads(null);
                 _audioSystem.SetCrossings(null);

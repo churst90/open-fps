@@ -727,20 +727,20 @@ within its radius (at medium, 300 m full and 800 m coarse: about 10 full tiles a
 A session is one working session of an agent, as in the streaming plan. Each stage leaves the game
 working and boxes valid.
 
-Where the stages stand (2026-10-10, all merged on main; none of 3 and 4 heard in the game yet):
+Where the stages stand (2026-10-11, all merged on main):
 
 | Stage | Status |
 |---|---|
 | 1. Triangle world, BVH, rays, Steam Audio, static collision | built 2026-10-06 (section 9) |
 | 2. Slopes, ramps and stairs | built 2026-10-06 (section 10) |
 | 3. Terrain from real elevation | built 2026-10-09 with streaming stage 2 (section 11) |
-| 4. Shape library, import, generators, editor | built 2026-10-10 (section 12, eb529bfe); rooms by flood built as an instrument, not switched on; sound points on models begun (12.6) |
+| 4. Shape library, import, generators, editor | built 2026-10-10 (section 12, eb529bfe). Rooms by flood switched on 2026-10-10 (25a328b9) and measured from their floods the same day, both approved by ear 2026-10-10; regions become places, steps 1 to 5, done 2026-10-10 and 11 (steps 2 and 3 approved by ear 2026-10-11); sound points on models begun (12.6). The shapes, footprints and roofs themselves are unheard in play |
 | 5. Diggable ground with strata | not started; held until wanted (Cody, 2026-10-10) |
-| 6. Vehicles and bodies in the acoustic scene | not started; next after the rooms, with sound library stage 5 |
+| 6. Vehicles and bodies in the acoustic scene | not started; next, with the physics stages (docs/PHYSICS_BOUNDARY.md section 8: physics stage 4, rigid bodies, goes with it, so a body's shape is made once for collision and for the acoustic scene) |
 
-The order agreed with Cody on 2026-10-10: switching rooms by flood on (12.6 item 1: the leaks and narrow
-rooms fixed first, gated by the parity harness) goes with sound library stage 4
-(docs/SOUND_LIBRARY_BOUNDARY.md 16.7); then stage 6 with library stage 5; stage 5 waits.
+The order agreed with Cody on 2026-10-11 (todo.md, "Next, in order"): regions become places, steps 3 to 5
+(done); the special-cases audit's parts (docs/SPECIAL_CASES_AUDIT.md); the physics survey (done); then the
+physics stages with stage 6; then sound library stages 6 to 8. Stage 5 waits until wanted.
 
 ### Stage 1: the triangle world, the BVH, rays, Steam Audio and static collision (4 to 6 sessions)
 
@@ -804,7 +804,8 @@ Built with streaming stage 2 (2026-10-09; section 11): the order of work was doc
   until every generator writes seeds.
 - Risks: interior layouts on irregular footprints; imported meshes that are not closed (the importer
   refuses them as solids and they can only be sheets).
-- As built (2026-10-10): section 12; rooms by flood and sound points on models are left (12.6).
+- As built (2026-10-10): section 12. Rooms by flood switched on 2026-10-10 and regions became places by
+  2026-10-11 (12.6 item 1); sound points on models are left (12.6).
 
 ### Stage 5: diggable ground with strata (5 to 8 sessions)
 
@@ -1602,7 +1603,8 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
 
 ### 12.6 Left of stage 4, and the plan for it
 
-1. **Rooms derived from seeds by flood (2.7)**, built as an instrument and not switched on yet.
+1. **Rooms derived from seeds by flood (2.7).** Built as an instrument, then switched on 2026-10-10 and approved by
+   ear ("Switched on", below); regions became places in five steps after it (below).
    `OpenFPS.Geometry/Triangles/RoomFlood.cs`. Quarter-metre cells (a whole number to an acoustic voxel: the three maps' grids are 1 m). Rooms
    whose reaches overlap flood together in one dense block of cells (an array index per cell, not a hash key), and
    the blocks flood on as many threads as are given. In three steps: each room fills what of its own box it can reach
@@ -1675,7 +1677,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    356 m with its reach, 77 million cells (about 460 MB while it floods): a block per room's bounds, or pages, before
    the client floods a world tile.
 
-   **Switched on (2026-10-10, unheard).** `EntityAcoustics.RoomsByFlood` floods every indoor room of a list of
+   **Switched on (2026-10-10, approved by ear the same day: "everything sounds good").** `EntityAcoustics.RoomsByFlood` floods every indoor room of a list of
    definitions through a triangle world with each door leaf at its shut pose (`Portal.OpeningCentre/OpeningRotation`;
    both sides move leaves in their worlds), and `RoomCells` says which room's flood holds a point. The server
    (`MapManager.RoomsOf`, after every change to the fixed geometry, in the background on the game's server) and the
@@ -1726,7 +1728,8 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    report). A cell's claim is a 16-bit index now, 3 bytes a cell while flooding instead of 5, so the largest group
    flooded (Albany's college, 52 million cells with its reach) takes about 160 MB.
 
-   **Measured from their floods (2026-10-10, unheard).** A flooded room's volume, face areas and face materials come
+   **Measured from their floods (2026-10-10, approved by ear the same day with the floors fixed: "everything sounds
+   great. no complaints").** A flooded room's volume, face areas and face materials come
    from its flood, not its box (2.7 item 4). `RoomFlood.Flood(..., measure: true)` gives each room a `Lining`: per face
    of the box's frame (floor, ceiling, north +Z, south, east +X, west), the area of each material lining it, the area
    open to the sky and the area that is another room's air, the volume, and the air's bounds. A ray goes from the air
@@ -1801,15 +1804,15 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
 
    **Regions become places: the plan (started 2026-10-10, after part A was approved by ear).** In order, each its
    own commit:
-   1. DONE. The ambience beds go (and the map-level `AmbienceId` from MapData and the three generators, the maps
-      regenerated with only that line gone; `AmbisonicFormat` and `AmbisonicBedDsp` stay, for the lab and their
-      tests): `ClientAudioSystem.SetMapAmbience` and the region bed, `PlayAmbientBed`/`StopAmbientBed`
+   1. DONE (2026-10-10). The ambience beds go (and the map-level `AmbienceId` from MapData and the three generators,
+      the maps regenerated with only that line gone; `AmbisonicFormat` and `AmbisonicBedDsp` stayed for the lab
+      until 2026-10-11, when they went with the recordings, 0525f576): `ClientAudioSystem.SetMapAmbience` and the region bed, `PlayAmbientBed`/`StopAmbientBed`
       in `IAudioProvider`, `FmodAudioProvider` and `AudioEngineFacade`, `PrefabTemplate.AmbienceId`, the manifest's
       ambience in Program.cs and ClientGameSession.cs, `Room.AmbienceId`; `MapManifest`'s field and
       `RegionComponent.AmbienceId` stay on the wire, unread, with a one-line comment. Tests: AmbienceAndWeather,
       ClientAudioHarness, EmitterStreamReplay, SteelDoorSound, VoiceLifecycle, Speedway, PrefabSpec, BeaconAids.
-   2. DONE (2026-10-10, unheard). The flood from a point, below ("The flood from a point").
-   3. DONE (2026-10-11, unheard). Openings framed from where the floods meet them, below ("Openings from the
+   2. DONE (2026-10-10, approved by ear 2026-10-11). The flood from a point, below ("The flood from a point").
+   3. DONE (2026-10-11, approved by ear 2026-10-11: "complete, success everything sounds good"). Openings framed from where the floods meet them, below ("Openings from the
       floods"). Portals derived through door leaves were not needed: every door is an entity with its two rooms,
       framed by its leaf.
    4. DONE (2026-10-11). The readers of `RoomSize` onto the flood, below ("The readers on the flood").
@@ -1818,7 +1821,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    cabin (it moves; its box comes from the vehicle), a room whose block is over `MaxBlockCells`, and every room until
    the first flood lands at load (or the load waits for it).
 
-   **The flood from a point (step 2, 2026-10-10, unheard).** A seed is a point (`Seed.Size` is read only by
+   **The flood from a point (step 2, 2026-10-10, approved by ear 2026-10-11).** A seed is a point (`Seed.Size` is read only by
    `RoomFlood.Groups`, for `MapTiles`). Each room floods out from its point, stopped by walls, floors, ceilings, shut
    leaves, openings and air under the open sky; no box and no margin. An opening is a portal with no leaf
    (`RoomFlood.Barrier`, from `EntityAcoustics.FloodBarriers`), its cells marked a cell wider and taller than it is
@@ -1893,7 +1896,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    Magnolia 19415 Turtle Dove Lane, barn, `/tp -88.8 -253.0 5.4`; 19617 Turtle Dove Lane, house, `/tp -299.2 -271.0
    6.4`; 16510 Country Star, house, `/tp -320.0 702.1 0.7` (273.7 to 470.1 m3); Albany Linn County Juvenile Detention,
    `/tp 1464.5 1274.2 1.9`; Favorite Mistake, `/tp -53.3 643.2 0.6` (900 to 1,419 m3).
-   **Marlow Tower's leaks (2026-10-11, unheard).** Cody, in the game after step 2: on floor 3's corridor "I heard the
+   **Marlow Tower's leaks (2026-10-11, approved by ear 2026-10-11).** Cody, in the game after step 2: on floor 3's corridor "I heard the
    train clear as day go by", walking round the tower "wind or rain or something leaking in like it was coming
    through the wall" and "a siren pop through quietly"; inside a flat on floor 3 everything sounded good. Traced from
    his client log and with `--path-probe ... fields` (each other place's field at the ear, the level its reverb bus
@@ -2059,7 +2062,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      Burklin Lane `/tp 1377.5 94.6 -1.0`, 26410 Country Woods Trail `/tp -822.0 708.6 4.7`; Albany: 777 College Park
      Drive Southwest `/tp 253.0 934.4 -1.9`, 6237 Chapman Place Southwest `/tp -642.8 -0.8 -2.6`, 1551 Beaver Court
      Southwest `/tp -535.0 859.2 -4.0` (the real places: what is outside, louder through the next roof or shed).
-   **Openings from the floods (step 3, 2026-10-11, unheard).** A flood keeps the cells of each opening its air meets
+   **Openings from the floods (step 3, 2026-10-11, approved by ear 2026-10-11).** A flood keeps the cells of each opening its air meets
    and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
    opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide
    and high as the cells reach and with the area they hold (less than the frame where something stands in it: a stair
@@ -2150,8 +2153,9 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
 3. Facets as polygons for the engine echoes (their rectangles overreach a triangle's corners); per-facet materials
    in the image sources (a shape's slots).
 4. Doors' remaining misses (16 on Albany): footprints whose rooms sit far from every wall, where the cover grid's
-   angle (the footprint's least rectangle) is not its walls'; the flood fixes them.
-5. The openings found in rooms' faces (12.2's table): look at what the new ones are.
+   angle (the footprint's least rectangle) is not its walls'; the flood fixes them. Not rechecked since step 3.
+5. The openings found in rooms' faces (12.2's table): done by step 3 for every room that floods (2026-10-11): the
+   face finder searches only places that did not flood, and a flooded room's openings are framed from its air.
 
 ## Appendix: box-geometry consumers today
 

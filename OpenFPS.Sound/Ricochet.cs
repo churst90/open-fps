@@ -81,32 +81,14 @@ public static class Ricochet
 {
     public const string WhinePrefix = "bullet:whine:";
 
-    /// <summary>A face's part in a ricochet: the critical angle off the face (degrees; zero: never),
-    /// the departure angle as a share of the incidence, the share of its speed it loses at the critical
-    /// angle, the share of its mass the slug keeps, and how much the face flattens it.</summary>
-    public readonly record struct Face(float CriticalDegrees, float DepartureRatio, float LossAtCritical, float MassKept, float Flatten);
-
-    private static readonly Dictionary<string, Face> _faces = new(StringComparer.OrdinalIgnoreCase)
-    {
-        // Hard, non-yielding: departure under incidence.
-        ["Metal"] = new(25f, 0.25f, 0.35f, 0.92f, 0.7f),
-        ["Concrete"] = new(15f, 0.35f, 0.35f, 0.85f, 1f),
-        ["Marble"] = new(18f, 0.3f, 0.3f, 0.88f, 1f),
-        ["Tile"] = new(15f, 0.3f, 0.35f, 0.88f, 1f),
-        ["Brick"] = new(12f, 0.4f, 0.4f, 0.85f, 0.9f),
-        // Asphalt yields a little: a lower angle, departure nearer incidence.
-        ["Asphalt"] = new(10f, 0.6f, 0.4f, 0.95f, 0.6f),
-        // Yielding: departure over incidence.
-        ["Gravel"] = new(8f, 1.0f, 0.5f, 0.95f, 0.4f),
-        ["Dirt"] = new(5f, 1.4f, 0.5f, 1f, 0.2f),
-        ["Water"] = new(-1f, 1.3f, 0.4f, 1f, 0.05f),   // -1: Birkhoff, from the slug's density
-    };
-
-    /// <summary>A face's part, or none (the round goes in, at any angle).</summary>
-    public static bool TryFace(string? material, out Face face)
+    /// <summary>A face's part, from the material table (AcousticRegistry, aliases and all), or none (the round goes in,
+    /// at any angle).</summary>
+    public static bool TryFace(string? material, out RicochetFace face)
     {
         face = default;
-        return material != null && _faces.TryGetValue(material, out face);
+        if (material == null || AcousticRegistry.GetProperties(material).Ricochet is not { } f) return false;
+        face = f;
+        return true;
     }
 
     /// <summary>The critical angle off a face for this slug, radians; zero where a round never skips.</summary>

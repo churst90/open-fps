@@ -73,7 +73,7 @@ public static class Thunder
     /// out: 650 Pa (thesis, sec. 5.1.5, matched to the HyMeX thunder energies), spectrum peaking at
     /// 148 Hz. Few's law puts that peak at this energy per metre.</summary>
     public const float SourcePa = 650f, SourceMetres = 2f, SourcePeakHz = 148f;
-    public static float SourceEnergyPerMetre(float c = 343f)
+    public static float SourceEnergyPerMetre(float c = AudioPhysics.SpeedOfSound)
     {
         float r = 0.63f * c / SourcePeakHz;
         return LightningPhysics.AmbientPressurePa * r * r;
@@ -83,7 +83,7 @@ public static class Thunder
     /// The acoustic energy per metre is a fixed share of what the channel took, and goes as the
     /// amplitude squared times the wave's length; Few's length goes as the energy's square root, so
     /// the amplitude goes as its fourth root.</summary>
-    public static float AmplitudeAt2m(float energyPerMetre, float c = 343f)
+    public static float AmplitudeAt2m(float energyPerMetre, float c = AudioPhysics.SpeedOfSound)
         => SourcePa * MathF.Pow(MathF.Max(1f, energyPerMetre) / SourceEnergyPerMetre(c), 0.25f);
 
     /// <summary>Air's coefficient of nonlinearity, (gamma + 1) / 2.</summary>
