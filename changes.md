@@ -4,6 +4,25 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Cody's play on step 2, fixed, unheard. E between two doors opens the one you face (else the nearer), measured
+  to its doorway, and a door a storey up or down is never in reach: in Marlow Tower's floor 3 corridor the
+  flats' doors face each other, and the one a hand's breadth nearer behind you took the key. On Magnolia and
+  Albany every room can be walked into (docs/MAPS_FROM_REAL_PLACES.md, "Every room can be walked into"): the
+  kitchen counter keeps clear of the back door and every way through, the back door goes toward one end of its
+  wall, sofas and beds leave every way into their room walkable, a door with a shed a step outside it moves
+  along its wall, every outside door has a landing and steps down to the ground, lawns, drives and paths are
+  dug down to the floor where they meet a house, and a room no way wide enough for a body reaches gets a side
+  door. Both maps regenerated; no id moved (two 0.28 and 0.54 m Albany leaves are plaster under the same ids);
+  the world's tiles are made again (WorldStore.GeneratorVersion 7). `RealPlaceMapTests.Every_way_in_can_be_walked_through`
+  holds both places to it with the server's own collision. Picked out with comma or period, a door behind a
+  wall now says "behind a wall" instead of a blip that never comes (the barn at 19415 Turtle Dove Lane: its
+  doorway faces the street, the house's doors were 14 to 18 m off through its metal wall). A barn has one room
+  and a doorway by the generator's rules, never a bathroom; the bathroom door heard was the house's. The /tp
+  listening list is checked to stand on (docs/LISTENING_SPOTS.md, ListeningSpotsTests), `StandingSpots.InRoom`
+  and AudioLab `--walk-pair room=` make the next one. `--walk-pair` takes one walk on the server's and the
+  client's movement side by side: at 19617 Turtle Dove Lane they agree on every walk tried, so the server was
+  not refusing moves there (docs/AUDIOLAB_NOTES.md).
+
 - Rooms flood from their points, unheard (docs/GEOMETRY.md 12.6, "The flood from a point"). No box and no margin:
   a room's air is what its walls, floors, ceilings, shut leaves, openings and the open sky close in. The generators
   put an opening wherever two places meet with no wall (a stairwell's storeys, the car park's open sides, the
