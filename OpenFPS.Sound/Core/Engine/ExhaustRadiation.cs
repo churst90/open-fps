@@ -74,7 +74,7 @@ public sealed class ExhaustRadiation
 
     /// <summary>Where the listener is, in the vehicle's own frame from its origin (the contact patch
     /// under its centre). Null when nobody outside is listening: then the pipe is heard as it is.</summary>
-    public void Aim(Vector3? listener, float speedOfSound = 343f)
+    public void Aim(Vector3? listener, float speedOfSound = AudioPhysics.SpeedOfSound)
     {
         if (listener is not { } l) { _tL = _tM = _tH = 1f; return; }
         var toListener = l - _exit;

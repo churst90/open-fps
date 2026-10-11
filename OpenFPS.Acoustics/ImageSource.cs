@@ -157,7 +157,7 @@ public static class ImageSource
                 float delay = (path - direct) / MathF.Max(1f, speedOfSound);
                 // Spreading, what the surface kept, and only the share that leaves as a mirror image.
                 float gain = (direct / path) * reflected * MathF.Sqrt(1f - scatter)
-                           * ApertureFactor(s, source, listener, hit);
+                           * ApertureFactor(s, source, listener, hit, speedOfSound);
 
                 if (path - direct <= MaxPathLength && path > direct && gain >= MinGain && delay >= MinDelaySeconds
                     && (occluded == null || (!occluded(source, hit) && !occluded(hit, listener))))
@@ -406,8 +406,8 @@ public static class ImageSource
                 float gain = (direct / path)
                            * EarlyReflections.Keep(A.Absorption)
                            * EarlyReflections.Keep(B.Absorption)
-                           * ApertureFactor(A, source, p2, p1)
-                           * ApertureFactor(B, p1, listener, p2);
+                           * ApertureFactor(A, source, p2, p1, speedOfSound)
+                           * ApertureFactor(B, p1, listener, p2, speedOfSound);
                 if (gain < MinGain) continue;
 
                 if (occluded != null &&
@@ -428,13 +428,13 @@ public static class ImageSource
     /// grows with distance, so from 200 m only buildings still reflect.
     /// </summary>
     private static float ApertureFactor(in ReflectingSurface s, Vector3 source, Vector3 listener,
-                                        Vector3 hit)
+                                        Vector3 hit, float speedOfSound)
     {
         float d1 = Vector3.Distance(source, hit);
         float d2 = Vector3.Distance(hit, listener);
         if (d1 <= 0.01f || d2 <= 0.01f) return 1f;
 
-        float lambda = 343f / MathF.Max(1f, FresnelReferenceHz);
+        float lambda = MathF.Max(1f, speedOfSound) / MathF.Max(1f, FresnelReferenceHz);
         float zone = MathF.Sqrt(lambda * d1 * d2 / (d1 + d2));
         if (zone <= 1e-4f) return 1f;
 

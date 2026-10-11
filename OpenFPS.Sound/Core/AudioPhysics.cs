@@ -7,7 +7,7 @@ namespace OpenFPS.Client.AudioEngine.Core;
 public static class AudioPhysics
 {
     /// <summary>Default speed of sound in air, m/s (~20 °C).</summary>
-    public const float SpeedOfSound = 343f;
+    public const float SpeedOfSound = OpenFPS.Common.AcousticConstants.SpeedOfSound;
 
     /// <summary>The speed of sound in the world's air now, m/s: one figure for Doppler, echo delays, the
     /// ground reflection and flight time (echoes once ran at 343 while Doppler followed the weather).</summary>

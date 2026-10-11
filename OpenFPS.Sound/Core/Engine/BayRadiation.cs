@@ -75,7 +75,7 @@ public sealed class BayRadiation
 
     /// <summary>Where the listener is, in the vehicle's own frame from its origin. Null when nobody
     /// outside is listening: then the bay is heard as it is.</summary>
-    public void Aim(Vector3? listener, float speedOfSound = 343f)
+    public void Aim(Vector3? listener, float speedOfSound = AudioPhysics.SpeedOfSound)
     {
         if (!_active || listener is not { } l) { _tL = _tM = _tH = 1f; return; }
         var (gL, gM, gH) = ExhaustRadiation.BodyShadow(_grille, l, _body, speedOfSound);

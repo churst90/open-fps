@@ -49,8 +49,9 @@ public static class DistantMotion
     public const float SpeedFloor = 0.002f;
 
     /// <summary>How far the velocity may be out in any direction, m/s: Doppler goes as the speed toward the
-    /// listener over the speed of sound, and 0.1 % of 343 m/s is 0.34 m/s.</summary>
-    public const float VelocityTolerance = 0.001f * 343f;
+    /// listener over the speed of sound, and 0.1 % of 343 m/s is 0.34 m/s (the reference air: a wire
+    /// tolerance, not a heard law).</summary>
+    public const float VelocityTolerance = 0.001f * AcousticConstants.SpeedOfSound;
 
     /// <summary>The heading a prediction may be out by, degrees (a horn's or a tailpipe's aim).</summary>
     public const float TurnToleranceDegrees = 1f;
