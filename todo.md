@@ -445,8 +445,18 @@ and the server's voice line.
 - Steam Audio counts walls in a row as (2n+1)/3 of one; the tracer counts them exactly.
 - A line run along a sheet pays a panel as thick as its run (2026-10-11): a thin plate's law carried to a
   block, which overstates a thick wall's high band, and no flanking path of its own through the sheet's
-  junctions. The real places' timber walls are solid 25 cm of wood in the data, so a line along one pays
-  1.7 m of wood; with a stud build it would keep its panel.
+  junctions. (The real places' walls, 25 cm of solid wood, are framed now and keep their panel: docs/GEOMETRY.md
+  12.6, "Timber walls are framed".)
+- Timber walls are framed (2026-10-11, unheard). Next: measure the sound change, `--barrier-sweep map=X n=4000
+  seed=1` and `outdoor n=2000` with `server=DIR` (the maps before, whose prefabs are all still there) and
+  `dump=FILE`, both places; `--path-probe` at 31907 Bobcat Lane (ear in bedroom 2 -18.8,1.75,20.1; the street
+  -5,0.7,20.1; bedroom 3 -18.8,1.2,23.7). Left: the room's face of a medium-detail house is its cladding's
+  material (one entity has one material: an assembly's inner plies have no face of their own to reflections or the
+  room survey); ceilings are still a two-leaf plaster box 6 cm thick (one board on joists under an attic in a real
+  house); metal buildings are 25 cm of solid steel (a steel frame clad in sheet); brick ties are no bridge (Sharp's
+  point connection is not in the model); every stud is a 2x4 at 16 in. (Albany's newer houses are 2x6: no era in
+  the data); a knock on a wall (StruckThings) reads its box as one stuff; a lintel too short to be a sheet is crossed
+  apart from its plasterboard (Constructions.IsSheet).
 - Diffraction is evaluated at 200/1250/8000 Hz, not the band averages transmission uses.
 
 ### Acoustics

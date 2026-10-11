@@ -1,0 +1,14 @@
+{
+  "Id": "stud_partition",
+  "Name": "Partition Wall",
+  "Description": "A North American partition: half-inch plasterboard on both faces of 2x4 studs at 16 inch centres, the cavity between them empty, 11.4 cm through.",
+  "Material": "Plaster",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.1143 },
+  "LeafMetres": 0.0127,
+  "StudSpacingMetres": 0.4064,
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.35,
+  "TransmissionMid": 0.18,
+  "TransmissionHigh": 0.08
+}

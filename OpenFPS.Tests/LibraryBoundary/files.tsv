@@ -2,6 +2,7 @@ file	group	projects	library_types
 OpenFPS.Acoustics/AcousticConstants.cs	lib	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	lib	Acoustics	
 OpenFPS.Acoustics/AcousticRegistry.cs	lib	Acoustics	
+OpenFPS.Acoustics/Assemblies.cs	lib	Acoustics	
 OpenFPS.Acoustics/Constructions.cs	lib	Acoustics	
 OpenFPS.Acoustics/Diffraction.cs	lib	Acoustics	
 OpenFPS.Acoustics/EarlyReflections.cs	lib	Acoustics	

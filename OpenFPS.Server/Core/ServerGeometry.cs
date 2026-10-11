@@ -151,7 +151,7 @@ public sealed class ServerGeometry
         if (world.Has<AcousticComponent>(e))
         {
             var a = world.Get<AcousticComponent>(e);
-            h.Add(a.LeafMetres); h.Add(a.StudSpacingMetres); h.Add(a.IsHollow); h.Add(a.ShellThickness); h.Add(a.Absorption);
+            h.Add(a.LeafMetres); h.Add(a.StudSpacingMetres); h.Add(a.Assembly); h.Add(a.IsHollow); h.Add(a.ShellThickness); h.Add(a.Absorption);
         }
         if (world.Has<SoundEmitterComponent>(e)) h.Add(string.IsNullOrEmpty(world.Get<SoundEmitterComponent>(e).SoundId));
         if (world.Has<IdentityComponent>(e)) { var id = world.Get<IdentityComponent>(e); h.Add(id.Name); h.Add(id.Announce); }
@@ -338,7 +338,7 @@ public sealed class ServerGeometry
         var a = world.Has<AcousticComponent>(e) ? world.Get<AcousticComponent>(e) : new AcousticComponent();
         bool emitter = world.Has<SoundEmitterComponent>(e) && !string.IsNullOrEmpty(world.Get<SoundEmitterComponent>(e).SoundId);
         var surface = EntityGeometry.SurfaceOf(material, c.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow, a.ShellThickness,
-                                               a.Absorption, emitter, moves: false, doorLeaf: leaf);
+                                               a.Absorption, emitter, moves: false, doorLeaf: leaf, assembly: a.Assembly);
         if (c.Shape == ColliderShape.Terrain)
             return world.Has<TerrainTileComponent>(e) && world.Get<TerrainTileComponent>(e) is { Posts: >= 2 } terrain
                 ? EntityGeometry.TerrainSpec(e.Id, t.Position, terrain, surface) : default;

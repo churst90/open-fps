@@ -27,6 +27,14 @@ Recent work, newest first. `git log` has the rest.
   the level (others' footsteps were cut at 15 m). Drops, steps, beeps, birds and blips are each their own voice.
   Beacons and perched birds are heard by the acoustic worker's answer, as everything else is. Steam Audio now
   builds Magnolia's scene (it threw every tick). Next: the reseed.
+- Timber walls are framed (docs/GEOMETRY.md 12.6, "Timber walls are framed"), unheard. The real places' walls
+  were 25 cm of solid wood or brick. Now each is a North American timber-framed assembly in one entity: lap siding
+  or a brick veneer over an inch of air, sheathing, 2x4 studs at 16 in. with glass-fibre batts, half-inch
+  plasterboard; partitions plasterboard both sides of the studs; a shed two thin walls and its air. A layer softer
+  than air between two airtight ones is a cavity (Sharp's double-leaf law). Siding wall 17/39/46 dB against the
+  timber's 23/48/75; brick veneer 42/68/101. Maps regenerated with every id kept; the guard `Every_wall_is_framed`
+  covers both places and the Tomball tiles. GeneratorVersion 10. The wire hash changes (AcousticComponent.Assembly).
+  The sound on the maps is not measured yet.
 
 - When an edge is buried (docs/GEOMETRY.md 12.6, "When an edge is buried"), unheard. The barrier search
   went round no edge within 5 cm of another box. Three rules now, for every asker of the barrier search:

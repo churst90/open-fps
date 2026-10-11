@@ -231,6 +231,7 @@ public sealed class TriangleWorldBuilder
         void Sf(in Surface sf)
         {
             S(sf.Material); V(sf.Construction.PanelSize); F(sf.Construction.Build.LeafMetres); F(sf.Construction.Build.StudSpacingMetres);
+            if (sf.Construction.Build.Assembly != 0) Mix((uint)sf.Construction.Build.Assembly);
             F(sf.Construction.ShellThickness); Mix((uint)sf.Layers); Mix((uint)sf.Flags); F(sf.Absorption);
         }
         Sf(s.Surface);

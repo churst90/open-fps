@@ -495,6 +495,19 @@ public static class AcousticRegistry
         Matter(reg, "Plaster", "building", 0.2f, 0f, 20f, 0.05f, 5f, 1000f, 0.25f, null, 10f, 8f);
         // Mineral-fibre ceiling tile: ISO mineral wool 1030, 0.04, mu 1.
         Matter(reg, "AcousticTile", "building", 0.2f, 0f, 0.5f, 1f, 0.5f, 1030f, 0.04f, null, 1f, 1f);
+        // Glass-fibre batt, the insulation between a wall's studs (an R-13 batt is 89 mm, Owens Corning's
+        // guide specification): about 10 kg/m3 (EST, light batts 8-16); its frame about 1 kPa (EST), far
+        // softer than the air in it, so between two boards it is a cavity, not a bond (WallTransmission.IsCavity);
+        // 89 mm of it absorbs about 0.35 at 125 Hz and 0.9 and up from 500 Hz (EST from the published curves for
+        // unfaced glass fibre of that depth); a line through it alone loses a few dB low and more high (EST).
+        // ISO mineral wool 1030, 0.04, mu 1; the binder burns off and the glass softens near 650 C (EST).
+        reg["GlassWool"] = new MaterialProperties
+        {
+            Absorption = 0.8f, AbsorptionLow = 0.35f, AbsorptionMid = 0.9f, AbsorptionHigh = 0.95f, Scattering = 0.1f,
+            TransmissionLow = 0.9f, TransmissionMid = 0.6f, TransmissionHigh = 0.35f, ResonanceIndex = 58,
+            DensityKgM3 = 10f, YoungsModulusGPa = 0.000001f, LossFactor = 0.3f, Porous = true,
+        };
+        Matter(reg, "GlassWool", "building", 0.2f, 0f, 0.01f, 1f, 0.01f, 1030f, 0.04f, 650f, 1f, 1f);
 
         // ── Liquids, and the rest ───────────────────────────────────────────────────────────────────────
         // Water at 20 C: a liquid, Poisson 0.5; cp 4182, k 0.6; freezes (and ice melts) at 0 C.
@@ -619,6 +632,7 @@ public static class AcousticRegistry
         Set("Snow", new(StrikeKind.Soil, 0.5e6f, 0.3f, 1e-3f, SprayLowHz: 1500f));
         Set("Fabric", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
         Set("Foam", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
+        Set("GlassWool", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
     }
 
     /// <summary>Other names for materials in the table: what a builder or a map may call them. "Metal" is mild

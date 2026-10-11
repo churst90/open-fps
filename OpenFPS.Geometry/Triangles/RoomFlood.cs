@@ -965,7 +965,8 @@ public static class RoomFlood
     /// Fills a block's cells from the solids, a page of it at a time. A box is solid where a cell's middle is in it,
     /// a box thinner than a cell along one of its axes taken as thick as a 6-connected flood needs to be stopped by
     /// it whatever its angle to the grid (a digital plane's least thickness: a cell times the largest component of
-    /// the axis); a shape where its convex pieces, each face put out by half that thickness, hold the cell's middle;
+    /// the axis), and, where that axis is at an angle to the grid, as much longer along its others (so two thin walls
+    /// meeting at a corner meet in cells); a shape where its convex pieces, each face put out by half that thickness, hold the cell's middle;
     /// the ground where it holds the cell's middle.
     /// </summary>
     /// <summary>
@@ -1193,9 +1194,24 @@ public static class RoomFlood
             rot = rot.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(rot);
             var inv = Quaternion.Conjugate(rot);
             var half = size * 0.5f;
-            static float Thin(Vector3 axis) => MathF.Max(MathF.Abs(axis.X), MathF.Max(MathF.Abs(axis.Y), MathF.Abs(axis.Z))) * Cell * 0.5f + 1e-4f;
-            half = Vector3.Max(half, new Vector3(Thin(Vector3.Transform(Vector3.UnitX, rot)), Thin(Vector3.Transform(Vector3.UnitY, rot)),
-                                                 Thin(Vector3.Transform(Vector3.UnitZ, rot))));
+            static float Largest(Vector3 axis) => MathF.Max(MathF.Abs(axis.X), MathF.Max(MathF.Abs(axis.Y), MathF.Abs(axis.Z)));
+            Vector3 ax = Vector3.Transform(Vector3.UnitX, rot), ay = Vector3.Transform(Vector3.UnitY, rot), az = Vector3.Transform(Vector3.UnitZ, rot);
+            var grown = Vector3.Max(half, new Vector3(Largest(ax), Largest(ay), Largest(az)) * (Cell * 0.5f) + new Vector3(1e-4f));
+            if (what == Solidity.Solid)
+            {
+                // A solid grown through a thin side at an angle to the grid is grown along its others by as much: two
+                // such meeting at a corner (a timber house's 12 cm walls at 45 degrees to the grid) left a corner less
+                // than a cell across between their grown faces, and a flood got out of it. Square to the grid, a thin
+                // side's growth closes every corner as it is, and nothing else moves.
+                float pad = 0f;
+                if (grown.X > half.X && Largest(ax) < 0.999f) pad = MathF.Max(pad, grown.X - half.X);
+                if (grown.Y > half.Y && Largest(ay) < 0.999f) pad = MathF.Max(pad, grown.Y - half.Y);
+                if (grown.Z > half.Z && Largest(az) < 0.999f) pad = MathF.Max(pad, grown.Z - half.Z);
+                if (pad > 0f)
+                    grown = new Vector3(grown.X > half.X ? grown.X : grown.X + pad, grown.Y > half.Y ? grown.Y : grown.Y + pad,
+                                        grown.Z > half.Z ? grown.Z : grown.Z + pad);
+            }
+            half = grown;
             var ext = Vector3.Abs(Vector3.Transform(new Vector3(half.X, 0, 0), rot)) + Vector3.Abs(Vector3.Transform(new Vector3(0, half.Y, 0), rot))
                       + Vector3.Abs(Vector3.Transform(new Vector3(0, 0, half.Z), rot));
             if (!Range(centre - ext, centre + ext, page, out int x0, out int x1, out int y0, out int y1, out int z0, out int z1)) return;

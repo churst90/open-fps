@@ -436,7 +436,7 @@ internal static class Gate
         {
             var room = rooms[s.Id];
             if (room.Unseeded) { unseeded++; continue; }
-            if (room.Open) open.Add(names[s.Id]);
+            if (room.Open) open.Add(room.OpenAt.Count > 0 ? $"{names[s.Id]} at {room.OpenAt[0]}" : names[s.Id]);
             var rot = s.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(s.Rotation);
             var inv = Quaternion.Conjugate(rot);
             var h = s.Size * 0.5f;

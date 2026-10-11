@@ -488,12 +488,26 @@ def _finish(e, name, layer):
     return e["EntityId"]
 
 
+# Walls whose two faces differ (an assembly: cladding out, plasterboard in, OpenFPS.Acoustics/Assemblies.cs): turned as
+# their frame is, their +Z the frame's +v, never folded into a half turn as a box of one stuff may be.
+FACED = {"brick_veneer_wall", "brick_veneer_wall_unlined", "framed_siding_wall", "framed_siding_wall_unlined"}
+
+
+def norm_full(a):
+    """An angle folded into (-pi, pi]."""
+    while a > math.pi + 1e-12:
+        a -= 2 * math.pi
+    while a <= -math.pi + 1e-12:
+        a += 2 * math.pi
+    return a
+
+
 def obox(prefab, F, u0, u1, v0, v1, y0, y1, name=None, layer="structure"):
     """A box written as the space it fills, in frame F. Scale comes from the prefab's own collider."""
     bx, by, bz = BASE[prefab]
     cx, cz = F.w((u0 + u1) / 2, (v0 + v1) / 2)
     e = {"EntityId": new_id(), "PrefabId": prefab, "Position": v3(cx, (y0 + y1) / 2, cz)}
-    a = norm_half(F.a)
+    a = norm_full(F.a) if prefab in FACED else norm_half(F.a)
     if abs(a) > 1e-9:
         e["Rotation"] = yaw(-a)
     e["Scale"] = v3((u1 - u0) / bx, (y1 - y0) / by, (v1 - v0) / bz)
@@ -519,7 +533,13 @@ def prop(prefab, x, y, z, name=None, layer="props"):
 
 
 def region(name, F, u0, u1, v0, v1, y0, y1, layer="zones"):
-    return obox("acoustic_region", F, u0, u1, v0, v1, y0, y1, name=name, layer=layer)
+    """A place. A room of a building is indoors, said here: the server's survey of a region's box (CompositeAcoustics)
+    reads a face as walled by what crosses it, and a wing's box against an angled wall was walled only by the 25 cm a
+    wall used to be; with walls as thick as they are built (12 to 23 cm), two rooms read as out of doors."""
+    eid = obox("acoustic_region", F, u0, u1, v0, v1, y0, y1, name=name, layer=layer)
+    if layer == "rooms":
+        entities[-1]["IsIndoor"] = True
+    return eid
 
 
 def named_place(name, F, u0, u1, v0, v1, y0, y1):
@@ -2186,6 +2206,38 @@ FLOOR_TOP = 0.12          # slab top 0.10, a finished floor 2 cm on it
 CEIL = 2.68               # underside of the ceiling
 WALL_T = 0.25
 PART_T = 0.12
+
+# The walls are timber-framed, as the houses of both places are (docs/GEOMETRY.md 12.6, "Timber walls are framed"): a
+# wall's prefab names its assembly (OpenFPS.Acoustics/Assemblies.cs) and its collider is the assembly's thickness.
+# Outside, cladding (lap siding, or a brick veneer over an inch of air) on sheathing, 2x4 studs at 16 inch centres with
+# batts between, plasterboard inside; a partition is plasterboard on both sides of the studs. A house built room by
+# room has its plasterboard as a sheet of its own, the rooms' face, so its walls stop at their studs (the unlined
+# prefab). WALL_T and PART_T stay the plan's allowance for a wall: where rooms, doors and furniture go is decided by
+# them as before, and a wall stands from the footprint in by its own thickness.
+FRAMED = {"brick_veneer_wall": "brick_veneer_wall_unlined", "framed_siding_wall": "framed_siding_wall_unlined"}
+# The head over a doorway bears on the wall either side, as a header sits on a jack stud at each end, 1 1/2 in. past
+# the opening: it laps the pieces beside it, so no hairline between them (the map's numbers round to 0.1 mm) lets a
+# room's air out where a flood's cell falls in it (four rooms on the two places, 2026-10-11, with walls 12 cm thick).
+BEARING = 0.038
+# How far an outer wall runs on past an inside corner, behind the wall it meets: a quarter-metre flood cell's worth
+# whatever its thickness. A rooms' flood takes a wall thinner than its cell as a cell thick (a digital plane's least
+# thickness, RoomFlood), and two 12 cm walls meeting at 45 degrees to its grid, each run on only its own thickness,
+# left the flood a way out of the corner (three houses on Albany, 2026-10-11).
+CORNER_REACH = WALL_T
+BOARD = "gypsum_board"
+BOARD_T = BASE[BOARD][2]
+PARTITION = "stud_partition"
+PART_BUILD = BASE[PARTITION][2]
+
+
+# How far in the plan allows for an outer wall and the plasterboard on it (drawn 3 cm thick before 2026-10-11):
+# which pieces a wall is in, and so its ids, is decided by these (edge_wall, same_pieces), however thick it is built.
+PLAN_REACH = (WALL_T, WALL_T + 0.03)
+
+
+def wall_thick(prefab):
+    """How thick a wall of this prefab stands: a framed one its assembly's thickness, anything else WALL_T."""
+    return BASE[prefab][2] if prefab in FRAMED or prefab in FRAMED.values() else WALL_T
 DOOR_TOP = FLOOR_TOP + 2.13           # the head of a doorway with no leaf in it (a barn's, an archway)
 
 
@@ -2246,7 +2298,7 @@ def wall_run(F, run, prefab, top, name, cuts, layer="structure", thick=WALL_T):
         if c0 > s:
             pieces.append((s, c0, 0.0, top))
         if ctop < top:
-            pieces.append((c0, c1, ctop, top))
+            pieces.append((c0 - BEARING, c1 + BEARING, ctop, top))
         s = c1
     if s < s1:
         pieces.append((s, s1, 0.0, top))
@@ -2342,24 +2394,34 @@ def ring_edges(ring):
     return out
 
 
-def edge_wall(E, L, reflex0, reflex1, prefab, top, name, cuts, layer="structure", thick=WALL_T, inset=0.0):
+def edge_wall(E, L, reflex0, reflex1, prefab, top, name, cuts, layer="structure", thick=WALL_T, inset=0.0, plan=None,
+              corner=None):
     """A wall along one side, inside it, with openings cut out of it and a lintel over each: lengthened at a
-    reflex corner by its thickness, so the inside of the corner is closed."""
-    s0, s1 = -(thick + inset) if reflex0 else 0.0, L + ((thick + inset) if reflex1 else 0.0)
+    reflex corner as far in as it reaches (or `corner`), so the inside of the corner is closed. Which pieces there are
+    is decided as far in as the plan allows for (`plan`, WALL_T for an outer wall), so a wall thinner than that has the
+    same pieces and ids; a piece of the plan's reach its own does not reach is kept as a 2 cm end where it stops."""
+    reach = thick + inset if corner is None else max(thick + inset, corner)
+    plan = reach if plan is None else plan
+    p0, p1 = -plan if reflex0 else 0.0, L + (plan if reflex1 else 0.0)
+    s0, s1 = -reach if reflex0 else 0.0, L + (reach if reflex1 else 0.0)
     pieces = []
-    s = s0
+    s = p0
     for c0, c1, ctop in sorted(cuts):
         if c0 > s:
             pieces.append((s, c0, 0.0, top))
         if ctop < top:
-            pieces.append((c0, c1, ctop, top))
+            pieces.append((c0 - BEARING, c1 + BEARING, ctop, top))
         s = c1
-    if s < s1:
-        pieces.append((s, s1, 0.0, top))
+    if s < p1:
+        pieces.append((s, p1, 0.0, top))
     made = []
     for a0, a1, y0, y1 in pieces:
         if a1 - a0 < 0.02:
             continue
+        mid = (a0 + a1) / 2
+        a0, a1 = max(a0, s0), min(a1, s1)
+        if a1 - a0 < 0.02:
+            a0, a1 = (s1 - 0.02, s1) if mid > (s0 + s1) / 2 else (s0, s0 + 0.02)
         obox(prefab, E, a0, a1, inset, inset + thick, y0, y1, name=name, layer=layer)
         made.append((entities[-1], a0, a1, y0, y1))
     return made
@@ -2548,7 +2610,7 @@ def edge_for_run(edges, F, run, s, width, box=None):
     return best[2], best[3]
 
 
-WALLS = {"brick": "brick_wall", "siding": "siding_wall", "metal": "metal_wall", "concrete": "concrete_wall"}
+WALLS = {"brick": "brick_veneer_wall", "siding": "framed_siding_wall", "metal": "metal_wall", "concrete": "concrete_wall"}
 STATS = defaultdict(int)
 FOOTPRINTS = SpatialHash(40.0)  # every building's wall ring as built, for the surfaces laid along lines
 
@@ -2582,7 +2644,7 @@ def build(bd):
     if kind == "shed" or (detail <= 1 and kind in ("garage", "workshop", "barn", "outbuilding")):
         F = Frame(bd.cx, bd.cz, bd.angle)
         hgt = max(2.2, min(bd.height or 2.5, 6.0))
-        oform("siding_wall" if bd.area < 30 else "metal_wall", F, [F.l(x, z) for x, z in ring], 0.0, hgt, {"Kind": "Prism"},
+        oform("frame_shed" if bd.area < 30 else "metal_wall", F, [F.l(x, z) for x, z in ring], 0.0, hgt, {"Kind": "Prism"},
               name=name, layer="structure")
         if not _DROPPING[0]:
             FOOTPRINTS.add(ring, bd.x0, bd.x1, bd.z0, bd.z1)
@@ -2610,6 +2672,12 @@ def build(bd):
            "building": "brick" if h01(label, "walls") < float(PLACE.get("BrickShare", 0.55)) else "siding"}[kind]
     wall_prefab = WALLS[mat]
     roof_prefab = "metal_wall" if mat == "metal" else "shingle_roof"
+    # A house built room by room has its plasterboard as a sheet of its own: its walls stop at their studs.
+    board = kind in ("house", "mobile_home") and detail >= 2
+    if board:
+        wall_prefab = FRAMED.get(wall_prefab, wall_prefab)
+    wall_t = wall_thick(wall_prefab)
+    inner = wall_t + (BOARD_T if board else 0.0)      # the inside face, from the footprint
 
     # Where the street is, for which wall is the front.
     if a is not None and getattr(a, "g", None) is not None:
@@ -2773,24 +2841,27 @@ def build(bd):
 
     pieces = defaultdict(list)         # side of the ring -> [(entity, a0, a1, y0, y1, prefab, inset, thick, top, layer)]
     for k, (E, L, reflex0, reflex1) in enumerate(edges):
-        for pc in edge_wall(E, L, reflex0, reflex1, wall_prefab, wall_h, f"{name} {edge_word(E)} wall", cuts.get(k, [])):
-            pieces[k].append(pc + (wall_prefab, 0.0, WALL_T, wall_h, "structure"))
-        if homes and detail >= 2:
-            # Plaster on the inside of the outer wall: the membrane that takes the bass out of a room.
-            for pc in edge_wall(E, L, reflex0, reflex1, "plaster_wall", CEIL, f"{name} {edge_word(E)} wall",
-                                [(c0, c1, min(ct, CEIL)) for c0, c1, ct in cuts.get(k, [])], layer="interiors", thick=0.03, inset=WALL_T):
-                pieces[k].append(pc + ("plaster_wall", WALL_T, 0.03, CEIL, "interiors"))
+        for pc in edge_wall(E, L, reflex0, reflex1, wall_prefab, wall_h, f"{name} {edge_word(E)} wall", cuts.get(k, []), thick=wall_t,
+                            plan=PLAN_REACH[0], corner=CORNER_REACH):
+            pieces[k].append(pc + (wall_prefab, 0.0, wall_t, wall_h, "structure"))
+        if board:
+            # Plasterboard on the inside of the outer wall: the second leaf over its studs, and the membrane that takes
+            # the bass out of a room.
+            for pc in edge_wall(E, L, reflex0, reflex1, BOARD, CEIL, f"{name} {edge_word(E)} wall",
+                                [(c0, c1, min(ct, CEIL)) for c0, c1, ct in cuts.get(k, [])], layer="interiors", thick=BOARD_T, inset=wall_t,
+                                plan=PLAN_REACH[1]):
+                pieces[k].append(pc + (BOARD, wall_t, BOARD_T, CEIL, "interiors"))
 
     for (k, s, width, prefab, room, dname) in doors_out:
         E = edges[k][0]
-        x, z = E.w(s, WALL_T / 2)
+        x, z = E.w(s, inner / 2)
         rid, rxz = room
         outside = -1                      # the outdoors: yards and roads are names, not rooms
         if prefab != "garage":
             steps_out(E, s, width, dname)
         if prefab is None:
             # An open doorway: the gap is the opening, to the outdoors.
-            portal_later(x, z, E.a, width, FLOOR_TOP, DOOR_TOP, WALL_T, rid, outside)
+            portal_later(x, z, E.a, width, FLOOR_TOP, DOOR_TOP, inner, rid, outside)
             continue
         if prefab == "garage":
             # A sectional door, shut: a steel panel in the opening.
@@ -2813,7 +2884,7 @@ def build(bd):
     for (k, s, width, prefab, room, dname) in doors_out:
         if prefab != "garage":
             ways.append((room[0], -1, width))
-    side_doors(bd, name, F, edges, walk_rooms, ways, pieces, facing_edge)
+    side_doors(bd, name, F, edges, walk_rooms, ways, pieces, facing_edge, inner)
 
 
 def room_for_point(ids, F, run, s):
@@ -2939,7 +3010,7 @@ def reshape(e, F, u0, u1, v0, v1, y0, y1):
     e["_box"] = (F, u0, u1, v0, v1, y0, y1)
 
 
-def side_doors(bd, name, F, edges, rooms, ways, pieces, facing_edge):
+def side_doors(bd, name, F, edges, rooms, ways, pieces, facing_edge, depth):
     """A door to the outdoors for every room no way wide enough for a body reaches from outside: a part of a footprint
     joined to the rest by less than a body's width, or not at all, or a garage whose only door in was cut from a
     stretch of partition too short for one (Magnolia and Albany, 2026-10-10: eight such rooms no one could walk into).
@@ -2993,9 +3064,9 @@ def side_doors(bd, name, F, edges, rooms, ways, pieces, facing_edge):
                 continue
             reshape(e, E, a0, c0, inset, inset + thick, 0.0, top)
             head = min(head_over("door"), top)
-            later.append((prefab, E, c0, c1, inset, inset + thick, head, top, e["Name"], layer))
+            later.append((prefab, E, c0 - BEARING, c1 + BEARING, inset, inset + thick, head, top, e["Name"], layer))
             later.append((prefab, E, c1, a1, inset, inset + thick, 0.0, top, e["Name"], layer))
-        x, z = E.w(at, WALL_T / 2)
+        x, z = E.w(at, depth / 2)
         rxz = F.w((box[0] + box[1]) / 2, (box[2] + box[3]) / 2)
         dname = f"{name} side door"
 
@@ -3012,11 +3083,11 @@ def side_doors(bd, name, F, edges, rooms, ways, pieces, facing_edge):
 def same_pieces(edges, a, b, width, taken):
     """Whether a door at `b` (side of the ring, s along it) leaves its wall in the pieces a door at `a` does: the same
     side, one no other outside door is on, and a piece of wall (and of its plaster) on each side of it, or none,
-    alike (edge_wall)."""
+    alike (edge_wall), each lengthened at a reflex corner as far in as it reaches."""
     if a[0] != b[0] or a[0] in taken:
         return False
     E, L, reflex0, reflex1 = edges[a[0]]
-    for thick in (WALL_T, WALL_T + 0.03):
+    for thick in PLAN_REACH:
         start, end = (-thick if reflex0 else 0.0), L + (thick if reflex1 else 0.0)
         if ((a[1] - width / 2 - start >= 0.02) != (b[1] - width / 2 - start >= 0.02)
                 or (end - (a[1] + width / 2) >= 0.02) != (end - (b[1] + width / 2) >= 0.02)):
@@ -3405,8 +3476,8 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two, edges):
                 # Too short a stretch of partition for a door a body goes through (a garage's into the kitchen was 0.28
                 # m): the gap is walled up, in the leaf's place in the order, and the room is given a way elsewhere.
                 inner.append(lambda line=line, sm=sm, wdt=wdt, axis=axis, i=i:
-                             obox("plaster_wall", F, *((line - PART_T / 2, line + PART_T / 2, sm - wdt / 2, sm + wdt / 2) if axis == "u"
-                                                       else (sm - wdt / 2, sm + wdt / 2, line - PART_T / 2, line + PART_T / 2)),
+                             obox(PARTITION, F, *((line - PART_BUILD / 2, line + PART_BUILD / 2, sm - wdt / 2, sm + wdt / 2) if axis == "u"
+                                                       else (sm - wdt / 2, sm + wdt / 2, line - PART_BUILD / 2, line + PART_BUILD / 2)),
                                   0.0, head_over("door"), name=f"{label} {names[i]} wall", layer="interiors"))
             elif kind_ == "door":
                 ri = order.index(names[i]) if names[i] in order else 99
@@ -3418,9 +3489,9 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two, edges):
             else:
                 inner.append(lambda x=x, z=z, phi=phi, i=i, j=j, wdt=wdt:
                              portal(x, z, phi, wdt, FLOOR_TOP, DOOR_TOP, PART_T, ids[i], ids[j]))
-        # thickness PART_T centred on the line
-        wall_run(F, (axis, line + PART_T / 2, s0, s1, 1), "plaster_wall", CEIL, f"{label} {names[i]} wall", cut,
-                 layer="interiors", thick=PART_T)
+        # the partition as thick as it is built, centred on the line
+        wall_run(F, (axis, line + PART_BUILD / 2, s0, s1, 1), PARTITION, CEIL, f"{label} {names[i]} wall", cut,
+                 layer="interiors", thick=PART_BUILD)
 
     return {"doors": doors_out, "inner": inner, "boxes": dict(zip(ids, inner_rects)),
             "rects": [(rid, r[1]) for rid, r in zip(ids, rooms)], "label": label, "walk": walk}

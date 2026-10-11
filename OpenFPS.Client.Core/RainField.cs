@@ -699,7 +699,7 @@ public sealed class RainSurvey
             BayB = MathF.Min(RainSurfaces.BuiltBayMetres, mid),
             Solid = true,
             Size = size,
-            Build = new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres),
+            Build = def.Acoustics.Build,
         });
     }
 

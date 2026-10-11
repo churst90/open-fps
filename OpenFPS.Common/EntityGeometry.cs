@@ -64,7 +64,7 @@ public static class EntityGeometry
         var a = def.Acoustics;
         bool emitter = !string.IsNullOrEmpty(def.SoundEmitter.SoundId);
         var surface = SurfaceOf(def.Material.Material, def.Collider.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow,
-                                a.ShellThickness, a.Absorption, emitter, moves: false, doorLeaf: role == GeometryRole.Mover);
+                                a.ShellThickness, a.Absorption, emitter, moves: false, doorLeaf: role == GeometryRole.Mover, assembly: a.Assembly);
         if (role == GeometryRole.SightOnly) surface = SightOnly(surface);
         if (def.Collider.Shape == Components.ColliderShape.Terrain)
             return def.Terrain is { Posts: >= 2 } terrain ? TerrainSpec(def.EntityId, transform.Position, terrain, surface) : default;
@@ -88,7 +88,7 @@ public static class EntityGeometry
     /// </summary>
     public static Surface SurfaceOf(string? material, Vector3 size, float leafMetres, float studSpacingMetres,
                                     bool hollow, float shellThickness, float absorption, bool emitter, bool moves,
-                                    bool doorLeaf)
+                                    bool doorLeaf, int assembly = 0)
     {
         // Kept empty when empty: some queries read that as "Generic", some pass it on.
         var mat = material ?? "";
@@ -99,7 +99,7 @@ public static class EntityGeometry
         if (AcousticRegistry.IsLeaves(mat)) flags |= SurfaceFlags.Foliage;
         if (doorLeaf) flags |= SurfaceFlags.DoorLeaf;
         if (hollow) flags |= SurfaceFlags.Hollow;
-        return new Surface(mat, new Construction(size, new WallBuild(leafMetres, studSpacingMetres), shellThickness),
+        return new Surface(mat, new Construction(size, new WallBuild(leafMetres, studSpacingMetres, assembly), shellThickness),
                            layers, flags, absorption);
     }
 }

@@ -129,6 +129,14 @@ public static class PrefabValidator
             r.Errors.Add($"LeafMetres {t.LeafMetres} cannot be negative.");
         if (t.StudSpacingMetres is < 0)
             r.Errors.Add($"StudSpacingMetres {t.StudSpacingMetres} cannot be negative.");
+        if (t.Assembly != null)
+        {
+            if (OpenFPS.Common.Assemblies.Named(t.Assembly) == null)
+                r.Errors.Add($"Assembly '{t.Assembly}' is not in the table (Assemblies): "
+                             + string.Join(", ", OpenFPS.Common.Assemblies.All.Select(a => a.Name)) + ".");
+            if (t.LeafMetres.HasValue || t.StudSpacingMetres.HasValue)
+                r.Errors.Add("Assembly and LeafMetres or StudSpacingMetres both set: an assembly's plies say how it is built. Keep one.");
+        }
 
         if (t.FaceMask.HasValue && t.MissingFaces != null)
             r.Errors.Add("FaceMask and MissingFaces both set — they describe the same thing and MissingFaces silently wins. Keep one.");

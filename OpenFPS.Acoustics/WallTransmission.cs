@@ -201,6 +201,12 @@ public static class WallTransmission
     /// <summary>A panel <paramref name="t"/> thick with a face <paramref name="a"/> by <paramref name="b"/>.</summary>
     private static (float Low, float Mid, float High) BandGains(MaterialProperties p, float t, float a, float b, WallBuild build)
     {
+        if (Assemblies.Get(build.Assembly) is { } assembly)
+        {
+            var plies = new List<Layer>(assembly.Plies.Count);
+            Assemblies.Append(assembly, t, false, plies);
+            return LayeredBandGains(plies, a, b);
+        }
         if (p.Porous || p.DensityKgM3 <= 0f || t <= 0f)
             return (p.TransmissionLow, p.TransmissionMid, p.TransmissionHigh);
         float flank = 1f + FlankingShare(a, b);
@@ -216,6 +222,12 @@ public static class WallTransmission
     /// <summary>The direct path's transmitted energy fraction at one frequency.</summary>
     private static float DirectTau(MaterialProperties p, float t, float faceA, float faceB, WallBuild build, float hz)
     {
+        if (Assemblies.Get(build.Assembly) is { } assembly)
+        {
+            var plies = new List<Layer>(assembly.Plies.Count);
+            Assemblies.Append(assembly, t, false, plies);
+            return LayeredTau(plies, faceA, faceB, hz);
+        }
         float e = p.YoungsModulusGPa * 1e9f, rho = p.DensityKgM3, eta = p.LossFactor;
         float leaf = build.LeafMetres;
         float r;
@@ -246,15 +258,51 @@ public static class WallTransmission
     // rule); fc = c^2 / (1.8 sqrt(12 D / m)). A porous layer on an airtight one adds its weight and its
     // stiffness and no holes: the plate seals it. A two-leaf layer (a stud partition) keeps its cavity: the
     // layers on either side join the leaf they touch, and the two leaves follow Sharp's double-leaf law,
-    // each with its own mass and critical frequency. Nothing airtight at all (a hedge against a fence),
+    // each with its own mass and critical frequency. A layer softer than the air in it that lets air through
+    // (glass-fibre batts between studs, the air space behind a brick veneer: IsCavity), with airtight layers
+    // on both sides, is a cavity the same way: the layers before it are one leaf, those after it the next,
+    // bridged by the studs it is built between. An assembly (Assemblies) is its plies laid out so, in the
+    // order the line crosses them. Nothing airtight at all (a hedge against a fence),
     // and each layer lets through what its holes let through, in a row.
 
     /// <summary>One layer of a construction: what it is made of, how much of it is crossed (its thickness
-    /// where it does not overlap the layer before) and how it is built.</summary>
-    public readonly record struct Layer(MaterialProperties Props, float Thickness, WallBuild Build);
+    /// where it does not overlap the layer before) and how it is built. An assembly's plies are crossed from
+    /// the face its thickness axis points away from, or the other way when <paramref name="Reversed"/>.</summary>
+    public readonly record struct Layer(MaterialProperties Props, float Thickness, WallBuild Build, bool Reversed = false);
 
     /// <summary>Whether a material stops air: dense and not porous.</summary>
     public static bool Seals(in MaterialProperties p) => !p.Porous && p.DensityKgM3 > 0f;
+
+    /// <summary>The air's own stiffness, its adiabatic bulk modulus rho c^2, Pa (about 142 kPa).</summary>
+    public const float AirBulkModulusPa = AirDensity * SoundSpeed * SoundSpeed;
+
+    /// <summary>
+    /// Whether a layer is a cavity between the layers either side of it rather than a ply bonded to them: it lets
+    /// air through and is softer than the air in it (glass-fibre batts, an open-cell foam, the air itself), so what
+    /// couples the boards either side is the air's stiffness and not its own. Soil, snow and carpet are stiffer than
+    /// air and bond (or, at a construction's face, add their weight as before).
+    /// </summary>
+    public static bool IsCavity(in MaterialProperties p) => !Seals(p) && p.YoungsModulusGPa * 1e9f < AirBulkModulusPa;
+
+    /// <summary>A layer's weight on a square metre, kg: an assembly's plies', or its own.</summary>
+    public static float MassPerArea(in MaterialProperties p, float thickness, WallBuild build)
+        => Assemblies.Get(build.Assembly) is { } a ? Assemblies.MassPerArea(a, thickness) : p.DensityKgM3 * thickness;
+
+    /// <summary>The layers with every assembly among them laid out as its plies, in the order crossed; the same
+    /// list when there is none.</summary>
+    private static IReadOnlyList<Layer> Plies(IReadOnlyList<Layer> layers)
+    {
+        bool any = false;
+        foreach (var l in layers) if (l.Build.Assembly != 0) { any = true; break; }
+        if (!any) return layers;
+        var plies = new List<Layer>(layers.Count + 4);
+        foreach (var l in layers)
+        {
+            if (Assemblies.Get(l.Build.Assembly) is { } a) Assemblies.Append(a, l.Thickness, l.Reversed, plies);
+            else plies.Add(l);
+        }
+        return plies;
+    }
 
     /// <summary>
     /// What layers in contact let through, per mixer band, as amplitude gains (the convention of
@@ -269,6 +317,7 @@ public static class WallTransmission
             var only = layers[0];
             return BandGains(only.Props, only.Thickness, faceA, faceB, only.Build);
         }
+        layers = Plies(layers);
         if (!Airtight(layers))
         {
             float gl = 1f, gm = 1f, gh = 1f;
@@ -293,6 +342,7 @@ public static class WallTransmission
     /// (for a single layer, <see cref="BoxLossDb"/>).</summary>
     public static float LayeredLossDb(IReadOnlyList<Layer> layers, float faceA, float faceB, float hz)
     {
+        if (layers.Count > 1) layers = Plies(layers);
         float tau = layers.Count == 1
             ? DirectTau(layers[0].Props, layers[0].Thickness, faceA, faceB, layers[0].Build, hz)
             : LayeredTau(layers, faceA, faceB, hz);
@@ -344,11 +394,40 @@ public static class WallTransmission
         var leaves = new List<Leaf>(2);
         var cavities = new List<(float Depth, float Bridge)>(1);
         var plies = new List<(float E, float Rho, float Eta, float T)>(layers.Count);
-        foreach (var l in layers)
+        // A cavity needs something airtight on both sides of it: the last airtight layer, and whether the leaf
+        // being gathered has any yet.
+        int lastSeal = -1;
+        for (int i = 0; i < layers.Count; i++) if (layers[i].Thickness > 0f && Seals(layers[i].Props)) lastSeal = i;
+        bool leafSeals = false, inCavity = false;
+        for (int i = 0; i < layers.Count; i++)
         {
+            var l = layers[i];
             var p = l.Props;
             float t = l.Thickness;
-            if (t <= 0f || p.DensityKgM3 <= 0f) continue;
+            if (t <= 0f) continue;
+            // Without studs the leaves meet at the panel's edges, its narrower span apart.
+            float bridge = l.Build.StudSpacingMetres > 0f ? l.Build.StudSpacingMetres : MathF.Min(faceA, faceB);
+            if (IsCavity(p) && i < lastSeal && (inCavity || (leafSeals && t >= MinCavityMetres)))
+            {
+                // Between two leaves: a cavity as deep as this layer. Two such layers together are one cavity,
+                // bridged as closely as either is.
+                if (inCavity)
+                {
+                    var (d, b) = cavities[^1];
+                    cavities[^1] = (d + t, MathF.Min(b, bridge));
+                }
+                else
+                {
+                    leaves.Add(Leaf.Of(plies));
+                    plies.Clear();
+                    cavities.Add((t, bridge));
+                    inCavity = true;
+                    leafSeals = false;
+                }
+                continue;
+            }
+            if (p.DensityKgM3 <= 0f) continue;
+            inCavity = false;
             float e = p.YoungsModulusGPa * 1e9f;
             float leaf = l.Build.LeafMetres;
             if (Seals(p) && leaf > 0f && t >= 2f * leaf + MinCavityMetres)
@@ -356,11 +435,11 @@ public static class WallTransmission
                 plies.Add((e, p.DensityKgM3, p.LossFactor, leaf));
                 leaves.Add(Leaf.Of(plies));
                 plies.Clear();
-                // Without studs the leaves meet at the panel's edges, its narrower span apart.
-                cavities.Add((t - 2f * leaf, l.Build.StudSpacingMetres > 0f ? l.Build.StudSpacingMetres : MathF.Min(faceA, faceB)));
+                cavities.Add((t - 2f * leaf, bridge));
                 plies.Add((e, p.DensityKgM3, p.LossFactor, leaf));
             }
             else plies.Add((e, p.DensityKgM3, p.LossFactor, t));
+            if (Seals(p)) leafSeals = true;
         }
         if (plies.Count > 0) leaves.Add(Leaf.Of(plies));
         if (leaves.Count == 0) return 1f;

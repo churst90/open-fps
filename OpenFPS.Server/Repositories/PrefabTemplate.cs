@@ -127,6 +127,11 @@ public class PrefabTemplate
     /// standard framing). Absent when the leaves meet only at the edges of the panel.</summary>
     public float? StudSpacingMetres { get; set; }
 
+    /// <summary>A wall of several stuffs, by name from the acoustics' table (Assemblies): "WoodFrameSiding" is lap
+    /// siding, sheathing, a stud cavity of glass fibre and plasterboard. Its plies run across the box from the face
+    /// its thickness axis points away from; the prefab's material is its face. Absent for one stuff.</summary>
+    public string? Assembly { get; set; }
+
     /// <summary>Which faces exist, as a bit mask: North 1, South 2, East 4, West 8, Top 16, Bottom 32
     /// (63 = closed box). Mutually exclusive with <see cref="MissingFaces"/> — set one or the other.</summary>
     public int? FaceMask { get; set; }

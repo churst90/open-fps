@@ -826,7 +826,7 @@ public class WorldBuildingsTests : IDisposable
         int houses = tiles.Sum(t => t.Entities.Count(x => x.Layer == "rooms"));
         int doors = tiles.Sum(t => t.Entities.Count(x => x.PrefabId is "door" or "glass_pull_door"));
         int solids = tiles.Sum(t => t.Entities.Count(x => x.Layer == "structure" && x.Name != null && !x.Name.Contains(" wall") && !x.Name.EndsWith(" floor")
-                                                        && !x.Name.EndsWith(" roof") && !x.Name.EndsWith(" ceiling") && x.PrefabId is "metal_wall" or "siding_wall"));
+                                                        && !x.Name.EndsWith(" roof") && !x.Name.EndsWith(" ceiling") && x.PrefabId is "metal_wall" or "frame_shed"));
         var sizes = keys.Select(k => new FileInfo(Path.Combine(service.Store.Root, "tiles", "v" + WorldStore.GeneratorVersion, k.RelativePath, "full.json.gz")).Length).OrderBy(s => s).ToList();
         long cache = Directory.EnumerateFiles(overtureCache, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
         var names = tiles.SelectMany(t => t.Entities).Where(x => x.Layer == "rooms").Select(x => x.Name).Distinct().Take(12).ToList();
@@ -851,6 +851,17 @@ public class WorldBuildingsTests : IDisposable
         }
         _o.WriteLine($"{floorRooms} rooms, every floor on a structure");
         Assert.True(floorRooms > 50);
+
+        // Every wall is framed (FramedWalls): cladding, sheathing, studs and plasterboard, the cladding facing out.
+        int framed = 0, sheds = 0;
+        foreach (var t in tiles)
+        {
+            var fw = FramedWalls.Check(t.Entities, PrefabRepo.Prefabs);
+            framed += fw.Outer; sheds += fw.Sheds;
+            Assert.True(fw.Bad.Count == 0, $"{fw.Bad.Count} walls not framed: " + string.Join("; ", fw.Bad.Take(5)));
+        }
+        _o.WriteLine($"{framed} outside walls framed, {sheds} sheds");
+        Assert.True(framed > 200, $"{framed} outside walls");
 
         // Nothing laid along a line enters a building (SurfacesClear), across the nine tiles in one frame: a piece is
         // stored by the tile its middle is in and a building by the tile its own middle is in.
