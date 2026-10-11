@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
+    <!-- The sun and the moon (docs/SKY.md): nothing else references it yet. -->
+    <ProjectReference Include="..\OpenFPS.Astronomy\OpenFPS.Astronomy.csproj" />
     <ProjectReference Include="..\OpenFPS.Client.Core\OpenFPS.Client.Core.csproj" />
     <!-- The map/prefab loaders live in the server. Referenced so the portal pipeline can be tested
          against the real shipped data rather than a hand-built stand-in. -->

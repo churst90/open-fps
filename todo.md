@@ -534,6 +534,9 @@ docs/WORLD_STREAMING.md, stage 2 as built.
 - Real weather for real places: designed (docs/REAL_WEATHER.md, 2026-10-10): Open-Meteo for the conditions,
   METAR to correct them near the ground; the clock decided 2026-10-11 (real local time); six decisions open
   (Decisions, above). With weather as a system (Next, in order, item 7).
+- The sun and the moon for the player (Cody, 2026-10-11; docs/SKY.md): the calculations and the sentence
+  are built (`OpenFPS.Astronomy`). The readout key and `/sky` come with the weather's clock, in
+  docs/REAL_WEATHER.md stage 1: they need the world's real local time and each place's zone.
 - Traffic volumes from published counts (average daily traffic by road), with time-of-day curves.
 
 ### Map editor

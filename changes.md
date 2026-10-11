@@ -49,7 +49,27 @@ Recent work, newest first. `git log` has the rest.
     417 before, 400 and 500 after in the stairwell.
   - Where to listen: `/tp -10.8 -104.2 3.28` (floor 1 stairwell, Dock Street through the front), `/tp -6.4
     -103.5 0.12` (the pavement before the entrance, Wharf Avenue over the roofs).
-
+- Where the sun and the moon are, calculated, not yet said in the game (docs/SKY.md). A new project,
+  `OpenFPS.Astronomy`, with no dependencies: the sun by NOAA's solar position equations (position with
+  refraction, rise, set, solar noon, civil, nautical and astronomical twilight), the moon by Meeus's lunar series
+  with topocentric parallax (position, rise, set, phase angle, lit share, waxing or waning, the eight phase
+  names, the instants of the four phases), and the sentence the readout key and `/sky` will say: "The sun west
+  south west, twenty degrees up, sets in an hour and ten minutes; the moon ...". Polar day and night give no
+  rise or set, never NaN. Checked against the Naval Observatory and NOAA's solar calculator for Magnolia,
+  Albany and Tromsø, every rise, set and twilight of 2026 among them. The key and `/sky` come with the
+  weather's clock.
+- One table of model kinds (part P2 of docs/SPECIAL_CASES_AUDIT.md), no change heard. `ModelKindTable` in the
+  sound library says, for any sound id, which kind of model it is, what synth makes it, how it moves (fixed,
+  walks, rolls, flies, rails), its level and size, its headroom and its places. The level and headroom
+  lookups, the voice factory, the places, the editor, the scope, the footsteps and the sixteen "is it a
+  vehicle" tests read it instead of each keeping its own list of prefixes, so a new kind cannot be silent in
+  one of them as the crossing bell was. A model that will not load is logged once by id instead of dropped
+  without a word, and a test loads every shipped map and prefab and checks each synthesised sound resolves
+  (they all do). The push mower says it is walked behind (`WalkedBehind`) instead of being named in the
+  footstep code. All eight replay streams and the render fingerprints are unchanged.
+- Nothing of a room is authored any more (docs/GEOMETRY.md 12.6, "Nothing authored of a room"): a prefab has no
+  RoomSize, RoomMaterials or ReverbScale, and the editor no face materials. A region is the box its collider fills;
+  a room's shape and what lines it come from its walls. No map changed and no sound.
 - State kept by entity id alone is kept by map as well, unheard. Every map is its own world and entity ids start
   again in each, so the server, which steps city, speedway, the real places and the world's frames together,
   shared state between a thing on one map and whatever had the same id on another. Found and fixed:
