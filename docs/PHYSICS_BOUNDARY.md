@@ -1099,7 +1099,14 @@ member named, the member it is named in). By file: `OpenFPS.Sound/VehicleSpec.cs
   the projects' own pages: Jolt Physics (MIT) lists soft bodies (a soft ball, cloth), ragdolls, wheeled and
   tracked vehicles, a full set of constraints, height-field terrain and triangle meshes, deterministic
   simulation, and x64 and ARM64 on Windows and Linux; JoltPhysicsSharp (MIT) binds it for .NET 9 and 10.
-  BepuPhysics v2 (Apache-2.0, pure C#) lists no soft bodies. Which engine is open with Cody (see below).
+  BepuPhysics v2 (Apache-2.0, pure C#) lists no soft bodies.
+- **The engine: Jolt Physics through JoltPhysicsSharp** (Cody: "yes record that"). Jolt solves rigid and soft
+  bodies, joints and contacts inside `OpenFPS.Physics`, behind our own types: nothing outside Physics sees
+  Jolt. Ours stays ours: the geometry (our BVH and Embree are the truth; each tile's shapes are handed to Jolt
+  as they are to Steam Audio, and kept in step), the approved walk, the tyre model, ballistics, air and wind,
+  fire, water, and every contact turned into a heard impact. The native library ships as FMOD's and Steam
+  Audio's do (OpenFPS.Native). Stage 0 measures its cost and its soft bodies in our scenes before anything
+  depends on it.
 - **Gravity is a property of the world** ("adjusting the gravity as a property of the world will effect
   everything on the world"): one value per world, 9.80665 m/s² by default, read by everything that falls,
   rolls, flies, sloshes or sways (players, bodies, vehicles, projectiles, water, fire's buoyant plume,
