@@ -1,0 +1,6 @@
+from_type	to_type	count
+OpenFPS.Common.ExternalBallistics	OpenFPS.Common.WeaponDefinition	12
+OpenFPS.Common.Gearbox	OpenFPS.Common.Editing.TunableAttribute	15
+OpenFPS.Common.SharedMovementEngine	OpenFPS.Common.Components.ColliderShape	5
+OpenFPS.Common.VehicleChassisSpec	OpenFPS.Common.Editing.TunableAttribute	28
+OpenFPS.Common.WheelDynamics	OpenFPS.Common.RoadWaterLaw	2

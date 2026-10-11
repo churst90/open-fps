@@ -37,3 +37,9 @@ through the open front door, along the east wall, and after streaming in from th
 server was not refusing moves there, and the stall was not reproduced. The client log has the body at the
 house's walls (C read 0.3 m off their faces, a body's radius) in the trench the floor's grading digs round
 the house, 0.25 m below the lawn. `room=` turns a room's id into a /tp spot (docs/LISTENING_SPOTS.md).
+
+Its machinery became physics stage 0's movement replay (docs/PHYSICS_BOUNDARY.md section 14): nineteen stored
+walks, each step taken from the server's state on both sides so a parting shows on the tick it happens.
+`--physics-replay` prints them with the three parity risks, and the drives, traffic, trains and ballistics
+table beside them; `--physics-parity` sweeps the same questions over thousands of standing points;
+`--jolt-trial` measures Jolt Physics in our scenes.

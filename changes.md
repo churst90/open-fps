@@ -58,6 +58,20 @@ Recent work, newest first. `git log` has the rest.
   rise or set, never NaN. Checked against the Naval Observatory and NOAA's solar calculator for Magnolia,
   Albany and Tromsø, every rise, set and twilight of 2026 among them. The key and `/sky` come with the
   weather's clock.
+- Physics stage 0, the guards (docs/PHYSICS_BOUNDARY.md section 14), no game code changed. A ratchet on what
+  the physics types reference (`PhysicsBoundaryTests`, 62 crossings, as the survey found); nineteen walks on the
+  city and Magnolia through the server's movement and the client's prediction, each track stored and the gap
+  held to 1 mm (`MovementReplayTests`); four drives, a minute of the city's traffic and ninety seconds of its
+  trains stored as state tracks (`DrivingReplayTests`, `RailReplayTests`); a ballistics table for every weapon
+  (`BallisticsTableTests`); `--physics-parity`, old path against new over thousands of standing points. Of
+  the survey's three parity risks one parts the two sides today: standing on a parked car (anything that
+  moves), the server stands you on its roof and the client lets you fall a centimetre a tick toward the road.
+  The ground memo and the two ways of gathering obstacles made no gap in any walk.
+- The Jolt trial in AudioLab (`--jolt-trial`, JoltPhysicsSharp 2.22.0, MIT): our city tile as a mesh and
+  Magnolia's ground as a height field go in unchanged (balls rest on our own floor), 500 bodies step in about
+  0.2 ms at 120 Hz on one thread, a stack of ten boxes sleeps, linear cast stops a bullet-sized sphere at a
+  10 cm wall, a soft ball and a cloth rest on the ground. Runs on Linux x64 with `libjoltc.so`. Its binding's
+  `BodyCreationSettings.MotionQuality` is broken in that version (worked round in the lab). No game code uses it.
 - One table of model kinds (part P2 of docs/SPECIAL_CASES_AUDIT.md), no change heard. `ModelKindTable` in the
   sound library says, for any sound id, which kind of model it is, what synth makes it, how it moves (fixed,
   walks, rolls, flies, rails), its level and size, its headroom and its places. The level and headroom

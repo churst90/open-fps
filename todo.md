@@ -66,8 +66,12 @@ since the last deploy" list below.
    (geometry, acoustics, sound, physics, the world and its generators, networking, the client UI) its own
    project with stated dependencies and no reach into the host.
 4. The physics stages, with geometry stage 6 (vehicles and bodies in the acoustic scene: docs/GEOMETRY.md
-   section 7, "Bodies and wheels" stage 2 below). Stage 0, the guards (a ratchet, a movement replay from
-   `--walk-pair`, driving and traffic replays, the ballistics table, a parity harness), is under way. Physics
+   section 7, "Bodies and wheels" stage 2 below). Stage 0 DONE 2026-10-11 (PHYSICS_BOUNDARY.md section 14):
+   the guards (a ratchet, 19 movement replays server against client, driving, traffic and rail tracks, the
+   ballistics table, `--physics-parity`) and the Jolt trial (a city tile as one mesh in 11 to 19 ms, 500
+   bodies at 0.21 ms a step, the soft ball and cloth rest and drape). Found: standing on a parked car the
+   server's floor is the roof and the client's the road (a 40 mm known gap); JoltPhysicsSharp 2.22.0's
+   `BodyCreationSettings.MotionQuality` setter does not reach the native side. Next: stage 1. Physics
    stage 4 (rigid and soft bodies) goes with geometry stage 6, so each body's shape is made once for
    collision and for the acoustic scene (PHYSICS_BOUNDARY.md section 8). Air moved by passing things, leaf
    litter and impacts that pass on momentum ("Next", below) are physics stages 4 and 5.

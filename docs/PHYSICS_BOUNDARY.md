@@ -36,6 +36,7 @@ stages come after the special-cases audit's parts.
 11. Decisions for Cody
 12. What was not measured
 13. Appendices: the inventory, the crossings, the presets' members
+14. Stage 0 as built (2026-10-11): the guards and the Jolt trial
 
 ---
 
@@ -668,7 +669,7 @@ changes one is finished only when the change is the one intended and its commit 
 
 | Stage | What | Sessions | Main risk |
 |---|---|---:|---|
-| 0 | Guards: the ratchet, the movement replay, the driving and traffic replays, the ballistics table, the parity harness | 1.5 to 2 | the driving replay depends on statics (the thread-static map id) |
+| 0 | Guards: the ratchet, the movement replay, the driving and traffic replays, the ballistics table, the parity harness; the Jolt trial. **Built 2026-10-11, section 14** | 1.5 to 2 | the driving replay depends on statics (the thread-static map id) |
 | 1 | `OpenFPS.Physics`; move what moves whole; the four crossing fixes; the wire hash covers it | 1.5 to 2 | the engine render fingerprint moves with `Gearbox` |
 | 2 | Split the presets and the mixed types; one law per law | 2 to 3 | approved sound depends on the sound's half reading the same numbers |
 | 3 | The state types; one world view both sides fill; the parity divergences; contact events; `DrivingSystem`'s mechanics into a vehicle step | 3 to 4 | movement parity |
@@ -679,7 +680,7 @@ changes one is finished only when the change is the one intended and its commit 
 
 A session is one working session of an agent, as in docs/GEOMETRY.md.
 
-### Stage 0: guards (1.5 to 2 sessions)
+### Stage 0: guards (1.5 to 2 sessions; built 2026-10-11, section 14)
 
 - **Ratchet** (`PhysicsBoundaryTests`, beside `LibraryBoundaryTests` and on its machinery): a checked-in
   list of physics files and the allowance of `physics_crossings.tsv` (62 now). Fails on a new reference from
@@ -1112,6 +1113,231 @@ member named, the member it is named in). By file: `OpenFPS.Sound/VehicleSpec.cs
   DefaultTrackOverWidth, FrontRollStiffnessShare, FrontWeightShare, Groups, LockFromTurningCircle,
   MaxSteerAngleRad, YawInertiaIndex. By both: Axles, CentreOfGravityZ. By the sound only: Default, MainBrake,
   PlacedOn, SteeredTyres.
+
+## 14. Stage 0 as built (2026-10-11): the guards and the Jolt trial
+
+Built on main `13ae8b27`. No game code changed: the guards are tests in OpenFPS.Tests with their stored data in
+`OpenFPS.Tests/PhysicsBoundary/`, and the instruments are in AudioLab. The walks, drives, traffic, trains and
+ballistics are produced by one rig, `OpenFPS.AudioLab/Spikes/PhysicsReplays*.cs`, which the tests compile in as
+they do `DistantUpdatesRig`, so the lab and the tests run the same code. All of it runs on GitHub Actions with
+the rest of the suite; none of it needs FMOD, Steam Audio or Jolt.
+
+### 14.1 The ratchet: `PhysicsBoundaryTests`
+
+- `types.tsv` is the survey's sorting of every inventory type into P, PS, V and G (from
+  `tools/physics_boundary/classify.py`, `RULES`; the server's `DrivingSystem` is left out, nothing in the
+  sorted projects can reach it).
+- `NoNewCrossings` binds the same compilation as `LibraryBoundaryTests` (Common, Client.Core, Geometry,
+  Acoustics, Sound, Native, Audio) and counts, in the declarations of every P and V type, each name that binds
+  to a repository type outside P, PS, V, G and OpenFPS.Geometry, keyed by the two types. Each count must equal
+  its line in `allowed.tsv`. It finds what the survey found, line for line: 62 in five pairs
+  (`VehicleChassisSpec` to `TunableAttribute` 28, `Gearbox` to `TunableAttribute` 15, `ExternalBallistics` to
+  `WeaponDefinition` 12, `SharedMovementEngine` to `ColliderShape` 5, `WheelDynamics` to `RoadWaterLaw` 2).
+- Keyed by type rather than file, so stage 1's moves need no change to it.
+- `EverySortedTypeIsFound`: a renamed or moved type cannot drop out of the count unseen.
+  `TheAllowanceIsNoMoreThanTheSurveyFound`: the sum never goes above 62.
+- After stage 1 it gains the assembly test of section 9 (`OpenFPS.Physics` references the runtime and
+  Geometry only).
+- Cost: about 3 s.
+
+### 14.2 The movement replay: `MovementReplayTests`
+
+Nineteen walks (`PhysicsReplays.Walks`), each a script of keys from one spot:
+
+| Walk | Map | What |
+|---|---|---|
+| `city_street_held`, `city_street_sprint` | city | W held, and a sprint, along the plaza from the spawn |
+| `city_street_taps`, `city_strafe_taps` | city | twelve taps of W; taps of A, D and S (one tap is one tick, 15 cm) |
+| `city_kerb` | city | off the 7 cm kerb onto Foundry Street and back up it |
+| `city_jump` | city | a running jump, then a standing one |
+| `city_doorway_lobby` | city | in through Brandt Court's front door, across the lobby, through the stairwell door (both opened at load) |
+| `city_stairs_up`, `city_stairs_down` | city | Brandt Court's first flight, nineteen steps, both ways |
+| `city_roof_fall` | city | off Brandt Court's west side at roof height, eighteen metres down |
+| `city_parked_car` | city | standing on a parked car (a moving box) and walking off its end |
+| `city_bus_side`, `city_two_cars` | city | into the side of a standing bus and along it; along two parked cars nose to tail |
+| `magnolia_spawn_held`, `magnolia_spawn_taps` | Magnolia | held and tapped over the ground from the spawn |
+| `magnolia_slope_up`, `magnolia_slope_down` | Magnolia | the steepest smooth ground near the spawn (7 %, found by `--physics-replay hills`), up held, down tapped then running |
+| `magnolia_house`, `magnolia_barn` | Magnolia | about the house at 19617 and the barn at 19415 Turtle Dove Lane |
+
+How a walk is taken:
+
+- The server's side is `MovementSystem.Update` with a real session and queued inputs, the body made as a
+  login makes it (a solid cylinder, indexed), the moving things filed again in the grid each tick as
+  `Program.cs` does.
+- The client's side is `ClientPhysicsSystem.Predict` over the client's world as a streamed client holds it
+  standing at the start: the tiles `TileStreamer.Begin` sends there, and the moving things' definitions.
+- Each tick the client starts from the server's state, as the reconciler replays from it, so the gap is what
+  one step on each side makes of the same body.
+- The ground memo ages as it would at 30 ticks a second, whatever the test machine's speed: it is forgotten
+  when the game's memo would have aged past 150 ms. A tick that took the machine over 150 ms is detected and
+  the walk retried.
+
+What is stored and checked:
+
+- `walks/NAME.tsv`: the server's body each tick (position to 10 µm, velocity, grounded) and the gap. Compared
+  to 0.1 mm in position, 1 mm/s in velocity. Plain text, so a change in movement is a readable diff.
+- Every walk is taken twice and must take the same track (no wall clock, no order dependence).
+- The rig carries its own copy of `MovementSystem`'s ground, gather and context; it must agree with the real
+  step on every tick, or the risks below would be measured on some other step. It does, on all 19.
+- The gap is held to 1 mm. A walk with a known gap carries `KnownGapMm` and its reason; the test fails if the
+  gap grows past it, and asks for it to be taken off once the gap is under 1 mm.
+- `walks.tsv`: one line per walk with the three risks, compared too.
+- The replay classes run in a collection of their own with parallelism off: `MovementSystem` keeps its
+  gather's scratch lists in statics meant for the one tick thread, so two test classes stepping it at once
+  share them.
+- Cost: the four replay classes together (walks, drives, traffic, trains, ballistics) took 32 to 45 s here, each run twice.
+
+### 14.3 The three parity risks of 3.7, measured
+
+The walks, and `--physics-parity` over 4,000 standing points each on the city and on Magnolia (14.6):
+
+1. **The moving things in the server's ground probe: a gap today.** On the parked car the server's floor is
+   the car's roof and the client's is the road 1.5 m below; from the same state the client falls 11 mm a tick
+   (39 mm on the first), on all 40 ticks the body is on the car. `city_parked_car` carries
+   `KnownGapMm = 40`. Over the sweep, every point on a parked box differed (396 of 396 on the city, 400 of 400
+   on Magnolia), and every one of the differences came from the moving things; one step from rest on a box
+   parted the two sides on 324 of 400 points on Magnolia, by up to 3.5 m. No point on a floor of the map
+   differed. In play the client is pulled back each round trip and falls again: a body standing on a car, a
+   bus or anything else that moves jitters by a centimetre a tick (heard as steps and landings).
+2. **The ground memo's stale answers: no gap in any walk.** The memo was used on 17 to 163 ticks a walk
+   (standing, tapping, pressing into a bus), and its floor never differed from a fresh probe's by over 1 mm,
+   because a body that moves under 5 cm in a tick is standing still or pressed against something, and the
+   floor under it has not changed. The sweep shows where it could: a point within 5 cm of another has a floor
+   over 1 mm different at 32 of 3,991 city points (kerbs, treads, slab edges; worst 1.42 m at a parapet) and
+   308 of 2,899 on Magnolia (the terrain's slope; worst 0.27 m), and the step from that remembered floor is
+   off by up to 0.34 m. To bite, a body must creep less than 5 cm a tick across such an edge, or the floor
+   must move under a still body within 150 ms (a lift, a vehicle).
+3. **The two gathers: no gap.** On `city_two_cars` the sets were the same boxes in another order on every
+   tick (85 of 85), and in another order at 27 of 3,991 sweep points on the city; the step with either list was
+   the same to the bit everywhere (0 of 3,991 and 0 of 2,899 over 1 mm). The deepest-contact tie the survey
+   feared did not occur. The orders differ because the server reads the grid's cells and the client its
+   snapshot's list.
+
+Item 1 is the one to close in stage 3 (the one world view both sides fill); 2 and 3 are recorded.
+
+### 14.4 The driving, traffic and train replays: `DrivingReplayTests`, `RailReplayTests`
+
+- Four drives through `DrivingSystem.Update` with a seated driver whose inputs go through `ApplyControls`, as
+  `MovementSystem` hands a driver's packets on: `city_main_street` (crank, eight seconds' throttle, coast,
+  brake to a stop, reverse), `city_turn` (away from a standstill and right across the Central Street junction
+  at speed), `city_wall` (steered into the tunnel's west wall: the stop and the impact), `magnolia_hill` (up the
+  7 % dirt slope, the pose pitching with it). Stored per tick in `drives/NAME.tsv`: position, heading, speed,
+  steer, throttle, brake, the pose's quaternion, tyre demand, and each wheel's bytes as the wire carries them.
+  A fresh `World` per class, so no `_running` state is carried in.
+- Traffic: the city's `VehicleSystem` for 60 s on a freshly loaded map, every moving thing sampled once a
+  second (188 movers: cars, buses, walkers, shuttles, aircraft), each with its wheels' bytes:
+  `traffic.tsv.gz`, 11,232 rows.
+- Trains: the city's `RailSystem` alone for 90 s, every source of every train once a second (24 movers):
+  `rail.tsv.gz`, 2,160 rows.
+- Each runs twice and must agree with itself before it is compared. Positions to 0.5 mm (drives) and 2 mm
+  (movers), angles and speeds to 1e-3, the wheels' bytes to one step of their encoding.
+- Traffic and trains load the city twice each, a second a load.
+
+### 14.5 The ballistics table: `BallisticsTableTests`
+
+`ExternalBallistics.Fly` for every weapon in `WeaponRegistry` (seven), six cases each: zeroed at 100 m on a
+standard day, level, raised 5 and 30 degrees, zeroed in a 5 m/s crosswind, zeroed on a hot day at altitude
+(35 C, 850 mb); at 50 m steps to 300 m for a pistol or shotgun round and 100 m steps to 1,000 m for a rifle's.
+Stored in `ballistics.tsv` (326 rows): height and drift to 0.2 mm, time to 20 µs, speed to 2 cm/s. The m700
+zeroed at 100 m is 14.78 m low at 1,000 m, 2.10 s out, at 307 m/s.
+
+### 14.6 The parity harness: `--physics-parity`
+
+`--physics-parity [map=city] [n=4000] [movers=30] [seed=1]`: standing points on floors near every kind of
+solid (and one in ten on a parked box), and at each, every question a later stage moves asked of the old path
+and the new (`Paths`: the server's ground probe, the client's, the server's step), every answer compared to the
+bit. At stage 0 the new path is the old one and all three agree on every point, which proves the harness;
+stages 1 and 2 put their moved code in the new column and must show none. The same points sweep the three
+risks (14.3). Cost: 7 s on the city, about 20 s on Magnolia with its load.
+
+### 14.7 Regenerating the stored data
+
+The same rule as the sound library's (docs/SOUND_LIBRARY_BOUNDARY.md 13.4): the stored tracks, tables and
+allowance change only in the commit that changes the physics or the boundary on purpose, and that commit says
+why. A move, a split, a constant made one: none may change any of them, except stage 2's one gravity, which
+regenerates them in its own commit.
+
+| Guard | When it changes | How |
+|---|---|---|
+| `allowed.tsv` | a crossing fixed: lower it | `OPENFPS_BOUNDARY_WRITE=1` with the filter `PhysicsBoundaryTests` (only lowers) |
+| `types.tsv` | a type renamed, or sorted into another group | by hand, with `classify.py` |
+| `walks/`, `walks.tsv`, `drives/`, `traffic.tsv.gz`, `rail.tsv.gz`, `ballistics.tsv` | movement, driving, traffic, trains or ballistics changed on purpose | `OPENFPS_PHYSICS_WRITE=1` with the filters `MovementReplayTests`, `DrivingReplayTests`, `RailReplayTests`, `BallisticsTableTests` |
+| a walk's `KnownGapMm` | a parity risk fixed | lower it, or take it off below 1 mm |
+
+`--physics-replay [walks|drives|traffic|rail|ballistics|all] [name=] [track]` prints what each guard stores
+without writing it; `hills map=` finds the steepest smooth ground on a map.
+
+Not yet seen on CI: the tracks were written on this machine (glibc 2.43). The tolerances are well past float
+rounding, but a walk or a drive accumulates over hundreds of ticks; if CI's maths parts one, the tolerance is
+the thing to look at first, as the sound fingerprints' maths probe was.
+
+### 14.8 The Jolt trial: `--jolt-trial`
+
+JoltPhysicsSharp 2.22.0 (2026-07-13; 2.23.0 of 2026-10-05 was under two weeks old), in AudioLab only.
+Licence MIT, confirmed in the package (`<license type="expression">MIT</license>`); its native package,
+JoltPhysics.Native 1.1.0, carries `LICENSE.MIT.txt` (Jolt Physics, Jorrit Rouwe). Both packages set
+`requireLicenseAcceptance`; restore accepted it without a prompt.
+
+**It runs on this machine's Linux x64.** The native library is `libjoltc.so` (2.0 MB,
+`runtimes/linux-x64/native/`, needing only libstdc++, libm, libgcc_s and libc); `joltc.dll` for Windows x64 and
+ARM64, and builds for Linux ARM64, macOS and Android, in the same package. It would ship through
+`OpenFPS.Native` as libfmod and libphonon do. Initialising Jolt costs 2 MB.
+
+Our geometry reaches it unchanged:
+
+- One city tile (the 250 m square about the spawn cut from the city's 13 static pieces, every triangle that
+  reaches into it): 29,490 triangles as one mesh shape in 11 to 19 ms, 5.8 MB.
+- The whole city as one mesh: 71,100 triangles in 25 ms, 11 MB.
+- Every building and box on Magnolia as one mesh: 393,382 triangles in 0.17 to 0.25 s, 77 MB (vertices
+  unshared, three a triangle; sharing them would cut it). No mesh was too big for one shape.
+- 64 balls dropped on the city tile's mesh all came to rest on our own floor there (`FloorAt`), 0.0 mm off.
+- Magnolia's ground at the spawn, 126 by 126 posts 2 m apart, as a height field in 1 to 2 ms: its posts are
+  within 3.6 mm of ours (Jolt stores samples in 8 bits a block), and 62 of 64 balls came to rest on our terrain
+  to 2 cm, the other two 2 cm and 15 cm off at a cell carved under a building's slab or the tile's edge (Jolt is
+  given no holes).
+- Units and axes: metres, y up, and the same right-handed maths and anticlockwise front faces as our
+  triangles (`Normal = E1 x E2`), so +X east, +Y up, +Z north go in as they are, with no mirror (Steam Audio
+  needed one, `Phonon.World`). Gravity is set per `PhysicsSystem`, which fits gravity as a property of the
+  world (9.80665 here).
+
+Measured, single-threaded (no worker threads, as the server's tick thread would run it), pinned to the
+lab's cores:
+
+| Scene, at 120 Hz | Step |
+|---|---|
+| the city tile, no bodies | 0.002 ms |
+| 50 bodies (boxes and balls dropped from 2 to 12 m) | 0.08 ms while falling, 0.02 to 0.09 ms after; all asleep by 8 s |
+| 500 bodies | 0.21 to 0.22 ms mean while falling (p95 0.31 ms, worst 0.7 to 1.3 ms), 0.16 ms after (worst 2.8 to 3.4 ms); 129 still awake at 8 s; 5.6 to 6.1 MB |
+| the same with three worker threads | 500 bodies 0.24 ms falling, 0.13 ms after: no faster at this size |
+
+Four steps a server tick for 500 bodies is under 1 ms of the 33 ms tick.
+
+- **Ten 0.5 m boxes stacked** settle and all sleep: after 10 s the top box's centre is at 4.7473 m (4.75 exactly
+  touching; 2.7 mm of penetration over ten contacts), the most any drifted sideways 11 mm.
+- **A bullet-sized sphere at a 10 cm wall** (7.8 mm across, from 0.3 m, gravity off): at 800 m/s, 6.7 m a step,
+  discrete goes through and linear cast stops it; at 100 m/s, 0.83 m a step, the same; a 6 cm stone at 15 m/s
+  is stopped either way. Jolt clamps a body to 500 m/s unless `MaxLinearVelocity` is raised. Our bullets stay
+  `ExternalBallistics` (the decision), so this is for thrown and knocked things.
+- **Soft bodies:** a soft ball 1 m across (266 vertices, 2 kPa) dropped from 1 m rests on the ground standing
+  1.055 m tall and 1.047 m wide; a 2 m cloth (441 vertices) dropped on a 1 m table 0.8 m high drapes over it
+  to 3.7 cm off the floor. The two together step in 0.15 to 0.47 ms mean (worst 1.8 to 9.9 ms, the first
+  contacts).
+
+Against Jolt, or to watch:
+
+- **The binding has bugs.** In 2.22.0 `BodyCreationSettings.MotionQuality`'s setter passes the enum by
+  reference to a C function that takes it by value: every body made with it got quality 244, read back, and
+  continuous collision silently did nothing. The body interface's `SetMotionQuality` works. Our own types over
+  it (the decision) are where such things are worked round; each binding call wants a test that reads back
+  what it set.
+- **A second copy of the world.** Every tile's triangles are handed over again (and the place's 393,000
+  triangles took 77 MB as built here); door leaves and streamed tiles must be kept in step, as for Steam Audio.
+- **Cross-machine determinism is not checked.** Jolt has a cross-platform deterministic build option; whether
+  the NuGet's native build has it was not looked at. Bodies are not predicted on the client (5.4), so only
+  run-to-run repeatability on the server matters, and that was not measured either.
+- **The worst steps** (3.4 ms with 500 bodies, 9.9 ms for the first soft contacts) are single steps, not
+  sustained, but four a tick would take a 33 ms tick past a frame's worth now and then.
+- Nothing found conflicts with our geometry: no mesh too big, no axis or winding change, metres throughout.
 
 ## Decisions (Cody, 2026-10-11)
 
