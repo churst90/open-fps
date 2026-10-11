@@ -10,6 +10,19 @@ Recent work, newest first. `git log` has the rest.
   finder could not see), and on Magnolia 481 rooms 9,650 m2; they are gone. An opening with no leaf is as big as the
   air that met it, a piece per bay between piers; a stair hole is what its flight leaves open (9 to 9.6 m2, not
   12). Heard: the real places' houses and halls closed to the street, as their walls are.
+- The guards widened (part P0 of docs/SPECIAL_CASES_AUDIT.md), tests only. Five new emitter-stream replay
+  scenarios, recorded from the code as it is, bugs included: `sirens_and_far_traffic` (a siren behind a
+  building, seven borrowed cars, a held horn), `train_behind_wall`, `places_and_woods` (a tree's and a
+  fountain tap's places, four woods, walking out of a room), `talker_and_aids` (voice chat from behind a
+  wall, the lane rumble) and `high_ids` (ids at Albany's and Magnolia's scale). Their lines show S1 (woods
+  and intakes never given a path), S2 (the held horn's two apparent positions), S3 (borrowed cars re-placed
+  with occlusion 0 against a path of 0.95), S6 (a siren and the guide beep on one voice id) and S11 (the
+  rumble's pitch put back every frame); the audit's P0 entry names the lines each later part should change.
+  The old three streams are unchanged; the five add 260 KB. `VoiceIdBandTests` reads every voice-id band
+  from the code and holds today's 47 overlaps exactly; its must-pass twin is skipped as S6's known failure
+  until P3. Two corrections to the audit from the streams: a borrowed voice's aperture is 1, not 0, so S3's
+  400 Hz low-pass does not happen; and the replay's moving vehicles face backwards (-Z), so their grilles and
+  exhausts are swapped in every stream.
 
 - The ambience recordings are gone (Cody: "remove those ambiences completely we simply don't need them"): the
   three four-channel beds and six stereo ones (90 MB, never in git), every copy in the build and publish
