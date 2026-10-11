@@ -18,6 +18,10 @@ public sealed class WinFormsClientShell : IClientShell
     private readonly NvdaSpeechOutput _speech;
     private readonly Action _quit;
     private MainWindow? _gameWindow;
+    // The connecting window, touched only on the UI thread. Ended by a login, it goes once the loading
+    // screen or the menu has focus, so the form behind does not take focus for a moment and be read.
+    private ConnectingWindow? _hold;
+    private bool _holdCloseOnNextWindow;
 
     public event Action<string>? CommandEntered;
 
@@ -34,7 +38,38 @@ public sealed class WinFormsClientShell : IClientShell
 
     public bool? NumLockOn => _gameWindow?.NumLockOn;
 
-    public void ShowLoading(string status, bool speak = true) => _navigation.ShowLoading(status, speak);
+    public void ShowLoading(string status, bool speak = true)
+    {
+        _navigation.ShowLoading(status, speak);
+        _navigation.EnqueueUIAction(CloseHoldAfterNextWindow);
+    }
+
+    public void ShowConnecting(string status, Action cancel) => _navigation.EnqueueUIAction(() =>
+    {
+        _holdCloseOnNextWindow = false;
+        if (_hold is { IsDisposed: false }) { _hold.SetStatus(status, cancel); return; }
+        var owner = Form.ActiveForm ?? _navigation.Menu;
+        var hold = new ConnectingWindow(status, cancel);
+        _hold = hold;
+        hold.FormClosed += (_, _) => { if (ReferenceEquals(_hold, hold)) _hold = null; };
+        if (owner != null) hold.Show(owner); else hold.Show();
+        hold.Activate();
+    });
+
+    public void EndConnecting(bool returnFocus) => _navigation.EnqueueUIAction(() =>
+    {
+        if (_hold is not { IsDisposed: false } hold) return;
+        if (!returnFocus) { _holdCloseOnNextWindow = true; return; }
+        // Windows gives focus back to the owner, to the control that had it.
+        hold.End();
+    });
+
+    private void CloseHoldAfterNextWindow()
+    {
+        if (!_holdCloseOnNextWindow) return;
+        _holdCloseOnNextWindow = false;
+        _hold?.CloseNow();
+    }
 
     public void UpdateLoadingStatus(string text, int percent) => _navigation.UpdateLoadingStatus(text, percent);
 
@@ -64,6 +99,7 @@ public sealed class WinFormsClientShell : IClientShell
     // NVDA reads the menu as it takes focus; without it the game says where you are.
     public void ReturnToMenu() => _navigation.ReturnToMenu(() =>
     {
+        CloseHoldAfterNextWindow();
         if (!_speech.ScreenReaderRunning) _speech.Speak("Main menu.", interrupt: false);
     });
 

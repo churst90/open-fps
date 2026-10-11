@@ -17,6 +17,22 @@ public sealed partial class ClientGameSession
     /// <summary>How long a lost connection is tried for before going back to the main menu.</summary>
     internal TimeSpan ReconnectFor { get; set; } = TimeSpan.FromSeconds(60);
 
+    /// <summary>
+    /// How long a connect from the menu keeps trying a server that does not answer: one started a little
+    /// before the server (Cody, 2026-10-11) failed at once with "The server did not answer".
+    /// </summary>
+    internal TimeSpan RetryFor { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The fewest seconds between the starts of two tries. An unanswered try is LiteNetLib's ten requests
+    /// half a second apart, so it ends 5 s after it began (Cody's log, 2026-10-11) and the next follows it
+    /// at once; this only paces a failure that comes back sooner.
+    /// </summary>
+    internal TimeSpan RetryInterval { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>The fewest seconds between two "still trying" lines, connecting or reconnecting.</summary>
+    internal TimeSpan AnnounceEvery { get; set; } = TimeSpan.FromSeconds(10);
+
     /// <summary>The world fades in over this on arrival...</summary>
     public const float FadeInSeconds = 1.0f;
 
@@ -27,7 +43,7 @@ public sealed partial class ClientGameSession
     {
         /// <summary>At the menu, nothing in flight.</summary>
         Idle,
-        /// <summary>Connecting or logging in from the connect form.</summary>
+        /// <summary>Connecting, trying again while the server does not answer, or logging in, from the menu.</summary>
         Connecting,
         /// <summary>Logged in: loading or in the world.</summary>
         LoggedIn,
@@ -46,8 +62,15 @@ public sealed partial class ClientGameSession
     private string _pass = "";
     private volatile bool _registering;
 
+    /// <summary>The tries of a connect or a reconnect, while the server has not answered; null once it has.</summary>
+    private volatile ConnectRetry? _retry;
     private DateTime _reconnectStarted;
-    private DateTime _nextAttempt;
+    /// <summary>What the last unanswered try said, for when the trying ends.</summary>
+    private string _lastFailure = "";
+    /// <summary>The server as the player knows it: a saved server's name, or the address.</summary>
+    private string _target = "";
+    /// <summary>Set by Escape and cleared by the next connect: an answer to a cancelled login is dropped.</summary>
+    private volatile bool _cancelled;
 
     /// <summary>Disconnects we made ourselves whose event has not arrived yet. LiteNetLib reports
     /// our own disconnect on a later poll, by which time we are back at the menu.</summary>
@@ -75,6 +98,16 @@ public sealed partial class ClientGameSession
     /// <summary>True while a lost connection is being tried again.</summary>
     public bool IsReconnecting => _link == LinkState.Reconnecting;
 
+    /// <summary>True from Connect until the login is answered, the player cancels, or the trying ends.</summary>
+    public bool IsConnecting => _link == LinkState.Connecting;
+
+    /// <summary>True while a connect from the menu is trying again because the server did not answer.</summary>
+    public bool IsRetrying => _link == LinkState.Connecting && _retry is { Retrying: true };
+
+    /// <summary>Raised on the game-loop thread when the player cancels a connect with Escape. Already
+    /// said; the head's connect form only shows it.</summary>
+    public event Action? ConnectCancelled;
+
     private void WireConnection()
     {
         _network.OnConnected += SendCredentials;
@@ -86,19 +119,63 @@ public sealed partial class ClientGameSession
 
     /// <summary>
     /// Connects to a server and logs in, or creates the account first when <paramref name="register"/>
-    /// is set. Callable from any thread. The outcome is spoken, and raised as
-    /// <see cref="LoginSucceeded"/>, <see cref="LoginFailed"/> or <see cref="ConnectFailed"/>.
+    /// is set. Callable from any thread. Focus goes to the head's connecting window until it ends; a
+    /// server that does not answer is tried again for <see cref="RetryFor"/>. The outcome is spoken, and
+    /// raised as <see cref="LoginSucceeded"/>, <see cref="LoginFailed"/>, <see cref="ConnectFailed"/> or
+    /// <see cref="ConnectCancelled"/>. <paramref name="serverName"/> is a saved server's name, said in
+    /// place of the address.
     /// </summary>
-    public void Connect(string address, string user, string pass, bool register)
+    public void Connect(string address, string user, string pass, bool register, string? serverName = null)
     {
         ServerAddress.Parse(address, out _host, out _port);
         _user = user.Trim();
         _pass = pass;
         _registering = register;
+        _cancelled = false;
+        _target = string.IsNullOrWhiteSpace(serverName) ? $"{_host}, port {_port}" : serverName.Trim();
+        _retry = new ConnectRetry(DateTime.UtcNow, RetryFor, RetryInterval, AnnounceEvery);
         _link = LinkState.Connecting;
+        // Said and shown before the socket opens: a socket that cannot open ends the hold, and the end
+        // must reach the head after the start.
+        string line = $"Connecting to {_target}. Escape to cancel.";
+        _speech.Speak(line, interrupt: true);
+        _shell.ShowConnecting(line, CancelConnect);
         _network.Start();
-        _speech.Speak($"Connecting to {_host}, port {_port}.", interrupt: true);
+        if (_link != LinkState.Connecting) return;
         _network.Connect(_host, _port);
+    }
+
+    /// <summary>
+    /// Escape while connecting or reconnecting: the try stops and the player is back where they were (the
+    /// menu item they used, or the main menu after a drop). Callable from any thread; runs on the
+    /// game-loop thread.
+    /// </summary>
+    public void CancelConnect() => _queued.Enqueue(DoCancelConnect);
+
+    private void DoCancelConnect()
+    {
+        switch (_link)
+        {
+            case LinkState.Connecting:
+                Serilog.Log.Information("Connect to {Target} cancelled after {Sec:F0} s.", _target,
+                    _retry is { } r ? (DateTime.UtcNow - r.Started).TotalSeconds : 0);
+                _cancelled = true;
+                _retry = null;
+                _link = LinkState.Idle;
+                DropConnection();
+                Ui.Play(UiCue.MenuBack);
+                _speech.Speak("Cancelled.", interrupt: true);
+                _shell.EndConnecting(returnFocus: true);
+                ConnectCancelled?.Invoke();
+                return;
+            case LinkState.Reconnecting:
+                Serilog.Log.Information("Reconnecting cancelled after {Sec:F0} s.", (DateTime.UtcNow - _reconnectStarted).TotalSeconds);
+                _cancelled = true;
+                Ui.Play(UiCue.MenuBack);
+                _speech.Speak("Stopped reconnecting.", interrupt: true);
+                StopReconnecting();
+                return;
+        }
     }
 
     private void SendCredentials()
@@ -106,28 +183,38 @@ public sealed partial class ClientGameSession
         if (_registering)
         {
             Serilog.Log.Information("Connected to server; creating the account '{User}'.", _user);
+            _retry = null;
             _speech.Speak("Connected. Creating the account.", interrupt: true);
+            _shell.ShowConnecting("Connected. Creating the account.", CancelConnect);
             _network.Send(new RegisterRequest { Username = _user, Password = _pass });
             return;
         }
         Serilog.Log.Information("Connected to server; sending login for user '{User}'.", _user);
-        if (_link != LinkState.Reconnecting) _speech.Speak("Connected. Logging in.", interrupt: true);
+        if (_link == LinkState.Connecting)
+        {
+            _retry = null;
+            _speech.Speak("Connected. Logging in.", interrupt: true);
+            _shell.ShowConnecting("Connected. Logging in.", CancelConnect);
+        }
         _network.Send(new LoginRequest { Username = _user, Password = _pass, Build = WireContract.Hash });
     }
 
     /// <summary>A new account: said, and on success followed straight into a login with the same name.</summary>
     private void HandleRegisterResponse(RegisterResponse reg)
     {
+        if (AnswerWasCancelled()) return;
         _registering = false;
         if (reg.Success)
         {
             _speech.Speak("Account created. Logging in.", interrupt: true);
+            _shell.ShowConnecting("Account created. Logging in.", CancelConnect);
             _network.Send(new LoginRequest { Username = _user, Password = _pass, Build = WireContract.Hash });
             return;
         }
         string reason = $"Could not create the account. {reg.Message}";
         _speech.Speak(reason, interrupt: true);
         _link = LinkState.Idle;
+        _shell.EndConnecting(returnFocus: true);
         // Nothing is logged in, so nothing stays connected: quitting would announce "Disconnected from
         // the server" for a connection the player never had.
         DropConnection();
@@ -137,7 +224,11 @@ public sealed partial class ClientGameSession
     private void NoteLoggedIn()
     {
         if (_link == LinkState.Reconnecting) _speech.Speak("Reconnected.", interrupt: true);
+        bool holding = _link is LinkState.Connecting or LinkState.Reconnecting;
         _link = LinkState.LoggedIn;
+        _retry = null;
+        // The loading screen that follows takes focus; the connecting window goes once it has.
+        if (holding) _shell.EndConnecting(returnFocus: false);
     }
 
     private void NoteLoginRejected()
@@ -145,7 +236,22 @@ public sealed partial class ClientGameSession
         // Rejected while trying to get back in (a new build on the server, a changed password):
         // trying again cannot help, so back to the menu with the reason already said.
         if (_link == LinkState.Reconnecting) GiveUpReconnecting(speak: false);
-        else { _link = LinkState.Idle; DropConnection(); }
+        else
+        {
+            bool holding = _link == LinkState.Connecting;
+            _link = LinkState.Idle;
+            _retry = null;
+            DropConnection();
+            if (holding) _shell.EndConnecting(returnFocus: true);
+        }
+    }
+
+    /// <summary>An answer that belongs to a connect the player cancelled, to be dropped.</summary>
+    private bool AnswerWasCancelled()
+    {
+        if (!_cancelled || _link is LinkState.Connecting or LinkState.Reconnecting) return false;
+        Serilog.Log.Information("Dropped the server's answer to a cancelled connect.");
+        return true;
     }
 
     private void OnConnectFailed(string reason)
@@ -154,11 +260,53 @@ public sealed partial class ClientGameSession
         if (_link == LinkState.Reconnecting)
         {
             Serilog.Log.Information("Reconnect attempt failed: {Reason}", reason);
+            _lastFailure = reason;
+            return;
+        }
+        if (_link == LinkState.Connecting)
+        {
+            // A socket error while a try is still out is not its end; the try reports that itself.
+            if (_network.IsConnecting)
+            {
+                Serilog.Log.Information("While connecting: {Reason} The try goes on.", reason);
+                return;
+            }
+            if (_retry is { } retry && _network.LastFailureWorthRetrying)
+            {
+                Serilog.Log.Information("Not answered: {Reason} Trying again for up to {Sec:F0} s in all.", reason, RetryFor.TotalSeconds);
+                _lastFailure = reason;
+                if (retry.NotAnswered(DateTime.UtcNow) is { } line) SayWhileConnecting(line);
+                return;
+            }
+            FailConnect(reason);
+            return;
+        }
+        if (_cancelled && _link == LinkState.Idle)
+        {
+            Serilog.Log.Information("After a cancelled connect: {Reason}", reason);
             return;
         }
         _speech.Speak(reason, interrupt: true);
-        if (_link == LinkState.Connecting) _link = LinkState.Idle;
         ConnectFailed?.Invoke(reason);
+    }
+
+    /// <summary>A connect from the menu is over without getting in: said, and focus is back where it was.</summary>
+    private void FailConnect(string reason)
+    {
+        _retry = null;
+        _link = LinkState.Idle;
+        // A try still out when the time ran out goes too, so it cannot log in behind the menu.
+        DropConnection();
+        _speech.Speak(reason, interrupt: true);
+        _shell.EndConnecting(returnFocus: true);
+        ConnectFailed?.Invoke(reason);
+    }
+
+    /// <summary>A line about the trying, said without cutting off whatever the player is reading, and shown.</summary>
+    private void SayWhileConnecting(string line)
+    {
+        _speech.Speak(line, interrupt: false);
+        _shell.ShowConnecting(line, CancelConnect);
     }
 
     /// <summary>Drops the connection on purpose, so its disconnect event is not taken for a loss.</summary>
@@ -179,29 +327,46 @@ public sealed partial class ClientGameSession
                 // Out of the world at once — nothing left playing as if the game were still there —
                 // and try to get back in.
                 Serilog.Log.Warning("Connection lost in game: {Reason}. Reconnecting.", reason);
-                _speech.Speak($"Disconnected from the server. {reason} Reconnecting.", interrupt: true);
+                string line = $"Disconnected from the server. {reason} Reconnecting. Escape to cancel.";
+                _speech.Speak(line, interrupt: true);
                 LeaveWorld();
-                _link = LinkState.Reconnecting;
+                _cancelled = false;
+                _lastFailure = reason;
                 _reconnectStarted = DateTime.UtcNow;
-                _nextAttempt = _reconnectStarted + ReconnectInterval;
+                _retry = new ConnectRetry(_reconnectStarted, ReconnectFor, ReconnectInterval, AnnounceEvery, retrying: true);
+                _link = LinkState.Reconnecting;
+                _shell.ShowConnecting(line, CancelConnect);
                 return;
             case LinkState.Reconnecting:
                 return;   // a connection made during a retry dropped again; the ticks carry on
+            case LinkState.Connecting:
+                // Connected, then dropped before the login was answered.
+                FailConnect($"Disconnected from the server. {reason}");
+                return;
             default:
-                string line = $"Disconnected from the server. {reason}";
-                _speech.Speak(line, interrupt: true);
+                string dropped = $"Disconnected from the server. {reason}";
+                _speech.Speak(dropped, interrupt: true);
                 _link = LinkState.Idle;
-                ConnectFailed?.Invoke(line);
+                ConnectFailed?.Invoke(dropped);
                 return;
         }
     }
 
     private void GiveUpReconnecting(bool speak)
     {
-        Serilog.Log.Warning("Gave up reconnecting after {Sec:F0} s.", (DateTime.UtcNow - _reconnectStarted).TotalSeconds);
+        Serilog.Log.Warning("Gave up reconnecting after {Sec:F0} s. Last: {Reason}", (DateTime.UtcNow - _reconnectStarted).TotalSeconds, _lastFailure);
+        if (speak) _speech.Speak("Could not reconnect. Back to the main menu.", interrupt: true);
+        StopReconnecting();
+    }
+
+    /// <summary>The reconnect is over without getting back in: to the main menu, which takes focus from the
+    /// connecting window.</summary>
+    private void StopReconnecting()
+    {
+        _retry = null;
         _link = LinkState.Idle;
         DropConnection();
-        if (speak) _speech.Speak("Could not reconnect. Back to the main menu.", interrupt: true);
+        _shell.EndConnecting(returnFocus: false);
         _shell.ReturnToMenu();
     }
 
@@ -220,19 +385,33 @@ public sealed partial class ClientGameSession
 
         if (_fading) AdvanceFade();
 
-        if (_link == LinkState.Reconnecting)
+        if (_link is LinkState.Connecting or LinkState.Reconnecting && _retry is { } retry)
         {
-            // Out of the world the bindings do not run, and Escape still has to reach the game menu.
-            if (!IsInGame && Input.GetSnapshot().JustPressed.Contains(GameKey.Escape)
-                && _shell.IsGameInputActive)
-                ShowGameMenu();
-            var now = DateTime.UtcNow;
-            if (now - _reconnectStarted > ReconnectFor) { GiveUpReconnecting(speak: true); return; }
-            if (now >= _nextAttempt && !_network.IsConnecting && !_network.IsConnected)
+            // Out of the world the bindings do not run. A head without a connecting window leaves the
+            // game window focused, and Escape there still has to stop the trying.
+            if (_link == LinkState.Reconnecting && !IsInGame && _shell.IsGameInputActive
+                && Input.GetSnapshot().JustPressed.Contains(GameKey.Escape))
             {
-                _nextAttempt = now + ReconnectInterval;
-                Ui.Play(UiCue.Reconnecting);
-                _network.Connect(_host, _port);
+                DoCancelConnect();
+                return;
+            }
+            // Connected and logging in: the server has answered, and its answer ends the trying.
+            if (_network.IsConnected) return;
+            var next = retry.Tick(DateTime.UtcNow, _network.IsConnecting, out string? say);
+            if (say != null) SayWhileConnecting(say);
+            switch (next)
+            {
+                case ConnectRetry.Next.GiveUp when _link == LinkState.Reconnecting:
+                    GiveUpReconnecting(speak: true);
+                    break;
+                case ConnectRetry.Next.GiveUp:
+                    Serilog.Log.Warning("Gave up connecting to {Target} after {Sec:F0} s.", _target, (DateTime.UtcNow - retry.Started).TotalSeconds);
+                    FailConnect(_lastFailure);
+                    break;
+                case ConnectRetry.Next.Try:
+                    Ui.Play(UiCue.Reconnecting);
+                    _network.Connect(_host, _port);
+                    break;
             }
         }
     }

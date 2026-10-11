@@ -57,6 +57,23 @@ public interface IClientShell
     /// </summary>
     void ShowGameMenu(Action<GameMenuChoice> chosen);
 
+    /// <summary>
+    /// A connect is under way, from the menu or getting back in after a drop: focus leaves every menu
+    /// for a window over the active one that holds the keys (<see cref="Session.ConnectHold"/>), so
+    /// arrows and Tab move nothing behind it. Escape there, or closing it, calls
+    /// <paramref name="cancel"/> once. Called again while it is up, it only changes the line shown. The
+    /// session has already said <paramref name="status"/>. A head without it leaves focus where it is.
+    /// </summary>
+    void ShowConnecting(string status, Action cancel) { }
+
+    /// <summary>
+    /// The connect is over. With <paramref name="returnFocus"/> the window goes and focus is back where
+    /// it was before it opened, its announcement following what the session said rather than cutting
+    /// it off. Without, the next call (<see cref="ShowLoading"/> or <see cref="ReturnToMenu"/>) moves
+    /// focus, and the window goes once that has.
+    /// </summary>
+    void EndConnecting(bool returnFocus) { }
+
     /// <summary>Closes the game window and anything over it and focuses the main menu.</summary>
     void ReturnToMenu();
 

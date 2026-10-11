@@ -44,6 +44,10 @@ internal static partial class GtkClientProgram
     // interrupt it.
     private static bool _suppressFocusSpeech;
 
+    // Set as the connecting window gives focus back: the item's name follows "Cancelled." or the reason
+    // a connect failed instead of cutting it off.
+    private static bool _focusSpeechFollows;
+
     /// <summary>When this process started, so every "why did it stop" line can say how long it ran.</summary>
     private static readonly DateTime _startedUtc = DateTime.UtcNow;
 
@@ -127,6 +131,7 @@ internal static partial class GtkClientProgram
         // The shell clears held keys around modal dialogs with the session's input buffer, which only
         // exists once the session (which needs the shell) is built.
         _shell.SetInput(_session.Input);
+        _shell.FocusReturning = () => _focusSpeechFollows = true;
         // The session speaks the outcome; the head only moves the form out of the way, or puts focus
         // back where the player can correct the mistake.
         _session.LoginSucceeded += _ => OnUi(() =>
@@ -134,10 +139,18 @@ internal static partial class GtkClientProgram
             // A server you have just logged in to by hand is remembered, so Connect can go straight back.
             if (_loginDialog != null) RememberServer(_pendingAddress, _pendingUser, _pendingPass, _pendingRemember);
             CloseLoginDialog();
+            CloseServersWindow();
         });
         _session.LoginFailed += reason => OnLoginOutcome($"Login failed. {reason}", success: false);
         // Connecting, or creating the account, failed: already spoken; the form keeps the reason.
         _session.ConnectFailed += reason => OnLoginOutcome(reason, success: false);
+        // Escape while connecting: said; focus stays where it was, so the form only shows it.
+        _session.ConnectCancelled += () => OnUi(() =>
+        {
+            if (_loginDialog == null) return;
+            _loginStatusText = "Cancelled.";
+            _loginStatus?.SetText(_loginStatusText);
+        });
         _settings = ClientSettings.Load();
         if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
             OpenFPS.Common.Loudness.DynamicRangeCompression = _settings.LevelCompression;
@@ -372,7 +385,8 @@ internal static partial class GtkClientProgram
             _pendingRemember = remember.GetActive();
             _loginStatusText = register ? "Creating the account..." : "Connecting...";
             _loginStatus?.SetText(_loginStatusText);
-            _session.Connect(_pendingAddress, _pendingUser, _pendingPass, register);
+            _session.Connect(_pendingAddress, _pendingUser, _pendingPass, register,
+                saved != null && _pendingAddress == $"{saved.Host}:{saved.Port}" ? saved.Name : null);
         }
         if (register)
             box.Append(MenuButton("Create account", () => Submit(register: true)));
@@ -410,6 +424,7 @@ internal static partial class GtkClientProgram
         _loginStatus?.SetText(message);
         if (success) { CloseLoginDialog(); return; }
         // To the status line: on Username, the screen reader read the field over the reason.
+        _focusSpeechFollows = false;
         _suppressFocusSpeech = true;
         _loginStatus?.GrabFocus();
     });
@@ -493,7 +508,9 @@ internal static partial class GtkClientProgram
             // A programmatic focus move that already announced its reason must not speak over it.
             if (_suppressFocusSpeech) { _suppressFocusSpeech = false; return; }
             Cue(UiCue.MenuMove);
-            _speech.Speak(text(), true);
+            bool follows = _focusSpeechFollows;
+            _focusSpeechFollows = false;
+            _speech.Speak(text(), interrupt: !follows);
         };
         widget.AddController(focus);
     }

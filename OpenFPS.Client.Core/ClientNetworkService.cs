@@ -16,6 +16,9 @@ public class ClientNetworkService : INetEventListener
     private string _peerTarget = "", _pendingTarget = "";
     /// <summary>A peer being left for another server: its disconnect is not news.</summary>
     private NetPeer? _leaving;
+    /// <summary>The try in flight, and one given up by <see cref="Disconnect"/>, whose end is not news:
+    /// a cancelled connect that later reported "did not answer" spoke over the menu.</summary>
+    private NetPeer? _pendingPeer, _abandoned;
 
     /// <summary>True from the moment a connect is started until the peer connects or the attempt ends.
     /// Without it, a second press of Connect during the handshake queues a second login.</summary>
@@ -45,8 +48,21 @@ public class ClientNetworkService : INetEventListener
 
     public bool IsConnected => _serverPeer != null;
 
+    /// <summary>
+    /// Whether the last <see cref="OnConnectionFailed"/> is one that trying again can mend: the server did
+    /// not answer, or the network was not there yet. A rejection, a wrong protocol or an unknown host is
+    /// not, and is said at once.
+    /// </summary>
+    public bool LastFailureWorthRetrying { get; private set; }
+
     /// <summary>True while a connect has been started and has neither succeeded nor failed.</summary>
     public bool IsConnecting => _connectPending;
+
+    /// <summary>How many connect requests one try sends, and how far apart: LiteNetLib's own 10 and
+    /// 500 ms, so a try the server does not answer ends after 5 s. Settable before <see cref="Start"/>
+    /// for tests.</summary>
+    internal int ConnectRequests { get; set; } = 10;
+    internal int ConnectRequestMs { get; set; } = 500;
 
     /// <summary>True once <see cref="Start"/> has opened a socket.</summary>
     public bool IsStarted => _netManager is { IsRunning: true };
@@ -57,17 +73,25 @@ public class ClientNetworkService : INetEventListener
     {
         if (_netManager == null) return;
         _connectPending = false;
+        if (_serverPeer == null && _pendingPeer != null) _abandoned = _pendingPeer;
+        _pendingPeer = null;
         _netManager.DisconnectAll();
     }
 
     public void Start()
     {
         if (IsStarted) return;
-        _netManager = new NetManager(this) { AutoRecycle = true };
+        _netManager = new NetManager(this)
+        {
+            AutoRecycle = true,
+            MaxConnectAttempts = ConnectRequests,
+            ReconnectDelay = ConnectRequestMs,
+        };
         if (!_netManager.Start())
         {
             const string msg = "Could not open a network socket. Another program may be using the port.";
             Log.Error("NetManager.Start() failed — no UDP socket. The client cannot connect.");
+            LastFailureWorthRetrying = false;
             OnConnectionFailed?.Invoke(msg);
             return;
         }
@@ -113,12 +137,13 @@ public class ClientNetworkService : INetEventListener
         {
             _connectPending = true;
             _pendingTarget = _lastTarget;
-            _netManager.Connect(Resolve(ip), port, "OpenFPS_Key");
+            _pendingPeer = _netManager.Connect(Resolve(ip), port, "OpenFPS_Key");
         }
         catch (Exception ex)
         {
             _connectPending = false;
             Log.Error(ex, "Connect to {Target} could not be started.", _lastTarget);
+            LastFailureWorthRetrying = false;
             OnConnectionFailed?.Invoke($"Could not connect to {_lastTarget}. {ex.Message}");
         }
     }
@@ -180,6 +205,7 @@ public class ClientNetworkService : INetEventListener
     public void OnPeerConnected(NetPeer peer)
     {
         _connectPending = false;
+        _pendingPeer = null;
         _serverPeer = peer;
         _peerTarget = _pendingTarget;
         Log.Information("Connected to server {EndPoint}.", peer.Address);
@@ -238,9 +264,16 @@ public class ClientNetworkService : INetEventListener
             Log.Information("Left {Address}.", peer.Address);
             return;
         }
+        if (ReferenceEquals(peer, _abandoned))
+        {
+            _abandoned = null;
+            Log.Information("Stopped trying {Target}.", _lastTarget);
+            return;
+        }
         if (_serverPeer != null && !ReferenceEquals(peer, _serverPeer)) return;
         bool wasConnected = _serverPeer != null;
         _connectPending = false;
+        _pendingPeer = null;
         _serverPeer = null;
 
         string reason = DescribeDisconnect(info);
@@ -248,7 +281,12 @@ public class ClientNetworkService : INetEventListener
             _lastTarget.Length > 0 ? _lastTarget : peer.Address.ToString(), reason, info.Reason, info.SocketErrorCode);
 
         if (wasConnected) OnConnectionLost?.Invoke(reason);
-        else OnConnectionFailed?.Invoke($"Could not connect to {_lastTarget}. {reason}");
+        else
+        {
+            LastFailureWorthRetrying = info.Reason is DisconnectReason.ConnectionFailed or DisconnectReason.Timeout
+                or DisconnectReason.HostUnreachable or DisconnectReason.NetworkUnreachable;
+            OnConnectionFailed?.Invoke($"Could not connect to {_lastTarget}. {reason}");
+        }
     }
 
     /// <summary>Turns LiteNetLib's disconnect enum into something worth hearing.</summary>
@@ -271,6 +309,8 @@ public class ClientNetworkService : INetEventListener
     public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
         Log.Error("Socket error {Error} talking to {EndPoint}.", socketError, endPoint);
+        // A socket error is the network's state now, not the server's answer: worth another try.
+        LastFailureWorthRetrying = true;
         OnConnectionFailed?.Invoke($"Network error: {socketError}.");
     }
 

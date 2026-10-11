@@ -91,6 +91,7 @@ internal sealed partial class GtkClientShell : IClientShell
         _loadingBar?.SetFraction(0);
 
         _loadingWindow.Present();
+        CloseHoldAfterNextWindow();
         if (speak) _speech.Speak(status, interrupt: true);
     });
 
@@ -115,6 +116,7 @@ internal sealed partial class GtkClientShell : IClientShell
 
         _loadingWindow?.SetVisible(false);
         _menuWindow?.SetVisible(false);
+        CloseHoldAfterNextWindow();
     });
 
     public void OpenCommandConsole() => OpenCommandConsole("");
@@ -358,6 +360,7 @@ internal sealed partial class GtkClientShell : IClientShell
         if (_menuWindow == null) return;
         _menuWindow.SetVisible(true);
         _menuWindow.Present();
+        CloseHoldAfterNextWindow();
         _speech.Speak("Main menu.", interrupt: false);
     });
 
