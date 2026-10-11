@@ -65,6 +65,12 @@ other at login. The server and the Windows zip go out together.
    name and prefix parts beside them; (2) the audit's voice registry (one list of voices, one writer a
    frame, one way to start a voice), then stage 5's audio clock slice; (3) the physics boundary survey, a doc,
    alongside (2); (4) physics stages with geometry stage 6; (5) library stages 6 to 8 on the clean voices.
+   The special-cases audit is written (docs/SPECIAL_CASES_AUDIT.md, 2026-10-11): 32 findings, parts P0 to P8.
+   Its order: P0 (wider replay guards, tests only), then P1 (the pops: the worker served stale results for
+   moving sources) with P2 (one table of model kinds) and P5 (names and materials to properties) beside it,
+   P8 (laws in one place) after; then P3a-d (the voice registry: one list, one writer, one start, which is the
+   path pass above widened to every voice range) with P6; then P4 (one ranking), then P7 (machine state from
+   the server, a wire change). P0 and P1 started 2026-10-11.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
