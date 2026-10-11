@@ -170,7 +170,7 @@ public sealed class RailSystem
                     heights[i] = src.HeightMetres;
                     line.Sample(td.StartOffsetMetres - src.AlongMetres, out var pos, out float heading, out _);
                     pos.Y += src.HeightMetres;
-                    string soundId = $"rail:{td.Preset}/{trainKey}/{src.Index}";
+                    string soundId = ModelKindTable.RailSource(td.Preset, trainKey, src.Index);
                     ents[i] = maps.SpawnEntity(mapId, w => w.Create(
                         EntityType.NPC,
                         new Transform { Position = pos, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },

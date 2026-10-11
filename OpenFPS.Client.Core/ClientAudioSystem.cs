@@ -1827,17 +1827,13 @@ public partial class ClientAudioSystem
 
     private readonly List<(int Id, float D2)> _frontCandidates = new();
 
-    /// <summary>How far apart a machine's outlets are, metres; memoised, asked per car per frame.</summary>
+    /// <summary>How far apart a machine's outlets are, metres, from the vehicle as it is now: its profile is
+    /// memoised by MachineRegistry.VehicleFor, which a model edit renews (a cache here never forgot).</summary>
     private static float OutletSeparation(string preset)
     {
-        if (_outletSeparation.TryGetValue(preset, out float cached)) return cached;
         var v = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
-        float sep = Vector3.Distance(ExhaustSlot(v), IntakeSlot(v));
-        _outletSeparation[preset] = sep;
-        return sep;
+        return Vector3.Distance(ExhaustSlot(v), IntakeSlot(v));
     }
-
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, float> _outletSeparation = new();
 
     /// <summary>Where the gas leaves, machine frame: the true tailpipe, not where a single voice sits
     /// (VehicleProfile.ExhaustEmitterBias).</summary>

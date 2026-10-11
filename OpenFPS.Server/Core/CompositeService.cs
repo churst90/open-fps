@@ -703,9 +703,9 @@ public class CompositeService
         });
         SetOrAdd(world, root, new SoundEmitterComponent
         {
-            // "engine:" makes the client run the engine itself from the speed this entity reports.
+            // A vehicle's id makes the client run the engine itself from the speed this entity reports.
             IsSynth = true,
-            SoundId = "engine:" + preset,
+            SoundId = ModelKindTable.IdOf(ModelSynth.Engine, preset),
             Mode = PlaybackMode.LoopOne,
             Volume = 1f,
             Range = Loudness.AudibleRange(profile.SourceLevelDb),

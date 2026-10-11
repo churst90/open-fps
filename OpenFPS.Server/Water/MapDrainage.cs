@@ -81,9 +81,7 @@ public static class MapDrainage
         var q = new QueryDescription().WithAll<Transform, SoundEmitterComponent>();
         world.Query(in q, (ref Transform t, ref SoundEmitterComponent s) =>
         {
-            string id = s.SoundId ?? "";
-            if (id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase) || id.StartsWith("water:", StringComparison.OrdinalIgnoreCase)
-                || id.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+            if (ModelKindTable.KindOf(s.SoundId)?.Synth is ModelSynth.Flow or ModelSynth.Water or ModelSynth.Shore)
                 found.Add(t.Position);
         });
         return found;

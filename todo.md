@@ -39,8 +39,8 @@ since the last deploy" list below.
      never fired and are closed anyway; every answer says where it was traced from, and every asker takes
      one by one rule. S5 done: a siren that is off asks for no path.
    - P2, one table of model kinds (`ModelKindTable`): DONE 2026-10-11, no stream changed. Two questions for
-     Cody (Decisions, below). Left for later: S26's two caches, S27's model fallbacks, and the server's own
-     prefix spellings outside P2's list.
+     Cody (Decisions, below). Its leftovers done the same day: the server's own prefix spellings read the
+     table, S26's two caches are gone, S27's model fallbacks log once by id.
    - P8, laws in one place: DONE 2026-10-11, unheard, except S21 (`VehicleShadow` on the shared
      `Diffraction`), waiting on the barrier model: the FMOD fallback voice's distance law and Doppler, one
      occlusion-floor default, one law and one reference for the speed of sound, the world's speed where a

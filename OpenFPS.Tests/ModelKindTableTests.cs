@@ -219,4 +219,68 @@ public class ModelKindTableTests
         Assert.Equal(kind, k);
         Assert.Equal(id, i);
     }
+
+    /// <summary>The server writes its ids through the table, and they read back as the kind they were written as.</summary>
+    [Fact]
+    public void AnIdWrittenThroughTheTableReadsBackAsItsKind()
+    {
+        foreach (var kind in ModelKindTable.All)
+            Assert.Same(kind, ModelKindTable.KindOf(ModelKindTable.IdOf(kind.Synth, "x")));
+        Assert.Equal("bell:crossing_gong", ModelKindTable.IdOf(ModelSynth.Bell, "crossing_gong"));
+        Assert.Equal("rail:light_rail/t7/3", ModelKindTable.RailSource("light_rail", "t7", 3));
+        Assert.True(ModelKindTable.TryRailSource(ModelKindTable.RailSource("light_rail", "t7", 3), out var preset, out var train, out int index));
+        Assert.Equal(("light_rail", "t7", 3), (preset, train, index));
+    }
+
+    /// <summary>Every shipped horn, aeroplane and air-braked vehicle's door declares what its voice needs:
+    /// none falls back (S27).</summary>
+    [Fact]
+    public void EveryShippedHornAircraftAndCabinDoorIsDeclared()
+    {
+        var failed = new List<string>();
+        foreach (var name in VehicleProfile.Presets.Keys)
+        {
+            var v = VehicleProfile.ByName(name);
+            string horn = VehicleProfile.HornFor(v);
+            Honk.LevelDb(horn);
+            if (ModelKindTable.Failures.TryGetValue(Honk.Prefix + horn, out var why)) failed.Add($"{name}: horn {horn} {why}");
+            if (string.IsNullOrEmpty(v.AirSystem) || !v.DoorChime) continue;
+            OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(v);
+            if (ModelKindTable.Failures.TryGetValue(ModelLibrary.Kinds.Air + ":" + v.AirSystem, out why)) failed.Add($"{name}: door {why}");
+        }
+        foreach (var name in AircraftProfile.Presets.Keys)
+        {
+            string id = ModelKindTable.IdOf(ModelSynth.Aircraft, name);
+            Assert.True(ModelKindTable.TryLevel(id, out _, out _), id);
+            if (ModelKindTable.Failures.TryGetValue(id, out var why)) failed.Add($"{id}: {why}");
+        }
+        Assert.Empty(failed);
+    }
+
+    /// <summary>A horn with no model keeps its 110 dB but says so, once, by its id.</summary>
+    [Fact]
+    public void AHornWithNoModelIsLoggedOnce()
+    {
+        Assert.Equal(110f, Honk.LevelDb("klaxon:no_such_horn_for_the_table_test"));
+        Assert.Equal(110f, Honk.LevelDb("air:no_such_horn_for_the_table_test"));
+        Assert.True(ModelKindTable.Failures.ContainsKey("horn:klaxon:no_such_horn_for_the_table_test"));
+        Assert.True(ModelKindTable.Failures.ContainsKey("horn:air:no_such_horn_for_the_table_test"));
+    }
+
+    /// <summary>
+    /// The exhaust a vehicle's voice comes out of follows the registry (S26): a preset asked for before it
+    /// is known is no longer held at the origin once it is.
+    /// </summary>
+    [Fact]
+    public void AnExhaustAskedForBeforeItsVehicleIsKnownFollowsItOnceItIs()
+    {
+        string id = "s26_" + Guid.NewGuid().ToString("N")[..6];
+        var def = new OpenFPS.Common.Networking.EntityDefinition { SoundEmitter = new SoundEmitterComponent { IsSynth = true, SoundId = ModelKindTable.IdOf(ModelSynth.Engine, id) } };
+        Assert.Equal(System.Numerics.Vector3.Zero, AudioEmission.LocalOffset(def));
+        Assert.True(ModelKindTable.Failures.ContainsKey(def.SoundEmitter.SoundId));
+        MachineRegistry.Add(new MachineDefinition { Id = id, Name = "S26", Base = "v8_muscle", Parts = Array.Empty<MachinePart>() });
+        var offset = AudioEmission.LocalOffset(def);
+        Assert.NotEqual(System.Numerics.Vector3.Zero, offset);
+        Assert.Equal(MachineRegistry.VehicleFor(id).ExhaustOffset, offset);
+    }
 }

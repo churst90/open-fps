@@ -2222,11 +2222,15 @@ public class GameServer
     /// <summary>Whether a sound id is running water with a tap a person turns.</summary>
     internal static bool IsTap(string? soundId)
     {
-        if (soundId == null || !soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
-        return TapIds.GetOrAdd(soundId, static id =>
+        if (!ModelKindTable.Is(soundId, ModelSynth.Flow)) return false;
+        return TapIds.GetOrAdd(soundId!, static id =>
         {
-            try { return OpenFPS.Common.RunningWaterSpec.ByName(id[5..]).Tap != null; }
-            catch (Exception) { return false; }
+            try { return OpenFPS.Common.RunningWaterSpec.ByName(ModelKindTable.KindOf(id)!.Rest(id)).Tap != null; }
+            catch (Exception ex)
+            {
+                ModelKindTable.Fail(id, ex.Message);
+                return false;
+            }
         });
     }
 

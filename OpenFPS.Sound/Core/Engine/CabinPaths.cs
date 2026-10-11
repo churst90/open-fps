@@ -158,18 +158,22 @@ public static class CabinPaths
         if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
         {
             float along = 1f, side = 1f;
+            string air = ModelLibrary.Kinds.Air + ":" + v.AirSystem;
             try
             {
                 var spec = ModelLibrary.Air(v.AirSystem);
+                bool found = false;
                 foreach (var p in spec.Ports)
                     if (string.Equals(p.Name, "door", StringComparison.OrdinalIgnoreCase))
                     {
                         along = p.AlongMetres;
                         if (p.LateralMetres != 0f) side = MathF.Sign(p.LateralMetres);
+                        found = true;
                         break;
                     }
+                if (!found) ModelKindTable.Fail(air, "has no door port; the door is put a metre from the front, kerb side");
             }
-            catch { }
+            catch (Exception ex) { ModelKindTable.Fail(air, ex.Message + "; the door is put a metre from the front, kerb side"); }
             float z = Math.Clamp(v.LengthMetres * 0.5f - along, g.Back, g.Front);
             door = paths.Count;
             paths.Add(new Path(Kind.Door, new Vector3(side * halfW, g.RoofUnder - 0.2f, z), -1, (int)side));

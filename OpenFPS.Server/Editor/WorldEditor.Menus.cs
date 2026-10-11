@@ -451,13 +451,13 @@ public sealed partial class WorldEditor
     public static string CategoryOf(PrefabTemplate t)
     {
         string id = t.Id.ToLowerInvariant();
-        string sound = (t.SoundId ?? "").ToLowerInvariant();
+        var model = ModelKindTable.KindOf(t.SoundId)?.Synth;
         if (t.IsItem) return "Things to carry";
         if (t.IsDoor == true) return "Doors";
-        if (sound.StartsWith("machine:")) return "Machines";
-        if (sound.StartsWith("water:") || sound.StartsWith("flow:") || sound.StartsWith("shore:") || id.Contains("water") || id.StartsWith("shore_")) return "Water";
-        if (sound.StartsWith("fire:")) return "Fire";
-        if (sound.StartsWith("foliage:") || id.Contains("tree") || id.Contains("foliage") || id.Contains("hedge")) return "Trees and plants";
+        if (model == ModelSynth.Machine) return "Machines";
+        if (model is ModelSynth.Water or ModelSynth.Flow or ModelSynth.Shore || id.Contains("water") || id.StartsWith("shore_")) return "Water";
+        if (model == ModelSynth.Fire) return "Fire";
+        if (model == ModelSynth.Foliage || id.Contains("tree") || id.Contains("foliage") || id.Contains("hedge")) return "Trees and plants";
         // A place is a room, a region, a doorway, a name or a trigger; a beacon is a thing that sounds.
         if (t.IsIndoor.HasValue || t.RegionAId.HasValue || id.Contains("region") || id.Contains("portal") || id.Contains("marker")
             || id.Contains("named_place") || t.Type == EntityType.Trigger) return "Places and markers";

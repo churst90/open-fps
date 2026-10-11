@@ -29,24 +29,13 @@ public static class AudioEmission
         var authored = def.SoundEmitter.Offset;
         if (authored != Vector3.Zero) return authored;
 
-        if (def.SoundEmitter.IsSynth && ModelKindTable.VehiclePreset(def.SoundEmitter.SoundId) is { } preset)
-            return PresetOffset(preset);
+        // The vehicle's own memo (MachineRegistry.VehicleFor), which a model edit or a load renews. A cache
+        // here kept the zero of a preset asked for before the registry knew it, and an edited exhaust's old
+        // place. A preset nobody knows is logged once, by the table.
+        if (def.SoundEmitter.IsSynth && ModelKindTable.KnownVehiclePreset(def.SoundEmitter.SoundId) is { } preset)
+            return MachineRegistry.VehicleFor(preset).ExhaustOffset;
         return Vector3.Zero;
     }
-
-    /// <summary>
-    /// The exhaust slot of a vehicle preset, worked out once: asked twice a frame per car on the audio
-    /// thread, and building the profile builds a whole engine, gearbox and tyre model each time.
-    /// </summary>
-    private static Vector3 PresetOffset(string preset)
-    {
-        if (_presetOffsets.TryGetValue(preset, out var cached)) return cached;
-        var offset = MachineRegistry.Knows(preset) ? MachineRegistry.VehicleFor(preset).ExhaustOffset : Vector3.Zero;
-        _presetOffsets[preset] = offset;
-        return offset;
-    }
-
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Vector3> _presetOffsets = new();
 
     /// <summary>Where this entity's sound comes out, in world space.</summary>
     public static Vector3 PointFor(in EntitySnapshot snap)

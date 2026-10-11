@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- P2's leftovers (docs/SPECIAL_CASES_AUDIT.md, "P2 as built"); nothing heard or said changes. The server writes
+  and reads model ids through `ModelKindTable` (`IdOf`, `RailSource`, `KindOf`): the vehicles, the crossings'
+  bell and gate, a parked car, the drainage lines, the trains, the editor's categories, the placed water, the
+  tiles' trees, the taps, and the client's crowns. S26: the exhaust offset and the outlet separation have no
+  cache of their own; they read the registry's vehicle, which a model edit renews. S27: a horn with no model,
+  an aeroplane with nothing to size it by and a door with no port keep their old values and are logged once by
+  id. The wire hash changes (AudioEmission, Honk and the table are in it).
+
 - One set of compass words: `OpenFPS.Words` (no dependencies) has `CompassWords.Of(degrees, points)` for 16,
   8 or 4 points, and every compass word in the game calls it: /wind, /build, the editor, the world's "north
   east of Magnolia", the driving aids' heading, the F key's facing and the sky readout. Seven copies of the

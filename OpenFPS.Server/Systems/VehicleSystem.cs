@@ -188,7 +188,7 @@ public sealed partial class VehicleSystem
             {
                 // Aircraft, machines and walkers are shuttles like any vehicle (RoadStart and RoadEnd
                 // carry a Y, so an approach is a shuttle that ends lower). Which library holds the
-                // preset decides the SoundId prefix the client picks its model by; a walker has no
+                // preset decides the kind of model the client picks by its SoundId; a walker has no
                 // voice, the client makes its footsteps from its movement.
                 bool isAircraft = AircraftProfile.Presets.ContainsKey(vd.Preset);
                 bool isMachine = !isAircraft && SmallMachineSpec.Presets.ContainsKey(vd.Preset);
@@ -204,7 +204,7 @@ public sealed partial class VehicleSystem
                 var profile = isAircraft || isMachine || isWalker ? null : MachineRegistry.VehicleFor(vd.Preset);
                 string displayKind = isAircraft ? air!.Name : isMachine ? machine!.Name : isWalker ? "someone walking" : profile!.Engine.Name;
                 float sourceLevelDb = isAircraft ? air!.SourceLevelDb : isMachine ? machine!.SourceLevelDb : isWalker ? 0f : profile!.SourceLevelDb;
-                string prefix = isAircraft ? "aircraft:" : isMachine ? "machine:" : "engine:";
+                string soundId = ModelKindTable.IdOf(isAircraft ? ModelSynth.Aircraft : isMachine ? ModelSynth.Machine : ModelSynth.Engine, vd.Preset);
                 // The collider carries it into a client's earshot through the spatial grid: an
                 // undersized aeroplane appears late. An aeroplane is its declared wingspan by length.
                 var hull = isAircraft
@@ -293,7 +293,7 @@ public sealed partial class VehicleSystem
                         SetOrAdd(shellWorld, e, new SoundEmitterComponent
                         {
                             IsSynth = true,
-                            SoundId = prefix + vd.Preset,
+                            SoundId = soundId,
                             Mode = PlaybackMode.LoopOne,
                             Volume = 1f,
                             Range = Loudness.AudibleRange(sourceLevelDb),
@@ -331,7 +331,7 @@ public sealed partial class VehicleSystem
                     new SoundEmitterComponent
                     {
                         IsSynth = true,
-                        SoundId = prefix + vd.Preset,
+                        SoundId = soundId,
                         Mode = PlaybackMode.LoopOne,
                         Volume = 1f,
                         // From its loudness, as the client places it: the broadcast radius is sized

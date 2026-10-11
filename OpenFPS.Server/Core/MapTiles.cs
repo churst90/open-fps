@@ -261,8 +261,7 @@ public sealed class MapTiles
             var s = world.Get<SoundEmitterComponent>(e);
             // A tree's wind is heard from its crown to 90 m, but a wood of them much further: the client
             // hears the trees past the hand-over as one source per wood (WoodChorus), so it needs them.
-            if (!string.IsNullOrEmpty(s.SoundId) && s.SoundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
-                return TileDetail.Coarse;
+            if (ModelKindTable.Is(s.SoundId, ModelSynth.Foliage)) return TileDetail.Coarse;
             if (!string.IsNullOrEmpty(s.SoundId) && s.Range < StreamRadii.MinFullMetres) return TileDetail.Full;
         }
         if (!string.IsNullOrEmpty(layer) && CoarseLayers.Contains(layer)) return TileDetail.Coarse;
