@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build + run the OpenFPS server WITHOUT hitting the ntfs3 build hang.
+# Build + run the OpenFPS server, the build kept out of the checkout.
 #
-# Builds with --artifacts-path on tmpfs (a plain `dotnet run` writes obj/bin onto the ntfs3 volume and
-# hangs), then runs the prebuilt DLL with the working directory set to OpenFPS.Server so it finds its
+# Builds with --artifacts-path on tmpfs (the repo was once on ntfs3, where a plain `dotnet run` hung; it is
+# on btrfs now, 2026-10), then runs the prebuilt DLL with the working directory set to OpenFPS.Server so it finds its
 # data (maps/, prefabs/, openfps.db — all resolved relative to cwd).
 #
 # Usage:

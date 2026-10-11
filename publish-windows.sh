@@ -15,8 +15,8 @@ set -e
 REPO="$(cd "$(dirname "$0")" && pwd)"
 DOTNET="${DOTNET:-$HOME/.dotnet/dotnet}"
 # Not /tmp: that is 8 GB of RAM shared with every other build and log, and this output (the
-# assets twice, plus the zip) filled it and broke the GTK build. Not the repo either: MSBuild's
-# output phase hangs on the ntfs3 volume. The home volume has neither problem.
+# assets twice, plus the zip) filled it and broke the GTK build. Not the repo either: build output stays
+# out of the checkout (it was once on ntfs3, where MSBuild's output phase hung).
 ART="${OPENFPS_PUBLISH_DIR:-$HOME/.cache/openfps-publish}/win"
 OUT="$ART/publish/OpenFPS.Client/release_win-x64"
 

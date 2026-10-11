@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The one way to build on this machine. Pinned to the last twelve cores (half the machine) at low
-# priority, so Cody's desktop and screen reader keep the rest. Output goes to tmpfs: the repo is on
-# ntfs3, where MSBuild's output step hangs.
+# priority, so Cody's desktop and screen reader keep the rest. Output goes where ARTIFACTS_DIR says,
+# never into the checkout (the repo was once on ntfs3, where MSBuild's output step hung). Prefer
+# ~/.cache/openfps-build/NAME on the NVMe: /tmp is 8 GB of RAM.
 #
 #   tools/build-local.sh ARTIFACTS_DIR PROJECT [more dotnet build args]
 #   tools/build-local.sh /tmp/openfps-build OpenFPS.Tests
