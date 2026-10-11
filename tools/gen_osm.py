@@ -473,6 +473,12 @@ rooms_later = []
 # other part's id: (frame along the wall, u0, u1, v0, v1, y0, y1 over the pad, name, the pad's height, the tile).
 steps_later = []
 
+# The finish laid on a home's slab where the home is one room a rectangle (detail 1), written after the steps so adding
+# it moves no other part's id: (frame, outline, prefab, name, the pad's height, the tile). The slab under it is the
+# footprint stood up in concrete, as every other building's is: until 2026-10-11 the finish was the slab, 27 cm of
+# carpet or wood on the ground (docs/GEOMETRY.md 12.6, "A floor is a construction").
+finishes_later = []
+
 STEP_RISE = 0.17          # a step's rise, m
 STEP_TREAD = 0.28         # ...and its going
 STEP_LANDING = 1.0        # the landing at the door, out from the wall
@@ -2488,12 +2494,12 @@ def build(bd):
 
     # ── Slab, roof: the footprint itself ────────────────────────────────────────────────────────
     homes = kind in ("house", "mobile_home")
-    floor_prefab = "concrete_floor"
-    if homes and detail == 1:
-        floor_prefab = "wood_floor" if h01(label, "floor") < 0.5 else "carpet_floor"
     outline = [F.l(x, z) for x, z in ring]
-    oform(floor_prefab, F, outline, -0.15, FLOOR_TOP if floor_prefab != "concrete_floor" else 0.10, {"Kind": "Prism"},
-          name=f"{name} floor", layer="structure")
+    oform("concrete_floor", F, outline, -0.15, 0.10, {"Kind": "Prism"}, name=f"{name} floor", layer="structure")
+    if homes and detail == 1:
+        finish = "wood_floor" if h01(label, "floor") < 0.5 else "carpet_floor"
+        finishes_later.append((F, outline, finish, f"{name} {'floorboards' if finish == 'wood_floor' else 'carpet'}",
+                               _Y_PIN[0], _TILE_PIN[0]))
     style, rise = roof_of(bd, kind, mat, wall_h, label)
     oform(roof_prefab, F, outline, wall_h, wall_h + rise, {"Kind": "Roof", "Style": style}, name=f"{name} roof", layer="structure")
     STATS[f"{style.lower()} roofs"] += 1
@@ -3814,6 +3820,10 @@ for E, u0, u1, v0, v1, y0, y1, nm, pin, tile in steps_later:
     _Y_PIN[0], _TILE_PIN[0] = pin, tile
     obox("concrete_floor", E, u0, u1, v0, v1, y0, y1, name=nm, layer="structure")
     _Y_PIN[0] = _TILE_PIN[0] = None
+for F, outline, prefab, nm, pin, tile in finishes_later:
+    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+    oform(prefab, F, outline, 0.10, FLOOR_TOP, {"Kind": "Prism"}, name=nm, layer="interiors")
+    _Y_PIN[0] = _TILE_PIN[0] = None
 
 ground_all()
 if HAS_GROUND:
@@ -3906,6 +3916,7 @@ if STATS["rooms whose furniture stands in a way through"]:
 if STATS["doors with something in the way outside"]:
     print(f"  {STATS['doors with something in the way outside']} outside doors have another building in the way a step out, with no clear spot along their wall")
 print(f"  {len(steps_later)} landings and steps at outside doors")
+print(f"  {len(finishes_later)} floors finished on a home's slab")
 if STATS["side doors"]:
     print(f"  {STATS['side doors']} rooms no way wide enough for a body reached have a side door")
 if STATS["rooms no one can walk into"]:

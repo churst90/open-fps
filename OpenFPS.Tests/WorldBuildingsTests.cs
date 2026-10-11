@@ -262,7 +262,7 @@ public class WorldBuildingsTests : IDisposable
             => Vector2.Distance(new Vector2(w.Position.X, w.Position.Z), new Vector2(g.Position.X, g.Position.Z)) <= 0.01
                && Math.Abs(w.Position.Y - g.Position.Y) <= 0.01 && (Extent(w) - Extent(g)).Length() <= 0.01
                && 1 - Math.Abs(Quaternion.Dot(Quaternion.Normalize(w.Rotation), Quaternion.Normalize(g.Rotation))) < 1e-5;
-        int openings = 0, wings = 0, stepsCompared = 0, sideDoorParts = 0;
+        int openings = 0, wings = 0, stepsCompared = 0, sideDoorParts = 0, finishes = 0;
         foreach (var d in MagnoliaDecisions())
         {
             if (d.GetProperty("detail").GetInt32() != 1) continue;
@@ -297,6 +297,13 @@ public class WorldBuildingsTests : IDisposable
                 var got = make(0);
                 Assert.True(stepsByName[got.Name!].Any(w => Same(w, got)), $"{fp.Id}: no {got.Name} in the map where {got.Position} is");
                 stepsCompared++;
+            }
+            foreach (var make in later.Finishes)
+            {
+                var got = make(0);
+                Assert.True(byName[got.Name!].Any(w => w.PrefabId == got.PrefabId && Same(w, got) && SameForm(w.Form, got.Form)),
+                            $"{fp.Id}: no {got.Name} in the map where {got.Position} is");
+                finishes++;
             }
             var mineRooms = made.Where(x => x.PrefabId == "acoustic_region").Select(x => x.EntityId).ToHashSet();
             int theirs = portals.Where(g => mineRooms.Contains(g.Key.Item1)).Sum(g => g.Count());
@@ -357,13 +364,14 @@ public class WorldBuildingsTests : IDisposable
                 ties.Add($"{d.GetProperty("name").GetString()} ({fp.Id})");
             }
         }
-        _o.WriteLine($"{openings} openings between rooms, {wings} rooms of leftover pieces and {stepsCompared} landings and steps and {sideDoorParts} parts of side doors where the map has them");
+        _o.WriteLine($"{openings} openings between rooms, {wings} rooms of leftover pieces and {stepsCompared} landings and steps, {sideDoorParts} parts of side doors and {finishes} floor finishes where the map has them");
         _o.WriteLine($"{compared} buildings at medium detail ({string.Join(", ", kinds.OrderByDescending(k => k.Value).Select(k => $"{k.Key} {k.Value}"))}), "
                      + $"{entities} entities; {same} buildings the same in every part, {matched} entities within 1 cm and the same turn (worst "
                      + $"{worstXz * 1000:F2} mm across, {worstY * 1000:F2} mm in height, {worstSize * 1000:F2} mm in size, turn 1 - |dot| {worstTurn:E1}); "
                      + $"the door on another wall of the same length facing the same way (a tie gen_osm breaks by rounding): {string.Join("; ", ties)}");
         Assert.True(compared > 1000);
         Assert.True(ties.Count <= compared / 200, $"{ties.Count} buildings differ");
+        Assert.True(finishes > 900, $"{finishes} floor finishes");
     }
 
     /// <summary>
@@ -385,7 +393,8 @@ public class WorldBuildingsTests : IDisposable
         int seen = 0, sameKind = 0, shells = 0, padSame = 0, shellSame = 0, solidSame = 0, solids = 0, otherRoad = 0;
         var confusion = new Dictionary<string, int>();
         var clock = Stopwatch.StartNew();
-        int tiles = 0;
+        int tiles = 0, floorRooms = 0;
+        var bare = new List<string>();
         for (int dx = -1; dx <= 1; dx++)
             for (int dz = -1; dz <= 1; dz++)
             {
@@ -405,7 +414,13 @@ public class WorldBuildingsTests : IDisposable
                     for (int i = 0; i < posts; i++)
                         window[j * posts + i] = (float)(e.HeightAt(west + i * 2 - u.Easting, south + j * 2 - u.Northing) - e.SeaLevelY);
                 tiles++;
-                foreach (var b in features.BuildingsOf(key, fps, ways, window, margin))
+                var made = features.BuildingsOf(key, fps, ways, window, margin);
+                var owned = made.Where(b => b.Owner == key).SelectMany(b => b.Entities.Concat(b.Later.Rooms.Concat(b.Later.Finishes).Select(m => m(0)))).ToList();
+                var tileKey = key;
+                var floors = FloorStructure.Check(owned, Prefabs, (x, z) => (float)(e.HeightAt(x + tileKey.Easting - u.Easting, z + tileKey.Northing - u.Northing) - e.SeaLevelY));
+                floorRooms += floors.Rooms;
+                bare.AddRange(floors.Bare);
+                foreach (var b in made)
                 {
                     if (b.Owner != key || !decided.TryGetValue(b.Fp.Id, out var d) || d.GetProperty("detail").GetInt32() != 1) continue;
                     seen++;
@@ -446,6 +461,9 @@ public class WorldBuildingsTests : IDisposable
         Assert.True(seen > 50);
         Assert.True(padSame >= shells * 0.9, $"{padSame} of {shells} pads");
         Assert.True(solidSame >= solids * 0.95, $"{solidSame} of {solids} solid boxes");
+        _o.WriteLine($"{floorRooms} rooms of the world's buildings, {bare.Count} with a floor on no structure");
+        Assert.True(floorRooms > 100, $"{floorRooms} rooms");
+        Assert.True(bare.Count == 0, string.Join("; ", bare.Take(5)));
     }
 
     // ═══ Tiles that agree ═══════════════════════════════════════════════════════════════════════════
@@ -504,13 +522,13 @@ public class WorldBuildingsTests : IDisposable
             Assert.Equal(6, room.RoomMaterials!.Length);
         }
         // An opening between two rooms of a building joins two rooms of its own tile, written after every building (and before
-        // the steps outside its doors, written last of all).
+        // the steps outside its doors and the homes' floor finishes, written last of all).
         foreach (var (tile, opening) in all.Where(x => x.E.PrefabId == "portal"))
         {
             var mine = (tile == A ? a : b).Entities;
             foreach (int id in new[] { opening.RegionAId!.Value, opening.RegionBId!.Value })
                 Assert.Equal("acoustic_region", mine.Single(x => x.EntityId == id).PrefabId);
-            Assert.True(opening.EntityId > mine.Where(x => x.PrefabId != "portal" && x.EntityId > 0 && !(x.Name ?? "").EndsWith(" landing") && !(x.Name ?? "").EndsWith(" step")).Max(x => x.EntityId));
+            Assert.True(opening.EntityId > mine.Where(x => x.PrefabId != "portal" && x.EntityId > 0 && x.Layer != "interiors" && !(x.Name ?? "").EndsWith(" landing") && !(x.Name ?? "").EndsWith(" step")).Max(x => x.EntityId));
             Assert.True(opening.EntityId < mine.Where(x => (x.Name ?? "").EndsWith(" landing")).Select(x => x.EntityId).DefaultIfEmpty(int.MaxValue).Min());
         }
         Assert.Contains("made-up buildings", a.Buildings);
@@ -774,6 +792,19 @@ public class WorldBuildingsTests : IDisposable
         _o.WriteLine("attribution: " + tiles.First(t => t.Buildings != null).Buildings);
         Assert.True(doors > 50);
         Assert.Contains(names, n => n!.Contains(" off "));
+
+        // Every room's floor stands on a structure (FloorStructure), the ground the tile's own.
+        int floorRooms = 0;
+        foreach (var t in tiles)
+        {
+            var field = Field(t.Terrain!);
+            float baseY = t.Terrain!.BaseY;
+            var fr = FloorStructure.Check(t.Entities, Prefabs, (x, z) => x is >= 0 and <= 250 && z is >= 0 and <= 250 ? baseY + field.HeightAt(x, z) : null);
+            floorRooms += fr.Rooms;
+            Assert.True(fr.Bare.Count == 0, $"{fr.Bare.Count} rooms on no structure: " + string.Join("; ", fr.Bare.Take(5)));
+        }
+        _o.WriteLine($"{floorRooms} rooms, every floor on a structure");
+        Assert.True(floorRooms > 50);
 
         // The other order, a fresh store, the same caches and no network: the same tiles.
         var offline = new FixtureNet { Fail = true };

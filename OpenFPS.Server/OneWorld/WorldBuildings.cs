@@ -6,7 +6,7 @@ namespace OpenFPS.Server.OneWorld;
 /// <summary>
 /// A building's shell as tools/gen_osm.py builds one at medium detail (its build(), ported; keep the two the same):
 /// the footprint covered by up to two rectangles in its own frame, walls round the outside of their union with the
-/// front door cut out of the longest wall facing the street, a floor slab and a roof deck over each rectangle, a
+/// front door cut out of the longest wall facing the street, a concrete floor slab (in a home, carpet or boards on it) and a roof deck over each rectangle, a
 /// ceiling in a home, one room in each rectangle, and the front door joining a room to the outdoors. A small shed, and
 /// any garage, workshop, barn or outbuilding, is one solid box. Everything is set on the building's pad (the ground at
 /// the middle of its wall nearest the road), or, for a solid box, with its foot at the lowest ground under it.
@@ -357,8 +357,10 @@ public static class WorldBuildings
         /// <summary>A side door given to a room no way reaches, and the wall round it (gen_osm.py doors_later), written after
         /// the openings.</summary>
         public List<Func<int, EntityData>> Doors { get; } = new();
-        /// <summary>The landing and steps outside each door (gen_osm.py steps_later), written last.</summary>
+        /// <summary>The landing and steps outside each door (gen_osm.py steps_later), written after the side doors.</summary>
         public List<Func<int, EntityData>> Steps { get; } = new();
+        /// <summary>A home's floor finish on its slab (gen_osm.py finishes_later), written last.</summary>
+        public List<Func<int, EntityData>> Finishes { get; } = new();
     }
 
     // gen_osm.py's steps outside a door (steps_out).
@@ -513,8 +515,20 @@ public static class WorldBuildings
         string floorPrefab = "concrete_floor";
         if (homes) floorPrefab = H01(label, "floor") < 0.5 ? "wood_floor" : "carpet_floor";
         var outline = ring.Select(q => F.L(q.X, q.Z)).ToList();
-        Oform(floorPrefab, F, outline, -0.15, floorPrefab != "concrete_floor" ? FloorTop : 0.10, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism },
-              $"{name} floor", "structure");
+        Oform("concrete_floor", F, outline, -0.15, 0.10, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism }, $"{name} floor", "structure");
+        // A home's finish on the slab, written after the steps (gen_osm.py finishes_later).
+        if (homes && later != null)
+        {
+            string finish = floorPrefab;
+            later.Finishes.Add(eid =>
+            {
+                double u0 = outline.Min(q => q.U), u1 = outline.Max(q => q.U), v0 = outline.Min(q => q.V), v1 = outline.Max(q => q.V);
+                var e = Make(finish, F, u0, u1, v0, v1, 0.10, FloorTop, $"{name} {(finish == "wood_floor" ? "floorboards" : "carpet")}", "interiors", null, eid);
+                double cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+                e.Form = new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism, Outline = outline.SelectMany(q => new[] { R4(q.U - cu), R4(q.V - cv) }).ToArray() };
+                return e;
+            });
+        }
         var (style, rise) = RoofOf(bd, kind, mat, wallH, label, p.Height);
         Oform(roofPrefab, F, outline, wallH, wallH + rise, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Roof, Style = style }, $"{name} roof", "structure");
         var boxes = RoomBoxes(F, ring, R);

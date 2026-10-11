@@ -2062,6 +2062,49 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      Burklin Lane `/tp 1377.5 94.6 -1.0`, 26410 Country Woods Trail `/tp -822.0 708.6 4.7`; Albany: 777 College Park
      Drive Southwest `/tp 253.0 934.4 -1.9`, 6237 Chapman Place Southwest `/tp -642.8 -0.8 -2.6`, 1551 Beaver Court
      Southwest `/tp -535.0 859.2 -4.0` (the real places: what is outside, louder through the next roof or shed).
+   - **What argued against it on the real places: floors that were only a finish.** Fixed, next paragraph. The
+     floors explain few of the louder pairs: of the pairs louder by the model, Magnolia's rooms 1 of 829 (low band),
+     the street heard indoors 3 to 6 of 269 to 374 a band; Albany's rooms none, the street indoors 1 to 5 of 96 to
+     254.
+
+   **A floor is a construction (2026-10-11, unheard).** Every home on the real places built at medium detail (the
+   whole of both places outside the spawn's few hundred metres, and every home of the world's tiles) stood on its
+   finish: the footprint stood up from -0.15 to 0.12 m in carpet or wood, laid on the ground, where every other
+   building stands on a 25 cm concrete slab and a home at high detail has a 2 cm finish on that slab. On the maps
+   before, 1,441 rooms on Magnolia and 1,959 on Albany had a floor with no structure under it (half 27 cm of
+   carpet, a porous fabric whose prefab passes 0.3/0.5/0.8, half 27 cm of solid wood on the ground). The rule
+   now, in gen_osm.py `build()` and `WorldBuildings.Build` alike: every building's floor is the concrete slab
+   (-0.15 to 0.10 m over the pad), and a home's finish (the same carpet or boards, chosen as before) is a second
+   prism of the footprint from 0.10 to 0.12. What you stand on is the same material at the same height, so
+   footsteps and the rooms' measured floors do not change, and the ground is graded to the same undersides. The
+   slab keeps its entity id (its prefab and height change); the finishes are written after the steps outside the
+   doors (gen_osm `finishes_later`, `WorldBuildings.Later.Finishes`), so no other part moves: Magnolia 38,226
+   entities to 39,199 (973 finishes), Albany 53,031 to 54,156 (1,125), every earlier entity the same but the
+   slabs. `WorldStore.GeneratorVersion` 8 remakes the world's tiles; the places' copies in the world follow their
+   maps' checksums. Upper floors and ceilings have no such gap: a two-storey house is one storey of rooms in a
+   taller shell (no upper floor is built), and every home's ceiling is one 6 cm plaster sheet over the footprint
+   under the roof; the city's flats are carpet on a 15 cm concrete slab over a plaster soffit.
+   - **The test.** `RealPlaceMapTests.Every_room_s_floor_stands_on_a_structure` (both places) and the world's
+     buildings in `WorldBuildingsTests` (Magnolia's footprints through the world's generator, Tomball's tiles):
+     at nine points over every room's floor, the solids stacked under what a body stands on (each less than 10
+     cm under the one above) must hold a structure, a slab (airtight, stone or metal, 8 cm or more) or boards
+     (airtight wood, 18 mm or more) over a void of 10 cm or more, the ground read from the place's terrain
+     (`FloorStructure`). Read from materials and thickness, never names. It fails on the old maps by the counts
+     above and passes on the new ones (2,864 rooms on Albany, 1,811 on Magnolia, 153 and 290 of the world's).
+     A gap thinner than 10 cm counts as contact: nine rooms have a neighbour's driveway, or a service road (the
+     Exxon on Magnolia), lying 6 to 8 cm over their finished floor, pitched so its underside clears the finish
+     by a few millimetres (1024 Belmont Avenue's living room has 1034's driveway in it). That is a separate
+     fault, a drive or road laid through another building's footprint, left in todo.
+   - **The sound** (`--barrier-sweep n=4000 seed=1` and `outdoor n=2000`, the old maps against the new, the
+     same pairs; `server=DIR` reads a map from elsewhere and `dump=FILE` writes every pair). Between rooms:
+     Magnolia 2 pairs quieter (by 21 dB, the low band), Albany 2 louder; the street heard indoors: Magnolia 9
+     quieter (median 20 dB) and 2 louder, Albany 12 quieter (median 18 dB) and 4 louder (low band; mid and high
+     alike). The louder ones are a way round the new slab's underside: the finish now lies on the slab's top
+     face, so the barrier search counts each top edge as buried in it (`OpeningRoutes.Buried`) and takes a bottom
+     edge, which on the real places is in the earth, and the earth is no box. 1303 Tamarack Court Southwest,
+     the street below, -78/-100/-100 to -29/-58/-93; 1974 Antelope Court Southwest -76/-100/-100 to
+     -29/-56/-89. Two rules would close it, both the barrier model's (todo): a layer of the same construction
+     (`Constructions`' contact) does not bury an edge, and the ground buries one.
    **Openings from the floods (step 3, 2026-10-11, approved by ear 2026-10-11).** A flood keeps the cells of each opening its air meets
    and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
    opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide

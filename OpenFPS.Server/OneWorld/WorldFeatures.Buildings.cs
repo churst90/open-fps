@@ -480,6 +480,7 @@ public sealed partial class WorldFeatures
         foreach (var l in laters) foreach (var make in l.Openings) entities.Add(make(++lastId));
         foreach (var l in laters) foreach (var make in l.Doors) entities.Add(make(++lastId));
         foreach (var l in laters) foreach (var make in l.Steps) entities.Add(make(++lastId));
+        foreach (var l in laters) foreach (var make in l.Finishes) entities.Add(make(++lastId));
         return (built, built > 0 ? Footprint.Attribution(Buildings?.Name ?? "Buildings", mine) : null);
     }
 
