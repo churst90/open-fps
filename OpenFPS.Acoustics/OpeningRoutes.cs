@@ -1246,7 +1246,8 @@ public sealed class OpeningRoutes
     /// What a straight leg loses to the boxes it crosses, amplitude per band: what their constructions let
     /// through (<see cref="WallTransmission"/>), or what bends round them (<see cref="BarrierGains"/>),
     /// whichever passes more in each band. The boxes standing in the openings at either end are not
-    /// charged: the opening's own transmission is.
+    /// charged: the opening's own transmission is. A leg through the earth (<see cref="ThroughTheGround"/>)
+    /// passes nothing that way, and what comes is what bends over the ground's profile or round the boxes.
     /// </summary>
     public Vector3 LegGains(Vector3 a, Vector3 b, int[] ignoreA, int[] ignoreB)
     {
@@ -1262,8 +1263,9 @@ public sealed class OpeningRoutes
             if (!SegmentSpan(i, a, b, 0f, out float t0, out float t1)) continue;
             crossed.Add(CrossingOf(i, a, b, t0, t1, len));
         }
-        if (crossed.Count == 0) return Vector3.One;
-        Vector3 through = Constructions.Through(crossed, len > 1e-6f ? (b - a) / len : Vector3.UnitX);
+        bool earth = ThroughTheGround(a, b);
+        if (crossed.Count == 0 && !earth) return Vector3.One;
+        Vector3 through = earth ? Vector3.Zero : Constructions.Through(crossed, len > 1e-6f ? (b - a) / len : Vector3.UnitX);
         var round = BarrierGains(a, b, WallTransmission.SoundSpeed, out _, out _, out _, out bool found, ignoreA, ignoreB);
         return found ? Vector3.Max(through, round) : through;
     }
@@ -1306,6 +1308,36 @@ public sealed class OpeningRoutes
         return any ? Constructions.InPlaneCorrection(crossed, (listener - source) / len) : Vector3.One;
     }
 
+    /// <summary>
+    /// What the worker multiplies Steam Audio's transmission by, per band: nothing through the earth (the
+    /// straight line under the terrain, <see cref="ThroughTheGround"/>), and otherwise the run rule's
+    /// correction (<see cref="InPlaneCorrection"/>). Steam Audio's ground is its surface's faces, each carrying
+    /// its land cover's figure, and the porous covers' figures do not depend on thickness: a line through a
+    /// grassy hill 4 m high, its ends 100 m apart, passed -8/-4/-2 dB (bare earth -10/-8/-6), where over
+    /// its crest is -8/-14/-22 (OpeningRoutesTerrainTests). What comes over the hill is the barrier
+    /// model's way over the ground's profile (<see cref="BarrierGains"/>), as for every other asker.
+    /// </summary>
+    public Vector3 SimulatorCorrection(Vector3 source, Vector3 listener)
+        => ThroughTheGround(source, listener) ? Vector3.Zero : InPlaneCorrection(source, listener);
+
+    /// <summary>
+    /// For an asker that charges the straight line through boxes only (the hand-rolled tracer): when the line
+    /// goes through the earth, which passes nothing, what comes over everything in the vertical plane, the
+    /// ground's profile and the boxes on it (<see cref="OverTheTop"/>), by the barrier model's law, and the top
+    /// it is heard from (<paramref name="edge"/>); zero, <paramref name="found"/> false, with no way over.
+    /// False when the line stays out of the ground, and the asker's own figure stands.
+    /// </summary>
+    public bool OverTheGround(Vector3 source, Vector3 listener, float speedOfSound, out Vector3 gains, out Vector3 edge, out bool found)
+    {
+        gains = Vector3.Zero; edge = listener; found = false;
+        if (!ThroughTheGround(source, listener)) return false;
+        float over = OverTheTop(source, listener, null, null, out edge);
+        if (over < 0f) return true;
+        found = true;
+        gains = Round(MathF.Max(over, GrazingMetres), MathF.Max(0.5f, Vector3.Distance(source, listener)), speedOfSound);
+        return true;
+    }
+
     /// <summary>The boxes the straight line passes, one a line: each one's panel figure, and how far the line
     /// runs inside one it goes into by its edge and what that run lets through. For the lab.</summary>
     public string ExplainLine(Vector3 source, Vector3 listener)
@@ -1323,6 +1355,9 @@ public sealed class OpeningRoutes
                     + $"in {t0 * len:F2} out {t1 * len:F2} m: panel {Db3(c.AsPanel)}"
                     + (c.Run > 0f ? $", gone in by its edge, {c.Run:F2} m inside {Db3(c.Gains)}" : "") + "\n");
         }
+        if (GroundCounts && _ground.Profile(source, listener, RouteJointMetres, new List<(float, float)>(), out float most, out float at))
+            sb.Append($"        line through the earth: the ground {most:F2} m over it at {at:F1} m along; the ground under the source "
+                    + $"{_ground.Describe(source.X, source.Z)}, under the ear {_ground.Describe(listener.X, listener.Z)}\n");
         return sb.ToString();
     }
 
@@ -1345,7 +1380,8 @@ public sealed class OpeningRoutes
     /// lets through radiates over its whole face, so the brick just over the edge of a slab built into it is
     /// heard past that edge, as the field through a panel is diffracted at the panel's edge.</item>
     /// </list>
-    /// No way bends at or under the terrain (<see cref="WaysRound"/>), which is no box.
+    /// No way bends at or under the terrain (<see cref="WaysRound"/>), which is no box, and no leg goes
+    /// through it (<see cref="ThroughTheGround"/>); a line through it is gone over (<see cref="OverTheTop"/>).
     /// Without the second, a 3 cm way over a stair's concrete guard whose leg ran on through the brick front
     /// was thrown out, and the guard was charged as a solid wall: a car on Dock Street jumped 22 to 31 dB
     /// as its line came out of the guard's shadow (Marlow Tower, 2026-10-11, --pop-hunt).
@@ -1602,10 +1638,34 @@ public sealed class OpeningRoutes
 
     /// <summary>
     /// The barrier model as it was before 2026-10-11, for the lab (--barrier-sweep buried) and the tests: every
-    /// other box within the joint buries an edge, the terrain buries none, and no way goes round an edge
-    /// buried in another box. Per thread. Never set in the game.
+    /// other box within the joint buries an edge, the terrain buries none and is in no segment's way, and no
+    /// way goes round an edge buried in another box. Per thread. Never set in the game.
     /// </summary>
     [ThreadStatic] public static bool OldBurialForLab;
+
+    /// <summary>For the lab (--barrier-sweep terrain) and the tests: the ground no obstacle to a straight
+    /// segment, as before 2026-10-11 (docs/GEOMETRY.md 12.6, "The ground in the way"): the legs, the line and
+    /// the string over the top paid boxes only, and a box within 2.6 degrees of level was taken as level by
+    /// the string over the top (Crossing). Bends are still not taken in the earth. Per thread. Never set in
+    /// the game; <see cref="OldBurialForLab"/> implies the first.</summary>
+    [ThreadStatic] public static bool GroundNoObstacleForLab;
+
+    /// <summary>Whether the scene has ground that stands in the way of a straight segment.</summary>
+    private bool GroundCounts => !_ground.IsEmpty && !OldBurialForLab && !GroundNoObstacleForLab;
+
+    /// <summary>
+    /// Whether the straight segment from <paramref name="a"/> to <paramref name="b"/> goes through the earth:
+    /// the terrain stands over it, in the vertical plane through them, by more than the joint somewhere
+    /// (Ground.Profile). The ground passes nothing (its impedance is so far above air's that outdoor
+    /// propagation treats it as a boundary, never one sound crosses), so such a segment is blocked, and what
+    /// gets past is what bends over the ground's profile (<see cref="OverTheTop"/>) or round the boxes with
+    /// every leg in the air. Within the joint is not in the way, so an end standing on the ground is not
+    /// blocked by the ground it stands on.
+    /// </summary>
+    public bool ThroughTheGround(Vector3 a, Vector3 b) => GroundCounts && _ground.Profile(a, b, RouteJointMetres, null, out _, out _);
+
+    /// <summary>The terrain's height at (x, z) as the routes have it, the highest tile's; NaN with none there (for the lab).</summary>
+    public float GroundAt(float x, float z) => _ground.HeightAt(x, z);
 
     /// <summary>Whether a point is at or under the terrain's surface (within the joint): the ground is no box,
     /// and an edge there is in the earth, not the air (Buried, WaysRound).</summary>
@@ -1825,8 +1885,14 @@ public sealed class OpeningRoutes
             if (through != null && through.Contains(i)) continue;
             if (t0 < nearestT) { nearestT = t0; nearest = i; }
         }
-        if (layers.Count == 0) return 0f;
-        t = Constructions.Through(layers, (b - a) / len);
+        // Through the earth the leg passes nothing; bent round a box it may yet clear the ground.
+        bool earth = ThroughTheGround(a, b);
+        if (layers.Count == 0)
+        {
+            if (earth) t = Vector3.Zero;
+            return 0f;
+        }
+        t = earth ? Vector3.Zero : Constructions.Through(layers, (b - a) / len);
         if (nearest < 0 || chain <= 0 || scratch.ChainBudget <= 0 || _solids[nearest].IsLeaf || nearestT * len > BendReachMetres) return 0f;
 
         // Round the first thing in the way, its own legs paid or bent in turn.
@@ -1886,7 +1952,8 @@ public sealed class OpeningRoutes
     /// single-worst-screen rule: a second screen stands in the first's shadow), searched round each box
     /// (Diffraction.PathDifferenceAroundBox). <paramref name="edgeVerified"/> says a route of that length
     /// exists clear of every other box; the shortest such is believed, and none can be shorter than the
-    /// worst box's own way round.
+    /// worst box's own way round. The ground is in the way too where the line goes through the earth, and
+    /// is gone over, never round (<see cref="OverTheTop"/>); no leg of a way round a box may go through it.
     /// </summary>
     public float BarrierPathDifference(Vector3 source, Vector3 listener, out Vector3 edge, out bool edgeVerified,
                                        int[]? ignoreA = null, int[]? ignoreB = null)
@@ -1939,8 +2006,9 @@ public sealed class OpeningRoutes
             bestEdge = last;
         }
         // Over the top of everything (ISO 9613-2, CNOSSOS-EU), whenever neither end has something over
-        // its head, whatever the search round the sides found.
-        if (worst >= 0f)
+        // its head, whatever the search round the sides found; and over the ground's profile when the line
+        // goes through the earth, with or without a box on it.
+        if (worst >= 0f || ThroughTheGround(source, listener))
         {
             float over = OverTheTop(source, listener, ignoreA, ignoreB, out Vector3 overEdge);
             if (over >= 0f && over < best) { best = over; bestEdge = overEdge; }
@@ -1964,6 +2032,10 @@ public sealed class OpeningRoutes
     /// leaves from. The bounded search round the sides found a way round a building at one car position and
     /// missed it two metres on: -13 dB, then -76, a third of a second apart; the way over changes only as
     /// fast as the profile.
+    /// <para>The ground is in the profile where it stands over the line (Ground.Profile, every corner of the
+    /// heightfield along the plane), and holds up what stands on it: the string goes over a brow, a creek's
+    /// bank or a cutting's side as over a screen, and over several ridges as over several screens (ISO 9613-2
+    /// 7.4, the path difference over the outermost edges; CNOSSOS-EU, the convex hull of the profile).</para>
     /// </summary>
     private float OverTheTop(Vector3 source, Vector3 listener, int[]? ignoreA, int[]? ignoreB, out Vector3 lastEdge)
         => OverTheTop(source, listener, ignoreA, ignoreB, out lastEdge, null);
@@ -1990,21 +2062,53 @@ public sealed class OpeningRoutes
         {
             if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
             if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
-            if (!Crossing(i, source, listener, run, out float s0, out float s1, out float bottom, out float top)) continue;
+            if (!Crossing(i, source, listener, run, out float s0, out float s1, out float bottom, out float top, out float topIn, out float topOut)) continue;
             float lineBottom = MathF.Min(Lerp(source.Y, listener.Y, s0 / run), Lerp(source.Y, listener.Y, s1 / run));
             if (top < lineBottom) continue;   // under the line all the way across: never touched
-            crossings.Add((i, s0, s1, bottom, top));
+            crossings.Add((i, s0, s1, bottom, top, topIn, topOut));
         }
-        if (crossings.Count == 0) return -1f;
+        // The ground's profile where it stands over the line (Ground.Profile), and the string over it alone:
+        // only the corners of that string can be corners of the string over everything.
+        var groundTops = scratch.GroundTops;
+        groundTops.Clear();
+        if (GroundCounts)
+        {
+            var profile = scratch.GroundProfile;
+            profile.Clear();
+            _ground.Profile(source, listener, RouteJointMetres, profile, out _, out _);
+            if (profile.Count > 0)
+            {
+                // Off the ends' own columns, and a joint over the ground, as the boxes' tops are: the string
+                // starts and ends at the ends, and on the surface it ran along the roads and lawns laid on the
+                // ground and was cut by them.
+                for (int k = 0; k < profile.Count; k++)
+                    profile[k] = (Math.Clamp(profile[k].S, 1e-3f, run - 1e-3f), profile[k].H + RouteJointMetres);
+                profile.Add((0f, source.Y));
+                profile.Add((run, listener.Y));
+                profile.Sort((x, y) => x.S != y.S ? x.S.CompareTo(y.S) : x.H.CompareTo(y.H));
+                UpperHull(profile, groundTops);
+                // Its two ends are the source and the ear, added with the boxes' tops below.
+                groundTops.RemoveAt(groundTops.Count - 1);
+                groundTops.RemoveAt(0);
+            }
+        }
+        if (crossings.Count == 0 && groundTops.Count == 0) return -1f;
         crossings.Sort((x, y) => x.Bottom.CompareTo(y.Bottom));
         int bins = Math.Clamp((int)MathF.Ceiling(run / ProfileBinMetres), 1, 4096);
         var held = scratch.ProfileBins;
         if (held.Length < bins) held = scratch.ProfileBins = new float[Math.Max(bins, 2 * held.Length)];
-        // What holds a box up at each bin: the line itself to begin with.
+        // What holds a box up at each bin: the line itself to begin with, or the ground where it stands
+        // over the line (a house on the brow of the hill in the way).
         for (int k = 0; k < bins; k++)
         {
             float sMid = (k + 0.5f) * run / bins;
             held[k] = Lerp(source.Y, listener.Y, sMid / run);
+            if (groundTops.Count > 0)
+            {
+                var q = Vector3.Lerp(source, listener, sMid / run);
+                float g = _ground.HeightAt(q.X, q.Z);
+                if (g > held[k]) held[k] = g;
+            }
         }
         var included = scratch.Included;
         included.Clear();
@@ -2028,7 +2132,7 @@ public sealed class OpeningRoutes
         if (DebugOverTheTop != null)
             foreach (var c in crossings)
                 DebugOverTheTop($"crossing {_solids[c.Box].Center} size {_solids[c.Box].Size} s {c.S0:F3}-{c.S1:F3} y {c.Bottom:F3}-{c.Top:F3} included {included.Contains(c.Box)}");
-        if (included.Count == 0) return -1f;
+        if (included.Count == 0 && groundTops.Count == 0) return -1f;
         // Something over an end's head (a ceiling, a canopy): the way out is sideways first, the side
         // search's and the openings' business.
         bool OverAnEnd(float s0, float s1, float bottom)
@@ -2049,9 +2153,10 @@ public sealed class OpeningRoutes
                 if (!included.Contains(c.Box)) continue;
                 // A box over an end's own column puts its top straight above that end: the string can
                 // only leave it upward through the box, which the leg test below finds.
-                pts.Add((MathF.Max(c.S0, 1e-3f), c.Top + RouteJointMetres, c.Box));
-                pts.Add((MathF.Min(c.S1, run - 1e-3f), c.Top + RouteJointMetres, c.Box));
+                pts.Add((MathF.Max(c.S0, 1e-3f), c.TopIn + RouteJointMetres, c.Box));
+                pts.Add((MathF.Min(c.S1, run - 1e-3f), c.TopOut + RouteJointMetres, c.Box));
             }
+            foreach (var (gs, gh) in groundTops) pts.Add((gs, gh, GroundTop));
             // Then by height too: two at one distance otherwise came in the index's order.
             pts.Sort((x, y) => x.S != y.S ? x.S.CompareTo(y.S) : x.Y.CompareTo(y.Y));
             // Upper hull, left to right (Andrew's monotone chain).
@@ -2067,12 +2172,12 @@ public sealed class OpeningRoutes
                 hull.Add(p);
             }
             float length = 0f;
-            int blocker = -1;
+            int blocker = -1, cutAt = -1;
             for (int k = 0; k + 1 < hull.Count; k++)
             {
                 Vector3 a = At(hull[k].S, hull[k].Y), b = At(hull[k + 1].S, hull[k + 1].Y);
                 int hit = FirstHit(a, b, hull[k].Box, hull[k + 1].Box, ignoreA, ignoreB);
-                if (hit >= 0) { blocker = hit; break; }
+                if (hit >= 0) { blocker = hit; cutAt = k; break; }
                 length += Vector3.Distance(a, b);
             }
             if (blocker < 0)
@@ -2080,23 +2185,45 @@ public sealed class OpeningRoutes
                 if (hull.Count > 2) lastEdge = At(hull[^2].S, hull[^2].Y);
                 if (explain != null)
                     foreach (var h in hull)
-                        if (h.Box >= 0)
+                        if (h.Box == GroundTop)
+                            explain.Append($"          over the ground at {h.S:F1} m, {h.Y:F2} m up\n");
+                        else if (h.Box >= 0)
                             explain.Append($"          over box {h.Box} {_solids[h.Box].Material} ({_solids[h.Box].Center.X:F1}, {_solids[h.Box].Center.Y:F2}, {_solids[h.Box].Center.Z:F1}) size ({_solids[h.Box].Size.X:F2}, {_solids[h.Box].Size.Y:F2}, {_solids[h.Box].Size.Z:F2}) at {h.S:F1} m, {h.Y:F2} m up\n");
                 return MathF.Max(0f, length - Vector3.Distance(source, listener));
             }
-            explain?.Append($"          over the top, pass {pass}: cut by box {blocker} {_solids[blocker].Material} ({_solids[blocker].Center.X:F1}, {_solids[blocker].Center.Y:F2}, {_solids[blocker].Center.Z:F1}) size ({_solids[blocker].Size.X:F2}, {_solids[blocker].Size.Y:F2}, {_solids[blocker].Size.Z:F2})\n");
+            explain?.Append($"          over the top, pass {pass}: cut by box {blocker} {_solids[blocker].Material} ({_solids[blocker].Center.X:F1}, {_solids[blocker].Center.Y:F2}, {_solids[blocker].Center.Z:F1}) size ({_solids[blocker].Size.X:F2}, {_solids[blocker].Size.Y:F2}, {_solids[blocker].Size.Z:F2}) turned {_solids[blocker].Rotation}, "
+                          + $"from {hull[cutAt].S:F2} m, {hull[cutAt].Y:F3} up ({hull[cutAt].Box}) to {hull[cutAt + 1].S:F2} m, {hull[cutAt + 1].Y:F3} up ({hull[cutAt + 1].Box})\n");
             // Something the string was already over, still in its way: an end is under it.
             if (!included.Add(blocker)) return -1f;
             bool known = false;
             foreach (var c in crossings) if (c.Box == blocker) { known = true; break; }
             if (!known)
             {
-                if (!Crossing(blocker, source, listener, run, out float s0, out float s1, out float bottom, out float top)) return -1f;
+                if (!Crossing(blocker, source, listener, run, out float s0, out float s1, out float bottom, out float top, out float topIn, out float topOut)) return -1f;
                 if (OverAnEnd(s0, s1, bottom)) return -1f;
-                crossings.Add((blocker, s0, s1, bottom, top));
+                crossings.Add((blocker, s0, s1, bottom, top, topIn, topOut));
             }
         }
         return -1f;
+    }
+
+    /// <summary>What a corner of the string over the top that is the ground's, not a box's, is marked by.</summary>
+    private const int GroundTop = -2;
+
+    /// <summary>The upper convex hull of points sorted by distance along (then height), left to right
+    /// (Andrew's monotone chain): the string pulled tight over them.</summary>
+    private static void UpperHull(List<(float S, float H)> sorted, List<(float S, float H)> hull)
+    {
+        hull.Clear();
+        foreach (var p in sorted)
+        {
+            while (hull.Count >= 2)
+            {
+                var o = hull[^2]; var a = hull[^1];
+                if ((a.S - o.S) * (p.H - o.H) - (a.H - o.H) * (p.S - o.S) >= 0f) hull.RemoveAt(hull.Count - 1); else break;
+            }
+            hull.Add(p);
+        }
     }
 
     /// <summary>How near an end, along the ground, a box's crossing must reach to stand over it, metres.</summary>
@@ -2117,11 +2244,13 @@ public sealed class OpeningRoutes
     private static float Lerp(float a, float b, float t) => a + (b - a) * t;
 
     /// <summary>Where the vertical plane through the two points crosses box i, as distances along the
-    /// ground from the source, and the box's top there. False if it does not.</summary>
-    private bool Crossing(int i, Vector3 source, Vector3 listener, float run, out float s0, out float s1, out float bottom, out float top)
+    /// ground from the source, the box's top where the plane goes in and out (<paramref name="topIn"/>,
+    /// <paramref name="topOut"/>), and its highest top and lowest bottom between. False if it does not.</summary>
+    private bool Crossing(int i, Vector3 source, Vector3 listener, float run, out float s0, out float s1, out float bottom, out float top,
+                          out float topIn, out float topOut)
     {
         var f = _frames[i];
-        s0 = 0f; s1 = run; top = 0f; bottom = 0f;
+        s0 = 0f; s1 = run; top = 0f; bottom = 0f; topIn = topOut = 0f;
         // Grown by the joint, as every leg test is: a string that passes within it of a box is in it.
         var half = f.Half + new Vector3(RouteJointMetres);
         var rot = Quaternion.Inverse(f.Inverse);
@@ -2134,8 +2263,22 @@ public sealed class OpeningRoutes
             float t0 = 0f, t1 = 1f;
             if (!Slab(la.X, lb.X - la.X, half.X, ref t0, ref t1) || !Slab(la.Z, lb.Z - la.Z, half.Z, ref t0, ref t1)) return false;
             s0 = t0 * run; s1 = t1 * run;
-            top = f.Centre.Y + f.Half.Y;
-            bottom = f.Centre.Y - f.Half.Y;
+            if (GroundNoObstacleForLab || up.Y == 1f)
+            {
+                top = topIn = topOut = f.Centre.Y + f.Half.Y;
+                bottom = f.Centre.Y - f.Half.Y;
+                return true;
+            }
+            // Nearly level is not level: its top and bottom faces' planes where the plane goes in and out, the
+            // top grown by the joint as the leg test grows it (a joint along its tilted up, a little more than
+            // a joint straight up). A road segment 16 m long pitched 1.1 degrees up a slope has one end 0.15 m
+            // over its middle, and the string laid level over the middle went through that end and was given up.
+            float j = RouteJointMetres;
+            topIn = FaceAt(f, up, Vector3.Lerp(source, listener, s0 / run), f.Half.Y + j) - j + 1e-4f;
+            topOut = FaceAt(f, up, Vector3.Lerp(source, listener, s1 / run), f.Half.Y + j) - j + 1e-4f;
+            top = MathF.Max(topIn, topOut);
+            bottom = MathF.Min(FaceAt(f, up, Vector3.Lerp(source, listener, s0 / run), -f.Half.Y),
+                               FaceAt(f, up, Vector3.Lerp(source, listener, s1 / run), -f.Half.Y));
             return true;
         }
         // Tilted: its world bounds, which is more than it covers and so never lets the string through it.
@@ -2151,10 +2294,15 @@ public sealed class OpeningRoutes
         if (!Slab(source.X - (min.X + max.X) * 0.5f, listener.X - source.X, (max.X - min.X) * 0.5f + RouteJointMetres, ref u0, ref u1)
             || !Slab(source.Z - (min.Z + max.Z) * 0.5f, listener.Z - source.Z, (max.Z - min.Z) * 0.5f + RouteJointMetres, ref u0, ref u1)) return false;
         s0 = u0 * run; s1 = u1 * run;
-        top = max.Y;
+        top = topIn = topOut = max.Y;
         bottom = min.Y;
         return true;
     }
+
+    /// <summary>The height over (q.X, q.Z) of the plane of a box's face <paramref name="h"/> along its own up
+    /// from its centre (its top at h = half its height).</summary>
+    private static float FaceAt(in Frame f, Vector3 up, Vector3 q, float h)
+        => f.Centre.Y + (h - up.X * (q.X - f.Centre.X) - up.Z * (q.Z - f.Centre.Z)) / up.Y;
 
     private static bool Slab(float o, float d, float h, ref float t0, ref float t1)
     {
@@ -2297,7 +2445,8 @@ public sealed class OpeningRoutes
     {
         lastBend = null;
         int hit = FirstHit(a, b, ownerA, ownerB, ignoreA, ignoreB);
-        if (hit < 0) return 0f;
+        // Clear of every box but through the earth: no way here; over the ground is the string's (OverTheTop).
+        if (hit < 0) return ThroughTheGround(a, b) ? -1f : 0f;
         var scratch = Scratch.Get(this);
         if (chain <= 0 || scratch.ChainBudget <= 0 || limit <= 0f) return -1f;
         // Round a door leaf is through its doorway, the openings' business (Route): bent round here it
@@ -2412,7 +2561,9 @@ public sealed class OpeningRoutes
         /// <summary>Boxes the current barrier search may still bend a route round (ClearedLeg).</summary>
         public int ChainBudget;
         public readonly List<(float S, float Y, int Box)> Profile = new(), Hull = new();
-        public readonly List<(int Box, float S0, float S1, float Bottom, float Top)> Crossings = new();
+        /// <summary>The ground's profile over the line, and the corners of the string over it (OverTheTop).</summary>
+        public readonly List<(float S, float H)> GroundProfile = new(), GroundTops = new();
+        public readonly List<(int Box, float S0, float S1, float Bottom, float Top, float TopIn, float TopOut)> Crossings = new();
         public readonly List<Constructions.Crossing> Layers = new(), LegLayers = new();
         public readonly HashSet<int> Included = new();
         public float[] ProfileBins = new float[256];
@@ -2483,12 +2634,31 @@ public sealed class OpeningRoutes
         private const float Cell = 64f;
         private readonly List<(Geometry.Heightfield Field, Vector3 Corner)> _tiles;
         private readonly Dictionary<(int, int), List<int>> _cells = new();
+        /// <summary>Each tile's blocks of <see cref="BlockCells"/> cells a side: the highest post of each, row by row.</summary>
+        private readonly float[][] _blockTop;
 
         public bool IsEmpty => _tiles.Count == 0;
 
         private Ground(List<(Geometry.Heightfield Field, Vector3 Corner)> tiles)
         {
             _tiles = tiles;
+            _blockTop = new float[tiles.Count][];
+            for (int t = 0; t < tiles.Count; t++)
+            {
+                var f = tiles[t].Field;
+                int cells = f.CellsPerSide, nb = (cells + BlockCells - 1) / BlockCells;
+                var top = new float[nb * nb];
+                for (int bj = 0; bj < nb; bj++)
+                    for (int bi = 0; bi < nb; bi++)
+                    {
+                        float h = float.MinValue;
+                        for (int j = bj * BlockCells; j <= Math.Min((bj + 1) * BlockCells, cells); j++)
+                            for (int i = bi * BlockCells; i <= Math.Min((bi + 1) * BlockCells, cells); i++)
+                                h = MathF.Max(h, f.HeightOfPost(i, j));
+                        top[bj * nb + bi] = h;
+                    }
+                _blockTop[t] = top;
+            }
             for (int t = 0; t < tiles.Count; t++)
             {
                 var (f, c) = tiles[t];
@@ -2536,6 +2706,156 @@ public sealed class OpeningRoutes
                 if (!float.IsNaN(h) && p.Y <= h + c.Y + slack) return true;
             }
             return false;
+        }
+
+        /// <summary>The ground's height at (x, z), the highest tile's; NaN where there is none.</summary>
+        public float HeightAt(float x, float z)
+        {
+            float best = float.NaN;
+            if (_tiles.Count == 0 || !_cells.TryGetValue((Key(x), Key(z)), out var list)) return best;
+            foreach (int t in list)
+            {
+                var (f, c) = _tiles[t];
+                float h = f.HeightAt(x - c.X, z - c.Z) + c.Y;
+                if (!float.IsNaN(h) && !(h <= best)) best = h;
+            }
+            return best;
+        }
+
+        /// <summary>Every tile's height at (x, z), for the lab.</summary>
+        public string Describe(float x, float z)
+        {
+            if (!_cells.TryGetValue((Key(x), Key(z)), out var list)) return "none";
+            var parts = new List<string>();
+            foreach (int t in list)
+            {
+                var (f, c) = _tiles[t];
+                float h = f.HeightAt(x - c.X, z - c.Z);
+                if (!float.IsNaN(h)) parts.Add($"{h + c.Y:F2} (tile {t}, {f.Spacing:F1} m posts)");
+            }
+            return parts.Count == 0 ? "none" : string.Join(", ", parts);
+        }
+
+        /// <summary>Cells a side of the blocks whose highest post lets <see cref="Profile"/> pass over them unwalked.</summary>
+        private const int BlockCells = 8;
+
+        [ThreadStatic] private static List<int>? _alongScratch;
+        [ThreadStatic] private static List<float>? _spanScratch, _cornerScratch;
+
+        /// <summary>
+        /// The ground under the straight line from <paramref name="a"/> to <paramref name="b"/>, in the vertical
+        /// plane through them: true when it stands over the line by more than <paramref name="slack"/> somewhere
+        /// between them (the line goes through the earth). Every corner of the ground's profile that stands over
+        /// the line, or within <paramref name="slack"/> under it, is added to <paramref name="into"/>, as (metres
+        /// along the ground from a, height). Exact for
+        /// the heightfield: over a tile the ground is flat within each triangle, so along a straight line it is
+        /// straight between the places the line crosses a cell's side or its diagonal, and those are its
+        /// corners. A block of cells whose highest post is under the line is passed over. <paramref name="most"/>
+        /// is the most the ground stands over the line, metres, <paramref name="mostAt"/> where (for the lab).
+        /// Without <paramref name="into"/> it stops at the first corner that blocks.
+        /// </summary>
+        public bool Profile(Vector3 a, Vector3 b, float slack, List<(float S, float H)>? into, out float most, out float mostAt)
+        {
+            most = float.MinValue; mostAt = 0f;
+            if (_tiles.Count == 0) return false;
+            float du = b.X - a.X, dw = b.Z - a.Z, dy = b.Y - a.Y;
+            float run = MathF.Sqrt(du * du + dw * dw);
+            var tiles = _alongScratch ??= new List<int>();
+            TilesAlong(a, b, tiles);
+            var spans = _spanScratch ??= new List<float>();
+            var corners = _cornerScratch ??= new List<float>();
+            bool blocked = false;
+            foreach (int ti in tiles)
+            {
+                var (f, c) = _tiles[ti];
+                float au = a.X - c.X, aw = a.Z - c.Z;
+                float t0 = 0f, t1 = 1f;
+                if (!Clip(au, du, f.Size, ref t0, ref t1) || !Clip(aw, dw, f.Size, ref t0, ref t1)) continue;
+                if (f.MaxY + c.Y <= MathF.Min(a.Y + dy * t0, a.Y + dy * t1)) continue;
+                float block = BlockCells * f.Spacing;
+                int nb = (f.CellsPerSide + BlockCells - 1) / BlockCells;
+                var tops = _blockTop[ti];
+                spans.Clear();
+                spans.Add(t0);
+                Crossings(au, du, block, t0, t1, spans);
+                Crossings(aw, dw, block, t0, t1, spans);
+                spans.Add(t1);
+                spans.Sort();
+                for (int k = 0; k + 1 < spans.Count; k++)
+                {
+                    float ta = spans[k], tb = spans[k + 1];
+                    float tm = 0.5f * (ta + tb);
+                    int bi = Math.Clamp((int)MathF.Floor((au + du * tm) / block), 0, nb - 1);
+                    int bj = Math.Clamp((int)MathF.Floor((aw + dw * tm) / block), 0, nb - 1);
+                    if (tops[bj * nb + bi] + c.Y <= MathF.Min(a.Y + dy * ta, a.Y + dy * tb)) continue;
+                    corners.Clear();
+                    corners.Add(ta);
+                    corners.Add(tb);
+                    Crossings(au, du, f.Spacing, ta, tb, corners);
+                    Crossings(aw, dw, f.Spacing, ta, tb, corners);
+                    Crossings(au - aw, du - dw, f.Spacing, ta, tb, corners);
+                    foreach (float t in corners)
+                    {
+                        float h = f.HeightAt(Math.Clamp(au + du * t, 0f, f.Size), Math.Clamp(aw + dw * t, 0f, f.Size));
+                        if (float.IsNaN(h)) continue;
+                        h += c.Y;
+                        float over = h - (a.Y + dy * t);
+                        if (over > most) { most = over; mostAt = t * run; }
+                        if (over > slack)
+                        {
+                            blocked = true;
+                            if (into == null) return true;
+                        }
+                        if (over + slack > 0f) into?.Add((t * run, h));
+                    }
+                }
+            }
+            return blocked;
+        }
+
+        /// <summary>The fractions of the way along where o + d t passes a multiple of <paramref name="step"/>,
+        /// strictly between <paramref name="t0"/> and <paramref name="t1"/>.</summary>
+        private static void Crossings(float o, float d, float step, float t0, float t1, List<float> into)
+        {
+            if (MathF.Abs(d) < 1e-9f) return;
+            float v0 = o + d * t0, v1 = o + d * t1;
+            int k0 = (int)MathF.Ceiling(MathF.Min(v0, v1) / step), k1 = (int)MathF.Floor(MathF.Max(v0, v1) / step);
+            for (int k = k0; k <= k1; k++)
+            {
+                float t = (k * step - o) / d;
+                if (t > t0 && t < t1) into.Add(t);
+            }
+        }
+
+        /// <summary>Clips o + d t, t in [t0, t1], to [0, size].</summary>
+        private static bool Clip(float o, float d, float size, ref float t0, ref float t1)
+        {
+            if (MathF.Abs(d) < 1e-9f) return o >= 0f && o <= size;
+            float ta = -o / d, tb = (size - o) / d;
+            if (ta > tb) (ta, tb) = (tb, ta);
+            t0 = MathF.Max(t0, ta); t1 = MathF.Min(t1, tb);
+            return t0 <= t1;
+        }
+
+        /// <summary>The tiles filed under the cells the line from a to b passes over, each once (Amanatides
+        /// and Woo's walk, on the ground).</summary>
+        private void TilesAlong(Vector3 a, Vector3 b, List<int> into)
+        {
+            into.Clear();
+            int x = Key(a.X), z = Key(a.Z), xe = Key(b.X), ze = Key(b.Z);
+            float dx = b.X - a.X, dz = b.Z - a.Z;
+            int sx = Math.Sign(dx), sz = Math.Sign(dz);
+            float tdx = sx != 0 ? Cell / MathF.Abs(dx) : float.MaxValue, tdz = sz != 0 ? Cell / MathF.Abs(dz) : float.MaxValue;
+            float tx = sx > 0 ? ((x + 1) * Cell - a.X) / dx : sx < 0 ? (x * Cell - a.X) / dx : float.MaxValue;
+            float tz = sz > 0 ? ((z + 1) * Cell - a.Z) / dz : sz < 0 ? (z * Cell - a.Z) / dz : float.MaxValue;
+            for (int guard = Math.Abs(xe - x) + Math.Abs(ze - z) + 2; guard >= 0; guard--)
+            {
+                if (_cells.TryGetValue((x, z), out var list))
+                    foreach (int t in list)
+                        if (!into.Contains(t)) into.Add(t);
+                if (x == xe && z == ze) break;
+                if (tx < tz) { x += sx; tx += tdx; } else { z += sz; tz += tdz; }
+            }
         }
     }
 

@@ -7,7 +7,7 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor] [panels|buried]
+/// --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor|ground] [panels|buried|terrain]
 ///
 /// How the barrier model's ways round one thing and through another (OpeningRoutes.BarrierGains) change
 /// what is heard behind walls on a real map: pairs of points in the map's places (an ear 1.6 m over a
@@ -20,7 +20,13 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// range off, 0.5 m over the ground (the street heard inside). pair=x,y,z;x,y,z spells one ear and source out.
 /// panels compares against every solid charged as one panel whatever way the line goes through it (before
 /// 2026-10-11, Constructions.PanelsOnlyForLab) instead of against the clear ways round only; buried against the
-/// burial of an edge as it was before the rules of 2026-10-11 (OpeningRoutes.OldBurialForLab).
+/// burial of an edge as it was before the rules of 2026-10-11 (OpeningRoutes.OldBurialForLab); terrain against the
+/// ground as no obstacle to a straight segment (OpeningRoutes.GroundNoObstacleForLab), and then a pair is kept when
+/// its line meets a box or goes through the earth. ground takes both ends out of doors (an ear 1.6 m and a source
+/// 0.5 m over the ground, 10 m to range apart): a source behind a rise, a bank or a cutting's side. With pair=,
+/// debug also prints every box the string over the top is given (OpeningRoutes.DebugOverTheTop). drive=x,z;x,z
+/// ear=x,y,z drives a source 0.5 m over the ground between the two points, every half metre, and says how far the
+/// straight leg steps between neighbouring positions, before and after (verbose prints each).
 /// server=DIR reads the maps and prefabs under DIR in place of the checkout's OpenFPS.Server (a map before a change);
 /// dump=FILE writes every pair, tab-separated, so two runs with one seed can be set side by side. Game coordinates (y up).
 /// </summary>
@@ -42,10 +48,16 @@ public static class BarrierSweepSpike
         // buried: before is every other box burying an edge, the terrain none, and no way round an edge
         // buried in another box (OpeningRoutes.OldBurialForLab).
         bool buried = args.Contains("buried");
+        // terrain: before is the ground in no segment's way (OpeningRoutes.GroundNoObstacleForLab).
+        bool terrain = args.Contains("terrain");
+        // ground: the ear out of doors too.
+        bool bothOut = args.Contains("ground");
+        if (bothOut) outdoor = true;
         void Before(bool on)
         {
             if (panels) Constructions.PanelsOnlyForLab = on;
             else if (buried) OpeningRoutes.OldBurialForLab = on;
+            else if (terrain) OpeningRoutes.GroundNoObstacleForLab = on;
             else OpeningRoutes.OnlyClearWaysRoundForLab = on;
         }
 
@@ -73,7 +85,9 @@ public static class BarrierSweepSpike
                 Console.WriteLine($"  {(before ? "before" : "after")}: leg {Db3(leg)}, openings {(any ? $"{Db3(new Vector3(answer.Low, answer.Mid, answer.High))} via {answer.Via}" : "none")}");
             }
             Before(false);
+            if (args.Contains("debug")) OpeningRoutes.DebugOverTheTop = Console.WriteLine;
             Console.WriteLine(routes.ExplainBarrier(s, e));
+            OpeningRoutes.DebugOverTheTop = null;
             Console.Write(routes.ExplainLine(s, e));
             return 0;
         }
@@ -107,12 +121,71 @@ public static class BarrierSweepSpike
         int attempts = 0;
         var clock = new Stopwatch();
         var legRows = new List<(Vector3 Old, Vector3 New)>();
+        // The boxes' ground or the terrain's, the higher: the lab's world has no triangle store, so the physics
+        // probe sees boxes only, and a lawn laid a little under the terrain put sources in the earth.
+        float GroundUnder(Vector3 p)
+        {
+            float g = PhysicsUtils.GetGroundHeight(world, p, -1, out _);
+            float t = routes.GroundAt(p.X, p.Z);
+            return float.IsNaN(t) ? g : MathF.Max(g, t);
+        }
+        if (Arg(args, "drive") is { } drive && Arg(args, "ear") is { } earArg)
+        {
+            // A source driven along the ground, 0.5 m over it, every half metre, past one ear: how far the
+            // straight leg steps from one position to the next, each model.
+            var e = earArg.Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray();
+            var ear = new Vector3(e[0], e[1], e[2]);
+            var d = drive.Split(';').Select(s => s.Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray()).ToArray();
+            var from = new Vector3(d[0][0], 0f, d[0][1]);
+            var to = new Vector3(d[1][0], 0f, d[1][1]);
+            int steps = Math.Max(1, (int)(Vector3.Distance(from, to) / 0.5f));
+            foreach (bool before in new[] { true, false })
+            {
+                var r = before ? oldRoutes : routes;
+                Before(before);
+                Vector3? last = null;
+                var biggest = new float[3];
+                int over3 = 0, earth = 0;
+                for (int k = 0; k <= steps; k++)
+                {
+                    var p = Vector3.Lerp(from, to, k / (float)steps);
+                    p.Y = GroundUnder(p + new Vector3(0, 200f, 0)) + 0.5f;
+                    // Not in a solid: the physics probe sees no water, and a creek's surface is a box over its bed.
+                    if (InSolid(p)) continue;
+                    var g = Db3V(r.LegGains(p, ear, Array.Empty<int>(), Array.Empty<int>()));
+                    if (!before && routes.ThroughTheGround(p, ear)) earth++;
+                    if (args.Contains("verbose")) Console.WriteLine($"    {(before ? "before" : "after")} ({p.X:F1}, {p.Y:F2}, {p.Z:F1}): {g.X:F1}/{g.Y:F1}/{g.Z:F1}");
+                    if (last is { } l)
+                    {
+                        var step = Vector3.Abs(g - l);
+                        biggest[0] = MathF.Max(biggest[0], step.X); biggest[1] = MathF.Max(biggest[1], step.Y); biggest[2] = MathF.Max(biggest[2], step.Z);
+                        if (MathF.Max(step.X, MathF.Max(step.Y, step.Z)) > 3f) over3++;
+                    }
+                    last = g;
+                }
+                Console.WriteLine($"  {(before ? "before" : "after")}: {steps + 1} positions, biggest step between neighbours {biggest[0]:F1}/{biggest[1]:F1}/{biggest[2]:F1} dB, "
+                                + $"{over3} steps over 3 dB" + (before ? "" : $"; {earth} positions through the earth"));
+            }
+            Before(false);
+            return 0;
+        }
         while (rows.Count < n && attempts < n * 50)
         {
             attempts++;
             int ep = places[rng.Next(places.Count)];
-            if (outdoor && !map.Regions[ep].IsIndoor) continue;
+            if (outdoor && !bothOut && !map.Regions[ep].IsIndoor) continue;
             var ear = PointIn(ep, 1.6f, 1.6f);
+            if (bothOut)
+            {
+                // Anywhere out of doors near a place: 1.6 m over the ground there.
+                double ea = rng.NextDouble() * Math.Tau, er = rng.NextDouble() * range;
+                ear = new Vector3(ear.X + (float)(Math.Cos(ea) * er), ear.Y + 50f, ear.Z + (float)(Math.Sin(ea) * er));
+                float eg = GroundUnder(ear);
+                if (eg <= -999f) continue;
+                ear.Y = eg + 1.6f;
+                ep = acoustics.GetRegionAt(world, ear);
+                if (map.Regions.TryGetValue(ep, out var ein) && ein.IsIndoor) continue;
+            }
             if (InSolid(ear)) continue;
             int sp;
             Vector3 src;
@@ -120,8 +193,8 @@ public static class BarrierSweepSpike
             {
                 // Out of doors, the ground's height under the ear's floor: the real places' outdoors is no box.
                 double angle = rng.NextDouble() * Math.Tau, r = 10 + rng.NextDouble() * (range - 10);
-                src = new Vector3(ear.X + (float)(Math.Cos(angle) * r), ear.Y + 1f, ear.Z + (float)(Math.Sin(angle) * r));
-                float ground = PhysicsUtils.GetGroundHeight(world, src, -1, out _);
+                src = new Vector3(ear.X + (float)(Math.Cos(angle) * r), ear.Y + (bothOut ? 50f : 1f), ear.Z + (float)(Math.Sin(angle) * r));
+                float ground = GroundUnder(src);
                 if (ground <= -999f) continue;
                 src.Y = ground + 0.5f;
                 sp = acoustics.GetRegionAt(world, src);
@@ -135,7 +208,7 @@ public static class BarrierSweepSpike
                 src = PointIn(sp, 0.5f, 1.6f);
             }
             if (InSolid(src) || Vector3.Distance(src, ear) < 2f) continue;
-            if (routes.LegBoxes(src, ear).Count == 0) continue;
+            if (routes.LegBoxes(src, ear).Count == 0 && !(terrain && routes.ThroughTheGround(src, ear))) continue;
             // Each model on a graph of its own, so the legs each keeps are its own.
             Before(true);
             clock.Restart();
@@ -147,9 +220,9 @@ public static class BarrierSweepSpike
             var now = routes.LegGains(src, ear, Array.Empty<int>(), Array.Empty<int>());
             newUs += clock.Elapsed.TotalMilliseconds * 1000;
             legRows.Add((oldLeg, now));
-            // What the worker adds to Steam Audio's answer for the same line (OpeningRoutes.InPlaneCorrection).
+            // What the worker adds to Steam Audio's answer for the same line (OpeningRoutes.SimulatorCorrection).
             clock.Restart();
-            var k = routes.InPlaneCorrection(src, ear);
+            var k = routes.SimulatorCorrection(src, ear);
             correctionUs += clock.Elapsed.TotalMilliseconds * 1000;
             if (k != Vector3.One) corrected++;
             now = Heard(acoustics, routes, now, src, ear);
@@ -167,6 +240,30 @@ public static class BarrierSweepSpike
                                                                                Db(r.Old.X), Db(r.Old.Y), Db(r.Old.Z), Db(r.New.X), Db(r.New.Y), Db(r.New.Z) }
                                                                          .Select(v => v.ToString("F3", CultureInfo.InvariantCulture)))
                                                    + $"\t{r.EarPlace}\t{r.SrcPlace}\t{Name(map, r.EarPlace)}\t{Name(map, r.SrcPlace)}"));
+        if (terrain)
+        {
+            // What the lines through the earth go over: the ground's own corners, or only what is laid or built on it.
+            int through = 0, overGround = 0, overBoxes = 0, noWay = 0;
+            var examples = new List<string>();
+            foreach (var r in rows)
+            {
+                if (!routes.ThroughTheGround(r.Src, r.Ear)) continue;
+                through++;
+                string why = routes.ExplainBarrier(r.Src, r.Ear);
+                if (why.Contains("over the ground at"))
+                {
+                    overGround++;
+                    if (examples.Count < top)
+                        examples.Add($"    ear ({r.Ear.X:F2}, {r.Ear.Y:F2}, {r.Ear.Z:F2}), source ({r.Src.X:F2}, {r.Src.Y:F2}, {r.Src.Z:F2}), "
+                                   + $"{Vector3.Distance(r.Ear, r.Src):F1} m: {Db3(r.Old)} -> {Db3(r.New)} dB");
+                }
+                else if (why.Contains("over the top: no way")) noWay++;
+                else overBoxes++;
+            }
+            Console.WriteLine($"  {through} lines through the earth: {overGround} heard over the ground's own corners, {overBoxes} over only what is laid or "
+                            + $"built on it, {noWay} with no way over (something over an end)");
+            foreach (var e in examples) Console.WriteLine(e);
+        }
         Console.WriteLine("  as heard (the straight leg against the openings, per band the better, OpeningRoutes.Better):");
 
         string[] band = { "low", "mid", "high" };
@@ -202,7 +299,11 @@ public static class BarrierSweepSpike
                     continue;
                 }
                 foreach (var line in routes.ExplainBarrier(r.Src, r.Ear).Split('\n'))
-                    if (line.Contains("round box") || line.Contains("both kinds")) Console.WriteLine("    " + line.Trim());
+                    if (line.Contains("round box") || line.Contains("both kinds") || (terrain && (line.Contains("over the ground") || line.Contains("over the top"))))
+                        Console.WriteLine("    " + line.Trim());
+                if (terrain)
+                    foreach (var line in routes.ExplainLine(r.Src, r.Ear).Split('\n'))
+                        if (line.Contains("through the earth")) Console.WriteLine("    " + line.Trim());
             }
         }
         return 0;
@@ -211,6 +312,7 @@ public static class BarrierSweepSpike
     private static float Get(Vector3 v, int b) => b == 0 ? v.X : b == 1 ? v.Y : v.Z;
     private static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
     private static string Db3(Vector3 g) => $"{Db(g.X):F0}/{Db(g.Y):F0}/{Db(g.Z):F0}";
+    private static Vector3 Db3V(Vector3 g) => new(Db(g.X), Db(g.Y), Db(g.Z));
     private static float Pct(List<float> sorted, double p) => sorted.Count == 0 ? 0f : sorted[Math.Clamp((int)(p * (sorted.Count - 1)), 0, sorted.Count - 1)];
     private static string Name(AcousticMap map, int id) => map.Regions.TryGetValue(id, out var r) ? $"'{r.FriendlyName}' ({id})" : id.ToString();
     private static string? Arg(string[] args, string key) => args.FirstOrDefault(a => a.StartsWith(key + "="))?[(key.Length + 1)..];

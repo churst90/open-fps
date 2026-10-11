@@ -2298,7 +2298,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      only over and round obstacles; Steam Audio's terrain is a 20 m deep panel no sound goes through
      (`Heightfield.Depth`). Approximate: a leg between two bends in the air that dips under a hill between them
      is still not stopped (legs pay boxes, and the terrain is none): the way over the brow is the over-the-top
-     string's, which also reads boxes only (todo).
+     string's, which also reads boxes only (done since, below, "The ground in the way").
    - **Round an edge buried in another box, that box paid once.** After the ways round edges in the air, a
      second search, of its own so it only adds: each box's most promising way that comes before any way of it in
      the air, its edge buried in other boxes. Its legs pay each of those boxes once, by the leg that runs
