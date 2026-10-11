@@ -9,6 +9,17 @@ namespace OpenFPS.Tests;
 
 public partial class RealPlaceMapTests
 {
+    /// <summary>Every door of a place is rendered as the map arrives (DoorSystem.RenderKeys): a list made of the
+    /// city's door sizes left the places' doors silent on their first swing.</summary>
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void Every_door_is_rendered_as_the_map_arrives(string id)
+    {
+        Assert.True(_maps.Get(id).Manager.TryGetMap(id, out var ecs, out _, out _, out _));
+        DoorPrewarmTests.EveryDoorIsRenderedAsTheMapArrives(ecs, 1000);
+        _o.WriteLine($"{id}: {DoorSystem.RenderKeys(ecs).Length} door renders");
+    }
+
     /// <summary>
     /// Every way into every building and room of a place can be walked to and through, with the server's own
     /// teleport check (MovementSystem.CheckCollision) and ground probe: the floor a step out from each doorway is
