@@ -83,6 +83,7 @@ OpenFPS.Client.Core/BeaconAids.cs	host
 OpenFPS.Client.Core/BirdLife.cs	host		
 OpenFPS.Client.Core/BuildForm.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	host		
+OpenFPS.Client.Core/ClientAudioSystem.Voices.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.cs	host		
 OpenFPS.Client.Core/ClientGeometry.cs	host		
 OpenFPS.Client.Core/ClientNetworkService.cs	host		
@@ -139,6 +140,7 @@ OpenFPS.Client.Core/StairCues.cs	host
 OpenFPS.Client.Core/StrideAccumulator.cs	host		
 OpenFPS.Client.Core/TurnNarration.cs	host		
 OpenFPS.Client.Core/UiSounds.cs	host		
+OpenFPS.Client.Core/VoiceRegistry.cs	host		
 OpenFPS.Client.Core/WallBumps.cs	host		
 OpenFPS.Client.Core/WorldAudioPlayer.cs	host		
 OpenFPS.Client.Core/ZoneSettle.cs	host		

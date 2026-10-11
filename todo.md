@@ -42,7 +42,7 @@ since the last deploy" list below.
      Cody (Decisions, below). Its leftovers done the same day: the server's own prefix spellings read the
      table, S26's two caches are gone, S27's model fallbacks log once by id.
    - P8, laws in one place: DONE 2026-10-11, unheard, except S21 (`VehicleShadow` on the shared
-     `Diffraction`), waiting on the barrier model: the FMOD fallback voice's distance law and Doppler, one
+     `Diffraction`), now waiting on a decision (below, P3a): the FMOD fallback voice's distance law and Doppler, one
      occlusion-floor default, one law and one reference for the speed of sound, the world's speed where a
      heard law wrote 343. Gravity, air density, brakes, rolling resistance and the two winds are physics
      stage 2's.
@@ -55,13 +55,21 @@ since the last deploy" list below.
    - Under way: the barrier model's way round one thing that passes through another (Acoustics, below),
      which P1 found in Marlow Tower's floor 1 stairwell; the compass words in one function and P2's
      leftovers.
-   - Then P3a to P3d, the voice registry: one list of voices, one writer a frame, one way to start a voice.
-     It is the one path pass for every voice of a moving thing that Cody asked for on 2026-10-11 ("shouldn't
-     all mobile sound sources like vehicles, trains, sirens, etc use the same path so there's
-     consistency?"), widened to every voice range. It replaces the horn, siren, distant and spread branches
-     in `ClientAudioSystem` and the trains' separate writer (`ClientAudioSystem.Trains.cs`), gated by the
-     emitter-stream replay: no change except where a voice was stale. Then library stage 5's `AudioClock`
-     slice (`IAudioClock`, its `WorldTime` from `WindField.Now()`; docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
+   - P3a, the registry for moving things: DONE 2026-10-11, unheard (the audit's "P3a as built"). The one path
+     pass for every voice of a moving thing Cody asked for ("shouldn't all mobile sound sources like vehicles,
+     trains, sirens, etc use the same path so there's consistency?"): engines, intakes, borrowed cars, horns,
+     held horns, sirens, train voices and cabin paths are entries in `VoiceRegistry`, each handed its owner's
+     one answer a frame, with `VehicleShadow`, in its own emitter; no second writer. The path pass's horn,
+     siren and distant branches, `VehiclePath` and the trains' writer are gone. Heard changes, by the stream
+     replay: intakes take their path (S1), borrowed cars their occlusion and distance (S3), the lane rumble
+     follows the speed (S11). Left: S21, which needs a decision (the shared law starts at 5 dB at the shadow's
+     edge and reads 8 kHz, so under the 15 dB cap a bus takes as much off the mid band as the top); S17 (ask by
+     movement); whether a blocked engine should be heard round the edge as its horn is (it is heard at the car).
+   - Then P3b (every other voice an entry: woods, places, talkers, own voice, copies, echoes, rain, birds,
+     beacons, aids, transients, and the fixed machines' own voices; the `id < -5000` test goes; P6 with it),
+     P3c (seeds from the entry, then ids from one allocator) and P3d (one way to start and stop, mounts and
+     levels from the model). Then library stage 5's `AudioClock` slice (`IAudioClock`, its `WorldTime` from
+     `WindField.Now()`; docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
    - Then P4 (one ranking), P6 (one path model for every asker), P7 (machine state from the server: a wire
      change, shipped with a deploy).
 3. The physics boundary survey: DONE 2026-10-11 (docs/PHYSICS_BOUNDARY.md). Cody asked for it the same day:
@@ -302,6 +310,14 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - The scope and the push mower (audit P2): should the scope call somebody pushing a push mower a person?
   Today, as before, it picks out no machine.
 - The editor and sound ids (audit P2): should the editor edit trains and woods through their sound ids?
+- A bus between you and a car (audit S21, "P3a as built"): on the buildings' barrier law a bus takes 5 dB
+  even where the line only grazes it, and under the 15 dB cap for a body with ends it takes as much off the
+  mid band as the top (11/15/15 dB broadside). The shared law with the cap (the mids darker than now), the
+  shared law with a higher cap (against the 10 to 15 dB measured for a lorry), or the bus's own law until
+  geometry stage 6 puts vehicles in the acoustic scene and retires `VehicleShadow`? Recommended: the last.
+- A car behind a building (audit P3a): its horn and siren are heard from the edge the sound comes round, its
+  engine from the car itself. Should the engine come from the edge too? Recommended: yes, once heard, since the
+  horn does it without trailing the car.
 - Reflections following a moving talker, and himself: he will check again.
 - Loudness law: anything over about 126 dB peak at 1 m (gunshots, glass, a thin plate) plays at full
   scale out to the 40 m clamp, so 5 m and 20 m sound the same (`Loudness.Place`). Explosions wait on it.

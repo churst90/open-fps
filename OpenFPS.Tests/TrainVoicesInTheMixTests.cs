@@ -123,8 +123,8 @@ public class TrainVoicesInTheMixTests
     private static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-6f, g));
 
     /// <summary>
-    /// A wall put up between a playing train voice and the ear reaches the voice. Its id is no entity's, so
-    /// the path pass skips it, and a re-submission leaves a voice's tone alone: until 2026-10-10 a train
+    /// A wall put up between a playing train voice and the ear reaches the voice. Its id is no entity's, and
+    /// the path pass skipped it, and a re-submission without its path leaves a voice's tone alone: until 2026-10-10 a train
     /// kept the band gains it started with, and a horn begun on an outdoor answer played flat through
     /// Marlow Tower's brick (74 dB in the floor 3 corridor, Cody's log).
     /// </summary>
@@ -135,11 +135,12 @@ public class TrainVoicesInTheMixTests
         Assert.True(h.TickUntil(() => h.Mixer.Latest.Values.Any(e => e.PhysicalKey.StartsWith("rail:", StringComparison.Ordinal)), 60),
                     "the train was never voiced");
         int voice = VoiceOf(h);
-        Assert.True(h.TickUntil(() => h.Mixer.HasPath(voice), 60), "the train's voice was never handed a path");
-        float open = h.Mixer.LastPath(voice).EqMid;
+        Assert.True(h.TickUntil(() => h.Mixer.HasCarried(voice), 60), "the train's voice was never handed a path");
+        float open = h.Mixer.LastCarried(voice).EqMid;
         h.AddWall(Wall, new Vector3(0f, 3f, 6f), new Vector3(40f, 8f, 0.35f));
-        bool walled = h.TickUntil(() => h.Mixer.LastPath(voice).EqMid < 0.1f * open, 300, TimeSpan.FromSeconds(5));
-        _o.WriteLine($"voice {voice}: mid {Db(open):F1} dB in view, {Db(h.Mixer.LastPath(voice).EqMid):F1} dB behind 35 cm of brick");
+        bool walled = h.TickUntil(() => h.Mixer.LastCarried(voice).EqMid < 0.1f * open, 300, TimeSpan.FromSeconds(5));
+        _o.WriteLine($"voice {voice}: mid {Db(open):F1} dB in view, {Db(h.Mixer.LastCarried(voice).EqMid):F1} dB behind 35 cm of brick");
+        Assert.False(h.Mixer.HasPath(voice), "the train's voice had a second writer");
         Assert.True(walled, "the wall never reached the playing voice");
     }
 }

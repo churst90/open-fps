@@ -671,7 +671,10 @@ What goes where, by member:
   decides, and submits, in one pass. The way through is to first turn each snapshot read into a
   read of a per-frame source table the adapter builds (id, spec, state), inside the same class, with
   the emitter stream unchanged; then move the class body out. `WorldAudioPlayer` (86 host references
-  in 15 of 117 members) and `BirdLife` (55 in 10 of 47) split the same way and are smaller.
+  in 15 of 117 members) and `BirdLife` (55 in 10 of 47) split the same way and are smaller. The voice
+  registry is that table's voice half: for the voices of moving things it exists since 2026-10-11
+  (`VoiceRegistry`, `ClientAudioSystem.Voices.cs`; docs/SPECIAL_CASES_AUDIT.md, "P3a as built"), and P3b
+  extends it to every voice.
 
 `SpatialService` (281 host references in 22 of 37 members) is the client's ray service over
 entities; the acoustics use it through `SpatialAcoustics` (8 calls). Since geometry stage 1 its rays

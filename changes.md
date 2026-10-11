@@ -4,6 +4,22 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- The voices of moving things have one path each, from one pass (part P3a of docs/SPECIAL_CASES_AUDIT.md),
+  unheard. Cody asked "shouldn't all mobile sound sources like vehicles, trains, sirens, etc use the same path
+  so there's consistency?" after a train horn played through a brick wall. Every engine, intake, borrowed far
+  car, horn, held horn, siren, train voice and cabin path is now an entry in a voice registry, with its owner,
+  its kind, where on the owner it sounds from and its declared level, and is handed its owner's one answer each
+  frame, with the vehicles in the way, in the one emitter that places it. No voice has a second writer. What
+  changes:
+  - A car's intake, its own voice within 20 m, kept the tone it started with. A car that came out from behind a
+    brick wall kept its intake 60 dB down in the mid band; now it opens up, and its air follows its distance.
+  - A car voiced from afar (a borrowed voice) is occluded and placed at its distance as its path says: it was
+    re-placed every frame with nothing in the way and no distance.
+  - The lane rumble's rate follows your speed. The voice budget put back the rate it started at every frame.
+  - Horns, held horns, sirens and trains are asked about on the same cadence as every other source.
+  Ids and everything else are as they were; the emitter streams changed only for these, voice by voice in the
+  audit's "P3a as built". `VehicleShadow` on the shared barrier law (S21) is left for a decision on its cap.
+
 - The compass has one rule for a bearing exactly between two points: the point clockwise, for every caller
   (Cody: "whichever is more precise for the compass, go with your recommendation"; neither is more precise, so
   one rule). The wind, the editor and the driving aids used to put it on the cardinal; they now say what

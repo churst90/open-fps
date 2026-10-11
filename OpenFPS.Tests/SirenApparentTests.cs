@@ -33,8 +33,13 @@ public class SirenApparentTests
 
     private static float Bearing(Vector3 ear, Vector3 p) => MathF.Atan2(p.X - ear.X, p.Z - ear.Z) * 180f / MathF.PI;
 
+    /// <summary>
+    /// A siren is placed by one writer, the registry's pass, every frame. With two (the siren's own update
+    /// and the car's path, each with its own apparent position) the image swung between bearings every
+    /// frame, 3.6 degrees for a car crossing 100 m out, and a far siren fluttered.
+    /// </summary>
     [Fact]
-    public void A_siren_is_placed_in_one_place_by_both_of_its_writers()
+    public void A_siren_is_placed_in_one_place_by_one_writer()
     {
         int id = PromptCallId();
         var h = new ClientAudioHarness();
@@ -45,10 +50,10 @@ public class SirenApparentTests
         var vel = new Vector3(17f, 0f, 0f);
         h.AddCar(id, "police_interceptor", at, vel);
         int siren = ClientAudioSystem.SirenVoiceBase - Math.Abs(id);
-        Assert.True(h.TickUntil(() => h.Mixer.HasPath(siren) && h.Mixer.Latest.ContainsKey(siren), 1200),
+        Assert.True(h.TickUntil(() => h.Mixer.HasCarried(siren) && h.Mixer.Latest.ContainsKey(siren), 1200),
                     "the siren never sounded with a path");
 
-        float worst = 0f;
+        float worst = 0f, last = Bearing(ear, h.Mixer.Latest[siren].ApparentPosition);
         for (int f = 0; f < 60; f++)
         {
             at += vel / (float)ClientAudioSystem.UpdateHz;
@@ -60,11 +65,14 @@ public class SirenApparentTests
             } });
             h.Tick();
             System.Threading.Thread.Sleep(2);
-            float fromPath = Bearing(ear, h.Mixer.LastPath(siren).ApparentPosition);
-            float fromVoice = Bearing(ear, h.Mixer.Latest[siren].ApparentPosition);
-            worst = MathF.Max(worst, MathF.Abs(fromPath - fromVoice));
+            float now = Bearing(ear, h.Mixer.Latest[siren].ApparentPosition);
+            // From the second frame: the first puts the car back where this loop starts it.
+            if (f > 0) worst = MathF.Max(worst, MathF.Abs(now - last));
+            last = now;
         }
-        _o.WriteLine($"worst disagreement between the two writers: {worst:F2} degrees");
-        Assert.True(worst < 0.5f, $"the path and the siren's own update place it {worst:F1} degrees apart");
+        _o.WriteLine($"worst step in bearing from one frame to the next: {worst:F2} degrees");
+        Assert.False(h.Mixer.HasPath(siren), "the siren was handed a path by a second writer");
+        // The car sweeps about 0.17 degrees a frame from here.
+        Assert.True(worst < 0.5f, $"the siren's bearing stepped {worst:F1} degrees in one frame");
     }
 }

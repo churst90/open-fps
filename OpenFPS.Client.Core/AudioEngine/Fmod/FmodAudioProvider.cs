@@ -3058,7 +3058,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 TargetRegionId = emitter.TargetRegionId, IsReflection = emitter.IsReflection,
                 FollowsListener = emitter.FollowsListener, ListenerOffset = emitter.ListenerOffset,
                 InsideListenersVehicle = emitter.InsideListenersVehicle,
-                RoomGain = 1.0f,
+                RoomGain = emitter.RoomGain,
                 ConeInside = emitter.ConeInside, ConeOutside = emitter.ConeOutside, ConeOutsideVolume = emitter.ConeOutsideVolume,
                 ReflectionSpread = emitter.ReflectionSpread,
                 SaState = saState, SaDsp = saDsp, SaHandle = saHandle
@@ -3171,6 +3171,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.TargetLow = emitter.EqLow; active.TargetMid = emitter.EqMid; active.TargetHigh = emitter.EqHigh;
                     active.AirLowDb = emitter.AirLowDb; active.AirMidDb = emitter.AirMidDb; active.AirHighDb = emitter.AirHighDb;
                     active.TargetRegionId = emitter.TargetRegionId;
+                    active.RoomGain = emitter.RoomGain;
                     // Part of the path: a talker can get into your car mid-sentence, or you into theirs.
                     active.InsideListenersVehicle = emitter.InsideListenersVehicle;
                 }
