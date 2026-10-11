@@ -795,6 +795,7 @@ public sealed partial class ClientGameSession : IDisposable
         switch (msg)
         {
             case LoginResponse login:
+                if (AnswerWasCancelled()) break;
                 if (login.Success)
                 {
                     _role = login.Role;

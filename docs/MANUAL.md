@@ -44,6 +44,21 @@ The main menu has five items: **Connect**, **Create account**, **Saved Servers**
 - After you log in by hand, the server is saved for you. The first server you save becomes your
   preferred one.
 
+While it connects, a small Connecting window takes focus. The client says "Connecting to" and the
+saved server's name (or the address you typed), then "Escape to cancel". The arrow keys, Tab, Enter
+and Space do nothing there, so the menu behind stays where it was. Control, Alt, Shift, Insert and the
+keypad still reach your screen reader.
+
+- If the server does not answer, the client keeps trying for about 30 seconds. It says "The server
+  is not answering yet; still trying. Escape to cancel." once, then "Still trying, 15 seconds." and
+  so on, no more often than every 10 seconds. A quiet low tick sounds with each try. It gets in as
+  soon as the server answers.
+- If the 30 seconds run out, it says why it could not connect ("The server did not answer. Check the
+  address and that the server is running.") and the cursor is back where it was.
+- **Escape** stops trying. It says "Cancelled." and the cursor is back where it was: on Connect, on
+  the server in Saved Servers, or in the Connect dialog.
+- A refusal (a wrong password, a full server, a different build) is said at once, with no retrying.
+
 Login refusals you may hear:
 - "This client does not match the server": your client was built from a different version than the
   server. Get a client built from the same version. The message gives both build numbers.
@@ -54,7 +69,9 @@ Login refusals you may hear:
 
 A list of servers. Move with the arrow keys; Enter on a server connects to it. The buttons are
 Connect, Set as preferred, Add, Edit, Remove and Close. Each server is read as its name, address,
-user name, and "preferred" if it is your preferred server.
+user name, and "preferred" if it is your preferred server. When the password is saved, the list stays
+open while it connects and closes once you are logged in, so a connect that fails or is cancelled
+leaves you on the same server. Without a saved password, the Connect dialog opens in its place.
 
 ### Entering the world
 
@@ -72,10 +89,12 @@ cannot be built within 30 seconds, you arrive on the server's landing map instea
 - **Escape** in game opens the game menu: **Keep playing**, **Main menu** and **Quit**. The cursor
   starts on Keep playing, and Escape closes the menu. Main menu and Quit log you out first; the
   world fades out over half a second.
-- If the connection drops, the client says "Disconnected from the server", stops every sound in the
-  world, and tries to log back in every 3 seconds with a quiet tick. When it gets back in it says
-  "Reconnected" and loads the map again. After a minute without success it says so and goes back
-  to the main menu. Escape during this opens the game menu.
+- If the connection drops, the client says "Disconnected from the server", the reason, and
+  "Reconnecting. Escape to cancel." It stops every sound in the world, the Connecting window takes
+  focus, and it tries to log back in every 3 seconds with a quiet tick, saying "Still trying" no more
+  often than every 10 seconds. When it gets back in it says "Reconnected" and loads the map again.
+  After a minute without success it says "Could not reconnect" and goes back to the main menu.
+  Escape during this stops trying: it says "Stopped reconnecting." and goes to the main menu.
 
 ## Keys
 
@@ -302,7 +321,7 @@ Inside a list:
 - Choosing: two rising notes. Going back: two falling notes.
 - Loading a map: one soft note per tenth of the load, rising.
 - Entering the world: a rising chord.
-- Trying to reconnect: a quiet low tick every 3 seconds.
+- Trying to connect again, or to reconnect: a quiet low tick with each try.
 - Chat: one soft note for your map, two rising notes for everyone, three rising notes for a
   private message to you, three notes up and back down for your team, two falling notes for the
   server, a bright chord for an admin.

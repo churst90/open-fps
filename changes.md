@@ -4,6 +4,27 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- Connecting holds focus and waits for a server that is not up yet, unheard (Cody, 2026-10-11: "either
+  announce it's reconnecting or if it is in the process of connecting, focus shouldn't be on the menu where
+  the arrows move the menu cursor"). A client started before its server said "The server did not answer"
+  after one 5-second try, and the main menu kept focus the whole time.
+  - While a connect is under way a Connecting window takes focus over whatever started it (the main menu,
+    Saved Servers, the Connect dialog, or the game window after a drop). Arrows, Tab, Enter, Space and
+    letters do nothing there; Control, Alt, Shift and the keys the game does not map (Insert, the review
+    keypad) pass to the screen reader. Escape cancels: "Cancelled.", and focus is back on the item used. A
+    held Escape keeps the window until the key is up, so its repeats cannot close the Connect dialog behind.
+  - It says "Connecting to" and the saved server's name or the address, then "Escape to cancel". A server
+    that does not answer is tried again for 30 seconds, each try starting as the last ends: "The server is not
+    answering yet; still trying. Escape to cancel." once, then "Still trying, N seconds." at most every 10
+    seconds, never the same line twice. Out of time, it says the old reason and focus goes back. A refusal, a
+    wrong protocol or an unknown host is said at once, as before.
+  - The reconnect after a drop in game says "Reconnecting. Escape to cancel." and holds focus the same way;
+    Escape stops it and goes to the main menu ("Stopped reconnecting."), where it used to open the game menu.
+  - A cancelled try that ended later ("did not answer") is no longer said over the menu, and a login answer
+    that arrives after Escape is dropped.
+  - Saved Servers stays open while it connects with a saved password, and closes on login.
+  - Both heads (GTK and Windows). ConnectRetry and ConnectHold in the client core; ConnectRetryTests (20).
+
 - What Cody heard in Marlow Tower on 2026-10-10, traced and fixed, unheard (docs/GEOMETRY.md 12.6, "Marlow
   Tower's leaks"). Three causes, none of them the rooms' floods:
   - **The train "clear as day" in the floor 3 corridor** was its horn, playing at 74 dB at the ear with nothing

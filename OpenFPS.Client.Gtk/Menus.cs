@@ -86,14 +86,36 @@ internal static partial class GtkClientProgram
         ConnectTo(server);
     }
 
+    /// <summary>Whether Connect goes straight in, with no form to ask for the password.</summary>
+    private static bool CanConnectAtOnce(SavedServer server)
+        => server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0;
+
     private static void ConnectTo(SavedServer server)
     {
-        if (server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0)
+        if (CanConnectAtOnce(server))
         {
-            _session.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, register: false);
+            _session.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, register: false, server.Name);
             return;
         }
         ShowLoginDialog(server);
+    }
+
+    // Saved Servers stays up while it connects, so a connect that fails or is cancelled puts focus back
+    // on the server that was chosen; it closes once the login is accepted.
+    private static Window? _serversWindow;
+
+    private static void CloseServersWindow()
+    {
+        var window = _serversWindow;
+        _serversWindow = null;
+        window?.Close();
+    }
+
+    /// <summary>Connect from Saved Servers: straight in with the window kept, or the password form in its place.</summary>
+    private static void ConnectFromServers(Window window, SavedServer server)
+    {
+        if (!CanConnectAtOnce(server)) window.Close();
+        ConnectTo(server);
     }
 
     /// <summary>
@@ -122,6 +144,8 @@ internal static partial class GtkClientProgram
     private static void ShowServers()
     {
         var window = Dialog("Saved Servers", 520, 420);
+        _serversWindow = window;
+        window.OnCloseRequest += (_, _) => { if (ReferenceEquals(_serversWindow, window)) _serversWindow = null; return false; };
         var box = VBox(16);
         var list = ListBox.New();
         list.SetSelectionMode(SelectionMode.Single);
@@ -159,16 +183,14 @@ internal static partial class GtkClientProgram
             int i = e.Row.GetIndex();
             if (i < 0 || i >= _settings.Servers.Count) return;
             Cue(UiCue.MenuSelect);
-            window.Close();
-            ConnectTo(_settings.Servers[i]);
+            ConnectFromServers(window, _settings.Servers[i]);
         };
         box.Append(list);
 
         var connect = MenuButton("Connect", () =>
         {
             if (Selected() is not { } s) { _speech.Speak("Choose a server first.", true); return; }
-            window.Close();
-            ConnectTo(s);
+            ConnectFromServers(window, s);
         });
         box.Append(connect);
         TabLeavesList(list, connect);

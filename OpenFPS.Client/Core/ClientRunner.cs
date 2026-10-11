@@ -69,7 +69,7 @@ public class ClientRunner
         _navigation = new ClientNavigationService(
             menuFactory: () => new MenuWindow(_speech, _settings, new MenuServices
             {
-                Connect = (address, user, pass, register) => _session.Connect(address, user, pass, register),
+                Connect = (address, user, pass, register, name) => _session.Connect(address, user, pass, register, name),
                 Cue = cue => _session?.Ui.Play(cue),
                 OutputDevices = () => _session.Audio.OutputDevices(),
                 InputDevices = () => _session.Audio.InputDevices(),
@@ -90,6 +90,8 @@ public class ClientRunner
         _session.LoginSucceeded += _ => _navigation.ReportLoginOutcome("", success: true);
         _session.LoginFailed += reason => _navigation.ReportLoginOutcome($"Login failed. {reason}", success: false);
         _session.ConnectFailed += reason => _navigation.ReportLoginOutcome(reason, success: false);
+        // Escape while connecting: said, and focus stays where it was; the form only shows it.
+        _session.ConnectCancelled += () => _navigation.EnqueueUIAction(() => _navigation.Menu?.ShowConnectCancelled());
         // Preloading the sound library is the long pole; it runs on the session's audio thread and the
         // menu is usable meanwhile, as on Linux.
         _session.BeginAudioInit(ApplyAudioSettings);

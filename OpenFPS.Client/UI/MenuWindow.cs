@@ -90,16 +90,24 @@ public sealed class MenuWindow : Form
         ShowLoginForm(server, register: true);
     }
 
+    /// <summary>Whether Connect goes straight in, with no form to ask for the password.</summary>
+    private static bool CanConnectAtOnce(SavedServer server)
+        => server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0;
+
     private void ConnectTo(SavedServer server)
     {
-        if (server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0)
+        if (CanConnectAtOnce(server))
         {
             _pending = null;   // already saved: nothing to remember afterwards
-            _services.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, false);
+            _services.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, false, server.Name);
             return;
         }
         ShowLoginForm(server);
     }
+
+    // Saved Servers stays up while it connects, so a connect that fails or is cancelled puts focus back
+    // on the server that was chosen; it closes once the login is accepted.
+    private Form? _serversForm;
 
     /// <summary>The Connect form; with <paramref name="register"/> it is the same form for making a new
     /// account, with Create account first (and the default) and focus on the username.</summary>
@@ -129,7 +137,8 @@ public sealed class MenuWindow : Form
         {
             _pending = new PendingLogin(server.Text.Trim(), user.Text.Trim(), pass.Text, remember.Checked);
             status.Text = register ? "Creating the account..." : "Connecting...";
-            _services.Connect(_pending.Address, _pending.User, _pending.Pass, register);
+            _services.Connect(_pending.Address, _pending.User, _pending.Pass, register,
+                saved != null && _pending.Address == $"{saved.Host}:{saved.Port}" ? saved.Name : null);
         }
         var connect = MenuButton("Connect", () => Submit(register: false));
         var create = MenuButton("Create account", () => Submit(register: true));
@@ -178,12 +187,19 @@ public sealed class MenuWindow : Form
             if (_pending is { } p && _loginForm != null) RememberServer(p);
             _pending = null;
             if (_loginForm != null) { _loginForm.DialogResult = DialogResult.OK; _loginForm.Close(); }
+            if (_serversForm is { IsDisposed: false } servers) { servers.DialogResult = DialogResult.OK; servers.Close(); }
             return;
         }
         if (_loginForm == null || _loginStatus == null) return;
         _loginStatus.Text = message;
         if (_speech.ScreenReaderRunning) _loginStatus.Focus();
         else _loginUser?.Focus();
+    }
+
+    /// <summary>A connect cancelled with Escape: already said, so the form only shows it.</summary>
+    public void ShowConnectCancelled()
+    {
+        if (_loginStatus is { IsDisposed: false }) _loginStatus.Text = "Cancelled.";
     }
 
     /// <summary>A server logged in to by hand is remembered, so Connect can go straight back.</summary>
@@ -219,7 +235,11 @@ public sealed class MenuWindow : Form
         }
         Refill();
 
-        var connect = MenuButton("Connect", () => Need(s => { form.DialogResult = DialogResult.OK; form.Close(); ConnectTo(s); }));
+        var connect = MenuButton("Connect", () => Need(s =>
+        {
+            if (!CanConnectAtOnce(s)) { form.DialogResult = DialogResult.OK; form.Close(); }
+            ConnectTo(s);
+        }));
         layout.Controls.Add(connect);
         layout.Controls.Add(MenuButton("Set as preferred", () => Need(s =>
         {
@@ -245,6 +265,8 @@ public sealed class MenuWindow : Form
         form.AcceptButton = connect;
         form.CancelButton = close;
         form.Controls.Add(layout);
+        _serversForm = form;
+        form.FormClosed += (_, _) => { if (ReferenceEquals(_serversForm, form)) _serversForm = null; };
         form.Shown += (_, _) =>
         {
             list.Focus();
@@ -456,7 +478,8 @@ public sealed class MenuWindow : Form
 /// <summary>What the menu needs from the rest of the client, so it does not reach into the session.</summary>
 public sealed class MenuServices
 {
-    public required Action<string, string, string, bool> Connect { get; init; }
+    /// <summary>Address, username, password, whether to create the account, and the saved server's name or null.</summary>
+    public required Action<string, string, string, bool, string?> Connect { get; init; }
     public required Action<UiCue> Cue { get; init; }
     public required Func<IReadOnlyList<string>> OutputDevices { get; init; }
     public required Func<IReadOnlyList<string>> InputDevices { get; init; }
