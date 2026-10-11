@@ -64,7 +64,6 @@ public sealed class BirdLife
     /// <summary>Beyond this from the listener a group is left asleep. The loudest perched bird, a crow,
     /// is lost under a street well inside it.</summary>
     private const float AwakeRadius = 160f;
-    private const int VoiceBase = -970_000, VoicePool = 48;
     /// <summary>A roof is a flat top this high up, with nothing over it.</summary>
     private const float RoofMinHeight = 10f, RoofMinArea = 60f;
     /// <summary>A skein of geese goes over, on average, this often.</summary>
@@ -311,8 +310,9 @@ public sealed class BirdLife
             }
     }
 
-    /// <summary>Where every call is declared as it starts (ClientAudioSystem's registry).</summary>
-    internal VoiceRegistry? Voices { get; set; }
+    /// <summary>Where every call is given its id and declared as it starts: ClientAudioSystem's registry, or
+    /// one of its own on its own.</summary>
+    internal VoiceRegistry Voices { get; set; } = new();
 
     /// <summary>Every call, as it is made: which species and where. For tests and traces.</summary>
     internal Action<string, Vector3>? OnCall { get; set; }
@@ -332,11 +332,13 @@ public sealed class BirdLife
         AcousticPathData? path = null;
         if (_acoustics != null)
             try { path = _acoustics.CalculateAcousticPath(world, -1, listener, at); } catch { }
-        int voiceId = VoiceBase - (_voice++ % VoicePool);
-        Voices?.DeclareEvent(voiceId, VoiceRegistry.NoEntity, VoiceKind.Bird, at, sp.CallDb);
+        int call = _voice++;
+        int voiceId = Voices.IdFor(VoiceKind.Bird, VoiceRegistry.NoEntity, call);
+        Voices.DeclareEvent(voiceId, VoiceRegistry.NoEntity, VoiceKind.Bird, at, sp.CallDb);
         _audio.Submit(new SpatialEmitter
         {
             EntityId = voiceId,
+            Seed = VoiceRegistry.SeedOf(VoiceKind.Bird, VoiceRegistry.NoEntity, call),
             SoundId = sound,
             Mode = PlaybackMode.Single,
             Type = EmitterType.WorldLocked,

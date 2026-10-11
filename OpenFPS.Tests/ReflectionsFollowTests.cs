@@ -130,8 +130,11 @@ public class ReflectionsFollowTests
     private static List<Vector3> OwnVoiceCopies(ClientAudioHarness h)
     {
         var at = new List<Vector3>();
-        for (int k = 1; k <= 8; k++)
-            if (h.Mixer.Live.Contains(ClientAudioSystem.OwnVoiceBase - k)) at.Add(h.Mixer.Latest[ClientAudioSystem.OwnVoiceBase - k].Position);
+        for (int k = 0; k < 8; k++)
+        {
+            int id = h.Voice(VoiceKind.OwnVoiceCopy, VoiceRegistry.NoEntity, k);
+            if (h.Mixer.Live.Contains(id)) at.Add(h.Mixer.Latest[id].Position);
+        }
         return at;
     }
 
@@ -191,7 +194,7 @@ public class ReflectionsFollowTests
             AddPlayer(h, Sean, new Vector3(0.6f, 0f, 1.1f));
             h.Tick();
             SeanSays();
-            int voice = ClientAudioSystem.TalkerVoiceBase - Sean;
+            int voice = h.Voice(VoiceKind.Talker, Sean);
             Assert.True(h.TickUntil(() => h.Mixer.Live.Contains(voice) && SeansCopies(h).Count > 0, 120), "Sean's voice and its copies never started");
 
             // His voice reverberates in the room his mouth is in...

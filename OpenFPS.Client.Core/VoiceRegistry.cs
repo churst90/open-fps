@@ -253,6 +253,69 @@ internal sealed class VoiceRegistry
         }
     }
 
+    /// <summary>A landing's part (<see cref="IdFor"/>): one landing at a time, the next replacing it.</summary>
+    public const int Landing = -1;
+
+    /// <summary>
+    /// The id of one voice: <paramref name="kind"/> of <paramref name="owner"/>, the <paramref name="part"/>th of
+    /// them. The owner is an entity, or for a voice no entity owns what it belongs to (a train's number, a rain
+    /// slot, an aid, a talker's room); the part tells one of its voices of a kind from another (a slot, a place,
+    /// a count). For now the ids of the seed table (<see cref="SeedOf"/>).
+    /// </summary>
+    public int IdFor(VoiceKind kind, int owner, int part = 0) => SeedOf(kind, owner, part);
+
+    /// <summary>
+    /// What a voice's chance is drawn from (<see cref="OpenFPS.Client.AudioEngine.Data.SpatialEmitter.Seed"/>),
+    /// by what it is the sound of: the ids voices had before they were given out, so nothing rendered moves.
+    /// An entity's own voice is seeded by its entity id.
+    /// </summary>
+    public static int SeedOf(VoiceKind kind, int owner, int part = 0) => kind switch
+    {
+        VoiceKind.Engine or VoiceKind.Aircraft or VoiceKind.Machine or VoiceKind.Wood or VoiceKind.Recording => owner,
+        VoiceKind.Reflection => -30_000 - owner * (OpenFPS.Common.EarlyReflections.MaxArrivals + 1) - part,
+        VoiceKind.Transient => -100_000 - part % 400_000,
+        VoiceKind.EngineEcho => -600_000 - part,
+        VoiceKind.Borrowed => -700_000 - Math.Abs(owner),
+        VoiceKind.Intake => -800_000 - Math.Abs(owner),
+        VoiceKind.Siren => -900_000 - Math.Abs(owner),
+        VoiceKind.Aid => AidSeed((AidVoice)owner, part),
+        VoiceKind.Beacon => -967_000 - part % 24,
+        VoiceKind.Bird => -970_000 - part % 48,
+        VoiceKind.Horn => -1_200_000 - Math.Abs(owner),
+        VoiceKind.OwnVoice => -1_300_000,
+        VoiceKind.OwnVoiceCopy => -1_300_001 - part,
+        VoiceKind.Talker => -1_400_000 - Math.Abs(owner),
+        VoiceKind.Cabin => -1_600_000 - part,
+        VoiceKind.TalkerCopy => -1_700_000 - owner * 8 - part,
+        VoiceKind.StepEcho => -1_800_000 - part % 48,
+        VoiceKind.HeldHorn => -2_100_000 - Math.Abs(owner),
+        VoiceKind.TrainField or VoiceKind.TrainSignal => -2_300_000 - (owner * OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots + part),
+        VoiceKind.Rain => part == 0 ? -2_400_000 - owner : -2_400_100 - owner * 8 - part,
+        VoiceKind.RainDrop => -2_401_000 - part % 48,
+        VoiceKind.Place => -5_000_000 - Math.Abs(owner) * OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MaxPlaces - part,
+        VoiceKind.Reference => -7_900_000 - part,
+        VoiceKind.OwnStep => part == Landing ? -50 : -100 - part % 12,
+        VoiceKind.Footstep => part == Landing ? -50 : -300 - part % 64,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "no seed"),
+    };
+
+    private static int AidSeed(AidVoice aid, int part) => aid switch
+    {
+        AidVoice.Guide => -961_000 - part % 6,
+        AidVoice.Centre => -962_000 - part % 6,
+        AidVoice.Kerb => -963_000 - part % 6,
+        AidVoice.CentreTone => -964_001,
+        AidVoice.KerbTone => -964_002,
+        AidVoice.CentreRumble => -964_003,
+        AidVoice.KerbRumble => -964_004,
+        AidVoice.Turn => -965_000 - part % 6,
+        AidVoice.Align => -966_001,
+        AidVoice.Relay => -966_010,
+        AidVoice.OverSpeed => -966_011,
+        AidVoice.Brake => -967_100 - part % 6,
+        _ => throw new ArgumentOutOfRangeException(nameof(aid), aid, "no seed"),
+    };
+
     /// <summary>A point in the owner's frame, from one in the world.</summary>
     public static Vector3 MountOf(Vector3 ownerAt, Quaternion ownerRotation, Vector3 at)
         => Vector3.Transform(at - ownerAt, Quaternion.Inverse(ownerRotation));

@@ -221,7 +221,7 @@ public static class TrainSceneSpike
                 {
                     nextCensus = now + 0.5;
                     var (active, noHrtf, refused, free) = provider.VoiceCensus();
-                    int trainVoices = provider.GetActiveSpatialSoundIds().Count(i => i <= ClientAudioSystem.TrainVoiceBase && i > ClientAudioSystem.TrainVoiceBase - 10_000);
+                    int trainVoices = audio.Voices.Entries.Count(e => e.Kind is VoiceKind.TrainField or VoiceKind.TrainSignal && provider.IsPlaying(e.VoiceId));
                     var heads = rail.HeadsOn("city", "rail_loop", out float lap);
                     float toGo = heads.Count > 0 ? crossingAt - heads[0] : 0f;
                     if (toGo < -lap / 2) toGo += lap;

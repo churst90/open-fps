@@ -126,7 +126,7 @@ public static class MachineSpike
 
         SpatialEmitter Exhaust(Vector3 p, Vector3 vel) => new()
         {
-            EntityId = CarId, SoundId = "engine:" + key, IsSynth = true, EngineKey = key,
+            EntityId = CarId, Seed = CarId, SoundId = "engine:" + key, IsSynth = true, EngineKey = key,
             EngineSpeed = speed, EngineRunning = true,
             Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
             Position = Rear(p), ApparentPosition = Rear(p), Velocity = vel,

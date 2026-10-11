@@ -378,7 +378,7 @@ public static class QualitySpike
         var (gain, reference) = Loudness.Place(level, extent);
         return new SpatialEmitter
         {
-            EntityId = id, Type = EmitterType.EntityAttached, IsSynth = true, PhysicalKey = key, EngineRunning = true,
+            EntityId = id, Seed = id, Type = EmitterType.EntityAttached, IsSynth = true, PhysicalKey = key, EngineRunning = true,
             SoundId = key, Mode = PlaybackMode.LoopOne,
             Position = at, ApparentPosition = at, Direction = Vector3.UnitZ,
             Volume = gain * PhysicalVoiceState.HeadroomGain(headroom), MinDistance = reference, ExtentMetres = extent,
@@ -448,7 +448,7 @@ public static class QualitySpike
                 var (gain, reference) = Loudness.Place(profile.SourceLevelDb, c.Extent);
                 s.P.PlaySpatialSound(new SpatialEmitter
                 {
-                    EntityId = id, SoundId = "engine:" + c.Key, IsSynth = true, EngineKey = c.Key,
+                    EntityId = id, Seed = id, SoundId = "engine:" + c.Key, IsSynth = true, EngineKey = c.Key,
                     EngineSpeed = v, EngineRunning = true, Type = EmitterType.EntityAttached, Mode = PlaybackMode.LoopOne,
                     Position = p, ApparentPosition = p, Velocity = vel, Direction = new Vector3(0f, 0f, dir),
                     Volume = gain, MinDistance = reference, ExtentMetres = c.Extent, Range = Loudness.AudibleRange(profile.SourceLevelDb),
@@ -477,7 +477,7 @@ public static class QualitySpike
                     float path = Vector3.Distance(mirror, ear);
                     s.P.PlaySpatialSound(new SpatialEmitter
                     {
-                        EntityId = id - 100 - w, SoundId = "echo", IsSynth = true, EchoOfEntity = id, IsReflection = true,
+                        EntityId = id - 100 - w, Seed = id - 100 - w, SoundId = "echo", IsSynth = true, EchoOfEntity = id, IsReflection = true,
                         EchoDelaySeconds = MathF.Max(0f, path - direct) / C, EchoGain = 0.6f, EchoScattering = 0.3f,
                         Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                         Position = mirror, ApparentPosition = mirror, Volume = gain, MinDistance = reference,
@@ -741,7 +741,7 @@ public static class QualitySpike
                 var p = moving && mode != "approach" ? new Vector3(4f, 0.4f, -50f + V * (float)t) : new Vector3(4f, 0.4f, 10f);
                 s.P.PlaySpatialSound(new SpatialEmitter
                 {
-                    EntityId = -900, SoundId = "engine:" + Key, IsSynth = true, EngineKey = Key,
+                    EntityId = -900, Seed = -900, SoundId = "engine:" + Key, IsSynth = true, EngineKey = Key,
                     EngineSpeed = V, EngineRunning = true, Type = EmitterType.EntityAttached, Mode = PlaybackMode.LoopOne,
                     Position = p, ApparentPosition = p, Velocity = mode == "approach" ? new Vector3(0f, 0f, -V) : moving ? new Vector3(0f, 0f, V) : Vector3.Zero,
                     Direction = Vector3.UnitZ, Volume = gain * 1e-4f, MinDistance = reference, ExtentMetres = 3.5f,
@@ -765,7 +765,7 @@ public static class QualitySpike
                 var mirror = new Vector3(-6f, 0.4f, 10f);
                 s.P.PlaySpatialSound(new SpatialEmitter
                 {
-                    EntityId = -901, SoundId = "echo", IsSynth = true, EchoOfEntity = -900, IsReflection = mode != "borrowed",
+                    EntityId = -901, Seed = -901, SoundId = "echo", IsSynth = true, EchoOfEntity = -900, IsReflection = mode != "borrowed",
                     EchoDelaySeconds = 0.03f, EchoGain = 1f, EchoScattering = 0f,
                     Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                     Position = mirror, ApparentPosition = mirror, Volume = gain, MinDistance = reference,

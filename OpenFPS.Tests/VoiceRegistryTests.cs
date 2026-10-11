@@ -140,7 +140,7 @@ public class VoiceRegistryTests
     public void A_borrowed_car_behind_a_building_is_occluded_and_at_its_distance()
     {
         var (run, seen) = EveryKind();
-        int voice = ClientAudioSystem.DistantVoiceBase - 504;
+        int voice = run.Audio.Voices.IdFor(VoiceKind.Borrowed, 504);
         Assert.Equal(VoiceKind.Borrowed, seen[voice]);
         var expanded = EmitterStreamReplayTests.Expand(run.Mixer.Lines);
         string last = expanded.Last(l => l.Contains($" Place {voice} "));
@@ -192,13 +192,14 @@ public class VoiceRegistryTests
     [Fact]
     public void The_lane_rumble_follows_the_speed()
     {
-        const string rumble = "-964003";
+        // Found by what it is (its seed), whatever id it was given.
+        int rumble = VoiceRegistry.SeedOf(VoiceKind.Aid, (int)AidVoice.CentreRumble);
         var expanded = EmitterStreamReplayTests.Expand(Replay.Run("talker_and_aids"));
         var lastOfFrame = new SortedDictionary<int, float>();
         foreach (var line in expanded)
         {
             var parts = line.Split(' ', 4);
-            if (parts.Length < 4 || parts[2] != rumble || parts[1] is not ("Play" or "Place")) continue;
+            if (parts.Length < 4 || parts[1] is not ("Play" or "Place") || Field(line, "Seed") != rumble) continue;
             lastOfFrame[int.Parse(parts[0])] = Field(line, "Pitch");
         }
         Assert.True(lastOfFrame.Count > 60, $"the rumble was placed in {lastOfFrame.Count} frames");

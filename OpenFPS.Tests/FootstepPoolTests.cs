@@ -1,4 +1,5 @@
 using System.Numerics;
+using OpenFPS.Client.Core;
 
 namespace OpenFPS.Tests;
 
@@ -35,7 +36,7 @@ public class FootstepPoolTests
         h.Tick();
         h.Audio.OnPlayerFootstep(new Vector3(60f, 0f, 0f), "Concrete", "0");
         h.Tick(3);
-        Assert.DoesNotContain(h.Mixer.Started, e => e.EntityId <= -300 && e.EntityId > -364);
+        Assert.Empty(h.Mixer.StartedAs(VoiceKind.Footstep));
     }
 
     [Fact]
@@ -48,7 +49,7 @@ public class FootstepPoolTests
         h.Audio.OnPlayerFootstep(new Vector3(3f, 0f, 2f), "Concrete", "0");
         h.Tick(3);
         Assert.Contains(h.Mixer.Started, e => e.FollowsListener && e.Essential);
-        Assert.Contains(h.Mixer.Started, e => !e.FollowsListener && e.EntityId <= -300 && e.EntityId > -364 && !e.Essential);
+        Assert.Contains(h.Mixer.StartedAs(VoiceKind.Footstep), e => !e.FollowsListener && !e.Essential);
     }
 
     private static string Sounds()

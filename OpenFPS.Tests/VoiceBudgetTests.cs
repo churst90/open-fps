@@ -301,26 +301,20 @@ public class VoiceBudgetTests
         Assert.True(fudged > honest * 1.5f, "the old fudge was not worth several decibels, so this test proves nothing.");
     }
 
-    /// <summary>The negative voice-id bands do not overlap: transient ids once spanned the engine-echo and
-    /// borrowed-voice bands, so a footstep could take over a car's reflection or distant voice.</summary>
+    /// <summary>Consecutive transients are different voices, so a sound and its reflection do not replace each
+    /// other, and none is an entity's: transient ids once spanned the engine-echo and borrowed-voice bands, so a
+    /// footstep could take over a car's reflection or distant voice (VoiceIdBandTests has every voice).</summary>
     [Fact]
-    public void TheVoiceIdBandsDoNotOverlap()
+    public void ConsecutiveTransientsAreDifferentVoicesAndNoEntitys()
     {
-        int transientHighest = WorldAudioPlayer.TransientVoiceId(0);
-        int transientLowest = WorldAudioPlayer.TransientVoiceId(WorldAudioPlayer.TransientVoiceSpan - 1);
-        _o.WriteLine($"transients   {transientLowest} .. {transientHighest}");
-        _o.WriteLine($"engine echoes {EngineReflections.EchoVoiceIdBase} and below");
-        _o.WriteLine($"borrowed      {ClientAudioSystem.DistantVoiceBase} and below");
-
-        Assert.True(transientHighest < 0, "a transient id must be negative so it cannot collide with an entity.");
-        Assert.True(transientLowest > EngineReflections.EchoVoiceIdBase,
-            "the transient band reaches into the engine-echo band.");
-        Assert.True(transientLowest > ClientAudioSystem.DistantVoiceBase,
-            "the transient band reaches into the borrowed-voice band.");
-
-        // Consecutive transients are different voices, so a sound and its reflection do not replace each other.
+        var voices = new VoiceRegistry();
         var seen = new HashSet<int>();
-        for (int i = 1; i <= 1000; i++) Assert.True(seen.Add(WorldAudioPlayer.TransientVoiceId(i)));
+        for (int i = 1; i <= 1000; i++)
+        {
+            int id = voices.IdFor(VoiceKind.Transient, VoiceRegistry.NoEntity, i);
+            Assert.True(id < 0, "a transient id must be negative so it cannot collide with an entity.");
+            Assert.True(seen.Add(id));
+        }
     }
 
     /// <summary>A transient's range does not fade it out while still audible: the mixer fades over the last

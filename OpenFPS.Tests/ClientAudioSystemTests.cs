@@ -55,10 +55,10 @@ public class ClientAudioSystemTests
         int[] voices =
         {
             NearCar,
-            ClientAudioHarness.HornVoice(NearCar),
-            ClientAudioHarness.DistantVoice(DistantNear),
-            ClientAudioHarness.HornVoice(DistantNear),
-            ClientAudioHarness.DistantVoice(DistantFar),
+            h.HornVoice(NearCar),
+            h.DistantVoice(DistantNear),
+            h.HornVoice(DistantNear),
+            h.DistantVoice(DistantFar),
         };
         bool allStarted = h.TickUntil(() => voices.All(h.Mixer.WasStarted), 120);
         Assert.True(allStarted, "not started: " + string.Join(", ", voices.Where(v => !h.Mixer.WasStarted(v))));
@@ -71,8 +71,8 @@ public class ClientAudioSystemTests
 
         // A borrowed voice and a horn are behind whatever their car is behind: the car's own path.
         h.Tick();
-        var borrowed = h.Mixer.LastCarried(ClientAudioHarness.DistantVoice(DistantNear));
-        var horn = h.Mixer.LastCarried(ClientAudioHarness.HornVoice(DistantNear));
+        var borrowed = h.Mixer.LastCarried(h.DistantVoice(DistantNear));
+        var horn = h.Mixer.LastCarried(h.HornVoice(DistantNear));
         Assert.Equal(borrowed.Occlusion, horn.Occlusion);
         Assert.Equal(borrowed.AirHighDb, horn.AirHighDb);
         Assert.Equal(borrowed.EqMid, horn.EqMid);
@@ -84,7 +84,7 @@ public class ClientAudioSystemTests
     public void ADistantVoiceIsDarkenedByTheAirInProportionToItsDistance()
     {
         var h = Field();
-        int nearVoice = ClientAudioHarness.DistantVoice(DistantNear), farVoice = ClientAudioHarness.DistantVoice(DistantFar);
+        int nearVoice = h.DistantVoice(DistantNear), farVoice = h.DistantVoice(DistantFar);
         Assert.True(h.TickUntil(() => h.Mixer.HasCarried(nearVoice) && h.Mixer.HasCarried(farVoice) && h.Mixer.HasCarried(NearCar), 300),
             "the borrowed voices were never given a path");
 
@@ -112,7 +112,7 @@ public class ClientAudioSystemTests
         for (int i = 1; i <= ClientAudioSystem.EngineVoiceBudget; i++)
             h.AddCar(NearCar + i, preset, new Vector3(30f + i * 0.5f, 0f, 40f + i));
         int last = NearCar + ClientAudioSystem.EngineVoiceBudget;
-        int borrowed = ClientAudioHarness.DistantVoice(last);
+        int borrowed = h.DistantVoice(last);
         Assert.True(h.TickUntil(() => h.Mixer.WasStarted(NearCar) && h.Mixer.WasStarted(borrowed), 120));
 
         var profile = MachineRegistry.VehicleFor(preset);
@@ -173,7 +173,7 @@ public class ClientAudioSystemTests
         for (int i = budget; i < n; i++)
         {
             Assert.False(h.Mixer.Live.Contains(CarAt(i)), $"car {i} ({10 + i * 10} m) is outside the budget but has a live engine");
-            Assert.True(h.Mixer.Live.Contains(ClientAudioHarness.DistantVoice(CarAt(i))), $"car {i} should be voiced from afar");
+            Assert.True(h.Mixer.Live.Contains(h.DistantVoice(CarAt(i))), $"car {i} should be voiced from afar");
         }
 
         // To the far end, past the hold that stops an engine being dropped the moment it started.
@@ -184,12 +184,12 @@ public class ClientAudioSystemTests
         for (int i = budget; i < n; i++)
         {
             Assert.True(h.Mixer.Live.Contains(CarAt(i)), $"car {i}, now among the nearest, should have a live engine");
-            Assert.False(h.Mixer.Live.Contains(ClientAudioHarness.DistantVoice(CarAt(i))), $"car {i} kept its borrowed voice as well as its engine");
+            Assert.False(h.Mixer.Live.Contains(h.DistantVoice(CarAt(i))), $"car {i} kept its borrowed voice as well as its engine");
         }
         for (int i = 0; i < extra; i++)
         {
             Assert.False(h.Mixer.Live.Contains(CarAt(i)), $"car {i}, now the furthest, kept its live engine");
-            Assert.True(h.Mixer.Live.Contains(ClientAudioHarness.DistantVoice(CarAt(i))), $"car {i}, now the furthest, should borrow");
+            Assert.True(h.Mixer.Live.Contains(h.DistantVoice(CarAt(i))), $"car {i}, now the furthest, should borrow");
         }
         int liveEngines = Enumerable.Range(0, n).Count(i => h.Mixer.Live.Contains(CarAt(i)));
         Assert.Equal(budget, liveEngines);
@@ -235,7 +235,7 @@ public class ClientAudioSystemTests
     {
         var h = Field();
         h.Honk(DistantNear);
-        int borrowed = ClientAudioHarness.DistantVoice(DistantNear), horn = ClientAudioHarness.HornVoice(DistantNear);
+        int borrowed = h.DistantVoice(DistantNear), horn = h.HornVoice(DistantNear);
         Assert.True(h.TickUntil(() => h.Mixer.Live.Contains(NearCar) && h.Mixer.Live.Contains(borrowed) && h.Mixer.Live.Contains(horn), 120));
 
         foreach (int id in h.World.RemoveEntities(new[] { NearCar, DistantNear })) h.Audio.ForgetEntity(id);

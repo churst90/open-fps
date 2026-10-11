@@ -360,7 +360,7 @@ public class RemoteFootstepsTests
         }
         h.Tick(3);
 
-        var steps = h.Mixer.Started.Where(e => e.EntityId <= -300 && e.EntityId > -364).ToList();
+        var steps = h.Mixer.StartedAs(VoiceKind.Footstep).ToList();
         Assert.NotEmpty(steps);
         foreach (var e in steps)
             _o.WriteLine($"step at {e.Position}: mid {e.EqMid:F2}, occlusion {e.Occlusion:F2}");

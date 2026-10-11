@@ -214,7 +214,7 @@ public static class ProbableBugsSpike
                 Vector3 At(double t) { float a = (float)((t - t0) * Speed / Radius); return new Vector3(Radius * MathF.Cos(a), 0f, Radius * MathF.Sin(a)); }
                 Stand(At(t0), speaker);
                 int id = AddEmitter("ANNOUNCE/st_louis_welcome", false, speaker, 400f, 12f);
-                // The walls' copies play under ClientAudioSystem.ReflectionVoiceId's ids: say how many, and
+                // The walls' copies play under the registry's ids for the speaker's slots: say how many, and
                 // count the times one of them moved more than a metre while it played (handed to another wall).
                 var lastAt = new Dictionary<int, Vector3>();
                 int jumps = 0; double nextSay = t0 + 5.0;
@@ -224,7 +224,7 @@ public static class ProbableBugsSpike
                     int playing = 0;
                     for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
                     {
-                        int voice = -30000 - id * (EarlyReflections.MaxArrivals + 1) - slot;
+                        int voice = audio.Voices.IdFor(VoiceKind.Reflection, id, slot);
                         if (!facade.IsPlaying(voice)) { lastAt.Remove(voice); continue; }
                         playing++;
                         var p = provider.GetSoundPosition(voice);

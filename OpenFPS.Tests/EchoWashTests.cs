@@ -97,9 +97,7 @@ public class EchoWashTests
     // ── In the game's choices ──────────────────────────────────────────────────────────────────────
 
     private static List<OpenFPS.Client.AudioEngine.Data.SpatialEmitter> StepCopies(ClientAudioHarness h, int from)
-        => h.Mixer.Started.Skip(from)
-               .Where(e => e.EntityId <= ClientAudioSystem.STEP_ECHO_BASE_ID && e.EntityId > ClientAudioSystem.STEP_ECHO_BASE_ID - 48)
-               .ToList();
+        => h.Mixer.StartedAs(VoiceKind.StepEcho, from).ToList();
 
     private static List<OpenFPS.Client.AudioEngine.Data.SpatialEmitter> StepBesideA(string material)
     {
@@ -169,10 +167,9 @@ public class EchoWashTests
         def.SoundEmitter.MinDistance = 12f;
         h.World.RegisterDefinition(def);
         h.StandAt(new Vector3(-12f, 0f, -12f));
-        int first = -30000 - Speaker * (EarlyReflections.MaxArrivals + 1);
-        bool Copies() => h.Mixer.Started.Any(e => e.EntityId <= first && e.EntityId > first - EarlyReflections.MaxArrivals);
+        bool Copies() => h.Mixer.StartedAs(VoiceKind.Reflection).Any(e => e.ReflectionOf == Speaker);
         Assert.True(h.TickUntil(Copies, 300), $"no wall of {material} answered");
-        return h.Mixer.Started.Where(e => e.EntityId <= first && e.EntityId > first - EarlyReflections.MaxArrivals).ToList();
+        return h.Mixer.StartedAs(VoiceKind.Reflection).Where(e => e.ReflectionOf == Speaker).ToList();
     }
 
     /// <summary>A recorded loop's copy carries its wall's roughness and the clean share √(1 − s); a smooth

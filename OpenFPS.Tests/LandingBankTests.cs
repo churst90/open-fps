@@ -1,4 +1,5 @@
 using System.Numerics;
+using OpenFPS.Client.Core;
 
 namespace OpenFPS.Tests;
 
@@ -8,6 +9,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class LandingBankTests
 {
+    /// <summary>A landing, found by what it is (its seed), whatever id it was given.</summary>
+    private static readonly int LandingSeed = VoiceRegistry.SeedOf(VoiceKind.OwnStep, VoiceRegistry.NoEntity, VoiceRegistry.Landing);
+
     private static string Sounds()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -26,7 +30,7 @@ public class LandingBankTests
         h.Tick();
         h.Audio.OnOwnLand(Vector3.Zero, surface, "0");
         h.Tick(3);
-        var landing = Assert.Single(h.Mixer.Started, e => e.EntityId == -50);
+        var landing = Assert.Single(h.Mixer.Started, e => e.Seed == LandingSeed);
         Assert.StartsWith($"LANDING/{surface}/", landing.SoundId, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -38,7 +42,7 @@ public class LandingBankTests
         h.Tick();
         h.Audio.OnPlayerLand(new Vector3(3f, 0f, 2f), "Tile", "0");
         h.Tick(3);
-        var landing = Assert.Single(h.Mixer.Started, e => e.EntityId == -50);
+        var landing = Assert.Single(h.Mixer.Started, e => e.Seed == LandingSeed);
         Assert.StartsWith("LANDING/Tile/", landing.SoundId, StringComparison.OrdinalIgnoreCase);
     }
 

@@ -21,7 +21,7 @@ public class SplitVoicePlacementTests
         float half = profile.LengthMetres * 0.5f;
         h.StandAt(new Vector3(0f, 0f, -half - 2f));
         h.AddCar(7, preset, Vector3.Zero);
-        int intake = ClientAudioSystem.IntakeVoiceBase - 7;
+        int intake = h.Voice(VoiceKind.Intake, 7);
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(7) && h.Mixer.Latest.ContainsKey(intake)),
                     "a car 2 m away did not get a voice at each end");
 
@@ -44,7 +44,7 @@ public class SplitVoicePlacementTests
         h.AddCar(7, preset, Vector3.Zero);
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(7)), "the car never got a voice");
         h.Tick(5);
-        Assert.False(h.Mixer.Latest.ContainsKey(ClientAudioSystem.IntakeVoiceBase - 7), "a car 150 m off was split");
+        Assert.Empty(h.Mixer.StartedAs(VoiceKind.Intake));
 
         float extent = Vector3.Distance(profile.ExhaustSlot, new Vector3(0f, profile.FrontTapHeight, profile.FrontTapZ));
         var wide = Loudness.Place(profile.SourceLevelDb, extent);

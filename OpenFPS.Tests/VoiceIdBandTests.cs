@@ -11,8 +11,8 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Every voice-id band the client computes (docs/SPECIAL_CASES_AUDIT.md, appendix), read from the
-/// constants and formulas the code uses, and checked against every other. Nothing allocates voice ids:
+/// Every voice-id band the client computes (docs/SPECIAL_CASES_AUDIT.md, appendix), read from the seed
+/// table the ids are still made by (VoiceRegistry.IdFor, SeedOf), and checked against every other. Nothing allocates voice ids:
 /// each band is a formula of an entity id or a counter, set by hand to sit apart (finding S6), so two
 /// kinds of voice that land on one id move or cut each other without a word in the log.
 ///
@@ -39,72 +39,71 @@ public class VoiceIdBandTests
         => (int)(t.GetField(name, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                  ?? throw new MissingFieldException(t.Name, name)).GetRawConstantValue()!;
 
-    private static int Call(Type t, string method, params object[] args)
-        => (int)(t.GetMethod(method, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                 ?? throw new MissingMethodException(t.Name, method)).Invoke(null, args)!;
-
     private static IReadOnlyList<(long, long)> One(long a, long b) => new[] { (Math.Min(a, b), Math.Max(a, b)) };
     private static readonly IReadOnlyList<(long, long)> None = Array.Empty<(long, long)>();
 
-    /// <summary>A pool of <paramref name="size"/> ids counting down from <paramref name="first"/>.</summary>
-    private static (long, long) Pool(int first, int size) => (first - (size - 1), first);
+    /// <summary>The ids of the first <paramref name="parts"/> of a kind of voice, as one closed interval.</summary>
+    private static (long, long) Span(Func<int, int> idOfPart, int parts)
+    {
+        long lo = long.MaxValue, hi = long.MinValue;
+        for (int k = 0; k < parts; k++) { int id = idOfPart(k); lo = Math.Min(lo, id); hi = Math.Max(hi, id); }
+        return (lo, hi);
+    }
+
+    private static int Seed(VoiceKind kind, int owner, int part = 0) => VoiceRegistry.SeedOf(kind, owner, part);
 
     /// <summary>Every band in the appendix but the source probes, which are questions to the acoustic
-    /// worker and never a voice.</summary>
+    /// worker and never a voice: the seed table (VoiceRegistry.SeedOf), the ids voices had.</summary>
     private static List<Band> Bands()
     {
+        const int Any = VoiceRegistry.NoEntity, Counted = 400_000;
         var cas = typeof(ClientAudioSystem);
         int arrivals = EarlyReflections.MaxArrivals;
         int places = ExtendedSources.MaxPlaces;
         int cabinPaths = MachineRegistry.Ids.Max(v => CabinPaths.For(MachineRegistry.VehicleFor(v))?.Count ?? 0);
         int ownCopies = Const(cas, "OwnVoiceCopies");
         int talkerRooms = Const(cas, "MaxTalkerRooms");
-        int reference = Const(cas, "ReferenceVoiceBase");
-        int stepPool = Const(cas, "STEP_ECHO_POOL_SIZE");
-        int Reflection(long e, int slot) => Call(cas, "ReflectionVoiceId", (int)e, slot);
-        int Place(long e, int k) => ClientAudioSystem.PlaceVoiceId((int)e, k);
 
-        var aids = typeof(DrivingAids);
-        int aidPool = Const(aids, "Pool");
         var aidIds = new List<(long, long)>();
-        foreach (var name in new[] { "GuideBaseId", "CentreBaseId", "KerbBaseId", "TurnBaseId", "BrakeBaseId" })
-            aidIds.Add(Pool(Const(aids, name), aidPool));
-        foreach (var name in new[] { "CentreToneId", "KerbToneId", "CentreRumbleId", "KerbRumbleId", "AlignId", "RelayId", "OverSpeedId" })
-            aidIds.Add((Const(aids, name), Const(aids, name)));
+        foreach (var aid in Enum.GetValues<AidVoice>()) aidIds.Add(Span(k => Seed(VoiceKind.Aid, (int)aid, k), 1000));
 
         int woodTop = WoodChorus.FirstId, woodBottom = WoodChorus.FirstId - 999_999;   // a million woods counted down (ClientWorldState.RefreshWoods)
         int trainSlots = TrainVoicing.Slots;
+        long echo0 = Seed(VoiceKind.EngineEcho, Any, 0), train0 = Seed(VoiceKind.TrainField, 0, 0);
+        Assert.Equal(echo0 - 1, Seed(VoiceKind.EngineEcho, Any, 1));
+        Assert.Equal(train0 - trainSlots, Seed(VoiceKind.TrainField, 1, 0));
 
         return new List<Band>
         {
             new("entity voices", Scale.Entity, (e, _) => One(1, e)),
             new("woods", Scale.Fixed, (_, _) => One(woodBottom, woodTop)),
-            new("reflection copies", Scale.Entity, (e, _) => One(Reflection(e, arrivals - 1), Reflection(1, 0))),
-            new("transients", Scale.Fixed, (_, _) => One(WorldAudioPlayer.TransientVoiceId(WorldAudioPlayer.TransientVoiceSpan - 1), WorldAudioPlayer.TransientVoiceId(0))),
-            new("engine echoes", Scale.Counter, (_, n) => n < 1 ? None : One(EngineReflections.EchoVoiceIdBase - (n - 1), EngineReflections.EchoVoiceIdBase)),
-            new("borrowed far cars", Scale.Entity, (e, _) => One(ClientAudioSystem.DistantVoiceBase - e, ClientAudioSystem.DistantVoiceBase - 1)),
-            new("front outlets", Scale.Entity, (e, _) => One(ClientAudioSystem.IntakeVoiceBase - e, ClientAudioSystem.IntakeVoiceBase - 1)),
-            new("sirens", Scale.Entity, (e, _) => One(ClientAudioSystem.SirenVoiceBase - e, ClientAudioSystem.SirenVoiceBase - 1)),
+            new("reflection copies", Scale.Entity, (e, _) => One(Seed(VoiceKind.Reflection, (int)e, arrivals - 1), Seed(VoiceKind.Reflection, 1, 0))),
+            new("transients", Scale.Fixed, (_, _) => new[] { Span(k => Seed(VoiceKind.Transient, Any, k), Counted) }),
+            // Counted past the ints, as a counter never reused is: one id down each.
+            new("engine echoes", Scale.Counter, (_, n) => n < 1 ? None : One(echo0 - (n - 1), echo0)),
+            new("borrowed far cars", Scale.Entity, (e, _) => One(Seed(VoiceKind.Borrowed, (int)e), Seed(VoiceKind.Borrowed, 1))),
+            new("front outlets", Scale.Entity, (e, _) => One(Seed(VoiceKind.Intake, (int)e), Seed(VoiceKind.Intake, 1))),
+            new("sirens", Scale.Entity, (e, _) => One(Seed(VoiceKind.Siren, (int)e), Seed(VoiceKind.Siren, 1))),
             new("driving aids", Scale.Fixed, (_, _) => aidIds),
-            new("beacons", Scale.Fixed, (_, _) => new[] { Pool(Const(typeof(BeaconAids), "BaseId"), Const(typeof(BeaconAids), "Pool")) }),
-            new("birds", Scale.Fixed, (_, _) => new[] { Pool(Const(typeof(BirdLife), "VoiceBase"), Const(typeof(BirdLife), "VoicePool")) }),
-            new("horns", Scale.Entity, (e, _) => One(ClientAudioSystem.HornVoiceBase - e, ClientAudioSystem.HornVoiceBase - 1)),
-            new("own voice", Scale.Fixed, (_, _) => One(ClientAudioSystem.OwnVoiceBase - ownCopies, ClientAudioSystem.OwnVoiceBase)),
-            new("talkers", Scale.Entity, (e, _) => One(ClientAudioSystem.TalkerVoiceBase - e, ClientAudioSystem.TalkerVoiceBase - 1)),
-            new("cabin paths", Scale.Fixed, (_, _) => One(ClientAudioSystem.CabinVoiceBase - (cabinPaths - 1), ClientAudioSystem.CabinVoiceBase - 1)),
-            new("talker copies", Scale.Fixed, (_, _) => One(ClientAudioSystem.TalkerCopyBase - (talkerRooms - 1) * ownCopies - (ownCopies - 1), ClientAudioSystem.TalkerCopyBase)),
-            new("step echoes", Scale.Fixed, (_, _) => new[] { Pool(ClientAudioSystem.STEP_ECHO_BASE_ID, stepPool) }),
-            new("held horns", Scale.Entity, (e, _) => One(ClientAudioSystem.HeldHornVoiceBase - e, ClientAudioSystem.HeldHornVoiceBase - 1)),
-            new("trains", Scale.Counter, (_, n) => n < 1 ? None : One(ClientAudioSystem.TrainVoiceBase - (n * trainSlots - 1), ClientAudioSystem.TrainVoiceBase)),
+            new("beacons", Scale.Fixed, (_, _) => new[] { Span(k => Seed(VoiceKind.Beacon, Any, k), 1000) }),
+            new("birds", Scale.Fixed, (_, _) => new[] { Span(k => Seed(VoiceKind.Bird, Any, k), 1000) }),
+            new("horns", Scale.Entity, (e, _) => One(Seed(VoiceKind.Horn, (int)e), Seed(VoiceKind.Horn, 1))),
+            new("own voice", Scale.Fixed, (_, _) => One(Seed(VoiceKind.OwnVoiceCopy, Any, ownCopies - 1), Seed(VoiceKind.OwnVoice, Any))),
+            new("talkers", Scale.Entity, (e, _) => One(Seed(VoiceKind.Talker, (int)e), Seed(VoiceKind.Talker, 1))),
+            new("cabin paths", Scale.Fixed, (_, _) => One(Seed(VoiceKind.Cabin, Any, cabinPaths - 1), Seed(VoiceKind.Cabin, Any, 1))),
+            new("talker copies", Scale.Fixed, (_, _) => One(Seed(VoiceKind.TalkerCopy, talkerRooms - 1, ownCopies - 1), Seed(VoiceKind.TalkerCopy, 0, 0))),
+            new("step echoes", Scale.Fixed, (_, _) => new[] { Span(k => Seed(VoiceKind.StepEcho, Any, k), 1000) }),
+            new("held horns", Scale.Entity, (e, _) => One(Seed(VoiceKind.HeldHorn, (int)e), Seed(VoiceKind.HeldHorn, 1))),
+            new("trains", Scale.Counter, (_, n) => n < 1 ? None : One(train0 - (n * trainSlots - 1), train0)),
             new("rain", Scale.Fixed, (_, _) => new[]
             {
-                Pool(RainField.VoiceBase, RainFeeds.Slots),
-                (RainField.PartVoiceId(RainFeeds.Slots - 1, 7), RainField.PartVoiceId(0, 1)),
-                Pool(RainField.NearVoiceBase, RainField.NearVoicePool),
+                Span(s => Seed(VoiceKind.Rain, s, 0), RainFeeds.Slots),
+                (Seed(VoiceKind.Rain, RainFeeds.Slots - 1, 7), Seed(VoiceKind.Rain, 0, 1)),
+                Span(k => Seed(VoiceKind.RainDrop, Any, k), 1000),
             }),
-            new("places", Scale.Entity, (e, _) => One(Place(e, places - 1), Place(1, 1))),
-            new("wood places", Scale.Fixed, (_, _) => One(Place(woodBottom, places - 1), Place(woodTop, 1))),
-            new("reference", Scale.Fixed, (_, _) => One(reference - 1, reference)),
+            new("places", Scale.Entity, (e, _) => One(Seed(VoiceKind.Place, (int)e, places - 1), Seed(VoiceKind.Place, 1, 1))),
+            new("wood places", Scale.Fixed, (_, _) => One(Seed(VoiceKind.Place, woodBottom, places - 1), Seed(VoiceKind.Place, woodTop, 1))),
+            new("reference", Scale.Fixed, (_, _) => One(Seed(VoiceKind.Reference, Any, 1), Seed(VoiceKind.Reference, Any, 0))),
         };
     }
 

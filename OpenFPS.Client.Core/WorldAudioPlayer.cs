@@ -155,8 +155,9 @@ public sealed class WorldAudioPlayer
     /// </summary>
     internal const float MaxRange = 3000f;
 
-    /// <summary>Where every one-off is declared as it starts (ClientAudioSystem's registry).</summary>
-    internal VoiceRegistry? Voices { get; set; }
+    /// <summary>Where every one-off is given its id and declared as it starts: ClientAudioSystem's registry,
+    /// or one of its own on its own.</summary>
+    internal VoiceRegistry Voices { get; set; } = new();
 
     /// <summary>The simulator's worker, for a one-shot's first answer. See
     /// <see cref="OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker.TryGetNearby"/>.</summary>
@@ -676,11 +677,13 @@ public sealed class WorldAudioPlayer
                 placed = (source.Gain * item.CopyGain, source.ReferenceDistance);
             }
 
+            // A voice of its own every time: the VoiceManager keys a submission by id, and a sound and
+            // its reflection under one id replaced each other (a grandstand heard only as its echo).
+            int heard = ++_nextVoice;
             var emitter = new SpatialEmitter
             {
-                // A voice of its own every time: the VoiceManager keys a submission by id, and a sound and
-                // its reflection under one id replaced each other (a grandstand heard only as its echo).
-                EntityId = NextVoiceId(),
+                EntityId = Voices.IdFor(VoiceKind.Transient, VoiceRegistry.NoEntity, heard),
+                Seed = VoiceRegistry.SeedOf(VoiceKind.Transient, VoiceRegistry.NoEntity, heard),
                 SoundId = item.SoundId,
                 // Nothing here loops: a looping latch would be a fire alarm.
                 Mode = OpenFPS.Common.Components.PlaybackMode.Single,
@@ -727,7 +730,7 @@ public sealed class WorldAudioPlayer
             }
             // Thunder carries its own ground reflection, worked out from where each bit of channel is.
             if (!inCabin && !item.Sky && HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
-            Voices?.DeclareEvent(emitter.EntityId, item.SourceEntityId >= 0 ? item.SourceEntityId : VoiceRegistry.NoEntity,
+            Voices.DeclareEvent(emitter.EntityId, item.SourceEntityId >= 0 ? item.SourceEntityId : VoiceRegistry.NoEntity,
                                  VoiceKind.Transient, emitter.Position, item.Sound.LevelDb);
             _audio.Submit(emitter);
 
@@ -948,7 +951,7 @@ public sealed class WorldAudioPlayer
                     ThroughCabin(ref e, speaker, vehicle, now);
             }
             else if (!f.Moving && !f.Sky) Facing(ref e, speaker.Transform.Rotation, listenerPosition);
-            Voices?.DeclareEvent(e.EntityId, f.SourceEntityId >= 0 ? f.SourceEntityId : VoiceRegistry.NoEntity,
+            Voices.DeclareEvent(e.EntityId, f.SourceEntityId >= 0 ? f.SourceEntityId : VoiceRegistry.NoEntity,
                                  VoiceKind.Transient, e.Position, e.EarLevelDb);
             _audio.Submit(e);
         }
@@ -968,19 +971,8 @@ public sealed class WorldAudioPlayer
     /// </summary>
     private const int DiffuseTaps = 2;
 
-    /// <summary>
-    /// Transient voices' own band of negative ids, one per event, above the engine echo band
-    /// (-600,000) and the borrowed-voice band (-700,000): a hashed id that landed in those took over a
-    /// car's reflection or a distant car's voice.
-    /// </summary>
-    internal const int TransientVoiceBase = -100_000;
-    internal const int TransientVoiceSpan = 400_000;
+    /// <summary>How many one-offs and copies have been heard: each its own voice.</summary>
     private int _nextVoice;
-
-    /// <summary>The id of the nth transient voice. Static so the bands can be checked without a mixer.</summary>
-    internal static int TransientVoiceId(int counter) => TransientVoiceBase - (counter % TransientVoiceSpan);
-
-    private int NextVoiceId() => TransientVoiceId(++_nextVoice);
 
     /// <summary>How many copies of copies a one-off sound gets. Three kept only the first crossings
     /// of a street; the flutter that follows a shot down it is a couple of dozen (EarlyReflections

@@ -390,21 +390,10 @@ public class WideSourcesTests
         Assert.True(RainField.RoofReach(SteelRoof()) >= 0.3f && RainField.RoofReach(SteelRoof()) <= 2.5f);
     }
 
-    /// <summary>The voice ids of the places stay clear of every other range the client hands out.</summary>
-    [Fact]
-    public void PlaceVoiceIdsDoNotCollide()
-    {
-        int lo = ClientAudioSystem.PlaceVoiceId(200_000, ExtendedSources.MaxPlaces - 1), hi = ClientAudioSystem.PlaceVoiceId(1, 1);
-        Assert.True(hi < -3_100_000 && lo > -7_900_000, $"{lo}..{hi}");
-        Assert.NotEqual(ClientAudioSystem.PlaceVoiceId(5, 1), ClientAudioSystem.PlaceVoiceId(4, 7));
-        int rainParts = RainField.PartVoiceId(8, 7);
-        Assert.True(rainParts > RainField.NearVoiceBase && rainParts < RainField.VoiceBase - RainFeeds.Slots);
-    }
-
     /// <summary>
-    /// Every extended source's places fit the voice ids a source is given, so two sources side by side (the
-    /// stretches of a beach, the trees of a park) never share a voice. A surf beach has ten places, and with
-    /// eight ids a source its ninth and tenth were the next stretch's first two.
+    /// Every extended source's places are voices of their own, so two sources side by side (the stretches of a
+    /// beach, the trees of a park) never share one, and fit the seeds a source is given. A surf beach has ten
+    /// places, and with eight ids a source its ninth and tenth were the next stretch's first two.
     /// </summary>
     [Fact]
     public void EveryLayoutFitsItsSourcesVoiceIds()
@@ -415,20 +404,21 @@ public class WideSourcesTests
         keys.AddRange(RunningWaterSpec.Presets.Keys.Select(k => "flow:" + k));
         keys.AddRange(ShoreSpec.Presets.Keys.Select(k => "shore:" + k));
         int widest = 0;
+        var voices = new VoiceRegistry();
         foreach (string key in keys)
         {
             var layout = ExtendedSources.Layout(key);
             if (layout == null) continue;
             widest = Math.Max(widest, layout.Length);
             // Source 41 and its neighbour 42, each with this layout: no id of one is an id of the other.
-            var mine = Enumerable.Range(1, layout.Length - 1).Select(k => ClientAudioSystem.PlaceVoiceId(41, k)).ToHashSet();
-            var next = Enumerable.Range(1, layout.Length - 1).Select(k => ClientAudioSystem.PlaceVoiceId(42, k)).ToHashSet();
+            var mine = Enumerable.Range(1, layout.Length - 1).Select(k => voices.IdFor(VoiceKind.Place, 41, k)).ToHashSet();
+            var next = Enumerable.Range(1, layout.Length - 1).Select(k => voices.IdFor(VoiceKind.Place, 42, k)).ToHashSet();
             Assert.True(!mine.Overlaps(next), $"{key} has {layout.Length} places and shares voice ids with the source beside it");
-            // Nor with the next source's own middle-relative ids, whatever its layout.
-            Assert.DoesNotContain(ClientAudioSystem.PlaceVoiceId(42, 1), mine);
+            var seeds = Enumerable.Range(1, layout.Length - 1).Select(k => VoiceRegistry.SeedOf(VoiceKind.Place, 41, k)).ToHashSet();
+            Assert.DoesNotContain(VoiceRegistry.SeedOf(VoiceKind.Place, 42, 1), seeds);
         }
         _o.WriteLine($"the widest layout has {widest} places; a source has {ExtendedSources.MaxPlaces} ids");
         Assert.True(widest >= 10, "the surf beach's ten places were not checked");
-        Assert.Equal(ExtendedSources.MaxPlaces, ClientAudioSystem.PlaceIdsPerSource);
+        Assert.True(widest <= ExtendedSources.MaxPlaces, $"a layout of {widest} places is wider than a source's seeds");
     }
 }
