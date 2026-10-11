@@ -37,7 +37,7 @@ public class SpatialAcoustics
         // (AsyncAcousticWorker.AddEarlyReflections), the same every tick for the same geometry. A ray
         // solve seeded from the clock here once moved every wall's reflection from frame to frame.
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        FindReflections(world, sourcePos, listenerPos, _reflectionScratch, 343.0f);
+        FindReflections(world, sourcePos, listenerPos, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
         for (int i = 0; i < _reflectionScratch.Count; i++)
         {
             var a = _reflectionScratch[i];

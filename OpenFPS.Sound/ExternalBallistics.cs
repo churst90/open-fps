@@ -14,6 +14,8 @@ public readonly record struct Air(float TemperatureC, float PressureMb)
     /// <summary>Dry air, kg/m³. Humidity moves it by under one per cent and is left out.</summary>
     public float Density => PressureMb * 100f / (287.05f * (TemperatureC + 273.15f));
 
+    /// <summary>m/s, an ideal gas: 331.3 at 0 °C, as the square root of the absolute temperature. The
+    /// one law for the speed of sound (AudioPhysics.SpeedOfSoundAt reads it).</summary>
     public float SpeedOfSound => 331.3f * MathF.Sqrt(1f + TemperatureC / 273.15f);
 }
 

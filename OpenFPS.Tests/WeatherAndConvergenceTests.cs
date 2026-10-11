@@ -317,11 +317,13 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void SpeedOfSoundTracksTemperature()
     {
-        Assert.Equal(343.4f, AudioPhysics.SpeedOfSoundAt(20f), 1);
+        Assert.Equal(343.2f, AudioPhysics.SpeedOfSoundAt(20f), 1);
         Assert.Equal(331.3f, AudioPhysics.SpeedOfSoundAt(0f), 1);
         Assert.True(AudioPhysics.SpeedOfSoundAt(-20f) < AudioPhysics.SpeedOfSoundAt(35f));
+        // One air: the mix's speed is the ballistics'.
+        Assert.Equal(new Air(12f, 1008f).SpeedOfSound, AudioPhysics.SpeedOfSoundAt(12f));
 
-        // Clamped rather than extrapolated off the end of the linear fit.
+        // Clamped: a temperature off the end of the weather is taken as its edge.
         Assert.Equal(AudioPhysics.SpeedOfSoundAt(60f), AudioPhysics.SpeedOfSoundAt(500f));
     }
 

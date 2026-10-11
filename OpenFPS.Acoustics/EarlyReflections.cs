@@ -114,7 +114,7 @@ public static class EarlyReflections
     /// <see cref="MaxFlutterArrivals"/> arrivals rather than <see cref="MaxArrivals"/>. For one-off
     /// sounds out of doors.</param>
     public static void Find(Vector3 source, Vector3 listener, IReadOnlyList<Solid> solids,
-                            List<Arrival> into, float speedOfSound = 343.0f,
+                            List<Arrival> into, float speedOfSound = AcousticConstants.SpeedOfSound,
                             int maxOrder = 1, bool separateFirst = false, bool flutter = false, int keep = 0,
                             float maxExtraPathMetres = RangeMetres)
     {
@@ -129,7 +129,7 @@ public static class EarlyReflections
     /// mirrors are each solid's box faces; a surface's identity is its owner's.
     /// </summary>
     public static void Find(Vector3 source, Vector3 listener, Geometry.TriangleWorld world,
-                            List<Arrival> into, float speedOfSound = 343.0f,
+                            List<Arrival> into, float speedOfSound = AcousticConstants.SpeedOfSound,
                             int maxOrder = 1, bool separateFirst = false, bool flutter = false, int keep = 0,
                             float maxExtraPathMetres = RangeMetres)
     {
@@ -450,8 +450,8 @@ public static class EarlyReflections
     /// shopfront or two, not a railing.</summary>
     public const float MinWallAreaSquareMetres = 150f;
 
-    /// <summary>Furthest a flutter copy is followed, metres: a second of sound.</summary>
-    public const float FlutterRangeMetres = 343f;
+    /// <summary>Furthest a flutter copy is followed, metres: a second of sound at the reference speed.</summary>
+    public const float FlutterRangeMetres = AcousticConstants.SpeedOfSound * 1f;
 
     /// <summary>
     /// The flutter: a sound handed back and forth across a street, each copy a street's width later and

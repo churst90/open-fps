@@ -271,7 +271,7 @@ public partial class MapManifest : IMessage
     public float MinimumY;
     public int ExpectedEntityCount;
     public float VoxelResolution = 0.5f;
-    public float OcclusionFloor = 0.2f;
+    public float OcclusionFloor = AcousticConstants.DefaultOcclusionFloor;
     public string OwnerId = "";
     public bool IsPublic = false;
 

@@ -78,7 +78,7 @@ public static class AcousticBands
 public static class WallTransmission
 {
     /// <summary>Speed of sound, m/s, at 20 °C.</summary>
-    public const float SoundSpeed = 343f;
+    public const float SoundSpeed = AcousticConstants.SpeedOfSound;
     /// <summary>Density of air, kg/m³, at 20 °C.</summary>
     public const float AirDensity = 1.21f;
 

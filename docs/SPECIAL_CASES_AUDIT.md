@@ -469,6 +469,35 @@ The heart of it. Four sessions, each mergeable on its own.
 - **Guards show.** walk, drive and traffic_rain change where a car is shadowed by another (drive: a car
   passes another) and in reflection delays at 12 °C (traffic_rain sets 12 °C): named. Fingerprints
   unchanged. `VehicleShadowApplyTests` and `VehicleShadowMutationTests` updated to the one law.
+- **Done 2026-10-11 (unheard), except S21.** S21 (`VehicleShadow` calls `Diffraction`) is waiting on the
+  barrier model, which is changing `Diffraction`, `OpeningRoutes` and the way over the top now; until it
+  lands `VehicleShadow` keeps its own Maekawa and its own 343. The rest:
+  - S25: a voice FMOD pans (no HRTF voice free) takes `RenderedGain` by hand, from the source's position,
+    as the binaural voices do; FMOD's own distances are set out of reach (`Rolloff.NoneMin`, 1000 km).
+    Reference 1 m, range 100 m: 90 m -39.1 dB before, -47.0 after; 100 m -40.0 before, silent after;
+    200 m -40.0 (held) before, silent after; nearer than three quarters of the range unchanged. Its Doppler
+    now runs at the world's speed too (FMOD's is 340 m/s times its Doppler scale; the scale is set from the
+    weather): a car closing at 30 m/s at 20 °C, +159.9 cents before, +158.4 after.
+  - S29: one default, `AcousticConstants.DefaultOcclusionFloor` (0.2), in all seven places. No law reads
+    the floor (walls decide), so nothing heard changes.
+  - S30: the world's speed (`AudioPhysics.CurrentSpeedOfSound`) in the hand-rolled path's reflection
+    delays, `ImageSource`'s Fresnel zone and the tailpipe's and bay's radiation aim. At 12 °C delays
+    +1.3 %, a face smaller than the zone +0.11 dB, ka -1.3 %; at 0 °C +3.5 %, +0.30 dB, -3.4 %. One
+    reference, `AcousticConstants.SpeedOfSound` (343, 20 °C), named by `AudioPhysics.SpeedOfSound` and
+    `WallTransmission.SoundSpeed`, for the defaults (`EarlyReflections.Find`, `Thunder`, `LightningPhysics`,
+    the two `Aim`s) and for what must not follow the weather: `FaceOpenings.MinimumGapMetres` (a map's
+    openings), `DistantMotion.VelocityTolerance` (a wire tolerance), `FlutterRangeMetres`, `ReportMeasure`.
+    `Diffraction`'s defaults are left to the barrier model.
+  - One law for the speed of sound itself: the mix took the linear fit 331.3 + 0.606 T and the bullets
+    the ideal gas; `AudioPhysics.SpeedOfSoundAt` now reads `Air.SpeedOfSound`. 20 °C 343.42 to 343.21 m/s,
+    40 °C 355.54 to 354.73. `thunder.ground_1500` regenerated (2.5 ms longer, total energy -0.06 dB).
+  - Streams: all eight unchanged. The changes named above for walk, drive and traffic_rain were S21's
+    (held) and the 12 °C delays, which the replay does not see: it holds the current speed at 343, and
+    the provider is not in it.
+  - Left to physics stage 2 (docs/PHYSICS_BOUNDARY.md, stage 2): gravity, air density (the 1.2 and 1.21
+    in the walls, doors, glass, pipes and hob, with the 343 beside each, which the sources' own mechanisms
+    keep: one air from the world's temperature and pressure), brakes, rolling resistance and drag, and
+    `WindModel` against `WindField`.
 
 #### Statics (inside library stage 5)
 

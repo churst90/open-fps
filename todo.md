@@ -41,9 +41,13 @@ since the last deploy" list below.
    - P2, one table of model kinds (`ModelKindTable`): DONE 2026-10-11, no stream changed. Two questions for
      Cody (Decisions, below). Left for later: S26's two caches, S27's model fallbacks, and the server's own
      prefix spellings outside P2's list.
-   - Under way: P5 (names and materials to properties), P8 (laws in one place), and the barrier model's way
-     round one thing that passes through another (Acoustics, below), which P1 found in Marlow Tower's floor 1
-     stairwell.
+   - P8, laws in one place: DONE 2026-10-11, unheard, except S21 (`VehicleShadow` on the shared
+     `Diffraction`), waiting on the barrier model: the FMOD fallback voice's distance law and Doppler, one
+     occlusion-floor default, one law and one reference for the speed of sound, the world's speed where a
+     heard law wrote 343. Gravity, air density, brakes, rolling resistance and the two winds are physics
+     stage 2's.
+   - Under way: P5 (names and materials to properties) and the barrier model's way round one thing that
+     passes through another (Acoustics, below), which P1 found in Marlow Tower's floor 1 stairwell.
    - Then P3a to P3d, the voice registry: one list of voices, one writer a frame, one way to start a voice.
      It is the one path pass for every voice of a moving thing that Cody asked for on 2026-10-11 ("shouldn't
      all mobile sound sources like vehicles, trains, sirens, etc use the same path so there's

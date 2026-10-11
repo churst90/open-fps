@@ -357,6 +357,7 @@ dead reckoning, part of the network, stays there.
 | Rolling resistance and drag | `DrivingSystem.cs:260-261` and `Driveline.cs:57-58` | the same law twice |
 | Gear choice | `DrivingSystem.SelectGear` and the client's engine processor | "written twice on purpose" |
 | Wind | `WindField` (everything heard) and `WindModel` (the server's bullets) | two gust laws |
+| Speed of sound | `AudioPhysics.SpeedOfSoundAt` (the mix, linear fit) and `Air.SpeedOfSound` (the bullets, ideal gas); 343 as a literal in the heard laws | made one by special-cases P8 (2026-10-11): `Air`'s law, one 20 °C reference, the world's speed in the heard laws |
 
 The sound models' own gravity inside an audio-rate mechanism (a door's bolt falling, a shard's flight) is
 not wrong, only unshared; it should read one constant. The ones that matter for play are the movement, the
@@ -739,6 +740,15 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   feel the air the ears do.
 - The sound's own audio-rate constants read the shared gravity; their renders must not change by more than
   the fingerprint's maths tolerance (decision 5).
+- The split with the special-cases audit's P8 (docs/SPECIAL_CASES_AUDIT.md, 2026-10-11): P8 made the
+  acoustic laws one, and this stage keeps the rest. Done in P8: one law for the speed of sound
+  (`Air.SpeedOfSound`, which `AudioPhysics.SpeedOfSoundAt` reads, so the bullets and the mix hear one air),
+  one reference for it (`AcousticConstants.SpeedOfSound`, 343 m/s at 20 °C), the world's current speed in
+  the heard laws that wrote 343, the FMOD fallback voice's distance law and Doppler, one occlusion-floor
+  default. Here: gravity, air density, brakes, rolling resistance and drag, `WindModel` and `WindField`.
+  Air density includes the acoustic 1.2 and 1.21 (walls, doors, glass, pipes, hob) and the 343 written
+  beside each in the sources' own mechanisms (pipe and horn resonances, Helmholtz cavities, radiation
+  impedance): they take one air, density and speed together, from the world's temperature and pressure.
 - Check: render fingerprint, emitter-stream replay, movement and driving replays unchanged, except where a
   constant was made one on purpose, regenerated in that commit with the reason.
 

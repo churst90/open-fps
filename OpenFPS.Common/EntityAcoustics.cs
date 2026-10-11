@@ -79,7 +79,7 @@ public static class EntityAcoustics
 
     /// <summary>The map of these entities' rooms and openings (<see cref="AcousticVolumeGenerator.GenerateRegions"/>),
     /// the indoor rooms where their floods are when <paramref name="floods"/> is given (<see cref="RoomsByFlood"/>).</summary>
-    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true,
+    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = AcousticConstants.DefaultOcclusionFloor, bool autoDiscoverPortals = false, bool report = true,
                                               Geometry.RoomCells? floods = null)
         => AcousticVolumeGenerator.GenerateRegions(Rooms(entities), Openings(entities), Solids(entities), mapSize, minBound,
                                                    voxelResolution, occlusionFloor, autoDiscoverPortals, report, floods);

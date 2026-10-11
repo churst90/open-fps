@@ -18,7 +18,7 @@ public static class AcousticVolumeGenerator
     /// box, the map carries them for "which room is this in", and a room whose flood was measured is measured
     /// (<see cref="RoomAcoustics.Measured"/>).</param>
     public static AcousticMap GenerateRegions(IEnumerable<PlacedRoom> rooms, IEnumerable<PlacedOpening> openings, IEnumerable<FaceOpenings.Box> solids,
-                                              Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true,
+                                              Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = AcousticConstants.DefaultOcclusionFloor, bool autoDiscoverPortals = false, bool report = true,
                                               OpenFPS.Common.Geometry.RoomCells? floods = null)
     {
         var console = report ? Console.Out : System.IO.TextWriter.Null;
