@@ -23,7 +23,20 @@ Recent work, newest first. `git log` has the rest.
   stairwell pairs at -81 to -93 dB. A blocked leg costs 13 to 18 % more. No stream or fingerprint changed;
   one boundary allowance went down (`SpatialAcoustics` reads the map once, 31 to 29). The lab's
   `--barrier-sweep` takes `buried` for the old rules.
-
+- No two voices share an id (part P3c of docs/SPECIAL_CASES_AUDIT.md, finding S6), unheard; nothing heard
+  changes. Voice ids were bands worked out from an entity's id or a count, and at the entity counts the real
+  places have, or after long enough, they met: on Albany a loudspeaker's wall copies had the ids of the one-off
+  sounds, and a patrol car numbered over 61,000 had the driving guide's id for its siren, moved as the guide's
+  beep and back each frame (the replay's high_ids shows it). The voice registry now gives the ids out: an entity's own voice keeps its entity id,
+  everything else (an outlet, a borrowed car, a horn, a siren, a train's voices, the places of a tree, the
+  copies off the walls, steps, rain, birds, beacons, the aids, one-off sounds, and the questions asked of the
+  acoustic worker) gets an id of its own while it sounds, and a voice fading out keeps its id until it has
+  faded. Every synth is seeded from what it is the sound of, not its id, at the seeds it had, so nothing
+  renders differently. The emitter streams were regenerated twice: first for the seed, a new field equal to the
+  old id; then for the ids, and put back to the old ids they are the same streams, line for line, but for three
+  driving-aid beeps re-placed in another order within a frame. One-offs of a kind still take turns as before
+  (the 49th raindrop replaces the first if it is still sounding); giving each its own voice is a change to what
+  is heard, for P3d. The woods' ids stay with the woods: they seed the woods' sound.
 - A solid gone into by its edge pays what the line runs through of it (docs/GEOMETRY.md 12.6, "A solid gone
   into by its edge"), unheard. Every box a line touched paid its panel figure once, however far the line ran
   inside it, so a car on Dock Street whose line went into the 15 cm edge of Marlow Tower's floor slab and out

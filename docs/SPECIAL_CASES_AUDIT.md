@@ -97,7 +97,7 @@ docs and the project notes.
 | S3 | `DistantEngine` CAS:2804-2826; `FmodAudioProvider.cs:2888-2891`, `:4147-4155`, `:3936-3939` | (Corrected 2026-10-11 by P0, "P0 as built": the emitter's defaults for `ApertureFactor` and `TransmissionBleed` are 1, so the 400 Hz low-pass below does not happen; occlusion 0 against the path's 0.95 stands.) A borrowed distant voice is re-submitted every frame with `ApertureFactor`, `Occlusion`, `TransmissionBleed` and `EffectiveDistance` at their defaults (0) and `TargetRegionId` the global region. Its update beats the path pass (S2), so its aperture target is 0 every tick. A non-reflection voice carries the diffraction low-pass, which below aperture 0.98 runs at `max(400, 22000·a²)` Hz: 400 Hz at aperture 0. Its spread is `a·90/d`: none. Its bearing is the car, never the edge it is heard round. | Probable: every borrowed car (up to 12 on the city) low-passed at 400 Hz whatever its path, and never occluded. Unheard as such; it would read as distant traffic sounding muffled and placed through walls. Verify first with a replay scenario with more cars than the engine budget (P0) and a look at the `-700000` `Place` lines. | A | Folded into P3; a one-line stop-gap is to give `DistantEngine` the car's path fields as `FrontVoice` does. |
 | S4 | `AsyncAcousticWorker.cs:532-560`, `:1345-1361`, `:296-336` | The source pool's serving and lending. Staging skips a pending source not served this tick (`:538`), but the read-back loop reads every pending source that still holds a Steam Audio source (`:558-560`): its direct result was simulated from inputs staged on an earlier tick, against this tick's listener, and is stored as this tick's answer, labelled with this tick's source position. A lent source (`:1351-1360`) goes to its new owner without `ClearSource`. A moving source is the only kind for which a stale input differs. | Candidate for the open pops: a quarter second, 20 to 30 dB, 3 to 6 a minute with 40 cars round Marlow Tower's floor 1 stairwell, each a moving car on Dock Street whose transmission jumps from -80/-100 to -35/-52/-80 dB; no still source gives it, and 32 transmission surfaces instead of 8 changed nothing (docs/GEOMETRY.md 12.6, "Marlow Tower's leaks"; todo.md, Acoustics). The pool overrunning has popped before (2026-10-03, `--pop-hunt extra=40`). | A | P1: read back only what was staged this tick, clear a lent source, tag every result with its provenance, and measure with `--pop-hunt` before and after. |
 | S5 | `UpdateSirens` CAS:2269-2290 with `VehiclePath` CAS:2298-2320 and `SirenVoice` CAS:2676-2680; CAS:650 | Every vehicle whose model has a siren asks the worker every frame, siren on or off, and is added to the path pass: `VehiclePath` is called before the mode is read, and a car whose engine has no voice enqueues a request each call. Off and no fresh answer, it also runs the hand-rolled tracer on the game thread for nothing. | Pool pressure on the city that feeds S4; game-thread cost per patrol car. | B | P1: ask only for a siren that is sounding; in P3 a voice that is not sounding is not in the registry. |
-| S6 | Appendix; CAS:57-58; `AudioEngine/Acoustics/EngineReflections.cs:91`, `:254`, `:302`; `ClientAudioSystem.Trains.cs:38`, `:66`, `:89` | Voice-id bands overlap. A reflection slot's id is `-30000 - id·5 - slot`: it enters the transients' band (-100,000 to -499,999) at entity id 14,000, and Albany joins with 18,024 entities, Magnolia with 13,590 (docs/WORLD_STREAMING.md:150-151). The siren band `-900,000 - id` covers the driving aids (-961,000 to -967,105), the beacons (-967,000 to -967,023) and the birds (-970,000 to -970,047) for vehicle ids 61,000 to 70,047. Borrowed, intake, horn and talker bands run into the next band at ids of 100,000 to 200,000. Engine echo ids count down from -600,000 and are never reused: at the city's 2.6 echoes a second (CAS:188-191) they reach the borrowed band in about 10 hours, then the intakes, sirens and horns. Train voice ordinals grow the same way. `IsEchoVoice` (`id <= -600000`) is true for every band below the echoes; nothing calls it. | A one-shot (a step, a door) taking over a recorded loop's reflection on Albany, or the reverse; a siren moving a driving-aid tone or a bird call; after a long session, a new engine echo moving a borrowed car. Past: transient ids hashed into the echo and borrowed bands, "a footstep could take over a car's reflection or distant voice" (VoiceBudgetTests.cs:304). | B | P3: the registry allocates every id from one space and frees it; one test proves no two live voices share an id. |
+| S6 | Appendix; CAS:57-58; `AudioEngine/Acoustics/EngineReflections.cs:91`, `:254`, `:302`; `ClientAudioSystem.Trains.cs:38`, `:66`, `:89` | Voice-id bands overlap. A reflection slot's id is `-30000 - id·5 - slot`: it enters the transients' band (-100,000 to -499,999) at entity id 14,000, and Albany joins with 18,024 entities, Magnolia with 13,590 (docs/WORLD_STREAMING.md:150-151). The siren band `-900,000 - id` covers the driving aids (-961,000 to -967,105), the beacons (-967,000 to -967,023) and the birds (-970,000 to -970,047) for vehicle ids 61,000 to 70,047. Borrowed, intake, horn and talker bands run into the next band at ids of 100,000 to 200,000. Engine echo ids count down from -600,000 and are never reused: at the city's 2.6 echoes a second (CAS:188-191) they reach the borrowed band in about 10 hours, then the intakes, sirens and horns. Train voice ordinals grow the same way. `IsEchoVoice` (`id <= -600000`) is true for every band below the echoes; nothing calls it. | A one-shot (a step, a door) taking over a recorded loop's reflection on Albany, or the reverse; a siren moving a driving-aid tone or a bird call; after a long session, a new engine echo moving a borrowed car. Past: transient ids hashed into the echo and borrowed bands, "a footstep could take over a car's reflection or distant voice" (VoiceBudgetTests.cs:304). | B | P3: the registry allocates every id from one space and frees it; one test proves no two live voices share an id. Done in P3c ("P3c as built"). |
 | S7 | `LookUpPhysicalLevel` CAS:1124-1214, `PhysicalHeadroom` CAS:1088-1122, the provider's factory `FmodAudioProvider.cs:2716-2756`, `NaturePlace` `:2281-2293`, `ExtendedSources.Layout` `OpenFPS.Sound/Core/Nature/ExtendedSources.cs:82-147`, `ModelKinds.TryModelOfSound` `OpenFPS.Sound/Editing/ModelKinds.cs:327` | One kind of physical model is named by its `kind:` prefix in five or six separate ladders, each its own list: the level and size, the headroom, the synth, the places, the editor's kinds. `ModelKinds` misses aircraft, rail, gate, siren, horn, wood and rain. `LookUpPhysicalLevel` and `PhysicalHeadroom` swallow every exception (`catch { }`) and return "not a model", which drops the source from both the ranking and the submit. | The level-crossing bell silent twice: missing from the level lookup, then from a second prefix list in the emitter branch (2026-09-22, project note "level crossings"). Any new kind is silent until it is in every list. | A | P2: one table of model kinds (prefix to level, size, headroom, places, factory, body kind), read by all of them; an unknown or broken spec fails loudly once. |
 | S8 | `"engine:"` tested in 15 places, 9 of them re-implementing `CabinWalls.Vehicle` (`AudioEngine/Acoustics/CabinWalls.cs:45-48`): CAS:87, :544, :1688-1690, :2275-2277, :2599-2600, :2735-2736, :2944-2945, `DrivingAids.cs:198`, `:301`, `RainField.cs:674`, `Scope.cs:34`, `OtherBodies.cs:71-72`, `OpenFPS.Common/AudioEmission.cs:33`, `OpenFPS.Sound/Fuel.cs:235`, `OpenFPS.Server/Core/OccupancyService.cs:297-298`; `rail:` 6, `aircraft:` 4, `machine:` 3 more | Whether something is a vehicle, an aircraft, a train or a machine is read from the sound id's spelling, place by place. `OtherBodies.cs:75-79` gives everything with a physical model no legs except `machine:mower_push`, by its exact id; `Scope.cs:40` makes every NPC without `machine:` a person, so the two disagree about mowers. `PlaysCopies` (CAS:81-89) says it decides by `IsSynth` and then tests two prefixes, one of them (`ENGINE/`) a spelling that is never on a snapshot (`OtherBodies.cs:68-70`). | Cars trailing footsteps, sixteen a second at 30 km/h, until the `engine:` test went in (OtherBodies.cs:66-70); then the resolved spelling let cars walk again. A new walked machine (a hand cart, a pushed pram) would be silent underfoot or walk with no one there. | B | P2: a body kind from the model table (vehicle, aircraft, train, machine, walker) and a declared operator on a machine spec, read through one helper. |
 | S9 | `Scope.cs:166-168`, `OpenFPS.Common/EntityGeometry.cs:100`, `MapTracker.cs:292-299`, `OpenFPS.Sound/Glass.cs:78-96`, `SpatialService.cs:687`, `OpenFPS.Sound/RainSurfaces.cs:41-42`, `BirdLife.cs:117`, `RainField.cs:664`, `OpenFPS.Sound/Fuel.cs:237-239`, `OpenFPS.Sound/Footsteps.cs:225-291` | Names and material strings decide physics. Standing on a roof is the thing under you named "...roof", while `SurfaceFlags.Roof` exists and mesh roofs set it from their shape. That flag is itself derived from the name for boxes. Glass type is decided by prefab id and name substrings ("window", "shop", "entrance"...), and anything unnamed is tempered. An entrance is a name containing "entrance". Rain on water or a canopy, a hedge for birds, a tree for fire and a material's footstep span and deck all switch on material names. `SurfaceFlags.Foliage` is declared and never set. | A roof whose name lacks the word, or a room called "Roof garden", is misread; a pane named "Office 3" breaks as tempered. Each is one mis-named map entity away from a wrong sound, and the real-place generators name things from OSM. | B | P5: the facts become properties: surface flags set from what a thing is (shape, prefab, generator), glazing as a field, entrances as a door or portal property, material behaviours as fields on the material table. |
@@ -614,6 +614,81 @@ still there (no band moved). The wire hash does not change (only `OpenFPS.Client
     grille, 4.2 m rail horn and interior 0.7 m fallbacks failing loudly; ranges from the entry's level (S24);
     the remaining fallbacks of S27; the facade's lost stop and silent replacement.
 
+**P3c as built (2026-10-11).** Unheard; nothing heard changes. S6 is closed: no two live voices share an id. The
+wire hash does not change (only `OpenFPS.Client.Core`, the lab and the tests). Two commits.
+
+- **Seeds** (first commit). `SpatialEmitter.Seed` is new, and the mixer draws every voice's chance from it, never
+  from its id: the engines, machines, aircraft, bells, stoves, horns, water, fires, trees, woods and shores, an
+  engine echo's smear and a recording's copy's wash. The host sets it from `VoiceRegistry.SeedOf(kind, owner,
+  part)`: the table of the ids voices had, kept as seeds so nothing rendered moves (an entity's own voice is
+  seeded by its entity id). Every voice's id is asked of the registry by the same three (`IdFor`), which was
+  then still that table. The rain and the engine echoes, library files, are handed both by their host
+  (`RainField.SlotVoice` and `DropVoice`, `EngineReflections.VoiceOf`); the aids name their voices by
+  `AidVoice`. The lab's spikes seed their synths with the ids they use. Streams: every `Play` line gains
+  `Seed=`, equal to its `EntityId` on every line; with the field taken out all eight are line for line the
+  stored ones. `VoiceIdBandTests` read off the seed table found the same 47 overlaps.
+- **Ids** (second commit). `VoiceRegistry.IdFor` gives the id: an entity's own voice (engine, aircraft,
+  machine, wood, recording) is under its entity id; every other voice, and every question to the acoustic
+  worker (`ProbeFor`: a one-off's source, somebody talking; `WorldAudioPlayer.SourceProbeId` asks it), gets an
+  id from `-1000` down, above the woods' entity ids (`WoodChorus.FirstId`), keyed by kind, owner and part and
+  by world. An id is held while its voice is an entry, in the frame it was asked for, and while the mixer has a
+  voice under it; `Sweep` lets the rest go, and they are taken again nearest zero first, so the order things
+  were let go in does not matter. So a retiring place, outlet, cabin path or train voice keeps its id until its
+  fade has ended without being an entry (the allocator holds it; the fades become the registry's in P3d), and a
+  one-off's id is free once its voice has stopped. A probe is held as long as the worker keeps a source nobody
+  asks about (`AsyncAcousticWorker.SaSourceTtlMs`, 5 s, 300 frames). `Hold` keeps an id for whoever refers to a
+  voice before it starts or after it stops (the tests). The band constants and formulas are gone
+  (`*VoiceBase`, `ReflectionVoiceId`'s arithmetic, `PlaceVoiceId`'s, the trains', rain's, the aids', beacons',
+  birds', step echoes', footsteps', the landing's `-50`, the reference voice's, `EchoVoiceIdBase`,
+  `TransientVoiceId`, `SourceProbeBase`); their numbers are the seed table only.
+- **Kept as it was, so nothing heard moves.** One-offs of a pooled kind take turns as before
+  (`VoiceRegistry.TurnsOf`: transients 400,000, beacons 24, birds, step echoes and drops 48, your steps 12,
+  everybody else's 64, the aids' beeps 6): the 49th drop's turn is the first's, and replaces it if that one is
+  still held. With each its own voice instead, traffic_rain's stream grew from 34,461 lines to 37,206: drops that
+  cut each other off all play. The cabin's paths are counted by path whichever vehicle you sit in, a talker's
+  copies by the room they were given, and a landing is one at a time.
+- **Streams** (second commit), regenerated for the new ids. `EmitterStreamReplayTests.UnderTheIdMapTheStreamIsTheOneBefore`
+  runs each scenario, puts every id the registry gave back to the one its voice had (its seed, by kind, owner and
+  part) from the moment it was given, writes every line whole (`Expand`) and compares with the streams of the
+  first commit (`OPENFPS_REPLAY_BEFORE=<folder>`). All eight are equal line for line, at the default processor
+  count and at `DOTNET_PROCESSOR_COUNT=4`: walk (18 ids given), drive (24), traffic_rain (94),
+  sirens_and_far_traffic (52), train_behind_wall (34), places_and_woods (69), talker_and_aids (25), high_ids
+  (34). One difference, in high_ids: frames 113 to 120, the three guide beeps' 48 re-placings come in another
+  order within their frame (the budget orders voices that nothing else tells apart by their ids, and the beeps'
+  ids now come in the order they were given); every line is the same line. In high_ids the siren of car 61,001
+  and the guide beep are two voices now (both were `-961001`, re-placed in turn as each), and the loudspeaker's
+  wall copies are out of the one-offs' ids. Written whole, the stream is the same either way: what the mixer was
+  told for each is the same, and only the real mixer, which kept one voice under the one id, would have played
+  the two as one.
+- **The band test**, must-pass: `VoiceIdBandTests.NoTwoLiveVoicesShareAnId`, over all eight scenarios: no id is
+  given while a voice sounds under it or it is an entry, and at every frame's end every voice the mixer holds and
+  every entry is under its entity's id or an id the registry holds for it. With it: every voice an entity can have
+  at each entity id S6 named (1 to 250,000, Albany's and Magnolia's counts among them) and every voice nobody
+  owns, all at once, each its own id; a million engine echoes one after another run on in six ids (S6: never
+  reused, they reached the borrowed cars' band after about ten hours); a fading voice's id held until it stops,
+  then the next voice's. The skipped twin and the 47-overlap list are gone.
+- **Tests.** A test asks for a voice by kind, owner and part (`ClientAudioHarness.Voice`, held for the test),
+  by what it started as (`RecordingMixer.StartedAs`), or by its seed, never by where its id falls.
+- **Left.**
+  - The woods' ids are not in the allocator. A wood is an entity of `ClientWorldState`'s and its own voice is
+    under its entity id like every entity's, and that id seeds its synth (`PlacedNatureVoice`): given an id
+    by the allocator, it would render differently. The allocator's ids stop above them, so the two never meet.
+    Moving them wants the woods' seed carried on the wood (a field of `WoodChorus`, which is in the wire hash)
+    or a reseed.
+  - Birds' asking (P6): a perch group's probe can be had now (`IdFor(Probe, NoEntity, group)`), but asked of
+    the worker the calls are placed by the simulator's answer, not the tracer's: the bird lines of the streams
+    move, and whether a call through a hedge or a wall sounds right is Cody's to hear, as for the beacons.
+  - Voices that nothing else tells apart are ordered by their ids, as since the 2026-10-11 fix; which comes
+    first can differ from before (high_ids' beeps).
+- **Next.**
+  - P3d: one way to start and stop; the fades owned by the registry, so a retiring voice stays an entry until
+    its fade has ended (the allocator holds its id meanwhile); whether a one-off of a pooled kind is its own
+    voice (no turns: drops, steps and beeps no longer cut each other off; a named stream change, traffic_rain
+    above); the entry's `Mount` and level from the model, with the 116 dB, 1.9 m grille, 4.2 m rail horn and
+    interior 0.7 m fallbacks failing loudly; ranges from the entry's level (S24); the remaining fallbacks of
+    S27; the facade's lost stop and silent replacement. With a reseed (renders may move) the seed table can go,
+    and the woods' ids with it.
+
 #### P4. One ranking (1 session)
 
 - **Changes.** Every voice that competes for the mixer ranks by its rendered level at the ear with its
@@ -860,7 +935,9 @@ Things that look special-cased but are physics, or the right shape already.
 
 ## 5. Appendix: every voice band
 
-As of `700cb635`; since P3b every band is a `VoiceRegistry` entry and its "Path from" is its kind's
+As of `700cb635`. Since P3c these are not ids: every voice's id is given by `VoiceRegistry.IdFor` (an entity's own
+voice its entity id), and the formulas below are only the seed table, `VoiceRegistry.SeedOf`, each voice's seed
+("P3c as built"). Since P3b every band is a `VoiceRegistry` entry and its "Path from" is its kind's
 (`VoiceRegistry.HeardFromOf`, "P3b as built"). "id" is the entity id as the client sees it (`EntitySnapshot.Id`), which reaches 18,024
 on Albany's join and 32,598 over all of Magnolia.
 

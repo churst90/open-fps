@@ -66,7 +66,14 @@ internal enum VoiceKind : byte
     Reference,
     /// <summary>A one-off sound the world reported (a door, a shot, a line said), or one of its copies.</summary>
     Transient,
+    /// <summary>Never a voice: a question to the acoustic worker about a source, under an id of its own
+    /// (<see cref="VoiceRegistry.ProbeFor"/>).</summary>
+    Probe,
 }
+
+/// <summary>What an id was given for: <see cref="Kind"/> of <see cref="Owner"/>, the <see cref="Part"/>th of
+/// them (<see cref="VoiceRegistry.IdFor"/>).</summary>
+internal readonly record struct VoiceKey(VoiceKind Kind, int Owner, int Part);
 
 /// <summary>Where a registered voice is heard from, and so whose path it takes.</summary>
 internal enum HeardFrom : byte
@@ -118,6 +125,11 @@ internal struct VoiceEntry
 /// no longer an entry after a frame without; a one-off is declared once and is one until it has stopped. One
 /// pass hands every voice heard by its owner's path that path (<see cref="ClientAudioSystem"/>, Voices); a
 /// voice that works out its own carries it, and nothing else writes either.
+///
+/// It gives out the ids (<see cref="IdFor"/>): an entity's own voice is under its entity id, and every other
+/// voice and every question to the acoustic worker under one id from one space, held while the voice is an
+/// entry or still sounding (a voice fading out keeps its id until its fade has ended) and then free for the
+/// next. So no two voices sound under one id, however many entities a map has or however long it runs.
 /// </summary>
 internal sealed class VoiceRegistry
 {
@@ -131,6 +143,38 @@ internal sealed class VoiceRegistry
     private readonly Dictionary<int, VoiceEntry> _entries = new();
     private readonly HashSet<int> _owners = new();
     private readonly List<int> _gone = new();
+
+    /// <summary>The first id given out, and every one after counts down from it: under every id an entity
+    /// has (the server's are not negative) and over the woods', which are entities of the client's own
+    /// (<see cref="OpenFPS.Common.WoodChorus.FirstId"/>).</summary>
+    public const int FirstId = -1000;
+    /// <summary>The last id there is to give: one over the first wood's.</summary>
+    public const int LastId = OpenFPS.Common.WoodChorus.FirstId + 1;
+
+    private struct Given
+    {
+        public int World;
+        public VoiceKey Key;
+        /// <summary>The frame it was last asked for in; it is not free before the frame after.</summary>
+        public int Asked;
+        /// <summary>Kept by whoever asked for it to be (<see cref="Hold"/>), however long.</summary>
+        public bool Held;
+    }
+    private readonly Dictionary<(int World, VoiceKey Key), int> _idOf = new();
+    private readonly Dictionary<int, Given> _given = new();
+    /// <summary>Ids let go, taken again nearest zero first, so which id a voice gets does not depend on the
+    /// order anything was let go in.</summary>
+    private readonly SortedSet<int> _free = new();
+    private int _next = FirstId;
+    private readonly List<int> _letGo = new();
+
+    /// <summary>How long a question's id is kept after it was last asked, frames: as long as the worker keeps
+    /// what it traced for a source nobody is asking about.</summary>
+    public int ProbeHoldFrames { get; init; } = 1;
+
+    /// <summary>Told of every id as it is given, with what for: the stream replay's map from these ids to the
+    /// ones voices had before (EmitterStreamReplayTests).</summary>
+    public Action<int, VoiceKey>? OnGiven { get; set; }
     // Footsteps and the reference voice are declared from the game thread between updates.
     private readonly object _lock = new();
 
@@ -153,7 +197,7 @@ internal sealed class VoiceRegistry
         VoiceKind.Cabin or VoiceKind.OwnVoice or VoiceKind.OwnStep or VoiceKind.Aid or VoiceKind.Reference => HeardFrom.Inside,
         VoiceKind.Reflection or VoiceKind.EngineEcho or VoiceKind.Talker or VoiceKind.TalkerCopy or VoiceKind.OwnVoiceCopy
             or VoiceKind.Footstep or VoiceKind.StepEcho or VoiceKind.Rain or VoiceKind.RainDrop or VoiceKind.Bird
-            or VoiceKind.Beacon or VoiceKind.Transient => HeardFrom.Own,
+            or VoiceKind.Beacon or VoiceKind.Transient or VoiceKind.Probe => HeardFrom.Own,
         _ => HeardFrom.Point,
     };
 
@@ -240,18 +284,196 @@ internal sealed class VoiceRegistry
                 else if (frame - e.SeenFrame > EventStartFrames && (sounding == null || !sounding(id))) _gone.Add(id);
             }
             foreach (int id in _gone) _entries.Remove(id);
+
+            // An id is free once it is no entry, nothing asked for it this frame and the mixer has nothing
+            // under it: a voice fading out (a retiring place or outlet, a train's voice let go) holds its id.
+            _letGo.Clear();
+            foreach (var (id, g) in _given)
+            {
+                if (g.Held || _entries.ContainsKey(id)) continue;
+                if (g.Asked >= (g.Key.Kind == VoiceKind.Probe ? frame - ProbeHoldFrames : frame)) continue;
+                if (sounding != null && sounding(id)) continue;
+                _letGo.Add(id);
+            }
+            foreach (int id in _letGo)
+            {
+                _idOf.Remove((_given[id].World, _given[id].Key));
+                _given.Remove(id);
+                _free.Add(id);
+            }
         }
     }
 
-    /// <summary>The listener left the map: no id declared so far means anything in the next.</summary>
+    /// <summary>The listener left the map: no id declared so far means anything in the next. The ids given in
+    /// it are let go as their voices stop.</summary>
     public void LeaveWorld()
     {
         lock (_lock)
         {
             _entries.Clear();
+            foreach (int id in _given.Keys.ToList())
+            {
+                var g = _given[id];
+                g.Held = false;
+                _given[id] = g;
+            }
             World++;
         }
     }
+
+    /// <summary>A landing's part (<see cref="IdFor"/>): one landing at a time, the next replacing it.</summary>
+    public const int Landing = -1;
+
+    /// <summary>
+    /// The id of one voice: <paramref name="kind"/> of <paramref name="owner"/>, the <paramref name="part"/>th of
+    /// them. The owner is an entity, or for a voice no entity owns what it belongs to (a train's number, a rain
+    /// slot, an aid, a talker's room); the part tells one of its voices of a kind from another (a slot, a place,
+    /// a count). An entity's own voice is under its entity id; anything else is given the id it has, or the
+    /// next free one, held until it is let go (<see cref="Sweep"/>).
+    /// </summary>
+    public int IdFor(VoiceKind kind, int owner, int part = 0)
+    {
+        if (IsOwnVoice(kind)) return owner;
+        var key = new VoiceKey(kind, owner, Turn(kind, owner, part));
+        lock (_lock)
+        {
+            if (_idOf.TryGetValue((World, key), out int id))
+            {
+                var g = _given[id];
+                g.Asked = Frame;
+                _given[id] = g;
+                return id;
+            }
+            if (_free.Count > 0)
+            {
+                id = _free.Max;
+                _free.Remove(id);
+            }
+            else
+            {
+                if (_next < LastId) throw new InvalidOperationException($"Every voice id from {FirstId} to {LastId} is in use.");
+                id = _next--;
+            }
+            _idOf[(World, key)] = id;
+            _given[id] = new Given { World = World, Key = key, Asked = Frame };
+            OnGiven?.Invoke(id, key);
+            return id;
+        }
+    }
+
+    /// <summary>The id of a voice (<see cref="IdFor"/>), kept for it until the world is left, whether it sounds
+    /// or not: for whoever refers to a voice by its id before it starts and after it stops (a test).</summary>
+    public int Hold(VoiceKind kind, int owner, int part = 0)
+    {
+        int id = IdFor(kind, owner, part);
+        if (IsOwnVoice(kind)) return id;
+        lock (_lock)
+        {
+            var g = _given[id];
+            g.Held = true;
+            _given[id] = g;
+        }
+        return id;
+    }
+
+    /// <summary>The id the acoustic worker is asked about an entity's sound under when it is not one of the
+    /// entity's own voices (a one-off's source, somebody talking): held a while after the last asking, as long
+    /// as the worker keeps its answer (<see cref="ProbeHoldFrames"/>).</summary>
+    public int ProbeFor(int entityId) => IdFor(VoiceKind.Probe, entityId);
+
+    /// <summary>
+    /// How many one-offs of a kind are voices at once: the next after that many is the first's turn again, and
+    /// replaces it if it is still held (a step's, a drop's). 0: every one its own. As they were before ids were
+    /// given out; whether each should be a voice of its own is a change to what is heard (P3d).
+    /// </summary>
+    public static int TurnsOf(VoiceKind kind, int owner) => kind switch
+    {
+        VoiceKind.Transient => 400_000,
+        VoiceKind.Beacon => 24,
+        VoiceKind.Bird or VoiceKind.StepEcho or VoiceKind.RainDrop => 48,
+        VoiceKind.OwnStep => 12,
+        VoiceKind.Footstep => 64,
+        VoiceKind.Aid => (AidVoice)owner is AidVoice.Guide or AidVoice.Centre or AidVoice.Kerb or AidVoice.Turn or AidVoice.Brake ? 6 : 0,
+        _ => 0,
+    };
+
+    /// <summary>Which turn the <paramref name="part"/>th one-off of a kind takes (<see cref="TurnsOf"/>); a
+    /// landing's part, below zero, is its own.</summary>
+    private static int Turn(VoiceKind kind, int owner, int part)
+        => TurnsOf(kind, owner) is int turns and > 0 && part >= 0 ? part % turns : part;
+
+    /// <summary>Whether a kind is an entity's own voice, which is under the entity's id.</summary>
+    public static bool IsOwnVoice(VoiceKind kind)
+        => kind is VoiceKind.Engine or VoiceKind.Aircraft or VoiceKind.Machine or VoiceKind.Wood or VoiceKind.Recording;
+
+    /// <summary>What an id is held for now, if anything.</summary>
+    public bool TryKeyOf(int id, out VoiceKey key)
+    {
+        lock (_lock)
+        {
+            if (_given.TryGetValue(id, out var g) && g.World == World) { key = g.Key; return true; }
+            key = default;
+            return false;
+        }
+    }
+
+    /// <summary>How many ids are held now.</summary>
+    public int IdsHeld { get { lock (_lock) return _given.Count; } }
+
+    /// <summary>
+    /// What a voice's chance is drawn from (<see cref="OpenFPS.Client.AudioEngine.Data.SpatialEmitter.Seed"/>),
+    /// by what it is the sound of: the ids voices had before they were given out, so nothing rendered moves.
+    /// An entity's own voice is seeded by its entity id.
+    /// </summary>
+    public static int SeedOf(VoiceKind kind, int owner, int part = 0) => SeedOfTurn(kind, owner, Turn(kind, owner, part));
+
+    private static int SeedOfTurn(VoiceKind kind, int owner, int part) => kind switch
+    {
+        VoiceKind.Engine or VoiceKind.Aircraft or VoiceKind.Machine or VoiceKind.Wood or VoiceKind.Recording => owner,
+        VoiceKind.Reflection => -30_000 - owner * (OpenFPS.Common.EarlyReflections.MaxArrivals + 1) - part,
+        VoiceKind.Transient => -100_000 - part,
+        VoiceKind.EngineEcho => -600_000 - part,
+        VoiceKind.Borrowed => -700_000 - Math.Abs(owner),
+        VoiceKind.Intake => -800_000 - Math.Abs(owner),
+        VoiceKind.Siren => -900_000 - Math.Abs(owner),
+        VoiceKind.Aid => AidSeed((AidVoice)owner, part),
+        VoiceKind.Beacon => -967_000 - part,
+        VoiceKind.Bird => -970_000 - part,
+        VoiceKind.Horn => -1_200_000 - Math.Abs(owner),
+        VoiceKind.OwnVoice => -1_300_000,
+        VoiceKind.OwnVoiceCopy => -1_300_001 - part,
+        VoiceKind.Talker => -1_400_000 - Math.Abs(owner),
+        VoiceKind.Cabin => -1_600_000 - part,
+        VoiceKind.TalkerCopy => -1_700_000 - owner * 8 - part,
+        VoiceKind.StepEcho => -1_800_000 - part,
+        VoiceKind.HeldHorn => -2_100_000 - Math.Abs(owner),
+        VoiceKind.TrainField or VoiceKind.TrainSignal => -2_300_000 - (owner * OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots + part),
+        VoiceKind.Rain => part == 0 ? -2_400_000 - owner : -2_400_100 - owner * 8 - part,
+        VoiceKind.RainDrop => -2_401_000 - part,
+        VoiceKind.Place => -5_000_000 - Math.Abs(owner) * OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MaxPlaces - part,
+        VoiceKind.Reference => -7_900_000 - part,
+        VoiceKind.Probe => -3_000_000 - owner,
+        VoiceKind.OwnStep => part == Landing ? -50 : -100 - part,
+        VoiceKind.Footstep => part == Landing ? -50 : -300 - part,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "no seed"),
+    };
+
+    private static int AidSeed(AidVoice aid, int part) => aid switch
+    {
+        AidVoice.Guide => -961_000 - part,
+        AidVoice.Centre => -962_000 - part,
+        AidVoice.Kerb => -963_000 - part,
+        AidVoice.CentreTone => -964_001,
+        AidVoice.KerbTone => -964_002,
+        AidVoice.CentreRumble => -964_003,
+        AidVoice.KerbRumble => -964_004,
+        AidVoice.Turn => -965_000 - part,
+        AidVoice.Align => -966_001,
+        AidVoice.Relay => -966_010,
+        AidVoice.OverSpeed => -966_011,
+        AidVoice.Brake => -967_100 - part,
+        _ => throw new ArgumentOutOfRangeException(nameof(aid), aid, "no seed"),
+    };
 
     /// <summary>A point in the owner's frame, from one in the world.</summary>
     public static Vector3 MountOf(Vector3 ownerAt, Quaternion ownerRotation, Vector3 at)

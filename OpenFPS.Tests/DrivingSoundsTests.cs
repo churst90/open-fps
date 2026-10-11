@@ -35,7 +35,7 @@ public class DrivingSoundsTests
         var at = new Vector3(0f, 0f, 0f);
         h.AddCar(bus, "transit_bus", at);
         Signals(h, bus, at, VehicleSignalBits.Encode(true, true, false, SirenMode.Wail));
-        int voice = ClientAudioSystem.HeldHornVoiceBase - bus;
+        int voice = h.Voice(VoiceKind.HeldHorn, bus);
         Assert.True(h.TickUntil(() => h.Mixer.WasStarted(voice), 60));
         var e = h.Mixer.Latest[voice];
         _o.WriteLine($"{e.PhysicalKey} at {e.Position}, blowing {e.EngineRunning}");
@@ -60,7 +60,7 @@ public class DrivingSoundsTests
         const int car = 601;
         var at = Vector3.Zero;
         h.AddCar(car, "police_interceptor", at);
-        int voice = ClientAudioSystem.SirenVoiceBase - car;
+        int voice = h.Voice(VoiceKind.Siren, car);
         // Standing still with the switch on: a driver's siren sounds where traffic's never would.
         Signals(h, car, at, VehicleSignalBits.Encode(true, false, true, SirenMode.Yelp));
         Assert.True(h.TickUntil(() => h.Mixer.WasStarted(voice), 60));

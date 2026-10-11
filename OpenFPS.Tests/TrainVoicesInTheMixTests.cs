@@ -18,7 +18,8 @@ public class TrainVoicesInTheMixTests
 
     private const int FirstEntity = 50_000;
 
-    private static bool IsTrainVoice(int id) => id <= ClientAudioSystem.TrainVoiceBase && id > ClientAudioSystem.TrainVoiceBase - 10_000;
+    /// <summary>A train's own voice starting, by what it plays (TrainVoiceState.SlotKey), not where its id falls.</summary>
+    private static bool IsTrainVoice(string playLine) => playLine.Contains("SoundId=\"rail\"", StringComparison.Ordinal);
 
     /// <summary>Where a point <paramref name="s"/> metres along the track is: a straight line down x, or a
     /// circle of 150 m round the origin (the listener 12 m inside it), which makes the groups merge and
@@ -66,7 +67,7 @@ public class TrainVoicesInTheMixTests
         });
 
         if (Environment.GetEnvironmentVariable("OPENFPS_TRAIN_MIX_DUMP") is { Length: > 0 } dump)
-            File.WriteAllLines(dump, r.Mixer.Lines.Where(l => l.Contains("PlanTrain") || l.Contains(" -23000")));
+            File.WriteAllLines(dump, r.Mixer.Lines.Where(l => l.Contains("PlanTrain") || IsTrainVoice(l)));
         var playing = new HashSet<int>();
         int most = 0, trainStarts = 0, sourceVoices = 0, signalSeen = 0;
         foreach (var line in r.Mixer.Lines)
@@ -76,7 +77,7 @@ public class TrainVoicesInTheMixTests
             if (parts[1] == "Play")
             {
                 if (id >= FirstEntity && id < FirstEntity + layout.Count) sourceVoices++;
-                if (!IsTrainVoice(id)) continue;
+                if (!IsTrainVoice(line)) continue;
                 trainStarts++;
                 playing.Add(id);
                 most = Math.Max(most, playing.Count);

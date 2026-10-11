@@ -71,10 +71,16 @@ since the last deploy" list below.
      `IsWood`'s range and `IsEchoVoice` are gone. Streams changed for the woods (S1) and the engine echoes (two
      writers). P6 done for talkers (a probe id, their body left out) and S23. Cody's decision the same day: a
      blocked engine is heard round the edge as its horn is (done; no stream moves, the replay's tracer has no
-     edges). Left for P6: beacons (their wall test is tuned by ear), birds (need probe ids: P3c), rain (pool load).
-   - Then P3c (seeds from the entry, equal to today's; then ids and probe ids from one allocator, a one-off's id
-     free when its voice stops, a retiring voice's when its fade ends) and P3d (one way to start and stop, fades
-     owned by the registry, mounts and levels from the model, ranges from the level). Then library stage 5's
+     edges). Left for P6: beacons (their wall test is tuned by ear), birds (probe ids since P3c; the asking wants
+     Cody's ear), rain (pool load).
+   - P3c, seeds then ids: DONE 2026-10-11, unheard, nothing heard changes (the audit's "P3c as built"). Every
+     synth seeded from its entry's kind, owner and part at the seed it had; every id but an entity's own voice's,
+     and every probe, given by the registry and held while wanted (a fading voice until its fade ends). S6
+     closed: `VoiceIdBandTests` is "no two live voices share an id", must-pass. Streams equal under the id map
+     (high_ids: three beeps re-placed in another order in frames 113 to 120). Left: the woods' ids (they seed
+     the woods' synth), birds asking the worker (P6, by ear), one-offs of a pooled kind each their own voice (P3d).
+   - Then P3d (one way to start and stop, fades owned by the registry, whether a pooled one-off is its own
+     voice, mounts and levels from the model, ranges from the level). Then library stage 5's
      `AudioClock` slice (`IAudioClock`, its `WorldTime` from `WindField.Now()`; docs/SOUND_LIBRARY_BOUNDARY.md
      18.3).
    - Beacons onto the worker's path, the model every other sound uses (Cody, 2026-10-11: "I'd move them to the

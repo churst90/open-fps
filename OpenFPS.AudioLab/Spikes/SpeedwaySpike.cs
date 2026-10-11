@@ -220,7 +220,7 @@ public static class SpeedwaySpike
                     var vel = new Vector3(MathF.Sin(head[i]), 0f, MathF.Cos(head[i])) * speed[i];
                     var em = new SpatialEmitter
                     {
-                        EntityId = -91000 - i, SoundId = "engine:" + cars[i].Preset, IsSynth = true,
+                        EntityId = -91000 - i, Seed = -91000 - i, SoundId = "engine:" + cars[i].Preset, IsSynth = true,
                         EngineKey = cars[i].Preset, EngineSpeed = speed[i], EngineRunning = true,
                         Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                         Position = p, Velocity = vel,
@@ -256,7 +256,7 @@ public static class SpeedwaySpike
                         if (!echoes.TryGetValue(key, out int vid)) echoes[key] = vid = nextEcho--;
                         var echo = new SpatialEmitter
                         {
-                            EntityId = vid, SoundId = "engine-echo", IsSynth = true,
+                            EntityId = vid, Seed = vid, SoundId = "engine-echo", IsSynth = true,
                             EchoOfEntity = -91000 - i, EchoDelaySeconds = r.DelaySeconds, EchoGain = g,
                             EngineKey = "", Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                             Position = r.ApparentPosition, Velocity = Vector3.Zero,

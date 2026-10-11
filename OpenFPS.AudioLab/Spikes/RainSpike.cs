@@ -687,7 +687,7 @@ public static class RainSpike
                     predicted += Math.Pow(10, (20 * Math.Log10(Math.Max(1e-9, gain)) - VehicleProfile.PeakHeadroomDb) / 10);
                     provider.PlaySpatialSound(new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
                     {
-                        EntityId = OpenFPS.Client.Core.RainField.VoiceBase - s,
+                        EntityId = -2_400_000 - s,
                         SoundId = "rain",
                         IsSynth = true,
                         PhysicalKey = OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Key(s),

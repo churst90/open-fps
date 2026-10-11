@@ -756,9 +756,6 @@ public sealed class RainSurvey
 /// </summary>
 public sealed class RainField
 {
-    /// <summary>Voice ids: one per slot, counting down from here.</summary>
-    public const int VoiceBase = -2_400_000;
-
     /// <summary>Surveyed again once the ear has moved this far, m, or this long has gone, s.</summary>
     public const float SurveyMetres = 1.5f, SurveySeconds = 2f;
 
@@ -887,7 +884,7 @@ public sealed class RainField
 
         for (int s = 0; s < RainFeeds.Slots; s++)
         {
-            int id = VoiceBase - s;
+            int id = SlotVoice(s, 0).Id;
             var patch = OnlySlot < 0 || OnlySlot == s ? _last.Patches[s] : null;
             if (patch == null)
             {
@@ -909,10 +906,6 @@ public sealed class RainField
     }
 
     // ── A patch heard from several places: the roof over the ear, the near quarters ──────────────
-
-    /// <summary>Voice ids for a slot's parts after the first (which is the slot's own voice): eight a slot.</summary>
-    public const int PartBase = VoiceBase - 100;
-    public static int PartVoiceId(int slot, int part) => part == 0 ? VoiceBase - slot : PartBase - slot * 8 - part;
 
     private readonly int[] _partsOn = new int[RainFeeds.Slots];
     private readonly Vector3[] _partAt = new Vector3[8];
@@ -968,7 +961,7 @@ public sealed class RainField
         for (int k = 0; k < parts; k++)
         {
             var e = whole;
-            e.EntityId = PartVoiceId(slot, k);
+            (e.EntityId, e.Seed) = SlotVoice(slot, k);
             e.PhysicalKey = RainFeeds.Key(slot, k);
             e.Position = _partAt[k];
             // Heard round an edge, the parts keep their spread about where the patch is heard from.
@@ -1013,7 +1006,7 @@ public sealed class RainField
 
     private void StopParts(int slot)
     {
-        for (int k = 1; k < _partsOn[slot]; k++) _audio.StopSound(PartVoiceId(slot, k));
+        for (int k = 1; k < _partsOn[slot]; k++) _audio.StopSound(SlotVoice(slot, k).Id);
         _partsOn[slot] = 0;
     }
 
@@ -1066,9 +1059,11 @@ public sealed class RainField
         float extent = patch.ReferenceDistance;
         var (gain, reference) = Loudness.Place(level, extent);
         var centre = survey.Centres[slot];
+        var (id, seed) = SlotVoice(slot, 0);
         var e = new SpatialEmitter
         {
-            EntityId = VoiceBase - slot,
+            EntityId = id,
+            Seed = seed,
             SoundId = "rain",
             IsSynth = true,
             PhysicalKey = RainFeeds.Key(slot),
@@ -1123,9 +1118,6 @@ public sealed class RainField
     private double _plannedTo = double.NaN;
     private int _nearVoice;
 
-    /// <summary>Near-drop voice ids: a pool below the patches'.</summary>
-    public const int NearVoiceBase = VoiceBase - 1000, NearVoicePool = 48;
-
     /// <summary>Drop sounds rendered for the first time in one frame, at most: each is a few
     /// milliseconds of the synthesiser, and a new surface or a new kind asks for a dozen at once.</summary>
     private const int MakePerFrame = 2;
@@ -1159,9 +1151,11 @@ public sealed class RainField
             // In the loudness frame of the rain on that surface, not on its own (DropBank.Placement).
             float field = impact.Slot >= 0 && impact.Slot < RainFeeds.Slots ? RainFeeds.Feed[impact.Slot].LevelDb : float.NaN;
             var (gain, reference) = DropBank.Placement(level, field);
+            var (dropId, dropSeed) = DropVoice(_nearVoice++);
             var e = new SpatialEmitter
             {
-                EntityId = NearVoiceBase - (_nearVoice++ % NearVoicePool),
+                EntityId = dropId,
+                Seed = dropSeed,
                 SoundId = sound.Id,
                 Mode = PlaybackMode.Single,
                 Type = EmitterType.WorldLocked,
@@ -1194,12 +1188,19 @@ public sealed class RainField
     /// know whose it is.</summary>
     public Action<int, bool>? Voiced { get; set; }
 
+    /// <summary>The id and seed of a slot's voice (part 0) or of one of its parts, given by the host by slot and
+    /// part, so no voice of the rain shares an id with anything else's.</summary>
+    public Func<int, int, (int Id, int Seed)> SlotVoice { get; set; } = (_, _) => throw new InvalidOperationException("The rain's voices have no ids: its host gives them (SlotVoice).");
+
+    /// <summary>The id and seed of the nth near drop, given by the host.</summary>
+    public Func<int, (int Id, int Seed)> DropVoice { get; set; } = _ => throw new InvalidOperationException("The rain's drops have no ids: its host gives them (DropVoice).");
+
     /// <summary>Lets every rain voice go: the rain stopped, or the world was left.</summary>
     public void Stop()
     {
         for (int s = 0; s < RainFeeds.Slots; s++)
         {
-            if (_on[s]) _audio.StopSound(VoiceBase - s);
+            if (_on[s]) _audio.StopSound(SlotVoice(s, 0).Id);
             _on[s] = false;
             StopParts(s);
             RainFeeds.Feed[s].Patch = null;

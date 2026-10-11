@@ -208,6 +208,46 @@ public class EmitterStreamReplayTests
         File.WriteAllLines(Path.Combine(dir, scenario + ".txt"), lines);
     }
 
+    /// <summary>
+    /// The stream with every id the registry gave put back to the id that voice had before ids were given
+    /// out (by its kind, owner and part, VoiceRegistry.SeedOf) is the stream from before, line for line: what
+    /// the mixer is told is the same but for the numbers voices are under (docs/SPECIAL_CASES_AUDIT.md, P3c).
+    /// OPENFPS_REPLAY_BEFORE names a folder of the streams from before, stored as these are; without it
+    /// there is nothing to compare with and the test says so.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Scenarios))]
+    public void UnderTheIdMapTheStreamIsTheOneBefore(string scenario)
+    {
+        string? before = Environment.GetEnvironmentVariable("OPENFPS_REPLAY_BEFORE");
+        if (string.IsNullOrEmpty(before)) { _o.WriteLine("OPENFPS_REPLAY_BEFORE is not set: nothing to compare with."); return; }
+        // Each written whole (Expand): two voices that shared an id before were written as changes from each
+        // other, and are two voices now.
+        var (_, stored) = Read(Path.Combine(before, scenario + ".txt.gz"));
+        var old = Expand(stored);
+        var (now, given) = Replay.RunUnderOldIds(scenario);
+        Dump(scenario + ".mapped", now);
+        var differ = new List<int>();
+        for (int i = 0; i < Math.Min(old.Count, now.Count); i++) if (old[i] != now[i]) differ.Add(i);
+        _o.WriteLine($"{scenario}: {now.Count} lines ({old.Count} before), {given} ids given, {differ.Count} lines differ under the map");
+        foreach (int i in differ.Take(12)) _o.WriteLine($"  line {i + 1}\n    before: {Line(old, i)}\n    now:    {Line(now, i)}");
+        Assert.Equal(old.Count, now.Count);
+        // Line for line, but for voices the budget re-places in the order of their ids when nothing else tells
+        // them apart (VoiceManager): within a frame they may come in another order now, each line the same.
+        var frames = differ.Select(i => old[i].Split(' ', 2)[0]).Distinct().ToList();
+        foreach (var frame in frames)
+        {
+            var was = old.Where(l => l.Split(' ', 2)[0] == frame).OrderBy(l => l, StringComparer.Ordinal).ToList();
+            var isNow = now.Where(l => l.Split(' ', 2)[0] == frame).OrderBy(l => l, StringComparer.Ordinal).ToList();
+            int part = FirstDifference(was, isNow);
+            Assert.True(part < 0, $"{scenario}, frame {frame}: under the id map a line is not the one before:\n"
+                + $"  before: {Line(was, part)}\n  now:    {Line(isNow, part)}");
+        }
+        if (differ.Count > 0)
+            _o.WriteLine($"{scenario}: the {differ.Count} lines that differ are the same lines in another order within frames {string.Join(", ", frames)} ("
+                + string.Join(", ", differ.Select(i => old[i].Split(' ', 4)).Select(p => p.Length > 2 ? $"{p[1]} {p[2]}" : p[^1]).Distinct()) + ")");
+    }
+
     [Fact]
     public void EveryScenarioIsStoredAndNothingElse()
     {
@@ -290,6 +330,54 @@ internal sealed class Replay
     };
 
     public static List<string> Run(string scenario) => RunScript(Scenarios[scenario]).Mixer.Lines;
+
+    /// <summary>The verbs whose first argument is a voice id.</summary>
+    private static readonly HashSet<string> VoiceVerbs = new(StringComparer.Ordinal)
+        { "Play", "Place", "Path", "Stop", "FadeEngine", "FadeVoice", "CancelFade", "ReviveEngine" };
+
+    /// <summary>
+    /// A scenario's stream, each line written whole (EmitterStreamReplayTests.Expand), with each id the registry
+    /// gave written as the id that voice had before ids were given out: its seed, by kind, owner and part
+    /// (VoiceRegistry.SeedOf). An id stands for what it was last given for, from the moment it was given; entity
+    /// ids, under which an entity's own voice is, stay. And how many ids were given.
+    /// </summary>
+    internal static (List<string> Lines, int Given) RunUnderOldIds(string scenario)
+    {
+        const string Mark = "\u0001given ";
+        int given = 0;
+        var r = RunScript(x =>
+        {
+            x.Audio.Voices.OnGiven = (id, key) =>
+            {
+                if (key.Kind == VoiceKind.Probe) return;
+                given++;
+                x.Mixer.Lines.Add($"{Mark}{id} {VoiceRegistry.SeedOf(key.Kind, key.Owner, key.Part)}");
+            };
+            Scenarios[scenario](x);
+        });
+        var oldOf = new Dictionary<int, string>();
+        var lines = new List<string>(r.Mixer.Lines.Count);
+        foreach (var line in EmitterStreamReplayTests.Expand(r.Mixer.Lines))
+        {
+            if (line.StartsWith(Mark, StringComparison.Ordinal))
+            {
+                var p = line[Mark.Length..].Split(' ');
+                oldOf[int.Parse(p[0], CultureInfo.InvariantCulture)] = p[1];
+                continue;
+            }
+            var parts = line.Split(' ');
+            if (parts.Length >= 3 && VoiceVerbs.Contains(parts[1]) && int.TryParse(parts[2], CultureInfo.InvariantCulture, out int id)
+                && oldOf.TryGetValue(id, out var was))
+            {
+                parts[2] = was;
+                for (int i = 3; i < parts.Length; i++)
+                    if (parts[i].StartsWith("EntityId=", StringComparison.Ordinal)) { parts[i] = "EntityId=" + was; break; }
+                lines.Add(string.Join(' ', parts));
+            }
+            else lines.Add(line);
+        }
+        return (lines, given);
+    }
 
     /// <summary>A script of a test's own, run with everything pinned as the stored scenarios are; the
     /// replay is handed back so the test can read what the mixer was told.</summary>

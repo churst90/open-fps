@@ -52,7 +52,7 @@ public class AsyncAcousticWorker : IDisposable
     private readonly Dictionary<int, long> _saDebugLastPrint = new();
     private long _saSummaryLastPrint;
     private const int SaMaxSources = 64;
-    private const long SaSourceTtlMs = 5000; // a source not asked about for 5 s is released
+    internal const long SaSourceTtlMs = 5000; // a source not asked about for 5 s is released
 
     private bool _saTried;
     private bool _saEnabled;

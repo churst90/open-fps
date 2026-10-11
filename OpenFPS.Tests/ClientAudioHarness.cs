@@ -38,6 +38,7 @@ internal sealed class ClientAudioHarness
         // No door prewarm: with the render cache empty (TestConfigIsolation) every harness rendered the
         // whole city's doors and starved the tests' own threads.
         Audio = new ClientAudioSystem(Facade, sounds, Player, () => Now, prewarm: false);
+        Mixer.KindOf = id => Audio.Voices.TryGet(id, out var e) ? e.Kind : null;
     }
 
     /// <summary>Stands the listener here, feet on the ground (the ear is EyeHeight above).</summary>
@@ -126,10 +127,13 @@ internal sealed class ClientAudioHarness
         return false;
     }
 
+    /// <summary>The id a voice plays under: <paramref name="kind"/> of <paramref name="owner"/>, the
+    /// <paramref name="part"/>th, kept for it for the test (VoiceRegistry.Hold).</summary>
+    public int Voice(VoiceKind kind, int owner, int part = 0) => Audio.Voices.Hold(kind, owner, part);
     /// <summary>The id a car's borrowed voice plays under.</summary>
-    public static int DistantVoice(int carId) => ClientAudioSystem.DistantVoiceBase - Math.Abs(carId);
+    public int DistantVoice(int carId) => Voice(VoiceKind.Borrowed, carId);
     /// <summary>The id a car's horn plays under.</summary>
-    public static int HornVoice(int carId) => ClientAudioSystem.HornVoiceBase - Math.Abs(carId);
+    public int HornVoice(int carId) => Voice(VoiceKind.Horn, carId);
 }
 
 /// <summary>A mixer that records everything asked of it, keyed by voice id, and plays nothing. Called
@@ -138,6 +142,13 @@ internal sealed class RecordingMixer : IAudioProvider
 {
     /// <summary>Every voice started, in order.</summary>
     public readonly List<SpatialEmitter> Started = new();
+    /// <summary>What each voice in <see cref="Started"/> was the sound of as it started, by its entry.</summary>
+    public readonly List<VoiceKind?> StartedKinds = new();
+    /// <summary>A voice's kind by its id, now (the registry's entry); none, nothing recorded.</summary>
+    public Func<int, VoiceKind?>? KindOf;
+    /// <summary>The voices started as <paramref name="kind"/>, from the <paramref name="from"/>th start on.</summary>
+    public IEnumerable<SpatialEmitter> StartedAs(VoiceKind kind, int from = 0)
+        => Started.Select((e, i) => (e, i)).Where(x => x.i >= from && StartedKinds[x.i] == kind).Select(x => x.e);
     /// <summary>The last emitter each voice was started or re-placed with.</summary>
     public readonly Dictionary<int, SpatialEmitter> Latest = new();
     /// <summary>Every acoustic path handed to each voice, in order.</summary>
@@ -159,7 +170,7 @@ internal sealed class RecordingMixer : IAudioProvider
     public AcousticPathData LastCarried(int id) => Carried[id][^1];
     public bool WasStarted(int id) => Started.Exists(e => e.EntityId == id);
 
-    public void PlaySpatialSound(SpatialEmitter e) { Started.Add(e); Latest[e.EntityId] = e; Live.Add(e.EntityId); }
+    public void PlaySpatialSound(SpatialEmitter e) { Started.Add(e); StartedKinds.Add(KindOf?.Invoke(e.EntityId)); Latest[e.EntityId] = e; Live.Add(e.EntityId); }
     public void UpdateSpatialAttributes(SpatialEmitter e)
     {
         Latest[e.EntityId] = e;
