@@ -2,6 +2,36 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-11
+
+- What Cody heard in Marlow Tower on 2026-10-10, traced and fixed, unheard (docs/GEOMETRY.md 12.6, "Marlow
+  Tower's leaks"). Three causes, none of them the rooms' floods:
+  - **The train "clear as day" in the floor 3 corridor** was its horn, playing at 74 dB at the ear with nothing
+    taken off it (his log: -5/-5/-10 dBFS low/mid/high, "blocked 95 %"). A train's voices kept the walls of
+    wherever each voice started: their ids are no entity's, so the path pass skipped them, and a re-submission
+    leaves a voice's tone alone. The horn began on the answer the last horn left, minutes earlier and from
+    somewhere else. A train's voices are handed their path every frame now, and a vehicle's answer asked from
+    another place (the source over a second's travel away, or the ear over 3 m) is not used: the hand-rolled
+    path stands in until the worker answers. Since 2026-10-07 (c719c374, a train as a handful of voices).
+  - **The rain "leaking in like it was coming through the wall"** on the stairs: a rain patch behind something
+    took the path to its middle, and a quarter that falls on the street below a building and on its roof has
+    its middle inside the building: in the stairwell, in the same air as the ear (-14 dB flat behind 35 cm of
+    brick). A patch behind something is heard by the path to each thing it falls on now, one path a frame. And
+    the hand-rolled path's five rays round a source put one through any floor the source sat on: 0.3 m over a
+    slab, a point 0.8 m off was in the room below, one ray in five clear, -14 dB at every band. Each point
+    round a source stays in its own air now (a footstep in the flat above: -14 dB flat before, the slab's
+    -38/-54/-81 after). Heavy rain on Cody's spot on the stairs: 26 dB to -9 dB; the floor 7 corridor 26 to
+    -14 dB.
+  - **The siren "popping through quietly"**: through the front entrance and up the stairwell to an open doorway
+    on every storey. Each storey's corridor has a fire door onto its stair now (steel, push bar from the
+    corridor, its closer shuts it), as an exit stair has; with the stairwell's storeys one space since the
+    floods, a siren on Main Street reached floor 3's corridor at -56 dB mid (-71 before step 2), and through
+    the shut door it is under -100. 37 doors, in the doorways' place, so no id moves; city.json regenerated. The
+    short pops themselves (a car's mid band up 20 to 30 dB for a quarter second) are older and still there:
+    the simulator's own transmission jumps for a moving source, not the routes (open in todo).
+
+  The wire hash is unchanged (nothing in Common or the library moved); the map changed, so restart the server.
+
 ## 2026-10-10
 
 - Rooms flood from their points, unheard (docs/GEOMETRY.md 12.6, "The flood from a point"). No box and no margin:

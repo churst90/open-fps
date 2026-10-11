@@ -163,6 +163,10 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
+- Marlow Tower's leaks (docs/GEOMETRY.md 12.6, "Marlow Tower's leaks"; spots in docs/LISTENING_SPOTS.md): a
+  train's horn from floor 3's corridor (`/tp -19.95 -101.5 9.29`) no clearer than the rest of the train; rain
+  on the stairs (`/tp -10.8 -104.2 9.28`) and under the roof (`/tp -19.95 -100 21.29`) faint, not through the
+  walls; the fire door from each corridor onto its stair (push bar, swings into the stair, closes itself).
 - The world (`/join world magnolia`, `/join world address 401 Market St, Tomball, TX`): the loading
   screen ("Building the world: 12 of 41 tiles."), the ground's land cover, the roads, woods, buildings
   and driveways outside the places, no crack where far ground meets near ground, and logging out and
@@ -309,7 +313,10 @@ and the server's voice line.
 - Pops on the Main Street pavement and in Selby House and Marlow Tower; is the city too busy with cars
   heard over the roofs (Cody)? `--pop-hunt` still finds a car's straight line through one wall as it
   passes a gap (-80 to -62 dB for 200-400 ms), and up to 19 dB between over the wall and over the roof
-  under the covered hall west of Main Street.
+  under the covered hall west of Main Street. Marlow Tower's stairwell, floor 1 (2026-10-11, `--pop-hunt
+  ear=-11.05,4.9,-100.84`): 3 to 6 a minute, the same before the floods' step 2; each a moving car on Dock Street
+  near x -23 whose simulated transmission jumps from -80/-100 to -35/-52/-80 dB. No still source there gives it
+  (`--path-probe`), and 32 transmission surfaces instead of 8 changed nothing. To try next: the source pool's lending.
 - The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost
   25 MB and twice the convolution (Cody).
 - Below 120 Hz the tail of a room you are not in is identical in both ears.
