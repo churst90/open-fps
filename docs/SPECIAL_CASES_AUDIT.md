@@ -165,7 +165,7 @@ that changes a stream regenerates it in the same commit and says which voices ch
 The stored scenarios today are walk, drive and traffic_rain (`EmitterStreamReplayTests.cs:276-281`): cars,
 their echoes and intakes, a one-off horn, the cabin, and rain. Nothing in them exercises sirens, held
 horns, borrowed cars, trains, spread sources, woods, talkers, birds, beacons or driving aids, or entity
-ids high enough to collide. That is why P0 comes first.
+ids high enough to collide. That is why P0 comes first. (P0 added five scenarios that do; see "P0 as built".)
 
 #### P0. Widen the guards (1 session)
 
@@ -188,6 +188,41 @@ ids high enough to collide. That is why P0 comes first.
   overlaps listed.
 - **Also.** The new streams are the evidence for S1, S2, S3 and S11: an agent can read them before any fix
   (a `-700000` voice's aperture, a `-20000000` wood with no `Path` line, the rumble's frozen pitch).
+
+**P0 as built (2026-10-11).** Tests only, no game code. Recorded at `22423a5b` from the code as it was, so
+the streams hold today's bugs; each scenario's summary in `EmitterStreamReplayTests.cs` names the lines.
+Each runs 120 frames (2 s), the shortest that shows its behaviour. The old three streams came out
+byte-identical. The five add 260 KB gzipped (the old three are 441 KB). Read a stream with
+`OPENFPS_REPLAY_DUMP=<dir>`; "frame" below is a line's first number.
+
+| Scenario | KB | What | What its lines show today | Expected to change in |
+|---|---:|---|---|---|
+| `sirens_and_far_traffic` | 40 | Listener in front of a brick building; patrol car 501 (`police_interceptor`, siren switched on, wail) driving behind it at 15 m/s; seven `v8_muscle` cars (502 to 508) with the engine budget shed to 2 (the `_adaptiveBudget` a mixer at its ceiling leaves), so all seven borrow; parked car 509 whose driver holds the horn from frame 20 to 60. | S3: `-700502` to `-700508` are played and re-placed with `Occlusion=0`, `EffectiveDistance=0`, `TargetRegionId=-1`, and `ApertureFactor=1` and `TransmissionBleed=1` (the emitter's defaults, not 0), while their `Path` lines say otherwise: `-700504`, behind the building, `Occlusion=0.95 TransmissionBleed=0.00393809 EffectiveDistance=47.84478 EqMid=0.0009898634` (frame 2). S2: `-2100509` has the exhaust's apparent position in its `Path` lines, `(6,0.8,7.77)`, and the grille's in its `Place` lines, `(6,1.1,11.2)`; at frame 110 it is stopped, then handed a `Path` and a whole `Place`. S1: `-800501` and `-800509` have `Place` lines and no `Path`. | P3a: the `-700xxx` `Place` lines carry the path's occlusion, bleed, distance and region; `-800xxx` gain the path; the `-2100509` and `-900501` `Path` lines fold into `Place`, with one apparent position. P3d: no `Path`/`Place` after the `Stop`. P4: which cars are live. P1's S5 change does not touch it (the siren is on throughout). |
+| `train_behind_wall` | 54 | Listener in front of a brick building; a two-car `light_rail` set (sources 601 up) at 12 m/s behind it, signalling for a crossing at frame 20. | The train's six voices (`-2300000` to `-2300005`) each get a `Path` line (the 2026-10-10 fix) and a `Place` line every frame; the source entities 603 to 612 get `Path` lines and no voice (asked for through `_trainPathIds`). | P3a: the train voices' `Path` lines fold into `Place`; the source entities' `Path` lines go. P7: the notch (`PowerLever`) from the server. |
+| `places_and_woods` | 50 | Walking north out of a 6 m roofed brick room through its doorway; outside, `foliage:park_tree` 701, `water:park_fountain/elm_park/0` 702 and `machine:ac_condenser` 703; nine `foliage:pine` 170 to 200 m off, made into four woods by `RefreshWoods`. | S1: the woods (`-20000000`, `-20000001`, `-20000003`; `-20000004` starts and stops at once) and their places (`-245000001` down) have `Play` and `Place` lines and never a `Path`; their band gains stay as they started, indoors. The tree's places (`-5008413` to `-5008418`) and the tap's (`-5008425` to `-5008427`) get `Path` lines from the spread branch. | P3b: the woods and their places gain path-carrying `Place` lines. P4: the place budget's order. |
+| `talker_and_aids` | 55 | Riding car 801 (`i4_economy`, driven) north up a 6 m two-way asphalt carriageway with one side's wheels over the centre line, 4 to 6 m/s; somebody on voice chat (802, packets through `ReceiveVoice`) walks out from behind a garden wall ahead on the right. | S11: the centre rumble `-964003` is re-placed twice a frame: the game thread's line with the pitch the speed asks for, then VoiceManager's held emitter putting `Pitch=0.41666666` and its first position back (frame 120: `Pitch=0.62326664`, then `Pitch=0.41666666`). The talker `-1400802` carries its own path (occlusion 0.79 at frame 2, 0.20 at 29, 0 at 61) and has no `Path` line; one wall copy, `-1700000`. | P3b: one `Place` a frame for `-964003`, its pitch following the speed. P6: the talker asked under a probe id (the replay has no Steam Audio, so its values may not move). |
+| `high_ids` | 60 | Riding car 32,598 (all of Magnolia) across a 30 m concrete-walled yard whose asphalt is a junction to the aids, so the guide beeps; a recorded loudspeaker 18,024 (Albany's join); parked patrol car 61,001 with its siren on. | S6: the loudspeaker's copies are `-120120` and `-120121`, in the transients' band. The siren's voice is `-961001`, the guide beep's second id: at frame 38 `Play -961001 ... SoundId="SYNTH/drive_guide"`, and from then on the one voice is re-placed every frame as the siren and as the beep in turn. | P3c: ids from the allocator; the copies leave the transient band and the siren and the beep become two voices (the stream equal to today's under the id map, except those lines). |
+
+- **The band test.** `OpenFPS.Tests/VoiceIdBandTests.cs` (its own file; `VoiceBudgetTests`' three-band check
+  stays as it is). It reads every band in the appendix from the code's own constants and formulas (the
+  private ones by reflection), except the source probes, which are questions to the worker and never a
+  voice. Entity ids are checked to 250,000, past the last overlap S6 names; counters never reused are
+  checked unbounded. `NoTwoVoiceIdBandsShareAnId` is the must-pass, skipped as the known failure with S6's
+  id, the codebase's pattern for a known failure; `TheVoiceIdBandsOverlapWhereS6Says` runs and holds
+  today's 47 overlaps exactly, each with the entity id or count it starts from, so a part that moves a band
+  is told. Among them: reflection copies into the transients from entity id 14,000; sirens onto the
+  driving aids, beacons and birds from 61,000, 67,000 and 70,000; engine echoes into the borrowed band
+  after 100,002; trains into rain after 16,667 admissions. P3 updates the list as it moves bands, and
+  P3c empties it and un-skips the must-pass.
+- **S3 is narrower than written.** The emitter's constructor sets `ApertureFactor` and `TransmissionBleed`
+  to 1, so a borrowed voice's aperture is 1, not 0, and the 400 Hz diffraction low-pass does not happen.
+  What the stream does show is occlusion 0, bleed 1, effective distance 0 and the global region on every
+  re-placement, against a path that says 0.95, 0.004 and 47.8 m; the band gains come from the path pass.
+- **The replay's vehicles face backwards.** `Replay.Facing` makes -Z forward; the server's vehicles face +Z
+  (`VehicleSystem.Parking.cs:323`, `CreateFromYawPitchRoll(atan2(x, z))`). So in every stream a moving car's
+  grille, siren and horn are at its tail and its exhaust at its nose. It hides none of the findings above.
+  Fixing it changes walk, drive and traffic_rain too, so it is a commit of its own with the streams
+  regenerated.
 
 #### P1. The pops: the source pool (1 session)
 

@@ -18,7 +18,9 @@ namespace OpenFPS.Tests;
 
 /// <summary>
 /// The emitter-stream replay (docs/SOUND_LIBRARY_BOUNDARY.md, stage 0). A whole ClientAudioSystem is driven
-/// through scripted worlds (a walk past cars and walls, a drive with a horn, traffic in the rain) and every
+/// through scripted worlds (a walk past cars and walls, a drive with a horn, traffic in the rain, and five
+/// more from part P0 of docs/SPECIAL_CASES_AUDIT.md: sirens and borrowed cars, a train, spread places and
+/// woods, a talker and the driving aids, ids at the real-place maps' scale) and every
 /// call it makes on the mixer is written down and compared with the stream stored in
 /// OpenFPS.Tests/LibraryBoundary/streams: a refactor that changes nothing changes no line of it.
 ///
@@ -278,6 +280,13 @@ internal sealed class Replay
         ["walk"] = Walk,
         ["drive"] = Drive,
         ["traffic_rain"] = TrafficInRain,
+        // The five P0 added (docs/SPECIAL_CASES_AUDIT.md, P0): recorded from the code as it was, bugs
+        // included. Each says which of the audit's findings its lines show.
+        ["sirens_and_far_traffic"] = SirensAndFarTraffic,
+        ["train_behind_wall"] = TrainBehindWall,
+        ["places_and_woods"] = PlacesAndWoods,
+        ["talker_and_aids"] = TalkerAndAids,
+        ["high_ids"] = HighIds,
     };
 
     public static List<string> Run(string scenario) => RunScript(Scenarios[scenario]).Mixer.Lines;
@@ -294,8 +303,14 @@ internal sealed class Replay
                      AudioPhysics.CurrentAirCelsius, MixerQuality.MixerRate,
                      OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
                      OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-                     OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead);
+                     OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead,
+                     (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
+                      DrivingCues.BrakeCue, DrivingCues.SpeedWarning));
         Loudness.DynamicRangeCompression = Loudness.DefaultCompression;
+        (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
+         DrivingCues.BrakeCue, DrivingCues.SpeedWarning) = (true, true, true, true, true, true);
+        // Voice chat streams are a static the replay's talker scenario fills; none from another test.
+        OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
         OpenFPS.Common.Hearing.EarModel.Enabled = true;
         OpenFPS.Common.Hearing.EarModel.ListeningLevelDb = OpenFPS.Common.Hearing.EarModel.DefaultListeningLevelDb;
         AudioPhysics.CurrentSpeedOfSound = AudioPhysics.SpeedOfSound;
@@ -319,7 +334,10 @@ internal sealed class Replay
              AudioPhysics.CurrentAirCelsius, MixerQuality.MixerRate,
              OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
              OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-             OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead) = saved;
+             OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead,
+             (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
+              DrivingCues.BrakeCue, DrivingCues.SpeedWarning)) = saved;
+            OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
         }
     }
 
@@ -369,12 +387,13 @@ internal sealed class Replay
         Move(id, at, velocity);
     }
 
-    internal void Move(int id, Vector3 at, Vector3 velocity)
+    internal void Move(int id, Vector3 at, Vector3 velocity, byte signals = 0)
         => World.SyncState(new[] { new EntityState
         {
             EntityId = id,
             Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = Facing(velocity) }),
             LinearVelocity = velocity,
+            Signals = signals,
         } });
 
     /// <summary>One source of a train as the server places it (RailSystem): an NPC entity whose SoundId
@@ -410,6 +429,62 @@ internal sealed class Replay
         Player.Yaw = yawDegrees;
         Player.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, -yawDegrees * MathF.PI / 180f);
     }
+
+    /// <summary>A carriageway as the map builds one: an asphalt box, named as a road is.</summary>
+    private void Road(int id, Vector3 centre, Vector3 size, string? name)
+    {
+        var def = new EntityDefinition
+        {
+            EntityId = id,
+            Type = EntityType.StaticObject,
+            Transform = new Transform { Position = centre, Rotation = Quaternion.Identity, Scale = Vector3.One },
+            Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = size, IsSolid = true },
+            Material = new MaterialComponent { Material = "Asphalt" },
+        };
+        if (name != null) def.Identity.Name = name;
+        World.RegisterDefinition(def);
+    }
+
+    /// <summary>A sound that stands where it is: a tree, a fountain's tap, a machine, a loudspeaker.</summary>
+    private void Fixture(int id, string soundId, bool synth, Vector3 at, float range, float minDistance)
+    {
+        var def = new EntityDefinition
+        {
+            EntityId = id,
+            Type = EntityType.StaticObject,
+            Transform = new Transform { Position = at, Rotation = Quaternion.Identity, Scale = Vector3.One },
+        };
+        def.SoundEmitter = new SoundEmitterComponent
+        {
+            IsSynth = synth, SoundId = soundId, Mode = PlaybackMode.LoopOne, Volume = 1f, Range = range, MinDistance = minDistance,
+        };
+        World.RegisterDefinition(def);
+    }
+
+    /// <summary>Somebody else on the server, standing or walking.</summary>
+    private void Person(int id, Vector3 feet)
+    {
+        World.RegisterDefinition(new EntityDefinition
+        {
+            EntityId = id,
+            Type = EntityType.Player,
+            Moves = true,
+            Transform = new Transform { Position = feet, Rotation = Quaternion.Identity, Scale = Vector3.One },
+        });
+        Move(id, feet, Vector3.Zero);
+    }
+
+    /// <summary>
+    /// The engine budget as a mixer at its ceiling leaves it (ChooseLiveEngines sheds to two): the budget
+    /// is 32, and a scenario of 33 cars would be a stream many times the size for the same behaviour. The
+    /// replay's mixer reports no load, so nothing gives it back.
+    /// </summary>
+    private void ShedEnginesTo(int engines)
+        => typeof(ClientAudioSystem).GetField("_adaptiveBudget", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(Audio, engines);
+
+    /// <summary>A driver's switches as the wire carries them (EntityState.Signals).</summary>
+    private static byte Driven(bool horn = false, OpenFPS.Common.SirenMode siren = OpenFPS.Common.SirenMode.Off)
+        => OpenFPS.Common.VehicleSignalBits.Encode(true, horn, siren != OpenFPS.Common.SirenMode.Off, siren);
 
     // ── The scenarios ───────────────────────────────────────────────────────────────────────────
 
@@ -490,6 +565,211 @@ internal sealed class Replay
                 cars[i].At += cars[i].V * (float)Dt;
             }
             r.Tick();
+        }
+    }
+
+    // ── P0's scenarios (docs/SPECIAL_CASES_AUDIT.md) ──────────────────────────────────────────────
+    //
+    // Recorded from the code as it stood at 22423a5b: they guard the behaviour as it is, the audit's bugs
+    // with it. Where a scenario's lines show a finding, its summary says which voice ids and fields, so
+    // the part that fixes it knows which lines it should change and which it should not.
+
+    /// <summary>
+    /// Two seconds standing in front of a building with a road behind it: a patrol car with its siren on
+    /// passing behind the building, seven cars more than the engine budget (shed to two, as a mixer at
+    /// its ceiling leaves it) so they borrow, and a parked car whose driver holds the horn.
+    ///
+    /// S3: each borrowed voice (-700502 to -700508) is played and re-placed with Occlusion 0,
+    /// EffectiveDistance 0, the global region and ApertureFactor and TransmissionBleed at 1 (the emitter's
+    /// defaults), whatever its Path lines say: -700504, behind the building, has Path Occlusion 0.95, bleed
+    /// 0.004 and 47.8 m. Its band gains come from the Path lines, which the Place lines do not carry.
+    /// S2: the held horn (-2100509) has two apparent positions, the exhaust's in its Path lines and the
+    /// grille's in its Place lines; at frame 110 it is stopped and then handed a Path and a Place. S1: the
+    /// front outlets (-800501, -800509) have Place lines and no Path.
+    /// </summary>
+    private static void SirensAndFarTraffic(Replay r)
+    {
+        r.Wall(9501, new Vector3(0f, 4f, -6f), new Vector3(40f, 8f, 0.3f), "Brick");
+        r.ShedEnginesTo(2);
+        var patrolAt = new Vector3(-30f, 0.5f, -14f);
+        var patrolV = new Vector3(15f, 0f, 0f);
+        r.Car(501, "police_interceptor", patrolAt, patrolV);
+        var hornAt = new Vector3(6f, 0.5f, 9f);
+        r.Car(509, "v8_muscle", hornAt, Vector3.Zero);
+        var cars = new (int Id, Vector3 At, Vector3 V)[]
+        {
+            (502, new Vector3(-30f, 0.5f, 70f), new Vector3(11f, 0f, 0f)),     // in the open, north
+            (503, new Vector3(40f, 0.5f, 85f), new Vector3(-12f, 0f, 0f)),
+            (504, new Vector3(-20f, 0.5f, -40f), new Vector3(10f, 0f, 0f)),    // behind the building
+            (505, new Vector3(25f, 0.5f, -60f), new Vector3(-11f, 0f, 0f)),
+            (506, new Vector3(150f, 0.5f, 10f), new Vector3(0f, 0f, 12f)),     // far down the street
+            (507, new Vector3(-160f, 0.5f, -5f), new Vector3(0f, 0f, -10f)),
+            (508, new Vector3(90f, 0.5f, 120f), new Vector3(0f, 0f, -9f)),
+        };
+        foreach (var c in cars) r.Car(c.Id, "v8_muscle", c.At, c.V);
+        var feet = new Vector3(0f, 0f, 4f);
+        for (int f = 0; f < 120; f++)
+        {
+            r.Listener(feet, Vector3.Zero, 180f);
+            r.Move(501, patrolAt, patrolV, Driven(siren: OpenFPS.Common.SirenMode.Wail));
+            r.Move(509, hornAt, Vector3.Zero, Driven(horn: f >= 20 && f < 60));
+            for (int i = 0; i < cars.Length; i++)
+            {
+                r.Move(cars[i].Id, cars[i].At, cars[i].V);
+                cars[i].At += cars[i].V * (float)Dt;
+            }
+            r.Tick();
+            patrolAt += patrolV * (float)Dt;
+        }
+    }
+
+    /// <summary>
+    /// Two seconds standing in front of a building while a two-car light rail set passes behind it,
+    /// sounding for a crossing. Its sources are entities (601 up); its voices are the train's own band
+    /// (-2300000 down), placed by PlaceTrainVoice with the path of the source they stand for.
+    /// </summary>
+    private static void TrainBehindWall(Replay r)
+    {
+        r.Wall(9601, new Vector3(0f, 5f, -8f), new Vector3(60f, 10f, 0.3f), "Brick");
+        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"));
+        const string train = "light_rail/t1";
+        const float speed = 12f;
+        float head = -10f;
+        (Vector3 At, Vector3 V) Source(int i) => (new Vector3(head - layout[i].AlongMetres, layout[i].HeightMetres, -25f), new Vector3(speed, 0f, 0f));
+        for (int i = 0; i < layout.Count; i++)
+        {
+            var (at, v) = Source(i);
+            r.RailSource(601 + i, $"rail:{train}/{i}", layout[i].LevelDb, at, v);
+        }
+        var feet = new Vector3(0f, 0f, 0f);
+        for (int f = 0; f < 120; f++)
+        {
+            for (int i = 0; i < layout.Count; i++)
+            {
+                var (at, v) = Source(i);
+                r.Move(601 + i, at, v);
+            }
+            if (f == 20) r.Audio.WorldAudio.TrainSignalReceived!(train, new[] { 2f, 1f, 2f, 1f, 1f, 1f, 3f }, 6f);
+            r.Listener(feet, Vector3.Zero, 180f);
+            r.Tick();
+            head += speed * (float)Dt;
+        }
+    }
+
+    /// <summary>
+    /// Two seconds walking out of a small roofed room through its doorway: outside, a tree near the door
+    /// (spread over its places), a fountain's tap, an air conditioner on the wall, and nine pines 170 to
+    /// 200 m off, heard as woods (WoodChorus: four of them, the pines falling in four 200 m squares).
+    ///
+    /// S1: the woods (-20000000 down) and their places (-245000001 down) have Play and Place lines and no
+    /// Path line: the path pass skips every id under -5000, so their band gains are what they started with
+    /// indoors, unchanged as you step outside. The tree's and the tap's places (-5008413 down, -5008425
+    /// down) get Path lines from the path pass's branch for spread sources.
+    /// </summary>
+    private static void PlacesAndWoods(Replay r)
+    {
+        // A 6 m room, its doorway in the north wall, a slab over it.
+        r.Wall(9701, new Vector3(0f, 1.5f, -3f), new Vector3(6.5f, 3f, 0.25f), "Brick");
+        r.Wall(9702, new Vector3(3f, 1.5f, 0f), new Vector3(0.25f, 3f, 6.5f), "Brick");
+        r.Wall(9703, new Vector3(-3f, 1.5f, 0f), new Vector3(0.25f, 3f, 6.5f), "Brick");
+        r.Wall(9704, new Vector3(-1.925f, 1.5f, 3f), new Vector3(2.65f, 3f, 0.25f), "Brick");
+        r.Wall(9705, new Vector3(1.925f, 1.5f, 3f), new Vector3(2.65f, 3f, 0.25f), "Brick");
+        r.Wall(9706, new Vector3(0f, 2.6f, 3f), new Vector3(1.2f, 0.8f, 0.25f), "Brick");
+        r.Wall(9707, new Vector3(0f, 3.1f, 0f), new Vector3(6.5f, 0.2f, 6.5f), "Concrete");
+        r.Fixture(701, "foliage:park_tree", true, new Vector3(3f, 0f, 7f), 90f, 1f);
+        r.Fixture(702, "water:park_fountain/elm_park/0", true, new Vector3(-3f, 0.4f, 6.5f), 120f, 1f);
+        r.Fixture(703, "machine:ac_condenser", true, new Vector3(4.5f, 0.5f, 4f), 120f, 1f);
+        for (int i = 0; i < 9; i++)
+            r.Fixture(710 + i, "foliage:pine", true, new Vector3(-15f + 15f * (i % 3), 0f, 170f + 15f * (i / 3)), 90f, 1f);
+        r.World.RefreshWoods();
+        var feet = new Vector3(0f, 0f, 1.5f);
+        var walking = new Vector3(0f, 0f, 1.4f);
+        for (int f = 0; f < 120; f++)
+        {
+            r.Listener(feet, walking, 0f);
+            r.Tick();
+            feet += walking * (float)Dt;
+        }
+    }
+
+    /// <summary>
+    /// Two seconds driving north up a two-lane street with one side's wheels over the centre line,
+    /// speeding up from 4 to 6 m/s, while somebody on voice chat walks out from behind a garden wall ahead
+    /// on the right. The driving aids are on.
+    ///
+    /// S11: the centre rumble (-964003) is submitted to VoiceManager once and then re-placed from the game
+    /// thread each frame with the pitch the speed asks for; VoiceManager then re-applies the emitter it
+    /// holds, so a later Place line in the same frame puts Pitch and Position back to their first values. The talker (-1400704) carries its own path (CarriesPath) and gets no Path line.
+    /// </summary>
+    private static void TalkerAndAids(Replay r)
+    {
+        r.Road(9801, new Vector3(0f, -0.05f, 40f), new Vector3(6f, 0.1f, 120f), "Test Street carriageway");
+        r.Wall(9802, new Vector3(8f, 1.5f, 28f), new Vector3(6f, 3f, 0.3f), "Brick");
+        var at = new Vector3(0.5f, 0.15f, 0f);
+        float speed = 4f;
+        r.Car(801, "i4_economy", at, new Vector3(0f, 0f, speed));
+        r.Player.RidingEntityId = 801;
+        r.Player.RidingControls = true;
+        const int talker = 802;
+        var mouth = new Vector3(6f, 0f, 31f);
+        var walking = new Vector3(-1.4f, 0f, 0f);
+        r.Person(talker, mouth);
+        var encoder = new OpenFPS.Client.Core.Platform.VoiceFrameEncoder();
+        ushort sequence = 1;
+        var block = new float[(int)(OpenFPS.Client.Core.Platform.VoiceCodec.Rate / ClientAudioSystem.UpdateHz)];
+        long sample = 0;
+        for (int f = 0; f < 120; f++)
+        {
+            var v = new Vector3(0f, 0f, speed);
+            r.Listener(at, v, 0f);
+            r.Move(801, at, v);
+            r.Move(talker, mouth, walking);
+            // A steady voice, a frame's worth of samples each frame, each packet in as the network hands it
+            // over (a stream is made by its first packet: one made before it is let go as long silent).
+            for (int i = 0; i < block.Length; i++, sample++)
+                block[i] = 0.3f * MathF.Sin(2f * MathF.PI * 180f * sample / OpenFPS.Client.Core.Platform.VoiceCodec.Rate);
+            encoder.Push(block, p => r.Audio.ReceiveVoice(talker, sequence++, p));
+            r.Tick();
+            at += v * (float)Dt;
+            mouth += walking * (float)Dt;
+            speed += 1f * (float)Dt;
+        }
+    }
+
+    /// <summary>
+    /// Two seconds driving across a walled yard (its asphalt a junction to the driving aids, so the guide
+    /// beeps) with ids at the scale of the real-place maps: the car you drive is 32,598 (all of Magnolia),
+    /// a loudspeaker playing a recording is 18,024 (Albany's join), and a parked patrol car with its siren
+    /// on is 61,001.
+    ///
+    /// S6: the loudspeaker's reflection copies are -30000 - 18024·5 - slot (-120120, -120121), inside the
+    /// transients' band (-100000 to -499999). The siren's voice is -900000 - 61001 = -961001, the second of
+    /// the guide beep's six ids: at frame 38 the beep is a Play of "SYNTH/drive_guide" on the siren's id, and
+    /// from then on that voice is re-placed every frame as the siren and as the beep in turn.
+    /// </summary>
+    private static void HighIds(Replay r)
+    {
+        r.Road(9901, new Vector3(0f, -0.25f, 0f), new Vector3(60f, 0.5f, 60f), null);
+        r.Wall(9902, new Vector3(15.25f, 3f, 0f), new Vector3(0.5f, 6f, 31f), "Concrete");
+        r.Wall(9903, new Vector3(-15.25f, 3f, 0f), new Vector3(0.5f, 6f, 31f), "Concrete");
+        r.Wall(9904, new Vector3(0f, 3f, 15.25f), new Vector3(31f, 6f, 0.5f), "Concrete");
+        r.Wall(9905, new Vector3(0f, 3f, -15.25f), new Vector3(31f, 6f, 0.5f), "Concrete");
+        const int mine = 32_598, speaker = 18_024, patrol = 61_001;
+        r.Fixture(speaker, "ANNOUNCE/st_louis_welcome", false, new Vector3(3f, 2f, 4f), 400f, 12f);
+        var patrolAt = new Vector3(8f, 0.5f, 8f);
+        r.Car(patrol, "police_interceptor", patrolAt, Vector3.Zero);
+        var at = new Vector3(-10f, 0.15f, -10f);
+        var east = new Vector3(3f, 0f, 0f);
+        r.Car(mine, "i4_economy", at, east);
+        r.Player.RidingEntityId = mine;
+        r.Player.RidingControls = true;
+        for (int f = 0; f < 120; f++)
+        {
+            r.Listener(at, east, 90f);
+            r.Move(mine, at, east);
+            r.Move(patrol, patrolAt, Vector3.Zero, Driven(siren: OpenFPS.Common.SirenMode.Wail));
+            r.Tick();
+            at += east * (float)Dt;
         }
     }
 }
