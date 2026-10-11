@@ -4,6 +4,25 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- Every other voice has one path too, from one writer (part P3b of docs/SPECIAL_CASES_AUDIT.md), unheard. The
+  standing machines, trees, fountains, bells, woods and recordings carry their path in their own emitter, as the
+  vehicles' voices do since P3a; so do a tree's or a fire's places and an engine's echoes. Talkers, your own
+  voice, the copies off the walls, footsteps, rain, birds, beacons, the driving aids and every one-off sound are
+  entries in the voice registry too, each with what it is and how it is heard. What changes:
+  - A wood heard as one (the far trees) takes its path from the acoustic worker. It was never asked about and
+    kept the stand-in it started on, wherever you walked.
+  - An engine's echo is placed at the length of the way it came, with its air from its first moment.
+  - Somebody else's landing is heard behind what is between you, as their footsteps are. It used to take a path
+    only after the worker's next answer; your own steps and landings no longer ask about one.
+  - A blocked engine, aeroplane or far car is heard from the edge its sound comes round, as its horn and siren
+    are, and from the car itself when the way is clear (Cody: "yes"). Turning between the two goes round your
+    head, not through it.
+  - Somebody on voice chat is asked about under a question of their own, with their own body out of the way, not
+    under their player's id. The hand-rolled path leaves out your own body by your id, not the first person within
+    2 m of your ears.
+  The emitter streams changed only for the woods and the engine echoes, voice by voice in the audit's "P3b as
+  built". The bus's own shadow law stays until geometry stage 6 puts vehicles in the acoustic scene (Cody).
+
 - The voices of moving things have one path each, from one pass (part P3a of docs/SPECIAL_CASES_AUDIT.md),
   unheard. Cody asked "shouldn't all mobile sound sources like vehicles, trains, sirens, etc use the same path
   so there's consistency?" after a train horn played through a brick wall. Every engine, intake, borrowed far

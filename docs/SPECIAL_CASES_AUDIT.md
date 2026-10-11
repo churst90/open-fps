@@ -27,10 +27,11 @@ Where the parts stand (2026-10-11):
 | P5, names and materials to properties | under way |
 | P8, laws in one place | under way |
 | The barrier model (a way round one thing that passes through another), found by P1 | under way, a part of its own (todo.md, "Acoustics") |
-| P3a, the registry for moving things | done 2026-10-11 ("P3a as built"), unheard: intakes and borrowed cars take their path, one writer per voice, the rumble follows the speed (S11); S21 left for a decision |
-| P3b to P3d, the rest of the registry | next |
+| P3a, the registry for moving things | done 2026-10-11 ("P3a as built"), unheard: intakes and borrowed cars take their path, one writer per voice, the rumble follows the speed (S11). S21 closed as deferred the same day (Cody): the bus keeps its own law until geometry stage 6 |
+| P3b, every other voice | done 2026-10-11 ("P3b as built"), unheard: every voice an entry, one writer each; woods take their path, engine echoes carry theirs; P6 for talkers and S23. Blocked engines heard round the edge (Cody, the same day) |
+| P3c, seeds then ids; P3d, one start and declared levels | next, in that order |
 | P4, one ranking | after P3 |
-| P6, one path model for every asker | after P4, or inside P3b |
+| P6, one path model for every asker | talkers and S23 done in P3b; birds, beacons and rain planned there ("P3b as built") |
 | P7, machine state from the server | last; a wire change, shipped with a server deploy |
 
 That is the order agreed with Cody on 2026-10-11 (todo.md, "Next, in order", item 2). It puts sound library
@@ -119,7 +120,7 @@ worlds would share, a number tuned to one map. Ranked the same way.
 |---|---|---|---|---|---|
 | S19 | `ChooseLiveMachines` CAS:1443-1449 against the emitter CAS:2900-2902; `docs/THE_CITY.md:252` | The machine ranking leaves out the headroom gain the emitter applies and reads the timbre by `SoundId` where the emitter uses `VoiceKey`. The engine ranking by distance (S12) contradicts THE_CITY.md's "The budget is ranked by LEVEL, not by distance". | A source picked on one set of numbers and played at another: the reason `PhysicalLevel` was memoised for both (CAS:1043-1047). | B | P4: the ranking reads the entry's placed gain, the same number the emitter plays. |
 | S20 | Provider orders: `FmodAudioProvider.cs:749` (render-ahead, nearest first by `EffectiveDistance`), `:4160-4182` (the 4 nearest region buses), `:1512`, `:1665`, `:1761` (engine detail, late field, echo candidates by `BaseVolume × RenderedGain`, each with its own hysteresis: `:1450`, `:1529`, `VoiceManager.cs:388`) | More rankings inside the provider, each by its own law. A voice fed `EffectiveDistance` 0 (S3, engine echoes) sorts first in the render pool. | When the render pool is short, a loud far engine starves before a quiet near one. | C | P4: the same audibility, computed once per voice per tick, read by every ordering. |
-| S21 | `AudioEngine/Acoustics/VehicleShadow.cs:16`, `:22`, `:62-66` against `OpenFPS.Acoustics/Diffraction.cs:27-40` | Two diffraction laws. `VehicleShadow` has its own Maekawa (0 dB at grazing, 15 dB cap, bands 150/1000/4000 Hz, its own detour), the shared one 5 dB at grazing, a 24 dB cap, bands 200/1250/8000. | A bus and a building of the same height and detour shadow a source by different amounts. | B | P8 now (call `Diffraction`, keep the 15 dB cap as the stated reason: a gap under it and two ends); retired by geometry stage 6. |
+| S21 | `AudioEngine/Acoustics/VehicleShadow.cs:16`, `:22`, `:62-66` against `OpenFPS.Acoustics/Diffraction.cs:27-40` | Two diffraction laws. `VehicleShadow` has its own Maekawa (0 dB at grazing, 15 dB cap, bands 150/1000/4000 Hz, its own detour), the shared one 5 dB at grazing, a 24 dB cap, bands 200/1250/8000. | A bus and a building of the same height and detour shadow a source by different amounts. | B | Closed as deferred (Cody, 2026-10-11): the bus keeps its own law until geometry stage 6 puts vehicles' bodies in the acoustic scene and retires `VehicleShadow`. |
 | S22 | `OpenFPS.Sound/BulletImpact.cs:76-107`, `OpenFPS.Sound/Ricochet.cs:89-110`, `Services/SoundMappingService.cs:35-55`, `:74` against `OpenFPS.Acoustics/AcousticRegistry.cs:491-493`, `:556-566` | Second and third material tables beside the registry, restating its densities and without its aliases: "Steel", "MildSteel", "Stainless", "Aluminium" become Generic (brittle) for impacts and ricochets. `RainField.cs:323` and `RainSurfaces.cs:44`, `:216` test `IsKnown` first, so they reach Generic without the registry's warning. | The project note "registry falls back silently": unknown material is Generic, and steel is "Metal". A steel post struck by a bullet chips like plaster. | B | P5: one material table with aliases; impact and ricochet behaviour as its fields; no caller bypasses its warning. |
 | S23 | `AudioEngine/Acoustics/SpatialAcoustics.cs:31`, `:324` | "The local player" for the hand-rolled path is the first Player entity within 2 m of the listener. | Two players standing together: the wrong body is left out of the occlusion rays, so your own body can block what you hear, or theirs is ignored. | B | P6: the caller passes `OwnEntityId` (CAS already knows it, CAS:40-46). |
 | S24 | CAS:3411 (`FootstepRange = 15`), `:3527`, `:3850` (step copies 25), `:4056` (landings 20), `:787` (a copy's `Range = authored × 0.8`), `:3652` (own-voice room 30), `:3463-3464`; `RainField.cs:1083`, `:1172`; `SpatialEmitter.cs:248`, `:259` against `OpenFPS.Common/Components.cs:245`, `:254` | Ranges as literals instead of `Loudness.AudibleRange` of the declared level. Another person's steps are culled at 15 m (their audible range at 68 dB is hundreds of metres). A reflection copy takes 0.8 of the authored range, 50 by default, while its direct voice gets the audible range: copies of a loud source stop at 40 m. Two defaults for range and reference (100/3 and 50/3). The comment at CAS:3510 says a step is about 55 dB; `FootstepDb` is 68 (`OpenFPS.Sound/Loudness.cs:46`). | A loud PA's wall answer vanishing at 40 m while the PA plays on; footsteps across a quiet yard that should be heard are not. | B | P3d: every range is the audible range of the entry's level, unless a stated physical reason says otherwise. |
@@ -475,7 +476,8 @@ still there. The wire hash does not change (only `OpenFPS.Client.Core` and the t
   `SetAcousticPath` read it from its emitter (`RecordingMixer.Carried`); `SirenApparentTests` asserts the
   siren's one writer.
 - **Left, and why.**
-  - S21 not folded in. On the shared law a bus's loss starts at 5 dB at the shadow's edge (Maekawa at a path
+  - S21 not folded in (closed as deferred the same day: Cody kept the bus's own law until geometry stage 6). On
+    the shared law a bus's loss starts at 5 dB at the shadow's edge (Maekawa at a path
     difference of zero, where `VehicleShadow` starts at 0) and is read at 200, 1250 and 8000 Hz, so under
     the 15 dB cap the broadside bus of `VehicleShadowApplyTests` takes 11/15/15 dB: the mid and high bands
     both at the cap, where the test (and the law's purpose) has most off the top. The call is three lines;
@@ -483,7 +485,8 @@ still there. The wire hash does not change (only `OpenFPS.Client.Core` and the t
   - S17 not done: one cadence now, but by distance, not by movement.
   - A blocked engine is heard from its point, as before, not round the edge as its horn is. The path pass
     meant the edge, and the engine's own emitter has overwritten it since 2026-09-14 so a moving car is
-    dead-reckoned. Kept; one row of `HeardFromOf` if it should change.
+    dead-reckoned. Kept; one row of `HeardFromOf` if it should change. (Changed in P3b, Cody's decision: "P3b
+    as built".)
 - **Next.**
   - P3b: every other voice an entry with one writer: woods and their places, spread places, talkers and their
     copies, own voice, reflection copy slots, step echoes, engine echoes (`EngineReflections.ApplyPath` still
@@ -498,6 +501,118 @@ still there. The wire hash does not change (only `OpenFPS.Client.Core` and the t
     still placed after its stop at frame 110 of sirens_and_far_traffic); the entry's `Mount` and level read
     from the model, with the 116 dB, 1.9 m grille, 4.2 m rail horn and interior 0.7 m (now in `HandPath`)
     fallbacks failing loudly; ranges from the entry's level; the facade's lost stop and silent replacement.
+
+**P3b as built (2026-10-11).** Unheard. Ids keep today's formulas; `VoiceIdBandTests`' 47 overlaps are all
+still there (no band moved). The wire hash does not change (only `OpenFPS.Client.Core`, the lab and the tests).
+
+- **Kinds.** `VoiceKind` gains twenty, and `HeardFrom` three; how each is heard is `HeardFromOf`, one table:
+
+  | Heard from | Kinds | Its path |
+  |---|---|---|
+  | `Point`, its own point on the owner | `Machine` (a standing machine, a tree, a fire, a fountain's tap, a bell), `Wood` | the owner's, handed by the pass (`HandPath`) |
+  | `TowardEdge` (`SirenApparent`) | the horns, sirens and trains of P3a, and since the second commit `Engine`, `Aircraft`, `Intake`, `Borrowed` | the owner's |
+  | `Edge`, where the owner's path arrives from | `Recording` (an authored recording, a loudspeaker's render) | the owner's |
+  | `Spread`, its own point and its middle's bearing moved by its offset | `Place` (the outer places of trees, fires, taps and woods) | its middle's, carried in the copy of the middle's emitter |
+  | `Inside`, with the listener | `Cabin`, `OwnVoice` (your voice's send into your room), `OwnStep` (your steps and landings), `Aid`, `Reference` | none: its room is yours |
+  | `Own`, its own point by a path it works out there and carries | `Reflection` (a source's wall copies), `EngineEcho`, `Talker`, `TalkerCopy`, `OwnVoiceCopy`, `Footstep` (somebody else's, and their landings), `StepEcho`, `Rain`, `RainDrop`, `Bird`, `Beacon`, `Transient` | its own, in its emitter |
+
+  Only kinds heard by their owner's path have their owner asked about (`VoiceRegistry.TakesOwnersPath`): a
+  talker's player, a step's walker and a bird are not. A one-off (`DeclareEvent`: steps, landings, step echoes,
+  near drops, birds, beacons, the aids' beeps, the reference voice, the transients and their copies) is an
+  entry until its voice has stopped, after 30 frames to start (`EventStartFrames`); a voice its owner places
+  only now and then (the copies of a talker's and of your own voice between searches, a source's wall copies in
+  a frame with no answer) is kept as declared (`Keep`). `EngineReflections` and `RainField` are library files,
+  so they say what they voiced by plain ids (`Voiced`) and the host declares it; the boundary gains nothing.
+- **One writer each.**
+  - The standing machines, trees, fires, fountains and bells, the woods, and the recordings and loudspeakers:
+    their own voice through `HandPath`, its path in the emitter the budget holds (`CarriesPath`). The pass's
+    `SetAcousticPath` for them is gone; it lost to the emitter on every field both wrote.
+  - The places: the copy of the middle's emitter now carries the middle's path. The spread branch is gone.
+  - The engine echoes: the echo's path in its own emitter (`EngineReflections.CarryPath`). `ApplyPath`'s
+    `SetAcousticPath` is gone; the emitter it lost to set the distance to 0 and the bleed to 1.
+  - Footsteps and landings had a second writer nobody named: the pass asked the worker about every voice id
+    above -5000 that was not an entity at the voice's own position (`GetSoundPosition`) and handed it the
+    answer. That was your own steps (-100 band), everybody else's (-300 band) and the landings (-50). Nothing
+    asks about a voice's own id now. Somebody else's step already carried its path; their landing carried none
+    and had only that one, so it carries its path as their steps do (`CarryThePath`). Your own steps and
+    landings are with you (`Inside`): nothing asks about them.
+  - The reflection copies, talkers and their copies, your own voice and its copies, step echoes, rain, drops,
+    birds, beacons, the aids, the reference voice and the transients had one writer already (each carries its
+    path or has none); now each is an entry with its kind.
+- **Gone.** The pass's two `SetAcousticPath` calls and its spread branch; the `id < -5000` test and the
+  `GetSoundPosition` fallback (the pass asks only about things in the world, `world.Entities`);
+  `ClientWorldState.IsWood`'s range (an instance set of the woods it made, and the audio reads the snapshot's
+  `WoodChorus`); `EngineReflections.IsEchoVoice`; `MovingThingKind` (now `OwnVoiceKind`, for every entity's own
+  voice). No game code calls `SetAcousticPath` now; the provider keeps it for the lab's spikes. Every replay
+  scenario is checked: every voice written in a frame is an entry at its end, and no `Path` line is written
+  (`VoiceRegistryTests`).
+- **P6.** A talker is asked under `WorldAudioPlayer.SourceProbeId(id)`, not the player's own id (S13), with
+  their body left out of the hand-rolled tracer's rays (`AcousticRequest.LeaveOut`; the worker's own fallback had
+  traced a one-off's source under its probe id with the speaker's body in the way, and one-offs now say whose it
+  is too). S23: the hand-rolled path leaves out the body the client says is the listener's
+  (`SpatialAcoustics.ListenerBodyId`, set with `OwnEntityId`), not the first player within 2 m of the ear. In
+  `AsyncAcousticWorker` only the request's new field and the line that reads it. Not done, and why:
+  - Beacons: whether a blip sounds at all is decided on its path (`BeaconAids.Reaches`: no more than half
+    blocked unless in sight), tuned by ear (2026-10-10, the barn). On the simulator's answer which beacons are
+    heard through which walls moves; that wants Cody's ear, and is a small change after it: ask under
+    `SourceProbeId(sourceId)` each blip, decide on the answer when there is one, the tracer until then.
+  - Birds: a bird is no entity, so a probe needs an id of its own, which is P3c's allocator; and a call is
+    over before an answer comes, so only the next call from the same perch gains. Plan: a probe per perched
+    group, asked as a group wakes, its answer moved to each bird.
+  - Rain: a patch is heard by the paths to what it falls on (up to four points a slot, eight slots), one path a
+    frame. Asked of the worker that is up to 32 sources on the pool P1 sized, and traffic_rain's stream would
+    change by the simulator against the tracer. Plan: after P4, the slot's loudest point asked under a probe,
+    the rest on the tracer, measured with `--pop-hunt` for the pool.
+- **A blocked engine round the edge (second commit; Cody, 2026-10-11, "yes").** Engines, aeroplanes, intakes
+  and borrowed cars take the horns' rule: their own point while the way is clear; blocked, `SirenApparent`'s
+  point on the edge's bearing at their own distance, so a change of edge turns round the head (the provider's
+  `TurnToward`, 120 degrees a second while blocked) and never through it, the bearing flips of 2026-09-28.
+  The interior engine is still heard inside. No stream changed and none was regenerated: the replay's worker
+  answers with the hand-rolled tracer and its worlds have no opening routes, so every answer is from the source's
+  own point and `SirenApparent` hands each engine its own point as before. The rule is tested on an answer.
+- **Streams** (first commit), each voice compared by what the mixer holds at the end of each frame, old stream
+  against new (the P3a model of the provider's fields). The other calls (listener, reverb, fades, stops,
+  registrations) are line for line the same, and every `Play` count too. Changed:
+  - The engine echoes, every one in walk (`-600000` to `-600003`), drive (`-600000`, `-600001`), traffic_rain
+    (`-600000` to `-600003`), sirens_and_far_traffic (`-600000`) and high_ids (`-600000` to `-600004`): two
+    writers. Their `EffectiveDistance` is the echo's own path (12.9 to 47.1 m) where the emitter put 0, and
+    their `TransmissionBleed` 0 where the emitter's default put 1; at its first frame each starts with its air
+    (1.47 dB in the high band at 12.9 m, walk's `-600000`) where the path handed before the voice existed was
+    dropped and the air came a frame later. For a reflection in the mixer the distance and bleed are inert
+    (bleed only pulls an apparent position toward the source's, and an echo's are one point; the distance is
+    read for a one-off's overload and the order of engines and machines in the render pool).
+  - The woods and their places in places_and_woods (`-20000001` with `-245000013` to `-245000018`, `-20000002`
+    with `-245000025` to `-245000030`, `-20000004` with `-245000049` to `-245000054`): stale (S1). Never asked
+    about, they kept `FirstAnswer`'s stand-in all their lives; from frames 12 to 15 they take the worker's answer
+    (distance 176.60 to 176.41 m, high-band air 18.59 to 18.57 dB for the first). Their band gains are the same:
+    clear either way in this scene. `-20000000` is stopped at frame 3, before an answer.
+  - Everything else the same: the talker `-1400802` (one writer already; on its probe id the same answer),
+    the trees' and the tap's places, the machine, the loudspeaker and its copies, the trains, the aids.
+  - All eight are the same at 4 processors as at 12.
+- **Tests.** `VoiceRegistryTests`: every voice written in each of the eight scenarios is an entry, and none is
+  handed a `Path`; how every kind is heard and which have their owner asked; a one-off's life and `Keep`; the
+  blocked engine's rule. Tests that read an echo's path from `SetAcousticPath` read it from its emitter; the
+  step test asserts your own step is handed no path; two tests that leaned on the tracer's 2 m guess say whose
+  body the listener is.
+- **Left.**
+  - A voice fading out after its owner stopped declaring it (an engine, a machine, a place or an outlet
+    retiring) is not an entry while it fades, and the budget places one voice once more in the frame it is
+    stopped (places_and_woods, `-20000000` at frame 3: the facade's lost stop); the registry test allows the
+    second by name.
+  - The lab's spikes still hand paths to their own voices with `SetAcousticPath`.
+- **Next.**
+  - P3c: first the seed, from the entry's owner and kind (both on every entry now), equal to today's so the
+    fingerprints and streams do not move. Then, in its own commit, ids from one allocator, with the probe ids
+    beside them (birds and rain need probes of their own for P6): a pool id is free when its entry is gone,
+    which for a one-off is when its voice has stopped (`Sweep` already knows), and a retiring voice holds its id
+    until its fade ends. The woods' ids move from `ClientWorldState` into it. Streams equal under the id map;
+    the band test becomes "no two live voices share an id", on top of the test that every voice written is an
+    entry.
+  - P3d: one way to start and stop (owners still write `IsPlaying ? Update : Play`; the held horn is still
+    placed after its stop, and the budget places a stopped voice once more); the fades owned by the registry,
+    so a retiring voice stays an entry; the entry's `Mount` and level from the model, with the 116 dB, 1.9 m
+    grille, 4.2 m rail horn and interior 0.7 m fallbacks failing loudly; ranges from the entry's level (S24);
+    the remaining fallbacks of S27; the facade's lost stop and silent replacement.
 
 #### P4. One ranking (1 session)
 
@@ -627,7 +742,8 @@ still there. The wire hash does not change (only `OpenFPS.Client.Core` and the t
 - **Done 2026-10-11 (unheard), except S21.** S21 (`VehicleShadow` calls `Diffraction`) is waiting on the
   barrier model, which is changing `Diffraction`, `OpeningRoutes` and the way over the top now; until it
   lands `VehicleShadow` keeps its own Maekawa and its own 343. (The barrier model has landed; S21 now waits
-  on a decision about the cap and the grazing step: "P3a as built".) The rest:
+  on a decision about the cap and the grazing step: "P3a as built". Closed as deferred 2026-10-11, Cody: the bus
+  keeps its own law until geometry stage 6 replaces vehicle shadows with real bodies.) The rest:
   - S25: a voice FMOD pans (no HRTF voice free) takes `RenderedGain` by hand, from the source's position,
     as the binaural voices do; FMOD's own distances are set out of reach (`Rolloff.NoneMin`, 1000 km).
     Reference 1 m, range 100 m: 90 m -39.1 dB before, -47.0 after; 100 m -40.0 before, silent after;
@@ -744,7 +860,8 @@ Things that look special-cased but are physics, or the right shape already.
 
 ## 5. Appendix: every voice band
 
-As of `700cb635`. "id" is the entity id as the client sees it (`EntitySnapshot.Id`), which reaches 18,024
+As of `700cb635`; since P3b every band is a `VoiceRegistry` entry and its "Path from" is its kind's
+(`VoiceRegistry.HeardFromOf`, "P3b as built"). "id" is the entity id as the client sees it (`EntitySnapshot.Id`), which reaches 18,024
 on Albany's join and 32,598 over all of Magnolia.
 
 | Band | Constant (file:line) | Formula | Started by | Path from | Stopped by | Ranked |

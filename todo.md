@@ -42,7 +42,8 @@ since the last deploy" list below.
      Cody (Decisions, below). Its leftovers done the same day: the server's own prefix spellings read the
      table, S26's two caches are gone, S27's model fallbacks log once by id.
    - P8, laws in one place: DONE 2026-10-11, unheard, except S21 (`VehicleShadow` on the shared
-     `Diffraction`), now waiting on a decision (below, P3a): the FMOD fallback voice's distance law and Doppler, one
+     `Diffraction`), closed as deferred (Cody, 2026-10-11: the bus keeps its own law until geometry stage 6
+     replaces vehicle shadows with real bodies): the FMOD fallback voice's distance law and Doppler, one
      occlusion-floor default, one law and one reference for the speed of sound, the world's speed where a
      heard law wrote 343. Gravity, air density, brakes, rolling resistance and the two winds are physics
      stage 2's.
@@ -62,16 +63,22 @@ since the last deploy" list below.
      one answer a frame, with `VehicleShadow`, in its own emitter; no second writer. The path pass's horn,
      siren and distant branches, `VehiclePath` and the trains' writer are gone. Heard changes, by the stream
      replay: intakes take their path (S1), borrowed cars their occlusion and distance (S3), the lane rumble
-     follows the speed (S11). Left: S21, which needs a decision (the shared law starts at 5 dB at the shadow's
-     edge and reads 8 kHz, so under the 15 dB cap a bus takes as much off the mid band as the top); S17 (ask by
-     movement); whether a blocked engine should be heard round the edge as its horn is (it is heard at the car).
-   - Then P3b (every other voice an entry: woods, places, talkers, own voice, copies, echoes, rain, birds,
-     beacons, aids, transients, and the fixed machines' own voices; the `id < -5000` test goes; P6 with it),
-     P3c (seeds from the entry, then ids from one allocator) and P3d (one way to start and stop, mounts and
-     levels from the model). Then library stage 5's `AudioClock` slice (`IAudioClock`, its `WorldTime` from
-     `WindField.Now()`; docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
-   - Then P4 (one ranking), P6 (one path model for every asker), P7 (machine state from the server: a wire
-     change, shipped with a deploy).
+     follows the speed (S11). Left: S17 (ask by movement).
+   - P3b, every other voice: DONE 2026-10-11, unheard (the audit's "P3b as built"). Every voice is a registry
+     entry with its kind and how it is heard (at its point, round the edge, spread, inside, or by its own path),
+     one-offs until they stop; the standing machines, woods, places, recordings and engine echoes carry their
+     path in their own emitter. The pass's `SetAcousticPath`, its spread branch, the `id < -5000` test,
+     `IsWood`'s range and `IsEchoVoice` are gone. Streams changed for the woods (S1) and the engine echoes (two
+     writers). P6 done for talkers (a probe id, their body left out) and S23. Cody's decision the same day: a
+     blocked engine is heard round the edge as its horn is (done; no stream moves, the replay's tracer has no
+     edges). Left for P6: beacons (their wall test is tuned by ear), birds (need probe ids: P3c), rain (pool load).
+   - Then P3c (seeds from the entry, equal to today's; then ids and probe ids from one allocator, a one-off's id
+     free when its voice stops, a retiring voice's when its fade ends) and P3d (one way to start and stop, fades
+     owned by the registry, mounts and levels from the model, ranges from the level). Then library stage 5's
+     `AudioClock` slice (`IAudioClock`, its `WorldTime` from `WindField.Now()`; docs/SOUND_LIBRARY_BOUNDARY.md
+     18.3).
+   - Then P4 (one ranking), the rest of P6 (beacons, birds and rain asking the worker), P7 (machine state from
+     the server: a wire change, shipped with a deploy).
 3. The physics boundary survey: DONE 2026-10-11 (docs/PHYSICS_BOUNDARY.md). Cody asked for it the same day:
    "all parts of this game engine need to be separated in their own packages and all work cohesively
    together". The boundary of an `OpenFPS.Physics` on Geometry, 24 missing pieces ranked, stages 0 to 6 at
@@ -310,14 +317,9 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - The scope and the push mower (audit P2): should the scope call somebody pushing a push mower a person?
   Today, as before, it picks out no machine.
 - The editor and sound ids (audit P2): should the editor edit trains and woods through their sound ids?
-- A bus between you and a car (audit S21, "P3a as built"): on the buildings' barrier law a bus takes 5 dB
-  even where the line only grazes it, and under the 15 dB cap for a body with ends it takes as much off the
-  mid band as the top (11/15/15 dB broadside). The shared law with the cap (the mids darker than now), the
-  shared law with a higher cap (against the 10 to 15 dB measured for a lorry), or the bus's own law until
-  geometry stage 6 puts vehicles in the acoustic scene and retires `VehicleShadow`? Recommended: the last.
-- A car behind a building (audit P3a): its horn and siren are heard from the edge the sound comes round, its
-  engine from the car itself. Should the engine come from the edge too? Recommended: yes, once heard, since the
-  horn does it without trailing the car.
+- A beacon behind a wall (audit P6, "P3b as built"): whether a blip sounds is decided on the hand-rolled path.
+  On the simulator's answer, as every other source is heard, which beacons come through which walls would move.
+  Try it, by ear?
 - Reflections following a moving talker, and himself: he will check again.
 - Loudness law: anything over about 126 dB peak at 1 m (gunshots, glass, a thin plate) plays at full
   scale out to the 40 m clamp, so 5 m and 20 m sound the same (`Loudness.Place`). Explosions wait on it.
