@@ -73,6 +73,41 @@ at the spawn address.
   The server streams the map by tile from geometry (docs/WORLD_STREAMING.md) and reads `Layer` for
   the coarse level (docs/WORLD_STREAMING.md, Detail layers).
 
+## Every room can be walked into
+
+Added 2026-10-10 after Cody's play on Magnolia: the kitchen counter stood across the back door on Bobcat
+Lane, the front doors of houses on a slope stood half a metre over their yards, and a few rooms had no
+way in a body fits through. The generator (and the world's port of it, WorldBuildings) now keeps to these
+rules, and `RealPlaceMapTests.Every_way_in_can_be_walked_through` holds both places to them with the
+server's own teleport check and ground probe: the floor a step out from every doorway is clear on both
+sides and within a step of the threshold, nothing solid stands where a hinged leaf swings, and every room
+is reached on foot from outside, every door taken as open.
+
+- The ways through a house (its inner doors and archways, its outside doors where they will be put) are
+  worked out before anything stands in a room. The kitchen counter runs along the rest of the back wall,
+  clear of every way through (1.2 m out from the wall and a body's width past each jamb); a sofa or a bed
+  stands in the middle of its room unless a way through crosses it, and then the nearest spot that leaves
+  every way into the room walkable to every other.
+- The back door goes toward one end of the kitchen's back wall, a jamb and half a leaf from the corner,
+  wherever that leaves the wall in as many pieces (so no id moves) and the floor inside clear past both
+  jambs.
+- A door with another building, or a wing of its own, a step outside it is moved along its wall to the
+  nearest clear spot (four front doors opened into a shed).
+- Every outside door has a concrete landing, its top 2 cm under the threshold, and steps from it down to
+  the ground at 17 cm a step until the ground beyond is within 30 cm. Each piece reaches 0.65 m and more
+  into the ground, so the terrain is never graded to it as to a slab.
+- A lawn, a drive or a path that meets a building on a pad is dug down there to just under its floor, as
+  the ground round a house on a slope is: on the high side a lawn laid over the slope stood above the
+  thresholds, and the door's head was at a body's height.
+- A room that no way wide enough for a body (0.65 m) reaches from outside gets a side door in the stretch
+  of outside wall behind it facing the street most: a part of a footprint joined to the rest by a neck
+  narrower than a body, or not at all, and two garages whose door into the house was cut from a stretch of
+  partition too short for a door (that gap is walled up). An opening with no wall in it counts by how
+  much of it a body can stand in, clear of the walls round the footprint. The wall piece the door is cut
+  from keeps its id; the rest of it, the leaf and the steps are written after the openings.
+- New entities are written after everything else, so no id on the map moved; two Albany leaves too narrow
+  to walk through (0.28 and 0.54 m) became plaster under the same ids.
+
 ## Detail levels
 
 `--detail=low|medium|high` (default from place.json). `FullDetailMetres` in place.json builds

@@ -252,11 +252,17 @@ public class WorldBuildingsTests : IDisposable
         var portals = map.Entities.Where(x => x.PrefabId == "portal" && x.RegionAId != null && x.RegionBId != null)
                                   .ToLookup(x => (x.RegionAId!.Value, x.RegionBId!.Value));
         var roomsByName = map.Entities.Where(x => x.PrefabId == "acoustic_region" && x.Name != null).ToLookup(x => x.Name!);
+        var stepsByName = map.Entities.Where(x => x.Name != null && (x.Name.EndsWith(" landing") || x.Name.EndsWith(" step"))).ToLookup(x => x.Name!);
+        var byName = map.Entities.Where(x => x.Name != null).ToLookup(x => x.Name!);
+        // Every footprint gen_osm.py builds (6 m² and more), for a door with a building a step outside it.
+        var rings = buildings.Values.Select(fp => (fp.Id, Ring: fp.Lat.Select((lat, k) => Utm.FromLatLon(lat, fp.Lon[k], u.Zone, u.North))
+                                                                      .Select(q => (X: q.Easting - u.Easting, Z: q.Northing - u.Northing)).ToList()))
+                                 .Where(r => new WorldBuildings.Shape(r.Ring).Area >= 6.0).ToList();
         bool Same(EntityData w, EntityData g)
             => Vector2.Distance(new Vector2(w.Position.X, w.Position.Z), new Vector2(g.Position.X, g.Position.Z)) <= 0.01
                && Math.Abs(w.Position.Y - g.Position.Y) <= 0.01 && (Extent(w) - Extent(g)).Length() <= 0.01
                && 1 - Math.Abs(Quaternion.Dot(Quaternion.Normalize(w.Rotation), Quaternion.Normalize(g.Rotation))) < 1e-5;
-        int openings = 0, wings = 0;
+        int openings = 0, wings = 0, stepsCompared = 0, sideDoorParts = 0;
         foreach (var d in MagnoliaDecisions())
         {
             if (d.GetProperty("detail").GetInt32() != 1) continue;
@@ -275,8 +281,23 @@ public class WorldBuildingsTests : IDisposable
             int first = d.GetProperty("entities")[0].GetInt32(), last = d.GetProperty("entities")[1].GetInt32();
             int next = map.Entities[first].EntityId - 1;
             var later = new WorldBuildings.Later();
-            var made = WorldBuildings.Build(plan, Prefabs, (x, z) => e.HeightAt(x, z), (0, 0), ref next, later: later);
+            string me = fp.Id;
+            var near = rings.Where(r => r.Id != me && r.Ring.Any(q => Math.Abs(q.X - ring[0].Item1) < 150 && Math.Abs(q.Z - ring[0].Item2) < 150)).ToList();
+            bool Occupied(double x, double z) => near.Any(r => WorldBuildings.Pip(x, z, r.Ring) || WorldBuildings.RingDistance(x, z, r.Ring) < 0.3);
+            var made = WorldBuildings.Build(plan, Prefabs, (x, z) => e.HeightAt(x, z), (0, 0), ref next, later: later, occupied: Occupied);
             compared++;
+            foreach (var make in later.Doors)
+            {
+                var got = make(0);
+                Assert.True(byName[got.Name!].Any(w => Same(w, got)), $"{fp.Id}: no {got.Name} in the map where {got.Position} is");
+                sideDoorParts++;
+            }
+            foreach (var make in later.Steps)
+            {
+                var got = make(0);
+                Assert.True(stepsByName[got.Name!].Any(w => Same(w, got)), $"{fp.Id}: no {got.Name} in the map where {got.Position} is");
+                stepsCompared++;
+            }
             var mineRooms = made.Where(x => x.PrefabId == "acoustic_region").Select(x => x.EntityId).ToHashSet();
             int theirs = portals.Where(g => mineRooms.Contains(g.Key.Item1)).Sum(g => g.Count());
             Assert.Equal(theirs, later.Openings.Count);
@@ -336,7 +357,7 @@ public class WorldBuildingsTests : IDisposable
                 ties.Add($"{d.GetProperty("name").GetString()} ({fp.Id})");
             }
         }
-        _o.WriteLine($"{openings} openings between rooms and {wings} rooms of leftover pieces where the map has them");
+        _o.WriteLine($"{openings} openings between rooms, {wings} rooms of leftover pieces and {stepsCompared} landings and steps and {sideDoorParts} parts of side doors where the map has them");
         _o.WriteLine($"{compared} buildings at medium detail ({string.Join(", ", kinds.OrderByDescending(k => k.Value).Select(k => $"{k.Key} {k.Value}"))}), "
                      + $"{entities} entities; {same} buildings the same in every part, {matched} entities within 1 cm and the same turn (worst "
                      + $"{worstXz * 1000:F2} mm across, {worstY * 1000:F2} mm in height, {worstSize * 1000:F2} mm in size, turn 1 - |dot| {worstTurn:E1}); "
@@ -482,13 +503,15 @@ public class WorldBuildingsTests : IDisposable
             Assert.True(room.IsIndoor);
             Assert.Equal(6, room.RoomMaterials!.Length);
         }
-        // An opening between two rooms of a building joins two rooms of its own tile, written after every building.
+        // An opening between two rooms of a building joins two rooms of its own tile, written after every building (and before
+        // the steps outside its doors, written last of all).
         foreach (var (tile, opening) in all.Where(x => x.E.PrefabId == "portal"))
         {
             var mine = (tile == A ? a : b).Entities;
             foreach (int id in new[] { opening.RegionAId!.Value, opening.RegionBId!.Value })
                 Assert.Equal("acoustic_region", mine.Single(x => x.EntityId == id).PrefabId);
-            Assert.True(opening.EntityId > mine.Where(x => x.PrefabId != "portal" && x.EntityId > 0).Max(x => x.EntityId));
+            Assert.True(opening.EntityId > mine.Where(x => x.PrefabId != "portal" && x.EntityId > 0 && !(x.Name ?? "").EndsWith(" landing") && !(x.Name ?? "").EndsWith(" step")).Max(x => x.EntityId));
+            Assert.True(opening.EntityId < mine.Where(x => (x.Name ?? "").EndsWith(" landing")).Select(x => x.EntityId).DefaultIfEmpty(int.MaxValue).Min());
         }
         Assert.Contains("made-up buildings", a.Buildings);
         Assert.Contains("Microsoft ML Buildings, ODbL-1.0", b.Buildings);
