@@ -1808,9 +1808,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
       ambience in Program.cs and ClientGameSession.cs, `Room.AmbienceId`; `MapManifest`'s field and
       `RegionComponent.AmbienceId` stay on the wire, unread, with a one-line comment. Tests: AmbienceAndWeather,
       ClientAudioHarness, EmitterStreamReplay, SteelDoorSound, VoiceLifecycle, Speedway, PrefabSpec, BeaconAids.
-   2. The flood from a point: a seed is a point; step 1 and 2 (own box, then the margin) become one flood out from
-      the seeds together, a cell to the room nearest it by the flood's own path, stopped by walls, shut leaves and air
-      under the open sky (the sky test of step 3 and the measure). The indoor flag is "flooded and closed".
+   2. DONE (2026-10-10, unheard). The flood from a point, below ("The flood from a point").
    3. Openings from the floods: where two floods meet (`Lining.Meets`, with where) and where one meets the sky, grouped
       by plane into rectangles, in place of `FaceOpenings` on box faces and of `OpeningRoutes.FaceOfRoom`; then
       portals derived where floods meet through a door leaf (the leaf's frame is the opening).
@@ -1823,6 +1821,81 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    A box stays where nothing floods: an outdoor place (a name over an area, a yard, a street, a park), a vehicle's
    cabin (it moves; its box comes from the vehicle), a room whose block is over `MaxBlockCells`, and every room until
    the first flood lands at load (or the load waits for it).
+
+   **The flood from a point (step 2, 2026-10-10, unheard).** A seed is a point (`Seed.Size` is read only by
+   `RoomFlood.Groups`, for `MapTiles`). Each room floods out from its point, stopped by walls, floors, ceilings, shut
+   leaves, openings and air under the open sky; no box and no margin. An opening is a portal with no leaf
+   (`RoomFlood.Barrier`, from `EntityAcoustics.FloodBarriers`), its cells marked a cell wider and taller than it is
+   (where its side meets a jamb at an angle to the grid, a cell between the two let the flood round it). Its cells,
+   like a wall's, are the first room's to reach them, so a point in a doorway is in a room. Measured, an opening to the
+   outdoors is open sky; one between rooms is another room's air.
+   - The block starts as far as the walls round the point (six rays along the axes, a metre past what each meets, 2 to
+     120 m). A block whose air reaches its side grows that way by half its size (at least 8 m), keeping its cells and
+     claims, and the flood goes on from the cells at the side: nothing is flooded twice, and each 8-cell page is
+     rasterised once a flood (`PageStore`; a shape's pieces once per 64 m square). Growing by doubling was tried:
+     Albany's college (33204) overran `MaxBlockCells` and lost its flood.
+   - Rooms flood apart; two whose air turns out to be the same air flood again as one, a cell to the first to reach
+     it. A wall's or an opening's cell that two rooms flooded apart both reach is the room's whose point is nearer
+     (`RoomCells`).
+   - Ordered biggest first, one at a time, so the biggest is never left behind a thread's chunk.
+   - The lining's sample cubes are on the map's grid; a cube whose middle and furthest faces meet different faces of
+     the room (a corner of walls at an angle to the grid) is asked face by face (on the city every face asked alone
+     moves no room's measure more than 2 %).
+
+   The generators now say where a room ends where no wall does. gen_city: an opening in the slab where each stairwell
+   flight comes up through the floor (the storey below ends there) and in the roof slab under each roof access; the
+   car park's open sides over the spandrels and its east side between the piers; the tunnel's quarters and its two
+   mouths; the concourse's thirds (their boxes up to the suspended ceiling now, not into the void over it, where the face
+   finder found a 0.6 m strip beside each opening); the hangar's front as its frame. The stairwell's doorway onto the corridor is the
+   doorway's size (aperture 1.0 m, was 1.4). Main Street block 2 stops at the tunnel's mouth (it ran 40 m in under
+   the roof and flooded as a room). gen_osm and `WorldBuildings`: a thin opening in the middle of the gap between two
+   touching rectangles' rooms; every part of a footprint no rectangle covers goes to the room it shares most of its
+   edge with and opens onto each other room it touches; a part touching no room is a room of its own if it is 2 m2 or
+   more (`WING_LEAST`; named as the building's rooms are, on a planned house a den from 12 m2, else a closet); a
+   barn's doorway is an opening to the outdoors. All written after everything else, so no id moved
+   (`WorldBuildings.Later`; `WorldStore.GeneratorVersion` 6). `mapgen.open_faces` lists the faces of a room's box with
+   nothing behind them, as a check.
+
+   Times (`only=rooms`, 8 threads): city 0.9 to 1.5 s (490 rooms), Magnolia 2.4 s (1,811), Albany 5.2 s (2,864).
+   Albany's is its 640 m building (30832): 4.2 s flooding 10.5 million cells of air before its block would have to
+   grow past `MaxBlockCells`; the rest is done by 4.8 s.
+
+   Gates against main (`only=agree`, `only=meets`, `only=dump` set point by point against main's dump):
+   - Server and client: every point the same (city 11,760, Magnolia 10,536, Albany 22,728).
+   - Air meeting with nothing between: none. On the city no two rooms' air meets and none meets the sky. On Magnolia
+     2 pairs and on Albany 17 meet, each two rooms of one building already joined by openings (round an opening's
+     end); none meets the sky.
+   - Lookups (24 points in and round each room; a room whose box changed is left out): city 54 of 11,641 moved: the tunnel's north quarter takes the 10
+     that were Main Street block 2 under the roof, 10 in 58 Alder Street's walled garden (its point is in a hedge),
+     points just past the tunnel's south mouth and the hangar's front now outdoors, wall cells between flats now the
+     nearer flat's. Magnolia 287 of 43,440 (0.66 %), Albany 611 of 68,736 (0.89 %): wall cells between two rooms of a
+     house now the nearer's, and the barns' margins outside their doorways (18 points) the outdoors.
+   - Measures: city 6 rooms over 5 %: the tunnel's north quarter (908 to 1,602 m3, its mouth open) and the five roof
+     accesses (32.9 to 30.5 m3, ended in the roof slab). Magnolia 245 of 1,810 and Albany 687 of 2,862 over 5 %, by
+     design: the parts of a footprint no rectangle held belong to a room now (the common rooms' air up 0.4 % on
+     Magnolia, 1.4 % on Albany), and two touching rooms divide their air at the opening between them instead of by
+     distance. Most moved: 19617 Turtle Dove Lane, house (4.7 to 17.4 m3), the barns (19415 Turtle Dove Lane: A mid
+     218 to 30 m2, its air no longer counted out of its doorway), Linn County Juvenile Detention (1,916 to 4,386 m3).
+   - Routes (the client's openings, these maps against main's, this code): city, each stairwell's storey link is
+     one opening the size of the hole (2.4 by 5.0 m, 12 m2), where the face finder found 0.6 m strips beside the flight
+     (about 5 m2): up to 4 dB more between storeys; the car park's east side one bay framed by its piers (11.6 by 2.5
+     m) where two were found (5.6 m each); the tunnel's north mouth 12 by 5.45 m to the outdoors where Main Street
+     block 2 was; the concourse's thirds as they were (29.54 by 5.77 m, authored now). Magnolia: 142 openings
+     between rooms of a building found in faces are the authored ones now (sizes within 5 %, 0.3 m over to the gap's
+     middle), 207 new, the barns' doorways 3.00 by 2.15 m (the face finder cut them at the room's box: 3.00 by 1.65 to
+     1.87). Albany: 342 found become authored, 676 new.
+
+   Tests: `RoomFloodTests` and `RealPlaceMapTests.Rooms_flood_shut_and_as_drawn` flood with the openings, as a load
+   does, and hold no room open to the sky on any of the three maps; `CityOpeningsTests` sets each opening's sides
+   against the rooms' floods, as a client has them (by the boxes, the car park's west side fell in Wharf Avenue's
+   sidewalk, which overlaps it by 1.5 m); `WorldBuildingsTests` holds the port's openings and leftover rooms to
+   where Magnolia has them. The emitter streams and the renders are unchanged, unregenerated.
+
+   Where to listen (`/tp` x east, y north, z mid-room): Marlow Tower stairwell, floor 3, `/tp -14.2 -102.7 10.5`
+   (between storeys); Marlow Tower roof access, `/tp -10.6 -106.5 25.4`; Tunnel, north portal, `/tp 0.0 -212.5 2.8`;
+   Magnolia 19415 Turtle Dove Lane, barn, `/tp -88.8 -253.0 5.4`; 19617 Turtle Dove Lane, house, `/tp -299.2 -271.0
+   6.4`; 16510 Country Star, house, `/tp -320.0 702.1 0.7` (273.7 to 470.1 m3); Albany Linn County Juvenile Detention,
+   `/tp 1464.5 1274.2 1.9`; Favorite Mistake, `/tp -53.3 643.2 0.6` (900 to 1,419 m3).
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
    would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a

@@ -134,14 +134,39 @@ def named_place(name, x0, x1, y0, y1, z0, z1):
     named_places.append((name, x0, x1, y0, y1, z0, z1))
 
 
-def portal(x, y, z, a, b, aperture):
-    """A hole between two named places. -1 is the outside."""
-    entities.append({
+def portal(x0, x1, y0, y1, z0, z1, a, b, through):
+    """A hole between two named places (-1 is the outside), written as the space it fills and turned so its frame
+    is X across, Y up and Z `through` ("x", "y" or "z"). A room's flood stops at it (docs/GEOMETRY.md 2.7), so it
+    says where one room ends and the next begins where no wall does."""
+    bx, by, bz = BASE["portal"]
+    dx, dy, dz = x1 - x0, y1 - y0, z1 - z0
+    if through == "z":
+        rot, across, up, depth = None, dx, dy, dz
+    elif through == "x":
+        rot, across, up, depth = yaw(math.pi / 2), dz, dy, dx                       # +Z to +x, +X to -z
+    else:
+        rot = {"X": round(-math.sin(math.pi / 4), 6), "Y": 0.0, "Z": 0.0, "W": round(math.cos(math.pi / 4), 6)}
+        across, up, depth = dx, dz, dy                                              # +Z up, +Y to -z
+    e = {
         "EntityId": new_id(),
         "PrefabId": "portal",
-        "Position": v3(x, y, z),
-        "RegionAId": a, "RegionBId": b, "ApertureSize": aperture,
-    })
+        "Position": v3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+        "Scale": v3(across / bx, up / by, depth / bz),
+        "RegionAId": a, "RegionBId": b, "ApertureSize": round(across, 3),
+    }
+    if rot is not None:
+        e["Rotation"] = rot
+    entities.append(e)
+    return e["EntityId"]
+
+
+# Openings where rooms meet with no wall, made where the rooms are but written after everything else, so adding
+# them moves no other part's id.
+openings_later = []
+
+
+def portal_later(*args):
+    openings_later.append(args)
 
 
 def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0, name=None):
@@ -757,8 +782,16 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
                      stair_b[0], stair_b[1])
         B_holed("tile_floor", sa0, sa1, floor_top - 0.02, floor_top + 0.03, stair_b[0], stair_b[1], hole(s - 1),
                 name=floor_name)
-        px, _, pz, _ = place(near_wall + WALL_T / 2, 0, (stair_b[0] + stair_b[1]) / 2, 0)
-        portal(px, floor_top + 1.0, pz, stair_id, corridor_id, 1.4)
+        sb = (stair_b[0] + stair_b[1]) / 2
+        px0, px1, pz0, pz1 = place(near_wall, near_wall + WALL_T, sb - DOOR_W / 2, sb + DOOR_W / 2)
+        portal(px0, px1, floor_top, floor_top + DOOR_H, pz0, pz1, stair_id, corridor_id, "x" if vertical else "z")
+        # One shaft: the flight from the storey below comes up through the hole in this floor, and the place
+        # below ends there, in the slab.
+        if s:
+            ha_, hb_ = hole(s - 1)[0:2], hole(s - 1)[2:4]
+            qx0, qx1, qz0, qz1 = place(ha_[0], ha_[1], hb_[0], hb_[1])
+            portal_later(qx0, qx1, y0 + SLAB / 2 - 0.05, y0 + SLAB / 2 + 0.05, qz0, qz1, last_stair, stair_id, "y")
+        last_stair = stair_id
 
         # The flight up from this storey: to the next one, or from the top storey to the roof. A box a
         # step: box k stands on the slab and its top is k + 1 risers over this floor, so the last
@@ -906,6 +939,11 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     B("brick_wall", da0, da1, roof_y + DOOR_H, top, hb1, hb1 + BULK_T, name=housing)
     B("concrete_floor", ha0, ha1, top, top + SLAB, hb0 - BULK_T, hb1 + BULK_T, name=f"{label} roof access roof")
     access_id = R(f"{label} roof access", la[0], la[1], storeys * STOREY, top, hb0, hb1)
+    # The last flight comes up through the roof into the access: the top storey's place ends in the roof slab.
+    ra, rb = hole(storeys - 1)[0:2], hole(storeys - 1)[2:4]
+    qx0, qx1, qz0, qz1 = place(ra[0], ra[1], rb[0], rb[1])
+    portal_later(qx0, qx1, storeys * STOREY + SLAB / 2 - 0.05, storeys * STOREY + SLAB / 2 + 0.05, qz0, qz1,
+                 last_stair, access_id, "y")
 
     # A parapet round the edge, on the outer walls, so walking about up here cannot take you over
     # the side. Not where the housing's own wall already stands on the street wall.
@@ -1012,7 +1050,14 @@ for lv in range(GAR_LEVELS):
         cz = GAR_Z0 + k * 6.0
         box("concrete_wall", GAR_X1 - 0.4, GAR_X1, y0, y0 + GAR_CLEAR, cz - 0.2, cz + 0.2,
             name=f"Parking garage east side, level {lv}")
-    region(f"Parking garage, level {lv}", GAR_X0, GAR_X1, y0, y0 + GAR_CLEAR, GAR_Z0, GAR_Z1)
+    level_id = region(f"Parking garage, level {lv}", GAR_X0, GAR_X1, y0, y0 + GAR_CLEAR, GAR_Z0, GAR_Z1)
+    # Its open sides, over the spandrels, to the outdoors.
+    for x0, x1, z0, z1, through in ((GAR_X0, GAR_X0 + 0.3, GAR_Z0, GAR_Z1, "x"),
+                                    (GAR_X0, GAR_X1, GAR_Z0, GAR_Z0 + 0.3, "z"),
+                                    (GAR_X0, GAR_X1, GAR_Z1 - 0.3, GAR_Z1, "z")):
+        portal_later(x0, x1, y0 + SPANDREL, y0 + GAR_CLEAR, z0, z1, level_id, -1, through)
+    # The east side, between its piers from the deck up, onto Main Street.
+    portal_later(GAR_X1 - 0.4, GAR_X1, y0, y0 + GAR_CLEAR, GAR_Z0, GAR_Z1, level_id, -1, "x")
 box("concrete_floor", GAR_X0, GAR_X1, GAR_LEVELS * (GAR_CLEAR + SLAB) - SLAB,
     GAR_LEVELS * (GAR_CLEAR + SLAB), GAR_Z0, GAR_Z1, name="Parking garage roof")
 box("metal_wall", GAR_X1 - 0.1, GAR_X1, 0.0, GAR_CLEAR, GAR_Z1 - 6.2, GAR_Z1 - 0.3, name="Parking garage shutter")
@@ -1028,11 +1073,18 @@ box("concrete_wall", KERB, KERB + 0.5, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1, name
 box("concrete_wall", -WALK, -KERB - 0.5, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel west wall")
 box("concrete_wall", KERB + 0.5, WALK, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel east wall")
 box("concrete_floor", -WALK, WALK, TUNNEL_H, TUNNEL_H + 0.4, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel roof")
+tunnel_ids = []
 for i in range(4):
     zz0 = TUNNEL_Z0 + i * (TUNNEL_Z1 - TUNNEL_Z0) / 4
     zz1 = TUNNEL_Z0 + (i + 1) * (TUNNEL_Z1 - TUNNEL_Z0) / 4
-    region(f"Tunnel, {['south portal', 'south half', 'north half', 'north portal'][i]}",
-           -KERB, KERB, 0.0, TUNNEL_H, zz0, zz1)
+    tunnel_ids.append(region(f"Tunnel, {['south portal', 'south half', 'north half', 'north portal'][i]}",
+                             -KERB, KERB, 0.0, TUNNEL_H, zz0, zz1))
+    # One tube in four places: each ends where the next begins.
+    if i:
+        portal_later(-KERB, KERB, 0.0, TUNNEL_H, zz0 - 0.05, zz0 + 0.05, tunnel_ids[i - 1], tunnel_ids[i], "z")
+# Each mouth is an opening to the street, a cell inside the roof's end: the tube's air stops there.
+portal_later(-KERB, KERB, 0.0, TUNNEL_H, TUNNEL_Z0 + 0.075, TUNNEL_Z0 + 0.175, tunnel_ids[0], -1, "z")
+portal_later(-KERB, KERB, 0.0, TUNNEL_H, TUNNEL_Z1 - 0.175, TUNNEL_Z1 - 0.075, tunnel_ids[3], -1, "z")
 
 # ══ The bus shelter ═══════════════════════════════════════════════════════════════════════════════
 #
@@ -1298,8 +1350,12 @@ term_ids = []
 for k in range(3):
     a = TERM_Z0 + k * (TERM_Z1 - TERM_Z0) / 3
     b = TERM_Z0 + (k + 1) * (TERM_Z1 - TERM_Z0) / 3
+    # Up to the suspended ceiling: over it is the void under the roof, no one's.
     term_ids.append(region(f"Terminal concourse, {['south', 'middle', 'north'][k]} end",
-                           TERM_X0 + 0.4, TERM_X1 - 0.06, 0.08, TERM_H, a, b))
+                           TERM_X0 + 0.4, TERM_X1 - 0.06, 0.08, TERM_H - 0.65, a, b))
+    # One hall in three places: each ends where the next begins.
+    if k:
+        portal_later(TERM_X0 + 0.4, TERM_X1 - 0.06, 0.08, TERM_H - 0.65, a - 0.05, a + 0.05, term_ids[k - 1], term_ids[k], "z")
 # Each door joins the end it is in: z 30 is in the south end, z 92 in the north (it named the middle).
 # The public entrances are automatic: two glass leaves that part for anyone who comes up to them and
 # slide away into the glazing either side.
@@ -1335,7 +1391,7 @@ box("metal_wall", HANGAR_X1 - 0.12, HANGAR_X1, 8.4, HANGAR_H, HANGAR_Z0 + 15.0, 
     name="Hangar front entrance")
 hangar_id = region("Hangar", HANGAR_X0 + 0.12, HANGAR_X1 - 0.12, 0.06, HANGAR_H,
                    HANGAR_Z0 + 0.12, HANGAR_Z1 - 0.12)
-portal(HANGAR_X1 - 0.06, 4.0, (HANGAR_Z0 + HANGAR_Z1) / 2, hangar_id, -1, 26.0)
+portal(HANGAR_X1 - 0.12, HANGAR_X1, 0.0, 8.4, HANGAR_Z0 + 15.0, HANGAR_Z1 - 15.0, hangar_id, -1, "x")
 # A steel personnel door in the back, which is the small opening the big one is measured against.
 door(HANGAR_X0 + 0.06, 0.06, HANGAR_BACK_DOOR, hangar_id, -1, facing_z=False, prefab="steel_door",
      name="Hangar back door")
@@ -1583,7 +1639,8 @@ for ax, aname in zip(AVENUES, ("Wharf Avenue", "Main Street", "Calder Avenue")):
         a, b = z0 + k * (z1 - z0) / n, z0 + (k + 1) * (z1 - z0) / n
         if ax == 0.0 and b <= TUNNEL_Z1:
             continue                                  # that stretch is the tunnel, already named
-        region(f"{aname}, block {k + 1}", ax - KERB, ax + KERB, 0.0, 6.0, a, b)
+        # A block running into the tunnel stops at its mouth: under the roof is the tunnel's.
+        region(f"{aname}, block {k + 1}", ax - KERB, ax + KERB, 0.0, 6.0, max(a, TUNNEL_Z1) if ax == 0.0 else a, b)
         region(f"{aname} sidewalk", ax - WALK, ax - KERB, 0.0, 4.0, a, b)
         region(f"{aname} sidewalk", ax + KERB, ax + WALK, 0.0, 4.0, a, b)
 
@@ -2385,6 +2442,10 @@ for (h_label, cx, cz, d, h) in HOUSE_PLANS:
 # The named places last, so that adding one moved no other part's id.
 for _name, *_span in named_places:
     box("named_place", *_span, name=_name)
+
+# The openings where rooms meet with no wall, after them.
+for _args in openings_later:
+    portal(*_args)
 
 map_data = {
     "Id": "city",

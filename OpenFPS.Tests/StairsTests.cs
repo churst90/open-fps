@@ -779,7 +779,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
         var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "maps", "city.json")));
         var portals = doc.RootElement.GetProperty("Entities").EnumerateArray()
             .Where(e => e.GetProperty("PrefabId").GetString() == "portal")
-            .Select(e => (A: e.GetProperty("RegionAId").GetInt32(), At: new Vector3(e.GetProperty("Position").GetProperty("X").GetSingle(),
+            .Select(e => (A: e.GetProperty("RegionAId").GetInt32(), B: e.GetProperty("RegionBId").GetInt32(), At: new Vector3(e.GetProperty("Position").GetProperty("X").GetSingle(),
                           e.GetProperty("Position").GetProperty("Y").GetSingle(), e.GetProperty("Position").GetProperty("Z").GetSingle())))
             .ToList();
         foreach (var tower in _city.Towers)
@@ -790,7 +790,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
             for (int s = 0; s < flights.Count; s++)
             {
                 int stairwell = _city.Regions.Single(r => r.Name == $"{tower} stairwell, floor {s}").Id;
-                var door = portals.Single(p => p.A == stairwell).At;
+                // The doorway onto the floor, not the opening the flight comes up through to the storey above.
+                var shaft = _city.Regions.Where(r => r.Name.StartsWith($"{tower} stairwell") || r.Name == $"{tower} roof access").Select(r => r.Id).ToHashSet();
+                var door = portals.Single(p => p.A == stairwell && !shaft.Contains(p.B)).At;
                 var ear = door with { Y = flights[s].Foot.Floor.Y + 1.6f };
                 var wayUp = flights[s].Foot.At;
 

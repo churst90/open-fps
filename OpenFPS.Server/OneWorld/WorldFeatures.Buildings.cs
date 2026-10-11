@@ -452,13 +452,16 @@ public sealed partial class WorldFeatures
         foreach (var b in Site(key, footprints, ways, inPlace, BuildingNear + MaxDrive))
             if (b.Drive != null)
                 LayLine(b.Drive, 3.6, "concrete_floor", YDrive, $"{b.Name} driveway", "drives", ground.At, place);
-        int built = 0;
+        int built = 0, lastId = 0;
         var mine = new List<Footprint>();
+        var laters = new List<WorldBuildings.Later>();
         foreach (var b in BuildEach(key, footprints, ways, ground, inPlace))
         {
             if (b.Owner == key)
             {
                 entities.AddRange(b.Entities);
+                foreach (var e in b.Entities) lastId = Math.Max(lastId, e.EntityId);
+                laters.Add(b.Later);
                 mine.Add(b.Fp);
                 built++;
             }
@@ -472,14 +475,19 @@ public sealed partial class WorldFeatures
                     if (TerrainBuilder.SlabOf(centre, e.Rotation, size * e.Scale) is { } slab) slabs.Add(slab);
                 }
         }
+        // Written after them, as gen_osm.py writes them: the leftover pieces' rooms, then the openings.
+        foreach (var l in laters) foreach (var make in l.Rooms) entities.Add(make(++lastId));
+        foreach (var l in laters) foreach (var make in l.Openings) entities.Add(make(++lastId));
         return (built, built > 0 ? Footprint.Attribution(Buildings?.Name ?? "Buildings", mine) : null);
     }
 
     /// <summary>A building as made for a tile: what it was made from, the tile it belongs to, what it is, its pad (null
     /// for a solid box), where the street it faces is (the zone's metres), its entities (in the tile's metres; ids from 1
-    /// where the tile stores it), and the box the woods keep clear of.</summary>
+    /// where the tile stores it), the box the woods keep clear of, and what is written after every building of the tile
+    /// (its leftover pieces' rooms and its openings).</summary>
     internal sealed record MadeBuilding(Footprint Fp, WorldTileKey Owner, string Kind, string Name, double? Pad, (double X, double Z) Street,
-                                        List<EntityData> Entities, (WorldBuildings.Frame F, double U0, double U1, double V0, double V1) Box);
+                                        List<EntityData> Entities, (WorldBuildings.Frame F, double U0, double U1, double V0, double V1) Box,
+                                        WorldBuildings.Later Later);
 
     private IEnumerable<MadeBuilding> BuildEach(WorldTileKey key, IReadOnlyList<Footprint> footprints, IReadOnlyList<OsmWay> ways, Ground ground,
                                                Func<double, double, double, double, bool> inPlace)
@@ -498,11 +506,12 @@ public sealed partial class WorldFeatures
             };
             bool owned = o == key;
             int ids = owned ? nextId : 0;
-            var made = WorldBuildings.Build(plan, _prefabs, G, (o.Easting - key.Easting, o.Northing - key.Northing), ref ids, measured: true);
+            var later = new WorldBuildings.Later();
+            var made = WorldBuildings.Build(plan, _prefabs, G, (o.Easting - key.Easting, o.Northing - key.Northing), ref ids, measured: true, later: later);
             if (owned) nextId = ids;
             var frame = new WorldBuildings.Frame(b.Shape.Cx + o.Easting, b.Shape.Cz + o.Northing, b.Shape.Angle);
             var (u0, u1, v0, v1) = WorldBuildings.Extents(new WorldBuildings.Frame(b.Shape.Cx, b.Shape.Cz, b.Shape.Angle), b.Shape.Ring);
-            yield return new MadeBuilding(b.Fp, o, b.Kind, b.Name, pad, (b.Street.X + o.Easting, b.Street.Z + o.Northing), made, (frame, u0, u1, v0, v1));
+            yield return new MadeBuilding(b.Fp, o, b.Kind, b.Name, pad, (b.Street.X + o.Easting, b.Street.Z + o.Northing), made, (frame, u0, u1, v0, v1), later);
         }
     }
 

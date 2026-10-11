@@ -310,6 +310,18 @@ public static class WorldBuildings
         public string? RoomSuffix { get; init; }
     }
 
+    /// <summary>What a building makes that is written after every building of its tile, so that adding it moves no
+    /// other part's id (gen_osm.py rooms_later, openings_later): the rooms of its footprint's leftover pieces, then its
+    /// openings. Each makes its entity given its id.</summary>
+    public sealed class Later
+    {
+        public List<Func<int, EntityData>> Rooms { get; } = new();
+        public List<Func<int, EntityData>> Openings { get; } = new();
+    }
+
+    /// <summary>gen_osm.py WING_LEAST: the least piece of a footprint touching no room that is a room of its own, m².</summary>
+    public const double WingLeast = 2.0;
+
     /// <summary>Whether a kind is one solid box at medium detail (gen_osm.py build(): a shed always, an outbuilding
     /// below high detail).</summary>
     public static bool IsSolidBox(string kind) => kind is "shed" or "garage" or "workshop" or "barn" or "outbuilding";
@@ -319,10 +331,11 @@ public static class WorldBuildings
     /// moved by <paramref name="shift"/> and rounded as the maps write them, heights over the pad (or the ground under
     /// a solid box). Each gets the next id from <paramref name="nextId"/>; a door's room is the id of the room it
     /// opens from. With <paramref name="measured"/>, each room carries what it is made of (floor, ceiling, walls) and
-    /// that it is indoors, as a map's load measures it, so a world tile needs no survey.
+    /// that it is indoors, as a map's load measures it, so a world tile needs no survey. The openings between its rooms
+    /// and the rooms of what no rectangle holds go to <paramref name="later"/>.
     /// </summary>
     public static List<EntityData> Build(Plan p, IReadOnlyDictionary<string, Prefab> prefabs, Func<double, double, double> ground,
-                                         (double X, double Z) shift, ref int nextId, bool measured = false)
+                                         (double X, double Z) shift, ref int nextId, bool measured = false, Later? later = null)
     {
         var bd = p.Shape;
         var outList = new List<EntityData>();
@@ -334,12 +347,19 @@ public static class WorldBuildings
 
         EntityData Obox(string prefab, Frame f, double u0, double u1, double v0, double v1, double y0, double y1, string? nm, string layer, double? foot = null)
         {
+            var e = Make(prefab, f, u0, u1, v0, v1, y0, y1, nm, layer, foot, ++id);
+            outList.Add(e);
+            return e;
+        }
+
+        EntityData Make(string prefab, Frame f, double u0, double u1, double v0, double v1, double y0, double y1, string? nm, string layer, double? foot, int eid)
+        {
             var b = Base(prefab);
             var (cx, cz) = f.W((u0 + u1) / 2, (v0 + v1) / 2);
             double a = WorldFeatures.NormHalf(f.A);
-            var e = new EntityData
+            return new EntityData
             {
-                EntityId = ++id,
+                EntityId = eid,
                 PrefabId = prefab,
                 Position = new Vector3(R4(cx + shift.X), R4(R4((y0 + y1) / 2) + (foot ?? lift)), R4(cz + shift.Z)),
                 Rotation = Math.Abs(a) > 1e-9 ? WorldFeatures.Yaw(-a) : Quaternion.Identity,
@@ -347,8 +367,6 @@ public static class WorldBuildings
                 Name = nm,
                 Layer = layer,
             };
-            outList.Add(e);
-            return e;
         }
 
         // gen_osm.py oform: a shape filling the box round an outline in frame f, the outline about the box's middle.
@@ -438,6 +456,39 @@ public static class WorldBuildings
             if (measured) { room.RoomMaterials = roomMaterials; room.IsIndoor = true; }
             ids.Add((room.EntityId, box));
         }
+        if (later != null)
+        {
+            // Where two rectangles touch there is no wall: the gap between their rooms is an opening, along the side they
+            // share and as wide as both rooms reach along it, in the middle of the gap and thin, so a room narrower than a
+            // cell keeps its own air on its side of it.
+            for (int i = 0; i < R.Count; i++)
+                for (int j = i + 1; j < R.Count; j++)
+                {
+                    var (ra, rb) = (R[i], R[j]);
+                    var sides = new[] { (ra.U1, rb.U0), (ra.U0, rb.U1), (ra.V1, rb.V0), (ra.V0, rb.V1) };
+                    for (int side = 0; side < 4; side++)
+                    {
+                        if (Math.Abs(sides[side].Item1 - sides[side].Item2) > 1e-3) continue;
+                        var (bi, bj) = (boxes[i], boxes[j]);
+                        var (g0, g1) = side switch { 0 => (bi.U1, bj.U0), 1 => (bj.U1, bi.U0), 2 => (bi.V1, bj.V0), _ => (bj.V1, bi.V0) };
+                        double at = (g0 + g1) / 2, lo, hi, x, z, phi;
+                        if (side < 2)
+                        {
+                            (lo, hi) = (Math.Max(bi.V0, bj.V0), Math.Min(bi.V1, bj.V1));
+                            (x, z) = F.W(at, (lo + hi) / 2);
+                            phi = F.A + Math.PI / 2;
+                        }
+                        else
+                        {
+                            (lo, hi) = (Math.Max(bi.U0, bj.U0), Math.Min(bi.U1, bj.U1));
+                            (x, z) = F.W((lo + hi) / 2, at);
+                            phi = F.A;
+                        }
+                        if (hi - lo > 0.3) PortalLater(x, z, phi, hi - lo, FloorTop - 0.02, top, 0.1, ids[i].Id, ids[j].Id);
+                    }
+                }
+            Wings(Enumerable.Range(0, R.Count).Select(i => (ids[i].Id, R[i])).ToList(), $"{name}{suffix}");
+        }
 
         // The front door: the longest stretch of a side facing the street with a room behind it, in its middle.
         var stretch = new (double S0, double S1)?[edges.Count];
@@ -524,6 +575,131 @@ public static class WorldBuildings
                 Name = nm,
                 Layer = "structure",
             });
+        }
+
+        // gen_osm.py portal: an opening with nothing in it joining room a to room b (-1 the outdoors), in a wall along phi.
+        void PortalLater(double x, double z, double phi, double width, double y0, double y1, double depth, int a, int b)
+            => later!.Openings.Add(eid =>
+            {
+                var e = Make("portal", new Frame(x, z, phi), -width / 2, width / 2, -depth / 2, depth / 2, y0, y1, null, "interiors", null, eid);
+                e.RegionAId = a;
+                e.RegionBId = b;
+                e.ApertureSize = (float)Math.Round(width, 3);
+                return e;
+            });
+
+        // gen_osm.py wings: every part of the footprint no room's rectangle holds is a room's. A piece of the grid's
+        // cells no rectangle covers goes to the room it shares most of its edge with and opens onto every other room it
+        // touches; a piece touching no room is a room of its own, its box the biggest rectangle in it.
+        void Wings(List<(int Id, (double U0, double U1, double V0, double V1) Rect)> rooms, string newName)
+        {
+            var (u0g, v0g, cu, cv, nu, nv) = (grid.U0, grid.V0, grid.Cu, grid.Cv, grid.Nu, grid.Nv);
+            var loc = bd.Ring.Select(q => F.L(q.X, q.Z)).Select(q => (X: q.U, Z: q.V)).ToList();
+            var inside = new bool[nv][];
+            var own = new int[nv][];
+            var seen = new bool[nv][];
+            for (int j = 0; j < nv; j++)
+            {
+                inside[j] = new bool[nu]; own[j] = new int[nu]; seen[j] = new bool[nu];
+                Array.Fill(own[j], -1);
+                for (int i = 0; i < nu; i++) inside[j][i] = FirmlyIn(u0g + (i + 0.5) * cu, v0g + (j + 0.5) * cv, loc);
+            }
+            for (int k = 0; k < rooms.Count; k++)
+            {
+                var (ru0, ru1, rv0, rv1) = rooms[k].Rect;
+                for (int j = 0; j < nv; j++)
+                {
+                    double vc = v0g + (j + 0.5) * cv;
+                    if (!(rv0 <= vc && vc <= rv1)) continue;
+                    for (int i = 0; i < nu; i++)
+                    {
+                        double uc = u0g + (i + 0.5) * cu;
+                        if (ru0 <= uc && uc <= ru1 && own[j][i] < 0) own[j][i] = k;
+                    }
+                }
+            }
+            var steps = new[] { (1, 0), (-1, 0), (0, 1), (0, -1) };
+            for (int j0 = 0; j0 < nv; j0++)
+                for (int i0 = 0; i0 < nu; i0++)
+                {
+                    if (seen[j0][i0] || !inside[j0][i0] || own[j0][i0] >= 0) continue;
+                    var piece = new List<(int I, int J)>();
+                    var stack = new Stack<(int, int)>();
+                    stack.Push((i0, j0));
+                    seen[j0][i0] = true;
+                    while (stack.Count > 0)
+                    {
+                        var (i, j) = stack.Pop();
+                        piece.Add((i, j));
+                        foreach (var (di, dj) in steps)
+                        {
+                            int a = i + di, b = j + dj;
+                            if (a >= 0 && a < nu && b >= 0 && b < nv && !seen[b][a] && inside[b][a] && own[b][a] < 0)
+                            {
+                                seen[b][a] = true;
+                                stack.Push((a, b));
+                            }
+                        }
+                    }
+                    piece.Sort((p1, p2) => p1.J != p2.J ? p1.J.CompareTo(p2.J) : p1.I.CompareTo(p2.I));
+                    // Its edges against rooms: (room, axis, line, s0, s1); axis 'u' is a line of constant u.
+                    var edgesOf = new List<(int K, char Axis, double Line, double S0, double S1)>();
+                    foreach (var (i, j) in piece)
+                        foreach (var (di, dj) in steps)
+                        {
+                            int a = i + di, b = j + dj;
+                            if (!(a >= 0 && a < nu && b >= 0 && b < nv) || own[b][a] < 0) continue;
+                            if (di != 0) edgesOf.Add((own[b][a], 'u', u0g + Math.Max(i, a) * cu, v0g + j * cv, v0g + (j + 1) * cv));
+                            else edgesOf.Add((own[b][a], 'v', v0g + Math.Max(j, b) * cv, u0g + i * cu, u0g + (i + 1) * cu));
+                        }
+                    if (edgesOf.Count == 0)
+                    {
+                        // A sliver in a corner touching no room's cells is left to whichever room's flood reaches it.
+                        if (piece.Count * cu * cv < WingLeast) continue;
+                        var mask = new bool[nv][];
+                        for (int j = 0; j < nv; j++) mask[j] = new bool[nu];
+                        foreach (var (i, j) in piece) mask[j][i] = true;
+                        var (_, i0r, i1r, j0r, j1r) = LargestRect(mask, nu, nv);
+                        var box = (U0: u0g + i0r * cu, U1: u0g + i1r * cu, V0: v0g + j0r * cv, V1: v0g + j1r * cv);
+                        later!.Rooms.Add(eid =>
+                        {
+                            var room = Make("acoustic_region", F, box.U0, box.U1, box.V0, box.V1, FloorTop - 0.02, top, newName, "rooms", null, eid);
+                            if (measured) { room.RoomMaterials = roomMaterials; room.IsIndoor = true; }
+                            return room;
+                        });
+                        continue;
+                    }
+                    var count = new SortedDictionary<int, int>();
+                    foreach (var ed in edgesOf) count[ed.K] = count.GetValueOrDefault(ed.K) + 1;
+                    int owner = -1, most = -1;
+                    foreach (var (kk, c) in count) if (c > most) (owner, most) = (kk, c);
+                    foreach (var (i, j) in piece) own[j][i] = owner;
+                    var runs = new SortedDictionary<(int K, char Axis, double Line), List<(double S0, double S1)>>();
+                    foreach (var (kk, axis, line, s0, s1) in edgesOf)
+                    {
+                        if (kk == owner) continue;
+                        var key = (kk, axis, Math.Round(line, 6));
+                        if (!runs.TryGetValue(key, out var l)) runs[key] = l = new();
+                        l.Add((s0, s1));
+                    }
+                    foreach (var ((kk, axis, line), spans) in runs)
+                    {
+                        spans.Sort();
+                        var merged = new List<(double S0, double S1)> { spans[0] };
+                        foreach (var (s0, s1) in spans.Skip(1))
+                        {
+                            if (s0 <= merged[^1].S1 + 1e-6) merged[^1] = (merged[^1].S0, Math.Max(merged[^1].S1, s1));
+                            else merged.Add((s0, s1));
+                        }
+                        foreach (var (s0, s1) in merged)
+                        {
+                            double sm = (s0 + s1) / 2;
+                            var (x, z) = axis == 'u' ? F.W(line, sm) : F.W(sm, line);
+                            double phi = axis == 'u' ? F.A + Math.PI / 2 : F.A;
+                            PortalLater(x, z, phi, s1 - s0, FloorTop - 0.02, top, 0.1, rooms[owner].Id, rooms[kk].Id);
+                        }
+                    }
+                }
         }
 
         string Material(string prefab) => prefabs.TryGetValue(prefab, out var pf) && !string.IsNullOrEmpty(pf.Material) && pf.Material != "None" ? pf.Material : "Generic";

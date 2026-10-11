@@ -435,14 +435,117 @@ def named_place(name, F, u0, u1, v0, v1, y0, y1):
     named_places.append((name, F, u0, u1, v0, v1, y0, y1, _Y_PIN[0]))
 
 
-def portal(x, y, z, a, b, aperture, layer="interiors"):
-    e = {"EntityId": new_id(), "PrefabId": "portal", "Position": v3(x, y, z),
-         "RegionAId": a, "RegionBId": b, "ApertureSize": aperture}
-    e["_pin"] = _Y_PIN[0]
-    e["Tile"] = entity_tile(x, z)
-    e["Layer"] = layer
-    entities.append(e)
-    COUNT[layer] += 1
+def portal(x, z, phi, width, y0, y1, depth, a, b, layer="interiors"):
+    """An opening with nothing in it, joining place `a` to place `b` (-1 the outdoors), in a wall running along angle
+    `phi`: its frame is its place, X across (along the wall), Y up, Z through. A room's flood stops at it
+    (docs/GEOMETRY.md 2.7), so it says where one room ends and the next begins where no wall does."""
+    e = obox("portal", Frame(x, z, phi), -width / 2, width / 2, -depth / 2, depth / 2, y0, y1, layer=layer)
+    e = entities[-1]
+    e["RegionAId"], e["RegionBId"], e["ApertureSize"] = a, b, round(width, 3)
+    return e["EntityId"]
+
+
+# Openings made where the rooms are made but written after everything else, so adding them moves no other
+# part's id: (x, z, phi, width, y0, y1, depth, a, b, the pad's height, the tile).
+openings_later = []
+
+
+def portal_later(x, z, phi, width, y0, y1, depth, a, b):
+    openings_later.append((x, z, phi, width, y0, y1, depth, a, b, _Y_PIN[0], _TILE_PIN[0]))
+
+
+# Rooms made for the parts of a footprint no rectangle holds, written last as the openings are:
+# (name, F, u0, u1, v0, v1, y0, y1, the pad's height, the tile, the place's id once written).
+rooms_later = []
+
+
+WING_LEAST = 2.0          # the least piece of a footprint touching no room that is a room of its own, m2
+
+
+def wings(F, ring, grid, rooms, top, new_name):
+    """Every part of a footprint that no room's rectangle holds is a room's: a piece of the footprint's grid cells
+    no rectangle covers goes to the room it shares most of its edge with, and opens onto every other room it touches
+    (an opening along each run of the edge between them); a piece that touches no room is a room of its own, named
+    `new_name(area)`, its box the biggest rectangle in it. So no air inside the walls belongs to no room
+    (docs/GEOMETRY.md 2.7). `rooms` is [(id, (u0, u1, v0, v1))] in F, in the order they were made."""
+    u0g, v0g, cu, cv, nu, nv = grid
+    loc = [F.l(x, z) for x, z in ring]
+    inside = [[firmly_in(u0g + (i + 0.5) * cu, v0g + (j + 0.5) * cv, loc) for i in range(nu)] for j in range(nv)]
+    own = [[-1] * nu for _ in range(nv)]
+    for k, (_, (ru0, ru1, rv0, rv1)) in enumerate(rooms):
+        for j in range(nv):
+            vc = v0g + (j + 0.5) * cv
+            if not rv0 <= vc <= rv1:
+                continue
+            for i in range(nu):
+                uc = u0g + (i + 0.5) * cu
+                if ru0 <= uc <= ru1 and own[j][i] < 0:
+                    own[j][i] = k
+    seen = [[False] * nu for _ in range(nv)]
+    for j0 in range(nv):
+        for i0 in range(nu):
+            if seen[j0][i0] or not inside[j0][i0] or own[j0][i0] >= 0:
+                continue
+            piece, stack = [], [(i0, j0)]
+            seen[j0][i0] = True
+            while stack:
+                i, j = stack.pop()
+                piece.append((i, j))
+                for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    a, b = i + di, j + dj
+                    if 0 <= a < nu and 0 <= b < nv and not seen[b][a] and inside[b][a] and own[b][a] < 0:
+                        seen[b][a] = True
+                        stack.append((a, b))
+            piece.sort(key=lambda c: (c[1], c[0]))
+            # Its edges against rooms: (room, axis, line, s0, s1); axis "u" is a line of constant u.
+            edges = []
+            for i, j in piece:
+                for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    a, b = i + di, j + dj
+                    if not (0 <= a < nu and 0 <= b < nv) or own[b][a] < 0:
+                        continue
+                    if di:
+                        line = u0g + (max(i, a)) * cu
+                        edges.append((own[b][a], "u", line, v0g + j * cv, v0g + (j + 1) * cv))
+                    else:
+                        line = v0g + (max(j, b)) * cv
+                        edges.append((own[b][a], "v", line, u0g + i * cu, u0g + (i + 1) * cu))
+            if not edges:
+                # A sliver in a corner touching no room's cells (no more than a couple of square metres) is left to
+                # whichever room's flood reaches it: a room of its own there is a room in a gap between two walls.
+                if len(piece) * cu * cv < WING_LEAST:
+                    continue
+                mask = [[False] * nu for _ in range(nv)]
+                for i, j in piece:
+                    mask[j][i] = True
+                _, i0r, i1r, j0r, j1r = largest_rect(mask, nu, nv)
+                area = len(piece) * cu * cv
+                rooms_later.append([new_name(area), F, u0g + i0r * cu, u0g + i1r * cu, v0g + j0r * cv, v0g + j1r * cv,
+                                    FLOOR_TOP - 0.02, top, _Y_PIN[0], _TILE_PIN[0], None])
+                continue
+            count = defaultdict(int)
+            for e in edges:
+                count[e[0]] += 1
+            owner = max(sorted(count), key=lambda k: count[k])
+            for i, j in piece:
+                own[j][i] = owner
+            runs = defaultdict(list)
+            for k, axis, line, s0, s1 in edges:
+                if k != owner:
+                    runs[(k, axis, round(line, 6))].append((s0, s1))
+            for (k, axis, line), spans in sorted(runs.items()):
+                spans.sort()
+                merged = [list(spans[0])]
+                for s0, s1 in spans[1:]:
+                    if s0 <= merged[-1][1] + 1e-6:
+                        merged[-1][1] = max(merged[-1][1], s1)
+                    else:
+                        merged.append([s0, s1])
+                for s0, s1 in merged:
+                    sm = (s0 + s1) / 2
+                    x, z = F.w(line, sm) if axis == "u" else F.w(sm, line)
+                    phi = F.a + math.pi / 2 if axis == "u" else F.a
+                    portal_later(x, z, phi, s1 - s0, FLOOR_TOP - 0.02, top, 0.1, rooms[owner][0], rooms[k][0])
 
 
 def door(prefab, x, z, y0, phi, a, b, opening, room_xz, name, layer="structure"):
@@ -2358,6 +2461,30 @@ def build(bd):
         ids = []
         for box in boxes:
             ids.append((region(f"{name}{suffix}", F, *box, FLOOR_TOP - 0.02, top, layer="rooms"), box))
+        # Where two rectangles touch there is no wall: the gap between their rooms is an opening, along the side they
+        # share and as wide as both rooms reach along it.
+        for i in range(len(R)):
+            for j in range(i + 1, len(R)):
+                a, b = R[i], R[j]
+                for side, (mine, theirs) in enumerate(((a[1], b[0]), (a[0], b[1]), (a[3], b[2]), (a[2], b[3]))):
+                    if abs(mine - theirs) > 1e-3:
+                        continue
+                    bi, bj = boxes[i], boxes[j]
+                    # In the middle of the gap between the two rooms' boxes, thin: a room narrower than a cell keeps
+                    # its own air on its side of it.
+                    g0, g1 = ((bi[1], bj[0]), (bj[1], bi[0]), (bi[3], bj[2]), (bj[3], bi[2]))[side]
+                    at, depth = (g0 + g1) / 2, 0.1
+                    if side < 2:
+                        lo, hi = max(bi[2], bj[2]), min(bi[3], bj[3])
+                        x, z = F.w(at, (lo + hi) / 2)
+                        phi = F.a + math.pi / 2
+                    else:
+                        lo, hi = max(bi[0], bj[0]), min(bi[1], bj[1])
+                        x, z = F.w((lo + hi) / 2, at)
+                        phi = F.a
+                    if hi - lo > 0.3:
+                        portal_later(x, z, phi, hi - lo, FLOOR_TOP - 0.02, top, depth, ids[i][0], ids[j][0])
+        wings(F, bd.ring, grid, [(ids[i][0], R[i]) for i in range(len(R))], top, lambda area: f"{name}{suffix}")
         # The front door: the longest stretch of a side facing the street with a room behind it, in its middle.
         stretch = []
         for k in range(len(edges)):
@@ -2392,6 +2519,7 @@ def build(bd):
                 sb = Lb * 0.3
                 doors_out.append((kb, sb, 0.9, "patio_door", room_at(ids, F, *Eb.w(sb, WALL_T + 0.3)), f"{name} back door"))
     else:
+        wings(F, bd.ring, grid, rooms["rects"], CEIL, lambda area: f"{label}, {'den' if area >= 12 else 'closet'}")
         # The plan's doors are on its rectangles' runs: each goes on the side of the ring it lies on.
         for (kr, s, width, prefab, room, dname) in rooms["doors"]:
             k, s = edge_for_run(edges, F, runs[kr], s, width, rooms["boxes"].get(room[0]))
@@ -2413,7 +2541,9 @@ def build(bd):
         rid, rxz = room
         outside = -1                      # the outdoors: yards and roads are names, not rooms
         if prefab is None:
-            continue                      # an open doorway: the gap is the opening
+            # An open doorway: the gap is the opening, to the outdoors.
+            portal_later(x, z, E.a, width, FLOOR_TOP, DOOR_TOP, WALL_T, rid, outside)
+            continue
         if prefab == "garage":
             # A sectional door, shut: a steel panel in the opening.
             G = Frame(x, z, E.a)
@@ -2693,7 +2823,8 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
                              door("door", x, z, FLOOR_TOP, phi, ids[own], ids[other], wdt, centres[own],
                                   f"{label} {names[own]} door", layer="interiors"))
             else:
-                inner.append(lambda x=x, z=z, i=i, j=j, wdt=wdt: portal(x, FLOOR_TOP + 1.05, z, ids[i], ids[j], wdt))
+                inner.append(lambda x=x, z=z, phi=phi, i=i, j=j, wdt=wdt:
+                             portal(x, z, phi, wdt, FLOOR_TOP, DOOR_TOP, PART_T, ids[i], ids[j]))
         # thickness PART_T centred on the line
         wall_run(F, (axis, line + PART_T / 2, s0, s1, 1), "plaster_wall", CEIL, f"{label} {names[i]} wall", cut,
                  layer="interiors", thick=PART_T)
@@ -2734,7 +2865,8 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
             g = on_run(rr, True)
             if g and g[1] >= 3.0 and not (fr and g[2] == fr[2] and abs(g[3] - fr[3]) < 3.0):
                 doors_out.append((g[2], g[3], min(4.9, g[1] - 0.6), "garage", (ids[i], centres[i]), f"{label} garage door"))
-    return {"doors": doors_out, "inner": inner, "boxes": dict(zip(ids, inner_rects))}
+    return {"doors": doors_out, "inner": inner, "boxes": dict(zip(ids, inner_rects)),
+            "rects": [(rid, r[1]) for rid, r in zip(ids, rooms)], "label": label}
 
 
 # THE OUTDOOR PLACES ARE NAMES, NOT ROOMS. A yard and a stretch of road are where you are told you
@@ -3205,6 +3337,17 @@ def ground_all():
             lo = min(_samples(F, u0, u1, v0, v1))
             p["Y"] = round(p["Y"] + lo, 4)
 
+
+# The rooms of the footprints' leftover pieces, then the openings made with the rooms, after everything else.
+for r in rooms_later:
+    nm, F, u0, u1, v0, v1, y0, y1, pin, tile, _ = r
+    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+    r[10] = region(nm, F, u0, u1, v0, v1, y0, y1, layer="rooms")
+    _Y_PIN[0] = _TILE_PIN[0] = None
+for x, z, phi, width, y0, y1, depth, a, b, pin, tile in openings_later:
+    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+    portal(x, z, phi, width, y0, y1, depth, a, b)
+    _Y_PIN[0] = _TILE_PIN[0] = None
 
 ground_all()
 if HAS_GROUND:

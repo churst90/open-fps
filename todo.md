@@ -36,7 +36,10 @@ other at login. The server and the Windows zip go out together.
    from authoring, the editor, prefabs and the generators; derive portals where floods meet through a
    door. The ambience bed machinery is gone (2026-10-10; Cody: no beds at all, region beds included); the
    component and manifest fields stay unread (positional wire). Part A approved by ear 2026-10-10 ("everything
-   sounds great"); regions-become-places steps in docs/GEOMETRY.md 12.6 item 1.
+   sounds great"); regions-become-places steps in docs/GEOMETRY.md 12.6 item 1. Step 2 built 2026-10-10,
+   unheard: rooms flood from their points with no box or margin, and the generators put an opening wherever
+   rooms meet with no wall (every part of a footprint is a room's). Listen first (the list in 12.6, "The flood
+   from a point": a stairwell, a roof access, a barn, the houses that changed most); steps 3 to 5 wait for it.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,

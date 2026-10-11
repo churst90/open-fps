@@ -63,6 +63,9 @@ public static class GeometryParitySpike
         string src = OpenFPS.AudioLab.LabPaths.Server("maps", "places", mapId + ".json");
         bool place = File.Exists(src);
         if (!place) src = OpenFPS.AudioLab.LabPaths.Server("maps", mapId + ".json");
+        // Another version of the map (mapfile=PATH), to set beside this one.
+        string other = Arg(args, "mapfile", "");
+        if (other != "") src = other;
         Directory.CreateDirectory(Path.Combine(dir, "maps", "places"));
         File.Copy(src, place ? Path.Combine(dir, "maps", "places", mapId + ".json") : Path.Combine(dir, "maps", mapId + ".json"));
         // A real place's ground is a file beside its map (MapElevation.File).
@@ -967,6 +970,15 @@ public static class GeometryParitySpike
             MeasureParity(ecs, serverWorld, data, mapSize, show, args);
 
         // ── Rooms from the walls against the rooms as drawn ──────────────────────────────────────
+        if (only.Contains("dump"))
+            DumpRooms(maps, mapId, ecs, serverWorld, data, mapSize, args);
+
+        if (only.Contains("routedump"))
+            DumpRoutes(maps, mapId, ecs, lookup, data, mapSize, args);
+
+        if (only.Contains("meets"))
+            MeetsParity(ecs, rebuilt, data, show);
+
         if (only.Contains("rooms"))
             RoomsParity(ecs, rebuilt, data, show, lookup, args);   // with the door leaves shut in their doorways
 
@@ -1018,7 +1030,7 @@ public static class GeometryParitySpike
         int threads = int.Parse(Arg(args, "threads", "1"));
         var clock = Stopwatch.StartNew();
         var slow = new List<string>();
-        var rooms = RoomFlood.Flood(world, seeds, data.MinBound, threads: threads, report: slow.Add);
+        var rooms = RoomFlood.Flood(world, seeds, data.MinBound, EntityAcoustics.FloodBarriers(EntityDefinitionFactory.StaticDefinitions(ecs)), threads: threads, report: slow.Add);
         double ms = clock.Elapsed.TotalMilliseconds;
         const float c = RoomFlood.Cell;
         double v = c * c * c;
@@ -1036,7 +1048,6 @@ public static class GeometryParitySpike
             if (room.Unseeded) { unseeded++; worst.Add((-1, $"{names[s.Id]} ({s.Id}): its middle in a solid")); continue; }
             if (room.Open) { open++; opened.Add($"{names[s.Id]} ({s.Id}) at {string.Join(" ", room.OpenAt.Take(2).Select(V))}"); }
             if (room.Meets.Count > 0) meeting++;
-            if (room.BeyondCount > 0) { past++; beyond += room.BeyondCount; }
             var inv = Quaternion.Conjugate(Quaternion.Normalize(s.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : s.Rotation));
             var h = s.Size * 0.5f;
             bool InBox(Vector3 p) { var l = Vector3.Transform(p - s.Centre, inv); return MathF.Abs(l.X) <= h.X && MathF.Abs(l.Y) <= h.Y && MathF.Abs(l.Z) <= h.Z; }
@@ -1052,6 +1063,7 @@ public static class GeometryParitySpike
                     for (int x = x0; x <= x1; x++)
                         if (InBox(RoomFlood.CentreOf(x, y, z, data.MinBound))) boxCells++;
             long air = room.AirCount, region = air + room.EdgeCount, regionIn = airIn + edgeIn;
+            if (air > airIn) { past++; beyond += air - airIn; }
             airBoth += airIn; airOnly += air - airIn; boxOnlyAir += boxCells - airIn;
             regionBoth += regionIn; regionOnly += region - regionIn; boxOnlyRegion += boxCells - regionIn;
             double iou = (double)airIn / Math.Max(1, air + boxCells - airIn);
@@ -1061,14 +1073,14 @@ public static class GeometryParitySpike
             if (air < 0.75 * boxCells) shrank++;
             missed.Add((boxCells - airIn, $"{names[s.Id]} ({s.Id}): {(boxCells - airIn) * v:F1} m3 of its box {boxCells * v:F1} m3 not reached, box at {V(s.Centre)} size {V(s.Size)}"));
             worst.Add((iou, $"{names[s.Id]} ({s.Id}): air {air * v:F1} m3, box {boxCells * v:F1} m3, both {airIn * v:F1}, IoU {iou:F2}"
-                            + $"{(room.Open ? ", open" : "")}{(room.BeyondCount > 0 ? $", {room.BeyondCount * v:F1} m3 past its margin" : "")}{(room.Meets.Count > 0 ? $", meets {string.Join(",", room.Meets)}" : "")}"));
+                            + $"{(room.Open ? ", open" : "")}{(air > airIn ? $", {(air - airIn) * v:F1} m3 outside its box" : "")}{(room.Meets.Count > 0 ? $", meets {string.Join(",", room.Meets)}" : "")}"));
         }
         airIous.Sort();
         regionIous.Sort();
         static double P(List<double> l, double q) => l.Count == 0 ? 0 : l[Math.Min(l.Count - 1, (int)(q * l.Count))];
         Console.WriteLine();
         Console.WriteLine($"rooms: {seeds.Count} indoor rooms flooded in {ms:F0} ms on {threads} thread(s) at {c} m; {unseeded} with their middle in a solid; "
-                          + $"{open} open past their margin; {past} reaching past it into air the walls close in ({beyond * v:F0} m3); {meeting} meeting another room's air; "
+                          + $"{open} open to the sky; {past} reaching outside their boxes ({beyond * v:F0} m3); {meeting} meeting another room's air; "
                           + $"{grew} with air more than a quarter more than their box, {shrank} more than a quarter less");
         Console.WriteLine($"  air: in both {airBoth * v:F0} m3, only the flood {airOnly * v:F0} m3, only the box {boxOnlyAir * v:F0} m3; "
                           + $"IoU 10th {P(airIous, 0.1):F2}, median {P(airIous, 0.5):F2}, 90th {P(airIous, 0.9):F2}");
@@ -1226,6 +1238,111 @@ public static class GeometryParitySpike
                           + $"surface {P(sRatio, 0.1):F2} / {P(sRatio, 0.5):F2} / {P(sRatio, 0.9):F2}; RT60 mid {P(rtRatio, 0.1):F2} / {P(rtRatio, 0.5):F2} / {P(rtRatio, 0.9):F2}");
         Console.WriteLine($"  {flipped} enclosed or not changed; {gainMoved} with the room lift moved 1 dB or more; {materialsMoved} with a face's material changed");
         foreach (var (_, line) in rows.OrderByDescending(r => r.Key).Take(show)) Console.WriteLine("    " + line);
+    }
+
+    /// <summary>
+    /// The server's room at 24 random points in and round every indoor room's box (seed=), and each flooded room's
+    /// measure, written to dump=PATH: "p x y z region" and "m id volume surface". Two builds' dumps set side by side
+    /// say which points moved and how far each room's measure did.
+    /// </summary>
+    private static void DumpRooms(MapManager maps, string mapId, World ecs, TriangleWorld world, MapData data, Vector3 mapSize, string[] args)
+    {
+        string path = Arg(args, "dump", "rooms.dump");
+        var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
+        maps.RoomsOf(mapId);
+        var rng = new Random(int.Parse(Arg(args, "seed", "1")));
+        using var w = new StreamWriter(path);
+        var ci = CultureInfo.InvariantCulture;
+        foreach (var def in defs.Where(d => d.Region.RoomSize.X > 0))
+            w.WriteLine(string.Format(ci, "r {0} {1:F1} {2:F1} {3:F1} {4}", def.EntityId, def.Transform.Position.X, def.Transform.Position.Z,
+                                      def.Transform.Position.Y, def.Region.FriendlyName));
+        foreach (var def in defs.Where(d => d.Region.RoomSize.X > 0 && d.Region.IsIndoor).OrderBy(d => d.EntityId))
+        {
+            var t = def.Transform;
+            var rot = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
+            for (int k = 0; k < 24; k++)
+            {
+                var local = new Vector3((float)(rng.NextDouble() - 0.5), (float)(rng.NextDouble() - 0.5), (float)(rng.NextDouble() - 0.5))
+                            * (def.Region.RoomSize + new Vector3(2f));
+                var p = t.Position + Vector3.Transform(local, rot);
+                w.WriteLine(string.Format(ci, "p {0} {1:F3} {2:F3} {3:F3} {4}", def.EntityId, p.X, p.Y, p.Z, MapManager.RegionAt(ecs, p)));
+            }
+        }
+        var map = ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
+                                                    streamed: data.TileMetres > 0, report: false, geometry: world);
+        Span<float> fa = stackalloc float[6];
+        foreach (var (id, room) in map.Regions.OrderBy(kv => kv.Key))
+        {
+            if (!RoomAcoustics.IsMeasured(room)) continue;
+            RoomAcoustics.FaceAreas(room, fa);
+            float s = 0f; for (int f = 0; f < 6; f++) s += fa[f];
+            w.WriteLine(string.Format(ci, "m {0} {1:F2} {2:F2} {3:F2}", id, room.Volume, s, RoomAcoustics.AbsorptionArea(room).Y));
+        }
+        Console.WriteLine($"dump: {path}");
+    }
+
+    /// <summary>
+    /// Where rooms' floods meet each other's air, or the open sky, and whether a portal (a door's or a leafless one)
+    /// links the two there: a pair with none is bounded today only by the boxes, and a flood from points would split
+    /// it by distance instead.
+    /// </summary>
+    private static void MeetsParity(World ecs, TriangleWorld world, MapData data, int show)
+    {
+        var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
+        var seeds = new List<RoomFlood.Seed>();
+        var names = new Dictionary<int, string>();
+        var shut = new Dictionary<int, (Vector3, Quaternion)>();
+        var links = new Dictionary<(int, int), List<string>>();
+        foreach (var def in defs)
+        {
+            if (def.Region.IsIndoor && def.Region.RoomSize.X > 0f && def.Region.RoomSize.Y > 0f && def.Region.RoomSize.Z > 0f)
+            {
+                seeds.Add(new RoomFlood.Seed(def.EntityId, def.Transform.Position, def.Region.RoomSize, def.Transform.Rotation));
+                names[def.EntityId] = def.Region.FriendlyName;
+            }
+            if (def.Portal.OpeningRotation != default) shut[def.EntityId] = (def.Portal.OpeningCentre, def.Portal.OpeningRotation);
+            int a = def.Portal.RegionAId, b = def.Portal.RegionBId;
+            if (a == b) continue;
+            var key = a < b ? (a, b) : (b, a);
+            if (!links.TryGetValue(key, out var l)) links[key] = l = new List<string>();
+            l.Add(def.Portal.OpeningRotation != default ? "door" : "portal");
+        }
+        seeds.Sort((x, y) => x.Id.CompareTo(y.Id));
+        var shutWorld = world.WithMoverPoses(id => shut.TryGetValue(id, out var p) ? (true, p.Item1, p.Item2) : (false, default, default));
+        var rooms = RoomFlood.Flood(shutWorld, seeds, data.MinBound, EntityAcoustics.FloodBarriers(defs), threads: 8);
+        int pairs = 0, linked = 0, open = 0, openLinked = 0;
+        var unlinked = new List<string>();
+        var linkedMeets = new List<string>();
+        var openUnlinked = new List<string>();
+        var kinds = new Dictionary<string, int>();
+        foreach (var (id, room) in rooms)
+        {
+            foreach (int other in room.Meets)
+            {
+                if (other < id) continue;
+                pairs++;
+                if (links.TryGetValue((id, other), out var l))
+                {
+                    linked++;
+                    foreach (var k in l.Distinct()) kinds[k] = kinds.GetValueOrDefault(k) + 1;
+                    linkedMeets.Add($"{names[id]} ({id}) and {names[other]} ({other}) by {string.Join(", ", l)}");
+                }
+                else unlinked.Add($"{names[id]} ({id}) and {names[other]} ({other})");
+            }
+            if (room.Open)
+            {
+                open++;
+                var key = (Math.Min(id, AcousticConstants.GlobalRegionId), Math.Max(id, AcousticConstants.GlobalRegionId));
+                if (links.ContainsKey(key)) openLinked++;
+                else openUnlinked.Add($"{names[id]} ({id}) at {V(room.OpenAt.FirstOrDefault())}");
+            }
+        }
+        Console.WriteLine();
+        Console.WriteLine($"meets: {pairs} pairs of rooms whose air meets, {linked} linked by {string.Join(", ", kinds.Select(k => $"{k.Value} {k.Key}"))}, {pairs - linked} by nothing; "
+                          + $"{open} rooms open to the sky, {openLinked} with a portal to the outside");
+        foreach (var line in unlinked.Take(show)) Console.WriteLine("    unlinked: " + line);
+        foreach (var line in linkedMeets.Take(show)) Console.WriteLine("    linked: " + line);
+        foreach (var line in openUnlinked.Take(show)) Console.WriteLine("    open, no portal out: " + line);
     }
 
     /// <summary>One room's way out: the path through its air from the cell nearest its middle to where it met air no
@@ -1421,7 +1538,8 @@ public static class GeometryParitySpike
                 }
                 var sn = ss.Where(x => Near(x, s0)).Select(x => x.Id).ToList(); var cn = cs.Where(x => Near(x, c0)).Select(x => x.Id).ToList();
                 Console.WriteLine($"    near seeds: server {string.Join(",", sn)}; client {string.Join(",", cn)}; only server {string.Join(",", sn.Except(cn))}; only client {string.Join(",", cn.Except(sn))}");
-                var sr = RoomFlood.Flood(sw, ss, data.MinBound, threads: 4); var cr = RoomFlood.Flood(cw, cs, data.MinBound, threads: 4);
+                var sr = RoomFlood.Flood(sw, ss, data.MinBound, EntityAcoustics.FloodBarriers(serverDefs), threads: 4);
+                var cr = RoomFlood.Flood(cw, cs, data.MinBound, EntityAcoustics.FloodBarriers(defs), threads: 4);
                 foreach (int n in sn.Union(cn))
                     Console.WriteLine($"    {n}: server air {(sr.TryGetValue(n, out var a) ? a.AirCount : -1)} edge {(a?.EdgeCount ?? -1)} open {a?.Open}; "
                                       + $"client air {(cr.TryGetValue(n, out var b) ? b.AirCount : -1)} edge {(b?.EdgeCount ?? -1)} open {b?.Open}");
@@ -1447,6 +1565,30 @@ public static class GeometryParitySpike
     /// grid (main's OpeningRoutes) and from the triangle store tile by tile, the same questions asked of
     /// both, and what a tile changing costs each.
     /// </summary>
+    /// <summary>The openings the client's route graph holds, one a line (route=PATH): "o kind a b x y z width height
+    /// tau-mid", to set two maps' openings side by side.</summary>
+    private static void DumpRoutes(MapManager maps, string mapId, World ecs, Dictionary<int, Entity> lookup, MapData data, Vector3 mapSize, string[] args)
+    {
+        var world = new WorldSnapshot();
+        var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
+        foreach (var def in defs)
+        {
+            world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
+            if (def.Region.RoomSize.X > 0) world.RegionEntityIds.Add(def.EntityId);
+        }
+        world.TileMetres = data.TileMetres;
+        world.AcousticMap = ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
+                                                              streamed: false, report: false);
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+        var boxes = SteamAudioScene.BoxesFromWorld(world);
+        var graph = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, p => acoustics.GetRegionAt(world, p));
+        string path = Arg(args, "route", "routes.dump");
+        using var w = new StreamWriter(path);
+        foreach (var o in graph.Openings)
+            w.WriteLine(FormattableString.Invariant($"o {o.Kind} {o.RegionA} {o.RegionB} {o.Centre.X:F2} {o.Centre.Y:F2} {o.Centre.Z:F2} {2 * o.HalfWidth:F2} {2 * o.HalfHeight:F2} {o.Tau.Y:F3}"));
+        Console.WriteLine($"routes: {graph.Openings.Count} openings written to {path}");
+    }
+
     private static void RoutesParity(MapManager maps, string mapId, World ecs, Dictionary<int, Entity> lookup, MapData data,
                                      Vector3 mapSize, int n, int show, List<Tally> tallies, string[] args)
     {

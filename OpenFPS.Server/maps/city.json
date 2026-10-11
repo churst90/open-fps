@@ -12171,12 +12171,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 1.02,
+    "Y": 1.07,
     "Z": -102.72
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 1116,
    "RegionBId": 1097,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 1119,
@@ -14249,12 +14260,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 4.25,
+    "Y": 4.3,
     "Z": -102.72
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 1244,
    "RegionBId": 1225,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 1250,
@@ -16139,12 +16161,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 7.25,
+    "Y": 7.3,
     "Z": -102.72
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 1364,
    "RegionBId": 1345,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 1369,
@@ -18134,12 +18167,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 10.25,
+    "Y": 10.3,
     "Z": -102.72
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 1489,
    "RegionBId": 1470,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 1495,
@@ -20024,12 +20068,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 13.25,
+    "Y": 13.3,
     "Z": -102.72
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 1609,
    "RegionBId": 1590,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 1614,
@@ -22019,12 +22074,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 16.25,
+    "Y": 16.3,
     "Z": -102.72
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 1734,
    "RegionBId": 1715,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 1740,
@@ -23825,12 +23891,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 19.25,
+    "Y": 19.3,
     "Z": -102.72
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 1850,
    "RegionBId": 1831,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 1855,
@@ -25736,12 +25813,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 22.25,
+    "Y": 22.3,
     "Z": -102.72
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 1971,
    "RegionBId": 1952,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 1977,
@@ -27793,12 +27881,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 1.02,
+    "Y": 1.07,
     "Z": -103.12
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 2105,
    "RegionBId": 2086,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 2108,
@@ -29871,12 +29970,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 4.25,
+    "Y": 4.3,
     "Z": -103.12
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 2233,
    "RegionBId": 2214,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 2239,
@@ -31761,12 +31871,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 7.25,
+    "Y": 7.3,
     "Z": -103.12
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 2353,
    "RegionBId": 2334,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 2358,
@@ -33756,12 +33877,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 10.25,
+    "Y": 10.3,
     "Z": -103.12
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 2478,
    "RegionBId": 2459,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 2484,
@@ -35646,12 +35778,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 13.25,
+    "Y": 13.3,
     "Z": -103.12
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 2598,
    "RegionBId": 2579,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 2603,
@@ -37641,12 +37784,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 16.25,
+    "Y": 16.3,
     "Z": -103.12
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 2723,
    "RegionBId": 2704,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 2729,
@@ -39782,12 +39936,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 1.02,
+    "Y": 1.07,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 2861,
    "RegionBId": 2842,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 2864,
@@ -41860,12 +42025,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 4.25,
+    "Y": 4.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 2989,
    "RegionBId": 2970,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 2995,
@@ -43750,12 +43926,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 7.25,
+    "Y": 7.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 3109,
    "RegionBId": 3090,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 3114,
@@ -45745,12 +45932,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 10.25,
+    "Y": 10.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 3234,
    "RegionBId": 3215,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 3240,
@@ -47635,12 +47833,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 13.25,
+    "Y": 13.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 3354,
    "RegionBId": 3335,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 3359,
@@ -49630,12 +49839,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 16.25,
+    "Y": 16.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 3479,
    "RegionBId": 3460,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 3485,
@@ -51436,12 +51656,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 19.25,
+    "Y": 19.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 3595,
    "RegionBId": 3576,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 3600,
@@ -53347,12 +53578,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 22.25,
+    "Y": 22.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 3716,
    "RegionBId": 3697,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 3722,
@@ -55153,12 +55395,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 25.25,
+    "Y": 25.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 3832,
    "RegionBId": 3813,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 3837,
@@ -57064,12 +57317,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 28.25,
+    "Y": 28.3,
     "Z": 28.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 3953,
    "RegionBId": 3934,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 3959,
@@ -59121,12 +59385,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 1.02,
+    "Y": 1.07,
     "Z": 157.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 4087,
    "RegionBId": 4068,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 4090,
@@ -61199,12 +61474,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 4.25,
+    "Y": 4.3,
     "Z": 157.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 4215,
    "RegionBId": 4196,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 4221,
@@ -63089,12 +63375,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 7.25,
+    "Y": 7.3,
     "Z": 157.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 4335,
    "RegionBId": 4316,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 4340,
@@ -65084,12 +65381,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 10.25,
+    "Y": 10.3,
     "Z": 157.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 4460,
    "RegionBId": 4441,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 4466,
@@ -66974,12 +67282,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 13.25,
+    "Y": 13.3,
     "Z": 157.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 4580,
    "RegionBId": 4561,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 4585,
@@ -68969,12 +69288,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
-    "Y": 16.25,
+    "Y": 16.3,
     "Z": 157.08
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 4705,
    "RegionBId": 4686,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 4711,
@@ -71095,12 +71425,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 1.02,
+    "Y": 1.07,
     "Z": 157.48
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 4842,
    "RegionBId": 4823,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 4845,
@@ -73053,12 +73394,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 4.25,
+    "Y": 4.3,
     "Z": 157.48
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 4963,
    "RegionBId": 4944,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 4968,
@@ -75048,12 +75400,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 7.25,
+    "Y": 7.3,
     "Z": 157.48
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 5088,
    "RegionBId": 5069,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 5094,
@@ -76938,12 +77301,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 10.25,
+    "Y": 10.3,
     "Z": 157.48
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 5208,
    "RegionBId": 5189,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 5213,
@@ -78933,12 +79307,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 13.25,
+    "Y": 13.3,
     "Z": 157.48
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 5333,
    "RegionBId": 5314,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 5339,
@@ -80823,12 +81208,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 16.25,
+    "Y": 16.3,
     "Z": 157.48
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 5453,
    "RegionBId": 5434,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 5458,
@@ -82734,12 +83130,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
-    "Y": 19.25,
+    "Y": 19.3,
     "Z": 157.48
+   },
+   "Scale": {
+    "X": 0.5,
+    "Y": 1.05,
+    "Z": 3.5
    },
    "RegionAId": 5574,
    "RegionBId": 5555,
-   "ApertureSize": 1.4
+   "ApertureSize": 1.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 5580,
@@ -94154,12 +94561,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 211.17,
-    "Y": 3.29,
+    "Y": 2.965,
     "Z": 3.3333
    },
    "Scale": {
     "X": 2.954,
-    "Y": 1.284,
+    "Y": 1.154,
     "Z": 5.4667
    },
    "Name": "Terminal concourse, south end"
@@ -94169,12 +94576,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 211.17,
-    "Y": 3.29,
+    "Y": 2.965,
     "Z": 58.0
    },
    "Scale": {
     "X": 2.954,
-    "Y": 1.284,
+    "Y": 1.154,
     "Z": 5.4667
    },
    "Name": "Terminal concourse, middle end"
@@ -94184,12 +94591,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 211.17,
-    "Y": 3.29,
+    "Y": 2.965,
     "Z": 112.6667
    },
    "Scale": {
     "X": 2.954,
-    "Y": 1.284,
+    "Y": 1.154,
     "Z": 5.4667
    },
    "Name": "Terminal concourse, north end"
@@ -94474,12 +94881,23 @@
    "PrefabId": "portal",
    "Position": {
     "X": 277.94,
-    "Y": 4.0,
+    "Y": 4.2,
     "Z": 190.0
+   },
+   "Scale": {
+    "X": 13.0,
+    "Y": 4.2,
+    "Z": 1.2
    },
    "RegionAId": 6237,
    "RegionBId": -1,
-   "ApertureSize": 26.0
+   "ApertureSize": 26.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
   },
   {
    "EntityId": 6239,
@@ -127839,12 +128257,12 @@
    "Position": {
     "X": 0.0,
     "Y": 3.0,
-    "Z": -210.0
+    "Z": -190.0
    },
    "Scale": {
     "X": 1.2,
     "Y": 1.2,
-    "Z": 6.0
+    "Z": 2.0
    },
    "Name": "Main Street, block 2"
   },
@@ -149042,6 +149460,1216 @@
     "Z": 2.0
    },
    "Name": "58 Alder Street garden gate"
+  },
+  {
+   "EntityId": 9809,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -12.65,
+    "Y": 3.125,
+    "Z": -106.74
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.91,
+    "Z": 1.0
+   },
+   "RegionAId": 1116,
+   "RegionBId": 1244,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9810,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -11.05,
+    "Y": 6.125,
+    "Z": -107.52
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 1244,
+   "RegionBId": 1364,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9811,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -12.65,
+    "Y": 9.125,
+    "Z": -107.02
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 1364,
+   "RegionBId": 1489,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9812,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -11.05,
+    "Y": 12.125,
+    "Z": -107.52
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 1489,
+   "RegionBId": 1609,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9813,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -12.65,
+    "Y": 15.125,
+    "Z": -107.02
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 1609,
+   "RegionBId": 1734,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9814,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -11.05,
+    "Y": 18.125,
+    "Z": -107.52
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 1734,
+   "RegionBId": 1850,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9815,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -12.65,
+    "Y": 21.125,
+    "Z": -107.02
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 1850,
+   "RegionBId": 1971,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9816,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -10.65,
+    "Y": 24.125,
+    "Z": -107.52
+   },
+   "Scale": {
+    "X": 0.8,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 1971,
+   "RegionBId": 2013,
+   "ApertureSize": 1.6,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9817,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 3.125,
+    "Z": -106.74
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.91,
+    "Z": 1.0
+   },
+   "RegionAId": 2105,
+   "RegionBId": 2233,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9818,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 6.125,
+    "Z": -107.52
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 2233,
+   "RegionBId": 2353,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9819,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 9.125,
+    "Z": -107.02
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 2353,
+   "RegionBId": 2478,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9820,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 12.125,
+    "Z": -107.52
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 2478,
+   "RegionBId": 2598,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9821,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 15.125,
+    "Z": -107.02
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 2598,
+   "RegionBId": 2723,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9822,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 10.65,
+    "Y": 18.125,
+    "Z": -107.52
+   },
+   "Scale": {
+    "X": 0.8,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 2723,
+   "RegionBId": 2769,
+   "ApertureSize": 1.6,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9823,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 3.125,
+    "Z": 23.26
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.91,
+    "Z": 1.0
+   },
+   "RegionAId": 2861,
+   "RegionBId": 2989,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9824,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 6.125,
+    "Z": 22.48
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 2989,
+   "RegionBId": 3109,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9825,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 9.125,
+    "Z": 22.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 3109,
+   "RegionBId": 3234,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9826,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 12.125,
+    "Z": 22.48
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 3234,
+   "RegionBId": 3354,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9827,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 15.125,
+    "Z": 22.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 3354,
+   "RegionBId": 3479,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9828,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 18.125,
+    "Z": 22.48
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 3479,
+   "RegionBId": 3595,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9829,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 21.125,
+    "Z": 22.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 3595,
+   "RegionBId": 3716,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9830,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 24.125,
+    "Z": 22.48
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 3716,
+   "RegionBId": 3832,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9831,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 27.125,
+    "Z": 22.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 3832,
+   "RegionBId": 3953,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9832,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 10.65,
+    "Y": 30.125,
+    "Z": 22.48
+   },
+   "Scale": {
+    "X": 0.8,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 3953,
+   "RegionBId": 3995,
+   "ApertureSize": 1.6,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9833,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -12.65,
+    "Y": 3.125,
+    "Z": 153.26
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.91,
+    "Z": 1.0
+   },
+   "RegionAId": 4087,
+   "RegionBId": 4215,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9834,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -11.05,
+    "Y": 6.125,
+    "Z": 152.48
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 4215,
+   "RegionBId": 4335,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9835,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -12.65,
+    "Y": 9.125,
+    "Z": 152.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 4335,
+   "RegionBId": 4460,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9836,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -11.05,
+    "Y": 12.125,
+    "Z": 152.48
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 4460,
+   "RegionBId": 4580,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9837,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -12.65,
+    "Y": 15.125,
+    "Z": 152.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 4580,
+   "RegionBId": 4705,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9838,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -10.65,
+    "Y": 18.125,
+    "Z": 152.48
+   },
+   "Scale": {
+    "X": 0.8,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 4705,
+   "RegionBId": 4751,
+   "ApertureSize": 1.6,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9839,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 3.125,
+    "Z": 152.2
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.91,
+    "Z": 1.0
+   },
+   "RegionAId": 4842,
+   "RegionBId": 4963,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9840,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 6.125,
+    "Z": 152.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 4963,
+   "RegionBId": 5088,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9841,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 9.125,
+    "Z": 152.48
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 5088,
+   "RegionBId": 5208,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9842,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 12.125,
+    "Z": 152.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 5208,
+   "RegionBId": 5333,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9843,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 11.05,
+    "Y": 15.125,
+    "Z": 152.48
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 5333,
+   "RegionBId": 5453,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9844,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 12.65,
+    "Y": 18.125,
+    "Z": 152.98
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 5453,
+   "RegionBId": 5574,
+   "ApertureSize": 2.4,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9845,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 10.65,
+    "Y": 21.125,
+    "Z": 152.48
+   },
+   "Scale": {
+    "X": 0.8,
+    "Y": 2.63,
+    "Z": 1.0
+   },
+   "RegionAId": 5574,
+   "RegionBId": 5616,
+   "ApertureSize": 1.6,
+   "Rotation": {
+    "X": -0.707107,
+    "Y": 0.0,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9846,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -121.85,
+    "Y": 1.8,
+    "Z": 62.0
+   },
+   "Scale": {
+    "X": 42.0,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5688,
+   "RegionBId": -1,
+   "ApertureSize": 84.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9847,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -66.75,
+    "Y": 1.8,
+    "Z": 20.15
+   },
+   "Scale": {
+    "X": 55.25,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5688,
+   "RegionBId": -1,
+   "ApertureSize": 110.5
+  },
+  {
+   "EntityId": 9848,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -66.75,
+    "Y": 1.8,
+    "Z": 103.85
+   },
+   "Scale": {
+    "X": 55.25,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5688,
+   "RegionBId": -1,
+   "ApertureSize": 110.5
+  },
+  {
+   "EntityId": 9849,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -11.7,
+    "Y": 1.25,
+    "Z": 62.0
+   },
+   "Scale": {
+    "X": 42.0,
+    "Y": 1.25,
+    "Z": 4.0
+   },
+   "RegionAId": 5688,
+   "RegionBId": -1,
+   "ApertureSize": 84.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9850,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -121.85,
+    "Y": 4.55,
+    "Z": 62.0
+   },
+   "Scale": {
+    "X": 42.0,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5750,
+   "RegionBId": -1,
+   "ApertureSize": 84.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9851,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -66.75,
+    "Y": 4.55,
+    "Z": 20.15
+   },
+   "Scale": {
+    "X": 55.25,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5750,
+   "RegionBId": -1,
+   "ApertureSize": 110.5
+  },
+  {
+   "EntityId": 9852,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -66.75,
+    "Y": 4.55,
+    "Z": 103.85
+   },
+   "Scale": {
+    "X": 55.25,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5750,
+   "RegionBId": -1,
+   "ApertureSize": 110.5
+  },
+  {
+   "EntityId": 9853,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -11.7,
+    "Y": 4.0,
+    "Z": 62.0
+   },
+   "Scale": {
+    "X": 42.0,
+    "Y": 1.25,
+    "Z": 4.0
+   },
+   "RegionAId": 5750,
+   "RegionBId": -1,
+   "ApertureSize": 84.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9854,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -121.85,
+    "Y": 7.3,
+    "Z": 62.0
+   },
+   "Scale": {
+    "X": 42.0,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5812,
+   "RegionBId": -1,
+   "ApertureSize": 84.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9855,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -66.75,
+    "Y": 7.3,
+    "Z": 20.15
+   },
+   "Scale": {
+    "X": 55.25,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5812,
+   "RegionBId": -1,
+   "ApertureSize": 110.5
+  },
+  {
+   "EntityId": 9856,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -66.75,
+    "Y": 7.3,
+    "Z": 103.85
+   },
+   "Scale": {
+    "X": 55.25,
+    "Y": 0.7,
+    "Z": 3.0
+   },
+   "RegionAId": 5812,
+   "RegionBId": -1,
+   "ApertureSize": 110.5
+  },
+  {
+   "EntityId": 9857,
+   "PrefabId": "portal",
+   "Position": {
+    "X": -11.7,
+    "Y": 6.75,
+    "Z": 62.0
+   },
+   "Scale": {
+    "X": 42.0,
+    "Y": 1.25,
+    "Z": 4.0
+   },
+   "RegionAId": 5812,
+   "RegionBId": -1,
+   "ApertureSize": 84.0,
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707107,
+    "Z": 0.0,
+    "W": 0.707107
+   }
+  },
+  {
+   "EntityId": 9858,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 0.0,
+    "Y": 2.75,
+    "Z": -275.0
+   },
+   "Scale": {
+    "X": 6.0,
+    "Y": 2.75,
+    "Z": 1.0
+   },
+   "RegionAId": 5821,
+   "RegionBId": 5822,
+   "ApertureSize": 12.0
+  },
+  {
+   "EntityId": 9859,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 0.0,
+    "Y": 2.75,
+    "Z": -250.0
+   },
+   "Scale": {
+    "X": 6.0,
+    "Y": 2.75,
+    "Z": 1.0
+   },
+   "RegionAId": 5822,
+   "RegionBId": 5823,
+   "ApertureSize": 12.0
+  },
+  {
+   "EntityId": 9860,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 0.0,
+    "Y": 2.75,
+    "Z": -225.0
+   },
+   "Scale": {
+    "X": 6.0,
+    "Y": 2.75,
+    "Z": 1.0
+   },
+   "RegionAId": 5823,
+   "RegionBId": 5824,
+   "ApertureSize": 12.0
+  },
+  {
+   "EntityId": 9861,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 0.0,
+    "Y": 2.75,
+    "Z": -299.875
+   },
+   "Scale": {
+    "X": 6.0,
+    "Y": 2.75,
+    "Z": 1.0
+   },
+   "RegionAId": 5821,
+   "RegionBId": -1,
+   "ApertureSize": 12.0
+  },
+  {
+   "EntityId": 9862,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 0.0,
+    "Y": 2.75,
+    "Z": -200.125
+   },
+   "Scale": {
+    "X": 6.0,
+    "Y": 2.75,
+    "Z": 1.0
+   },
+   "RegionAId": 5824,
+   "RegionBId": -1,
+   "ApertureSize": 12.0
+  },
+  {
+   "EntityId": 9863,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 211.17,
+    "Y": 2.965,
+    "Z": 30.6667
+   },
+   "Scale": {
+    "X": 14.77,
+    "Y": 2.885,
+    "Z": 1.0
+   },
+   "RegionAId": 6219,
+   "RegionBId": 6220,
+   "ApertureSize": 29.54
+  },
+  {
+   "EntityId": 9864,
+   "PrefabId": "portal",
+   "Position": {
+    "X": 211.17,
+    "Y": 2.965,
+    "Z": 85.3333
+   },
+   "Scale": {
+    "X": 14.77,
+    "Y": 2.885,
+    "Z": 1.0
+   },
+   "RegionAId": 6220,
+   "RegionBId": 6221,
+   "ApertureSize": 29.54
   }
  ],
  "Crossings": [
