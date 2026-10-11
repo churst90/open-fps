@@ -118,7 +118,8 @@ reverb that comes from the room's actual size and materials.
   Steam Audio bindings), `OpenFPS.Common` (shared simulation and the wire), `OpenFPS.Server`,
   `OpenFPS.Client.Core` (client logic and the audio engine), `OpenFPS.Client.Gtk` (Linux client),
   `OpenFPS.Client` (Windows client), `OpenFPS.AudioLab` (measurement and rendering tools; `--help`
-  lists them), `OpenFPS.Tests`.
+  lists them), `OpenFPS.Astronomy` (where the sun and the moon are), `OpenFPS.Words` (the compass points,
+  said one way everywhere), `OpenFPS.Tests`.
 - Build with `--artifacts-path` pointing outside the repository (see the run scripts). Do not use
   `dotnet run`: it writes `obj/` and `bin/` into the repository. The repository is on btrfs on the
   NVMe now, not ntfs3 (the run scripts' comments still say ntfs3).

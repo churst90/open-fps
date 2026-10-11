@@ -327,8 +327,7 @@ public class ClientWorldState
         if (def.SoundEmitter.RunsOnItsOwn())
             _audioEntityIds[def.EntityId] = 0;
 
-        if (!IsWood(def.EntityId) && def.SoundEmitter.IsSynth
-            && def.SoundEmitter.SoundId?.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase) == true)
+        if (!IsWood(def.EntityId) && def.SoundEmitter.IsSynth && ModelKindTable.Is(def.SoundEmitter.SoundId, ModelSynth.Foliage))
         {
             if (_crownIds.TryAdd(def.EntityId, 0)) _crownsDirty = true;
         }

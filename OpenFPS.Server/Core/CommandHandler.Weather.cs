@@ -4,6 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;
+using OpenFPS.Words;
 
 namespace OpenFPS.Server.Core;
 
@@ -105,27 +106,28 @@ public partial class CommandHandler
 
     internal static string GustWord(float gustiness) => gustiness < 0.2f ? "steady" : gustiness < 0.5f ? "gusty" : "very gusty";
 
-    private static readonly string[] Points =
-        { "north", "north east", "east", "south east", "south", "south west", "west", "north west" };
-
-    /// <summary>The nearest of the eight points to a bearing, in words.</summary>
+    /// <summary>The nearest of the eight points to a bearing; exactly between two, the cardinal.</summary>
     internal static string CompassWord(float degrees)
     {
-        int i = (int)MathF.Round(((degrees % 360f) + 360f) % 360f / 45f) % 8;
-        return Points[i];
+        // Wrapped in float, as it always was: the wrap rounds a bearing a float's width off a midpoint onto it.
+        return CompassWords.Of(((degrees % 360f) + 360f) % 360f, 8, MidpointRounding.ToEven);
     }
 
-    private static readonly Dictionary<string, float> Bearings = new(StringComparer.OrdinalIgnoreCase)
+    /// <summary>Each of the sixteen points run together ("northnortheast") and by its initials ("nne"),
+    /// to its bearing.</summary>
+    internal static readonly Dictionary<string, float> Bearings = BearingsOf();
+
+    private static Dictionary<string, float> BearingsOf()
     {
-        ["north"] = 0, ["n"] = 0, ["northnortheast"] = 22.5f, ["nne"] = 22.5f,
-        ["northeast"] = 45, ["ne"] = 45, ["eastnortheast"] = 67.5f, ["ene"] = 67.5f,
-        ["east"] = 90, ["e"] = 90, ["eastsoutheast"] = 112.5f, ["ese"] = 112.5f,
-        ["southeast"] = 135, ["se"] = 135, ["southsoutheast"] = 157.5f, ["sse"] = 157.5f,
-        ["south"] = 180, ["s"] = 180, ["southsouthwest"] = 202.5f, ["ssw"] = 202.5f,
-        ["southwest"] = 225, ["sw"] = 225, ["westsouthwest"] = 247.5f, ["wsw"] = 247.5f,
-        ["west"] = 270, ["w"] = 270, ["westnorthwest"] = 292.5f, ["wnw"] = 292.5f,
-        ["northwest"] = 315, ["nw"] = 315, ["northnorthwest"] = 337.5f, ["nnw"] = 337.5f,
-    };
+        var bearings = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < CompassWords.Sixteen.Length; i++)
+        {
+            string[] words = CompassWords.Sixteen[i].Split(' ');
+            bearings[string.Concat(words)] = i * 22.5f;
+            bearings[string.Concat(words.Select(w => w[0]))] = i * 22.5f;
+        }
+        return bearings;
+    }
 
     /// <summary>
     /// "8", "8 northwest", "8 north west gusty", "12 270 very gusty", "0": a speed in metres a second,

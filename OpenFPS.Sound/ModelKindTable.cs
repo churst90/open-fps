@@ -108,6 +108,8 @@ public static class ModelKindTable
     private static readonly Dictionary<string, ModelKind> ByPrefix =
         Rows.ToDictionary(r => r.Prefix, StringComparer.OrdinalIgnoreCase);
 
+    private static readonly Dictionary<ModelSynth, ModelKind> BySynth = Rows.ToDictionary(r => r.Synth);
+
     /// <summary>Every kind, in the table's order.</summary>
     public static IReadOnlyList<ModelKind> All => Rows;
 
@@ -122,6 +124,10 @@ public static class ModelKindTable
 
     /// <summary>Whether a sound id is of this kind.</summary>
     public static bool Is(string? soundId, ModelSynth synth) => KindOf(soundId)?.Synth == synth;
+
+    /// <summary>The sound id of a model of a kind: the kind's prefix, a colon and <paramref name="rest"/>
+    /// ("bell:" and "crossing_gong").</summary>
+    public static string IdOf(ModelSynth synth, string rest) => BySynth[synth].Prefix + ":" + rest;
 
     // ── Level, headroom, places ─────────────────────────────────────────────────────────────────
 
@@ -273,6 +279,9 @@ public static class ModelKindTable
 
     /// <summary>"rail:&lt;preset&gt;/&lt;train&gt;/&lt;source index&gt;": what the server writes as the SoundId of
     /// each entity of a consist.</summary>
+    public static string RailSource(string preset, string train, int index) => IdOf(ModelSynth.Rail, $"{preset}/{train}/{index}");
+
+    /// <summary>Reads what <see cref="RailSource"/> writes.</summary>
     public static bool TryRailSource(string? soundId, out string preset, out string train, out int index)
     {
         preset = ""; train = ""; index = -1;
@@ -346,12 +355,9 @@ public static class ModelKindTable
     private static (float, float)? AircraftLevel(string id)
     {
         var p = AircraftProfile.ByName(id[9..]);
-        float span = p.EngineSpanMetres > 0f
-            ? p.EngineSpanMetres
-            : MathF.Max(2f, p.Propeller?.DiameterMetres
-                         ?? p.Turbine?.Fan?.DiameterMetres
-                         ?? p.Turbine?.BypassNozzleDiameterMetres
-                         ?? 2f);
+        float? radiates = p.Propeller?.DiameterMetres ?? p.Turbine?.Fan?.DiameterMetres ?? p.Turbine?.BypassNozzleDiameterMetres;
+        if (p.EngineSpanMetres <= 0f && radiates == null) Fail(id, "declares no propeller, fan or nozzle to size it by; sized 2 m");
+        float span = p.EngineSpanMetres > 0f ? p.EngineSpanMetres : MathF.Max(2f, radiates ?? 2f);
         return (p.SourceLevelDb, span);
     }
 }

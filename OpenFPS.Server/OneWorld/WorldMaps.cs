@@ -6,6 +6,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Serilog;
+using OpenFPS.Words;
 
 namespace OpenFPS.Server.OneWorld;
 
@@ -140,8 +141,6 @@ public sealed class WorldMaps
 
     public static bool IsWorldMap(string mapId) => mapId.StartsWith(IdPrefix, StringComparison.OrdinalIgnoreCase);
 
-    private static readonly string[] Compass8 = { "north", "north east", "east", "south east", "south", "south west", "west", "north west" };
-
     public bool TryGetFrame(string mapId, out Frame frame)
     {
         lock (_frames) return _frames.TryGetValue(mapId, out frame!);
@@ -170,7 +169,7 @@ public sealed class WorldMaps
         float d = MathF.Sqrt(dx * dx + dz * dz);
         if (d < 30f) return $"the world, at {frame.Place.Name}";
         float bearing = (MathF.Atan2(dx, dz) * 180f / MathF.PI + 360f) % 360f;
-        string way = Compass8[(int)((bearing + 22.5f) / 45f) % 8];
+        string way = CompassWords.Of(bearing, 8);
         string far = d < 1000f ? $"{d:F0} metres" : $"{d / 1000f:F1} kilometres";
         return $"the world, {far} {way} of {frame.Place.Name}";
     }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using OpenFPS.Words;
 
 namespace OpenFPS.Astronomy;
 
@@ -9,22 +10,8 @@ namespace OpenFPS.Astronomy;
 /// </summary>
 public static class SkyWords
 {
-    /// <summary>The sixteen points clockwise from north, spelt as the game's eight are ("north east", the
-    /// weather's and the editor's words), the half-points by the same rule.</summary>
-    public static readonly string[] Points =
-    {
-        "north", "north north east", "north east", "east north east",
-        "east", "east south east", "south east", "south south east",
-        "south", "south south west", "south west", "west south west",
-        "west", "west north west", "north west", "north north west",
-    };
-
     /// <summary>The nearest of the sixteen points to an azimuth in degrees from true north.</summary>
-    public static string Compass(double azimuth)
-    {
-        double a = ((azimuth % 360.0) + 360.0) % 360.0;
-        return Points[(int)Math.Round(a / 22.5, MidpointRounding.AwayFromZero) % 16];
-    }
+    public static string Compass(double azimuth) => CompassWords.Of(azimuth, 16);
 
     public static string Readout(SkyNow sky, TimeZoneInfo zone, Func<double, string>? bearing = null)
     {

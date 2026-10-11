@@ -102,7 +102,7 @@ public sealed class CrossingSystem
                     new SoundEmitterComponent
                     {
                         IsSynth = true,
-                        SoundId = "bell:" + (cd.Bell ?? "crossing_gong"),
+                        SoundId = ModelKindTable.IdOf(ModelSynth.Bell, cd.Bell ?? "crossing_gong"),
                         Mode = PlaybackMode.LoopOne,
                         Volume = 1f,
                         Range = Loudness.AudibleRange(86f),
@@ -173,7 +173,7 @@ public sealed class CrossingSystem
                     new SoundEmitterComponent
                     {
                         IsSynth = true,
-                        SoundId = "gate:" + CrossingGateSpec.Standard.Name,
+                        SoundId = ModelKindTable.IdOf(ModelSynth.Gate, CrossingGateSpec.Standard.Name),
                         Mode = PlaybackMode.LoopOne,
                         Volume = 1f,
                         Range = Loudness.AudibleRange(CrossingGateSpec.Standard.ClunkDb),

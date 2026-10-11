@@ -23,7 +23,7 @@ Where the parts stand (2026-10-11):
 |---|---|
 | P0, wider guards | done 2026-10-11 ("P0 as built"); tests only. The replay's backwards vehicles it found were fixed the same day (e5e3d0f6), all eight streams regenerated |
 | P1, the pops and the worker's answers | done 2026-10-11, unheard. The Main Street pavement's pops fixed; Marlow Tower's floor 1 stairwell's are the barrier model's |
-| P2, one table of model kinds | done 2026-10-11 ("P2 as built"); no stream changed. Two questions for Cody there |
+| P2, one table of model kinds | done 2026-10-11 ("P2 as built"), its leftovers (the server's prefixes, S26, S27's model fallbacks) the same day; no stream changed. Two questions for Cody there |
 | P5, names and materials to properties | under way |
 | P8, laws in one place | under way |
 | The barrier model (a way round one thing that passes through another), found by P1 | under way, a part of its own (todo.md, "Acoustics") |
@@ -340,11 +340,26 @@ questions; `TryRailSource` and `TryWaterTap` are the two keys' parsers, which th
   - `ModelKinds.TryModelOfSound` misses rail, wood, horn, aircraft, gate, siren and rain. Kept as it was:
     answering for rail and wood would let the editor restart and edit trains and woods through their sound,
     a change in the editor. Their rows have no `LibraryKind` until that is decided.
-- Not done here: S26's two caches (`AudioEmission._presetOffsets`, `_outletSeparation`) and S27's model
-  fallbacks (horn kind, aircraft size, cabin door port) are as they were; the server's id writers
-  (`VehicleSystem`'s prefix, `CrossingSystem`) and its readers outside P2's list (`WorldEditor.Menus`,
-  `MapDrainage`, `MapTiles`, `Program.cs`'s flow test, `ClientWorldState`'s foliage test, which Part C owns)
-  still spell prefixes.
+- The leftovers, done later the same day:
+  - The server's own prefixes read the table. Writers: `ModelKindTable.IdOf(synth, rest)` in `VehicleSystem`
+    (engine, machine, aircraft), `CrossingSystem` (bell, gate), `CompositeService` (a parked car's engine),
+    `DrainageNetwork.Voice` (flow), and `ModelKindTable.RailSource`, beside its parser, in `RailSystem`.
+    Readers: `WorldEditor.Menus.CategoryOf`, `MapDrainage.PlacedWater`, `MapTiles`' foliage, `Program.IsTap`
+    (whose silent catch now logs by id) and `ClientWorldState`'s foliage. The server reaches the table through
+    OpenFPS.Common, so no reference was added. Left: `CompositeService.AircraftPrefix` is a map record's
+    template id, not a sound id; the client's own voice keys in CAS and the provider (`rail:...@k`, a water
+    tap's feature key, a siren's `PhysicalKey`) and the library's key owners (`Fire.Key`, `GasHob.Prefix`,
+    `Honk.Prefix`, `WoodChorus.Prefix`, `Waves`) still spell theirs.
+  - S26: neither cache is kept. `AudioEmission.LocalOffset` and CAS `OutletSeparation` read the vehicle from
+    `MachineRegistry.VehicleFor`, which is memoised already and renewed by a model edit or a registry load,
+    so a preset asked for before it was known, or an edited exhaust, is right once it is. An unknown preset
+    is logged once by the table (`KnownVehiclePreset`).
+  - S27, the model fallbacks: each keeps its value and is logged once by id (`ModelKindTable.Fail`). A horn
+    with no model (`Honk.LevelDb`, 110 dB), an aeroplane with no propeller, fan or nozzle to size it
+    (`AircraftLevel`, 2 m), and an air-braked vehicle's door with no air system or no door port
+    (`CabinPaths`, its `catch { }` gone; a metre from the front, kerb side). `ModelKindTableTests` checks no
+    shipped horn, aeroplane or door falls back. The other S27 items (the rain patch, the bump, the hand-over
+    and teleporter levels, CAS's `"SYNTH"`, span and length) are measured or voice values, for P3d.
 - Guards: all eight replay streams and the render fingerprints unchanged, not regenerated; the boundary
   ratchet gains the one library file and no crossing.
 

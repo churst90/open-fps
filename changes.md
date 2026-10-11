@@ -15,6 +15,23 @@ Recent work, newest first. `git log` has the rest.
   a slab's edge or a neighbour's shed before a wall, or passes a pier beside a window. A leg costs 1 to 10 % more.
   The emitter streams and render fingerprints are unchanged. The lab's `--barrier-sweep` measures it on any map,
   and `--walk-pair ears=` finds a standing spot by each ear it reports.
+- P2's leftovers (docs/SPECIAL_CASES_AUDIT.md, "P2 as built"); nothing heard or said changes. The server writes
+  and reads model ids through `ModelKindTable` (`IdOf`, `RailSource`, `KindOf`): the vehicles, the crossings'
+  bell and gate, a parked car, the drainage lines, the trains, the editor's categories, the placed water, the
+  tiles' trees, the taps, and the client's crowns. S26: the exhaust offset and the outlet separation have no
+  cache of their own; they read the registry's vehicle, which a model edit renews. S27: a horn with no model,
+  an aeroplane with nothing to size it by and a door with no port keep their old values and are logged once by
+  id. The wire hash changes (AudioEmission, Honk and the table are in it).
+
+- One set of compass words: `OpenFPS.Words` (no dependencies) has `CompassWords.Of(degrees, points)` for 16,
+  8 or 4 points, and every compass word in the game calls it: /wind, /build, the editor, the world's "north
+  east of Magnolia", the driving aids' heading, the F key's facing and the sky readout. Seven copies of the
+  eight words, two of the four and the weather's names for the sixteen are gone. OpenFPS.Astronomy references
+  it; Server and Client.Core reference it directly. Every caller says what it said: each keeps its own angle
+  sum and wrap, and the wind, the editor and the driving aids still round a bearing exactly between two points
+  to the cardinal (the rest clockwise). The one difference is three float bearings, each a float short of a
+  midpoint, that the world's description put in the next point (`CompassWordsTests`, which keeps the old
+  copies as the record). The gen_osm.py mirror's "northeast" wall names are left to match the Python.
 - The emitter-stream replay turns vehicles and the listener as the game does (+Z forward, yaw toward east), not
   backwards; a test fix, no game change. All eight streams regenerated (docs/SPECIAL_CASES_AUDIT.md, P0).
 

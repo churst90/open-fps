@@ -2,14 +2,19 @@
 
   <!-- Where the sun and the moon are (docs/SKY.md): the sun by NOAA's solar position equations, the moon by
        Meeus's lunar series, rise and set and twilight, the moon's phase, and the sentence that says it. Pure
-       functions of a latitude, a longitude and a UTC instant. It references no other project and no package,
-       so the server's /sky and the client's key can both use it. Nothing of it is on the wire. -->
+       functions of a latitude, a longitude and a UTC instant. It references only OpenFPS.Words (the compass
+       points) and no package, so the server's /sky and the client's key can both use it. Nothing of it is on
+       the wire. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Words\OpenFPS.Words.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="OpenFPS.Tests" />
