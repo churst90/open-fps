@@ -328,6 +328,10 @@ internal sealed partial class VoiceRegistry
     /// <summary>A landing's part (<see cref="IdFor"/>): one landing at a time, the next replacing it.</summary>
     public const int Landing = -1;
 
+    /// <summary>The part of an entity's probe a beacon's blip is asked under: beside its one-offs' and its
+    /// voice's (part 0), from a point of its own (a door's face).</summary>
+    public const int BeaconProbe = 1;
+
     /// <summary>
     /// The id of one voice: <paramref name="kind"/> of <paramref name="owner"/>, the <paramref name="part"/>th of
     /// them. The owner is an entity, or for a voice no entity owns what it belongs to (a train's number, a rain

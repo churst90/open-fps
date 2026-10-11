@@ -185,6 +185,7 @@ string[] usage =
     "                                                up and down real treads, every footfall checked (docs/GEOMETRY.md)",
     "  --enclosure [map= at= walk= step= head= dist=]",
     "                                                what the room round a listener measures, and its send",
+    "  --beacon-count [map=city] tp=E,N,H [tp=...] [list]   door beacons heard by the tracer and by the worker's answer",
     "  --path-probe [map=city] ear=x,y,z src=x,y,z [door= open= swings= traced legcost explain panels root=]",
     "                                                what the occlusion worker hands the mixer",
     "  --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor] [panels|buried] [pair=E;S] [server=DIR] [dump=FILE]",
@@ -877,6 +878,10 @@ if (args.Contains("--thin-panel"))
 if (args.Contains("--barrier-sweep"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.BarrierSweepSpike.Run(args));
+}
+if (args.Contains("--beacon-count"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.BeaconCountSpike.Run(args));
 }
 if (args.Contains("--path-probe"))
 {

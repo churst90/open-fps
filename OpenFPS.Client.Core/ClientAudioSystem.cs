@@ -397,6 +397,8 @@ public partial class ClientAudioSystem
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
         _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced) { Manual = manualAcoustics };
         WorldAudio.Worker = _acousticWorker;
+        // Blips are heard by the worker's answer, as every sustained voice is (P6).
+        _beacons.Worker = _acousticWorker;
         _acousticWorker.Start();
     }
 
@@ -579,6 +581,7 @@ public partial class ClientAudioSystem
         WorldAudio.Cabins = _cabins;
         WorldAudio.SelfId = OwnEntityId;
         WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
+        _beacons.EarSpeed = _earSpeed;
         _beacons.Update(world, visualEyePos, _now(), OwnEntityId);
         _drivingAids.Update(world, _state, _now());
         // The rest of the world through the glass, if you sit in anything with a roof.

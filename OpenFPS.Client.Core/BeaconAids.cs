@@ -111,9 +111,11 @@ public sealed class BeaconAids
                     // First heard: start on a beat of its own, so two doors side by side do not blip
                     // in unison for ever.
                     _next[id] = now + (Math.Abs(id) % 16) / 16.0 * _prefs.Every;
+                    Ask(world, id, BlipPoint(world, id, at, listener, out _), listener);
                     continue;
                 }
-                if (now < due) continue;
+                // Asked every frame it is near, so the worker's answer is fresh when it blips.
+                if (now < due) { Ask(world, id, BlipPoint(world, id, at, listener, out _), listener); continue; }
                 _next[id] = now + _prefs.Every;
                 Blip(world, id, people ? SoundFor(world, id, myTeam) : kind.Sound, at, listener);
             }
@@ -152,22 +154,31 @@ public sealed class BeaconAids
         return Blip(world, id, sound, at, listener);
     }
 
+    /// <summary>
+    /// Where a beacon's blip sounds from, and the room it rings: a door's at face height on your side of it,
+    /// ringing the room you are in (from the middle of the doorway it rang whichever zone the doorway fell to);
+    /// a vehicle's on the side of its body toward you (from the middle of its footprint every path out read 0.95
+    /// blocked and none was heard, Cody, 2026-10-05); anything else where it is.
+    /// </summary>
+    private Vector3 BlipPoint(WorldSnapshot world, int sourceId, Vector3 at, Vector3 listener, out int region)
+    {
+        region = -1;
+        if (TryDoorFace(world, sourceId, listener, out var face, out var inRoom))
+        {
+            if (_acoustics != null) region = _acoustics.GetRegionAt(world, inRoom);
+            return face;
+        }
+        return TryVehicleSide(world, sourceId, listener, out var side) ? side : at;
+    }
+
     /// <summary>One blip, unless a wall is in the way of it: then false.</summary>
     private bool Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
     {
         var (gain, reference) = Loudness.Place(BlipDb + (float)_prefs.LevelDb);
-        // A door's beacon is fixed to the door at face height on your side, and rings the room you are
-        // in. From the middle of the doorway it rang whichever zone the doorway fell to.
-        int region = -1;
-        if (TryDoorFace(world, sourceId, listener, out var face, out var inRoom))
-        {
-            at = face;
-            if (_acoustics != null) region = _acoustics.GetRegionAt(world, inRoom);
-        }
-        // A vehicle's beacon is on the side of its body toward you. From the middle of its footprint
-        // every path out read 0.95 blocked and none was heard (Cody, 2026-10-05).
-        else if (TryVehicleSide(world, sourceId, listener, out var side)) at = side;
-        // The acoustic path every one-off sound takes; the door's own leaf does not block its own blip.
+        at = BlipPoint(world, sourceId, at, listener, out int region);
+        // The path the worker answers for this beacon (the hand-rolled tracer until it has); the door's own
+        // leaf does not block its own blip.
+        Ask(world, sourceId, at, listener);
         if (!Reaches(world, sourceId, listener, at, out var path)) return false;
         int blip = _idx++;
         int voiceId = Voices.IdFor(VoiceKind.Beacon, VoiceRegistry.NoEntity, blip);
@@ -198,23 +209,80 @@ public sealed class BeaconAids
         return true;
     }
 
-    /// <summary>Whether a blip from this beacon reaches you, and by what path. A beacon you can see
-    /// always does; one you cannot must be no more than half blocked — round a near corner, not
-    /// through a wall.</summary>
+    /// <summary>
+    /// Whether a blip from this beacon reaches you, and by what path: the acoustic worker's answer for it, the
+    /// path every sustained voice is heard by (the simulator's transmission, the routes through doorways, the
+    /// way round one thing that runs on through another, the edge it bends over), or the hand-rolled tracer's
+    /// until the worker has answered. A beacon you can see always does; one you cannot must be no more than
+    /// half blocked by that path, round a near corner or through a doorway and not through a wall. Whether it
+    /// sounds, where from and how loud are the one answer, and so is the tracker's "behind a wall".
+    /// </summary>
     internal bool Reaches(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at,
                           out OpenFPS.Client.AudioEngine.Data.AcousticPathData? path)
     {
-        path = null;
-        if (_acoustics == null) return true;
-        try { path = _acoustics.CalculateAcousticPath(world, sourceId, listener, at); } catch { }
-        return path is not { } blocked || blocked.Occlusion <= MaxOcclusion || InSight(world, sourceId, listener, at);
+        path = Answered(world, sourceId, listener, at);
+        return Hears(path, () => InSight(world, sourceId, listener, at));
+    }
+
+    /// <summary>The rule on an answer: in sight, or no more than <see cref="MaxOcclusion"/> blocked.</summary>
+    internal static bool Hears(OpenFPS.Client.AudioEngine.Data.AcousticPathData? path, Func<bool> inSight)
+        => path is not { } blocked || blocked.Occlusion <= MaxOcclusion || inSight();
+
+    /// <summary>The worker's answer for this beacon's blip at <paramref name="at"/> heard at
+    /// <paramref name="listener"/>, if it has a fresh one; otherwise the hand-rolled tracer's; null without
+    /// acoustics.</summary>
+    internal OpenFPS.Client.AudioEngine.Data.AcousticPathData? Answered(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
+    {
+        if (_acoustics == null) return null;
+        float speed = world.Entities.TryGetValue(sourceId, out var e) ? e.Velocity.Length() : 0f;
+        if (Worker != null && Worker.TryGetDirectFor(ProbeOf(sourceId), at, speed, listener, EarSpeed, out var answer))
+        {
+            AnsweredByWorker++;
+            return answer;
+        }
+        try { return _acoustics.CalculateAcousticPath(world, sourceId, listener, at); } catch { return null; }
+    }
+
+    /// <summary>Where a placed beacon blips from for this listener, and asks the worker about it: for the lab's
+    /// count of the doors heard (--beacon-count).</summary>
+    internal Vector3 AskFor(WorldSnapshot world, int sourceId, Vector3 listener)
+    {
+        var at = BlipPoint(world, sourceId, world.Entities[sourceId].Transform.Position, listener, out _);
+        Ask(world, sourceId, at, listener);
+        return at;
+    }
+
+    /// <summary>The acoustic worker blips are heard by (P6); null, the hand-rolled tracer alone.</summary>
+    internal OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker? Worker { get; set; }
+
+    /// <summary>How fast the ear moves, m/s: how far from here an answer traced a moment ago may have been
+    /// asked (AcousticPathData.Answers).</summary>
+    internal float EarSpeed { get; set; }
+
+    /// <summary>Blips decided on the worker's answer rather than the tracer's, for a test.</summary>
+    internal int AnsweredByWorker { get; private set; }
+
+    /// <summary>The question a beacon's blip is asked of the worker under: a probe of its own, beside the one
+    /// its owner's one-offs and voice are asked under.</summary>
+    private int ProbeOf(int sourceId) => Voices.IdFor(VoiceKind.Probe, sourceId, VoiceRegistry.BeaconProbe);
+
+    /// <summary>Asks the worker about a beacon's blip from <paramref name="at"/>, its own body left out of the
+    /// tracer's rays, so an answer is in by the time it blips.</summary>
+    private void Ask(WorldSnapshot world, int sourceId, Vector3 at, Vector3 listener)
+    {
+        if (Worker == null) return;
+        Worker.EnqueueRequest(new OpenFPS.Client.AudioEngine.Acoustics.AcousticRequest
+        {
+            EntityId = ProbeOf(sourceId), ListenerPos = listener, SourcePos = at,
+            SourceRadius = AudioEmission.MinOcclusionRadius, LeaveOut = sourceId,
+        });
     }
 
     /// <summary>
     /// Whether nothing stands between you and the face of the thing on your side of it: one ray from
     /// just off its thinnest face, which clears the jamb and the wall a door is set into.
     /// </summary>
-    private bool InSight(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
+    internal bool InSight(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
     {
         if (_acoustics == null || !world.Entities.TryGetValue(sourceId, out var e)) return false;
         // A vehicle's blip is already off its body on your side (TryVehicleSide). Stepped off its
