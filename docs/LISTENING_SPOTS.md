@@ -9,7 +9,7 @@ teleporter charges for two seconds before it moves you. `/tp` also takes a place
 
 The city spawn is on the Foundry Street pavement, `/tp 60 122 0.15`, facing north.
 
-## Spots checked to stand on (2026-10-10)
+## Spots checked to stand on (2026-10-11)
 
 Each is on its room's floor and clear to the server's teleport check (`ListeningSpotsTests`). A room's middle
 is often no such spot: half its height is above the ceiling's reach, a narrow room's middle can be in a wall,
@@ -43,10 +43,11 @@ and furniture stands there. To make another, give AudioLab the room's id from th
 | 58 Alder Street garden gate | `/tp -330 148.8 0.2` | The fire through the open gate, against the fence beside it |
 | Marlow Tower front entrance, outside | `/tp -7 -103 0.5` | The glass front door: keyed from the street, pulled open, swings out |
 | Marlow Tower front entrance, inside | `/tp -12 -103 0.5` | The same door from the stairwell: push bar, swings out |
-| Marlow Tower floor 3 corridor, by the stair door | `/tp -19.95 -101.5 9.29` | A train going by to the south: a rumble through the end wall, its horn as muffled as the rest of it. A siren on Main Street not through the shut stair door |
-| Marlow Tower floor 3 stair door | the same spot, facing east | The new fire door onto the stair: push bar from the corridor, it swings into the stair and its closer shuts it |
-| Marlow Tower floor 3 stairwell | `/tp -10.8 -104.2 9.28` | In rain: no rain inside the stairwell, the street's only faintly through the front entrance |
-| Marlow Tower floor 7 corridor | `/tp -19.95 -100 21.29` | In rain: the roof faint and low through its slab |
+| Marlow Tower floor 3 corridor, by the stair door | `/tp -19.95 -101.5 9.29` | Between two flats' doors: E opens the one you face, else the nearer (2026-10-11) |
+| Main Street pavement before Marlow Tower's entrance | `/tp -6.4 -103.5 0.12` | With traffic: no pops from the cars on Wharf Avenue over the car park and the tower (audit P1, 2026-10-11) |
+| Marlow Tower floor 1 stairwell | `/tp -10.8 -104.2 3.28` | Still there: 4 to 11 pops a minute from a car on Dock Street, the barrier model's (todo, Acoustics) |
+| 19415 Turtle Dove Lane, the barn (magnolia tx) | `/tp -88.8 -253.0 3.9` | Comma or period to the house's doors: "behind a wall" instead of a beacon that never comes |
+| 19617 Turtle Dove Lane, the house (magnolia tx) | `/tp -301.4 -268.7 5.2` | Walking in and out of every room; the back door clear of the counter, steps at the outside doors |
 | Union Building roof | `/tp 12 29 30.3` | Open air ten storeys up; the roof access door (steel, push bar) a few steps away |
 | Union Building stairwell, floor 1 | `/tp 12 30 3.3` | The stairs: a flight up, a flight down, the open well |
 

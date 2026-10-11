@@ -6,10 +6,16 @@ order of work, steps 5 and 6: weather as a system, wind acting on things), CODY_
 (weather as a system, every value holdable by hand), docs/WORLD_STREAMING.md (one world on the UTM grid,
 frames, the server fetches) and todo.md ("Real places from open data": "Real weather for real places
 (Open-Meteo or NOAA by latitude and longitude)"). Its build order stays where todo.md puts weather: Next, in
-order, item 6.
+order, item 7 (the detail, after the physics and library stages).
 
 Every claim about a source was checked against that source's own pages or by asking it on 2026-10-10;
 the URLs are in section 13. Figures marked [recalled] were not checked here.
+
+Where it stands (2026-10-11): a design, nothing built. Decided by Cody: the world's clock is the real local
+time at real places (section 12, decision 2). Planned the same day: where the sun and the moon are for the
+player, with the clock in stage 1 (section 12; docs/SKY.md). Open: the other six decisions in section 12
+(Open-Meteo's free tier, the User-Agent and on-demand fetching, made-up maps, real lightning, the NWS API,
+when the data stops).
 
 ## Contents
 

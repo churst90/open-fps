@@ -2,101 +2,77 @@
 
 Planned work. Finished work is in [changes.md](changes.md), `git log` and
 [docs/DONE_2026-10.md](docs/DONE_2026-10.md). "(Cody)" marks what waits on Cody's ear or decision.
-Updated 2026-10-10: every item checked against the code, `git log --first-parent main`, changes.md and
-Cody's approvals; what was done went to docs/DONE_2026-10.md ("Audit of 2026-10-10").
+Updated 2026-10-11: every item checked against the commits since the last push (d1013eb6 to 6102931c),
+changes.md and Cody's approvals; what was done went to docs/DONE_2026-10.md ("Audit of 2026-10-11").
 
 ## Next, in order
 
-The order agreed with Cody on 2026-10-10. Cody's list of 2026-10-08 and where each of its twelve items
+The order agreed with Cody on 2026-10-11. Cody's list of 2026-10-08 and where each of its twelve items
 stands is in [docs/CODY_ASKS_2026-10-08.md](docs/CODY_ASKS_2026-10-08.md).
 
-The VPS and the Windows zip are behind: the last deploy was 3fc38430512b on 2026-10-08. Since then
-OpenFPS.Common and the wire changed many times (WorldLoading, EntityState.SpeedRate and Turn,
-EditorMenuItem's members, MapSettingsUpdate's play area, UserRole.Owner, ChatMessage.Team and Title,
-SoundEmitterComponent.Loudspeaker and Quench, the ground water field, geometry stage 4's two messages, and
-the wire hash now covering the library projects), so a client and a server from either side refuse each
-other at login. The server and the Windows zip go out together.
+Shipping is outside the order: push, the VPS and the Windows zip go out together, once the work in flight
+has landed, and only when Cody says so (each time). The VPS and the Windows zip are behind: the last deploy
+was 3fc38430512b on 2026-10-08. Since then OpenFPS.Common and the wire changed many times (WorldLoading,
+EntityState.SpeedRate and Turn, EditorMenuItem's members, MapSettingsUpdate's play area, UserRole.Owner,
+ChatMessage.Team and Title, SoundEmitterComponent.Loudspeaker and Quench, the ground water field, geometry
+stage 4's two messages, the rooms and openings moved into OpenFPS.Acoustics, the weather files in
+`WorldWeather`), and the wire hash covers the library projects, so a client and a server from either side
+refuse each other at login. Restart the server and update the clients first; what goes out is the "Landed
+since the last deploy" list below.
 
-1. Ship: push, the VPS and the Windows zip, together, once the work in flight has landed, and only when
-   Cody says so (each time). Restart the server and update the clients first; what is in it is the
-   "Landed since the last deploy" list below.
-2. Rooms from walls: switched on 2026-10-10 (25a328b9) and APPROVED by ear the same day (Cody: "everything
-   sounds good"): a point's room is the room whose
-   flood holds it, server and client alike, region ids unchanged (docs/GEOMETRY.md 12.6 item 1). Leak fixes
-   in the generators came with it (97730e32: door heads lap their leaves, roof-access doorways the door's
-   width). Rooms measure volume, faces and their materials from their floods (2026-10-10, APPROVED by ear the same day on
-   all three maps with the floors fixed: "everything sounds great. no complaints"). The 5 server/client disagreements are fixed (two floods over the same air; a house's rooms sent
-   apart across a tile edge) and Albany's 640 m "house" (a bare `building=yes` way round an address point) is a
-   building; floods over 64 million cells keep their boxes. The ground no longer comes up through the places'
-   floors (the prism floors were left out of the grading since stage 4; footsteps in 1,253 Albany and 377
-   Magnolia rooms were on dirt).
-   Then regions become places. An indoor room is a name
-   and a seed point, its shape, indoor flag and materials measured from the walls; an outdoor place (yard,
-   street, park) is a name over an area. Drop the box (`RoomSize`), `Materials` and `ReverbTimeScale`
-   from authoring, the editor, prefabs and the generators; derive portals where floods meet through a
-   door. The ambience bed machinery is gone (2026-10-10; Cody: no beds at all, region beds included); the
-   component and manifest fields stay unread (positional wire). Part A approved by ear 2026-10-10 ("everything
-   sounds great"); regions-become-places steps in docs/GEOMETRY.md 12.6 item 1. Step 2 (rooms flood from their
-   points, every part of a footprint a room's) and step 3 (openings framed from the floods, no more false
-   openings in rooms' box faces) approved by ear 2026-10-11 (Cody: "complete, success everything sounds
-   good"). Step 4 2026-10-11, no sound changed: StandingSpots, /tp, DoorManners and the tracker read the
-   flood; MapTiles and the indoor flag stay on the box until the flood decides them at load (12.6). Step 5
-   2026-10-11, no sound changed: nothing of a room authored (no RoomSize, RoomMaterials or ReverbScale in a
-   prefab, no face materials in the editor). The 21 rooms that seemed to have the ground through their floors
-   were points in their walls' cells past the footprint; over the rooms' air there are none (12.6).
-   Then (Cody, 2026-10-11): one path pass for every voice of a moving thing. Each voice is an entry saying
-   which thing owns it and where on it it sounds from (engine, siren mouth, horn, a train's bogie taps,
-   aircraft engines, a far-off borrowed voice, a spread source's places); one pass hands each its path every
-   frame with the same shadow and timing, replacing the horn/siren/distant/spread branches in
-   `ClientAudioSystem` (~:697-741) and the trains' separate writer (`ClientAudioSystem.Trains.cs`), which kept a
-   horn on a stale outdoor path through Marlow Tower's brick (2026-10-10). Gated by EmitterStreamReplay: no
-   change except where a voice was stale. Start after the Marlow Tower leak fix is merged.
-   Before it (Cody, 2026-10-11): a read-only audit of special cases in the audio, acoustics and sound code
-   (voices told apart by id ranges, kinds read from names or sound-id prefixes, several writers to one voice,
-   every source starting its own voice), ranked by how likely each is to cause the next bug, with the fix
-   for each; written after the leak and play agents finish, then a couple of agents per part. The path pass
-   above becomes one of those parts, planned to cover every voice range, not only moving things.
-   Physics as its own project (Cody, 2026-10-11: "all parts of this game engine need to be separated in their
-   own packages and all work cohesively together"): `OpenFPS.Physics` on Geometry, holding bodies with mass and
-   velocity, contacts and momentum, movement (from Common's `SharedMovementEngine`, `PhysicsUtils`), vehicles,
-   wheels and doors (from Sound's `Chassis`, `WheelDynamics`, `VehicleBody`, `DoorPhysics`; this replaces the
-   2026-10-06 placement of vehicle physics in Sound) and moving air; the server steps it and Sound reads its
-   state. Planned the way the sound library was: a boundary survey first, guards, then stages. The rest of the
-   engine follows the same rule: each part (geometry, acoustics, sound, physics, the world and its generators,
-   networking, the client UI) its own project with stated dependencies and no reach into the host. Not
-   started; comes after the special-cases audit's parts. Surveyed 2026-10-11: docs/PHYSICS_BOUNDARY.md (the
-   boundary, what the physics is missing, stages 0 to 6 at 20 to 30 sessions, ten decisions for Cody).
-   The order agreed with Cody, 2026-10-11: (1) regions become places, steps 3 to 5, with the audit's small
-   name and prefix parts beside them; (2) the audit's voice registry (one list of voices, one writer a
-   frame, one way to start a voice), then stage 5's audio clock slice; (3) the physics boundary survey, a doc,
-   alongside (2); (4) physics stages with geometry stage 6; (5) library stages 6 to 8 on the clean voices.
-   The special-cases audit is written (docs/SPECIAL_CASES_AUDIT.md, 2026-10-11): 32 findings, parts P0 to P8.
-   Its order: P0 (wider replay guards, tests only), then P1 (the pops: the worker served stale results for
-   moving sources) with P2 (one table of model kinds) and P5 (names and materials to properties) beside it,
-   P8 (laws in one place) after; then P3a-d (the voice registry: one list, one writer, one start, which is the
-   path pass above widened to every voice range) with P6; then P4 (one ranking), then P7 (machine state from
-   the server, a wire change). P0 and P1 started 2026-10-11.
-   P0 merged 2026-10-11. Found by it: the replay harness faced moving vehicles backwards (`Replay.Facing`
-   took -Z as forward; the server's vehicles face +Z), so a replayed car's grille, siren and horn sat at its
-   tail. Fixed 2026-10-11 in a commit of its own, the listener's turn with it, all eight streams regenerated.
-   P2 built 2026-10-11 (`ModelKindTable`, the audit's "P2 as built"), streams unchanged. Waiting on Cody: whether
-   the scope calls somebody pushing a push mower a person (today, as before, it picks out no machine), and
-   whether the editor should edit trains and woods through their sound ids. Left for later: S26's two caches
-   and S27's model fallbacks, and the server's own prefix spellings outside P2's list.
-   P1 done 2026-10-11, unheard: the pavement's pops were the way over the top giving up after four boxes
-   (fixed, 41-56 a minute to 0); the stairwell's are the barrier model (Acoustics, below), not the source
-   pool, whose faults (S4) never fired and are closed anyway; S5 done.
-3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
-   scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
-   branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
-   run-off and ground water in a per-world `WorldWeather`. Next in stage 5: `AudioClock` behind `IAudioClock`
-   (its `WorldTime` is `WindField.Now()`), then the rest of section 8's order (18.3).
-4. Sound library stages 6 to 8: the world input and `OpenFPS.Audio`, splitting `ClientAudioSystem`,
-   `WorldAudioPlayer` and `BirdLife`, versions and Resonance.
-5. Geometry stage 5, diggable ground with strata: held until it is wanted.
-6. Then detail, in this order:
+1. Regions become places, steps 3 to 5: DONE 2026-10-11 (docs/GEOMETRY.md 12.6, "Regions become places").
+   Step 3 (openings framed from where the floods meet them) approved by ear 2026-10-11 with step 2 (Cody:
+   "complete, success everything sounds good"). Step 4 (the readers of a room's box use its flood) and step 5
+   (nothing of a room authored: no RoomSize, RoomMaterials or ReverbScale in a prefab, no face materials in
+   the editor) changed no sound. Before them, all approved by ear: rooms from walls switched on (2026-10-10,
+   "everything sounds good"), rooms measured from their floods with the ground graded under the places'
+   floors (2026-10-10, "everything sounds great. no complaints"), step 1 (no ambience beds) and step 2 (rooms
+   flood from their points). The 21 rooms that seemed to have the ground through their floors were points in
+   their walls' cells past the footprint; over the rooms' air there are none. Left on the box: which tiles a
+   room is sent with, and the indoor flag, until the flood can decide them at load (12.6, step 4).
+2. The special-cases audit's parts (docs/SPECIAL_CASES_AUDIT.md, 2026-10-11: 32 findings, parts P0 to P8),
+   in this order:
+   - P0, wider replay guards (tests only): DONE 2026-10-11. The replay faced moving vehicles and the
+     listener backwards, which it found; fixed the same day (e5e3d0f6), all eight streams regenerated.
+   - P1, the pops and the worker's answers: DONE 2026-10-11, unheard. The Main Street pavement's pops were
+     the way over the top giving up after four boxes (41-56 a minute to 0). The source pool's faults (S4)
+     never fired and are closed anyway; every answer says where it was traced from, and every asker takes
+     one by one rule. S5 done: a siren that is off asks for no path.
+   - P2, one table of model kinds (`ModelKindTable`): DONE 2026-10-11, no stream changed. Two questions for
+     Cody (Decisions, below). Left for later: S26's two caches, S27's model fallbacks, and the server's own
+     prefix spellings outside P2's list.
+   - Under way: P5 (names and materials to properties), P8 (laws in one place), and the barrier model's way
+     round one thing that passes through another (Acoustics, below), which P1 found in Marlow Tower's floor 1
+     stairwell.
+   - Then P3a to P3d, the voice registry: one list of voices, one writer a frame, one way to start a voice.
+     It is the one path pass for every voice of a moving thing that Cody asked for on 2026-10-11 ("shouldn't
+     all mobile sound sources like vehicles, trains, sirens, etc use the same path so there's
+     consistency?"), widened to every voice range. It replaces the horn, siren, distant and spread branches
+     in `ClientAudioSystem` and the trains' separate writer (`ClientAudioSystem.Trains.cs`), gated by the
+     emitter-stream replay: no change except where a voice was stale. Then library stage 5's `AudioClock`
+     slice (`IAudioClock`, its `WorldTime` from `WindField.Now()`; docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
+   - Then P4 (one ranking), P6 (one path model for every asker), P7 (machine state from the server: a wire
+     change, shipped with a deploy).
+3. The physics boundary survey: DONE 2026-10-11 (docs/PHYSICS_BOUNDARY.md). Cody asked for it the same day:
+   "all parts of this game engine need to be separated in their own packages and all work cohesively
+   together". The boundary of an `OpenFPS.Physics` on Geometry, 24 missing pieces ranked, stages 0 to 6 at
+   20 to 30 sessions. Cody's decisions the same day: all ten as recommended; soft bodies as well as rigid
+   ones; gravity a property of the world; the engine Jolt Physics through JoltPhysicsSharp. This replaces the
+   2026-10-06 placement of vehicle physics in Sound. The rest of the engine follows the same rule: each part
+   (geometry, acoustics, sound, physics, the world and its generators, networking, the client UI) its own
+   project with stated dependencies and no reach into the host.
+4. The physics stages, with geometry stage 6 (vehicles and bodies in the acoustic scene: docs/GEOMETRY.md
+   section 7, "Bodies and wheels" stage 2 below). Stage 0, the guards (a ratchet, a movement replay from
+   `--walk-pair`, driving and traffic replays, the ballistics table, a parity harness), is under way. Physics
+   stage 4 (rigid and soft bodies) goes with geometry stage 6, so each body's shape is made once for
+   collision and for the acoustic scene (PHYSICS_BOUNDARY.md section 8). Air moved by passing things, leaf
+   litter and impacts that pass on momentum ("Next", below) are physics stages 4 and 5.
+5. Sound library stages 6 to 8 on the clean voices: the world input and `OpenFPS.Audio`, splitting
+   `ClientAudioSystem`, `WorldAudioPlayer` and `BirdLife`, versions and Resonance.
+6. Geometry stage 5, diggable ground with strata: held until it is wanted.
+7. Then detail, in this order:
    - weather as a system and wind acting on things (docs/MATTER.md 5.3 and its order of work, steps 5
-     and 6; CODY_ASKS item 12);
+     and 6; CODY_ASKS item 12), with real weather for the real places (docs/REAL_WEATHER.md);
    - footsteps through the structure ("Walls", below);
    - the struck sounds, from Cody's notes ("Bump sounds", below);
    - cars in full detail ("Cars in full detail", below);
@@ -106,24 +82,44 @@ other at login. The server and the Windows zip go out together.
 
 In every play session, clear the "Waiting on Cody's ear" list so heard work merges before it piles up.
 
-### Landed since the last deploy (2026-10-09 and 10, all merged on main)
+### Landed since the last deploy (2026-10-09 to 11, all merged on main)
 
-Details in changes.md and the docs named. "Unheard" means nobody has listened in the game yet.
+Details in changes.md and the docs named. "Unheard" means nobody has listened in the game yet. The wire
+hash changed, so the server and the Windows zip go out together.
 - The one world: terrain from 3DEP (T1, T2), the world store and one world in tiles (W1, W2); built
   ahead behind a loading screen, tiles in order of time to reach; Magnolia and Albany copied in at 2 m on
   the UTM grid; 7.8 m ground in the far ring with the seam closed; a login back to where you left;
   land cover from ESA WorldCover; roads and woods from OpenStreetMap; buildings from Overture with
   driveways. Unheard (docs/WORLD_STREAMING.md).
 - Geometry stage 4: the shape library, real footprints and roofs on the places, kerbs, glTF and OBJ
-  import, shapes in the quick build; rooms by flood as an instrument only. Unheard (docs/GEOMETRY.md 12).
-- Sound library stage 3: OpenFPS.Sound and OpenFPS.Acoustics; Acoustics without MemoryPack (Cody,
-  decision 4). No sound changed.
+  import, shapes in the quick build. Unheard (docs/GEOMETRY.md 12).
+- Rooms from walls (docs/GEOMETRY.md 12.6): the flood at a quarter metre, switched on for server and
+  client alike, rooms measured from their floods, server and client agreeing on every room point, homes
+  under a hectare, the ground graded under the places' floors: approved by ear 2026-10-10. Regions become
+  places, steps 1 to 5 (no ambience beds; rooms flood from their points; openings framed from the floods;
+  the readers on the flood; nothing of a room authored): steps 2 and 3 approved by ear 2026-10-11, the
+  others changed no sound.
+- Sound library stages 3 (OpenFPS.Sound and OpenFPS.Acoustics; Acoustics without MemoryPack, Cody's
+  decision 4), 4 (rooms and openings as values in Acoustics) and 5's first slice (traced reverb per
+  provider, the weather per world in `WorldWeather`). No sound changed.
+- Marlow Tower's leaks (train voices take their current path, rain from its surfaces, sample points kept in a
+  source's own air, a fire door on every tower storey's stair): approved by ear 2026-10-11.
+- The play fixes of 2026-10-11: E opens the door you face, every room of the real places walkable
+  (counters, landings and steps, lawns dug down, side doors), checked /tp spots, `--walk-pair`, the
+  tracker's "behind a wall". Unheard.
+- Connecting: the Connecting window holds focus, Escape cancels, a server that is not up yet is tried for
+  30 s; the in-game reconnect the same way. Unheard.
+- The special-cases audit's P0 (replay guards), P1 (the pavement pops, answer provenance, one freshness
+  rule; unheard) and P2 (`ModelKindTable`), and the replay harness facing things as the game does.
+- State kept by map as well as entity id (11 stores: driven cars' wheels, the traffic's wheels and tyre
+  demand, sirens and horns, seat headings, door announcements, parked drivers' doors, junction conflicts,
+  respawn reminders, the resend queue): unheard.
+- The ambience recordings and the bed stage removed (the Windows zip 90 MB smaller).
+- Build warnings cleared; SQLite's native library 3.50.3 (CVE-2025-6965).
 - Water over the ground and fire by fuel, stage 1: approved by ear 2026-10-10.
 - The loudspeaker model (PA and megaphone): approved by ear 2026-10-10.
 - The gas hob, rounds 1 and 2: round 2 approved by ear 2026-10-10. Not on any map.
 - The shut glass door leak fix: approved by ear 2026-10-10.
-- Marlow Tower's leaks (train voices take their current path, rain from its surfaces, sample points kept in a
-  source's own air, a fire door on every tower storey's stair): approved by ear 2026-10-11.
 - Floors: layers in contact as one panel, then one 15 cm slab and the end-of-voice clicks fixed. Round 2
   unheard (inbox/floors-2026-10-10).
 - The material table and struck things (bumps, Shift+E and /tap on things): heard 2026-10-10, notes kept
@@ -141,8 +137,10 @@ Details in changes.md and the docs named. "Unheard" means nobody has listened in
 - Server: the protected Owner role and names in chat, bans, `/setmapsize`; E picks what you face; Alex
   waits clear of the doorway; `/weather` says "Clearing" and a cleared front's rain stops; a front every
   five minutes on average; the trace threads niced; a gradient backdrop behind the menus.
+- Designs, no code: the real weather (docs/REAL_WEATHER.md), the physics boundary (docs/PHYSICS_BOUNDARY.md),
+  the special-cases audit (docs/SPECIAL_CASES_AUDIT.md).
 
-### Decided (Cody, 2026-10-09 and 10)
+### Decided (Cody, 2026-10-09 to 11)
 
 - Reflections in their own process: dropped. The cost was the reverb's convolution, not tracing; the
   convolution was made 38 % cheaper instead.
@@ -154,13 +152,21 @@ Details in changes.md and the docs named. "Unheard" means nobody has listened in
   doorway clears (was 3 s).
 - Sound library decision 4: `AcousticMap` and the octree lose `[MemoryPackable]` and Acoustics its
   MemoryPack package; `TransientSound` keeps it in Sound.
+- Ambience: no beds at all, region beds included (2026-10-10); the recordings removed too (2026-10-11:
+  "remove those ambiences completely we simply don't need them").
+- Physics as its own project, `OpenFPS.Physics` on Geometry, and every part of the engine its own package
+  (2026-10-11). The survey's ten recommendations approved; soft bodies wanted as well as rigid ones;
+  gravity a property of the world; the engine Jolt Physics through JoltPhysicsSharp.
+- Real weather: the world's clock is the real local time at real places (2026-10-11).
+- Tests: two test runs at once on this machine, both on the last twelve cores (2026-10-11).
+- The order of work above (2026-10-11).
 
 ### Matter
 Cody, 2026-10-10: every material interacts with every other as in real life; wind moves things
 physically and its sound comes only from what it moves; a built thing sounds by its material, size and
 shape. The design and its order of work are in docs/MATTER.md. Steps 1 (the material table), 2 (struck
 things) and 4 (water over the ground) are built, and fire by fuel (step 3) has its stage 1; next are
-weather as a system and wind on things (item 6 above), then gases and chemistry.
+weather as a system and wind on things (item 7 above), then gases and chemistry.
 
 ### Loudspeakers
 The PA horn and the megaphone as amplifier, driver and horn: approved by ear 2026-10-10
@@ -173,12 +179,16 @@ old PA in --loudspeaker game).
 
 ## Waiting on Cody's ear
 
-Approved 2026-10-09 and 10, so off this list: the hull's blows in time; the cheaper reverb tail; the
+Approved 2026-10-09 to 11, so off this list: the hull's blows in time; the cheaper reverb tail; the
 shut glass door leak fix (inbox/pa-leak-2026-10-09); the loudspeaker (inbox/loudspeaker-2026-10-10); the
 gas hob round 2 (inbox/gas-stove-2026-10-10/round2, "sounds great now"); the four probable-bug
 fixes of 2026-10-09 with recorded sounds' echoes smeared off rough walls (inbox/probable-bugs-2026-10-09,
 "the probable bugs sound good"); water over the ground
-(inbox/water-over-terrain-2026-10-10); fire by fuel, stage 1 (inbox/fire-fuel-2026-10-10).
+(inbox/water-over-terrain-2026-10-10); fire by fuel, stage 1 (inbox/fire-fuel-2026-10-10); rooms from
+walls switched on (2026-10-10, "everything sounds good"); rooms measured from their floods with the ground
+graded under the places' floors (2026-10-10, "everything sounds great. no complaints"); regions become
+places, steps 2 and 3 (2026-10-11, "complete, success everything sounds good"); Marlow Tower's leak fixes
+(2026-10-11).
 Heard, with notes and nothing to listen to again: the engine CPU renders (inbox/engine-cpu-2026-10-09;
 the phased pass-by that did not sweep was the lab's panned capture, not the game); struck things and
 bumps (inbox/struck-things-2026-10-10; notes under "Bump sounds", low priority).
@@ -210,7 +220,24 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
   queued after the block's drives were laid down).
 
 ### Listen in the game (Cody)
-Built and measured, not heard in the game. Restart the server and update the client first.
+Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
+here are checked to stand on (docs/LISTENING_SPOTS.md).
+- The play fixes of 2026-10-11. E between two doors: in Marlow Tower's floor 3 corridor (`/tp -19.95
+  -101.5 9.29`) the flats' doors face each other; E opens the one you face. Walking into every room on
+  Magnolia and Albany: the back door on Bobcat Lane at Magnolia's spawn (`/join magnolia tx`), clear of the
+  counter, and steps at the outside doors; 19617 Turtle Dove Lane (`/tp -301.4 -268.7 5.2`). The tracker:
+  from the barn at 19415 Turtle Dove Lane (`/tp -88.8 -253.0 3.9`), comma or period to the house's doors
+  says "behind a wall".
+- Connecting: start the client before the server. The Connecting window takes focus, says "Escape to
+  cancel", and keeps trying for 30 seconds ("Still trying, N seconds."); Escape says "Cancelled." and puts
+  you back on the menu item. Drop the connection in game: "Reconnecting. Escape to cancel."
+- The pops (audit P1): on the Main Street pavement before Marlow Tower's entrance (`/tp -6.4 -103.5
+  0.12`) with traffic, no pops from the cars on Wharf Avenue over the car park and the tower. Marlow
+  Tower's floor 1 stairwell (`/tp -10.8 -104.2 3.28`) still has 4 to 11 a minute (the barrier model, under
+  way).
+- State by map: with someone on another map at the same time (the speedway while you drive on the city),
+  nothing of theirs turns up on yours: no siren on a car nobody switched on, no tyres or skids on the wrong
+  thing, the seat's heading steady while you ride.
 - The world (`/join world magnolia`, `/join world address 401 Market St, Tomball, TX`): the loading
   screen ("Building the world: 12 of 41 tiles."), the ground's land cover, the roads, woods, buildings
   and driveways outside the places, no crack where far ground meets near ground, and logging out and
@@ -249,6 +276,18 @@ Built and measured, not heard in the game. Restart the server and update the cli
   the airliner's whine; walls (lows through, top not).
 
 ### Decisions (Cody)
+The open questions for Cody, in one place. A few that belong to one item stay with it, marked (Cody).
+- Real weather (docs/REAL_WEATHER.md section 12), six decisions open, each with a recommendation:
+  Open-Meteo's free tier for a game with no ads; the User-Agent and fetching on demand; made-up maps keep
+  simulated weather (a map may name a real place to follow); real lightning (GLM) later or not; the NWS API
+  not at first; when the data stops, the forecast for six hours, then the simulation. (The clock was
+  decided 2026-10-11: real local time at real places.)
+- The scope and the push mower (audit P2): should the scope call somebody pushing a push mower a person?
+  Today, as before, it picks out no machine.
+- The editor and sound ids (audit P2): should the editor edit trains and woods through their sound ids?
+- Compass words: seven functions turn a bearing into compass words, each its own way. Recommended: all
+  of them call one 16-point function, which lands in OpenFPS.Astronomy's `SkyWords` with the sun and moon
+  readout (docs/SKY.md).
 - Reflections following a moving talker, and himself: he will check again.
 - Loudness law: anything over about 126 dB peak at 1 m (gunshots, glass, a thin plate) plays at full
   scale out to the 40 m clamp, so 5 m and 20 m sound the same (`Loudness.Place`). Explosions wait on it.
@@ -285,8 +324,6 @@ Left by the 2026-10-07 housekeeping; none changes sound.
   `TransientSound` lacks its APPEND ONLY marker; `PhysicsUtils.GroundMaterial` returns its input.
 - `ElevatorDoor.faceAtFoot` and `PushBarDoor.railHit` are kept only for the random sequence: retire them
   with a render regeneration.
-- Nullable warnings: CS8602 in Spawning and MovementSystem, CA2014 in SolidContact, CS8714 in
-  SpatialGrid.
 - Stale code comment: RainField.cs 33 lists gutters, downpipes and run-off as missing (built 2026-10-06).
 - `OpenFPS.Sound/Machines.cs` 87: the TODO on a part's `ExtentMetres` still names ClientAudioSystem's
   car-sized `MathF.Max(reference, 3f)`, which is gone (engines are placed by their outlet separation
@@ -302,8 +339,8 @@ Left by the 2026-10-07 housekeeping; none changes sound.
 - A door leaf swings through furniture and walls.
 - Footsteps, car doors and the knock declare a level against their peak, as doors did before
   2026-10-04 (14-29 dB low). The knock (`DoorKnock`) may also be about 20 dB short at 1-2 kHz.
-- Push-bar fire doors on the towers' stairwells (they change every tower's acoustics); the terminal's
-  road-side steel door, automatic if it is the public way in (Cody).
+- The terminal's road-side steel door, automatic if it is the public way in (Cody). The towers' stairwells
+  have their push-bar fire doors since 2026-10-11 (one from every storey's corridor).
 
 ### Roles, bodies, admin gun, keys
 - `/undo` covers `/put` only: not `/place` or `/spawn`, and not after a reconnect (`/edit undo` covers
@@ -335,7 +372,7 @@ and the server's voice line.
 - Floors: one 15 cm slab between storeys in the city's towers (37.9/54/80 dB against a lab slab's
   40/54/83) is merged (8406509a, unheard). Other generators (houses, the terminal, the garage) were not
   checked for doubled slabs.
-- Footsteps through the structure (Next, in order, item 6). A neighbour's steps are mostly impact into
+- Footsteps through the structure (Next, in order, item 7). A neighbour's steps are mostly impact into
   the slab; the game has only the airborne part, about 10 dB short on a carpeted floor and the wrong
   shape (a click, not a thud). Plan: the slab's normalised impact level from its own airborne loss by Ver's relation,
   Ln(f) = 38 + 30 lg f - R(f) (homogeneous slab; checks against a bare 152 mm slab's Ln,w 79, IIC 27);
@@ -364,8 +401,8 @@ and the server's voice line.
   wall. The barrier model needs a way round one thing that passes through another, paid as the diffraction
   times what the leg's walls let through per band, competing with the straight line as now. That changes
   what is heard behind walls everywhere (louder where a near low wall stands in front of a heavier one), so
-  a part of its own, measured on the three maps (docs/GEOMETRY.md 12.6, "Marlow Tower's leaks"). Older finds
-  of `--pop-hunt`: a car's straight line through one wall as it passes a gap (-80 to -62 dB for 200-400 ms),
+  a part of its own, measured on the three maps (docs/GEOMETRY.md 12.6, "Marlow Tower's leaks"); under way
+  since 2026-10-11. Older finds of `--pop-hunt`: a car's straight line through one wall as it passes a gap (-80 to -62 dB for 200-400 ms),
   and up to 19 dB between over the wall and over the roof under the covered hall west of Main Street.
 - The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost
   25 MB and twice the convolution (Cody).
@@ -414,8 +451,8 @@ Synthesis to spec; recordings are the yardstick only.
 Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md). Roads as data and per-wheel
 physics are done.
 - Stage 2: moving bodies in the acoustic scene (vehicles from their panels, people as soft bodies), so
-  a bus or a crowd blocks sound like a wall of its size and material (geometry stage 6; Next, in order,
-  item 3).
+  a bus or a crowd blocks sound like a wall of its size and material (geometry stage 6 with physics
+  stage 4; Next, in order, item 4).
 - Stage 4: rolling noise per wheel outside the car (inside it is per wheel since 2026-10-06), left and
   right as separate directions, the surface under each, joints struck by each axle.
 - Turning paths cut over the kerb on the 7 m estate roads (a junction connector needs a kerb-aware
@@ -442,9 +479,11 @@ physics are done.
 - Untested in ClientAudioSystem: the starvation path, `PlayReferenceVoice`, `SubmitLanding`.
 
 ### Zones (Cody)
-- Today a zone is a named box in the map; the smallest box you stand in is the one said.
-- Proposal: a room or building names its own zone from its walls; a free-standing zone (park, plaza,
-  car park) stays a box; a zone inside a zone is said as the inner one, the outer on the where-am-I key.
+- Today, indoors, the zone said is the room whose flood holds you (since 2026-10-10: a room is a name and a
+  point, its air flooded from its walls); outdoors a zone is a named box in the map, and the smallest box
+  you stand in is the one said.
+- Proposal: a building names its own zone from its rooms; a free-standing zone (park, plaza, car park)
+  stays a box; a zone inside a zone is said as the inner one, the outer on the where-am-I key.
 
 ### Bump sounds
 Built and merged 2026-10-10 (fb9868f9; docs/MATTER.md 7.5): a bump is a body (palm, boot toe, shoulder) striking what
@@ -454,13 +493,13 @@ inbox/struck-things-2026-10-10. Still open: the plaster stud wall bump is 10-15 
 against a recorded body slam into plaster; the car's rattle is busier than recorded ones; bumping a
 person is still the old impact.
 Heard by Cody 2026-10-10 (low priority, after geometry and the library reorganisation; Next, in order,
-item 6): the aluminium bar sounds like a bright bell; running into the car sounds crunchy and staticky;
+item 7): the aluminium bar sounds like a bright bell; running into the car sounds crunchy and staticky;
 the fence and the glass door sound the same tonally, and the fence does not sound like a fence; the
 aluminium sheet is far too sustained and tonal. Kept in the game meanwhile.
 
 ## Next
 
-### Air moved by things, leaves, impacts, a physics project (asked 2026-10-11, to discuss)
+### Air moved by things, leaves, impacts (asked 2026-10-11; physics stages 4 and 5)
 - A passing bus moves no air today. Wind is the weather's field (`WindField`) and the ear wind reads it; a
   vehicle only blocks sound (`VehicleShadow`). Wanted: a moving body pushes air (a pressure pulse ahead, a
   turbulent wake behind that decays with distance and time) into the same local air the ear wind, foliage
@@ -473,11 +512,9 @@ aluminium sheet is far too sustained and tonal. Kept in the game meanwhile.
   passes on (`DrivingSystem.cs:388`, "TODO: the impulse and the damage"). Wanted: bodies with mass and
   velocity, momentum exchanged on contact with restitution, a struck person or object thrown and landing
   (`BodyFall` for the sound), damage from the closing speed.
-- Physics is not one project: player movement in Common (`SharedMovementEngine`, `PhysicsUtils`), vehicles,
-  wheels and doors in Sound (`Chassis`, `WheelDynamics`, `VehicleBody`, `DoorPhysics`, by the 2026-10-06
-  decision), collision in Geometry, the stepping in the server (`MovementSystem`, `DrivingSystem`).
-  Proposed: an `OpenFPS.Physics` project on Geometry (bodies, contacts, momentum, air), with Sound reading
-  physics state rather than owning it.
+- Physics as one project: surveyed and decided 2026-10-11 (docs/PHYSICS_BOUNDARY.md; Next, in order, items
+  3 and 4). The bodies and contacts are physics stage 4 (Jolt through JoltPhysicsSharp), the moving air and
+  loose layers (leaf litter) stage 5.
 
 ### Doors as live models (filed 2026-10-05, not started)
 The door models are physical but rendered once per key, slower than real time, and replayed from the
@@ -492,9 +529,11 @@ copied into the one world. The world's own tiles are made by the server on deman
 ESA WorldCover (land cover), OpenStreetMap (roads and woods) and Overture (buildings and driveways);
 docs/WORLD_STREAMING.md, stage 2 as built.
 - Addresses (Overture's addresses theme) and lots on the world's tiles, then the world's roads as RoadData
-  for traffic (Next, in order, item 6). Overture release 2026-09-23.1 will be withdrawn around the end of
+  for traffic (Next, in order, item 7). Overture release 2026-09-23.1 will be withdrawn around the end of
   November 2026: moving to a newer one is a new generator version.
-- Real weather for real places (Open-Meteo or NOAA by latitude and longitude).
+- Real weather for real places: designed (docs/REAL_WEATHER.md, 2026-10-10): Open-Meteo for the conditions,
+  METAR to correct them near the ground; the clock decided 2026-10-11 (real local time); six decisions open
+  (Decisions, above). With weather as a system (Next, in order, item 7).
 - Traffic volumes from published counts (average daily traffic by road), with time-of-day curves.
 
 ### Map editor
@@ -634,16 +673,16 @@ Synth video (inbox, transcribed): ours is the more physical model; these are wha
 Geometry stages 1 to 4 are built and merged: the triangle world, wedges, stairs and arches (stage 2),
 terrain (stage 3), and stage 4 (eb529bfe, 2026-10-10, unheard; docs/GEOMETRY.md section 12): the shape
 library (round, outlined, roofed, swept), real footprints and roofs on Magnolia and Albany, round trunks,
-kerbs, glTF and OBJ import with mesh assets on the wire, shapes in the quick build. Left of stage 4
-(GEOMETRY.md 12.6):
-- Rooms derived from seeds by flood: built as an instrument (`--geometry-parity only=rooms`), not switched
-  on; on the real places the floods leak out of houses and lose narrow rooms. Next, in order, item 2.
+kerbs, glTF and OBJ import with mesh assets on the wire, shapes in the quick build. Rooms derived from
+seeds by flood were switched on 2026-10-10 and approved by ear, and regions became places in five steps by
+2026-10-11 (12.6; Next, in order, item 1). Left of stage 4 (GEOMETRY.md 12.6):
 - Sound points on models (MATTER.md 8): where a model's sound parts are, read by machine parts and emitters.
   Begun: struck sounds read the shape a part has (a pitched roof struck as its deck, a flight as one step).
 - Facets as polygons for the engine echoes; per-surface materials in the image sources.
-- Doors' remaining misses on Albany (16) and the openings found in rooms' faces (GEOMETRY.md 12.6 items 4
-  and 5).
-Then stage 6, vehicles and bodies in the acoustic scene (Next, in order, item 3); stage 5, diggable ground
+- Doors' remaining misses on Albany (16; GEOMETRY.md 12.6 item 4), not rechecked since the floods' openings
+  (step 3), which ended the openings found in flooded rooms' faces (item 5).
+Then stage 6, vehicles and bodies in the acoustic scene, with the physics stages (Next, in order, item 4);
+stage 5, diggable ground
 with strata, is held until wanted; forests, ocean maps and boats.
 
 ### Experience and badges
@@ -758,7 +797,8 @@ Some may already be fixed; confirm before fixing again.
 
 ### Platform and server
 - A stress test with 50 or more bots.
-- Check the SQLite package for security updates.
+- Check the SQLite package for security updates again before each release (3.50.3 since 2026-10-11, for
+  CVE-2025-6965).
 
 ## Ideas
 
