@@ -40,6 +40,9 @@ public sealed class BirdLife
         /// <summary>What the group perches on: the order groups are woken in, and so draw from the one
         /// generator in.</summary>
         public int Perch;
+        /// <summary>Where the group's calls come from as one (the middle of its birds), as the acoustic worker
+        /// is asked about it; each bird's call takes that answer moved to the bird.</summary>
+        public Vector3 Heard;
         public double QuietUntil;
         public bool Awake;
         /// <summary>Geese only: where the skein is and where it is going.</summary>
@@ -220,7 +223,9 @@ public sealed class BirdLife
                 CallsLeft = 0,
             };
         }
-        return new Group { Species = species, Centre = perch.Transform.Position, Birds = birds, Perch = perch.Id };
+        var heard = Vector3.Zero;
+        foreach (var b in birds) heard += b.At;
+        return new Group { Species = species, Centre = perch.Transform.Position, Birds = birds, Perch = perch.Id, Heard = heard / Math.Max(1, n) };
     }
 
     private static string[] Pick(IReadOnlyList<string> calls, Random rng, int count)
@@ -243,6 +248,7 @@ public sealed class BirdLife
     public void Update(WorldSnapshot world, Vector3 listener, double now)
     {
         if (now >= _nextSurvey) { _nextSurvey = now + 2.0; Survey(world); }
+        _askFrame++;
 
         foreach (var g in _perched)
         {
@@ -254,7 +260,10 @@ public sealed class BirdLife
                 g.Awake = true;
                 foreach (var b in g.Birds)
                     b.Next = now + Uniform(0f, g.Species.BoutGapMax * 0.5f);
+                Ask(g, listener);
             }
+            // Asked again twice a second, each group in a frame of its own, so its answer is fresh for the ear.
+            else if (_askFrame % AskEveryFrames == (g.Perch & 0x7fffffff) % AskEveryFrames) Ask(g, listener);
             Live(world, g, listener, now);
         }
 
@@ -280,7 +289,7 @@ public sealed class BirdLife
 
             bool starting = b.CallsLeft <= 0;
             if (starting) b.CallsLeft = _rng.Next(sp.BoutCallsMin, sp.BoutCallsMax + 1);
-            Call(world, sp, b.Repertoire[_rng.Next(b.Repertoire.Length)], b.At, g.Velocity, b.Pitch, listener);
+            Call(world, sp, b.Repertoire[_rng.Next(b.Repertoire.Length)], b.At, g.Velocity, b.Pitch, listener, g);
             b.CallsLeft--;
             b.Next = now + (b.CallsLeft > 0 ? Uniform(sp.CallGapMin, sp.CallGapMax) : Uniform(sp.BoutGapMin, sp.BoutGapMax));
             if (b.CallsLeft <= 0) b.RestingSince = now;
@@ -322,7 +331,58 @@ public sealed class BirdLife
     /// all: the voice budget would drop it, and it would cost an acoustic path to find that out.</summary>
     private const float InaudibleGain = 0.001f;   // -60 dBFS
 
-    private void Call(WorldSnapshot world, BirdSpecies sp, string sound, Vector3 at, Vector3 velocity, float pitch, Vector3 listener)
+    /// <summary>The acoustic worker a perched group's calls are heard by (P6); null, the hand-rolled tracer alone.</summary>
+    internal AsyncAcousticWorker? Worker { get; set; }
+
+    /// <summary>How fast the ear moves, m/s: how far from here an answer traced a moment ago may have been asked
+    /// (AcousticPathData.Answers).</summary>
+    internal float EarSpeed { get; set; }
+
+    /// <summary>Calls placed by the worker's answer rather than the tracer's, for a test.</summary>
+    internal int AnsweredByWorker { get; private set; }
+
+    /// <summary>How often an awake group is asked about again, frames.</summary>
+    private const int AskEveryFrames = 30;
+    private int _askFrame;
+
+    /// <summary>The question a perched group is asked under: a probe of its own, by its perch.</summary>
+    private int ProbeOf(Group g) => Voices.IdFor(VoiceKind.Probe, VoiceRegistry.NoEntity, g.Perch);
+
+    /// <summary>Asks the worker about where a group's calls come from, as it wakes and now and then after.</summary>
+    private void Ask(Group g, Vector3 listener)
+    {
+        Worker?.EnqueueRequest(new AcousticRequest
+        {
+            // Nothing left out, as before: a hedge's own leaves are between its sparrows and you.
+            EntityId = ProbeOf(g), ListenerPos = listener, SourcePos = g.Heard, SourceRadius = AudioEmission.MinOcclusionRadius,
+        });
+    }
+
+    /// <summary>
+    /// A call's path: the worker's answer for its group (its transmission, the routes through openings, the way
+    /// round one thing and through another, the edge it bends over), moved from the group's middle to the bird
+    /// as a near source's answer is (FirstAnswer); the hand-rolled tracer's for a group it has not answered yet,
+    /// and for the geese.
+    /// </summary>
+    private AcousticPathData? PathOf(WorldSnapshot world, Group? g, Vector3 at, Vector3 listener)
+    {
+        if (_acoustics == null) return null;
+        if (g != null && Worker != null && Worker.TryGetDirectFor(ProbeOf(g), g.Heard, 0f, listener, EarSpeed, out var answer))
+        {
+            AnsweredByWorker++;
+            Vector3 moved = at - g.Heard;
+            float from = MathF.Max(0.1f, Vector3.Distance(listener, g.Heard));
+            float dist = Vector3.Distance(listener, at);
+            var p = answer;
+            p.ApparentPosition = answer.ApparentPosition + moved;
+            p.EffectiveDistance = answer.EffectiveDistance * dist / from;
+            return p;
+        }
+        try { return _acoustics.CalculateAcousticPath(world, -1, listener, at); } catch { return null; }
+    }
+
+    private void Call(WorldSnapshot world, BirdSpecies sp, string sound, Vector3 at, Vector3 velocity, float pitch, Vector3 listener,
+                      Group? group = null)
     {
         float range = Loudness.AudibleRange(sp.CallDb);
         float d = Vector3.Distance(at, listener);
@@ -330,9 +390,7 @@ public sealed class BirdLife
         var (gain, reference) = Loudness.Place(sp.CallDb);
         if (Loudness.RenderedGain(gain, reference, range, d) < InaudibleGain) return;
         OnCall?.Invoke(sp.Name, at);
-        AcousticPathData? path = null;
-        if (_acoustics != null)
-            try { path = _acoustics.CalculateAcousticPath(world, -1, listener, at); } catch { }
+        AcousticPathData? path = PathOf(world, group, at, listener);
         int call = _voice++;
         int voiceId = Voices.IdFor(VoiceKind.Bird, VoiceRegistry.NoEntity, call);
         Voices.DeclareEvent(voiceId, VoiceRegistry.NoEntity, VoiceKind.Bird, at, sp.CallDb);

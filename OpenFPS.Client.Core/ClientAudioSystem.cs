@@ -397,8 +397,9 @@ public partial class ClientAudioSystem
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
         _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced) { Manual = manualAcoustics };
         WorldAudio.Worker = _acousticWorker;
-        // Blips are heard by the worker's answer, as every sustained voice is (P6).
+        // Blips and the perched birds' calls are heard by the worker's answer, as every sustained voice is (P6).
         _beacons.Worker = _acousticWorker;
+        _birds.Worker = _acousticWorker;
         _acousticWorker.Start();
     }
 
@@ -842,6 +843,7 @@ public partial class ClientAudioSystem
         UpdateTalkers(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
         _partMs[3] += Ms(partAt);
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        _birds.EarSpeed = _earSpeed;
         _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
         _rain.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
         _partMs[2] += Ms(partAt);
