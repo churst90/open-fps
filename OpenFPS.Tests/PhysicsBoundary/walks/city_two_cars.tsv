@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_two_cars: pressed along the sides of two parked cars nose to tail, across the joint between them
 # map city, start 68.600 0.050 125.500, heading 20, script -15 w60 -10
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

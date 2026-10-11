@@ -36,7 +36,7 @@ stages come after the special-cases audit's parts.
 11. Decisions for Cody
 12. What was not measured
 13. Appendices: the inventory, the crossings, the presets' members
-14. Stage 0 as built (2026-10-11): the guards and the Jolt trial
+14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
 
 ---
 
@@ -1267,9 +1267,8 @@ regenerates them in its own commit.
 `--physics-replay [walks|drives|traffic|rail|ballistics|all] [name=] [track]` prints what each guard stores
 without writing it; `hills map=` finds the steepest smooth ground on a map.
 
-Not yet seen on CI: the tracks were written on this machine (glibc 2.43). The tolerances are well past float
-rounding, but a walk or a drive accumulates over hundreds of ticks; if CI's maths parts one, the tolerance is
-the thing to look at first, as the sound fingerprints' maths probe was.
+The tracks were written on this machine (glibc 2.43). Each store says which maths it was made on, and another
+machine compares by the rule for other maths (14.9).
 
 ### 14.8 The Jolt trial: `--jolt-trial`
 
@@ -1338,6 +1337,75 @@ Against Jolt, or to watch:
 - **The worst steps** (3.4 ms with 500 bodies, 9.9 ms for the first soft contacts) are single steps, not
   sustained, but four a tick would take a 33 ms tick past a frame's worth now and then.
 - Nothing found conflicts with our geometry: no mesh too big, no axis or winding change, metres throughout.
+
+### 14.9 Other machines: the maths line, the drift and the slip
+
+GitHub's runner parted the traffic from its stored copy twice on 2026-10-11, with no physics changed: a heading
+of pi against -pi (now compared round the circle), then a Twin-turbo Cummins 6 at second 57, z 138.089 against
+138.087 stored, just past the 2 mm allowed. Its libm and CPU are not this machine's, and a minute of
+integration carries the difference. The physics stores now do what the emitter-stream replay does
+(docs/SOUND_LIBRARY_BOUNDARY.md 13.3):
+
+- **The maths line.** Every store's first line is `# maths <fingerprint>` (`CrossMachine.MathsFingerprint`):
+  the sound guards' libm probe (`RenderFingerprintTests.MathsProbe`: the bits of every libm function the models
+  call, and the vector width), the instruction sets the JIT may use for the vector types (AVX-512, AVX2, FMA),
+  and the bits of the `System.Numerics` operations the steps call (normalise, transform by a quaternion,
+  slerp, cross, dot, length). Here it is `8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93`.
+  Adding the line changed no row of any store. On GitHub the libm probe already differs (the emitter streams
+  say so in shard 5).
+- **The same maths: as before.** Positions to 0.1 mm (walks), 0.5 mm (drives) and 2 mm (movers), the rest as
+  in 14.2 to 14.5. A refactor that changes nothing changes no row past float rounding.
+- **Other maths: the drift and the slip** (`CrossMachine`, one rule per store in `PhysicsReplayTests.cs`).
+  `OPENFPS_PHYSICS_FOREIGN=1` compares as other maths would, to see the rule here.
+
+How the two machines part, measured. A minute of traffic and a minute and a half of trains were run with every
+tick's step rounded a float unit longer or shorter at random (`PhysicsCrossMachineTests`), rounding everywhere
+on every tick, a harder push than a different libm:
+
+| Store | Seconds | Worst drift, rounded every tick | GitHub |
+|---|---:|---|---|
+| traffic, 188 movers | 60 | 1 mm (one printed step) in position, 1e-4 rad, 1 mm/s, one wheel step | 1 to 3 mm at 57 s, 1e-4 rad |
+| trains, 24 sources | 90 | 1 mm, 1e-4 rad | within 2 mm |
+| four drives | 8 to 17 | 0.1 mm (one printed step), 1e-4 rad | within 0.5 mm |
+
+The steps are contractive: drivers hold their lines, so rounding does not grow; it stays at the printed
+resolution. The one thing that did grow was a decision. One walker on Foundry Street started a tick later and
+stood 46 mm behind (one tick at 1.4 m/s) for three seconds, then caught up. A threshold (a start, a stop, a
+gear, a give way) crossed a tick early or late moves a body along its own path by its speed times the ticks.
+
+So the rule for other maths has two parts:
+
+- **Drift**, on every row: the same-maths tolerance plus, per simulated second, 1 mm of position, 1 mm/s of
+  speed, 1e-4 rad of heading, and a wheel step a minute. That is twenty times GitHub's worst position drift
+  (about 0.05 mm/s) and fifty times its heading drift. At the end of the minute a car may be 62 mm off; a lane
+  is 3.5 m.
+- **Slip**, for a row past its drift: it passes only if it is where the body would be two ticks along or back
+  its own path (twice the slip seen). Along its stored heading: drift plus speed times 2/30 s (1.1 m for the
+  fastest car, 16 m/s). Across it: drift plus what a slip on the tightest turn (5 m) puts off the tangent,
+  under 0.12 m. Height: drift plus the vertical speed (walks) or the speed (vehicles) times the slip. Speed:
+  plus 10 m/s² times the slip (0.67 m/s). Heading: plus 1.5 rad/s times the slip. On a slipped row the
+  wheels, controls, pose, grounded flag and gap are not compared: a tick turns a slip ratio from nothing to a
+  skid. A row whose wheels or controls are past their drift while the body is where it was stored fails.
+- A flight has no decisions, so the ballistics table has drift only, growing with the time of flight (1 mm of
+  height and drift, 10 µs and 1 cm/s a second). `walks.tsv`, the risk counts, allows a count to move by two
+  and a worst case by half a millimetre.
+
+What it still catches, each a test in `PhysicsCrossMachineTests` on the stored traffic: a car in the next lane
+(3.5 m across), half a lane over (1 m across, against a bound of 0.1 m), a car that stops (10.5 m/s off in the
+next second), its wheels changed where the car is the same, and a walk a stair tread lower; and it passes a car
+a tick along its way with a skid begun early, and a minute of drift at half the bound. The rounded-every-tick
+traffic must pass it on every run (4 rows passed as slips here). Two deliberate changes to `VehicleSystem`,
+tried with `OPENFPS_PHYSICS_FOREIGN=1` and reverted: one car's lane offset by 1 m failed at second 1 ("0.996 m
+across its path, past 0.0314"); every routed car's top speed 3 % lower failed at second 2 ("0.829 m along its
+path, past 0.541").
+
+The movement walks' 1 mm gap between the server and the client is unaffected: both sides run in one process
+on one machine, and the gap is checked on every run whatever the store's maths.
+
+Regenerating on another machine writes that machine's maths line, and then this machine compares by the rule
+for other maths until it is regenerated here.
+
+Cost: `PhysicsCrossMachineTests` about 6 s, nearly all of it the rounded minute of traffic.
 
 ## Decisions (Cody, 2026-10-11)
 

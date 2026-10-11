@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_doorway_lobby: in through Brandt Court's front door, across the lobby, through the stairwell door
 # map city, start -5.000 0.100 157.080, heading 270, script -15 w100 -10
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

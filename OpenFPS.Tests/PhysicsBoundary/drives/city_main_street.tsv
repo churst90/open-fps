@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_main_street: up Main Street northbound: crank, eight seconds' throttle, coast, brake to a stop, reverse
 # map city, i4_economy, start 3.000 0.050 -120.000, heading 0, script -30 w240 -60 s90 -15 s60 -15
 tick	keys	x	y	z	heading	speed	steer	throttle	brake	qx	qy	qz	qw	demand	then per wheel: load_daN angular slip_ratio slip_angle surface demand water

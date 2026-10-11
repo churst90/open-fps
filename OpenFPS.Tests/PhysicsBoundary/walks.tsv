@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 walk	map	ticks	metres	worst_gap_mm	gap_ticks	ground_differs	ground_from_movers	worst_ground_mm	memo_hits	memo_stale	worst_memo_mm	memo_track_effect_mm	gather_differs	gather_moves	worst_gather_mm
 city_street_held	city	120	13.50	0.00	0	0	0	0.0	24	0	0.0	0.0	0	0	0.0
 city_street_taps	city	145	1.80	0.00	0	0	0	0.0	115	0	0.0	0.0	0	0	0.0
