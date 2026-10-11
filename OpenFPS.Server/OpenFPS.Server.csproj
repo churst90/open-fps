@@ -10,6 +10,9 @@
     <PackageReference Include="Parquet.Net" Version="6.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.4" />
+    <!-- The native SQLite under EF Core: 2.1.10 bundles SQLite before 3.50.2 (CVE-2025-6965, GHSA-2m69-gcr7-jv3q).
+         The 3.x lib packages carry the native library only and follow SQLite's own version. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

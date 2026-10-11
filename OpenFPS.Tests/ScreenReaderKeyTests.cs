@@ -27,7 +27,7 @@ public class ScreenReaderKeyTests
     private sealed class Shell : IClientShell
     {
         public bool IsGameInputActive { get; set; } = true;
-        public event Action<string>? CommandEntered;
+        public event Action<string>? CommandEntered { add { } remove { } }
         public void ShowLoading(string status, bool speak = true) { }
         public void UpdateLoadingStatus(string text, int percent) { }
         public void EnterGame() { }

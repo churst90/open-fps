@@ -107,7 +107,7 @@ public struct SpatialEmitter
     public bool IsSynth;
     /// <summary>A vehicle engine preset (see VehicleProfile.Presets) run live in the mixer. Set when
     /// the entity's SoundId is "engine:&lt;preset&gt;".</summary>
-    public string EngineKey;
+    public string? EngineKey;
     /// <summary>
     /// A physical model other than a vehicle engine, run live in the mixer, as the whole prefixed id
     /// ("machine:ac_window", "aircraft:airliner"): the prefix says which library the name is in, and

@@ -93,7 +93,7 @@ public static class MovementSystem
                 // predicted all of it, was pulled back.
                 float stepDt = next.DeltaTime > 0f ? MathF.Min(next.DeltaTime, MaxInputDeltaTime) : dt;
                 if (stepDt > session.InputBudget + 1e-5f) break;
-                session.InputQueue.TryDequeue(out var input);
+                if (!session.InputQueue.TryDequeue(out var input)) break;
                 processedInputs++;
                 session.LastProcessedSequenceId = input.SequenceId;
                 session.InputBudget = MathF.Max(0f, session.InputBudget - stepDt);

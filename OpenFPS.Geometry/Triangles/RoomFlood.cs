@@ -878,11 +878,11 @@ public static class RoomFlood
         // across one axis is grown by how much further the other two reach.
         var grow = new float[rc * 3];
         var volume = new double[rc];
+        Span<double> stretch = stackalloc double[3];   // every element is written for each room before it is read
         for (int k = 0; k < rc; k++)
         {
             double cells = air[k] * (double)Cell * Cell * Cell;
             double volumeGap = 0;
-            Span<double> stretch = stackalloc double[3];
             for (int a = 0; a < 3; a++)
             {
                 double across = 0.5 * (faces[k * 6 + 2 * a] + faces[k * 6 + 2 * a + 1]) * face;

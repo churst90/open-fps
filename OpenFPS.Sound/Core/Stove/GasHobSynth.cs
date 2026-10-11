@@ -71,7 +71,7 @@ public sealed class GasHobSynth
         public float LastFlashJoules, LastLightDelay, GasSince;
         // The sound.
         public PowerLawNoise Roar, Whoosh;
-        public float RoarUnit, WhooshUnit, FlickerLp, Flicker;
+        public float RoarUnit, WhooshUnit, FlickerLp;
         public float InjLp1, InjLp2, ValveLp1, ValveLp2;
         public float InjAmp, InjAlpha, ValveAmp, ValveAlpha;
         public Modes Cap;

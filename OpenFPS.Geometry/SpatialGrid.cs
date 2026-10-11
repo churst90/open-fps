@@ -7,7 +7,7 @@ namespace OpenFPS.Common;
 /// moves is filed again every tick.
 /// </summary>
 /// <typeparam name="T">What is filed (usually an entity).</typeparam>
-public class SpatialGrid<T>
+public class SpatialGrid<T> where T : notnull
 {
     private readonly float _cellSize;
     private readonly Dictionary<(int, int), List<T>> _staticGrid = new();

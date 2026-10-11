@@ -3924,7 +3924,7 @@ public partial class ClientAudioSystem
         }
         if (!c.Found) return;
         float gb = c.Height;
-        _groundMat[0] = c.Material;
+        _groundMat[0] = c.Material ?? "Generic";
         if (gb > MathF.Min(src.Y, ear.Y)) return;                // nothing to bounce off below both
         if (src.Y - gb < minHeight) return;                      // the recording has it already
 

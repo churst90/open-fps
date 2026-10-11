@@ -79,12 +79,14 @@ public static class SolidContact
             return CylinderCore(v[..(3 * tc)], planes[..pc], radius, -half, half, 0f, canGoDown);
         }
         var best = none;
+        Span<Vector3> partV = stackalloc Vector3[3 * StackTriangles];
+        Span<Vector4> partPlanes = stackalloc Vector4[StackTriangles];
         for (int k = 0; k < parts; k++)
         {
             int tc = world.PartTriangleCountOf(solid, k);
-            Span<Vector3> v = tc <= StackTriangles ? stackalloc Vector3[3 * StackTriangles] : new Vector3[3 * tc];
+            Span<Vector3> v = tc <= StackTriangles ? partV : new Vector3[3 * tc];
             world.PartTrianglesOf(solid, k, centre, v);
-            Span<Vector4> planes = tc <= StackTriangles ? stackalloc Vector4[StackTriangles] : new Vector4[tc];
+            Span<Vector4> planes = tc <= StackTriangles ? partPlanes : new Vector4[tc];
             int pc = world.PartPlanesOf(solid, k, centre, planes);
             var r = CylinderCore(v[..(3 * tc)], planes[..pc], radius, -half, half, 0f, canGoDown);
             if (r.IsColliding && (!best.IsColliding || r.Penetration > best.Penetration)) best = r;

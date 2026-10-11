@@ -614,7 +614,6 @@ public sealed class FireSynth
     /// </summary>
     public float Quench;
     private float _quench;
-    private float _sizzleTarget, _sizzleAmp;
     private float _cooling;      // seconds since it went out, while its char is still hot
     private float _hotQ;         // the heat release it had when it went out, kW: how much char is cooling
     private float _tickClock;
@@ -1055,6 +1054,7 @@ public sealed class FireSynth
         }
 
         // Embers coming down.
+        Span<float> hz = stackalloc float[2], tau = stackalloc float[2], amp = stackalloc float[2];
         for (int i = 0; i < _emberAt.Length; i++)
         {
             if (_emberAt[i] < 0f) continue;
@@ -1065,9 +1065,9 @@ public sealed class FireSynth
             float p = SmallestCracklePascals * 0.15f * _emberSize[i] * CracklePart;
             var lands = _sums[Math.Min(_emberPlace[i], places - 1)];
             lands.Pulse(at, 25e-6f, p);
-            Span<float> hz = stackalloc float[] { 5200f + 2000f * _sum.Signed(), 9000f + 2500f * _sum.Signed() };
-            Span<float> tau = stackalloc float[] { 0.0015f, 0.0008f };
-            Span<float> amp = stackalloc float[] { 0.5f * p, 0.3f * p };
+            hz[0] = 5200f + 2000f * _sum.Signed(); hz[1] = 9000f + 2500f * _sum.Signed();
+            tau[0] = 0.0015f; tau[1] = 0.0008f;
+            amp[0] = 0.5f * p; amp[1] = 0.3f * p;
             lands.Ring(at, hz, tau, amp);
         }
     }

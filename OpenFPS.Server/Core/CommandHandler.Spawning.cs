@@ -198,7 +198,7 @@ public partial class CommandHandler
         };
         if (!_server.Rail.SpawnOne(_maps, session.CurrentMapId, td)) { Say(reply, "The train could not be put on the track."); return; }
         bool record = !_maps.IsShipped(session.CurrentMapId);
-        if (record) data.Trains.Add(td);
+        if (record) (data.Trains ??= new List<TrainData>()).Add(td);
         Say(reply, $"A {profile.Name} is on the {best.Id} track, {bestDistance:F0} metres from you. {Lasting(record, "it")}");
     }
 

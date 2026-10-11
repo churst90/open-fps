@@ -112,13 +112,13 @@ public class LoudspeakerTests
     public void TheBandsSumToTheVoiceAndPowerThenBeamIsTheBeam()
     {
         var rad = Radiator.For(LoudspeakerSpec.PaHorn);
+        Span<float> g = stackalloc float[Radiator.Bands];
         foreach (double hz in new[] { 150.0, 400, 1000, 2500, 4500, 9000 })
         {
             Assert.InRange(Db(SineThrough(hz, new[] { Unit() })), -0.1, 0.1);
 
             var power = new RadiatorState(); power.Configure(Rate);
             var beam = new RadiatorState(); beam.Configure(Rate);
-            Span<float> g = stackalloc float[Radiator.Bands];
             rad.PowerGains(g); power.Start(g);
             float cos = MathF.Cos(MathF.PI * 0.75f);
             rad.BeamOverPower(cos, g); beam.Start(g);

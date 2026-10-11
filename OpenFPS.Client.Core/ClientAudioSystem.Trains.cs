@@ -221,6 +221,7 @@ public partial class ClientAudioSystem
                     float d = Vector3.DistanceSquared(src.At, centre);
                     if (d < nearest) { nearest = d; rep = src.Snap; }
                 }
+            if (rep.Definition is null) continue;   // no car of the group has a source this frame
             float slotGain = TrainVoicing.LawGain(v.SlotLevelDb, 0f, Vector3.Distance(centre, eyePos))
                            * Correction(v, rep.Definition.SoundEmitter.SoundId!, v.SlotLevelDb);
             var weights = _trainWeights[slot];

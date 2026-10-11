@@ -100,7 +100,7 @@ public sealed class ChimeHorn
     {
         private readonly ChimeBellSpec _b;
         private readonly float _rate, _dt, _trim, _startDelay, _openScale, _leak, _bend, _ragged;
-        private Mode[] _modes;
+        private Mode[] _modes = [];
         private readonly Random _rng;
         private readonly float _hpA;
         private double _phase;

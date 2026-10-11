@@ -25,7 +25,7 @@ public sealed class SteamFrontEnd
     private readonly Random _rng;
     private readonly float[] _beatPhase;      // where in a revolution each beat happens
     private readonly float[] _beatGain;
-    private Mode[] _stack;
+    private Mode[] _stack = [];
     private readonly float _leakAmp, _motionAmp;
     private readonly float _decayTau;
     private double _rev;                      // driver revolutions

@@ -652,6 +652,7 @@ public sealed class OpeningRoutes
         if (map == null) return false;
         float bestGap = float.MaxValue;
         bool found = false;
+        Span<float> gap = stackalloc float[3];
         foreach (int r in new[] { d.RegionA, d.RegionB })
         {
             if (!map.Regions.TryGetValue(r, out var region) || region.RoomSize.X <= 0f) continue;
@@ -661,7 +662,9 @@ public sealed class OpeningRoutes
             Vector3 local = Vector3.Transform(d.Centre - c, Quaternion.Inverse(q));
             Vector3 h = region.RoomSize * 0.5f;
             // Distance of the point from each of the six face planes; the nearest is the one it is on.
-            Span<float> gap = stackalloc float[3] { MathF.Abs(MathF.Abs(local.X) - h.X), MathF.Abs(MathF.Abs(local.Y) - h.Y), MathF.Abs(MathF.Abs(local.Z) - h.Z) };
+            gap[0] = MathF.Abs(MathF.Abs(local.X) - h.X);
+            gap[1] = MathF.Abs(MathF.Abs(local.Y) - h.Y);
+            gap[2] = MathF.Abs(MathF.Abs(local.Z) - h.Z);
             for (int ax = 0; ax < 3; ax++)
             {
                 if (gap[ax] >= bestGap) continue;
