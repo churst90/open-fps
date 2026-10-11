@@ -381,6 +381,54 @@ public class RainTests
             if (r.Patches[s] != null) Assert.False(r.Direct[s], $"{RainSurvey.SlotName(s)} is heard in plain view from inside a closed room");
     }
 
+    /// <summary>
+    /// A hall two storeys high, by its outer wall: the near quarter along the wall falls on the street below
+    /// and on the roof. Its middle is between them, in the hall's own air, and the path to it went through
+    /// no wall (Marlow Tower's stairwell, 2026-10-10: rain at -14 dB flat behind 35 cm of
+    /// brick). It is heard by the path to each thing it falls on.
+    /// </summary>
+    [Fact]
+    public void APatchBehindWallsIsHeardFromItsSurfacesNotItsMiddle()
+    {
+        var world = World(); Ground(world, "Asphalt");
+        float f = 9f;
+        Box(world, "Brick", new Vector3(-3.35f, (f - 0.3f) / 2f, 0f), new Vector3(13.3f, f - 0.3f, 20f));     // under the storey
+        Box(world, "Concrete", new Vector3(-3.35f, f - 0.15f, 0f), new Vector3(13.3f, 0.3f, 20f));          // its floor
+        // The roof in three, the middle one over the ear, and a plaster ceiling under it all (Marlow Tower's
+        // top floors): the rest of the roof is not the roof over the ear, and is behind the ceiling.
+        Box(world, "Plaster", new Vector3(-3.35f, f + 5.985f, 0f), new Vector3(13.3f, 0.03f, 20f));
+        Box(world, "Concrete", new Vector3(-3.35f, f + 6.15f, 0f), new Vector3(13.3f, 0.3f, 2f));
+        Box(world, "Concrete", new Vector3(-3.35f, f + 6.15f, 5.5f), new Vector3(13.3f, 0.3f, 9f));
+        Box(world, "Concrete", new Vector3(-3.35f, f + 6.15f, -5.5f), new Vector3(13.3f, 0.3f, 9f));
+        Box(world, "Brick", new Vector3(3.15f, f + 3f, 0f), new Vector3(0.3f, 6f, 20f));                    // the outer wall
+        Box(world, "Brick", new Vector3(-9.85f, f + 3f, 0f), new Vector3(0.3f, 6f, 20f));
+        Box(world, "Brick", new Vector3(-3.35f, f + 3f, 9.85f), new Vector3(13.3f, 6f, 0.3f));
+        Box(world, "Brick", new Vector3(-3.35f, f + 3f, -9.85f), new Vector3(13.3f, 6f, 0.3f));
+        var ear = new Vector3(2.4f, f + 1.6f, 0f);
+        var r = new RainSurvey().Run(world, ear, -1, -1);
+        _o.WriteLine(r.Describe());
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+        OpenFPS.Client.AudioEngine.Data.AcousticPathData PathFrom(Vector3 at) => acoustics.CalculateAcousticPath(world, -1, ear, at);
+        int mixed = 0;
+        for (int s = 1; s < RainFeeds.Slots; s++)
+        {
+            if (r.Patches[s] == null || r.Direct[s]) continue;
+            var sources = r.Sources[s];
+            Assert.NotEmpty(sources);
+            // Each where rain lands: the street's top or the roof's.
+            Assert.All(sources, p => Assert.True(MathF.Abs(p.At.Y) < 0.01f || MathF.Abs(p.At.Y - (f + 6.3f)) < 0.01f, $"{RainSurvey.SlotName(s)}: a source at {p.At}"));
+            if (!(sources.Any(p => p.At.Y < 1f) && sources.Any(p => p.At.Y > f))) continue;
+            mixed++;
+            var middle = PathFrom(r.Centres[s] + new Vector3(0f, 0.3f, 0f));
+            var heard = OpenFPS.Client.Core.RainField.PatchPath(PathFrom, r, s);
+            static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-6f, g));
+            _o.WriteLine($"{RainSurvey.SlotName(s)}: middle at {r.Centres[s]} {Db(middle.EqMid):F1} dB; from its {sources.Count} surfaces {Db(heard.EqMid):F1} dB");
+            Assert.True(r.Centres[s].Y > 1f && r.Centres[s].Y < f + 6f, "the middle of a patch on the street and the roof is between them");
+            Assert.True(Db(heard.EqMid) < -40f, $"{RainSurvey.SlotName(s)}: {Db(heard.EqMid):F1} dB through the roof or the wall");
+        }
+        Assert.True(mixed > 0, "no quarter fell both on the street and on the roof");
+    }
+
     [Fact]
     public void UnderASheetRoofTheRoofIsTheVoice()
     {

@@ -55,6 +55,10 @@ public sealed class RainSurvey
     /// dB: a concrete slab. Physics, not a cut: the plate law gives a 15 cm slab about 25 dB.</summary>
     public const float SilentRoofDb = 25f;
 
+    /// <summary>The most things a patch behind something is heard from by its own path (Result.Sources):
+    /// the heaviest carry nearly all of what is heard, and each is a path asked on the game's thread.</summary>
+    public const int MaxSources = 4;
+
     /// <summary>What lies between the ear and the roof over it lets less through than this (an
     /// amplitude, mid band) and the roof is not voiced: a floor slab, not a ceiling tile.</summary>
     public const float OpaqueGain = 0.003f;
@@ -63,6 +67,13 @@ public sealed class RainSurvey
     {
         public readonly RainPatch?[] Patches = new RainPatch?[RainFeeds.Slots];
         public readonly Vector3[] Centres = new Vector3[RainFeeds.Slots];
+        /// <summary>Where a patch behind something is heard from by the path: the middle of its columns on
+        /// each thing it falls on, weighted as heard, heaviest first and at most <see cref="MaxSources"/>.
+        /// Its middle (<see cref="Centres"/>) is not on any surface when it falls both on the pavement
+        /// under a building and on its roof: inside the building, where the path to it went through no
+        /// wall (Marlow Tower's stairwell, 2026-10-10: rain at -14 dB flat behind 35 cm of brick).</summary>
+        public readonly List<(Vector3 At, float Weight)>[] Sources =
+            Enumerable.Range(0, RainFeeds.Slots).Select(_ => new List<(Vector3, float)>()).ToArray();
         /// <summary>The patch is heard in plain view (or round an edge, already paid for in its areas) and
         /// takes no path but the air; one wholly behind something takes the path to it.</summary>
         public readonly bool[] Direct = new bool[RainFeeds.Slots];
@@ -142,6 +153,9 @@ public sealed class RainSurvey
     private readonly record struct ColumnRecord(int Slot, int Ring, int Thing, float Area, float Distance, Vector3 At,
                                                 bool FromBelow, int Under, float UnderTop, bool Seen, float Angle, bool Plain);
     private readonly Vector3[] _wPos = new Vector3[RainFeeds.Slots];
+    /// <summary>Per slot, per thing (its index), the weight and weighted position of its columns.</summary>
+    private readonly Dictionary<int, (float W, Vector3 At)>[] _onThing =
+        Enumerable.Range(0, RainFeeds.Slots).Select(_ => new Dictionary<int, (float, Vector3)>()).ToArray();
 
     private static Dictionary<string, RainLayer>[] MakeLayerMaps()
     {
@@ -244,9 +258,17 @@ public sealed class RainSurvey
         // A patch is heard from the part of it in view or round an edge (the street past a shelter's
         // glass). Only a patch wholly behind something (outside, to a listener indoors) is heard by the
         // path to it.
+        foreach (var m in _onThing) m.Clear();
         foreach (var c in _columns)
         {
             if (c.Slot != OverheadSlot && _seenAny[c.Slot] && !c.Seen) continue;
+            if (c.Slot != OverheadSlot)
+            {
+                // The same weight as the patch's middle (AddColumn): a column's middle on one box's top is on that top.
+                float w = c.Area / (c.Distance * c.Distance);
+                _onThing[c.Slot].TryGetValue(c.Thing, out var sum);
+                _onThing[c.Slot][c.Thing] = (sum.W + w, sum.At + c.At * w);
+            }
             _underTop = c.UnderTop;
             // Near and heard straight (or the roof over the ear): its big drops are played one by one
             // (NearDrops), and the patch keeps the rest.
@@ -284,6 +306,13 @@ public sealed class RainSurvey
             result.Patches[slot] = new RainPatch { Layers = layers, ReferenceDistance = dist };
             result.Centres[slot] = centre;
             result.Direct[slot] = slot == OverheadSlot || _seenAny[slot];
+            if (!result.Direct[slot])
+            {
+                var sources = result.Sources[slot];
+                foreach (var (_, (w, at)) in _onThing[slot]) if (w > 0) sources.Add((at / w, w));
+                sources.Sort(static (a, b) => b.Weight.CompareTo(a.Weight));
+                if (sources.Count > MaxSources) sources.RemoveRange(MaxSources, sources.Count - MaxSources);
+            }
         }
         result.Milliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
         return result;
@@ -734,7 +763,7 @@ public sealed class RainField
     /// <summary>Surveyed again once the ear has moved this far, m, or this long has gone, s.</summary>
     public const float SurveyMetres = 1.5f, SurveySeconds = 2f;
 
-    /// <summary>A ring patch's path is asked again this often, s, one patch a frame.</summary>
+    /// <summary>The path to each surface of a ring patch is asked again this often, s, one surface a frame.</summary>
     public const float PathSeconds = 0.4f;
 
     /// <summary>The rain is let go this long after it stops, s, so a voice is not torn down and built
@@ -749,7 +778,9 @@ public sealed class RainField
     private double _surveyedWhen = double.NegativeInfinity;
     private readonly bool[] _on = new bool[RainFeeds.Slots];
     private readonly AcousticPathData?[] _paths = new AcousticPathData?[RainFeeds.Slots];
-    private readonly double[] _pathAt = new double[RainFeeds.Slots];
+    /// <summary>Per ring patch and surface (RainSurvey.Result.Sources), the path last asked, where to and when.</summary>
+    private readonly (AcousticPathData? Path, Vector3 At, double When)[,] _sourcePaths =
+        new (AcousticPathData?, Vector3, double)[RainFeeds.Slots, RainSurvey.MaxSources];
     private int _nextPath;
     private double _dryFrom = double.NaN;
     private Precipitation _falling;
@@ -831,21 +862,26 @@ public sealed class RainField
 
         PlayNear(ear, now, listenerRegion);
 
-        // One ring patch's path a frame: the walls and windows between the ear and that patch.
+        // One path a frame, to one surface of one ring patch: the walls and windows between the ear and it.
         if (_acoustics != null)
         {
-            for (int tries = 0; tries < RainFeeds.Slots; tries++)
+            const int Pairs = RainFeeds.Slots * RainSurvey.MaxSources;
+            for (int tries = 0; tries < Pairs; tries++)
             {
-                int s = _nextPath;
-                _nextPath = (_nextPath + 1) % RainFeeds.Slots;
+                int pair = _nextPath;
+                _nextPath = (_nextPath + 1) % Pairs;
+                int s = pair / RainSurvey.MaxSources, k = pair % RainSurvey.MaxSources;
                 if (s == RainSurvey.OverheadSlot || _last.Patches[s] == null || _last.Direct[s]) continue;
-                if (now - _pathAt[s] < PathSeconds) continue;
-                try
-                {
-                    _paths[s] = _acoustics.CalculateAcousticPath(world, -1, ear, _last.Centres[s] + new Vector3(0f, 0.3f, 0f));
-                }
-                catch { _paths[s] = null; }
-                _pathAt[s] = now;
+                var sources = _last.Sources[s];
+                if (k >= Math.Max(1, sources.Count)) continue;
+                Vector3 at = sources.Count > 0 ? sources[k].At : _last.Centres[s];
+                ref var known = ref _sourcePaths[s, k];
+                if (known.Path != null && now - known.When < PathSeconds && Vector3.DistanceSquared(known.At, at) < 0.25f) continue;
+                try { known = (_acoustics.CalculateAcousticPath(world, -1, ear, at + new Vector3(0f, 0.3f, 0f)), at, now); }
+                catch { known = (null, at, now); }
+                _paths[s] = Combine(_last, s, j => _sourcePaths[s, j] is { Path: { } p } done
+                                                   && Vector3.DistanceSquared(done.At, sources.Count > 0 ? sources[j].At : _last.Centres[s]) < 0.25f
+                                                   ? p : null) ?? _paths[s];
                 break;
             }
         }
@@ -978,6 +1014,47 @@ public sealed class RainField
     {
         for (int k = 1; k < _partsOn[slot]; k++) _audio.StopSound(PartVoiceId(slot, k));
         _partsOn[slot] = 0;
+    }
+
+    /// <summary>
+    /// A patch behind something, heard by the path to each thing it falls on (RainSurvey.Result.Sources),
+    /// <paramref name="pathFrom"/> a point to the ear: per band the paths' energies weighted as the survey
+    /// weights the surfaces, from where the one that delivers most arrives. Its middle alone when it has no sources.
+    /// </summary>
+    public static AcousticPathData PatchPath(Func<Vector3, AcousticPathData> pathFrom, RainSurvey.Result survey, int slot)
+    {
+        var lift = new Vector3(0f, 0.3f, 0f);
+        var sources = survey.Sources[slot];
+        if (sources.Count == 0) return pathFrom(survey.Centres[slot] + lift);
+        var each = new AcousticPathData[sources.Count];
+        for (int k = 0; k < each.Length; k++) each[k] = pathFrom(sources[k].At + lift);
+        return Combine(survey, slot, k => each[k])!.Value;
+    }
+
+    /// <summary><see cref="PatchPath"/> from the paths already asked to each surface; null when none is.
+    /// A patch with no sources is its middle's path (index 0).</summary>
+    private static AcousticPathData? Combine(RainSurvey.Result survey, int slot, Func<int, AcousticPathData?> pathTo)
+    {
+        var sources = survey.Sources[slot];
+        if (sources.Count == 0) return pathTo(0);
+        double weights = 0, low = 0, mid = 0, high = 0, best = -1;
+        AcousticPathData strongest = default;
+        for (int k = 0; k < sources.Count; k++)
+        {
+            if (pathTo(k) is not { } p) continue;
+            float w = sources[k].Weight;
+            double l = p.EqLow * p.EqLow, m = p.EqMid * p.EqMid, h = p.EqHigh * p.EqHigh;
+            low += w * l; mid += w * m; high += w * h; weights += w;
+            if (w * (l + m + h) > best) { best = w * (l + m + h); strongest = p; }
+        }
+        if (weights <= 0) return null;
+        var path = strongest;
+        path.EqLow = (float)Math.Sqrt(low / weights);
+        path.EqMid = (float)Math.Sqrt(mid / weights);
+        path.EqHigh = (float)Math.Sqrt(high / weights);
+        path.Occlusion = Math.Clamp(MathF.Min(strongest.Occlusion, 1f - MathF.Max(path.EqLow, MathF.Max(path.EqMid, path.EqHigh))),
+                                    0f, AcousticConstants.OcclusionCap);
+        return path;
     }
 
     /// <summary>The emitter for one slot: where its patch is, the level its voice measured, the path.</summary>
@@ -1121,6 +1198,7 @@ public sealed class RainField
             StopParts(s);
             RainFeeds.Feed[s].Patch = null;
             _paths[s] = null;
+            for (int k = 0; k < RainSurvey.MaxSources; k++) _sourcePaths[s, k] = default;
         }
         _last = null;
         _plannedTo = double.NaN;
