@@ -2032,10 +2032,17 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    `WorldPlaces` and `WorldBuildings` carry into a tile from a survey or from their prefabs, so a tile needs no survey
    of its own) and a composite part's, which carry a measure rather than author one.
 
-   Found moving `RealPlaceMapTests.The_ground_never_rises_through_what_lies_on_it` onto the floods (nine points over
-   each room's air instead of its box): the ground comes up through the floor at points of 21 rooms, 14 on Albany and 7
-   on Magnolia (1077 Lawrence Avenue, 777 College Park Drive's two buildings, 26319 South Heaton Lane, Building off
-   Turtle Creek Lane among them). The test keeps its box points, which are clear; the flood's are open.
+   `RealPlaceMapTests.The_ground_never_rises_through_what_lies_on_it` now checks nine points over each room's air, not
+   its box: down from the top of the air to what is under it, where the room's air (`RoomCells.TryAirAt`) holds the
+   point half a metre over it. Tried with `TryRoomAt` first, 21 rooms (14 on Albany, 7 on Magnolia) seemed to have the
+   ground through their floors. They do not: each point was 0.1 to 0.2 m outside the footprint, in a cell of the
+   room's wall (a wall at an angle to the grid is rasterised as thick as a flood needs, so it holds cells whose
+   middles are just past its outer face, `RoomFlood.Room.EdgeRuns`), where there is no floor, only the yard's ground
+   (AudioLab `--geometry-parity only=column at=X,Z to=X,Z` says what a ray down meets and how far the footprint is).
+   `RoomCells` keeps the air and the wall cells apart now (`TryAirAt`; `TryRoomAt` still holds both, so a point on a
+   wall's face is in the room). Over every room's air on both places: no point with the ground on top. No generator
+   or grading rule needed changing; the world's buildings are graded by the same slabs (`TerrainBuilder.Slab`, the
+   footprint's outline).
 
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box

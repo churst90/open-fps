@@ -982,6 +982,9 @@ public static class GeometryParitySpike
         if (only.Contains("indoor"))
             IndoorParity(ecs, serverWorld, show);
 
+        if (only.Contains("column"))
+            Column(ecs, serverWorld, args);
+
         if (only.Contains("rooms"))
             RoomsParity(ecs, rebuilt, data, show, lookup, args);   // with the door leaves shut in their doorways
 
@@ -1289,6 +1292,56 @@ public static class GeometryParitySpike
     /// links the two there: a pair with none is bounded today only by the boxes, and a flood from points would split
     /// it by distance instead.
     /// </summary>
+    /// <summary>What a ray straight down at (at=X,Z, world x and z) meets, top to bottom (column=), and who owns each.</summary>
+    private static void Column(World ecs, TriangleWorld world, string[] args)
+    {
+        var xz = Arg(args, "at", "0,0").Split(',').Select(v => float.Parse(v, CultureInfo.InvariantCulture)).ToArray();
+        float top = 200f;
+        var all = new AcceptAll();
+        var names = new Dictionary<int, string>();
+        ecs.Query(new QueryDescription().WithAll<OpenFPS.Common.Components.IdentityComponent>(), (Entity e, ref OpenFPS.Common.Components.IdentityComponent id) =>
+            names[e.Id] = $"{id.Name ?? ""} [{id.PrefabId}]");
+        Console.WriteLine($"column at x {xz[0]}, z {xz[1]}:");
+        for (int k = 0; k < 12; k++)
+        {
+            var o = new Vector3(xz[0], top, xz[1]);
+            if (!world.Closest(o, -Vector3.UnitY, 400f, GeometryLayers.All, RayFaces.Both, ref all, out var hit)) break;
+            float y = top - hit.T;
+            string name = names.TryGetValue(hit.Owner, out var n) ? n : "terrain or a road";
+            Console.WriteLine($"  {y:F2} {(hit.Front ? "top" : "underside")} of {name} (#{hit.Owner})");
+            top = y - 0.01f;
+        }
+        // Toward to=X,Z: how far until something other than the ground is under foot, and what.
+        if (Arg(args, "to", "") is { Length: > 0 } toArg)
+        {
+            var to = toArg.Split(',').Select(v => float.Parse(v, CultureInfo.InvariantCulture)).ToArray();
+            var a = new Vector2(xz[0], xz[1]); var b = new Vector2(to[0], to[1]);
+            for (float t = 0f; t <= 1f; t += 0.01f)
+            {
+                var q = Vector2.Lerp(a, b, t);
+                if (!world.Closest(new Vector3(q.X, 200f, q.Y), -Vector3.UnitY, 400f, GeometryLayers.All, RayFaces.Both, ref all, out var h)) continue;
+                if (names.TryGetValue(h.Owner, out var n) && !n.StartsWith("Ground ["))
+                {
+                    Console.WriteLine($"  {Vector2.Distance(a, q):F2} m on, at ({q.X:F2}, {q.Y:F2}): {n} at {200f - h.T:F2}");
+                    break;
+                }
+            }
+        }
+        // What a box a cell round each height there overlaps (the flood's raster asks the same).
+        var refs = new List<SolidRef>();
+        for (float y = -1f; y <= 4f; y += 0.5f)
+        {
+            refs.Clear();
+            var c = new Vector3(xz[0], y, xz[1]);
+            world.Overlapping(c - new Vector3(0.125f), c + new Vector3(0.125f), GeometryLayers.Acoustics, ref all, refs);
+            Console.WriteLine($"  box at {y:F2}: " + string.Join(", ", refs.Select(r => names.TryGetValue(world.OwnerOf(r), out var n) ? n : $"#{world.OwnerOf(r)}")));
+        }
+        var floods = MapManager.RoomsOf(ecs);
+        if (floods == null) return;
+        for (float y = -8f; y <= 8f; y += RoomFlood.Cell)
+            if (floods.TryRoomAt(new Vector3(xz[0], y, xz[1]), out int room)) Console.WriteLine($"  {y:F2}: room {room}");
+    }
+
     /// <summary>Each region's indoor flag as the load's box survey set it against a ray up from its point: under
     /// cover or under the sky.</summary>
     private static void IndoorParity(World ecs, TriangleWorld world, int show)
