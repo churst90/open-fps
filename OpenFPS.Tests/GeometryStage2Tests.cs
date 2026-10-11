@@ -130,7 +130,7 @@ public class GeometryStage2Tests : IDisposable
 
     // ═══ Shapes ══════════════════════════════════════════════════════════════════════════════════
 
-    private static Surface Concrete(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false, null);
+    private static Surface Concrete(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false);
 
     private static SolidSpec Shaped(int owner, Vector3 at, Vector3 size, ShapeSpec? form, float yaw = 0f)
         => SolidSpec.Of(owner, at, Quaternion.CreateFromYawPitchRoll(yaw, 0, 0), size, Concrete(size), Shapes.Make(form, size));
@@ -307,7 +307,7 @@ public class GeometryStage2Tests : IDisposable
     {
         var concrete = new Vector3(1.2f, 2.8f, 4.48f);
         var wood = new Vector3(1.0f, 2.6f, 3.9f);
-        var woodSurface = EntityGeometry.SurfaceOf("Wood", wood, 0, 0, false, 0, 0, false, false, false, null);
+        var woodSurface = EntityGeometry.SurfaceOf("Wood", wood, 0, 0, false, 0, 0, false, false, false);
         var world = WorldOf(
             Shaped(7, new Vector3(0, 1.4f, 2f + concrete.Z / 2f), concrete, new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }),
             Shaped(8, new Vector3(0, 2.75f, 2f + concrete.Z + 1f), new Vector3(1.2f, 0.1f, 2f), null),
@@ -346,8 +346,8 @@ public class GeometryStage2Tests : IDisposable
     [Fact]
     public void FourWheelRaysPitchAndRollACar()
     {
-        var kerbSurface = EntityGeometry.SurfaceOf("Concrete", new Vector3(4, 0.12f, 20), 0, 0, false, 0, 0, false, false, false, null);
-        var grass = EntityGeometry.SurfaceOf("Grass", new Vector3(20, 0.02f, 20), 0, 0, false, 0, 0, false, false, false, null);
+        var kerbSurface = EntityGeometry.SurfaceOf("Concrete", new Vector3(4, 0.12f, 20), 0, 0, false, 0, 0, false, false, false);
+        var grass = EntityGeometry.SurfaceOf("Grass", new Vector3(20, 0.02f, 20), 0, 0, false, 0, 0, false, false, false);
         var world = WorldOf(
             Shaped(7, new Vector3(0, 0.5f, 6f), new Vector3(4f, 1f, 12f), new ShapeSpec { Kind = ShapeKind.Wedge }),   // 1 in 12, rising toward +Z
             new SolidSpec(8, new Vector3(22f, 0.06f, 0f), Quaternion.Identity, new Vector3(4f, 0.12f, 20f), kerbSurface),

@@ -159,6 +159,8 @@ public class ScopeTests
         Person(snap, 1, new Vector3(0f, 9f, 300f), velocity: new Vector3(-1.2f, 0f, 0f));
         Static(snap, 10, new Vector3(0f, 8.5f, 300f), new Vector3(10f, 1f, 10f), "Concrete", "10 Elm Street roof");
         Static(snap, 11, new Vector3(30f, 5f, 412.3f), new Vector3(10f, 10f, 1f), "Brick", "Brandt Court");
+        Room(snap, 20, new Vector3(0f, 4.05f, 300f), new Vector3(10f, 7.9f, 10f), "10 Elm Street");
+        Rooms(snap);
         var spatial = new SpatialService();
         Vector3 eye = new(0f, 1.7f, 0f);
 
@@ -422,6 +424,53 @@ public class ScopeTests
         def.Identity = new IdentityComponent { Name = name };
         def.Material = new MaterialComponent { Material = material };
         snap.Entities[id] = new EntitySnapshot { Id = id, Definition = def, Transform = new Transform { Position = centre, Rotation = Quaternion.Identity } };
+    }
+
+    /// <summary>
+    /// A roof is what has a room's air under it with the sky over you, whatever it is called (the audit's S9): a slab
+    /// called a canopy over a room is a roof, one called a roof over nothing is not, and a landing called "to the
+    /// roof" indoors is a floor.
+    /// </summary>
+    [Fact]
+    public void ARoofIsWhatARoomIsUnderNotWhatItIsCalled()
+    {
+        var snap = new WorldSnapshot();
+        Static(snap, 10, new Vector3(0f, 8.5f, 0f), new Vector3(10f, 1f, 10f), "Concrete", "Car park canopy");
+        Room(snap, 20, new Vector3(0f, 4.05f, 0f), new Vector3(10f, 7.9f, 10f), "Car park");
+        Static(snap, 11, new Vector3(30f, 2.5f, 0f), new Vector3(4f, 0.1f, 2f), "Metal", "Bus shelter roof");
+        Static(snap, 12, new Vector3(-30f, 6.0f, 0f), new Vector3(3f, 0.25f, 3f), "Concrete", "Marlow Tower stairs, floor 7 to the roof");
+        Room(snap, 21, new Vector3(-30f, 6.0f, 0f), new Vector3(3f, 6f, 3f), "Marlow Tower stairwell");
+        Rooms(snap);
+        var spatial = new SpatialService();
+        Assert.True(ScopeView.StandsOnRoof(snap, spatial, new Vector3(0f, 9f, 0f)));
+        Assert.False(ScopeView.StandsOnRoof(snap, spatial, new Vector3(30f, 2.55f, 0f)));
+        Assert.False(ScopeView.StandsOnRoof(snap, spatial, new Vector3(-30f, 6.125f, 0f)));
+        // On the ground beside the car park: nothing under the street.
+        Static(snap, 13, new Vector3(0f, -0.05f, 20f), new Vector3(10f, 0.1f, 10f), "Asphalt", "Elm Street");
+        Assert.False(ScopeView.StandsOnRoof(snap, spatial, new Vector3(0f, 0f, 20f)));
+    }
+
+    private static void Room(WorldSnapshot snap, int id, Vector3 centre, Vector3 size, string name)
+    {
+        var def = new EntityDefinition { EntityId = id, Type = EntityType.StaticObject };
+        def.Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = size, IsSolid = false };
+        def.Region = new RegionComponent { FriendlyName = name, IsIndoor = true, RoomSize = size };
+        def.Transform = new Transform { Position = centre, Rotation = Quaternion.Identity };
+        snap.Entities[id] = new EntitySnapshot { Id = id, Definition = def, Transform = def.Transform };
+        snap.RegionEntityIds.Add(id);
+    }
+
+    /// <summary>The snapshot's rooms as the client maps them.</summary>
+    private static void Rooms(WorldSnapshot snap)
+    {
+        var defs = snap.Entities.Values.Select(e => e.Definition).ToList();
+        var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
+        foreach (var e in snap.Entities.Values)
+        {
+            lo = Vector3.Min(lo, e.Transform.Position - e.Definition.Collider.Size);
+            hi = Vector3.Max(hi, e.Transform.Position + e.Definition.Collider.Size);
+        }
+        snap.AcousticMap = EntityAcoustics.GenerateRegions(defs, hi - lo, lo, 1f, report: false);
     }
 
     private static void Spawn(ClientGameSession session)

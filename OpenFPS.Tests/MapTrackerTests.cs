@@ -199,10 +199,44 @@ public class MapTrackerTests
     [Fact]
     public void TheTwoLeavesOfABiPartingDoorAreOneEntrance()
     {
-        var world = World(Thing(1, "Terminal apron entrance, south", new Vector3(-0.5f, 1, 10), Beacons.Door),
-                          Thing(2, "Terminal apron entrance, south", new Vector3(0.5f, 1, 10), Beacons.Door));
+        var hall = Thing(10, "", new Vector3(0, 1.5f, 15), size: new Vector3(10, 3, 10));
+        hall.Definition.Region = new RegionComponent { FriendlyName = "Terminal", IsIndoor = true, RoomSize = new Vector3(10, 3, 10) };
+        var left = Thing(1, "Terminal apron entrance, south", new Vector3(-0.5f, 1, 10), Beacons.Door);
+        var right = Thing(2, "Terminal apron entrance, south", new Vector3(0.5f, 1, 10), Beacons.Door);
+        left.Definition.Portal = right.Definition.Portal = new PortalComponent { RegionAId = 10, RegionBId = AcousticConstants.GlobalRegionId };
+        var world = World(hall, left, right);
         Assert.Single(MapTracker.Gather(world, Vector3.Zero, TrackCategory.Entrances, -1));
         Assert.Single(MapTracker.Gather(world, Vector3.Zero, TrackCategory.Doors, -1));
+    }
+
+    /// <summary>
+    /// An entrance is what an opening joins and whether a person can walk through it, not its name: a landing called
+    /// an entrance is a floor; an opening with no leaf from a room to the open air with a floor on both sides of its
+    /// sill is the way into that room; one over a parapet is not.
+    /// </summary>
+    [Fact]
+    public void AnEntranceIsWhatAnOpeningJoinsNotWhatItIsCalled()
+    {
+        var hangar = Thing(10, "", new Vector3(0, 4f, 0), size: new Vector3(10, 8, 10));
+        hangar.Definition.Region = new RegionComponent { FriendlyName = "Hangar", IsIndoor = true, RoomSize = new Vector3(10, 8, 10) };
+        hangar.Definition.Collider = hangar.Definition.Collider with { IsSolid = false };
+        var floor = Thing(20, "Apron and hangar floor", new Vector3(0, -0.1f, 5), size: new Vector3(30, 0.2f, 30));
+        var landing = Thing(21, "Dollar General entrance landing", new Vector3(-12, 0.05f, -8), size: new Vector3(2, 0.1f, 1.5f));
+        // The hangar's open front, from the floor up: X across, Y up, Z through.
+        var front = Thing(30, "", new Vector3(0, 3f, 5), size: new Vector3(8, 6, 0.1f));
+        front.Definition.Collider = front.Definition.Collider with { IsSolid = false };
+        front.Definition.Portal = new PortalComponent { RegionAId = 10, RegionBId = AcousticConstants.GlobalRegionId, ApertureSize = 8 };
+        // A side open over a parapet a metre high, with a drop beyond.
+        var parapet = Thing(22, "Hangar parapet", new Vector3(5.5f, 0.5f, 0), size: new Vector3(0.3f, 1f, 10));
+        var side = Thing(31, "", new Vector3(5.5f, 4f, 0), size: new Vector3(10, 6, 0.3f));
+        side.Definition.Collider = side.Definition.Collider with { IsSolid = false };
+        side.Definition.Transform = side.Transform = new Transform { Position = side.Transform.Position, Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f) };
+        side.Definition.Portal = new PortalComponent { RegionAId = 10, RegionBId = AcousticConstants.GlobalRegionId, ApertureSize = 10 };
+        var world = World(hangar, floor, landing, front, parapet, side);
+        world.RegionEntityIds.Add(10);
+
+        var entrances = MapTracker.Gather(world, new Vector3(0, 0, 10), TrackCategory.Entrances, -1);
+        Assert.Equal(new[] { "Hangar entrance" }, entrances.Select(e => e.Name));
     }
 
     [Fact]

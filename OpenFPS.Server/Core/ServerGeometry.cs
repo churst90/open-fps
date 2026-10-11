@@ -337,9 +337,8 @@ public sealed class ServerGeometry
         var material = world.Has<MaterialComponent>(e) ? world.Get<MaterialComponent>(e).Material : "Generic";
         var a = world.Has<AcousticComponent>(e) ? world.Get<AcousticComponent>(e) : new AcousticComponent();
         bool emitter = world.Has<SoundEmitterComponent>(e) && !string.IsNullOrEmpty(world.Get<SoundEmitterComponent>(e).SoundId);
-        string? name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name : null;
         var surface = EntityGeometry.SurfaceOf(material, c.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow, a.ShellThickness,
-                                               a.Absorption, emitter, moves: false, doorLeaf: leaf, name);
+                                               a.Absorption, emitter, moves: false, doorLeaf: leaf);
         if (c.Shape == ColliderShape.Terrain)
             return world.Has<TerrainTileComponent>(e) && world.Get<TerrainTileComponent>(e) is { Posts: >= 2 } terrain
                 ? EntityGeometry.TerrainSpec(e.Id, t.Position, terrain, surface) : default;

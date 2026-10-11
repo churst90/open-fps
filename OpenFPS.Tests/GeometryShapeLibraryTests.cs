@@ -54,7 +54,7 @@ public class GeometryShapeLibraryTests
             Path = new float[] { 0, 0, 0, 3, 0, 0, 3, 0, 3 } }, new Vector3(3.1f, 0.12f, 3.1f) },
     };
 
-    private static Surface Concrete(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false, null);
+    private static Surface Concrete(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false);
 
     private static TriangleWorld WorldOf(params SolidSpec[] solids) => new TriangleWorldBuilder(250f).Build(solids, Array.Empty<SolidSpec>());
 

@@ -497,7 +497,7 @@ public class WorldStreamingTests
     {
         var maps = LoadPlace("magnolia_tx");
         Assert.True(maps.TryGetMap("magnolia_tx", out var world, out _, out _, out var lookup));
-        var surface = EntityGeometry.SurfaceOf("Dirt", Vector3.One, 0, 0, false, 0, 0, false, false, false, "Ground");
+        var surface = EntityGeometry.SurfaceOf("Dirt", Vector3.One, 0, 0, false, 0, 0, false, false, false);
         var tiles = new Dictionary<(int, int), (Vector3 At, TerrainTileComponent T)>();
         foreach (var e in lookup.Values.Where(e => world.Has<TerrainTileComponent>(e)))
         {

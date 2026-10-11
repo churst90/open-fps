@@ -20,7 +20,8 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class DoorPrewarmTests
 {
-    public DoorPrewarmTests() { AcousticRegistry.Initialize(); }
+    private readonly Xunit.Abstractions.ITestOutputHelper _o;
+    public DoorPrewarmTests(Xunit.Abstractions.ITestOutputHelper o) { _o = o; AcousticRegistry.Initialize(); }
 
     /// <summary>The keys DoorSystem sends for a door, built as it builds them (KnobDoorSound, PushBarSound,
     /// GlassDoorSound): every opening from either side, and every close.</summary>
@@ -75,6 +76,7 @@ public class DoorPrewarmTests
         maps.Initialize();
         Assert.True(maps.TryGetMap("city", out var world, out _, out _, out _));
         EveryDoorIsRenderedAsTheMapArrives(world, 400);
+        _o.WriteLine($"city: {DoorSystem.RenderKeys(world).Length} door renders");
     }
 
     /// <summary>One table of door models: each key prefix once, none the start of another, and a key no row names is

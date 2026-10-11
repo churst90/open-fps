@@ -198,7 +198,7 @@ public class GeometryImportTests : IDisposable
         Assert.NotNull(made.Parts);
         Assert.All(made.Parts!, p => Assert.True(MeshCheck.Check(p).Closed));
 
-        var surface = EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false, null);
+        var surface = EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false);
         var world = new TriangleWorldBuilder(250f).Build(new[] { SolidSpec.OfShape(9, new Vector3(0, 1, 0), Quaternion.Identity, size, surface, form) },
                                                          Array.Empty<SolidSpec>());
         var all = new AcceptAll();
