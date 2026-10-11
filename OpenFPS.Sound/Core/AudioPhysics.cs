@@ -27,14 +27,14 @@ public static class AudioPhysics
     }
     private static float _currentCelsius = 20f;
 
-    /// <summary>Speed of sound in dry air, m/s: c = 331.3 + 0.606·T(°C). About 4 % across −20 to
-    /// +40 °C, shifting every Doppler factor the same way.</summary>
-    /// <param name="celsius">Air temperature. Clamped to a range the linear fit still holds over.</param>
+    /// <summary>Speed of sound in dry air, m/s: the air's own law (<see cref="OpenFPS.Common.Air.SpeedOfSound"/>),
+    /// so a bullet's crack and the mix's Doppler and delays hear one air (the mix had the linear fit
+    /// 331.3 + 0.606·T, 0.2 % fast at 40 °C). About 4 % across −20 to +40 °C, shifting every Doppler
+    /// factor the same way.</summary>
+    /// <param name="celsius">Air temperature. Clamped, so a map's temperature in the wrong units cannot
+    /// take the mix off the end of the weather.</param>
     public static float SpeedOfSoundAt(float celsius)
-    {
-        float t = Math.Clamp(celsius, -60f, 60f);
-        return 331.3f + 0.606f * t;
-    }
+        => new OpenFPS.Common.Air(Math.Clamp(celsius, -60f, 60f), 1013.25f).SpeedOfSound;
 
     /// <summary>
     /// Doppler pitch multiplier, f' = f · (c − v_listener·û) / (c − v_source·û), û from source to
