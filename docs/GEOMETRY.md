@@ -2387,6 +2387,126 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      Principles of Optics, 7th ed., Cambridge 1999, https://doi.org/10.1017/CBO9781139644181 (Kirchhoff's
      aperture). Funkhouser et al. 2004, Maekawa 1968, Kurze and Anderson 1971, ISO 9613-2 and Hopkins 2007 as
      cited above.
+
+   **The ground in the way (2026-10-11, unheard).** The rules above keep a way round from bending in the earth,
+   but every straight segment still went through hills for nothing: the terrain is no box, and the segments
+   paid boxes only.
+   - **How a segment was charged.** Every asker has its straight segments charged in `OpeningRoutes`:
+     - the straight line, by the worker (Steam Audio's direct stage, then `BarrierGains` for what bends round);
+     - every leg of the routes by the openings (`Evaluate`, `Leg`, `LegGains`), which is also what the routes give
+       one-offs, sirens and trains;
+     - the legs of the ways round one box and through the rest (`LegsThrough`, `PaidLeg`) and of the clear ways
+       round (`ClearedRoute`, `ClearedLeg`);
+     - the string over the top (`OverTheTop`), whose legs are tested against boxes (`FirstHit`).
+     Of these only the bends read the ground (`WaysRound`, "When an edge is buried"): a leg, the line or the
+     string through a hill paid nothing for it. Steam Audio has the ground as triangles of the surface
+     (`SceneTerrain`), each with its land cover's figure, and the porous covers' figures (`Grass` 0.4/0.6/0.8,
+     `Dirt` 0.3/0.4/0.5) do not depend on thickness: through a grassy hill 4 m high, its ends 100 m apart, it
+     gives -8/-4/-2 dB, bare earth -10/-8/-6, asphalt -66/-90/-115 (`OpeningRoutesTerrainTests`), the same for
+     any hill. (Above, the ground was taken as a 20 m deep panel no sound goes through; measured, it is not.)
+     The hand-rolled tracer (`SpatialService`, which the one-shot path uses: footsteps, birds, speech,
+     beacons, and every source when Steam Audio cannot answer) does not see the terrain at all.
+   - **The model.** The ground passes nothing: its impedance is so far above air's that outdoor propagation
+     treats it as a boundary (Attenborough, Li and Horoshenkov). A segment through the earth is blocked, and
+     what gets past is what goes over the ground's profile in the vertical plane through the two ends: ISO
+     9613-2 (7.4) treats what stands in that plane by the path difference over its top edges, two or more by
+     the path over the outermost; CNOSSOS-EU takes the convex hull of the profile and the edges on it, the
+     path over them the "rubber band" (RIVM 2019-0023, 5.12). That string is what `OverTheTop` pulls over
+     boxes already, so the ground's profile joins it: every corner of the heightfield along the plane, a
+     joint (5 cm) over the ground as a box's top is a joint over the box, holding up what stands on it (a
+     house on the brow). Its path difference is diffracted by the barrier model's law (Maekawa, as Kurze and
+     Anderson put it, `Diffraction.BandGains`) and competes with the ways round the boxes as before. The
+     ground effect (its reflection) is already in each voice and is not taken again.
+   - **For every asker, once.** `OpeningRoutes.ThroughTheGround` (the profile, `Ground.Profile`) blocks:
+     - a leg of the routes (`LegGains`: through the earth it passes nothing, and what comes is `BarrierGains`);
+     - a leg of a way round (`PaidLeg` passes nothing through the earth; `ClearedLeg` has no way there);
+     - the line (`BarrierPathDifference` pulls the string whenever the line goes through the earth, with or
+       without a box on it).
+     The worker multiplies Steam Audio's transmission by `SimulatorCorrection`, as by the run rule before:
+     nothing where the line goes through the earth. The hand-rolled tracer's line through the earth is
+     replaced by the way over the ground's profile (`OverTheGround`, `SpatialAcoustics.CalculateMainPath`),
+     heard from the top it bends over, as the worker's is.
+   - **Nearly level is not level.** The string over the top took a box within 2.6 degrees of level as level,
+     its top the middle's. The places' roads, drives and lawns are pitched along the ground, and a 16 m road
+     segment 1.1 degrees up a slope has an end 0.15 m over its middle: the string went through that end and was
+     given up, and with the ground in the way that was no way at all (-100). Its top is now its top face's
+     plane where the string goes in and out (`Crossing`). The city's boxes are level and do not move.
+   - **What is approximated.** The heightfield is taken as it is: 2 m posts on the places, 7.8 m in the far ring,
+     each cell flat in two triangles, so its corners along a line are exact for it and the profile has no
+     sample spacing of its own; the survey under it is 3DEP's, resampled. Every corner is a knife edge; a
+     real brow is rounded, which costs more than a knife edge (ITU-R P.526's rounded obstacle), so a broad
+     hill is a little louder here than it is. Several ridges are one string (ISO's C3 term for double
+     diffraction is not taken), the barrier model's 24 dB cap holds, and the ground is gone over, never round
+     the end of a ridge. Within the joint is not in the way, so an end on the ground is not blocked by the
+     ground it stands on. At the shadow boundary the law steps from nothing to Maekawa's 5 dB (the lit side is
+     not modelled, as for boxes): CNOSSOS-EU tapers it to nothing at a path difference of -λ/20, and asks
+     whether ground that small is flat (RIVM 2019-0023, 5.4, not agreed). A box on the ground over the line
+     (a house on the rise) is gone over, not round: the ways round only go round boxes on the line.
+   - **Steam Audio on the places.** Measuring this found that no tile scene was made on Magnolia or Albany: a
+     solid of more than 64 corners read past the corners `SteamAudioScene.AddPieceMesh` keeps to share and
+     threw, and every source fell back to the hand-rolled tracer, which hears no hill (fixed with this). The
+     worker at seven spots behind a rise, main's build with that fix against this one (low/mid/high dB): Magnolia
+     -10/-8/-6 to -6/-10/-18, -5/-7/-12 and -5/-6/-9; Albany -10/-8/-6 to -6/-9/-16, -6/-11/-18 (the creek's bank),
+     -18/-24/-24 (over a car park's pad), and -17/-13/-10 (two rises) to -5/-7/-12. The one-shot path at the same
+     spots was 0 to -4 dB, and is now the worker's.
+   - **The sweep** (`--barrier-sweep terrain`, against the ground as no obstacle and level boxes; the routes' leg
+     model, Steam Audio not in it; quieter or louder by more than 0.5 dB, low/mid/high):
+     | map, pairs | quieter | median, most (dB) | louder |
+     |---|---|---|---|
+     | Magnolia, both out of doors (2,000, `ground`) | 5.5/6.5/6.5 % | 5.2/5.9/9.4, 18/24/24 | 0.2/0.1/0.1 % |
+     | Albany, both out of doors | 4.7/5.0/5.2 % | 5.2/7.1/11.3, 18/24/24 | 0.3/0.3/0.2 % |
+     | Magnolia, between places (2,000) | 0.3/0.1/0 % | 34/4/-, 52/4/- | none |
+     | Albany, between places | 0.05/0/0 % | 2/-/- | none |
+     | Magnolia, the street heard inside (1,500, `outdoor`) | 1.7/1.4/1.2 % | 22/16/17, 77/52/25 | none |
+     | Albany, the street heard inside | 4.1/2.7/2.3 % | 28/31/19, 77/53/31 | none |
+     | city (2,000 between places, 1,000 the street heard inside) | none | | none |
+
+     Of the lines through the earth out of doors (196 on Magnolia, 189 on Albany), 94 and 64 go over the
+     ground's own corners, the rest over a road, a lawn or a pad laid on it; none is left with no way. Most are
+     close to grazing: a line 0.1 to 0.6 m into a rise, -5/-6/-9 dB. The most, -18/-24/-24, over a car park's
+     pad graded into the slope. Quieter between places and from the street: a line through a wall and then the
+     earth (an ear indoors, a source beyond a rise), -23/-48/-75 to -100, where the openings now carry it. The
+     louder are lines through a porous lawn and the earth (-8/-4/-2, now -5/-5/-6 over the lawn) and pitched
+     slabs the string can go over now (-100 to -10/-17/-24). The city's dumps are main's to the thousandth of a dB.
+   - **A drive past a rise** (`drive=` and `ear=`, a source 0.5 m over the ground every half metre): Albany, ear
+     (136.94, -4.94, 1287.72), x 170 to 235: no step before; after, 8 steps over 3 dB in 247 positions, 58 of them
+     through the earth. Six are the shadow boundary, 5 to 6 dB; two are the source in a creek's tilted water
+     box, which the string takes as high as its highest corner (a source no car makes). Magnolia, ear
+     (-1103.93, 0.71, -1032.08), x -1260 to -1195: 2 steps of 5 dB before (boxes), 5 after.
+   - **The cost.** The straight leg on the same pairs: Magnolia 1,216 to 1,060 µs, Albany 2,233 to 2,104, between
+     places 1,536 to 1,489 and 2,347 to 2,276, the city 2,115 to 2,068 (a leg through the earth stops early).
+     The worker's correction, once a tick for each source Steam Audio finds blocked: 7 to 26 µs on the places
+     (the run rule's was 4 to 16). A segment's profile walks only the 16 m blocks of cells whose highest post
+     stands over it.
+   - **The guards.** RenderFingerprint, the eight emitter streams (at the default and at four processors),
+     VoiceIdBand, PhysicsBoundary, the physics replays, PhysicsCrossMachine and LibraryBoundary unchanged: the
+     replay has no terrain. Tests: `OpeningRoutesTerrainTests` (a hill gone over its crest, two ridges by one
+     string, a line over the ground and a source on it not blocked, a leg round a wall that dips under a berm,
+     the box list and the triangle store alike, no terrain no change, and with Steam Audio opted in, what it
+     gives through a hill and the correction).
+   - **Where to listen** (`--walk-pair ears=`, z the floor; the source at the engine point given, about the
+     distance and bearing named; before, each was 0 to -4 dB by the hand-rolled tracer the places fell back
+     to, or -10/-8/-6 through the hill with Steam Audio):
+     - Magnolia `/tp -1103.9 -1032.1 -0.8`, a rise to the north-west, source (-1227.3, 6.7, -938.5), 155 m:
+       -6/-10/-18;
+     - Magnolia `/tp -1325.6 829.0 1.1`, source (-1495.6, -1.6, 758.6), 184 m to the west: -5/-7/-12;
+     - Albany `/tp -320.5 1283.6 -6.7`, source (-300.4, -7.9, 1115.6), 169 m to the south: -6/-9/-16;
+     - Albany `/tp 136.9 1287.7 -6.8`, the creek's bank, source (202.9, -8.9, 1393.7), 125 m: -6/-11/-18;
+     - Albany `/tp -623.8 1073.6 -4.4`, over a car park's pad, source (-512.8, -8.4, 1147.1), 133 m: -18/-24/-24;
+     - Albany `/tp -813.3 671.2 -7.6`, two rises, source (-913.3, -6.2, 577.6), 137 m: -17/-13/-10 to -5/-7/-12.
+   - **References.** ISO 9613-2:1996 (withdrawn), https://www.iso.org/standard/20649.html, and ISO 9613-2:2024,
+     https://www.iso.org/standard/74047.html (screening, 7.4 in the 1996 text: the path difference z over the top edges, e between
+     the outermost two, C3 for two). Commission Directive (EU) 2015/996 (CNOSSOS-EU), https://eur-lex.europa.eu/eli/dir/2015/996/oj;
+     Kok and van Beek, Amendments for CNOSSOS-EU, RIVM Letter report 2019-0023,
+     https://www.rivm.nl/bibliotheek/rapporten/2019-0023.pdf (5.12, the convex hull of the edges and the path over
+     them; 5.4, the attenuation zero at -λ/20 and the flatness criterion). Deygout, "Multiple knife-edge
+     diffraction of microwaves", IEEE Trans. Antennas Propag. 14 (1966) 480-489,
+     https://doi.org/10.1109/TAP.1966.1138719, and Epstein and Peterson, Proc. IRE 41 (1953) 595-611 (several knife
+     edges taken one at a time, the alternatives to one string). Salomons, Van Maercke, Defrance and de Roo, "The
+     Harmonoise sound propagation model", Acta Acustica united with Acustica 97 (2011) 62-74,
+     https://www.ingentaconnect.com/contentone/dav/aaua/2011/00000097/00000001/art00008 (a terrain profile by
+     segments). ITU-R P.526, https://www.itu.int/rec/R-REC-P.526 (a rounded obstacle). Maekawa 1968, Kurze and
+     Anderson 1971 and Attenborough, Li and Horoshenkov as cited above.
    **Openings from the floods (step 3, 2026-10-11, approved by ear 2026-10-11).** A flood keeps the cells of each opening its air meets
    and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
    opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide
