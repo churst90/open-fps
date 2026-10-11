@@ -882,7 +882,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 extra = System.Runtime.InteropServices.Marshal.StringToHGlobalAnsi(wavPath);
                 Log.Information("FMOD output is being captured to {Path} (silent: this replaces the sound card)", wavPath);
             }
-            FmodCheck(_system.set3DSettings(1.0f, 1.0f, 1.0f), "set3DSettings"); // 1 unit = 1 metre
+            FmodCheck(_system.set3DSettings(FmodDopplerScale(_speedOfSound), 1.0f, 1.0f), "set3DSettings"); // 1 unit = 1 metre
 
             // Eight buffers of 1024 (FMOD's Linux default is four, 93 ms): about 185 ms of stall the
             // mixer can absorb, for 93 ms more latency. Insurance, not a fix. docs/AUDIO_LOAD_DROPOUTS.md.
@@ -1260,9 +1260,17 @@ public partial class FmodAudioProvider : IAudioProvider
 
     // From the world's air temperature; 20 °C until the weather says otherwise.
     private float _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound;
+
+    /// <summary>FMOD's Doppler (a voice it pans, with no HRTF voice) runs at 340 m/s times its Doppler
+    /// scale: the scale that makes it the world's speed, as the binaural voices' Doppler is.</summary>
+    internal static float FmodDopplerScale(float speedOfSound) => 340f / MathF.Max(1f, speedOfSound);
+
     public void SetAirTemperature(float celsius)
     {
-        _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSoundAt(celsius);
+        float c = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSoundAt(celsius);
+        if (c != _speedOfSound && _system.hasHandle())
+            FmodCheck(_system.set3DSettings(FmodDopplerScale(c), 1.0f, 1.0f), "set3DSettings");
+        _speedOfSound = c;
         OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentSpeedOfSound = _speedOfSound;
         OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius = celsius;
     }
