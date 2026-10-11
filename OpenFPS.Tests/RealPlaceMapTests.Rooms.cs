@@ -48,4 +48,24 @@ public partial class RealPlaceMapTests
         Assert.True(r.Rooms > 100, $"{r.Rooms} rooms");
         Assert.Empty(r.Bare);
     }
+
+    /// <summary>
+    /// Nothing laid along a line goes into a building (docs/GEOMETRY.md 12.6, "A road stops at a wall"): no piece of a
+    /// road, verge, sidewalk, kerb, drive or path overlaps any building's footprint (SurfacesClear). Until 2026-10-11,
+    /// 1024 Belmont Avenue Southwest's living room had 1034's driveway in it and a service road ran through the Exxon on
+    /// Magnolia: on the maps before, 276 pieces on Albany and 110 on Magnolia.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void Nothing_laid_along_a_line_enters_a_building(string id)
+    {
+        var p = _maps.Get(id);
+        var prefabs = OpenFPS.Server.OneWorld.WorldBuildings.PrefabsFrom(
+            new OpenFPS.Server.Repositories.PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")).Prefabs);
+        var r = SurfacesClear.Check(p.Data.Entities, prefabs);
+        _o.WriteLine($"{id}: {r.Pieces} pieces, {r.Footprints} footprints, {r.Overlapping} pieces in a building");
+        foreach (var f in r.Found.Take(20)) _o.WriteLine("  " + f);
+        Assert.True(r.Pieces > 1000 && r.Footprints > 1000, $"{r.Pieces} pieces, {r.Footprints} footprints");
+        Assert.Empty(r.Found);
+    }
 }

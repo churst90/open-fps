@@ -2095,7 +2095,61 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      A gap thinner than 10 cm counts as contact: nine rooms have a neighbour's driveway, or a service road (the
      Exxon on Magnolia), lying 6 to 8 cm over their finished floor, pitched so its underside clears the finish
      by a few millimetres (1024 Belmont Avenue's living room has 1034's driveway in it). That is a separate
-     fault, a drive or road laid through another building's footprint, left in todo.
+     fault, a drive or road laid through another building's footprint: fixed, next paragraph.
+
+   **A road stops at a wall (2026-10-11, unheard).** Nothing laid along a line went round a building: on the maps
+   before, 276 pieces on Albany and 110 on Magnolia of a road, verge, sidewalk, drive or path lay in a building's
+   footprint. A made-up driveway ran straight from the road to its house at the end h01 picks, through whatever
+   stood between (1034 Belmont Avenue's, a house behind 1024 on a flag lot, through 1024's living room); a mapped
+   drive drawn into its garage went in; a footway mapped through the college's cafeteria ran through it; and a
+   service road ran through a 23 by 8 m footprint at the Exxon on Magnolia that is most likely the forecourt's
+   canopy, which Microsoft's footprints trace as a building. Three rules, in gen_osm.py and the world's port alike:
+   - A building the carriageway runs into (its footprint within half the way's width of the way's line) is not
+     made; the road is kept with its lanes the whole of its width. The world's tiles had this rule
+     (`WorldFeatures.Site`); gen_osm.py had only its comment. Magnolia 5 (the Exxon canopy, 18673 Turtle Creek
+     Lane, 19903 Turtle Dove Lane, 24597 Spencer Boulevard, a building off a private road), Albany 4 (102 41st
+     Avenue Southeast, through which 41st Avenue runs, 34378 Looney Lane, two others). On the places such a
+     building is still decided and built, then left out with its ids unused, so no other building's id moves; its
+     lot keeps its yards, and a place named on it (the Exxon) is a name where it is, as a place without a building.
+   - A made-up driveway goes in front of its house where its strip enters no other building: from the chosen end,
+     a quarter metre at a time either way, no further than the lot (gen_osm `made_drive_u`; the world, which has
+     no lots, 3 m past the house's ends, `WorldFeatures.DriveFor`). A house with no such way has none: Albany 25,
+     Magnolia 4 (laid and left out, ids unused).
+   - Every piece laid along a line stops short of every footprint it would enter, by 2 cm: the cut that keeps the
+     most of it, shorter from either end or with a gap where it passes through, or narrower from either side; a
+     piece under 0.3 m is not laid (gen_osm `cut_off_rings`, `WorldFeatures.CutOffRings`). A mapped drive into its
+     garage stops at the wall. Magnolia 7 drives cut; Albany 8 drives, 69 paths, 2 verges (34 wholly inside, not
+     laid). A piece cut in two keeps its id and its second part is written last.
+   - **The test.** `RealPlaceMapTests.Nothing_laid_along_a_line_enters_a_building` (both places),
+     `WorldBuildingsTests.Tomball_from_the_trimmed_extract` (the nine tiles in one frame) and
+     `A_drive_stops_at_a_wall_and_goes_round_a_neighbour` (a flag lot, a drive into its garage, an aisle through a
+     shop): no piece of the roads, verges, paths or drives layers overlaps an upright prism of the structure layer
+     (a slab, a ceiling, a solid shed) by more than 0.005 m² (`SurfacesClear`). Layers and geometry, never names.
+     Yards are left out: a yard round its own house clips its corner by a centimetre (the lot's frame is not the
+     wall ring's), and one under a solid shed is under a solid.
+   - **The sound** (`--barrier-sweep n=4000 seed=1` and `outdoor n=2000`, `server=` each map, the pairs both runs
+     drew): between rooms, Magnolia 4 of 1,875 changed (one 17 dB quieter in the low band, three up to 5 dB
+     louder), Albany 1 of 734 (0.8 dB); the street indoors, Magnolia 3 of 950 (19415 Turtle Dove Lane's barn,
+     whose made-up drive ran through it, 12 dB louder from outside), Albany 1 of 359 (0.5 dB). `--path-probe`:
+     Country Food Market from under where the canopy stood -58/-61/-100 to -33/-34/-59 dB (its walls are gone),
+     from the road beside it unchanged; 1024 Belmont Avenue's living room from the street -48.0/-53.4/-79.0 to
+     -47.3/-54.6/-79.0. Ids on the places: everything before the woods keeps its id; the woods and what is
+     written after them (named places, shores, the leftover rooms, openings, steps and finishes) move, because a
+     drive moved along a lot clears different trees. `WorldStore.GeneratorVersion` 9 remakes the world's tiles.
+
+   **The city's floors (2026-10-11, unheard).** `CityFloorsTests.Every_room_s_floor_stands_on_a_structure` holds
+   the city to `FloorStructure`. A room there is a place the server's survey finds indoors with something solid
+   over its middle (58 Alder Street's fenced back garden is indoors to the survey and open to the sky; 489 rooms of
+   490), and a floor's top is looked for up to 0.3 m over a room's underside, not 0.1: a stairwell's storey runs
+   down through the slab under it (one shaft, so the opening a flight comes up through is in a place), and the
+   garage's lowest deck, 25 cm of concrete, is laid on the ground under a box that starts at the ground. At 0.1 m
+   those 32 stairwells and the garage read as standing on the plaster soffit below and on the dirt, which they do
+   not. What failed: the tunnel, its asphalt laid on the map's dirt (now a 25 cm concrete invert under the road and
+   its walls, written last), and two Main Street sidewalk places that ran on 40 m inside the tunnel's solid walls
+   from the block that meets its mouth (now stopped at the mouth, as that block's carriageway already was; the
+   same ids). One entity more, so the city's vehicles' ids move by one and the stored traffic and rail replays were
+   rewritten for that alone (every other column the same). The sound: `--barrier-sweep`, 694 pairs between places
+   and 210 from outdoors that both runs drew, one changed (1.4 dB, low band); `--path-probe` in the tunnel unchanged.
    - **The sound** (`--barrier-sweep n=4000 seed=1` and `outdoor n=2000`, the old maps against the new, the
      same pairs; `server=DIR` reads a map from elsewhere and `dump=FILE` writes every pair). Between rooms:
      Magnolia 2 pairs quieter (by 21 dB, the low band), Albany 2 louder; the street heard indoors: Magnolia 9

@@ -107,6 +107,11 @@ is reached on foot from outside, every door taken as open.
   from keeps its id; the rest of it, the leaf and the steps are written after the openings.
 - New entities are written after everything else, so no id on the map moved; two Albany leaves too narrow
   to walk through (0.28 and 0.54 m) became plaster under the same ids.
+- Nothing laid along a line enters a building (docs/GEOMETRY.md 12.6, "A road stops at a wall"): a building
+  the carriageway runs into is built and left out, its ids unused; a made-up driveway goes along the lot to
+  where it is clear of every other building, or is left out; every piece of a road, sidewalk, drive or path
+  stops 2 cm short of any wall. A drive moved along its lot clears different trees, so from the woods on the
+  ids moved (2026-10-11).
 
 ## Detail levels
 

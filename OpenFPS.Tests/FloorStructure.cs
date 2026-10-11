@@ -20,7 +20,7 @@ internal static class FloorStructure
     /// <summary>Faces this close are in contact, m: a map's numbers round to a millimetre.</summary>
     private const float Contact = 0.003f;
     /// <summary>How far over a room's underside a floor's top may be, m (a finish's top is 2 cm over it).</summary>
-    private const float FloorReach = 0.10f;
+    public const float FloorReach = 0.10f;
     private const float Cell = 8f;
 
     private sealed record Solid(Vector3 Centre, Quaternion Inverse, Vector3 Half, float[]? Outline, MaterialProperties Props, string Prefab)
@@ -48,11 +48,14 @@ internal static class FloorStructure
     /// where, and the stack top to bottom), with how many rooms fail by each stack.</summary>
     public sealed record Result(int Rooms, int Points, List<string> Bare, Dictionary<string, int> ByStack);
 
-    /// <summary>Every room (an acoustic region in the rooms layer) of <paramref name="entities"/>, nine points over its
-    /// floor each. <paramref name="ground"/>: the ground's height at a point, or null where there is none to meet.</summary>
+    /// <summary>Every room (an acoustic region in the rooms layer, or each <paramref name="room"/> says is one) of
+    /// <paramref name="entities"/>, nine points over its floor each. <paramref name="ground"/>: the ground's height at a
+    /// point, or null where there is none to meet. <paramref name="floorReach"/>: how far over a room's underside its floor's
+    /// top may be (<see cref="FloorReach"/>; more where a map's rooms run down through the slab under them).</summary>
     public static Result Check(IEnumerable<EntityData> entities, IReadOnlyDictionary<string, WorldBuildings.Prefab> prefabs,
-                               Func<float, float, float?> ground)
+                               Func<float, float, float?> ground, Func<EntityData, bool>? room = null, float floorReach = FloorReach)
     {
+        room ??= x => x.Layer == "rooms";
         AcousticRegistry.Initialize();
         var list = entities.ToList();
         var solids = new List<Solid>();
@@ -81,30 +84,30 @@ internal static class FloorStructure
         var bare = new List<string>();
         var byStack = new Dictionary<string, int>();
         var under = new List<Solid>();
-        foreach (var room in list.Where(x => x.PrefabId == "acoustic_region" && x.Layer == "rooms"))
+        foreach (var r in list.Where(x => x.PrefabId == "acoustic_region" && room(x)))
         {
             rooms++;
-            var half = (prefabs.TryGetValue(room.PrefabId, out var rp) ? rp.Size : Vector3.One) * room.Scale * 0.5f;
-            var rot = room.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(room.Rotation);
-            float floor = room.Position.Y - half.Y;
+            var half = (prefabs.TryGetValue(r.PrefabId, out var rp) ? rp.Size : Vector3.One) * r.Scale * 0.5f;
+            var rot = r.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(r.Rotation);
+            float floor = r.Position.Y - half.Y;
             string? worst = null;
             foreach (float fu in new[] { -1f, 0f, 1f })
                 foreach (float fv in new[] { -1f, 0f, 1f })
                 {
                     float au = fu * MathF.Max(0f, half.X - MathF.Min(0.3f, half.X / 2));
                     float av = fv * MathF.Max(0f, half.Z - MathF.Min(0.3f, half.Z / 2));
-                    var at = room.Position + Vector3.Transform(new Vector3(au, 0f, av), rot);
+                    var at = r.Position + Vector3.Transform(new Vector3(au, 0f, av), rot);
                     points++;
                     under.Clear();
                     if (grid.TryGetValue(((int)MathF.Floor(at.X / Cell), (int)MathF.Floor(at.Z / Cell)), out var cell))
                         foreach (int k in cell)
-                            if (solids[k].Top <= floor + FloorReach && solids[k].Covers(at.X, at.Z)) under.Add(solids[k]);
+                            if (solids[k].Top <= floor + floorReach && solids[k].Covers(at.X, at.Z)) under.Add(solids[k]);
                     string? why = Why(under, ground(at.X, at.Z));
                     if (why != null) worst ??= why;
                 }
             if (worst == null) continue;
             byStack[worst] = byStack.GetValueOrDefault(worst) + 1;
-            if (bare.Count < 40) bare.Add($"{room.Name} ({room.Position.X:F1}, {room.Position.Z:F1}): {worst}");
+            if (bare.Count < 40) bare.Add($"{r.Name} ({r.Position.X:F1}, {r.Position.Z:F1}): {worst}");
         }
         return new Result(rooms, points, bare, byStack);
     }

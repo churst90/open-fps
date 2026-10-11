@@ -284,6 +284,81 @@ def bbox_of(F, u0, u1, v0, v1):
     return (min(c[0] for c in cs), max(c[0] for c in cs), min(c[1] for c in cs), max(c[1] for c in cs))
 
 
+def ring_in_box(ring, u0, u1, v0, v1):
+    """The part of a ring (points (u, v) in a box's frame, not closed) inside the box, by clipping it to each side
+    in turn; its corners, which bound it as tightly as the part itself."""
+    poly = list(ring)
+    for k, s, side in ((0, 1, u0), (0, -1, u1), (1, 1, v0), (1, -1, v1)):
+        out = []
+        for i in range(len(poly)):
+            p, q = poly[i], poly[(i + 1) % len(poly)]
+            dp, dq = s * (p[k] - side), s * (q[k] - side)
+            if dp >= 0:
+                out.append(p)
+            if (dp >= 0) != (dq >= 0):
+                t = dp / (dp - dq)
+                out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+        poly = out
+        if not poly:
+            break
+    return poly
+
+
+def poly_area(poly):
+    n = len(poly)
+    return abs(sum(poly[i][0] * poly[(i + 1) % n][1] - poly[(i + 1) % n][0] * poly[i][1] for i in range(n))) / 2 if n >= 3 else 0.0
+
+
+CLEAR_GAP = 0.02          # how far a surface laid along a line stops short of a building's wall, m
+CLEAR_LEAST = 0.3         # the shortest or narrowest piece of one worth keeping, m
+
+
+def cut_off_rings(u0, u1, v0, v1, rings):
+    """A box along a line (u along it, v across) cut back off every footprint it enters (rings in the box's frame):
+    for each in turn, the cut that keeps the most of it, shorter from either end or with a gap where it passes
+    through (in u), or narrower from either side (in v). The pieces left, each clear of every ring."""
+    pieces = [(u0, u1, v0, v1)]
+    for ring in rings:
+        out = []
+        for a0, a1, b0, b1 in pieces:
+            part = ring_in_box(ring, a0, a1, b0, b1)
+            if poly_area(part) <= 1e-4:
+                out.append((a0, a1, b0, b1))
+                continue
+            pu0, pu1 = min(p[0] for p in part), max(p[0] for p in part)
+            pv0, pv1 = min(p[1] for p in part), max(p[1] for p in part)
+            cuts = [[c for c in ((a0, pu0 - CLEAR_GAP, b0, b1), (pu1 + CLEAR_GAP, a1, b0, b1)) if c[1] - c[0] >= CLEAR_LEAST]]
+            if pv0 - CLEAR_GAP - b0 >= CLEAR_LEAST:
+                cuts.append([(a0, a1, b0, pv0 - CLEAR_GAP)])
+            if b1 - pv1 - CLEAR_GAP >= CLEAR_LEAST:
+                cuts.append([(a0, a1, pv1 + CLEAR_GAP, b1)])
+            out.extend(max(cuts, key=lambda cut: sum((c[1] - c[0]) * (c[3] - c[2]) for c in cut)))
+        pieces = out
+    return pieces
+
+
+def line_to_ring(line, ring):
+    """How far a polyline comes to a closed ring: 0 where they cross or a point of the line is inside it."""
+    best = float("inf")
+    for x, z in ring:
+        best = min(best, project(line, x, z)[0])
+    for i in range(len(line)):
+        if pip(line[i][0], line[i][1], ring):
+            return 0.0
+        for k in range(len(ring) - 1):
+            best = min(best, seg_point(line[i][0], line[i][1], *ring[k], *ring[k + 1])[0])
+            if i < len(line) - 1 and _crosses(line[i], line[i + 1], ring[k], ring[k + 1]):
+                return 0.0
+    return best
+
+
+def _crosses(a, b, c, d):
+    def cr(o, p, q):
+        return (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0])
+    d1, d2, d3, d4 = cr(a, b, c), cr(a, b, d), cr(c, d, a), cr(c, d, b)
+    return ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0))
+
+
 def largest_rect(mask, nu, nv):
     """The largest all-true rectangle in a grid: (area, i0, i1, j0, j1), i along u, j along v."""
     heights = [0] * nu
@@ -395,9 +470,16 @@ def entity_tile(x, z):
 _Y_PIN = [None]
 
 
+# While a building that is not made (one standing in a carriageway) is built, or a drive that is not laid: what
+# is made then is left out of the map at the end, its ids unused, so no other entity's id moves.
+_DROPPING = [False]
+
+
 def _finish(e, name, layer):
     if name:
         e["Name"] = name
+    if _DROPPING[0]:
+        e["_drop"] = True
     e["_pin"] = _Y_PIN[0]
     e["Tile"] = entity_tile(e["Position"]["X"], e["Position"]["Z"])
     e["Layer"] = layer
@@ -1498,6 +1580,7 @@ class Building:
         self.height = b.get("h") or 0.0
         self.addr = None
         self.place = None
+        self.on_road = False
         self.kind = None
         a, mx, mz, long_, short = min_rect(ring[:-1])
         self.angle, self.long, self.short = a, long_, short
@@ -1508,6 +1591,20 @@ class Building:
 
 BLD = []
 B_INDEX = SpatialHash(40.0)
+# Every way a car drives on, whole, and half its width: what a building may not stand in.
+CARRIAGEWAYS = SpatialHash(40.0)
+for w in sorted(ways_by_kind["road"], key=lambda w: w["id"]):
+    line = []
+    for n in w["nodes"]:
+        x, z = nxz(n)
+        if not line or abs(x - line[-1][0]) + abs(z - line[-1][1]) >= 1e-6:
+            line.append((x, z))
+    if len(line) < 2 or plen(line) < 4.0:
+        continue
+    half = way_width(w["tags"], w["tags"]["highway"]) / 2
+    CARRIAGEWAYS.add((line, half), min(p[0] for p in line) - half, max(p[0] for p in line) + half,
+                     min(p[1] for p in line) - half, max(p[1] for p in line) + half)
+ON_ROAD = []
 for b in BUILDINGS:
     ring = [P(lat, lon) for lat, lon in b["ring"]]
     if len(ring) < 4:
@@ -1516,7 +1613,13 @@ for b in BUILDINGS:
     if bd.area < 6.0 or not in_area(bd.cx, bd.cz):
         continue
     # A building standing on a road is a mistake in somebody's data, or a canopy over a forecourt;
-    # either way it is not something to wall in across the carriageway.
+    # either way it is not something to wall in across the carriageway. The road is kept, with its lanes
+    # the whole of its width, and the building is not made (as the world's tiles do, WorldFeatures.Site).
+    # Everything else is decided as if it were there (its address, its lot, its place's name), and it is
+    # built and then left out, so no other entity's id moves (DROPPING).
+    bd.on_road = any(line_to_ring(line, bd.ring) < half for line, half in CARRIAGEWAYS.near(bd.x0, bd.x1, bd.z0, bd.z1))
+    if bd.on_road:
+        ON_ROAD.append(bd)
     BLD.append(bd)
     B_INDEX.add(bd, bd.x0, bd.x1, bd.z0, bd.z1)
 
@@ -1957,6 +2060,32 @@ def lot_of_point(x, z):
     return None
 
 
+DRIVE_HALF = 1.8          # half a made-up driveway's width, m
+STATS_EARLY = defaultdict(int)
+
+
+def made_drive_u(F, h, v0, end, house, lot_u0, lot_u1):
+    """Where across a lot (u in its frame, lot_u0 to lot_u1) a made-up driveway runs from the road (v0) to the front of
+    the house (extents h): 2.4 m in from the house's chosen end, else the nearest point to that, a quarter metre at a
+    time either way (toward the house's middle first) and no further than the lot, where the drive's strip enters no
+    other building; None if there is none."""
+    pref = h[0] + 2.4 if end == 0 else h[1] - 2.4
+    inward = 1 if end == 0 else -1
+    lo, hi = lot_u0 + DRIVE_HALF, lot_u1 - DRIVE_HALF
+    v1 = h[2] - 0.2
+    cands = [pref]
+    for k in range(1, int((lot_u1 - lot_u0) / 0.25) + 2):
+        cands += [pref + inward * 0.25 * k, pref - inward * 0.25 * k]
+    for du in cands:
+        if du != pref and not lo <= du <= hi:
+            continue
+        x0, x1, z0, z1 = bbox_of(F, du - DRIVE_HALF, du + DRIVE_HALF, v0, v1)
+        if not any(poly_area(ring_in_box([F.l(x, z) for x, z in b.ring[:-1]], du - DRIVE_HALF, du + DRIVE_HALF, v0, v1)) > 1e-4
+                   for b in B_INDEX.near(x0, x1, z0, z1) if b is not house and not b.on_road):
+            return du
+    return None
+
+
 YARD_LOTS = SpatialHash(40.0)
 for lot in LOTS:
     YARD_LOTS.add(lot, *bbox_of(lot["F"], lot["u0"], lot["u1"], lot["front"] - VERGE, lot["back"]))
@@ -1974,14 +2103,24 @@ for lot in LOTS:
     if LEVEL < 1 or id(lot) in DRIVE_FOR or lot["house"] is None or a.main is None or a.main.kind not in ("house", "mobile_home"):
         continue
     F, h = lot["F"], lot["house"]
-    # The end of the house the drive comes to: the side its garage is on, seeded from the address.
+    # The end of the house the drive comes to: the side its garage is on, seeded from the address. It goes where
+    # its way from the road is clear of every other building, as near that end as the lot allows; a house with no
+    # such way (one behind another on a flag lot) has none made up.
     end = 0 if h01(a.label, "drive") < 0.5 else 1
-    du = h[0] + 2.4 if end == 0 else h[1] - 2.4
-    lot["drive_u"] = du
-    lot["drive_end"] = end
+    du = made_drive_u(F, h, lot["front"] - VERGE, end, a.main, lot["u0"], lot["u1"])
+    if du is None:
+        STATS_EARLY["houses with no clear way from the road for a driveway"] += 1
+    # One with no clear way, or to a house that is not made (on_road), is laid where it would have been and left
+    # out, so no other id moves.
+    _DROPPING[0] = du is None or a.main.on_road
+    if not _DROPPING[0]:
+        lot["drive_u"] = du
+        lot["drive_end"] = end
+    du = du if du is not None else (h[0] + 2.4 if end == 0 else h[1] - 2.4)
     x0, z0 = F.w(du, lot["front"] - VERGE)
     x1, z1 = F.w(du, h[2] - 0.2)
     lay_line([(x0, z0), (x1, z1)], 3.6, "concrete_floor", Y_DRIVE, f"{a.label} driveway", "drives")
+    _DROPPING[0] = False
 
 
 # ══ Gates and fences ══════════════════════════════════════════════════════════════════════════════
@@ -2411,6 +2550,7 @@ def edge_for_run(edges, F, run, s, width, box=None):
 
 WALLS = {"brick": "brick_wall", "siding": "siding_wall", "metal": "metal_wall", "concrete": "concrete_wall"}
 STATS = defaultdict(int)
+FOOTPRINTS = SpatialHash(40.0)  # every building's wall ring as built, for the surfaces laid along lines
 
 
 # What build() decided for each building, written by --decisions=FILE for the test that holds the world's port of
@@ -2444,6 +2584,8 @@ def build(bd):
         hgt = max(2.2, min(bd.height or 2.5, 6.0))
         oform("siding_wall" if bd.area < 30 else "metal_wall", F, [F.l(x, z) for x, z in ring], 0.0, hgt, {"Kind": "Prism"},
               name=name, layer="structure")
+        if not _DROPPING[0]:
+            FOOTPRINTS.add(ring, bd.x0, bd.x1, bd.z0, bd.z1)
         return
 
     # The rooms, in rectangles inside the footprint (a rectangle's is one, the whole of it). The walls go round
@@ -2496,6 +2638,8 @@ def build(bd):
     homes = kind in ("house", "mobile_home")
     outline = [F.l(x, z) for x, z in ring]
     oform("concrete_floor", F, outline, -0.15, 0.10, {"Kind": "Prism"}, name=f"{name} floor", layer="structure")
+    if not _DROPPING[0]:
+        FOOTPRINTS.add(ring, bd.x0, bd.x1, bd.z0, bd.z1)
     if homes and detail == 1:
         finish = "wood_floor" if h01(label, "floor") < 0.5 else "carpet_floor"
         finishes_later.append((F, outline, finish, f"{name} {'floorboards' if finish == 'wood_floor' else 'carpet'}",
@@ -3363,15 +3507,26 @@ def pad_of(bd):
     return ground(best[1], best[2])
 
 
+LATER_LISTS = {"rooms": rooms_later, "openings": openings_later, "doors": doors_later, "steps": steps_later,
+               "finishes": finishes_later}
+DROP_LATER = {k: set() for k in LATER_LISTS}
 for bd in sorted(BLD, key=lambda b: (round(b.cx, 2), round(b.cz, 2))):
     first = len(entities)
     _TILE_PIN[0] = tile_of(bd.cx, bd.cz)
     _Y_PIN[0] = pad_of(bd)
+    _DROPPING[0] = bd.on_road
+    later_from = {k: len(v) for k, v in LATER_LISTS.items()}
     build(bd)
+    if bd.on_road:
+        for k, v in LATER_LISTS.items():
+            DROP_LATER[k].update(range(later_from[k], len(v)))
+    _DROPPING[0] = False
     if _Y_PIN[0] is not None:
         PADS.add(("pad", bd, _Y_PIN[0]), bd.x0, bd.x1, bd.z0, bd.z1)
     if id(bd) in DECIDED:
         DECIDED[id(bd)].update({"id": bd.src.get("id"), "kind": bd.kind, "pad": _Y_PIN[0], "entities": [first, len(entities)]})
+        if bd.on_road:
+            del DECIDED[id(bd)]
     _Y_PIN[0] = None
     _TILE_PIN[0] = None
     if len({tile_of(e["Position"]["X"], e["Position"]["Z"]) for e in entities[first:]}) > 1:
@@ -3803,28 +3958,66 @@ def ground_all():
 
 
 # The rooms of the footprints' leftover pieces, then the openings made with the rooms, after everything else.
-for r in rooms_later:
+for i, r in enumerate(rooms_later):
     nm, F, u0, u1, v0, v1, y0, y1, pin, tile, _ = r
-    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+    _Y_PIN[0], _TILE_PIN[0], _DROPPING[0] = pin, tile, i in DROP_LATER["rooms"]
     r[10] = region(nm, F, u0, u1, v0, v1, y0, y1, layer="rooms")
     _Y_PIN[0] = _TILE_PIN[0] = None
-for x, z, phi, width, y0, y1, depth, a, b, pin, tile in openings_later:
-    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+for i, (x, z, phi, width, y0, y1, depth, a, b, pin, tile) in enumerate(openings_later):
+    _Y_PIN[0], _TILE_PIN[0], _DROPPING[0] = pin, tile, i in DROP_LATER["openings"]
     portal(x, z, phi, width, y0, y1, depth, a, b)
     _Y_PIN[0] = _TILE_PIN[0] = None
-for pin, tile, make in doors_later:
-    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+for i, (pin, tile, make) in enumerate(doors_later):
+    _Y_PIN[0], _TILE_PIN[0], _DROPPING[0] = pin, tile, i in DROP_LATER["doors"]
     make()
     _Y_PIN[0] = _TILE_PIN[0] = None
-for E, u0, u1, v0, v1, y0, y1, nm, pin, tile in steps_later:
-    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+for i, (E, u0, u1, v0, v1, y0, y1, nm, pin, tile) in enumerate(steps_later):
+    _Y_PIN[0], _TILE_PIN[0], _DROPPING[0] = pin, tile, i in DROP_LATER["steps"]
     obox("concrete_floor", E, u0, u1, v0, v1, y0, y1, name=nm, layer="structure")
     _Y_PIN[0] = _TILE_PIN[0] = None
-for F, outline, prefab, nm, pin, tile in finishes_later:
-    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+for i, (F, outline, prefab, nm, pin, tile) in enumerate(finishes_later):
+    _Y_PIN[0], _TILE_PIN[0], _DROPPING[0] = pin, tile, i in DROP_LATER["finishes"]
     oform(prefab, F, outline, 0.10, FLOOR_TOP, {"Kind": "Prism"}, name=nm, layer="interiors")
     _Y_PIN[0] = _TILE_PIN[0] = None
+_DROPPING[0] = False
 
+# The place a building that is not made was (a shop's name on a canopy over its forecourt): a name where it is, as
+# a place without a building has, written last.
+for bd in ON_ROAD:
+    if bd.place is not None:
+        obox("named_place", Frame(bd.place["x"], bd.place["z"], 0.0), -15, 15, -15, 15, 0.0, 6.0, name=bd.place["name"], layer="zones")
+
+
+# Nothing laid along a line goes into a building: a road's surfaces, a sidewalk, a kerb, a drive, a path or a
+# track stops short of every footprint it would enter (cut_off_rings), a mapped drive at its own house's wall as at
+# anybody else's. A piece keeps its id; a piece a building cuts in two has its second part written last.
+SURFACE_LAYERS = ("roads", "verges", "paths", "drives")
+SURFACES_CUT = defaultdict(int)
+
+
+def clear_surfaces():
+    gone = 0
+    for e in [e for e in entities if e.get("_seg") is not None and e["Layer"] in SURFACE_LAYERS and not e.get("_drop")]:
+        F, u0, u1, v0, v1, y0, y1 = e["_box"]
+        rings = [[F.l(x, z) for x, z in ring] for ring in FOOTPRINTS.near(*bbox_of(F, u0, u1, v0, v1))]
+        pieces = cut_off_rings(u0, u1, v0, v1, rings)
+        if pieces == [(u0, u1, v0, v1)]:
+            continue
+        SURFACES_CUT[e["Layer"]] += 1
+        if not pieces:
+            e["_drop"] = True
+            gone += 1
+            continue
+        for k, (a0, a1, b0, b1) in enumerate(pieces):
+            p = e if k == 0 else dict(e, EntityId=new_id(), Position=dict(e["Position"]), Scale=dict(e["Scale"]))
+            reshape(p, F, a0, a1, b0, b1, y0, y1)
+            p["Tile"] = tile_of(p["Position"]["X"], p["Position"]["Z"])
+            if k:
+                entities.append(p)
+    return gone
+
+
+SURFACES_GONE = clear_surfaces()
 ground_all()
 if HAS_GROUND:
     spawn = (spawn[0], spawn[1] + ground(spawn[0], spawn[2]), spawn[2])
@@ -3843,6 +4036,18 @@ if HAS_GROUND:
         r["Centreline"] = dense
     for j in JUNCTIONS:
         j["Position"]["Y"] = round(road_y(j["Position"]["X"], j["Position"]["Z"]) + Y_ROAD, 4)
+
+# What was made and left out (_DROPPING, clear_surfaces) leaves the map now, its ids unused; the decisions' ranges of
+# entities are counted again without it.
+_kept = [0]
+for e in entities:
+    _kept.append(_kept[-1] + (0 if e.get("_drop") else 1))
+for d in DECIDED.values():
+    d["entities"] = [_kept[d["entities"][0]], _kept[d["entities"][1]]]
+entities[:] = [e for e in entities if not e.get("_drop")]
+COUNT.clear()
+for e in entities:
+    COUNT[e["Layer"]] += 1
 
 
 # ══ The map ═══════════════════════════════════════════════════════════════════════════════════════
@@ -3915,6 +4120,14 @@ if STATS["rooms whose furniture stands in a way through"]:
     print(f"  {STATS['rooms whose furniture stands in a way through']} rooms have no spot for their sofa or bed clear of the ways through")
 if STATS["doors with something in the way outside"]:
     print(f"  {STATS['doors with something in the way outside']} outside doors have another building in the way a step out, with no clear spot along their wall")
+if ON_ROAD:
+    print(f"  {len(ON_ROAD)} buildings stand in a carriageway and are not made: "
+          + "; ".join(f"{b.src.get('id')} at ({b.cx:.1f}, {b.cz:.1f})" for b in ON_ROAD))
+if SURFACES_CUT:
+    print("  pieces cut back off a building: " + ", ".join(f"{k} {v}" for k, v in sorted(SURFACES_CUT.items()))
+          + f" ({SURFACES_GONE} wholly inside one, not laid)")
+for k, v in sorted(STATS_EARLY.items()):
+    print(f"  {v} {k}")
 print(f"  {len(steps_later)} landings and steps at outside doors")
 print(f"  {len(finishes_later)} floors finished on a home's slab")
 if STATS["side doors"]:

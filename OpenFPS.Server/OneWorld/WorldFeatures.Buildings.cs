@@ -247,6 +247,17 @@ public sealed partial class WorldFeatures
     /// </summary>
     private List<Sited> Site(WorldTileKey key, IReadOnlyList<Footprint> footprints, IReadOnlyList<OsmWay> ways, Func<double, double, double, double, bool> inPlace,
                              double reach = BuildingNear)
+        => Site(key, footprints, ways, inPlace, reach, out _);
+
+    /// <summary>A building that is made, as what stands in the way of a surface laid along a line, in the zone's metres:
+    /// its wall ring (WorldBuildings.WallRing, what its walls and floor are built on), its footprint's ring as given
+    /// (closed), and that one's bounds.</summary>
+    internal sealed record Standing(List<(double X, double Z)> Ring, List<(double X, double Z)> Raw, double X0, double X1, double Z0, double Z1);
+
+    /// <summary><see cref="Site(WorldTileKey, IReadOnlyList{Footprint}, IReadOnlyList{OsmWay}, Func{double, double, double, double, bool}, double)"/>,
+    /// and every footprint of <paramref name="footprints"/> that is made, near the tile or not (<paramref name="standing"/>).</summary>
+    private List<Sited> Site(WorldTileKey key, IReadOnlyList<Footprint> footprints, IReadOnlyList<OsmWay> ways, Func<double, double, double, double, bool> inPlace,
+                             double reach, out List<Standing> standing)
     {
         var lines = RoadLines(key, ways);
         // The ends of every mapped driveway near: a house with one beside it is given no made-up one.
@@ -303,12 +314,13 @@ public sealed partial class WorldFeatures
             return false;
         }
 
-        var sited = new List<Sited>();
+        // Every footprint that is made, near the tile or not: what a made-up driveway keeps clear of is the same
+        // whichever tile asks.
+        var made = new List<(int Ri, WorldTileKey Owner, WorldBuildings.Shape Shape, Standing At)>();
         for (int ri = 0; ri < rings.Count; ri++)
         {
             var (fp, ring, _, _, _, _) = rings[ri];
             double x0 = ring.Min(p => p.X), x1 = ring.Max(p => p.X), z0 = ring.Min(p => p.Z), z1 = ring.Max(p => p.Z);
-            if (x1 < t0x || x0 > t1x || z1 < t0z || z0 > t1z) continue;
             if (Math.Sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0)) > MaxBuildingAcross) continue;
             if (inPlace(x0, x1, z0, z1)) continue;
             // The building's own metres: those of the tile its middle is in, the same from every tile.
@@ -317,12 +329,9 @@ public sealed partial class WorldFeatures
             var owner = WorldTileKey.Of(key.Zone, key.North, mx / (ring.Count - 1), mz / (ring.Count - 1));
             var local = ring.Select(p => (p.X - owner.Easting, p.Z - owner.Northing)).ToList();
             var shape = new WorldBuildings.Shape(local);
-            if (shape.Area < 6.0) continue;
-            var classed = Classify(fp, shape, Beside(ri));
-            if (classed == null) continue;
-            var (kind, placeKind) = classed.Value;
+            if (shape.Area < 6.0 || fp.Class == "roof") continue;
             // A building standing on a road is a mistake in somebody's data, or a canopy over a forecourt: the road
-            // is kept and the building is not made.
+            // is kept, with its lanes the whole of its width, and the building is not made.
             bool onRoad = false;
             foreach (var l in lines)
             {
@@ -331,6 +340,20 @@ public sealed partial class WorldFeatures
                 if (LineToRing(l.Pts, ring) < half) { onRoad = true; break; }
             }
             if (onRoad) continue;
+            var wall = WorldBuildings.WallRing(local).Select(q => (q.X + owner.Easting, q.Z + owner.Northing)).ToList();
+            made.Add((ri, owner, shape, new Standing(wall, ring, x0, x1, z0, z1)));
+        }
+        var stand = made.Select(m => m.At).ToList();
+        standing = stand;
+
+        var sited = new List<Sited>();
+        for (int mi = 0; mi < made.Count; mi++)
+        {
+            var (ri, owner, shape, at) = made[mi];
+            var (fp, ring, _, _, _, _) = rings[ri];
+            double x0 = at.X0, x1 = at.X1, z0 = at.Z0, z1 = at.Z1;
+            if (x1 < t0x || x0 > t1x || z1 < t0z || z0 > t1z) continue;
+            var (kind, placeKind) = Classify(fp, shape, Beside(ri))!.Value;
 
             double cx = shape.Cx + owner.Easting, cz = shape.Cz + owner.Northing;
             string word = char.ToUpperInvariant(kind[0]) + kind[1..].Replace('_', ' ');
@@ -361,7 +384,7 @@ public sealed partial class WorldFeatures
                         && z1 >= key.Northing - BuildingNear && z0 <= key.Northing + WorldTileKey.TileMetres + BuildingNear;
             List<(double E, double N)>? drive = null;
             if (homes && facing is { } fd && !driveEnds.Any(p => WorldBuildings.Pip(p.E, p.N, ring) || Project(ring.Select(q => (q.X, q.Z)).ToList(), p.E, p.N).D < MappedDriveNear))
-                drive = DriveFor(ring, shape.Angle, (cx, cz), fd.Foot, fd.Road[0].Width, seed);
+                drive = DriveFor(ring, shape.Angle, (cx, cz), fd.Foot, fd.Road[0].Width, seed, stand.Where((_, k) => k != mi).ToList());
             sited.Add(new Sited
             {
                 Fp = fp, Shape = shape, Owner = owner, Kind = kind, PlaceKind = placeKind,
@@ -375,14 +398,21 @@ public sealed partial class WorldFeatures
                     .ThenBy(b => b.Fp.Id, StringComparer.Ordinal).ToList();
     }
 
+    /// <summary>A lot reaches at least this far past either end of its house, metres (gen_osm.py make_lots): as far as
+    /// a made-up driveway may be moved along the front to keep clear of another building.</summary>
+    public const double LotBeyondHouse = 3.0;
+
     /// <summary>
     /// gen_osm.py's driveway for a lot with none mapped, without the lot: from the edge of the road the house faces
     /// straight in to its front wall, 2.4 m in from the end of the house h01 picks, in a frame square to the road
     /// (or to the house, where one of its sides is within 35 degrees of that); null where the house is at the road or
-    /// further than <see cref="MaxDrive"/> from it.
+    /// further than <see cref="MaxDrive"/> from it. Where that way enters another building (<paramref name="others"/>,
+    /// the footprints made), the nearest place either way a quarter metre at a time (toward the house's middle first),
+    /// no further than <see cref="LotBeyondHouse"/> past its ends, where it does not (gen_osm.py made_drive_u); null if
+    /// there is none.
     /// </summary>
     private static List<(double E, double N)>? DriveFor(List<(double X, double Z)> ring, double houseAngle, (double X, double Z) middle,
-                                                         (double E, double N) foot, double roadWidth, string seed)
+                                                         (double E, double N) foot, double roadWidth, string seed, IReadOnlyList<Standing> others)
     {
         double nx = middle.X - foot.E, nz = middle.Z - foot.N, l = Math.Sqrt(nx * nx + nz * nz);
         if (l < 1e-6) return null;
@@ -399,10 +429,37 @@ public sealed partial class WorldFeatures
         double front = roadWidth / 2 + Verge;
         var h = WorldBuildings.Extents(f, ring);
         if (h.V0 < front + 1) front = Math.Min(front, h.V0 - 1);
-        double du = WorldBuildings.H01(seed, "drive") < 0.5 ? h.U0 + 2.4 : h.U1 - 2.4;
+        bool atStart = WorldBuildings.H01(seed, "drive") < 0.5;
+        double pref = atStart ? h.U0 + 2.4 : h.U1 - 2.4, inward = atStart ? 1 : -1;
         double v0 = front - Verge, v1 = h.V0 - 0.2;
         if (v1 - v0 < 2.0 || v1 - v0 > MaxDrive) return null;
-        return new List<(double E, double N)> { f.W(du, v0), f.W(du, v1) };
+        double lo = h.U0 - LotBeyondHouse + DriveHalf, hi = h.U1 + LotBeyondHouse - DriveHalf;
+        int steps = (int)((h.U1 - h.U0 + 2 * LotBeyondHouse) / 0.25) + 1;
+        for (int k = 0; k <= steps; k++)
+            foreach (double du in k == 0 ? new[] { pref } : new[] { pref + inward * 0.25 * k, pref - inward * 0.25 * k })
+            {
+                if (k > 0 && (du < lo || du > hi)) continue;
+                var (bx0, bx1, bz0, bz1) = Bounds(f, du - DriveHalf, du + DriveHalf, v0, v1);
+                bool clear = true;
+                foreach (var o in others)
+                {
+                    if (o.X1 < bx0 || o.X0 > bx1 || o.Z1 < bz0 || o.Z0 > bz1) continue;
+                    var local = new List<(double U, double V)>(o.Raw.Count - 1);
+                    for (int q = 0; q < o.Raw.Count - 1; q++) local.Add(f.L(o.Raw[q].X, o.Raw[q].Z));
+                    if (PolyArea(RingInBox(local, du - DriveHalf, du + DriveHalf, v0, v1)) > 1e-4) { clear = false; break; }
+                }
+                if (clear) return new List<(double E, double N)> { f.W(du, v0), f.W(du, v1) };
+            }
+        return null;
+    }
+
+    /// <summary>Half a made-up driveway's width, metres.</summary>
+    public const double DriveHalf = 1.8;
+
+    private static (double X0, double X1, double Z0, double Z1) Bounds(WorldBuildings.Frame f, double u0, double u1, double v0, double v1)
+    {
+        var c = new[] { f.W(u0, v0), f.W(u1, v0), f.W(u0, v1), f.W(u1, v1) };
+        return (c.Min(p => p.X), c.Max(p => p.X), c.Min(p => p.Z), c.Max(p => p.Z));
     }
 
     /// <summary>
@@ -446,10 +503,11 @@ public sealed partial class WorldFeatures
     private (int Built, string? Sources) LayBuildings(WorldTileKey key, IReadOnlyList<Footprint> footprints, IReadOnlyList<OsmWay> ways, Ground ground,
                                                      double west, double south, Func<double, double, double, double, bool> inPlace,
                                                      List<EntityData> entities, List<TerrainBuilder.Slab> slabs,
-                                                     List<(WorldBuildings.Frame F, double U0, double U1, double V0, double V1)> boxes, Action<Piece> place)
+                                                     List<(WorldBuildings.Frame F, double U0, double U1, double V0, double V1)> boxes, Action<Piece> place,
+                                                     List<Sited> sitedForDrives)
     {
         // The made-up driveways of every house near enough for one to reach the tile, laid as a road's pieces are.
-        foreach (var b in Site(key, footprints, ways, inPlace, BuildingNear + MaxDrive))
+        foreach (var b in sitedForDrives)
             if (b.Drive != null)
                 LayLine(b.Drive, 3.6, "concrete_floor", YDrive, $"{b.Name} driveway", "drives", ground.At, place);
         int built = 0, lastId = 0;

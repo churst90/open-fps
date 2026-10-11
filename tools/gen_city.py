@@ -1644,8 +1644,10 @@ for ax, aname in zip(AVENUES, ("Wharf Avenue", "Main Street", "Calder Avenue")):
         a, b = z0 + k * (z1 - z0) / n, z0 + (k + 1) * (z1 - z0) / n
         if ax == 0.0 and b <= TUNNEL_Z1:
             continue                                  # that stretch is the tunnel, already named
-        # A block running into the tunnel stops at its mouth: under the roof is the tunnel's.
-        region(f"{aname}, block {k + 1}", ax - KERB, ax + KERB, 0.0, 6.0, max(a, TUNNEL_Z1) if ax == 0.0 else a, b)
+        # A block running into the tunnel stops at its mouth: under the roof is the tunnel's, and its
+        # sidewalks stop there too (until 2026-10-11 they ran on 40 m inside the tunnel's walls).
+        a = max(a, TUNNEL_Z1) if ax == 0.0 else a
+        region(f"{aname}, block {k + 1}", ax - KERB, ax + KERB, 0.0, 6.0, a, b)
         region(f"{aname} sidewalk", ax - WALK, ax - KERB, 0.0, 4.0, a, b)
         region(f"{aname} sidewalk", ax + KERB, ax + WALK, 0.0, 4.0, a, b)
 
@@ -2451,6 +2453,11 @@ for _name, *_span in named_places:
 # The openings where rooms meet with no wall, after them.
 for _args in openings_later:
     portal(*_args)
+
+# A tunnel's floor is a construction (docs/GEOMETRY.md 12.6, "A floor is a construction"): a cut-and-cover box
+# has a concrete invert under its road, as it has a concrete roof over it. Until 2026-10-11 the asphalt lay on the
+# map's dirt. Under the road and its walls, the road's surface as it was; written last, so no other id moves.
+box("concrete_floor", -WALK, WALK, -0.25, 0.0, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel floor")
 
 map_data = {
     "Id": "city",

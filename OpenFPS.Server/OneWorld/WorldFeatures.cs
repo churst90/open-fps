@@ -202,9 +202,14 @@ public sealed partial class WorldFeatures
         }
     }
 
-    /// <summary>A box along a run of a line, before it is placed: gen_osm.py seg_box's arguments.</summary>
-    private readonly record struct Piece(string Prefab, double Ax, double Az, double Bx, double Bz, double Width,
-                                         float Y0, float Y1, double Ext0, double Ext1, double Hp, double Hq, string Name, string Layer);
+    /// <summary>A box along a run of a line, before it is placed: gen_osm.py seg_box's arguments, and how far it
+    /// reaches across the run to either side (<see cref="V0"/> to <see cref="V1"/>, left positive; minus and plus half
+    /// its width until a building cuts it narrower).</summary>
+    private readonly record struct Piece(string Prefab, double Ax, double Az, double Bx, double Bz, double V0, double V1,
+                                         float Y0, float Y1, double Ext0, double Ext1, double Hp, double Hq, string Name, string Layer)
+    {
+        public double Width => V1 - V0;
+    }
 
     /// <summary>
     /// Lays a tile from the ways that reach it, the ground of its window (<see cref="PostsFor"/> a side from
@@ -265,12 +270,24 @@ public sealed partial class WorldFeatures
 
         bool Mine(double e, double n) => WorldTileKey.Of(key.Zone, key.North, e, n) == key;
 
-        void Place(Piece p)
+        // Every building made near the tile (the same set whichever tile asks): nothing laid along a line goes into
+        // one (WorldFeatures.Clear).
+        var standing = new List<Standing>();
+        var sitedForDrives = footprints is { Count: > 0 }
+            ? Site(key, footprints, ways, InPlace, BuildingNear + MaxDrive, out standing)
+            : new List<Sited>();
+
+        void Place(Piece whole)
+        {
+            var (wx0, wx1, wz0, wz1) = PieceBox(whole).Bounds;
+            if (!Touches(wx0, wx1, wz0, wz1) || InPlace(wx0, wx1, wz0, wz1)) return;
+            strips.Add((whole.Ax, whole.Az, whole.Bx, whole.Bz, whole.Width / 2));
+            foreach (var p in ClearOf(whole, standing)) PlaceClear(p);
+        }
+
+        void PlaceClear(Piece p)
         {
             var box = PieceBox(p);
-            var (x0, x1, z0, z1) = box.Bounds;
-            if (!Touches(x0, x1, z0, z1) || InPlace(x0, x1, z0, z1)) return;
-            strips.Add((p.Ax, p.Az, p.Bx, p.Bz, p.Width / 2));
             var size = Size(p.Prefab);
             if (TerrainBuilder.SlabOf(new Vector3((float)(box.Cx - west), box.Cy, (float)(box.Cz - south)), box.Turn, box.Extent) is { } slab)
             {
@@ -375,7 +392,7 @@ public sealed partial class WorldFeatures
         // The buildings near the tile: those whose middle is in it stored whole, every one near graded under.
         var boxes = new List<(WorldBuildings.Frame F, double U0, double U1, double V0, double V1)>();
         var (built, sources) = footprints is { Count: > 0 }
-            ? LayBuildings(key, footprints, ways, ground, west, south, InPlace, entities, slabs, boxes, Place)
+            ? LayBuildings(key, footprints, ways, ground, west, south, InPlace, entities, slabs, boxes, Place, sitedForDrives)
             : (0, null);
 
         int trees = classes == null ? 0 : Woods(key, classes, ground, strips, boxes, entities);
@@ -633,7 +650,7 @@ public sealed partial class WorldFeatures
                 double hp = k == 0 ? hts[i] : height(px, pz), hq = k == n - 1 ? hts[i + 1] : height(qx, qz);
                 double f0 = k == 0 ? e0 : Seam, f1 = k == n - 1 ? e1 : Seam;
                 if (Math.Sqrt((qx - px) * (qx - px) + (qz - pz) * (qz - pz)) < 0.05) continue;
-                lay(new Piece(prefab, px, pz, qx, qz, width, 0f, y1, f0, f1, hp, hq, name, layer));
+                lay(new Piece(prefab, px, pz, qx, qz, -width / 2, width / 2, 0f, y1, f0, f1, hp, hq, name, layer));
             }
         }
     }
@@ -647,7 +664,7 @@ public sealed partial class WorldFeatures
     {
         double L = Math.Sqrt((p.Bx - p.Ax) * (p.Bx - p.Ax) + (p.Bz - p.Az) * (p.Bz - p.Az));
         var f = new Frame(p.Ax, p.Az, Math.Atan2(p.Bz - p.Az, p.Bx - p.Ax));
-        double u0 = -p.Ext0, u1 = L + p.Ext1, v0 = -p.Width / 2, v1 = p.Width / 2;
+        double u0 = -p.Ext0, u1 = L + p.Ext1, v0 = p.V0, v1 = p.V1;
         var (cx, cz) = f.W((u0 + u1) / 2, (v0 + v1) / 2);
         double g = (p.Hq - p.Hp) / L, uc = (u0 + u1) / 2;
         double cy = p.Hp + g * uc + (p.Y0 + p.Y1) / 2.0;
