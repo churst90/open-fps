@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- One set of compass words: `OpenFPS.Words` (no dependencies) has `CompassWords.Of(degrees, points)` for 16,
+  8 or 4 points, and every compass word in the game calls it: /wind, /build, the editor, the world's "north
+  east of Magnolia", the driving aids' heading, the F key's facing and the sky readout. Seven copies of the
+  eight words, two of the four and the weather's names for the sixteen are gone. OpenFPS.Astronomy references
+  it; Server and Client.Core reference it directly. Every caller says what it said: each keeps its own angle
+  sum and wrap, and the wind, the editor and the driving aids still round a bearing exactly between two points
+  to the cardinal (the rest clockwise). The one difference is three float bearings, each a float short of a
+  midpoint, that the world's description put in the next point (`CompassWordsTests`, which keeps the old
+  copies as the record). The gen_osm.py mirror's "northeast" wall names are left to match the Python.
+
 - The emitter-stream replay turns vehicles and the listener as the game does (+Z forward, yaw toward east), not
   backwards; a test fix, no game change. All eight streams regenerated (docs/SPECIAL_CASES_AUDIT.md, P0).
 

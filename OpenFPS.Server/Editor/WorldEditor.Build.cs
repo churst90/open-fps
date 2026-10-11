@@ -9,6 +9,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 
 using EntityData = OpenFPS.Server.Repositories.EntityData;
+using OpenFPS.Words;
 
 namespace OpenFPS.Server.Editor;
 
@@ -454,7 +455,7 @@ public sealed partial class WorldEditor
             else where = kind == "roof" ? "over you" : "at your feet";
         }
         else where = "at the build cursor";
-        if (kind != "floor" && kind != "roof") where += $", facing {Compass4Names[(int)MathF.Round(facingYaw / (MathF.PI / 2f)) % 4]}";
+        if (kind != "floor" && kind != "roof") where += $", facing {CompassWords.Four[(int)MathF.Round(facingYaw / (MathF.PI / 2f)) % 4]}";
         return new Pose(centre, rotation, Vector3.One);
     }
 

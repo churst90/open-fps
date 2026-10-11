@@ -7,6 +7,7 @@ using OpenFPS.Common.Editing;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Words;
 
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 
@@ -805,11 +806,11 @@ public sealed partial class WorldEditor
                    name => $"{name} faces {FieldDescriptor.Format(((degrees % 360) + 360) % 360)} degrees, {CompassOf(to)}.");
             return;
         }
-        int index = Array.IndexOf(Compass8, word);
+        int index = CompassWords.Eight.IndexOf(word);
         if (index < 0) { Say(reply, "Say /edit face north, north east, east, south east, south, south west, west or north west."); return; }
         float yaw = index * MathF.PI / 4f;
         Repose(s, reply, "turned", (_, _, p) => p with { Rotation = Quaternion.CreateFromYawPitchRoll(yaw, 0f, 0f) },
-               name => $"{name} faces {Compass8[index]}.");
+               name => $"{name} faces {CompassWords.Eight[index]}.");
     }
 
     /// <summary>Where a thing put down by a player goes: standing on the ground at their feet, or, if it is
@@ -856,7 +857,7 @@ public sealed partial class WorldEditor
         string name = NameOf(world, e);
         Push(s, new PlaceOp(s.CurrentMapId, thing, "copied", name));
         HandOf(s).Selected = newId;
-        Say(reply, $"Copied {name}, {Metres(along)} {Compass4Names[Quarter(yaw)]} of it. The copy is selected.");
+        Say(reply, $"Copied {name}, {Metres(along)} {CompassWords.Four[Quarter(yaw)]} of it. The copy is selected.");
         Notify(s, $"{s.Username} copied {name}.");
         Refresh(s, reply);
     }

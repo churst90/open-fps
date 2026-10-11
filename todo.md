@@ -293,9 +293,6 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - The scope and the push mower (audit P2): should the scope call somebody pushing a push mower a person?
   Today, as before, it picks out no machine.
 - The editor and sound ids (audit P2): should the editor edit trains and woods through their sound ids?
-- Compass words: seven functions turn a bearing into compass words, each its own way. Recommended: all
-  of them call one 16-point function, which lands in OpenFPS.Astronomy's `SkyWords` with the sun and moon
-  readout (docs/SKY.md).
 - Reflections following a moving talker, and himself: he will check again.
 - Loudness law: anything over about 126 dB peak at 1 m (gunshots, glass, a thin plate) plays at full
   scale out to the 40 m clamp, so 5 m and 20 m sound the same (`Loudness.Place`). Explosions wait on it.

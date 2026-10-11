@@ -6,6 +6,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Editing;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
+using OpenFPS.Words;
 
 
 namespace OpenFPS.Server.Editor;
@@ -307,15 +308,16 @@ public sealed partial class WorldEditor
         return MathF.Atan2(f.X, f.Z);
     }
 
-    private static readonly string[] Compass8 = { "north", "north east", "east", "south east", "south", "south west", "west", "north west" };
+    /// <summary>North, east, south and west, as CompassWords.Four names them.</summary>
     private static readonly Vector3[] Compass4 = { Vector3.UnitZ, Vector3.UnitX, -Vector3.UnitZ, -Vector3.UnitX };
-    private static readonly string[] Compass4Names = { "north", "east", "south", "west" };
 
+    /// <summary>The nearest of the eight points to a heading in radians; exactly between two, the cardinal.</summary>
     public static string CompassOf(float yaw)
     {
         float deg = yaw * 180f / MathF.PI;
+        // Wrapped in float, as it always was: the wrap rounds a heading a float's width off a midpoint onto it.
         deg = ((deg % 360f) + 360f) % 360f;
-        return Compass8[(int)MathF.Round(deg / 45f) % 8];
+        return CompassWords.Of(deg, 8, MidpointRounding.ToEven);
     }
 
     /// <summary>Which of north, east, south, west a heading is nearest: 0 to 3.</summary>

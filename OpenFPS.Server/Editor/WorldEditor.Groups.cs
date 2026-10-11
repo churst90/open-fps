@@ -7,6 +7,7 @@ using OpenFPS.Common.Editing;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Words;
 
 namespace OpenFPS.Server.Editor;
 
@@ -204,7 +205,7 @@ public sealed partial class WorldEditor
         hand.Held.Clear();
         hand.Held.AddRange(placedIds);
         hand.Selected = placedIds[0];
-        Say(reply, $"Placed the group {id}, {Plural(ops.Count, "thing")}, in front of you, facing {Compass4Names[q]}. They are held: /edit held move, nudge or turn moves them as one, and each is its own thing too.");
+        Say(reply, $"Placed the group {id}, {Plural(ops.Count, "thing")}, in front of you, facing {CompassWords.Four[q]}. They are held: /edit held move, nudge or turn moves them as one, and each is its own thing too.");
         Notify(s, $"{s.Username} placed the group {id}.");
         Refresh(s, reply);
     }

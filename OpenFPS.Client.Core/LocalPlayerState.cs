@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Numerics;
+using OpenFPS.Words;
 
 namespace OpenFPS.Client.Core;
 
@@ -74,37 +76,12 @@ public class LocalPlayerState
         Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), Rotation);
         float angle = MathF.Atan2(forward.X, forward.Z) * (180.0f / MathF.PI);
         if (angle < 0) angle += 360.0f;
-        return angle switch
-        {
-            < 22.5f or >= 337.5f => "North",
-            < 67.5f => "North East",
-            < 112.5f => "East",
-            < 157.5f => "South East",
-            < 202.5f => "South",
-            < 247.5f => "South West",
-            < 292.5f => "West",
-            _ => "North West"
-        };
+        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(CompassWords.Of(angle, 8));
     }
 
     public string GetCompassDirection()
     {
-        Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), Rotation);
-
-        float angle = MathF.Atan2(forward.X, forward.Z) * (180.0f / MathF.PI);
-        if (angle < 0) angle += 360.0f;
-
-        string cardinal = angle switch
-        {
-            < 22.5f or >= 337.5f => "North",
-            < 67.5f => "North East",
-            < 112.5f => "East",
-            < 157.5f => "South East",
-            < 202.5f => "South",
-            < 247.5f => "South West",
-            < 292.5f => "West",
-            _ => "North West"
-        };
+        string cardinal = GetCardinal();
         
         // Increasing pitch looks down: CreateFromYawPitchRoll's pitch turns forward (+Z) toward -Y.
         // This readout had it backwards once ("pressing f says looking down" while looking up), and

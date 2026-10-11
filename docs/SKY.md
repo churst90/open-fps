@@ -49,10 +49,9 @@ three quarters lit, south east, thirty-five degrees up, sets in five hours."
   say them), the half-points by the same rule ("west south west"). The tracker's own words
   (`DirectionWords`, "left in front") are relative to where you face and live in OpenFPS.Common, which this
   library cannot reference; `Readout` takes a bearing function, so the client can pass one that says the
-  tracker's words instead. No 16-point word function existed in the game; the 8-point one is written seven
-  times (server: `CommandHandler.CompassWord`, `CommandHandler.Building`'s `Compass`, `WorldEditor.CompassOf`,
-  `WorldMaps.Compass8`; client: `DrivingAids.Compass`, `LocalPlayerState` twice). A test holds the eight
-  main points to `CommandHandler.CompassWord`'s.
+  tracker's words instead. The words are `OpenFPS.Words`' `CompassWords.Of` (16, 8 or 4 points), which
+  every compass word in the game now calls; the 8-point copies that were written seven times are gone
+  (`CompassWordsTests` keeps them as the record). A test holds the eight main points to the weather's.
 - Heights in words to the degree: "one degree up", "on the horizon", "straight overhead".
 - Up: "sets in ..." in words. Down: "down, rises at 6:42 a.m.", a clock time in the place's zone. More than a
   day away: "rises on January 15 at 11:35 a.m.".

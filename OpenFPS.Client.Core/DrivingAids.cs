@@ -3,6 +3,7 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using Serilog;
+using OpenFPS.Words;
 
 namespace OpenFPS.Client.Core;
 
@@ -921,12 +922,12 @@ public sealed class DrivingAids
         return v.LengthSquared() < 1e-6f ? Vector3.UnitZ : Vector3.Normalize(v);
     }
 
-    private static string Compass(Vector3 f)
+    internal static string Compass(Vector3 f)
     {
         float deg = MathF.Atan2(f.X, f.Z) * 180f / MathF.PI;
         if (deg < 0) deg += 360f;
-        string[] names = { "north", "north east", "east", "south east", "south", "south west", "west", "north west" };
-        return names[(int)MathF.Round(deg / 45f) % 8];
+        // Exactly between two points, the cardinal, as it always was.
+        return CompassWords.Of(deg, 8, MidpointRounding.ToEven);
     }
 
     private static string Kmh(float speed) => speed < 0.5f ? "stopped" : $"{MathF.Round(speed * 3.6f)} kilometres an hour";

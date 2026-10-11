@@ -8,6 +8,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 
 using EntityData = OpenFPS.Server.Repositories.EntityData;
+using OpenFPS.Words;
 
 namespace OpenFPS.Server.Editor;
 
@@ -196,7 +197,7 @@ public sealed partial class WorldEditor
         }
         if (made == 0) { Say(reply, $"No row: {stopped}"); return; }
         Push(s, new BatchOp(s.CurrentMapId, ops, $"made a row of {made} {name}"));
-        Say(reply, $"A row of {made} {name}, {Metres(along)} apart going {Compass4Names[Quarter(yaw)]}."
+        Say(reply, $"A row of {made} {name}, {Metres(along)} apart going {CompassWords.Four[Quarter(yaw)]}."
                  + (stopped != null ? $" Stopped there: {stopped}" : "") + " One undo takes the row away.");
         Notify(s, $"{s.Username} made a row of {name}.");
         Refresh(s, reply);

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Words the game says the same way wherever it says them: the compass points. It references no other
+       project and no package, so the server, the client and OpenFPS.Astronomy can all use it. Nothing of it
+       is on the wire. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

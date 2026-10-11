@@ -4,6 +4,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Repositories;
 using Arch.Core;
+using OpenFPS.Words;
 
 namespace OpenFPS.Server.Core;
 
@@ -320,17 +321,12 @@ public partial class CommandHandler
         }
     }
 
-    private static string Compass(float yaw)
+    internal static string Compass(float yaw)
     {
         float degrees = yaw * (180f / MathF.PI);
         while (degrees < 0) degrees += 360f;
         while (degrees >= 360f) degrees -= 360f;
-        return degrees switch
-        {
-            < 22.5f or >= 337.5f => "north", < 67.5f => "north east", < 112.5f => "east",
-            < 157.5f => "south east", < 202.5f => "south", < 247.5f => "south west",
-            < 292.5f => "west", _ => "north west",
-        };
+        return CompassWords.Of(degrees, 8);
     }
 
     /// <summary>/composites: what there is to place.</summary>
