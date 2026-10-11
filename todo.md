@@ -40,6 +40,13 @@ other at login. The server and the Windows zip go out together.
    unheard: rooms flood from their points with no box or margin, and the generators put an opening wherever
    rooms meet with no wall (every part of a footprint is a room's). Listen first (the list in 12.6, "The flood
    from a point": a stairwell, a roof access, a barn, the houses that changed most); steps 3 to 5 wait for it.
+   Then (Cody, 2026-10-11): one path pass for every voice of a moving thing. Each voice is an entry saying
+   which thing owns it and where on it it sounds from (engine, siren mouth, horn, a train's bogie taps,
+   aircraft engines, a far-off borrowed voice, a spread source's places); one pass hands each its path every
+   frame with the same shadow and timing, replacing the horn/siren/distant/spread branches in
+   `ClientAudioSystem` (~:697-741) and the trains' separate writer (`ClientAudioSystem.Trains.cs`), which kept a
+   horn on a stale outdoor path through Marlow Tower's brick (2026-10-10). Gated by EmitterStreamReplay: no
+   change except where a voice was stale. Start after the Marlow Tower leak fix is merged.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
