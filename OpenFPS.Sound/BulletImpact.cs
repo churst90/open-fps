@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using Kind = OpenFPS.Common.StrikeKind;
 
 namespace OpenFPS.Common;
 
@@ -63,48 +64,25 @@ public static class BulletImpact
     public const string HitPrefix = "bullet:hit:";
     public const string DebrisPrefix = "bullet:debris:";
 
-    /// <summary>What a struck material does with a round.</summary>
-    public enum Kind { Brittle, Metal, Soil, Water, Wood, Panel, Soft }
-
-    /// <summary>A material's part in it: how it behaves, what a cubic metre of crater costs, how dense
+    /// <summary>A material's part in a strike: how it behaves, what a cubic metre of crater costs, how dense
     /// what it throws off is, the mean chip, and how hard a chip's landing is (its contact time).</summary>
-    public readonly record struct Stuff(Kind Kind, float CraterJoulesPerM3, float DebrisDensity, float ChipGrams, float ChipContactSeconds);
+    public readonly record struct Stuff(Kind Kind, float CraterJoulesPerM3, float DebrisDensity, float ChipGrams, float ChipContactSeconds,
+                                        float SprayLowHz, bool Rustles);
 
-    // Crater energies: the specific energy a hard target spends per volume of crater. Estimates, set so
-    // a 9 mm pistol bullet (500 J) leaves a crater a few cubic centimetres in concrete, as photographs of
-    // bullet strikes on concrete show; softer stuff is cheaper.
-    private static readonly Dictionary<string, Stuff> _stuff = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Concrete"] = new(Kind.Brittle, 250e6f, 2400f, 0.4f, 30e-6f),
-        ["Brick"] = new(Kind.Brittle, 120e6f, 1900f, 0.6f, 40e-6f),
-        ["Marble"] = new(Kind.Brittle, 400e6f, 2700f, 0.3f, 25e-6f),
-        ["Tile"] = new(Kind.Brittle, 300e6f, 2300f, 0.2f, 25e-6f),
-        ["Glass"] = new(Kind.Brittle, 300e6f, 2500f, 0.2f, 25e-6f),
-        ["Asphalt"] = new(Kind.Brittle, 60e6f, 2300f, 0.5f, 50e-6f),
-        ["Generic"] = new(Kind.Brittle, 150e6f, 1200f, 0.3f, 50e-6f),
-        ["Metal"] = new(Kind.Metal, 0f, 7850f, 0f, 20e-6f),
-        ["Fence"] = new(Kind.Metal, 0f, 7850f, 0f, 20e-6f),
-        ["Wood"] = new(Kind.Wood, 30e6f, 650f, 0.3f, 150e-6f),
-        ["Plaster"] = new(Kind.Panel, 20e6f, 800f, 0.4f, 250e-6f),
-        ["AcousticTile"] = new(Kind.Panel, 5e6f, 250f, 0.2f, 400e-6f),
-        ["Plastic"] = new(Kind.Panel, 40e6f, 1100f, 0.2f, 120e-6f),
-        ["Dirt"] = new(Kind.Soil, 5e6f, 1600f, 0.6f, 500e-6f),
-        ["Grass"] = new(Kind.Soil, 6e6f, 1500f, 0.6f, 700e-6f),
-        ["Gravel"] = new(Kind.Soil, 8e6f, 1700f, 2.0f, 60e-6f),
-        ["Water"] = new(Kind.Water, 0f, 1000f, 0f, 0f),
-        ["Carpet"] = new(Kind.Soft, 0f, 200f, 0f, 1e-3f),
-        ["Audience"] = new(Kind.Soft, 0f, 300f, 0f, 1e-3f),
-        ["Foliage"] = new(Kind.Soft, 0f, 500f, 0f, 1e-3f),
-        ["Rubber"] = new(Kind.Soft, 0f, 1100f, 0f, 1e-3f),
-        ["Leather"] = new(Kind.Soft, 0f, 900f, 0f, 1e-3f),
-        ["BootRubber"] = new(Kind.Soft, 0f, 1250f, 0f, 1e-3f),
-        ["Skin"] = new(Kind.Soft, 0f, 1050f, 0f, 1e-3f),
-        ["None"] = new(Kind.Soft, 0f, 1f, 0f, 1e-3f),
-    };
-
-    /// <summary>A material's part in a strike; an unknown name is Generic, as the registry has it.</summary>
+    /// <summary>A material's part in a strike, from the material table (AcousticRegistry), aliases and all: "Steel"
+    /// is Metal's. An unknown name is Generic, and the table says so.</summary>
     public static Stuff StuffOf(string? material)
-        => material != null && _stuff.TryGetValue(material, out var s) ? s : _stuff["Generic"];
+    {
+        var p = AcousticRegistry.GetProperties(material ?? "");
+        if (p.Strike is not { } s)
+        {
+            AcousticRegistry.WarnOnce("strike:" + material, $"material '{material}' has no strike behaviour; it strikes as 'Generic'");
+            p = AcousticRegistry.GetProperties("Generic");
+            s = p.Strike!.Value;
+        }
+        float debris = s.DebrisDensityKgM3 > 0f ? s.DebrisDensityKgM3 : MathF.Max(1f, p.DensityKgM3);
+        return new Stuff(s.Kind, s.CraterJoulesPerM3, debris, s.ChipGrams, s.ChipContactSeconds, s.SprayLowHz, s.Rustles);
+    }
 
     public static Kind KindOf(string? material) => StuffOf(material).Kind;
 
@@ -584,7 +562,7 @@ public static class BulletImpact
             Kind.Soil => 3f * 0.15f * VolumePascals(CraterCubicMetres(h), OpeningSeconds(h)),
             Kind.Wood => 2f * 0.25f * crack,
             Kind.Panel => 3f * VolumePascals(3f * CraterCubicMetres(h), 0.006f),
-            Kind.Soft => h.Material.Equals("Foliage", StringComparison.OrdinalIgnoreCase) ? 1.5f * SoftThumpPascals(h) : 0f,
+            Kind.Soft => StuffOf(h.Material).Rustles ? 1.5f * SoftThumpPascals(h) : 0f,
             _ => 0f,
         };
         return MathF.Max(1e-3f, 1.1f * (peak + extra));
@@ -868,7 +846,7 @@ public static class BulletImpact
                 AddVolumePulse(p, lead, OpeningSeconds(h), VolumePascals(CraterCubicMetres(h), OpeningSeconds(h)), sampleRate);
                 // The spray leaving: a rush of grains.
                 if (random) AddNoiseBurst(p, lead + 0.001f, 0.01f, 0.06f, 0.15f * VolumePascals(CraterCubicMetres(h), OpeningSeconds(h)),
-                              h.Material.Equals("Grass", StringComparison.OrdinalIgnoreCase) ? 1500f : 400f, 6000f, rng, sampleRate);
+                              StuffOf(h.Material).SprayLowHz, 6000f, rng, sampleRate);
                 break;
             }
             case Kind.Water:
@@ -887,7 +865,7 @@ public static class BulletImpact
             case Kind.Soft:
             {
                 AddVolumePulse(p, lead, MathF.Max(1e-3f, tau), SoftThumpPascals(h), sampleRate);
-                if (random && h.Material.Equals("Foliage", StringComparison.OrdinalIgnoreCase))
+                if (random && StuffOf(h.Material).Rustles)
                     AddNoiseBurst(p, lead, 0.01f, 0.12f, 0.5f * SoftThumpPascals(h), 2000f, 9000f, rng, sampleRate);
                 break;
             }

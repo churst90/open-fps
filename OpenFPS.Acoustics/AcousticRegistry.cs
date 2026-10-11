@@ -99,6 +99,15 @@ public struct MaterialProperties
     /// <summary>Heat of combustion, MJ/kg.</summary>
     public float HeatOfCombustionMJKg { get; set; }
 
+    // ── What it does when struck by a round (BulletImpact, Ricochet) ─────────────────────────────
+
+    /// <summary>How a round's strike on it behaves. Every material in the table has one; null only on a
+    /// material made in code, which a strike reads as Generic's and says so.</summary>
+    public StrikeBehaviour? Strike { get; set; }
+
+    /// <summary>How a round skips off it; null where a round goes in at any angle.</summary>
+    public RicochetFace? Ricochet { get; set; }
+
     /// <summary>The loss factor at <paramref name="hz"/>: <see cref="LossFactor"/> at 1 kHz, scaled by
     /// <see cref="LossExponent"/>.</summary>
     public readonly float LossAt(float hz)
@@ -110,6 +119,24 @@ public struct MaterialProperties
     /// <summary>The modulus across the grain, GPa: <see cref="YoungsModulusGPa"/> when it has no grain.</summary>
     public readonly float AcrossGrainGPa => TransverseModulusGPa > 0f ? TransverseModulusGPa : YoungsModulusGPa;
 }
+
+/// <summary>What a struck material does with a round (BulletImpact's sections).</summary>
+public enum StrikeKind { Brittle, Metal, Soil, Water, Wood, Panel, Soft }
+
+/// <summary>
+/// A material's part in a strike: how it behaves, what a cubic metre of crater costs, the mean chip and how hard
+/// a chip's landing is (its contact time). What it throws off weighs what the material does, except where
+/// <see cref="DebrisDensityKgM3"/> says the debris is something else (turf throws up the soil under it).
+/// <see cref="SprayLowHz"/> is the lowest band of what a soil's spray rushes in (grains low, blades high);
+/// <see cref="Rustles"/> is leaves swishing as a round goes through.
+/// </summary>
+public readonly record struct StrikeBehaviour(StrikeKind Kind, float CraterJoulesPerM3, float ChipGrams, float ChipContactSeconds,
+                                              float DebrisDensityKgM3 = 0f, float SprayLowHz = 400f, bool Rustles = false);
+
+/// <summary>A face's part in a ricochet: the critical angle off it (degrees; below zero, Birkhoff's from the
+/// slug's density), the departure angle as a share of the incidence, the share of its speed it loses at the
+/// critical angle, the share of its mass the slug keeps, and how much the face flattens it.</summary>
+public readonly record struct RicochetFace(float CriticalDegrees, float DepartureRatio, float LossAtCritical, float MassKept, float Flatten);
 
 public static class AcousticRegistry
 {
@@ -203,7 +230,14 @@ public static class AcousticRegistry
             foreach (var porous in new[] { "Fence", "Foliage", "Grass", "Audience", "Dirt", "Gravel", "Carpet", "AcousticTile", "None" })
                 if (reg.TryGetValue(porous, out var pp)) { pp.Porous = true; reg[porous] = pp; }
 
+            // Before AddMatter: a material made "like" another strikes as that one does.
+            AddStrikes(reg);
             AddMatter(reg);
+            AddStrikesAfterMatter(reg);
+
+            foreach (var kvp in reg)
+                if (kvp.Value.Strike == null)
+                    Serilog.Log.Error("[MATERIAL] AcousticRegistry: '{Name}' has no strike behaviour; a round on it strikes as Generic", kvp.Key);
 
             // Every material needs its own ResonanceIndex.
             var seen = new Dictionary<int, string>();
@@ -484,6 +518,66 @@ public static class AcousticRegistry
         reg[name] = p;
     }
 
+    /// <summary>
+    /// What a round does to each material (BulletImpact, Ricochet). Crater energies are the specific energy a hard
+    /// target spends per volume of crater: estimates, set so a 9 mm pistol bullet (500 J) leaves a crater a few cubic
+    /// centimetres in concrete, as photographs of bullet strikes on concrete show; softer stuff is cheaper.
+    /// </summary>
+    private static void AddStrikes(Dictionary<string, MaterialProperties> reg)
+    {
+        void Set(string name, StrikeBehaviour strike, RicochetFace? face = null)
+        {
+            var p = reg[name];
+            p.Strike = strike;
+            p.Ricochet = face;
+            reg[name] = p;
+        }
+        Set("Concrete", new(StrikeKind.Brittle, 250e6f, 0.4f, 30e-6f), new(15f, 0.35f, 0.35f, 0.85f, 1f));
+        Set("Brick", new(StrikeKind.Brittle, 120e6f, 0.6f, 40e-6f), new(12f, 0.4f, 0.4f, 0.85f, 0.9f));
+        Set("Marble", new(StrikeKind.Brittle, 400e6f, 0.3f, 25e-6f), new(18f, 0.3f, 0.3f, 0.88f, 1f));
+        Set("Tile", new(StrikeKind.Brittle, 300e6f, 0.2f, 25e-6f), new(15f, 0.3f, 0.35f, 0.88f, 1f));
+        Set("Glass", new(StrikeKind.Brittle, 300e6f, 0.2f, 25e-6f));
+        // Asphalt yields a little: a lower angle, departure nearer incidence.
+        Set("Asphalt", new(StrikeKind.Brittle, 60e6f, 0.5f, 50e-6f), new(10f, 0.6f, 0.4f, 0.95f, 0.6f));
+        Set("Generic", new(StrikeKind.Brittle, 150e6f, 0.3f, 50e-6f));
+        // Hard, non-yielding: departure under incidence.
+        Set("Metal", new(StrikeKind.Metal, 0f, 0f, 20e-6f), new(25f, 0.25f, 0.35f, 0.92f, 0.7f));
+        Set("Fence", new(StrikeKind.Metal, 0f, 0f, 20e-6f));
+        Set("Wood", new(StrikeKind.Wood, 30e6f, 0.3f, 150e-6f));
+        Set("Plaster", new(StrikeKind.Panel, 20e6f, 0.4f, 250e-6f));
+        Set("AcousticTile", new(StrikeKind.Panel, 5e6f, 0.2f, 400e-6f));
+        Set("Plastic", new(StrikeKind.Panel, 40e6f, 0.2f, 120e-6f));
+        // Yielding: departure over incidence.
+        Set("Dirt", new(StrikeKind.Soil, 5e6f, 0.6f, 500e-6f), new(5f, 1.4f, 0.5f, 1f, 0.2f));
+        // Turf throws up the soil under it, and its spray is blades, not grains.
+        Set("Grass", new(StrikeKind.Soil, 6e6f, 0.6f, 700e-6f, DebrisDensityKgM3: 1500f, SprayLowHz: 1500f));
+        Set("Gravel", new(StrikeKind.Soil, 8e6f, 2.0f, 60e-6f), new(8f, 1.0f, 0.5f, 0.95f, 0.4f));
+        Set("Water", new(StrikeKind.Water, 0f, 0f, 0f), new(-1f, 1.3f, 0.4f, 1f, 0.05f));
+        foreach (var soft in new[] { "Carpet", "Audience", "Rubber", "Leather", "BootRubber", "Skin", "None" })
+            Set(soft, new(StrikeKind.Soft, 0f, 0f, 1e-3f));
+        Set("Foliage", new(StrikeKind.Soft, 0f, 0f, 1e-3f, Rustles: true));
+    }
+
+    /// <summary>The materials AddMatter made from nothing, or "like" one that strikes otherwise (ice is like water to
+    /// sound, not to a round).</summary>
+    private static void AddStrikesAfterMatter(Dictionary<string, MaterialProperties> reg)
+    {
+        void Set(string name, StrikeBehaviour strike, RicochetFace? face = null)
+        {
+            var p = reg[name];
+            p.Strike = strike;
+            p.Ricochet = face;
+            reg[name] = p;
+        }
+        // Ice is brittle and hard: about a fifth of concrete's crater energy from its 5-25 MPa crushing strength
+        // (EST), and a round skips off it as off concrete (EST).
+        Set("Ice", new(StrikeKind.Brittle, 50e6f, 0.3f, 40e-6f), new(15f, 0.35f, 0.35f, 0.85f, 1f));
+        // Settled snow is a soil a tenth as dear to crater as dirt, and its spray is fine (EST).
+        Set("Snow", new(StrikeKind.Soil, 0.5e6f, 0.3f, 1e-3f, SprayLowHz: 1500f));
+        Set("Fabric", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
+        Set("Foam", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
+    }
+
     /// <summary>Other names for materials in the table: what a builder or a map may call them. "Metal" is mild
     /// steel. An alias reads its material's properties and index; it is not listed in KnownMaterials.</summary>
     private static readonly Dictionary<string, string> Aliases = new(System.StringComparer.OrdinalIgnoreCase)
@@ -581,9 +675,9 @@ public static class AcousticRegistry
     public static IReadOnlyCollection<string> UnknownNamesAsked => (IReadOnlyCollection<string>)_warned.Keys;
 
     /// <summary>Logged once per name: GetProperties sits in loops that run every frame.</summary>
-    private static void WarnOnce(string key, string what)
+    public static void WarnOnce(string key, string what)
     {
         if (!_warned.TryAdd(key, true)) return;
-        Serilog.Log.Warning("[MATERIAL] AcousticRegistry: {What}. Known: {Known}", what, string.Join(", ", KnownMaterials()));
+        Serilog.Log.Error("[MATERIAL] AcousticRegistry: {What}. Known: {Known}", what, string.Join(", ", KnownMaterials()));
     }
 }

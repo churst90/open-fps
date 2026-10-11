@@ -197,16 +197,16 @@ public sealed class RainSurvey
             if (ceiling >= 0 && _things[ceiling].Id != roof)
             {
                 var c = _things[ceiling];
-                eq = WallTransmission.BandGains(AcousticRegistry.GetProperties(Known(c.Material)), c.Size, c.Build);
+                eq = WallTransmission.BandGains(AcousticRegistry.GetProperties(c.Material), c.Size, c.Build);
             }
             // A roof of two leaves (a box-section canopy, a cavity roof): the top leaf rings and the
             // rest of the build is a wall between it and the room.
             if (!roofThing.Vehicle && roofThing.Build.LeafMetres > 0f)
             {
-                var whole = WallTransmission.BandGains(AcousticRegistry.GetProperties(Known(roofThing.Material)), roofThing.Size, roofThing.Build);
+                var whole = WallTransmission.BandGains(AcousticRegistry.GetProperties(roofThing.Material), roofThing.Size, roofThing.Build);
                 var leafSize = new Vector3(roofThing.Size.X, roofThing.Size.Y, roofThing.Size.Z);
                 SetThickness(ref leafSize, roofThing.Build.LeafMetres);
-                var leaf = WallTransmission.BandGains(AcousticRegistry.GetProperties(Known(roofThing.Material)), leafSize, WallBuild.Solid);
+                var leaf = WallTransmission.BandGains(AcousticRegistry.GetProperties(roofThing.Material), leafSize, WallBuild.Solid);
                 eq = (eq.Low * Ratio(whole.Low, leaf.Low), eq.Mid * Ratio(whole.Mid, leaf.Mid), eq.High * Ratio(whole.High, leaf.High));
             }
             if (eq.Mid >= OpaqueGain)
@@ -320,8 +320,6 @@ public sealed class RainSurvey
 
     private static float Ratio(float a, float b) => b > 1e-6f ? Math.Clamp(a / b, 0f, 1f) : 1f;
 
-    private static string Known(string material) => AcousticRegistry.IsKnown(material) ? material : "Generic";
-
     private static void SetThickness(ref Vector3 size, float t)
     {
         float x = MathF.Abs(size.X), y = MathF.Abs(size.Y), z = MathF.Abs(size.Z);
@@ -366,7 +364,7 @@ public sealed class RainSurvey
             Near(pane, area * glass, ring, top, slot, fromBelow);
             return;
         }
-        var layer = new RainLayer { Kind = thing.Kind, Material = thing.Material, ModulusGPa = AcousticRegistry.GetProperties(Known(thing.Material)).YoungsModulusGPa };
+        var layer = new RainLayer { Kind = thing.Kind, Material = thing.Material, ModulusGPa = AcousticRegistry.GetProperties(thing.Material).YoungsModulusGPa };
         switch (thing.Kind)
         {
             case RainSurfaceKind.Plate:
@@ -380,11 +378,11 @@ public sealed class RainSurvey
                 layer.FromBelow = true;
                 break;
             case RainSurfaceKind.Soft:
-                layer.Stretch = RainSurfaces.ContactStretch(AcousticRegistry.GetProperties(Known(thing.Material)));
+                layer.Stretch = RainSurfaces.ContactStretch(AcousticRegistry.GetProperties(thing.Material));
                 break;
             case RainSurfaceKind.Canopy:
             {
-                layer.Stretch = RainSurfaces.ContactStretch(AcousticRegistry.GetProperties(Known(thing.Material)));
+                layer.Stretch = RainSurfaces.ContactStretch(AcousticRegistry.GetProperties(thing.Material));
                 layer.LeafAreaIndex = thing.LeafAreaIndex;
                 if (under is int u)
                 {
@@ -392,7 +390,7 @@ public sealed class RainSurvey
                     var kind = below.Kind == RainSurfaceKind.Plate || below.Kind == RainSurfaceKind.Canopy
                         ? RainSurfaceKind.Hard : below.Kind;
                     layer.UnderKind = kind == RainSurfaceKind.None ? RainSurfaceKind.Soft : kind;
-                    layer.UnderStretch = RainSurfaces.ContactStretch(AcousticRegistry.GetProperties(Known(below.Material)));
+                    layer.UnderStretch = RainSurfaces.ContactStretch(AcousticRegistry.GetProperties(below.Material));
                     float bottom = thing.Sphere ? thing.Centre.Y - thing.Radius : thing.Centre.Y - thing.Half.Y;
                     layer.DripFallMetres = MathF.Max(0.5f, MathF.Round(2f * (bottom - _underTop)) / 2f);
                     // Leaves face every way: the aim is the drips', on the ground under the crown.
@@ -415,7 +413,7 @@ public sealed class RainSurvey
     /// biggest drops are placed one by one, the rest is the slot's patch.</summary>
     private void Body(Result result, Vector3 ear)
     {
-        var props = AcousticRegistry.GetProperties(Known(RainSurfaces.BodyMaterial));
+        var props = AcousticRegistry.GetProperties(RainSurfaces.BodyMaterial);
         var layer = Layer(OverheadSlot, new RainLayer
         {
             Kind = RainSurfaceKind.Soft, Material = RainSurfaces.BodyMaterial, ModulusGPa = props.YoungsModulusGPa,
