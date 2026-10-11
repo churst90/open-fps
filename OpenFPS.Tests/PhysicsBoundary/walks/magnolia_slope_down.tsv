@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # magnolia_slope_down: down it, in taps and then running
 # map magnolia_tx, start -66.200 -1.312 248.200, heading 180, script -15 tw10 -10 W60 -10
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

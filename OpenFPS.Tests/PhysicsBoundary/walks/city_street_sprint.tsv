@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_street_sprint: a sprint west along the plaza
 # map city, start 60.000 0.120 122.000, heading 270, script -15 W60 -15
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

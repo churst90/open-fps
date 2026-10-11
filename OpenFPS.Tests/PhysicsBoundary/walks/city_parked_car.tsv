@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_parked_car: standing on a parked car and walking off its end
 # map city, start 70.000 1.600 127.000, heading 0, script -15 w30 -30
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

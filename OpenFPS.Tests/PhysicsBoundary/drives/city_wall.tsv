@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_wall: south on Main Street and steered into the tunnel's west wall: the stop and the impact
 # map city, v6, start -3.000 0.050 -200.000, heading 180, script -30 w90 -15 wd60 -30
 tick	keys	x	y	z	heading	speed	steer	throttle	brake	qx	qy	qz	qw	demand	then per wheel: load_daN angular slip_ratio slip_angle surface demand water

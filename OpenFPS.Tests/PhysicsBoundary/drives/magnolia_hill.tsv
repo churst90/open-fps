@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # magnolia_hill: up the steepest smooth ground near Magnolia's spawn (7 % on dirt), the pose pitching with it
 # map magnolia_tx, i4_economy, start -66.200 -4.314 213.200, heading 0, script -30 w120 -30 s45 -15
 tick	keys	x	y	z	heading	speed	steer	throttle	brake	qx	qy	qz	qw	demand	then per wheel: load_daN angular slip_ratio slip_angle surface demand water

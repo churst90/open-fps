@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # magnolia_spawn_taps: twelve taps east from the spawn
 # map magnolia_tx, start -11.178 1.048 23.246, heading 90, script -15 tw12 -10
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

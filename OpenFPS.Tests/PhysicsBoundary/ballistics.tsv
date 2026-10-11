@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 weapon	case	angle_mrad	range_m	height_m	drift_m	seconds	speed_mps
 akm	zero100	1.4589	100.0	0.0000	0.0000	0.15056	617.20
 akm	zero100	1.4589	200.0	-0.2199	0.0000	0.32589	526.97
