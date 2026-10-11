@@ -83,6 +83,13 @@ other at login. The server and the Windows zip go out together.
    the scope calls somebody pushing a push mower a person (today, as before, it picks out no machine), and
    whether the editor should edit trains and woods through their sound ids. Left for later: S26's two caches
    and S27's model fallbacks, and the server's own prefix spellings outside P2's list.
+   P5 built 2026-10-11 (the audit's "P5 as built"), streams unchanged, unheard: one material table, declared
+   glazing, roofs and entrances from geometry and what openings join, one door model table, each map's door
+   prewarm from the map (a manifest field: restart the server, new Windows zip). Waiting on Cody: whether a bus
+   shelter's canopy is "a roof" to the scope (it needs a declared roofing field sent to the client), and which
+   doors Alex's haunts take as front entrances (`Haunts` still reads "entrance" in the door's name; by what
+   doors join, every house door is one). Left: storeys in `MapTracker.Floors` from the building; the glass
+   door's sound key reading the prefab's glazing.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,

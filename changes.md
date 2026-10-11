@@ -4,6 +4,23 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- Names and materials to properties (part P5 of docs/SPECIAL_CASES_AUDIT.md), nothing heard changed on a shipped
+  map. Unheard:
+  - One material table. A bullet's strike and ricochet, the footstep model's deck and grit, and whether a thing is
+    leaves come from the material table, so "Steel" strikes and skips as steel (it chipped like plaster), oak
+    splinters as wood and stainless rings as metal. An unknown material is an error in the log, once.
+  - Glass says what kind it is: each glass prefab has a `Glazing` (annealed, tempered, laminated), shown in the
+    editor and required by the validator, instead of a guess from its name. Every shipped pane breaks as before.
+  - The scope's "on a roof" is a roof's shape, or the open sky over you with a room under your feet, not the word
+    "roof" in a name. The two bus shelters' canopies on the city are no longer called roofs: they have no room
+    under them.
+  - An entrance is a door or an opening from a room to the open air that a person can walk through. The hangar's
+    open front and the tunnel's mouths are entrances now, said as "Hangar entrance"; the landings named after
+    their shops' entrances on the real places are not; the car park's sides over their parapets are not.
+  - Each map's doors are rendered as the map arrives, from the map itself (the server sends every sound its doors
+    can make with the map), instead of from a list of the city's door sizes: the first swing of a door on Albany or
+    Magnolia was silent. Every door model has one row in one table, and a sound none names is never played as a
+    knob door.
 - One table of model kinds (part P2 of docs/SPECIAL_CASES_AUDIT.md), no change heard. `ModelKindTable` in the
   sound library says, for any sound id, which kind of model it is, what synth makes it, how it moves (fixed,
   walks, rolls, flies, rails), its level and size, its headroom and its places. The level and headroom
