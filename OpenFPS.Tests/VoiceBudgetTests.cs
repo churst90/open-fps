@@ -317,8 +317,6 @@ public class VoiceBudgetTests
             "the transient band reaches into the engine-echo band.");
         Assert.True(transientLowest > ClientAudioSystem.DistantVoiceBase,
             "the transient band reaches into the borrowed-voice band.");
-        Assert.False(EngineReflections.IsEchoVoice(transientLowest),
-            "a transient is being classified as an engine echo.");
 
         // Consecutive transients are different voices, so a sound and its reflection do not replace each other.
         var seen = new HashSet<int>();

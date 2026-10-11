@@ -17,11 +17,9 @@ OpenFPS.Client.Core/AudioEngine/Acoustics/OpeningGraph.cs	OpenFPS.Common.Network
 OpenFPS.Client.Core/AudioEngine/Acoustics/OpeningGraph.cs	OpenFPS.Common.WorldSnapshot	9
 OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Client.Core.NamedPlaces	2
 OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Client.Core.SpatialService	8
-OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.Components.EntityType	4
-OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.Components.Transform	4
-OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.EntitySnapshot	15
-OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.Networking.EntityDefinition	2
-OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.WorldSnapshot	33
+OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.Components.Transform	2
+OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.EntitySnapshot	5
+OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.WorldSnapshot	31
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.Components.ColliderComponent	2
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.Components.Transform	2
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.EntitySnapshot	6

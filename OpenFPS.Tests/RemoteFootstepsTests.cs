@@ -209,7 +209,7 @@ public class RemoteFootstepsTests
         // ...and what each of his steps has between it and Cody's ears, asked as the audio system asks
         // it (ClientAudioSystem.CarryThePath): a clear street, so nothing but his own body could be.
         var spatial = new SpatialService { OwnEntityId = r.Cody.Entity.Id };
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(spatial);
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(spatial) { ListenerBodyId = r.Cody.Entity.Id };
         var heard = new List<(float Distance, float Mid, float Occlusion)>();
         others.OnStepTriggered += (p, _, _, _, body) =>
         {

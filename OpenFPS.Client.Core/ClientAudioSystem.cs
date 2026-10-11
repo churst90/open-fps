@@ -37,12 +37,12 @@ public partial class ClientAudioSystem
     private readonly HashSet<string> _preloadedSounds = new();
 
     private int _ownEntityId = -1;
-    /// <summary>The player's own entity, set at spawn; passed to the SpatialService so occlusion rays
-    /// ignore it.</summary>
+    /// <summary>The player's own entity, set at spawn; passed to the SpatialService and the hand-rolled
+    /// path so the rays ignore it.</summary>
     public int OwnEntityId
     {
         get => _ownEntityId;
-        set { _ownEntityId = value; _spatial.OwnEntityId = value; }
+        set { _ownEntityId = value; _spatial.OwnEntityId = value; _acoustics.ListenerBodyId = value; }
     }
     
     private WorldSnapshot? _lastSnapshot;
@@ -377,8 +377,18 @@ public partial class ClientAudioSystem
         WorldAudio.HornReceived = StartHorn;
         WorldAudio.TrainSignalReceived = StartTrainSignal;
         WorldAudio.Ground = ApplyRecordedGround;
-        _birds = new BirdLife(audio, _acoustics, seed);
+        WorldAudio.Voices = _voices;
+        _drivingAids.Voices = _voices;
+        _beacons.Voices = _voices;
+        _birds = new BirdLife(audio, _acoustics, seed) { Voices = _voices };
         _rain = new RainField(audio, _acoustics, seed) { SurveyInPlace = manualAcoustics };
+        // What the library's sources voice, declared as theirs: each carries its own path.
+        _rain.Voiced = (id, drop) =>
+        {
+            if (drop) _voices.DeclareEvent(id, VoiceRegistry.NoEntity, VoiceKind.RainDrop, Vector3.Zero);
+            else _voices.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Rain, Vector3.Zero);
+        };
+        _engineEchoes.Voiced = (id, engine) => _voices.Declare(id, engine, VoiceKind.EngineEcho, Vector3.Zero);
         _stepRandom = seed is int s ? new Random(s) : Random.Shared;
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
@@ -514,6 +524,7 @@ public partial class ClientAudioSystem
         {
 
         _frameCount++;
+        _voices.Frame = _frameCount;
         // The previous snapshot, kept before assigning: comparing `world` with `_lastSnapshot` after it
         // compared it with itself and silently disabled the moving-region check below. The two may also be
         // the same object (an unchanged world), and a zero delta is then right.
@@ -645,31 +656,17 @@ public partial class ClientAudioSystem
         _pathIds.UnionWith(_voices.Owners);
         foreach (var id in _pathIds)
         {
-            // Ids below -5000 are copies and voices that work out their own paths (a wall's copy, your
-            // voice and your room's answer, a talker, a horn, a siren). Never reflections of reflections:
-            // that feeds back for ever, and a copy asked about from its image is traced through its own wall.
-            if (id < -5000)
-            {
-                continue; 
-            }
+            // Asked about things in the world only, never about a voice's own id: a copy, a talker, your own
+            // voice, rain and the rest work out their own paths (VoiceRegistry.HeardFromOf), and a copy asked
+            // about from its image was traced through its own wall.
+            if (!world.Entities.TryGetValue(id, out var snap)) continue;
 
             // Asked about the point the sound comes out of, not the entity's origin: for anything that
             // drives the origin is its contact patch, and a probe there was half buried (about half the
             // samples blocked on open road).
-            Vector3 sourcePos;
-            float sourceRadius = OpenFPS.Common.AudioEmission.DefaultOcclusionRadius;
-            float sourceSpeed = 0f;
-            if (world.Entities.TryGetValue(id, out var snap))
-            {
-                sourcePos = OpenFPS.Common.AudioEmission.PointFor(snap);
-                sourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap);
-                sourceSpeed = snap.Velocity.Length();
-            }
-            else
-            {
-                sourcePos = _audio.GetSoundPosition(id);
-                if (sourcePos == Vector3.Zero) continue;
-            }
+            Vector3 sourcePos = OpenFPS.Common.AudioEmission.PointFor(snap);
+            float sourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap);
+            float sourceSpeed = snap.Velocity.Length();
             
             float dist = Vector3.Distance(visualEyePos, sourcePos);
             int updateRate = 1;
@@ -708,23 +705,10 @@ public partial class ClientAudioSystem
                         // What moves is not in the acoustic scene, so a bus between you and a car
                         // is put back here as the barrier it is. See VehicleShadow. Every voice of this
                         // entity hears it through this one answer (PathOf).
-                        var owned = Shadowed(world, id, path, sourcePos, visualEyePos);
-                        _ownerPaths[id] = owned;
-                        var shadowed = owned.Heard;
-                        // A moving thing's own voice carries its path in its emitter (HandPath), as its
-                        // horn, siren, outlets and borrowed voice do: a second writer here lost to the
-                        // emitter on every field they share. An owner with no voice of its own (a far
-                        // car, a train's source) is asked about for its voices' sake only.
-                        if (!_voices.IsRegistered(id) && _audio.IsPlaying(id)) _audio.SetAcousticPath(id, shadowed);
-                        // A tree's, a fire's or a fountain tap's other places: behind the same wall,
-                        // each heard from its own offset round the same edge (ExtendedSources).
-                        if (_spreading.TryGetValue(id, out var spread) && spread.Voiced)
-                            for (int k = 1; k < spread.At.Length; k++)
-                            {
-                                var placePath = shadowed;
-                                placePath.ApparentPosition = shadowed.ApparentPosition + (spread.At[k] - spread.At[0]);
-                                _audio.SetAcousticPath(PlaceVoiceId(id, k), placePath);
-                            }
+                        // Every voice of this entity carries this one answer in its own emitter (HandPath):
+                        // its own, its outlets, its horn and siren, its places. A second writer here lost to
+                        // the emitter on every field they share.
+                        _ownerPaths[id] = Shadowed(world, id, path, sourcePos, visualEyePos);
                         continue;
                     }
 
@@ -789,6 +773,7 @@ public partial class ClientAudioSystem
                         TransmissionBleed = path.MaterialAbsorption * 0.5f 
                     };
 
+                    _voices.Declare(reflectId, id, VoiceKind.Reflection, path.ApparentPosition);
                     if (_audio.IsPlaying(reflectId))
                     {
                         // A surface that stopped answering and started again keeps its voice.
@@ -807,6 +792,9 @@ public partial class ClientAudioSystem
                     if (_audio.IsPlaying(reflectId) && _audio.FadeOut(reflectId)) _audio.StopSound(reflectId);
                 }
             }
+            // No answer this frame: its walls' copies sound on where they were, and stay its.
+            else if (_reflectionSlots.ContainsKey(id))
+                for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++) _voices.Keep(ReflectionVoiceId(id, slot));
         }
 
         Stage(1, ref stageTicks);     // 5: the acoustic paths of every active voice
@@ -862,8 +850,8 @@ public partial class ClientAudioSystem
         // Every source has been offered to the reflection system: it sets what next frame's reflections
         // must reach to be worth a voice.
         _engineEchoes.EndFrame();
-        // A voice of a moving thing not declared this frame is no longer one.
-        _voices.Sweep(_frameCount);
+        // A sustained voice not declared this frame is no longer an entry, nor a one-off that has stopped.
+        _voices.Sweep(_frameCount, _sounding ??= _audio.IsPlaying);
 
         {
             double pass = 0; foreach (var v in _partMs) pass += v;
@@ -884,6 +872,7 @@ public partial class ClientAudioSystem
     }
 
     private double _lastUpdateAt, _worstGapMs, _worstUpdateMs;
+    private Func<int, bool>? _sounding;
 
     /// <summary>
     /// Where the audio update's time went, by stage (<see cref="StageNames"/>), worst case over the
@@ -1251,10 +1240,10 @@ public partial class ClientAudioSystem
 
     /// <summary>A tree's or a wood's share this frame: the amplitude its voice is played at (0: no voice
     /// of its own), and for a wood how many trees its synth stands for. Everything else: 1, 1.</summary>
-    private float ChorusShare(int entityId, out float trees)
+    private float ChorusShare(WorldSnapshot world, int entityId, out float trees)
     {
         trees = 1f;
-        if (OpenFPS.Client.Core.ClientWorldState.IsWood(entityId))
+        if (IsWood(world, entityId))
         {
             if (!_woodWeights.Woods.TryGetValue(entityId, out var w)) return 0f;
             trees = w.Trees;
@@ -1293,7 +1282,7 @@ public partial class ClientAudioSystem
             if (SilentSignal(em.SoundId, now)) continue;
             // A tree past the hand-over is heard in its wood, an empty wood not at all; ranked by what each
             // plays (a wood's trees add in power, so its amplitude by their root).
-            float chorus = ChorusShare(entityId, out float chorusTrees);
+            float chorus = ChorusShare(world, entityId, out float chorusTrees);
             if (chorus <= 0f || chorusTrees <= 1e-3f) continue;
             chorus *= MathF.Sqrt(chorusTrees);
 
@@ -2037,8 +2026,8 @@ public partial class ClientAudioSystem
     /// <summary>
     /// The outer places of a tree or a fire, each a voice at its own point reading its own stream of the
     /// one synth. Everything but the point is the source's own emitter: the same level reference, range,
-    /// path, region and declared level, and the same balance gain, so the places and the middle are one
-    /// source. Kept while any of it is spread, and <see cref="MergeHoldSeconds"/> after.
+    /// path (carried, HandPath), region and declared level, and the same balance gain, so the places and
+    /// the middle are one source. Kept while any of it is spread, and <see cref="MergeHoldSeconds"/> after.
     /// </summary>
     private void PlaceOuter(int sourceId, Spreading sp, in SpatialEmitter middle, WorldSnapshot world, double now)
     {
@@ -2062,6 +2051,8 @@ public partial class ClientAudioSystem
             e.StartSoundId = "";
             e.StopSoundId = "";
             ApplyGround(ref e, world);
+            // Its middle's path, carried in the copy of its middle's emitter: no second writer.
+            _voices.Declare(e.EntityId, sourceId, VoiceKind.Place, sp.Layout[k], e.EarLevelDb);
             if (_placesRetiring.Remove(e.EntityId)) _audio.ReviveEngine(e.EntityId);
             if (_audio.IsPlaying(e.EntityId)) _audio.UpdateSpatialAttributes(e);
             else _audio.PlayPhysicalSoundDirect(e);
@@ -2640,14 +2631,9 @@ public partial class ClientAudioSystem
             && !_liveMachines.Contains(snap.Id))
             return;
 
-        // The worker's last answer; until it has one, FirstAnswer. Never "nothing in the way". A moving thing's
-        // is its owner's path for the frame, which its horn, siren and outlets are heard through too.
-        VoiceKind? ownKind = MovingThingKind(def);
-        AcousticPathData acousticPath = ownKind != null ? PathOf(world, snap, eyePos).Raw
-            : _acousticWorker.TryGetDirectFor(snap.Id, OpenFPS.Common.AudioEmission.PointFor(snap),
-                                              snap.Velocity.Length(), eyePos, _earSpeed, out var cached)
-            ? cached
-            : FirstAnswer(world, snap, eyePos);
+        // The worker's last answer; until it has one, FirstAnswer. Never "nothing in the way". The entity's
+        // path for the frame, which its horn, siren, outlets and places are heard through too.
+        AcousticPathData acousticPath = PathOf(world, snap, eyePos).Raw;
 
         string resolvedSoundId = "";
         bool interior = false;
@@ -2704,7 +2690,7 @@ public partial class ClientAudioSystem
                 engineVolume = gain * def.SoundEmitter.Volume
                              * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
                 // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus).
-                engineVolume *= ChorusShare(snap.Id, out chorusTrees);
+                engineVolume *= ChorusShare(world, snap.Id, out chorusTrees);
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
@@ -2923,8 +2909,10 @@ public partial class ClientAudioSystem
             SynthFilterResonance = def.SoundEmitter.SynthFilterResonance,
             SynthPulseWidth = def.SoundEmitter.SynthPulseWidth
         };
-        // A vehicle's engine or an aeroplane: its path in the emitter the budget holds, the only writer.
-        if (ownKind is { } own) HandPath(ref emitter, own, world, snap, emitterPosition, earLevel, eyePos, inside: interior);
+        // Its path in the emitter the budget holds, the only writer: heard from its point (an engine, an
+        // aeroplane, a machine, a wood), or from where the path arrives (a recording).
+        HandPath(ref emitter, OwnVoiceKind(world, def, physicalKey.Length > 0), world, snap, emitterPosition, earLevel, eyePos,
+                 inside: interior);
 
         // A repeating one-shot (RepeatIntervalSeconds: a PA, a foghorn, a station bell) is built as
         // normal and handed over only when its interval comes round.
@@ -3049,11 +3037,14 @@ public partial class ClientAudioSystem
             float levelDb = OpenFPS.Common.Speech.NormalDb - stream.Ring.SpeechRmsDbfs;
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
 
+            // Asked under its own probe, as a one-off's source is: under the player's id it shared one answer with
+            // anything else of theirs asked about at their feet (S13). Their own body is left out of the rays.
+            int probe = WorldAudioPlayer.SourceProbeId(id);
             _acousticWorker.EnqueueRequest(new AcousticRequest
             {
-                EntityId = id, ListenerPos = eyePos, SourcePos = mouth, SourceRadius = 0.15f,
+                EntityId = probe, ListenerPos = eyePos, SourcePos = mouth, SourceRadius = 0.15f, LeaveOut = id,
             });
-            if (!_acousticWorker.TryGetDirectFor(id, mouth, snap.Velocity.Length(), eyePos, _earSpeed, out var path))
+            if (!_acousticWorker.TryGetDirectFor(probe, mouth, snap.Velocity.Length(), eyePos, _earSpeed, out var path))
                 path = _acoustics.CalculateAcousticPath(world, id, eyePos, mouth);
 
             var e = new SpatialEmitter
@@ -3099,6 +3090,7 @@ public partial class ClientAudioSystem
                     e.EqHigh *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(high);
                 }
             }
+            _voices.Declare(voiceId, id, VoiceKind.Talker, mouth - snap.Transform.Position, levelDb);
             if (_talkersVoiced.Contains(id) && _audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
             else { _audio.PlayPhysicalSoundDirect(e); _talkersVoiced.Add(id); }
 
@@ -3131,7 +3123,8 @@ public partial class ClientAudioSystem
 
     /// <summary>
     /// The first voice id of the copies of other players' voices: a block of <see cref="OwnVoiceCopies"/>
-    /// ids per talker from here down, below -5000 so the acoustic-path pass never traces one from its image.
+    /// ids per talker from here down. Each carries its own path (VoiceKind.TalkerCopy): traced from its image,
+    /// it would go through its own wall.
     /// </summary>
     internal const int TalkerCopyBase = -1_700_000;
     /// <summary>How many talkers the surfaces answer at once. A search is a few milliseconds on the game
@@ -3173,6 +3166,7 @@ public partial class ClientAudioSystem
             _talkerRooms[id] = room;
         }
         room.Region = region;
+        KeepCopies(room.FirstId, room.On);
         if (now < room.NextSearch || _talkerSearchedThisFrame) return;
         _talkerSearchedThisFrame = true;
         room.NextSearch = now + 0.1;
@@ -3180,7 +3174,8 @@ public partial class ClientAudioSystem
         float flight = Vector3.Distance(mouth, ear) / AudioPhysics.CurrentSpeedOfSound;
         room.Answering = PlaceVoiceCopies(world, mouth, ear, room.Arrivals, gain, reference, flight,
                                           room.FirstId, room.On,
-                                          OpenFPS.Client.AudioEngine.Fmod.Talkers.CopyKey(id), "voice chat", region, range);
+                                          OpenFPS.Client.AudioEngine.Fmod.Talkers.CopyKey(id), "voice chat", region, range,
+                                          VoiceKind.TalkerCopy, id);
     }
 
     private void StopTalkerRoom(int id)
@@ -3251,6 +3246,7 @@ public partial class ClientAudioSystem
         var forward = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(_state.Yaw, 0f, 0f));
         Vector3 ear = _state.VisualPosition + new Vector3(0f, _state.EyeHeight, 0f);
         Vector3 mouth = ear + forward * 1f - new Vector3(0f, _state.EyeHeight - OpenFPS.Common.Speech.MouthHeight, 0f);
+        _voices.DeclareEvent(ReferenceVoiceBase - _referenceVoice, VoiceRegistry.NoEntity, VoiceKind.Reference, mouth);
         _audio.Submit(new SpatialEmitter
         {
             EntityId = ReferenceVoiceBase - _referenceVoice,
@@ -3336,6 +3332,8 @@ public partial class ClientAudioSystem
             TargetRegionId = _listenerRegion,
         };
         if (!own) CarryThePath(ref footstep, nudgePos, bodyId);
+        _voices.DeclareEvent(id, own ? OwnEntityId : bodyId >= 0 ? bodyId : VoiceRegistry.NoEntity,
+                             own ? VoiceKind.OwnStep : VoiceKind.Footstep, nudgePos, footstep.EarLevelDb);
         _audio.Submit(footstep);
 
         // The walls answering YOUR footfalls. Other people's steps have none: their pool is yours.
@@ -3387,8 +3385,8 @@ public partial class ClientAudioSystem
 
     /// <summary>
     /// Voices for the surfaces answering your own footfalls: their own pool, so a copy never takes its
-    /// step's slot, and below -5000, where the acoustic-path pass leaves them alone. Each carries its whole
-    /// path from its image. Asked about from the image, the worker traced it through its own wall (-40 to
+    /// step's slot. Each carries its whole path from its image (VoiceKind.StepEcho), and nothing asks about
+    /// it there: asked about from the image, the worker traced it through its own wall (-40 to
     /// -100 dB) or round by the stairwell (Cody, 2026-10-04, Marlow Tower: "it's like they're left on the
     /// first floor").
     /// </summary>
@@ -3460,10 +3458,12 @@ public partial class ClientAudioSystem
             EchoDelaySeconds = 0f,
             TargetRegionId = _listenerRegion,
         };
+        _voices.Declare(OwnVoiceBase, OwnEntityId, VoiceKind.OwnVoice, Vector3.Zero, levelDb);
         if (_voiceRoomOn && _audio.IsPlaying(OwnVoiceBase)) _audio.UpdateSpatialAttributes(room);
         else { _audio.PlayPhysicalSoundDirect(room); _voiceRoomOn = true; }
 
         // The surfaces, a few times a second: the room only changes as you move.
+        KeepCopies(OwnVoiceBase - 1, _voiceCopyOn);
         if (now < _voiceNextSearch) return;
         _voiceNextSearch = now + 0.1;
         float c = AudioPhysics.CurrentSpeedOfSound;
@@ -3471,7 +3471,7 @@ public partial class ClientAudioSystem
         int slot = PlaceVoiceCopies(world, mouth, ear, _voiceArrivals, gain, reference, MicrophoneLatency,
                                     OwnVoiceBase - 1, _voiceCopyOn,
                                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.OwnVoiceCopyKey, "own voice",
-                                    _listenerRegion);
+                                    _listenerRegion, 30f, VoiceKind.OwnVoiceCopy, OwnEntityId);
         if (now >= _voiceNextLog)
         {
             _voiceNextLog = now + 5;
@@ -3507,7 +3507,8 @@ public partial class ClientAudioSystem
     private int PlaceVoiceCopies(WorldSnapshot world, Vector3 mouth, Vector3 ear,
                                  List<OpenFPS.Common.EarlyReflections.Arrival> arrivals,
                                  float gain, float reference, float alreadyLateSeconds,
-                                 int firstId, bool[] on, string key, string soundId, int regionId, float range = 30f)
+                                 int firstId, bool[] on, string key, string soundId, int regionId, float range,
+                                 VoiceKind kind, int ownerId)
     {
         arrivals.Clear();
         _acoustics.FindReflections(world, mouth, ear, arrivals, AudioPhysics.CurrentSpeedOfSound,
@@ -3553,12 +3554,19 @@ public partial class ClientAudioSystem
                 EchoDelaySeconds = MathF.Max(0f, a.PathLength / c - alreadyLateSeconds),
                 TargetRegionId = regionId,
             };
+            _voices.Declare(id, ownerId, kind, a.ImagePosition);
             if (on[slot] && _audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(copy);
             else { _audio.PlayPhysicalSoundDirect(copy); on[slot] = true; }
             slot++;
         }
         StopVoiceCopies(firstId, on, slot);
         return slot;
+    }
+
+    /// <summary>The copies still answering between searches stay entries, as they were declared.</summary>
+    private void KeepCopies(int firstId, bool[] on)
+    {
+        for (int k = 0; k < on.Length; k++) if (on[k]) _voices.Keep(firstId - k);
     }
 
     /// <summary>Stops the copies from slot <paramref name="from"/> on.</summary>
@@ -3636,6 +3644,7 @@ public partial class ClientAudioSystem
     {
         int echoId = STEP_ECHO_BASE_ID - (_stepEchoIndex % STEP_ECHO_POOL_SIZE);
         _stepEchoIndex++;
+        _voices.DeclareEvent(echoId, OwnEntityId, VoiceKind.StepEcho, a.ImagePosition, stepLevelDb);
         _audio.Submit(new SpatialEmitter
         {
             EntityId = echoId,
@@ -3861,6 +3870,10 @@ public partial class ClientAudioSystem
                 MinDistance = landReference,
                 TargetRegionId = _listenerRegion,
             };
+            // Somebody else's lands where it fell, behind whatever is between, as their steps do.
+            if (!follows) CarryThePath(ref landEmitter, nudgePos);
+            _voices.DeclareEvent(landEmitter.EntityId, follows ? OwnEntityId : VoiceRegistry.NoEntity,
+                                 follows ? VoiceKind.OwnStep : VoiceKind.Footstep, nudgePos, OpenFPS.Common.Loudness.FootstepDb);
             _audio.Submit(landEmitter);
         }
     }

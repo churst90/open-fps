@@ -28,10 +28,7 @@ public class SpatialAcoustics
     public List<AcousticPathData> CalculateAcousticPaths(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
     {
         var rawResults = new List<AcousticPathData>();
-        var localPlayer = world.Entities.Values.FirstOrDefault(e => e.Definition.Type == EntityType.Player && Vector3.Distance(e.Transform.Position, listenerPos) < 2.0f);
-        int localPlayerId = (localPlayer.Id != 0) ? localPlayer.Id : AcousticConstants.GlobalRegionId;
-
-        rawResults.Add(CalculateMainPath(world, entityId, listenerPos, sourcePos, localPlayerId));
+        rawResults.Add(CalculateMainPath(world, entityId, listenerPos, sourcePos, ListenerBody));
 
         // Early reflections: one image-source model, shared with the Steam Audio path
         // (AsyncAcousticWorker.AddEarlyReflections), the same every tick for the same geometry. A ray
@@ -320,8 +317,12 @@ public class SpatialAcoustics
     public int GetRoomAt(WorldSnapshot world, Vector3 position) => _spatial.GetRegionAt(world, position);
 
     public AcousticPathData CalculateAcousticPath(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
-    {
-        var localPlayer = world.Entities.Values.FirstOrDefault(e => e.Definition.Type == EntityType.Player && Vector3.Distance(e.Transform.Position, listenerPos) < 2.0f);
-        return CalculateMainPath(world, entityId, listenerPos, sourcePos, localPlayer.Id != 0 ? localPlayer.Id : AcousticConstants.GlobalRegionId);
-    }
+        => CalculateMainPath(world, entityId, listenerPos, sourcePos, ListenerBody);
+
+    /// <summary>The listener's own body, left out of every ray: the one the client says is theirs
+    /// (ClientAudioSystem.OwnEntityId), not the first player found within 2 m of the ear, which with two
+    /// people standing together could be the other one (S23). -1: none.</summary>
+    public int ListenerBodyId { get; set; } = -1;
+
+    private int ListenerBody => ListenerBodyId >= 0 ? ListenerBodyId : AcousticConstants.GlobalRegionId;
 }

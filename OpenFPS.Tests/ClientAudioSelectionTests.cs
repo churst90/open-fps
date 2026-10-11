@@ -756,7 +756,7 @@ public class ClientAudioSelectionTests
         var snapshot = h.World.GetSnapshot();
         Assert.NotNull(snapshot.Woods);
         var wood = Assert.Single(snapshot.Woods!.Woods);
-        Assert.True(ClientWorldState.IsWood(wood.Id));
+        Assert.True(h.World.IsWood(wood.Id));
 
         // 250 m off: the wood, and no tree.
         h.StandAt(new Vector3(1016f, 0f, 1016f - 250f));

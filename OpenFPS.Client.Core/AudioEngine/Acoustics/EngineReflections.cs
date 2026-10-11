@@ -257,9 +257,10 @@ public sealed class EngineReflections
             // Asked whether it plays, not remembered: on the car's first frame the engine's voice (whose
             // ring the echo reads) is made later in the tick, the start fails, and the next frame retries.
             var e = Make(echo.VoiceId, entityId, direct, r, gain);
+            CarryPath(ref e, directPath, r, listener, directDist);
+            Voiced?.Invoke(echo.VoiceId, entityId);
             if (audio.IsPlaying(echo.VoiceId)) audio.UpdateSpatialAttributes(e);
             else audio.PlayPhysicalSoundDirect(e);
-            ApplyPath(audio, echo.VoiceId, directPath, r, listener, directDist);
             echo.Seen = true;
             echo.Silent = 0f;
             echo.Last = r;
@@ -282,8 +283,10 @@ public sealed class EngineReflections
             }
             // Only the level goes: moving a dying echo would Doppler it into a whistle.
             float fade = 1f - echo.Silent / ReleaseSeconds;
-            audio.UpdateSpatialAttributes(Make(echo.VoiceId, entityId, direct, echo.Last, echo.Gain * fade));
-            ApplyPath(audio, echo.VoiceId, directPath, echo.Last, listener, directDist);
+            var dying = Make(echo.VoiceId, entityId, direct, echo.Last, echo.Gain * fade);
+            CarryPath(ref dying, directPath, echo.Last, listener, directDist);
+            Voiced?.Invoke(echo.VoiceId, entityId);
+            audio.UpdateSpatialAttributes(dying);
         }
         if (drop != null) foreach (int k in drop) mine.Remove(k);
     }
@@ -298,8 +301,6 @@ public sealed class EngineReflections
         foreach (var e in mine.Values) audio.StopSound(e.VoiceId);
         _voices.Remove(entityId);
     }
-
-    public static bool IsEchoVoice(int id) => id <= EchoVoiceIdBase;
 
     /// <summary>
     /// The reflections the world offers a sound at this point, obstruction-tested, for any source (the
@@ -398,26 +399,30 @@ public sealed class EngineReflections
     }
 
     /// <summary>
-    /// Gives an echo an acoustic path: the worker never sees echo ids, so without one they were
-    /// unoccluded and full-bandwidth. Distance, delay and air are the echo's own: with the car's air, an
-    /// echo 120 m round a facade was brighter than the car 40 m away, and brightness is how the ear
-    /// judges nearness.
+    /// Gives an echo its acoustic path, in its own emitter, its one writer: the worker never sees echo ids,
+    /// so without one they were unoccluded and full-bandwidth. Distance, delay and air are the echo's own:
+    /// with the car's air, an echo 120 m round a facade was brighter than the car 40 m away, and brightness
+    /// is how the ear judges nearness.
     /// </summary>
-    private static void ApplyPath(AudioEngineFacade audio, int voiceId, in AcousticPathData directPath,
-                                  in Reflection r, Vector3 listener, float directDist)
+    private static void CarryPath(ref SpatialEmitter e, in AcousticPathData directPath, in Reflection r,
+                                  Vector3 listener, float directDist)
     {
-        var p = directPath;
-        p.ApparentPosition = r.ApparentPosition;
-        p.EffectiveDistance = MathF.Max(r.PathLength, Vector3.Distance(listener, r.ApparentPosition));
-        (p.AirLowDb, p.AirMidDb, p.AirHighDb) = EchoAir(directPath, directDist, r.PathLength);
-        // Not the direct path's blocking: both legs were found clear (Blocked), and copying the direct
-        // path's occlusion muffled the echo a second time.
-        p.Occlusion = 0f;
-        p.EqLow = p.EqMid = p.EqHigh = 1f;
-        p.TransmissionBleed = 0f;
-        p.IsReflection = true;
-        audio.SetAcousticPath(voiceId, p);
+        e.ApparentPosition = r.ApparentPosition;
+        e.EffectiveDistance = MathF.Max(r.PathLength, Vector3.Distance(listener, r.ApparentPosition));
+        (e.AirLowDb, e.AirMidDb, e.AirHighDb) = EchoAir(directPath, directDist, r.PathLength);
+        // Not the direct path's blocking or its edge: both legs were found clear (Blocked), and copying the
+        // direct path's occlusion muffled the echo a second time.
+        e.Occlusion = 0f;
+        e.EqLow = e.EqMid = e.EqHigh = 1f;
+        e.TransmissionBleed = 0f;
+        e.ApertureFactor = 1f;
+        e.TargetRegionId = directPath.RegionId;
+        e.RoomGain = directPath.RoomGain;
+        e.CarriesPath = true;
     }
+
+    /// <summary>Told of every echo voice placed (its id, its engine's), so the host can know whose it is.</summary>
+    public Action<int, int>? Voiced { get; set; }
 
     /// <summary>
     /// The air over the echo's path, per band: ISO 9613-1 is proportional to distance, so the direct

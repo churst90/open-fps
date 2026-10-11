@@ -72,7 +72,7 @@ public class VoiceIdBandTests
         foreach (var name in new[] { "CentreToneId", "KerbToneId", "CentreRumbleId", "KerbRumbleId", "AlignId", "RelayId", "OverSpeedId" })
             aidIds.Add((Const(aids, name), Const(aids, name)));
 
-        int woodTop = WoodChorus.FirstId, woodBottom = WoodChorus.FirstId - 999_999;   // ClientWorldState.IsWood
+        int woodTop = WoodChorus.FirstId, woodBottom = WoodChorus.FirstId - 999_999;   // a million woods counted down (ClientWorldState.RefreshWoods)
         int trainSlots = TrainVoicing.Slots;
 
         return new List<Band>

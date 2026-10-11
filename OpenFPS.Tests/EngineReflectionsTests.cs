@@ -67,12 +67,12 @@ public class EngineReflectionsTests
                 EntityId = car, Position = at, ApparentPosition = at, Volume = volume, MinDistance = 3f, Range = 600f,
                 TargetRegionId = 4,
             };
-            Echoes.Update(car, direct, path ?? new AcousticPathData(0f, at, 10f), ear ?? Ear, C, dt, Audio, traced);
+            Echoes.Update(car, direct, path ?? new AcousticPathData(0f, at, 10f) { RegionId = 4 }, ear ?? Ear, C, dt, Audio, traced);
         }
 
         public void Pump() => Audio.PumpForTest();
 
-        public IEnumerable<int> EchoIds => Mixer.Started.Select(e => e.EntityId).Where(EngineReflections.IsEchoVoice).Distinct();
+        public IEnumerable<int> EchoIds => Mixer.Started.Where(e => e.EchoOfEntity != 0).Select(e => e.EntityId).Distinct();
     }
 
     private static Rig WithWall()
@@ -150,7 +150,10 @@ public class EngineReflectionsTests
         r.Pump();
 
         var id = Assert.Single(r.EchoIds);
-        var p = r.Mixer.LastPath(id);
+        // Carried in its own emitter, its one writer.
+        Assert.False(r.Mixer.HasPath(id));
+        var p = r.Mixer.Started.Last(e => e.EntityId == id);
+        Assert.True(p.CarriesPath);
         float length = Vector3.Distance(Image, Ear);
         Assert.True(p.IsReflection);
         Assert.Equal(0f, p.Occlusion);
@@ -296,7 +299,7 @@ public class EngineReflectionsTests
         r.Pump();
         var ids = r.EchoIds.ToList();
         Assert.Equal(2, ids.Count);
-        Assert.All(ids, id => Assert.True(EngineReflections.IsEchoVoice(id)));
+        Assert.All(ids, id => Assert.True(id <= EngineReflections.EchoVoiceIdBase));
         int mine = r.Mixer.Started.First(e => e.EchoOfEntity == Car).EntityId;
         int theirs = r.Mixer.Started.First(e => e.EchoOfEntity == OtherCar).EntityId;
         Assert.NotEqual(mine, theirs);

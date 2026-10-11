@@ -16,6 +16,9 @@ public struct AcousticRequest
     /// <summary>The sphere probed round it: per source, by the room the emitter has above what it rests on
     /// (<see cref="AudioEmission.OcclusionRadiusFor"/>).</summary>
     public float SourceRadius;
+    /// <summary>The body whose sound it is, left out of the hand-rolled tracer's rays, when the question is
+    /// asked under a probe id (a talker's mouth is inside the talker); null: <see cref="EntityId"/>.</summary>
+    public int? LeaveOut;
 }
 
 /// <summary>
@@ -405,7 +408,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         try
         {
-            return _acoustics.CalculateAcousticPaths(world, req.EntityId, req.ListenerPos, req.SourcePos);
+            return _acoustics.CalculateAcousticPaths(world, req.LeaveOut ?? req.EntityId, req.ListenerPos, req.SourcePos);
         }
         catch (Exception ex)
         {

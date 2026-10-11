@@ -902,6 +902,7 @@ public sealed class RainField
                 continue;
             }
             if (s == RainSurvey.OverheadSlot) OnYourRoof(ref e, e.Position);
+            Voiced?.Invoke(id, false);
             if (_on[s] && _audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
             else { _audio.PlayPhysicalSoundDirect(e); _on[s] = true; }
         }
@@ -975,6 +976,7 @@ public sealed class RainField
             e.Volume *= balance;
             if (slot == RainSurvey.OverheadSlot) OnYourRoof(ref e, _partAt[k]);
             bool on = k == 0 ? _on[slot] : k < _partsOn[slot];
+            Voiced?.Invoke(e.EntityId, false);
             if (on && _audio.IsPlaying(e.EntityId)) _audio.UpdateSpatialAttributes(e);
             else _audio.PlayPhysicalSoundDirect(e);
         }
@@ -1183,9 +1185,14 @@ public sealed class RainField
                 (e.EqLow, e.EqMid, e.EqHigh) = _last.OverheadEq;
                 e.InsideListenersVehicle = _last.OverheadIsVehicle;
             }
+            Voiced?.Invoke(e.EntityId, true);
             _audio.Submit(e);
         }
     }
+
+    /// <summary>Told of every rain voice placed, with whether it is a one-off (a near drop), so the host can
+    /// know whose it is.</summary>
+    public Action<int, bool>? Voiced { get; set; }
 
     /// <summary>Lets every rain voice go: the rain stopped, or the world was left.</summary>
     public void Stop()

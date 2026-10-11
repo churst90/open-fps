@@ -88,6 +88,52 @@ public class VoiceRegistryTests
         Assert.All(seen.Keys, id => Assert.Contains(id, carried));
     }
 
+    public static IEnumerable<object[]> Scenarios() => EmitterStreamReplayTests.Scenarios();
+
+    /// <summary>
+    /// Every voice written in a frame of every stored scenario is an entry at the end of it, and no voice is
+    /// ever handed a path by a second call (docs/SPECIAL_CASES_AUDIT.md, P3b): what a voice is comes from its
+    /// entry, not from where its id falls.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Scenarios))]
+    public void Every_voice_written_is_an_entry_and_none_has_a_second_writer(string scenario)
+    {
+        var kinds = new Dictionary<VoiceKind, int>();
+        var unregistered = new SortedSet<string>();
+        var before = new HashSet<int>();
+        int read = 0;
+        var run = Replay.RunScript(r =>
+        {
+            r.AfterTick = x =>
+            {
+                var lines = x.Mixer.Lines;
+                var written = new List<(int Id, string Line)>();
+                var stopped = new HashSet<int>();
+                for (; read < lines.Count; read++)
+                {
+                    var parts = lines[read].Split(' ', 4);
+                    if (parts.Length < 3) continue;
+                    if (parts[1] == "Stop") stopped.Add(int.Parse(parts[2]));
+                    if (parts[1] is "Play" or "Place" or "Path") written.Add((int.Parse(parts[2]), $"{parts[1]} {parts[2]} (frame {parts[0]})"));
+                }
+                foreach (var (id, line) in written)
+                {
+                    if (x.Audio.Voices.TryGet(id, out var e)) kinds[e.Kind] = kinds.GetValueOrDefault(e.Kind) + 1;
+                    // Let go this frame, its owner gone, and placed once more on the way out by the budget's
+                    // held emitter before the stop goes through (P3d: one way to stop).
+                    else if (!(stopped.Contains(id) && before.Contains(id))) unregistered.Add(line);
+                }
+                before.Clear();
+                foreach (var e in x.Audio.Voices.Entries) before.Add(e.VoiceId);
+            };
+            Replay.Scenarios[scenario](r);
+        });
+        _o.WriteLine(string.Join(", ", kinds.OrderBy(k => k.Key).Select(k => $"{k.Key} {k.Value}")));
+        Assert.True(unregistered.Count == 0, "written and no entry: " + string.Join("; ", unregistered.Take(20)));
+        Assert.DoesNotContain(run.Mixer.Lines, l => l.Split(' ', 3) is [_, "Path", _]);
+    }
+
     /// <summary>A borrowed car behind a building is heard behind it: its voice was re-placed every frame with
     /// nothing in the way and no distance whatever its path said (S3).</summary>
     [Fact]
@@ -149,6 +195,51 @@ public class VoiceRegistryTests
         foreach (var kind in new[] { VoiceKind.Horn, VoiceKind.HeldHorn, VoiceKind.Siren, VoiceKind.TrainField, VoiceKind.TrainSignal })
             Assert.Equal(HeardFrom.TowardEdge, VoiceRegistry.HeardFromOf(kind));
         Assert.Equal(HeardFrom.Inside, VoiceRegistry.HeardFromOf(VoiceKind.Cabin));
+        foreach (var kind in new[] { VoiceKind.Machine, VoiceKind.Wood })
+            Assert.Equal(HeardFrom.Point, VoiceRegistry.HeardFromOf(kind));
+        Assert.Equal(HeardFrom.Edge, VoiceRegistry.HeardFromOf(VoiceKind.Recording));
+        Assert.Equal(HeardFrom.Spread, VoiceRegistry.HeardFromOf(VoiceKind.Place));
+        foreach (var kind in new[] { VoiceKind.OwnVoice, VoiceKind.OwnStep, VoiceKind.Aid, VoiceKind.Reference })
+            Assert.Equal(HeardFrom.Inside, VoiceRegistry.HeardFromOf(kind));
+        foreach (var kind in new[] { VoiceKind.Reflection, VoiceKind.EngineEcho, VoiceKind.Talker, VoiceKind.TalkerCopy,
+                                     VoiceKind.OwnVoiceCopy, VoiceKind.Footstep, VoiceKind.StepEcho, VoiceKind.Rain,
+                                     VoiceKind.RainDrop, VoiceKind.Bird, VoiceKind.Beacon, VoiceKind.Transient })
+            Assert.Equal(HeardFrom.Own, VoiceRegistry.HeardFromOf(kind));
+        // Only a voice heard by its owner's path has its owner asked about.
+        foreach (var kind in Enum.GetValues<VoiceKind>())
+            Assert.Equal(VoiceRegistry.HeardFromOf(kind) is HeardFrom.Point or HeardFrom.TowardEdge or HeardFrom.Edge or HeardFrom.Spread,
+                         VoiceRegistry.TakesOwnersPath(kind));
+    }
+
+    [Fact]
+    public void A_one_off_is_an_entry_until_it_has_stopped_and_its_owner_is_not_asked_about()
+    {
+        var reg = new VoiceRegistry { Frame = 1 };
+        bool sounding = false;
+        reg.DeclareEvent(-1800003, 9, VoiceKind.StepEcho, Vector3.Zero, 68f);
+        reg.Declare(-1400009, 9, VoiceKind.Talker, Vector3.Zero, 60f);
+        // A talker's own path is its own: the player is not asked about for it.
+        Assert.Empty(reg.Owners);
+
+        // Waiting to start, then sounding: kept with no declaration.
+        for (int f = 2; f <= VoiceRegistry.EventStartFrames + 1; f++) reg.Sweep(f, _ => sounding);
+        Assert.True(reg.IsRegistered(-1800003));
+        Assert.False(reg.IsRegistered(-1400009));
+        sounding = true;
+        reg.Sweep(VoiceRegistry.EventStartFrames + 40, _ => sounding);
+        Assert.True(reg.IsRegistered(-1800003));
+        sounding = false;
+        reg.Sweep(VoiceRegistry.EventStartFrames + 41, _ => sounding);
+        Assert.False(reg.IsRegistered(-1800003));
+
+        // Kept between its owner's searches, as it was declared.
+        reg.Frame = 100;
+        reg.Declare(-1700000, 9, VoiceKind.TalkerCopy, new Vector3(1f, 2f, 3f));
+        reg.Frame = 101;
+        reg.Keep(-1700000);
+        reg.Sweep(101);
+        Assert.True(reg.TryGet(-1700000, out var copy));
+        Assert.Equal(new Vector3(1f, 2f, 3f), copy.Mount);
     }
 
     [Fact]
