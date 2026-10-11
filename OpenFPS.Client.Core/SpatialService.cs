@@ -397,7 +397,7 @@ public class SpatialService
                     float run = def.Collider.Shape == ColliderShape.Box && !def.Acoustics.IsHollow
                         ? Constructions.RunInside(nudgedStart, nudgedEnd, transform.Position, def.Collider.Size, transform.Rotation) : 0f;
                     crossed.Add(Constructions.Of(tIn, tOut, AcousticRegistry.GetProperties(def.Material.Material), panel,
-                                                 new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), layers,
+                                                 def.Acoustics.Build, layers,
                                                  layer ? Constructions.Normal(def.Collider.Size, transform.Rotation) : Vector3.Zero, run));
                 }
             }

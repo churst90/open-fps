@@ -1,0 +1,13 @@
+{
+  "Id": "brick_veneer_wall_unlined",
+  "Name": "Brick Wall",
+  "Description": "The brick-veneered wall without its plasterboard, for a house whose plasterboard is a sheet of its own against it, room by room.",
+  "Material": "Brick",
+  "Assembly": "WoodFrameBrickVeneerUnlined",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.2175 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.06,
+  "TransmissionMid": 0.03,
+  "TransmissionHigh": 0.015
+}

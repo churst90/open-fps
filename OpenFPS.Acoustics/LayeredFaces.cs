@@ -250,7 +250,7 @@ public static class LayeredFaces
                 for (int side = 0; side < 2; side++)
                 {
                     if (!Open(run, m, frames, side == 0 ? +1 : -1)) continue;
-                    var g = GainsOf(run, frames, solids, gainsOf);
+                    var g = GainsOf(run, f.N, frames, solids, gainsOf);
                     var list = cells[side];
                     // A stretch running on from the last with the same figure is one.
                     if (list.Count > 0 && MathF.Abs(list[^1].V1 - va) <= Eps && list[^1].G == g)
@@ -357,8 +357,9 @@ public static class LayeredFaces
         return true;
     }
 
-    /// <summary>What a run of layers lets through, worked out once per set of layers.</summary>
-    private static Vector3 GainsOf(List<Near> run, List<Frame> frames, IReadOnlyList<Solid> solids, Dictionary<string, Vector3> cache)
+    /// <summary>What a run of layers lets through, worked out once per set of layers; the run is sorted along
+    /// <paramref name="along"/>.</summary>
+    private static Vector3 GainsOf(List<Near> run, Vector3 along, List<Frame> frames, IReadOnlyList<Solid> solids, Dictionary<string, Vector3> cache)
     {
         var key = new System.Text.StringBuilder();
         foreach (var n in run) key.Append(n.Frame).Append(',');
@@ -373,8 +374,9 @@ public static class LayeredFaces
             var props = AcousticRegistry.GetProperties(string.IsNullOrEmpty(s.Material) ? "Generic" : s.Material);
             float t = MathF.Max(0f, n.Hi - MathF.Max(n.Lo, covered));
             covered = MathF.Max(covered, n.Hi);
-            layers.Add(new WallTransmission.Layer(props, t, s.Build));
-            float mass = props.DensityKgM3 * 2f * f.Half;
+            // The run goes the way of `along`; an assembly facing the other way is crossed from its far face.
+            layers.Add(new WallTransmission.Layer(props, t, s.Build, Vector3.Dot(f.N, along) < 0f));
+            float mass = WallTransmission.MassPerArea(props, 2f * f.Half, s.Build);
             if (mass > heaviest) { heaviest = mass; faceA = 2f * f.HalfU; faceB = 2f * f.HalfV; }
         }
         var (l, m, h) = run.Count == 1

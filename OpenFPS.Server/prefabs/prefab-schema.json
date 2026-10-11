@@ -192,6 +192,11 @@
       "minimum": 0,
       "description": "The centres of the studs a two-leaf wall's leaves are fixed to, metres (0.6 for standard framing). Omit when the leaves meet only at the edges of the panel."
     },
+    "Assembly": {
+      "type": "string",
+      "enum": ["WoodFrameSiding", "WoodFrameSidingUnlined", "WoodFrameBrickVeneer", "WoodFrameBrickVeneerUnlined", "WoodFrameShed"],
+      "description": "A wall of several stuffs, from the acoustics' table (Assemblies): its plies (cladding, sheathing, a stud cavity, plasterboard) run across the box from the face its thickness axis points away from. The material is its face. Not with LeafMetres or StudSpacingMetres."
+    },
     "FaceMask": {
       "type": "integer",
       "minimum": 0,

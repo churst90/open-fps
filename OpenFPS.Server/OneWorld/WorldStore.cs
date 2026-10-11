@@ -34,8 +34,10 @@ public sealed class WorldStore
     /// 6: every part of a building's footprint in a room, openings between its rooms (docs/GEOMETRY.md 12.6);
     /// 7: a landing and steps outside each door, and a door with a building a step outside it moved along its wall;
     /// 8: a home's floor a concrete slab with its carpet or boards on it, not 27 cm of carpet or wood on the ground;
-    /// 9: nothing laid along a line enters a building, and a made-up driveway keeps clear of other buildings.</summary>
-    public const int GeneratorVersion = 9;
+    /// 9: nothing laid along a line enters a building, and a made-up driveway keeps clear of other buildings;
+    /// 10: walls timber-framed (cladding, sheathing, studs with batts, plasterboard: Assemblies), a shed two thin walls
+    /// and its air, not a block of wood.</summary>
+    public const int GeneratorVersion = 10;
 
     public const long DefaultCapBytes = 20L * 1024 * 1024 * 1024;
 

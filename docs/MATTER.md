@@ -109,6 +109,9 @@ conductivity, melting point, water uptake and vapour resistance. The fuel fields
 - Aliases: Steel and MildSteel are Metal, Aluminum is Aluminium, SodaLimeGlass is Glass, Soil is Dirt,
   Porcelain and CeramicTile are Tile, Plasterboard and Gypsum are Plaster, Stainless is StainlessSteel.
   An alias reads its material; lists show only the table's own names.
+- GlassWool (2026-10-11, index 58): the glass-fibre batt between a timber wall's studs, its own face like
+  Foam's. Softer than the air in it, so between two boards it is a cavity, not a bond
+  (`WallTransmission.IsCavity`; docs/GEOMETRY.md 12.6, "Timber walls are framed").
 - `LossFactor` is the loss at 1 kHz, and `LossAt(f)` is it times (f / 1 kHz) to the `LossExponent`: 0 for
   metal, glass and stone, 0.8 for wood (the Rayleigh fit DoorPhysics.WoodLoss already used), 0.3 for
   polymers. Nothing that read `LossFactor` before reads it differently.
@@ -152,6 +155,7 @@ conductivity, melting point, water uptake and vapour resistance. The fuel fields
 | Polycarbonate | polymer | 1200 | 2.3 | 0.37 | 0.015 (0.3) | 1384 | 150 | 0.0002 | 65 | 1200 | 0.2 | 260 | 0.15 | 5000 |
 | BootRubber | polymer | 1250 | 0.2 | 0.48 | 0.2 (0.3) | 400 | 10 | 0.005 | 15 | 1400 | 0.17 | no | 1 | 10000 |
 | PVC | polymer | 1400 | 3 | 0.38 | 0.02 (0.3) | 1464 | 150 | 0.0008 | 50 | 1000 | 0.17 | 200 | 0.1 | 50000 |
+| GlassWool | building | 10 | 0.000001 | 0.2 | 0.3 | 10 | 0.01 | 1 | 0.01 | 1030 | 0.04 | 650 | 1 | 1 |
 | AcousticTile | building | 250 | 0.05 | 0.2 | 0.3 | 447 | 0.5 | 1 | 0.5 | 1030 | 0.04 | no | 1 | 1 |
 | Plaster | building | 800 | 3 | 0.2 | 0.03 | 1936 | 20 | 0.05 | 5 | 1000 | 0.25 | no | 10 | 8 |
 | Snow | ground | 300 | 0.002 | 0.2 | 0.2 | 82 | 0.05 | 1 | 0.02 | 2050 | 0.13 | 0 | 5 | 2 |

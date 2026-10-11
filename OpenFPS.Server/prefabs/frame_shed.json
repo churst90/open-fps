@@ -1,0 +1,13 @@
+{
+  "Id": "frame_shed",
+  "Name": "Shed",
+  "Description": "A small timber shed as one solid: plywood siding on studs all round and the shed's air inside, so a sound through it crosses two thin walls and the air between them, not a block of wood.",
+  "Material": "Plywood",
+  "Assembly": "WoodFrameShed",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 2 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.2,
+  "TransmissionMid": 0.08,
+  "TransmissionHigh": 0.03
+}

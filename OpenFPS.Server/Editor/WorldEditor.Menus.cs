@@ -461,12 +461,12 @@ public sealed partial class WorldEditor
         // A place is a room, a region, a doorway, a name or a trigger; a beacon is a thing that sounds.
         if (t.IsIndoor.HasValue || t.RegionAId.HasValue || id.Contains("region") || id.Contains("portal") || id.Contains("marker")
             || id.Contains("named_place") || t.Type == EntityType.Trigger) return "Places and markers";
-        if (id.Contains("building")) return BuildingsCategory;
+        if (id.Contains("building") || id.Contains("shed")) return BuildingsCategory;
         if (id.Contains("stair") || id.Contains("ramp")) return "Stairs and ramps";
         // Audience is upholstery with people or air behind it: seats and soft furniture.
         if (t.Material.Equals("Audience", StringComparison.OrdinalIgnoreCase) || id.Contains("furniture") || id.Contains("seat")) return "Furniture and seating";
         if (id.Contains("floor") || id.Contains("road") || id.Contains("roof") || id.Contains("ground") || id.Contains("ceiling")) return "Floors, roads and roofs";
-        if (id.Contains("wall") || id.Contains("fence") || id.Contains("pillar") || id.Contains("arch") || id.Contains("boulder")) return "Walls and fences";
+        if (id.Contains("wall") || id.Contains("partition") || id.Contains("board") || id.Contains("fence") || id.Contains("pillar") || id.Contains("arch") || id.Contains("boulder")) return "Walls and fences";
         if (t.HasEmitter || t.Type == EntityType.Beacon || id.Contains("emitter")) return "Sounds";
         return "Other";
     }

@@ -1,0 +1,13 @@
+{
+  "Id": "brick_veneer_wall",
+  "Name": "Brick Wall",
+  "Description": "A brick-veneered house wall: one wythe of brick, an inch of air with only its ties across it, sheathing on 2x4 studs with glass-fibre batts, and half-inch plasterboard inside, 23 cm through. The brick is the weight; the air and the studs' cavity are why it keeps out more than its weight alone would.",
+  "Material": "Brick",
+  "Assembly": "WoodFrameBrickVeneer",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.2302 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.06,
+  "TransmissionMid": 0.03,
+  "TransmissionHigh": 0.015
+}

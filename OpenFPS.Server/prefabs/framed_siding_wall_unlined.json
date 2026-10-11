@@ -1,0 +1,13 @@
+{
+  "Id": "framed_siding_wall_unlined",
+  "Name": "Siding Wall",
+  "Description": "The siding wall without its plasterboard: lap siding, sheathing and the studs with their batts, for a house whose plasterboard is a sheet of its own against it, room by room.",
+  "Material": "Wood",
+  "Assembly": "WoodFrameSidingUnlined",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.108 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.2,
+  "TransmissionMid": 0.08,
+  "TransmissionHigh": 0.03
+}

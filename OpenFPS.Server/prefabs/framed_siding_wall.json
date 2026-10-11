@@ -1,0 +1,13 @@
+{
+  "Id": "framed_siding_wall",
+  "Name": "Siding Wall",
+  "Description": "A North American house wall: lap siding over plywood or OSB sheathing on 2x4 studs at 16 inch centres, glass-fibre batts between them and half-inch plasterboard inside, 12 cm through. Two leaves over a cavity, so it is weakest at the bottom, where the studs and the air between the boards let the bass through.",
+  "Material": "Wood",
+  "Assembly": "WoodFrameSiding",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.1207 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.2,
+  "TransmissionMid": 0.08,
+  "TransmissionHigh": 0.03
+}

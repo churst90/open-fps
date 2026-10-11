@@ -270,7 +270,7 @@ public class PrefabRepository
         // A door's skins are its leaves: one datum, read by the door's ring and by what gets through it.
         float leaf = t.LeafMetres ?? (t.IsDoor == true ? t.DoorSkinMetres ?? 0f : 0f);
         if (t.TransmissionLow.HasValue || t.TransmissionMid.HasValue || t.TransmissionHigh.HasValue || t.Absorption.HasValue || t.Scattering.HasValue || t.ShellThickness.HasValue || t.FaceMask.HasValue || t.MissingFaces != null
-            || leaf > 0f || t.StudSpacingMetres.HasValue)
+            || leaf > 0f || t.StudSpacingMetres.HasValue || t.Assembly != null)
         {
             components.Add(new AcousticComponent 
             { 
@@ -284,6 +284,7 @@ public class PrefabRepository
                 FaceMask = finalFaceMask,
                 LeafMetres = MathF.Max(0f, leaf),
                 StudSpacingMetres = MathF.Max(0f, t.StudSpacingMetres ?? 0f),
+                Assembly = Assemblies.Named(t.Assembly)?.Id ?? 0,
             });
         }
 

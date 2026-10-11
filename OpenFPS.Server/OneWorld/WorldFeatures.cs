@@ -781,6 +781,14 @@ public sealed partial class WorldFeatures
         return a;
     }
 
+    /// <summary>gen_osm.py norm_full: an angle folded into (-pi, pi], for a box whose two faces differ.</summary>
+    public static double NormFull(double a)
+    {
+        while (a > Math.PI + 1e-12) a -= 2 * Math.PI;
+        while (a <= -Math.PI + 1e-12) a += 2 * Math.PI;
+        return a;
+    }
+
     /// <summary>mapgen.py yaw: a turn about the vertical, rounded as the maps write it.</summary>
     public static Quaternion Yaw(double r)
         => Math.Abs(r) < 1e-9 ? Quaternion.Identity : new Quaternion(0f, (float)Math.Round(Math.Sin(r / 2), 6), 0f, (float)Math.Round(Math.Cos(r / 2), 6));

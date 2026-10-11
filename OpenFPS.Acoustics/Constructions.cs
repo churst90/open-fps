@@ -97,8 +97,9 @@ public static class Constructions
     public static Crossing Of(float tIn, float tOut, in MaterialProperties props, Vector3 panel, WallBuild build, int times, Vector3 normal,
                               Vector3 asPanel, float run)
     {
-        // A two-leaf build is not one stuff: a line along it runs in its cavity, and pays its panel.
-        if (PanelsOnlyForLab || times != 1 || build.LeafMetres > 0f) run = 0f;
+        // A two-leaf build, or an assembly of several stuffs, is not one stuff: a line along it runs in its
+        // cavity, and pays its panel.
+        if (PanelsOnlyForLab || times != 1 || build.LeafMetres > 0f || build.Assembly != 0) run = 0f;
         return new Crossing
         {
             In = tIn, Out = tOut, Props = props, Panel = panel, Build = build, Times = times, Normal = normal,
@@ -123,8 +124,8 @@ public static class Constructions
     // rigid cross junction (Hopkins, Sound Insulation, 2007). Such a crossing is charged as the stuff the
     // line passes through: a panel as thick as its run inside, the sheet's own face for the flanking share,
     // and never less than the sheet crossed face to face. A block entered by any side is the same rule. A
-    // two-leaf build (a stud wall, sealed glazing) is not one stuff: a line along it runs in its cavity, and
-    // it keeps its panel figure.
+    // two-leaf build (a stud wall, sealed glazing) or an assembly (a timber-framed house wall, Assemblies) is
+    // not one stuff: a line along it runs in its cavity, and it keeps its panel figure.
     // Approximate: the run is a thin plate's mass law and coincidence carried to a thick block, which
     // overstates a thick wall's high band; and the flanking by the junctions a sheet is built into is no
     // path of its own (WallTransmission's flanking share stands for it).
@@ -269,8 +270,9 @@ public static class Constructions
                 covered = MathF.Max(covered, c.Out);
                 // A layer the line runs along is as thick as its run.
                 float depth = !asPanels && c.Run > 0f ? c.Run : t;
-                layers.Add(new WallTransmission.Layer(c.Props, depth * own, c.Build));
-                float mass = c.Props.DensityKgM3 * t;
+                // An assembly's plies run along its normal: crossed the other way, they come in reverse.
+                layers.Add(new WallTransmission.Layer(c.Props, depth * own, c.Build, Vector3.Dot(dir, c.Normal) < 0f));
+                float mass = WallTransmission.MassPerArea(c.Props, t, c.Build);
                 if (mass > heaviest) { heaviest = mass; faceA = a; faceB = b; }
             }
             var (gl, gm, gh) = WallTransmission.LayeredBandGains(layers, faceA, faceB);

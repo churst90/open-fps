@@ -2198,8 +2198,8 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      the edge face jumps from the panel to the run; the way round that edge (Maekawa, a few dB) is louder than
      either. The real places' timber walls are solid 25 cm of wood in the data, so a line along one pays 1.7 m
      of wood (-52/-76/-100 where its panel is -24/-48/-76); a timber frame with a stud build would keep its
-     panel. Steam Audio's correction is worked out on the routes' boxes, which are the scene's boxes as they
-     stand.
+     panel (done since, below, "Timber walls are framed"). Steam Audio's correction is worked out on the routes'
+     boxes, which are the scene's boxes as they stand.
    - **The stairwell** (still sources on Dock Street at z -128.5, the worker with Steam Audio, low/mid/high
      dB): x -19.5 to -15.5, -35/-52/-80 before, -57/-78/-100 now (the slab's run 0.8 m); either side as it was,
      -45/-69/-100 (over the guard and through the brick front); x -30 and -32 -57/-83/-100 and -50/-87/-100 to
@@ -2387,6 +2387,54 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      Principles of Optics, 7th ed., Cambridge 1999, https://doi.org/10.1017/CBO9781139644181 (Kirchhoff's
      aperture). Funkhouser et al. 2004, Maekawa 1968, Kurze and Anderson 1971, ISO 9613-2 and Hopkins 2007 as
      cited above.
+   **Timber walls are framed (2026-10-11, unheard).** The real places' outside walls were 25 cm of solid wood or
+   brick, lined with 3 cm of solid plaster in a house built room by room, and a shed was a block of wood; a line
+   along one paid 1.7 m of wood. The houses of Magnolia and Albany are timber-framed, so every wall is now built as
+   one: one entity a wall piece, as before, its prefab naming an assembly (`Assemblies`, in the acoustics), its
+   material the face outside.
+   - **The assemblies.** Lap siding (10 mm of wood averaged over the wall, lapped, so its weight on the sheathing
+     and not its stiffness: `Ply.Lapped`), 11.1 mm sheathing (plywood's figures for OSB), a 2x4's 88.9 mm cavity of
+     glass-fibre batts between studs at 406 mm, 12.7 mm plasterboard: 120.7 mm (`framed_siding_wall`). Brick veneer
+     92.1 mm, a 25.4 mm air space only ties cross (no bridge but its edges), the same sheathing, studs and board:
+     230.2 mm (`brick_veneer_wall`). The same without the board where the board is its own sheet against it, a house
+     built room by room (`..._unlined` and `gypsum_board`, the rooms' plaster face). A partition is two 12.7 mm
+     boards on 2x4 studs at 406 mm, 114.3 mm, the existing two-leaf build (`stud_partition`). A shed is two 15.9 mm
+     plywood walls and its air (`frame_shed`). New material `GlassWool`.
+   - **The model.** A layer that lets air through and is softer than the air in it (glass fibre, the air space,
+     an open-cell foam: `WallTransmission.IsCavity`, E under rho c^2, 142 kPa) with airtight layers on both sides is
+     a cavity: the layers before it one leaf, those after it the next, bridged by the studs it is built between
+     (Sharp's double-leaf law, as the two-leaf build); soil, snow and carpet are stiffer than air and bond as before.
+     An assembly is its plies laid out so, in the order a line crosses them (`Constructions.Through` and
+     `LayeredFaces` read which way it faces), and a line along one runs in its cavity and keeps its panel. A wall
+     whose faces differ is turned as its frame is, never folded into a half turn (gen_osm `FACED`, the port's
+     `NormFull`). The build reaches the wire as `AcousticComponent.Assembly` and `WallBuild.Assembly`.
+   - **What it gives** (`TimberFrameWallTests`, 4 by 2.75 m, low/mid/high): siding 17.4/39.0/46.0 dB, the brick
+     veneer 42.4/68.3/100.6, the 25 cm of timber it replaces 23.1/47.5/75.3. The siding wall is the mass law of its
+     24 kg/m2 at 125 Hz (21.7 dB), rises with the studs' bridge to 43 dB at 1 kHz, and dips at 2 to 3.15 kHz with
+     the boards' coincidence, as Bradley and Birta measured such walls (the studs' dip at 125 Hz, the boards' at
+     2.5 to 3.1 kHz). Bonded as one plate, siding and sheathing put the dip at 800 Hz to 1 kHz, hence `Lapped`.
+   - **The maps.** Regenerated; every id the same (a wall's pieces are decided as far in as the plan allows,
+     WALL_T, and cut to how far the wall reaches). Doors stand in the middle of their wall. A doorway's head laps
+     the wall either side by a jack stud's 38 mm (`BEARING`): a hairline between abutting pieces let a flood out of
+     a Magnolia house. An outer wall runs on WALL_T past an inside corner (`CORNER_REACH`), and the flood grows a
+     thin solid at an angle to its grid along its other sides as much as through its thin one (`RoomFlood.Mark`):
+     12 cm walls at 45 degrees left a flood a way out of three Albany corners. A room of a building is asserted
+     indoors (`IsIndoor`): the server's survey read two wing rooms as outdoors once the walls were as thin as
+     they are. city.json is untouched (gen_city has no timber walls). `WorldStore.GeneratorVersion` 10.
+   - **The guard.** `FramedWalls` (RealPlaceMapTests `Every_wall_is_framed`, and the Tomball tiles in
+     `WorldBuildingsTests`): every upright sheet of wood, plasterboard or brick of a building is a framed assembly
+     with its cladding facing out (off its floor slab), a board against an unlined one, a stud partition, or a
+     shed's assembly; by material and build, never by name. On the maps before: 9,497 on Magnolia and 18,522 on
+     Albany failed.
+   - **Left (next).** The sound change is not measured yet: `--barrier-sweep server=DIR dump=FILE` old against new
+     on both places and `--path-probe` for a house from the street and room to room. The rest is in todo.
+   - **References.** Bradley and Birta, Canadian Acoustics 29(3) (2001) 64-65,
+     https://jcaa.caa-aca.ca/index.php/jcaa/article/download/1385/1128/1518. Brick Industry Association TN 28 (2012),
+     https://gobrick.com/media/file/28-brick-veneer-wood-stud-walls.pdf. WWPA Standard Patterns (bevel siding 5 1/2
+     in. dressed, 4 1/2 in. exposed). Canadian Wood Council, OSB sizes,
+     https://old.cwc.ca/wp-content/uploads/2019/03/Oriented-Strand-Board-OSB-Sizes.pdf. Owens Corning batt guide
+     specification, https://www.owenscorning.com/dms/10024955. NIST PS 20 (2x4 dressed sizes), IRC R602.3(5), ASTM C1396.
+
    **Openings from the floods (step 3, 2026-10-11, approved by ear 2026-10-11).** A flood keeps the cells of each opening its air meets
    and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
    opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide

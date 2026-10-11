@@ -128,7 +128,7 @@ public sealed class SteamAudioScene : IDisposable
             var size = def.Collider.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
             boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material,
-                              new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), snap.Id, def.Collider.Form,
+                              def.Acoustics.Build, snap.Id, def.Collider.Form,
                               OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(def)));
         }
         // In id order, not the order the world listed them in (a ConcurrentDictionary's, which follows the

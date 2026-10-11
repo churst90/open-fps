@@ -1,0 +1,12 @@
+{
+  "Id": "gypsum_board",
+  "Name": "Plasterboard",
+  "Description": "Half-inch plasterboard on the inside of a house wall. With the wall behind it, the second leaf over the studs' cavity; for the room, its own face, a membrane that takes the bass out of it.",
+  "Material": "Plaster",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.0127 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.35,
+  "TransmissionMid": 0.18,
+  "TransmissionHigh": 0.08
+}

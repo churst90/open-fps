@@ -399,6 +399,14 @@ public partial struct AcousticComponent
     /// at the panel's edges. See <see cref="WallBuild"/>.</summary>
     public float StudSpacingMetres { get; set; }
 
+    /// <summary>A wall of several stuffs, by its number in the acoustics' table (<see cref="Assemblies"/>): a
+    /// timber-framed house wall's cladding, sheathing, stud cavity and plasterboard. Zero for none. See
+    /// <see cref="WallBuild"/>.</summary>
+    public int Assembly { get; set; }
+
+    /// <summary>How the wall is built, as the acoustics read it.</summary>
+    [MemoryPackIgnore] public readonly WallBuild Build => new(LeafMetres, StudSpacingMetres, Assembly);
+
     public AcousticComponent() { FaceMask = 63; }
 }
 

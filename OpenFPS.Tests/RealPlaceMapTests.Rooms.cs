@@ -68,4 +68,27 @@ public partial class RealPlaceMapTests
         Assert.True(r.Pieces > 1000 && r.Footprints > 1000, $"{r.Pieces} pieces, {r.Footprints} footprints");
         Assert.Empty(r.Found);
     }
+
+    /// <summary>
+    /// Every wall is framed (docs/GEOMETRY.md 12.6, "Timber walls are framed"): each upright sheet of wood, plasterboard
+    /// or brick a building is made of is cladding, sheathing, a glass-fibre stud cavity and plasterboard, its cladding
+    /// facing out, or a partition of plasterboard on studs, and a shed of one solid is two thin walls and its air
+    /// (FramedWalls, by material and build). On the maps before, every outside wall was 25 cm of solid wood or brick and
+    /// its lining 3 cm of solid plaster, and a shed a block of wood: 9,497 on Magnolia and 18,522 on Albany failed.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void Every_wall_is_framed(string id)
+    {
+        var map = OpenFPS.Server.Repositories.MapRepository.LoadFromFile(Path.Combine(AppContext.BaseDirectory, "places", id + ".json"))!;
+        var prefabs = new OpenFPS.Server.Repositories.PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")).Prefabs;
+        var r = FramedWalls.Check(map.Entities, prefabs);
+        _o.WriteLine($"{id}: {r.Outer} outside walls lined, {r.Unlined} unlined with {r.Boards} boards, {r.Partitions} partitions, {r.Sheds} sheds; "
+                     + $"{r.Why.Values.Sum()} not framed");
+        foreach (var (why, n) in r.Why.OrderByDescending(kv => kv.Value)) _o.WriteLine($"  {n}: {why}");
+        foreach (var b in r.Bad.Take(10)) _o.WriteLine("  " + b);
+        Assert.True(r.Outer > 3000 && r.Unlined > 200 && r.Boards > 400 && r.Partitions > 500 && r.Sheds > 20,
+                    $"{r.Outer} outside walls, {r.Unlined} unlined, {r.Boards} boards, {r.Partitions} partitions, {r.Sheds} sheds");
+        Assert.Empty(r.Bad);
+    }
 }

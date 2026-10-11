@@ -20,6 +20,8 @@ public static class WorldBuildings
 {
     // gen_osm.py's constants.
     public const double StoreyH = 2.75, FloorTop = 0.12, Ceil = 2.68, WallT = 0.25, DoorLap = 0.05;
+    /// <summary>gen_osm.py BEARING: how far a doorway's head laps the wall either side, a jack stud's 1 1/2 in.</summary>
+    public const double Bearing = 0.038;
     /// <summary>The head of a doorway with no leaf in it (gen_osm.py DOOR_TOP); one with a leaf laps it (head_over).</summary>
     public const double DoorTop = FloorTop + 2.13;
     public const double BrickShare = 0.55;
@@ -437,7 +439,8 @@ public static class WorldBuildings
         {
             var b = Base(prefab);
             var (cx, cz) = f.W((u0 + u1) / 2, (v0 + v1) / 2);
-            double a = WorldFeatures.NormHalf(f.A);
+            // gen_osm.py FACED: a wall whose two faces differ is turned as its frame is, never folded into a half turn.
+            double a = prefab is "brick_veneer_wall" or "framed_siding_wall" ? WorldFeatures.NormFull(f.A) : WorldFeatures.NormHalf(f.A);
             return new EntityData
             {
                 EntityId = eid,
@@ -474,7 +477,7 @@ public static class WorldBuildings
             double hgt = Math.Max(2.2, Math.Min(p.Height ?? 2.5, 6.0));
             // gen_osm.py ground_all, anything else solid: its foot at the lowest ground under it.
             double lo = Samples(f, local.Min(q => q.U), local.Max(q => q.U), local.Min(q => q.V), local.Max(q => q.V), ground).Min();
-            Oform(bd.Area < 30 ? "siding_wall" : "metal_wall", f, local, 0.0, hgt, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism },
+            Oform(bd.Area < 30 ? "frame_shed" : "metal_wall", f, local, 0.0, hgt, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism },
                   name, "structure", lo);
             nextId = id;
             return outList;
@@ -497,7 +500,9 @@ public static class WorldBuildings
             "premises" => bd.Area > 250 ? "metal" : "brick",
             _ => "metal",
         };
-        string wallPrefab = mat switch { "brick" => "brick_wall", "siding" => "siding_wall", "metal" => "metal_wall", _ => "concrete_wall" };
+        string wallPrefab = mat switch { "brick" => "brick_veneer_wall", "siding" => "framed_siding_wall", "metal" => "metal_wall", _ => "concrete_wall" };
+        // gen_osm.py wall_thick: a framed wall stands as thick as its assembly (its collider), anything else WallT.
+        double wallT = wallPrefab is "brick_veneer_wall" or "framed_siding_wall" ? Math.Round(Base(wallPrefab).Z, 6) : WallT;
         string roofPrefab = mat == "metal" ? "metal_wall" : "shingle_roof";
 
         var toStreet = (X: p.Street.X - bd.Cx, Z: p.Street.Z - bd.Cz);
@@ -648,7 +653,7 @@ public static class WorldBuildings
             }
         if (doorPrefab != null)
         {
-            var (x, z) = E.W(s, WallT / 2);
+            var (x, z) = E.W(s, wallT / 2);
             Door(doorPrefab, x, z, FloorTop, E.A, roomId, -1, width, roomXz, doorName);
         }
         if (later != null) SideDoors(doorPrefab != null || kind == "barn" ? width : 0.0);
@@ -708,16 +713,16 @@ public static class WorldBuildings
                 {
                     if (pc.Y0 > 0.0 || pc.A0 > c0 - 0.02 || pc.A1 < c1 + 0.02) continue;
                     var old = outList[pc.Index];
-                    outList[pc.Index] = Make(old.PrefabId, ed.F, pc.A0, c0, 0.0, WallT, 0.0, pc.Y1, old.Name, old.Layer, null, old.EntityId);
+                    outList[pc.Index] = Make(old.PrefabId, ed.F, pc.A0, c0, 0.0, wallT, 0.0, pc.Y1, old.Name, old.Layer, null, old.EntityId);
                     double head = Math.Min(FloorTop + Math.Round(Base("door").Y, 4) - DoorLap, pc.Y1);
-                    pieceLater.Add((c0, c1, head, pc.Y1, old.Name));
+                    pieceLater.Add((c0 - Bearing, c1 + Bearing, head, pc.Y1, old.Name));
                     pieceLater.Add((c1, pc.A1, 0.0, pc.Y1, old.Name));
                 }
-                var (dx, dz) = ed.F.W(b2.At, WallT / 2);
+                var (dx, dz) = ed.F.W(b2.At, wallT / 2);
                 var rxz = F.W((box.U0 + box.U1) / 2, (box.V0 + box.V1) / 2);
                 string sideName = $"{name} side door";
                 foreach (var (u0, u1, y0, y1, nm) in pieceLater)
-                    later!.Doors.Add(eid => Make(wallPrefab, ed.F, u0, u1, 0.0, WallT, y0, y1, nm, "structure", null, eid));
+                    later!.Doors.Add(eid => Make(wallPrefab, ed.F, u0, u1, 0.0, wallT, y0, y1, nm, "structure", null, eid));
                 later!.Doors.Add(eid => DoorEntity("door", dx, dz, FloorTop, ed.F.A, written?[0] ?? rid, -1, SideDoor, rxz, sideName, eid));
                 if (p.Pad is { } padded2)
                     foreach (var (v0, v1, bottom, stepTop, landing) in StepsOut(ed.F, b2.At, SideDoor, padded2, ground))
@@ -766,18 +771,24 @@ public static class WorldBuildings
         {
             var made = new List<(int Index, double A0, double A1, double Y0, double Y1)>();
             var pieces = new List<(double A0, double A1, double Y0, double Y1)>();
+            // The pieces as far in as the plan allows (WallT), each cut to how far in the wall itself reaches.
             double at = ed.Reflex0 ? -WallT : 0.0, end = ed.L + (ed.Reflex1 ? WallT : 0.0);
+            // gen_osm.py CORNER_REACH: past an inside corner it runs on WallT, a flood cell's worth, whatever its thickness.
+            double corner = Math.Max(wallT, WallT);
+            double s0 = ed.Reflex0 ? -corner : 0.0, s1 = ed.L + (ed.Reflex1 ? corner : 0.0);
             foreach (var (c0, c1, ctop) in cuts.OrderBy(c => c.C0).ThenBy(c => c.C1).ThenBy(c => c.Top))
             {
                 if (c0 > at) pieces.Add((at, c0, 0.0, wtop));
-                if (ctop < wtop) pieces.Add((c0, c1, ctop, wtop));
+                if (ctop < wtop) pieces.Add((c0 - Bearing, c1 + Bearing, ctop, wtop));
                 at = c1;
             }
             if (at < end) pieces.Add((at, end, 0.0, wtop));
-            foreach (var (a0, a1, y0, y1) in pieces)
+            foreach (var (p0, p1, y0, y1) in pieces)
             {
-                if (a1 - a0 < 0.02) continue;
-                Obox(prefab, ed.F, a0, a1, 0.0, WallT, y0, y1, nm, "structure");
+                if (p1 - p0 < 0.02) continue;
+                double mid = (p0 + p1) / 2, a0 = Math.Max(p0, s0), a1 = Math.Min(p1, s1);
+                if (a1 - a0 < 0.02) (a0, a1) = mid > (s0 + s1) / 2 ? (s1 - 0.02, s1) : (s0, s0 + 0.02);
+                Obox(prefab, ed.F, a0, a1, 0.0, wallT, y0, y1, nm, "structure");
                 made.Add((outList.Count - 1, a0, a1, y0, y1));
             }
             return made;
