@@ -4,6 +4,8 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- The emitter-stream replay turns vehicles and the listener as the game does (+Z forward, yaw toward east), not
+  backwards; a test fix, no game change. All eight streams regenerated (docs/SPECIAL_CASES_AUDIT.md, P0).
 - One table of model kinds (part P2 of docs/SPECIAL_CASES_AUDIT.md), no change heard. `ModelKindTable` in the
   sound library says, for any sound id, which kind of model it is, what synth makes it, how it moves (fixed,
   walks, rolls, flies, rails), its level and size, its headroom and its places. The level and headroom
