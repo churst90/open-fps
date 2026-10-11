@@ -13,11 +13,13 @@ using OpenFPS.Client.AudioEngine.Core.Nature;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// How distance attenuates a voice: FMOD's inverse rolloff, on every 3D channel and bus, the same law
-/// as <see cref="OpenFPS.Common.Loudness"/>'s <c>RenderedGain</c>, which every balance is set against.
-/// Linear rolloff must not come back: near and far sources sit at nearly one level, and it undoes
-/// <c>Widen</c> (a wide source pays its gain down for a reference distance that only an inverse law
-/// gives back), so long vehicles were quiet in proportion to their length.
+/// How distance attenuates a voice: <see cref="OpenFPS.Common.Loudness"/>'s <c>RenderedGain</c>, applied
+/// by hand on every voice, binaural or panned by FMOD, so the balance is the same whichever path a voice
+/// gets. FMOD's inverse mode stays on 3D channels and buses as the closest of its own laws, but a voice's
+/// FMOD distances are set out of reach (<see cref="NoneMin"/>), so FMOD pans and Dopplers it and applies
+/// no law of its own. Linear rolloff must not come back: near and far sources sit at nearly one level, and
+/// it undoes <c>Widen</c> (a wide source pays its gain down for a reference distance that only an inverse
+/// law gives back), so long vehicles were quiet in proportion to their length.
 /// </summary>
 internal static class Rolloff
 {
@@ -25,6 +27,9 @@ internal static class Rolloff
 
     /// <summary>Both laws' bits, for clearing the mode before setting 2D.</summary>
     public const MODE Either = MODE._3D_LINEARROLLOFF | MODE._3D_INVERSEROLLOFF;
+
+    /// <summary>FMOD distances no voice reaches, so FMOD's own rolloff is unity: 1000 km.</summary>
+    public const float NoneMin = 1.0e6f, NoneMax = 1.0e7f;
 }
 
 internal static class FmodHelpers
@@ -2903,9 +2908,10 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             else
             {
-                // No HRTF voice: FMOD's inverse rolloff is the law the HRTF path applies by hand, so a
-                // voice that misses the pool is not louder and nearer (linear left a clap 200 m across a
-                // 3 km range at 93 % of full scale). Counted for direct sounds only: an echo refused by
+                // No HRTF voice: FMOD pans it, and ApplyAcousticFilters gives it the law the HRTF path
+                // gets, so a voice that misses the pool is not louder and nearer (linear left a clap 200 m
+                // across a 3 km range at 93 % of full scale; FMOD's inverse held min/range past the range
+                // where RenderedGain fades to nothing). Counted for direct sounds only: an echo refused by
                 // the reserve is the policy working.
                 if (!emitter.IsReflection) _saPoolMisses++;
                 channel.getMode(out MODE fallbackMode);
@@ -2933,7 +2939,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // 25 s run (91 % of its log), each taking FMOD's lock on the game thread against the mixer.
             if (saState == null)
             {
-                channel.set3DMinMaxDistance(emitter.MinDistance, emitter.Range);
+                channel.set3DMinMaxDistance(Rolloff.NoneMin, Rolloff.NoneMax);
                 // A loudspeaker's beam is its radiator's, not a flat cone.
                 if (emitter.ConeInside < 360f && emitter.Radiator == null)
                 {
@@ -2949,7 +2955,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // else, no HRTF, distance, room or echo. Head-relative, so it stays put as the head turns.
             channel.getMode(out MODE headMode);
             channel.setMode((headMode & ~Rolloff.Either) | MODE._3D | MODE._3D_HEADRELATIVE);
-            channel.set3DMinMaxDistance(1000f, 10000f);
+            channel.set3DMinMaxDistance(Rolloff.NoneMin, Rolloff.NoneMax);
             channel.set3DLevel(1.0f);
             PlaceInHead(channel, emitter.FollowsListener ? emitter.ListenerOffset : emitter.Position - _listenerPos);
         }
@@ -3270,7 +3276,6 @@ public partial class FmodAudioProvider : IAudioProvider
                 // refused calls (see PlaySpatialSound).
                 if (active.SaState == null)
                 {
-                    active.Channel.set3DMinMaxDistance(active.MinDistance, emitter.Range);
                     if (emitter.ConeInside < 360f && active.Radiator == null)
                     {
                         active.Channel.set3DConeSettings(emitter.ConeInside, emitter.ConeOutside, emitter.ConeOutsideVolume);
@@ -3923,10 +3928,9 @@ public partial class FmodAudioProvider : IAudioProvider
             return;
         }
 
-        // No Steam Audio: FMOD pans and rolls off the mono point source.
+        // No Steam Audio: FMOD pans the mono point source (the distance law is in ApplyAcousticFilters).
         FMOD.VECTOR fpos = FmodHelpers.ToFmodVec(active.CurrentApparentPosition), fvel = FmodHelpers.ToFmodVec(active.Velocity);
         active.Channel.set3DAttributes(ref fpos, ref fvel);
-        active.Channel.set3DMinMaxDistance(active.MinDistance, active.Range);
 
         float distToSound = Vector3.Distance(lPosVec, active.CurrentApparentPosition);
         bool isIndirect = active.ApparentPosition != Vector3.Zero && active.ApparentPosition != active.Position;
@@ -3989,15 +3993,11 @@ public partial class FmodAudioProvider : IAudioProvider
 
         float roomGainBonus = MathHelper.Lerp(1.0f, active.RoomGain, 0.5f);
 
-        // A 2D binaural channel gets no rolloff from FMOD, so the law is applied here.
-        float distAtten = 1.0f;
-        if (active.SaState != null)
-        {
-            // One law, in Loudness, so a test can check a balance without a sound card. From where the
-            // source is, not where it is heard from: round a building the heard point is a direction.
-            distAtten = Loudness.RenderedGain(1.0f, active.MinDistance, active.Range,
-                                              Vector3.Distance(lPosVec, active.Position));
-        }
+        // The distance law, here for every voice: FMOD applies none (Rolloff.NoneMin). One law, in
+        // Loudness, so a test can check a balance without a sound card. From where the source is, not
+        // where it is heard from: round a building the heard point is a direction.
+        float distAtten = Loudness.RenderedGain(1.0f, active.MinDistance, active.Range,
+                                                Vector3.Distance(lPosVec, active.Position));
 
         // The cone by hand on a 2D binaural channel (a 3D fallback channel uses FMOD's): full inside
         // the inner cone, ConeOutsideVolume past the outer, smooth between.
@@ -4723,10 +4723,8 @@ public partial class FmodAudioProvider : IAudioProvider
             foreach (var a in _activeSounds)
             {
                 if (!a.Channel.hasHandle() || a.LastVolume <= 0f) continue;
-                float dist = Vector3.Distance(_listenerPos, a.CurrentApparentPosition);
-                // FMOD applies the law to a voice it pans; LastVolume holds it only for binaural ones.
-                float law = a.SaState != null ? 1f : Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist);
-                float db = 20f * MathF.Log10(MathF.Max(1e-9f, a.LastVolume * law));
+                // LastVolume holds the distance law on both paths.
+                float db = 20f * MathF.Log10(MathF.Max(1e-9f, a.LastVolume));
                 var eq = a.LastEqDb;
                 all.Add(new VoiceLevel(a.EntityId, a.SoundId, Vector3.Distance(_listenerPos, a.Position),
                                        db + MathF.Max(eq.Low, MathF.Max(eq.Mid, eq.High)),
