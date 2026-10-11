@@ -271,8 +271,9 @@ public class EngineReflectionsTests
 
     /// <summary>
     /// The echo reads the engine's ring, which may not exist yet on the frame the car comes into
-    /// earshot, so the start can fail. Asking the mixer whether the voice is playing — not remembering
-    /// that it was asked for — is what makes the next frame try again; once it plays it is only moved.
+    /// earshot, so the start can fail. Every frame sounds the echo (AudioEngineFacade.Sound), and the audio
+    /// thread starts it if it is not playing when the call arrives and moves it if it is: a failed start is
+    /// tried again on the next frame, and two calls queued before the first is done start it once.
     /// </summary>
     [Fact]
     public void AnEchoThatDidNotStartIsAskedForAgain()
@@ -282,11 +283,11 @@ public class EngineReflectionsTests
         r.Update(Car, Engine);      // the first start has not reached the mixer
         r.Pump();
         int id = Assert.Single(r.EchoIds);
-        Assert.Equal(2, r.Mixer.Started.Count(e => e.EntityId == id));
+        Assert.Equal(1, r.Mixer.Started.Count(e => e.EntityId == id));
 
         r.Update(Car, Engine);
         r.Pump();
-        Assert.Equal(2, r.Mixer.Started.Count(e => e.EntityId == id));
+        Assert.Equal(1, r.Mixer.Started.Count(e => e.EntityId == id));
         Assert.Equal(1, r.Echoes.VoiceCount);
     }
 
