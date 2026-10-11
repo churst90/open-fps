@@ -7,7 +7,7 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor]
+/// --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor] [panels]
 ///
 /// How the barrier model's ways round one thing and through another (OpeningRoutes.BarrierGains) change
 /// what is heard behind walls on a real map: pairs of points in the map's places (an ear 1.6 m over a
@@ -18,6 +18,8 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// the routes' own (Constructions.Through for what the line passes through); the simulator's through figure
 /// stands in for it in the game's direct path. outdoor takes ears indoors only and sources out of doors, 10 m to
 /// range off, 0.5 m over the ground (the street heard inside). pair=x,y,z;x,y,z spells one ear and source out.
+/// panels compares against every solid charged as one panel whatever way the line goes through it (before
+/// 2026-10-11, Constructions.PanelsOnlyForLab) instead of against the clear ways round only.
 /// server=DIR reads the maps and prefabs under DIR in place of the checkout's OpenFPS.Server (a map before a change);
 /// dump=FILE writes every pair, tab-separated, so two runs with one seed can be set side by side. Game coordinates (y up).
 /// </summary>
@@ -33,6 +35,14 @@ public static class BarrierSweepSpike
         float range = float.Parse(Arg(args, "range") ?? "150", CultureInfo.InvariantCulture);
         var rng = new Random(int.Parse(Arg(args, "seed") ?? "1", CultureInfo.InvariantCulture));
         bool outdoor = args.Contains("outdoor");
+        // panels: before is every solid one panel whatever way the line goes through it (Constructions,
+        // "A solid gone into by its edge"), not the barrier model's clear ways round only.
+        bool panels = args.Contains("panels");
+        void Before(bool on)
+        {
+            if (panels) Constructions.PanelsOnlyForLab = on;
+            else OpeningRoutes.OnlyClearWaysRoundForLab = on;
+        }
 
         var world = PathProbeSpike.LoadAsClient(Arg(args, "server") ?? OpenFPS.AudioLab.LabPaths.Server(), mapId);
         var acoustics = new SpatialAcoustics();
@@ -52,13 +62,14 @@ public static class BarrierSweepSpike
             foreach (bool before in new[] { true, false })
             {
                 var (a, r) = before ? (oldAcoustics, oldRoutes) : (acoustics, routes);
-                OpeningRoutes.OnlyClearWaysRoundForLab = before;
+                Before(before);
                 var leg = r.LegGains(s, e, Array.Empty<int>(), Array.Empty<int>());
                 bool any = r.Route(s, a.GetRegionAt(world, s), e, a.GetRegionAt(world, e), out var answer);
                 Console.WriteLine($"  {(before ? "before" : "after")}: leg {Db3(leg)}, openings {(any ? $"{Db3(new Vector3(answer.Low, answer.Mid, answer.High))} via {answer.Via}" : "none")}");
             }
-            OpeningRoutes.OnlyClearWaysRoundForLab = false;
+            Before(false);
             Console.WriteLine(routes.ExplainBarrier(s, e));
+            Console.Write(routes.ExplainLine(s, e));
             return 0;
         }
         // The outdoors' own box reaches far under the ground: its points are not places anyone stands.
@@ -86,7 +97,8 @@ public static class BarrierSweepSpike
         }
 
         var rows = new List<(Vector3 Ear, Vector3 Src, Vector3 Old, Vector3 New, int EarPlace, int SrcPlace)>();
-        double oldUs = 0, newUs = 0;
+        double oldUs = 0, newUs = 0, correctionUs = 0;
+        int corrected = 0;
         int attempts = 0;
         var clock = new Stopwatch();
         var legRows = new List<(Vector3 Old, Vector3 New)>();
@@ -120,20 +132,26 @@ public static class BarrierSweepSpike
             if (InSolid(src) || Vector3.Distance(src, ear) < 2f) continue;
             if (routes.LegBoxes(src, ear).Count == 0) continue;
             // Each model on a graph of its own, so the legs each keeps are its own.
-            OpeningRoutes.OnlyClearWaysRoundForLab = true;
+            Before(true);
             clock.Restart();
             var oldLeg = oldRoutes.LegGains(src, ear, Array.Empty<int>(), Array.Empty<int>());
             oldUs += clock.Elapsed.TotalMilliseconds * 1000;
             var old = Heard(oldAcoustics, oldRoutes, oldLeg, src, ear);
-            OpeningRoutes.OnlyClearWaysRoundForLab = false;
+            Before(false);
             clock.Restart();
             var now = routes.LegGains(src, ear, Array.Empty<int>(), Array.Empty<int>());
             newUs += clock.Elapsed.TotalMilliseconds * 1000;
             legRows.Add((oldLeg, now));
+            // What the worker adds to Steam Audio's answer for the same line (OpeningRoutes.InPlaneCorrection).
+            clock.Restart();
+            var k = routes.InPlaneCorrection(src, ear);
+            correctionUs += clock.Elapsed.TotalMilliseconds * 1000;
+            if (k != Vector3.One) corrected++;
             now = Heard(acoustics, routes, now, src, ear);
             rows.Add((ear, src, old, now, ep, sp));
         }
-        Console.WriteLine($"  {rows.Count} pairs whose line meets something; the straight leg {oldUs / rows.Count:F0} µs before, {newUs / rows.Count:F0} µs after");
+        Console.WriteLine($"  {rows.Count} pairs whose line meets something; the straight leg {oldUs / rows.Count:F0} µs before, {newUs / rows.Count:F0} µs after; "
+                        + $"the simulator's correction {correctionUs / rows.Count:F1} µs, not one on {corrected} ({100.0 * corrected / Math.Max(1, rows.Count):F1} %)");
         for (int b = 0; b < 3; b++)
         {
             var dl = legRows.Select(r => Db(Get(r.New, b)) - Db(Get(r.Old, b))).ToList();
@@ -159,15 +177,25 @@ public static class BarrierSweepSpike
             var levelsOld = rows.Select(r => Db(Get(r.Old, b))).OrderBy(x => x).ToList();
             var levelsNew = rows.Select(r => Db(Get(r.New, b))).OrderBy(x => x).ToList();
             Console.WriteLine($"        level median {Pct(levelsOld, 0.5):F1} -> {Pct(levelsNew, 0.5):F1} dB, 90th {Pct(levelsOld, 0.9):F1} -> {Pct(levelsNew, 0.9):F1}");
+            var q = d.Where(x => x < -0.5f).Select(x => -x).OrderBy(x => x).ToList();
+            if (q.Count > 0)
+                Console.WriteLine($"        quieter by more than 0.5 dB: {q.Count} ({100.0 * q.Count / d.Count:F1} %); of those median {Pct(q, 0.5):F1}, "
+                                + $"90th {Pct(q, 0.9):F1}, 99th {Pct(q, 0.99):F1}, max {q[^1]:F1} dB; over 3 dB {q.Count(x => x > 3f)}, over 10 dB {q.Count(x => x > 10f)}");
         }
         for (int b = 0; b < 3; b++)
         {
             Console.WriteLine($"  biggest, {band[b]} band:");
-            foreach (var r in rows.OrderByDescending(r => Db(Get(r.New, b)) - Db(Get(r.Old, b))).Take(top))
+            foreach (var r in rows.OrderByDescending(r => MathF.Abs(Db(Get(r.New, b)) - Db(Get(r.Old, b)))).Take(top))
             {
-                if (Db(Get(r.New, b)) - Db(Get(r.Old, b)) <= 0.5f) break;
+                if (MathF.Abs(Db(Get(r.New, b)) - Db(Get(r.Old, b))) <= 0.5f) break;
                 Console.WriteLine($"    ear ({r.Ear.X:F2}, {r.Ear.Y:F2}, {r.Ear.Z:F2}) in {Name(map, r.EarPlace)}, source ({r.Src.X:F2}, {r.Src.Y:F2}, {r.Src.Z:F2}) in {Name(map, r.SrcPlace)}, "
                                 + $"{Vector3.Distance(r.Ear, r.Src):F1} m: {Db3(r.Old)} -> {Db3(r.New)} dB");
+                if (panels)
+                {
+                    foreach (var line in routes.ExplainLine(r.Src, r.Ear).Split('\n'))
+                        if (line.Contains("by its edge")) Console.WriteLine("    " + line.Trim());
+                    continue;
+                }
                 foreach (var line in routes.ExplainBarrier(r.Src, r.Ear).Split('\n'))
                     if (line.Contains("round box") || line.Contains("both kinds")) Console.WriteLine("    " + line.Trim());
             }

@@ -1257,7 +1257,7 @@ public sealed class OpeningRoutes
         {
             if (Array.IndexOf(ignoreA, i) >= 0 || Array.IndexOf(ignoreB, i) >= 0) continue;
             if (!SegmentSpan(i, a, b, 0f, out float t0, out float t1)) continue;
-            crossed.Add(CrossingOf(i, t0 * len, t1 * len));
+            crossed.Add(CrossingOf(i, a, b, t0, t1, len));
         }
         if (crossed.Count == 0) return Vector3.One;
         Vector3 through = Constructions.Through(crossed, len > 1e-6f ? (b - a) / len : Vector3.UnitX);
@@ -1265,17 +1265,62 @@ public sealed class OpeningRoutes
         return found ? Vector3.Max(through, round) : through;
     }
 
-    /// <summary>Box i crossed from <paramref name="tIn"/> to <paramref name="tOut"/> metres along a line:
-    /// solids in contact crossed one after another are one construction (Constructions).</summary>
-    private Constructions.Crossing CrossingOf(int i, float tIn, float tOut)
+    /// <summary>Box i crossed by the line from <paramref name="a"/> to <paramref name="b"/>, from <paramref name="t0"/>
+    /// to <paramref name="t1"/> of its length <paramref name="len"/>: solids in contact crossed one after another are
+    /// one construction, and one gone into by its edge pays what the line runs through of it (Constructions).</summary>
+    private Constructions.Crossing CrossingOf(int i, Vector3 a, Vector3 b, float t0, float t1, float len)
     {
         ref readonly var s = ref _solids[i];
         bool layer = !s.IsLeaf && Constructions.IsSheet(s.Size);
-        return new Constructions.Crossing
+        var f = _frames[i];
+        float run = Constructions.RunInsideLocal(Vector3.Transform(a - f.Centre, f.Inverse), Vector3.Transform(b - f.Centre, f.Inverse), s.Size);
+        return Constructions.Of(t0 * len, t1 * len, AcousticRegistry.GetProperties(s.Material), s.Size, s.Build, 1,
+                                layer ? Constructions.Normal(s.Size, s.Rotation) : Vector3.Zero, _solidGains[i], run);
+    }
+
+    /// <summary>
+    /// What charging the straight line's boxes by what it runs through of them does to it, per band, against
+    /// each box's panel figure (Constructions.InPlaneCorrection): 1 unless the line goes into some solid by
+    /// its edge. The worker multiplies Steam Audio's transmission by it, whose faces each carry a panel's figure.
+    /// </summary>
+    public Vector3 InPlaneCorrection(Vector3 source, Vector3 listener)
+    {
+        var scratch = Scratch.Get(this);
+        var cand = scratch.Candidates;
+        _grid.Along(source, listener, cand);
+        var crossed = scratch.Layers;
+        crossed.Clear();
+        float len = Vector3.Distance(source, listener);
+        if (len < 1e-6f) return Vector3.One;
+        bool any = false;
+        foreach (int i in cand)
         {
-            In = tIn, Out = tOut, Props = AcousticRegistry.GetProperties(s.Material), Panel = s.Size, Build = s.Build,
-            Gains = _solidGains[i], Times = 1, Normal = layer ? Constructions.Normal(s.Size, s.Rotation) : Vector3.Zero,
-        };
+            if (!SegmentSpan(i, source, listener, 0f, out float t0, out float t1)) continue;
+            var c = CrossingOf(i, source, listener, t0, t1, len);
+            any |= c.Run > 0f;
+            crossed.Add(c);
+        }
+        return any ? Constructions.InPlaneCorrection(crossed, (listener - source) / len) : Vector3.One;
+    }
+
+    /// <summary>The boxes the straight line passes, one a line: each one's panel figure, and how far the line
+    /// runs inside one it goes into by its edge and what that run lets through. For the lab.</summary>
+    public string ExplainLine(Vector3 source, Vector3 listener)
+    {
+        var sb = new System.Text.StringBuilder();
+        var cand = new List<int>();
+        _grid.Along(source, listener, cand);
+        float len = Vector3.Distance(source, listener);
+        foreach (int i in cand)
+        {
+            if (!SegmentSpan(i, source, listener, 0f, out float t0, out float t1)) continue;
+            var c = CrossingOf(i, source, listener, t0, t1, len);
+            ref readonly var s = ref _solids[i];
+            sb.Append($"        line box {i} {s.Material} ({s.Center.X:F2}, {s.Center.Y:F2}, {s.Center.Z:F2}) size ({s.Size.X:F2}, {s.Size.Y:F2}, {s.Size.Z:F2}), "
+                    + $"in {t0 * len:F2} out {t1 * len:F2} m: panel {Db3(c.AsPanel)}"
+                    + (c.Run > 0f ? $", gone in by its edge, {c.Run:F2} m inside {Db3(c.Gains)}" : "") + "\n");
+        }
+        return sb.ToString();
     }
 
     // ═══ Round one thing and through another ══════════════════════════════════════════════════════
@@ -1334,7 +1379,7 @@ public sealed class OpeningRoutes
             if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
             if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
             if (!SegmentSpan(i, source, listener, 0f, out float t0, out float t1)) continue;
-            line.Add((i, CrossingOf(i, t0 * len, t1 * len)));
+            line.Add((i, CrossingOf(i, source, listener, t0, t1, len)));
         }
 
         // Most promising first: the detour's diffraction times the rest of the line without that box, each
@@ -1488,7 +1533,7 @@ public sealed class OpeningRoutes
             if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
             if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
             if (!SegmentSpan(i, a, b, 0f, out float t0, out float t1)) continue;
-            layers.Add(CrossingOf(i, t0 * len, t1 * len));
+            layers.Add(CrossingOf(i, a, b, t0, t1, len));
             paid.Add(i);
             if (t0 < nearestT) { nearestT = t0; nearest = i; }
         }

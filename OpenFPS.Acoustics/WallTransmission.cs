@@ -193,6 +193,11 @@ public static class WallTransmission
         return BandGains(p, t, a, b, build);
     }
 
+    /// <summary>A panel <paramref name="t"/> thick with a face <paramref name="a"/> by <paramref name="b"/>,
+    /// whichever side is the smallest (a sheet's stuff run through along its plane, Constructions.Along).</summary>
+    public static (float Low, float Mid, float High) PanelBandGains(MaterialProperties p, float t, float a, float b, WallBuild build)
+        => BandGains(p, t, a, b, build);
+
     /// <summary>A panel <paramref name="t"/> thick with a face <paramref name="a"/> by <paramref name="b"/>.</summary>
     private static (float Low, float Mid, float High) BandGains(MaterialProperties p, float t, float a, float b, WallBuild build)
     {

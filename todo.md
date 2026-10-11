@@ -258,8 +258,12 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
   you back on the menu item. Drop the connection in game: "Reconnecting. Escape to cancel."
 - The pops (audit P1): on the Main Street pavement before Marlow Tower's entrance (`/tp -6.4 -103.5
   0.12`) with traffic, no pops from the cars on Wharf Avenue over the car park and the tower. Marlow
-  Tower's floor 1 stairwell (`/tp -10.8 -104.2 3.28`) still has 4 to 11 a minute (the barrier model, under
-  way).
+  Tower's floor 1 stairwell (`/tp -10.8 -104.2 3.28`, the pop hunt's ear `/tp -11.0 -100.8 3.3`): no pops
+  from cars on Dock Street since the barrier model and the slab's edge (2026-10-11); a short dip in their
+  low end as they pass the stair's head. Lines along walls and slabs elsewhere, quieter now: Brandt Court
+  flat 30B `/tp -27.6 161.6 9.4` (Main Street), Marlow Tower corridor floor 4 `/tp -20.5 -50.0 12.4`;
+  Magnolia 26706 Barnett Lane `/tp -357.1 1336.6 -4.2`; Albany 6229 Warwick Court's bathroom `/tp -142.1
+  -35.1 0.0`, 1333 Morse Lane `/tp -377.0 204.6 -1.1`.
 - State by map: with someone on another map at the same time (the speedway while you drive on the city),
   nothing of theirs turns up on yours: no siren on a car nobody switched on, no tyres or skids on the wrong
   thing, the seat's heading steady while you ride.
@@ -416,6 +420,10 @@ and the server's voice line.
   and seals are not modelled.
 - Shut glass front doors let more in than steel doors: 17/28/43 dB against 13/48/58 (`--wall-tl`).
 - Steam Audio counts walls in a row as (2n+1)/3 of one; the tracer counts them exactly.
+- A line run along a sheet pays a panel as thick as its run (2026-10-11): a thin plate's law carried to a
+  block, which overstates a thick wall's high band, and no flanking path of its own through the sheet's
+  junctions. The real places' timber walls are solid 25 cm of wood in the data, so a line along one pays
+  1.7 m of wood; with a stud build it would keep its panel.
 - Diffraction is evaluated at 200/1250/8000 Hz, not the band averages transmission uses.
 
 ### Acoustics
@@ -428,10 +436,12 @@ and the server's voice line.
   -35/-52/-80 dB for 4 m of road, x -19.5 to -15.5. The guard's half is done (2026-10-11, unheard): a way
   round one thing that runs on through another is paid as the diffraction times what its legs pass through
   (docs/GEOMETRY.md 12.6, "Round one thing, through another"), so beside the stretch it is -45/-70/-100, and
-  11 excursions in two minutes are 8. Left: the stretch itself, where the line goes in through the 15 cm
-  edge of the floor slab between two storeys of brick and out of its top, charged as 15 cm of concrete
-  crossed face to face. A sheet entered by its edge is a flanking path, not a panel: the panel model's
-  (WallTransmission, Constructions, Steam Audio's faces in LayeredFaces), a part of its own. Older finds
+  11 excursions in two minutes are 8. The stretch itself is done too (2026-10-11, unheard): a solid gone
+  into by its edge pays what the line runs through of it (docs/GEOMETRY.md 12.6, "A solid gone into by its
+  edge"), and the stairwell has no pops (10 to 0 in two minutes). Left there: a dip, not a jump. For those
+  4 m of road the line through the slab (-57/-78/-100) is 11/9 dB under the brick beside it, because a
+  straight-line model has no way through the brick just over a slab's edge buried in the front. A way round
+  an edge buried in another box, its legs paying that box once, would close it; listen first. Older finds
   of `--pop-hunt`: a car's straight line through one wall as it passes a gap (-80 to -62 dB for 200-400 ms),
   and up to 19 dB between over the wall and over the roof under the covered hall west of Main Street.
 - The barrier model goes round a slab's underside through the earth on the real places (found 2026-10-11 with

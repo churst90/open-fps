@@ -2016,7 +2016,8 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      is the slab's edge, not the guard: from x -19.8 to -15.6 the line goes into the front through the 15 cm edge of the floor slab (1579) between the two storeys'
      brick and out of its top, and the panel model charges that as 15 cm of concrete crossed face to face, where it
      has gone through nearly a metre of it. A sheet entered by its edge is a flanking path (EN 12354), not a panel;
-     that is the panel model's (and Steam Audio's faces, `LayeredFaces`), a part of its own (todo).
+     that is the panel model's (and Steam Audio's faces, `LayeredFaces`), a part of its own: done since, below
+     ("A solid gone into by its edge").
    - **The pavement** (`--pop-hunt ear=-6.4,1.77,-103.5`, 120 s): 1 mid and 4 high before, 2 mid and 6 high after
      (and 0 in an earlier run of this change); every one a car on Wharf Avenue 235 m off seen clear between two
      buildings, or the clear search's own way round, not a way through anything (the traces say "over an edge" or
@@ -2105,6 +2106,110 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      the street below, -78/-100/-100 to -29/-58/-93; 1974 Antelope Court Southwest -76/-100/-100 to
      -29/-56/-89. Two rules would close it, both the barrier model's (todo): a layer of the same construction
      (`Constructions`' contact) does not bury an edge, and the ground buries one.
+   **A solid gone into by its edge (2026-10-11, unheard).** The last of the stairwell's pops.
+   - **How a line was charged.** Every box a straight line touches paid its panel figure once: the material
+     and the box's smallest side as the thickness, the other two as the face (`WallTransmission.BandGains`,
+     at field incidence), however far the line ran inside it. Sheets in contact along the line were one layered
+     panel (`Constructions.Through`). The same in every asker: the hand-rolled tracer (`SpatialService`), the
+     legs of the routes and the barrier model's ways (`OpeningRoutes.LegGains`, `BarrierGains`, `PaidLeg`) and
+     Steam Audio, whose faces each carry a figure such that the three hits a ray makes on one box give the
+     box's panel (`SteamAudioScene.MaterialIndex`, and a construction's broad faces from `LayeredFaces`). So a
+     line into the 15 cm edge of a floor slab and out of its top, 0.8 m later, paid 15 cm of concrete.
+   - **The model.** A panel's loss is a plate driven on one broad face and radiating from the other: its
+     bending, at field incidence, so a line across it at an angle pays its thickness, not its chord. A line
+     into a sheet by a narrow side has not crossed a panel. The side it meets does not move as a plate face,
+     and a sheet's motion in its own plane radiates next to nothing; only bending radiates (Cremer, Heckl and
+     Petersson). What gets through either crosses the stuff on the line or turns into bending where the sheet
+     meets another, which costs more again: EN 12354-1's flanking path between two elements is their mean
+     loss plus the junction's vibration reduction index K_ij (5.7 dB or more for a rigid cross junction,
+     Annex E), plus the area term (Hopkins). So a box gone into or out of by a side other than its two broad
+     faces, and run through further than it is thick, is charged as the stuff the line runs through: a panel as
+     thick as the run, its face the sheet's own (for the flanking share), and never less than the panel
+     (`Constructions.RunInside`, `Constructions.Along`). Face to face is the whole thickness crossed at any
+     angle; a line in a face or along a joint (inside by less than 2 mm) has touched the box, not entered it,
+     and pays the panel as before; a corner clipped (a run no longer than the thickness) pays the panel. A
+     two-leaf build (a stud wall, sealed glazing) is not one stuff: a line along it runs in its cavity, and it
+     keeps its panel. Layers in contact keep their rule, the layer run along as thick as its run.
+   - **Steam Audio.** A face's figure cannot know how far a ray runs inside behind it, and the three hits on a
+     box are not always the same two faces, so its scene is unchanged: every face keeps its panel's figure.
+     The worker multiplies Steam Audio's transmission, per band, by what the panel model's run rule does to the
+     same line against the same boxes as panels (`OpeningRoutes.InPlaneCorrection`, the ratio of
+     `Constructions.Through` with and without the runs): 1 unless the line goes into something by its edge.
+     The barrier model's cap is the line through the boxes its way passes through, now with their runs, so a
+     way round still never passes a wall for less than the line pays for it.
+   - **Where it is approximate.** The run is a thin plate's mass law and coincidence carried to a block as
+     thick as the run, which overstates a thick wall's high band; most runs reach the -100 dB floor in the mid
+     and high bands anyway. The flanking through the junctions a sheet is built into is no path of its own
+     (the panel's flanking share stands for it). At a free edge, a grazing line that moves from a broad face to
+     the edge face jumps from the panel to the run; the way round that edge (Maekawa, a few dB) is louder than
+     either. The real places' timber walls are solid 25 cm of wood in the data, so a line along one pays 1.7 m
+     of wood (-52/-76/-100 where its panel is -24/-48/-76); a timber frame with a stud build would keep its
+     panel. Steam Audio's correction is worked out on the routes' boxes, which are the scene's boxes as they
+     stand.
+   - **The stairwell** (still sources on Dock Street at z -128.5, the worker with Steam Audio, low/mid/high
+     dB): x -19.5 to -15.5, -35/-52/-80 before, -57/-78/-100 now (the slab's run 0.8 m); either side as it was,
+     -45/-69/-100 (over the guard and through the brick front); x -30 and -32 -57/-83/-100 and -50/-87/-100 to
+     -81/-100/-100 and -74/-100/-100 (the lines there go into the same slab by its edge); x -14 -70/-100/-100
+     to -91/-100/-100. `--pop-hunt` (40 cars, 30 still sources, 120 s, the same build with `panels` for the old
+     charge, two runs): 10 and 7 mid-band excursions before, 0 and 0 after (7 to 0 against main's build). What is
+     left is a dip,
+     not a pop: for those 4 m of road the line through the slab is 11/9 dB under the line through the brick
+     beside it. A real front radiates into the stairwell over its whole inner face, so the brick a few
+     centimetres over the slab's edge would be heard there; a straight-line model has only the line, and the
+     barrier model does not go round the slab's edge, which is buried in the brick (its legs would pay the
+     brick twice). A way round an edge buried in another box, its legs paying that box once, would close it
+     (todo).
+   - **The pavement** (`--pop-hunt ear=-6.4,1.77,-103.5`, 120 s, two runs): 2 mid and 4 high, then 3 and 2,
+     before; 1 and 3, then 3 and 6, after. Each is a car on Wharf Avenue 229 to 327 m off: seen clear between
+     two buildings (visibility 0.75 to 1), or the clear search's way over an edge (0 m against 6 m a moment
+     later), some answered on another car's source. The same cars do it with either charge, and none of their
+     lines goes into anything by its edge: which cars it catches moves from run to run.
+   - **The three maps** (`--barrier-sweep map=X n=4000 panels`, the same pairs as above; louder or quieter by
+     more than 0.5 dB, low/mid/high, as heard against the openings):
+     | map | indoor pairs quieter | median of those | most | street heard inside (2,000) | median | most |
+     |---|---|---|---|---|---|---|
+     | city | 0.9/0.3/0.1 % | 10.7/17.9/18.7 dB | 34.8/27.9/19.5 | 1.6/0.4/0.3 % | 9.7/23.3/19.5 | 27.2/28.6/21.3 |
+     | Magnolia | 0.8/0.0/0 % | 3.3/3.7/- | 28.8/3.7/- | 0.6/0.1/0.1 % | 7.7/0.8/7.1 | 27.0/3.9/7.1 |
+     | Albany | 0.6/0.1/0 % | 4.6/3.7/- | 16.4/9.1/- | 2.1/0.5/0.1 % | 6.5/3.9/3.8 | 31.4/23.4/3.8 |
+
+     The median and 90th percentile levels of all pairs did not move by more than 0.3 dB. Louder: none indoors;
+     one street pair on the city by 1.8 dB in the low band (Brandt Court stairwell floor 4 from the street, -82
+     to -80 dB by the openings): a leg's barrier search tries its most promising ways first, by what the line
+     lets through, and with the slab's run paid a better way came within its budget. The biggest, each spelled
+     out by `--path-probe explain` or the sweep's line list:
+     - a line into a tower's floor slab by its edge, in every city building: Brandt Court flat 30B from Main
+       Street, -35/-51/-79 to -57/-80/-100 (a 0.86 m run); Marlow Tower flat 24F from the street to
+       the west, -73/-100/-100 to -100 (1.38 m); Union Building corridor floor 6 from Calder Avenue, -55/-95/-100
+       to -78/-100/-100;
+     - on the real places, a line along a timber or brick wall's length (in by its end, out of its face, 1 to
+       2 m): 26706 Barnett Lane from outside, -47/-96/-100 to -64/-100/-100; 6229 Warwick Court's bathroom,
+       -40/-89/-100 to -67/-100/-100; a line through a 6 cm patio slab or a 0.8 m road box lengthwise (24615
+       Spencer Boulevard, -42/-52/-74 to -57/-52/-74; 1333 Morse Lane, the road 4.3 m, -34/-66/-100 to
+       -53/-88/-100).
+   - **The cost.** The worker's correction, once a tick for each source Steam Audio finds blocked, is one walk
+     along the line's boxes: 4 to 16 µs on the three maps (the sweep's pairs; 8 to 18 % of lines have a run).
+     The legs cost the same as before (city 1,816 and 1,801 µs, Magnolia 1,148 and 1,140, Albany 1,804 and
+     1,796). A run's figure is worked out once per material, centimetre of run and decimetre of face, and kept.
+   - **The guards.** RenderFingerprint, VoiceIdBand, ModelKindTable, PhysicsBoundary, MovementReplay and
+     LibraryBoundary unchanged. Two emitter streams regenerated, both the hand-rolled tracer's five rays round a
+     source (the replay has no Steam Audio): traffic_rain's car 305 (its engine and intake, 305 and -800305)
+     passing the end of the porch's brick wall, 8 frames, at most 1.1 dB quieter and occlusion 0.003 more where one ray runs along the wall's end;
+     places_and_woods' air conditioner (703) at the room's north-east corner, up to 11.8 dB quieter in frames
+     54-60 where its line runs along the north wall's end piece, and the tree, the fountain and their parts
+     (701, 702, -5008413 to -5008427) by at most 0.004 occlusion. Tests: `EdgeOnCrossingTests`.
+   - **Where to listen** (each `--walk-pair map=X ears=...`): Marlow Tower floor 1 stairwell `/tp -10.8 -104.2
+     3.28` and the pop hunt's ear `/tp -11.0 -100.8 3.3` (cars on Dock Street, south: no jump as they pass the
+     stair's head, and a dip in the low band for those few metres); city: Brandt Court flat 30B `/tp -27.6
+     161.6 9.4` (Main Street, south-east), Marlow Tower corridor floor 4 `/tp -20.5 -50.0 12.4` (the street to
+     the west); Magnolia: 26706 Barnett Lane `/tp -357.1 1336.6 -4.2`, 24615 Spencer Boulevard `/tp -271.6
+     -1085.4 2.0`; Albany: 6229 Warwick Court Southwest's bathroom `/tp -142.1 -35.1 0.0`, 1333 Morse Lane
+     Southwest `/tp -377.0 204.6 -1.1` (what is outside, quieter through the wall along its length).
+   - **References.** Cremer, Heckl and Petersson, Structure-Borne Sound, 3rd ed., Springer 2005,
+     https://doi.org/10.1007/b137728 (wave types; radiation is by bending). Hopkins, Sound Insulation,
+     Butterworth-Heinemann 2007, https://doi.org/10.4324/9780080550473 (flanking, EN 12354's paths and K_ij).
+     EN 12354-1 Annex E, K_ij for rigid junctions; the heavy-junction catalogue that tests it:
+     https://upcommons.upc.edu/entities/publication/1935d59a-5a5e-4350-bcc5-aa8a2102ad01/full. The panel model's
+     own sources are in `WallTransmission` (Sharp 1978, EN 12354-1 Annex C).
    **Openings from the floods (step 3, 2026-10-11, approved by ear 2026-10-11).** A flood keeps the cells of each opening its air meets
    and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
    opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide

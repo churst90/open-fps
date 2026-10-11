@@ -11,7 +11,7 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [explain] [emitters] [fields] [overlays=DIR] [root=DIR/]
+/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [explain] [panels] [emitters] [fields] [overlays=DIR] [root=DIR/]
 ///
 /// What the game's occlusion worker hands the mixer for one source and one ear on a real map: occlusion
 /// and the three band gains in dB, with what each part of the answer says on its own — the one-shot
@@ -29,6 +29,8 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// reverb at the ear and the first source's traced echoes give the two ears each time (TracedBinaural).
 /// explain spells out the barrier search for each source: every box on the line, the routes round the
 /// worst, what each ran into, and the way over the top (OpeningRoutes.ExplainBarrier).
+/// panels charges every solid as one panel whatever way the line goes through it, as before 2026-10-11
+/// (Constructions.PanelsOnlyForLab); without it, the line's boxes gone into by an edge are listed with their run.
 /// fields gives each other place's reverberant field at the ear, the level its reverb bus is set to (OpeningRoutes.FieldAt).
 /// emitters lists the sounding entities within 3 m of each source as the client is handed them; overlays=DIR
 /// lays the world editor's edits in DIR over the map, as the server does (read only).
@@ -84,6 +86,7 @@ public static class PathProbeSpike
         int id = 1;
         bool traced = args.Contains("traced");
         Explain = args.Contains("explain");
+        Constructions.PanelsOnlyForLab = args.Contains("panels");
         AsyncAcousticWorker.TraceProvenance = Explain;
         void Ask(Vector3 at) => worker.EnqueueRequest(new AcousticRequest { EntityId = 997, ListenerPos = at, SourcePos = at + Vector3.UnitX, SourceRadius = 0.1f });
         Measure(worker, acoustics, world, ear, srcs, ref id);
@@ -314,13 +317,15 @@ public static class PathProbeSpike
                 walls++;
                 bool layer = !b.Hung && b.Form == null && Constructions.IsSheet(b.Size);
                 crossings.Add(Constructions.Of(at, len - back, AcousticRegistry.GetProperties(b.Material), b.Size, b.Build, 1,
-                                               layer ? Constructions.Normal(b.Size, b.Rotation) : Vector3.Zero));
+                                               layer ? Constructions.Normal(b.Size, b.Rotation) : Vector3.Zero,
+                                               b.Form == null ? Constructions.RunInside(ear, src, b.Center, b.Size, b.Rotation) : 0f));
             }
             Console.WriteLine($"      {walls} wall(s) on the line        {sl,6:F1} {sm,6:F1} {sh,6:F1}  each on its own");
             var c = Constructions.Through(crossings, dir);
             Console.WriteLine($"      the same as constructions   {Bands(c.X, c.Y, c.Z)}  layers in contact one panel");
             if (Explain && worker.Provenance.TryGetValue(id, out var made)) Console.WriteLine($"      worker's answer came from: {made}");
             if (Explain && routes != null) Console.Write(routes.ExplainBarrier(src, ear));
+            if (Explain && routes != null) Console.Write(routes.ExplainLine(src, ear));
             id++;
         }
     }

@@ -603,6 +603,16 @@ public class AsyncAcousticWorker : IDisposable
                 // it last had, so one held but not staged reads back an answer from where it was then.
                 if (!_staged.Contains(kv.Key) || !_saSources.TryGetValue(kv.Key, out var src)) continue;
                 var direct = _saSim.GetResult(src);
+                // Steam Audio's faces each carry their solid's panel figure, so a line into a floor slab by its
+                // edge paid 15 cm of concrete crossed face to face where it ran through nearly a metre of it.
+                // The panel model's figure for what the line runs through, as a share of the panels' own
+                // (Constructions, "A solid gone into by its edge").
+                if (routes != null && direct.Visibility < 1f)
+                {
+                    var k = routes.InPlaneCorrection(kv.Value.SourcePos, kv.Value.ListenerPos);
+                    if (k != Vector3.One)
+                        direct = direct with { TransLow = direct.TransLow * k.X, TransMid = direct.TransMid * k.Y, TransHigh = direct.TransHigh * k.Z };
+                }
 
                 if (_saDebug && kv.Key >= 0)
                 {
