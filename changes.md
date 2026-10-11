@@ -4,6 +4,24 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- The ground in the way (docs/GEOMETRY.md 12.6, "The ground in the way"), unheard. Straight segments went
+  through hills for nothing: the routes' legs, the legs of the ways round, the string over the top and the
+  hand-rolled tracer saw no terrain, and Steam Audio's ground passed its land cover's porous figure, -10/-8/-6
+  dB through bare earth and -8/-4/-2 through grass, for any hill. Now a segment through the earth passes
+  nothing, and what comes is the string over the ground's profile (every corner of the heightfield, as
+  ISO 9613-2 and CNOSSOS-EU go over a terrain profile's ridges), by the barrier model's Maekawa law, for every
+  asker: the worker (Steam Audio's transmission is multiplied by nothing through the earth), the routes, and
+  the one-shot path. Behind the rises on the places: -10/-8/-6 to -5/-7/-12 up to -18/-24/-24. Out of doors on
+  the places 5 to 6.5 % of the sweep's pairs are quieter (median 5 to 11 dB), between places 0 to 0.3 %, from
+  the street indoors 1.2 to 4.1 %; 0.1 to 0.3 % louder (pitched slabs the string can now go over; a lawn and
+  the earth now over the lawn). The city is unchanged. The string takes a nearly level box's top as its face's
+  plane: a road pitched along a slope was gone through and given up. `--barrier-sweep` takes `terrain`,
+  `ground` (both ends out of doors) and `drive=`.
+- Steam Audio on the real places: a solid of more than 64 corners (a swept kerb) threw in
+  `SteamAudioScene.AddPieceMesh`, so no tile scene was made on Magnolia or Albany and every source there fell
+  back to the hand-rolled tracer. Found by `--path-probe` while measuring the ground in the way; fixed, unheard.
+  On the places, what was heard until now was the hand-rolled tracer's.
+
 - When an edge is buried (docs/GEOMETRY.md 12.6, "When an edge is buried"), unheard. The barrier search
   went round no edge within 5 cm of another box. Three rules now, for every asker of the barrier search:
   - A layer of the same construction that ends with the edge does not bury it. A 2 cm finish cut to its

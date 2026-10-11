@@ -212,11 +212,22 @@ public class SpatialAcoustics
         Vector3 apparentPos = sourcePos;
         // Through the walls: the band gains themselves (SpatialService, WallTransmission).
         float gainL = eqL, gainM = eqM, gainH = eqH;
+        int listenerRegionId = GetRegionAt(world, listenerPos);
+        var routes = RoutesFor(world, listenerPos);
+
+        // The tracer sees boxes only, so a line through a hill passed for nothing. The earth passes nothing:
+        // what comes is over the ground's profile and what stands on it, heard from the top it bends over,
+        // as the simulator's path has it (OpeningRoutes.OverTheGround).
+        if (routes != null && routes.OverTheGround(sourcePos, listenerPos, AudioPhysics.CurrentSpeedOfSound, out var over, out var top, out bool overFound))
+        {
+            gainL = over.X; gainM = over.Y; gainH = over.Z;
+            directOcclusion = 1f;
+            Vector3 toTop = top - listenerPos;
+            if (overFound && toTop.LengthSquared() > 1e-6f) apparentPos = listenerPos + Vector3.Normalize(toTop) * directDist;
+        }
 
         // ...and by the openings, where those deliver more (OpeningRoutes): the same rule, and the same
         // graph, as the simulator's path.
-        int listenerRegionId = GetRegionAt(world, listenerPos);
-        var routes = RoutesFor(world, listenerPos);
         if (routes != null
             && routes.Route(sourcePos, GetRegionAt(world, sourcePos), listenerPos, listenerRegionId, out var route))
         {

@@ -472,10 +472,14 @@ and the server's voice line.
   city's floor test, 2026-10-11).
 - A made-up driveway is a straight strip: a house with none clear from the road (Albany 25, Magnolia 4, most
   behind another house) has none. A drive that bends round would give them one.
-- A leg of a way round that dips under a hill between its two bends is not stopped: legs and the string over
-  the top pay boxes, and the terrain is none (docs/GEOMETRY.md 12.6, "When an edge is buried"; the edges
-  themselves are the ground's since 2026-10-11). The straight leg of a route through the earth is the same.
-  The terrain as an obstacle in the legs and in the profile, as ISO 9613-2 takes a ground profile.
+- The ground in the way (2026-10-11, unheard; docs/GEOMETRY.md 12.6, "The ground in the way"): a line or leg
+  through the earth passes nothing and goes over the ground's profile; Steam Audio's ground no longer passes
+  its cover's figure; the one-shot path goes over the ground too. Steam Audio made no tile scene on the places
+  until the same day (a solid of more than 64 corners): what Cody heard there was the hand-rolled tracer.
+  Listen at the spots in 12.6. Left: the shadow boundary steps from nothing to 5 dB (CNOSSOS-EU's lit side to
+  -λ/20, and its flatness test, RIVM 2019-0023 5.4, for boxes and ground alike, a change of the law); rounded
+  brows (ITU-R P.526); round the end of a ridge; a house on the rise is gone over only; a source in a creek's
+  tilted water box takes the box's highest corner.
 - The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost
   25 MB and twice the convolution (Cody).
 - Below 120 Hz the tail of a room you are not in is identical in both ears.

@@ -1053,9 +1053,11 @@ drainage with every tile (2026-10-10, above); swept kerbs on the places' roads w
   and verges; high detail near a player; bridges and tunnels (laid on the ground like any road today);
   kerbs and sidewalks on the world's roads as swept profiles. Order agreed with Cody on 2026-10-10: after
   the sound library and geometry stages (todo.md, Next, in order, item 7).
-- Diffraction over the terrain profile and the ground reflection reading the slope; traffic, walkers and
-  Alex follow the roads' heights where the roads carry them, and anything that leaves a road keeps its old
-  flat assumptions.
+- The ground reflection reading the slope; traffic, walkers and Alex follow the roads' heights where the
+  roads carry them, and anything that leaves a road keeps its old flat assumptions. (Diffraction over the
+  terrain profile is done, 2026-10-11, unheard: docs/GEOMETRY.md 12.6, "The ground in the way". What is left
+  of it: the lit side of the shadow boundary and the flatness test, rounded brows, and going round the end of
+  a ridge.)
 - Rebasing a frame past 8 km, crossing a UTM zone edge, frames that are empty for a while let go.
 - The client's tile cache.
 - Faster tile fetching: not for now (Cody, 2026-10-09). A car above about 65 m/s can still meet unbuilt

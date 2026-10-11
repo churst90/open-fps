@@ -343,7 +343,9 @@ public sealed class SteamAudioScene : IDisposable
             Quaternion boxTurn = rec.BoxRotation;
             int Corner(Vector3 v, Span<Vector3> seen, ref int n)
             {
-                for (int k = 0; k < n; k++) if (seen[k] == v) return first + k;
+                // Only the first corners are kept to share: past them a solid's corners are each its own. Read
+                // past them, a solid of more than 64 (a swept kerb) threw, and no tile scene was made on the places.
+                for (int k = 0; k < Math.Min(n, seen.Length); k++) if (seen[k] == v) return first + k;
                 if (n < seen.Length) seen[n] = v;
                 verts.Add(Phonon.World(box ? TracedPoint(v, boxCentre, boxSize, boxTurn) : v));
                 return first + n++;

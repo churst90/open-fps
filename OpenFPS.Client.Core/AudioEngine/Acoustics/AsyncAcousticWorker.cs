@@ -609,10 +609,11 @@ public class AsyncAcousticWorker : IDisposable
                 // Steam Audio's faces each carry their solid's panel figure, so a line into a floor slab by its
                 // edge paid 15 cm of concrete crossed face to face where it ran through nearly a metre of it.
                 // The panel model's figure for what the line runs through, as a share of the panels' own
-                // (Constructions, "A solid gone into by its edge").
+                // (Constructions, "A solid gone into by its edge"). Its ground's faces carry their land cover's
+                // porous figure, so a line through a hill passed grass twice; through the earth it is nothing.
                 if (routes != null && direct.Visibility < 1f)
                 {
-                    var k = routes.InPlaneCorrection(kv.Value.SourcePos, kv.Value.ListenerPos);
+                    var k = routes.SimulatorCorrection(kv.Value.SourcePos, kv.Value.ListenerPos);
                     if (k != Vector3.One)
                         direct = direct with { TransLow = direct.TransLow * k.X, TransMid = direct.TransMid * k.Y, TransHigh = direct.TransHigh * k.Z };
                 }
