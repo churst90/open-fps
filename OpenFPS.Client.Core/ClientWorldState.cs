@@ -1017,7 +1017,9 @@ public class ClientWorldState
     {
         // The rooms from the walls (docs/GEOMETRY.md 12.6), as the server floods them: until the geometry is
         // built the boxes serve.
-        var defs = definitions as IReadOnlyCollection<EntityDefinition> ?? definitions.ToList();
+        // In id order: the world's dictionary lists them in an order that follows the processor count, and the
+        // map takes its rooms' order, the smaller of two equal overlapping rooms and its openings' ids from it.
+        var defs = definitions.OrderBy(d => d.EntityId).ToList();
         var floods = geometry == null ? null
             : OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, rooms, RoomFloodThreads, measure: true);
         var map = OpenFPS.Common.EntityAcoustics.GenerateRegions(defs, mapSize, min,
@@ -1055,7 +1057,7 @@ public class ClientWorldState
                 lock (_metaLock) { live = AcousticMap; epoch = _mapEpoch; min = _acousticMin; }
                 var geometry = Geometry.Built;
                 if (live == null || geometry == null) return;
-                var defs = _definitions.Values.ToList();
+                var defs = _definitions.Values.OrderBy(d => d.EntityId).ToList();
                 OpenFPS.Common.Geometry.RoomCells cells;
                 lock (_floodLock) cells = OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, _roomFloods, RoomFloodThreads, measure: true);
                 lock (_metaLock)
@@ -1154,7 +1156,7 @@ public class ClientWorldState
         var sw = System.Diagnostics.Stopwatch.StartNew();
         // Cleared before the definitions are read: a room that arrives while this runs sets it again.
         _tablesDirty = false;
-        var defs = _definitions.Values.ToList();
+        var defs = _definitions.Values.ToList();   // put in id order by BuildAcousticMap
         AcousticMap built;
         lock (_floodLock)
             built = BuildAcousticMap(defs, size, min, res, floor, streamed: TileMetres > 0f, report: false,
@@ -1210,7 +1212,8 @@ public class ClientWorldState
                 built.Portals.Remove(id); built.OpeningFrames.Remove(id);
             }
         }
-        foreach (var def in _definitions.Values)
+        // In id order, as the map was built: a portal's place in the map's list is the order routes are met in.
+        foreach (var def in _definitions.Values.OrderBy(d => d.EntityId))
         {
             if (def.Portal.RegionAId == def.Portal.RegionBId) continue;
             bool ends = (def.Portal.RegionAId == AcousticConstants.GlobalRegionId || built.Regions.ContainsKey(def.Portal.RegionAId))
@@ -1258,6 +1261,10 @@ public class ClientWorldState
             crowns.Add(new WoodChorus.Crown(id, _serverTransforms.TryGetValue(id, out var t) ? t.Position : def.Transform.Position, sid[8..]));
             sample ??= def;
         }
+        // By id: the dictionary lists the crowns in an order that follows the processor count, and the woods
+        // take their ids, centres and emitter from the order the crowns come in.
+        crowns.Sort(static (a, b) => a.Id.CompareTo(b.Id));
+        if (crowns.Count > 0) sample = _definitions.TryGetValue(crowns[0].Id, out var first) ? first : sample;
         var chorus = WoodChorus.Build(crowns, (cell, preset) =>
         {
             var key = (cell.X, cell.Z, preset);
@@ -1309,7 +1316,7 @@ public class ClientWorldState
             if (kvp.Value.Type == EntityType.Player || IsWood(kvp.Key)) continue;
             var transform = _serverTransforms.GetValueOrDefault(kvp.Key);
             float d = Vector3.Distance(pos, transform.Position);
-            if (d < bestDist) { bestDist = d; bestId = kvp.Key; }
+            if (d < bestDist || (d == bestDist && kvp.Key < bestId)) { bestDist = d; bestId = kvp.Key; }
         }
         return bestDist < 3.0f ? bestId : null;
     }

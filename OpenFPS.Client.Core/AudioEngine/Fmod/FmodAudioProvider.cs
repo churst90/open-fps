@@ -726,7 +726,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private EngineRenderPool? _enginePool;
     private readonly List<IRenderedVoice> _engineSnapshot = new();
 
-    private readonly List<(float Distance, IRenderedVoice Voice)> _engineOrder = new();
+    private readonly List<(float Distance, int Id, int Lane, IRenderedVoice Voice)> _engineOrder = new();
 
     /// <summary>
     /// Every voice the pool renders ahead, engines and standing machines in one list, nearest first;
@@ -742,16 +742,20 @@ public partial class FmodAudioProvider : IAudioProvider
         lock (_lock)
             foreach (var a in _activeSounds)
             {
-                if (a.EngineState != null) _engineOrder.Add((a.EffectiveDistance, a.EngineState));
+                if (a.EngineState != null) _engineOrder.Add((a.EffectiveDistance, a.EntityId, -1, a.EngineState));
                 else if (a.MachineState != null)
                 {
-                    _engineOrder.Add((a.EffectiveDistance, a.MachineState));
+                    _engineOrder.Add((a.EffectiveDistance, a.EntityId, -1, a.MachineState));
                     // A train's lanes render what its voices read: listed once, just ahead of its nearest voice.
                     if (a.MachineState is TrainSlotState tv && _snapshotTrains.Add(tv.Shared))
-                        foreach (var lane in tv.Shared.Lanes) _engineOrder.Add((a.EffectiveDistance - 0.01f, lane));
+                    {
+                        int l = 0;
+                        foreach (var lane in tv.Shared.Lanes) _engineOrder.Add((a.EffectiveDistance - 0.01f, a.EntityId, l++, lane));
+                    }
                 }
             }
-        _engineOrder.Sort(static (x, y) => x.Distance.CompareTo(y.Distance));
+        // Ties by voice id, then lane: the same order on every machine whatever order the voices started in.
+        _engineOrder.Sort(static (x, y) => (x.Distance, x.Id, x.Lane).CompareTo((y.Distance, y.Id, y.Lane)));
         foreach (var e in _engineOrder) _engineSnapshot.Add(e.Voice);
         return _engineSnapshot;
     }
@@ -1677,7 +1681,7 @@ public partial class FmodAudioProvider : IAudioProvider
             float dist = Vector3.Distance(_listenerPos, a.Position);
             _lateCandidates.Add((a, a.BaseVolume * Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist)));
         }
-        _lateCandidates.Sort((x, y) => y.Level.CompareTo(x.Level));
+        _lateCandidates.Sort(static (x, y) => (y.Level, x.A.EntityId).CompareTo((x.Level, y.A.EntityId)));
         int n = Math.Min(LateField.MaxSources, _lateCandidates.Count);
         _lateLevel.Clear();
         for (int i = 0; i < n; i++)
@@ -1777,7 +1781,7 @@ public partial class FmodAudioProvider : IAudioProvider
             loudest = MathF.Max(loudest, level);
             _echoCandidates.Add((a, score));
         }
-        _echoCandidates.Sort((x, y) => y.Score.CompareTo(x.Score));
+        _echoCandidates.Sort(static (x, y) => (y.Score, x.A.EntityId).CompareTo((x.Score, y.A.EntityId)));
         float floor = loudest * MathF.Pow(10f, -EchoWithinDb / 20f);
         int allowed = _echoRigs.Count;
         var keep = new HashSet<ActiveSound>();
@@ -4187,6 +4191,7 @@ public partial class FmodAudioProvider : IAudioProvider
             })
             .OrderBy(c => c.Priority)
             .ThenBy(c => c.Dist)
+            .ThenBy(c => c.Id)
             .Take(MaxActiveReverbBuses)
             .ToList();
 
@@ -4218,13 +4223,15 @@ public partial class FmodAudioProvider : IAudioProvider
                 {
                     // Leakage through portals, for a map with no openings yet and for two outdoor places,
                     // which share the one unbounded node.
-                    var portals = _acousticMap.Portals.Values.Where(p =>
-                        (p.Portal.RegionAId == regionId && p.Portal.RegionBId == listenerRegionId) ||
-                        (p.Portal.RegionAId == listenerRegionId && p.Portal.RegionBId == regionId) ||
-                        (!IsEnclosure(listenerRegionId) && (p.Portal.RegionAId == regionId || p.Portal.RegionBId == regionId))
+                    var portals = _acousticMap.Portals.Where(kv => kv.Value.Portal is var p && (
+                        (p.RegionAId == regionId && p.RegionBId == listenerRegionId) ||
+                        (p.RegionAId == listenerRegionId && p.RegionBId == regionId) ||
+                        (!IsEnclosure(listenerRegionId) && (p.RegionAId == regionId || p.RegionBId == regionId)))
                     );
 
-                    var nearest = portals.OrderBy(p => Vector3.Distance(lPosVec, p.Position)).FirstOrDefault();
+                    // Ties by id: the map's portals are listed in the order the world's dictionary gave them.
+                    var nearest = portals.OrderBy(kv => Vector3.Distance(lPosVec, kv.Value.Position)).ThenBy(kv => kv.Key)
+                                         .Select(kv => kv.Value).FirstOrDefault();
                     if (nearest.Portal.ApertureSize > 0)
                     {
                         float dist = Vector3.Distance(lPosVec, nearest.Position);
@@ -4740,7 +4747,7 @@ public partial class FmodAudioProvider : IAudioProvider
                                        a.IsReflection, Vector3.Distance(a.Position, a.CurrentApparentPosition) > 1f));
             }
         }
-        all.Sort(static (x, y) => y.Db.CompareTo(x.Db));
+        all.Sort(static (x, y) => (y.Db, x.EntityId).CompareTo((x.Db, y.EntityId)));
         return all.Count > count ? all.GetRange(0, count) : all;
     }
 

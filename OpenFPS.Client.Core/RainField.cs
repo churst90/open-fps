@@ -310,7 +310,8 @@ public sealed class RainSurvey
             {
                 var sources = result.Sources[slot];
                 foreach (var (_, (w, at)) in _onThing[slot]) if (w > 0) sources.Add((at / w, w));
-                sources.Sort(static (a, b) => b.Weight.CompareTo(a.Weight));
+                // Ties by place, not by the order the things were met in (the world's order follows the processor count).
+                sources.Sort(static (a, b) => (b.Weight, a.At.X, a.At.Z, a.At.Y).CompareTo((a.Weight, b.At.X, b.At.Z, b.At.Y)));
                 if (sources.Count > MaxSources) sources.RemoveRange(MaxSources, sources.Count - MaxSources);
             }
         }

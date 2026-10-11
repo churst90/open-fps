@@ -34,7 +34,7 @@ public static class NamedPlaces
             var size = e.Definition.Collider.Size;
             if (!GeometryUtils.IsPointInOBB(point, e.Transform.Position, size, e.Transform.Rotation)) continue;
             float volume = size.X * size.Y * size.Z;
-            if (volume < bestVolume) { bestVolume = volume; best = id; }
+            if (volume < bestVolume || (volume == bestVolume && id < best)) { bestVolume = volume; best = id; }
         }
         return best;
     }
