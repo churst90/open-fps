@@ -57,8 +57,8 @@ public sealed partial class CombatService
 
     /// <summary>Walkers taken off the street, and when somebody walks their way again.</summary>
     private readonly List<(string MapId, int DeadId, double DueAt)> _comingBack = new();
-    /// <summary>Dead players already told the last ten seconds, by entity id.</summary>
-    private readonly HashSet<int> _reminded = new();
+    /// <summary>Dead players already told the last ten seconds, by map and entity id.</summary>
+    private readonly HashSet<(string MapId, int Id)> _reminded = new();
 
     /// <summary>Where a gun is held, in the body's frame: a reload is heard from the hands.</summary>
     private static readonly Vector3 Hands = new(0f, 1.25f, 0.35f);
@@ -1430,12 +1430,16 @@ public sealed partial class CombatService
             if (!world.Has<PlayerComponent>(e)) { (due ??= new List<Entity>()).Add(e); return; }
             double left = dead.DiedAt + PlayerRespawnSeconds - now;
             if (left <= 0) (due ??= new List<Entity>()).Add(e);
-            else if (left <= RespawnReminderSeconds && !_reminded.Contains(e.Id)) (remind ??= new List<Entity>()).Add(e);
+            else if (left <= RespawnReminderSeconds && !_reminded.Contains((mapId, e.Id))) (remind ??= new List<Entity>()).Add(e);
         });
+        // Somebody who left dead leaves no reminder behind for whoever is given their id next.
+        if (_reminded.Count > 0 && LookupFor(world) is { } byId)
+            _reminded.RemoveWhere(k => k.MapId == mapId
+                && !(byId.TryGetValue(k.Id, out var p) && world.IsAlive(p) && world.Has<DeadComponent>(p)));
         if (remind != null)
             foreach (var e in remind)
             {
-                _reminded.Add(e.Id);
+                _reminded.Add((mapId, e.Id));
                 if (SessionOf(world, e) is { } s)
                     _server.SendToSession(s, new TextEvent { Text = $"You come back in {RespawnReminderSeconds:0} seconds." });
             }
@@ -1470,7 +1474,7 @@ public sealed partial class CombatService
     private void Respawn(string mapId, World world, Entity e)
     {
         world.Remove<DeadComponent>(e);
-        _reminded.Remove(e.Id);
+        _reminded.Remove((mapId, e.Id));
         // A player beacon again (EntityDefinitionFactory).
         _server.SyncAudioComponent(e.Id);
         if (world.Has<HealthComponent>(e))
@@ -1500,6 +1504,8 @@ public sealed partial class CombatService
         if (RetireWalker != null && world.Has<Pedestrian>(e) && RetireWalker(mapId, world, e))
             _comingBack.Add((mapId, id, diedAt + WalkerRespawnSeconds));
         if (!world.IsAlive(e)) return;
+        // Whatever the traffic was moving lets go of it, or the next entity given this id inherits it.
+        ForgetVehicle?.Invoke(mapId, id);
         _maps.DestroyEntity(mapId, e);
         _server.BroadcastRemoval(mapId, id);
     }

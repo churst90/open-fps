@@ -94,8 +94,8 @@ public class ClientAudioSelectionTests
         var started = h.Mixer.Started.Skip(starts).Select(e => e.EntityId).ToList();
         var stopped = h.Mixer.Stopped.Skip(stops).ToList();
         _o.WriteLine($"in 10 s standing still: started {string.Join(", ", started)}; stopped {string.Join(", ", stopped)}");
-        Assert.Empty(started.Where(id => id >= 1 && id <= n || id == Lone));
-        Assert.Empty(stopped.Where(id => id >= 1 && id <= n || id == Lone));
+        Assert.DoesNotContain(started, id => id >= 1 && id <= n || id == Lone);
+        Assert.DoesNotContain(stopped, id => id >= 1 && id <= n || id == Lone);
         Assert.Contains(Lone, h.Mixer.Live);
         Assert.Equal(budget, Enumerable.Range(1, budget).Count(h.Mixer.Live.Contains));
     }
@@ -126,8 +126,8 @@ public class ClientAudioSelectionTests
         var stopped = h.Mixer.Stopped.Skip(stops).ToList();
         _o.WriteLine($"6 s after the bus arrived: started {string.Join(", ", started)}; stopped {string.Join(", ", stopped)}");
         Assert.Contains(Lone, h.Mixer.Live);
-        Assert.Empty(stopped.Where(id => id >= 1 && id <= budget));
-        Assert.Empty(started.Where(id => id >= 1 && id <= budget));
+        Assert.DoesNotContain(stopped, id => id >= 1 && id <= budget);
+        Assert.DoesNotContain(started, id => id >= 1 && id <= budget);
         Assert.Equal(budget, Enumerable.Range(1, budget).Count(h.Mixer.Live.Contains));
     }
 

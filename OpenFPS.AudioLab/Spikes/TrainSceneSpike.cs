@@ -63,7 +63,7 @@ public static class TrainSceneSpike
         { Console.WriteLine("FAIL: no city map"); return 1; }
         var rail = new RailSystem();
         var resend = new HashSet<int>();
-        var crossings = new CrossingSystem(rail, id => resend.Add(id));
+        var crossings = new CrossingSystem(rail, (_, id) => resend.Add(id));
 
         // The map's own light rail sets stay off: one train, the one under test.
         var trackData = cityData.Tracks!.First(t => t.Id == "rail_loop");

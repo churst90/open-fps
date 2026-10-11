@@ -29,14 +29,14 @@ public sealed class FireSystem
     }
 
     private readonly Dictionary<string, MapFire> _maps = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Action<int>? _resend;
+    private readonly Action<string, int>? _resend;
 
     /// <summary>How often the spread is stepped, s.</summary>
     public const float StepSeconds = 1f;
 
     /// <param name="resend">Asks the server to send an entity's definition again: a fire's state
-    /// (SynthRunning, Quench) lives there.</param>
-    public FireSystem(Action<int>? resend = null) { _resend = resend; }
+    /// (SynthRunning, Quench) lives there. Given the map and the entity.</param>
+    public FireSystem(Action<string, int>? resend = null) { _resend = resend; }
 
     /// <summary>A map's spread, if anything has been lit or struck there.</summary>
     public FireSpread? SpreadOf(string mapId) => _maps.TryGetValue(mapId, out var m) ? m.Sim : null;
@@ -215,7 +215,7 @@ public sealed class FireSystem
                 {
                     em.SynthRunning = b.Running;
                     em.Quench = b.Quench;
-                    _resend?.Invoke(e.Id);
+                    _resend?.Invoke(mapId, e.Id);
                 }
                 continue;
             }
@@ -238,7 +238,7 @@ public sealed class FireSystem
                 EntityType.StaticObject));
             if (e == Entity.Null) continue;
             m.Emitters[key] = e;
-            _resend?.Invoke(e.Id);
+            _resend?.Invoke(mapId, e.Id);
         }
         if (m.Emitters.Count == live.Count) return;
         foreach (var key in m.Emitters.Keys.Where(k => !live.Contains(k)).ToList())

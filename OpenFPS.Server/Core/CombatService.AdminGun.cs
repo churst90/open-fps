@@ -255,7 +255,7 @@ public sealed partial class CombatService
 
     /// <summary>Whether something is moved by the vehicle system (traffic, people walking), and so can be
     /// frozen. The server hands it over; without it only people and driven vehicles are.</summary>
-    public Func<int, bool>? MovedByTraffic { get; set; }
+    public Func<string, int, bool>? MovedByTraffic { get; set; }
 
     /// <summary>What an admin round does where it lands, for vaporize, freeze and inspect. Always ends
     /// the round.</summary>
@@ -277,7 +277,7 @@ public sealed partial class CombatService
             case AdminGunMode.Freeze:
             {
                 var target = body ? hit : RootOf(world, lookup, hit);
-                if (!CanFreeze(world, target))
+                if (!CanFreeze(mapId, world, target))
                 {
                     Tell($"Nothing to freeze: {ThingName(world, hit)} does not move.");
                     return true;
@@ -295,9 +295,9 @@ public sealed partial class CombatService
 
     // ── Freezing ────────────────────────────────────────────────────────────────────────────────
 
-    private bool CanFreeze(World world, Entity e)
+    private bool CanFreeze(string mapId, World world, Entity e)
         => world.IsAlive(e) && !world.Has<DeadComponent>(e)
-           && (IsPerson(world, e) || world.Has<DriveComponent>(e) || (MovedByTraffic?.Invoke(e.Id) ?? false));
+           && (IsPerson(world, e) || world.Has<DriveComponent>(e) || (MovedByTraffic?.Invoke(mapId, e.Id) ?? false));
 
     /// <summary>Holds something still for <see cref="AdminGun.FreezeSeconds"/>: a player is told, and the
     /// stun gun's crackle is heard on them. A driver frozen freezes what they are driving.</summary>

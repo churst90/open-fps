@@ -20,8 +20,8 @@ public sealed partial class VehicleSystem
     private sealed record Retired(DemoVehicle V, NameComponent Name, IdentityComponent Identity,
                                   ColliderComponent Collider, Pedestrian Person);
 
-    /// <summary>Walkers taken off the street and not yet replaced, by the dead one's entity id.</summary>
-    private readonly Dictionary<int, Retired> _retired = new();
+    /// <summary>Walkers taken off the street and not yet replaced, by the map and the dead one's entity id.</summary>
+    private readonly Dictionary<(string MapId, int Id), Retired> _retired = new();
 
     /// <summary>
     /// Takes a dead person off the street: out of the world, and every client told. True when they were
@@ -43,14 +43,14 @@ public sealed partial class VehicleSystem
                 return false;
             }
 
-        if (!_byEntity.TryGetValue(dead.Id, out var v) || v.MapId != mapId) return false;
+        if (!_byEntity.TryGetValue((mapId, dead.Id), out var v)) return false;
         var name = world.Has<NameComponent>(dead) ? world.Get<NameComponent>(dead) : new NameComponent { Name = "someone walking" };
         var identity = world.Has<IdentityComponent>(dead) ? world.Get<IdentityComponent>(dead) : new IdentityComponent { Name = name.Name };
         var collider = world.Has<ColliderComponent>(dead) ? world.Get<ColliderComponent>(dead)
                      : new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(0.5f, 1.8f, 0.5f), IsSolid = false };
         var person = world.Has<Pedestrian>(dead) ? world.Get<Pedestrian>(dead) : new Pedestrian { Voice = "", Pair = "" };
-        _retired[dead.Id] = new Retired(v, name, identity, collider, person);
-        _byEntity.Remove(dead.Id);
+        _retired[(mapId, dead.Id)] = new Retired(v, name, identity, collider, person);
+        _byEntity.Remove((mapId, dead.Id));
         // Nobody is on a crossing or waiting at its kerb any more: traffic is not held for them.
         v.ClearedFor = null;
         v.WaitingFor = null;
@@ -79,9 +79,8 @@ public sealed partial class VehicleSystem
     public Entity ReplaceWalker(string mapId, World world, int deadId)
     {
         var maps = _maps;
-        if (maps == null || !_retired.Remove(deadId, out var r)) return Entity.Null;
+        if (maps == null || !_retired.Remove((mapId, deadId), out var r)) return Entity.Null;
         var v = r.V;
-        if (v.MapId != mapId) return Entity.Null;
 
         Vector3 start;
         float heading;
@@ -112,7 +111,7 @@ public sealed partial class VehicleSystem
         if (e == Entity.Null) return Entity.Null;
         v.Entity = e;
         v.Gone = false;
-        _byEntity[e.Id] = v;
+        _byEntity[(mapId, e.Id)] = v;
         Log.Information("Map {Map}: somebody new ({New}) walks the way {Name} ({Old}) walked.",
                         mapId, e.Id, v.DisplayName, deadId);
         return e;
@@ -149,5 +148,5 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>Tests: whether a walker's walk has nobody on it, waiting for somebody new.</summary>
-    internal bool IsRetiredForTest(int deadId) => _retired.ContainsKey(deadId);
+    internal bool IsRetiredForTest(string mapId, int deadId) => _retired.ContainsKey((mapId, deadId));
 }

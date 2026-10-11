@@ -86,7 +86,7 @@ public partial class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
     }
 
     /// <summary>A place's ground, the file beside its map (MapElevation.File), into another maps folder.</summary>
-    public static void CopyGround(string id, string placesDir)
+    internal static void CopyGround(string id, string placesDir)
     {
         string ground = Path.Combine(AppContext.BaseDirectory, "places", id + ".elevation");
         if (File.Exists(ground)) File.Copy(ground, Path.Combine(placesDir, id + ".elevation"), overwrite: true);

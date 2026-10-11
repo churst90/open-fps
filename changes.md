@@ -16,6 +16,35 @@ Recent work, newest first. `git log` has the rest.
 - Nothing of a room is authored any more (docs/GEOMETRY.md 12.6, "Nothing authored of a room"): a prefab has no
   RoomSize, RoomMaterials or ReverbScale, and the editor no face materials. A region is the box its collider fills;
   a room's shape and what lines it come from its walls. No map changed and no sound.
+- State kept by entity id alone is kept by map as well, unheard. Every map is its own world and entity ids start
+  again in each, so the server, which steps city, speedway, the real places and the world's frames together,
+  shared state between a thing on one map and whatever had the same id on another. Found and fixed:
+  - A driven car's wheel simulation (`DrivingSystem._running`): a parked car on one map stopped the wheels of
+    a car being driven on another, and the broadcast sent either the other's wheels. Now one table per world,
+    each entry carrying its entity's version, and a car no longer driven is dropped after the world's step.
+  - The traffic by entity (`VehicleSystem._byEntity`): the broadcast's wheels and tyre demand for a car could
+    be another map's car's, or a walker's (tyres and skids heard on the wrong thing); the admin gun's freeze
+    asked with no map at all, and its forget could not find a walker whose id another map's car had taken.
+    Now by map and id, and so the walkers waiting to be replaced (`_retired`), which another map's dead walker
+    with the same id used to overwrite.
+  - The horn and siren switches (`VehicleSignals`): a siren switched on in one car sounded on every drivable
+    vehicle with that id on every map, and on a new car given a destroyed one's id. Now per world and version.
+  - The headings of what people are riding in (`OccupancySystem`): each map's step read the last map's, so a
+    player in a car on one map was turned by the difference between it and a bus with the same id on another.
+  - Door apertures last announced (`DoorSystem`): a shut door was re-sent every tick while a door with its id
+    stood open on another map. Now per world, and a door gone with its tile is forgotten.
+  - The doors parked drivers are using (`VehicleSystem.Parking`), the junction conflict cache (keyed by lane
+    segment numbers, which every map's roads start from zero), and the dead players already told how long
+    they have (`CombatService`): all by map now. Anything the traffic moved that is taken away dead is
+    forgotten by it too, so the next entity given its id does not inherit it.
+  - Definitions resent at the next broadcast go to the entity's own map when the caller says which: doors,
+    level crossings, fires and the traffic's engines do. A caller that does not say still resends on every map
+    with that id, which costs bytes but loses nothing.
+  - Checked and already by map or by world: rail, crossings, pedestrian speech, crowds, the panhandler, Alex,
+    door manners, crosswalks, lanes, junction slots, fire, ground and road water, map tiles and geometry, the
+    editor's hands, stacks and touches, build sessions, and each session's known entities.
+- Build warnings: the ten xUnit analyzer warnings in the tests and the four stack buffers made in a loop in the
+  lab's glass and street spikes are gone; the server, the GTK client, the lab and the tests build with none.
 - Openings framed from where the rooms' air meets them, unheard (docs/GEOMETRY.md 12.6, "Openings from the
   floods"). A flooded room no longer has openings found in its box's faces: on Albany 1,530 rooms had 33,342 m2 of
   openings to the outdoors that their walls do not have (a box's face across its own house's wing, walls the face

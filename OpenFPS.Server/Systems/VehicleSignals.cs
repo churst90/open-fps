@@ -22,9 +22,13 @@ public static class VehicleSignals
         public float TapLeft;
         public bool SirenOn;
         public SirenMode Tone = SirenMode.Wail;
+        /// <summary>The vehicle's entity version: an id taken again by a new vehicle starts with its switches off.</summary>
+        public int Version;
     }
 
-    private static readonly ConcurrentDictionary<int, Switches> _byVehicle = new();
+    /// <summary>Each world's switches, by vehicle entity id. By world, because ids start again in every
+    /// map's world, and a world that goes takes its switches with it.</summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<World, ConcurrentDictionary<int, Switches>> _byVehicle = new();
 
     /// <summary>How long a held horn survives without a packet saying so: a few ticks of loss, not a
     /// driver who has gone.</summary>
@@ -37,30 +41,42 @@ public static class VehicleSignals
     /// has. Hi-lo, the European two-tone, is chosen by name (/siren hilo).</summary>
     private static readonly SirenMode[] Tones = { SirenMode.Wail, SirenMode.Yelp, SirenMode.Phaser };
 
-    private static Switches Of(int vehicleId) => _byVehicle.GetOrAdd(vehicleId, _ => new Switches());
+    private static Switches Of(World world, Entity vehicle)
+    {
+        var all = _byVehicle.GetValue(world, static _ => new());
+        if (all.TryGetValue(vehicle.Id, out var s) && s.Version == vehicle.Version) return s;
+        return all[vehicle.Id] = new Switches { Version = vehicle.Version };
+    }
+
+    private static bool TryFind(World world, Entity vehicle, out Switches s)
+    {
+        s = null!;
+        return _byVehicle.TryGetValue(world, out var all) && all.TryGetValue(vehicle.Id, out s!) && s.Version == vehicle.Version;
+    }
 
     /// <summary>A driver's input packet: the horn key down or up.</summary>
-    public static void Horn(int vehicleId, bool held)
+    public static void Horn(World world, Entity vehicle, bool held)
     {
-        if (!held && !_byVehicle.ContainsKey(vehicleId)) return;
-        var s = Of(vehicleId);
+        if (!held && !TryFind(world, vehicle, out _)) return;
+        var s = Of(world, vehicle);
         s.Horn = held;
         if (held) s.HornAge = 0f;
     }
 
     /// <summary>A half-second blast, for a session that cannot hold a key.</summary>
-    public static void Tap(int vehicleId) => Of(vehicleId).TapLeft = TapSeconds;
+    public static void Tap(World world, Entity vehicle) => Of(world, vehicle).TapLeft = TapSeconds;
 
-    public static bool HornSounding(int vehicleId)
-        => _byVehicle.TryGetValue(vehicleId, out var s) && (s.Horn || s.TapLeft > 0f);
+    public static bool HornSounding(World world, Entity vehicle)
+        => TryFind(world, vehicle, out var s) && (s.Horn || s.TapLeft > 0f);
 
-    public static (bool On, SirenMode Tone) Siren(int vehicleId)
-        => _byVehicle.TryGetValue(vehicleId, out var s) ? (s.SirenOn, s.Tone) : (false, SirenMode.Wail);
+    public static (bool On, SirenMode Tone) Siren(World world, Entity vehicle)
+        => TryFind(world, vehicle, out var s) ? (s.SirenOn, s.Tone) : (false, SirenMode.Wail);
 
     /// <summary>Lets go of horns nobody is holding any more. Once a tick.</summary>
     public static void Update(float dt)
     {
-        foreach (var s in _byVehicle.Values)
+        foreach (var (_, all) in _byVehicle)
+        foreach (var s in all.Values)
         {
             if (s.Horn)
             {
@@ -79,7 +95,7 @@ public static class VehicleSignals
     {
         string? head = SirenOf(world, root);
         if (head == null) return "This vehicle has no siren.";
-        var s = Of(root.Id);
+        var s = Of(world, root);
         string word = args.Length > 0 ? args[0].Trim().ToLowerInvariant() : "";
         switch (word)
         {
@@ -131,7 +147,7 @@ public static class VehicleSignals
         if (!world.Has<DriveComponent>(e)) return 0;
         bool horn = false, siren = false;
         var tone = SirenMode.Wail;
-        if (_byVehicle.TryGetValue(e.Id, out var s))
+        if (TryFind(world, e, out var s))
         {
             horn = s.Horn || s.TapLeft > 0f;
             siren = s.SirenOn;

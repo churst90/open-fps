@@ -54,7 +54,7 @@ public class VehicleMotionTests : IDisposable
         public required Entity Entity;
         public VehicleSystem.Inspection State
         {
-            get { Assert.True(Vehicles.TryInspect(Id, out var s)); return s; }
+            get { Assert.True(Vehicles.TryInspect("motion", Id, out var s)); return s; }
         }
         public Vector3 Position => World.Get<Transform>(Entity).Position;
         /// <summary>The map's doors, when a test needs them to move (a door with a sensor or a closer).</summary>
@@ -327,7 +327,7 @@ public class VehicleMotionTests : IDisposable
         rig.Tick(30 * 3);
         float from = rig.State.Speed;
         Assert.True(from > 15f);
-        Assert.True(rig.Vehicles.BrakeHard(rig.Id, 3f));
+        Assert.True(rig.Vehicles.BrakeHard("motion", rig.Id, 3f));
         float prev = from, worstDecel = 0f, worstDemand = 0f, lowest = from;
         for (int i = 0; i < 30 * 4; i++)
         {
@@ -342,7 +342,7 @@ public class VehicleMotionTests : IDisposable
         Assert.InRange(worstDecel, expected * 0.97f, expected * 1.01f);
         Assert.InRange(lowest, 2.9f, 3.3f);
         Assert.InRange(worstDemand, 0.85f, 1.0f);
-        Assert.False(rig.Vehicles.BrakeHard(-12345, 1f));
+        Assert.False(rig.Vehicles.BrakeHard("motion", -12345, 1f));
         // A moment, not a new speed limit: it gets going again.
         rig.Tick(30 * 12);
         Assert.True(rig.State.Speed > from * 0.9f, $"still at {rig.State.Speed:F1} m/s twelve seconds after a hard stop from {from:F1}");
@@ -447,10 +447,10 @@ public class VehicleMotionTests : IDisposable
         var road = new Vector3(0, 0.1f, 0); var end = new Vector3(0, 0.1f, 50);
         var rig = Build(Circle(60f), Car(corneringG: 1f), life: new StreetLifeData(),
                         more: new() { new() { Name = "Mower", Preset = "mower_push", RoadStart = road, RoadEnd = end } });
-        Assert.True(rig.Vehicles.TryInspect(rig.Id, out var car));
+        Assert.True(rig.Vehicles.TryInspect("motion", rig.Id, out var car));
         Assert.True(car.OnStreet);
         Assert.Equal(OpenFPS.Common.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy")), car.Horn);
-        Assert.True(rig.Vehicles.TryInspect(Spawned()["Mower"].Id, out var mower));
+        Assert.True(rig.Vehicles.TryInspect("motion", Spawned()["Mower"].Id, out var mower));
         Assert.False(mower.OnStreet);
         Assert.Equal("", mower.Horn);
 

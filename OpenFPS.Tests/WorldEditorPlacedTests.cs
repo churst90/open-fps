@@ -176,7 +176,7 @@ public class WorldEditorPlacedTests : IDisposable
         var filtered = rig.Menu("placed", "megaphone")!;
         Assert.Equal("1 of 2 placed on this map match megaphone, nearest first", filtered.Title);
         Assert.Single(filtered.Items, i => i.Kind == EditorItemKind.Menu);
-        Assert.Empty(rig.Menu("placed", "within", "10", "metres")!.Items.Where(i => i.Kind == EditorItemKind.Menu));
+        Assert.DoesNotContain(rig.Menu("placed", "within", "10", "metres")!.Items, i => i.Kind == EditorItemKind.Menu);
         Assert.Equal(2, rig.Menu("placed", "within", "60")!.Items.Count(i => i.Kind == EditorItemKind.Menu));
         Assert.Equal(2, rig.Menu("placed", "tester")!.Items.Count(i => i.Kind == EditorItemKind.Menu));
 

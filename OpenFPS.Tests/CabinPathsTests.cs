@@ -65,7 +65,7 @@ public class CabinPathsTests
         var ear = new Vector3(-0.36f, 1.25f, 0.28f);
         for (int p = 0; p < lay.Count; p++)
             Assert.Equal(CabinPaths.PlacedMetres, CabinPaths.Offset(lay, p, ear).Length(), 3);
-        Assert.Equal(CabinPaths.OnePlace.Length(), CabinPaths.PlacedMetres, 2);
+        Assert.Equal(CabinPaths.PlacedMetres, CabinPaths.OnePlace.Length(), 2);
     }
 
     /// <summary>Mean square of the voice inside, pascals, over <paramref name="seconds"/> after one to settle.</summary>
