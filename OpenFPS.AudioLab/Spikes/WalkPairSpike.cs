@@ -13,6 +13,7 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// <summary>
 /// --walk-pair map=magnolia_tx at=E,N,H [heading=DEG] [key=w|a|s|d] [ticks=90] [taps=N gap=10] [sprint] [full] [from=E,N,H] [open=ID,...] [show=all]
 /// --walk-pair map=... room=ID[,ID...]  the standing spot in each room (StandingSpots.InRoom; the map file's ids), as /tp takes it
+/// --walk-pair map=... ears=x,y,z[;x,y,z...]  the standing spot nearest each ear the lab measured at (engine coordinates)
 ///
 /// One walk taken twice from the same spot: by the server's MovementSystem.Update with a real session and
 /// queued inputs, and by the client's ClientPhysicsSystem.Predict over the client's world as it arrives
@@ -48,6 +49,20 @@ public static class WalkPairSpike
                 if (StandingSpots.InRoom(ecs, grid, room) is { } spot)
                     Console.WriteLine($"  #{id} {name}: /tp {StandingSpots.Typed(spot)}   (engine {V(spot)})");
                 else Console.WriteLine($"  #{id} {name}: no standing spot");
+            }
+            return 0;
+        }
+
+        if (Arg(args, "ears") is { } earsArg)
+        {
+            // An ear the lab measured at (engine coordinates, 1.6 m over its floor): the nearest spot a body
+            // stands on within a 4 m square round it, on that floor.
+            foreach (var part in earsArg.Split(';'))
+            {
+                var f = part.Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray();
+                var floor = new Vector3(f[0], f[1] - 1.6f, f[2]);
+                var spot = StandingSpots.In(ecs, grid, floor + new Vector3(0, 1.2f, 0), Quaternion.Identity, new Vector3(4f, 2.4f, 4f));
+                Console.WriteLine($"  ear {V(new Vector3(f[0], f[1], f[2]))}: {(spot is { } s ? $"/tp {StandingSpots.Typed(s)}   (engine {V(s)})" : "no standing spot")}");
             }
             return 0;
         }

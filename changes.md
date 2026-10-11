@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- Behind walls, a way round one thing that runs on through another is counted (docs/GEOMETRY.md 12.6, "Round
+  one thing, through another"), unheard. It was thrown out, and a low wall before a heavier one was charged its
+  whole transmission: in Marlow Tower's floor 1 stairwell a car on Dock Street jumped 22 to 31 dB as its line
+  came out of the stair guard's shadow. Now such a way is paid as Maekawa's loss for its detour times what its
+  legs pass through, by the panel model, and competes with the straight line and the openings as before; it can
+  only add, and never passes a wall for less than the line pays for it. Beside the stairwell's stretch the car
+  is -45/-70/-100 dB instead of -57/-83/-100; the stretch itself is the floor slab's edge, left for the panel
+  model. On the three maps, 2 to 21 % of blocked pairs are louder in some band, most where a line clips a corner,
+  a slab's edge or a neighbour's shed before a wall, or passes a pier beside a window. A leg costs 1 to 10 % more.
+  The emitter streams and render fingerprints are unchanged. The lab's `--barrier-sweep` measures it on any map,
+  and `--walk-pair ears=` finds a standing spot by each ear it reports.
 - The emitter-stream replay turns vehicles and the listener as the game does (+Z forward, yaw toward east), not
   backwards; a test fix, no game change. All eight streams regenerated (docs/SPECIAL_CASES_AUDIT.md, P0).
 
