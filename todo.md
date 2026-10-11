@@ -74,6 +74,10 @@ other at login. The server and the Windows zip go out together.
    P8 (laws in one place) after; then P3a-d (the voice registry: one list, one writer, one start, which is the
    path pass above widened to every voice range) with P6; then P4 (one ranking), then P7 (machine state from
    the server, a wire change). P0 and P1 started 2026-10-11.
+   P0 merged 2026-10-11. Found by it: the replay harness faces moving vehicles backwards (`Replay.Facing`
+   takes -Z as forward; the server's vehicles face +Z, `VehicleSystem.Parking.cs:323`), so a replayed car's
+   grille, siren and horn sit at its tail. Fix in a commit of its own with walk, drive and traffic_rain
+   regenerated, before P3a reads those lines.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,

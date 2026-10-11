@@ -1683,6 +1683,10 @@ written down (`StreamMixer`) and compared with `streams/<scenario>.txt.gz`:
 | `drive` | 360 | riding east at 12 m/s along a wall, an oncoming car sounding its horn as it nears |
 | `traffic_rain` | 360 | standing by a wall under a porch roof in 8 mm/h of rain, five cars on two lanes and a crossing street |
 
+Five more since 2026-10-11, 120 frames each, from part P0 of docs/SPECIAL_CASES_AUDIT.md (which lists what
+each shows and which later part should change which lines): `sirens_and_far_traffic`, `train_behind_wall`,
+`places_and_woods`, `talker_and_aids` and `high_ids`. 260 KB more.
+
 - Recorded: every voice started (the whole emitter, every field), re-placed (the fields that changed),
   stopped and faded; every acoustic path (the fields that changed); the listener, shelter, boundaries,
   ear wind, enclosure, reverb, air, ambience beds, registered sounds (a hash of the PCM). 37,000 lines
