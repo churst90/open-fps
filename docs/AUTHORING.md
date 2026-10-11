@@ -74,7 +74,7 @@ shape of it.
 | Emitter | `HasEmitter` + `SoundId`, `StartSoundId`, `StopSoundId`, `Volume`, `Range`, `MinDistance`, `Mode`, `EmitterDirection`, `EmitterOffset`, `Cone*`, `RepeatIntervalSeconds` | `SoundEmitterComponent` |
 | Granular | `IsGranular`, `Granular*` | (same component) |
 | Synth | `IsSynth`, `Synth*` | (same component) |
-| Region | `IsIndoor`, `RoomSize`, `AmbienceId`, `ReverbScale`, `RoomMaterials` | `RegionComponent` |
+| Region | `IsIndoor` | `RegionComponent` |
 | Portal | `RegionAId`, `RegionBId`, `ApertureSize` | `PortalComponent` |
 | Door | `IsDoor`, `DoorKind`, `HingeSide`, `PushSide`, `KeyedSide`, `SwingSeconds`, `SwingDegrees`, `DoorSkinMetres`, `Slides`, `Powered`, `SensorMetres`, `CloseAfterSeconds`, `CloseSeconds` | `DoorComponent` (and a `PortalComponent`) |
 | Beacon | `BeaconCategory` | (see Beacons below) |
@@ -105,7 +105,7 @@ walks back into range.
 
 ### Materials
 
-`Material` and `RoomMaterials` take material **names** known to `AcousticRegistry`
+`Material` (and a map entity's `RoomMaterials`, below) take material **names** known to `AcousticRegistry`
 (`OpenFPS.Common/AcousticRegistry.cs`):
 
 `AcousticTile`, `Asphalt`, `Audience`, `BootRubber`, `Brick`, `Carpet`, `Concrete`, `Dirt`, `Fence`,
@@ -152,18 +152,19 @@ rejected, because the loader would otherwise attach no emitter and the object wo
 
 ### Regions and portals
 
-An **acoustic region** is a room volume the listener stands *inside*; it is what supplies reverb, ambience
-and the room half of portal coupling. A region must not be solid, and needs a positive `RoomSize` — its
-volume and surface areas are what the reverb time is computed from.
+A **region** is a place the listener is *in*: a room, or a named place in the open (a yard, a street, a
+park). A prefab declares one with `IsIndoor` and nothing else (2026-10-11). Its box is the one its collider
+fills, scaled as the map entity is. A region must not be solid.
 
-`RoomMaterials` names the six interior surfaces, in the order the reverb math reads them:
+- **A room** (`IsIndoor` true) is a name and a point. Its air is flooded out from that point through the
+  walls, floors, ceilings and shut door leaves round it, and its volume, its face areas and what lines each
+  face are measured from them (docs/GEOMETRY.md 12.6). The box is only its point, and the fallback until
+  its flood lands at load.
+- **A place in the open** (`IsIndoor` false) is the box itself: the area a player hears named as they walk
+  into it.
 
-```
-Floor, Ceiling, North, South, East, West
-```
-
-That is **not** the `FaceMask` bit order (`North 1, South 2, East 4, West 8, Top 16, Bottom 32`), which is a
-genuine trap; both orders are spelled out wherever they are written down.
+`RoomSize`, `RoomMaterials` and `ReverbScale` on a prefab are gone (2026-10-11): a prefab that names one is
+refused as an unknown field. Ambience beds are gone too (2026-10-10): no prefab or map names one.
 
 A **portal** is an opening joining two regions. It must not be solid. `RegionAId` / `RegionBId` are the map
 `EntityId`s of the two regions, where `-1` means "the outside". A reusable portal prefab leaves both at `-1`
@@ -246,7 +247,7 @@ of boxes keeps working. On a prefab or on a map entity (the entity's wins):
 
 **Map fields:** `Id`, `Description`, `IsDefault`, `Size`, `MinBound`, `MaxBound`, `PlayMin`, `PlayMax`,
 `SpawnPoint`, `MinimumY`, `VoxelResolution`, `OcclusionFloor`, `Gravity`, `Temperature`, `Humidity`,
-`AirPressure`, `AirAbsorptionMultiplier`, `AmbienceId`, `BeaconPolicy`, `Entities`, `Composites`,
+`AirPressure`, `AirAbsorptionMultiplier`, `BeaconPolicy`, `Entities`, `Composites`,
 and for traffic and rail: `Roads`, `Junctions`, `RoadStops`, `Tracks`, `Vehicles`, `Trains`,
 `Crossings`, `StreetLife`. `OwnerId` and `IsPublic` are read too, but the server's
 `map_access.json` overrides them for any map it lists.
@@ -262,7 +263,9 @@ and for traffic and rail: `Roads`, `Junctions`, `RoadStops`, `Tracks`, `Vehicles
 
 **Entity fields:** `EntityId`, `PrefabId`, `Position`, `Rotation`, `Scale`, `Name`, and the per-instance
 overrides `IsIndoor`, `RoomMaterials` (or `Materials`), `RegionAId`, `RegionBId`, `ApertureSize`, and on a
-door `PushSide` and `KeyedSide`.
+door `PushSide` and `KeyedSide`. `RoomMaterials` on a map entity carries a measure already made (the world's
+tiles copy a room's survey into it, so a tile needs no survey of its own); a room that floods measures its
+own and nothing needs to set it.
 
 `Name` is what a player hears: on a region or named place, as they walk into it; on a wall or door,
 when they bump into or scan it ("Brandt Court front entrance").
@@ -296,7 +299,7 @@ From the rooms map (`OpenFPS.Tests/maps/default.json`) — a concrete room with 
 // four walls with a 2 m gap at x -8..-6 in the south wall
 { "EntityId": 203, "PrefabId": "concrete_wall", "Position": { "X": -10, "Y": 2, "Z": 10 }, "Scale": { "X": 2, "Y": 1.333, "Z": 1 } },
 { "EntityId": 204, "PrefabId": "concrete_wall", "Position": { "X": -4,  "Y": 2, "Z": 10 }, "Scale": { "X": 2, "Y": 1.333, "Z": 1 } },
-// the room itself: a non-solid volume with six concrete surfaces
+// the room itself: a non-solid volume; its flood measures it from the walls
 { "EntityId": 210, "PrefabId": "acoustic_region", "Position": { "X": -7, "Y": 2, "Z": 15 }, "IsIndoor": true,
   "RoomMaterials": ["Concrete", "Concrete", "Concrete", "Concrete", "Concrete", "Concrete"] },
 // the doorway, joining the room to the outside
@@ -306,9 +309,11 @@ From the rooms map (`OpenFPS.Tests/maps/default.json`) — a concrete room with 
 { "EntityId": 220, "PrefabId": "chirp_beacon", "Position": { "X": -7, "Y": 1.5, "Z": 15 } }
 ```
 
-Walls are geometry; the region is the acoustics; the portal is the hole. All three are separate entities on
-purpose — the walls are what Steam Audio traces against, the region is what supplies the reverb, and the
-portal is what tells the engine the two rooms are coupled and where the sound comes through.
+Walls are geometry; the region is the room's name and point; the portal is the hole. All three are separate
+entities on purpose: the walls are what Steam Audio traces against and what the room is measured from, the
+region says there is a room here and what it is called, and the portal is what tells the engine the two rooms
+are coupled and where the sound comes through. The test map's rooms still carry six `RoomMaterials` from
+before 2026-10-11; a room that floods measures its own over them.
 
 ## Doors
 
@@ -414,7 +419,7 @@ quietly ignore*:
 - emitter settings with `HasEmitter` false, an emitter with nothing to play, `Type: "Beacon"` with no
   emitter, an inside-out cone, `MinDistance ≥ Range`, a zero-length `EmitterDirection`;
 - synth or granular parameters without their flag, or both flags at once;
-- a region that is solid, has no `RoomSize`, or whose `RoomMaterials` is not six known names;
+- a region that is solid or has no collider; `RoomSize`, `RoomMaterials` or `ReverbScale` (unknown fields);
 - a portal that is solid, or that links a region to itself, or an entity that is both region and portal;
 - out-of-range numbers generally (transmission/absorption/scattering outside 0–1, negative mass, a face
   mask outside 0–63, `FaceMask` and `MissingFaces` both set…).

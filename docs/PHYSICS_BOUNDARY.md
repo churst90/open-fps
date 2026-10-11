@@ -15,6 +15,12 @@ physics lives in Sound (docs/SOUND_LIBRARY_BOUNDARY.md, decision 2).
 - The model is docs/SOUND_LIBRARY_BOUNDARY.md: survey, guards, then stages that each leave the game
   working.
 
+Where it stands (2026-10-11): surveyed, and Cody's decisions recorded the same day (the last section: all ten
+as recommended, with soft bodies wanted as well as rigid ones, gravity a property of the world, and the engine
+Jolt Physics through JoltPhysicsSharp). Stage 0, the guards, is under way. Stage 4 (rigid and soft bodies)
+goes with geometry stage 6 (docs/GEOMETRY.md section 7). In todo.md's order, agreed 2026-10-11, the physics
+stages come after the special-cases audit's parts.
+
 ## Contents
 
 1. Summary
@@ -702,7 +708,7 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   `WeatherWindTests`, and the sound library's `RenderFingerprintTests` (the engine render reads `Gearbox`,
   `VehicleProfile` and `Driveline`) and `EmitterStreamReplayTests` (its `drive` and `traffic_rain` scenarios
   read the wheels). All run on GitHub Actions (memory: tests on GitHub); locally only through
-  `tools/test-local.sh`, one run at a time.
+  `tools/test-local.sh`, which takes one of two slots on the machine.
 
 ### Stage 1: the project and the moves (1.5 to 2 sessions)
 
@@ -794,7 +800,7 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
 
 ## 8. How it fits with geometry stage 6 and library stages 5 to 7
 
-The order agreed with Cody on 2026-10-11 (todo.md, Next, in order, item 2): regions become places; the
+The order agreed with Cody on 2026-10-11 (todo.md, Next, in order): regions become places; the
 audit's voice registry; this survey alongside it; then the physics stages with geometry stage 6; then
 library stages 6 to 8.
 

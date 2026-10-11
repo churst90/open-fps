@@ -144,6 +144,9 @@ degrees a second. You cannot turn while riding in a vehicle: you face the way it
 
 - Comma and period look up to 100 m away. A thing one floor up or down counts as further than one
   on your floor. The kind you chose is saved.
+- A door with a wall between you and it is still named, but its beacon would not be heard through the
+  wall, so you hear "behind a wall" instead. Find the way round to it: a barn's doorway, for example,
+  may face the street, away from the house's doors.
 - Narration (N): as you turn, look and walk, the client says what is now in front of you, and what
   passes in front of you. `/narrate on|off` does the same as N.
 - Bumps: walking into something plays a knock from where you touched it and says its name. The knock
@@ -177,11 +180,12 @@ What E does, in order:
    still within reach.
 2. A tap or a gas hob you are standing at (within about 1.3 m): turns the tap on or off. On a hob it
    lights the next burner; with every burner lit it turns them all off.
-3. A shut door within reach: opens it. With a vehicle in reach too, the one you face wins, else the
-   nearer.
+3. A shut door within reach: opens it. Between two doors (a corridor's doors facing each other), or a
+   door and a vehicle, the one you face wins, else the nearer, measured to its doorway. A door on the
+   floor above or below is never in reach.
 4. In a seat: gets you out (if your door is shut, the first press opens it).
 5. Beside a vehicle: gets you in (the first press opens its door).
-6. An open door within reach: shuts it.
+6. An open door within reach: shuts it, chosen the same way.
 
 Doors and vehicles are within reach up to about 5 m.
 
@@ -257,7 +261,10 @@ Doors come in kinds, and each works as the real one does.
 - A door with a knob or lever (houses, flats): E opens it and E shuts it. It stays as you leave it.
 - A steel door with a push bar (fire, stair and service doors): E opens it. Its closer starts it back
   a second after the last person leaves the doorway, slowly and then quickly for the latch. If nobody
-  goes through, it starts back 3 seconds after it is fully open.
+  goes through, it starts back 3 seconds after it is fully open. In the city's towers every storey's
+  corridor has one onto the stairs (since 2026-10-11): you push it from the corridor, it swings into
+  the stairwell, and it shuts behind you, so the street's sound no longer comes up the stairs into the
+  corridors.
 - A glass front door (the towers' street doors): locked from the street. E unlocks it with your key
   and you pull it open. From inside you push the bar. It swings out over the pavement. Everyone has
   the key for now. A closer shuts it a second after the doorway is clear, and it locks again.
@@ -458,7 +465,7 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
 - `/tp PLACE`, `/tp PLAYER`, `/tp MAP`, `/tp x y z` (or `/goto`, `/teleport`): needs a teleporter in
   your hands or on your back. Without one: "You don't have a teleporter."
 - A place is a named area or room, on your map or another you may enter. Part of the name is
-  enough.
+  enough. A room puts you on its floor, at a clear spot near its middle.
 - It has unlimited uses. It charges for two seconds, and people hear you leave and arrive.
 - A teleporter is a premium item: only the administrator can give one.
 
@@ -496,8 +503,8 @@ that:
 - OpenStreetMap's roads, each in its own width and surface, with sidewalks where they are mapped and a
   named place over each road and junction, and driveways.
 - Buildings from Overture's footprints, each with walls, a floor, a roof, a room and a front door
-  facing the nearest road; sheds, garages and barns are solid. A house without an address is "House
-  off Main Street".
+  facing the nearest road; sheds, garages and barns are solid. Every outside door has a landing and
+  steps up to it. A house without an address is "House off Main Street".
 - Magnolia and Albany are in the world as their maps have them, with their houses, roads and traffic.
 
 There is no traffic on the world's own roads yet, and no addresses, lots or lawns.
@@ -582,11 +589,13 @@ holding a placed group). Items that need a number or a name open a small dialog 
   list as written, and they have versions and pins like any other.
 - Prefabs are models. Their fields come from prefab-schema.json, with its ranges; a new version makes
   every thing made from that prefab again, where it stands.
-- A prefab's lists (the faces it leaves out, a room's six materials) are listed item by item. Each item
-  can be changed or taken out; Add puts more on the end (one or more values: a room's six materials go in
-  together, Floor, Ceiling, North, South, East, West). A list of parts, such as a fountain's falls or a
-  group's parts, adds a copy of its last part to change after. The prefab is checked whole each time, so
-  a room with five materials is refused and says why.
+- A prefab's lists (the faces it leaves out) are listed item by item. Each item can be changed or taken
+  out; Add puts more on the end (one or more values). A list of parts, such as a fountain's falls or a
+  group's parts, adds a copy of its last part to change after. The prefab is checked whole each time, and
+  what is wrong is said.
+- A room has no materials to set (since 2026-10-11): the six face settings (floor, ceiling and four walls)
+  are gone from a room's settings and from its prefab. A room sounds of what its walls, floor and ceiling
+  are made of, so to change how it sounds, change them. A region is a room if it is set Indoor.
 - A thing made again, by a new version of its prefab or a new model for its sound, carries on as it
   was: an open door stays open and keeps its lock, a fire keeps the moment it was lit and so how far it
   has grown, a machine or a tap that was off stays off.
@@ -708,7 +717,7 @@ command for each:
 | `/edit model retire KIND ID`, `/edit model restore KIND ID` | Offer a model no longer for new things, or again |
 | `/edit model remove KIND ID LIST[N]` | Take an item out of a model's list: `/edit model remove group yard Parts[1]` |
 | `/edit model add KIND ID LIST [VALUES]` | Put values on the end of a list (`/edit model add prefab my_room MissingFaces North`), or add a copy of the last part of a list of parts (`/edit model add water my_fountain Falls`) |
-| `/edit model set KIND ID LIST[N] VALUE` | Change one item of a list of values: `/edit model set prefab my_room RoomMaterials[2] Brick` |
+| `/edit model set KIND ID LIST[N] VALUE` | Change one item of a list of values: `/edit model set prefab my_shed MissingFaces[0] South` |
 | `/edit undo`, `/edit redo` | Undo and redo |
 
 Direct keys (off unless you turn them on with `/editorkeys on`; they are new and have not been tried
@@ -1180,8 +1189,10 @@ player's own map, which writes the edits into its file and keeps the file as it 
   `AirAbsorptionMultiplier`, `Gravity`. Values out of range are corrected with a warning.
 - `BeaconPolicy`: for each beacon kind (door, exit, stairs, item, vehicle, waypoint, player), one of
   `default_on`, `default_off`, `forced_on` or `forbidden`. A kind not listed is on.
-- `Entities`: the objects, each with `PrefabId`, `Position`, `Rotation`, `Scale`, `Name`, and room
-  and material settings.
+- `Entities`: the objects, each with `PrefabId`, `Position`, `Rotation`, `Scale`, `Name`, and a door's
+  sides or a place's indoor setting where they differ from the prefab. A room is a name and a point:
+  its size, shape and materials are measured from the walls round it, and nothing in the file needs
+  to set them (since 2026-10-11).
 - `Vehicles`, `Trains`, `Tracks` (routes with waypoints, width, banking and stops), `Crossings`.
   A crossing is a point on a rail line; the server works out the rest. Each road through it gets a
   gate on each approach (on the right of the traffic, 3.7 m before the nearest rail); the gates go

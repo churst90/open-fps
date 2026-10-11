@@ -44,7 +44,8 @@ Her code is the reference: `/usr/lib/python3.14/site-packages/orca`, for example
 
 - One project per agent, small commits (a folder or a theme each), messages saying what went.
 - Build only with `tools/build-local.sh`, test only with `tools/test-local.sh` (twelve cores, a
-  machine-wide lock: Cody's machine froze from parallel test runs). Pushes are held, so at the end of
+  machine-wide lock: Cody's machine froze from parallel test runs; two slots on the same twelve cores
+  since 2026-10-11). Pushes are held, so at the end of
   a project run the whole suite once through the script:
   `tools/test-local.sh ART "FullyQualifiedName~OpenFPS.Tests"`, and fix what it shows.
 - Report: lines of code and of comments before and after, what dead code went, anything moved to

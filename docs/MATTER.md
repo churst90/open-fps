@@ -463,13 +463,13 @@ Agreed direction with Cody, 2026-10-10. Each step uses the one material table.
    Built 2026-10-10 (section 2.4; fb9868f9); no sound changed.
 2. Struck things (section 7) for simple shapes, with a tap and knock in the builder, then bumps against walls,
    glass doors, fences and cars; fitted against recordings as the spec. Built 2026-10-10 (section 7.5;
-   fb9868f9), heard the same day with notes; the polish waits (todo.md, Next, in order, item 6).
+   fb9868f9), heard the same day with notes; the polish waits (todo.md, Next, in order, item 7).
 3. Fire driven by fuel, with water and rain putting it out and the fire's own local wind. Stage 1 built and
    approved by ear 2026-10-10 (docs/FIRE.md section 12); the fire's own wind is designed, not built, and
    stage 2 (aggregation, surface fire, structures) is in todo.md, "Fire, the rest".
 4. Water draining over terrain, the cheap per-tile version (section 4.2), with the world tiles. Built
    2026-10-10, approved by ear the same day (docs/RUNNING_WATER.md 13; inbox/water-over-terrain-2026-10-10).
-5. Weather as a system (todo.md, Next, in order, item 6): rain, wind, wet roads, fuel moisture and fire
+5. Weather as a system (todo.md, Next, in order, item 7; real weather for the real places in docs/REAL_WEATHER.md): rain, wind, wet roads, fuel moisture and fire
    tied together.
 6. Wind acting on things (section 5.3): wires, gaps, flags, loose objects, all from the wind field. With 5,
    the first of the detail work after the sound library and geometry stages (todo.md).

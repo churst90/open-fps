@@ -258,6 +258,12 @@ Rebuilding everything rather than one tile at a time is deliberate: openings are
 round each room, and a room on a tile edge needs the walls of both tiles. With 300 m loaded the
 rebuild is a fraction of a second on a background thread.
 
+Since 2026-10-10 each refresh also floods every indoor room from its point through the walls round it, and
+floods again, rooms only, whenever the client's geometry is published (docs/GEOMETRY.md 12.6, "Switched on").
+A point's room is the room whose flood holds it, as on the server; a room's volume, faces and materials are
+measured from its flood. Groups of rooms whose seeds and nearby walls have not changed are not flooded again
+(`RoomFlood.Cache`).
+
 ### Steam Audio scene
 
 Built (stage 1b, 2026-10-06), following docs/GEOMETRY.md 2.4 and its measurements:
@@ -1016,6 +1022,24 @@ version 5 (and WorldPlaces format 2): stored tiles are made again when next want
 tiles' drainage, 3 s after they stop changing, in the background, and puts the voices of its drainage lines
 in the tiles they stand in. See docs/RUNNING_WATER.md section 13.
 
+### Rooms from their walls on the world's tiles (2026-10-10 and 11)
+
+The world's buildings (`WorldBuildings`, the port of gen_osm.py) follow the generator's rules for rooms
+(docs/GEOMETRY.md 12.6, "Regions become places"):
+
+- Generator version 6 (2026-10-10, places step 2): every part of a footprint belongs to a room (its wings),
+  an opening is put between touching rectangles' rooms, and a barn's doorway is an opening to the outdoors.
+- Generator version 7 (2026-10-11): every room can be walked into (docs/MAPS_FROM_REAL_PLACES.md, "Every room
+  can be walked into"): counters clear of the back door, landings and steps at outside doors, lawns dug down
+  to the floor, side doors where no way reaches.
+- `WorldPlaces.FormatVersion` 3 (2026-10-10): the places' copies are graded under their prism floors, so the
+  ground no longer comes up through them.
+
+Stored tiles of an older version are made again when next wanted. Rooms that flood together are kept in the
+same tiles (`RoomFlood.Groups` in `MapTiles`), so a client never holds one room of a house open to another
+through an archway without the other. The client floods the rooms it holds in every refresh of the acoustic
+map ("Acoustic map", above).
+
 ### Left after stage 2 (as of 2026-10-10)
 
 Done since the four steps: the world built ahead and a login back to where you left (2026-10-09, "Building
@@ -1028,7 +1052,7 @@ drainage with every tile (2026-10-10, above); swept kerbs on the places' roads w
   that traffic routes on (the world's traffic is still only the places'); footpaths, rail, water features
   and verges; high detail near a player; bridges and tunnels (laid on the ground like any road today);
   kerbs and sidewalks on the world's roads as swept profiles. Order agreed with Cody on 2026-10-10: after
-  the sound library and geometry stages (todo.md, Next, in order, item 6).
+  the sound library and geometry stages (todo.md, Next, in order, item 7).
 - Diffraction over the terrain profile and the ground reflection reading the slope; traffic, walkers and
   Alex follow the roads' heights where the roads carry them, and anything that leaves a road keeps its old
   flat assumptions.
