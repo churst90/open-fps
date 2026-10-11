@@ -19,15 +19,14 @@ public static class CompassWords
     public static readonly ImmutableArray<string> Four = Every(4);
 
     /// <summary>
-    /// The nearest of <paramref name="points"/> (4, 8 or 16) to a bearing in degrees clockwise from north.
-    /// <paramref name="midpoint"/> is Math.Round's rule on the point's index, for a bearing exactly between
-    /// two: AwayFromZero takes the one clockwise, ToEven the even one (on eight, the cardinal).
+    /// The nearest of <paramref name="points"/> (4, 8 or 16) to a bearing in degrees clockwise from north. A
+    /// bearing exactly between two points is said as the one clockwise, by every caller (Cody, 2026-10-11: one rule).
     /// </summary>
-    public static string Of(double degrees, int points = 8, MidpointRounding midpoint = MidpointRounding.AwayFromZero)
+    public static string Of(double degrees, int points = 8)
     {
         if (points is not (4 or 8 or 16)) throw new ArgumentOutOfRangeException(nameof(points), points, "4, 8 or 16");
         double a = ((degrees % 360.0) + 360.0) % 360.0;
-        int i = (int)Math.Round(a / (360.0 / points), midpoint) % points;
+        int i = (int)Math.Round(a / (360.0 / points), MidpointRounding.AwayFromZero) % points;
         return Sixteen[i * (16 / points)];
     }
 

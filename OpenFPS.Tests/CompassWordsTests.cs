@@ -24,6 +24,16 @@ public class CompassWordsTests
         // CommandHandler.CompassWord (/weather and /wind).
         public static string Wind(float degrees) => Points8[(int)MathF.Round(((degrees % 360f) + 360f) % 360f / 45f) % 8];
 
+        // The three that put an exact midpoint on the cardinal (MathF.Round's even rule) now put it on the
+        // point clockwise, as the rest did (Cody, 2026-10-11: one rule). Nothing else they say changed.
+        static int Clockwise(float deg) => (int)MathF.Round(deg / 45f, MidpointRounding.AwayFromZero) % 8;
+        public static bool OnAMidpoint(float deg) => MathF.Abs(deg / 45f - MathF.Floor(deg / 45f) - 0.5f) < 1e-6f;
+        public static string WindNow(float degrees) => Points8[Clockwise(((degrees % 360f) + 360f) % 360f)];
+        public static float EditorDegrees(float yaw) { float deg = yaw * 180f / MathF.PI; return ((deg % 360f) + 360f) % 360f; }
+        public static string EditorNow(float yaw) => Points8[Clockwise(EditorDegrees(yaw))];
+        public static float DrivingDegrees(Vector3 f) { float deg = MathF.Atan2(f.X, f.Z) * 180f / MathF.PI; return deg < 0 ? deg + 360f : deg; }
+        public static string DrivingNow(Vector3 f) => Points8[Clockwise(DrivingDegrees(f))];
+
         // CommandHandler.Building's Compass (/build).
         public static string Building(float yaw)
         {
@@ -147,32 +157,23 @@ public class CompassWordsTests
     /// <summary>The words each caller says between and exactly at the points. Three round a bearing exactly
     /// between two points to the cardinal (the wind, the editor, the driving aids); the rest clockwise.</summary>
     [Theory]
-    [InlineData(0, 8, MidpointRounding.ToEven, "north")]
-    [InlineData(22.5, 8, MidpointRounding.ToEven, "north")]
-    [InlineData(67.5, 8, MidpointRounding.ToEven, "east")]
-    [InlineData(112.5, 8, MidpointRounding.ToEven, "east")]
-    [InlineData(157.5, 8, MidpointRounding.ToEven, "south")]
-    [InlineData(202.5, 8, MidpointRounding.ToEven, "south")]
-    [InlineData(247.5, 8, MidpointRounding.ToEven, "west")]
-    [InlineData(292.5, 8, MidpointRounding.ToEven, "west")]
-    [InlineData(337.5, 8, MidpointRounding.ToEven, "north")]
-    [InlineData(22.5, 8, MidpointRounding.AwayFromZero, "north east")]
-    [InlineData(67.5, 8, MidpointRounding.AwayFromZero, "east")]
-    [InlineData(112.5, 8, MidpointRounding.AwayFromZero, "south east")]
-    [InlineData(157.5, 8, MidpointRounding.AwayFromZero, "south")]
-    [InlineData(202.5, 8, MidpointRounding.AwayFromZero, "south west")]
-    [InlineData(247.5, 8, MidpointRounding.AwayFromZero, "west")]
-    [InlineData(292.5, 8, MidpointRounding.AwayFromZero, "north west")]
-    [InlineData(337.5, 8, MidpointRounding.AwayFromZero, "north")]
-    [InlineData(360, 8, MidpointRounding.AwayFromZero, "north")]
-    [InlineData(100, 8, MidpointRounding.AwayFromZero, "east")]
-    [InlineData(-100, 8, MidpointRounding.AwayFromZero, "west")]
-    [InlineData(11.25, 16, MidpointRounding.AwayFromZero, "north north east")]
-    [InlineData(247.5, 16, MidpointRounding.AwayFromZero, "west south west")]
-    [InlineData(44, 4, MidpointRounding.AwayFromZero, "north")]
-    [InlineData(46, 4, MidpointRounding.AwayFromZero, "east")]
-    public void TheWords(double degrees, int points, MidpointRounding midpoint, string word)
-        => Assert.Equal(word, CompassWords.Of(degrees, points, midpoint));
+    [InlineData(22.5, 8, "north east")]
+    [InlineData(67.5, 8, "east")]
+    [InlineData(112.5, 8, "south east")]
+    [InlineData(157.5, 8, "south")]
+    [InlineData(202.5, 8, "south west")]
+    [InlineData(247.5, 8, "west")]
+    [InlineData(292.5, 8, "north west")]
+    [InlineData(337.5, 8, "north")]
+    [InlineData(360, 8, "north")]
+    [InlineData(100, 8, "east")]
+    [InlineData(-100, 8, "west")]
+    [InlineData(11.25, 16, "north north east")]
+    [InlineData(247.5, 16, "west south west")]
+    [InlineData(44, 4, "north")]
+    [InlineData(46, 4, "east")]
+    public void TheWords(double degrees, int points, string word)
+        => Assert.Equal(word, CompassWords.Of(degrees, points));
 
     [Fact]
     public void TheListsAreTheOldLists()
@@ -191,7 +192,8 @@ public class CompassWordsTests
             float r = d * MathF.PI / 180f;
             var velocity = new Vector3(-MathF.Sin(r) * 8f, 0f, -MathF.Cos(r) * 8f);
             float from = new WindAir(velocity.X, velocity.Z, 0f, 0, 0, 0).FromDegrees;
-            Assert.Equal($"Wind 8 metres a second from the {Old.Wind(from)}, steady.", CommandHandler.DescribeWind(velocity, 0f));
+            Assert.Equal($"Wind 8 metres a second from the {Old.WindNow(from)}, steady.", CommandHandler.DescribeWind(velocity, 0f));
+            Assert.True(Old.WindNow(from) == Old.Wind(from) || Old.OnAMidpoint(((from % 360f) + 360f) % 360f), $"{from}");
         }
     }
 
@@ -201,13 +203,15 @@ public class CompassWordsTests
         foreach (float yaw in Yaws())
         {
             Assert.Equal(Old.Building(yaw), CommandHandler.Compass(yaw));
-            Assert.Equal(Old.Editor(yaw), WorldEditor.CompassOf(yaw));
+            Assert.Equal(Old.EditorNow(yaw), WorldEditor.CompassOf(yaw));
+            Assert.True(Old.EditorNow(yaw) == Old.Editor(yaw) || Old.OnAMidpoint(Old.EditorDegrees(yaw)), $"{yaw}");
         }
         // The editor's /edit face takes degrees from -360 to 360.
         foreach (float d in Degrees())
         {
             float to = d * MathF.PI / 180f;
-            Assert.Equal(Old.Editor(to), WorldEditor.CompassOf(to));
+            Assert.Equal(Old.EditorNow(to), WorldEditor.CompassOf(to));
+            Assert.True(Old.EditorNow(to) == Old.Editor(to) || Old.OnAMidpoint(Old.EditorDegrees(to)), $"{to}");
         }
     }
 
@@ -222,13 +226,15 @@ public class CompassWordsTests
             Assert.Equal(Old.Cardinal(rotation), state.GetCardinal());
             Assert.StartsWith(Old.Cardinal(rotation) + ", ", state.GetCompassDirection());
             var forward = Vector3.Transform(Vector3.UnitZ, rotation);
-            Assert.Equal(Old.Driving(forward), DrivingAids.Compass(forward));
+            Assert.Equal(Old.DrivingNow(forward), DrivingAids.Compass(forward));
+            Assert.True(Old.DrivingNow(forward) == Old.Driving(forward) || Old.OnAMidpoint(Old.DrivingDegrees(forward)), $"{yaw}");
         }
         foreach (float d in Degrees())
         {
             float r = d * MathF.PI / 180f;
             var f = new Vector3(MathF.Sin(r), 0f, MathF.Cos(r));
-            Assert.Equal(Old.Driving(f), DrivingAids.Compass(f));
+            Assert.Equal(Old.DrivingNow(f), DrivingAids.Compass(f));
+            Assert.True(Old.DrivingNow(f) == Old.Driving(f) || Old.OnAMidpoint(Old.DrivingDegrees(f)), $"{d}");
         }
     }
 

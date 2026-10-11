@@ -110,7 +110,7 @@ public partial class CommandHandler
     internal static string CompassWord(float degrees)
     {
         // Wrapped in float, as it always was: the wrap rounds a bearing a float's width off a midpoint onto it.
-        return CompassWords.Of(((degrees % 360f) + 360f) % 360f, 8, MidpointRounding.ToEven);
+        return CompassWords.Of(((degrees % 360f) + 360f) % 360f, 8);
     }
 
     /// <summary>Each of the sixteen points run together ("northnortheast") and by its initials ("nne"),

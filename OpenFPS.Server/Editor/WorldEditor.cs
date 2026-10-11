@@ -317,7 +317,7 @@ public sealed partial class WorldEditor
         float deg = yaw * 180f / MathF.PI;
         // Wrapped in float, as it always was: the wrap rounds a heading a float's width off a midpoint onto it.
         deg = ((deg % 360f) + 360f) % 360f;
-        return CompassWords.Of(deg, 8, MidpointRounding.ToEven);
+        return CompassWords.Of(deg, 8);
     }
 
     /// <summary>Which of north, east, south, west a heading is nearest: 0 to 3.</summary>

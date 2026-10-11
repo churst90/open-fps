@@ -4,6 +4,11 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- The compass has one rule for a bearing exactly between two points: the point clockwise, for every caller
+  (Cody: "whichever is more precise for the compass, go with your recommendation"; neither is more precise, so
+  one rule). The wind, the editor and the driving aids used to put it on the cardinal; they now say what
+  `/build`, the facing key, the world maps and the sky say. Only exact midpoints change: `/weather wind nne`
+  (22.5 degrees) reads "from the north east" on eight points.
 - Behind walls, a way round one thing that runs on through another is counted (docs/GEOMETRY.md 12.6, "Round
   one thing, through another"), unheard. It was thrown out, and a low wall before a heavier one was charged its
   whole transmission: in Marlow Tower's floor 1 stairwell a car on Dock Street jumped 22 to 31 dB as its line

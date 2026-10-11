@@ -927,7 +927,7 @@ public sealed class DrivingAids
         float deg = MathF.Atan2(f.X, f.Z) * 180f / MathF.PI;
         if (deg < 0) deg += 360f;
         // Exactly between two points, the cardinal, as it always was.
-        return CompassWords.Of(deg, 8, MidpointRounding.ToEven);
+        return CompassWords.Of(deg, 8);
     }
 
     private static string Kmh(float speed) => speed < 0.5f ? "stopped" : $"{MathF.Round(speed * 3.6f)} kilometres an hour";
