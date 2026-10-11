@@ -234,9 +234,9 @@ public static class FuelCatalog
         }
         if (ModelKindTable.IsVehicle(soundId) && w > 0.5f && d > 0.5f)
             return Car(MathF.Min(w, d), MathF.Max(w, d));
-        if (material.Equals("Foliage", StringComparison.OrdinalIgnoreCase) && baseAboveGround >= 1f && w > 0.5f && d > 0.5f)
+        if (AcousticRegistry.IsLeaves(material) && baseAboveGround >= 1f && w > 0.5f && d > 0.5f)
             return Tree(MathF.Sqrt(w * d), baseAboveGround, baseAboveGround + h, "tree");
-        if (material.Equals("Wood", StringComparison.OrdinalIgnoreCase) && baseAboveGround < 0.5f)
+        if (AcousticRegistry.IsWood(material) && baseAboveGround < 0.5f)
         {
             float wide = MathF.Max(w, d), narrow = MathF.Min(w, d);
             if (narrow < 0.1f || h < 0.25f) return null;                       // a board, a floor, a fence: stage 2

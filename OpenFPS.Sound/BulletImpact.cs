@@ -81,7 +81,7 @@ public static class BulletImpact
             s = p.Strike!.Value;
         }
         float debris = s.DebrisDensityKgM3 > 0f ? s.DebrisDensityKgM3 : MathF.Max(1f, p.DensityKgM3);
-        return new Stuff(s.Kind, s.CraterJoulesPerM3, debris, s.ChipGrams, s.ChipContactSeconds, s.SprayLowHz, s.Rustles);
+        return new Stuff(s.Kind, s.CraterJoulesPerM3, debris, s.ChipGrams, s.ChipContactSeconds, s.SprayLowHz, p.Leaves);
     }
 
     public static Kind KindOf(string? material) => StuffOf(material).Kind;

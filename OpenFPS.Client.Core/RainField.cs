@@ -659,7 +659,7 @@ public sealed class RainSurvey
             _foliage.Clear();
             foreach (var e in world.Entities.Values)
                 if (e.Definition.Type == EntityType.StaticObject && !e.Definition.Collider.IsSolid
-                    && string.Equals(e.Definition.Material.Material, "Foliage", StringComparison.OrdinalIgnoreCase))
+                    && AcousticRegistry.IsLeaves(e.Definition.Material.Material))
                     _foliage.Add(e);
         }
         foreach (var e in _foliage)

@@ -99,6 +99,14 @@ public struct MaterialProperties
     /// <summary>Heat of combustion, MJ/kg.</summary>
     public float HeatOfCombustionMJKg { get; set; }
 
+    /// <summary>A volume of leaves (a hedge, a tree's crown): rain drums on it as a canopy, birds perch in it, a round
+    /// swishes through it, and over a trunk it burns as a tree.</summary>
+    public bool Leaves { get; set; }
+
+    /// <summary>What it is underfoot (Footsteps); null where it is a slab bearing on the ground with an ordinary grit,
+    /// <see cref="Common.Underfoot.Ground"/>.</summary>
+    public Underfoot? Underfoot { get; set; }
+
     // ── What it does when struck by a round (BulletImpact, Ricochet) ─────────────────────────────
 
     /// <summary>How a round's strike on it behaves. Every material in the table has one; null only on a
@@ -120,6 +128,19 @@ public struct MaterialProperties
     public readonly float AcrossGrainGPa => TransverseModulusGPa > 0f ? TransverseModulusGPa : YoungsModulusGPa;
 }
 
+/// <summary>
+/// What a material is underfoot (Footsteps). A floor of it spans <see cref="DeckSpanMetres"/> between its supports with a
+/// deck <see cref="DeckMetres"/> thick (zero: it bears on the ground everywhere and rings no note); where the foot touches,
+/// its grit is <see cref="GrainMm"/> across and covers <see cref="Coverage"/> of it; and a heap of it (gravel, dirt,
+/// grass) has <see cref="LooseCount"/> loose pieces a foot disturbs, each <see cref="LooseGrainMm"/> across.
+/// </summary>
+public readonly record struct Underfoot(float DeckSpanMetres, float DeckMetres, float GrainMm, float Coverage, int LooseCount = 0,
+                                        float LooseGrainMm = 0f)
+{
+    /// <summary>A slab on the ground with some grit on it: anything that says nothing else.</summary>
+    public static readonly Underfoot Ground = new(0f, 0f, 0.25f, 0.50f);
+}
+
 /// <summary>What a struck material does with a round (BulletImpact's sections).</summary>
 public enum StrikeKind { Brittle, Metal, Soil, Water, Wood, Panel, Soft }
 
@@ -127,11 +148,10 @@ public enum StrikeKind { Brittle, Metal, Soil, Water, Wood, Panel, Soft }
 /// A material's part in a strike: how it behaves, what a cubic metre of crater costs, the mean chip and how hard
 /// a chip's landing is (its contact time). What it throws off weighs what the material does, except where
 /// <see cref="DebrisDensityKgM3"/> says the debris is something else (turf throws up the soil under it).
-/// <see cref="SprayLowHz"/> is the lowest band of what a soil's spray rushes in (grains low, blades high);
-/// <see cref="Rustles"/> is leaves swishing as a round goes through.
+/// <see cref="SprayLowHz"/> is the lowest band of what a soil's spray rushes in (grains low, blades high).
 /// </summary>
 public readonly record struct StrikeBehaviour(StrikeKind Kind, float CraterJoulesPerM3, float ChipGrams, float ChipContactSeconds,
-                                              float DebrisDensityKgM3 = 0f, float SprayLowHz = 400f, bool Rustles = false);
+                                              float DebrisDensityKgM3 = 0f, float SprayLowHz = 400f);
 
 /// <summary>A face's part in a ricochet: the critical angle off it (degrees; below zero, Birkhoff's from the
 /// slug's density), the departure angle as a share of the incidence, the share of its speed it loses at the
@@ -229,9 +249,11 @@ public static class AcousticRegistry
 
             foreach (var porous in new[] { "Fence", "Foliage", "Grass", "Audience", "Dirt", "Gravel", "Carpet", "AcousticTile", "None" })
                 if (reg.TryGetValue(porous, out var pp)) { pp.Porous = true; reg[porous] = pp; }
+            var leaves = reg["Foliage"]; leaves.Leaves = true; reg["Foliage"] = leaves;
 
-            // Before AddMatter: a material made "like" another strikes as that one does.
+            // Before AddMatter: a material made "like" another strikes and lies underfoot as that one does.
             AddStrikes(reg);
+            AddUnderfoot(reg);
             AddMatter(reg);
             AddStrikesAfterMatter(reg);
 
@@ -555,7 +577,28 @@ public static class AcousticRegistry
         Set("Water", new(StrikeKind.Water, 0f, 0f, 0f), new(-1f, 1.3f, 0.4f, 1f, 0.05f));
         foreach (var soft in new[] { "Carpet", "Audience", "Rubber", "Leather", "BootRubber", "Skin", "None" })
             Set(soft, new(StrikeKind.Soft, 0f, 0f, 1e-3f));
-        Set("Foliage", new(StrikeKind.Soft, 0f, 0f, 1e-3f, Rustles: true));
+        Set("Foliage", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
+    }
+
+    /// <summary>What each material is underfoot (Footsteps).</summary>
+    private static void AddUnderfoot(Dictionary<string, MaterialProperties> reg)
+    {
+        void Set(string name, Underfoot u) { var p = reg[name]; p.Underfoot = u; reg[name] = p; }
+        // A cast or floated slab: sand and exposed aggregate, and enough of it to hear.
+        Set("Concrete", new(0f, 0f, 0.45f, 0.80f));
+        // Polished stone. Nearly nothing there, which is why a marble hall is all click and no scrape.
+        Set("Marble", new(0f, 0f, 0.03f, 0.25f));
+        Set("Glass", new(0.80f, 0.012f, 0.02f, 0.15f));
+        // Boards on joists at 16 inches, sawn and sealed: a fine grain, and much less of it than concrete.
+        Set("Wood", new(0.40f, 0.021f, 0.12f, 0.45f));
+        // A steel deck or a walkway plate, plate or chequer: smooth between the pattern, sharp on it.
+        Set("Metal", new(0.60f, 0.005f, 0.08f, 0.35f));
+        // The sole sinks into soft things: nothing to rattle over.
+        Set("Carpet", new(0f, 0f, 0.05f, 0.20f));
+        // Blades, not stones: many, tiny, and very quiet.
+        Set("Grass", new(0f, 0f, 0.30f, 0.35f, 30, 1.5f));
+        Set("Dirt", new(0f, 0f, 0.60f, 0.70f, 22, 4f));
+        Set("Gravel", new(0f, 0f, 2.00f, 0.95f, 70, 12f));
     }
 
     /// <summary>The materials AddMatter made from nothing, or "like" one that strikes otherwise (ice is like water to
@@ -605,6 +648,15 @@ public static class AcousticRegistry
         EnsureInitialized();
         return !string.IsNullOrEmpty(type) && _registry.ContainsKey(Canonical(type));
     }
+
+    /// <summary>Whether a material is a volume of leaves (<see cref="MaterialProperties.Leaves"/>).</summary>
+    public static bool IsLeaves(string? type) => !string.IsNullOrEmpty(type) && GetProperties(type).Leaves;
+
+    /// <summary>Whether a material is liquid (its family): what falls on it falls into a pool.</summary>
+    public static bool IsLiquid(string? type) => !string.IsNullOrEmpty(type) && GetProperties(type).Family == "liquid";
+
+    /// <summary>Whether a material is wood (its family): oak, pine, plywood as much as "Wood".</summary>
+    public static bool IsWood(string? type) => !string.IsNullOrEmpty(type) && GetProperties(type).Family == "wood";
 
     /// <summary>Whether a material is glass (its family), whatever the glass: float, laminated, an alias of either.</summary>
     public static bool IsGlass(string? type) => !string.IsNullOrEmpty(type) && GetProperties(type).Family == "glass";

@@ -106,6 +106,43 @@ public class MaterialStrikeTests
         Assert.DoesNotContain(material, AcousticRegistry.UnknownNamesAsked);
     }
 
+    /// <summary>What each material is underfoot, as Footsteps' own tables had it before they moved into the material
+    /// table; anything they did not name is a slab with an ordinary grit.</summary>
+    [Theory]
+    [InlineData("Wood", 0.40f, 0.021f, 0.12f, 0.45f, 0, 0f)]
+    [InlineData("Metal", 0.60f, 0.005f, 0.08f, 0.35f, 0, 0f)]
+    [InlineData("Glass", 0.80f, 0.012f, 0.02f, 0.15f, 0, 0f)]
+    [InlineData("Concrete", 0f, 0f, 0.45f, 0.80f, 0, 0f)]
+    [InlineData("Marble", 0f, 0f, 0.03f, 0.25f, 0, 0f)]
+    [InlineData("Carpet", 0f, 0f, 0.05f, 0.20f, 0, 0f)]
+    [InlineData("Grass", 0f, 0f, 0.30f, 0.35f, 30, 1.5f)]
+    [InlineData("Dirt", 0f, 0f, 0.60f, 0.70f, 22, 4f)]
+    [InlineData("Gravel", 0f, 0f, 2.00f, 0.95f, 70, 12f)]
+    [InlineData("Tile", 0f, 0f, 0.25f, 0.50f, 0, 0f)]
+    [InlineData("Asphalt", 0f, 0f, 0.25f, 0.50f, 0, 0f)]
+    [InlineData("Brick", 0f, 0f, 0.25f, 0.50f, 0, 0f)]
+    public void WhatWasUnderfootBeforeIsUnderfootAsItWas(string material, float span, float deck, float grain, float coverage, int loose, float looseMm)
+    {
+        Assert.Equal(span, Footsteps.FreeSpanM(material));
+        Assert.Equal(deck, Footsteps.DeckThicknessM(material));
+        Assert.Equal((grain, coverage), Footsteps.ContactTexture(material));
+        Assert.Equal((loose, looseMm), Footsteps.LooseMaterial(material));
+        Assert.Equal(Footsteps.ContactTexture(material.ToLowerInvariant()), Footsteps.ContactTexture(material));
+    }
+
+    /// <summary>Leaves are a property of the material, and only foliage has them; a pool is what falls into a liquid.</summary>
+    [Fact]
+    public void LeavesAndPoolsAreWhatTheMaterialIs()
+    {
+        Assert.Equal(new[] { "Foliage" }, AcousticRegistry.KnownMaterials().Where(m => AcousticRegistry.GetProperties(m).Leaves));
+        Assert.Equal(RainSurfaceKind.Canopy, RainSurfaces.KindOf("Foliage", 0f));
+        Assert.Equal(RainSurfaceKind.Pool, RainSurfaces.KindOf("Water", 0f));
+        Assert.NotEqual(RainSurfaceKind.Pool, RainSurfaces.KindOf("Ice", 0f));
+        Assert.True(BulletImpact.StuffOf("Foliage").Rustles);
+        Assert.True(AcousticRegistry.IsWood("Oak") && AcousticRegistry.IsWood("wood") && !AcousticRegistry.IsWood("Metal"));
+        Assert.True(AcousticRegistry.IsGlass("LaminatedGlass") && AcousticRegistry.IsGlass("SodaLimeGlass") && !AcousticRegistry.IsGlass("Plastic"));
+    }
+
     [Fact]
     public void AnUnknownMaterialStrikesAsGenericAndSaysSo()
     {

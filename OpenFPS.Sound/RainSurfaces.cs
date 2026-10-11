@@ -38,9 +38,9 @@ public static class RainSurfaces
     /// <summary>The kind of surface a material of this skin thickness is to rain.</summary>
     public static RainSurfaceKind KindOf(string material, float skinMetres)
     {
-        if (string.Equals(material, "Water", StringComparison.OrdinalIgnoreCase)) return RainSurfaceKind.Pool;
-        if (string.Equals(material, "Foliage", StringComparison.OrdinalIgnoreCase)) return RainSurfaceKind.Canopy;
         var p = AcousticRegistry.GetProperties(material);
+        if (p.Family == "liquid") return RainSurfaceKind.Pool;
+        if (p.Leaves) return RainSurfaceKind.Canopy;
         if (p.DensityKgM3 <= 0f) return RainSurfaceKind.None;
         if (p.YoungsModulusGPa < SoftBelowGPa) return RainSurfaceKind.Soft;
         if (skinMetres > 0f && skinMetres <= PlateMaxSkinMetres) return RainSurfaceKind.Plate;
