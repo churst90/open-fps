@@ -2135,6 +2135,20 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      -47.3/-54.6/-79.0. Ids on the places: everything before the woods keeps its id; the woods and what is
      written after them (named places, shores, the leftover rooms, openings, steps and finishes) move, because a
      drive moved along a lot clears different trees. `WorldStore.GeneratorVersion` 9 remakes the world's tiles.
+
+   **The city's floors (2026-10-11, unheard).** `CityFloorsTests.Every_room_s_floor_stands_on_a_structure` holds
+   the city to `FloorStructure`. A room there is a place the server's survey finds indoors with something solid
+   over its middle (58 Alder Street's fenced back garden is indoors to the survey and open to the sky; 489 rooms of
+   490), and a floor's top is looked for up to 0.3 m over a room's underside, not 0.1: a stairwell's storey runs
+   down through the slab under it (one shaft, so the opening a flight comes up through is in a place), and the
+   garage's lowest deck, 25 cm of concrete, is laid on the ground under a box that starts at the ground. At 0.1 m
+   those 32 stairwells and the garage read as standing on the plaster soffit below and on the dirt, which they do
+   not. What failed: the tunnel, its asphalt laid on the map's dirt (now a 25 cm concrete invert under the road and
+   its walls, written last), and two Main Street sidewalk places that ran on 40 m inside the tunnel's solid walls
+   from the block that meets its mouth (now stopped at the mouth, as that block's carriageway already was; the
+   same ids). One entity more, so the city's vehicles' ids move by one and the stored traffic and rail replays were
+   rewritten for that alone (every other column the same). The sound: `--barrier-sweep`, 694 pairs between places
+   and 210 from outdoors that both runs drew, one changed (1.4 dB, low band); `--path-probe` in the tunnel unchanged.
    - **The sound** (`--barrier-sweep n=4000 seed=1` and `outdoor n=2000`, the old maps against the new, the
      same pairs; `server=DIR` reads a map from elsewhere and `dump=FILE` writes every pair). Between rooms:
      Magnolia 2 pairs quieter (by 21 dB, the low band), Albany 2 louder; the street heard indoors: Magnolia 9

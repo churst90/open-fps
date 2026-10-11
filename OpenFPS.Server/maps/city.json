@@ -128272,12 +128272,12 @@
    "Position": {
     "X": -7.75,
     "Y": 2.0,
-    "Z": -210.0
+    "Z": -190.0
    },
    "Scale": {
     "X": 0.35,
     "Y": 0.8,
-    "Z": 6.0
+    "Z": 2.0
    },
    "Name": "Main Street sidewalk"
   },
@@ -128287,12 +128287,12 @@
    "Position": {
     "X": 7.75,
     "Y": 2.0,
-    "Z": -210.0
+    "Z": -190.0
    },
    "Scale": {
     "X": 0.35,
     "Y": 0.8,
-    "Z": 6.0
+    "Z": 2.0
    },
    "Name": "Main Street sidewalk"
   },
@@ -150670,6 +150670,21 @@
    "RegionAId": 6220,
    "RegionBId": 6221,
    "ApertureSize": 29.54
+  },
+  {
+   "EntityId": 9865,
+   "PrefabId": "concrete_floor",
+   "Position": {
+    "X": 0.0,
+    "Y": -0.125,
+    "Z": -250.0
+   },
+   "Scale": {
+    "X": 1.9,
+    "Y": 2.5,
+    "Z": 10.0
+   },
+   "Name": "Tunnel floor"
   }
  ],
  "Crossings": [

@@ -4,6 +4,11 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- The city's floors are held to the same test as the real places' (docs/GEOMETRY.md 12.6, "The city's floors"),
+  unheard. The tunnel's road lay on the map's dirt: it has a concrete invert now. Two Main Street sidewalk places
+  ran 40 m inside the tunnel's walls: they stop at its mouth. The stairwells and the garage, which a first scan
+  showed on plaster and on dirt, stand on their slabs: their places' boxes start under the slab. No sound changed
+  that the sweep can find. The traffic and rail replays were rewritten: one more entity moves the vehicles' ids by one.
 - Nothing laid along a line goes into a building (docs/GEOMETRY.md 12.6, "A road stops at a wall"), unheard. On
   the real places 276 pieces on Albany and 110 on Magnolia of a road, verge, sidewalk, drive or path lay in a
   footprint: 1034 Belmont Avenue's made-up driveway through 1024's living room, a service road through the Exxon's
