@@ -39,7 +39,9 @@ other at login. The server and the Windows zip go out together.
    sounds great"); regions-become-places steps in docs/GEOMETRY.md 12.6 item 1. Step 2 built 2026-10-10,
    unheard: rooms flood from their points with no box or margin, and the generators put an opening wherever
    rooms meet with no wall (every part of a footprint is a room's). Listen first (the list in 12.6, "The flood
-   from a point": a stairwell, a roof access, a barn, the houses that changed most); steps 3 to 5 wait for it.
+   from a point": a stairwell, a roof access, a barn, the houses that changed most). Step 3 built 2026-10-11,
+   unheard: openings framed from the floods, no more false openings in rooms' box faces (12.6, "Openings from the
+   floods", with where to listen).
    Then (Cody, 2026-10-11): one path pass for every voice of a moving thing. Each voice is an entry saying
    which thing owns it and where on it it sounds from (engine, siren mouth, horn, a train's bogie taps,
    aircraft engines, a far-off borrowed voice, a spread source's places); one pass hands each its path every
@@ -60,11 +62,18 @@ other at login. The server and the Windows zip go out together.
    state. Planned the way the sound library was: a boundary survey first, guards, then stages. The rest of the
    engine follows the same rule: each part (geometry, acoustics, sound, physics, the world and its generators,
    networking, the client UI) its own project with stated dependencies and no reach into the host. Not
-   started; comes after the special-cases audit's parts.
+   started; comes after the special-cases audit's parts. Surveyed 2026-10-11: docs/PHYSICS_BOUNDARY.md (the
+   boundary, what the physics is missing, stages 0 to 6 at 20 to 30 sessions, ten decisions for Cody).
    The order agreed with Cody, 2026-10-11: (1) regions become places, steps 3 to 5, with the audit's small
    name and prefix parts beside them; (2) the audit's voice registry (one list of voices, one writer a
    frame, one way to start a voice), then stage 5's audio clock slice; (3) the physics boundary survey, a doc,
    alongside (2); (4) physics stages with geometry stage 6; (5) library stages 6 to 8 on the clean voices.
+   The special-cases audit is written (docs/SPECIAL_CASES_AUDIT.md, 2026-10-11): 32 findings, parts P0 to P8.
+   Its order: P0 (wider replay guards, tests only), then P1 (the pops: the worker served stale results for
+   moving sources) with P2 (one table of model kinds) and P5 (names and materials to properties) beside it,
+   P8 (laws in one place) after; then P3a-d (the voice registry: one list, one writer, one start, which is the
+   path pass above widened to every voice range) with P6; then P4 (one ranking), then P7 (machine state from
+   the server, a wire change). P0 and P1 started 2026-10-11.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,

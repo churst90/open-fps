@@ -104,6 +104,49 @@ public class RoomFloodTests
         Assert.DoesNotContain(shut.Cells, p => p.Z < -1.75f);
     }
 
+    /// <summary>The doorway with no leaf as an opening to the outdoors, 1 m wide and 2.1 m high in a wall 25 cm thick.</summary>
+    private static RoomFlood.Barrier Doorway(int id = 900)
+        => new(id, new Vector3(0, 1.05f, -1.625f), new Vector3(1f, 2.1f, 0.25f), Quaternion.Identity, Outdoors: true);
+
+    [Fact]
+    public void An_opening_is_framed_as_the_air_met_it()
+    {
+        var barriers = new[] { Doorway() };
+        var cells = RoomCells.From(RoomFlood.Flood(World(Room(gap: true)), new[] { Hint() }, Origin, barriers), barriers);
+        var f = Assert.Single(cells.Openings);
+        Assert.Equal((900, 500), (f.Opening, f.Room));
+        Assert.InRange(f.Size.X, 0.95f, 1.01f);
+        Assert.InRange(f.Size.Y, 2.0f, 2.11f);
+        Assert.InRange(f.Area, 1.0f * 2.1f * 0.85f, 1.0f * 2.1f * 1.01f);
+        Assert.InRange(Vector3.Distance(f.Centre, new Vector3(0, 1.05f, -1.625f)), 0f, 0.2f);
+    }
+
+    [Fact]
+    public void A_post_in_an_opening_parts_it_in_two()
+    {
+        var solids = Room(gap: true);
+        solids.Add(Box(90, new Vector3(0f, 0, -1.75f), new Vector3(0.25f, 2.1f, -1.5f)));
+        var barriers = new[] { Doorway() };
+        var cells = RoomCells.From(RoomFlood.Flood(World(solids), new[] { Hint() }, Origin, barriers), barriers);
+        Assert.Equal(2, cells.Openings.Count);
+        Assert.All(cells.Openings, f => Assert.Equal(900, f.Opening));
+        // Biggest first: the half metre west of the post, then the quarter east of it.
+        Assert.InRange(cells.Openings[0].Size.X, 0.45f, 0.51f);
+        Assert.InRange(cells.Openings[1].Size.X, 0.2f, 0.26f);
+        Assert.True(cells.Openings[0].Centre.X < 0f && cells.Openings[1].Centre.X > 0.25f);
+    }
+
+    [Fact]
+    public void Where_a_room_meets_the_sky_with_no_opening_there_the_flood_frames_one()
+    {
+        var cells = RoomCells.From(RoomFlood.Flood(World(Room(gap: true)), new[] { Hint() }, Origin), Array.Empty<RoomFlood.Barrier>());
+        var f = Assert.Single(cells.Openings);
+        Assert.Equal((0, 500), (f.Opening, f.Room));
+        // Facing south out of the doorway, the doorway's size.
+        Assert.True(Vector3.Transform(Vector3.UnitZ, f.Rotation).Z < -0.99f);
+        Assert.InRange(f.Area, 1.0f * 2.1f * 0.85f, 1.0f * 2.1f * 1.01f);
+    }
+
     [Fact]
     public void Its_cells_say_which_room_a_point_is_in_and_a_cache_floods_only_what_changed()
     {

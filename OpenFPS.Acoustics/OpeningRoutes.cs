@@ -486,6 +486,9 @@ public sealed class OpeningRoutes
     /// tunnel mouth, a doorway with no door in it.</summary>
     public const string FaceKind = "open face";
 
+    /// <summary>What a door's doorway is called (<see cref="Declared.Kind"/>): its leaf's frame is searched round.</summary>
+    public const string DoorKind = "door";
+
     /// <summary>How far past an opening's declared size its jambs, floor and lintel are searched for,
     /// metres: a leaf laps its frame and an authored portal is placed by hand.</summary>
     private const float FrameSearchMetres = 0.5f;
@@ -498,9 +501,9 @@ public sealed class OpeningRoutes
     {
         var o = new Opening { Id = d.Id, Kind = d.Kind, RegionA = d.RegionA, RegionB = d.RegionB, Centre = d.Centre };
         bool haveFrame = d.Rotation != default;
-        if (haveFrame && d.Kind == FaceKind)
+        if (haveFrame && d.Kind != DoorKind)
         {
-            // A gap measured from its walls (FaceOpenings): nothing to search for. Z is through it whatever
+            // A gap measured from its walls (FaceOpenings) or from the air that met it (FloodOpenings): nothing to search for. Z is through it whatever
             // its proportions: a slot in a thick wall is deeper than it is wide.
             var fq = Quaternion.Normalize(d.Rotation);
             o.Across = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, fq));

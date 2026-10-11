@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- Openings framed from where the rooms' air meets them, unheard (docs/GEOMETRY.md 12.6, "Openings from the
+  floods"). A flooded room no longer has openings found in its box's faces: on Albany 1,530 rooms had 33,342 m2 of
+  openings to the outdoors that their walls do not have (a box's face across its own house's wing, walls the face
+  finder could not see), and on Magnolia 481 rooms 9,650 m2; they are gone. An opening with no leaf is as big as the
+  air that met it, a piece per bay between piers; a stair hole is what its flight leaves open (9 to 9.6 m2, not
+  12). Heard: the real places' houses and halls closed to the street, as their walls are.
+
 - The ambience recordings are gone (Cody: "remove those ambiences completely we simply don't need them"): the
   three four-channel beds and six stereo ones (90 MB, never in git), every copy in the build and publish
   folders, the ambisonic bed stage and its format helpers (`AmbisonicBedDsp`, `AmbisonicFormat`), the lab's

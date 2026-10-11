@@ -122,12 +122,16 @@ public static class EntityAcoustics
         }
         seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
         var shutWorld = world.WithMoverPoses(id => shut.TryGetValue(id, out var p) ? (true, p.Item1, p.Item2) : (false, default, default));
-        return Geometry.RoomCells.From(Geometry.RoomFlood.Flood(shutWorld, seeds, origin, FloodBarriers(defs), threads: threads, cache: cache, measure: measure));
+        var barriers = FloodBarriers(defs);
+        return Geometry.RoomCells.From(Geometry.RoomFlood.Flood(shutWorld, seeds, origin, barriers, threads: threads, cache: cache, measure: measure), barriers);
     }
 
     /// <summary>A region entity's room, as its flood measured it where <paramref name="cells"/> holds its lining.</summary>
     public static Room RoomOf(EntityDefinition def, Geometry.RoomCells? cells)
         => cells != null && cells.TryLining(def.EntityId, out var lining) ? RoomAcoustics.Measured(def.Region.ToRoom(), lining) : def.Region.ToRoom();
+
+    /// <summary>The map's openings framed from its rooms' floods (<see cref="AcousticVolumeGenerator.ApplyFloodOpenings"/>).</summary>
+    public static void ApplyFloodOpenings(AcousticMap map, Geometry.RoomCells floods) => AcousticVolumeGenerator.ApplyFloodOpenings(map, floods);
 
     /// <summary>The openings in the faces of the map's rooms, or of only <paramref name="rooms"/>, from these
     /// entities' solids (<see cref="AcousticVolumeGenerator.AddFaceOpenings"/>).</summary>
