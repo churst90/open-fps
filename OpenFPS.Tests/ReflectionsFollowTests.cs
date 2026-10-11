@@ -70,10 +70,12 @@ public class ReflectionsFollowTests
         Assert.NotEmpty(echoes);
         int step = h.Mixer.Started.Skip(from).First(e => e.FollowsListener).EntityId;
 
-        // The step itself is answered, and long enough after for the copies to have been too.
-        Assert.True(h.TickUntil(() => h.Mixer.HasPath(step), 300), "the worker never answered for the step itself");
-        for (int i = 0; i < 30; i++) { h.Tick(); System.Threading.Thread.Sleep(2); }
+        // Long enough for the worker to have answered anything it was asked. Nothing is: the step is with you
+        // and has no path, and each copy carries its own (VoiceRegistry.HeardFromOf).
+        for (int i = 0; i < 60; i++) { h.Tick(); System.Threading.Thread.Sleep(2); }
+        Assert.False(h.Mixer.HasPath(step), "your own step was handed a path");
 
+        Assert.All(echoes, e => Assert.True(e.CarriesPath));
         foreach (var e in echoes)
             Assert.False(h.Mixer.HasPath(e.EntityId),
                 $"the copy at ({e.Position.X:F1}, {e.Position.Y:F1}, {e.Position.Z:F1}) was given a path traced from its image: "

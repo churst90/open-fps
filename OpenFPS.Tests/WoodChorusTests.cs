@@ -59,7 +59,7 @@ public class WoodChorusTests
         // Heard further than one tree: 16 trees are 12 dB louder.
         float single = Loudness.AudibleRange(FoliageSpec.ParkTree.SourceLevelDb);
         Assert.True(big.RangeMetres > single * 1.5f, $"{big.RangeMetres:F0} m against {single:F0} m");
-        Assert.All(chorus.Woods, w => Assert.True(ClientWorldState.IsWood(w.Id)));
+        Assert.All(chorus.Woods, w => Assert.True(w.Id <= WoodChorus.FirstId));
     }
 
     /// <summary>Walking from 400 m into the middle of a wood, the power of the trees' own voices and the
@@ -124,7 +124,7 @@ public class WoodChorusTests
         }
         Assert.Empty(world.RefreshWoods());
         var snap = world.GetSnapshot();
-        var woods = snap.Entities.Values.Where(e => ClientWorldState.IsWood(e.Id)).ToList();
+        var woods = snap.Entities.Values.Where(e => world.IsWood(e.Id)).ToList();
         Assert.Equal(2, woods.Count);
         Assert.All(woods, w => Assert.StartsWith("wood:park_tree@", w.Definition.SoundEmitter.SoundId));
         Assert.All(woods, w => Assert.Contains(w.Id, snap.AudioEntityIds));
@@ -135,7 +135,7 @@ public class WoodChorusTests
         // A refresh with nothing changed changes nothing.
         long version = world.Version;
         Assert.Empty(world.RefreshWoods());
-        Assert.Equal(woods.Select(w => w.Definition), world.GetSnapshot().Entities.Values.Where(e => ClientWorldState.IsWood(e.Id)).Select(e => e.Definition));
+        Assert.Equal(woods.Select(w => w.Definition), world.GetSnapshot().Entities.Values.Where(e => world.IsWood(e.Id)).Select(e => e.Definition));
 
         // The far wood's trees leave with their tile: its wood goes too, and the other keeps its id.
         world.RemoveEntities(Enumerable.Range(50, 6));

@@ -311,6 +311,9 @@ public sealed class BirdLife
             }
     }
 
+    /// <summary>Where every call is declared as it starts (ClientAudioSystem's registry).</summary>
+    internal VoiceRegistry? Voices { get; set; }
+
     /// <summary>Every call, as it is made: which species and where. For tests and traces.</summary>
     internal Action<string, Vector3>? OnCall { get; set; }
 
@@ -329,9 +332,11 @@ public sealed class BirdLife
         AcousticPathData? path = null;
         if (_acoustics != null)
             try { path = _acoustics.CalculateAcousticPath(world, -1, listener, at); } catch { }
+        int voiceId = VoiceBase - (_voice++ % VoicePool);
+        Voices?.DeclareEvent(voiceId, VoiceRegistry.NoEntity, VoiceKind.Bird, at, sp.CallDb);
         _audio.Submit(new SpatialEmitter
         {
-            EntityId = VoiceBase - (_voice++ % VoicePool),
+            EntityId = voiceId,
             SoundId = sound,
             Mode = PlaybackMode.Single,
             Type = EmitterType.WorldLocked,

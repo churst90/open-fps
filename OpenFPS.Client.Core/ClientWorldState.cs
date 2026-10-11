@@ -269,6 +269,7 @@ public class ClientWorldState
         _crownsDirty = false;
         _woodIds.Clear();
         _woodKeys.Clear();
+        _woodEntities.Clear();
 
         lock (_gridLock)
         {
@@ -1239,8 +1240,11 @@ public class ClientWorldState
     public double LastWoodsMs { get; private set; }
     public double WoodsMsMax { get; set; }
 
-    /// <summary>Whether an id is one of the client's own wood entities.</summary>
-    public static bool IsWood(int entityId) => entityId <= WoodChorus.FirstId && entityId > WoodChorus.FirstId - 1_000_000;
+    /// <summary>The wood entities made so far and not taken away, read on any thread.</summary>
+    private readonly ConcurrentDictionary<int, byte> _woodEntities = new();
+
+    /// <summary>Whether an id is one of the client's own wood entities: one it made, not one whose id falls in a range.</summary>
+    public bool IsWood(int entityId) => _woodEntities.ContainsKey(entityId);
 
     /// <summary>
     /// Makes the woods again from the tree crowns held: after a map loads and after tiles come or go.
@@ -1277,6 +1281,7 @@ public class ClientWorldState
             keep.Add(w.Id);
             if (_woodKeys.TryGetValue(w.Id, out var had) && had.Key == w.Key && had.Centre == w.Centre && had.Range == w.RangeMetres) continue;
             _woodKeys[w.Id] = (w.Key, w.Centre, w.RangeMetres);
+            _woodEntities[w.Id] = 0;
             var def = new EntityDefinition
             {
                 EntityId = w.Id,
@@ -1296,7 +1301,7 @@ public class ClientWorldState
         }
         var gone = new List<int>();
         foreach (int id in _woodKeys.Keys) if (!keep.Contains(id)) gone.Add(id);
-        foreach (int id in gone) _woodKeys.Remove(id);
+        foreach (int id in gone) { _woodKeys.Remove(id); _woodEntities.TryRemove(id, out _); }
         if (gone.Count > 0) RemoveEntities(gone);
         _woods = chorus.Woods.Count > 0 ? chorus : null;
         Touch();

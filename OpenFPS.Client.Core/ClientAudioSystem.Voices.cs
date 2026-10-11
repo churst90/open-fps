@@ -7,10 +7,11 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// The voices of moving things (docs/SPECIAL_CASES_AUDIT.md, P3a): an engine, its intake and cabin paths, a
-/// borrowed far car, a horn held or honked, a siren, a train's voices. Each is declared to the registry by
-/// its owner and handed its path here, from its owner's one answer this frame, so no voice has a second
-/// writer and none keeps the path it started with.
+/// The voices heard by their owner's path (docs/SPECIAL_CASES_AUDIT.md, P3a and P3b): an engine, its intake
+/// and cabin paths, a borrowed far car, a horn held or honked, a siren, a train's voices, a standing machine,
+/// a tree or a wood and its places, a recording. Each is declared to the registry by its owner and handed its
+/// path here, from its owner's one answer this frame, so no voice has a second writer and none keeps the path
+/// it started with.
 /// </summary>
 public partial class ClientAudioSystem
 {
@@ -94,7 +95,12 @@ public partial class ClientAudioSystem
         }
         var path = PathOf(world, owner, ear);
         var heard = path.Heard;
-        e.ApparentPosition = VoiceRegistry.HeardFromOf(kind) == HeardFrom.TowardEdge ? SirenApparent(heard, at, ear) : at;
+        e.ApparentPosition = VoiceRegistry.HeardFromOf(kind) switch
+        {
+            HeardFrom.TowardEdge => SirenApparent(heard, at, ear),
+            HeardFrom.Edge => heard.ApparentPosition,
+            _ => at,
+        };
         e.Occlusion = heard.Occlusion;
         e.EqLow = heard.EqLow; e.EqMid = heard.EqMid; e.EqHigh = heard.EqHigh;
         e.AirLowDb = heard.AirLowDb; e.AirMidDb = heard.AirMidDb; e.AirHighDb = heard.AirHighDb;
@@ -106,17 +112,35 @@ public partial class ClientAudioSystem
         e.CarriesPath = path.Fresh;
     }
 
-    /// <summary>What kind of moving thing's own voice an entity's emitter is, or null for anything else (a
-    /// fixed machine, a tree, a recording), which the path pass still serves.</summary>
-    private VoiceKind? MovingThingKind(EntityDefinition def)
+    /// <summary>What an entity's own voice is: a moving thing's engine or aeroplane, a wood, a standing
+    /// physical model, or a recording (anything authored, a loudspeaker's render).</summary>
+    private VoiceKind OwnVoiceKind(WorldSnapshot world, EntityDefinition def, bool physical)
     {
-        if (!def.SoundEmitter.IsSynth) return null;
+        if (!def.SoundEmitter.IsSynth) return VoiceKind.Recording;
         string key = VoiceKey(def);
         return OpenFPS.Common.ModelKindTable.KindOf(key) switch
         {
             { Body: OpenFPS.Common.ModelBody.Rolls } when OpenFPS.Common.ModelKindTable.KnownVehiclePreset(key) != null => VoiceKind.Engine,
             { Synth: OpenFPS.Common.ModelSynth.Aircraft } => VoiceKind.Aircraft,
-            _ => null,
+            _ when IsWood(world, def.EntityId) => VoiceKind.Wood,
+            _ => physical ? VoiceKind.Machine : VoiceKind.Recording,
         };
+    }
+
+    private OpenFPS.Common.WoodChorus? _woodsOf;
+    private readonly HashSet<int> _woodIds = new();
+
+    /// <summary>Whether an entity is one of the woods the world made of its far trees (WoodChorus), by the
+    /// woods it has now rather than by where its id falls.</summary>
+    private bool IsWood(WorldSnapshot world, int entityId)
+    {
+        var woods = world.Woods;
+        if (!ReferenceEquals(woods, _woodsOf))
+        {
+            _woodsOf = woods;
+            _woodIds.Clear();
+            if (woods != null) foreach (var w in woods.Woods) _woodIds.Add(w.Id);
+        }
+        return _woodIds.Contains(entityId);
     }
 }

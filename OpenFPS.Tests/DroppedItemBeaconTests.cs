@@ -103,7 +103,11 @@ public class DroppedItemBeaconTests
         facade.InitializeForTest();
         var ear = Feet + new Vector3(0f, 1.6f, 0f);
         facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        // His own body left out of the rays, as the client says whose it is (ClientAudioSystem.OwnEntityId).
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService())
+        {
+            ListenerBodyId = body.Id,
+        };
         var aids = new BeaconAids(facade, BeaconPreferences.InMemory(), acoustics);
         for (int i = 0; i < 6; i++)
         {

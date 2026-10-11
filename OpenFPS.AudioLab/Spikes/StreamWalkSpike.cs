@@ -115,7 +115,7 @@ public static class StreamWalkSpike
         client.SetAcousticMap(map);
         Console.WriteLine($"  join: {client.EntityCount} entities, {client.Tiles.Count} tiles, {joinBytes / 1024.0:F0} KB, {clock.ElapsedMilliseconds} ms to the acoustic map");
 
-        var acoustics = new SpatialAcoustics();
+        var acoustics = new SpatialAcoustics { ListenerBodyId = body.Id };
         using var worker = new AsyncAcousticWorker(acoustics);
         worker.UpdateWorld(client.GetSnapshot());
         worker.Start();

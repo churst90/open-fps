@@ -530,9 +530,13 @@ public sealed class DrivingAids
         else Play(KerbSound, KerbBaseId - (_kerbIdx++ % Pool), offset, SensorVolume);
     }
 
+    /// <summary>Where every aid's voice is declared (ClientAudioSystem's registry): in the head, no path.</summary>
+    internal VoiceRegistry? Voices { get; set; }
+
     private void Play(string sound, int id, Vector3 offset, float volume)
     {
         if (!_registered) return;
+        Voices?.DeclareEvent(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
         _audio.Submit(new SpatialEmitter
         {
             EntityId = id,
@@ -569,6 +573,7 @@ public sealed class DrivingAids
             Essential = true,
             Type = EmitterType.UI,           // in the head: dry, panned, not out on the road
         };
+        Voices?.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
         if (_audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);
     }
@@ -615,6 +620,7 @@ public sealed class DrivingAids
         };
         // The budget holds this voice and places it from what it holds: re-placed past it, the rate stayed
         // at the speed the strip was first touched at and the range was measured from there (S11).
+        Voices?.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
         if (_audio.IsPlaying(id)) _audio.Refresh(e);
         else _audio.Submit(e);
     }

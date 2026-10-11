@@ -359,7 +359,11 @@ internal sealed class Replay
         Audio.AcousticWorker.StepForTest();
         Facade.PumpForTest();
         Facade.PumpForTest();
+        AfterTick?.Invoke(this);
     }
+
+    /// <summary>Called at the end of every frame, for a test that reads the system between frames.</summary>
+    internal Action<Replay>? AfterTick;
 
     // ── The world ───────────────────────────────────────────────────────────────────────────────
 

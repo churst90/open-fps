@@ -58,6 +58,9 @@ public sealed class BeaconAids
     /// <summary>Where a door's beacon hangs: on the face toward you, at face height above its threshold.</summary>
     private const float FaceHeightMetres = 1.6f;
 
+    /// <summary>Where every blip is declared as it starts (ClientAudioSystem's registry).</summary>
+    internal VoiceRegistry? Voices { get; set; }
+
     public BeaconAids(AudioEngineFacade audio, BeaconPreferences? prefs = null,
                       OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics? acoustics = null)
     {
@@ -164,9 +167,11 @@ public sealed class BeaconAids
         else if (TryVehicleSide(world, sourceId, listener, out var side)) at = side;
         // The acoustic path every one-off sound takes; the door's own leaf does not block its own blip.
         if (!Reaches(world, sourceId, listener, at, out var path)) return false;
+        int voiceId = BaseId - (_idx++ % Pool);
+        Voices?.DeclareEvent(voiceId, sourceId, VoiceKind.Beacon, at, BlipDb + (float)_prefs.LevelDb);
         _audio.Submit(new SpatialEmitter
         {
-            EntityId = BaseId - (_idx++ % Pool),
+            EntityId = voiceId,
             SoundId = sound,
             Mode = OpenFPS.Common.Components.PlaybackMode.Single,
             Position = at,

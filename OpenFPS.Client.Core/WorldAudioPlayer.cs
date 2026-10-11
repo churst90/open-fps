@@ -155,6 +155,9 @@ public sealed class WorldAudioPlayer
     /// </summary>
     internal const float MaxRange = 3000f;
 
+    /// <summary>Where every one-off is declared as it starts (ClientAudioSystem's registry).</summary>
+    internal VoiceRegistry? Voices { get; set; }
+
     /// <summary>The simulator's worker, for a one-shot's first answer. See
     /// <see cref="OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker.TryGetNearby"/>.</summary>
     public OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker? Worker { get; set; }
@@ -162,8 +165,8 @@ public sealed class WorldAudioPlayer
     /// <summary>
     /// The id the simulator files its answer for a sounding entity under (a talker, a one-shot's
     /// source): a question to the worker, never a voice, in a band below every voice band (the horns'
-    /// -1,200,000 is the lowest). The per-frame loop skips transient ids, so without this a one-shot
-    /// from a quiet place lived on the hand-rolled tracer (<see cref="AsyncAcousticWorker.TryGetNearby"/>).
+    /// -1,200,000 is the lowest). The per-frame pass asks only about things in the world, so without this a
+    /// one-shot from a quiet place lived on the hand-rolled tracer (<see cref="AsyncAcousticWorker.TryGetNearby"/>).
     /// </summary>
     internal const int SourceProbeBase = -3_000_000;
     internal static int SourceProbeId(int entityId) => SourceProbeBase - entityId;
@@ -173,7 +176,7 @@ public sealed class WorldAudioPlayer
         => Worker?.EnqueueRequest(new AcousticRequest
         {
             EntityId = SourceProbeId(entityId), ListenerPos = listener, SourcePos = at,
-            SourceRadius = AudioEmission.MinOcclusionRadius,
+            SourceRadius = AudioEmission.MinOcclusionRadius, LeaveOut = entityId,
         });
 
     /// <summary>The simulator's answer for a sounding entity, if it has one for about this point and this
@@ -627,7 +630,7 @@ public sealed class WorldAudioPlayer
                                                         listenerPosition, item.Sound.Position);
             // An echo's image is behind its wall, so traced like a direct sound it came out 40-60 dB down.
             // Both legs were checked clear when it was found; like the engines' echoes
-            // (EngineReflections.ApplyPath) it keeps only its surfaces' and the air's loss.
+            // (EngineReflections.CarryPath) it keeps only its surfaces' and the air's loss.
             if (item.IsReflection)
                 path = path with
                 {
@@ -724,6 +727,8 @@ public sealed class WorldAudioPlayer
             }
             // Thunder carries its own ground reflection, worked out from where each bit of channel is.
             if (!inCabin && !item.Sky && HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
+            Voices?.DeclareEvent(emitter.EntityId, item.SourceEntityId >= 0 ? item.SourceEntityId : VoiceRegistry.NoEntity,
+                                 VoiceKind.Transient, emitter.Position, item.Sound.LevelDb);
             _audio.Submit(emitter);
 
             // A part of the thunder stays in its direction while the listener walks on under it.
@@ -943,6 +948,8 @@ public sealed class WorldAudioPlayer
                     ThroughCabin(ref e, speaker, vehicle, now);
             }
             else if (!f.Moving && !f.Sky) Facing(ref e, speaker.Transform.Rotation, listenerPosition);
+            Voices?.DeclareEvent(e.EntityId, f.SourceEntityId >= 0 ? f.SourceEntityId : VoiceRegistry.NoEntity,
+                                 VoiceKind.Transient, e.Position, e.EarLevelDb);
             _audio.Submit(e);
         }
     }
