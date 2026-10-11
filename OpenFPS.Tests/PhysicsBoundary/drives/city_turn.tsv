@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_turn: away from a standstill, right across the Central Street junction at speed, and a correction left
 # map city, i4_economy, start 3.000 0.050 -40.000, heading 0, script -30 w90 wd30 w45 wa20 -30 s60 -15
 tick	keys	x	y	z	heading	speed	steer	throttle	brake	qx	qy	qz	qw	demand	then per wheel: load_daN angular slip_ratio slip_angle surface demand water

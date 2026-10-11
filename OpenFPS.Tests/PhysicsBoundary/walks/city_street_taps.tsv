@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_street_taps: twelve taps of W east from the spawn
 # map city, start 60.000 0.120 122.000, heading 90, script -15 tw12 -10
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

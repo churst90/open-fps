@@ -138,21 +138,24 @@ public class AsyncAcousticWorkerTests
         Await(() => worker.TryGetResult(7, out var p) && p[0].SourcePosition == moved, "answered the source again");
     }
 
-    /// <summary>A request made before there is a world is dropped, not held.</summary>
+    /// <summary>A request made before there is a world is dropped, not held. Stepped by hand: watched from
+    /// another thread, an empty queue and an empty pending list were also what the worker shows between taking
+    /// a request off the queue and filing it, and a world given then answered the request (GitHub, 2026-10-11).</summary>
     [Fact]
     public void ARequestWithNoWorldIsDroppedNotHeld()
     {
-        using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        using var worker = new AsyncAcousticWorker(new SpatialAcoustics()) { Manual = true };
         worker.EnqueueRequest(Ask(1, Behind));
-        worker.Start();
+        worker.StepForTest();
 
         var queue = (ConcurrentQueue<AcousticRequest>)Field(worker, "_requestQueue");
         var pending = (Dictionary<int, AcousticRequest>)Field(worker, "_pending");
-        Await(() => queue.IsEmpty && pending.Count == 0, "drained the queue");
+        Assert.True(queue.IsEmpty && pending.Count == 0, "the pass with no world kept the request");
 
         worker.UpdateWorld(Walled());
         worker.EnqueueRequest(Ask(2, Behind));
-        Await(() => worker.TryGetResult(2, out _), "answered the later source");
+        worker.StepForTest();
+        Assert.True(worker.TryGetResult(2, out _), "the later source was not answered");
         Assert.False(worker.TryGetResult(1, out _), "a request with no world to answer it was kept");
     }
 

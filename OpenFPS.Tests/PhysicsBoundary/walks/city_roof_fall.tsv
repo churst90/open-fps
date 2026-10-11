@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_roof_fall: off Brandt Court's west side at roof height: eighteen metres down (RoofEdgeFallTests' spot)
 # map city, start -31.400 18.250 191.884, heading 270, script -15 w60 -60
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

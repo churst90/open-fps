@@ -4,6 +4,24 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- The physics replays hold on other machines (docs/PHYSICS_BOUNDARY.md 14.9). GitHub parted the city's
+  traffic from its stored copy by 2 mm after 57 s, with no physics changed: another libm and CPU, carried over a
+  minute. Every physics store (walks, drives, traffic, trains, ballistics) now starts with the maths it was made
+  on, as the emitter streams do. On the same maths a run is compared to float rounding as before; on other maths
+  within a drift that grows with simulated time (1 mm, 1 mm/s and 1e-4 rad a second, twenty to fifty times the
+  worst GitHub showed), or as a slip, a body two ticks along or back its own path. Measured by running a minute
+  of traffic with every tick's step rounded differently: drift stayed at the printed millimetre, and one walker
+  started a tick late. The rule still fails a car in the next lane, half a lane over, stopped, or with only its
+  wheels changed (tests on the stored traffic), and a real change to the traffic: a 1 m lane offset failed at
+  second 1, routed cars 3 % slower at second 2. `OPENFPS_PHYSICS_FOREIGN=1` compares as another machine would.
+  No row of any store changed.
+- `AsyncAcousticWorkerTests.ARequestWithNoWorldIsDroppedNotHeld` failed once on GitHub. The test, not the
+  worker: it watched the worker's queue and pending list from another thread, and both are empty for a moment
+  after the worker takes a request off the queue and before it files it. A world given in that moment answered
+  the request. With that moment widened by a 50 ms sleep the test failed 50 runs in 50. It now steps the worker
+  by hand (`Manual`, `StepForTest`), as the class's other deterministic tests do, and still fails if the worker
+  keeps a request with no world.
+
 - The voices of moving things have one path each, from one pass (part P3a of docs/SPECIAL_CASES_AUDIT.md),
   unheard. Cody asked "shouldn't all mobile sound sources like vehicles, trains, sirens, etc use the same path
   so there's consistency?" after a train horn played through a brick wall. Every engine, intake, borrowed far

@@ -108,13 +108,14 @@ public static partial class PhysicsReplays
 
     /// <summary>
     /// The city's traffic for <paramref name="seconds"/> on a freshly loaded map, through VehicleSystem as
-    /// the server's tick runs it; every moving thing sampled once a second.
+    /// the server's tick runs it; every moving thing sampled once a second. <paramref name="stepOf"/> gives a
+    /// tick's step instead of the fixed one (PhysicsCrossMachineTests rounds it differently every tick).
     /// </summary>
-    public static string Traffic(LoadedMap map, double seconds = 60)
+    public static string Traffic(LoadedMap map, double seconds = 60, Func<int, float>? stepOf = null)
     {
         var vehicles = new VehicleSystem();
         vehicles.Spawn(map.Maps);
-        return Movers(map, seconds, dt => vehicles.Update(map.Id, map.World, dt), id => vehicles.TryGetWheels(map.Id, id, out var w) ? w : null);
+        return Movers(map, seconds, dt => vehicles.Update(map.Id, map.World, dt), id => vehicles.TryGetWheels(map.Id, id, out var w) ? w : null, stepOf);
     }
 
     /// <summary>The city's trains alone, through RailSystem, sampled the same way.</summary>
@@ -122,10 +123,10 @@ public static partial class PhysicsReplays
     {
         var rail = new RailSystem();
         rail.Spawn(map.Maps);
-        return Movers(map, seconds, dt => rail.Update(map.Id, map.World, dt), _ => null);
+        return Movers(map, seconds, dt => rail.Update(map.Id, map.World, dt), _ => null, null);
     }
 
-    private static string Movers(LoadedMap map, double seconds, Action<float> step, Func<int, WheelState[]?> wheels)
+    private static string Movers(LoadedMap map, double seconds, Action<float> step, Func<int, WheelState[]?> wheels, Func<int, float>? stepOf)
     {
         var ecs = map.World;
         float dt = PhysicsConstants.FixedDeltaTime;
@@ -135,7 +136,7 @@ public static partial class PhysicsReplays
         int ticks = (int)Math.Round(seconds * PhysicsConstants.TickRate);
         for (int tick = 1; tick <= ticks; tick++)
         {
-            step(dt);
+            step(stepOf?.Invoke(tick) ?? dt);
             if (tick % PhysicsConstants.TickRate != 0) continue;
             int second = tick / PhysicsConstants.TickRate;
             ecs.Query(new QueryDescription().WithAll<Transform, Velocity>().WithNone<PlayerComponent>(), (Entity e, ref Transform t, ref Velocity v) =>

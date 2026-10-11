@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_stairs_up: up Brandt Court's first flight, nineteen steps
 # map city, start -13.050 0.100 156.400, heading 180, script -15 w80 -10
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm

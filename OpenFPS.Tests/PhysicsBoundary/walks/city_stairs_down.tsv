@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # city_stairs_down: down the same flight from its top
 # map city, start -13.050 3.400 149.400, heading 0, script -15 w60 -10
 tick	keys	x	y	z	vx	vy	vz	grounded	gap_mm
