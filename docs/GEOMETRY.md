@@ -1937,8 +1937,26 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      the same siren -69.4/<-100/<-100 dB, the stairwell's field in the corridor -12.6 to -60.9 dB. The flat is as it
      was (walls first). The pops (20 to 30 dB for a quarter second, many cars at once, in the stairwell) are older:
      at 448ea7e0 too, 3 to 6 a minute with 40 cars round floor 1's stairwell (`--pop-hunt ear=-11.05,4.9,-100.84`),
-     each a moving source's simulated transmission jumping from -80/-100 to -35/-52/-80 dB on Dock Street; no still
-     source reproduces it, and 32 transmission surfaces instead of 8 changed nothing. Open.
+     each a moving source's simulated transmission jumping from -80/-100 to -35/-52/-80 dB on Dock Street. Not the
+     source pool (audit P1, 2026-10-11): still sources along the lane give the same, -35.4/-52.4/-79.5 dB from x
+     -19.5 to -15.5 at z -128.5 and -56.5/-82.7/-100 on either side (`--path-probe explain`). The line from the
+     stairwell down to the street crosses the floor slab's edge (box 1579, 15 cm concrete) all along; either side
+     of that stretch it also crosses the stair's 1.07 m concrete guard (1576 at x -13.9, 1575), and between them it
+     passes the head of the flight. The way over the guard is 3 cm, but its leg to the street runs through the
+     brick front (1585), so the search does not believe it and the guard is charged as a whole wall in a row with
+     the front. A way round one thing that passes through another is never paid as diffraction times that other
+     thing's transmission; with it, the guard would cost a few dB and this stretch would not stand out. Open: it is
+     a change to the barrier model everywhere (todo, Acoustics). The pavement's pops were the way over the top
+     giving up after four boxes (`OpeningRoutes.OverTheTopPasses`): fixed, below.
+
+     The pavement before the entrance (`--pop-hunt ear=-6.4,1.77,-103.5`, 40 cars): 41 to 56 pops a minute, each a
+     car on Wharf Avenue 190-260 m off, behind the multi-storey car park and the tower, from -90/-100/-100 to
+     -25/-25/-25 dB and back in a third of a second. Along the lane at x -131.5 the way over the top existed at z
+     62.0-63.0, 70.5-71.5 and 76.5-79.5 and nowhere between: the car park is a parapet and a slab a storey, each one
+     a leg runs into is a pass, and the search stopped at four. It goes on now until the string is clear or an end
+     is under something; the lane is -25/-25/-25 at every point and the pavement has no pops (1 high-band in some
+     minutes, a clear line between two buildings 235 m off). The source pool's own faults (S4) were never seen to
+     fire; they are closed anyway (docs/CLIENT_NOTES.md, "The worker's answers").
 
    The train at the corridor's south end, through the end wall, stays what the panel model gives 35 cm of brick
    (-40/-61/-87): with the horn's path followed, a freight's rumble is what comes through.
@@ -1946,7 +1964,8 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    Where to listen (each checked by `StairsTests.AListeningSpotIsWhereABodyStands`: clear to /tp, the floor at z):
    floor 3 corridor by the stair door `/tp -19.95 -101.5 9.29`; its south end `/tp -19.95 -110.5 9.29`; floor 3
    stairwell `/tp -10.8 -104.2 9.28`; flat 31F `/tp -14 -85 9.29`; floor 7 corridor `/tp -19.95 -100 21.29`;
-   before the front entrance `/tp -6.4 -103.5 0.12`.
+   before the front entrance `/tp -6.4 -103.5 0.12`; floor 1 stairwell, where the pops are left, `/tp -10.8 -104.2
+   3.28`, and the pop hunt's ear there `/tp -11.05 -100.84 3.28`.
    **Openings from the floods (step 3, 2026-10-11, unheard).** A flood keeps the cells of each opening its air meets
    and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
    opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide

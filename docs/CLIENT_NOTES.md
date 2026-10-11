@@ -261,6 +261,31 @@ grows worse than linearly in the probe count. The per-tick route search was neve
 Making it safe also took a fix of its own (a source staged without probes in the tick the batch arrived
 crashed the native library; Postscript 2 there).
 
+## The worker's answers: the pool, and what each answer says
+
+The simulator holds 64 Steam Audio sources, all added to it at the start, and traces every one of them on
+every run from the inputs it was last given, staged this tick or not. Each tick the first 64 requests in
+line are served (last tick's turned-away first); a served source without one takes a free source, or one
+held by somebody not served this tick, the one asked about longest ago. So (audit S4, 2026-10-11):
+- Only what was staged this tick is read back. A source held but not staged would read back an answer
+  traced from where it was then. In practice a full pool is all served sources, so this never fired (0
+  stale read-backs in 60 s of `--pop-hunt` with 70 and with 120 sources), but nothing else kept it so.
+- A lent source is cleared (`ClearSource`) before its new owner's inputs, as a released one is.
+- A request the pool has no room for keeps its last simulated answer for up to a second, moved with the
+  source, and is first in line next tick. Not the hand-rolled tracer: that is another model, and the switch
+  between them was a pop.
+- One ear a tick, the newest request's: the simulator runs against one listener.
+
+Each answer says what traced it (`AcousticPathData.Provenance`: simulated, held, hand-rolled), where the
+source was (`SimulatedFrom`; older than `SourcePosition`, the request's, for a held one) and where the ear
+was (`ListenerPosition`). Every asker takes one only if it is for here (`AcousticPathData.Answers`):
+traced within 1 m of the source and 3 m of the ear, plus 1.5 s of each one's speed. On the city the worker
+trails a car by 380 to 470 ms at the median and up to 1.5 s on a loaded machine (28 of 128,000 reads
+refused, --pop-hunt in Marlow Tower's stairwell), so 1.5 s keeps the answers that are only late and
+refuses one left by a pooled id's last occupant, one asked from before a teleport, and a horn's left from
+the horn before. Refused, the path pass keeps the voice's path as it is; a new voice starts on an answer
+for a source near it or the one-shots' path; a horn, siren, train or talker takes the one-shots' path.
+
 ## Engine render pool
 
 EngineRenderPool removed the ceiling on how many vehicles a map may carry. A physical engine is a

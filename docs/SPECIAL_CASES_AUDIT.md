@@ -239,6 +239,19 @@ byte-identical. The five add 260 KB gzipped (the old three are 441 KB). Read a s
   Audio, `EmitterStreamReplayTests.cs:22-25`), except `sirens_and_far_traffic` if S5 is done here: the
   siren car's requests while off are gone. Render fingerprints unchanged. The proof is the pop count, by
   ear and by `--pop-hunt`.
+- **Done 2026-10-11 (unheard).** S4 was not the pops. A full pool is all served sources, so nobody turned
+  away holds one and the read-back never took a stale answer (0 in 60 s with 70 and with 120 sources); a
+  lent source's inputs were replaced at once. Both are closed anyway: only what was staged this tick is
+  read back, and a lent source is cleared. Every answer carries what traced it and the source position and
+  ear it was traced for (`AcousticPathData.SimulatedFrom`, `ListenerPosition`, `Provenance`), every asker
+  takes it by one rule (`AcousticPathData.Answers`), and a tick traces from the newest ear. S5 done: a
+  siren that is off asks for nothing. The pops themselves are geometry and the barrier search, found with
+  still sources on `--path-probe`: on the Main Street pavement (41-56 a minute) the way over the top gave up
+  after four boxes (`OpeningRoutes.OverTheTopPasses`, unbounded in practice now: 0 a minute); in Marlow
+  Tower's floor 1 stairwell (4-11 a minute, unchanged) a 1.07 m stair guard is charged as a whole wall
+  because the 3 cm way over it runs on through the brick front (todo, Acoustics). Path lag (a car against
+  its answer) the same within the machine's own noise: two rounds run in turn, medians 400 and 333 ms
+  before and 383 and 367 after on the pavement, 567 and 417 before and 400 and 500 after in the stairwell.
 
 #### P2. One table of model kinds (1 session)
 
