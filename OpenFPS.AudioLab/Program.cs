@@ -173,6 +173,8 @@ string[] usage =
     "                                                the wood room walked with the megaphone on, captured",
     "  --walk [map= from= to= via= y= seconds= stand= taps= gap= trace sprint]",
     "                                                the real movement and ground probe over a real map",
+    "  --walk-pair [map= at=E,N,H heading= key=w|a|s|d ticks= taps= gap= sprint full from=E,N,H open=ID,... show=all] the server's and the client's step side by side",
+    "  --walk-pair map= room=ID[,ID...]   a /tp spot a body stands on in each room (StandingSpots.InRoom)",
     "  --stair-walk [scene=shapes|city] [sprint] [trace]",
     "                                                up and down real treads, every footfall checked (docs/GEOMETRY.md)",
     "  --enclosure [map= at= walk= step= head= dist=]",
@@ -521,6 +523,10 @@ if (args.Contains("--breath"))
     Environment.Exit(brCode);
 }
 
+if (args.Contains("--walk-pair"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.WalkPairSpike.Run(args));
+}
 if (args.Contains("--walk"))
 {
     int walkCode = OpenFPS.Client.Core.AudioEngine.Fmod.WalkSpike.Run(args);

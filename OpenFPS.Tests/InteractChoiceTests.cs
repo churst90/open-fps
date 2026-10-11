@@ -75,6 +75,9 @@ public class DoorChoiceTests
         return (world, maps);
     });
 
+    /// <summary>The city as the server loads it, once for every test that needs it.</summary>
+    internal static OpenFPS.Server.Core.MapManager Maps => City.Value.Maps;
+
     private static string Chosen(Vector3 at, float yaw)
     {
         var door = GameServer.ShutDoorInReach(City.Value.World, at, yaw, out _, out string name);
