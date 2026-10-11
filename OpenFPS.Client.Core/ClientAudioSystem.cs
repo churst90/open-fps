@@ -727,7 +727,8 @@ public partial class ClientAudioSystem
                     // between two opposite walls.
                     int reflectId = ReflectionVoiceId(id, slot);
                     var placed = _placed.TryGetValue(id, out var p)
-                        ? p : (originalSnap.Definition.SoundEmitter.Volume, originalSnap.Definition.SoundEmitter.MinDistance);
+                        ? p : (originalSnap.Definition.SoundEmitter.Volume, originalSnap.Definition.SoundEmitter.MinDistance,
+                               originalSnap.Definition.SoundEmitter.Range);
                     var echo = LoopEchoLevel(path, placed.Volume, placed.MinDistance, dist);
 
                     // A loudspeaker's copy is its render, thrown toward the wall by its beam: the band
@@ -754,7 +755,9 @@ public partial class ClientAudioSystem
                         // What the surface and the extra distance left of it, per band (LoopEchoLevel).
                         Volume = echo.Volume,
                         MinDistance = echo.MinDistance,
-                        Range = originalSnap.Definition.SoundEmitter.Range * 0.8f,
+                        // Heard as far as its source is: at 0.8 of the authored range a loud source's copies
+                        // stopped at 40 m while it played on (S24).
+                        Range = placed.Range,
                         IsReflection = true,
                         // Played from the source voice's own position, so it is what is being heard,
                         // arriving later, not the file again from the top.
@@ -1706,7 +1709,7 @@ public partial class ClientAudioSystem
 
     /// <summary>Each entity voice's volume and reference distance as last submitted, which its walls'
     /// copies are placed against.</summary>
-    private readonly Dictionary<int, (float Volume, float MinDistance)> _placed = new();
+    private readonly Dictionary<int, (float Volume, float MinDistance, float Range)> _placed = new();
 
     /// <summary>
     /// A loudspeaker's beam toward the wall a copy came off, on the mixer's three bands. The image sits
@@ -2189,11 +2192,8 @@ public partial class ClientAudioSystem
                 continue;
             }
             int voiceId = HornVoiceId(id);
-            // Behind a car's grille, a little above the bumper; on a locomotive's cab roof.
-            bool rail = OpenFPS.Common.ModelKindTable.BodyOf(snap.Definition.SoundEmitter.SoundId) == OpenFPS.Common.ModelBody.Rails;
-            Vector3 pos = snap.Transform.Position
-                        + Vector3.Transform(rail ? new Vector3(0f, 4.2f, 0f) : new Vector3(0f, 0.6f, Grille(snap)),
-                                            snap.Transform.Rotation);
+            // Where the vehicle's model has its horn: behind a car's grille, on a train its horn source.
+            Vector3 pos = HornAt(world, snap);
             float levelDb = OpenFPS.Common.Honk.LevelDb(horn.Key[OpenFPS.Common.Honk.Prefix.Length..horn.Key.LastIndexOf(':')]);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
             var e = new SpatialEmitter
@@ -2379,7 +2379,7 @@ public partial class ClientAudioSystem
         int voiceId = HeldHornVoiceId(snap.Id);
         // Let go before it ever sounded: nothing to close.
         if (!blowing && !_voices.IsRegistered(voiceId)) return;
-        Vector3 pos = snap.Transform.Position + Vector3.Transform(new Vector3(0f, 0.6f, Grille(snap)), snap.Transform.Rotation);
+        Vector3 pos = HornAt(world, snap);
         float levelDb = OpenFPS.Common.Honk.LevelDb(horn);
         var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
         var e = new SpatialEmitter
@@ -2457,20 +2457,76 @@ public partial class ClientAudioSystem
         _sirenVoiced.Add(snap.Id);
     }
 
-    /// <summary>A siren head: at the grille, which is where the horn is.</summary>
+    /// <summary>A siren head, where its vehicle's model has it (VehicleProfile.SirenMount): behind the grille,
+    /// in the bumper beside the horn.</summary>
     internal static Vector3 SirenMouth(in EntitySnapshot snap)
-        => snap.Transform.Position + Vector3.Transform(new Vector3(0f, 0.4f, Grille(snap)), snap.Transform.Rotation);
+        => snap.Transform.Position + Vector3.Transform(
+            OpenFPS.Common.ModelKindTable.Vehicle(snap.Definition.SoundEmitter.SoundId)?.SirenMount ?? new Vector3(0f, 0.4f, Grille(snap)),
+            snap.Transform.Rotation);
 
     /// <summary>
-    /// How far ahead of a vehicle's middle its grille is, metres (where horns and a siren head sit): a
-    /// quarter of a metre in from the nose of its declared body, or 1.9 m for a vehicle the client cannot
-    /// name.
+    /// Where a vehicle's horn is, in the world: where its model has it (VehicleProfile.HornMount); a train's is its
+    /// horn source (TrainLayout), wherever on the train the honk was reported from. A train with none, or a
+    /// vehicle the client cannot name, is logged once by id.
+    /// </summary>
+    private Vector3 HornAt(WorldSnapshot world, in EntitySnapshot snap)
+    {
+        string? sid = snap.Definition.SoundEmitter.SoundId;
+        if (OpenFPS.Common.ModelKindTable.BodyOf(sid) == OpenFPS.Common.ModelBody.Rails) return TrainHornAt(world, snap);
+        var mount = OpenFPS.Common.ModelKindTable.Vehicle(sid)?.HornMount ?? new Vector3(0f, 0.6f, Grille(snap));
+        return snap.Transform.Position + Vector3.Transform(mount, snap.Transform.Rotation);
+    }
+
+    /// <summary>A train's horn source's point, from the honked source: the train's layout names which of its
+    /// sources the horn is, and that source is an entity of its own.</summary>
+    private Vector3 TrainHornAt(WorldSnapshot world, in EntitySnapshot snap)
+    {
+        string sid = snap.Definition.SoundEmitter.SoundId ?? "";
+        if (OpenFPS.Common.ModelKindTable.TryRailSource(sid, out string preset, out string train, out int index))
+        {
+            int horn = -1;
+            try { horn = OpenFPS.Common.TrainSignal.WarningSource(OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset))); }
+            catch (Exception ex) { OpenFPS.Common.ModelKindTable.Fail(sid, ex.Message); }
+            if (horn == index) return OpenFPS.Common.AudioEmission.PointFor(snap);
+            if (horn >= 0)
+            {
+                string hornId = OpenFPS.Common.ModelKindTable.RailSource(preset, train, horn);
+                foreach (var other in world.DynamicEntities)
+                    if (string.Equals(other.Definition.SoundEmitter.SoundId, hornId, StringComparison.OrdinalIgnoreCase))
+                        return OpenFPS.Common.AudioEmission.PointFor(other);
+            }
+        }
+        OpenFPS.Common.ModelKindTable.Fail(sid, "honked, and its train has no horn source on the map: heard from its own point");
+        return OpenFPS.Common.AudioEmission.PointFor(snap);
+    }
+
+    /// <summary>
+    /// How far ahead of a vehicle's middle its grille is, metres: its model's (VehicleProfile.GrilleZ). A
+    /// vehicle the client cannot name is logged once by id and measured from its collider, or failing that
+    /// put 1.9 m ahead.
     /// </summary>
     internal static float Grille(in EntitySnapshot snap)
     {
-        if (OpenFPS.Common.ModelKindTable.Vehicle(snap.Definition.SoundEmitter.SoundId) is { } vehicle)
-            return MathF.Max(0.5f, vehicle.LengthMetres * 0.5f - 0.25f);
+        string? sid = snap.Definition.SoundEmitter.SoundId;
+        if (OpenFPS.Common.ModelKindTable.Vehicle(sid) is { } vehicle) return vehicle.GrilleZ;
+        float length = snap.Definition.Collider.Size.Z;
+        if (length > 0f)
+        {
+            OpenFPS.Common.ModelKindTable.Fail(sid ?? "", "names no vehicle: its grille is a quarter of a metre in from its collider's nose");
+            return MathF.Max(0.5f, length * 0.5f - 0.25f);
+        }
+        OpenFPS.Common.ModelKindTable.Fail(sid ?? "", "names no vehicle and has no body: its grille is taken as 1.9 m ahead");
         return 1.9f;
+    }
+
+    /// <summary>The level a vehicle's model declares at a metre (VehicleProfile.SourceLevelDb). One that declares
+    /// none is logged once by id and placed at <see cref="EngineSourceLevelDb"/>.</summary>
+    private static float DeclaredLevel(string preset, OpenFPS.Common.VehicleProfile profile)
+    {
+        if (profile.SourceLevelDb > 0f) return profile.SourceLevelDb;
+        OpenFPS.Common.ModelKindTable.Fail(OpenFPS.Common.ModelKindTable.IdOf(OpenFPS.Common.ModelSynth.Engine, preset),
+                                           $"declares no source level: placed at {EngineSourceLevelDb} dB");
+        return EngineSourceLevelDb;
     }
 
     /// <summary>
@@ -2536,7 +2592,7 @@ public partial class ClientAudioSystem
         _distantBoundTo[snap.Id] = sourceId;
 
         var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
-        float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
+        float level = DeclaredLevel(preset, profile);
         float extent = OutletSeparation(preset);
         var (gain, reference) = OpenFPS.Common.Loudness.Place(level, extent);
         Vector3 pos = OpenFPS.Common.AudioEmission.PointFor(snap);
@@ -2618,7 +2674,12 @@ public partial class ClientAudioSystem
         if (def.SoundEmitter.IsSynth)
         {
             resolvedSoundId = VoiceKey(def);
-            if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH";
+            if (string.IsNullOrEmpty(resolvedSoundId))
+            {
+                // A synthesised emitter that names no model: the plain oscillator its fields describe.
+                OpenFPS.Common.ModelKindTable.Fail("SYNTH", "an emitter is synthesised with no sound id: played as the plain oscillator");
+                resolvedSoundId = "SYNTH";
+            }
             // The ranking's own lookup, not a second prefix list: with two, the crossing bell won a voice
             // and then fell through here as a nameless synth, placed every frame and rendered by nothing.
             if (PhysicalLevel(resolvedSoundId, out _, out _))
@@ -2694,7 +2755,7 @@ public partial class ClientAudioSystem
                 engineKey = vehiclePreset;
                 var profile = OpenFPS.Common.MachineRegistry.VehicleFor(engineKey);
                 // Its own measured level: a stock car is 14 dB over a road car, a diesel pickup 30 under.
-                float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
+                float level = DeclaredLevel(engineKey, profile);
                 // Its acoustic size is the distance between the ends it radiates from (a car 3.5 m, a bus
                 // 10, a motorcycle 1): inside it the level is flat, since a metre nearer the intake is a
                 // metre further from the exhaust. Widened by Loudness.Place, which pays the gain back;
@@ -2786,7 +2847,7 @@ public partial class ClientAudioSystem
                              ? emitterPosition : acousticPath.ApparentPosition,
             // Inside, the voice has already rendered what gets through the body: the path would count
             // the panels twice.
-            EffectiveDistance = interior ? 0.7f : acousticPath.EffectiveDistance,
+            EffectiveDistance = interior ? OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.PlacedMetres : acousticPath.EffectiveDistance,
             Occlusion = interior ? 0f : acousticPath.Occlusion,
             EqLow = interior ? 1f : acousticPath.EqLow, EqMid = interior ? 1f : acousticPath.EqMid, EqHigh = interior ? 1f : acousticPath.EqHigh,
             AirLowDb = interior ? 0f : acousticPath.AirLowDb, AirMidDb = interior ? 0f : acousticPath.AirMidDb, AirHighDb = interior ? 0f : acousticPath.AirHighDb,
@@ -2824,7 +2885,7 @@ public partial class ClientAudioSystem
             FollowsListener = interior,
             ListenerOffset = !interior ? Vector3.Zero
                            : cabinLayout != null ? Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Offset(cabinLayout, 0, cabinEar), snap.Transform.Rotation)
-                           : Vector3.Transform(new Vector3(0f, -0.4f, 0.6f), snap.Transform.Rotation),
+                           : Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace, snap.Transform.Rotation),
             CabinEarX = cabinEar.X,
             PhysicalKey = physicalKey,
             Trees = chorusTrees,
@@ -2904,7 +2965,7 @@ public partial class ClientAudioSystem
         if (engineKey.Length > 0 || physicalKey.Length > 0) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
         Spreading? spreading = extentLayout != null ? SpreadOf(snap, extentLayout, ref emitter, eyePos, engineDt, now) : null;
-        _placed[snap.Id] = (emitter.Volume, emitter.MinDistance);
+        _placed[snap.Id] = (emitter.Volume, emitter.MinDistance, emitter.Range);
         _voices.Submit(emitter);
         // ...and its other places, after its middle, so the synth they read already exists.
         if (spreading != null) PlaceOuter(snap.Id, spreading, emitter, world, now);
@@ -3153,8 +3214,9 @@ public partial class ClientAudioSystem
     /// </summary>
     private int _othersFootstepIndex;
 
-    /// <summary>How far away another body's step can be heard at all, metres: a footstep's range.</summary>
-    private const float FootstepRange = 15f;
+    /// <summary>How far away another body's step can be heard at all, metres: the audible range of a step's
+    /// level (S24; it was 15 m, hundreds short of a 68 dB step's).</summary>
+    private static float FootstepRange(float levelDb) => OpenFPS.Common.Loudness.AudibleRange(levelDb);
 
     /// <summary>Somebody else's step: a sound left where it fell, and only one close enough to hear is
     /// made at all.</summary>
@@ -3165,7 +3227,7 @@ public partial class ClientAudioSystem
     /// their foot and you (CarryThePath).</summary>
     public void OnPlayerFootstep(Vector3 pos, string mat, string var, StepSlope slope, int bodyId)
     {
-        if (Vector3.Distance(pos, _state.VisualPosition) > FootstepRange) return;
+        if (Vector3.Distance(pos, _state.VisualPosition) > FootstepRange(OpenFPS.Common.Loudness.FootstepDb + StrideAccumulator.SlopeDb(slope))) return;
         SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f, slope: slope,
                        bodyId: bodyId);
     }
@@ -3274,7 +3336,7 @@ public partial class ClientAudioSystem
             // No two steps alike: a hair of pitch and a touch of level, at random.
             Volume = stepGain * MathF.Pow(10f, (float)(_stepRandom.NextDouble() * 2.0 - 1.0) * FootstepLevelJitterDb / 20f),
             Pitch = slopePitch * (1f + (float)(_stepRandom.NextDouble() * 2.0 - 1.0) * FootstepPitchJitter),
-            Range = FootstepRange,
+            Range = FootstepRange(OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb),
             // Your own feet are pinned (they are how you know you are moving); everybody else's compete
             // by loudness like any other sound.
             Essential = own,
@@ -3401,7 +3463,7 @@ public partial class ClientAudioSystem
             ApparentPosition = ear + facing * reference,
             Volume = gain,
             MinDistance = reference,
-            Range = 30f,
+            Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
             Pitch = 1f,
             EngineRunning = true,
             CarriesPath = true,
@@ -3423,7 +3485,7 @@ public partial class ClientAudioSystem
         int slot = PlaceVoiceCopies(world, mouth, ear, _voiceArrivals, gain, reference, MicrophoneLatency,
                                     VoiceRegistry.NoEntity, _voiceCopyOn,
                                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.OwnVoiceCopyKey, "own voice",
-                                    _listenerRegion, 30f, VoiceKind.OwnVoiceCopy, OwnEntityId);
+                                    _listenerRegion, OpenFPS.Common.Loudness.AudibleRange(levelDb), VoiceKind.OwnVoiceCopy, OwnEntityId);
         if (now >= _voiceNextLog)
         {
             _voiceNextLog = now + 5;
@@ -3612,7 +3674,7 @@ public partial class ClientAudioSystem
             MinDistance = stepReference,
             EarLevelDb = stepLevelDb,
             EarCopyDb = 20f * MathF.Log10(MathF.Max(1e-6f, gain)),
-            Range = 25f,
+            Range = OpenFPS.Common.Loudness.AudibleRange(stepLevelDb),
             // No DelayMs: the facade delays every submission by its distance, and the image is the
             // whole path away.
             IsReflection = true,
@@ -3820,7 +3882,7 @@ public partial class ClientAudioSystem
                 Type = EmitterType.WorldLocked,
                 Volume = landGain,
                 EarLevelDb = OpenFPS.Common.Loudness.FootstepDb,
-                Range = 20.0f,
+                Range = OpenFPS.Common.Loudness.AudibleRange(OpenFPS.Common.Loudness.FootstepDb),
                 Essential = true,
                 IsEvent = true,
                 MinDistance = landReference,

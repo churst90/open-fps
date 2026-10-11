@@ -145,7 +145,7 @@ public sealed class WorldAudioPlayer
     private readonly List<(string Id, double At)> _releases = new();
     private Vector3 _lastListener;
     private Thunder.Air _air = Thunder.Air.Standard;
-    private float _earAboveGround = 1.7f;
+    private float _earAboveGround = LocalPlayerState.StandingEyeHeight;
     private int _thunderCount;
 
     /// <summary>
@@ -442,7 +442,7 @@ public sealed class WorldAudioPlayer
             try
             {
                 var strike = new LightningStrike(1, FlashKind.CloudToGround, new Vector3(3000f, 4000f, 0f), new Vector3(3000f, 0f, 0f), 2e5f, 2);
-                Thunder.Render(strike, new Vector3(0f, 1.7f, 0f), Thunder.Air.Standard, new Thunder.Options { Threads = 1 });
+                Thunder.Render(strike, new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f), Thunder.Air.Standard, new Thunder.Options { Threads = 1 });
             }
             catch (Exception ex) { Serilog.Log.Debug(ex, "[THUNDER] prewarm failed"); }
         });

@@ -216,7 +216,7 @@ public class ClientAudioSelectionTests
         Assert.Equal(0f, engine.Occlusion);
         Assert.Equal((1f, 1f, 1f), (engine.EqLow, engine.EqMid, engine.EqHigh));
         Assert.Equal((0f, 0f, 0f), (engine.AirLowDb, engine.AirMidDb, engine.AirHighDb));
-        Assert.Equal(0.7f, engine.EffectiveDistance);
+        Assert.Equal(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.PlacedMetres, engine.EffectiveDistance);
         Assert.NotEqual(Vector3.Zero, engine.ListenerOffset);
         // No front voice from inside: both ends come through the body.
         Assert.Empty(h.Mixer.StartedAs(VoiceKind.Intake));

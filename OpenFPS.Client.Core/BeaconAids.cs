@@ -190,7 +190,8 @@ public sealed class BeaconAids
             Volume = gain,
             EarLevelDb = BlipDb + (float)_prefs.LevelDb,
             MinDistance = reference,
-            Range = 40f,
+            // As far as a blip of its level is heard (S24): which beacons blip is each kind's own reach.
+            Range = Loudness.AudibleRange(BlipDb + (float)_prefs.LevelDb),
             IsEvent = true,
             Type = EmitterType.WorldLocked,
         });

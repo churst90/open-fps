@@ -45,8 +45,16 @@ public static class TeleporterSounds
         Charge => 62f,
         Leave => 92f,
         Arrive => 96f,
-        _ => 56f,
+        Ready => 56f,
+        _ => Unknown(kind),
     };
+
+    /// <summary>A teleporter sound no level is declared for: logged once by key, and placed as the ready hum.</summary>
+    private static float Unknown(string kind)
+    {
+        ModelKindTable.Fail(Key(kind), "is a teleporter sound with no level: placed at the ready hum's 56 dB");
+        return 56f;
+    }
 
     public static float Seconds(string kind) => kind switch
     {

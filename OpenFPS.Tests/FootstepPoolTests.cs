@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Client.Core;
+using OpenFPS.Common;
 
 namespace OpenFPS.Tests;
 
@@ -29,15 +30,22 @@ public class FootstepPoolTests
         Assert.All(own, e => Assert.True(e.FollowsListener, "a stranger's step in your own feet's slot"));
     }
 
+    /// <summary>A step past the audible range of a step's level is not made; one across a quiet yard, inside
+    /// it, is (S24: the range was 15 m, where a 68 dB step is heard for hundreds).</summary>
     [Fact]
     public void A_step_too_far_away_to_hear_is_not_made()
     {
         var h = new ClientAudioHarness(Sounds());
         h.StandAt(Vector3.Zero);
         h.Tick();
-        h.Audio.OnPlayerFootstep(new Vector3(60f, 0f, 0f), "Concrete", "0");
+        float range = Loudness.AudibleRange(Loudness.FootstepDb);
+        Assert.True(range > 60f, $"a step is heard to {range:F0} m");
+        h.Audio.OnPlayerFootstep(new Vector3(range + 10f, 0f, 0f), "Concrete", "0");
         h.Tick(3);
         Assert.Empty(h.Mixer.StartedAs(VoiceKind.Footstep));
+        h.Audio.OnPlayerFootstep(new Vector3(60f, 0f, 0f), "Concrete", "0");
+        h.Tick(3);
+        Assert.Single(h.Mixer.StartedAs(VoiceKind.Footstep));
     }
 
     [Fact]

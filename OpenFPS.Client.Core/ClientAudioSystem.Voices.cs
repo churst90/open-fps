@@ -87,7 +87,7 @@ public partial class ClientAudioSystem
             // Inside, the voice has already rendered what gets through the body: a path would count the
             // panels twice, and its room is yours (the cabin), whatever room the car's middle is in.
             e.ApparentPosition = at;
-            e.EffectiveDistance = 0.7f;
+            e.EffectiveDistance = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.PlacedMetres;
             e.Occlusion = 0f;
             e.EqLow = 1f; e.EqMid = 1f; e.EqHigh = 1f;
             e.AirLowDb = 0f; e.AirMidDb = 0f; e.AirHighDb = 0f;
