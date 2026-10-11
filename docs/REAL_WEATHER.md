@@ -520,6 +520,21 @@ places, and 4 and 5 make it move and soak in as it really does.
 7. **When the data stops.** Recommended: keep using the fetched forecast for up to six hours, then hand over
    to the simulation from the last real state; `/weather` says which.
 
+### Decided (Cody, 2026-10-11)
+
+- **The world's clock: real local time at real places** ("Yes, real local time at real places for the weather.
+  Must be realistic to the area as it is happening"). On the world, the time, date and weather at a place are
+  what they are there now; made-up maps keep their own clock. The other six decisions are open.
+- **Where the sun and the moon are, for the player** (asked the same day). Both are computed from the place's
+  latitude and longitude and the real time: the sun by NOAA's solar position equations, the moon by Meeus's
+  lunar series (position, phase, illuminated share), each to about a tenth of a degree, more than the ear needs.
+  A readout key and `/sky` say each body's bearing and height in the words the tracker already uses ("the sun
+  west-southwest, twenty degrees up, sets in an hour and ten minutes; the moon waxing gibbous, three quarters
+  lit, southeast, thirty-five degrees up, rises at ..."), below the horizon as "down, rises at ...". Not a sound
+  in the sky: the sun is not a source. What the sun's height changes is heard where it is physical: the
+  temperature and the wind's daily turn, the dawn chorus and dusk, insects by temperature. It goes with the
+  clock in stage 1.
+
 ## 13. Sources
 
 Checked 2026-10-10, by reading the page or by asking the service.

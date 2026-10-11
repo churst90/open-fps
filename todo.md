@@ -36,12 +36,10 @@ other at login. The server and the Windows zip go out together.
    from authoring, the editor, prefabs and the generators; derive portals where floods meet through a
    door. The ambience bed machinery is gone (2026-10-10; Cody: no beds at all, region beds included); the
    component and manifest fields stay unread (positional wire). Part A approved by ear 2026-10-10 ("everything
-   sounds great"); regions-become-places steps in docs/GEOMETRY.md 12.6 item 1. Step 2 built 2026-10-10,
-   unheard: rooms flood from their points with no box or margin, and the generators put an opening wherever
-   rooms meet with no wall (every part of a footprint is a room's). Listen first (the list in 12.6, "The flood
-   from a point": a stairwell, a roof access, a barn, the houses that changed most). Step 3 built 2026-10-11,
-   unheard: openings framed from the floods, no more false openings in rooms' box faces (12.6, "Openings from the
-   floods", with where to listen).
+   sounds great"); regions-become-places steps in docs/GEOMETRY.md 12.6 item 1. Step 2 (rooms flood from their
+   points, every part of a footprint a room's) and step 3 (openings framed from the floods, no more false
+   openings in rooms' box faces) approved by ear 2026-10-11 (Cody: "complete, success everything sounds
+   good"). Steps 4 and 5 under way.
    Then (Cody, 2026-10-11): one path pass for every voice of a moving thing. Each voice is an entry saying
    which thing owns it and where on it it sounds from (engine, siren mouth, horn, a train's bogie taps,
    aircraft engines, a far-off borrowed voice, a spread source's places); one pass hands each its path every
