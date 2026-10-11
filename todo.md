@@ -486,6 +486,9 @@ docs/WORLD_STREAMING.md, stage 2 as built.
   for traffic (Next, in order, item 6). Overture release 2026-09-23.1 will be withdrawn around the end of
   November 2026: moving to a newer one is a new generator version.
 - Real weather for real places (Open-Meteo or NOAA by latitude and longitude).
+- The sun and the moon for the player (Cody, 2026-10-11; docs/SKY.md): the calculations and the sentence
+  are built (`OpenFPS.Astronomy`). The readout key and `/sky` come with the weather's clock, in
+  docs/REAL_WEATHER.md stage 1: they need the world's real local time and each place's zone.
 - Traffic volumes from published counts (average daily traffic by road), with time-of-day curves.
 
 ### Map editor

@@ -533,7 +533,8 @@ places, and 4 and 5 make it move and soak in as it really does.
   lit, southeast, thirty-five degrees up, rises at ..."), below the horizon as "down, rises at ...". Not a sound
   in the sky: the sun is not a source. What the sun's height changes is heard where it is physical: the
   temperature and the wind's daily turn, the dawn chorus and dusk, insects by temperature. It goes with the
-  clock in stage 1.
+  clock in stage 1. The calculations and the sentence are built (`OpenFPS.Astronomy`, docs/SKY.md); the key
+  and `/sky` are not.
 
 ## 13. Sources
 
