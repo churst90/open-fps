@@ -303,6 +303,31 @@ public class VoiceRegistryTests
         Assert.Equal(reg.World, again.World);
     }
 
+    /// <summary>
+    /// A one-off of a pooled kind is a voice of its own (P3d, Cody 2026-10-11): the 49th drop, the 13th of your
+    /// steps, the 7th guide beep no longer take the first's id and cut it off while it sounds; the budget
+    /// decides what is heard. A landing is still one at a time.
+    /// </summary>
+    [Fact]
+    public void Every_one_off_is_a_voice_of_its_own()
+    {
+        var reg = new VoiceRegistry { Frame = 1 };
+        foreach (var (kind, owner, n) in new[]
+                 {
+                     (VoiceKind.RainDrop, VoiceRegistry.NoEntity, 48), (VoiceKind.OwnStep, VoiceRegistry.NoEntity, 12),
+                     (VoiceKind.Footstep, VoiceRegistry.NoEntity, 64), (VoiceKind.Bird, VoiceRegistry.NoEntity, 48),
+                     (VoiceKind.Beacon, VoiceRegistry.NoEntity, 24), (VoiceKind.StepEcho, VoiceRegistry.NoEntity, 48),
+                     (VoiceKind.Aid, (int)AidVoice.Guide, 6),
+                 })
+        {
+            int first = reg.IdFor(kind, owner, 0);
+            int again = reg.IdFor(kind, owner, n);
+            Assert.NotEqual(first, again);
+        }
+        Assert.Equal(reg.IdFor(VoiceKind.Footstep, VoiceRegistry.NoEntity, VoiceRegistry.Landing),
+                     reg.IdFor(VoiceKind.Footstep, VoiceRegistry.NoEntity, VoiceRegistry.Landing));
+    }
+
     /// <summary>A registry on a facade over a mixer that records, pumped by hand.</summary>
     private static (VoiceRegistry Reg, AudioEngineFacade Facade, RecordingMixer Mixer) OnAMixer(int fadeCalls = 0)
     {

@@ -345,13 +345,10 @@ public class BirdLifeMutationTests
         }
 
         var ids = played.Select(e => e.EntityId).ToList();
-        Assert.Equal(48, ids.Distinct().Count());
-        // Counting down from the first: the first call has the top of the pool (give or take calls
-        // in the same frame, which the mixer takes in its own order), and every id is at or below it.
-        int top = ids.Max();
-        Assert.True(top < 0);
-        Assert.InRange(ids[0], top - 3, top);
-        Assert.All(ids, id => Assert.InRange(id, top - 47, top));
+        // Every call a voice of its own (P3d), no pool of 48 taken in turn.
+        Assert.True(ids.Distinct().Count() > 48, $"{ids.Distinct().Count()} voices for {ids.Count} calls");
+        // Each from the allocator, never an entity's id.
+        Assert.All(ids, id => Assert.True(id <= VoiceRegistry.FirstId, $"a call under {id}"));
     }
 
     /// <summary>
