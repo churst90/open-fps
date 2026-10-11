@@ -10,11 +10,5 @@
   },
   "Type": "StaticObject",
   "IsIndoor": true,
-  "IsSolid": false,
-  "RoomSize": {
-    "X": 10,
-    "Y": 5,
-    "Z": 10
-  },
-  "ReverbScale": 1.0
+  "IsSolid": false
 }

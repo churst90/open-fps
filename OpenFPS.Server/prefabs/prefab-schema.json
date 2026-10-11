@@ -388,25 +388,7 @@
     },
     "IsIndoor": {
       "type": "boolean",
-      "description": "Any field in this block declares the entity an acoustic REGION — a room volume the listener stands inside. A region must not be solid and must carry a positive RoomSize."
-    },
-    "RoomSize": {
-      "$ref": "#/definitions/vector3",
-      "description": "Interior dimensions in metres — the volume and surface areas the reverb time is computed from."
-    },
-    "ReverbScale": {
-      "type": "number",
-      "exclusiveMinimum": 0,
-      "description": "Multiplier on the computed reverb time."
-    },
-    "RoomMaterials": {
-      "type": "array",
-      "minItems": 6,
-      "maxItems": 6,
-      "items": {
-        "$ref": "#/definitions/material"
-      },
-      "description": "The six interior surfaces by material NAME, in the order Floor, Ceiling, North, South, East, West — the order the reverb math reads them, which is NOT the FaceMask bit order."
+      "description": "Declares the entity a REGION, a place the listener is in: a room, whose shape, size and materials its flood measures from the walls, or a named place in the open, the box its ColliderSize fills. A region must not be solid."
     },
     "RegionAId": {
       "type": "integer",

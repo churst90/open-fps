@@ -322,10 +322,6 @@ public sealed partial class WorldEditor
 
     // ── Baking ──────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>The settings of a thing a map file holds itself: its name, a door's sides, indoors and a
-    /// room's materials. The rest (a sound's volume, range and model) stay in the overlay.</summary>
-    private static readonly string[] FaceWords = { "Floor", "Ceiling", "North", "South", "East", "West" };
-
     /// <summary>Whether a map setting is a field of the map file (MapSettings.Apply lays it on MapData).</summary>
     private static bool FileHolds(string path)
         => path.Equals(MapSettings.Weather, StringComparison.OrdinalIgnoreCase) || path.Equals(MapSettings.Hour, StringComparison.OrdinalIgnoreCase)
@@ -345,18 +341,7 @@ public sealed partial class WorldEditor
                 case "KeyedSide": e.KeyedSide = value == "front" ? 1f : value == "back" ? -1f : 0f; break;
                 case "PushSide": e.PushSide = value == "back" ? -1f : 1f; break;
                 case "Indoor": e.IsIndoor = value == "true"; break;
-                default:
-                    int face = Array.IndexOf(FaceWords, path);
-                    if (face < 0) { left[path] = value; break; }
-                    // All six, from the room as it is, with this one as kept.
-                    var six = e.RoomMaterials is { Length: 6 } m ? m.ToArray() : new string[6];
-                    for (int i = 0; i < 6; i++)
-                        if (string.IsNullOrEmpty(six[i]))
-                            six[i] = live != Entity.Null && world.IsAlive(live) && EntitySettings.Named(FaceWords[i]) is { } st && st.Applies(world, live)
-                                ? st.Get(world, live) : "Generic";
-                    six[face] = value;
-                    e.RoomMaterials = six;
-                    break;
+                default: left[path] = value; break;
             }
         }
         return left.Count == 0 ? null : left;

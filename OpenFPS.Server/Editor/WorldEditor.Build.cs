@@ -160,7 +160,7 @@ public sealed partial class WorldEditor
     private static bool Plain(PrefabTemplate t)
         => t.ColliderSize.HasValue && (t.IsSolid ?? true) && (t.Shape ?? ColliderShape.Box) == ColliderShape.Box
            && t.IsDoor != true && !t.IsItem && !t.HasEmitter && t.Type == EntityType.StaticObject
-           && !t.RoomSize.HasValue && !t.RegionAId.HasValue && !t.RegionBId.HasValue && t.Form == null;
+           && !t.IsIndoor.HasValue && !t.RegionAId.HasValue && !t.RegionBId.HasValue && t.Form == null;
 
     /// <summary>The doors opened by hand, one prefab per kind of door (DoorEvents.Slug).</summary>
     private List<(string Word, string Label, PrefabTemplate Prefab)> DoorTypes(UserSession s)

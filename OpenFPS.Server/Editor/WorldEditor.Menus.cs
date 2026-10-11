@@ -459,7 +459,7 @@ public sealed partial class WorldEditor
         if (sound.StartsWith("fire:")) return "Fire";
         if (sound.StartsWith("foliage:") || id.Contains("tree") || id.Contains("foliage") || id.Contains("hedge")) return "Trees and plants";
         // A place is a room, a region, a doorway, a name or a trigger; a beacon is a thing that sounds.
-        if (t.RoomSize.HasValue || t.RegionAId.HasValue || id.Contains("region") || id.Contains("portal") || id.Contains("marker")
+        if (t.IsIndoor.HasValue || t.RegionAId.HasValue || id.Contains("region") || id.Contains("portal") || id.Contains("marker")
             || id.Contains("named_place") || t.Type == EntityType.Trigger) return "Places and markers";
         if (id.Contains("building")) return BuildingsCategory;
         if (id.Contains("stair") || id.Contains("ramp")) return "Stairs and ramps";

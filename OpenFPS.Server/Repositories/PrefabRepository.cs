@@ -339,17 +339,17 @@ public class PrefabRepository
             });
         }
 
-        // Any region field declares a region; the validator insists on the RoomSize the reverb needs.
-        if (t.IsIndoor.HasValue || t.RoomSize.HasValue || t.ReverbScale.HasValue || t.RoomMaterials != null)
+        // A region: its box is the one its collider fills, scaled as the entity is (where nothing floods, a yard or a
+        // street, the box is the place; a room's flood measures the rest). No materials or reverb scale are authored.
+        if (t.IsIndoor.HasValue)
         {
             var region = new RegionComponent
             {
                 FriendlyName = string.IsNullOrWhiteSpace(regionName) ? t.Name : regionName,
-                IsIndoor = t.IsIndoor ?? true,
-                // The room scales with the entity, as the collider does.
-                RoomSize = (t.RoomSize ?? Vector3.Zero) * (scale ?? Vector3.One),
-                ReverbTimeScale = t.ReverbScale ?? 1.0f,
-                Materials = ResolveRoomMaterials(t.RoomMaterials)
+                IsIndoor = t.IsIndoor.Value,
+                RoomSize = (t.ColliderSize ?? Vector3.Zero) * (scale ?? Vector3.One),
+                ReverbTimeScale = 1.0f,
+                Materials = ResolveRoomMaterials(null)
             };
             components.Add(region);
         }

@@ -203,30 +203,31 @@ public class PrefabSpecTests
         t.ColliderSize = new Vector3(10, 5, 10);
         t.IsSolid = true;
         t.IsIndoor = true;
-        t.RoomSize = new Vector3(10, 5, 10);
         Rejects(t, "region AND a solid collider");
     }
 
     [Fact]
-    public void RegionWithoutRoomSize_IsRejected()
+    public void RegionWithoutColliderSize_IsRejected()
     {
         var t = Valid();
         t.IsSolid = false;
         t.IsIndoor = true;
-        Rejects(t, "RoomSize");
+        Rejects(t, "ColliderSize");
     }
 
-    [Fact]
-    public void RoomMaterials_WrongLengthOrUnknownName_AreRejected()
+    /// <summary>A room's size, materials and reverb are measured from its walls (docs/GEOMETRY.md 12.6, step 5): a
+    /// prefab that names them is refused.</summary>
+    [Theory]
+    [InlineData("RoomSize")]
+    [InlineData("RoomMaterials")]
+    [InlineData("ReverbScale")]
+    public void A_room_s_size_materials_and_reverb_are_not_authored(string field)
     {
         var t = Valid();
         t.IsSolid = false;
-        t.RoomSize = new Vector3(4, 3, 4);
-        t.RoomMaterials = new[] { "Concrete", "Concrete" };
-        Rejects(t, "exactly 6");
-
-        t.RoomMaterials = new[] { "Concrete", "Concrete", "Concrete", "Concrete", "Concrete", "Cheese" };
-        Rejects(t, "not a known material");
+        t.IsIndoor = true;
+        t.ColliderSize = new Vector3(4, 3, 4);
+        Rejects(t, field, new[] { "Id", "Name", "Material", "IsSolid", "IsIndoor", "ColliderSize", field });
     }
 
     [Fact]
@@ -386,7 +387,7 @@ public class PrefabSpecTests
     }
 
     [Fact]
-    public void Spawn_ResolvesRoomMaterialNamesToResonanceIndices()
+    public void A_region_is_the_box_its_collider_fills_with_nothing_authored_on_its_faces()
     {
         string dir = Path.Combine(Path.GetTempPath(), "openfps-prefab-room-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -400,8 +401,7 @@ public class PrefabSpecTests
                   "Material": "None",
                   "IsSolid": false,
                   "IsIndoor": true,
-                  "RoomSize": { "X": 10, "Y": 5, "Z": 10 },
-                  "RoomMaterials": ["Wood", "Concrete", "Concrete", "Concrete", "Concrete", "Carpet"]
+                  "ColliderSize": { "X": 10, "Y": 5, "Z": 10 }
                 }
                 """);
 
@@ -409,12 +409,11 @@ public class PrefabSpecTests
             Assert.Empty(repo.RejectedPrefabs);
 
             using var world = new WorldScope();
-            var region = world.World.Get<RegionComponent>(repo.Spawn(world.World, "gym", Vector3.Zero));
-
-            AcousticRegistry.EnsureInitialized();
-            Assert.Equal(AcousticRegistry.GetProperties("Wood").ResonanceIndex, region.Materials[0]);     // floor
-            Assert.Equal(AcousticRegistry.GetProperties("Concrete").ResonanceIndex, region.Materials[1]); // ceiling
-            Assert.Equal(AcousticRegistry.GetProperties("Carpet").ResonanceIndex, region.Materials[5]);   // west
+            var region = world.World.Get<RegionComponent>(repo.Spawn(world.World, "gym", Vector3.Zero, scale: new Vector3(2, 1, 1)));
+            Assert.True(region.IsIndoor);
+            Assert.Equal(new Vector3(20, 5, 10), region.RoomSize);
+            Assert.Equal(1f, region.ReverbTimeScale);
+            Assert.All(region.Materials, m => Assert.Equal(0, m));
         }
         finally { Directory.Delete(dir, true); }
     }

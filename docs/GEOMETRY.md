@@ -1813,9 +1813,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
       floods"). Portals derived through door leaves were not needed: every door is an entity with its two rooms,
       framed by its leaf.
    4. DONE (2026-10-11). The readers of `RoomSize` onto the flood, below ("The readers on the flood").
-   5. Authoring: `RoomSize`, `Materials` and `ReverbTimeScale` out of the editor (EntitySettings, WorldEditor menus and
-      build, ModelCatalog), PrefabTemplate/PrefabRepository/PrefabValidator, and gen_city.py, gen_osm.py,
-      gen_speedway.py, WorldBuildings and WorldPlaces; maps regenerated, city.json byte-identical to gen_city.py.
+   5. DONE (2026-10-11). Out of authoring, below ("Nothing authored of a room").
    A box stays where nothing floods: an outdoor place (a name over an area, a yard, a street, a park), a vehicle's
    cabin (it moves; its box comes from the vehicle), a room whose block is over `MaxBlockCells`, and every room until
    the first flood lands at load (or the load waits for it).
@@ -2002,6 +2000,18 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    - `OpeningRoutes.FaceOfRoom`: only for an authored opening no flood met.
    - `CompositeService`: a room built at run time is made from its survey.
    No lookup, measure or route moved (the three maps' dumps are main's and step 3's, byte for byte).
+
+   **Nothing authored of a room (step 5, 2026-10-11).** A prefab declares a region by `IsIndoor` alone; `RoomSize`,
+   `RoomMaterials` and `ReverbScale` are gone from `PrefabTemplate`, the schema, the validator and `acoustic_region`
+   (a prefab naming one is refused as any unknown field is). A region's box is the one its collider fills, scaled as
+   the entity is: the place itself where nothing floods, a room's point and fallback until its flood lands. Its
+   materials start blank (the load's survey fills a room that does not flood, the flood's lining measures one that
+   does) and its reverb scale is 1. The editor has no face materials to set (the six "Floor" to "West" settings and
+   their bake into the map file are gone); its menus and build tell a region by `IsIndoor`. `RegionComponent`'s fields
+   stay on the wire. gen_city.py, gen_osm.py and gen_speedway.py never wrote these: the four maps come out byte for
+   byte as they were, and so do the dumps. Left: a map entity's `RoomMaterials` (the test map's gym, and what
+   `WorldPlaces` and `WorldBuildings` carry into a tile from a survey or from their prefabs, so a tile needs no survey
+   of its own) and a composite part's, which carry a measure rather than author one.
 
    Found moving `RealPlaceMapTests.The_ground_never_rises_through_what_lies_on_it` onto the floods (nine points over
    each room's air instead of its box): the ground comes up through the floor at points of 21 rooms, 14 on Albany and 7

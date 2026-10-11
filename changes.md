@@ -4,6 +4,10 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- Nothing of a room is authored any more (docs/GEOMETRY.md 12.6, "Nothing authored of a room"): a prefab has no
+  RoomSize, RoomMaterials or ReverbScale, and the editor no face materials. A region is the box its collider fills;
+  a room's shape and what lines it come from its walls. No map changed and no sound.
+
 - Openings framed from where the rooms' air meets them, unheard (docs/GEOMETRY.md 12.6, "Openings from the
   floods"). A flooded room no longer has openings found in its box's faces: on Albany 1,530 rooms had 33,342 m2 of
   openings to the outdoors that their walls do not have (a box's face across its own house's wing, walls the face
