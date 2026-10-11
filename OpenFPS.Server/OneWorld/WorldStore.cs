@@ -32,8 +32,9 @@ public sealed class WorldStore
     /// 4: buildings from Overture (release OvertureBuildings.Release), the woods kept off them;
     /// 5: the drainage, which way each cell drains (WorldTile.Drainage, docs/RUNNING_WATER.md 13);
     /// 6: every part of a building's footprint in a room, openings between its rooms (docs/GEOMETRY.md 12.6);
-    /// 7: a landing and steps outside each door, and a door with a building a step outside it moved along its wall.</summary>
-    public const int GeneratorVersion = 7;
+    /// 7: a landing and steps outside each door, and a door with a building a step outside it moved along its wall;
+    /// 8: a home's floor a concrete slab with its carpet or boards on it, not 27 cm of carpet or wood on the ground.</summary>
+    public const int GeneratorVersion = 8;
 
     public const long DefaultCapBytes = 20L * 1024 * 1024 * 1024;
 
