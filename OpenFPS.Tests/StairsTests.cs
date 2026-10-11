@@ -769,6 +769,30 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
+    /// The places given Cody to listen at in Marlow Tower (/tp x east, y north, z height, docs/GEOMETRY.md
+    /// 12.6) are where a body stands: clear as /tp checks it, with the floor the server finds under it at
+    /// z. A list of 2026-10-10 had spots in ceilings and walls.
+    /// </summary>
+    [Theory]
+    [InlineData(-19.95f, -101.5f, 9.29f)]     // floor 3 corridor, beside the stairwell door
+    [InlineData(-19.95f, -110.5f, 9.29f)]     // floor 3 corridor, its south end against the brick
+    [InlineData(-10.8f, -104.2f, 9.28f)]      // floor 3 stairwell, past the end of the flight up (Cody's rain was 0.65 m east)
+    [InlineData(-14.0f, -85.0f, 9.29f)]       // flat 31F
+    [InlineData(-19.95f, -100.0f, 21.29f)]    // floor 7 corridor, under the roof
+    [InlineData(-6.4f, -103.5f, 0.12f)]       // Main Street pavement, before the front entrance
+    [InlineData(-14.2f, -102.7f, 9.28f)]      // floor 3 stairwell, its open floor by the door
+    [InlineData(-10.65f, -103.9f, 24.25f)]    // the roof access, on its landing before the door
+    public void AListeningSpotIsWhereABodyStands(float x, float y, float z)
+    {
+        var feet = PlayerCoordinates.ToWorld(x, y, z);
+        Assert.False(MovementSystem.CheckCollision(_city.World, _city.Grid, feet, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight),
+                     $"/tp {x} {y} {z}: solid");
+        float floor = PhysicsUtils.GetGroundHeight(_city.World, _city.Grid, feet, out string material);
+        _o.WriteLine($"/tp {x} {y} {z}: on {material} at {floor:F3} m");
+        Assert.True(MathF.Abs(floor - z) < 0.02f, $"/tp {x} {y} {z}: the floor under it is at {floor:F3} m");
+    }
+
+    /// <summary>
     /// From the stairwell door on every floor of every tower, the stairs beacon is heard from that floor's
     /// way up only, although it is nearly 12 m off at the far end of the shaft and the floors above and
     /// below are nearer.
@@ -777,8 +801,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     public void FromEveryStairwellDoorYouHearThatFloorsWayUp()
     {
         var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "maps", "city.json")));
+        // The openings and the doors in them: each storey's way onto its corridor is a fire door.
         var portals = doc.RootElement.GetProperty("Entities").EnumerateArray()
-            .Where(e => e.GetProperty("PrefabId").GetString() == "portal")
+            .Where(e => e.TryGetProperty("RegionAId", out _) && e.TryGetProperty("RegionBId", out _))
             .Select(e => (A: e.GetProperty("RegionAId").GetInt32(), B: e.GetProperty("RegionBId").GetInt32(), At: new Vector3(e.GetProperty("Position").GetProperty("X").GetSingle(),
                           e.GetProperty("Position").GetProperty("Y").GetSingle(), e.GetProperty("Position").GetProperty("Z").GetSingle())))
             .ToList();
@@ -792,7 +817,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
                 int stairwell = _city.Regions.Single(r => r.Name == $"{tower} stairwell, floor {s}").Id;
                 // The doorway onto the floor, not the opening the flight comes up through to the storey above.
                 var shaft = _city.Regions.Where(r => r.Name.StartsWith($"{tower} stairwell") || r.Name == $"{tower} roof access").Select(r => r.Id).ToHashSet();
-                var door = portals.Single(p => p.A == stairwell && !shaft.Contains(p.B)).At;
+                // ...nor the front entrance, onto the street (-1).
+                bool Floor(int other) => other != -1 && !shaft.Contains(other);
+                var door = portals.Single(p => p.A == stairwell && Floor(p.B) || p.B == stairwell && Floor(p.A)).At;
                 var ear = door with { Y = flights[s].Foot.Floor.Y + 1.6f };
                 var wayUp = flights[s].Foot.At;
 

@@ -478,8 +478,8 @@ public class DoorSidesTests : IDisposable
 
     /// <summary>
     /// The city's doors swing the right way: a room door into its room, and an exit (a push bar, a
-    /// building's front entrance) out of it, toward the street or the roof. Each door's first place is
-    /// the room it belongs to.
+    /// building's front entrance) out of it, toward the street, the roof or the stair (each storey's
+    /// fire door from its corridor). Each door's first place is the room it belongs to.
     /// </summary>
     [Fact]
     public void TheCitysDoorsSwingTheRightWay()
@@ -503,6 +503,6 @@ public class DoorSidesTests : IDisposable
         _o.WriteLine($"{into} doors swing into their rooms, {outOf} exits swing out; wrong: {string.Join(", ", wrong.Take(10))}");
         Assert.Empty(wrong);
         Assert.Equal(397, into);
-        Assert.Equal(12, outOf);
+        Assert.Equal(49, outOf);
     }
 }

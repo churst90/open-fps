@@ -782,9 +782,14 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
                      stair_b[0], stair_b[1])
         B_holed("tile_floor", sa0, sa1, floor_top - 0.02, floor_top + 0.03, stair_b[0], stair_b[1], hole(s - 1),
                 name=floor_name)
+        # A fire door between each storey's corridor and the stair, as an exit stair's enclosure has (IBC 1023):
+        # pushed from the corridor, it swings into the stair and its closer shuts it. It was an open doorway, and
+        # with the shaft one space from the ground up the street came in by the front entrance to every corridor
+        # (a siren on Main Street at -56 dB in floor 3's, 2026-10-10). In the portal's place, so no id moves.
         sb = (stair_b[0] + stair_b[1]) / 2
-        px0, px1, pz0, pz1 = place(near_wall, near_wall + WALL_T, sb - DOOR_W / 2, sb + DOOR_W / 2)
-        portal(px0, px1, floor_top, floor_top + DOOR_H, pz0, pz1, stair_id, corridor_id, "x" if vertical else "z")
+        sx_, _, sz_, _ = place(near_wall + WALL_T / 2, 0, sb, 0)
+        door(sx_, floor_top, sz_, corridor_id, stair_id, facing_z=not vertical, prefab="steel_door", opening=DOOR_W,
+             name=f"{label} stairwell door, floor {s}")
         # One shaft: the flight from the storey below comes up through the hole in this floor, and the place
         # below ends there, in the slab.
         if s:
