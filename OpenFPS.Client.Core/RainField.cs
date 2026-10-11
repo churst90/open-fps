@@ -899,9 +899,11 @@ public sealed class RainField
                 continue;
             }
             if (s == RainSurvey.OverheadSlot) OnYourRoof(ref e, e.Position);
+            // Down to one voice: the parts it was heard from before go (S18: they played on).
+            StopParts(s);
             Voiced?.Invoke(id, false);
-            if (_on[s] && _audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
-            else { _audio.PlayPhysicalSoundDirect(e); _on[s] = true; }
+            _audio.Sound(e);
+            _on[s] = true;
         }
     }
 
@@ -968,11 +970,11 @@ public sealed class RainField
             e.ApparentPosition = whole.ApparentPosition + (_partAt[k] - whole.Position);
             e.Volume *= balance;
             if (slot == RainSurvey.OverheadSlot) OnYourRoof(ref e, _partAt[k]);
-            bool on = k == 0 ? _on[slot] : k < _partsOn[slot];
             Voiced?.Invoke(e.EntityId, false);
-            if (on && _audio.IsPlaying(e.EntityId)) _audio.UpdateSpatialAttributes(e);
-            else _audio.PlayPhysicalSoundDirect(e);
+            _audio.Sound(e);
         }
+        // Fewer parts than before: the rest go.
+        for (int k = Math.Max(1, parts); k < _partsOn[slot]; k++) _audio.StopSound(SlotVoice(slot, k).Id);
         _on[slot] = true;
         _partsOn[slot] = parts;
     }
@@ -1076,7 +1078,7 @@ public sealed class RainField
             EarLevelDb = level,
             MinDistance = reference,
             ExtentMetres = extent,
-            Range = MathF.Max(60f, Loudness.AudibleRange(level)),
+            Range = Loudness.AudibleRange(level),
             Pitch = 1f,
             EngineRunning = true,
             CarriesPath = true,
@@ -1164,7 +1166,7 @@ public sealed class RainField
                 Volume = gain,
                 EarLevelDb = level,
                 MinDistance = reference,
-                Range = MathF.Max(10f, Loudness.AudibleRange(level)),
+                Range = Loudness.AudibleRange(level),
                 Pitch = 1f,
                 IsEvent = true,
                 CarriesPath = true,

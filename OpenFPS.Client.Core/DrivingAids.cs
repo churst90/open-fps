@@ -83,7 +83,11 @@ public sealed class DrivingAids
     /// turning on purpose and it keeps its hands off.</summary>
     private const float AssistWithinDegrees = 35f;
 
-    public DrivingAids(AudioEngineFacade audio) => _audio = audio;
+    public DrivingAids(AudioEngineFacade audio)
+    {
+        _audio = audio;
+        Voices = new VoiceRegistry { Mixer = audio };
+    }
 
     // ── The road ahead (docs/DRIVING_AIDS.md) ────────────────────────────────────────────────
 
@@ -531,22 +535,19 @@ public sealed class DrivingAids
 
     /// <summary>Where every aid's voice is given its id and declared: ClientAudioSystem's registry, or one of
     /// its own on its own. In the head, no path.</summary>
-    internal VoiceRegistry Voices { get; set; } = new();
+    internal VoiceRegistry Voices { get; set; }
 
     /// <summary>The id of an aid's voice, the <paramref name="n"/>th of its kind.</summary>
     private int Id(AidVoice aid, int n = 0) => Voices.IdFor(VoiceKind.Aid, (int)aid, n);
 
-    private void StopIfPlaying(int id)
-    {
-        if (_audio.IsPlaying(id)) _audio.StopSound(id);
-    }
+    private void StopIfPlaying(int id) => Voices.Stop(id);
 
     private void Play(string sound, AidVoice aid, int n, Vector3 offset, float volume)
     {
         if (!_registered) return;
         int id = Id(aid, n);
         Voices.DeclareEvent(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
-        _audio.Submit(new SpatialEmitter
+        Voices.Submit(new SpatialEmitter
         {
             EntityId = id,
             Seed = VoiceRegistry.SeedOf(VoiceKind.Aid, (int)aid, n),
@@ -586,8 +587,7 @@ public sealed class DrivingAids
             Type = EmitterType.UI,           // in the head: dry, panned, not out on the road
         };
         Voices.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
-        if (_audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
-        else _audio.PlayPhysicalSoundDirect(e);
+        Voices.Sound(e);
     }
 
     private void StopTones()
@@ -635,8 +635,7 @@ public sealed class DrivingAids
         // The budget holds this voice and places it from what it holds: re-placed past it, the rate stayed
         // at the speed the strip was first touched at and the range was measured from there (S11).
         Voices.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
-        if (_audio.IsPlaying(id)) _audio.Refresh(e);
-        else _audio.Submit(e);
+        Voices.Sustain(e);
     }
 
     // ── The road ahead ───────────────────────────────────────────────────────────────────────

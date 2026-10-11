@@ -428,6 +428,17 @@ public sealed record VehicleProfile
     public float WidthMetres { get; init; } = 1.9f;
     public float HeightMetres { get; init; } = 1.4f;
 
+    /// <summary>How far ahead of the middle the grille is, metres: a quarter of a metre in from the nose.</summary>
+    public float GrilleZ => MathF.Max(0.5f, LengthMetres * 0.5f - 0.25f);
+    /// <summary>How high the horn sits, metres: behind the grille, a little above the bumper.</summary>
+    public float HornHeightMetres { get; init; } = 0.6f;
+    /// <summary>How high a siren head sits, metres: behind the grille beside the horn, lower, in the bumper.</summary>
+    public float SirenHeightMetres { get; init; } = 0.4f;
+    /// <summary>Where the horn is, in the vehicle's own frame (x right, y up, z forward).</summary>
+    public Vector3 HornMount => new(0f, HornHeightMetres, GrilleZ);
+    /// <summary>Where a siren head is, in the vehicle's own frame.</summary>
+    public Vector3 SirenMount => new(0f, SirenHeightMetres, GrilleZ);
+
     /// <summary>The preset key of the engine, for a map or a command line to name. See EngineProfile.Presets.</summary>
     public string EngineKey { get; init; } = "";
 

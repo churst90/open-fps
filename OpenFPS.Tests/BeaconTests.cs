@@ -178,6 +178,70 @@ public class BeaconTests
         Assert.DoesNotContain(provider.PlayedSounds, s => s.Contains("beacon_door"));
     }
 
+    /// <summary>
+    /// A blip is heard by the acoustic worker's answer for it, as every sustained voice is (P6, Cody 2026-10-11):
+    /// each near beacon is asked under a probe of its own every frame, so when it blips the answer is in and
+    /// decides whether it sounds and from where. Behind the wall at 24 Birch Street the worker's answer keeps the
+    /// doors silent too; beside a door it blips on it.
+    /// </summary>
+    [Fact]
+    public void A_blip_is_heard_by_the_workers_answer()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
+        Assert.True(maps.TryGetMapData("city", out var data));
+        var client = new ClientWorldState();
+        client.Clear(data.Size);
+        var doors = new System.Collections.Generic.List<EntityDefinition>();
+        foreach (var def in EntityDefinitionFactory.StaticDefinitions(world))
+        {
+            client.RegisterDefinition(def);
+            if (def.Identity.BeaconCategory == Beacons.Door) doors.Add(def);
+        }
+        // A metre and a half out from a door's face, in plain view of it.
+        var spatial = new OpenFPS.Client.Core.SpatialService();
+        Vector3? before = null;
+        foreach (var d in doors)
+        {
+            var n = Vector3.Transform(Vector3.UnitZ, d.Transform.Rotation);
+            var face = d.Transform.Position + n * (0.5f * d.Collider.Size.Z + 0.35f);
+            var at = face + n * 1.5f + Vector3.UnitY * 0.5f;
+            var dir = at - face;
+            if (spatial.RaycastSingle(client.GetSnapshot(), face, Vector3.Normalize(dir), dir.Length(), out _, out _)) continue;
+            before = at;
+            break;
+        }
+        Assert.NotNull(before);
+
+        foreach (var (ear, heard) in new[] { (before!.Value, true), (new Vector3(-340.8f, 1.6f, -13.45f), false) })
+        {
+            var provider = new VoiceLifecycleTests.RecordingProvider();
+            var facade = new AudioEngineFacade(provider);
+            facade.InitializeForTest();
+            facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+            var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+            using var worker = new OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker(acoustics) { Manual = true };
+            var aids = new BeaconAids(facade, BeaconPreferences.InMemory(), acoustics) { Worker = worker };
+            var snap = client.GetSnapshot();
+            worker.UpdateWorld(snap);
+            for (int i = 0; i < 120; i++)
+            {
+                aids.Update(snap, ear, 10.0 + i / 60.0);
+                worker.StepForTest();
+                for (int k = 0; k < 3; k++) facade.PumpForTest();
+            }
+            _o.WriteLine($"ear {ear}: played {string.Join(", ", provider.PlayedSounds)}; {aids.AnsweredByWorker} decided on the worker's answer");
+            if (heard)
+            {
+                Assert.Contains(provider.PlayedSounds, s => s.Contains("beacon_door"));
+                Assert.True(aids.AnsweredByWorker > 0, "no blip was decided on the worker's answer");
+            }
+            else Assert.DoesNotContain(provider.PlayedSounds, s => s.Contains("beacon_door"));
+        }
+    }
+
     /// <summary>Every city door is a door beacon and every parked car a vehicle beacon, though nobody placed
     /// one; checked on the definitions the client is sent.</summary>
     [Fact]

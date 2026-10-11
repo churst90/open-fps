@@ -117,6 +117,8 @@ internal struct VoiceEntry
     /// <summary>A one-off, started once: an entry until its voice has stopped, not until a frame goes by
     /// without it.</summary>
     public bool Event;
+    /// <summary>Let go and fading (<see cref="VoiceRegistry.Retire"/>): an entry until its fade has ended.</summary>
+    public bool Retiring;
 }
 
 /// <summary>
@@ -131,7 +133,7 @@ internal struct VoiceEntry
 /// entry or still sounding (a voice fading out keeps its id until its fade has ended) and then free for the
 /// next. So no two voices sound under one id, however many entities a map has or however long it runs.
 /// </summary>
-internal sealed class VoiceRegistry
+internal sealed partial class VoiceRegistry
 {
     /// <summary>The owner of a voice that is no entity's: rain, a bird, the aids round your head.</summary>
     public const int NoEntity = int.MinValue;
@@ -280,6 +282,7 @@ internal sealed class VoiceRegistry
             foreach (var (id, e) in _entries)
             {
                 if (e.World != World) _gone.Add(id);
+                else if (e.Retiring || _retiring.ContainsKey(id)) continue;
                 else if (!e.Event) { if (e.SeenFrame < frame) _gone.Add(id); }
                 else if (frame - e.SeenFrame > EventStartFrames && (sounding == null || !sounding(id))) _gone.Add(id);
             }
@@ -311,6 +314,7 @@ internal sealed class VoiceRegistry
         lock (_lock)
         {
             _entries.Clear();
+            _retiring.Clear();
             foreach (int id in _given.Keys.ToList())
             {
                 var g = _given[id];
@@ -324,6 +328,10 @@ internal sealed class VoiceRegistry
     /// <summary>A landing's part (<see cref="IdFor"/>): one landing at a time, the next replacing it.</summary>
     public const int Landing = -1;
 
+    /// <summary>The part of an entity's probe a beacon's blip is asked under: beside its one-offs' and its
+    /// voice's (part 0), from a point of its own (a door's face).</summary>
+    public const int BeaconProbe = 1;
+
     /// <summary>
     /// The id of one voice: <paramref name="kind"/> of <paramref name="owner"/>, the <paramref name="part"/>th of
     /// them. The owner is an entity, or for a voice no entity owns what it belongs to (a train's number, a rain
@@ -334,7 +342,7 @@ internal sealed class VoiceRegistry
     public int IdFor(VoiceKind kind, int owner, int part = 0)
     {
         if (IsOwnVoice(kind)) return owner;
-        var key = new VoiceKey(kind, owner, Turn(kind, owner, part));
+        var key = new VoiceKey(kind, owner, part);
         lock (_lock)
         {
             if (_idOf.TryGetValue((World, key), out int id))
@@ -361,6 +369,13 @@ internal sealed class VoiceRegistry
         }
     }
 
+    /// <summary>The id a voice already has, without giving it one: for whoever stops what may never have started.</summary>
+    public bool TryIdOf(VoiceKind kind, int owner, int part, out int id)
+    {
+        if (IsOwnVoice(kind)) { id = owner; return true; }
+        lock (_lock) return _idOf.TryGetValue((World, new VoiceKey(kind, owner, part)), out id);
+    }
+
     /// <summary>The id of a voice (<see cref="IdFor"/>), kept for it until the world is left, whether it sounds
     /// or not: for whoever refers to a voice by its id before it starts and after it stops (a test).</summary>
     public int Hold(VoiceKind kind, int owner, int part = 0)
@@ -382,9 +397,9 @@ internal sealed class VoiceRegistry
     public int ProbeFor(int entityId) => IdFor(VoiceKind.Probe, entityId);
 
     /// <summary>
-    /// How many one-offs of a kind are voices at once: the next after that many is the first's turn again, and
-    /// replaces it if it is still held (a step's, a drop's). 0: every one its own. As they were before ids were
-    /// given out; whether each should be a voice of its own is a change to what is heard (P3d).
+    /// How many one-offs of a kind took turns at a voice before each was a voice of its own (P3d): the next after
+    /// that many was the first's turn again and cut it off if it still sounded. Only the seed table reads it now,
+    /// so a one-off's synth is seeded as it was (<see cref="SeedOf"/>); its id is its own.
     /// </summary>
     public static int TurnsOf(VoiceKind kind, int owner) => kind switch
     {
@@ -397,8 +412,8 @@ internal sealed class VoiceRegistry
         _ => 0,
     };
 
-    /// <summary>Which turn the <paramref name="part"/>th one-off of a kind takes (<see cref="TurnsOf"/>); a
-    /// landing's part, below zero, is its own.</summary>
+    /// <summary>Which turn the <paramref name="part"/>th one-off of a kind took (<see cref="TurnsOf"/>), for its
+    /// seed; a landing's part, below zero, is its own.</summary>
     private static int Turn(VoiceKind kind, int owner, int part)
         => TurnsOf(kind, owner) is int turns and > 0 && part >= 0 ? part % turns : part;
 

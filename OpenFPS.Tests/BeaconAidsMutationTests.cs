@@ -317,24 +317,19 @@ public class BeaconAidsMutationTests
     }
 
     /// <summary>
-    /// Blips take their voices from a pool of their own, 24 ids counting down and round again, so a blip
-    /// never takes another sound's voice and they never run out.
+    /// Every blip is a voice of its own (P3d): no pool of 24 taken in turn, so a blip never cuts off one still
+    /// sounding, and its id is the allocator's, never an entity's.
     /// </summary>
     [Fact]
-    public void BlipsCycleThroughAPoolOfTwentyFourVoices()
+    public void EveryBlipIsAVoiceOfItsOwn()
     {
         var world = Moving(Thing(1, new Vector3(2f, 1f, 0f), DoorSize, Beacons.Door),
                            Thing(2, new Vector3(-2f, 1f, 0f), DoorSize, Beacons.Door),
                            Thing(3, new Vector3(0f, 1f, 2f), DoorSize, Beacons.Door));
         var ids = new Rig().Run(world, Ear, 10, 30).Select(e => e.EntityId).ToList();
         Assert.True(ids.Count > 48, $"only {ids.Count} blips");
-        Assert.Equal(24, ids.Distinct().Count());
-        int top = ids[0];
-        Assert.True(top < 0);
-        // In the order they were handed out — until two blips fall in one frame and the mixer takes
-        // them in its own order, which the first two rounds do not.
-        for (int i = 0; i < 48; i++) Assert.Equal(top - i % 24, ids[i]);
-        Assert.All(ids, id => Assert.InRange(id, top - 23, top));
+        Assert.True(ids.Distinct().Count() > 24, $"{ids.Distinct().Count()} voices for {ids.Count} blips");
+        Assert.All(ids, id => Assert.True(id <= VoiceRegistry.FirstId, $"blip under {id}"));
     }
 
     /// <summary>

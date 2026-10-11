@@ -21,6 +21,12 @@ Recent work, newest first. `git log` has the rest.
   `SteamAudioScene.AddPieceMesh`, so no tile scene was made on Magnolia or Albany and every source there fell
   back to the hand-rolled tracer. Found by `--path-probe` while measuring the ground in the way; fixed, unheard.
   On the places, what was heard until now was the hand-rolled tracer's.
+- Audit P3d, steps 1 to 5 (docs/SPECIAL_CASES_AUDIT.md, "P3d as built"), unheard, on its branch. Every world
+  voice is started, placed, faded and stopped one way, through the voice registry; a voice is no longer placed
+  after its stop. Horns, sirens and grilles sit where the vehicle's model says; ranges are the audible range of
+  the level (others' footsteps were cut at 15 m). Drops, steps, beeps, birds and blips are each their own voice.
+  Beacons and perched birds are heard by the acoustic worker's answer, as everything else is. Steam Audio now
+  builds Magnolia's scene (it threw every tick). Next: the reseed.
 
 - When an edge is buried (docs/GEOMETRY.md 12.6, "When an edge is buried"), unheard. The barrier search
   went round no edge within 5 cm of another box. Three rules now, for every asker of the barrier search:

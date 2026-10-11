@@ -145,7 +145,7 @@ public sealed class WorldAudioPlayer
     private readonly List<(string Id, double At)> _releases = new();
     private Vector3 _lastListener;
     private Thunder.Air _air = Thunder.Air.Standard;
-    private float _earAboveGround = 1.7f;
+    private float _earAboveGround = LocalPlayerState.StandingEyeHeight;
     private int _thunderCount;
 
     /// <summary>
@@ -157,7 +157,7 @@ public sealed class WorldAudioPlayer
 
     /// <summary>Where every one-off is given its id and declared as it starts: ClientAudioSystem's registry,
     /// or one of its own on its own.</summary>
-    internal VoiceRegistry Voices { get; set; } = new();
+    internal VoiceRegistry Voices { get; set; }
 
     /// <summary>The simulator's worker, for a one-shot's first answer. See
     /// <see cref="OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker.TryGetNearby"/>.</summary>
@@ -197,6 +197,7 @@ public sealed class WorldAudioPlayer
     public WorldAudioPlayer(AudioEngineFacade audio, SpatialAcoustics acoustics, bool prewarm = true)
     {
         _audio = audio;
+        Voices = new VoiceRegistry { Mixer = audio };
         _acoustics = acoustics;
         _prewarms = prewarm;
         if (!prewarm) return;
@@ -441,7 +442,7 @@ public sealed class WorldAudioPlayer
             try
             {
                 var strike = new LightningStrike(1, FlashKind.CloudToGround, new Vector3(3000f, 4000f, 0f), new Vector3(3000f, 0f, 0f), 2e5f, 2);
-                Thunder.Render(strike, new Vector3(0f, 1.7f, 0f), Thunder.Air.Standard, new Thunder.Options { Threads = 1 });
+                Thunder.Render(strike, new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f), Thunder.Air.Standard, new Thunder.Options { Threads = 1 });
             }
             catch (Exception ex) { Serilog.Log.Debug(ex, "[THUNDER] prewarm failed"); }
         });
@@ -731,7 +732,7 @@ public sealed class WorldAudioPlayer
             if (!inCabin && !item.Sky && HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
             Voices.DeclareEvent(emitter.EntityId, item.SourceEntityId >= 0 ? item.SourceEntityId : VoiceRegistry.NoEntity,
                                  VoiceKind.Transient, emitter.Position, item.Sound.LevelDb);
-            _audio.Submit(emitter);
+            Voices.Submit(emitter);
 
             // A part of the thunder stays in its direction while the listener walks on under it.
             if (item.Sky)
@@ -952,7 +953,9 @@ public sealed class WorldAudioPlayer
             else if (!f.Moving && !f.Sky) Facing(ref e, speaker.Transform.Rotation, listenerPosition);
             Voices.DeclareEvent(e.EntityId, f.SourceEntityId >= 0 ? f.SourceEntityId : VoiceRegistry.NoEntity,
                                  VoiceKind.Transient, e.Position, e.EarLevelDb);
-            _audio.Submit(e);
+            // Placed afresh in the budget, never asked for again: submitted in the tick its line ended, a
+            // line started again from the top (S18).
+            Voices.Refresh(e);
         }
     }
 
@@ -1416,7 +1419,7 @@ public sealed class WorldAudioPlayer
     {
         // A followed voice left playing stays where it last was: thunder for tens of seconds, a line
         // finishing in the next map from wherever its speaker stood in the last.
-        foreach (var f in _following) _audio.StopSound(f.Emitter.EntityId);
+        foreach (var f in _following) Voices.Stop(f.Emitter.EntityId);
         _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); _mapGeneration++;
     }
 

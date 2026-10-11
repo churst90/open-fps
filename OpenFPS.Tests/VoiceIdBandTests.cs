@@ -169,7 +169,7 @@ public class VoiceIdBandTests
         reg.Sweep(9);
         Assert.False(reg.TryKeyOf(probe, out _));
 
-        // A one-off that comes round its kind's turns takes the id of the one in its turn, as it did before (P3d).
-        Assert.Equal(reg.IdFor(VoiceKind.RainDrop, VoiceRegistry.NoEntity, 3), reg.IdFor(VoiceKind.RainDrop, VoiceRegistry.NoEntity, 3 + 48));
+        // A one-off is a voice of its own, however many of its kind came before it (P3d).
+        Assert.NotEqual(reg.IdFor(VoiceKind.RainDrop, VoiceRegistry.NoEntity, 3), reg.IdFor(VoiceKind.RainDrop, VoiceRegistry.NoEntity, 3 + 48));
     }
 }

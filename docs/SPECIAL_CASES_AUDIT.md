@@ -29,9 +29,10 @@ Where the parts stand (2026-10-11):
 | The barrier model (a way round one thing that passes through another), found by P1 | under way, a part of its own (todo.md, "Acoustics") |
 | P3a, the registry for moving things | done 2026-10-11 ("P3a as built"), unheard: intakes and borrowed cars take their path, one writer per voice, the rumble follows the speed (S11). S21 closed as deferred the same day (Cody): the bus keeps its own law until geometry stage 6 |
 | P3b, every other voice | done 2026-10-11 ("P3b as built"), unheard: every voice an entry, one writer each; woods take their path, engine echoes carry theirs; P6 for talkers and S23. Blocked engines heard round the edge (Cody, the same day) |
-| P3c, seeds then ids; P3d, one start and declared levels | next, in that order |
+| P3c, seeds then ids | done 2026-10-11 ("P3c as built") |
+| P3d, one start and declared levels | steps 1 to 5 of 6 built 2026-10-11 ("P3d as built"), unheard, not merged; the reseed next |
 | P4, one ranking | after P3 |
-| P6, one path model for every asker | talkers and S23 done in P3b; birds, beacons and rain planned there ("P3b as built") |
+| P6, one path model for every asker | talkers and S23 in P3b; beacons and perched birds in P3d; rain patches left |
 | P7, machine state from the server | last; a wire change, shipped with a server deploy |
 
 That is the order agreed with Cody on 2026-10-11 (todo.md, "Next, in order", item 2). It puts sound library
@@ -688,6 +689,50 @@ wire hash does not change (only `OpenFPS.Client.Core`, the lab and the tests). T
     interior 0.7 m fallbacks failing loudly; ranges from the entry's level (S24); the remaining fallbacks of
     S27; the facade's lost stop and silent replacement. With a reseed (renders may move) the seed table can go,
     and the woods' ids with it.
+
+**P3d as built (2026-10-11), steps 1 to 5 of 6.** Unheard. Branch `worktree-agent-a59cc2655299daa49`, not merged.
+OpenFPS.Sound changed (step 2), so the wire hash does.
+
+- **One way to start and stop** (step 1). `VoiceRegistry.Sound` (outside the budget: the audio thread starts it
+  if it is not sounding, places it if it is), `Submit`, `Sustain` (the lane rumble), `Refresh`, `Retire` (a fade,
+  then a stop) and `Stop`. No owner writes `IsPlaying ? Update : Play`. The registry owns the fades (`Fades`, once
+  a frame before the sweep): a retiring voice is an entry, and holds its id, until its fade ends; one wanted again
+  is brought back, not restarted. The facade numbers every call, and nothing asked of a voice before its stop is
+  done after it (the held horn placed after its stop, sirens_and_far_traffic frame 110; the wood placed by the
+  budget's held emitter after its stop, places_and_woods frame 3). A replacement play asks the binaural pool
+  before stopping the old voice and is logged once by id. S18's rain parts and the followed line, in passing.
+- **Mounts, levels and ranges** (step 2). `VehicleProfile.GrilleZ`, `HornMount`, `SirenMount`; a train's horn is
+  its horn source; the interior at `CabinPaths.PlacedMetres` and `OnePlace`; one ear height
+  (`LocalPlayerState.StandingEyeHeight`, `SeatedEyeHeight`) and breath from `Speech.MouthHeight`. The 116 dB, the
+  1.9 m grille, a train with no horn source, an unnamed synth and an unknown teleporter sound are logged once by
+  id (`ModelKindTable.Fail`). Ranges are the audible range of the level (S24): others' steps (were 15 m), step
+  copies, landings, your own voice's room and copies, beacons (40), the rain's floors, a recording's wall copies
+  (its source's range, not 0.8 of the authored one).
+- **Every one-off its own voice** (step 3): no pools taken in turn; traffic_rain 34,461 to 37,206 lines.
+- **Beacons on the worker's path** (step 4, P6): each beacon in reach asked every frame under
+  `IdFor(Probe, entity, BeaconProbe)`; the blip, its place and level and the tracker's "behind a wall" follow the
+  worker's answer (the tracer until it has one). City, every one of 514 door beacons from five spots
+  (`--beacon-count`): Marlow floor 3 corridor 10 and 10, Brandt Court 30B 1 and 1, Main Street 4 and 4, Marlow
+  floor 4 10 and 10, the garage level 0 32 and 40 (the 8 changed are 175 to 334 m off across open ground, past a
+  door's 12 m reach). Magnolia not counted: it found the next item.
+- **Found and fixed, own commit:** `SteamAudioScene.AddPieceMesh` overran its 64-corner buffer on a Magnolia
+  solid, so every simulation tick threw and every source on Magnolia fell back to the tracer.
+- **Birds on the worker's path** (step 5, P6): a probe per perched group (`IdFor(Probe, NoEntity, perch)`), asked
+  as it wakes and twice a second; a call takes its group's answer moved to the bird. The geese keep the tracer.
+- **Streams** (each step's commit says voice by voice): step 1 sirens_and_far_traffic, places_and_woods,
+  train_behind_wall, high_ids (no-op revives and cancels gone); step 2 drive, talker_and_aids, high_ids (interior
+  0.7 to 0.72 m; loudspeaker copies' range 320 to 400); step 3 traffic_rain; steps 4 and 5 none (no beacon or bird
+  in any scenario). All eight equal at DOTNET_PROCESSOR_COUNT=4.
+- **Next (not done):**
+  - Step 6, the reseed: the seed table goes, every synth seeded by a stable hash of kind, owner and part; the
+    woods' voices into the allocator (`IsOwnVoice` without `Wood`, `PlaceOfEntity` the middle's voice id, the
+    machine budget's retire and revive by voice id); the old table kept in the tests for `RunUnderOldIds`; every
+    stream regenerated; the render check by band levels (the fingerprints use fixed seeds, so they will not move).
+  - The rain's 40 dB start level and the bump's 85 dB stand until measured; the rain voice measures itself by
+    running, so holding it back silent would leave the replay's rain silent. Decide, then do.
+  - Rain patches asked under probes (P6's last asker), measured with `--pop-hunt`.
+  - SpatialEmitter's two default ranges (100/3 against 50/3, S24).
+  - Cody to hear: the listening list in the report of 2026-10-11.
 
 #### P4. One ranking (1 session)
 

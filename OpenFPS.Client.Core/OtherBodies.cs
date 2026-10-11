@@ -24,7 +24,7 @@ public sealed class OtherBodies
     public const float GroundedVerticalSpeed = 0.15f;
 
     /// <summary>Head above feet, metres: where a breath comes from, audible in the elevation.</summary>
-    public const float HeadHeight = 1.6f;
+    public const float HeadHeight = OpenFPS.Common.Speech.MouthHeight;
 
     /// <summary>One body's physical state: where its feet are in its gait, and how hard it is working.</summary>
     private sealed class Body

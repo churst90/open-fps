@@ -38,7 +38,11 @@ public class LocalPlayerState
     /// hatchback's roof is 1.15 m above it: at the standing 1.7 a driver's ears were over the roof, out
     /// of the cabin's room. Seated, they are about a metre up.
     /// </summary>
-    public float EyeHeight => IsRiding ? 1.0f : 1.7f;
+    public float EyeHeight => IsRiding ? SeatedEyeHeight : StandingEyeHeight;
+
+    /// <summary>The ears above the feet standing, metres, and above a seat's floor sitting: the one ear height
+    /// every listener-placed sound reads (S28).</summary>
+    public const float StandingEyeHeight = 1.7f, SeatedEyeHeight = 1.0f;
     public int Health { get; set; } = 100;
     /// <summary>The gun in your hands (a weapon id), or empty: what decides whether Enter fires and R
     /// reloads. From the server's StatsUpdate.</summary>

@@ -55,7 +55,9 @@ public static class HandOverSounds
         Kind.Teleporter => TeleporterSounds.LevelDb(TeleporterSounds.Ready),
         Kind.Crowbar => 66f,
         Kind.Torch => 58f,
-        _ => 50f,
+        // Anything else in the hand, a soft thing: cloth, paper, a box.
+        Kind.Soft => 50f,
+        _ => throw new ArgumentOutOfRangeException(nameof(prefabId), prefabId, "a hand-over kind with no level"),
     };
 
     public static float Seconds(string prefabId) => KindOf(prefabId, out var w) switch

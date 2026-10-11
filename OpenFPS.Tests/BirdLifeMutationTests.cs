@@ -28,6 +28,8 @@ public class BirdLifeMutationTests
         public readonly List<(string Species, Vector3 At, double T)> Calls = new();
         public double Now;
         public bool Pump;
+        /// <summary>An acoustic worker run by hand between updates, as the replay runs it; null, none.</summary>
+        public OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker? Worker;
 
         public Rig(int seed, SpatialAcoustics? acoustics = null)
         {
@@ -50,6 +52,7 @@ public class BirdLifeMutationTests
             {
                 Now = from + i * dt;
                 Birds.Update(world, ear, Now);
+                if (Worker != null) { Worker.UpdateWorld(world); Worker.StepForTest(); }
                 if (Pump) for (int k = 0; k < 2; k++) Audio.PumpForTest();
             }
         }
@@ -345,13 +348,10 @@ public class BirdLifeMutationTests
         }
 
         var ids = played.Select(e => e.EntityId).ToList();
-        Assert.Equal(48, ids.Distinct().Count());
-        // Counting down from the first: the first call has the top of the pool (give or take calls
-        // in the same frame, which the mixer takes in its own order), and every id is at or below it.
-        int top = ids.Max();
-        Assert.True(top < 0);
-        Assert.InRange(ids[0], top - 3, top);
-        Assert.All(ids, id => Assert.InRange(id, top - 47, top));
+        // Every call a voice of its own (P3d), no pool of 48 taken in turn.
+        Assert.True(ids.Distinct().Count() > 48, $"{ids.Distinct().Count()} voices for {ids.Count} calls");
+        // Each from the allocator, never an entity's id.
+        Assert.All(ids, id => Assert.True(id <= VoiceRegistry.FirstId, $"a call under {id}"));
     }
 
     /// <summary>
@@ -384,6 +384,29 @@ public class BirdLifeMutationTests
             Assert.Equal(expected.ApparentPosition, e.ApparentPosition);
             Assert.Equal(expected.RegionId, e.TargetRegionId);
         }
+    }
+
+    /// <summary>
+    /// A perched group's calls are heard by the acoustic worker's answer (P6, Cody 2026-10-11): each group is
+    /// asked under a probe of its own as it wakes and twice a second after, and its calls take that answer moved
+    /// to the bird. Behind the wall the answer says so: each call is placed by it, as the group's middle hears it.
+    /// </summary>
+    [Fact]
+    public void A_perched_groups_calls_are_heard_by_the_workers_answer()
+    {
+        var acoustics = new SpatialAcoustics(new SpatialService());
+        var wall = Box(1, new Vector3(0f, 5f, 5f), new Vector3(200f, 10f, 0.3f), "Concrete");
+        var hedges = Grid(2, 100, 6f, 1f, (i, at) => Box(i, at, Hedge, "Foliage"), new Vector3(0f, 0f, 40f));
+        var world = World(hedges.Append(wall));
+        using var worker = new OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker(acoustics) { Manual = true };
+        using var rig = new Rig(13, acoustics) { Pump = true, Worker = worker };
+        rig.Birds.Worker = worker;
+        rig.Run(world, Ear, 0, 120, dt: 0.1);
+        var played = rig.Mixer.Played;
+        Assert.True(played.Count > 10, $"only {played.Count} calls");
+        Assert.True(rig.Birds.AnsweredByWorker > played.Count / 2, $"{rig.Birds.AnsweredByWorker} of {played.Count} calls on the worker's answer");
+        foreach (var e in played)
+            Assert.True(e.Occlusion > 0.1f, $"a call at {e.Position} is barely behind the wall ({e.Occlusion:F2})");
     }
 
     /// <summary>
