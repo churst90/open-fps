@@ -88,6 +88,8 @@ Details in changes.md and the docs named. "Unheard" means nobody has listened in
 - The loudspeaker model (PA and megaphone): approved by ear 2026-10-10.
 - The gas hob, rounds 1 and 2: round 2 approved by ear 2026-10-10. Not on any map.
 - The shut glass door leak fix: approved by ear 2026-10-10.
+- Marlow Tower's leaks (train voices take their current path, rain from its surfaces, sample points kept in a
+  source's own air, a fire door on every tower storey's stair): approved by ear 2026-10-11.
 - Floors: layers in contact as one panel, then one 15 cm slab and the end-of-voice clicks fixed. Round 2
   unheard (inbox/floors-2026-10-10).
 - The material table and struck things (bumps, Shift+E and /tap on things): heard 2026-10-10, notes kept
@@ -175,10 +177,6 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first.
-- Marlow Tower's leaks (docs/GEOMETRY.md 12.6, "Marlow Tower's leaks"; spots in docs/LISTENING_SPOTS.md): a
-  train's horn from floor 3's corridor (`/tp -19.95 -101.5 9.29`) no clearer than the rest of the train; rain
-  on the stairs (`/tp -10.8 -104.2 9.28`) and under the roof (`/tp -19.95 -100 21.29`) faint, not through the
-  walls; the fire door from each corridor onto its stair (push bar, swings into the stair, closes itself).
 - The world (`/join world magnolia`, `/join world address 401 Market St, Tomball, TX`): the loading
   screen ("Building the world: 12 of 41 tiles."), the ground's land cover, the roads, woods, buildings
   and driveways outside the places, no crack where far ground meets near ground, and logging out and
