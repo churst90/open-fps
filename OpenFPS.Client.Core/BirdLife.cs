@@ -74,6 +74,7 @@ public sealed class BirdLife
     public BirdLife(AudioEngineFacade audio, SpatialAcoustics? acoustics, int? seed = null)
     {
         _audio = audio;
+        Voices = new VoiceRegistry { Mixer = audio };
         _acoustics = acoustics;
         _rng = seed is int s ? new Random(s) : new Random();
     }
@@ -312,7 +313,7 @@ public sealed class BirdLife
 
     /// <summary>Where every call is given its id and declared as it starts: ClientAudioSystem's registry, or
     /// one of its own on its own.</summary>
-    internal VoiceRegistry Voices { get; set; } = new();
+    internal VoiceRegistry Voices { get; set; }
 
     /// <summary>Every call, as it is made: which species and where. For tests and traces.</summary>
     internal Action<string, Vector3>? OnCall { get; set; }
@@ -335,7 +336,7 @@ public sealed class BirdLife
         int call = _voice++;
         int voiceId = Voices.IdFor(VoiceKind.Bird, VoiceRegistry.NoEntity, call);
         Voices.DeclareEvent(voiceId, VoiceRegistry.NoEntity, VoiceKind.Bird, at, sp.CallDb);
-        _audio.Submit(new SpatialEmitter
+        Voices.Submit(new SpatialEmitter
         {
             EntityId = voiceId,
             Seed = VoiceRegistry.SeedOf(VoiceKind.Bird, VoiceRegistry.NoEntity, call),

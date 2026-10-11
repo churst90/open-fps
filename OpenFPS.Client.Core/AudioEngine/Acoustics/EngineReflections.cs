@@ -261,8 +261,7 @@ public sealed class EngineReflections
             var e = Make(id, seed, entityId, direct, r, gain);
             CarryPath(ref e, directPath, r, listener, directDist);
             Voiced?.Invoke(id, entityId);
-            if (audio.IsPlaying(id)) audio.UpdateSpatialAttributes(e);
-            else audio.PlayPhysicalSoundDirect(e);
+            audio.Sound(e);
             echo.Seen = true;
             echo.Silent = 0f;
             echo.Last = r;

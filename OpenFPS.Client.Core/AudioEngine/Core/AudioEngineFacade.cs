@@ -22,13 +22,22 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     private const int MaxBudgetVoices = 256;
     private readonly AudioBank _bank = new();
 
-    // Game thread to audio thread.
-    private readonly ConcurrentQueue<SpatialEmitter> _submissionQueue = new();
-    private readonly ConcurrentQueue<int> _stopRequests = new();
-    private readonly ConcurrentQueue<KeyValuePair<int, AcousticPathData>> _acousticPaths = new();
-    private readonly ConcurrentQueue<SpatialEmitter> _directPlayQueue = new();
-    private readonly ConcurrentQueue<SpatialEmitter> _updateAttributesQueue = new();
-    private readonly ConcurrentQueue<SpatialEmitter> _refreshQueue = new();
+    // Game thread to audio thread, each call numbered in the order it was made (Tick).
+    private readonly ConcurrentQueue<(long Seq, SpatialEmitter E)> _submissionQueue = new();
+    private readonly ConcurrentQueue<(long Seq, int Id)> _stopRequests = new();
+    private readonly ConcurrentQueue<(long Seq, KeyValuePair<int, AcousticPathData> Path)> _acousticPaths = new();
+    private readonly ConcurrentQueue<(long Seq, SpatialEmitter E)> _directPlayQueue = new();
+    private readonly ConcurrentQueue<(long Seq, SpatialEmitter E)> _updateAttributesQueue = new();
+    private readonly ConcurrentQueue<(long Seq, SpatialEmitter E)> _refreshQueue = new();
+    private readonly ConcurrentQueue<(long Seq, SpatialEmitter E)> _soundQueue = new();
+    private readonly ConcurrentQueue<(long Seq, SpatialEmitter E)> _sustainQueue = new();
+    private long _seq;
+    private long Next() => Interlocked.Increment(ref _seq);
+    /// <summary>The last stop asked for each id this tick, by number: anything asked of that voice before it
+    /// is not done (Tick).</summary>
+    private readonly Dictionary<int, long> _stoppedAt = new();
+    private readonly List<(long Seq, SpatialEmitter E)> _placings = new();
+    private bool StoppedAfter(int id, long seq) => _stoppedAt.TryGetValue(id, out long at) && at > seq;
 
     // Under _stateLock.
     private Vector3 _listenerPos;
@@ -169,37 +178,67 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
         if (aMap != null) _provider.SetAcousticMap(aMap);
 
-        while (_stopRequests.TryDequeue(out int id))
+        // The queues are drained one kind at a time, but what was asked of one voice is done in the order it was
+        // asked: a placing, a start or a submission asked before the voice's stop is not done after it. Drained
+        // kind by kind, a voice placed and then stopped in one frame was placed after its stop (a held horn let
+        // go), and a submission queued before a stop took the stop back (the budget placed a stopped voice once
+        // more).
+        _stoppedAt.Clear();
+        while (_stopRequests.TryDequeue(out var stop))
         {
+            _stoppedAt[stop.Id] = stop.Seq;
             // A voice the manager does not own (started directly) is stopped at the provider, or never.
-            bool owned = _voiceManager?.RequestStop(id) ?? false;
-            if (!owned) _provider.StopSound(id);
-        }
-        
-        while (_acousticPaths.TryDequeue(out var kvp)) 
-        {
-            _provider.SetAcousticPath(kvp.Key, kvp.Value);
+            bool owned = _voiceManager?.RequestStop(stop.Id) ?? false;
+            if (!owned) _provider.StopSound(stop.Id);
         }
 
-        while (_submissionQueue.TryDequeue(out var emitter))
+        while (_acousticPaths.TryDequeue(out var kvp))
         {
-            _voiceManager?.Submit(emitter);
+            if (StoppedAfter(kvp.Path.Key, kvp.Seq)) continue;
+            _provider.SetAcousticPath(kvp.Path.Key, kvp.Path.Value);
         }
 
-        while (_refreshQueue.TryDequeue(out var emitter))
+        while (_submissionQueue.TryDequeue(out var s))
         {
-            _voiceManager?.Refresh(emitter);
+            if (StoppedAfter(s.E.EntityId, s.Seq)) continue;
+            _voiceManager?.Submit(s.E);
         }
 
-        while (_directPlayQueue.TryDequeue(out var emitter))
+        while (_refreshQueue.TryDequeue(out var r))
         {
-            _provider.PlaySpatialSound(emitter);
+            if (StoppedAfter(r.E.EntityId, r.Seq)) continue;
+            _voiceManager?.Refresh(r.E);
         }
 
-        while (_updateAttributesQueue.TryDequeue(out var emitter))
+        while (_sustainQueue.TryDequeue(out var h))
         {
-            _provider.UpdateSpatialAttributes(emitter);
+            if (StoppedAfter(h.E.EntityId, h.Seq)) continue;
+            if (_provider.IsPlaying(h.E.EntityId)) _voiceManager?.Refresh(h.E);
+            else _voiceManager?.Submit(h.E);
         }
+
+        while (_directPlayQueue.TryDequeue(out var d))
+        {
+            if (StoppedAfter(d.E.EntityId, d.Seq)) continue;
+            _provider.PlaySpatialSound(d.E);
+        }
+
+        // A voice sounded (Sound) is started if it is not sounding, here and now, and otherwise placed with the
+        // rest, in the order the placings were asked for.
+        _placings.Clear();
+        while (_soundQueue.TryDequeue(out var o))
+        {
+            if (StoppedAfter(o.E.EntityId, o.Seq)) continue;
+            if (_provider.IsPlaying(o.E.EntityId)) _placings.Add(o);
+            else _provider.PlaySpatialSound(o.E);
+        }
+        while (_updateAttributesQueue.TryDequeue(out var u))
+        {
+            if (StoppedAfter(u.E.EntityId, u.Seq)) continue;
+            _placings.Add(u);
+        }
+        if (_placings.Count > 1) _placings.Sort(static (a, b) => a.Seq.CompareTo(b.Seq));
+        foreach (var p in _placings) _provider.UpdateSpatialAttributes(p.E);
 
         // The budget is what the mixer has, asked every frame (VoiceManager.MaxVoices).
         if (_voiceManager != null)
@@ -344,7 +383,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             emitter.DelayMs += dist / AudioPhysics.CurrentSpeedOfSound * 1000.0f;
         }
 
-        _submissionQueue.Enqueue(emitter);
+        _submissionQueue.Enqueue((Next(), emitter));
     }
 
     /// <summary>
@@ -356,7 +395,21 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public void Refresh(SpatialEmitter emitter)
     {
         if (!_isInitialized) return;
-        _refreshQueue.Enqueue(emitter);
+        _refreshQueue.Enqueue((Next(), emitter));
+    }
+
+    /// <summary>A sustained voice in the budget: submitted while it is not sounding, refreshed while it is
+    /// (<see cref="Refresh"/>), decided on the audio thread. Its flight time is added only when submitted.</summary>
+    public void Sustain(SpatialEmitter emitter)
+    {
+        if (!_isInitialized) return;
+        if (emitter.Type != EmitterType.UI)
+        {
+            Vector3 lPos;
+            lock (_stateLock) { lPos = _listenerPos; }
+            emitter.DelayMs += Vector3.Distance(lPos, emitter.Position) / AudioPhysics.CurrentSpeedOfSound * 1000.0f;
+        }
+        _sustainQueue.Enqueue((Next(), emitter));
     }
 
     /// <summary>Plays outside the voice budget (echoes and the like); such a voice must be stopped by
@@ -370,7 +423,27 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
         else
         {
-            _directPlayQueue.Enqueue(emitter);
+            _directPlayQueue.Enqueue((Next(), emitter));
+        }
+    }
+
+    /// <summary>
+    /// A voice outside the budget, sounded: started if it is not sounding when the audio thread comes to it,
+    /// and otherwise placed. The one call for a voice its owner sounds every frame (VoiceRegistry.Sound): decided
+    /// on the audio thread, in the order asked, so a stop asked in the same frame is never undone by a start
+    /// asked before it, nor a start lost to a voice that ended meanwhile.
+    /// </summary>
+    public void Sound(SpatialEmitter emitter)
+    {
+        if (!_isInitialized) return;
+        if (Thread.CurrentThread == _audioThread)
+        {
+            if (_provider.IsPlaying(emitter.EntityId)) _provider.UpdateSpatialAttributes(emitter);
+            else _provider.PlaySpatialSound(emitter);
+        }
+        else
+        {
+            _soundQueue.Enqueue((Next(), emitter));
         }
     }
 
@@ -383,7 +456,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
         else
         {
-            _updateAttributesQueue.Enqueue(emitter);
+            _updateAttributesQueue.Enqueue((Next(), emitter));
         }
     }
 
@@ -411,7 +484,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>Asks a sound to stop, on the audio thread; a machine with a stop sound plays it first.</summary>
     public void StopSound(int entityId)
     {
-        _stopRequests.Enqueue(entityId);
+        _stopRequests.Enqueue((Next(), entityId));
     }
 
     /// <summary>A hard cut, on the calling thread.</summary>
@@ -426,7 +499,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>An entity's path (occlusion, bleed), applied on the audio thread.</summary>
     public void SetAcousticPath(int entityId, AcousticPathData path)
     {
-        _acousticPaths.Enqueue(new KeyValuePair<int, AcousticPathData>(entityId, path));
+        _acousticPaths.Enqueue((Next(), new KeyValuePair<int, AcousticPathData>(entityId, path)));
     }
 
     public bool IsPlaying(int entityId) => _isInitialized && _provider.IsPlaying(entityId);

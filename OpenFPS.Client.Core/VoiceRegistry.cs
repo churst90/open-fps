@@ -117,6 +117,8 @@ internal struct VoiceEntry
     /// <summary>A one-off, started once: an entry until its voice has stopped, not until a frame goes by
     /// without it.</summary>
     public bool Event;
+    /// <summary>Let go and fading (<see cref="VoiceRegistry.Retire"/>): an entry until its fade has ended.</summary>
+    public bool Retiring;
 }
 
 /// <summary>
@@ -131,7 +133,7 @@ internal struct VoiceEntry
 /// entry or still sounding (a voice fading out keeps its id until its fade has ended) and then free for the
 /// next. So no two voices sound under one id, however many entities a map has or however long it runs.
 /// </summary>
-internal sealed class VoiceRegistry
+internal sealed partial class VoiceRegistry
 {
     /// <summary>The owner of a voice that is no entity's: rain, a bird, the aids round your head.</summary>
     public const int NoEntity = int.MinValue;
@@ -280,6 +282,7 @@ internal sealed class VoiceRegistry
             foreach (var (id, e) in _entries)
             {
                 if (e.World != World) _gone.Add(id);
+                else if (e.Retiring || _retiring.ContainsKey(id)) continue;
                 else if (!e.Event) { if (e.SeenFrame < frame) _gone.Add(id); }
                 else if (frame - e.SeenFrame > EventStartFrames && (sounding == null || !sounding(id))) _gone.Add(id);
             }
@@ -311,6 +314,7 @@ internal sealed class VoiceRegistry
         lock (_lock)
         {
             _entries.Clear();
+            _retiring.Clear();
             foreach (int id in _given.Keys.ToList())
             {
                 var g = _given[id];
@@ -359,6 +363,13 @@ internal sealed class VoiceRegistry
             OnGiven?.Invoke(id, key);
             return id;
         }
+    }
+
+    /// <summary>The id a voice already has, without giving it one: for whoever stops what may never have started.</summary>
+    public bool TryIdOf(VoiceKind kind, int owner, int part, out int id)
+    {
+        if (IsOwnVoice(kind)) { id = owner; return true; }
+        lock (_lock) return _idOf.TryGetValue((World, new VoiceKey(kind, owner, Turn(kind, owner, part))), out id);
     }
 
     /// <summary>The id of a voice (<see cref="IdFor"/>), kept for it until the world is left, whether it sounds

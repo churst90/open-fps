@@ -189,7 +189,7 @@ internal sealed class RecordingMixer : IAudioProvider
         if (!Paths.TryGetValue(id, out var list)) Paths[id] = list = new List<AcousticPathData>();
         list.Add(p);
     }
-    public void StopSound(int id) { Stopped.Add(id); Live.Remove(id); }
+    public void StopSound(int id) { Stopped.Add(id); Live.Remove(id); _fading.Remove(id); }
     public bool IsPlaying(int id) => Live.Contains(id);
     public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(Live);
 
@@ -204,11 +204,23 @@ internal sealed class RecordingMixer : IAudioProvider
     /// <summary>The mixer's load as the budget reads it, 0..1. A test sets it to drive the control loop.</summary>
     public float Load;
     public float MixerLoad => Load;
-    public void ReviveEngine(int id) { }
-    public bool FadeOutEngine(int id) => true;
+    /// <summary>How many fade calls a voice takes to reach silence (0: at once), for a test of the fades.</summary>
+    public int FadeCalls;
+    private readonly Dictionary<int, int> _fading = new();
+    /// <summary>Every voice brought back from a fade (ReviveEngine, CancelVoiceFade), in order.</summary>
+    public readonly List<int> Revived = new();
+    public void ReviveEngine(int id) { Revived.Add(id); _fading.Remove(id); }
+    public bool FadeOutEngine(int id) => Faded(id);
     public int SpatialVoicesFree => 256;
-    public bool FadeOutVoice(int id) => true;
-    public void CancelVoiceFade(int id) { }
+    public bool FadeOutVoice(int id) => Faded(id);
+    public void CancelVoiceFade(int id) { Revived.Add(id); _fading.Remove(id); }
+    private bool Faded(int id)
+    {
+        if (!Live.Contains(id)) return true;
+        int n = _fading.GetValueOrDefault(id) + 1;
+        _fading[id] = n;
+        return n > FadeCalls;
+    }
     public Vector3 GetSoundPosition(int id) => Latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;
     public void Preload(string id) { }
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;

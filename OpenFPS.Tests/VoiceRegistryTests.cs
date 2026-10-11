@@ -1,5 +1,7 @@
 using System.Numerics;
+using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Rail;
+using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using Xunit.Abstractions;
@@ -93,7 +95,9 @@ public class VoiceRegistryTests
     /// <summary>
     /// Every voice written in a frame of every stored scenario is an entry at the end of it, and no voice is
     /// ever handed a path by a second call (docs/SPECIAL_CASES_AUDIT.md, P3b): what a voice is comes from its
-    /// entry, not from where its id falls.
+    /// entry, not from where its id falls. And none is placed after its stop (P3d): a held horn let go was, at
+    /// frame 110 of sirens_and_far_traffic, and the budget's held emitter for a wood at frame 3 of
+    /// places_and_woods.
     /// </summary>
     [Theory]
     [MemberData(nameof(Scenarios))]
@@ -101,7 +105,7 @@ public class VoiceRegistryTests
     {
         var kinds = new Dictionary<VoiceKind, int>();
         var unregistered = new SortedSet<string>();
-        var before = new HashSet<int>();
+        var afterStop = new SortedSet<string>();
         int read = 0;
         var run = Replay.RunScript(r =>
         {
@@ -116,21 +120,21 @@ public class VoiceRegistryTests
                     if (parts.Length < 3) continue;
                     if (parts[1] == "Stop") stopped.Add(int.Parse(parts[2]));
                     if (parts[1] is "Play" or "Place" or "Path") written.Add((int.Parse(parts[2]), $"{parts[1]} {parts[2]} (frame {parts[0]})"));
+                    // Started again after a stop is a new voice; placed after it is a voice that is gone.
+                    if (parts[1] == "Place" && stopped.Contains(int.Parse(parts[2]))) afterStop.Add(lines[read][..Math.Min(40, lines[read].Length)]);
+                    if (parts[1] == "Play") stopped.Remove(int.Parse(parts[2]));
                 }
                 foreach (var (id, line) in written)
                 {
                     if (x.Audio.Voices.TryGet(id, out var e)) kinds[e.Kind] = kinds.GetValueOrDefault(e.Kind) + 1;
-                    // Let go this frame, its owner gone, and placed once more on the way out by the budget's
-                    // held emitter before the stop goes through (P3d: one way to stop).
-                    else if (!(stopped.Contains(id) && before.Contains(id))) unregistered.Add(line);
+                    else unregistered.Add(line);
                 }
-                before.Clear();
-                foreach (var e in x.Audio.Voices.Entries) before.Add(e.VoiceId);
             };
             Replay.Scenarios[scenario](r);
         });
         _o.WriteLine(string.Join(", ", kinds.OrderBy(k => k.Key).Select(k => $"{k.Key} {k.Value}")));
         Assert.True(unregistered.Count == 0, "written and no entry: " + string.Join("; ", unregistered.Take(20)));
+        Assert.True(afterStop.Count == 0, "placed after its stop: " + string.Join("; ", afterStop.Take(20)));
         Assert.DoesNotContain(run.Mixer.Lines, l => l.Split(' ', 3) is [_, "Path", _]);
     }
 
@@ -297,5 +301,142 @@ public class VoiceRegistryTests
         reg.Declare(-1200007, 7, VoiceKind.Horn, mount, 110f, frame: 3);
         Assert.True(reg.TryGet(-1200007, out var again));
         Assert.Equal(reg.World, again.World);
+    }
+
+    /// <summary>A registry on a facade over a mixer that records, pumped by hand.</summary>
+    private static (VoiceRegistry Reg, AudioEngineFacade Facade, RecordingMixer Mixer) OnAMixer(int fadeCalls = 0)
+    {
+        var mixer = new RecordingMixer { FadeCalls = fadeCalls };
+        var facade = new AudioEngineFacade(mixer);
+        facade.InitializeForTest();
+        return (new VoiceRegistry { Mixer = facade }, facade, mixer);
+    }
+
+    private static SpatialEmitter Synth(int id) => new()
+    {
+        EntityId = id, SoundId = "horn", IsSynth = true, PhysicalKey = "horn:test", Position = new Vector3(0f, 0f, 5f),
+        Volume = 1f, MinDistance = 1f, Range = 100f, Type = EmitterType.WorldLocked,
+    };
+
+    /// <summary>
+    /// One way to start and place (P3d): an owner sounds its voice every frame and the mixer starts it once and
+    /// places it after; what was asked of one voice is done in the order it was asked, so a voice placed and then
+    /// stopped in one frame is not placed after its stop, and one stopped and sounded again is started again.
+    /// </summary>
+    [Fact]
+    public void A_voice_is_started_once_placed_after_and_never_placed_after_its_stop()
+    {
+        var (reg, facade, mixer) = OnAMixer();
+        reg.Declare(-5, 1, VoiceKind.Horn, Vector3.Zero, 110f, frame: 1);
+        reg.Sound(Synth(-5));
+        facade.PumpForTest();
+        Assert.Single(mixer.Started);
+        reg.Sound(Synth(-5));
+        facade.PumpForTest();
+        Assert.Single(mixer.Started);
+        Assert.Contains(-5, mixer.Live);
+
+        // Placed, then let go, in one frame: the stop is the last word.
+        var moved = Synth(-5);
+        moved.Position = new Vector3(0f, 0f, 9f);
+        reg.Sound(moved);
+        reg.Stop(-5);
+        facade.PumpForTest();
+        Assert.DoesNotContain(-5, mixer.Live);
+        Assert.Equal(5f, mixer.Latest[-5].Position.Z);
+        Assert.False(reg.IsRegistered(-5));
+
+        // Stopped, then sounded again: started again.
+        reg.Declare(-6, 1, VoiceKind.Horn, Vector3.Zero, 110f, frame: 2);
+        reg.Sound(Synth(-6));
+        facade.PumpForTest();
+        reg.Stop(-6);
+        reg.Sound(Synth(-6));
+        facade.PumpForTest();
+        Assert.Equal(2, mixer.Started.Count(e => e.EntityId == -6));
+        Assert.Contains(-6, mixer.Live);
+
+        // Nothing to stop: no stop is sent.
+        int stops = mixer.Stopped.Count;
+        reg.Stop(-77);
+        facade.PumpForTest();
+        Assert.Equal(stops, mixer.Stopped.Count);
+    }
+
+    /// <summary>A submission to the budget asked before a stop in the same frame does not take the stop back
+    /// (the facade's lost stop): the budget neither starts nor places it after.</summary>
+    [Fact]
+    public void A_submission_before_a_stop_does_not_take_the_stop_back()
+    {
+        var (reg, facade, mixer) = OnAMixer();
+        var e = Synth(-9);
+        e.Mode = OpenFPS.Common.Components.PlaybackMode.LoopOne;
+        reg.Declare(-9, 1, VoiceKind.Machine, Vector3.Zero, 60f, frame: 1);
+        reg.Submit(e);
+        facade.PumpForTest();
+        facade.PumpForTest();
+        Assert.Contains(-9, mixer.Live);
+
+        reg.Submit(e);
+        reg.Stop(-9);
+        facade.PumpForTest();
+        facade.PumpForTest();
+        Assert.DoesNotContain(-9, mixer.Live);
+        int started = mixer.Started.Count(x => x.EntityId == -9);
+        facade.PumpForTest();
+        facade.PumpForTest();
+        Assert.Equal(started, mixer.Started.Count(x => x.EntityId == -9));
+    }
+
+    /// <summary>
+    /// The registry owns the fades (P3d): a voice let go fades, stays an entry and holds its id until its fade
+    /// has ended, and is stopped then; one wanted again before is brought back, not started again.
+    /// </summary>
+    [Fact]
+    public void A_voice_let_go_is_an_entry_until_its_fade_ends()
+    {
+        var (reg, facade, mixer) = OnAMixer(fadeCalls: 3);
+        int id = reg.IdFor(VoiceKind.Place, 40, 1);
+        reg.Frame = 1;
+        reg.Declare(id, 40, VoiceKind.Place, Vector3.Zero, 60f);
+        reg.Sound(Synth(id));
+        facade.PumpForTest();
+        reg.Sweep(1, mixer.IsPlaying);
+
+        reg.Frame = 2;
+        reg.Retire(id);
+        for (int f = 2; f <= 4; f++)
+        {
+            reg.Frame = f;
+            reg.Fades();
+            facade.PumpForTest();
+            reg.Sweep(f, mixer.IsPlaying);
+            Assert.True(reg.TryGet(id, out var e), $"frame {f}");
+            Assert.True(e.Retiring);
+            Assert.True(reg.TryKeyOf(id, out _));
+            Assert.Contains(id, mixer.Live);
+        }
+        reg.Frame = 5;
+        reg.Fades();
+        facade.PumpForTest();
+        reg.Sweep(5, mixer.IsPlaying);
+        Assert.False(reg.IsRegistered(id));
+        Assert.DoesNotContain(id, mixer.Live);
+        Assert.Contains(id, mixer.Stopped);
+
+        // Wanted again while fading: brought back, the one voice it was.
+        int other = reg.IdFor(VoiceKind.Place, 41, 1);
+        int from = mixer.Started.Count;
+        reg.Declare(other, 41, VoiceKind.Place, Vector3.Zero, 60f);
+        reg.Sound(Synth(other));
+        facade.PumpForTest();
+        reg.Retire(other);
+        reg.Fades();
+        reg.Declare(other, 41, VoiceKind.Place, Vector3.Zero, 60f);
+        reg.Sound(Synth(other));
+        facade.PumpForTest();
+        Assert.Contains(other, mixer.Revived);
+        Assert.False(reg.IsRetiring(other));
+        Assert.Single(mixer.Started.Skip(from), x => x.EntityId == other);
     }
 }

@@ -60,12 +60,13 @@ public sealed class BeaconAids
 
     /// <summary>Where every blip is given its id and declared as it starts: ClientAudioSystem's registry, or
     /// one of its own on its own.</summary>
-    internal VoiceRegistry Voices { get; set; } = new();
+    internal VoiceRegistry Voices { get; set; }
 
     public BeaconAids(AudioEngineFacade audio, BeaconPreferences? prefs = null,
                       OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics? acoustics = null)
     {
         _audio = audio;
+        Voices = new VoiceRegistry { Mixer = audio };
         _prefs = prefs ?? BeaconPreferences.Load();
         _acoustics = acoustics;
     }
@@ -171,7 +172,7 @@ public sealed class BeaconAids
         int blip = _idx++;
         int voiceId = Voices.IdFor(VoiceKind.Beacon, VoiceRegistry.NoEntity, blip);
         Voices.DeclareEvent(voiceId, sourceId, VoiceKind.Beacon, at, BlipDb + (float)_prefs.LevelDb);
-        _audio.Submit(new SpatialEmitter
+        Voices.Submit(new SpatialEmitter
         {
             EntityId = voiceId,
             Seed = VoiceRegistry.SeedOf(VoiceKind.Beacon, VoiceRegistry.NoEntity, blip),

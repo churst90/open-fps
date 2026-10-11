@@ -2539,6 +2539,14 @@ public partial class FmodAudioProvider : IAudioProvider
         _reverbSaVoices.Clear();
     }
 
+    /// <summary>Ids a voice has been replaced under, each logged once.</summary>
+    private readonly HashSet<int> _replacedLogged = new();
+
+    /// <summary>Whether a world voice would be refused for want of a binaural voice (PlaySpatialSound).</summary>
+    private bool RefusedForHrtf(in SpatialEmitter emitter)
+        => _steamAudioEnabled && emitter.Type is EmitterType.EntityAttached or EmitterType.WorldLocked
+           && !emitter.IsReflection && !emitter.Essential && SpatialVoicesFree == 0;
+
     public void PlaySpatialSound(SpatialEmitter emitter)
     {
         bool loopNative = emitter.Mode == PlaybackMode.LoopOne;
@@ -2559,6 +2567,17 @@ public partial class FmodAudioProvider : IAudioProvider
                 }
                 active.Channel.getCurrentSound(out var currentSound);
                 if (!emitter.IsGranular && !emitter.IsSynth && currentSound.hasHandle() && active.SoundId == emitter.SoundId) { UpdateSpatialAttributes(emitter); return; }
+                // Another voice under this id. The pool is asked first: the old voice's binaural slot comes back
+                // only once the mixer is done with it, so stopped and then refused, the id fell silent.
+                if (RefusedForHrtf(emitter))
+                {
+                    _refusedForHrtf++;
+                    return;
+                }
+                if (_replacedLogged.Add(emitter.EntityId))
+                    Log.Warning("Voice {Id}: {Old} replaced by {New} under one id. Every voice has an id of its own "
+                              + "(VoiceRegistry), so one start replacing another is a fault in whoever started it.",
+                                emitter.EntityId, active.SoundId, emitter.SoundId);
                 StopSound(emitter.EntityId);
             }
         }
@@ -2567,8 +2586,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // the head. The budgets see it not playing and give voices up when the pool runs low
         // (ClientAudioSystem.HrtfLowWater). Your own steps and speech (Essential) still play; a reflection
         // is refused by the pool's reserve already.
-        if (_steamAudioEnabled && emitter.Type is EmitterType.EntityAttached or EmitterType.WorldLocked
-            && !emitter.IsReflection && !emitter.Essential && SpatialVoicesFree == 0)
+        if (RefusedForHrtf(emitter))
         {
             _refusedForHrtf++;
             return;

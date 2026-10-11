@@ -92,7 +92,7 @@ public partial class ClientAudioSystem
             VoiceTrain(world, eyePos, voicer, members, now, dt);
         }
 
-        // Trains let go: every voice faded, then stopped; the voicer forgotten once silent.
+        // Trains let go: every voice faded, then stopped (the registry's); the voicer forgotten once silent.
         _trainsDone.Clear();
         foreach (var (key, voicer) in _trainVoicers)
         {
@@ -100,10 +100,9 @@ public partial class ClientAudioSystem
             bool any = false;
             for (int slot = 0; slot < TrainVoicing.Slots; slot++)
             {
-                if (!voicer.Playing[slot]) continue;
-                int id = TrainVoiceId(voicer, slot);
-                if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); voicer.Playing[slot] = false; }
-                else any = true;
+                if (!StillVoiced(voicer, slot)) continue;
+                _voices.Retire(TrainVoiceId(voicer, slot));
+                any = true;
             }
             if (!any) _trainsDone.Add(key);
         }
@@ -118,8 +117,17 @@ public partial class ClientAudioSystem
     private readonly Dictionary<int, (EntitySnapshot Snap, Vector3 At, float Gain)> _trainSourceAt = new();
     private readonly Dictionary<int, float>[] _trainWeights = Enumerable.Range(0, TrainVoicing.Slots).Select(_ => new Dictionary<int, float>()).ToArray();
 
+    /// <summary>Whether a train's voice still sounds or fades: an entry of the registry's, which keeps one
+    /// until its fade has ended. Its slot is free once not.</summary>
+    private bool StillVoiced(TrainVoicer v, int slot)
+    {
+        if (v.Playing[slot] && !_voices.IsRegistered(TrainVoiceId(v, slot))) v.Playing[slot] = false;
+        return v.Playing[slot];
+    }
+
     private void VoiceTrain(WorldSnapshot world, Vector3 eyePos, TrainVoicer v, int[] members, double now, float dt)
     {
+        for (int slot = 0; slot < TrainVoicing.Slots; slot++) StillVoiced(v, slot);
         _trainSources.Clear();
         _trainSourceAt.Clear();
         int warning = TrainSignal.WarningSource(v.Layout), bell = TrainSignal.BellSource(v.Layout);
@@ -208,6 +216,8 @@ public partial class ClientAudioSystem
                     if (v.IdleSince[slot] < 0) v.IdleSince[slot] = now;
                     _audio.PlanTrainSlot(v.Preset, v.Name, slot, EmptyTrainPlan);
                     if (now - v.IdleSince[slot] > TrainVoiceHoldSeconds) StopTrainVoice(v, slot);
+                    // Held empty, it still sounds: an entry as it was declared.
+                    else _voices.Keep(TrainVoiceId(v, slot));
                 }
                 continue;
             }
@@ -255,8 +265,7 @@ public partial class ClientAudioSystem
     private void StopTrainVoice(TrainVoicer v, int slot)
     {
         if (!v.Playing[slot]) return;
-        int id = TrainVoiceId(v, slot);
-        if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); v.Playing[slot] = false; }
+        _voices.Retire(TrainVoiceId(v, slot));
     }
 
     private float Correction(TrainVoicer v, string soundId, float levelDb)
@@ -304,12 +313,8 @@ public partial class ClientAudioSystem
         // through Marlow Tower's brick (2026-10-10, 74 dB in a corridor).
         HandPath(ref e, kind, world, rep, at, levelDb, eyePos);
         ApplyGround(ref e, _groundWorld);
-        if (_audio.IsPlaying(voiceId))
-        {
-            _audio.ReviveEngine(voiceId);
-            _audio.UpdateSpatialAttributes(e);
-        }
-        else _audio.PlayPhysicalSoundDirect(e);
+        // A voice let go and still fading is brought back (Sound), not started again.
+        _voices.Sound(e);
         v.Playing[slot] = true;
     }
 
@@ -318,7 +323,7 @@ public partial class ClientAudioSystem
     {
         foreach (var voicer in _trainVoicers.Values)
             for (int slot = 0; slot < TrainVoicing.Slots; slot++)
-                if (voicer.Playing[slot]) _audio.StopSound(TrainVoiceId(voicer, slot));
+                if (voicer.Playing[slot]) _voices.Stop(TrainVoiceId(voicer, slot));
         _trainVoicers.Clear();
         _liveTrains.Clear();
         _trainStarted.Clear();
