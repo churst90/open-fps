@@ -1812,9 +1812,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    3. DONE (2026-10-11, unheard). Openings framed from where the floods meet them, below ("Openings from the
       floods"). Portals derived through door leaves were not needed: every door is an entity with its two rooms,
       framed by its leaf.
-   4. The readers of `RoomSize` (83 in the game, 24 test files) onto the flood: `SpatialService.GetRegionAt`,
-      `MapManager.RegionAt`, `MapTiles` footprints, `DoorManners`, `PlaceAt` and `/tp`, `MapTracker`, the voxel
-      marks, `RoomAcoustics`; the server's `SurveyRegions` box survey goes (the lining measures).
+   4. DONE (2026-10-11). The readers of `RoomSize` onto the flood, below ("The readers on the flood").
    5. Authoring: `RoomSize`, `Materials` and `ReverbTimeScale` out of the editor (EntitySettings, WorldEditor menus and
       build, ModelCatalog), PrefabTemplate/PrefabRepository/PrefabValidator, and gen_city.py, gen_osm.py,
       gen_speedway.py, WorldBuildings and WorldPlaces; maps regenerated, city.json byte-identical to gen_city.py.
@@ -1979,6 +1977,36 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    house `/tp 1423.4 40.8 -2.4` (between its rooms 17.3 to 7.9 m2). Albany Linn-Benton Community College Cafeteria
    `/tp -27.5 -345.4 0.7` (741 m2 gone); 7101 Supra Drive Southwest, house `/tp -53.1 -690.8 0.8` (289 m2); 6121
    Warwick Place Southwest, main bedroom `/tp -161.1 89.8 0.2` (between rooms 9.6 to 1.7 m2).
+
+   **The readers on the flood (step 4, 2026-10-11).** `RoomCells` gives each flooded room's air (`TryAir`: the bounds
+   of its cells and its volume) and its floor (`FloorOf`: the top of the lowest cell in most of its columns, so not a
+   flight down through it). Moved onto them:
+   - `StandingSpots.InRoom` (and so `/tp` to a room, `--walk-pair room=`): over the room's air from its floor, a spot
+     whose body the server finds in the room. Marlow Tower's roof access is now `/tp -10.6 -105.5 24.1` (it was
+     -106.3 23.8, on the top of the flight); the other listed spots are as they were.
+   - `/tp` by name: a room's size is its air, and its spot is `InRoom`'s.
+   - `DoorManners`: which side of a door is further in, by the volume of each room's air.
+   - The client's tracker: in a room where its flood holds you, as near as its air's nearest edge otherwise.
+   - `ListeningSpots` holds a spot to the room the server's lookup puts it in, not the box.
+   Already on the flood, with the box only where nothing flooded: `SpatialService.GetRegionAt`, `MapManager.RegionAt`
+   and the place names, the voxel marks, `RoomAcoustics` (volume, faces, absorption, Sabine time), the routes' rooms,
+   `FaceOpenings` (step 3). Left on the box, and why:
+   - `MapTiles`: which tiles a room is sent with, and which rooms flood together across a tile's edge
+     (`RoomFlood.Groups` from `Seed.Size`). The tiles are made at load, before the first flood lands.
+   - `MapManager.SurveyRegions`: the indoor flag (it decides what floods, and is sent before any flood) and the
+     materials of a room that does not flood, which a client hears until its own measure lands. A ray up from each
+     region's point says the same as the survey for 711 of the city's 724 regions (`only=indoor`); the 13 are the
+     platforms' canopies and Foundry Street under the terminal walkway (covered, but open sided, so outdoors) and 58
+     Alder Street's walled garden (the survey's indoors, under the sky). The flag stays the survey's until the flood
+     can decide it at load: covered, flooded and closed.
+   - `OpeningRoutes.FaceOfRoom`: only for an authored opening no flood met.
+   - `CompositeService`: a room built at run time is made from its survey.
+   No lookup, measure or route moved (the three maps' dumps are main's and step 3's, byte for byte).
+
+   Found moving `RealPlaceMapTests.The_ground_never_rises_through_what_lies_on_it` onto the floods (nine points over
+   each room's air instead of its box): the ground comes up through the floor at points of 21 rooms, 14 on Albany and 7
+   on Magnolia (1077 Lawrence Avenue, 777 College Park Drive's two buildings, 26319 South Heaton Lane, Building off
+   Turtle Creek Lane among them). The test keeps its box points, which are clear; the flood's are open.
 
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box

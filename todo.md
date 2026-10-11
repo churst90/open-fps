@@ -39,7 +39,10 @@ other at login. The server and the Windows zip go out together.
    sounds great"); regions-become-places steps in docs/GEOMETRY.md 12.6 item 1. Step 2 (rooms flood from their
    points, every part of a footprint a room's) and step 3 (openings framed from the floods, no more false
    openings in rooms' box faces) approved by ear 2026-10-11 (Cody: "complete, success everything sounds
-   good"). Steps 4 and 5 under way.
+   good"). Step 4 2026-10-11, no sound changed: StandingSpots, /tp, DoorManners and the tracker read the
+   flood; MapTiles and the indoor flag stay on the box until the flood decides them at load (12.6). Step 5
+   under way. Open: 21 rooms on the places have the ground through their floors at points of their air (12.6,
+   "The readers on the flood").
    Then (Cody, 2026-10-11): one path pass for every voice of a moving thing. Each voice is an entry saying
    which thing owns it and where on it it sounds from (engine, siren mouth, horn, a train's bogie taps,
    aircraft engines, a far-off borrowed voice, a spread source's places); one pass hands each its path every

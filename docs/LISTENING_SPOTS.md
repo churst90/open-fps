@@ -15,12 +15,12 @@ Each is on its room's floor and clear to the server's teleport check (`Listening
 is often no such spot: half its height is above the ceiling's reach, a narrow room's middle can be in a wall,
 and furniture stands there. To make another, give AudioLab the room's id from the map file:
 `--walk-pair map=magnolia_tx room=16390` prints `/tp` for the nearest clear spot to its middle
-(`StandingSpots.InRoom`, to the tenth, the height rounded up).
+(`StandingSpots.InRoom`: in a room the server finds you in by its flood, on its floor, to the tenth, the height rounded up).
 
 | Map | Where | /tp |
 |---|---|---|
 | city | Marlow Tower stairwell, floor 3 | `/tp -14.2 -102.7 9.3` |
-| city | Marlow Tower roof access, the landing at the top of the stairs | `/tp -10.6 -106.3 23.8` |
+| city | Marlow Tower roof access, by the top of the stairs | `/tp -10.6 -105.5 24.1` |
 | city | Tunnel, north portal | `/tp 0.0 -212.5 0.1` |
 | magnolia tx | 19415 Turtle Dove Lane, the barn | `/tp -88.8 -253.0 3.9` |
 | magnolia tx | 19617 Turtle Dove Lane, the house | `/tp -301.4 -268.7 5.2` |

@@ -10,7 +10,7 @@ namespace OpenFPS.Common.Geometry;
 public sealed class RoomCells
 {
     public static readonly RoomCells Empty = new(Array.Empty<Span>(), new HashSet<int>(), new Dictionary<int, RoomFlood.Lining>(), Vector3.Zero,
-                                                 new List<FloodOpenings.Frame>());
+                                                 new List<FloodOpenings.Frame>(), new Dictionary<int, (Vector3, Vector3, float)>());
 
     /// <summary>Cells x0 to x1 of row (y, z), the room's id.</summary>
     private readonly record struct Span(long Row, int X0, int X1, int Room);
@@ -25,8 +25,35 @@ public sealed class RoomCells
     public int SpanCount => _spans.Length;
 
     private RoomCells(Span[] spans, HashSet<int> flooded, Dictionary<int, RoomFlood.Lining> linings, Vector3 origin,
-                      List<FloodOpenings.Frame> openings)
-    { _spans = spans; _flooded = flooded; _linings = linings; Origin = origin; Openings = openings; }
+                      List<FloodOpenings.Frame> openings, Dictionary<int, (Vector3 Min, Vector3 Max, float Volume)> air)
+    { _spans = spans; _flooded = flooded; _linings = linings; Origin = origin; Openings = openings; _air = air; }
+
+    private readonly Dictionary<int, (Vector3 Min, Vector3 Max, float Volume)> _air;
+
+    /// <summary>The height of a flooded room's floor: the top of the lowest of its cells in most of its columns (a
+    /// stair down through it, or a step, is the fewer), or null for a room that did not flood.</summary>
+    public float? FloorOf(int room)
+    {
+        var lowest = new Dictionary<(int, int), int>();
+        foreach (var s in _spans)
+        {
+            if (s.Room != room) continue;
+            int y = (int)(uint)(s.Row & 0xFFFFFFFF), z = (int)(s.Row >> 32);
+            for (int x = s.X0; x <= s.X1; x++)
+                if (!lowest.TryGetValue((x, z), out int y0) || y < y0) lowest[(x, z)] = y;
+        }
+        if (lowest.Count == 0) return null;
+        int floor = lowest.Values.GroupBy(y => y).OrderByDescending(g => g.Count()).ThenBy(g => g.Key).First().Key;
+        return RoomFlood.CentreOf(0, floor, 0, Origin).Y + RoomFlood.Cell * 0.5f;
+    }
+
+    /// <summary>A flooded room's air: the bounds of its cells' middles, and its volume (its cells), m³.</summary>
+    public bool TryAir(int room, out Vector3 min, out Vector3 max, out float volume)
+    {
+        if (_air.TryGetValue(room, out var a)) { (min, max, volume) = a; return true; }
+        min = max = default; volume = 0f;
+        return false;
+    }
 
     /// <summary>The openings as the floods met them, and where a flood met the open sky (<see cref="FloodOpenings"/>).</summary>
     public IReadOnlyList<FloodOpenings.Frame> Openings { get; }
@@ -45,10 +72,18 @@ public sealed class RoomCells
         var linings = new Dictionary<int, RoomFlood.Lining>();
         Vector3 origin = Vector3.Zero;
         var edges = new List<Span>();
+        var air = new Dictionary<int, (Vector3, Vector3, float)>();
         foreach (var (id, room) in rooms)
         {
             if (room.Unseeded || room.AirCount == 0) continue;
             flooded.Add(id);
+            var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
+            foreach (var r in room.AirRuns)
+            {
+                lo = Vector3.Min(lo, RoomFlood.CentreOf(r.X, r.Y, r.Z, room.Origin));
+                hi = Vector3.Max(hi, RoomFlood.CentreOf(r.X + r.Length - 1, r.Y, r.Z, room.Origin));
+            }
+            air[id] = (lo, hi, room.Volume);
             if (room.Lining != null) linings[id] = room.Lining;
             origin = room.Origin;
             foreach (var r in room.AirRuns) spans.Add(new Span(RowOf(r.Y, r.Z), r.X, r.X + r.Length - 1, id));
@@ -67,7 +102,7 @@ public sealed class RoomCells
                 merged[^1] = last with { X1 = s.X1 };
             else merged.Add(s);
         }
-        return new RoomCells(merged.ToArray(), flooded, linings, origin, FloodOpenings.From(rooms, barriers ?? Array.Empty<RoomFlood.Barrier>()));
+        return new RoomCells(merged.ToArray(), flooded, linings, origin, FloodOpenings.From(rooms, barriers ?? Array.Empty<RoomFlood.Barrier>()), air);
     }
 
     /// <summary>The air spans as they are (no two rooms' air is the same cell), and the wall spans cut to what the air
