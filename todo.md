@@ -79,15 +79,14 @@ since the last deploy" list below.
      closed: `VoiceIdBandTests` is "no two live voices share an id", must-pass. Streams equal under the id map
      (high_ids: three beeps re-placed in another order in frames 113 to 120). Left: the woods' ids (they seed
      the woods' synth), birds asking the worker (P6, by ear), one-offs of a pooled kind each their own voice (P3d).
-   - Then P3d (one way to start and stop, fades owned by the registry, whether a pooled one-off is its own
-     voice, mounts and levels from the model, ranges from the level). Then library stage 5's
-     `AudioClock` slice (`IAudioClock`, its `WorldTime` from `WindField.Now()`; docs/SOUND_LIBRARY_BOUNDARY.md
-     18.3).
-   - Beacons onto the worker's path, the model every other sound uses (Cody, 2026-10-11: "I'd move them to the
-     new model if that would be more realistic"): whether a blip sounds, where it comes from and how loud,
-     from the worker's answer (routes through doorways, the barrier model) instead of the hand-rolled
-     tracer's straight line against 0.5. With P3d, then a listening list: a corridor, a house, parked cars.
-   - Then P4 (one ranking), the rest of P6 (beacons, birds and rain asking the worker), P7 (machine state from
+   - P3d: steps 1 to 5 of 6 BUILT 2026-10-11 on branch worktree-agent-a59cc2655299daa49, unheard, not merged (the
+     audit's "P3d as built"): one way to start and stop, fades owned by the registry, the facade's lost stop and
+     silent replacement; mounts, levels and ranges from the model; every one-off its own voice; beacons and
+     perched birds on the worker's path (P6). Also fixed: Steam Audio never built Magnolia's scene (a 64-corner
+     buffer overrun). Next: step 6, the reseed (stable hash seeds, the woods' ids into the allocator, all streams
+     regenerated, render check by band); the rain and bump start levels; rain patches under probes. Then library
+     stage 5's `AudioClock` slice (docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
+   - Then P4 (one ranking), the rest of P6 (rain asking the worker), P7 (machine state from
      the server: a wire change, shipped with a deploy).
 3. The physics boundary survey: DONE 2026-10-11 (docs/PHYSICS_BOUNDARY.md). Cody asked for it the same day:
    "all parts of this game engine need to be separated in their own packages and all work cohesively
