@@ -27,7 +27,8 @@ Where the parts stand (2026-10-11):
 | P5, names and materials to properties | under way |
 | P8, laws in one place | under way |
 | The barrier model (a way round one thing that passes through another), found by P1 | under way, a part of its own (todo.md, "Acoustics") |
-| P3a to P3d, the voice registry | next, after P5 and P8 |
+| P3a, the registry for moving things | done 2026-10-11 ("P3a as built"), unheard: intakes and borrowed cars take their path, one writer per voice, the rumble follows the speed (S11); S21 left for a decision |
+| P3b to P3d, the rest of the registry | next |
 | P4, one ranking | after P3 |
 | P6, one path model for every asker | after P4, or inside P3b |
 | P7, machine state from the server | last; a wire change, shipped with a server deploy |
@@ -414,6 +415,90 @@ The heart of it. Four sessions, each mergeable on its own.
   `WorldAudioPlayer.cs` and `RainField.cs`, which P5 and P2 touch at other lines. P6 is easiest as part of
   P3b.
 
+**P3a as built (2026-10-11).** Unheard. Ids keep today's formulas; `VoiceIdBandTests`' 47 overlaps are all
+still there. The wire hash does not change (only `OpenFPS.Client.Core` and the tests).
+
+- **The registry.** `VoiceRegistry` (`OpenFPS.Client.Core/VoiceRegistry.cs`). An entry per voice id: its
+  owner (entity id and `World`, one more each time the listener leaves a map), its `VoiceKind` (Engine,
+  Aircraft, Intake, Borrowed, Horn, HeldHorn, Siren, TrainField, TrainSignal, Cabin), its `Mount` (where on
+  the owner, in the owner's frame), its declared level and the frame it was last declared in. An owner
+  declares each of its voices every frame it sounds; an entry not declared in a frame is swept at its end.
+  How a kind is heard from is a table (`HeardFromOf`): at its point (engine, aircraft, intake, borrowed:
+  dead-reckoned from where the car is now), toward the edge its path comes round when blocked (horns, held
+  horns, sirens, a train's voices: `SirenApparent`), or inside (the cabin paths, and the engine of the
+  vehicle you sit in).
+- **The pass.** `ClientAudioSystem.Voices.cs`. `PathOf(owner)` is worked out once a frame per owner: the
+  worker's answer under P1's one rule (`TryGetDirectFor`, `AcousticPathData.Answers`), with `VehicleShadow`;
+  with no answer, `FirstAnswer` stands in and the worker is asked now. The path pass seeds it for every id it
+  serves. `HandPath` declares a voice and hands it, in the one emitter that places it, its position, apparent
+  position, occlusion, band gains, air, aperture, bleed, distance, region and room gain, with `CarriesPath`
+  when the answer is fresh; a stand-in places the voice and leaves its tone as it was (refused, a voice keeps
+  what it has). `SpatialEmitter.RoomGain` is new, part of the path with `CarriesPath` and taken at a start.
+  Owners still start and stop their own voices (P3d).
+- **Asked.** The path pass asks about every owner of an entry (last frame's), with the horns' and borrowed
+  cars' own sets, on the one cadence every source has (every frame within 15 m, every second to 50 m, every
+  tenth beyond). Before, a horn's, a siren's or a train source's owner without a voice of its own was asked
+  every frame (`VehiclePath`).
+- **Replaced.** The path pass's branches for horns, held horns, sirens (with its copy of `SirenApparent`)
+  and borrowed voices; `VehiclePath`; the trains' writer (`SetAcousticPath` in `PlaceTrainVoice`) and
+  `_trainPathIds`; `DistantEngine`'s bare emitter (S3); `FrontVoice`'s path, frozen at its start (S1); the
+  engine's and the aeroplane's own path fields. The path pass still serves the fixed machines, recordings,
+  trees and their spread places, and reflection copies (P3b).
+- **Writers removed.** No registered voice is handed a path by `SetAcousticPath` (S2): an engine's or an
+  aeroplane's own voice carries its path through the budget, so VoiceManager's held emitter is the
+  registry's output, re-applied unchanged. The path pass no longer hands a path to an id with no voice (a
+  far car's own id, a train's sources: no-ops). S11: the lane rumble is a voice of your car, and the aid now
+  renews the emitter the budget holds (`Refresh`) instead of re-placing it past the budget, which then put
+  the first pitch and place back.
+- **Streams.** Each voice compared by what the mixer holds at the end of each frame, old stream against new
+  (a model of the provider's fields: `Play` takes all, `Place` the band group only with `CarriesPath`,
+  `Path` all but on an interior engine). Changed:
+  - The intakes take their path every frame (S1). traffic_rain's `-800305` started behind the brick with the
+    mid band at -60 dB and kept it after its car came out at frame 200 (now 0 dB); every intake's air loss
+    followed its distance from then on (`-800101`, `-800102` in walk, `-800202` in drive, `-800301` to
+    `-800305`, `-800501`).
+  - The borrowed voices carry their car's path (S3): distance 0 to 48.9 to 160 m for `-700502` to `-700508`,
+    and behind the building `-700504` and `-700505` occlusion 0.95 and bleed 0.004 where they were re-placed
+    as 0 and 1; their first frame's bands and air are the stand-in's, not the emitter's defaults.
+  - train_behind_wall: the six train voices' distance and air are up to a frame older, from the one cadence
+    (their sources at 25 m are asked every second frame, not every frame); their tone the same.
+  - talker_and_aids (its own commit): the centre rumble `-964003` has one Place a frame, its pitch following
+    the speed (0.417 at 4 m/s to 0.623 at 6), its place riding with the car.
+  - Everything else the same, its `Path` lines folded into its `Place` lines: the engines, the drive's horn
+    `-1200202`, the held horn `-2100509` (its one apparent position, the grille's), the sirens `-900501` and
+    high_ids' `-961001`, the outlet `-800509`, the cabin. Every `Play` line gains `RoomGain=1`.
+    places_and_woods and high_ids are the same voice for voice.
+  - All eight are the same at 4 processors as at 12.
+- **Tests.** `VoiceRegistryTests`: one of every kind in a replay, none handed a `Path`, each carrying its
+  own; a borrowed car behind a building occluded and at its distance; the rumble following the speed; how
+  each kind is heard from; an entry's life and world. Tests that read a vehicle voice's path from
+  `SetAcousticPath` read it from its emitter (`RecordingMixer.Carried`); `SirenApparentTests` asserts the
+  siren's one writer.
+- **Left, and why.**
+  - S21 not folded in. On the shared law a bus's loss starts at 5 dB at the shadow's edge (Maekawa at a path
+    difference of zero, where `VehicleShadow` starts at 0) and is read at 200, 1250 and 8000 Hz, so under
+    the 15 dB cap the broadside bus of `VehicleShadowApplyTests` takes 11/15/15 dB: the mid and high bands
+    both at the cap, where the test (and the law's purpose) has most off the top. The call is three lines;
+    the cap and the grazing step need deciding first. No replay scenario has a vehicle in another's way.
+  - S17 not done: one cadence now, but by distance, not by movement.
+  - A blocked engine is heard from its point, as before, not round the edge as its horn is. The path pass
+    meant the edge, and the engine's own emitter has overwritten it since 2026-09-14 so a moving car is
+    dead-reckoned. Kept; one row of `HeardFromOf` if it should change.
+- **Next.**
+  - P3b: every other voice an entry with one writer: woods and their places, spread places, talkers and their
+    copies, own voice, reflection copy slots, step echoes, engine echoes (`EngineReflections.ApplyPath` still
+    calls `SetAcousticPath`), rain slots and parts, near drops, birds, beacons, the driving aids' tones and
+    beeps, the reference voice, transients; the fixed machines' and recordings' own voices onto `HandPath`, so
+    the path pass's `SetAcousticPath` and its spread branch go; then the `id < -5000` test, `IsWood` and
+    `IsEchoVoice`. P6 with it (talkers under a probe id).
+  - P3c: seeds from the entry's owner and kind (both on the entry now), with values equal to today's; then ids
+    from one allocator, freed when a voice stops, streams equal under the id map, and the band test becomes
+    "no two live voices share an id".
+  - P3d: one way to start and stop (owners still write `IsPlaying ? Update : Play` each, and the held horn is
+    still placed after its stop at frame 110 of sirens_and_far_traffic); the entry's `Mount` and level read
+    from the model, with the 116 dB, 1.9 m grille, 4.2 m rail horn and interior 0.7 m (now in `HandPath`)
+    fallbacks failing loudly; ranges from the entry's level; the facade's lost stop and silent replacement.
+
 #### P4. One ranking (1 session)
 
 - **Changes.** Every voice that competes for the mixer ranks by its rendered level at the ear with its
@@ -541,7 +626,8 @@ The heart of it. Four sessions, each mergeable on its own.
   unchanged. `VehicleShadowApplyTests` and `VehicleShadowMutationTests` updated to the one law.
 - **Done 2026-10-11 (unheard), except S21.** S21 (`VehicleShadow` calls `Diffraction`) is waiting on the
   barrier model, which is changing `Diffraction`, `OpeningRoutes` and the way over the top now; until it
-  lands `VehicleShadow` keeps its own Maekawa and its own 343. The rest:
+  lands `VehicleShadow` keeps its own Maekawa and its own 343. (The barrier model has landed; S21 now waits
+  on a decision about the cap and the grazing step: "P3a as built".) The rest:
   - S25: a voice FMOD pans (no HRTF voice free) takes `RenderedGain` by hand, from the source's position,
     as the binaural voices do; FMOD's own distances are set out of reach (`Rolloff.NoneMin`, 1000 km).
     Reference 1 m, range 100 m: 90 m -39.1 dB before, -47.0 after; 100 m -40.0 before, silent after;
