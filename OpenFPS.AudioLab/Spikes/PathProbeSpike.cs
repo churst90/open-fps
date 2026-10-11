@@ -11,7 +11,7 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [explain] [emitters] [overlays=DIR] [root=DIR/]
+/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [explain] [emitters] [fields] [overlays=DIR] [root=DIR/]
 ///
 /// What the game's occlusion worker hands the mixer for one source and one ear on a real map: occlusion
 /// and the three band gains in dB, with what each part of the answer says on its own — the one-shot
@@ -29,6 +29,7 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// reverb at the ear and the first source's traced echoes give the two ears each time (TracedBinaural).
 /// explain spells out the barrier search for each source: every box on the line, the routes round the
 /// worst, what each ran into, and the way over the top (OpeningRoutes.ExplainBarrier).
+/// fields gives each other place's reverberant field at the ear, the level its reverb bus is set to (OpeningRoutes.FieldAt).
 /// emitters lists the sounding entities within 3 m of each source as the client is handed them; overlays=DIR
 /// lays the world editor's edits in DIR over the map, as the server does (read only).
 /// legcost times the straight leg from each source to the ear instead: the one-box barrier search and the
@@ -59,6 +60,7 @@ public static class PathProbeSpike
         Settle(worker, ear);
         Console.WriteLine($"  ear ({ear.X:F1}, {ear.Y:F1}, {ear.Z:F1}) in {RegionName(world, acoustics, ear)}; Steam Audio {(worker.SteamAudioActive ? "on" : "OFF")}");
         DescribeOpenings(acoustics, world, ear);
+        if (args.Contains("fields")) DescribeFields(acoustics, world, ear);
         if (args.Contains("legcost"))
         {
             var routes = acoustics.RoutesFor(world)!;
@@ -231,6 +233,25 @@ public static class PathProbeSpike
         }
     }
 
+    /// <summary>fields: what each other place's reverberant field is worth at the ear (OpeningRoutes.FieldAt, the
+    /// level the provider sets that place's reverb bus to), the outdoors first, then the rooms within 30 m.</summary>
+    private static void DescribeFields(SpatialAcoustics acoustics, WorldSnapshot world, Vector3 ear)
+    {
+        var routes = acoustics.RoutesFor(world);
+        if (routes == null || world.AcousticMap == null) return;
+        int lr = acoustics.GetRegionAt(world, ear);
+        var ids = new List<int> { world.AcousticMap.GlobalEnvironmentId };
+        ids.AddRange(world.AcousticMap.RegionPositions.Where(kv => kv.Key != lr && Vector3.Distance(kv.Value, ear) < 30f)
+                                                       .OrderBy(kv => Vector3.Distance(kv.Value, ear)).Select(kv => kv.Key));
+        foreach (int id in ids.Distinct())
+        {
+            if (routes.NodeOf(id) == routes.NodeOf(lr)) continue;
+            float g = routes.FieldAt(id, ear, lr, 60f, out var via);
+            string name = world.AcousticMap.Regions.TryGetValue(id, out var r) && r.FriendlyName.Length > 0 ? r.FriendlyName : $"region {id}";
+            Console.WriteLine($"    field of {name}: {Db(g),6:F1} dB, heard from ({via.X:F1}, {via.Y:F1}, {via.Z:F1})");
+        }
+    }
+
     /// <summary>explain: the barrier search spelled out for each source (OpeningRoutes.ExplainBarrier).</summary>
     private static bool Explain;
 
@@ -254,6 +275,8 @@ public static class PathProbeSpike
             if (paths == null || paths.Count == 0) { Console.WriteLine("      worker: no answer"); id++; continue; }
             var p = paths[0];
             Console.WriteLine($"      worker (sustained voices)  {Bands(p.EqLow, p.EqMid, p.EqHigh)}  occlusion {p.Occlusion:F2}, heard from {Bearing(ear, p.ApparentPosition)}");
+            foreach (var q in paths.Where(q => q.IsReflection))
+                Console.WriteLine($"      worker reflection          {Bands(q.EqLow, q.EqMid, q.EqHigh)}  heard from {Bearing(ear, q.ApparentPosition)}");
             var h = acoustics.CalculateAcousticPath(world, -1, ear, src);
             Console.WriteLine($"      one-shot path              {Bands(h.EqLow, h.EqMid, h.EqHigh)}  occlusion {h.Occlusion:F2}, heard from {Bearing(ear, h.ApparentPosition)}");
 
