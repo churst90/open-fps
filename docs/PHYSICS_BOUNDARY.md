@@ -1090,3 +1090,17 @@ member named, the member it is named in). By file: `OpenFPS.Sound/VehicleSpec.cs
   DefaultTrackOverWidth, FrontRollStiffnessShare, FrontWeightShare, Groups, LockFromTurningCircle,
   MaxSteerAngleRad, YawInertiaIndex. By both: Axles, CentreOfGravityZ. By the sound only: Default, MainBrake,
   PlacedOn, SteeredTyres.
+
+## Decisions (Cody, 2026-10-11)
+
+- Approved as recommended, all ten (section 8), with two changes:
+- **Soft bodies as well as rigid ones** ("I will want soft bodies as well as solid bodies"). This changes the
+  rigid-body engine decision: our own solver was recommended for rigid bodies alone. Checked 2026-10-11 on
+  the projects' own pages: Jolt Physics (MIT) lists soft bodies (a soft ball, cloth), ragdolls, wheeled and
+  tracked vehicles, a full set of constraints, height-field terrain and triangle meshes, deterministic
+  simulation, and x64 and ARM64 on Windows and Linux; JoltPhysicsSharp (MIT) binds it for .NET 9 and 10.
+  BepuPhysics v2 (Apache-2.0, pure C#) lists no soft bodies. Which engine is open with Cody (see below).
+- **Gravity is a property of the world** ("adjusting the gravity as a property of the world will effect
+  everything on the world"): one value per world, 9.80665 m/s² by default, read by everything that falls,
+  rolls, flies, sloshes or sways (players, bodies, vehicles, projectiles, water, fire's buoyant plume,
+  thrown objects), never a constant in code. Stage 2's "one constant per law" removes the 40 copies of 9.81.
