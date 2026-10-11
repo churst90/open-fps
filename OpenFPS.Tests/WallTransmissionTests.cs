@@ -238,6 +238,21 @@ public class WallTransmissionTests
     }
 
     [Fact]
+    public void ASourceJustOverAFloorIsHeardThroughTheFloor()
+    {
+        // The cross of sample rays round a source 0.3 m over a slab put a point under it, in the room
+        // below: one ray in five clear, and the floor passed -14 dB at every band (a footstep in the flat
+        // above, rain on Marlow Tower's roof, 2026-10-10). The cross stays in the source's own air.
+        var slab = new Vector3(20f, 0.15f, 20f);
+        var world = World((new Vector3(0, 3f, 0), slab, "Concrete", WallBuild.Solid));
+        var p = new SpatialAcoustics().CalculateAcousticPath(world, -1, new Vector3(0, 1.6f, 0), new Vector3(0, 3.375f, -5f));
+        var (sl, sm, sh) = WallTransmission.BandGains("Concrete", slab, WallBuild.Solid);
+        Assert.Equal(Db(sl), Db(p.EqLow), 1);
+        Assert.Equal(Db(sm), Db(p.EqMid), 1);
+        Assert.Equal(Db(sh), Db(p.EqHigh), 1);
+    }
+
+    [Fact]
     public void NoMapFloorLetsSoundThroughAWall()
     {
         // The map's OcclusionFloor said "sounds never drop below this through walls". Walls decide.

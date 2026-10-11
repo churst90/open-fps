@@ -12168,26 +12168,26 @@
   },
   {
    "EntityId": 1118,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 1.07,
     "Z": -102.72
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 1116,
-   "RegionBId": 1097,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 1097,
+   "RegionBId": 1116,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Marlow Tower stairwell door, floor 0"
   },
   {
    "EntityId": 1119,
@@ -14257,26 +14257,26 @@
   },
   {
    "EntityId": 1249,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 4.3,
     "Z": -102.72
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 1244,
-   "RegionBId": 1225,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 1225,
+   "RegionBId": 1244,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Marlow Tower stairwell door, floor 1"
   },
   {
    "EntityId": 1250,
@@ -16158,26 +16158,26 @@
   },
   {
    "EntityId": 1368,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 7.3,
     "Z": -102.72
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 1364,
-   "RegionBId": 1345,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 1345,
+   "RegionBId": 1364,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Marlow Tower stairwell door, floor 2"
   },
   {
    "EntityId": 1369,
@@ -18164,26 +18164,26 @@
   },
   {
    "EntityId": 1494,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 10.3,
     "Z": -102.72
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 1489,
-   "RegionBId": 1470,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 1470,
+   "RegionBId": 1489,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Marlow Tower stairwell door, floor 3"
   },
   {
    "EntityId": 1495,
@@ -20065,26 +20065,26 @@
   },
   {
    "EntityId": 1613,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 13.3,
     "Z": -102.72
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 1609,
-   "RegionBId": 1590,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 1590,
+   "RegionBId": 1609,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Marlow Tower stairwell door, floor 4"
   },
   {
    "EntityId": 1614,
@@ -22071,26 +22071,26 @@
   },
   {
    "EntityId": 1739,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 16.3,
     "Z": -102.72
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 1734,
-   "RegionBId": 1715,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 1715,
+   "RegionBId": 1734,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Marlow Tower stairwell door, floor 5"
   },
   {
    "EntityId": 1740,
@@ -23888,26 +23888,26 @@
   },
   {
    "EntityId": 1854,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 19.3,
     "Z": -102.72
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 1850,
-   "RegionBId": 1831,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 1831,
+   "RegionBId": 1850,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Marlow Tower stairwell door, floor 6"
   },
   {
    "EntityId": 1855,
@@ -25810,26 +25810,26 @@
   },
   {
    "EntityId": 1976,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 22.3,
     "Z": -102.72
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 1971,
-   "RegionBId": 1952,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 1952,
+   "RegionBId": 1971,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Marlow Tower stairwell door, floor 7"
   },
   {
    "EntityId": 1977,
@@ -27878,26 +27878,26 @@
   },
   {
    "EntityId": 2107,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 1.07,
     "Z": -103.12
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 2105,
-   "RegionBId": 2086,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 2086,
+   "RegionBId": 2105,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Kestrel House stairwell door, floor 0"
   },
   {
    "EntityId": 2108,
@@ -29967,26 +29967,26 @@
   },
   {
    "EntityId": 2238,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 4.3,
     "Z": -103.12
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 2233,
-   "RegionBId": 2214,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 2214,
+   "RegionBId": 2233,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Kestrel House stairwell door, floor 1"
   },
   {
    "EntityId": 2239,
@@ -31868,26 +31868,26 @@
   },
   {
    "EntityId": 2357,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 7.3,
     "Z": -103.12
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 2353,
-   "RegionBId": 2334,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 2334,
+   "RegionBId": 2353,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Kestrel House stairwell door, floor 2"
   },
   {
    "EntityId": 2358,
@@ -33874,26 +33874,26 @@
   },
   {
    "EntityId": 2483,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 10.3,
     "Z": -103.12
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 2478,
-   "RegionBId": 2459,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 2459,
+   "RegionBId": 2478,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Kestrel House stairwell door, floor 3"
   },
   {
    "EntityId": 2484,
@@ -35775,26 +35775,26 @@
   },
   {
    "EntityId": 2602,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 13.3,
     "Z": -103.12
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 2598,
-   "RegionBId": 2579,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 2579,
+   "RegionBId": 2598,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Kestrel House stairwell door, floor 4"
   },
   {
    "EntityId": 2603,
@@ -37781,26 +37781,26 @@
   },
   {
    "EntityId": 2728,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 16.3,
     "Z": -103.12
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 2723,
-   "RegionBId": 2704,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 2704,
+   "RegionBId": 2723,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Kestrel House stairwell door, floor 5"
   },
   {
    "EntityId": 2729,
@@ -39933,26 +39933,26 @@
   },
   {
    "EntityId": 2863,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 1.07,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 2861,
-   "RegionBId": 2842,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 2842,
+   "RegionBId": 2861,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 0"
   },
   {
    "EntityId": 2864,
@@ -42022,26 +42022,26 @@
   },
   {
    "EntityId": 2994,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 4.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 2989,
-   "RegionBId": 2970,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 2970,
+   "RegionBId": 2989,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 1"
   },
   {
    "EntityId": 2995,
@@ -43923,26 +43923,26 @@
   },
   {
    "EntityId": 3113,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 7.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 3109,
-   "RegionBId": 3090,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 3090,
+   "RegionBId": 3109,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 2"
   },
   {
    "EntityId": 3114,
@@ -45929,26 +45929,26 @@
   },
   {
    "EntityId": 3239,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 10.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 3234,
-   "RegionBId": 3215,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 3215,
+   "RegionBId": 3234,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 3"
   },
   {
    "EntityId": 3240,
@@ -47830,26 +47830,26 @@
   },
   {
    "EntityId": 3358,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 13.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 3354,
-   "RegionBId": 3335,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 3335,
+   "RegionBId": 3354,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 4"
   },
   {
    "EntityId": 3359,
@@ -49836,26 +49836,26 @@
   },
   {
    "EntityId": 3484,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 16.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 3479,
-   "RegionBId": 3460,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 3460,
+   "RegionBId": 3479,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 5"
   },
   {
    "EntityId": 3485,
@@ -51653,26 +51653,26 @@
   },
   {
    "EntityId": 3599,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 19.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 3595,
-   "RegionBId": 3576,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 3576,
+   "RegionBId": 3595,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 6"
   },
   {
    "EntityId": 3600,
@@ -53575,26 +53575,26 @@
   },
   {
    "EntityId": 3721,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 22.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 3716,
-   "RegionBId": 3697,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 3697,
+   "RegionBId": 3716,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 7"
   },
   {
    "EntityId": 3722,
@@ -55392,26 +55392,26 @@
   },
   {
    "EntityId": 3836,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 25.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 3832,
-   "RegionBId": 3813,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 3813,
+   "RegionBId": 3832,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 8"
   },
   {
    "EntityId": 3837,
@@ -57314,26 +57314,26 @@
   },
   {
    "EntityId": 3958,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 28.3,
     "Z": 28.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 3953,
-   "RegionBId": 3934,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 3934,
+   "RegionBId": 3953,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Union Building stairwell door, floor 9"
   },
   {
    "EntityId": 3959,
@@ -59382,26 +59382,26 @@
   },
   {
    "EntityId": 4089,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 1.07,
     "Z": 157.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 4087,
-   "RegionBId": 4068,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 4068,
+   "RegionBId": 4087,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Brandt Court stairwell door, floor 0"
   },
   {
    "EntityId": 4090,
@@ -61471,26 +61471,26 @@
   },
   {
    "EntityId": 4220,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 4.3,
     "Z": 157.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 4215,
-   "RegionBId": 4196,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 4196,
+   "RegionBId": 4215,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Brandt Court stairwell door, floor 1"
   },
   {
    "EntityId": 4221,
@@ -63372,26 +63372,26 @@
   },
   {
    "EntityId": 4339,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 7.3,
     "Z": 157.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 4335,
-   "RegionBId": 4316,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 4316,
+   "RegionBId": 4335,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Brandt Court stairwell door, floor 2"
   },
   {
    "EntityId": 4340,
@@ -65378,26 +65378,26 @@
   },
   {
    "EntityId": 4465,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 10.3,
     "Z": 157.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 4460,
-   "RegionBId": 4441,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 4441,
+   "RegionBId": 4460,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Brandt Court stairwell door, floor 3"
   },
   {
    "EntityId": 4466,
@@ -67279,26 +67279,26 @@
   },
   {
    "EntityId": 4584,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 13.3,
     "Z": 157.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 4580,
-   "RegionBId": 4561,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 4561,
+   "RegionBId": 4580,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Brandt Court stairwell door, floor 4"
   },
   {
    "EntityId": 4585,
@@ -69285,26 +69285,26 @@
   },
   {
    "EntityId": 4710,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": -18.675,
     "Y": 16.3,
     "Z": 157.08
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 4705,
-   "RegionBId": 4686,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
     "W": 0.707107
-   }
+   },
+   "RegionAId": 4686,
+   "RegionBId": 4705,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Brandt Court stairwell door, floor 5"
   },
   {
    "EntityId": 4711,
@@ -71422,26 +71422,26 @@
   },
   {
    "EntityId": 4844,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 1.07,
     "Z": 157.48
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 4842,
-   "RegionBId": 4823,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 4823,
+   "RegionBId": 4842,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Selby House stairwell door, floor 0"
   },
   {
    "EntityId": 4845,
@@ -73391,26 +73391,26 @@
   },
   {
    "EntityId": 4967,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 4.3,
     "Z": 157.48
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 4963,
-   "RegionBId": 4944,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 4944,
+   "RegionBId": 4963,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Selby House stairwell door, floor 1"
   },
   {
    "EntityId": 4968,
@@ -75397,26 +75397,26 @@
   },
   {
    "EntityId": 5093,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 7.3,
     "Z": 157.48
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 5088,
-   "RegionBId": 5069,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 5069,
+   "RegionBId": 5088,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Selby House stairwell door, floor 2"
   },
   {
    "EntityId": 5094,
@@ -77298,26 +77298,26 @@
   },
   {
    "EntityId": 5212,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 10.3,
     "Z": 157.48
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 5208,
-   "RegionBId": 5189,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 5189,
+   "RegionBId": 5208,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Selby House stairwell door, floor 3"
   },
   {
    "EntityId": 5213,
@@ -79304,26 +79304,26 @@
   },
   {
    "EntityId": 5338,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 13.3,
     "Z": 157.48
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 5333,
-   "RegionBId": 5314,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 5314,
+   "RegionBId": 5333,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Selby House stairwell door, floor 4"
   },
   {
    "EntityId": 5339,
@@ -81205,26 +81205,26 @@
   },
   {
    "EntityId": 5457,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 16.3,
     "Z": 157.48
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 5453,
-   "RegionBId": 5434,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 5434,
+   "RegionBId": 5453,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Selby House stairwell door, floor 5"
   },
   {
    "EntityId": 5458,
@@ -83127,26 +83127,26 @@
   },
   {
    "EntityId": 5579,
-   "PrefabId": "portal",
+   "PrefabId": "steel_door",
    "Position": {
     "X": 19.025,
     "Y": 19.3,
     "Z": 157.48
    },
-   "Scale": {
-    "X": 0.5,
-    "Y": 1.05,
-    "Z": 3.5
-   },
-   "RegionAId": 5574,
-   "RegionBId": 5555,
-   "ApertureSize": 1.0,
    "Rotation": {
     "X": 0.0,
     "Y": 0.707107,
     "Z": 0.0,
-    "W": 0.707107
-   }
+    "W": -0.707107
+   },
+   "RegionAId": 5555,
+   "RegionBId": 5574,
+   "Scale": {
+    "X": 1.1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Selby House stairwell door, floor 6"
   },
   {
    "EntityId": 5580,

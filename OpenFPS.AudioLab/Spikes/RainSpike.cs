@@ -108,7 +108,14 @@ public static class RainSpike
                     paths[s] = direct;
                     continue;
                 }
-                paths[s] = acoustics.CalculateAcousticPath(world, -1, ear, survey.Centres[s] + new Vector3(0f, 0.3f, 0f));
+                var t = System.Diagnostics.Stopwatch.StartNew();
+                var middle = acoustics.CalculateAcousticPath(world, -1, ear, survey.Centres[s] + new Vector3(0f, 0.3f, 0f));
+                double middleMs = t.Elapsed.TotalMilliseconds;
+                t.Restart();
+                paths[s] = OpenFPS.Client.Core.RainField.PatchPath(at => acoustics.CalculateAcousticPath(world, -1, ear, at), survey, s);
+                static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
+                Console.WriteLine($"  {RainSurvey.SlotName(s)}: path from {survey.Sources[s].Count} surface(s) {Db(paths[s]!.Value.EqLow):F0}/{Db(paths[s]!.Value.EqMid):F0}/{Db(paths[s]!.Value.EqHigh):F0} dB "
+                                + $"in {t.Elapsed.TotalMilliseconds:F2} ms; from its middle {Db(middle.EqLow):F0}/{Db(middle.EqMid):F0}/{Db(middle.EqHigh):F0} dB in {middleMs:F2} ms");
             }
             foreach (var (label, fall) in rates)
             {

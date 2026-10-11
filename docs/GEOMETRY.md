@@ -1847,7 +1847,7 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    car park's open sides over the spandrels and its east side between the piers; the tunnel's quarters and its two
    mouths; the concourse's thirds (their boxes up to the suspended ceiling now, not into the void over it, where the face
    finder found a 0.6 m strip beside each opening); the hangar's front as its frame. The stairwell's doorway onto the corridor is the
-   doorway's size (aperture 1.0 m, was 1.4). Main Street block 2 stops at the tunnel's mouth (it ran 40 m in under
+   doorway's size (aperture 1.0 m, was 1.4); since 2026-10-11 it holds a fire door (below, "Marlow Tower's leaks"). Main Street block 2 stops at the tunnel's mouth (it ran 40 m in under
    the roof and flooded as a room). gen_osm and `WorldBuildings`: a thin opening in the middle of the gap between two
    touching rectangles' rooms; every part of a footprint no rectangle covers goes to the room it shares most of its
    edge with and opens onto each other room it touches; a part touching no room is a room of its own if it is 2 m2 or
@@ -1891,11 +1891,62 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    sidewalk, which overlaps it by 1.5 m); `WorldBuildingsTests` holds the port's openings and leftover rooms to
    where Magnolia has them. The emitter streams and the renders are unchanged, unregenerated.
 
-   Where to listen (`/tp` x east, y north, z mid-room): Marlow Tower stairwell, floor 3, `/tp -14.2 -102.7 10.5`
-   (between storeys); Marlow Tower roof access, `/tp -10.6 -106.5 25.4`; Tunnel, north portal, `/tp 0.0 -212.5 2.8`;
+   Where to listen (`/tp` x east, y north, z mid-room; the two Marlow spots on their floors, as checked in
+   `StairsTests.AListeningSpotIsWhereABodyStands`): Marlow Tower stairwell, floor 3, `/tp -14.2 -102.7 9.28`
+   (between storeys); Marlow Tower roof access, `/tp -10.65 -103.9 24.25`; Tunnel, north portal, `/tp 0.0 -212.5 2.8`;
    Magnolia 19415 Turtle Dove Lane, barn, `/tp -88.8 -253.0 5.4`; 19617 Turtle Dove Lane, house, `/tp -299.2 -271.0
    6.4`; 16510 Country Star, house, `/tp -320.0 702.1 0.7` (273.7 to 470.1 m3); Albany Linn County Juvenile Detention,
    `/tp 1464.5 1274.2 1.9`; Favorite Mistake, `/tp -53.3 643.2 0.6` (900 to 1,419 m3).
+   **Marlow Tower's leaks (2026-10-11, unheard).** Cody, in the game after step 2: on floor 3's corridor "I heard the
+   train clear as day go by", walking round the tower "wind or rain or something leaking in like it was coming
+   through the wall" and "a siren pop through quietly"; inside a flat on floor 3 everything sounded good. Traced from
+   his client log and with `--path-probe ... fields` (each other place's field at the ear, the level its reverb bus
+   is set to), `--rain survey`, `--pop-hunt`, and set against builds of 448ea7e0 (before step 2). The floods were
+   none of it:
+   - **The train was its horn**, at 74 dB at his ear and -5/-5/-10 dBFS low/mid/high: as good as unblocked. The
+     paths say -40/-61/-87 dB at the corridor's south end (one 35 cm brick wall, the end wall, toward the line) and
+     under -95 by the openings, before step 2 and after. A train's voices kept the band gains each voice started
+     with (their ids are no entity's, so the path pass skipped them, and a re-submission leaves a voice's tone
+     alone), and the horn started on the answer the previous horn left, minutes before and from elsewhere. Since
+     c719c374 (2026-10-07). Now `PlaceTrainVoice` hands each voice its path every frame, and `VehiclePath` takes
+     no answer asked from another place (`AsyncAcousticWorker.TryGetResult` gives where the ear was).
+   - **The rain on the stairs** (his log: -18/-18/-18 dBFS, "blocked 20 %", 6 m off, on the flight from floor 3).
+     A patch behind something took the path to its middle, and the near north quarter there falls on the pavement
+     11 m below and the roof 13 m above: its middle was in the stairwell's air. Each patch behind something is now
+     heard by the path to each thing it falls on (`RainSurvey.Result.Sources`, the heaviest four; `RainField.PatchPath`),
+     one path a frame. Under it, the hand-rolled path's five rays round a source (10 degrees, 0.15 to 0.8 m) put
+     one through the floor a source sat on: rain 0.3 m over the roof, or a footstep in the flat above, had a point
+     in the room below and came through any slab at -14 dB flat. Each point round a source is pulled back to the
+     first solid on its way out (`SpatialService.InItsAir`). Heavy rain (Leq, the scene summed):
+
+     | where | before | after |
+     |---|---|---|
+     | where Cody stood on the stairs (his log: -10.15, -104.6, feet 9.28; too near the wall for /tp) | 26.1 dB | -9.3 dB |
+     | floor 3 stairwell, `/tp -10.8 -104.2 9.28` | | -8.3 dB |
+     | floor 7 corridor, under the roof | 26.4 dB | -14.4 dB |
+     | floor 3 corridor by the stair door | | -40.4 dB |
+     | flat 31F | | -50.3 dB |
+
+     The near north quarter on the stairs: its middle -14/-14/-14 dB, its two surfaces -70/-85/-100.
+   - **The siren** came in by the front entrance (glass, -18/-28/-45 dB), up the stairwell and out of an open
+     doorway on every storey. Step 2 made the storeys one space (12 m2 between them, where the face finder had 5
+     m2), so this route rose 6 to 14 dB: a siren on Main Street opposite the entrance reached floor 3's corridor
+     at -56.3/-56.4/-69.7 dB (-73.0/-70.8/-82.9 at 448ea7e0). An exit stair's enclosure has a self-closing fire door
+     on every storey (IBC 1023); the generator left the doorway open since 2026-09-20. gen_city puts a steel push
+     bar door there now, pushed from the corridor into the stair, in the portal's place so no id moves (37 doors):
+     the same siren -69.4/<-100/<-100 dB, the stairwell's field in the corridor -12.6 to -60.9 dB. The flat is as it
+     was (walls first). The pops (20 to 30 dB for a quarter second, many cars at once, in the stairwell) are older:
+     at 448ea7e0 too, 3 to 6 a minute with 40 cars round floor 1's stairwell (`--pop-hunt ear=-11.05,4.9,-100.84`),
+     each a moving source's simulated transmission jumping from -80/-100 to -35/-52/-80 dB on Dock Street; no still
+     source reproduces it, and 32 transmission surfaces instead of 8 changed nothing. Open.
+
+   The train at the corridor's south end, through the end wall, stays what the panel model gives 35 cm of brick
+   (-40/-61/-87): with the horn's path followed, a freight's rumble is what comes through.
+
+   Where to listen (each checked by `StairsTests.AListeningSpotIsWhereABodyStands`: clear to /tp, the floor at z):
+   floor 3 corridor by the stair door `/tp -19.95 -101.5 9.29`; its south end `/tp -19.95 -110.5 9.29`; floor 3
+   stairwell `/tp -10.8 -104.2 9.28`; flat 31F `/tp -14 -85 9.29`; floor 7 corridor `/tp -19.95 -100 21.29`;
+   before the front entrance `/tp -6.4 -103.5 0.12`.
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
    would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a

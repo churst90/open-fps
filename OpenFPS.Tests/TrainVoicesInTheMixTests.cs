@@ -91,4 +91,55 @@ public class TrainVoicesInTheMixTests
         Assert.True(trainStarts <= TrainVoicing.Slots + 3, $"{trainStarts} starts in {seconds:F0} s: voices are coming and going");
         Assert.Equal(1, signalSeen);
     }
+
+    // ── A train's voice takes the path of where it is now ─────────────────────────────────────────
+
+    private const int Source = 77, Wall = 78;
+
+    /// <summary>A train's source as the server puts one, 12 m north of the listener at the origin.</summary>
+    private static ClientAudioHarness ATrainInView()
+    {
+        var h = new ClientAudioHarness();
+        h.StandAt(Vector3.Zero);
+        var def = new OpenFPS.Common.Networking.EntityDefinition
+        {
+            EntityId = Source,
+            Type = OpenFPS.Common.Components.EntityType.StaticObject,
+            Transform = new OpenFPS.Common.Components.Transform { Position = new Vector3(0f, 1f, 12f), Rotation = Quaternion.Identity, Scale = Vector3.One },
+        };
+        def.SoundEmitter.IsSynth = true;
+        def.SoundEmitter.SoundId = "rail:" + TrainProfile.Presets.Keys.First() + "/t1/0";
+        def.SoundEmitter.Mode = OpenFPS.Common.Components.PlaybackMode.LoopOne;
+        def.SoundEmitter.Volume = 1f;
+        def.SoundEmitter.MinDistance = 1f;
+        def.SoundEmitter.Range = 200f;
+        h.World.RegisterDefinition(def);
+        return h;
+    }
+
+    private static int VoiceOf(ClientAudioHarness h)
+        => h.Mixer.Latest.Values.First(e => e.PhysicalKey.StartsWith("rail:", StringComparison.Ordinal)).EntityId;
+
+    private static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-6f, g));
+
+    /// <summary>
+    /// A wall put up between a playing train voice and the ear reaches the voice. Its id is no entity's, so
+    /// the path pass skips it, and a re-submission leaves a voice's tone alone: until 2026-10-10 a train
+    /// kept the band gains it started with, and a horn begun on an outdoor answer played flat through
+    /// Marlow Tower's brick (74 dB in the floor 3 corridor, Cody's log).
+    /// </summary>
+    [Fact]
+    public void A_playing_train_voice_is_handed_the_path_of_where_it_is_now()
+    {
+        var h = ATrainInView();
+        Assert.True(h.TickUntil(() => h.Mixer.Latest.Values.Any(e => e.PhysicalKey.StartsWith("rail:", StringComparison.Ordinal)), 60),
+                    "the train was never voiced");
+        int voice = VoiceOf(h);
+        Assert.True(h.TickUntil(() => h.Mixer.HasPath(voice), 60), "the train's voice was never handed a path");
+        float open = h.Mixer.LastPath(voice).EqMid;
+        h.AddWall(Wall, new Vector3(0f, 3f, 6f), new Vector3(40f, 8f, 0.35f));
+        bool walled = h.TickUntil(() => h.Mixer.LastPath(voice).EqMid < 0.1f * open, 300, TimeSpan.FromSeconds(5));
+        _o.WriteLine($"voice {voice}: mid {Db(open):F1} dB in view, {Db(h.Mixer.LastPath(voice).EqMid):F1} dB behind 35 cm of brick");
+        Assert.True(walled, "the wall never reached the playing voice");
+    }
 }

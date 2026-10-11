@@ -225,12 +225,16 @@ public class SpatialService
         // The spread grows with distance (10 degrees, 0.15 to 0.8 m), as the emitter's projection does.
         float sampleOffset = Math.Clamp(Vector3.Distance(start, end) * MathF.Tan(10f * MathF.PI / 180f), 0.15f, 0.8f);
 
+        // Each point round the source is in the source's own air: pulled back to the first solid on the way out
+        // to it. Left where the cross put it, a source 0.3 m over a slab had a point under it, in the room below,
+        // and one ray in five clear made any floor or roof -14 dB at every band (rain on Marlow Tower's roof, a
+        // footstep in the flat above, 2026-10-10).
         Vector3[] sourcePoints = {
             end, // Center
-            end + (up * sampleOffset), 
-            end - (up * sampleOffset),
-            end + (right * sampleOffset),
-            end - (right * sampleOffset)
+            InItsAir(world, end, up * sampleOffset, ignoreEntityId, ignoreEntityId2),
+            InItsAir(world, end, -up * sampleOffset, ignoreEntityId, ignoreEntityId2),
+            InItsAir(world, end, right * sampleOffset, ignoreEntityId, ignoreEntityId2),
+            InItsAir(world, end, -right * sampleOffset, ignoreEntityId, ignoreEntityId2)
         };
 
         float sumBlock = 0, sumBleed = 0, sumLow = 0, sumMid = 0, sumHigh = 0;
@@ -250,6 +254,34 @@ public class SpatialService
         eqLow = sumLow / 5.0f;
         eqMid = sumMid / 5.0f;
         eqHigh = sumHigh / 5.0f;
+    }
+
+    /// <summary>How far a source's extent goes this way: <paramref name="offset"/> from <paramref name="at"/>,
+    /// or up to 5 cm short of the first solid on the way. Neither ignored id stops it.</summary>
+    private Vector3 InItsAir(WorldSnapshot world, Vector3 at, Vector3 offset, int ignoreA, int ignoreB)
+    {
+        float len = offset.Length();
+        if (len < 1e-4f) return at;
+        Vector3 dir = offset / len;
+        float clear = len;
+        List<EntitySnapshot> others;
+        if (UsesTriangles(world))
+        {
+            var filter = Filter(world, ignoreA, ignoreB);
+            if (world.Geometry!.Enter(at, dir, len, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, out var hit) && hit.T < clear)
+                clear = hit.T;
+            others = Others(world, staticOnly: false);
+        }
+        else others = GetEntitiesToTest(world, at, len + 1f);
+        foreach (var s in others)
+        {
+            if (s.Id == ignoreA || s.Id == ignoreB) continue;
+            var def = s.Definition;
+            if (!def.Collider.IsSolid || def.Collider.Shape != ColliderShape.Box || def.Collider.Size.X <= 0) continue;
+            if (GeometryUtils.RayIntersectsOBB(at, dir, s.Transform.Position, def.Collider.Size, s.Transform.Rotation, out float t) && t < clear)
+                clear = t;
+        }
+        return clear >= len ? at + offset : at + dir * MathF.Max(0f, clear - 0.05f);
     }
 
     /// <summary>

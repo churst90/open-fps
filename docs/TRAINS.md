@@ -244,6 +244,10 @@ from one voice to another fades out of one and into the other over 0.4 s, in pow
 through the hand-over (measured: +0.6 dB). The voice is placed at the middle of what it carries, by the
 power each source brings.
 
+**Its path.** Each voice is heard through the path of the source nearest its middle (the horn's and the
+bell's, their own), handed to it every frame. Until 2026-10-11 a voice kept the path it started with: a horn
+begun on an old answer from outdoors played through Marlow Tower's brick at 74 dB.
+
 **What a voice renders.** The engines, fans, drives, chimneys, horn and bell have state of their own
 and are rendered once each, by a lane on the render pool (each diesel its own lane: an EMD 645 is half
 a core), into a ring any voice may read. The rolling stock is rendered by the voice carrying it through

@@ -29,6 +29,8 @@ public class AsyncAcousticWorker : IDisposable
     private readonly SpatialAcoustics _acoustics;
     private readonly ConcurrentQueue<AcousticRequest> _requestQueue = new();
     private readonly ConcurrentDictionary<int, List<AcousticPathData>> _results = new();
+    /// <summary>Where the listener was when each result was asked for.</summary>
+    private readonly ConcurrentDictionary<int, Vector3> _askedFrom = new();
     private readonly CancellationTokenSource _cts = new();
     private Thread? _workerThread;
 
@@ -170,6 +172,7 @@ public class AsyncAcousticWorker : IDisposable
             p.SourcePosition = req.SourcePos;
             paths[i] = p;
         }
+        _askedFrom[req.EntityId] = req.ListenerPos;
         _results[req.EntityId] = paths;
         foreach (var p in paths)
             if (!p.IsReflection) { Remember(req, p); break; }
@@ -228,8 +231,19 @@ public class AsyncAcousticWorker : IDisposable
         return _results.TryGetValue(entityId, out paths!);
     }
 
+    /// <summary>A result and where the listener was when it was asked for.</summary>
+    public bool TryGetResult(int entityId, out List<AcousticPathData> paths, out Vector3 listener)
+    {
+        listener = _askedFrom.TryGetValue(entityId, out var at) ? at : new Vector3(float.NaN);
+        return _results.TryGetValue(entityId, out paths!);
+    }
+
     /// <summary>Drops a removed entity's result; its Steam Audio source goes with the idle sweep.</summary>
-    public void Forget(int entityId) => _results.TryRemove(entityId, out _);
+    public void Forget(int entityId)
+    {
+        _results.TryRemove(entityId, out _);
+        _askedFrom.TryRemove(entityId, out _);
+    }
 
     public WorldSnapshot? GetLastWorld()
     {
@@ -1402,6 +1416,7 @@ public class AsyncAcousticWorker : IDisposable
             _saLastSeen.Remove(id);
             _saDebugLastPrint.Remove(id);
             _results.TryRemove(id, out _);
+            _askedFrom.TryRemove(id, out _);
             _routeCache.Forget(id);
         }
     }

@@ -122,6 +122,9 @@ public partial class ClientAudioSystem
     /// taken as that voice's own. A pooled one-shot id reused a few seconds later is almost always
     /// further than this from its previous occupant; a car between two ticks is not a non-entity.</summary>
     internal const float StaleResultMetres = 1.0f;
+    /// <summary>A vehicle's answer asked from further than this from where the ear is now is an old one: half a
+    /// second of running, where a teleport or a minute's walk is tens of metres.</summary>
+    internal const float StaleListenerMetres = 3.0f;
 
     /// <summary>Is this cached result an answer about THIS voice? An entity keeps its last result
     /// between ticks; a voice that is not an entity — a footstep, a shot, anything from an id pool —
@@ -2301,9 +2304,17 @@ public partial class ClientAudioSystem
                 EntityId = snap.Id, ListenerPos = eyePos, SourcePos = at,
                 SourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap),
             });
-        if (_acousticWorker.TryGetResult(snap.Id, out var paths))
+        // An answer for where the source was long ago is not one: a train's horn is asked about only while
+        // it sounds, so the next horn began on the answer the last one left, minutes and a street away.
+        float moved = StaleResultMetres + snap.Velocity.Length() * 0.5f;
+        if (_acousticWorker.TryGetResult(snap.Id, out var paths, out var askedFrom))
             foreach (var p in paths)
-                if (!p.IsReflection) return p;
+            {
+                if (p.IsReflection) continue;
+                if (Vector3.DistanceSquared(p.SourcePosition, at) <= moved * moved
+                    && Vector3.DistanceSquared(askedFrom, eyePos) <= StaleListenerMetres * StaleListenerMetres) return p;
+                break;
+            }
         return _acoustics.CalculateAcousticPath(world, snap.Id, eyePos, at);
     }
 
