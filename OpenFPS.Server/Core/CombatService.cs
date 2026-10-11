@@ -771,8 +771,7 @@ public sealed partial class CombatService
     }
 
     private static bool IsGlass(World world, Entity e)
-        => world.Has<MaterialComponent>(e)
-           && string.Equals(world.Get<MaterialComponent>(e).Material, "Glass", StringComparison.OrdinalIgnoreCase);
+        => world.Has<MaterialComponent>(e) && AcousticRegistry.IsGlass(world.Get<MaterialComponent>(e).Material);
 
     /// <summary>The scope on a weapon: its own, for now. An attachment would be looked up here.</summary>
     public static string ScopeOf(WeaponDefinition weapon) => weapon.ScopeId;
@@ -886,7 +885,7 @@ public sealed partial class CombatService
         var col = world.Get<ColliderComponent>(hitEntity);
         string material = world.Has<MaterialComponent>(hitEntity)
             ? world.Get<MaterialComponent>(hitEntity).Material ?? "Generic" : "Generic";
-        if (material.Equals("Glass", StringComparison.OrdinalIgnoreCase))
+        if (AcousticRegistry.IsGlass(material))
         {
             // A rifle bullet goes through a window and on, a little slower; the window does not.
             f.BrokenGlass.Add(hitEntity.Id);
@@ -1130,7 +1129,7 @@ public sealed partial class CombatService
             Normal: Vector3.Transform(axis, t.Rotation),
             // What kind of glass it is, from what the map says the part is (GlassKind): a house window
             // annealed, a shop front, a door, a shelter or a car's side window tempered, a windscreen laminated.
-            Type: GlassKind.Of(GlazedPartOf(world, lookup, pane, box)),
+            Type: GlassKind.Of(GlazedPartOf(world, lookup, pane, box, _maps.Prefabs)),
             HeightAboveGround: MathF.Max(0f, t.Position.Y - collider.Size.Y * 0.5f));
 
         Span<GlassEvent> buffer = stackalloc GlassEvent[48];
@@ -1156,9 +1155,10 @@ public sealed partial class CombatService
         _server.BroadcastRemoval(session.CurrentMapId, pane.Id);
     }
 
-    /// <summary>A glass entity as the glass kind needs it: its prefab and name, and, when it is a part of a
-    /// composite, the composite's template and where the part sits in it.</summary>
-    private static GlazedPart GlazedPartOf(World world, Dictionary<int, Entity> lookup, Entity pane, Vector3 size)
+    /// <summary>A glass entity as the glass kind needs it: its prefab and the glazing that declares, and, when it is a
+    /// part of a composite, the composite's template and where the part sits in it.</summary>
+    private static GlazedPart GlazedPartOf(World world, Dictionary<int, Entity> lookup, Entity pane, Vector3 size,
+                                           IReadOnlyDictionary<string, OpenFPS.Server.Repositories.PrefabTemplate> prefabs)
     {
         string prefab = world.Has<IdentityComponent>(pane) ? world.Get<IdentityComponent>(pane).PrefabId ?? "" : "";
         string owner = "";
@@ -1170,7 +1170,8 @@ public sealed partial class CombatService
             if (lookup.TryGetValue(parent.ParentEntityId, out var whole) && world.Has<CompositeComponent>(whole))
                 owner = world.Get<CompositeComponent>(whole).TemplateId ?? "";
         }
-        return new GlazedPart(prefab, NameOf(world, pane), owner, local, size);
+        var glazing = prefabs.TryGetValue(prefab.ToLowerInvariant(), out var t) ? t.Glazing : null;
+        return new GlazedPart(prefab, glazing, owner, local, size);
     }
 
     // ── Wounds and death ────────────────────────────────────────────────────────────────────────

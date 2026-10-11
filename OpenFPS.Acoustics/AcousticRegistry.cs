@@ -606,6 +606,9 @@ public static class AcousticRegistry
         return !string.IsNullOrEmpty(type) && _registry.ContainsKey(Canonical(type));
     }
 
+    /// <summary>Whether a material is glass (its family), whatever the glass: float, laminated, an alias of either.</summary>
+    public static bool IsGlass(string? type) => !string.IsNullOrEmpty(type) && GetProperties(type).Family == "glass";
+
     /// <summary>A material name's ResonanceIndex, as region face arrays store it, so maps can be authored
     /// by name.</summary>
     public static bool TryGetResonanceIndex(string type, out int index)

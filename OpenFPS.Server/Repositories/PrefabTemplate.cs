@@ -40,6 +40,10 @@ public class PrefabTemplate
     /// that is not a surface (an emitter, a region, a portal).</summary>
     public string Material { get; set; } = "None";
 
+    /// <summary>What kind of glass it is, by NAME ("Annealed", "Tempered", "Laminated"): how it breaks when shot
+    /// (GlassKind). Required on anything of glass; nothing else may say it.</summary>
+    public OpenFPS.Common.GlassType? Glazing { get; set; }
+
     // --- Collider (ColliderComponent) --------------------------------------------------------------
 
     /// <summary>Full extents in metres, scaled by the map entity's `Scale`. Omit for something with no

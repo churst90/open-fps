@@ -84,6 +84,11 @@
       "$ref": "#/definitions/material",
       "description": "Surface material. Drives footsteps and the per-band acoustics of this surface. 'None' for a non-surface (emitter, region, portal)."
     },
+    "Glazing": {
+      "type": "string",
+      "enum": ["Annealed", "Tempered", "Laminated"],
+      "description": "What kind of glass it is: how a shot pane breaks. Annealed: ordinary float glass, a home's window, cracks into large shards. Tempered: toughened, doors, shop fronts, shelters, fails whole into cubes. Laminated: two sheets on an interlayer, takes the hole and holds. Required when the material is glass, and only then."
+    },
     "ColliderSize": {
       "$ref": "#/definitions/vector3",
       "description": "Full extents in metres, multiplied by the map entity's Scale. Every extent must be > 0. Omit for no physical presence."
