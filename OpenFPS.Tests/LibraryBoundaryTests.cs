@@ -157,7 +157,7 @@ public class LibraryBoundaryTests
     }
 
     /// <summary>All sorted projects' sources in one compilation, each tree named by its repository path.</summary>
-    private static CSharpCompilation CompileSorted()
+    internal static CSharpCompilation CompileSorted()
     {
         string root = RepoRoot();
         var parse = new CSharpParseOptions(LanguageVersion.Preview);

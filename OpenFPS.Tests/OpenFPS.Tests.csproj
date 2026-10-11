@@ -57,6 +57,8 @@
     <Compile Include="..\OpenFPS.Client\Core\KeypadKeys.cs" Link="Linked\KeypadKeys.cs" />
     <!-- The acceptance rig for far things sent less often, which AudioLab runs as an instrument too. -->
     <Compile Include="..\OpenFPS.AudioLab\Spikes\DistantUpdatesRig.cs" Link="Linked\DistantUpdatesRig.cs" />
+    <!-- The physics guards' walks, drives, traffic, trains and ballistics, which AudioLab runs as its physics-replay instrument. -->
+    <Compile Include="..\OpenFPS.AudioLab\Spikes\PhysicsReplays*.cs" Exclude="..\OpenFPS.AudioLab\Spikes\PhysicsReplaySpike.cs" Link="Linked\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
