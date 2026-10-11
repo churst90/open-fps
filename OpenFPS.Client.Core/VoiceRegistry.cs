@@ -71,11 +71,11 @@ internal enum VoiceKind : byte
 /// <summary>Where a registered voice is heard from, and so whose path it takes.</summary>
 internal enum HeardFrom : byte
 {
-    /// <summary>Its own point on the owner, now, wherever the owner's path arrives from: the engine and its
-    /// outlets are dead-reckoned from where the car is, and an answer is up to ten frames old.</summary>
+    /// <summary>Its own point on the owner, now, wherever the owner's path arrives from.</summary>
     Point,
-    /// <summary>Its point, turned toward the edge the owner's path arrives round when the way is blocked
-    /// (<see cref="ClientAudioSystem.SirenApparent"/>).</summary>
+    /// <summary>Its point while the way is clear; when it is blocked, turned toward the edge the owner's path
+    /// arrives round, at its own distance (<see cref="ClientAudioSystem.SirenApparent"/>): a blocked source comes
+    /// from the edge it bent over.</summary>
     TowardEdge,
     /// <summary>Where the owner's path says it arrives from, at that point: a recording heard round a corner.</summary>
     Edge,
@@ -145,7 +145,8 @@ internal sealed class VoiceRegistry
     /// <summary>How a kind of voice is heard from, given its path.</summary>
     public static HeardFrom HeardFromOf(VoiceKind kind) => kind switch
     {
-        VoiceKind.Horn or VoiceKind.HeldHorn or VoiceKind.Siren
+        VoiceKind.Engine or VoiceKind.Aircraft or VoiceKind.Intake or VoiceKind.Borrowed
+            or VoiceKind.Horn or VoiceKind.HeldHorn or VoiceKind.Siren
             or VoiceKind.TrainField or VoiceKind.TrainSignal => HeardFrom.TowardEdge,
         VoiceKind.Recording => HeardFrom.Edge,
         VoiceKind.Place => HeardFrom.Spread,

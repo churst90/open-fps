@@ -150,6 +150,33 @@ public class VoiceRegistryTests
         Assert.InRange(distance, 30f, 80f);
     }
 
+    /// <summary>
+    /// A blocked engine is heard from the edge its sound bends round, as its horn is, and at its own distance,
+    /// so a turn from the car to the edge goes round the head and not through it; clear, it is heard from the
+    /// car (Cody, 2026-10-11). The replay's tracer answers every source from its own point, so the rule is
+    /// shown on an answer here.
+    /// </summary>
+    [Fact]
+    public void A_blocked_engine_is_heard_round_the_edge_at_its_own_distance()
+    {
+        foreach (var kind in new[] { VoiceKind.Engine, VoiceKind.Aircraft, VoiceKind.Intake, VoiceKind.Borrowed })
+            Assert.Equal(VoiceRegistry.HeardFromOf(VoiceKind.Horn), VoiceRegistry.HeardFromOf(kind));
+        var ear = new Vector3(0f, 1.7f, 0f);
+        var car = new Vector3(9f, 0.8f, 8f);
+        // Round a corner: the path arrives from the doorway, straight ahead.
+        var blocked = new OpenFPS.Client.AudioEngine.Data.AcousticPathData(0.95f, new Vector3(0f, 1.2f, 3f), 12f)
+        {
+            SourcePosition = car,
+        };
+        var heard = ClientAudioSystem.SirenApparent(blocked, car, ear);
+        Assert.Equal(Vector3.Distance(ear, car), Vector3.Distance(ear, heard), 3);
+        Assert.Equal(0f, Vector3.Normalize(heard - ear).X, 3);
+        // In the open, or with no answer yet: from the car.
+        var open = new OpenFPS.Client.AudioEngine.Data.AcousticPathData(0f, car, 12f) { SourcePosition = car };
+        Assert.Equal(car, ClientAudioSystem.SirenApparent(open, car, ear));
+        Assert.Equal(car, ClientAudioSystem.SirenApparent(default, car, ear));
+    }
+
     private static float Field(string line, string name)
     {
         int at = line.IndexOf(" " + name + "=", StringComparison.Ordinal) + name.Length + 2;
@@ -190,9 +217,9 @@ public class VoiceRegistryTests
     [Fact]
     public void How_each_kind_is_heard_from()
     {
-        foreach (var kind in new[] { VoiceKind.Engine, VoiceKind.Aircraft, VoiceKind.Intake, VoiceKind.Borrowed })
-            Assert.Equal(HeardFrom.Point, VoiceRegistry.HeardFromOf(kind));
-        foreach (var kind in new[] { VoiceKind.Horn, VoiceKind.HeldHorn, VoiceKind.Siren, VoiceKind.TrainField, VoiceKind.TrainSignal })
+        // A blocked source comes from the edge it bent over, an engine as its horn does (Cody, 2026-10-11).
+        foreach (var kind in new[] { VoiceKind.Engine, VoiceKind.Aircraft, VoiceKind.Intake, VoiceKind.Borrowed,
+                                     VoiceKind.Horn, VoiceKind.HeldHorn, VoiceKind.Siren, VoiceKind.TrainField, VoiceKind.TrainSignal })
             Assert.Equal(HeardFrom.TowardEdge, VoiceRegistry.HeardFromOf(kind));
         Assert.Equal(HeardFrom.Inside, VoiceRegistry.HeardFromOf(VoiceKind.Cabin));
         foreach (var kind in new[] { VoiceKind.Machine, VoiceKind.Wood })

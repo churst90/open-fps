@@ -2909,8 +2909,9 @@ public partial class ClientAudioSystem
             SynthFilterResonance = def.SoundEmitter.SynthFilterResonance,
             SynthPulseWidth = def.SoundEmitter.SynthPulseWidth
         };
-        // Its path in the emitter the budget holds, the only writer: heard from its point (an engine, an
-        // aeroplane, a machine, a wood), or from where the path arrives (a recording).
+        // Its path in the emitter the budget holds, the only writer: heard from its point (a machine, a wood),
+        // from the edge its path comes round when blocked (an engine, an aeroplane), or from where the path
+        // arrives (a recording).
         HandPath(ref emitter, OwnVoiceKind(world, def, physicalKey.Length > 0), world, snap, emitterPosition, earLevel, eyePos,
                  inside: interior);
 
