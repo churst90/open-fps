@@ -163,7 +163,7 @@ public static class PrefabSchema
     /// <summary>Units the names do not carry.</summary>
     private static readonly Dictionary<string, string> Units = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["ColliderSize"] = "m", ["RoomSize"] = "m", ["EmitterOffset"] = "m", ["ItemWeight"] = "kg", ["Mass"] = "kg",
+        ["ColliderSize"] = "m", ["EmitterOffset"] = "m", ["ItemWeight"] = "kg", ["Mass"] = "kg",
         ["Range"] = "m", ["MinDistance"] = "m", ["ShellThickness"] = "m", ["ApertureSize"] = "m", ["Landing"] = "m",
         ["Thickness"] = "m", ["SynthFreq"] = "Hz", ["SynthLfoRate"] = "Hz", ["ConeInsideAngle"] = "degrees",
         ["ConeOutsideAngle"] = "degrees", ["GranularGrainSize"] = "ms", ["GranularDensity"] = "per second",

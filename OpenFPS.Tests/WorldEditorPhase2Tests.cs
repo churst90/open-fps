@@ -376,7 +376,7 @@ public class WorldEditorPhase2Tests : IDisposable
     // ── Doors, rooms, places ────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void ADoorsSidesAndARoomsMaterialsAndNameAreSettings()
+    public void ADoorsSidesAndARoomsNameAreSettingsAndARoomsMaterialsAreNot()
     {
         var rig = new Rig(_dir, UserRole.Dev);
         rig.On("mine");
@@ -392,16 +392,16 @@ public class WorldEditorPhase2Tests : IDisposable
         rig.Stand(rig.Tester, "mine", new Vector3(-30, 0.05f, 30));
         rig.Run("edit", "place", "acoustic_region");
         int room = rig.Selected;
-        Assert.Equal("Floor, Carpet.", rig.Run("edit", "set", "Floor", "carpet"));
+        // What a room is made of is measured from its walls (docs/GEOMETRY.md 12.6, step 5): not a setting.
+        Assert.NotEqual("Floor, Carpet.", rig.Run("edit", "set", "Floor", "carpet"));
         Assert.True(AcousticRegistry.TryGetResonanceIndex("Carpet", out int carpet));
-        Assert.Equal(carpet, rig.World("mine").Get<RegionComponent>(rig.Thing(room)).Materials[0]);
+        Assert.NotEqual(carpet, rig.World("mine").Get<RegionComponent>(rig.Thing(room)).Materials[0]);
         Assert.Equal("Name, The Lounge.", rig.Run("edit", "set", "Name", "The", "Lounge"));
         Assert.Equal("The Lounge", rig.World("mine").Get<RegionComponent>(rig.Thing(room)).FriendlyName);
         var places = rig.Menu("menu", "places")!;
         Assert.Contains(places.Items, i => i.Command == $"edit select #{room}");
         Assert.StartsWith("Undid", rig.Run("edit", "undo"));
-        Assert.StartsWith("Undid", rig.Run("edit", "undo"));
-        Assert.NotEqual(carpet, rig.World("mine").Get<RegionComponent>(rig.Thing(room)).Materials[0]);
+        Assert.NotEqual("The Lounge", rig.World("mine").Get<RegionComponent>(rig.Thing(room)).FriendlyName);
     }
 
     [Fact]

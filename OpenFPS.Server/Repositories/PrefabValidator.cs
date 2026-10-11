@@ -249,7 +249,7 @@ public static class PrefabValidator
         }
 
         // --- Region ---------------------------------------------------------------------------------
-        bool declaresRegion = t.IsIndoor.HasValue || t.RoomSize.HasValue || t.ReverbScale.HasValue || t.RoomMaterials != null;
+        bool declaresRegion = t.IsIndoor.HasValue;
 
         if (declaresRegion)
         {
@@ -258,26 +258,9 @@ public static class PrefabValidator
                              "solid geometry is a volume they cannot. Set IsSolid to false, or move the region fields to a " +
                              "separate 'acoustic_region' entity.");
 
-            if (!t.RoomSize.HasValue || t.RoomSize.Value.X <= 0 || t.RoomSize.Value.Y <= 0 || t.RoomSize.Value.Z <= 0)
-                r.Errors.Add($"A region needs a RoomSize with three positive extents (got {(t.RoomSize.HasValue ? Fmt(t.RoomSize.Value) : "none")}). " +
-                             "Its volume and surface areas are what the reverb time is computed from.");
-
-            if (t.ReverbScale is <= 0)
-                r.Errors.Add($"ReverbScale {t.ReverbScale} must be greater than 0.");
-
-            if (t.RoomMaterials != null)
-            {
-                if (t.RoomMaterials.Length != RoomFaceOrder.Length)
-                    r.Errors.Add($"RoomMaterials has {t.RoomMaterials.Length} entries; it needs exactly {RoomFaceOrder.Length}, " +
-                                 $"in the order {string.Join(", ", RoomFaceOrder)}.");
-                for (int i = 0; i < t.RoomMaterials.Length; i++)
-                {
-                    if (!AcousticRegistry.IsKnown(t.RoomMaterials[i]))
-                        r.Errors.Add($"RoomMaterials[{i}] ({(i < RoomFaceOrder.Length ? RoomFaceOrder[i] : "?")}) is " +
-                                     $"'{t.RoomMaterials[i]}', which is not a known material. " +
-                                     $"Known: {string.Join(", ", AcousticRegistry.KnownMaterials())}.");
-                }
-            }
+            if (!t.ColliderSize.HasValue || t.ColliderSize.Value.X <= 0 || t.ColliderSize.Value.Y <= 0 || t.ColliderSize.Value.Z <= 0)
+                r.Errors.Add($"A region needs a ColliderSize with three positive extents (got {(t.ColliderSize.HasValue ? Fmt(t.ColliderSize.Value) : "none")}): " +
+                             "the box it is, where nothing floods (a yard, a street).");
         }
 
         // --- Portal ---------------------------------------------------------------------------------

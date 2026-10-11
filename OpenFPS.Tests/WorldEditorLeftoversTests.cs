@@ -206,7 +206,8 @@ public class WorldEditorLeftoversTests : IDisposable
         var faces = fields.Single(n => n.Name == "MissingFaces");
         Assert.True(faces.IsValueList);
         Assert.Contains("North", faces.Field!.Choices);
-        Assert.True(fields.Single(n => n.Name == "RoomMaterials").IsValueList);
+        // A room's materials are measured from its walls, not a field to set (docs/GEOMETRY.md 12.6, step 5).
+        Assert.DoesNotContain(fields, n => n.Name is "RoomMaterials" or "RoomSize" or "ReverbScale");
 
         Assert.StartsWith("Added North, East to the missing faces of the prefab concrete_wall. Version 1; 2 now",
                           rig.Run("edit", "model", "add", "prefab", "concrete_wall", "MissingFaces", "north", "east"));
@@ -214,24 +215,16 @@ public class WorldEditorLeftoversTests : IDisposable
         Assert.StartsWith("Missing faces 2 of the prefab concrete_wall, West", rig.Run("edit", "model", "set", "prefab", "concrete_wall", "MissingFaces[1]", "West"));
         Assert.Equal(new[] { "North", "West" }, rig.Maps.Prefabs["concrete_wall"].MissingFaces);
         Assert.Contains("is one of", rig.Run("edit", "model", "add", "prefab", "concrete_wall", "MissingFaces", "sideways"));
+
+        // The menus: each item with its value, a way to add, and a way to take one out.
+        var list = rig.Menu("menu", "model:prefab:concrete_wall:MissingFaces")!;
+        Assert.Contains(list.Items, i => i.Label == "Missing faces 2, West" && i.Command == "mfield:prefab:concrete_wall:MissingFaces[1]");
+        var item = rig.Menu("menu", "mfield:prefab:concrete_wall:MissingFaces[1]")!;
+        Assert.Contains(item.Items, i => i.Command == "edit model set prefab concrete_wall MissingFaces[1] North");
+        Assert.Contains(item.Items, i => i.Command == "edit model remove prefab concrete_wall MissingFaces[1]");
         Assert.StartsWith("Took missing faces 1 out", rig.Run("edit", "model", "remove", "prefab", "concrete_wall", "MissingFaces[0]"));
         Assert.StartsWith("Took missing faces 1 out", rig.Run("edit", "model", "remove", "prefab", "concrete_wall", "MissingFaces[0]"));
         Assert.Null(rig.Maps.Prefabs["concrete_wall"].MissingFaces);
-
-        // A room's six materials: the validator refuses five, takes six.
-        Assert.Contains("needs exactly 6", rig.Run("edit", "model", "add", "prefab", "acoustic_region", "RoomMaterials", "carpet", "plaster", "plaster", "plaster", "plaster"));
-        Assert.Null(rig.Maps.Prefabs["acoustic_region"].RoomMaterials);
-        Assert.StartsWith("Added", rig.Run("edit", "model", "add", "prefab", "acoustic_region", "RoomMaterials", "carpet", "plaster", "plaster", "plaster", "plaster", "plaster"));
-        Assert.Equal("Carpet", rig.Maps.Prefabs["acoustic_region"].RoomMaterials![0]);
-        Assert.StartsWith("Room materials 2 of the prefab acoustic_region, Concrete", rig.Run("edit", "model", "set", "prefab", "acoustic_region", "RoomMaterials[1]", "concrete"));
-        Assert.Contains("needs exactly 6", rig.Run("edit", "model", "remove", "prefab", "acoustic_region", "RoomMaterials[5]"));
-
-        // The menus: each item with its value, a way to add, and a way to take one out.
-        var list = rig.Menu("menu", "model:prefab:acoustic_region:RoomMaterials")!;
-        Assert.Contains(list.Items, i => i.Label == "Room materials 2, Concrete" && i.Command == "mfield:prefab:acoustic_region:RoomMaterials[1]");
-        var item = rig.Menu("menu", "mfield:prefab:acoustic_region:RoomMaterials[1]")!;
-        Assert.Contains(item.Items, i => i.Command == "edit model set prefab acoustic_region RoomMaterials[1] Carpet");
-        Assert.Contains(item.Items, i => i.Command == "edit model remove prefab acoustic_region RoomMaterials[1]");
         var facesMenu = rig.Menu("menu", "model:prefab:concrete_wall:MissingFaces")!;
         Assert.Contains(facesMenu.Items, i => i.Command == "edit model add prefab concrete_wall MissingFaces Top");
     }

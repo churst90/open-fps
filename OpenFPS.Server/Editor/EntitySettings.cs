@@ -55,12 +55,6 @@ public static class EntitySettings
 
     private static bool IsDoor(World w, Entity e) => w.Has<DoorComponent>(e);
 
-    // ── A room's six faces ──────────────────────────────────────────────────────────────────────
-
-    private static readonly string[] FaceWords = { "Floor", "Ceiling", "North", "South", "East", "West" };
-
-    private static bool IsRoom(World w, Entity e) => w.Has<RegionComponent>(e) && w.Get<RegionComponent>(e).RoomSize.X > 0f;
-
     /// <summary>A material's name from the index a room's faces are kept as.</summary>
     public static string MaterialName(int index)
     {
@@ -68,24 +62,6 @@ public static class EntitySettings
             if (AcousticRegistry.TryGetResonanceIndex(name, out int i) && i == index) return name;
         return "Generic";
     }
-
-    private static Setting Face(int face) => new(
-        new FieldDescriptor
-        {
-            Path = FaceWords[face], Label = face < 2 ? FaceWords[face].ToLowerInvariant() : $"{FaceWords[face].ToLowerInvariant()} wall",
-            Type = FieldType.Choice, Choices = AcousticRegistry.KnownMaterials(),
-            Help = "What this face of the room is made of. It decides how long the room rings and how bright it sounds.",
-        },
-        Keeping.Settings, IsRoom,
-        (w, e) => MaterialName(w.Get<RegionComponent>(e).Materials is { Length: 6 } m ? m[face] : 0),
-        (w, e, v) =>
-        {
-            if (!AcousticRegistry.TryGetResonanceIndex(v, out int index)) return;
-            ref var r = ref w.Get<RegionComponent>(e);
-            var faces = r.Materials is { Length: 6 } m ? (int[])m.Clone() : new int[6];
-            faces[face] = index;
-            r.Materials = faces;
-        });
 
     /// <summary>Every setting there is, in the order the menu says them.</summary>
     public static readonly IReadOnlyList<Setting> All = new[]
@@ -164,7 +140,6 @@ public static class EntitySettings
             Keeping.Settings, (w, e) => w.Has<RegionComponent>(e),
             (w, e) => w.Get<RegionComponent>(e).IsIndoor ? "true" : "false",
             (w, e, v) => w.Get<RegionComponent>(e).IsIndoor = v == "true"),
-        Face(0), Face(1), Face(2), Face(3), Face(4), Face(5),
     };
 
     /// <summary>The settings a thing has.</summary>

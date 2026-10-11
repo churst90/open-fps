@@ -242,19 +242,10 @@ public class PrefabTemplate
 
     // --- Acoustic region (RegionComponent) ------------------------------------------------------------
 
-    /// <summary>Any field in this block declares the entity an acoustic REGION — a room volume the
-    /// listener can be inside. A region must not be solid, and must carry a non-zero
-    /// <see cref="RoomSize"/>, because its reverb is computed from that volume.</summary>
+    /// <summary>Declares the entity a REGION, a place the listener can be in: a room (indoors, its shape, size and
+    /// materials measured from the walls by its flood, docs/GEOMETRY.md 12.6) or a named place in the open (the
+    /// box its collider fills, <see cref="ColliderSize"/> as the entity is scaled). A region must not be solid.</summary>
     public bool? IsIndoor { get; set; }
-    /// <summary>Interior dimensions in metres, used for the room's volume and surface areas.</summary>
-    public Vector3? RoomSize { get; set; }
-    /// <summary>Multiplier on the computed reverb time (&gt; 0).</summary>
-    public float? ReverbScale { get; set; }
-
-    /// <summary>The six interior surfaces by material name, in the order the reverb reads them: Floor,
-    /// Ceiling, North, South, East, West (not the <see cref="FaceMask"/> bit order). The readable form of
-    /// RegionComponent.Materials.</summary>
-    public string[]? RoomMaterials { get; set; }
 
     // --- Acoustic portal (PortalComponent) -------------------------------------------------------------
 
