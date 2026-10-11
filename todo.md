@@ -75,10 +75,9 @@ other at login. The server and the Windows zip go out together.
    P8 (laws in one place) after; then P3a-d (the voice registry: one list, one writer, one start, which is the
    path pass above widened to every voice range) with P6; then P4 (one ranking), then P7 (machine state from
    the server, a wire change). P0 and P1 started 2026-10-11.
-   P0 merged 2026-10-11. Found by it: the replay harness faces moving vehicles backwards (`Replay.Facing`
-   takes -Z as forward; the server's vehicles face +Z, `VehicleSystem.Parking.cs:323`), so a replayed car's
-   grille, siren and horn sit at its tail. Fix in a commit of its own with walk, drive and traffic_rain
-   regenerated, before P3a reads those lines.
+   P0 merged 2026-10-11. Found by it: the replay harness faced moving vehicles backwards (`Replay.Facing`
+   took -Z as forward; the server's vehicles face +Z), so a replayed car's grille, siren and horn sat at its
+   tail. Fixed 2026-10-11 in a commit of its own, the listener's turn with it, all eight streams regenerated.
    P2 built 2026-10-11 (`ModelKindTable`, the audit's "P2 as built"), streams unchanged. Waiting on Cody: whether
    the scope calls somebody pushing a push mower a person (today, as before, it picks out no machine), and
    whether the editor should edit trains and woods through their sound ids. Left for later: S26's two caches

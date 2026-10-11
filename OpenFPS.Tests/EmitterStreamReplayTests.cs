@@ -417,17 +417,23 @@ internal sealed class Replay
         Move(id, at, velocity);
     }
 
-    /// <summary>Turned to face along its velocity (forward is -Z), or north when it stands.</summary>
+    /// <summary>Turned to face along its velocity, or north when it stands. Forward is +Z, as the server
+    /// turns its vehicles (heading = Atan2(x, z), Rotation = CreateFromYawPitchRoll(heading, 0, 0): RaceLine,
+    /// VehicleSystem); its traffic never pitches, and these roads are flat.</summary>
     private static Quaternion Facing(Vector3 velocity)
         => velocity.LengthSquared() < 1e-6f ? Quaternion.Identity
-         : Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.Atan2(-velocity.X, -velocity.Z));
+         : Quaternion.CreateFromYawPitchRoll(MathF.Atan2(velocity.X, velocity.Z), 0f, 0f);
 
+    /// <summary>The listener as the client turns it (ClientPhysicsSystem): yaw in radians, increasing
+    /// toward east, Rotation = CreateFromYawPitchRoll(yaw, pitch 0, 0). Riding, that is the vehicle's heading
+    /// (ClientGameSession.FollowRide), so it agrees with <see cref="Facing"/>.</summary>
     internal void Listener(Vector3 feet, Vector3 velocity, float yawDegrees)
     {
         Player.Position = feet;
         Player.Velocity = velocity;
-        Player.Yaw = yawDegrees;
-        Player.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, -yawDegrees * MathF.PI / 180f);
+        Player.Yaw = yawDegrees * MathF.PI / 180f;
+        Player.Pitch = 0f;
+        Player.Rotation = Quaternion.CreateFromYawPitchRoll(Player.Yaw, 0f, 0f);
     }
 
     /// <summary>A carriageway as the map builds one: an asphalt box, named as a road is.</summary>
@@ -570,8 +576,8 @@ internal sealed class Replay
 
     // ── P0's scenarios (docs/SPECIAL_CASES_AUDIT.md) ──────────────────────────────────────────────
     //
-    // Recorded from the code as it stood at 22423a5b: they guard the behaviour as it is, the audit's bugs
-    // with it. Where a scenario's lines show a finding, its summary says which voice ids and fields, so
+    // Recorded from the code as it stood at 22423a5b, and again when the replay's facing was fixed
+    // (2026-10-11): they guard the behaviour as it is, the audit's bugs with it. Where a scenario's lines show a finding, its summary says which voice ids and fields, so
     // the part that fixes it knows which lines it should change and which it should not.
 
     /// <summary>
@@ -582,7 +588,7 @@ internal sealed class Replay
     /// S3: each borrowed voice (-700502 to -700508) is played and re-placed with Occlusion 0,
     /// EffectiveDistance 0, the global region and ApertureFactor and TransmissionBleed at 1 (the emitter's
     /// defaults), whatever its Path lines say: -700504, behind the building, has Path Occlusion 0.95, bleed
-    /// 0.004 and 47.8 m. Its band gains come from the Path lines, which the Place lines do not carry.
+    /// 0.004 and 48.9 m. Its band gains come from the Path lines, which the Place lines do not carry.
     /// S2: the held horn (-2100509) has two apparent positions, the exhaust's in its Path lines and the
     /// grille's in its Place lines; at frame 110 it is stopped and then handed a Path and a Place. S1: the
     /// front outlets (-800501, -800509) have Place lines and no Path.
