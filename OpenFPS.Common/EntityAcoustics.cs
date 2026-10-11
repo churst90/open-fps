@@ -84,9 +84,27 @@ public static class EntityAcoustics
         => AcousticVolumeGenerator.GenerateRegions(Rooms(entities), Openings(entities), Solids(entities), mapSize, minBound,
                                                    voxelResolution, occlusionFloor, autoDiscoverPortals, report, floods);
 
+    /// <summary>The openings a flood stops at: every portal with no leaf (a door's leaf is shut in its doorway
+    /// instead), as its frame, the entity's own place, turn and size (X across, Y up, Z through).</summary>
+    public static List<Geometry.RoomFlood.Barrier> FloodBarriers(IEnumerable<EntityDefinition> entities)
+    {
+        var barriers = new List<Geometry.RoomFlood.Barrier>();
+        foreach (var def in entities)
+        {
+            if (def.Portal.RegionAId == def.Portal.RegionBId || def.Portal.OpeningRotation != default) continue;
+            var size = def.Collider.Size;
+            if (size.X <= 0f || size.Y <= 0f) continue;
+            bool outdoors = def.Portal.RegionAId == AcousticConstants.GlobalRegionId || def.Portal.RegionBId == AcousticConstants.GlobalRegionId;
+            barriers.Add(new Geometry.RoomFlood.Barrier(def.EntityId, def.Transform.Position, size,
+                                                         def.Transform.Rotation == default ? Quaternion.Identity : def.Transform.Rotation, outdoors));
+        }
+        barriers.Sort((a, b) => a.Id.CompareTo(b.Id));
+        return barriers;
+    }
+
     /// <summary>
-    /// Every indoor room of these entities flooded from its box through <paramref name="world"/> with each door's
-    /// leaf shut in its doorway (docs/GEOMETRY.md 12.6). The server and the client both call this, with the same
+    /// Every indoor room of these entities flooded from its point through <paramref name="world"/> with each door's
+    /// leaf shut in its doorway, stopped by the portals with no leaf (docs/GEOMETRY.md 2.7, 12.6). The server and the client both call this, with the same
     /// definitions and the same geometry, so both put a point in the same room. With <paramref name="measure"/>
     /// (the client, which hears them) what lines each room is measured too.
     /// </summary>
@@ -95,7 +113,8 @@ public static class EntityAcoustics
     {
         var seeds = new List<Geometry.RoomFlood.Seed>();
         var shut = new Dictionary<int, (Vector3, Quaternion)>();
-        foreach (var def in entities)
+        var defs = entities as IReadOnlyCollection<EntityDefinition> ?? entities.ToList();
+        foreach (var def in defs)
         {
             if (def.Region.IsIndoor && def.Region.RoomSize.X > 0f && def.Region.RoomSize.Y > 0f && def.Region.RoomSize.Z > 0f)
                 seeds.Add(new Geometry.RoomFlood.Seed(def.EntityId, def.Transform.Position, def.Region.RoomSize, def.Transform.Rotation));
@@ -103,7 +122,7 @@ public static class EntityAcoustics
         }
         seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
         var shutWorld = world.WithMoverPoses(id => shut.TryGetValue(id, out var p) ? (true, p.Item1, p.Item2) : (false, default, default));
-        return Geometry.RoomCells.From(Geometry.RoomFlood.Flood(shutWorld, seeds, origin, threads: threads, cache: cache, measure: measure));
+        return Geometry.RoomCells.From(Geometry.RoomFlood.Flood(shutWorld, seeds, origin, FloodBarriers(defs), threads: threads, cache: cache, measure: measure));
     }
 
     /// <summary>A region entity's room, as its flood measured it where <paramref name="cells"/> holds its lining.</summary>

@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-10
 
+- Rooms flood from their points, unheard (docs/GEOMETRY.md 12.6, "The flood from a point"). No box and no margin:
+  a room's air is what its walls, floors, ceilings, shut leaves, openings and the open sky close in. The generators
+  put an opening wherever two places meet with no wall (a stairwell's storeys, the car park's open sides, the
+  tunnel's quarters and mouths, the concourse's thirds, between a house's rooms, a barn's doorway), and every part
+  of a real place's footprint belongs to a room, on the maps and in the world's tiles (stored tiles are made
+  again). City, Magnolia and Albany regenerated; no id moved, the new entities are written last. Heard most: a
+  stairwell's storeys open to each other through the whole hole (up to 4 dB more between them), the barns no
+  longer lose their sound out of their doorways, and houses whose wings were nobody's. A flood is faster
+  (Albany 5.2 s on 8 threads): a block grows where its air reaches, keeping what it has flooded.
+
 - No ambience beds at all (Cody, 2026-10-10): the map's outdoor bed and the region beds, their provider calls
   (`PlayAmbientBed`, `StopAmbientBed`), `SetMapAmbience`, `PrefabTemplate.AmbienceId` and the map file's
   `AmbienceId` are gone; the maps are regenerated with that one line out. `RegionComponent.AmbienceId` and

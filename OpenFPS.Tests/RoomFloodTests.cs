@@ -9,8 +9,8 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Rooms measured from the walls (docs/GEOMETRY.md 2.7, 12.6): a flood from each room's hint box through the space
-/// the solids leave, stopped by walls, floors, ceilings and shut door leaves, kept within the hint grown by a margin.
+/// Rooms measured from the walls (docs/GEOMETRY.md 2.7, 12.6): a flood from each room's point through the space the
+/// solids leave, stopped by walls, floors, ceilings, shut door leaves, openings and the open sky.
 /// </summary>
 public class RoomFloodTests
 {
@@ -83,7 +83,7 @@ public class RoomFloodTests
     public void A_bay_beyond_the_box_is_part_of_the_room()
     {
         var closed = RoomFlood.Flood(World(Room()), new[] { Hint() }, Origin)[500];
-        var r = RoomFlood.Flood(World(Room(bay: 1.5f)), new[] { Hint() }, Origin, margin: 2f)[500];
+        var r = RoomFlood.Flood(World(Room(bay: 1.5f)), new[] { Hint() }, Origin)[500];
         Assert.False(r.Open);
         Assert.Contains(r.Cells, p => p.X > 3f);
         Assert.DoesNotContain(r.Cells, p => p.X > 3.5f);
@@ -92,12 +92,13 @@ public class RoomFloodTests
     }
 
     [Fact]
-    public void An_open_doorway_lets_it_out_as_far_as_its_margin_and_a_shut_leaf_does_not()
+    public void An_open_doorway_lets_it_meet_the_sky_and_a_shut_leaf_does_not()
     {
         var open = RoomFlood.Flood(World(Room(gap: true)), new[] { Hint() }, Origin)[500];
         Assert.True(open.Open);
-        Assert.Contains(open.Cells, p => p.Z < -1.75f);
-        Assert.All(open.Cells, p => Assert.True(p.Z > -1.5f - 1f - 0.25f));   // its margin
+        Assert.Contains(open.OpenAt, p => p.Z < -1.75f);
+        Assert.Contains(open.Cells, p => p.Z < -1.5f);                        // the doorway, under the ceiling
+        Assert.All(open.Cells, p => Assert.True(p.Z > -1.75f));               // and nothing under the sky
         var shut = RoomFlood.Flood(World(Room(gap: true, leaf: true)), new[] { Hint() }, Origin)[500];
         Assert.False(shut.Open);
         Assert.DoesNotContain(shut.Cells, p => p.Z < -1.75f);
@@ -158,7 +159,6 @@ public class RoomFloodTests
         // 3 m deep, past the metre the room may reach: closed in by walls, so the room's, and not open.
         var r = RoomFlood.Flood(World(Room(bay: 3f)), new[] { Hint() }, Origin)[500];
         Assert.False(r.Open);
-        Assert.True(r.BeyondCount > 0);
         Assert.Contains(r.Cells, p => p.X > 4.5f);
         Assert.DoesNotContain(r.Cells, p => p.X > 5f);
     }
@@ -328,10 +328,9 @@ public class RoomFloodTests
             Assert.True(m.TryGetMapData("city", out var data));
             Assert.True(m.TryGetGeometry("city", out var geometry));
             var g = Gate.Measure(geometry.World, ecs, data.MinBound);
-            // Open by design: the car park's open sides, the tunnel's mouth, the hangar's open front, a walled
-            // garden and the street cut down to the tunnel, all under the sky.
-            string[] designed = { "Parking garage", "Tunnel, south portal", "Hangar", "back garden", "Main Street, block" };
-            Assert.All(g.Open, name => Assert.Contains(designed, d => name.Contains(d)));
+            // Where a room opens to the outdoors (the car park's open sides, the tunnel's mouths, the hangar's front)
+            // there is an opening, so none meets the sky.
+            Assert.Empty(g.Open);
             Assert.True(g.MedianIou > 0.8, $"median IoU {g.MedianIou:F2}");
 
             // The server and a client sent the whole city put every point in the same room: the client floods
@@ -369,7 +368,8 @@ public class RoomFloodTests
     }
 }
 
-/// <summary>Every indoor room of a loaded map flooded through its server's triangle world and set against its box.</summary>
+/// <summary>Every indoor room of a loaded map flooded through its server's triangle world, stopped at its openings as a
+/// load floods it, and set against its box.</summary>
 internal static class Gate
 {
     public sealed record Result(List<string> Open, int Unseeded, double MedianIou, int Rooms);
@@ -385,7 +385,7 @@ internal static class Gate
             names[e.Id] = r.FriendlyName ?? "";
         });
         seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
-        var rooms = RoomFlood.Flood(world, seeds, origin, threads: 4);
+        var rooms = RoomFlood.Flood(world, seeds, origin, EntityAcoustics.FloodBarriers(EntityDefinitionFactory.StaticDefinitions(ecs)), threads: 4);
         var ious = new List<double>();
         var open = new List<string>();
         int unseeded = 0;

@@ -36,7 +36,11 @@ public class CityOpeningsTests
         foreach (var def in defs)
             world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
+        // The rooms as their floods, as a client has them once the geometry is built: a box overlapping another place
+        // (the garage's west side under Wharf Avenue's sidewalk) is not what says which side of an opening is which.
+        Assert.True(maps.TryGetGeometry(mapId, out var geometry));
+        var floods = EntityAcoustics.RoomsByFlood(geometry.World, defs, data.MinBound, null, 4, measure: true);
+        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor, floods: floods);
         long genMs = sw.ElapsedMilliseconds;
 
         var acoustics = new SpatialAcoustics();

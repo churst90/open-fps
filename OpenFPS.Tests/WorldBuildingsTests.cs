@@ -236,7 +236,7 @@ public class WorldBuildingsTests : IDisposable
     /// The port's shell against gen_osm.py's, for every building of Magnolia built at medium detail: given what gen_osm
     /// decided for it (kind, name, the street it faces, its pad), the port makes the same entities in the same order,
     /// with the same ids, prefabs, names and rooms, each within a centimetre of where gen_osm put it, the same size and
-    /// the same turn.
+    /// the same turn; and the openings and leftover rooms gen_osm writes after everything else, each where the map has it.
     /// </summary>
     [Fact]
     public void Magnolia_s_buildings_are_built_as_gen_osm_built_them()
@@ -249,6 +249,14 @@ public class WorldBuildingsTests : IDisposable
         var ties = new List<string>();
         double worstXz = 0, worstY = 0, worstSize = 0, worstTurn = 0;
         var kinds = new Dictionary<string, int>();
+        var portals = map.Entities.Where(x => x.PrefabId == "portal" && x.RegionAId != null && x.RegionBId != null)
+                                  .ToLookup(x => (x.RegionAId!.Value, x.RegionBId!.Value));
+        var roomsByName = map.Entities.Where(x => x.PrefabId == "acoustic_region" && x.Name != null).ToLookup(x => x.Name!);
+        bool Same(EntityData w, EntityData g)
+            => Vector2.Distance(new Vector2(w.Position.X, w.Position.Z), new Vector2(g.Position.X, g.Position.Z)) <= 0.01
+               && Math.Abs(w.Position.Y - g.Position.Y) <= 0.01 && (Extent(w) - Extent(g)).Length() <= 0.01
+               && 1 - Math.Abs(Quaternion.Dot(Quaternion.Normalize(w.Rotation), Quaternion.Normalize(g.Rotation))) < 1e-5;
+        int openings = 0, wings = 0;
         foreach (var d in MagnoliaDecisions())
         {
             if (d.GetProperty("detail").GetInt32() != 1) continue;
@@ -266,8 +274,24 @@ public class WorldBuildingsTests : IDisposable
             };
             int first = d.GetProperty("entities")[0].GetInt32(), last = d.GetProperty("entities")[1].GetInt32();
             int next = map.Entities[first].EntityId - 1;
-            var made = WorldBuildings.Build(plan, Prefabs, (x, z) => e.HeightAt(x, z), (0, 0), ref next);
+            var later = new WorldBuildings.Later();
+            var made = WorldBuildings.Build(plan, Prefabs, (x, z) => e.HeightAt(x, z), (0, 0), ref next, later: later);
             compared++;
+            var mineRooms = made.Where(x => x.PrefabId == "acoustic_region").Select(x => x.EntityId).ToHashSet();
+            int theirs = portals.Where(g => mineRooms.Contains(g.Key.Item1)).Sum(g => g.Count());
+            Assert.Equal(theirs, later.Openings.Count);
+            foreach (var make in later.Openings)
+            {
+                var got = make(0);
+                Assert.True(portals[(got.RegionAId!.Value, got.RegionBId!.Value)].Any(w => Same(w, got)), $"{fp.Id}: no opening in the map where {got.Position} is");
+                openings++;
+            }
+            foreach (var make in later.Rooms)
+            {
+                var got = make(0);
+                Assert.True(roomsByName[got.Name!].Any(w => Same(w, got)), $"{fp.Id}: no room {got.Name} in the map where {got.Position} is");
+                wings++;
+            }
             kinds[kind] = kinds.GetValueOrDefault(kind) + 1;
             Assert.Equal(last - first, made.Count);
             bool whole = true, shellSame = true;
@@ -312,6 +336,7 @@ public class WorldBuildingsTests : IDisposable
                 ties.Add($"{d.GetProperty("name").GetString()} ({fp.Id})");
             }
         }
+        _o.WriteLine($"{openings} openings between rooms and {wings} rooms of leftover pieces where the map has them");
         _o.WriteLine($"{compared} buildings at medium detail ({string.Join(", ", kinds.OrderByDescending(k => k.Value).Select(k => $"{k.Key} {k.Value}"))}), "
                      + $"{entities} entities; {same} buildings the same in every part, {matched} entities within 1 cm and the same turn (worst "
                      + $"{worstXz * 1000:F2} mm across, {worstY * 1000:F2} mm in height, {worstSize * 1000:F2} mm in size, turn 1 - |dot| {worstTurn:E1}); "
@@ -449,13 +474,21 @@ public class WorldBuildingsTests : IDisposable
         Assert.NotEmpty(across);
         Assert.Contains(a.Entities, x => x.Layer == "structure" && x.Name!.EndsWith(" floor") && x.Position.X + Extent(x).X / 2 > 250);
         // Rooms: indoors, made of what is round them; the door opens from one in its own tile.
-        foreach (var (tile, door) in all.Where(x => x.E.RegionAId != null))
+        foreach (var (tile, door) in all.Where(x => x.E.RegionAId != null && x.E.PrefabId != "portal"))
         {
             var room = (tile == A ? a : b).Entities.Single(x => x.EntityId == door.RegionAId);
             Assert.Equal("acoustic_region", room.PrefabId);
             Assert.Equal(-1, door.RegionBId);
             Assert.True(room.IsIndoor);
             Assert.Equal(6, room.RoomMaterials!.Length);
+        }
+        // An opening between two rooms of a building joins two rooms of its own tile, written after every building.
+        foreach (var (tile, opening) in all.Where(x => x.E.PrefabId == "portal"))
+        {
+            var mine = (tile == A ? a : b).Entities;
+            foreach (int id in new[] { opening.RegionAId!.Value, opening.RegionBId!.Value })
+                Assert.Equal("acoustic_region", mine.Single(x => x.EntityId == id).PrefabId);
+            Assert.True(opening.EntityId > mine.Where(x => x.PrefabId != "portal" && x.EntityId > 0).Max(x => x.EntityId));
         }
         Assert.Contains("made-up buildings", a.Buildings);
         Assert.Contains("Microsoft ML Buildings, ODbL-1.0", b.Buildings);

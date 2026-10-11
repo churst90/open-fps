@@ -38,15 +38,21 @@ public sealed class RoomCells
         var flooded = new HashSet<int>();
         var linings = new Dictionary<int, RoomFlood.Lining>();
         Vector3 origin = Vector3.Zero;
+        var edges = new List<Span>();
         foreach (var (id, room) in rooms)
         {
             if (room.Unseeded || room.AirCount == 0) continue;
             flooded.Add(id);
             if (room.Lining != null) linings[id] = room.Lining;
             origin = room.Origin;
-            foreach (var r in room.AirRuns.Concat(room.EdgeRuns)) spans.Add(new Span(RowOf(r.Y, r.Z), r.X, r.X + r.Length - 1, id));
+            foreach (var r in room.AirRuns) spans.Add(new Span(RowOf(r.Y, r.Z), r.X, r.X + r.Length - 1, id));
+            foreach (var r in room.EdgeRuns) edges.Add(new Span(RowOf(r.Y, r.Z), r.X, r.X + r.Length - 1, id));
         }
-        spans.Sort((a, b) => a.Row != b.Row ? a.Row.CompareTo(b.Row) : a.X0.CompareTo(b.X0));
+        // Rooms flooded apart can both hold a wall's or an opening's cells between them: the air's first, then the
+        // lower id, so whoever floods with whatever else, a cell is one room's.
+        var seedOf = new Dictionary<int, Vector3>();
+        foreach (var (id, room) in rooms) seedOf[id] = room.Seed;
+        spans = Disjoint(spans, edges, seedOf, origin);
         // A room's air and its wall cells side by side in a row are one span.
         var merged = new List<Span>(spans.Count);
         foreach (var s in spans)
@@ -56,6 +62,51 @@ public sealed class RoomCells
             else merged.Add(s);
         }
         return new RoomCells(merged.ToArray(), flooded, linings, origin);
+    }
+
+    /// <summary>The air spans as they are (no two rooms' air is the same cell), and the wall spans cut to what the air
+    /// does not hold, a cell two rooms' walls both hold going to the room whose seed is nearer (then the lower id), as
+    /// a flood of the two together would give it to the first to reach it. Sorted by row and x.</summary>
+    private static List<Span> Disjoint(List<Span> air, List<Span> edges, IReadOnlyDictionary<int, Vector3> seedOf, Vector3 origin)
+    {
+        int Order(Span a, Span b) => a.Row != b.Row ? a.Row.CompareTo(b.Row) : a.X0 != b.X0 ? a.X0.CompareTo(b.X0) : a.Room.CompareTo(b.Room);
+        air.Sort(Order);
+        var airByRow = new Dictionary<long, List<(int X0, int X1)>>();
+        foreach (var a in air) { if (!airByRow.TryGetValue(a.Row, out var l)) airByRow[a.Row] = l = new(); l.Add((a.X0, a.X1)); }
+        var result = new List<Span>(air);
+        foreach (var row in edges.GroupBy(e => e.Row))
+        {
+            long r = row.Key;
+            int y = (int)(uint)(r & 0xFFFFFFFF), z = (int)(r >> 32);
+            var list = row.ToList();
+            // The row cut at every span's ends; each piece is held by the spans over it.
+            var cuts = new SortedSet<int>();
+            foreach (var e in list) { cuts.Add(e.X0); cuts.Add(e.X1 + 1); }
+            if (airByRow.TryGetValue(r, out var al)) foreach (var (a0, a1) in al) { cuts.Add(a0); cuts.Add(a1 + 1); }
+            var bounds = cuts.ToArray();
+            for (int b = 0; b + 1 < bounds.Length; b++)
+            {
+                int x0 = bounds[b], x1 = bounds[b + 1] - 1;
+                if (al != null && al.Any(a => a.X0 <= x0 && a.X1 >= x1)) continue;
+                var over = list.Where(e => e.X0 <= x0 && e.X1 >= x1).Select(e => e.Room).Distinct().OrderBy(id => id).ToList();
+                if (over.Count == 0) continue;
+                if (over.Count == 1) { result.Add(new Span(r, x0, x1, over[0])); continue; }
+                for (int x = x0; x <= x1; x++)
+                {
+                    var c = RoomFlood.CentreOf(x, y, z, origin);
+                    int best = over[0];
+                    float bd = Vector3.DistanceSquared(c, seedOf.GetValueOrDefault(best));
+                    foreach (int id in over.Skip(1))
+                    {
+                        float d = Vector3.DistanceSquared(c, seedOf.GetValueOrDefault(id));
+                        if (d < bd) { bd = d; best = id; }
+                    }
+                    result.Add(new Span(r, x, x, best));
+                }
+            }
+        }
+        result.Sort(Order);
+        return result;
     }
 
     /// <summary>Every span: its room, its row's y and z, and its first and last x, in cells from the origin.</summary>
