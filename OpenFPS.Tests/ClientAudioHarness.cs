@@ -128,8 +128,8 @@ internal sealed class ClientAudioHarness
     }
 
     /// <summary>The id a voice plays under: <paramref name="kind"/> of <paramref name="owner"/>, the
-    /// <paramref name="part"/>th (VoiceRegistry.IdFor).</summary>
-    public int Voice(VoiceKind kind, int owner, int part = 0) => Audio.Voices.IdFor(kind, owner, part);
+    /// <paramref name="part"/>th, kept for it for the test (VoiceRegistry.Hold).</summary>
+    public int Voice(VoiceKind kind, int owner, int part = 0) => Audio.Voices.Hold(kind, owner, part);
     /// <summary>The id a car's borrowed voice plays under.</summary>
     public int DistantVoice(int carId) => Voice(VoiceKind.Borrowed, carId);
     /// <summary>The id a car's horn plays under.</summary>

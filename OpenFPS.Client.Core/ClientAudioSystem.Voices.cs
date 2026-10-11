@@ -15,7 +15,12 @@ namespace OpenFPS.Client.Core;
 /// </summary>
 public partial class ClientAudioSystem
 {
-    private readonly VoiceRegistry _voices = new();
+    /// <summary>Every voice and the ids they are under; a question's id kept as long as the worker keeps a
+    /// source nobody asks about.</summary>
+    private readonly VoiceRegistry _voices = new()
+    {
+        ProbeHoldFrames = (int)Math.Ceiling(AsyncAcousticWorker.SaSourceTtlMs / 1000.0 * UpdateHz),
+    };
 
     /// <summary>The voices of moving things, for a test.</summary>
     internal VoiceRegistry Voices => _voices;

@@ -6,7 +6,8 @@ namespace OpenFPS.Tests;
 /// <summary>
 /// Your own footsteps against a street full of other people's. Reported 2026-09-27, with 310 people
 /// on the city: "I'm not hearing my own footsteps when I walk outside". Everybody's steps shared one
-/// pool of twelve voice ids, taken in turn, and a submission under an id replaces the one waiting.
+/// pool of twelve voice ids, taken in turn, and a submission under an id replaces the one waiting; yours are
+/// counted apart from theirs now.
 /// </summary>
 public class FootstepPoolTests
 {
@@ -23,7 +24,7 @@ public class FootstepPoolTests
             h.Audio.OnPlayerFootstep(new Vector3(3f + i * 0.1f, 0f, 2f), "Concrete", "0");
         h.Tick(3);
 
-        var own = h.Mixer.Started.Where(e => e.EntityId <= -100 && e.EntityId > -100 - 12).ToList();
+        var own = h.Mixer.StartedAs(VoiceKind.OwnStep).ToList();
         Assert.NotEmpty(own);
         Assert.All(own, e => Assert.True(e.FollowsListener, "a stranger's step in your own feet's slot"));
     }

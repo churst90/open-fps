@@ -164,13 +164,12 @@ public sealed class WorldAudioPlayer
     public OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker? Worker { get; set; }
 
     /// <summary>
-    /// The id the simulator files its answer for a sounding entity under (a talker, a one-shot's
-    /// source): a question to the worker, never a voice, in a band below every voice band (the horns'
-    /// -1,200,000 is the lowest). The per-frame pass asks only about things in the world, so without this a
-    /// one-shot from a quiet place lived on the hand-rolled tracer (<see cref="AsyncAcousticWorker.TryGetNearby"/>).
+    /// The id the simulator files its answer for a sounding entity under (a talker, a one-shot's source): a
+    /// question to the worker, never a voice, given by the registry (VoiceRegistry.ProbeFor). The per-frame
+    /// pass asks only about things in the world, so without this a one-shot from a quiet place lived on the
+    /// hand-rolled tracer (<see cref="AsyncAcousticWorker.TryGetNearby"/>).
     /// </summary>
-    internal const int SourceProbeBase = -3_000_000;
-    internal static int SourceProbeId(int entityId) => SourceProbeBase - entityId;
+    internal int SourceProbeId(int entityId) => Voices.ProbeFor(entityId);
 
     /// <summary>Asks the simulator about a sounding entity, at the point the sound leaves it.</summary>
     private void AskAbout(int entityId, Vector3 listener, Vector3 at)

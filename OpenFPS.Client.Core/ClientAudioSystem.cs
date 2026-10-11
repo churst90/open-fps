@@ -3043,7 +3043,7 @@ public partial class ClientAudioSystem
 
             // Asked under its own probe, as a one-off's source is: under the player's id it shared one answer with
             // anything else of theirs asked about at their feet (S13). Their own body is left out of the rays.
-            int probe = WorldAudioPlayer.SourceProbeId(id);
+            int probe = _voices.ProbeFor(id);
             _acousticWorker.EnqueueRequest(new AcousticRequest
             {
                 EntityId = probe, ListenerPos = eyePos, SourcePos = mouth, SourceRadius = 0.15f, LeaveOut = id,

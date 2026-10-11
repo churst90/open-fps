@@ -1088,7 +1088,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
             int before = h.Mixer.Started.Count;
             h.Audio.OnOwnFootstep(new Vector3(0f, 0f, 0.2f), "Concrete", "0", slope);
             h.Tick(3);
-            var step = h.Mixer.Started.Skip(before).First(e => e.FollowsListener && e.EntityId <= -100 && e.EntityId > -200);
+            var step = h.Mixer.StartedAs(VoiceKind.OwnStep, before).First(e => e.FollowsListener);
             pitch = step.Pitch;
             // The take has played out: its voice is free for the next step to start again.
             h.Mixer.Live.Clear();
