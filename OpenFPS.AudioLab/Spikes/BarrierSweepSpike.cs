@@ -7,7 +7,7 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor] [panels]
+/// --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor] [panels|buried]
 ///
 /// How the barrier model's ways round one thing and through another (OpeningRoutes.BarrierGains) change
 /// what is heard behind walls on a real map: pairs of points in the map's places (an ear 1.6 m over a
@@ -19,7 +19,8 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// stands in for it in the game's direct path. outdoor takes ears indoors only and sources out of doors, 10 m to
 /// range off, 0.5 m over the ground (the street heard inside). pair=x,y,z;x,y,z spells one ear and source out.
 /// panels compares against every solid charged as one panel whatever way the line goes through it (before
-/// 2026-10-11, Constructions.PanelsOnlyForLab) instead of against the clear ways round only.
+/// 2026-10-11, Constructions.PanelsOnlyForLab) instead of against the clear ways round only; buried against the
+/// burial of an edge as it was before the rules of 2026-10-11 (OpeningRoutes.OldBurialForLab).
 /// server=DIR reads the maps and prefabs under DIR in place of the checkout's OpenFPS.Server (a map before a change);
 /// dump=FILE writes every pair, tab-separated, so two runs with one seed can be set side by side. Game coordinates (y up).
 /// </summary>
@@ -38,9 +39,13 @@ public static class BarrierSweepSpike
         // panels: before is every solid one panel whatever way the line goes through it (Constructions,
         // "A solid gone into by its edge"), not the barrier model's clear ways round only.
         bool panels = args.Contains("panels");
+        // buried: before is every other box burying an edge, the terrain none, and no way round an edge
+        // buried in another box (OpeningRoutes.OldBurialForLab).
+        bool buried = args.Contains("buried");
         void Before(bool on)
         {
             if (panels) Constructions.PanelsOnlyForLab = on;
+            else if (buried) OpeningRoutes.OldBurialForLab = on;
             else OpeningRoutes.OnlyClearWaysRoundForLab = on;
         }
 

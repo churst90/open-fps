@@ -31,7 +31,7 @@ public static class OpeningGraph
 
     /// <summary>
     /// The graph for the scene the acoustic triangle store holds (docs/GEOMETRY.md stage 1): the same
-    /// openings and places as <see cref="Build(WorldSnapshot, IReadOnlyList{SteamAudioScene.Box}, Func{Vector3, int}?)"/>,
+    /// openings and places as <see cref="Build(WorldSnapshot, IReadOnlyList{SteamAudioScene.Box}, Func{Vector3, int}?, IReadOnlyList{OpenFPS.Common.Geometry.SolidSpec}?)"/>,
     /// the boxes asked of the store's tiles, and whatever did not change since the last build kept in
     /// <paramref name="cache"/>.
     /// </summary>
@@ -40,8 +40,10 @@ public static class OpeningGraph
         => OpeningRoutes.Build(scene, world.AcousticMap, Declared(world, LeavesOf(world)), regionAt, cache);
 
     /// <summary>The graph for a scene built from <paramref name="boxes"/> (as <see cref="SteamAudioScene.BoxesFromWorld"/>
-    /// makes them, so the leaves stand where the scene has them), with the world's places and openings.</summary>
-    public static OpeningRoutes Build(WorldSnapshot world, IReadOnlyList<SteamAudioScene.Box> boxes, Func<Vector3, int>? regionAt)
+    /// makes them, so the leaves stand where the scene has them), with the world's places and openings, and
+    /// its tiles of ground (<paramref name="terrains"/>, WorldSnapshot.TerrainSolids), which are no box.</summary>
+    public static OpeningRoutes Build(WorldSnapshot world, IReadOnlyList<SteamAudioScene.Box> boxes, Func<Vector3, int>? regionAt,
+                                      IReadOnlyList<OpenFPS.Common.Geometry.SolidSpec>? terrains)
     {
         var leaves = LeavesOf(world);
 
@@ -50,7 +52,7 @@ public static class OpeningGraph
             solids.Add(new OpeningRoutes.Solid(b.Center, b.Size, b.Rotation, b.Material, b.Build,
                                                b.EntityId != 0 && leaves.Contains(b.EntityId)));
 
-        return OpeningRoutes.Build(solids, world.AcousticMap, Declared(world, leaves), regionAt);
+        return OpeningRoutes.Build(solids, world.AcousticMap, Declared(world, leaves), regionAt, terrains);
     }
 
     private static IEnumerable<OpeningRoutes.Declared> Declared(WorldSnapshot world, HashSet<int> leaves)

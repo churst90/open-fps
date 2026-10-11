@@ -4,6 +4,26 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- When an edge is buried (docs/GEOMETRY.md 12.6, "When an edge is buried"), unheard. The barrier search
+  went round no edge within 5 cm of another box. Three rules now, for every asker of the barrier search:
+  - A layer of the same construction that ends with the edge does not bury it. A 2 cm finish cut to its
+    slab's outline buried every edge of the floor, so the way went under the slab into the earth: 1303
+    Tamarack Court Southwest from the street below was -29/-58/-94 dB; now -100.
+  - The ground buries every edge at or under its surface. No way round a box bends in the earth: not under a
+    slab, a barn or a wall standing on the ground (17902 Country Fields from outside past the barn, -29 to
+    -90 dB in the low band).
+  - An edge buried in another box is gone round through that box, paid once, by a face of it open to the
+    air: the brick front just over a floor slab's edge radiates into the room, so Marlow Tower's floor 1
+    stairwell hears Dock Street through it (-57/-78/-100 to -45/-67/-93 for the 4 m of road where the line
+    goes into the slab's edge, within Maekawa's grazing loss of the brick beside it). A way that could only go
+    into a box by a face lying on what it goes round pays the run, or is no way.
+  On the three maps 6 to 8 % of blocked pairs between places are louder in the low band (median 11 to 13 dB),
+  most a line that went into a slab or a wall by its edge now heard through the front or the wall beside it;
+  the street heard inside, 7 to 19 %. Quieter: 0 to 1.2 %, ways under things through the earth, and 3 city
+  stairwell pairs at -81 to -93 dB. A blocked leg costs 13 to 18 % more. No stream or fingerprint changed;
+  one boundary allowance went down (`SpatialAcoustics` reads the map once, 31 to 29). The lab's
+  `--barrier-sweep` takes `buried` for the old rules.
+
 - A solid gone into by its edge pays what the line runs through of it (docs/GEOMETRY.md 12.6, "A solid gone
   into by its edge"), unheard. Every box a line touched paid its panel figure once, however far the line ran
   inside it, so a car on Dock Street whose line went into the 15 cm edge of Marlow Tower's floor slab and out

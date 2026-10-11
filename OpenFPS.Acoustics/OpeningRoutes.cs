@@ -99,6 +99,8 @@ public sealed class OpeningRoutes
     private readonly Dictionary<int, int> _nodeOf = new();          // region id -> node
     /// <summary>The door leaves standing in an opening (in its <see cref="Opening.Contents"/>), by box.</summary>
     private bool[] _leafInOpening = Array.Empty<bool>();
+    /// <summary>The scene's terrain, which is no box: it buries every edge at or under its surface.</summary>
+    private Ground _ground = Ground.None;
 
     public IReadOnlyList<Opening> Openings => _openings;
     public IReadOnlyList<Solid> Solids => _solids;
@@ -152,10 +154,11 @@ public sealed class OpeningRoutes
     /// <summary>
     /// The graph for one scene: the boxes as they stand (door leaves where they are), the map's places,
     /// and the openings it declares. <paramref name="regionAt"/>, when given, checks that each opening
-    /// really has its two places on its two sides.
+    /// really has its two places on its two sides. <paramref name="terrains"/> are the scene's tiles of
+    /// ground, which are no box.
     /// </summary>
     public static OpeningRoutes Build(IReadOnlyList<Solid> solids, AcousticMap? map, IEnumerable<Declared> declared,
-                                      Func<Vector3, int>? regionAt = null)
+                                      Func<Vector3, int>? regionAt = null, IReadOnlyList<Geometry.SolidSpec>? terrains = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var arr = new Solid[solids.Count];
@@ -164,7 +167,7 @@ public sealed class OpeningRoutes
         double gridMs = clock.Elapsed.TotalMilliseconds;
         var problems = new List<string>();
         var openings = new List<Opening>();
-        var model = new OpeningRoutes(arr, grid, openings, problems);
+        var model = new OpeningRoutes(arr, grid, openings, problems) { _ground = Ground.Of(terrains) };
         double solidsMs = clock.Elapsed.TotalMilliseconds - gridMs;
         model.Fill(map, declared, regionAt, null, clock, gridMs, solidsMs);
         return model;
@@ -245,7 +248,7 @@ public sealed class OpeningRoutes
         double solidsMs = clock.Elapsed.TotalMilliseconds;
 
         var index = new TileIndex(scene, offsets);
-        var model = new OpeningRoutes(solids, frames, gains, index, new List<Opening>(), new List<string>());
+        var model = new OpeningRoutes(solids, frames, gains, index, new List<Opening>(), new List<string>()) { _ground = Ground.Of(scene) };
         var seen = new HashSet<int>();
         int derived = 0, keptCount = 0;
         Opening? Derive(Declared d)
@@ -1337,8 +1340,12 @@ public sealed class OpeningRoutes
     /// the legs cross let through (<see cref="WallTransmission"/>). A ray through a sequence of edges and walls
     /// keeps the product of what each does to it (Funkhouser et al., JASA 115, 2004, p. 747). Never more
     /// than that detour's diffraction times the straight line through every box the way does not go round:
-    /// a wall the way passes through costs it no less than it costs the line.</item>
+    /// a wall the way passes through costs it no less than it costs the line. Round an edge in the air first;
+    /// then round an edge buried in another box, that box paid once (LegsThrough, Passage): what a front
+    /// lets through radiates over its whole face, so the brick just over the edge of a slab built into it is
+    /// heard past that edge, as the field through a panel is diffracted at the panel's edge.</item>
     /// </list>
+    /// No way bends at or under the terrain (<see cref="WaysRound"/>), which is no box.
     /// Without the second, a 3 cm way over a stair's concrete guard whose leg ran on through the brick front
     /// was thrown out, and the guard was charged as a solid wall: a car on Dock Street jumped 22 to 31 dB
     /// as its line came out of the guard's shadow (Marlow Tower, 2026-10-11, --pop-hunt).
@@ -1405,43 +1412,117 @@ public sealed class OpeningRoutes
             tc.Add((Vector3.Dot(hope, hope), d, ps, p, box));
         }
         if (tc.Count > 1) tc.Sort((x, y) => y.Hope.CompareTo(x.Hope));
+        Vector3 bestEdge = edge;
+        bool any = found;
+        var burial = scratch.Burials;
+        burial.Clear();
+        for (int k = 0; k < tc.Count; k++) burial.Add(Burial.Unknown);
+        Burial BurialOf(int k)
+        {
+            if (burial[k] == Burial.Unknown)
+            {
+                var (_, _, ps, p, box) = tc[k];
+                burial[k] = EdgeBurial(p, ps, box, ignoreA, ignoreB, null, null);
+            }
+            return burial[k];
+        }
+
+        // One way round each box: the first, most promising, whose edge is in the air, or on its own
+        // construction's edge (Buried). A box whose first few are all buried is a wall's.
         var perBox = scratch.PerBox;
         perBox.Clear();
         int tried = 0;
         scratch.ChainBudget = ThroughBendsPerSearch;
-        foreach (var (_, d, ps, p, box) in tc)
+        for (int k = 0; k < tc.Count; k++)
         {
-            // One way round each box: the first, most promising, whose edge is in the air. An edge buried in
-            // something else (a guard's foot in the floor it stands on) is no edge to go round: its legs would
-            // start inside the floor and pay it whole. A box whose first few are all buried is a wall's.
+            int box = tc[k].Box;
             int looked = perBox.TryGetValue(box, out int had) ? had : 0;
             if (looked < 0 || looked >= BuriedLooksPerBox) continue;
             perBox[box] = looked + 1;
-            if (Buried(p, box, ignoreA, ignoreB) || (ps != p && Buried(ps, box, ignoreA, ignoreB))) continue;
+            if (BurialOf(k) != Burial.Air) continue;
             perBox[box] = -1;
             if (++tried > MaxThroughTried) break;
+            TryWay(k, buried: false);
+        }
+
+        // Then round an edge buried in another box, the most promising of each box that comes before any
+        // way of it in the air: the slab's edge in the brick of the front it is built into. Its legs pay
+        // that box once. A search of its own, so it only ever adds to the ways in the air.
+        if (!OldBurialForLab)
+        {
+            perBox.Clear();
+            tried = 0;
+            // Their legs go straight: a third of the cost, and 6 pairs in 4,000 on the city up to 10 dB under
+            // what bending them round what stands by the bend gives.
+            scratch.ChainBudget = 0;
+            for (int k = 0; k < tc.Count; k++)
+            {
+                int box = tc[k].Box;
+                int looked = perBox.TryGetValue(box, out int had) ? had : 0;
+                if (looked < 0 || looked >= BuriedLooksPerBox) continue;
+                perBox[box] = looked + 1;
+                // A box's ways come most promising first: once one cannot beat what was found, none after it can.
+                var most = Round(MathF.Max(tc[k].D, GrazingMetres), dist, speedOfSound);
+                if (most.X <= best.X && most.Y <= best.Y && most.Z <= best.Z) { perBox[box] = -1; continue; }
+                var kind = BurialOf(k);
+                if (kind == Burial.Air) { perBox[box] = -1; continue; }
+                perBox[box] = -1;
+                if (tried >= MaxThroughTried) break;
+                if (TryWay(k, buried: true)) tried++;
+            }
+        }
+        edge = bestEdge;
+        found = any;
+        return best;
+
+        // The way tc[k], round its box, its legs paid (LegsThrough), competing per band with what was found.
+        // Whether its legs were traced.
+        bool TryWay(int k, bool buried)
+        {
+            var (_, d, ps, p, box) = tc[k];
             float dd = MathF.Max(d, GrazingMetres);
             var round = Round(dd, dist, speedOfSound);
-            if (round.X <= best.X && round.Y <= best.Y && round.Z <= best.Z) continue;
+            if (round.X <= best.X && round.Y <= best.Y && round.Z <= best.Z) return false;
+            // What the edge is buried in, and the layers of its own construction that end with it there.
+            var inBoxes = scratch.EdgeBoxes;
+            var ownLayers = scratch.EdgeLayers;
+            inBoxes.Clear(); ownLayers.Clear();
+            EdgeBurial(p, ps, box, ignoreA, ignoreB, inBoxes, ownLayers);
+            if (buried)
+            {
+                // Its legs pay at least the panels of what the edge is buried in: no better than found, not traced.
+                var bound = round;
+                foreach (int b in inBoxes) bound *= _solidGains[b];
+                if (bound.X <= best.X && bound.Y <= best.Y && bound.Z <= best.Z) return false;
+            }
             paid.Clear();
-            var legs = LegsThrough(source, ps, p, listener, box, dd, dist, speedOfSound, ignoreA, ignoreB, out float extra);
+            var legs = LegsThrough(source, ps, p, listener, box, dd, dist, speedOfSound, ignoreA, ignoreB,
+                                   buried ? inBoxes : null, out float extra, out bool blocked);
+            if (blocked)
+            {
+                explain?.Append($"        round box {box} {_solids[box].Material}: its edge buried in {string.Join(", ", inBoxes.Select(b => $"{b} {_solids[b].Material}"))}, "
+                              + "which the sound could reach there only through the box itself: no way\n");
+                return false;
+            }
             var detour = Round(dd + extra, dist, speedOfSound);
             // Every box on the line the way does not go round, it passes through: never paying less for
             // them than the line does.
             var line_ = LineThrough(line, -1, paid, dir);
             var g = detour * Vector3.Min(legs, line_);
             best = Vector3.Max(best, g);
-            found = true;
+            any = true;
             float energy = Vector3.Dot(g, g);
-            if (energy > bestEnergy) { bestEnergy = energy; edge = p; }
+            if (energy > bestEnergy) { bestEnergy = energy; bestEdge = p; }
             if (explain != null)
             {
                 explain.Append($"        round box {box} {_solids[box].Material} ({_solids[box].Center.X:F1}, {_solids[box].Center.Y:F2}, {_solids[box].Center.Z:F1}) "
                              + $"size ({_solids[box].Size.X:F2}, {_solids[box].Size.Y:F2}, {_solids[box].Size.Z:F2}) {d:F3} m, {dd + extra:F3} m in all ({Db3(detour)}); "
+                             + (ownLayers.Count > 0 ? $"its construction's {string.Join(", ", ownLayers.Select(b => $"{b} {_solids[b].Material}"))} ending with it; " : "")
+                             + (buried ? $"its edge buried in {string.Join(", ", inBoxes.Select(b => $"{b} {_solids[b].Material}"))}, paid once; " : "")
                              + $"its legs pay {string.Join(", ", paid.Select(b => $"{b} {_solids[b].Material}"))} ({Db3(legs)}), the line those of them it crosses {Db3(line_)}: {Db3(g)}\n");
             }
+            return true;
         }
-        return best;
     }
 
     /// <summary>What the straight line keeps through the boxes it crosses: all but <paramref name="except"/>,
@@ -1455,21 +1536,109 @@ public sealed class OpeningRoutes
         return Constructions.Through(without, dir);
     }
 
-    /// <summary>Whether a point is inside a box other than <paramref name="owner"/>, every box grown by the joint.</summary>
-    private bool Buried(Vector3 p, int owner, int[]? ignoreA, int[]? ignoreB)
+    /// <summary>What an edge is buried in: nothing but its own construction (in the air), or another box.</summary>
+    private enum Burial : byte { Unknown, Air, Boxes }
+
+    /// <summary>A way's bends (<paramref name="p"/>, and <paramref name="ps"/> where it crosses a face) on the
+    /// edges of box <paramref name="owner"/>: buried in the boxes added to <paramref name="boxes"/>, and on
+    /// the edge of the layers of its own construction added to <paramref name="layers"/> (<see cref="Buried"/>).</summary>
+    private Burial EdgeBurial(Vector3 p, Vector3 ps, int owner, int[]? ignoreA, int[]? ignoreB, List<int>? boxes, List<int>? layers)
+    {
+        bool inBox = Buried(p, owner, ignoreA, ignoreB, boxes, layers);
+        if (ps != p && (boxes != null || !inBox)) inBox |= Buried(ps, owner, ignoreA, ignoreB, boxes, layers);
+        return inBox ? Burial.Boxes : Burial.Air;
+    }
+
+    /// <summary>
+    /// Whether a point on an edge of box <paramref name="owner"/> is buried in another box, every box grown
+    /// by the joint: a guard's foot in the floor it stands on, a slab's edge in the brick of the front built
+    /// on it. A layer of the owner's own construction (sheets in contact, <see cref="LayeredFaces.InContact"/>)
+    /// whose own edge runs there too does not bury it: the two end together, and the point is on the edge of
+    /// the construction, in the air. A 2 cm finish laid on a slab to its outline buried every top edge of the
+    /// slab, and the slab every edge of the finish, so no way went round the floor's edge but under the
+    /// slab, into the earth. Such a layer is added to <paramref name="layers"/> (for the lab), every box that
+    /// buries the point to <paramref name="boxes"/>. Before 2026-10-11 (<see cref="OldBurialForLab"/>) any
+    /// other box buried it.
+    /// </summary>
+    private bool Buried(Vector3 p, int owner, int[]? ignoreA, int[]? ignoreB, List<int>? boxes, List<int>? layers)
     {
         var cand = Scratch.Get(this).Clear;
         var e = new Vector3(RouteJointMetres);
         _grid.Along(p - e, p + e, cand);
+        bool buried = false;
         foreach (int i in cand)
         {
             if (i == owner) continue;
             if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
             if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
             ref readonly var s = ref _solids[i];
-            if (GeometryUtils.IsPointInOBB(p, s.Center, s.Size + new Vector3(2f * RouteJointMetres), s.Rotation)) return true;
+            if (!GeometryUtils.IsPointInOBB(p, s.Center, s.Size + new Vector3(2f * RouteJointMetres), s.Rotation)) continue;
+            if (!OldBurialForLab && EndsWith(i, owner, p))
+            {
+                if (layers != null && !layers.Contains(i)) layers.Add(i);
+                continue;
+            }
+            buried = true;
+            if (boxes == null) return true;
+            if (!boxes.Contains(i)) boxes.Add(i);
         }
-        return false;
+        return buried;
+    }
+
+    /// <summary>Whether box <paramref name="i"/> is a layer of <paramref name="owner"/>'s construction whose own
+    /// edge runs through <paramref name="p"/> (within the joint of two of its sides): the two end together.</summary>
+    private bool EndsWith(int i, int owner, Vector3 p)
+    {
+        ref readonly var s = ref _solids[i];
+        ref readonly var o = ref _solids[owner];
+        if (s.IsLeaf || o.IsLeaf) return false;
+        if (!LayeredFaces.InContact(o.Center, o.Size, o.Rotation, s.Center, s.Size, s.Rotation)) return false;
+        var f = _frames[i];
+        var local = Vector3.Abs(Vector3.Transform(p - f.Centre, f.Inverse));
+        var inner = f.Half - new Vector3(RouteJointMetres);
+        int sides = (local.X >= inner.X ? 1 : 0) + (local.Y >= inner.Y ? 1 : 0) + (local.Z >= inner.Z ? 1 : 0);
+        return sides >= 2;
+    }
+
+    /// <summary>
+    /// The barrier model as it was before 2026-10-11, for the lab (--barrier-sweep buried) and the tests: every
+    /// other box within the joint buries an edge, the terrain buries none, and no way goes round an edge
+    /// buried in another box. Per thread. Never set in the game.
+    /// </summary>
+    [ThreadStatic] public static bool OldBurialForLab;
+
+    /// <summary>Whether a point is at or under the terrain's surface (within the joint): the ground is no box,
+    /// and an edge there is in the earth, not the air (Buried, WaysRound).</summary>
+    private bool InGround(Vector3 p) => !OldBurialForLab && _ground.Buries(p, RouteJointMetres);
+
+    /// <summary>
+    /// Every way round box <paramref name="i"/>, grown by <paramref name="grow"/> on every side, from
+    /// <paramref name="a"/> to <paramref name="b"/> (Diffraction.PathDifferenceAroundBox), into
+    /// <paramref name="ways"/>, less those that bend at or under the terrain (<see cref="InGround"/>), and the
+    /// shortest left's path difference and the crossing its last leg leaves from. False when none is left.
+    /// One rule for every search: a slab's underside graded into a hill, a wall's foot on the ground.
+    /// </summary>
+    private bool WaysRound(int i, Vector3 a, Vector3 b, List<(float D, Vector3 SourceSide, Vector3 Edge)> ways,
+                           out float shortest, out Vector3 last, float grow = 0f)
+    {
+        ref readonly var s = ref _solids[i];
+        ways.Clear();
+        if (!Diffraction.PathDifferenceAroundBox(s.Center, s.Size + new Vector3(2f * grow), s.Rotation, a, b,
+                                                 out shortest, out last, ways)) return false;
+        if (_ground.IsEmpty || OldBurialForLab) return true;
+        int kept = 0;
+        float best = float.MaxValue;
+        for (int k = 0; k < ways.Count; k++)
+        {
+            var w = ways[k];
+            if (InGround(w.Edge) || (w.SourceSide != w.Edge && InGround(w.SourceSide))) continue;
+            ways[kept++] = w;
+            if (w.D < best) { best = w.D; last = w.Edge; }
+        }
+        ways.RemoveRange(kept, ways.Count - kept);
+        if (kept == 0) return false;
+        shortest = best;
+        return true;
     }
 
     private static string Db3(Vector3 g) => $"{DbOf(g.X):F0}/{DbOf(g.Y):F0}/{DbOf(g.Z):F0}";
@@ -1486,19 +1655,135 @@ public sealed class OpeningRoutes
     /// What the legs of a way round box <paramref name="skip"/> pass through, per band, and how much further
     /// they bend (<paramref name="extra"/>, metres): from the bend to the ear, across the box, and from the
     /// bend back to the source (<see cref="PaidLeg"/>). Each leg starts at the bend, so what stands against
-    /// the edge (a stair's guard in two pieces) is gone round and what stands further off is paid.
+    /// the edge (a stair's guard in two pieces) is gone round and what stands further off is paid. Each box
+    /// the bend is buried in (<paramref name="buriedIn"/>) is paid once, by the leg that runs furthest inside
+    /// it, and never bent round: it is what the way goes through. One no leg touches (the edge within the
+    /// joint of it) is paid as its panel all the same: going round the edge goes through it.
     /// </summary>
     private Vector3 LegsThrough(Vector3 source, Vector3 sourceSide, Vector3 edge, Vector3 listener, int skip, float d,
-                                float dist, float speedOfSound, int[]? ignoreA, int[]? ignoreB, out float extra)
+                                float dist, float speedOfSound, int[]? ignoreA, int[]? ignoreB,
+                                List<int>? buriedIn, out float extra, out bool blocked)
     {
-        float x3 = PaidLeg(edge, listener, skip, -1, MaxChainedBoxes, d, dist, speedOfSound, ignoreA, ignoreB, out var t3);
+        var scratch = Scratch.Get(this);
+        var notOn = scratch.NotOnLeg;
+        for (int l = 0; l < 3; l++) notOn[l].Clear();
+        var through = buriedIn is { Count: > 0 } ? buriedIn : null;
+        var alone = Vector3.One;
+        extra = 0f;
+        blocked = false;
+        if (through != null)
+        {
+            foreach (int box in through)
+            {
+                // Legs 0 (bend to ear), 1 (across the box) and 2 (back to the source): the one deepest in it.
+                float c0 = Inside(box, edge, listener), c1 = sourceSide != edge ? Inside(box, edge, sourceSide) : -1f, c2 = Inside(box, sourceSide, source);
+                int payer = c0 >= c1 && c0 >= c2 ? 0 : c1 >= c2 ? 1 : 2;
+                for (int l = 0; l < 3; l++) if (l != payer) notOn[l].Add(box);
+                // Where the paying leg leaves its bend into the box, which way the sound comes from or goes
+                // on to in the air there, and so which face of the box it passes (Passage).
+                if (payer == 1) continue;
+                Vector3 at = payer == 0 ? edge : sourceSide;
+                Vector3 air = payer == 0 ? (sourceSide != edge ? sourceSide : source) : (sourceSide != edge ? edge : listener);
+                if (Vector3.DistanceSquared(air, at) < 1e-10f) continue;
+                switch (Passage(box, skip, at, Vector3.Normalize(air - at)))
+                {
+                    case PassageKind.ThroughOwner:
+                        blocked = true;
+                        return Vector3.Zero;
+                    case PassageKind.ByEdge:
+                        // Gone into the box by its edge: what the leg runs through of it, never less than its panel.
+                        float run = payer == 0 ? c0 : c2;
+                        ref readonly var s = ref _solids[box];
+                        WallTransmission.Faces(s.Size, out float thickness, out _, out _);
+                        if (run <= thickness) break;
+                        var c = Constructions.Of(0f, run, AcousticRegistry.GetProperties(s.Material), s.Size, s.Build, 1, Vector3.Zero, _solidGains[box], run);
+                        notOn[payer].Add(box);
+                        alone *= Vector3.Min(c.Gains, _solidGains[box]);
+                        scratch.Paid.Add(box);
+                        break;
+                }
+            }
+        }
+        float x3 = PaidLeg(edge, listener, skip, -1, MaxChainedBoxes, d, dist, speedOfSound, ignoreA, ignoreB, notOn[0], through, out var t3);
         float x2 = 0f;
         var t2 = Vector3.One;
-        if (sourceSide != edge) x2 = PaidLeg(edge, sourceSide, skip, skip, MaxChainedBoxes, d + x3, dist, speedOfSound, ignoreA, ignoreB, out t2);
-        float x1 = PaidLeg(sourceSide, source, skip, -1, MaxChainedBoxes, d + x3 + x2, dist, speedOfSound, ignoreA, ignoreB, out var t1);
+        if (sourceSide != edge) x2 = PaidLeg(edge, sourceSide, skip, skip, MaxChainedBoxes, d + x3, dist, speedOfSound, ignoreA, ignoreB, notOn[1], through, out t2);
+        float x1 = PaidLeg(sourceSide, source, skip, -1, MaxChainedBoxes, d + x3 + x2, dist, speedOfSound, ignoreA, ignoreB, notOn[2], through, out var t1);
         extra = x1 + x2 + x3;
-        return t1 * t2 * t3;
+        if (through != null)
+            foreach (int box in through)
+                if (!scratch.Paid.Contains(box)) { alone *= _solidGains[box]; scratch.Paid.Add(box); }
+        return t1 * t2 * t3 * alone;
     }
+
+    private enum PassageKind { Undecided, ByFace, ByEdge, ThroughOwner }
+
+    /// <summary>
+    /// Which face of box <paramref name="box"/> the sound passes at a bend <paramref name="at"/> on the edge of
+    /// box <paramref name="owner"/> buried in it, the air it comes from or goes on into lying in direction
+    /// <paramref name="toAir"/>. Sound goes from the air into a solid, or out of it, only by a face open to the
+    /// air: where the bend is at a corner of the box, a face against the owner (a slab's underside on the
+    /// wall it bears on) passes nothing but what the owner lets through, and the way goes round the owner. By
+    /// one of the box's broad faces it crosses the box as a panel (the brick of a front over the edge of the
+    /// slab built into it); by a narrow one it has gone into the box by its edge (the 15 cm edge of a slab
+    /// in a front, from the street) and pays the run (Constructions, "A solid gone into by its edge"); by
+    /// none, only through the owner, it is no way.
+    /// </summary>
+    private PassageKind Passage(int box, int owner, Vector3 at, Vector3 toAir)
+    {
+        ref readonly var s = ref _solids[box];
+        var f = _frames[box];
+        if (!GeometryUtils.IsPointInOBB(at, s.Center, s.Size + new Vector3(2f * RouteJointMetres), s.Rotation)) return PassageKind.Undecided;
+        var la = Vector3.Transform(at - f.Centre, f.Inverse);
+        var q = Vector3.Transform(at + toAir * PassageStepMetres - f.Centre, f.Inverse);
+        // The faces of the box the air beside the bend is outside of.
+        Span<int> faces = stackalloc int[3];
+        int n = 0;
+        for (int k = 0; k < 3; k++)
+        {
+            float v = Comp(q, k), h = Comp(f.Half, k);
+            if (MathF.Abs(v) > h) faces[n++] = v > 0f ? k + 1 : -(k + 1);
+        }
+        if (n == 0) return PassageKind.Undecided;
+        // The bend on the box's surface, and the box's own frame back to the world.
+        var corner = Vector3.Clamp(la, -f.Half, f.Half);
+        var toWorld = Quaternion.Inverse(f.Inverse);
+        ref readonly var o = ref _solids[owner];
+        int thick = Constructions.ThicknessAxis(s.Size);
+        bool byFace = false, byEdge = false;
+        for (int a = 0; a < n; a++)
+        {
+            bool covered = false;
+            // At a corner, a little way along this face from the edge: is the owner against it?
+            for (int b = 0; b < n && !covered; b++)
+            {
+                if (b == a) continue;
+                var r = corner + Normal(faces[a]) * (2f * Constructions.ContactMetres) - Normal(faces[b]) * RouteJointMetres;
+                covered = GeometryUtils.IsPointInOBB(f.Centre + Vector3.Transform(r, toWorld), o.Center,
+                                                     o.Size + new Vector3(2f * Constructions.ContactMetres), o.Rotation);
+            }
+            if (covered) continue;
+            if (Math.Abs(faces[a]) - 1 == thick) byFace = true; else byEdge = true;
+        }
+        return byFace ? PassageKind.ByFace : byEdge ? PassageKind.ByEdge : PassageKind.ThroughOwner;
+
+        static Vector3 Normal(int face)
+        {
+            float sign = face > 0 ? 1f : -1f;
+            int k = Math.Abs(face) - 1;
+            return k == 0 ? new Vector3(sign, 0, 0) : k == 1 ? new Vector3(0, sign, 0) : new Vector3(0, 0, sign);
+        }
+    }
+
+    /// <summary>How far into the air beside a bend the face it passes is judged from, metres.</summary>
+    private const float PassageStepMetres = 0.01f;
+
+    private static float Comp(Vector3 v, int axis) => axis == 0 ? v.X : axis == 1 ? v.Y : v.Z;
+
+    /// <summary>How far the segment runs inside box i, metres (0 for one that only touches it), or -1 if it
+    /// misses it.</summary>
+    private float Inside(int i, Vector3 a, Vector3 b)
+        => SegmentSpan(i, a, b, 0f, out float t0, out float t1) ? (t1 - t0) * Vector3.Distance(a, b) : -1f;
 
     /// <summary>
     /// One straight leg from <paramref name="a"/> to <paramref name="b"/>, the better of paying everything it
@@ -1509,10 +1794,11 @@ public sealed class OpeningRoutes
     /// the leg touches it, faces included, so a leg run along the joint of a wall top and the slab on it pays
     /// both; not grown by the joint, as the clear search's tests are: grown, a leg crossing a front within
     /// 5 cm of where its slab meets its brick paid both, 30 dB more than either. <paramref name="ownerA"/>
-    /// and <paramref name="ownerB"/> are the boxes the ends are on the edge of.
+    /// and <paramref name="ownerB"/> are the boxes the ends are on the edge of; <paramref name="notOn"/> are
+    /// not paid on this leg, and <paramref name="through"/> are never bent round (LegsThrough).
     /// </summary>
     private float PaidLeg(Vector3 a, Vector3 b, int ownerA, int ownerB, int chain, float detour, float dist, float speedOfSound,
-                          int[]? ignoreA, int[]? ignoreB, out Vector3 t)
+                          int[]? ignoreA, int[]? ignoreB, List<int>? notOn, List<int>? through, out Vector3 t)
     {
         t = Vector3.One;
         float len = Vector3.Distance(a, b);
@@ -1532,25 +1818,24 @@ public sealed class OpeningRoutes
             if (i == ownerA || i == ownerB) continue;
             if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
             if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
+            if (notOn != null && notOn.Contains(i)) continue;
             if (!SegmentSpan(i, a, b, 0f, out float t0, out float t1)) continue;
             layers.Add(CrossingOf(i, a, b, t0, t1, len));
             paid.Add(i);
+            if (through != null && through.Contains(i)) continue;
             if (t0 < nearestT) { nearestT = t0; nearest = i; }
         }
-        if (nearest < 0) return 0f;
+        if (layers.Count == 0) return 0f;
         t = Constructions.Through(layers, (b - a) / len);
-        if (chain <= 0 || scratch.ChainBudget <= 0 || _solids[nearest].IsLeaf || nearestT * len > BendReachMetres) return 0f;
+        if (nearest < 0 || chain <= 0 || scratch.ChainBudget <= 0 || _solids[nearest].IsLeaf || nearestT * len > BendReachMetres) return 0f;
 
         // Round the first thing in the way, its own legs paid or bent in turn.
         scratch.ChainBudget--;
         float bestX = 0f;
         var r0 = Round(detour, dist, speedOfSound) * t;
         float bestScore = Vector3.Dot(r0, r0);
-        ref readonly var box = ref _solids[nearest];
         var ways = scratch.Ways[chain];
-        ways.Clear();
-        if (!Diffraction.PathDifferenceAroundBox(box.Center, box.Size + new Vector3(2f * RouteJointMetres), box.Rotation,
-                                                 a, b, out _, out _, ways)) return 0f;
+        if (!WaysRound(nearest, a, b, ways, out _, out _, RouteJointMetres)) return 0f;
         ways.Sort((x, y) => x.D.CompareTo(y.D));
         var kept = scratch.PaidKept[chain];
         kept.Clear();
@@ -1560,11 +1845,11 @@ public sealed class OpeningRoutes
         {
             if (++tried > ChainRoutesPerBox) break;
             paid.RemoveRange(start, paid.Count - start);
-            float x1 = PaidLeg(a, ps, ownerA, nearest, chain - 1, detour + d, dist, speedOfSound, ignoreA, ignoreB, out var t1);
+            float x1 = PaidLeg(a, ps, ownerA, nearest, chain - 1, detour + d, dist, speedOfSound, ignoreA, ignoreB, notOn, through, out var t1);
             float x2 = 0f;
             var t2 = Vector3.One;
-            if (ps != pe) x2 = PaidLeg(ps, pe, nearest, nearest, chain - 1, detour + d + x1, dist, speedOfSound, ignoreA, ignoreB, out t2);
-            float x3 = PaidLeg(pe, b, nearest, ownerB, chain - 1, detour + d + x1 + x2, dist, speedOfSound, ignoreA, ignoreB, out var t3);
+            if (ps != pe) x2 = PaidLeg(ps, pe, nearest, nearest, chain - 1, detour + d + x1, dist, speedOfSound, ignoreA, ignoreB, notOn, through, out t2);
+            float x3 = PaidLeg(pe, b, nearest, ownerB, chain - 1, detour + d + x1 + x2, dist, speedOfSound, ignoreA, ignoreB, notOn, through, out var t3);
             float x = d + x1 + x2 + x3;
             var tt = t1 * t2 * t3;
             var g = Round(detour + x, dist, speedOfSound) * tt;
@@ -1618,10 +1903,7 @@ public sealed class OpeningRoutes
         {
             if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
             if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
-            ref readonly var b = ref _solids[i];
-            boxRoutes.Clear();
-            if (!Diffraction.PathDifferenceAroundBox(b.Center, b.Size, b.Rotation, source, listener,
-                                                     out float dd, out Vector3 p, boxRoutes)) continue;
+            if (!WaysRound(i, source, listener, boxRoutes, out float dd, out Vector3 p)) continue;
             foreach (var (rd, rs, re) in boxRoutes) routes.Add((rd, rs, re, i));
             if (dd <= worst) continue;
             worst = dd; edge = p;
@@ -1918,8 +2200,7 @@ public sealed class OpeningRoutes
         foreach (int i in cand)
         {
             ref readonly var b = ref _solids[i];
-            boxRoutes.Clear();
-            if (!Diffraction.PathDifferenceAroundBox(b.Center, b.Size, b.Rotation, source, listener, out float dd, out _, boxRoutes)) continue;
+            if (!WaysRound(i, source, listener, boxRoutes, out float dd, out _)) continue;
             sb.Append($"        box {i} {b.Material} centre ({b.Center.X:F1}, {b.Center.Y:F2}, {b.Center.Z:F1}) size ({b.Size.X:F2}, {b.Size.Y:F2}, {b.Size.Z:F2}): round it {dd:F3} m\n");
             foreach (var (rd, rs, re) in boxRoutes) routes.Add((rd, rs, re, i));
             worst = MathF.Max(worst, dd);
@@ -2023,12 +2304,9 @@ public sealed class OpeningRoutes
         // was a crack beside a shut glass door at -12 dB.
         if (_solids[hit].IsLeaf) return -1f;
         scratch.ChainBudget--;
-        ref readonly var box = ref _solids[hit];
         // One list per depth: the loop below recurses while it walks this one.
         var ways = scratch.Ways[chain];
-        ways.Clear();
-        if (!Diffraction.PathDifferenceAroundBox(box.Center, box.Size + new Vector3(2f * RouteJointMetres), box.Rotation,
-                                                 a, b, out _, out _, ways)) return -1f;
+        if (!WaysRound(hit, a, b, ways, out _, out _, RouteJointMetres)) return -1f;
         ways.Sort((x, y) => x.D.CompareTo(y.D));
         float best = -1f;
         int tried = 0;
@@ -2124,6 +2402,12 @@ public sealed class OpeningRoutes
         public readonly List<int>[] PaidKept =
             System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, MaxChainedBoxes + 1), _ => new List<int>()));
         public readonly Dictionary<int, int> PerBox = new();
+        /// <summary>What each way round in ThroughCandidates is buried in, worked out when first asked.</summary>
+        public readonly List<Burial> Burials = new();
+        /// <summary>The way being weighed: the boxes its edge is buried in, and its construction's layers ending there.</summary>
+        public readonly List<int> EdgeBoxes = new(), EdgeLayers = new();
+        /// <summary>What each of a way's three legs does not pay (LegsThrough).</summary>
+        public readonly List<int>[] NotOnLeg = { new(), new(), new() };
         public readonly List<(float D, Vector3 SourceSide, Vector3 Edge)> BoxRoutes = new();
         /// <summary>Boxes the current barrier search may still bend a route round (ClearedLeg).</summary>
         public int ChainBudget;
@@ -2184,6 +2468,76 @@ public sealed class OpeningRoutes
     }
 
     internal readonly record struct Frame(Vector3 Centre, Vector3 Half, Quaternion Inverse);
+
+    // ═══ The ground ══════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// The terrain under a point (docs/GEOMETRY.md 2.3), from the scene's tiles of ground: the highest tile
+    /// over it. The terrain is no box, so the searches round boxes see it only here.
+    /// </summary>
+    private sealed class Ground
+    {
+        public static readonly Ground None = new(new List<(Geometry.Heightfield, Vector3)>());
+
+        /// <summary>The cells a tile is filed under, metres.</summary>
+        private const float Cell = 64f;
+        private readonly List<(Geometry.Heightfield Field, Vector3 Corner)> _tiles;
+        private readonly Dictionary<(int, int), List<int>> _cells = new();
+
+        public bool IsEmpty => _tiles.Count == 0;
+
+        private Ground(List<(Geometry.Heightfield Field, Vector3 Corner)> tiles)
+        {
+            _tiles = tiles;
+            for (int t = 0; t < tiles.Count; t++)
+            {
+                var (f, c) = tiles[t];
+                for (int x = Key(c.X); x <= Key(c.X + f.Size); x++)
+                    for (int z = Key(c.Z); z <= Key(c.Z + f.Size); z++)
+                    {
+                        if (!_cells.TryGetValue((x, z), out var list)) _cells[(x, z)] = list = new List<int>(1);
+                        list.Add(t);
+                    }
+            }
+        }
+
+        private static int Key(float v) => (int)MathF.Floor(v / Cell);
+
+        /// <summary>The tiles held as solids (WorldSnapshot.TerrainSolids): heights in the world, post (0, 0) at the corner.</summary>
+        public static Ground Of(IReadOnlyList<Geometry.SolidSpec>? terrains)
+        {
+            if (terrains == null || terrains.Count == 0) return None;
+            var tiles = new List<(Geometry.Heightfield, Vector3)>();
+            foreach (var t in terrains) if (t.Terrain != null) tiles.Add((t.Terrain, t.TerrainCorner));
+            return tiles.Count == 0 ? None : new Ground(tiles);
+        }
+
+        /// <summary>The tiles a triangle store holds, each where its piece is placed.</summary>
+        public static Ground Of(Geometry.TriangleWorld scene)
+        {
+            List<(Geometry.Heightfield, Vector3)>? tiles = null;
+            for (int i = 0; i < scene.InstanceCount; i++)
+            {
+                ref readonly var inst = ref scene.Instance(i);
+                if (inst.Piece.Terrain is not { } field || inst.Rotated) continue;
+                (tiles ??= new()).Add((field, inst.ToWorld(inst.Piece.TerrainOffset)));
+            }
+            return tiles == null ? None : new Ground(tiles);
+        }
+
+        /// <summary>Whether <paramref name="p"/> is at or under the ground's surface, within <paramref name="slack"/>.</summary>
+        public bool Buries(Vector3 p, float slack)
+        {
+            if (_tiles.Count == 0 || !_cells.TryGetValue((Key(p.X), Key(p.Z)), out var list)) return false;
+            foreach (int t in list)
+            {
+                var (f, c) = _tiles[t];
+                float h = f.HeightAt(p.X - c.X, p.Z - c.Z);
+                if (!float.IsNaN(h) && p.Y <= h + c.Y + slack) return true;
+            }
+            return false;
+        }
+    }
 
     /// <summary>
     /// A uniform grid of cubes over the scene, each listing the boxes whose bounds (a hair larger than the

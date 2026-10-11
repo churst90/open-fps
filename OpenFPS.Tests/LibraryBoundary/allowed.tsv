@@ -19,7 +19,7 @@ OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Client.Cor
 OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Client.Core.SpatialService	8
 OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.Components.Transform	2
 OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.EntitySnapshot	5
-OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.WorldSnapshot	31
+OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	OpenFPS.Common.WorldSnapshot	29
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.Components.ColliderComponent	2
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.Components.Transform	2
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	OpenFPS.Common.EntitySnapshot	6

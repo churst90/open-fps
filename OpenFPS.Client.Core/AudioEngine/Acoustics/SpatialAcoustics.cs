@@ -149,16 +149,17 @@ public class SpatialAcoustics
     {
         var shared = _routes;
         if (shared != null) return shared;
-        if (world.AcousticMap == null) return null;
+        var map = world.AcousticMap;
+        if (map == null) return null;
         long doors = DoorPoses(world, listener);
         lock (_localRoutesLock)
         {
             var current = _localRoutes;
-            if (current == null || !ReferenceEquals(_localRoutesMap, world.AcousticMap))
+            if (current == null || !ReferenceEquals(_localRoutesMap, map))
             {
                 current = BuildLocalRoutes(world);
                 _localRoutes = current;
-                _localRoutesMap = world.AcousticMap;
+                _localRoutesMap = map;
                 _localRoutesDoors = doors;
                 _localRoutesVersion = world.GeometryVersion;
                 return current;
@@ -170,7 +171,6 @@ public class SpatialAcoustics
             if (now - _localRoutesStartedAt < DoorRebuildSeconds * 1000) return current;
             _localRoutesStartedAt = now;
             _localRoutesDoors = doors;
-            var map = world.AcousticMap;
             _localRoutesBuild = System.Threading.Tasks.Task.Run(() =>
             {
                 var built = BuildLocalRoutes(world);
@@ -183,7 +183,7 @@ public class SpatialAcoustics
 
     private OpeningRoutes BuildLocalRoutes(WorldSnapshot world)
         => OpeningGraph.Build(world, OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world),
-                              p => GetRegionAt(world, p));
+                              p => GetRegionAt(world, p), world.TerrainSolids());
 
     /// <summary>Where the door leaves near the listener stand, folded into one number.</summary>
     private static long DoorPoses(WorldSnapshot world, Vector3? listener)

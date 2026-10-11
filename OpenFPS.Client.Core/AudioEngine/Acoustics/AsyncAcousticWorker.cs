@@ -949,16 +949,17 @@ public class AsyncAcousticWorker : IDisposable
     /// The routes through openings for a scene: with the acoustic triangle store (<paramref name="geometry"/>)
     /// built tile by tile, each tile and opening kept in <paramref name="cache"/> while nothing round it
     /// changed. The openings' sides are checked against the places only when <paramref name="report"/>: the
-    /// check only ever wrote the report.
+    /// check only ever wrote the report. <paramref name="terrains"/> are the world's tiles of ground, for the
+    /// box list (the triangle store has its own).
     /// </summary>
-    private OpeningRoutes BuildRoutes(WorldSnapshot world, List<SteamAudioScene.Box> boxes,
+    private OpeningRoutes BuildRoutes(WorldSnapshot world, List<SteamAudioScene.Box> boxes, List<OpenFPS.Common.Geometry.SolidSpec> terrains,
                                       OpenFPS.Common.Geometry.TriangleWorld? geometry, OpeningRoutes.TileCache? cache, bool report)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         Func<Vector3, int> regionAt = p => _acoustics.GetRegionAt(world, p);
         var model = geometry != null && cache != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled
             ? OpeningGraph.Build(world, geometry, report ? regionAt : null, cache)
-            : OpeningGraph.Build(world, boxes, regionAt);
+            : OpeningGraph.Build(world, boxes, regionAt, terrains);
         if (!report) return model;
         Console.WriteLine($"[AcousticWorker] Openings: {model.Openings.Count} from the map, {model.Problems.Count} disagreeing with the geometry ({sw.ElapsedMilliseconds} ms).");
         foreach (var problem in model.Problems.Take(20)) Console.WriteLine($"[AcousticWorker]   opening {problem}");
@@ -1277,7 +1278,7 @@ public class AsyncAcousticWorker : IDisposable
                 _lastScenesMs = parts.Elapsed.TotalMilliseconds;
                 SceneOnlyMsTotal += _lastScenesMs;
                 parts.Restart();
-                var routes = routesDue || keptRoutes == null ? BuildRoutes(world, doorBoxes, geometry, routeCache, report: false) : keptRoutes;
+                var routes = routesDue || keptRoutes == null ? BuildRoutes(world, doorBoxes, doorTerrains, geometry, routeCache, report: false) : keptRoutes;
                 _lastRoutesMs = parts.Elapsed.TotalMilliseconds;
                 RoutesMsTotal += _lastRoutesMs;
                 return (full, listener, doorBoxes, forMap, routes, geometry);
@@ -1361,7 +1362,7 @@ public class AsyncAcousticWorker : IDisposable
         }
         // The scene's own boxes, so diffraction and occlusion cannot disagree about what is there.
         _barrierBoxes = boxes;
-        PublishRoutes(BuildRoutes(world, boxes, _enclosureWorld, _routeTiles, report: mapChanged));
+        PublishRoutes(BuildRoutes(world, boxes, terrains, _enclosureWorld, _routeTiles, report: mapChanged));
         Console.WriteLine($"[AcousticWorker] Built Steam Audio scene from {boxes.Count} solid box colliders ({built.ElapsedMilliseconds} ms).");
     }
 
