@@ -226,13 +226,13 @@ public static class FuelCatalog
     public static FuelSpec? ForThing(string soundId, string material, bool round, Vector3 size, float baseAboveGround)
     {
         float w = MathF.Max(0f, size.X), h = MathF.Max(0f, size.Y), d = MathF.Max(0f, size.Z);
-        if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
+        if (ModelKindTable.Is(soundId, ModelSynth.Fire))
         {
             string key = FireSpec.KeyForPlaced(soundId, round, size);
             FireSpec.ParseKey(key, out _, out _, out var fs);
             return Hearth(key, fs ?? FireSpec.ByName(key).Outline);
         }
-        if (soundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase) && w > 0.5f && d > 0.5f)
+        if (ModelKindTable.IsVehicle(soundId) && w > 0.5f && d > 0.5f)
             return Car(MathF.Min(w, d), MathF.Max(w, d));
         if (material.Equals("Foliage", StringComparison.OrdinalIgnoreCase) && baseAboveGround >= 1f && w > 0.5f && d > 0.5f)
             return Tree(MathF.Sqrt(w * d), baseAboveGround, baseAboveGround + h, "tree");

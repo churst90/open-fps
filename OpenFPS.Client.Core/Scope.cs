@@ -30,14 +30,14 @@ public static class ScopeView
     public static SightKind? Classify(in EntitySnapshot e)
     {
         var def = e.Definition;
-        string sound = def.SoundEmitter.SoundId ?? "";
-        if (sound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) return SightKind.Vehicle;
-        if (sound.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase)) return SightKind.Aircraft;
-        if (sound.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)) return SightKind.Train;
+        var body = ModelKindTable.BodyOf(def.SoundEmitter.SoundId);
+        if (body == ModelBody.Rolls) return SightKind.Vehicle;
+        if (body == ModelBody.Flies) return SightKind.Aircraft;
+        if (body == ModelBody.Rails) return SightKind.Train;
         if (def.Type == EntityType.Player) return SightKind.Player;
-        // A walker is an NPC with no machine in it. A riding mower is a machine; somebody pushing a
-        // push mower is a person.
-        if (def.Type == EntityType.NPC && !sound.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)) return SightKind.Person;
+        // A walker is an NPC with no model in it. A machine is not picked out, the push mower included,
+        // though its body walks (docs/SPECIAL_CASES_AUDIT.md, P2: the open choice).
+        if (def.Type == EntityType.NPC && body == null) return SightKind.Person;
         return null;
     }
 

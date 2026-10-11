@@ -64,19 +64,12 @@ public sealed class OtherBodies
             var type = body.Definition.Type;
             if (type != EntityType.Player && type != EntityType.NPC) continue;
 
-            // A thing with an engine has no legs. A car IS an NPC to the server, and without this every
-            // car trailed footsteps ("footsteps being drug behind it", sixteen a second at 30 km/h). The
-            // same test as ClientAudioSystem's for a vehicle, on the raw "engine:" id the server writes:
-            // the resolved spelling "ENGINE/" is never on a snapshot, and matching it let cars walk.
-            if (body.Definition.SoundEmitter.SoundId is { } sid &&
-                sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
-            // Nor anything else with a physical model (aircraft, bogies, riding mowers), except the push
-            // mower: somebody is walking behind it.
-            if (body.Definition.SoundEmitter.SoundId is { } pid && body.Definition.SoundEmitter.IsSynth
-                && (pid.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase)
-                    || pid.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)
-                    || (pid.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
-                        && !pid.Equals("machine:mower_push", StringComparison.OrdinalIgnoreCase)))) continue;
+            // Only a body that walks has legs. A car IS an NPC to the server, and without this every car
+            // trailed footsteps ("footsteps being drug behind it", sixteen a second at 30 km/h); then the
+            // resolved spelling "ENGINE/", never on a snapshot, let cars walk again. The model table
+            // reads the raw id the server writes: an aircraft, a bogie, a riding mower has no legs, a
+            // push mower has its walker's (SmallMachineSpec.WalkedBehind).
+            if (ModelKindTable.BodyOf(body.Definition.SoundEmitter.SoundId) is { } kind && kind != ModelBody.Walks) continue;
 
             // Nor somebody sitting in one: OccupancySystem gives an occupant the vehicle's velocity, heard
             // (Cody and Sean, 2026-10-05) as running footsteps from the driver's seat. The stride is

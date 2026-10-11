@@ -294,8 +294,7 @@ public class OccupancyService
             // its stops, not at a light; the driver's own door is not that door.
             if (!leavingWorld && !occupant.Controls && world.Has<SoundEmitterComponent>(root)
                 && world.Get<SoundEmitterComponent>(root) is { SoundId: { } sid } em
-                && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-                && MachineRegistry.Knows(sid[7..]) && MachineRegistry.VehicleFor(sid[7..]).DoorChime
+                && ModelKindTable.Vehicle(sid) is { DoorChime: true }
                 && !em.ServingStop)
             {
                 message = $"The doors of {name} are shut. It lets passengers off at its stops.";

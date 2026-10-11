@@ -2268,7 +2268,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// places as the source has (ExtendedSources.Layout); an outer place (SpatialEmitter.PlaceOfEntity)
     /// reads the synth of its source's live voice, or is not made.
     /// </summary>
-    private PhysicalVoiceState? NaturePlace(string kind, string preset, in SpatialEmitter emitter, int rate)
+    private PhysicalVoiceState? NaturePlace(OpenFPS.Common.ModelSynth kind, string preset, in SpatialEmitter emitter, int rate)
     {
         if (emitter.PlaceOfEntity != 0)
         {
@@ -2278,16 +2278,16 @@ public partial class FmodAudioProvider : IAudioProvider
             return new NaturePlaceState(shared, emitter.Place, rate, emitter.Position);
         }
         int places = ExtendedSources.Layout(emitter.PhysicalKey)?.Length ?? 1;
-        PlacedNatureVoice voice = kind == "shore"
+        PlacedNatureVoice voice = kind == OpenFPS.Common.ModelSynth.Shore
             ? ShoreVoice(emitter, rate)
-            : kind == "wood" && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
+            : kind == OpenFPS.Common.ModelSynth.Wood && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(woodPreset), places, rate,
                                     emitter.EntityId * 43 + 17, emitter.Position, Weather)
               { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey)?[1..], TargetTrees = emitter.Trees }
-            : kind == "flow"
+            : kind == OpenFPS.Common.ModelSynth.Flow
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.RunningWaterSpec.ByName(preset), rate,
                                     emitter.EntityId * 47 + 19, emitter.Position, Weather)
-            : kind == "fire"
+            : kind == OpenFPS.Common.ModelSynth.Fire
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FireSpec.ByName(preset), places, rate,
                                     emitter.EntityId * 41 + 13, emitter.Position, Weather)
             : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(preset), places, rate,
@@ -2708,46 +2708,46 @@ public partial class FmodAudioProvider : IAudioProvider
         }
         else if (emitter.IsSynth && !string.IsNullOrEmpty(emitter.PhysicalKey))
         {
-            // A physical model that is not a vehicle (PhysicalVoiceState). The one place a name turns
-            // into a model, which is why the emitter carries the prefix rather than a key and a flag.
+            // A physical model that is not a vehicle (PhysicalVoiceState): the one place a kind's synth
+            // (ModelKindTable) becomes its voice.
             if (!_isInitialized) return;
             _system.getSoftwareFormat(out int mrate, out _, out _);
-            int colon = emitter.PhysicalKey.IndexOf(':');
-            string kind = colon > 0 ? emitter.PhysicalKey[..colon] : "";
-            string preset = colon > 0 ? emitter.PhysicalKey[(colon + 1)..] : emitter.PhysicalKey;
+            var kind = OpenFPS.Common.ModelKindTable.KindOf(emitter.PhysicalKey);
+            string preset = kind != null ? kind.Rest(emitter.PhysicalKey) : emitter.PhysicalKey;
             try
             {
-                machineState = kind.ToLowerInvariant() switch
+                machineState = kind?.Synth switch
                 {
-                    "machine" => new MachineVoiceState(OpenFPS.Common.SmallMachineSpec.ByName(preset),
+                    OpenFPS.Common.ModelSynth.Machine => new MachineVoiceState(OpenFPS.Common.SmallMachineSpec.ByName(preset),
                                                        mrate, emitter.EntityId, emitter.EntityId * 31 + 7),
-                    "aircraft" => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
+                    OpenFPS.Common.ModelSynth.Aircraft => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
                                                          mrate, emitter.EntityId * 17 + 3,
                                                          lever: emitter.PowerLever),
-                    "rail" => RailSlot(emitter.PhysicalKey, mrate),
+                    OpenFPS.Common.ModelSynth.Rail => RailSlot(emitter.PhysicalKey, mrate),
                     // Its own voice: 35 dB over the car's exhaust, the two cannot share one full-scale
                     // reference (SirenVoiceState).
-                    "siren" => new SirenVoiceState(OpenFPS.Common.SirenSpec.ByName(preset), mrate),
+                    OpenFPS.Common.ModelSynth.Siren => new SirenVoiceState(OpenFPS.Common.SirenSpec.ByName(preset), mrate),
                     // Running is the server's word, not worked out locally (BellVoiceState).
-                    "bell" => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
+                    OpenFPS.Common.ModelSynth.Bell => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
                                                  mrate, emitter.EntityId * 13 + 5),
                     // The arm follows the crossing's closed signal (Running, the server's word).
-                    "gate" => new GateVoiceState(OpenFPS.Common.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
+                    OpenFPS.Common.ModelSynth.Gate => new GateVoiceState(OpenFPS.Common.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
                     // Given their place: they read the wind where they stand (NatureVoiceState).
-                    "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
+                    OpenFPS.Common.ModelSynth.Water => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
                     // Heard from places across it (ExtendedSources), all reading the middle's synth.
-                    "fire" or "foliage" or "flow" or "shore" or "wood" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
+                    OpenFPS.Common.ModelSynth.Fire or OpenFPS.Common.ModelSynth.Foliage or OpenFPS.Common.ModelSynth.Flow
+                        or OpenFPS.Common.ModelSynth.Shore or OpenFPS.Common.ModelSynth.Wood => NaturePlace(kind!.Synth, preset, emitter, mrate),
                     // Rain round the listener, fed by the rain survey (RainVoiceState); the roof over
                     // the ear and the near quarters are several parts each (RainFeeds.PartsFor).
-                    "rain" => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
+                    OpenFPS.Common.ModelSynth.Rain => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
                                 && rainPart < RainParts(rainSlot)
                         ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23 + rainPart * 7919, rainPart, RainParts(rainSlot))
                         : null,
                     // A gas hob: its knobs' settings and when they were turned are in the key (HobKey).
-                    "stove" => new StoveVoiceState(OpenFPS.Common.GasHobSpec.ByName(emitter.PhysicalKey), emitter.PhysicalKey,
+                    OpenFPS.Common.ModelSynth.Stove => new StoveVoiceState(OpenFPS.Common.GasHobSpec.ByName(emitter.PhysicalKey), emitter.PhysicalKey,
                                                    mrate, emitter.EntityId * 59 + 29),
                     // The rhythm of the hand on the horn is in the key (Honk).
-                    "horn" => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
+                    OpenFPS.Common.ModelSynth.Horn => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
                         ? new HornVoiceState(hornKey, rhythm, mrate, emitter.EntityId * 29 + 1)
                         : null,
                     _ => null,

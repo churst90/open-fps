@@ -29,9 +29,8 @@ public static class AudioEmission
         var authored = def.SoundEmitter.Offset;
         if (authored != Vector3.Zero) return authored;
 
-        string id = def.SoundEmitter.SoundId ?? "";
-        if (def.SoundEmitter.IsSynth && id.StartsWith("engine:", StringComparison.OrdinalIgnoreCase))
-            return PresetOffset(id[7..]);
+        if (def.SoundEmitter.IsSynth && ModelKindTable.VehiclePreset(def.SoundEmitter.SoundId) is { } preset)
+            return PresetOffset(preset);
         return Vector3.Zero;
     }
 
