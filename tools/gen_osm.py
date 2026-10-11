@@ -115,6 +115,16 @@ def pip(x, z, ring):
     return inside
 
 
+def ring_distance(x, z, ring):
+    """How far a point is from a closed ring's edges."""
+    best = float("inf")
+    for (ax, az), (bx, bz) in zip(ring, ring[1:]):
+        dx, dz = bx - ax, bz - az
+        t = max(0.0, min(1.0, ((x - ax) * dx + (z - az) * dz) / max(1e-12, dx * dx + dz * dz)))
+        best = min(best, math.hypot(x - ax - t * dx, z - az - t * dz))
+    return best
+
+
 def firmly_in(x, z, ring, by=0.001):
     """Inside a ring, and still inside `by` to either side along x and along z."""
     return pip(x, z, ring) and pip(x - by, z, ring) and pip(x + by, z, ring) and pip(x, z - by, ring) and pip(x, z + by, ring)
@@ -459,6 +469,47 @@ def portal_later(x, z, phi, width, y0, y1, depth, a, b):
 rooms_later = []
 
 
+# Steps down from each outside door to the ground, written last of all, after the openings, so adding them moves no
+# other part's id: (frame along the wall, u0, u1, v0, v1, y0, y1 over the pad, name, the pad's height, the tile).
+steps_later = []
+
+STEP_RISE = 0.17          # a step's rise, m
+STEP_TREAD = 0.28         # ...and its going
+STEP_LANDING = 1.0        # the landing at the door, out from the wall
+STEP_SIDE = 0.3           # how far the steps reach past each side of the doorway
+STEP_LEFT = 0.3           # the most the last step may stand over the ground beyond it (a body steps 0.4)
+STEP_MOST = 10
+SLAB_CUT = 0.15           # the floor slab's underside under the pad: the ground is cut down to it round a floor
+SLAB_REACH = 3.0          # ...as far as a post a cell and a half from its outline (TerrainBuilder.Grade)
+
+
+def steps_out(E, s, width, name):
+    """A concrete landing outside a doorway on a building's pad, its top just under the threshold, and steps from it
+    down to the ground: a floor is level and the ground round it is not, and a body steps no more than 0.4 m (Cody,
+    2026-10-10: the front doors of houses on a slope stood half a metre over their yards and could not be walked
+    into). The frame E runs along the wall, v into the building; each piece reaches 0.65 m and more down into the
+    ground, so the ground is never graded to it as to a slab. A building on no pad (set into the ground) has none."""
+    pad = _Y_PIN[0]
+    if pad is None or not HAS_GROUND:
+        return
+    half = width / 2 + STEP_SIDE
+
+    def low(v):
+        g = min(ground(*E.w(u, v)) for u in (s - half, s, s + half)) - pad
+        return min(g, -SLAB_CUT) if -v <= SLAB_REACH else g
+    top = FLOOR_TOP - 0.02
+    pieces = [(-STEP_LANDING, 0.0, top)]
+    v = -STEP_LANDING
+    while top - min(low(v), low(v - STEP_TREAD)) > STEP_LEFT and len(pieces) <= STEP_MOST:
+        top -= STEP_RISE
+        pieces.append((v - STEP_TREAD, v, top))
+        v -= STEP_TREAD
+    for k, (v0, v1, t) in enumerate(pieces):
+        bottom = min(min(low(v0), low(v1)) - 0.3, t - 0.65)
+        steps_later.append((E, s - half, s + half, v0, v1, round(bottom, 4), t, f"{name} {'landing' if k == 0 else 'step'}",
+                            pad, _TILE_PIN[0]))
+
+
 WING_LEAST = 2.0          # the least piece of a footprint touching no room that is a room of its own, m2
 
 
@@ -546,6 +597,7 @@ def wings(F, ring, grid, rooms, top, new_name):
                     x, z = F.w(line, sm) if axis == "u" else F.w(sm, line)
                     phi = F.a + math.pi / 2 if axis == "u" else F.a
                     portal_later(x, z, phi, s1 - s0, FLOOR_TOP - 0.02, top, 0.1, rooms[owner][0], rooms[k][0])
+                    WAYS_MADE.append((rooms[owner][0], rooms[k][0], open_width(F, ring, axis, line, s0, s1)))
 
 
 def door(prefab, x, z, y0, phi, a, b, opening, room_xz, name, layer="structure"):
@@ -1190,6 +1242,9 @@ if not HAS_GROUND:
 
 # Things the woods keep clear of, and the lots and buildings must not stand in.
 CLEAR = SpatialHash(20.0)
+# The buildings set on a level pad, with its height: a lawn beside one is dug down to its floor (ground_all).
+PADS = SpatialHash(20.0)
+LAWN_DUG = 1.0            # how near a building a lawn is dug down to its floor, m
 
 
 def clear_strip(ax, az, bx, bz, half):
@@ -2156,10 +2211,13 @@ def edge_wall(E, L, reflex0, reflex1, prefab, top, name, cuts, layer="structure"
         s = c1
     if s < s1:
         pieces.append((s, s1, 0.0, top))
+    made = []
     for a0, a1, y0, y1 in pieces:
         if a1 - a0 < 0.02:
             continue
         obox(prefab, E, a0, a1, inset, inset + thick, y0, y1, name=name, layer=layer)
+        made.append((entities[-1], a0, a1, y0, y1))
+    return made
 
 
 def edge_word(E):
@@ -2446,10 +2504,12 @@ def build(bd):
         oform("plaster_wall", F, outline, CEIL, CEIL + 0.06, {"Kind": "Prism"}, name=f"{name} ceiling", layer="structure")
 
     # ── Rooms ───────────────────────────────────────────────────────────────────────────────────
+    ways_from = len(WAYS_MADE)        # the ways through between this building's rooms start here
+    late_from = len(rooms_later)      # ...and the rooms of its leftover pieces
     cuts = defaultdict(list)          # side of the ring -> [(s0, s1, top)]
     doors_out = []                    # (side of the ring, s along it, width, prefab, (room id, room xz), name)
     if kind in ("house", "mobile_home") and detail >= 2:
-        rooms = plan_house(bd, F, R, runs, mask, grid, facing, label, two)
+        rooms = plan_house(bd, F, R, runs, mask, grid, facing, label, two, edges)
     else:
         rooms = None
 
@@ -2484,6 +2544,7 @@ def build(bd):
                         phi = F.a
                     if hi - lo > 0.3:
                         portal_later(x, z, phi, hi - lo, FLOOR_TOP - 0.02, top, depth, ids[i][0], ids[j][0])
+                        WAYS_MADE.append((ids[i][0], ids[j][0], open_width(F, bd.ring, "u" if side < 2 else "v", at, lo, hi)))
         wings(F, bd.ring, grid, [(ids[i][0], R[i]) for i in range(len(R))], top, lambda area: f"{name}{suffix}")
         # The front door: the longest stretch of a side facing the street with a room behind it, in its middle.
         stretch = []
@@ -2525,21 +2586,58 @@ def build(bd):
             k, s = edge_for_run(edges, F, runs[kr], s, width, rooms["boxes"].get(room[0]))
             doors_out.append((k, s, width, prefab, room, dname))
 
+    # A door with another building, or a wing of its own, in the way a step outside it is moved along its wall to
+    # the nearest spot clear of it (Cody's listen, 2026-10-10: the front doors of four houses opened into a shed),
+    # its room still behind it and its wall in as many pieces, so no part of the map changes its id.
+    boxes_of = rooms["boxes"] if rooms is not None else {}
+    for n, (k, s, width, prefab, room, dname) in enumerate(doors_out):
+        if prefab == "garage" or door_clear(bd, edges[k][0], s, width):
+            continue
+        taken = [d[0] for m, d in enumerate(doors_out) if m != n]
+        moved = None
+        for step in range(1, 41):
+            for sign in (1, -1):
+                s2 = s + sign * step * 0.25
+                if not (same_pieces(edges, (k, s), (k, s2), width, taken) and door_clear(bd, edges[k][0], s2, width)):
+                    continue
+                inside = edges[k][0].w(s2, DOOR_DEPTH)
+                if rooms is None:
+                    if room_at(ids, F, *inside)[0] != room[0]:
+                        continue
+                elif room[0] in boxes_of:
+                    iu0, iu1, iv0, iv1 = boxes_of[room[0]]
+                    u, v = F.l(*inside)
+                    if not (iu0 <= u <= iu1 and iv0 <= v <= iv1) or not inside_clear(F, edges[k][0], s2, width, boxes_of[room[0]]):
+                        continue
+                moved = s2
+                break
+            if moved is not None:
+                break
+        if moved is None:
+            STATS["doors with something in the way outside"] += 1
+            continue
+        doors_out[n] = (k, moved, width, prefab, room, dname)
+
     for (k, s, width, prefab, room, dname) in doors_out:
         cuts[k].append((s - width / 2, s + width / 2, FLOOR_TOP + 2.25 if prefab == "garage" else head_over(prefab) if prefab else DOOR_TOP))
 
+    pieces = defaultdict(list)         # side of the ring -> [(entity, a0, a1, y0, y1, prefab, inset, thick, top, layer)]
     for k, (E, L, reflex0, reflex1) in enumerate(edges):
-        edge_wall(E, L, reflex0, reflex1, wall_prefab, wall_h, f"{name} {edge_word(E)} wall", cuts.get(k, []))
+        for pc in edge_wall(E, L, reflex0, reflex1, wall_prefab, wall_h, f"{name} {edge_word(E)} wall", cuts.get(k, [])):
+            pieces[k].append(pc + (wall_prefab, 0.0, WALL_T, wall_h, "structure"))
         if homes and detail >= 2:
             # Plaster on the inside of the outer wall: the membrane that takes the bass out of a room.
-            edge_wall(E, L, reflex0, reflex1, "plaster_wall", CEIL, f"{name} {edge_word(E)} wall",
-                      [(c0, c1, min(ct, CEIL)) for c0, c1, ct in cuts.get(k, [])], layer="interiors", thick=0.03, inset=WALL_T)
+            for pc in edge_wall(E, L, reflex0, reflex1, "plaster_wall", CEIL, f"{name} {edge_word(E)} wall",
+                                [(c0, c1, min(ct, CEIL)) for c0, c1, ct in cuts.get(k, [])], layer="interiors", thick=0.03, inset=WALL_T):
+                pieces[k].append(pc + ("plaster_wall", WALL_T, 0.03, CEIL, "interiors"))
 
     for (k, s, width, prefab, room, dname) in doors_out:
         E = edges[k][0]
         x, z = E.w(s, WALL_T / 2)
         rid, rxz = room
         outside = -1                      # the outdoors: yards and roads are names, not rooms
+        if prefab != "garage":
+            steps_out(E, s, width, dname)
         if prefab is None:
             # An open doorway: the gap is the opening, to the outdoors.
             portal_later(x, z, E.a, width, FLOOR_TOP, DOOR_TOP, WALL_T, rid, outside)
@@ -2554,6 +2652,18 @@ def build(bd):
     if rooms is not None:
         for d in rooms["inner"]:
             d()
+
+    # Every room on foot from outside: one that no way wide enough for a body reaches gets a door of its own.
+    walk_rooms = [(rid, box, lambda rid=rid: rid) for rid, box in (rooms["boxes"].items() if rooms is not None else ids)]
+    # The rooms of its leftover pieces too, written later: a piece touching no room has no way in at all.
+    for n, r in enumerate(rooms_later[late_from:], late_from):
+        walk_rooms.append((("piece", n), (r[2], r[3], r[4], r[5]), lambda r=r: r[10]))
+    # A house's plan says its ways through; the openings to its leftover pieces can run along a partition.
+    ways = list(rooms["walk"]) if rooms is not None else [w for w in WAYS_MADE[ways_from:]]
+    for (k, s, width, prefab, room, dname) in doors_out:
+        if prefab != "garage":
+            ways.append((room[0], -1, width))
+    side_doors(bd, name, F, edges, walk_rooms, ways, pieces, facing_edge)
 
 
 def room_for_point(ids, F, run, s):
@@ -2583,7 +2693,252 @@ def side_word(F, run):
 # end. A wing of the footprint is a garage if it is the size of one and the house has none, and a den
 # otherwise. Then every room is checked to be reachable from the front door, and a doorway is cut to a
 # neighbour for any that is not. The plan is invented; the footprint it is cut from is real.
-def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
+WAY_SIDE = 0.35           # floor kept clear past each jamb of a way through: a body's width and a hand, m
+WAY_DEPTH = 1.2           # ...and out from the wall's line on each side: the wall and a step to it, m
+BACK_DOOR_IN = 1.05       # a back door's middle from the end of its wall: the corner, a jamb and half the leaf, m
+COUNTER_MIN = 1.2         # the shortest kitchen counter, m
+
+
+def clear_of(axis, line, s, width):
+    """The floor (u0, u1, v0, v1) a way through `width` wide at `s` along a wall on `line` needs clear on both sides."""
+    half = width / 2 + WAY_SIDE
+    if axis == "v":
+        return (s - half, s + half, line - WAY_DEPTH, line + WAY_DEPTH)
+    return (line - WAY_DEPTH, line + WAY_DEPTH, s - half, s + half)
+
+
+def clear_run(c, ways, shortest):
+    """The longest piece of a box along its long side that stands in none of `ways`, or None if none is `shortest`."""
+    u0, u1, v0, v1 = c
+    along_u = (u1 - u0) >= (v1 - v0)
+    lo, hi, a0, a1 = (u0, u1, v0, v1) if along_u else (v0, v1, u0, u1)
+    pieces = [(lo, hi)]
+    for w in ways:
+        wl, wh, wa0, wa1 = (w[0], w[1], w[2], w[3]) if along_u else (w[2], w[3], w[0], w[1])
+        if wa1 <= a0 or wa0 >= a1:
+            continue
+        pieces = [p for q in pieces for p in ((q[0], min(q[1], wl)), (max(q[0], wh), q[1])) if p[1] - p[0] > 1e-6]
+    best = max(pieces, key=lambda p: (p[1] - p[0], -p[0]), default=None)
+    if best is None or best[1] - best[0] < shortest:
+        return None
+    return (best[0], best[1], v0, v1) if along_u else (u0, u1, best[0], best[1])
+
+
+def inside_clear(F, E, s, width, box):
+    """Whether a body a step inside a doorway at `s` along the wall E has its room's floor beside it on both sides, past
+    each jamb: a door clamped to the end of its room's stretch of wall stood against the partition there."""
+    for u in (s - width / 2 - 0.3, s + width / 2 + 0.3):
+        uu, vv = F.l(*E.w(u, DOOR_DEPTH))
+        if not (box[0] - 1e-6 <= uu <= box[1] + 1e-6 and box[2] - 1e-6 <= vv <= box[3] + 1e-6):
+            return False
+    return True
+
+
+def door_clear(bd, E, s, width):
+    """Whether the ground a step outside a doorway at `s` along the wall E (v into the building) is clear of any
+    building, its own included (a wing round a corner), across the steps' width and out to a metre."""
+    half = width / 2 + STEP_SIDE
+    for u in (s - half, s, s + half):
+        for v in (-0.35, -1.0):
+            x, z = E.w(u, v)
+            if pip(x, z, bd.ring):
+                return False
+            for o in B_INDEX.near(x - 0.4, x + 0.4, z - 0.4, z + 0.4):
+                if o is not bd and (pip(x, z, o.ring) or ring_distance(x, z, o.ring) < 0.3):
+                    return False
+    return True
+
+
+# The ways through between the rooms of the building being made, (room, room, how wide): the openings between its
+# rectangles and its leftover pieces (wings), and a house's inner doors and archways.
+WAYS_MADE = []
+UNWALKED = []             # the rooms side_doors found no wall for, by name, for the summary
+WALK_WIDE = 0.65          # the narrowest way through a body (0.6 m) takes, m
+SIDE_DOOR = 0.9           # the width of a door given to a room no way reaches
+
+# A side door's leaf and the wall round it, written after the openings and before the steps, so adding them moves no
+# other part's id: (the pad's height, the tile, what makes them).
+doors_later = []
+
+
+def open_width(F, ring, axis, line, s0, s1, step=0.05):
+    """How wide a way a body has through an opening with no wall in it, along `line` (u if `axis` is "u") from s0 to
+    s1 in F: the longest run of it a body's middle can stand on, clear of the walls inside the ring there and a step
+    either side of it, and a body's width less a hand for the corners of the walls (one clear point of 5 cm, measured
+    off the ring, was not one a body got through); 0 if there is none. Two rooms' boxes can meet along more than the footprint
+    is wide there (a neck)."""
+    n = max(1, int((s1 - s0) / step))
+    run = best = 0
+    for i in range(n + 1):
+        t = s0 + (s1 - s0) * i / n
+        sides = [F.w(line + d, t) if axis == "u" else F.w(t, line + d) for d in (0.0, -0.6, 0.6)]
+        if all(pip(x, z, ring) and ring_distance(x, z, ring) >= WALL_T + 0.3 for x, z in sides):
+            run += 1
+            best = max(best, run)
+        else:
+            run = 0
+    return 0.0 if best == 0 else (best - 1) * (s1 - s0) / n + 0.5
+
+
+def reshape(e, F, u0, u1, v0, v1, y0, y1):
+    """An entity obox made, made again as the box it now fills, keeping its id, name and tile."""
+    bx, by, bz = BASE[e["PrefabId"]]
+    cx, cz = F.w((u0 + u1) / 2, (v0 + v1) / 2)
+    e["Position"] = v3(cx, (y0 + y1) / 2, cz)
+    e["Scale"] = v3((u1 - u0) / bx, (y1 - y0) / by, (v1 - v0) / bz)
+    e["_box"] = (F, u0, u1, v0, v1, y0, y1)
+
+
+def side_doors(bd, name, F, edges, rooms, ways, pieces, facing_edge):
+    """A door to the outdoors for every room no way wide enough for a body reaches from outside: a part of a footprint
+    joined to the rest by less than a body's width, or not at all, or a garage whose only door in was cut from a
+    stretch of partition too short for one (Magnolia and Albany, 2026-10-10: eight such rooms no one could walk into).
+    It goes in the stretch of outside wall behind the room facing the street most, then the longest, where nothing
+    stands outside it; the piece of wall it is cut from keeps its id, and the rest is written later."""
+    ways = list(ways)
+
+    def reached():
+        reach, grew = {-1}, True
+        while grew:
+            grew = False
+            for a, b, w in ways:
+                if w >= WALK_WIDE and (a in reach) != (b in reach):
+                    reach |= {a, b}
+                    grew = True
+        return reach
+    for rid, box, id_of in rooms:
+        if rid in reached() or min(box[1] - box[0], box[3] - box[2]) < 2 * 0.3 + 0.05:
+            continue
+        best = None
+        for k, (E, L, _, _) in enumerate(edges):
+            for c0s, c1s in covered(E, L, [box], F):
+                for n, (e, a0, a1, y0, y1, prefab, inset, thick, top, layer) in enumerate(pieces[k]):
+                    if inset != 0.0 or y0 > 0.0:
+                        continue
+                    lo, hi = max(c0s, a0) + 0.35 + SIDE_DOOR / 2, min(c1s, a1) - 0.35 - SIDE_DOOR / 2
+                    if hi < lo:
+                        continue
+                    mid = (lo + hi) / 2
+                    for step in range(0, 200):
+                        at = [mid + step * 0.25, mid - step * 0.25]
+                        hit = next((s2 for s2 in at if lo <= s2 <= hi and door_clear(bd, E, s2, SIDE_DOOR)), None)
+                        if hit is not None:
+                            cand = (facing_edge(k) > 0.5, hi - lo, -abs(hit - mid), -k, k, n, hit)
+                            if best is None or cand > best:
+                                best = cand
+                            break
+                        if mid + step * 0.25 > hi and mid - step * 0.25 < lo:
+                            break
+        if best is None:
+            STATS["rooms no one can walk into"] += 1
+            UNWALKED.append(f"{name} room {rid}")
+            continue
+        k, n, at = best[4], best[5], best[6]
+        E = edges[k][0]
+        c0, c1 = at - SIDE_DOOR / 2, at + SIDE_DOOR / 2
+        later = []
+        # The wall, and the plaster on its inside, round the doorway: each piece keeps its first part.
+        for e, a0, a1, y0, y1, prefab, inset, thick, top, layer in pieces[k]:
+            if y0 > 0.0 or a0 > c0 - 0.02 or a1 < c1 + 0.02:
+                continue
+            reshape(e, E, a0, c0, inset, inset + thick, 0.0, top)
+            head = min(head_over("door"), top)
+            later.append((prefab, E, c0, c1, inset, inset + thick, head, top, e["Name"], layer))
+            later.append((prefab, E, c1, a1, inset, inset + thick, 0.0, top, e["Name"], layer))
+        x, z = E.w(at, WALL_T / 2)
+        rxz = F.w((box[0] + box[1]) / 2, (box[2] + box[3]) / 2)
+        dname = f"{name} side door"
+
+        def make(later=later, x=x, z=z, a=E.a, id_of=id_of, rxz=rxz, dname=dname):
+            for prefab, G, u0, u1, v0, v1, y0, y1, nm, layer in later:
+                obox(prefab, G, u0, u1, v0, v1, y0, y1, name=nm, layer=layer)
+            door("door", x, z, FLOOR_TOP, a, id_of(), -1, SIDE_DOOR, rxz, dname)
+        doors_later.append((_Y_PIN[0], _TILE_PIN[0], make))
+        steps_out(E, at, SIDE_DOOR, dname)
+        ways.append((rid, -1, SIDE_DOOR))
+        STATS["side doors"] += 1
+
+
+def same_pieces(edges, a, b, width, taken):
+    """Whether a door at `b` (side of the ring, s along it) leaves its wall in the pieces a door at `a` does: the same
+    side, one no other outside door is on, and a piece of wall (and of its plaster) on each side of it, or none,
+    alike (edge_wall)."""
+    if a[0] != b[0] or a[0] in taken:
+        return False
+    E, L, reflex0, reflex1 = edges[a[0]]
+    for thick in (WALL_T, WALL_T + 0.03):
+        start, end = (-thick if reflex0 else 0.0), L + (thick if reflex1 else 0.0)
+        if ((a[1] - width / 2 - start >= 0.02) != (b[1] - width / 2 - start >= 0.02)
+                or (end - (a[1] + width / 2) >= 0.02) != (end - (b[1] + width / 2) >= 0.02)):
+            return False
+    return True
+
+
+def walk_between(room, box, points, cell=0.1):
+    """Whether a body (0.3 m round) can walk from every one of `points` to every other across `room` with `box`
+    standing in it (all in one frame, (u0, u1, v0, v1)): a bed across a narrow room cut the way from the door to the
+    next room's (Albany, 2026-10-10: four dens behind a main bedroom no one could cross)."""
+    r0, r1, q0, q1 = room[0] + 0.3, room[1] - 0.3, room[2] + 0.3, room[3] - 0.3
+    if r1 <= r0 or q1 <= q0:
+        return len(points) <= 1
+    nu, nv = max(1, int((r1 - r0) / cell) + 1), max(1, int((q1 - q0) / cell) + 1)
+    b0, b1, c0, c1 = box[0] - 0.3, box[1] + 0.3, box[2] - 0.3, box[3] + 0.3
+
+    def free(i, j):
+        u, v = r0 + i * cell, q0 + j * cell
+        return not (b0 - 0.02 <= u <= b1 + 0.02 and c0 - 0.02 <= v <= c1 + 0.02)
+
+    def cell_of(p):
+        return (min(nu - 1, max(0, int(round((p[0] - r0) / cell)))), min(nv - 1, max(0, int(round((p[1] - q0) / cell)))))
+    starts = [cell_of(p) for p in points]
+    if any(not free(*c) for c in starts):
+        return False
+    seen = {starts[0]}
+    stack = [starts[0]]
+    while stack:
+        i, j = stack.pop()
+        for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+            if 0 <= a < nu and 0 <= b < nv and (a, b) not in seen and free(a, b):
+                seen.add((a, b))
+                stack.append((a, b))
+    return all(c in seen for c in starts)
+
+
+def ways_into(room, ways):
+    """Where each way through that reaches into a room meets its floor: the middle of what the two share."""
+    out = []
+    for w in ways:
+        u0, u1, v0, v1 = max(room[0], w[0]), min(room[1], w[1]), max(room[2], w[2]), min(room[3], w[3])
+        if u1 > u0 and v1 > v0:
+            out.append(((u0 + u1) / 2, (v0 + v1) / 2))
+    return out
+
+
+def clear_spot(box, room, ways):
+    """`box` moved as little as it can be within `room` (both (u0, u1, v0, v1)) to stand in none of `ways` and leave
+    every way into the room walkable to every other, or None."""
+    points = ways_into(room, ways)
+    u0, u1, v0, v1 = box
+    r0, r1, q0, q1 = room
+    cands = []
+    for du in [k * 0.25 for k in range(-24, 25)]:
+        if u0 + du < r0 - 1e-6 or u1 + du > r1 + 1e-6:
+            continue
+        for dv in [k * 0.25 for k in range(-24, 25)]:
+            if v0 + dv < q0 - 1e-6 or v1 + dv > q1 + 1e-6:
+                continue
+            moved = (u0 + du, u1 + du, v0 + dv, v1 + dv)
+            if any(moved[0] < w[1] and moved[1] > w[0] and moved[2] < w[3] and moved[3] > w[2] for w in ways):
+                continue
+            cands.append((du * du + dv * dv, abs(du), du, dv))
+    for _, _, du, dv in sorted(cands):
+        moved = (u0 + du, u1 + du, v0 + dv, v1 + dv)
+        if walk_between(room, moved, points):
+            return moved
+    return None
+
+
+def plan_house(bd, F, R, runs, mask, grid, facing, label, two, edges):
     # The main rectangle, and which of its sides faces the street.
     main_i = max(range(len(R)), key=lambda i: (R[i][1] - R[i][0]) * (R[i][3] - R[i][2]))
     ru0, ru1, rv0, rv1 = R[main_i]
@@ -2788,51 +3143,11 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
         if floor:
             obox(floor, F, iu0, iu1, iv0, iv1, 0.10, FLOOR_TOP, name=f"{label} {nm} floor", layer="interiors")
 
-    # Furniture: upholstery with air behind it is what takes the bass out of a room
-    # (carpet-is-deaf-to-bass), and a kitchen has a counter along its back wall.
-    for (nm, rr, floor, ab), (iu0, iu1, iv0, iv1) in zip(rooms, inner_rects):
-        cu_, cv_ = (iu0 + iu1) / 2, (iv0 + iv1) / 2
-        if iu1 - iu0 < 2.4 or iv1 - iv0 < 2.4:
-            continue
-        if nm == "living room":
-            obox("furniture_soft", F, cu_ - 1.0, cu_ + 1.0, cv_ - 0.45, cv_ + 0.45, FLOOR_TOP, 0.95, name=f"{label} sofa", layer="interiors")
-        elif "bedroom" in nm:
-            obox("furniture_soft", F, cu_ - 0.8, cu_ + 0.8, cv_ - 1.0, cv_ + 1.0, FLOOR_TOP, 0.65, name=f"{label} bed", layer="interiors")
-        elif nm == "kitchen" and ab is not None and abs(ab[3] - D) < 1e-6 and ab[1] - ab[0] > 3.0:
-            c = rect(ab[0] + 0.6, ab[1] - 0.6, D - WALL_T - 0.62, D - WALL_T - 0.02)
-            obox("tile_wall", F, c[0], c[1], c[2], c[3], FLOOR_TOP, 0.92, name=f"{label} kitchen counter", layer="interiors")
-
-    # Partitions with their openings; the inner doors are made after the outer ones.
-    inner = []
-    order = ["garage", "bathroom", "main bedroom", "bedroom", "bedroom 2", "bedroom 3", "closet", "den", "utility room"]
-    for (i, j), (axis, line, s0, s1) in sorted(adj.items()):
-        lk = links.get((i, j))
-        cut = []
-        if lk:
-            kind_, wdt = lk
-            wdt = min(wdt, s1 - s0 - 0.3)
-            sm = (s0 + s1) / 2
-            cut = [(sm - wdt / 2, sm + wdt / 2, head_over("door") if kind_ == "door" else DOOR_TOP)]
-            x, z = F.w(line, sm) if axis == "u" else F.w(sm, line)
-            phi = F.a + math.pi / 2 if axis == "u" else F.a
-            if kind_ == "door":
-                ri = order.index(names[i]) if names[i] in order else 99
-                rj = order.index(names[j]) if names[j] in order else 99
-                own, other = (i, j) if ri <= rj else (j, i)
-                inner.append(lambda x=x, z=z, phi=phi, own=own, other=other, wdt=wdt:
-                             door("door", x, z, FLOOR_TOP, phi, ids[own], ids[other], wdt, centres[own],
-                                  f"{label} {names[own]} door", layer="interiors"))
-            else:
-                inner.append(lambda x=x, z=z, phi=phi, i=i, j=j, wdt=wdt:
-                             portal(x, z, phi, wdt, FLOOR_TOP, DOOR_TOP, PART_T, ids[i], ids[j]))
-        # thickness PART_T centred on the line
-        wall_run(F, (axis, line + PART_T / 2, s0, s1, 1), "plaster_wall", CEIL, f"{label} {names[i]} wall", cut,
-                 layer="interiors", thick=PART_T)
-
-    # The outside doors, on the outer runs.
+    # The outside doors, on the outer runs: decided before anything stands in a room, so nothing does where
+    # somebody has to walk to one.
     def on_run(rr, toward_street):
         """The outer run one of a room's sides lies on, most toward (or away from) the street:
-        (score, overlap, run index, middle of the overlap)."""
+        (score, overlap, run index, middle of the overlap, start of it, end of it)."""
         u0, u1, v0, v1 = rr
         best = None
         for k, run in enumerate(runs):
@@ -2843,7 +3158,7 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
                     lo, hi = max(s0, lo_), min(s1, hi_)
                     if hi - lo > 1.2:
                         f = facing(run)
-                        cand = (round(f if toward_street else -f, 6), hi - lo, k, (lo + hi) / 2)
+                        cand = (round(f if toward_street else -f, 6), hi - lo, k, (lo + hi) / 2, lo, hi)
                         if best is None or cand > best:
                             best = cand
         return best
@@ -2857,16 +3172,108 @@ def plan_house(bd, F, R, runs, mask, grid, facing, label, two):
                 break
     if fr:
         doors_out.append((fr[2], fr[3], 0.95, "door", (ids[living], centres[living]), f"{label} front door"))
+    boxes_by_id = dict(zip(ids, inner_rects))
+
+    def placed(entry):
+        """The side of the ring an outside door goes on and how far along it, as build() puts it (edge_for_run)."""
+        kr, s, width, prefab, room, dname = entry
+        return edge_for_run(edges, F, runs[kr], s, width, boxes_by_id.get(room[0]))
+
     bk = on_run(rooms[kitchen][1], False)
     if bk and (not fr or bk[2] != fr[2]):
-        doors_out.append((bk[2], bk[3], 0.9, "patio_door", (ids[kitchen], centres[kitchen]), f"{label} back door"))
+        back = (bk[2], bk[3], 0.9, "patio_door", (ids[kitchen], centres[kitchen]), f"{label} back door")
+        # Toward one end of the kitchen's back wall, as a kitchen's back door is, so the counter has the rest of the
+        # wall (Cody, 2026-10-10: on Bobcat Lane the counter stood across the middle of it); only where that leaves the
+        # door on the same side of the ring with its wall in as many pieces, so no part of the map changes its id.
+        lo, hi = bk[4], bk[5]
+        inset = min(BACK_DOOR_IN, (hi - lo) / 2)
+        moved = (bk[2], lo + inset if h01(seed, "back door") < 0.5 else hi - inset) + back[2:]
+        if same_pieces(edges, placed(back), placed(moved), 0.9, [placed(d)[0] for d in doors_out]) \
+                and inside_clear(F, edges[placed(moved)[0]][0], placed(moved)[1], 0.9, boxes_by_id[ids[kitchen]]):
+            back = moved
+        doors_out.append(back)
     for i, (nm, rr, floor, ab) in enumerate(rooms):
         if nm == "garage":
             g = on_run(rr, True)
             if g and g[1] >= 3.0 and not (fr and g[2] == fr[2] and abs(g[3] - fr[3]) < 3.0):
                 doors_out.append((g[2], g[3], min(4.9, g[1] - 0.6), "garage", (ids[i], centres[i]), f"{label} garage door"))
+
+    # Where each way through is, with the floor a body crosses to reach it on either side: the inner doors and
+    # archways where the partitions will be cut, and the outside doors where build() will put them.
+    ways = []
+    for (i, j), (axis, line, s0, s1) in adj.items():
+        if (i, j) in links:
+            wdt = min(links[(i, j)][1], s1 - s0 - 0.3)
+            ways.append(clear_of(axis, line, (s0 + s1) / 2, wdt))
+    for entry in doors_out:
+        k, s = placed(entry)
+        u, v = F.l(*edges[k][0].w(s, 0.0))
+        axis = runs[entry[0]][0]
+        ways.append(clear_of(axis, v, u, entry[2]) if axis == "v" else clear_of(axis, u, v, entry[2]))
+
+    # Furniture: upholstery with air behind it is what takes the bass out of a room
+    # (carpet-is-deaf-to-bass), and a kitchen has a counter along its back wall, clear of every way through.
+    for (nm, rr, floor, ab), (iu0, iu1, iv0, iv1) in zip(rooms, inner_rects):
+        cu_, cv_ = (iu0 + iu1) / 2, (iv0 + iv1) / 2
+        if iu1 - iu0 < 2.4 or iv1 - iv0 < 2.4:
+            continue
+        if nm == "living room" or "bedroom" in nm:
+            sofa = nm == "living room"
+            want = (cu_ - 1.0, cu_ + 1.0, cv_ - 0.45, cv_ + 0.45) if sofa else (cu_ - 0.8, cu_ + 0.8, cv_ - 1.0, cv_ + 1.0)
+            # In the middle of the room unless a way through crosses it: then the nearest spot clear of them all.
+            at = clear_spot(want, (iu0, iu1, iv0, iv1), ways)
+            if at is None:
+                STATS["rooms whose furniture stands in a way through"] += 1
+                at = want
+            obox("furniture_soft", F, *at, FLOOR_TOP, 0.95 if sofa else 0.65, name=f"{label} {'sofa' if sofa else 'bed'}", layer="interiors")
+        elif nm == "kitchen" and ab is not None and abs(ab[3] - D) < 1e-6 and ab[1] - ab[0] > 3.0:
+            c = clear_run(rect(ab[0] + 0.6, ab[1] - 0.6, D - WALL_T - 0.62, D - WALL_T - 0.02), ways, COUNTER_MIN)
+            if c is None:
+                # No stretch of the back wall is clear: a short counter in its far corner, where nobody walks.
+                STATS["kitchens with a corner counter"] += 1
+                c = clear_run(rect(ab[0] + 0.02, ab[0] + 0.02 + COUNTER_MIN, D - WALL_T - 0.62, D - WALL_T - 0.02), ways, 0.3) \
+                    or clear_run(rect(ab[1] - 0.02 - COUNTER_MIN, ab[1] - 0.02, D - WALL_T - 0.62, D - WALL_T - 0.02), ways, 0.3) \
+                    or rect(ab[0] + 0.02, ab[0] + 0.32, D - WALL_T - 0.62, D - WALL_T - 0.02)
+            obox("tile_wall", F, c[0], c[1], c[2], c[3], FLOOR_TOP, 0.92, name=f"{label} kitchen counter", layer="interiors")
+
+    # Partitions with their openings; the inner doors are made after the outer ones.
+    inner = []
+    walk = []                         # the ways through the plan cuts, (room, room, how wide)
+    order = ["garage", "bathroom", "main bedroom", "bedroom", "bedroom 2", "bedroom 3", "closet", "den", "utility room"]
+    for (i, j), (axis, line, s0, s1) in sorted(adj.items()):
+        lk = links.get((i, j))
+        cut = []
+        if lk:
+            kind_, wdt = lk
+            wdt = min(wdt, s1 - s0 - 0.3)
+            sm = (s0 + s1) / 2
+            cut = [(sm - wdt / 2, sm + wdt / 2, head_over("door") if kind_ == "door" else DOOR_TOP)]
+            walk.append((ids[i], ids[j], wdt))
+            x, z = F.w(line, sm) if axis == "u" else F.w(sm, line)
+            phi = F.a + math.pi / 2 if axis == "u" else F.a
+            if kind_ == "door" and wdt < WALK_WIDE:
+                # Too short a stretch of partition for a door a body goes through (a garage's into the kitchen was 0.28
+                # m): the gap is walled up, in the leaf's place in the order, and the room is given a way elsewhere.
+                inner.append(lambda line=line, sm=sm, wdt=wdt, axis=axis, i=i:
+                             obox("plaster_wall", F, *((line - PART_T / 2, line + PART_T / 2, sm - wdt / 2, sm + wdt / 2) if axis == "u"
+                                                       else (sm - wdt / 2, sm + wdt / 2, line - PART_T / 2, line + PART_T / 2)),
+                                  0.0, head_over("door"), name=f"{label} {names[i]} wall", layer="interiors"))
+            elif kind_ == "door":
+                ri = order.index(names[i]) if names[i] in order else 99
+                rj = order.index(names[j]) if names[j] in order else 99
+                own, other = (i, j) if ri <= rj else (j, i)
+                inner.append(lambda x=x, z=z, phi=phi, own=own, other=other, wdt=wdt:
+                             door("door", x, z, FLOOR_TOP, phi, ids[own], ids[other], wdt, centres[own],
+                                  f"{label} {names[own]} door", layer="interiors"))
+            else:
+                inner.append(lambda x=x, z=z, phi=phi, i=i, j=j, wdt=wdt:
+                             portal(x, z, phi, wdt, FLOOR_TOP, DOOR_TOP, PART_T, ids[i], ids[j]))
+        # thickness PART_T centred on the line
+        wall_run(F, (axis, line + PART_T / 2, s0, s1, 1), "plaster_wall", CEIL, f"{label} {names[i]} wall", cut,
+                 layer="interiors", thick=PART_T)
+
     return {"doors": doors_out, "inner": inner, "boxes": dict(zip(ids, inner_rects)),
-            "rects": [(rid, r[1]) for rid, r in zip(ids, rooms)], "label": label}
+            "rects": [(rid, r[1]) for rid, r in zip(ids, rooms)], "label": label, "walk": walk}
 
 
 # THE OUTDOOR PLACES ARE NAMES, NOT ROOMS. A yard and a stretch of road are where you are told you
@@ -2955,6 +3362,8 @@ for bd in sorted(BLD, key=lambda b: (round(b.cx, 2), round(b.cz, 2))):
     _TILE_PIN[0] = tile_of(bd.cx, bd.cz)
     _Y_PIN[0] = pad_of(bd)
     build(bd)
+    if _Y_PIN[0] is not None:
+        PADS.add(("pad", bd, _Y_PIN[0]), bd.x0, bd.x1, bd.z0, bd.z1)
     if id(bd) in DECIDED:
         DECIDED[id(bd)].update({"id": bd.src.get("id"), "kind": bd.kind, "pad": _Y_PIN[0], "entities": [first, len(entities)]})
     _Y_PIN[0] = None
@@ -3289,6 +3698,49 @@ def _set(e, F, u0, u1, v0, v1, y0, y1, centre_y, turn=None):
         e["Rotation"] = turn
 
 
+def dug(F, u0, u1, v0, v1, g00, g10, g01, g11):
+    """A lawn's corners (the ground under each, as laid over the slope) lowered so that along any side of it that meets
+    a building on a pad it stands no higher than just under that building's floor: the ground round a house on a slope
+    is dug down to it on the high side. Laid over the slope, a lawn stood up to half a metre over the threshold of a
+    door into the hill, with the door's head at a body's height (Cody, 2026-10-10). Lowering a side's two corners by d
+    lowers the lawn's plane (ground_all's fit) along that side by d and leaves the far side where it was."""
+    su, sv = u1 - u0, v1 - v0
+    g = {"00": g00, "10": g10, "01": g01, "11": g11}
+    sides = (("00", "01", lambda t: (u0, v0 + t * sv), sv), ("10", "11", lambda t: (u1, v0 + t * sv), sv),
+             ("00", "10", lambda t: (u0 + t * su, v0), su), ("01", "11", lambda t: (u0 + t * su, v1), su))
+    for _ in range(2):
+        gu = ((g["10"] + g["11"]) - (g["00"] + g["01"])) / (2 * su)
+        gv = ((g["01"] + g["11"]) - (g["00"] + g["10"])) / (2 * sv)
+        centre = (g["00"] + g["10"] + g["01"] + g["11"]) / 4
+        drops = {}
+        for a, b, at, length in sides:
+            drop = 0.0
+            for i in range(int(length / 0.5) + 1):
+                u, v = at(min(1.0, i * 0.5 / length))
+                x, z = F.w(u, v)
+                height = centre + gu * (u - (u0 + u1) / 2) + gv * (v - (v0 + v1) / 2) + Y_LAWN
+                for _, bld, pad in PADS.near(x - LAWN_DUG, x + LAWN_DUG, z - LAWN_DUG, z + LAWN_DUG):
+                    if pip(x, z, bld.ring) or ring_distance(x, z, bld.ring) <= LAWN_DUG:
+                        drop = max(drop, height - (pad + FLOOR_TOP - 0.06))
+            if drop > 1e-4:
+                drops[(a, b)] = drop
+        if not drops:
+            break
+        for (a, b), drop in drops.items():
+            g[a] -= drop
+            g[b] -= drop
+    return g["00"], g["10"], g["01"], g["11"]
+
+
+def drive_end(x, z, h, top):
+    """The ground under an end of a drive or a path whose surface stands `top` over it: no higher than leaves that
+    surface just under the floor of a building on a pad it ends at (dug)."""
+    for _, bld, pad in PADS.near(x - LAWN_DUG, x + LAWN_DUG, z - LAWN_DUG, z + LAWN_DUG):
+        if pip(x, z, bld.ring) or ring_distance(x, z, bld.ring) <= LAWN_DUG:
+            h = min(h, pad + FLOOR_TOP - 0.06 - top)
+    return h
+
+
 def ground_all():
     for e in entities:
         pin, box, seg = e.pop("_pin", None), e.pop("_box", None), e.pop("_seg", None)
@@ -3307,6 +3759,10 @@ def ground_all():
         if seg is not None:
             L, heights = seg
             ha, hb = heights if heights is not None else (ground(F.ox, F.oz), ground(*F.w(L, 0.0)))
+            if e["Layer"] in ("drives", "paths"):
+                # A drive or a path that runs up to a building on a pad comes up to it no higher than just under its
+                # floor, as the ground there is dug: one pitched to the slope stood 0.3 m over a threshold.
+                ha, hb = drive_end(F.ox, F.oz, ha, y1), drive_end(*F.w(L, 0.0), hb, y1)
             g = (hb - ha) / L
             uc = (u0 + u1) / 2
             _set(e, F, u0, u1, v0, v1, y0, y1, ha + g * uc + (y0 + y1) / 2, _turn(F.a, g, 0.0))
@@ -3320,6 +3776,8 @@ def ground_all():
         elif y1 - y0 <= 0.6 and su >= 1.0 and sv >= 1.0:
             g00, g10 = ground(*F.w(u0, v0)), ground(*F.w(u1, v0))
             g01, g11 = ground(*F.w(u0, v1)), ground(*F.w(u1, v1))
+            if prefab == "grass_floor":
+                g00, g10, g01, g11 = dug(F, u0, u1, v0, v1, g00, g10, g01, g11)
             gu = ((g10 + g11) - (g00 + g01)) / (2 * su)
             gv = ((g01 + g11) - (g00 + g10)) / (2 * sv)
             _set(e, F, u0, u1, v0, v1, y0, y1, (g00 + g10 + g01 + g11) / 4 + (y0 + y1) / 2, _turn(F.a, gu, gv))
@@ -3347,6 +3805,14 @@ for r in rooms_later:
 for x, z, phi, width, y0, y1, depth, a, b, pin, tile in openings_later:
     _Y_PIN[0], _TILE_PIN[0] = pin, tile
     portal(x, z, phi, width, y0, y1, depth, a, b)
+    _Y_PIN[0] = _TILE_PIN[0] = None
+for pin, tile, make in doors_later:
+    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+    make()
+    _Y_PIN[0] = _TILE_PIN[0] = None
+for E, u0, u1, v0, v1, y0, y1, nm, pin, tile in steps_later:
+    _Y_PIN[0], _TILE_PIN[0] = pin, tile
+    obox("concrete_floor", E, u0, u1, v0, v1, y0, y1, name=nm, layer="structure")
     _Y_PIN[0] = _TILE_PIN[0] = None
 
 ground_all()
@@ -3433,6 +3899,17 @@ print("  buildings: " + ", ".join(f"{k} {STATS[k]}" for k in ("house", "mobile_h
 print(f"  {regions} zones and rooms, {by_prefab['named_place']} named places, {STATS['doors']} outside doors, "
       f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} stretches of shore, {len(VEHICLES)} vehicles")
 print("  by layer: " + ", ".join(f"{k} {v}" for k, v in sorted(COUNT.items())))
+if STATS["kitchens with a corner counter"]:
+    print(f"  {STATS['kitchens with a corner counter']} kitchens with no clear stretch of back wall have a short counter in a corner")
+if STATS["rooms whose furniture stands in a way through"]:
+    print(f"  {STATS['rooms whose furniture stands in a way through']} rooms have no spot for their sofa or bed clear of the ways through")
+if STATS["doors with something in the way outside"]:
+    print(f"  {STATS['doors with something in the way outside']} outside doors have another building in the way a step out, with no clear spot along their wall")
+print(f"  {len(steps_later)} landings and steps at outside doors")
+if STATS["side doors"]:
+    print(f"  {STATS['side doors']} rooms no way wide enough for a body reached have a side door")
+if STATS["rooms no one can walk into"]:
+    print(f"  {STATS['rooms no one can walk into']} rooms no way reaches have no outside wall for a door: {'; '.join(UNWALKED)}")
 print(f"  {CUT_BY_EDGE} buildings stand across a {TILE:.0f} m tile edge; each is tagged whole with the tile its middle is in")
 print(f"  spawn {tuple(round(c, 2) for c in spawn)} facing {math.degrees(spawn_yaw) % 360:.0f} degrees from north, "
       f"at {SPAWN_ADDR.label if SPAWN_ADDR else 'the origin'}")

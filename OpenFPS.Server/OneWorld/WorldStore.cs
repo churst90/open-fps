@@ -31,8 +31,9 @@ public sealed class WorldStore
     /// 2: the cells' materials from the land cover; 3: roads from OpenStreetMap and woods from the land cover;
     /// 4: buildings from Overture (release OvertureBuildings.Release), the woods kept off them;
     /// 5: the drainage, which way each cell drains (WorldTile.Drainage, docs/RUNNING_WATER.md 13);
-    /// 6: every part of a building's footprint in a room, openings between its rooms (docs/GEOMETRY.md 12.6).</summary>
-    public const int GeneratorVersion = 6;
+    /// 6: every part of a building's footprint in a room, openings between its rooms (docs/GEOMETRY.md 12.6);
+    /// 7: a landing and steps outside each door, and a door with a building a step outside it moved along its wall.</summary>
+    public const int GeneratorVersion = 7;
 
     public const long DefaultCapBytes = 20L * 1024 * 1024 * 1024;
 

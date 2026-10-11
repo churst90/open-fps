@@ -142,6 +142,43 @@ public static class WorldBuildings
         => Pip(x, z, ring) && Pip(x - by, z, ring) && Pip(x + by, z, ring) && Pip(x, z - by, ring) && Pip(x, z + by, ring);
 
     /// <summary>gen_osm.py pip: whether a point is inside a ring (even-odd).</summary>
+    /// <summary>gen_osm.py open_width: how wide a way a body has through an opening with no wall in it, along a line of
+    /// constant u (<paramref name="alongV"/>) or v at <paramref name="line"/> from s0 to s1: the longest run its middle
+    /// can stand on clear of the walls inside the ring there and a step either side, and a body's width less a hand for
+    /// the walls' corners; 0 if none.</summary>
+    public static double OpenWidth(Frame f, IReadOnlyList<(double X, double Z)> ring, bool alongV, double line, double s0, double s1, double step = 0.05)
+    {
+        int n = Math.Max(1, (int)((s1 - s0) / step));
+        int run = 0, best = 0;
+        for (int i = 0; i <= n; i++)
+        {
+            double t = s0 + (s1 - s0) * i / n;
+            bool clear = true;
+            foreach (double d in new[] { 0.0, -0.6, 0.6 })
+            {
+                var (x, z) = alongV ? f.W(line + d, t) : f.W(t, line + d);
+                clear &= Pip(x, z, ring) && RingDistance(x, z, ring) >= WallT + 0.3;
+            }
+            if (clear) best = Math.Max(best, ++run);
+            else run = 0;
+        }
+        return best == 0 ? 0.0 : (best - 1) * (s1 - s0) / n + 0.5;
+    }
+
+    /// <summary>gen_osm.py ring_distance: how far a point is from a closed ring's edges.</summary>
+    public static double RingDistance(double x, double z, IReadOnlyList<(double X, double Z)> ring)
+    {
+        double best = double.PositiveInfinity;
+        for (int i = 0; i + 1 < ring.Count; i++)
+        {
+            var (ax, az) = ring[i]; var (bx, bz) = ring[i + 1];
+            double dx = bx - ax, dz = bz - az;
+            double t = Math.Max(0.0, Math.Min(1.0, ((x - ax) * dx + (z - az) * dz) / Math.Max(1e-12, dx * dx + dz * dz)));
+            best = Math.Min(best, Math.Sqrt((x - ax - t * dx) * (x - ax - t * dx) + (z - az - t * dz) * (z - az - t * dz)));
+        }
+        return best;
+    }
+
     public static bool Pip(double x, double z, IReadOnlyList<(double X, double Z)> ring)
     {
         bool inside = false;
@@ -317,6 +354,43 @@ public static class WorldBuildings
     {
         public List<Func<int, EntityData>> Rooms { get; } = new();
         public List<Func<int, EntityData>> Openings { get; } = new();
+        /// <summary>A side door given to a room no way reaches, and the wall round it (gen_osm.py doors_later), written after
+        /// the openings.</summary>
+        public List<Func<int, EntityData>> Doors { get; } = new();
+        /// <summary>The landing and steps outside each door (gen_osm.py steps_later), written last.</summary>
+        public List<Func<int, EntityData>> Steps { get; } = new();
+    }
+
+    // gen_osm.py's steps outside a door (steps_out).
+    public const double StepRise = 0.17, StepTread = 0.28, StepLanding = 1.0, StepSide = 0.3, StepLeft = 0.3, SlabCut = 0.15, SlabReach = 3.0;
+    public const int StepMost = 10;
+    /// <summary>gen_osm.py WALK_WIDE and SIDE_DOOR: the narrowest way through a body takes, and a side door's width, m.</summary>
+    public const double WalkWide = 0.65, SideDoor = 0.9;
+
+    /// <summary>
+    /// gen_osm.py steps_out: a concrete landing outside a doorway on a pad, its top just under the threshold, and steps
+    /// from it down to the ground, each piece reaching 0.65 m and more into the ground so the ground is never graded to
+    /// it as to a slab. <paramref name="e"/> runs along the wall, v into the building; heights over the pad.
+    /// </summary>
+    public static List<(double V0, double V1, double Bottom, double Top, bool Landing)> StepsOut(Frame e, double s, double width, double pad,
+                                                                                                   Func<double, double, double> ground)
+    {
+        double half = width / 2 + StepSide;
+        double Low(double v)
+        {
+            double g = new[] { s - half, s, s + half }.Min(u => { var (x, z) = e.W(u, v); return ground(x, z); }) - pad;
+            return -v <= SlabReach ? Math.Min(g, -SlabCut) : g;
+        }
+        double top = FloorTop - 0.02;
+        var pieces = new List<(double V0, double V1, double Top)> { (-StepLanding, 0.0, top) };
+        double at = -StepLanding;
+        while (top - Math.Min(Low(at), Low(at - StepTread)) > StepLeft && pieces.Count <= StepMost)
+        {
+            top -= StepRise;
+            pieces.Add((at - StepTread, at, top));
+            at -= StepTread;
+        }
+        return pieces.Select((q, k) => (q.V0, q.V1, Math.Round(Math.Min(Math.Min(Low(q.V0), Low(q.V1)) - 0.3, q.Top - 0.65), 4), q.Top, k == 0)).ToList();
     }
 
     /// <summary>gen_osm.py WING_LEAST: the least piece of a footprint touching no room that is a room of its own, m².</summary>
@@ -335,10 +409,15 @@ public static class WorldBuildings
     /// and the rooms of what no rectangle holds go to <paramref name="later"/>.
     /// </summary>
     public static List<EntityData> Build(Plan p, IReadOnlyDictionary<string, Prefab> prefabs, Func<double, double, double> ground,
-                                         (double X, double Z) shift, ref int nextId, bool measured = false, Later? later = null)
+                                         (double X, double Z) shift, ref int nextId, bool measured = false, Later? later = null,
+                                         Func<double, double, bool>? occupied = null)
     {
         var bd = p.Shape;
         var outList = new List<EntityData>();
+        // gen_osm.py WAYS_MADE: the ways through between this building's rooms, (room, room, how wide).
+        var waysMade = new List<(int A, int B, double W)>();
+        // The rooms of its leftover pieces, each with where its id will be once it is written (Later.Rooms).
+        var lateRooms = new List<(int[] Written, (double U0, double U1, double V0, double V1) Box)>();
         string kind = p.Kind, name = p.Name, label = p.Seed;
         double lift = p.Pad ?? 0;
         int id = nextId;
@@ -484,7 +563,11 @@ public static class WorldBuildings
                             (x, z) = F.W((lo + hi) / 2, at);
                             phi = F.A;
                         }
-                        if (hi - lo > 0.3) PortalLater(x, z, phi, hi - lo, FloorTop - 0.02, top, 0.1, ids[i].Id, ids[j].Id);
+                        if (hi - lo > 0.3)
+                        {
+                            PortalLater(x, z, phi, hi - lo, FloorTop - 0.02, top, 0.1, ids[i].Id, ids[j].Id);
+                            waysMade.Add((ids[i].Id, ids[j].Id, OpenWidth(F, bd.Ring, side < 2, at, lo, hi)));
+                        }
                     }
                 }
             Wings(Enumerable.Range(0, R.Count).Select(i => (ids[i].Id, R[i])).ToList(), $"{name}{suffix}");
@@ -519,24 +602,155 @@ public static class WorldBuildings
         else { width = 0.95; doorPrefab = "door"; doorName = $"{name} door"; }
         width = Math.Max(0.8, Math.Min(width, L - 0.6));
         var (roomId, roomXz) = RoomAt(ids, F, E.W(s, DoorDepth));
+        // gen_osm.py build(): a door with another building, or a wing of its own, in the way a step outside it is moved
+        // along its wall to the nearest spot clear of it, its room still behind it and its wall in as many pieces.
+        if (!DoorClear(E, s, width))
+        {
+            double? moved = null;
+            for (int step = 1; step <= 40 && moved == null; step++)
+                foreach (int sign in new[] { 1, -1 })
+                {
+                    double s2 = s + sign * step * 0.25;
+                    if (!SamePieces(edges[k], s, s2, width) || !DoorClear(E, s2, width)) continue;
+                    if (RoomAt(ids, F, E.W(s2, DoorDepth)).Id != roomId) continue;
+                    moved = s2;
+                    break;
+                }
+            if (moved is { } m) s = m;
+        }
         // gen_osm.py head_over: the head laps the leaf by DoorLap, as a jamb does.
         var cut = (C0: s - width / 2, C1: s + width / 2, Top: doorPrefab != null ? FloorTop + Math.Round(Base(doorPrefab).Y, 4) - DoorLap : DoorTop);
 
+        var wallPieces = new List<(int Index, double A0, double A1, double Y0, double Y1)>[edges.Count];
         for (int i = 0; i < edges.Count; i++)
-            EdgeWall(edges[i], wallPrefab, wallH, $"{name} {EdgeWord(edges[i].F)} wall", i == k ? new[] { cut } : Array.Empty<(double, double, double)>());
+            wallPieces[i] = EdgeWall(edges[i], wallPrefab, wallH, $"{name} {EdgeWord(edges[i].F)} wall", i == k ? new[] { cut } : Array.Empty<(double, double, double)>());
 
+        if (doorPrefab != null && p.Pad is { } padded && later != null)
+            foreach (var (v0, v1, bottom, stepTop, landing) in StepsOut(E, s, width, padded, ground))
+            {
+                double h = width / 2 + StepSide, at = s;
+                string stepName = $"{doorName} {(landing ? "landing" : "step")}";
+                later.Steps.Add(eid => Make("concrete_floor", E, at - h, at + h, v0, v1, bottom, stepTop, stepName, "structure", null, eid));
+            }
         if (doorPrefab != null)
         {
             var (x, z) = E.W(s, WallT / 2);
             Door(doorPrefab, x, z, FloorTop, E.A, roomId, -1, width, roomXz, doorName);
         }
+        if (later != null) SideDoors(doorPrefab != null || kind == "barn" ? width : 0.0);
         nextId = id;
         return outList;
 
+        // gen_osm.py side_doors: a door to the outdoors for every room no way wide enough for a body reaches from outside.
+        void SideDoors(double frontWidth)
+        {
+            var ways = new List<(int A, int B, double W)>(waysMade);
+            if (frontWidth > 0) ways.Add((roomId, -1, frontWidth));
+            HashSet<int> Reached()
+            {
+                var reach = new HashSet<int> { -1 };
+                for (bool grew = true; grew;)
+                {
+                    grew = false;
+                    foreach (var (a, b, w) in ways)
+                        if (w >= WalkWide && reach.Contains(a) != reach.Contains(b)) { reach.Add(a); reach.Add(b); grew = true; }
+                }
+                return reach;
+            }
+            var walkRooms = ids.Select(r => (Key: r.Id, Box: r.Rect, Written: (int[]?)null))
+                               .Concat(lateRooms.Select((r, n) => (Key: -1000 - n, Box: r.Box, Written: (int[]?)r.Written))).ToList();
+            foreach (var (rid, box, written) in walkRooms)
+            {
+                if (Reached().Contains(rid) || Math.Min(box.U1 - box.U0, box.V1 - box.V0) < 2 * 0.3 + 0.05) continue;
+                (int Front, double Long, double Off, int NegK, int K, int N, double At)? best = null;
+                for (int ek = 0; ek < edges.Count; ek++)
+                    foreach (var (c0s, c1s) in Covered(edges[ek].F, edges[ek].L, new List<(double U0, double U1, double V0, double V1)> { box }, F))
+                        for (int n = 0; n < wallPieces[ek].Count; n++)
+                        {
+                            var pc = wallPieces[ek][n];
+                            if (pc.Y0 > 0.0) continue;
+                            double lo = Math.Max(c0s, pc.A0) + 0.35 + SideDoor / 2, hi = Math.Min(c1s, pc.A1) - 0.35 - SideDoor / 2;
+                            if (hi < lo) continue;
+                            double mid = (lo + hi) / 2;
+                            for (int step = 0; step < 200; step++)
+                            {
+                                double? hit = null;
+                                foreach (double s2 in new[] { mid + step * 0.25, mid - step * 0.25 })
+                                    if (lo <= s2 && s2 <= hi && DoorClear(edges[ek].F, s2, SideDoor)) { hit = s2; break; }
+                                if (hit is { } h)
+                                {
+                                    var cand = (FacingEdge(ek) > 0.5 ? 1 : 0, hi - lo, -Math.Abs(h - mid), -ek, ek, n, h);
+                                    if (best == null || Before(best.Value, cand)) best = cand;
+                                    break;
+                                }
+                                if (mid + step * 0.25 > hi && mid - step * 0.25 < lo) break;
+                            }
+                        }
+                if (best is not { } b2) continue;
+                var ed = edges[b2.K];
+                double c0 = b2.At - SideDoor / 2, c1 = b2.At + SideDoor / 2;
+                var pieceLater = new List<(double U0, double U1, double Y0, double Y1, string? Nm)>();
+                foreach (var pc in wallPieces[b2.K])
+                {
+                    if (pc.Y0 > 0.0 || pc.A0 > c0 - 0.02 || pc.A1 < c1 + 0.02) continue;
+                    var old = outList[pc.Index];
+                    outList[pc.Index] = Make(old.PrefabId, ed.F, pc.A0, c0, 0.0, WallT, 0.0, pc.Y1, old.Name, old.Layer, null, old.EntityId);
+                    double head = Math.Min(FloorTop + Math.Round(Base("door").Y, 4) - DoorLap, pc.Y1);
+                    pieceLater.Add((c0, c1, head, pc.Y1, old.Name));
+                    pieceLater.Add((c1, pc.A1, 0.0, pc.Y1, old.Name));
+                }
+                var (dx, dz) = ed.F.W(b2.At, WallT / 2);
+                var rxz = F.W((box.U0 + box.U1) / 2, (box.V0 + box.V1) / 2);
+                string sideName = $"{name} side door";
+                foreach (var (u0, u1, y0, y1, nm) in pieceLater)
+                    later!.Doors.Add(eid => Make(wallPrefab, ed.F, u0, u1, 0.0, WallT, y0, y1, nm, "structure", null, eid));
+                later!.Doors.Add(eid => DoorEntity("door", dx, dz, FloorTop, ed.F.A, written?[0] ?? rid, -1, SideDoor, rxz, sideName, eid));
+                if (p.Pad is { } padded2)
+                    foreach (var (v0, v1, bottom, stepTop, landing) in StepsOut(ed.F, b2.At, SideDoor, padded2, ground))
+                    {
+                        double h2 = SideDoor / 2 + StepSide, at2 = b2.At;
+                        string stepName = $"{sideName} {(landing ? "landing" : "step")}";
+                        later.Steps.Add(eid => Make("concrete_floor", ed.F, at2 - h2, at2 + h2, v0, v1, bottom, stepTop, stepName, "structure", null, eid));
+                    }
+                ways.Add((rid, -1, SideDoor));
+            }
+
+            // gen_osm.py's tuple order: the first part that differs decides.
+            static bool Before((int, double, double, int, int, int, double) a, (int, double, double, int, int, int, double) b)
+                => a.Item1 != b.Item1 ? a.Item1 < b.Item1 : a.Item2 != b.Item2 ? a.Item2 < b.Item2 : a.Item3 != b.Item3 ? a.Item3 < b.Item3
+                   : a.Item4 != b.Item4 ? a.Item4 < b.Item4 : a.Item5 != b.Item5 ? a.Item5 < b.Item5 : a.Item6 != b.Item6 ? a.Item6 < b.Item6 : a.Item7 < b.Item7;
+        }
+
+        // gen_osm.py door_clear: the ground a step outside clear of every building, this one's own wings included.
+        bool DoorClear(Frame e, double at, double w)
+        {
+            double h = w / 2 + StepSide;
+            foreach (double u in new[] { at - h, at, at + h })
+                foreach (double v in new[] { -0.35, -1.0 })
+                {
+                    var (x, z) = e.W(u, v);
+                    if (Pip(x, z, bd.Ring) || (occupied?.Invoke(x, z) ?? false)) return false;
+                }
+            return true;
+        }
+
+        // gen_osm.py same_pieces, for one door: its wall (and the plaster on it) in as many pieces at s2 as at s1.
+        static bool SamePieces(Edge ed, double s1, double s2, double w)
+        {
+            foreach (double thick in new[] { WallT, WallT + 0.03 })
+            {
+                double start = ed.Reflex0 ? -thick : 0.0, end = ed.L + (ed.Reflex1 ? thick : 0.0);
+                if ((s1 - w / 2 - start >= 0.02) != (s2 - w / 2 - start >= 0.02) || (end - (s1 + w / 2) >= 0.02) != (end - (s2 + w / 2) >= 0.02))
+                    return false;
+            }
+            return true;
+        }
+
         // gen_osm.py edge_wall: a wall along one side, inside it, with openings cut out of it and a lintel over each,
         // lengthened at a reflex corner by its thickness.
-        void EdgeWall(Edge ed, string prefab, double wtop, string nm, (double C0, double C1, double Top)[] cuts)
+        List<(int Index, double A0, double A1, double Y0, double Y1)> EdgeWall(Edge ed, string prefab, double wtop, string nm, (double C0, double C1, double Top)[] cuts)
         {
+            var made = new List<(int Index, double A0, double A1, double Y0, double Y1)>();
             var pieces = new List<(double A0, double A1, double Y0, double Y1)>();
             double at = ed.Reflex0 ? -WallT : 0.0, end = ed.L + (ed.Reflex1 ? WallT : 0.0);
             foreach (var (c0, c1, ctop) in cuts.OrderBy(c => c.C0).ThenBy(c => c.C1).ThenBy(c => c.Top))
@@ -550,12 +764,17 @@ public static class WorldBuildings
             {
                 if (a1 - a0 < 0.02) continue;
                 Obox(prefab, ed.F, a0, a1, 0.0, WallT, y0, y1, nm, "structure");
+                made.Add((outList.Count - 1, a0, a1, y0, y1));
             }
+            return made;
         }
 
         // gen_osm.py door: a leaf in a doorway whose wall runs along phi, its +Z face (the outside) away from its room,
         // made to cover the opening and lap each jamb.
         void Door(string prefab, double x, double z, double y0, double phi, int a, int b, double opening, (double X, double Z) room, string nm)
+            => outList.Add(DoorEntity(prefab, x, z, y0, phi, a, b, opening, room, nm, ++id));
+
+        EntityData DoorEntity(string prefab, double x, double z, double y0, double phi, int a, int b, double opening, (double X, double Z) room, string nm, int eid)
         {
             var bs = Base(prefab);
             if (prefabs.TryGetValue(prefab, out var pf) && pf.Hinged)
@@ -563,9 +782,9 @@ public static class WorldBuildings
                 double nx = -Math.Sin(phi), nz = Math.Cos(phi);
                 if ((room.X - x) * nx + (room.Z - z) * nz > 0) phi += Math.PI;
             }
-            outList.Add(new EntityData
+            return new EntityData
             {
-                EntityId = ++id,
+                EntityId = eid,
                 PrefabId = prefab,
                 Position = new Vector3(R4(x + shift.X), R4(R4(y0 + bs.Y / 2) + lift), R4(z + shift.Z)),
                 Rotation = WorldFeatures.Yaw(-phi),
@@ -574,7 +793,7 @@ public static class WorldBuildings
                 Scale = new Vector3(R4(Math.Round((opening + 2 * DoorLap) / bs.X, 4)), 1f, 1f),
                 Name = nm,
                 Layer = "structure",
-            });
+            };
         }
 
         // gen_osm.py portal: an opening with nothing in it joining room a to room b (-1 the outdoors), in a wall along phi.
@@ -661,8 +880,11 @@ public static class WorldBuildings
                         foreach (var (i, j) in piece) mask[j][i] = true;
                         var (_, i0r, i1r, j0r, j1r) = LargestRect(mask, nu, nv);
                         var box = (U0: u0g + i0r * cu, U1: u0g + i1r * cu, V0: v0g + j0r * cv, V1: v0g + j1r * cv);
+                        var written = new int[1];
+                        lateRooms.Add((written, box));
                         later!.Rooms.Add(eid =>
                         {
+                            written[0] = eid;
                             var room = Make("acoustic_region", F, box.U0, box.U1, box.V0, box.V1, FloorTop - 0.02, top, newName, "rooms", null, eid);
                             if (measured) { room.RoomMaterials = roomMaterials; room.IsIndoor = true; }
                             return room;
@@ -697,6 +919,7 @@ public static class WorldBuildings
                             var (x, z) = axis == 'u' ? F.W(line, sm) : F.W(sm, line);
                             double phi = axis == 'u' ? F.A + Math.PI / 2 : F.A;
                             PortalLater(x, z, phi, s1 - s0, FloorTop - 0.02, top, 0.1, rooms[owner].Id, rooms[kk].Id);
+                            waysMade.Add((rooms[owner].Id, rooms[kk].Id, OpenWidth(F, bd.Ring, axis == 'u', line, s0, s1)));
                         }
                     }
                 }

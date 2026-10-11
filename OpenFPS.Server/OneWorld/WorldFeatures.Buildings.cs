@@ -478,6 +478,8 @@ public sealed partial class WorldFeatures
         // Written after them, as gen_osm.py writes them: the leftover pieces' rooms, then the openings.
         foreach (var l in laters) foreach (var make in l.Rooms) entities.Add(make(++lastId));
         foreach (var l in laters) foreach (var make in l.Openings) entities.Add(make(++lastId));
+        foreach (var l in laters) foreach (var make in l.Doors) entities.Add(make(++lastId));
+        foreach (var l in laters) foreach (var make in l.Steps) entities.Add(make(++lastId));
         return (built, built > 0 ? Footprint.Attribution(Buildings?.Name ?? "Buildings", mine) : null);
     }
 
@@ -493,11 +495,18 @@ public sealed partial class WorldFeatures
                                                Func<double, double, double, double, bool> inPlace)
     {
         int nextId = 0;
-        foreach (var b in Site(key, footprints, ways, inPlace))
+        var sited = Site(key, footprints, ways, inPlace);
+        foreach (var b in sited)
         {
             if (!b.Near) continue;
             var o = b.Owner;
             double G(double x, double z) => ground.At(x + o.Easting, z + o.Northing);
+            // Every other building near, for a door with one a step outside it (gen_osm.py door_clear).
+            var others = sited.Where(n => n != b && Math.Abs(n.Shape.Cx + n.Owner.Easting - b.Shape.Cx - o.Easting) < 120
+                                          && Math.Abs(n.Shape.Cz + n.Owner.Northing - b.Shape.Cz - o.Northing) < 120)
+                              .Select(n => n.Shape.Ring.Select(q => (X: q.X + n.Owner.Easting - o.Easting, Z: q.Z + n.Owner.Northing - o.Northing)).ToList())
+                              .ToList();
+            bool Occupied(double x, double z) => others.Any(r => WorldBuildings.Pip(x, z, r) || WorldBuildings.RingDistance(x, z, r) < 0.3);
             double? pad = b.PadAt is { } p ? G(p.X, p.Z) : null;
             var plan = new WorldBuildings.Plan
             {
@@ -507,7 +516,8 @@ public sealed partial class WorldFeatures
             bool owned = o == key;
             int ids = owned ? nextId : 0;
             var later = new WorldBuildings.Later();
-            var made = WorldBuildings.Build(plan, _prefabs, G, (o.Easting - key.Easting, o.Northing - key.Northing), ref ids, measured: true, later: later);
+            var made = WorldBuildings.Build(plan, _prefabs, G, (o.Easting - key.Easting, o.Northing - key.Northing), ref ids, measured: true, later: later,
+                                            occupied: Occupied);
             if (owned) nextId = ids;
             var frame = new WorldBuildings.Frame(b.Shape.Cx + o.Easting, b.Shape.Cz + o.Northing, b.Shape.Angle);
             var (u0, u1, v0, v1) = WorldBuildings.Extents(new WorldBuildings.Frame(b.Shape.Cx, b.Shape.Cz, b.Shape.Angle), b.Shape.Ring);

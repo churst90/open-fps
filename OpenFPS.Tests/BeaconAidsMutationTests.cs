@@ -404,6 +404,29 @@ public class BeaconAidsMutationTests
     }
 
     /// <summary>
+    /// Picked out with comma or period, a door behind a wall is not blipped and the tracker is told so, to say "behind a
+    /// wall" (Cody, 2026-10-10: in a barn, the house's front door "right in front, 18 metres", and nothing heard).
+    /// </summary>
+    [Fact]
+    public void APingThroughAWallSaysItWasNotHeard()
+    {
+        var wall = Thing(1, new Vector3(0f, 5f, 5f), new Vector3(200f, 10f, 0.3f));
+        var door = Thing(10, new Vector3(0f, 1f, 10f), DoorSize, Beacons.Door, "Wood");
+        var open = Thing(11, new Vector3(3f, 1f, -4f), DoorSize, Beacons.Door, "Wood");
+        var acoustics = new SpatialAcoustics(new SpatialService());
+        var ear = new Vector3(0f, 1.6f, 0f);
+        var world = Fixed(wall, door, open);
+        var mixer = new EmitterRecordingProvider();
+        var audio = new AudioEngineFacade(mixer);
+        audio.InitializeForTest();
+        var aids = new BeaconAids(audio, BeaconPreferences.InMemory(), acoustics);
+        Assert.False(aids.Ping(world, 10, TrackCategory.Doors, ear));
+        Assert.True(aids.Ping(world, 11, TrackCategory.Doors, ear));
+        Assert.Equal("Front door, right in front, 18 metres, behind a wall.",
+                     OpenFPS.Client.Core.Session.ClientGameSession.BehindAWall("Front door, right in front, 18 metres."));
+    }
+
+    /// <summary>
     /// A door behind a wall, whose face you cannot see, does not reach you — and nor does a beacon
     /// the world has no fixed record of, since there is no face to look for.
     /// </summary>

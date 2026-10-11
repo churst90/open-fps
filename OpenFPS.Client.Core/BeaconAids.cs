@@ -119,8 +119,10 @@ public sealed class BeaconAids
     /// One blip from a thing picked out with comma or period (<see cref="MapTracker"/>), so the ear
     /// finds what the words described. Played even with that category off, since you asked, but not
     /// where the map forbids it; a place has no sound; and like every blip it is not heard through a wall.
+    /// False when it was not heard because a wall is in the way, so the tracker can say so: Cody, 2026-10-10, in a
+    /// barn, was told of the house's front door "right in front, 18 metres" and heard nothing.
     /// </summary>
-    public void Ping(WorldSnapshot world, int id, TrackCategory category, Vector3 listener, int selfId = -1)
+    public bool Ping(WorldSnapshot world, int id, TrackCategory category, Vector3 listener, int selfId = -1)
     {
         string? kind = category switch
         {
@@ -131,10 +133,10 @@ public sealed class BeaconAids
             TrackCategory.Vehicles => Beacons.Vehicle,
             _ => null,
         };
-        if (kind == null || PolicyFor(kind) == Beacons.Policy.Forbidden) return;
-        if (!world.Entities.TryGetValue(id, out var e)) return;
+        if (kind == null || PolicyFor(kind) == Beacons.Policy.Forbidden) return true;
+        if (!world.Entities.TryGetValue(id, out var e)) return true;
         EnsureSounds();
-        if (!_registered) return;
+        if (!_registered) return true;
         var at = e.Transform.Position;
         string sound = Kinds[kind].Sound;
         if (kind == Beacons.Player)
@@ -142,10 +144,11 @@ public sealed class BeaconAids
             at += new Vector3(0f, OtherBodies.HeadHeight, 0f);
             sound = SoundFor(world, id, TeamOf(world, selfId));
         }
-        Blip(world, id, sound, at, listener);
+        return Blip(world, id, sound, at, listener);
     }
 
-    private void Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
+    /// <summary>One blip, unless a wall is in the way of it: then false.</summary>
+    private bool Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
     {
         var (gain, reference) = Loudness.Place(BlipDb + (float)_prefs.LevelDb);
         // A door's beacon is fixed to the door at face height on your side, and rings the room you are
@@ -160,7 +163,7 @@ public sealed class BeaconAids
         // every path out read 0.95 blocked and none was heard (Cody, 2026-10-05).
         else if (TryVehicleSide(world, sourceId, listener, out var side)) at = side;
         // The acoustic path every one-off sound takes; the door's own leaf does not block its own blip.
-        if (!Reaches(world, sourceId, listener, at, out var path)) return;
+        if (!Reaches(world, sourceId, listener, at, out var path)) return false;
         _audio.Submit(new SpatialEmitter
         {
             EntityId = BaseId - (_idx++ % Pool),
@@ -182,6 +185,7 @@ public sealed class BeaconAids
             IsEvent = true,
             Type = EmitterType.WorldLocked,
         });
+        return true;
     }
 
     /// <summary>Whether a blip from this beacon reaches you, and by what path. A beacon you can see

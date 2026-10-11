@@ -2024,9 +2024,11 @@ public class GameServer
             // A gas hob you are standing at, the same way: its knobs are under your hand.
             if (TurnHobInReach(world, position, Say)) return;
 
+            float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;
+
             // Then a shut door in reach, from a seat the one beside you: once to open it, again to get
             // in or out.
-            var door = ShutDoorInReach(world, position, out Vector3 doorAt, out string doorName);
+            var door = ShutDoorInReach(world, position, yaw, out Vector3 doorAt, out string doorName);
             if (world.Has<OccupantComponent>(session.Entity))
             {
                 if (door != null && OpenDoor(world, door.Value, doorName, position, session.Entity, Say)) return;
@@ -2042,7 +2044,6 @@ public class GameServer
 
             // A shut door and a car both in reach: the one you face wins, else the nearer (Cody,
             // 2026-10-08: E beside a car opened the apartment door behind him).
-            float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;
             if (door != null && (root < 0 || Prefer(position, yaw, doorAt, carAt))
                 && OpenDoor(world, door.Value, doorName, position, session.Entity, Say)) return;
 
@@ -2058,7 +2059,7 @@ public class GameServer
             if (_hands.TakeWithin(session, PhysicsConstants.PickUpReach, out string took)) { Say(took); return; }
 
             // Last, an open door in reach is shut: beside a house E opens it and E again shuts it.
-            if (CloseDoorInReach(world, position, session.Entity, Say)) return;
+            if (CloseDoorInReach(world, position, yaw, session.Entity, Say)) return;
 
             if (interact.TargetEntityId.HasValue
                 && _maps.TryGetMap(session.CurrentMapId, out var w, out _, out _, out var lookup)
@@ -2073,27 +2074,46 @@ public class GameServer
         });
     }
 
-    /// <summary>The nearest shut door within arm's length that opens by hand. Only shut doors, so once one
-    /// is open the key moves on to getting in or out.</summary>
-    private static Entity? ShutDoorInReach(World world, Vector3 position, out Vector3 at, out string name)
+    /// <summary>
+    /// The shut door within arm's length that opens by hand and that you mean: the one you face, else the
+    /// nearer (<see cref="Prefer"/>), measured to its doorway on your floor. Only shut doors, so once one is
+    /// open the key moves on to getting in or out. Cody, 2026-10-10, in Marlow Tower's floor 3 corridor:
+    /// between two flats' doors, a hand's breadth nearer the one behind him, E opened that one.
+    /// </summary>
+    internal static Entity? ShutDoorInReach(World world, Vector3 position, float yaw, out Vector3 at, out string name)
+        => DoorInReach(world, position, yaw, open: false, out at, out name);
+
+    /// <summary>A door that opens by hand within reach, shut or open, the one meant (see ShutDoorInReach).
+    /// Measured to the doorway, where it shuts, not to the leaf where it has swung; in the world's frame, since a
+    /// door in a building keeps its shut pose in the building's.</summary>
+    private static Entity? DoorInReach(World world, Vector3 position, float yaw, bool open, out Vector3 at, out string name)
     {
-        Entity? nearest = null;
-        float best = PhysicsConstants.InteractionRange;
+        Entity? chosen = null;
         Vector3 found = default;
         string named = "door";
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
         {
-            if (d.Target > 0f) return;                    // already open, or on its way
+            if ((d.Target > 0f) != open) return;          // shut and shutting, or open and opening
             if (!DoorSystem.OpensByHand(d)) return;       // it opens for you, or for the lift
-            float distance = Vector3.Distance(position, t.Position);
-            if (distance > best) return;
-            best = distance; nearest = e; found = t.Position;
+            DoorSystem.Doorway(world, e, out var doorway, out _);
+            float distance = MathF.Min(Vector3.Distance(position, t.Position), Vector3.Distance(position, doorway));
+            if (distance > PhysicsConstants.InteractionRange) return;
+            // A door on the floor above or below is not one you can reach, however near in plan.
+            float up = doorway.Y - position.Y;
+            if (up < -DoorBelowFeet || up > DoorFloorReach) return;
+            if (chosen != null && !Prefer(position, yaw, doorway, found)) return;
+            chosen = e; found = doorway;
             named = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
                   ? world.Get<IdentityComponent>(e).Name : "door";
         });
         at = found; name = named;
-        return nearest;
+        return chosen;
     }
+
+    /// <summary>How far a doorway's middle may be above your feet, and below them, and be on your floor, metres:
+    /// a door's middle is a metre or so over its threshold, and Marlow Tower's storeys are three apart, so the
+    /// door below is two metres under your feet and the one above four over them.</summary>
+    internal const float DoorFloorReach = 2.5f, DoorBelowFeet = 0.75f;
 
     /// <summary>Opens a door and says so.</summary>
     private static bool OpenDoor(World world, Entity door, string name, Vector3 position, Entity who, Action<string> say)
@@ -2199,26 +2219,11 @@ public class GameServer
         });
     }
 
-    /// <summary>Shuts the nearest open door within arm's length, if there is one, unless somebody is in
-    /// the way of the leaf: then says so, and leaves it open.</summary>
-    private static bool CloseDoorInReach(World world, Vector3 position, Entity who, Action<string> say)
+    /// <summary>Shuts the open door within arm's length that you mean (the one you face, else the nearer),
+    /// if there is one, unless somebody is in the way of the leaf: then says so, and leaves it open.</summary>
+    private static bool CloseDoorInReach(World world, Vector3 position, float yaw, Entity who, Action<string> say)
     {
-        Entity? nearest = null;
-        float best = PhysicsConstants.InteractionRange;
-        string name = "door";
-        world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
-        {
-            if (d.Target <= 0f) return;                   // already shut, or on its way
-            if (!DoorSystem.OpensByHand(d)) return;
-            // Measured to where the door shuts (the doorway), not to the swung leaf; in the world's frame,
-            // since a door in a building keeps its shut pose in the building's.
-            DoorSystem.Doorway(world, e, out var doorway, out _);
-            float distance = MathF.Min(Vector3.Distance(position, t.Position), Vector3.Distance(position, doorway));
-            if (distance > best) return;
-            best = distance; nearest = e;
-            name = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
-                 ? world.Get<IdentityComponent>(e).Name : "door";
-        });
+        var nearest = DoorInReach(world, position, yaw, open: true, out _, out string name);
         if (nearest == null) return false;
         if (DoorSystem.InTheWay(world, nearest.Value, 0f, who) is { } blocker)
         {

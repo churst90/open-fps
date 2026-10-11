@@ -692,7 +692,7 @@ public sealed class DoorSystem
 
     /// <summary>Where the leaf is, centre and turn, at an opening between 0 and 1: what Place puts it at,
     /// in the world.</summary>
-    private static (Vector3 Centre, Quaternion Rotation) LeafAt(World world, Entity entity, in DoorComponent door, float openness)
+    internal static (Vector3 Centre, Quaternion Rotation) LeafAt(World world, Entity entity, in DoorComponent door, float openness)
     {
         Doorway(world, entity, out var shutCentre, out var shutRotation);
         float halfWidth = HalfWidth(world, entity, door);

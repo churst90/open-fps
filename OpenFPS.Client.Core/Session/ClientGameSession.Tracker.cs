@@ -46,14 +46,19 @@ public sealed partial class ClientGameSession
         SyncTrackCategory();
         var snapshot = _world.GetSnapshot();
         string line = _tracker.Step(direction, snapshot, _state.Position, _state.Yaw, _ownEntityId);
-        Say(line);
         if (_tracker.Selected is { } picked)
         {
             Serilog.Log.Information("[TRACK] {Category} '{Line}' e{Id} at {Pos}", _tracker.Category, line, picked.Id, picked.At);
-            _audioSystem.Beacons.Ping(snapshot, picked.Id, _tracker.Category,
-                _state.Position + new Vector3(0f, _state.EyeHeight, 0f), _ownEntityId);
+            // Its blip is not heard through a wall; said, so silence is not taken for nothing there.
+            if (!_audioSystem.Beacons.Ping(snapshot, picked.Id, _tracker.Category,
+                    _state.Position + new Vector3(0f, _state.EyeHeight, 0f), _ownEntityId))
+                line = BehindAWall(line);
         }
+        Say(line);
     }
+
+    /// <summary>A tracker line for a thing whose blip a wall keeps from you: "..., 18 metres, behind a wall."</summary>
+    internal static string BehindAWall(string line) => line.TrimEnd().TrimEnd('.') + ", behind a wall.";
 
     /// <summary>/track, /track doors: which kind of thing comma and period step through.</summary>
     internal static string TrackCommand(string[] args, Action? save = null)
