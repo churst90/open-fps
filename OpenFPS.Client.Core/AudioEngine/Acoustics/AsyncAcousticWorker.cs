@@ -528,11 +528,15 @@ public class AsyncAcousticWorker : IDisposable
     /// <param name="Path">Steam Audio's own route through the scene, when it found one.</param>
     /// <param name="Route">What came by the openings (OpeningRoutes), when source and listener are in
     /// different places and a route joins them.</param>
+    /// <param name="Round">What bends round the things in the way, per band, spreading included
+    /// (OpeningRoutes.BarrierGains): round everything clear, or round one thing and through the rest.</param>
+    /// <param name="RoundFound">Whether there is any such way.</param>
     private readonly record struct SaResult(SteamAudioSimulator.DirectResult Direct, Vector3 ApparentPosition,
                                             bool HasApparent, float BarrierDelta,
                                             bool BarrierVerified = true,
                                             SteamAudioSimulator.PathResult Path = default,
-                                            OpeningRoutes.Answer? Route = null);
+                                            OpeningRoutes.Answer? Route = null,
+                                            Vector3 Round = default, bool RoundFound = false);
 
     // Below this visibility a source is heard from where it arrives (an edge, an opening), not through the wall.
     private const float PathRedirectVisibility = 0.5f;
@@ -616,10 +620,12 @@ public class AsyncAcousticWorker : IDisposable
                 // near car on the speedway was heard to stop: the bearing snapped to the 7.3 m probe grid.
                 // See docs/CLIENT_NOTES.md, "The bearing follows the level".
                 Vector3 edge = kv.Value.ListenerPos;
-                bool edgeVerified = false;
-                float barrierDelta = routes != null
-                    ? routes.BarrierPathDifference(kv.Value.SourcePos, kv.Value.ListenerPos, out edge, out edgeVerified)
-                    : -1f;
+                bool edgeVerified = false, roundFound = false;
+                float barrierDelta = -1f;
+                Vector3 round = Vector3.Zero;
+                if (routes != null)
+                    round = routes.BarrierGains(kv.Value.SourcePos, kv.Value.ListenerPos, AudioPhysics.CurrentSpeedOfSound,
+                                                out barrierDelta, out edgeVerified, out edge, out roundFound);
                 if (_saDebug && edgeVerified)
                     Console.WriteLine($"[ROUTE] {kv.Value.SourcePos} -> {kv.Value.ListenerPos}: {barrierDelta:F2} m round one box, edge {edge}");
                 Vector3 apparent = default;
@@ -628,7 +634,12 @@ public class AsyncAcousticWorker : IDisposable
                 if (direct.Visibility < PathRedirectVisibility)
                 {
                     float dist = Vector3.Distance(kv.Value.ListenerPos, kv.Value.SourcePos);
-                    if (edgeVerified)
+                    // A way that is partly through walls is heard from its edge only when it delivers more
+                    // than the straight line through them all.
+                    var through = SteamAudioSimulator.ToAcousticParams(direct);
+                    bool roundWins = roundFound && Vector3.Dot(round, round)
+                        > through.EqLow * through.EqLow + through.EqMid * through.EqMid + through.EqHigh * through.EqHigh;
+                    if (edgeVerified || roundWins)
                     {
                         // The edge is the secondary source, placed on its bearing at the real source's
                         // distance: the level has paid for the detour already.
@@ -649,7 +660,7 @@ public class AsyncAcousticWorker : IDisposable
                 OpeningRoutes.Answer? viaOpenings = routes != null
                     ? AskRoutes(routes, world, kv.Key, kv.Value.SourcePos, kv.Value.ListenerPos, listenerRegion)
                     : null;
-                results[kv.Key] = new SaResult(direct, apparent, hasApparent, barrierDelta, edgeVerified, route, viaOpenings);
+                results[kv.Key] = new SaResult(direct, apparent, hasApparent, barrierDelta, edgeVerified, route, viaOpenings, round, roundFound);
                 if (direct.Visibility < PathRedirectVisibility) blocked++;
                 reflections += _lastReflectionCount;
             }
@@ -693,19 +704,16 @@ public class AsyncAcousticWorker : IDisposable
         {
             // Measured once, in RunSteamAudio, where the same number decides the bearing: two measurements
             // could have the level "over the wall" and the bearing "through a door".
-            float delta = sr.BarrierDelta;
             // Only a route that exists: round a shut door's edge is eight centimetres and straight into the
-            // wall it hangs in, and would pass -7/-11/-19 dB (--path-probe). Not Steam Audio's pathing eq
-            // either: that is the bend's colour, about 1.0 for a route 150 m long, not its loss.
-            if (delta >= 0f && !sr.BarrierVerified) delta = -1f;
-            if (delta >= 0f)
+            // wall it hangs in, and would pass -7/-11/-19 dB (--path-probe). A way round one thing that runs
+            // on through another pays that other's transmission (OpeningRoutes.BarrierGains). Not Steam
+            // Audio's pathing eq either: that is the bend's colour, about 1.0 for a route 150 m long, not its loss.
+            if (sr.RoundFound)
             {
-                var (dLow, dMid, dHigh) = Diffraction.BandGains(delta, AudioPhysics.CurrentSpeedOfSound);
-                // The longer route's spreading, which the barrier loss stops paying at its 24 dB ceiling: a
-                // walker 8 m through a brick wall and 164 m round the building (Marlow flat 01F) would beat
-                // the wall's -24/-30/-36 and be heard through it. 26 dB there; under half a dB for a kerb.
-                float spread = MathF.Max(0.5f, dist) / (MathF.Max(0.5f, dist) + delta);
-                dLow *= spread; dMid *= spread; dHigh *= spread;
+                // The longer route's spreading is in it, which the barrier loss stops paying at its 24 dB
+                // ceiling: a walker 8 m through a brick wall and 164 m round the building (Marlow flat 01F)
+                // would beat the wall's -24/-30/-36 and be heard through it. 26 dB there; under half a dB for a kerb.
+                float dLow = sr.Round.X, dMid = sr.Round.Y, dHigh = sr.Round.Z;
                 // Per band, the better of what the material lets through and what came round the edge.
                 ap = new SteamAudioSimulator.AcousticParams(
                     ap.Occlusion,
@@ -716,7 +724,10 @@ public class AsyncAcousticWorker : IDisposable
                 // A source arriving round an edge is quieter, not absent.
                 float throughput = MathF.Max(dLow, MathF.Max(dMid, dHigh));
                 occ = Math.Clamp(MathF.Min(occ, 1f - throughput), 0f, AcousticConstants.OcclusionCap);
-                if (trace != null) trace += $"; over an edge {delta:F1} m {Db(dLow):F0}/{Db(dMid):F0}/{Db(dHigh):F0}";
+                if (trace != null)
+                    trace += sr.BarrierVerified && sr.BarrierDelta >= 0f
+                        ? $"; over an edge {sr.BarrierDelta:F1} m {Db(dLow):F0}/{Db(dMid):F0}/{Db(dHigh):F0}"
+                        : $"; round one, through the rest {Db(dLow):F0}/{Db(dMid):F0}/{Db(dHigh):F0}";
             }
             else if (trace != null && sr.BarrierDelta >= 0f) trace += $"; edge {sr.BarrierDelta:F1} m not verified";
         }

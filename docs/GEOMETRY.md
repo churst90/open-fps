@@ -1941,8 +1941,9 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      passes the head of the flight. The way over the guard is 3 cm, but its leg to the street runs through the
      brick front (1585), so the search does not believe it and the guard is charged as a whole wall in a row with
      the front. A way round one thing that passes through another is never paid as diffraction times that other
-     thing's transmission; with it, the guard would cost a few dB and this stretch would not stand out. Open: it is
-     a change to the barrier model everywhere (todo, Acoustics). The pavement's pops were the way over the top
+     thing's transmission; with it, the guard would cost a few dB and this stretch would not stand out. Done since,
+     for every asker (below, "Round one thing, through another"); what is left of these pops is the slab's edge, not
+     the guard. The pavement's pops were the way over the top
      giving up after four boxes (`OpeningRoutes.OverTheTopPasses`): fixed, below.
 
      The pavement before the entrance (`--pop-hunt ear=-6.4,1.77,-103.5`, 40 cars): 41 to 56 pops a minute, each a
@@ -1962,6 +1963,102 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    stairwell `/tp -10.8 -104.2 9.28`; flat 31F `/tp -14 -85 9.29`; floor 7 corridor `/tp -19.95 -100 21.29`;
    before the front entrance `/tp -6.4 -103.5 0.12`; floor 1 stairwell, where the pops are left, `/tp -10.8 -104.2
    3.28`, and the pop hunt's ear there `/tp -11.05 -100.84 3.28`.
+   **Round one thing, through another (2026-10-11, unheard).** The barrier model before: what got past the things
+   on a line was, per band, the better of the line through all of them (Steam Audio's transmission, or the panel
+   model along a route's leg) and a way round that was clear of the whole scene (`BarrierPathDifference`: round
+   each box on the line, its legs bent round up to two more, or the string over the top), paid as Maekawa's loss
+   for its detour and the spreading over the longer way. A way round one box whose leg ran on into a wall was
+   thrown out, so a low wall before a heavier one was charged its whole transmission in a row with the heavier one.
+   Now there is a second kind of way, in `OpeningRoutes.BarrierGains`, which every asker of the barrier uses: the
+   worker's simulated path (in place of `BarrierPathDifference` and its own Maekawa sum), and every leg of the
+   routes by the openings (`LegGains`), so one-offs, sirens, trains and anything the worker answers. The
+   hand-rolled tracer (beacons, birds, rain patches, the stand-in before an answer) has no barrier search and is
+   unchanged (docs/SPECIAL_CASES_AUDIT.md S14).
+
+   - **The model.** For each box on the line, its most promising way round (shortest, by its detour times what the
+     rest of the line lets through), the legs straight from the bend to the source and to the ear. Each leg pays
+     every box it passes through by the panel model (`WallTransmission`, sheets in contact as one construction,
+     `Constructions.Through`); a leg may instead bend round what it meets within a metre of the bend (the other
+     piece of a guard, a post), the extra detour added. What arrives is Maekawa's loss for the whole detour
+     (Kurze and Anderson's form of it, `Diffraction.InsertionLossDb`, 24 dB at most) times the spreading times what
+     the legs let through: G = IL(δ) · d/(d+δ) · T(legs), per band. It competes with the straight line, the clear
+     ways round and the openings as before, per band the better. The basis: a ray through a sequence of edges and
+     walls keeps the product of what each does to it (Funkhouser et al. 2004: "the product of all the attenuation
+     coefficients for the reflecting, diffracting, and transmitting surfaces along the corresponding propagation
+     sequence"); a screen's loss is Maekawa's for the extra path (Maekawa 1968, Kurze and Anderson 1971, ISO 9613-2's
+     screening term); a wall's is the panel model (Sharp 1978, EN 12354-1, as WallTransmission says); and the
+     sound through a barrier and the sound over it are both real and both arrive (the HUD guide's rule: a barrier
+     whose transmission loss is 10 dB more than its diffraction loss loses under half a decibel to transmission).
+   - **When it is allowed.** Only where everything solid on the way is paid: every box a leg touches, faces
+     included, at its own transmission. Not round a leaf standing in its doorway (the doorway's to charge, as
+     before). Not round an edge buried within 5 cm of another box (a guard's foot in the floor it stands on: its
+     legs would start inside the floor). And never more than the detour's loss times the straight line through the
+     boxes the way passes through, so a wall costs the way no less than it costs the line. It can only add: on the
+     three maps no pair came out quieter, and the tests hold it below what the heavier wall alone lets through.
+   - **Where it is approximate.** The paths compete by the better per band, not by summing their energies (the
+     rule already used between the line, the ways round and the openings): at most 3 dB under where two are equal.
+     A way bent at several edges is charged one screen's loss for its whole detour; ISO 9613-2's double diffraction
+     (its C3) takes up to about 5 dB more for edges far apart (the clear search does the same). The leg's wall is
+     paid at field incidence whatever the leg's angle, and the edge is a ray's bend, which wants the wall several
+     wavelengths from the edge (1.7 m at 200 Hz: the stairwell's guard is 2 m from the front). One box is gone round
+     per way (and what stands within a metre of its edge). The ground of the real places is no box, so a way under
+     a raised floor at ground level is not stopped by the earth (the clear search's rule, nothing below both ends,
+     holds).
+   - **The stairwell** (still sources on Dock Street at z -128.5, the worker with Steam Audio, low/mid/high dB): x
+     -27 to -21, before -57/-83/-100, now -45/-67/-96 to -45/-70/-100 (over the guard, 1 to 4 cm, -5/-6/-11, then
+     through the brick front 1585, -40/-62/-87); x -15.2 -56/-82/-100 to -45/-69/-100; x -19.8 to -15.6 as it was,
+     -35/-52/-80; x -30 and beyond as it was, -57/-83/-100 (the way over the guard comes down through the slab's edge
+     and the brick both). `--pop-hunt` (40 cars, 30 still sources, 120 s): 11 mid-band excursions before, 22 to 31
+     dB; 8 after, each a car coming into the stretch from -69 (the guard's shadow) or -80 dB to -53. What is left
+     is the slab's edge, not the guard: from x -19.8 to -15.6 the line goes into the front through the 15 cm edge of the floor slab (1579) between the two storeys'
+     brick and out of its top, and the panel model charges that as 15 cm of concrete crossed face to face, where it
+     has gone through nearly a metre of it. A sheet entered by its edge is a flanking path (EN 12354), not a panel;
+     that is the panel model's (and Steam Audio's faces, `LayeredFaces`), a part of its own (todo).
+   - **The pavement** (`--pop-hunt ear=-6.4,1.77,-103.5`, 120 s): 1 mid and 4 high before, 2 mid and 6 high after
+     (and 0 in an earlier run of this change); every one a car on Wharf Avenue 235 m off seen clear between two
+     buildings, or the clear search's own way round, not a way through anything (the traces say "over an edge" or
+     visibility 1).
+   - **The three maps** (`--barrier-sweep map=X n=4000`: an ear 1.6 m over a place's floor, a source in another
+     place within 150 m, the line meeting something; the leg as the routes charge it against the openings, per band
+     the better): louder by more than 0.5 dB, low/mid/high, city 6.9/1.9/2.1 % of pairs (median of those
+     7.9/10.9/5.6 dB, most 56.2/38.6/29.6), Magnolia 20.7/9.7/0.1 % (11.8/5.0/15.5, most 52.7/46.0/18.1), Albany
+     8.7/3.9/0.0 % (12.2/4.5/-, most 47.8/20.2/0); none quieter. The street heard indoors (`outdoor`: the ear
+     indoors, the source 0.5 m over the ground, 2,000 pairs): city 8.8/4.0/3.0 %, Magnolia 18.8/17.1/16.1 % within
+     80 m, Albany 8.5/6.5/4.7 %. The biggest, each spelled out by `pair=` and `--path-probe explain`:
+     - a line that clips a corner, a slab's edge or a parapet by a few centimetres before a heavier wall, which
+       paid both before and now pays Maekawa's grazing loss and the wall: Union Building flat 70B from Central
+       Street, -100/-100/-100 to -45/-70/-100 (the car park's slab edge, 3.5 cm, then the flat's brick); on the
+       real places a neighbour's shed or roof, then a timber-frame wall (-24/-48/-76): -100 to -29/-54/-85;
+     - round a brick pier or panel and through the window beside it: Selby House flat 01F from Main Street block
+       8, -100/-100/-100 to -44/-83/-100; 60 Alder Street from the next back garden, -66/-97/-100 to -24/-57/-70;
+     - ways bent at several edges that the clear search's budget missed: Selby House's stairwell, floor 5 to
+       floor 4 by the stair hole, -18/-18/-26 (the openings) to -7/-11/-19.
+   - **The cost.** A blocked straight leg, the same pairs both ways: city 2,037 to 2,245 µs, Magnolia 1,487 to
+     1,496, Albany 1,799 to 1,908 (+10 %, +1 %, +6 %). One source in the worker (`--path-probe legcost`, the
+     stairwell's): the barrier search 1.0 to 1.9 ms, both kinds 1.2 to 2.1 ms. The ways tried are bounded: four
+     boxes, one way each (twelve looked at for an edge in the air), four bends in all.
+   - **The guards.** The eight emitter streams and the render fingerprints are unchanged: the replay runs the
+     worker without Steam Audio, and none of its scenarios has a route leg the change moves. Tests:
+     `OpeningRoutesBarrierTests` (a low wall before a heavier one, a guard in two pieces, never quieter).
+   - **References.** Maekawa, "Noise reduction by screens", Applied Acoustics 1 (1968) 157-173,
+     https://doi.org/10.1016/0003-682X(68)90020-0. Kurze and Anderson, "Sound attenuation by barriers", Applied
+     Acoustics 4 (1971) 35-53, https://trid.trb.org/View/130867, the form 5 + 20 log10(√(2πN)/tanh √(2πN)) as
+     restated in https://www.ct.upt.ro/buletinhidro/2013-1/004%20Muscă%20Determination%20s.pdf. ISO 9613-2's
+     screening (a thin barrier one diffraction a path, a thick one two; over the top and round the sides):
+     https://jcaa.caa-aca.ca/index.php/jcaa/article/download/880/597/987, and its limits (20 dB one edge, 25 dB
+     two or more; each object's own and the highest kept): https://doku.datakustik.com/CadnaA/en/Industrie_ISO.html.
+     Funkhouser, Tsingos, Carlbom et al., "A beam tracing method for interactive architectural acoustics", JASA 115
+     (2004) 739-756, p. 747: https://people.csail.mit.edu/addy/research/funk-beamtracing-jasa04.pdf. HUD, Noise
+     Guidebook, chapter 4, transmission against diffraction:
+     https://housingnm.org/uploads/documents/Noise-Guidebook-Chapter-4.pdf.
+   - **Where to listen** (each `--walk-pair map=X ears=...`, the server's collision: a body stands there, z the
+     floor): Marlow Tower floor 1 stairwell `/tp -10.8 -104.2 3.28` and the pop hunt's ear `/tp -11.0 -100.8 3.3`
+     (cars on Dock Street, south); city: Union Building flat 70B `/tp 25.0 25.8 21.4` (Central Street, east),
+     Marlow Tower stairwell floor 0 `/tp -11.8 -97.0 0.1` (Main Street, north), Brandt Court flat 02B `/tp
+     -27.8 190.7 0.1` (Wharf Avenue, south-west); Magnolia: 26618 North Carrol Lane `/tp -129.4 1268.1 0.4`, 16523
+     Burklin Lane `/tp 1377.5 94.6 -1.0`, 26410 Country Woods Trail `/tp -822.0 708.6 4.7`; Albany: 777 College Park
+     Drive Southwest `/tp 253.0 934.4 -1.9`, 6237 Chapman Place Southwest `/tp -642.8 -0.8 -2.6`, 1551 Beaver Court
+     Southwest `/tp -535.0 859.2 -4.0` (the real places: what is outside, louder through the next roof or shed).
    **Openings from the floods (step 3, 2026-10-11, unheard).** A flood keeps the cells of each opening its air meets
    and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
    opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide

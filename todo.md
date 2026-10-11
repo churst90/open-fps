@@ -358,13 +358,13 @@ and the server's voice line.
   heard over the roofs (Cody)? The pavement's are gone (2026-10-11: the way over the car park and the tower
   gave up after four boxes; 41-56 a minute to 0). Left: Marlow Tower's floor 1 stairwell, 4 to 11 a minute
   (`--pop-hunt ear=-11.05,4.9,-100.84`, `/tp -10.8 -104.2 3.28`), a car on Dock Street from -57/-83/-100 to
-  -35/-52/-80 dB for 4 m of road, x -19.5 to -15.5. Still sources do it: the line crosses the slab's edge all
-  along and, either side of that stretch, the stair's 1.07 m concrete guard. The way over the guard is 3 cm,
-  but its leg runs on through the brick front, so it is not believed and the guard is charged as a whole
-  wall. The barrier model needs a way round one thing that passes through another, paid as the diffraction
-  times what the leg's walls let through per band, competing with the straight line as now. That changes
-  what is heard behind walls everywhere (louder where a near low wall stands in front of a heavier one), so
-  a part of its own, measured on the three maps (docs/GEOMETRY.md 12.6, "Marlow Tower's leaks"). Older finds
+  -35/-52/-80 dB for 4 m of road, x -19.5 to -15.5. The guard's half is done (2026-10-11, unheard): a way
+  round one thing that runs on through another is paid as the diffraction times what its legs pass through
+  (docs/GEOMETRY.md 12.6, "Round one thing, through another"), so beside the stretch it is -45/-70/-100, and
+  11 excursions in two minutes are 8. Left: the stretch itself, where the line goes in through the 15 cm
+  edge of the floor slab between two storeys of brick and out of its top, charged as 15 cm of concrete
+  crossed face to face. A sheet entered by its edge is a flanking path, not a panel: the panel model's
+  (WallTransmission, Constructions, Steam Audio's faces in LayeredFaces), a part of its own. Older finds
   of `--pop-hunt`: a car's straight line through one wall as it passes a gap (-80 to -62 dB for 200-400 ms),
   and up to 19 dB between over the wall and over the roof under the covered hall west of Main Street.
 - The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost

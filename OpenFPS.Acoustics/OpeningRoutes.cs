@@ -400,6 +400,11 @@ public sealed class OpeningRoutes
     /// measure how far the answers depend on the order boxes are met in. Never set in the game.</summary>
     public static bool ReverseGridOrderForParity;
 
+    /// <summary>For the lab (--barrier-sweep) and the tests: the barrier model as it was before 2026-10-11, the
+    /// ways round clear of everything and none through anything. Per thread, so a test that sets it moves no
+    /// other test. Never set in the game.</summary>
+    [ThreadStatic] public static bool OnlyClearWaysRoundForLab;
+
     /// <summary>For the parity harness only: told every box the over-the-top search crosses.</summary>
     public static Action<string>? DebugOverTheTop;
 
@@ -1236,9 +1241,9 @@ public sealed class OpeningRoutes
 
     /// <summary>
     /// What a straight leg loses to the boxes it crosses, amplitude per band: what their constructions let
-    /// through (<see cref="WallTransmission"/>), or what bends round the worst of them by a route clear of
-    /// everything else (<see cref="BarrierPathDifference"/>), whichever passes more in each band. The boxes
-    /// standing in the openings at either end are not charged: the opening's own transmission is.
+    /// through (<see cref="WallTransmission"/>), or what bends round them (<see cref="BarrierGains"/>),
+    /// whichever passes more in each band. The boxes standing in the openings at either end are not
+    /// charged: the opening's own transmission is.
     /// </summary>
     public Vector3 LegGains(Vector3 a, Vector3 b, int[] ignoreA, int[] ignoreB)
     {
@@ -1252,27 +1257,296 @@ public sealed class OpeningRoutes
         {
             if (Array.IndexOf(ignoreA, i) >= 0 || Array.IndexOf(ignoreB, i) >= 0) continue;
             if (!SegmentSpan(i, a, b, 0f, out float t0, out float t1)) continue;
-            ref readonly var s = ref _solids[i];
-            // Solids in contact crossed one after another are one construction (Constructions).
-            bool layer = !s.IsLeaf && Constructions.IsSheet(s.Size);
-            crossed.Add(new Constructions.Crossing
-            {
-                In = t0 * len, Out = t1 * len, Props = AcousticRegistry.GetProperties(s.Material), Panel = s.Size, Build = s.Build,
-                Gains = _solidGains[i], Times = 1, Normal = layer ? Constructions.Normal(s.Size, s.Rotation) : Vector3.Zero,
-            });
+            crossed.Add(CrossingOf(i, t0 * len, t1 * len));
         }
         if (crossed.Count == 0) return Vector3.One;
         Vector3 through = Constructions.Through(crossed, len > 1e-6f ? (b - a) / len : Vector3.UnitX);
-        float delta = BarrierPathDifference(a, b, out _, out bool verified, ignoreA, ignoreB);
-        if (verified && delta >= 0f)
-        {
-            var (l, m, h) = Diffraction.BandGains(delta, WallTransmission.SoundSpeed);
-            float dist = MathF.Max(0.5f, Vector3.Distance(a, b));
-            float spread = dist / (dist + delta);
-            through = Vector3.Max(through, new Vector3(l, m, h) * spread);
-        }
-        return through;
+        var round = BarrierGains(a, b, WallTransmission.SoundSpeed, out _, out _, out _, out bool found, ignoreA, ignoreB);
+        return found ? Vector3.Max(through, round) : through;
     }
+
+    /// <summary>Box i crossed from <paramref name="tIn"/> to <paramref name="tOut"/> metres along a line:
+    /// solids in contact crossed one after another are one construction (Constructions).</summary>
+    private Constructions.Crossing CrossingOf(int i, float tIn, float tOut)
+    {
+        ref readonly var s = ref _solids[i];
+        bool layer = !s.IsLeaf && Constructions.IsSheet(s.Size);
+        return new Constructions.Crossing
+        {
+            In = tIn, Out = tOut, Props = AcousticRegistry.GetProperties(s.Material), Panel = s.Size, Build = s.Build,
+            Gains = _solidGains[i], Times = 1, Normal = layer ? Constructions.Normal(s.Size, s.Rotation) : Vector3.Zero,
+        };
+    }
+
+    // ═══ Round one thing and through another ══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// What gets past the boxes in the way by bending round them, amplitude per band against the free field
+    /// at the straight distance, the longer way's spreading included; <paramref name="found"/> false (and
+    /// zero) when there is no way round. Per band the better of two kinds of path:
+    /// <list type="bullet">
+    /// <item>round everything, clear of the whole scene (<see cref="BarrierPathDifference"/>, whose
+    /// <paramref name="pathDifference"/> and <paramref name="verified"/> come back as it gives them);</item>
+    /// <item>round one box on the line, its legs bending round what stands against the bend and paying what
+    /// they pass through (<see cref="LegsThrough"/>): Maekawa's loss for the whole detour times what the boxes
+    /// the legs cross let through (<see cref="WallTransmission"/>). A ray through a sequence of edges and walls
+    /// keeps the product of what each does to it (Funkhouser et al., JASA 115, 2004, p. 747). Never more
+    /// than that detour's diffraction times the straight line through every box the way does not go round:
+    /// a wall the way passes through costs it no less than it costs the line.</item>
+    /// </list>
+    /// Without the second, a 3 cm way over a stair's concrete guard whose leg ran on through the brick front
+    /// was thrown out, and the guard was charged as a solid wall: a car on Dock Street jumped 22 to 31 dB
+    /// as its line came out of the guard's shadow (Marlow Tower, 2026-10-11, --pop-hunt).
+    /// <paramref name="edge"/> is where the best of them, by energy, leaves for the ear.
+    /// </summary>
+    public Vector3 BarrierGains(Vector3 source, Vector3 listener, float speedOfSound, out float pathDifference,
+                                out bool verified, out Vector3 edge, out bool found, int[]? ignoreA = null, int[]? ignoreB = null)
+        => BarrierGains(source, listener, speedOfSound, out pathDifference, out verified, out edge, out found, ignoreA, ignoreB, null);
+
+    private Vector3 BarrierGains(Vector3 source, Vector3 listener, float speedOfSound, out float pathDifference,
+                                 out bool verified, out Vector3 edge, out bool found, int[]? ignoreA, int[]? ignoreB,
+                                 System.Text.StringBuilder? explain)
+    {
+        pathDifference = BarrierPathDifference(source, listener, out edge, out verified, ignoreA, ignoreB);
+        float dist = MathF.Max(0.5f, Vector3.Distance(source, listener));
+        Vector3 best = Vector3.Zero;
+        float bestEnergy = 0f;
+        found = false;
+        if (verified && pathDifference >= 0f)
+        {
+            best = Round(pathDifference, dist, speedOfSound);
+            bestEnergy = Vector3.Dot(best, best);
+            found = true;
+        }
+        var scratch = Scratch.Get(this);
+        var all = scratch.AllBarrierRoutes;
+        if (all.Count == 0 || OnlyClearWaysRoundForLab) return best;
+
+        // The straight line's crossings, to pay the rest of the line without the boxes a way goes round.
+        var line = scratch.LineCrossings;
+        line.Clear();
+        float len = Vector3.Distance(source, listener);
+        Vector3 dir = len > 1e-6f ? (listener - source) / len : Vector3.UnitX;
+        var cand = scratch.Candidates;
+        _grid.Along(source, listener, cand);
+        foreach (int i in cand)
+        {
+            if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
+            if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
+            if (!SegmentSpan(i, source, listener, 0f, out float t0, out float t1)) continue;
+            line.Add((i, CrossingOf(i, t0 * len, t1 * len)));
+        }
+
+        // Most promising first: the detour's diffraction times the rest of the line without that box, each
+        // box by its own figure (an order, not a bound; the layered figure costs a panel model per box).
+        var tc = scratch.ThroughCandidates;
+        tc.Clear();
+        var paid = scratch.Paid;
+        int restFor = -1;
+        Vector3 rest = Vector3.One;
+        foreach (var (d, ps, p, box) in all)
+        {
+            // Round a leaf standing in its doorway is through the doorway (BarrierPathDifference).
+            if (_solids[box].IsLeaf && box < _leafInOpening.Length && _leafInOpening[box]) continue;
+            var round = Round(MathF.Max(d, GrazingMetres), dist, speedOfSound);
+            if (round.X <= best.X && round.Y <= best.Y && round.Z <= best.Z) continue;
+            if (box != restFor)
+            {
+                rest = Vector3.One;
+                foreach (var (i, c) in line) if (i != box) rest *= c.Gains;
+                restFor = box;
+            }
+            var hope = round * rest;
+            tc.Add((Vector3.Dot(hope, hope), d, ps, p, box));
+        }
+        if (tc.Count > 1) tc.Sort((x, y) => y.Hope.CompareTo(x.Hope));
+        var perBox = scratch.PerBox;
+        perBox.Clear();
+        int tried = 0;
+        scratch.ChainBudget = ThroughBendsPerSearch;
+        foreach (var (_, d, ps, p, box) in tc)
+        {
+            // One way round each box: the first, most promising, whose edge is in the air. An edge buried in
+            // something else (a guard's foot in the floor it stands on) is no edge to go round: its legs would
+            // start inside the floor and pay it whole. A box whose first few are all buried is a wall's.
+            int looked = perBox.TryGetValue(box, out int had) ? had : 0;
+            if (looked < 0 || looked >= BuriedLooksPerBox) continue;
+            perBox[box] = looked + 1;
+            if (Buried(p, box, ignoreA, ignoreB) || (ps != p && Buried(ps, box, ignoreA, ignoreB))) continue;
+            perBox[box] = -1;
+            if (++tried > MaxThroughTried) break;
+            float dd = MathF.Max(d, GrazingMetres);
+            var round = Round(dd, dist, speedOfSound);
+            if (round.X <= best.X && round.Y <= best.Y && round.Z <= best.Z) continue;
+            paid.Clear();
+            var legs = LegsThrough(source, ps, p, listener, box, dd, dist, speedOfSound, ignoreA, ignoreB, out float extra);
+            var detour = Round(dd + extra, dist, speedOfSound);
+            // Every box on the line the way does not go round, it passes through: never paying less for
+            // them than the line does.
+            var line_ = LineThrough(line, -1, paid, dir);
+            var g = detour * Vector3.Min(legs, line_);
+            best = Vector3.Max(best, g);
+            found = true;
+            float energy = Vector3.Dot(g, g);
+            if (energy > bestEnergy) { bestEnergy = energy; edge = p; }
+            if (explain != null)
+            {
+                explain.Append($"        round box {box} {_solids[box].Material} ({_solids[box].Center.X:F1}, {_solids[box].Center.Y:F2}, {_solids[box].Center.Z:F1}) "
+                             + $"size ({_solids[box].Size.X:F2}, {_solids[box].Size.Y:F2}, {_solids[box].Size.Z:F2}) {d:F3} m, {dd + extra:F3} m in all ({Db3(detour)}); "
+                             + $"its legs pay {string.Join(", ", paid.Select(b => $"{b} {_solids[b].Material}"))} ({Db3(legs)}), the line those of them it crosses {Db3(line_)}: {Db3(g)}\n");
+            }
+        }
+        return best;
+    }
+
+    /// <summary>What the straight line keeps through the boxes it crosses: all but <paramref name="except"/>,
+    /// or only those in <paramref name="only"/> when given.</summary>
+    private Vector3 LineThrough(List<(int Box, Constructions.Crossing Crossing)> line, int except, List<int>? only, Vector3 dir)
+    {
+        var without = Scratch.Get(this).Without;
+        without.Clear();
+        foreach (var (i, c) in line)
+            if (i != except && (only == null || only.Contains(i))) without.Add(c);
+        return Constructions.Through(without, dir);
+    }
+
+    /// <summary>Whether a point is inside a box other than <paramref name="owner"/>, every box grown by the joint.</summary>
+    private bool Buried(Vector3 p, int owner, int[]? ignoreA, int[]? ignoreB)
+    {
+        var cand = Scratch.Get(this).Clear;
+        var e = new Vector3(RouteJointMetres);
+        _grid.Along(p - e, p + e, cand);
+        foreach (int i in cand)
+        {
+            if (i == owner) continue;
+            if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
+            if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
+            ref readonly var s = ref _solids[i];
+            if (GeometryUtils.IsPointInOBB(p, s.Center, s.Size + new Vector3(2f * RouteJointMetres), s.Rotation)) return true;
+        }
+        return false;
+    }
+
+    private static string Db3(Vector3 g) => $"{DbOf(g.X):F0}/{DbOf(g.Y):F0}/{DbOf(g.Z):F0}";
+    private static float DbOf(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
+
+    /// <summary>Maekawa's loss for a detour (Diffraction.BandGains) and the spreading over the longer way.</summary>
+    private static Vector3 Round(float pathDifference, float dist, float speedOfSound)
+    {
+        var (l, m, h) = Diffraction.BandGains(pathDifference, speedOfSound);
+        return new Vector3(l, m, h) * (dist / (dist + pathDifference));
+    }
+
+    /// <summary>
+    /// What the legs of a way round box <paramref name="skip"/> pass through, per band, and how much further
+    /// they bend (<paramref name="extra"/>, metres): from the bend to the ear, across the box, and from the
+    /// bend back to the source (<see cref="PaidLeg"/>). Each leg starts at the bend, so what stands against
+    /// the edge (a stair's guard in two pieces) is gone round and what stands further off is paid.
+    /// </summary>
+    private Vector3 LegsThrough(Vector3 source, Vector3 sourceSide, Vector3 edge, Vector3 listener, int skip, float d,
+                                float dist, float speedOfSound, int[]? ignoreA, int[]? ignoreB, out float extra)
+    {
+        float x3 = PaidLeg(edge, listener, skip, -1, MaxChainedBoxes, d, dist, speedOfSound, ignoreA, ignoreB, out var t3);
+        float x2 = 0f;
+        var t2 = Vector3.One;
+        if (sourceSide != edge) x2 = PaidLeg(edge, sourceSide, skip, skip, MaxChainedBoxes, d + x3, dist, speedOfSound, ignoreA, ignoreB, out t2);
+        float x1 = PaidLeg(sourceSide, source, skip, -1, MaxChainedBoxes, d + x3 + x2, dist, speedOfSound, ignoreA, ignoreB, out var t1);
+        extra = x1 + x2 + x3;
+        return t1 * t2 * t3;
+    }
+
+    /// <summary>
+    /// One straight leg from <paramref name="a"/> to <paramref name="b"/>, the better of paying everything it
+    /// crosses (one construction where solids touch, <see cref="Constructions.Through"/>) and bending round the
+    /// first thing it meets from <paramref name="a"/> and doing the same with the legs of that bend, up to
+    /// <paramref name="chain"/> more boxes; better by the energy the whole way delivers, its detour so far
+    /// <paramref name="detour"/>. Returns the extra metres, <paramref name="t"/> what is paid. A box counts if
+    /// the leg touches it, faces included, so a leg run along the joint of a wall top and the slab on it pays
+    /// both; not grown by the joint, as the clear search's tests are: grown, a leg crossing a front within
+    /// 5 cm of where its slab meets its brick paid both, 30 dB more than either. <paramref name="ownerA"/>
+    /// and <paramref name="ownerB"/> are the boxes the ends are on the edge of.
+    /// </summary>
+    private float PaidLeg(Vector3 a, Vector3 b, int ownerA, int ownerB, int chain, float detour, float dist, float speedOfSound,
+                          int[]? ignoreA, int[]? ignoreB, out Vector3 t)
+    {
+        t = Vector3.One;
+        float len = Vector3.Distance(a, b);
+        if (len < 1e-6f) return 0f;
+        var scratch = Scratch.Get(this);
+        var cand = scratch.Clear;
+        _grid.Along(a, b, cand);
+        var layers = scratch.LegLayers;
+        layers.Clear();
+        // What each way pays is added to Scratch.Paid; only the chosen way's stays.
+        var paid = scratch.Paid;
+        int start = paid.Count;
+        int nearest = -1;
+        float nearestT = float.MaxValue;
+        foreach (int i in cand)
+        {
+            if (i == ownerA || i == ownerB) continue;
+            if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
+            if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
+            if (!SegmentSpan(i, a, b, 0f, out float t0, out float t1)) continue;
+            layers.Add(CrossingOf(i, t0 * len, t1 * len));
+            paid.Add(i);
+            if (t0 < nearestT) { nearestT = t0; nearest = i; }
+        }
+        if (nearest < 0) return 0f;
+        t = Constructions.Through(layers, (b - a) / len);
+        if (chain <= 0 || scratch.ChainBudget <= 0 || _solids[nearest].IsLeaf || nearestT * len > BendReachMetres) return 0f;
+
+        // Round the first thing in the way, its own legs paid or bent in turn.
+        scratch.ChainBudget--;
+        float bestX = 0f;
+        var r0 = Round(detour, dist, speedOfSound) * t;
+        float bestScore = Vector3.Dot(r0, r0);
+        ref readonly var box = ref _solids[nearest];
+        var ways = scratch.Ways[chain];
+        ways.Clear();
+        if (!Diffraction.PathDifferenceAroundBox(box.Center, box.Size + new Vector3(2f * RouteJointMetres), box.Rotation,
+                                                 a, b, out _, out _, ways)) return 0f;
+        ways.Sort((x, y) => x.D.CompareTo(y.D));
+        var kept = scratch.PaidKept[chain];
+        kept.Clear();
+        for (int k = start; k < paid.Count; k++) kept.Add(paid[k]);
+        int tried = 0;
+        foreach (var (d, ps, pe) in ways)
+        {
+            if (++tried > ChainRoutesPerBox) break;
+            paid.RemoveRange(start, paid.Count - start);
+            float x1 = PaidLeg(a, ps, ownerA, nearest, chain - 1, detour + d, dist, speedOfSound, ignoreA, ignoreB, out var t1);
+            float x2 = 0f;
+            var t2 = Vector3.One;
+            if (ps != pe) x2 = PaidLeg(ps, pe, nearest, nearest, chain - 1, detour + d + x1, dist, speedOfSound, ignoreA, ignoreB, out t2);
+            float x3 = PaidLeg(pe, b, nearest, ownerB, chain - 1, detour + d + x1 + x2, dist, speedOfSound, ignoreA, ignoreB, out var t3);
+            float x = d + x1 + x2 + x3;
+            var tt = t1 * t2 * t3;
+            var g = Round(detour + x, dist, speedOfSound) * tt;
+            float score = Vector3.Dot(g, g);
+            if (score <= bestScore) continue;
+            bestScore = score; bestX = x; t = tt;
+            kept.Clear();
+            for (int k = start; k < paid.Count; k++) kept.Add(paid[k]);
+        }
+        paid.RemoveRange(start, paid.Count - start);
+        paid.AddRange(kept);
+        return bestX;
+    }
+
+    /// <summary>Ways round one box and through the rest whose legs are traced, most promising first.</summary>
+    private const int MaxThroughTried = 4;
+
+    /// <summary>Ways round each box looked at for one whose edge is in the air.</summary>
+    private const int BuriedLooksPerBox = 12;
+
+    /// <summary>Boxes the legs of all those ways may bend round in all, a bound on cost.</summary>
+    private const int ThroughBendsPerSearch = 4;
+
+    /// <summary>How near the start of a leg, metres, what it runs into must stand to be gone round rather than
+    /// paid: the other pieces of the guard or post the way bends over. Further off, the way round everything
+    /// clear (BarrierPathDifference) is the search that bends.</summary>
+    private const float BendReachMetres = 1f;
 
     // ═══ Round one obstacle ═══════════════════════════════════════════════════════════════════════
 
@@ -1308,6 +1582,10 @@ public sealed class OpeningRoutes
             worst = dd; edge = p;
         }
 
+        // Every way round every box, for BarrierGains' ways round one box and through the rest.
+        var all = scratch.AllBarrierRoutes;
+        all.Clear();
+        all.AddRange(routes);
         routes.RemoveAll(r => r.D < worst - 1e-3f);
         edgeVerified = false;
         if (routes.Count > 1) routes.Sort((x, y) => x.D.CompareTo(y.D));
@@ -1626,6 +1904,8 @@ public sealed class OpeningRoutes
         }
         float over = OverTheTop(source, listener, null, null, out var oe, sb);
         sb.Append($"        over the top: {(over < 0f ? "no way" : $"{over:F3} m, last top ({oe.X:F1}, {oe.Y:F2}, {oe.Z:F1})")}\n");
+        var gains = BarrierGains(source, listener, WallTransmission.SoundSpeed, out _, out _, out var ge, out bool found, null, null, sb);
+        sb.Append($"        what bends round, both kinds: {(found ? $"{Db3(gains)} dB, from ({ge.X:F1}, {ge.Y:F2}, {ge.Z:F1})" : "no way")}\n");
         return sb.ToString();
     }
 
@@ -1790,13 +2070,21 @@ public sealed class OpeningRoutes
         public readonly List<(int, int)> Chain = new();
         public readonly List<Vector3> Points = new();
         public readonly List<Vector3> Legs = new();
-        public readonly List<(float D, Vector3 SourceSide, Vector3 Edge, int Box)> BarrierRoutes = new();
+        public readonly List<(float D, Vector3 SourceSide, Vector3 Edge, int Box)> BarrierRoutes = new(), AllBarrierRoutes = new();
+        public readonly List<(float Hope, float D, Vector3 SourceSide, Vector3 Edge, int Box)> ThroughCandidates = new();
+        public readonly List<(int Box, Constructions.Crossing Crossing)> LineCrossings = new();
+        public readonly List<Constructions.Crossing> Without = new();
+        /// <summary>The boxes the way being weighed passes through (BarrierGains, PaidLeg).</summary>
+        public readonly List<int> Paid = new();
+        public readonly List<int>[] PaidKept =
+            System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, MaxChainedBoxes + 1), _ => new List<int>()));
+        public readonly Dictionary<int, int> PerBox = new();
         public readonly List<(float D, Vector3 SourceSide, Vector3 Edge)> BoxRoutes = new();
         /// <summary>Boxes the current barrier search may still bend a route round (ClearedLeg).</summary>
         public int ChainBudget;
         public readonly List<(float S, float Y, int Box)> Profile = new(), Hull = new();
         public readonly List<(int Box, float S0, float S1, float Bottom, float Top)> Crossings = new();
-        public readonly List<Constructions.Crossing> Layers = new();
+        public readonly List<Constructions.Crossing> Layers = new(), LegLayers = new();
         public readonly HashSet<int> Included = new();
         public float[] ProfileBins = new float[256];
         public readonly List<(float D, Vector3 SourceSide, Vector3 Edge)>[] Ways =

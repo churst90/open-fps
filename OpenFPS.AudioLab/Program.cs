@@ -175,12 +175,15 @@ string[] usage =
     "                                                the real movement and ground probe over a real map",
     "  --walk-pair [map= at=E,N,H heading= key=w|a|s|d ticks= taps= gap= sprint full from=E,N,H open=ID,... show=all] the server's and the client's step side by side",
     "  --walk-pair map= room=ID[,ID...]   a /tp spot a body stands on in each room (StandingSpots.InRoom)",
+    "  --walk-pair map= ears=x,y,z[;...]   a /tp spot a body stands on nearest each ear (engine coordinates)",
     "  --stair-walk [scene=shapes|city] [sprint] [trace]",
     "                                                up and down real treads, every footfall checked (docs/GEOMETRY.md)",
     "  --enclosure [map= at= walk= step= head= dist=]",
     "                                                what the room round a listener measures, and its send",
     "  --path-probe [map=city] ear=x,y,z src=x,y,z [door= open= swings= traced legcost root=]",
     "                                                what the occlusion worker hands the mixer",
+    "  --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor] [pair=E;S]",
+    "                                                behind walls with and without ways round one thing and through another",
     "  --siren-route [map=city] [track=downtown] [preset=police_interceptor] [lane=1.8] [at=x,z] [from=] [sec=60] [every=10]",
     "                                                a car's path to a fixed listener, frame by frame",
     "  --pop-hunt [map=city] ear=x,y,z [sec= cars= extra= seed=] [verbose] [lines]",
@@ -853,6 +856,10 @@ if (args.Contains("--pa-leak"))
 if (args.Contains("--thin-panel"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.ThinPanelSpike.Run(args));
+}
+if (args.Contains("--barrier-sweep"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.BarrierSweepSpike.Run(args));
 }
 if (args.Contains("--path-probe"))
 {

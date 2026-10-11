@@ -70,6 +70,10 @@ public static class PathProbeSpike
                 while (t.ElapsedMilliseconds < 300) { routes.BarrierPathDifference(src, ear, out _, out _); n++; }
                 double bar = t.Elapsed.TotalMilliseconds * 1000 / n;
                 t.Restart(); n = 0;
+                while (t.ElapsedMilliseconds < 300) { routes.BarrierGains(src, ear, WallTransmission.SoundSpeed, out _, out _, out _, out _); n++; }
+                double gains = t.Elapsed.TotalMilliseconds * 1000 / n;
+                Console.WriteLine($"  leg {src} -> ear: both kinds of way round {gains:F0} µs");
+                t.Restart(); n = 0;
                 while (t.ElapsedMilliseconds < 300) { routes.LegGains(src, ear, Array.Empty<int>(), Array.Empty<int>()); n++; }
                 double leg = t.Elapsed.TotalMilliseconds * 1000 / n;
                 float d = routes.BarrierPathDifference(src, ear, out _, out bool v);
