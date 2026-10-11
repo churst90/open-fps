@@ -613,7 +613,9 @@ public sealed class DrivingAids
             Essential = true,
             Type = EmitterType.UI,
         };
-        if (_audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
+        // The budget holds this voice and places it from what it holds: re-placed past it, the rate stayed
+        // at the speed the strip was first touched at and the range was measured from there (S11).
+        if (_audio.IsPlaying(id)) _audio.Refresh(e);
         else _audio.Submit(e);
     }
 

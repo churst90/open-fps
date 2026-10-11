@@ -111,6 +111,36 @@ public class VoiceRegistryTests
         return float.Parse(line[at..(end < 0 ? line.Length : end)], System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// The lane rumble under your own car is placed by the budget alone, from the emitter it holds, which the
+    /// aid renews: re-placed past it each frame, the budget then put back the pitch and place it started with,
+    /// so the strikes kept the rate of the speed the strip was first touched at (S11).
+    /// </summary>
+    [Fact]
+    public void The_lane_rumble_follows_the_speed()
+    {
+        const string rumble = "-964003";
+        var expanded = EmitterStreamReplayTests.Expand(Replay.Run("talker_and_aids"));
+        var lastOfFrame = new SortedDictionary<int, float>();
+        foreach (var line in expanded)
+        {
+            var parts = line.Split(' ', 4);
+            if (parts.Length < 4 || parts[2] != rumble || parts[1] is not ("Play" or "Place")) continue;
+            lastOfFrame[int.Parse(parts[0])] = Field(line, "Pitch");
+        }
+        Assert.True(lastOfFrame.Count > 60, $"the rumble was placed in {lastOfFrame.Count} frames");
+        float first = lastOfFrame.First().Value, last = lastOfFrame.Last().Value;
+        _o.WriteLine($"rumble pitch {first:F3} at frame {lastOfFrame.First().Key}, {last:F3} at frame {lastOfFrame.Last().Key}");
+        // From 4 m/s to 6: half as fast again.
+        Assert.InRange(last / first, 1.35f, 1.65f);
+        float prev = 0f;
+        foreach (var (_, pitch) in lastOfFrame)
+        {
+            Assert.True(pitch >= prev, "the rumble's rate went back");
+            prev = pitch;
+        }
+    }
+
     [Fact]
     public void How_each_kind_is_heard_from()
     {
