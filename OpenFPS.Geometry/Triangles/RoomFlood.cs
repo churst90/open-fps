@@ -99,6 +99,12 @@ public static class RoomFlood
         public HashSet<int> Meets { get; } = new();
         /// <summary>The openings (<see cref="Barrier.Id"/>) its air stopped at.</summary>
         public HashSet<int> Openings { get; } = new();
+        /// <summary>The cells of each opening its air meets (the opening's id, the cell): what the opening is framed
+        /// from (<see cref="FloodOpenings"/>).</summary>
+        public List<(int Opening, int X, int Y, int Z)> OpeningCells { get; } = new();
+        /// <summary>The cells under the open sky its air meets, and which way from the air (0 +x, 1 -x, 2 +y, 3 -y,
+        /// 4 +z, 5 -z): where it opens to the outdoors with no opening there.</summary>
+        public List<(int Dir, int X, int Y, int Z)> SkyCells { get; } = new();
         public float Volume => AirCount * Cell * Cell * Cell;
         /// <summary>What lines its air, measured when the flood was asked to (<see cref="Flood"/>'s measure): null otherwise.</summary>
         public Lining? Lining { get; internal set; }
@@ -575,6 +581,10 @@ public static class RoomFlood
 
         var meets = new HashSet<long>();
         var touched = new HashSet<long>();
+        // The opening cells and the cells under the open sky each room's air meets, where in the world they are (a
+        // block's indices move as it grows): what the openings are framed from (FloodOpenings).
+        var openingCells = new HashSet<(int Room, int Opening, int X, int Y, int Z)>();
+        var skyCells = new HashSet<(int Room, int Dir, int X, int Y, int Z)>();
         // Air on the block's outermost layer: the walls past it are not known yet, so the block grows that way and
         // the flood goes on from these cells.
         var atSide = new List<int>();
@@ -614,12 +624,21 @@ public static class RoomFlood
                     {
                         // An opening's cells, like a wall's, go to the first room to reach them: a point in a doorway is
                         // in a room, never the outdoors.
-                        if (claim[m] == 0)
+                        if (claim[m] == 0) claim[m] = (ushort)(k + 1);
+                        if (raster.IsOpening(m, out int opening))
                         {
-                            claim[m] = (ushort)(k + 1);
-                            if (raster.IsOpening(m, out int opening)) touched.Add(((long)k << 32) | (uint)opening);
+                            touched.Add(((long)k << 32) | (uint)opening);
+                            // Through the opening's cells the way the air came: a solid past them (a shutter shut in
+                            // a car park's bay) means the air met a wall, not an opening.
+                            int bx = ax, by = ay, bz = az, b = m;
+                            while (true)
+                            {
+                                bx += ax - cx; by += ay - cy; bz += az - cz; b += step;
+                                if ((uint)bx >= (uint)nx || (uint)by >= (uint)ny || (uint)bz >= (uint)nz || !raster.IsOpening(b, out _)) break;
+                            }
+                            bool shut = (uint)bx < (uint)nx && (uint)by < (uint)ny && (uint)bz < (uint)nz && raster.Blocked(b);
+                            if (!shut) openingCells.Add((k, opening, lx + ax, ly + ay, lz + az));
                         }
-                        else if (claim[m] - 1 != k && raster.IsOpening(m, out int opening)) touched.Add(((long)k << 32) | (uint)opening);
                         continue;
                     }
                     if (claim[m] != 0) { Meet(claim[m] - 1, k); continue; }
@@ -628,6 +647,7 @@ public static class RoomFlood
                         var room = rooms[seeds[local[k]].Id];
                         room.Open = true;
                         lock (room) if (room.OpenAt.Count < 8) room.OpenAt.Add(CentreAt(m));
+                        skyCells.Add((k, d, lx + ax, ly + ay, lz + az));
                         continue;
                     }
                     claim[m] = (ushort)(k + 1);
@@ -711,6 +731,8 @@ public static class RoomFlood
             rooms[seeds[b].Id].Meets.Add(seeds[a].Id);
         }
         foreach (long t in touched) rooms[seeds[local[(int)(t >> 32)]].Id].Openings.Add((int)(t & 0xFFFFFFFF));
+        foreach (var (k, opening, x, y, z) in openingCells) rooms[seeds[local[k]].Id].OpeningCells.Add((opening, x, y, z));
+        foreach (var (k, dir, x, y, z) in skyCells) rooms[seeds[local[k]].Id].SkyCells.Add((dir, x, y, z));
 
         // The cells as runs along x, room by room, over the bounds of what was claimed (the air's and a cell more for
         // its walls), not the whole block, most of which a room in a big block never reaches.

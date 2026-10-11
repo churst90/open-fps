@@ -1069,6 +1069,7 @@ public class ClientWorldState
                             regions[id] = OpenFPS.Common.EntityAcoustics.RoomOf(def, cells);
                     live.Regions = regions;
                     live.RoomCells = cells;
+                    OpenFPS.Common.EntityAcoustics.ApplyFloodOpenings(live, cells);
                 }
                 RoomRefreshes++;
                 Interlocked.Increment(ref _geometryVersion);

@@ -181,6 +181,7 @@ OpenFPS.Geometry/SpatialGrid.cs	lib	Geometry
 OpenFPS.Geometry/TileKey.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Bvh.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Facets.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/FloodOpenings.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/GeometryPiece.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Heightfield.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/MeshAssets.cs	lib	Geometry	

@@ -974,7 +974,7 @@ public static class GeometryParitySpike
             DumpRooms(maps, mapId, ecs, serverWorld, data, mapSize, args);
 
         if (only.Contains("routedump"))
-            DumpRoutes(maps, mapId, ecs, lookup, data, mapSize, args);
+            DumpRoutes(maps, mapId, ecs, lookup, data, mapSize, serverWorld, args);
 
         if (only.Contains("meets"))
             MeetsParity(ecs, rebuilt, data, show);
@@ -1567,7 +1567,8 @@ public static class GeometryParitySpike
     /// </summary>
     /// <summary>The openings the client's route graph holds, one a line (route=PATH): "o kind a b x y z width height
     /// tau-mid", to set two maps' openings side by side.</summary>
-    private static void DumpRoutes(MapManager maps, string mapId, World ecs, Dictionary<int, Entity> lookup, MapData data, Vector3 mapSize, string[] args)
+    private static void DumpRoutes(MapManager maps, string mapId, World ecs, Dictionary<int, Entity> lookup, MapData data, Vector3 mapSize,
+                                   TriangleWorld serverWorld, string[] args)
     {
         var world = new WorldSnapshot();
         var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
@@ -1577,8 +1578,9 @@ public static class GeometryParitySpike
             if (def.Region.RoomSize.X > 0) world.RegionEntityIds.Add(def.EntityId);
         }
         world.TileMetres = data.TileMetres;
+        // The rooms as their floods, as a client has them once the geometry is built.
         world.AcousticMap = ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
-                                                              streamed: false, report: false);
+                                                              streamed: false, report: false, geometry: serverWorld);
         var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         var graph = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, p => acoustics.GetRegionAt(world, p));

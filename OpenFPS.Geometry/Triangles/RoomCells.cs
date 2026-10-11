@@ -9,7 +9,8 @@ namespace OpenFPS.Common.Geometry;
 /// </summary>
 public sealed class RoomCells
 {
-    public static readonly RoomCells Empty = new(Array.Empty<Span>(), new HashSet<int>(), new Dictionary<int, RoomFlood.Lining>(), Vector3.Zero);
+    public static readonly RoomCells Empty = new(Array.Empty<Span>(), new HashSet<int>(), new Dictionary<int, RoomFlood.Lining>(), Vector3.Zero,
+                                                 new List<FloodOpenings.Frame>());
 
     /// <summary>Cells x0 to x1 of row (y, z), the room's id.</summary>
     private readonly record struct Span(long Row, int X0, int X1, int Room);
@@ -23,16 +24,21 @@ public sealed class RoomCells
     public IReadOnlySet<int> Flooded => _flooded;
     public int SpanCount => _spans.Length;
 
-    private RoomCells(Span[] spans, HashSet<int> flooded, Dictionary<int, RoomFlood.Lining> linings, Vector3 origin)
-    { _spans = spans; _flooded = flooded; _linings = linings; Origin = origin; }
+    private RoomCells(Span[] spans, HashSet<int> flooded, Dictionary<int, RoomFlood.Lining> linings, Vector3 origin,
+                      List<FloodOpenings.Frame> openings)
+    { _spans = spans; _flooded = flooded; _linings = linings; Origin = origin; Openings = openings; }
+
+    /// <summary>The openings as the floods met them, and where a flood met the open sky (<see cref="FloodOpenings"/>).</summary>
+    public IReadOnlyList<FloodOpenings.Frame> Openings { get; }
 
     /// <summary>What lines a flooded room's air, where the flood measured it.</summary>
     public bool TryLining(int room, out RoomFlood.Lining lining) => _linings.TryGetValue(room, out lining!);
 
     private static long RowOf(int y, int z) => ((long)z << 32) | (uint)y;
 
-    /// <summary>The floods of <paramref name="rooms"/> (RoomFlood.Flood), all from one origin.</summary>
-    public static RoomCells From(IReadOnlyDictionary<int, RoomFlood.Room> rooms)
+    /// <summary>The floods of <paramref name="rooms"/> (RoomFlood.Flood), all from one origin, and the openings they
+    /// met framed (<paramref name="barriers"/>, the ones they were flooded with).</summary>
+    public static RoomCells From(IReadOnlyDictionary<int, RoomFlood.Room> rooms, IReadOnlyList<RoomFlood.Barrier>? barriers = null)
     {
         var spans = new List<Span>();
         var flooded = new HashSet<int>();
@@ -61,7 +67,7 @@ public sealed class RoomCells
                 merged[^1] = last with { X1 = s.X1 };
             else merged.Add(s);
         }
-        return new RoomCells(merged.ToArray(), flooded, linings, origin);
+        return new RoomCells(merged.ToArray(), flooded, linings, origin, FloodOpenings.From(rooms, barriers ?? Array.Empty<RoomFlood.Barrier>()));
     }
 
     /// <summary>The air spans as they are (no two rooms' air is the same cell), and the wall spans cut to what the air
