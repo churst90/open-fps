@@ -65,7 +65,7 @@ public sealed partial class ClientGameSession : IDisposable
 
     // From the manifest, for when the acoustics are generated.
     private float _voxelResolution = AcousticConstants.DefaultVoxelResolution;
-    private float _occlusionFloor = 0.2f;
+    private float _occlusionFloor = AcousticConstants.DefaultOcclusionFloor;
     private Vector3 _mapMin;
     /// <summary>The map's tiles are streamed (MapManifest.TileMetres), and its first load is complete: every
     /// definition batch from now on is a tile arriving.</summary>

@@ -11,7 +11,7 @@ public partial class AcousticMap
     public Vector3 MinBound { get; set; }
     /// <summary>Carried from the map file and not read: what gets through a wall is decided by the
     /// wall (WallTransmission), not by a per-map floor under it.</summary>
-    public float OcclusionFloor { get; set; } = 0.05f;
+    public float OcclusionFloor { get; set; } = AcousticConstants.DefaultOcclusionFloor;
     public int GlobalEnvironmentId { get; set; } = -1;
     public SparseAcousticOctree VoxelGrid { get; set; }
     public Dictionary<int, Room> Regions { get; set; } = new();

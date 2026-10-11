@@ -956,7 +956,7 @@ public class ClientWorldState
 
     private readonly ConcurrentDictionary<TileKey, TileDetail> _tiles = new();
     private Vector3 _acousticMin;
-    private float _voxelResolution = 0.5f, _occlusionFloor = 0.2f;
+    private float _voxelResolution = 0.5f, _occlusionFloor = AcousticConstants.DefaultOcclusionFloor;
     private long _mapEpoch;
     private long _geometryVersion;
     private int _refreshRunning;

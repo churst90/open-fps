@@ -6,6 +6,10 @@ public static class AcousticConstants
     // --- Architecture & Hierarchy ---
     public const int GlobalRegionId = -1; // The Global Environment world ID
     public const float DefaultVoxelResolution = 0.5f;
+    /// <summary>A map's occlusion floor when its file gives none: one value for the map file, the manifest,
+    /// the client and the generator (they had 0.2 and 0.05). Carried and not read (see
+    /// <see cref="AcousticMap.OcclusionFloor"/>).</summary>
+    public const float DefaultOcclusionFloor = 0.2f;
 
     // --- Occlusion Settings ---
     public const float OcclusionCap = 0.95f;

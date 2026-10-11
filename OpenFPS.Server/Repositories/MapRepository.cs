@@ -105,7 +105,7 @@ public class MapData
     public float MinimumY { get; set; } = -10.0f;
     public string Description { get; set; } = string.Empty;
     public float VoxelResolution { get; set; } = 0.5f;
-    public float OcclusionFloor { get; set; } = 0.2f;
+    public float OcclusionFloor { get; set; } = AcousticConstants.DefaultOcclusionFloor;
 
     // AirPressure is millibars, not atmospheres: a 1.0 made every map a near-vacuum to the client's air
     // absorption. NormalizeAtmosphere catches it.
