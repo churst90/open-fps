@@ -180,8 +180,8 @@ public static class VehicleSpike
                 provider.PlaySpatialSound(Engine(pos, Vector3.Zero, 0f));
                 // Echo voices, keyed by the facade they answer for.
                 var voices = new Dictionary<int, (int VoiceId, float Silent)>();
-                Span<Reflection> first = stackalloc Reflection[8];
-                Span<Reflection> second = stackalloc Reflection[8];
+                Span<Reflection> first = new Reflection[8];
+                Span<Reflection> second = new Reflection[8];
 
                 int pass = 0; float speed = 0f, progress = 0f, phase = 0f; string state = "wait";
                 float from = roadStart, to = roadEnd;
