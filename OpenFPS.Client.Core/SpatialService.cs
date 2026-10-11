@@ -169,14 +169,20 @@ public class SpatialService
             var (tin, tout) = spans.TryGetValue(solid, out var span) ? span : (0f, -1f);
             if (tout < 0f) tout = len;   // it ends inside
             var normal = Vector3.Zero;
-            if (!hollow && !surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.DoorLeaf))
+            float run = 0f;
+            if (!hollow)
             {
-                var (_, size, rotation) = geo.BoxOf(solid);
-                int owner = geo.OwnerOf(solid);
-                bool hung = world.Entities.TryGetValue(owner, out var e) && OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(e.Definition);
-                if (!hung && size.X > 0f && Constructions.IsSheet(size)) normal = Constructions.Normal(size, rotation);
+                var (centre, size, rotation) = geo.BoxOf(solid);
+                // Gone into by its edge, a box pays what the line runs through of it (Constructions).
+                if (size.X > 0f && size.Y > 0f && size.Z > 0f) run = Constructions.RunInside(nudgedStart, nudgedEnd, centre, size, rotation);
+                if (!surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.DoorLeaf))
+                {
+                    int owner = geo.OwnerOf(solid);
+                    bool hung = world.Entities.TryGetValue(owner, out var e) && OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(e.Definition);
+                    if (!hung && size.X > 0f && Constructions.IsSheet(size)) normal = Constructions.Normal(size, rotation);
+                }
             }
-            list.Add(Constructions.Of(tin, tout, AcousticRegistry.GetProperties(surface.Material), panel, surface.Construction.Build, layers, normal));
+            list.Add(Constructions.Of(tin, tout, AcousticRegistry.GetProperties(surface.Material), panel, surface.Construction.Build, layers, normal, run));
         }
         var g = Constructions.Through(list, rayDir);
         eqLow *= g.X; eqMid *= g.Y; eqHigh *= g.Z;
@@ -387,9 +393,12 @@ public class SpatialService
                     // doorway, is hollow or is round never is.
                     bool layer = def.Collider.Shape == ColliderShape.Box && !def.Acoustics.IsHollow && !def.Moves
                                  && !OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(def) && Constructions.IsSheet(def.Collider.Size);
+                    // Gone into by its edge, a box pays what the line runs through of it (Constructions).
+                    float run = def.Collider.Shape == ColliderShape.Box && !def.Acoustics.IsHollow
+                        ? Constructions.RunInside(nudgedStart, nudgedEnd, transform.Position, def.Collider.Size, transform.Rotation) : 0f;
                     crossed.Add(Constructions.Of(tIn, tOut, AcousticRegistry.GetProperties(def.Material.Material), panel,
                                                  new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), layers,
-                                                 layer ? Constructions.Normal(def.Collider.Size, transform.Rotation) : Vector3.Zero));
+                                                 layer ? Constructions.Normal(def.Collider.Size, transform.Rotation) : Vector3.Zero, run));
                 }
             }
         }

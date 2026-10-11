@@ -4,6 +4,24 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- A solid gone into by its edge pays what the line runs through of it (docs/GEOMETRY.md 12.6, "A solid gone
+  into by its edge"), unheard. Every box a line touched paid its panel figure once, however far the line ran
+  inside it, so a car on Dock Street whose line went into the 15 cm edge of Marlow Tower's floor slab and out
+  of its top, 0.8 m on, was charged 15 cm of concrete: -35/-52/-80 dB in the floor 1 stairwell for 4 m of
+  road, where the brick front beside it gives -45/-69/-100. A panel's loss is a plate's bending, driven on one
+  face; a sheet driven at its edge moves in its own plane, which does not radiate, so the line pays the stuff
+  it runs through: a panel as thick as the run, never less than the sheet's own, in the hand-rolled tracer,
+  the routes' legs and the barrier model. Steam Audio's faces keep their figures, and the worker multiplies
+  its answer by the panel model's correction for the same line. Two-leaf builds keep their panel. The
+  stairwell's pops: 7 to 10 in two minutes to 0 (the stretch is now -57/-78/-100, a dip of 11/9 dB in the
+  low and mid bands rather than a jump; todo). The pavement's few are the same cars on Wharf Avenue with
+  either charge, seen clear between buildings or over an edge, none through anything by its edge. On the
+  three maps 0.6 to 2.1 % of blocked pairs are quieter in the low band (median 3 to 11 dB), most a line along
+  a tower's floor slab or a house wall's length; one pair is louder, by 1.8 dB.
+  The correction costs 4 to 16 µs a blocked source a tick. Two emitter streams regenerated (the replay's
+  hand-rolled rays along a wall's end: a car by up to 1.1 dB, an air conditioner at a room's corner by up to
+  11.8 dB). The lab's `--pop-hunt`, `--path-probe` and `--barrier-sweep` take `panels` for the old charge.
+
 - The voices of moving things have one path each, from one pass (part P3a of docs/SPECIAL_CASES_AUDIT.md),
   unheard. Cody asked "shouldn't all mobile sound sources like vehicles, trains, sirens, etc use the same path
   so there's consistency?" after a train horn played through a brick wall. Every engine, intake, borrowed far

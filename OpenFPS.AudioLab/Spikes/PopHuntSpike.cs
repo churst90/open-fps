@@ -7,7 +7,7 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --pop-hunt [map=city] ear=x,y,z [sec=60] [cars=40] [extra=30] [seed=1] [verbose] [lines]
+/// --pop-hunt [map=city] ear=x,y,z [sec=60] [cars=40] [extra=30] [seed=1] [verbose] [lines] [panels]
 ///
 /// "Now and then I hear sounds like a siren pop through for an instant when I'm deep inside a
 /// building" (Cody, 2026-10-02). The game's [POP] line names the voice; this finds the answer that
@@ -53,6 +53,8 @@ public static class PopHuntSpike
         int extra = (int)Num(args, "extra", 30f);
         bool verbose = args.Contains("verbose");
         bool lines = args.Contains("lines");
+        // panels: every solid one panel whatever way the line goes through it, as before 2026-10-11.
+        Constructions.PanelsOnlyForLab = args.Contains("panels");
         var rng = new Random((int)Num(args, "seed", 1f));
 
         var world = PathProbeSpike.LoadAsClient(OpenFPS.AudioLab.LabPaths.Server(), mapId);
