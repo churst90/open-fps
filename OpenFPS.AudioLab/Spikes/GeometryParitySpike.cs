@@ -979,6 +979,9 @@ public static class GeometryParitySpike
         if (only.Contains("meets"))
             MeetsParity(ecs, rebuilt, data, show);
 
+        if (only.Contains("indoor"))
+            IndoorParity(ecs, serverWorld, show);
+
         if (only.Contains("rooms"))
             RoomsParity(ecs, rebuilt, data, show, lookup, args);   // with the door leaves shut in their doorways
 
@@ -1286,6 +1289,25 @@ public static class GeometryParitySpike
     /// links the two there: a pair with none is bounded today only by the boxes, and a flood from points would split
     /// it by distance instead.
     /// </summary>
+    /// <summary>Each region's indoor flag as the load's box survey set it against a ray up from its point: under
+    /// cover or under the sky.</summary>
+    private static void IndoorParity(World ecs, TriangleWorld world, int show)
+    {
+        int same = 0, total = 0;
+        var differ = new List<string>();
+        ecs.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (Entity e, ref Transform t, ref RegionComponent r) =>
+        {
+            if (r.RoomSize.X <= 0f) return;
+            total++;
+            var all = new AcceptAll();
+            bool covered = world.Closest(t.Position, Vector3.UnitY, RoomFlood.SkyReach, GeometryLayers.Acoustics, RayFaces.Both, ref all, out _);
+            if (covered == r.IsIndoor) { same++; return; }
+            differ.Add($"{r.FriendlyName} ({e.Id}) at {V(t.Position)}: survey {(r.IsIndoor ? "indoors" : "outdoors")}, ray {(covered ? "covered" : "sky")}");
+        });
+        Console.WriteLine($"indoor: {same} of {total} regions the same by the box survey and by a ray up from the point; {differ.Count} differ");
+        foreach (var line in differ.Take(show)) Console.WriteLine("    " + line);
+    }
+
     private static void MeetsParity(World ecs, TriangleWorld world, MapData data, int show)
     {
         var defs = EntityDefinitionFactory.StaticDefinitions(ecs);

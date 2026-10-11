@@ -251,9 +251,22 @@ public sealed class MapTracker
                 // A region: a room, a floor of a stairwell, a street. Gather only asks of regions.
                 string name = def.Region.FriendlyName ?? "";
                 if (string.IsNullOrWhiteSpace(name)) return null;
-                // A place is as near as its nearest edge, and you are in it at nought.
-                var size = def.Collider.Size != Vector3.Zero ? def.Collider.Size : def.Region.RoomSize;
-                var (min, max) = Bounds(e.Transform, size);
+                // A place is as near as its nearest edge, and you are in it at nought: a room as far as its flood's
+                // air reaches, a place (and a room that did not flood) as far as its box.
+                Vector3 min, max;
+                var cells = world.AcousticMap?.RoomCells;
+                if (cells != null && cells.TryAir(e.Id, out var lo, out var hi, out _))
+                {
+                    if (cells.TryRoomAt(feet + new Vector3(0f, 1f, 0f), out int inRoom) && inRoom == e.Id)
+                        return new Tracked(e.Id, name.Trim(), feet, feet.Y, 0f);
+                    float c = OpenFPS.Common.Geometry.RoomFlood.Cell * 0.5f;
+                    (min, max) = (lo - new Vector3(c), hi + new Vector3(c));
+                }
+                else
+                {
+                    var size = def.Collider.Size != Vector3.Zero ? def.Collider.Size : def.Region.RoomSize;
+                    (min, max) = Bounds(e.Transform, size);
+                }
                 var near = Vector3.Clamp(feet, min, max);
                 return new Tracked(e.Id, name.Trim(), near, near.Y, Vector3.Distance(feet, near));
             }

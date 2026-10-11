@@ -202,12 +202,15 @@ public sealed class DoorManners
         return vb <= va;
     }
 
-    /// <summary>Every region on the map: whether it is indoors, and how big it is.</summary>
+    /// <summary>Every region on the map: whether it is indoors, and how big it is (its flood's air where it flooded,
+    /// else its box).</summary>
     private static Dictionary<int, (bool Indoor, float Volume)> Regions(World world)
     {
         var regions = new Dictionary<int, (bool, float)>();
+        var floods = OpenFPS.Server.Core.MapManager.RoomsOf(world);
         world.Query(new QueryDescription().WithAll<RegionComponent>(), (Entity e, ref RegionComponent r) =>
         {
+            if (floods != null && floods.TryAir(e.Id, out _, out _, out float air)) { regions[e.Id] = (r.IsIndoor, air); return; }
             var s = r.RoomSize;
             regions[e.Id] = (r.IsIndoor, s.X > 0f && s.Y > 0f && s.Z > 0f ? s.X * s.Y * s.Z : float.MaxValue);
         });

@@ -19,11 +19,28 @@ public static class StandingSpots
     /// <summary>The most points tried in one place; a big yard is tried more coarsely.</summary>
     public const int MostPoints = 4096;
 
-    /// <summary>The standing spot in a room: <see cref="In"/> over its box.</summary>
+    /// <summary>The standing spot in a room: <see cref="In"/> over its flood's air where it flooded, the spot in that
+    /// air (a body's middle in the room the server says it is in), else over its box.</summary>
     public static Vector3? InRoom(World world, SpatialGrid<Entity> grid, Entity room)
     {
         if (!world.IsAlive(room) || !world.Has<Transform>(room) || !world.Has<RegionComponent>(room)) return null;
         var t = world.Get<Transform>(room);
+        var floods = MapManager.RoomsOf(world);
+        if (floods != null && floods.TryAir(room.Id, out var lo, out var hi, out _))
+        {
+            // The cells' middles out to their faces, from its floor (the top of the floor's cells in most of its
+            // columns: not a flight going down through it).
+            float c = OpenFPS.Common.Geometry.RoomFlood.Cell * 0.5f;
+            lo -= new Vector3(c); hi += new Vector3(c);
+            if (floods.FloorOf(room.Id) is float floor) lo.Y = MathF.Min(floor, hi.Y - 0.5f);
+            // About the room's own point where it lies in the air, so the spot nearest it is tried first.
+            var middle = Vector3.Clamp(t.Position, lo, hi);
+            var half = Vector3.Max(middle - lo, hi - middle);
+            var box = new Vector3(2f * half.X, hi.Y - lo.Y, 2f * half.Z);
+            int id = room.Id;
+            return In(world, grid, new Vector3(middle.X, (lo.Y + hi.Y) * 0.5f, middle.Z), Quaternion.Identity, box,
+                      p => floods.TryRoomAt(p + new Vector3(0f, PhysicsConstants.PlayerHeight * 0.5f, 0f), out int at) && at == id);
+        }
         return In(world, grid, t.Position, t.Rotation, world.Get<RegionComponent>(room).RoomSize);
     }
 
@@ -34,7 +51,8 @@ public static class StandingSpots
     /// the box's bottom: a bed, a sofa or a counter top is not one, nor a stair down through the floor (the middle of
     /// Marlow Tower's roof access is over the top flight); failing that anywhere, any ground. Null when none will do.
     /// </summary>
-    public static Vector3? In(World world, SpatialGrid<Entity> grid, Vector3 centre, Quaternion rotation, Vector3 size)
+    public static Vector3? In(World world, SpatialGrid<Entity> grid, Vector3 centre, Quaternion rotation, Vector3 size,
+                              Func<Vector3, bool>? inPlace = null)
     {
         if (rotation.LengthSquared() < 1e-6f) rotation = Quaternion.Identity;
         var half = Vector3.Max(size * 0.5f, Vector3.Zero);
@@ -56,7 +74,8 @@ public static class StandingSpots
             foreach (var (_, lx, lz) in points)
             {
                 var p = centre + Vector3.Transform(new Vector3(lx, 0f, lz), rotation);
-                if (Standing(world, grid, new Vector3(p.X, probeY, p.Z), bottom, floorOnly, centre, rotation, half) is { } spot)
+                if (Standing(world, grid, new Vector3(p.X, probeY, p.Z), bottom, floorOnly, centre, rotation, half) is { } spot
+                    && (inPlace == null || inPlace(spot)))
                     return spot;
             }
         return null;

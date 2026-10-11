@@ -155,15 +155,19 @@ public partial class CommandHandler
         foreach (var mapId in maps)
         {
             if (!_maps.TryGetMap(mapId, out var world, out _, out var grid, out _)) continue;
-            var places = new List<(string Name, Vector3 Centre, Vector3 Size)>();
-            world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (ref Transform t, ref RegionComponent r) =>
+            // A room by its flood (how much air, and a spot in it), a place by its box.
+            var floods = MapManager.RoomsOf(world);
+            var places = new List<(string Name, Vector3 Centre, Vector3 Size, float Volume, Entity? Room)>();
+            world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (Entity e, ref Transform t, ref RegionComponent r) =>
             {
-                if (!string.IsNullOrWhiteSpace(r.FriendlyName)) places.Add((r.FriendlyName, t.Position, r.RoomSize));
+                if (string.IsNullOrWhiteSpace(r.FriendlyName)) return;
+                float volume = floods != null && floods.TryAir(e.Id, out _, out _, out float air) ? air : r.RoomSize.X * r.RoomSize.Y * r.RoomSize.Z;
+                places.Add((r.FriendlyName, t.Position, r.RoomSize, volume, e));
             });
             world.Query(new QueryDescription().WithAll<Transform, IdentityComponent, ColliderComponent>(),
                 (ref Transform t, ref IdentityComponent id, ref ColliderComponent c) =>
                 {
-                    if (id.PrefabId == NamedPlacePrefab && !string.IsNullOrWhiteSpace(id.Name)) places.Add((id.Name, t.Position, c.Size));
+                    if (id.PrefabId == NamedPlacePrefab && !string.IsNullOrWhiteSpace(id.Name)) places.Add((id.Name, t.Position, c.Size, c.Size.X * c.Size.Y * c.Size.Z, null));
                 });
             foreach (var match in new Func<string, bool>[]
             {
@@ -172,8 +176,12 @@ public partial class CommandHandler
                 n => n.Contains(typed, StringComparison.OrdinalIgnoreCase),
             })
             {
-                foreach (var p in places.Where(p => match(p.Name)).OrderBy(p => p.Size.X * p.Size.Y * p.Size.Z))
-                    if (StandingSpot(world, grid, p.Centre, p.Size) is { } at) return (mapId, at, p.Name);
+                foreach (var p in places.Where(p => match(p.Name)).OrderBy(p => p.Volume))
+                {
+                    var at = p.Room is { } room && floods != null && floods.Flooded.Contains(room.Id)
+                        ? StandingSpots.InRoom(world, grid, room) : StandingSpot(world, grid, p.Centre, p.Size);
+                    if (at is { } spot) return (mapId, spot, p.Name);
+                }
             }
         }
         return null;

@@ -30,11 +30,8 @@ public static class ListeningSpots
                      $"{typed} on {mapId} is solid");
         float ground = PhysicsUtils.GetGroundHeight(world, grid, at + new Vector3(0f, 0.1f, 0f), out _);
         Assert.InRange(at.Y - ground, 0f, 0.15f);
-        var t = world.Get<Transform>(room);
-        var rotation = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
-        var local = Vector3.Transform(at - t.Position, Quaternion.Inverse(rotation));
-        Assert.True(MathF.Abs(local.X) <= region.RoomSize.X / 2 && MathF.Abs(local.Z) <= region.RoomSize.Z / 2
-                    && local.Y >= -region.RoomSize.Y / 2 - 0.35f && local.Y <= region.RoomSize.Y / 2, $"{typed} is not in {region.FriendlyName}");
+        // In the room as the server finds it: its flood where it flooded.
+        Assert.True(MapManager.RegionAt(world, at + new Vector3(0f, 1f, 0f)) == room.Id, $"{typed} is not in {region.FriendlyName}");
         Assert.Equal(typed, StandingSpots.InRoom(world, grid, room) is { } spot ? StandingSpots.Typed(spot) : "none");
     }
 }
@@ -43,7 +40,7 @@ public class CityListeningSpotsTests
 {
     [Theory]
     [InlineData(1489, "-14.2 -102.7 9.3", "Marlow Tower stairwell, floor 3")]
-    [InlineData(2013, "-10.6 -106.3 23.8", "Marlow Tower roof access")]
+    [InlineData(2013, "-10.6 -105.5 24.1", "Marlow Tower roof access")]
     [InlineData(5824, "0.0 -212.5 0.1", "Tunnel, north portal")]
     public void You_can_stand_there(int room, string typed, string name)
         => ListeningSpots.Check(DoorChoiceTests.Maps, "city", room, typed, name);
