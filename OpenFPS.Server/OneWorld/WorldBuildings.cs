@@ -431,7 +431,7 @@ public static class WorldBuildings
             return e;
         }
 
-        EntityData Make(string prefab, Frame f, double u0, double u1, double v0, double v1, double y0, double y1, string? nm, string layer, double? foot, int eid)
+        EntityData Make(string prefab, Frame f, double u0, double u1, double v0, double v1, double y0, double y1, string? nm, string? layer, double? foot, int eid)
         {
             var b = Base(prefab);
             var (cx, cz) = f.W((u0 + u1) / 2, (v0 + v1) / 2);
