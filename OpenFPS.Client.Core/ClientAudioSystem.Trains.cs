@@ -317,6 +317,12 @@ public partial class ClientAudioSystem
             _audio.UpdateSpatialAttributes(e);
         }
         else _audio.PlayPhysicalSoundDirect(e);
+        // Handed the path every frame, as a siren's is. A re-submission leaves a voice's tone alone and the
+        // path pass skips voice ids, so a train kept the walls of wherever its voice started: a horn begun
+        // on a stale outdoor answer played flat through Marlow Tower's brick (2026-10-10, 74 dB in a corridor).
+        var placed = path;
+        placed.ApparentPosition = e.ApparentPosition;
+        _audio.SetAcousticPath(voiceId, placed);
         v.Playing[slot] = true;
         _trainPathIds.Add(rep.Id);
     }
