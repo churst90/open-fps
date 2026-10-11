@@ -133,6 +133,9 @@ public static class AcousticVolumeGenerator
         // it is not found twice. One per gap, not per pair of rooms: a lobby with a front door and an open
         // side onto one street is heard through both (2026-10-02). Only for regions with a wall, never the
         // floor (FaceOpenings).
+        // A flooded room's openings are framed from where its air met them, and where it met the sky; the faces of
+        // boxes are searched only round the places that did not flood (a yard, a street, a roof).
+        if (floods != null) ApplyFloodOpenings(acousticMap, floods);
         int openingCount = AddFaceOpenings(acousticMap, solids);
         if (openingCount > 0)
             console.WriteLine($"[AcousticMap] {openingCount} opening(s) from the gaps in rooms' faces (open sides, tunnel mouths, doorways with no door).");
@@ -231,6 +234,59 @@ public static class AcousticVolumeGenerator
     public const int FirstFaceOpeningId = -2000;
 
     /// <summary>
+    /// Frames the map's openings from its floods (docs/GEOMETRY.md 12.6, step 3): each authored opening with no leaf
+    /// takes the frame its rooms' air met (its biggest piece; each other piece, past a pier, is an opening of its own
+    /// between the same two places), and each patch of open sky a flooded room's air met is an opening to the outdoors.
+    /// What a flooded room had from the faces of its box goes; a door keeps its leaf's frame. Build-then-swap.
+    /// </summary>
+    public static void ApplyFloodOpenings(AcousticMap map, OpenFPS.Common.Geometry.RoomCells floods)
+    {
+        var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
+        var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
+        foreach (var (id, frame) in map.OpeningFrames)
+        {
+            // An authored opening's frame (from an earlier flood), or a found one round a room that floods now.
+            if (id > 0) { frames.Remove(id); continue; }
+            if (id <= FirstFaceOpeningId && floods.Flooded.Contains(frame.Room)) { frames.Remove(id); portals.Remove(id); }
+        }
+        int nextId = FirstFaceOpeningId;
+        foreach (int id in portals.Keys) if (id <= FirstFaceOpeningId) nextId = Math.Min(nextId, id - 1);
+
+        static Vector3 SizeOf(in OpenFPS.Common.Geometry.FloodOpenings.Frame f)
+            => new(f.Size.X, f.Size.X > 0f ? MathF.Min(f.Size.Y, f.Area / f.Size.X) : f.Size.Y, f.Size.Z);
+
+        foreach (var group in floods.Openings.Where(f => f.Opening > 0).GroupBy(f => f.Opening))
+        {
+            if (!portals.TryGetValue(group.Key, out var authored)) continue;
+            bool first = true;
+            foreach (var f in group)
+            {
+                var size = SizeOf(f);
+                if (first)
+                {
+                    frames[group.Key] = new OpeningFrame(f.Room, f.Centre, f.Rotation, size);
+                    first = false;
+                    continue;
+                }
+                int id = nextId--;
+                var piece = authored.Portal;
+                piece.ApertureSize = MathF.Sqrt(size.X * size.Y);
+                portals[id] = (piece, f.Centre);
+                frames[id] = new OpeningFrame(f.Room, f.Centre, f.Rotation, size);
+            }
+        }
+        foreach (var f in floods.Openings.Where(f => f.Opening == 0))
+        {
+            var size = SizeOf(f);
+            int id = nextId--;
+            portals[id] = (new Opening { RegionAId = f.Room, RegionBId = AcousticConstants.GlobalRegionId, ApertureSize = MathF.Sqrt(size.X * size.Y) }, f.Centre);
+            frames[id] = new OpeningFrame(f.Room, f.Centre, f.Rotation, size);
+        }
+        map.OpeningFrames = frames;
+        map.Portals = portals;
+    }
+
+    /// <summary>
     /// Puts on the map an opening for every gap in the faces of its structures (or of only
     /// <paramref name="rooms"/>, replacing what those rooms had), from <paramref name="boxes"/>: the scene's
     /// fixed solid boxes, each door's leaf standing shut in its doorway (open-fps: EntityAcoustics.Solids).
@@ -286,9 +342,12 @@ public static class AcousticVolumeGenerator
         var placeColumns = new BoxColumns();
         for (int i = 0; i < places.Count; i++) placeColumns.Add(i, places[i].Min, places[i].Max);
         var candidates = new List<int>();
+        // A flooded room's openings come from its flood (ApplyFloodOpenings): neither its faces nor a gap into it.
+        var flooded = map.RoomCells?.Flooded;
         foreach (var (room, rMin, rMax) in places)
         {
             if (rooms != null && !rooms.Contains(room.Id)) continue;
+            if (flooded != null && flooded.Contains(room.Id)) continue;
             var region = map.Regions[room.Id];
             if (RoomAcoustics.OpenFaceCount(region) == 6) continue;
 
@@ -314,6 +373,7 @@ public static class AcousticVolumeGenerator
 
             foreach (var gap in FaceOpenings.Find(room, region.Materials, nearSolids, nearPlaces, res, map.GlobalEnvironmentId))
             {
+                if (flooded != null && flooded.Contains(gap.Beyond)) continue;
                 var frame = new OpeningFrame(room.Id, gap.Centre, gap.Rotation, new Vector3(gap.Width, gap.Height, gap.Depth));
                 var list = Known(known, room.Id, gap.Beyond);
                 bool seen = false;

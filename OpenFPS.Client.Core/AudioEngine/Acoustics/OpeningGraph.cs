@@ -77,10 +77,11 @@ public static class OpeningGraph
             // The gaps in rooms' faces (AcousticVolumeGenerator: open sides, tunnel mouths, doorways with
             // no door) carry their own rectangle; an authored portal is as wide as its author said.
             bool face = id <= OpenFPS.Common.Systems.AcousticVolumeGenerator.FirstFaceOpeningId;
-            if (face && map.OpeningFrames.TryGetValue(id, out var frame))
+            // An authored opening with no leaf carries the frame its rooms' floods met (AcousticVolumeGenerator.ApplyFloodOpenings).
+            if (map.OpeningFrames.TryGetValue(id, out var frame))
             {
-                yield return new OpeningRoutes.Declared(id, OpeningRoutes.FaceKind, frame.Centre, frame.Rotation,
-                                                        frame.Size, 0f, portal.RegionAId, portal.RegionBId);
+                yield return new OpeningRoutes.Declared(id, face ? OpeningRoutes.FaceKind : id > 0 ? "doorway" : "guessed opening",
+                                                        frame.Centre, frame.Rotation, frame.Size, 0f, portal.RegionAId, portal.RegionBId);
                 continue;
             }
             yield return new OpeningRoutes.Declared(id, face ? OpeningRoutes.FaceKind : id > 0 ? "doorway" : "guessed opening",

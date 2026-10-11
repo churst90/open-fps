@@ -1809,9 +1809,9 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
       `RegionComponent.AmbienceId` stay on the wire, unread, with a one-line comment. Tests: AmbienceAndWeather,
       ClientAudioHarness, EmitterStreamReplay, SteelDoorSound, VoiceLifecycle, Speedway, PrefabSpec, BeaconAids.
    2. DONE (2026-10-10, unheard). The flood from a point, below ("The flood from a point").
-   3. Openings from the floods: where two floods meet (`Lining.Meets`, with where) and where one meets the sky, grouped
-      by plane into rectangles, in place of `FaceOpenings` on box faces and of `OpeningRoutes.FaceOfRoom`; then
-      portals derived where floods meet through a door leaf (the leaf's frame is the opening).
+   3. DONE (2026-10-11, unheard). Openings framed from where the floods meet them, below ("Openings from the
+      floods"). Portals derived through door leaves were not needed: every door is an entity with its two rooms,
+      framed by its leaf.
    4. The readers of `RoomSize` (83 in the game, 24 test files) onto the flood: `SpatialService.GetRegionAt`,
       `MapManager.RegionAt`, `MapTiles` footprints, `DoorManners`, `PlaceAt` and `/tp`, `MapTracker`, the voxel
       marks, `RoomAcoustics`; the server's `SurveyRegions` box survey goes (the lining measures).
@@ -1947,6 +1947,39 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
    floor 3 corridor by the stair door `/tp -19.95 -101.5 9.29`; its south end `/tp -19.95 -110.5 9.29`; floor 3
    stairwell `/tp -10.8 -104.2 9.28`; flat 31F `/tp -14 -85 9.29`; floor 7 corridor `/tp -19.95 -100 21.29`;
    before the front entrance `/tp -6.4 -103.5 0.12`.
+   **Openings from the floods (step 3, 2026-10-11, unheard).** A flood keeps the cells of each opening its air meets
+   and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
+   opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide
+   and high as the cells reach and with the area they hold (less than the frame where something stands in it: a stair
+   hole with its flight). An opening cell the air met counts only if what lies past it, the way the air came, is not
+   solid: a shut shutter in a car park's bay is a wall, not an opening. Air meeting the sky with no opening there is framed the same way, by the face it meets it
+   through and the plane it lies in. `RoomCells.Openings` carries them; `AcousticVolumeGenerator.ApplyFloodOpenings`
+   puts them on the map (an authored opening takes its biggest piece as its frame, each other piece is an opening of
+   its own between the same two places, each sky patch an opening to the outdoors) whenever the map is made with
+   floods, and again when the client floods the published geometry. `FaceOpenings` now searches only the faces of
+   places that did not flood (a yard, a street, a roof) and finds no gap into a flooded room; `OpeningRoutes` takes a
+   framed opening as it is and searches a frame round it only for a door's leaf (and for an authored opening no flood
+   met). No room's air, lookup or measure moved: the three maps' dumps are byte for byte main's.
+
+   Routes (the client's openings with the floods, against main's):
+   - Albany: 1,530 flooded rooms had openings to the outdoors found in their boxes' faces, 33,342 m2 in all, where
+     their floods are closed: a box's face across a wing of its own house, or past walls the face finder cannot see.
+     273 m2 remain (the 640 m building, whose box serves). Between rooms 45,937 to 39,748 m2: 21 rooms over 3 dB.
+   - Magnolia: 481 rooms, 9,650 to 18 m2 to the outdoors (the barns' doorways, 5.8 to 5.9 m2 each; 19315 Turtle Dove
+     Lane's had 29.6 with its false faces); between rooms 21,272 to 18,363 m2, 12 rooms over 3 dB.
+   - City: the stair holes as the air meets them past the flight, 9.0 to 9.6 m2 (the authored frame was 12); the concourse's
+     thirds 29.3 by 5.5 m; the car park's sides a frame a bay, level 0's west side now with them (+0.9 dB of opening);
+     the tunnel's north quarter loses its second opening onto Main Street block 2 (130.8 to 63.0 m2 to the outdoors,
+     -3.2 dB).
+
+   Where to listen (`--walk-pair map=ID room=ID`, a spot the server's collision says a body stands on, z the floor):
+   city Tunnel, north portal `/tp 0.0 -212.5 0.1`; Parking garage, level 0 `/tp -66.8 62.0 0.3`; Marlow Tower
+   stairwell, floor 3 `/tp -14.2 -102.7 9.3`. Magnolia 17523 Country Mile, house `/tp -240.6 594.9 1.5` (102 m2 of
+   false openings to the street gone); 19315 Turtle Dove Lane, barn `/tp 93.3 -260.1 1.2`; 16514 Walnut Springs Lane,
+   house `/tp 1423.4 40.8 -2.4` (between its rooms 17.3 to 7.9 m2). Albany Linn-Benton Community College Cafeteria
+   `/tp -27.5 -345.4 0.7` (741 m2 gone); 7101 Supra Drive Southwest, house `/tp -53.1 -690.8 0.8` (289 m2); 6121
+   Warwick Place Southwest, main bedroom `/tp -161.1 89.8 0.2` (between rooms 9.6 to 1.7 m2).
+
 2. **Sound points on models (MATTER.md 8).** A prefab's `SoundPoints` (name, position on its shape, size,
    directivity) read by machine parts and emitters. Begun: struck sounds read the shape a part has where its box
    would mislead (`StruckThings.Describe(form:)`, from a bump and a knock): a pitched roof is struck as its deck, a
