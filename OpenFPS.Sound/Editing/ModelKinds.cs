@@ -328,26 +328,13 @@ public static class ModelKinds
     {
         kind = id = "";
         if (string.IsNullOrEmpty(soundId)) return false;
-        int colon = soundId.IndexOf(':');
-        if (colon <= 0) return false;
-        string prefix = soundId[..colon].ToLowerInvariant();
-        string rest = soundId[(colon + 1)..];
+        // The table says which library kind a prefix names; a vehicle's sound is its engine, so
+        // "engine:school_bus" is the vehicle school_bus.
+        if (ModelKindTable.KindOf(soundId) is not { } model) return false;
+        string rest = model.Rest(soundId);
         int slash = rest.IndexOf('/');
         string key = slash >= 0 ? rest[..slash] : rest;
-        kind = prefix switch
-        {
-            "machine" => ModelLibrary.Kinds.SmallMachine,
-            "water" => ModelLibrary.Kinds.Water,
-            "fire" => ModelLibrary.Kinds.Fire,
-            "foliage" => ModelLibrary.Kinds.Foliage,
-            "flow" => ModelLibrary.Kinds.Flow,
-            "bell" => ModelLibrary.Kinds.Bell,
-            "shore" => ModelLibrary.Kinds.Shore,
-            "stove" => ModelLibrary.Kinds.GasHob,
-            // A vehicle's sound is its engine: "engine:school_bus" is the vehicle school_bus.
-            "engine" => ModelLibrary.Kinds.Vehicle,
-            _ => "",
-        };
+        kind = model.LibraryKind ?? "";
         id = key;
         return kind.Length > 0 && ModelLibrary.Knows(kind, id);
     }

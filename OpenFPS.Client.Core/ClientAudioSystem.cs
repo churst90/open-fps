@@ -83,9 +83,7 @@ public partial class ClientAudioSystem
         if (!world.Entities.TryGetValue(id, out var snap)) return false;
         var emitter = snap.Definition.SoundEmitter;
         string sound = emitter.SoundId ?? "";
-        return !emitter.IsSynth
-            && !sound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-            && !sound.StartsWith("ENGINE/", StringComparison.OrdinalIgnoreCase);
+        return !emitter.IsSynth && !OpenFPS.Common.ModelKindTable.IsVehicle(sound);
     }
 
     /// <summary>
@@ -540,10 +538,9 @@ public partial class ClientAudioSystem
         {
             string? preset = null; Vector3 local = default;
             if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var ride)
-                && ride.Definition.SoundEmitter.SoundId is { } rideSound
-                && rideSound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase))
+                && OpenFPS.Common.ModelKindTable.VehiclePreset(ride.Definition.SoundEmitter.SoundId) is { } ridePreset)
             {
-                preset = rideSound[7..];
+                preset = ridePreset;
                 local = Vector3.Transform(visualEyePos - ride.Transform.Position, Quaternion.Inverse(ride.Transform.Rotation));
             }
             _acousticWorker.Traced.RideIn(preset, local);
@@ -1071,7 +1068,7 @@ public partial class ClientAudioSystem
     private string VoiceKey(OpenFPS.Common.Networking.EntityDefinition def)
     {
         string id = def.SoundEmitter.SoundId ?? "";
-        if (!id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase)) return id;
+        if (!OpenFPS.Common.ModelKindTable.Is(id, OpenFPS.Common.ModelSynth.Fire)) return id;
         var k = (id, def.Collider.Shape, def.Collider.Size);
         if (_voiceKeys.TryGetValue(k, out var key)) return key;
         key = OpenFPS.Common.FireSpec.KeyForPlaced(id, def.Collider.Shape.IsRound(), def.Collider.Size);
@@ -1088,144 +1085,13 @@ public partial class ClientAudioSystem
     private float PhysicalHeadroom(string soundId)
     {
         if (_physicalHeadroom.TryGetValue(soundId, out float h)) return h;
-        h = OpenFPS.Common.VehicleProfile.PeakHeadroomDb;
-        try
-        {
-            if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(soundId, out string waterPreset, out _, out _))
-                h = OpenFPS.Common.WaterFeatureSpec.ByName(waterPreset).PeakHeadroomDb;
-            else if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
-                h = OpenFPS.Common.WaterFeatureSpec.ByName(soundId[6..]).PeakHeadroomDb;
-            else if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
-                h = OpenFPS.Common.FireSpec.ByName(soundId[5..]).PeakHeadroomDb;
-            else if (soundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
-                h = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]).PeakHeadroomDb;
-            else if (OpenFPS.Common.WoodChorus.ParseKey(soundId, out string woodPreset, out _, out _))
-                h = OpenFPS.Common.FoliageSpec.ByName(woodPreset).PeakHeadroomDb;
-            else if (soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
-                h = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]).PeakHeadroomDb;
-            else if (OpenFPS.Common.HobKey.IsKey(soundId))
-                h = OpenFPS.Common.GasHobSpec.ByName(soundId).PeakHeadroomDb;
-            else if (soundId.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
-                h = OpenFPS.Common.ShoreSpec.ByName(soundId).PeakHeadroomDb;
-            else if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
-                h = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]).PeakHeadroomDb;
-            else if (OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(soundId, out string railPreset, out _, out int railIndex))
-            {
-                // A train's bell renders with the bell's own room, as a crossing's does (TrainLayout).
-                var layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(railPreset));
-                if (railIndex >= 0 && railIndex < layout.Count) h = layout[railIndex].HeadroomDb;
-            }
-        }
-        catch (Exception) { }
+        h = OpenFPS.Common.ModelKindTable.Headroom(soundId);
         _physicalHeadroom[soundId] = h;
         return h;
     }
 
     private static (float LevelDb, float Extent)? LookUpPhysicalLevel(string soundId)
-    {
-        try
-        {
-            if (soundId.StartsWith("machine:", StringComparison.OrdinalIgnoreCase))
-            {
-                var spec = OpenFPS.Common.SmallMachineSpec.ByName(soundId[8..]);
-                return (spec.SourceLevelDb, spec.ExtentMetres);
-            }
-            if (soundId.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
-            {
-                // "rail:<preset>/<train>/<source index>" — the server places one entity per source
-                // in TrainLayout order; the level is that source's own.
-                if (OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(soundId, out string preset, out _, out int index))
-                {
-                    var layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset));
-                    if (index >= 0 && index < layout.Count)
-                        return (layout[index].LevelDb, layout[index].ExtentMetres);
-                }
-                return null;
-            }
-            if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
-            {
-                // A level crossing's gong. Without a level here a source is dropped by both the ranking
-                // and the submit path, and the bell was silent on the client. Its size is the bell.
-                var bell = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]);
-                return (bell.ReferenceDb, MathF.Max(0.5f, bell.DiameterMetres));
-            }
-            if (soundId.StartsWith("gate:", StringComparison.OrdinalIgnoreCase))
-            {
-                // A level crossing's gate mechanism, placed by its motor's level; the case at the
-                // foot of the mast is half a metre of steel.
-                var gate = OpenFPS.Common.CrossingGateSpec.ByName(soundId[5..]);
-                return (gate.SourceLevelDb, 0.5f);
-            }
-            // Water, fire and trees are placed like machines, by their declared level and size (basin,
-            // hearth, crown). One tap of a water feature ("water:<preset>/<feature>/<tap>") takes the
-            // whole feature's level and its own landing's size: each renders its share against the
-            // whole's scale, so the taps sum to the feature at any distance.
-            if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(soundId, out string waterPreset, out _, out int waterTap))
-            {
-                var feature = OpenFPS.Common.WaterFeatureSpec.ByName(waterPreset);
-                if (waterTap >= feature.Taps.Length) return null;
-                return (feature.SourceLevelDb, feature.Taps[waterTap].ExtentMetres);
-            }
-            if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
-            {
-                var water = OpenFPS.Common.WaterFeatureSpec.ByName(soundId[6..]);
-                return (water.SourceLevelDb, water.ExtentMetres);
-            }
-            if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
-            {
-                var fire = OpenFPS.Common.FireSpec.ByName(soundId[5..]);
-                return (fire.SourceLevelDb, fire.ExtentMetres);
-            }
-            if (soundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
-            {
-                var tree = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]);
-                return (tree.SourceLevelDb, tree.ExtentMetres);
-            }
-            // A wood heard as one (WoodChorus): one tree's level (its synth renders its trees), the
-            // wood's size.
-            if (OpenFPS.Common.WoodChorus.ParseKey(soundId, out string woodPreset, out float woodX, out float woodZ))
-            {
-                var tree = OpenFPS.Common.FoliageSpec.ByName(woodPreset);
-                return (tree.SourceLevelDb, MathF.Max(woodX, woodZ));
-            }
-            // Running water: a creek, a gutter, a drain, a downpipe (RunningWaterSynth). Its size is its
-            // length or its opening; its level is declared at its base flow or its reference rain.
-            if (soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
-            {
-                var flow = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
-                return (flow.SourceLevelDb, flow.ExtentMetres);
-            }
-            // A gas hob (GasHobSynth): declared with every burner on full; its size is the hob.
-            if (OpenFPS.Common.HobKey.IsKey(soundId))
-            {
-                var hob = OpenFPS.Common.GasHobSpec.ByName(soundId);
-                return (hob.SourceLevelDb, hob.ExtentMetres);
-            }
-            // Waves at an edge (ShoreSynth): declared at its reference wind straight onshore; its size is a
-            // stretch of the edge.
-            if (soundId.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
-            {
-                var shore = OpenFPS.Common.ShoreSpec.ByName(soundId);
-                return (shore.SourceLevelDb, shore.ExtentMetres);
-            }
-            if (soundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
-            {
-                var p = OpenFPS.Common.AircraftProfile.ByName(soundId[9..]);
-                // The size is what radiates (the disc or the nozzle), which only has to stop the inverse
-                // law running away directly underneath; with more than one engine it is their span
-                // (AircraftProfile.EngineSpanMetres, 11.5 m on a twin), as a bus's length is its size.
-                float span = p.EngineSpanMetres > 0f
-                    ? p.EngineSpanMetres
-                    : MathF.Max(2f, p.Propeller?.DiameterMetres
-                                 ?? p.Turbine?.Fan?.DiameterMetres
-                                 ?? p.Turbine?.BypassNozzleDiameterMetres
-                                 ?? 2f);
-                return (p.SourceLevelDb, span);
-            }
-        }
-        catch { }
-        return null;
-    }
+        => OpenFPS.Common.ModelKindTable.TryLevel(soundId, out float level, out float extent) ? (level, extent) : null;
 
     private readonly Dictionary<int, (float Speed, double At)> _lastRailSpeed = new();
     private readonly Dictionary<int, (float Speed, double At)> _lastAirSpeed = new();
@@ -1340,8 +1206,9 @@ public partial class ClientAudioSystem
     private static OpenFPS.Common.AircraftProfile? PhysicalAircraft(EntitySnapshot snap)
     {
         string? sid = snap.Definition.SoundEmitter.SoundId;
-        if (sid == null || !sid.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase)) return null;
-        try { return OpenFPS.Common.AircraftProfile.ByName(sid[9..]); } catch { return null; }
+        if (OpenFPS.Common.ModelKindTable.KindOf(sid) is not { Synth: OpenFPS.Common.ModelSynth.Aircraft } kind) return null;
+        try { return OpenFPS.Common.AircraftProfile.ByName(kind.Rest(sid!)); }
+        catch (Exception ex) { OpenFPS.Common.ModelKindTable.Fail(sid!, ex.Message); return null; }
     }
 
     private readonly Dictionary<string, OpenFPS.Common.RunningWaterSpec> _flowSpecs = new(StringComparer.OrdinalIgnoreCase);
@@ -1357,7 +1224,7 @@ public partial class ClientAudioSystem
     private bool Dry(string soundId, int entityId, bool running, double now)
     {
         // Still water: no wind to raise waves, no swell, no current. It makes no sound.
-        if (soundId.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+        if (OpenFPS.Common.ModelKindTable.Is(soundId, OpenFPS.Common.ModelSynth.Shore))
         {
             try { return OpenFPS.Common.ShoreSpec.ByName(soundId).CalmAt(_audio.Weather.MeanSpeed); }
             catch (Exception) { return false; }
@@ -1369,7 +1236,7 @@ public partial class ClientAudioSystem
             if (!OpenFPS.Common.HobKey.TryParse(soundId, out var hob) || hob.AnyOn) return false;
             return OpenFPS.Common.WindField.Now() - hob.At > OpenFPS.Common.HobKey.QuietAfterSeconds;
         }
-        if (!soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!OpenFPS.Common.ModelKindTable.Is(soundId, OpenFPS.Common.ModelSynth.Flow)) return false;
         try
         {
             // Once per sound id: this runs for every sink in every flat, every frame.
@@ -1685,9 +1552,7 @@ public partial class ClientAudioSystem
             if (!world.Entities.TryGetValue(entityId, out var snap)) continue;
             var em = snap.Definition.SoundEmitter;
             if (!em.IsSynth || em.SoundId == null) continue;
-            if (!em.SoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
-            string preset = em.SoundId[7..];
-            if (!OpenFPS.Common.MachineRegistry.Knows(preset)) continue;
+            if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(em.SoundId) is not { } preset) continue;
             _carPreset[entityId] = preset;
 
             float d2 = Vector3.DistanceSquared(snap.Transform.Position, eyePos);
@@ -2272,9 +2137,7 @@ public partial class ClientAudioSystem
         foreach (var snap in world.DynamicEntities)
         {
             string? sid = snap.Definition.SoundEmitter.SoundId;
-            if (sid == null || !sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
-            string preset = sid[7..];
-            if (!OpenFPS.Common.MachineRegistry.Knows(preset)
+            if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(sid) is not { } preset
                 || OpenFPS.Common.MachineRegistry.VehicleFor(preset).Siren is not { } sirenKey) continue;
             _sirenCars.Add(snap.Id);
             var path = VehiclePath(world, snap, eyePos);
@@ -2368,7 +2231,7 @@ public partial class ClientAudioSystem
     /// <summary>A train's horn, whistle or bell source, while the train is not sounding it.</summary>
     private bool SilentSignal(string soundId, double now)
     {
-        if (!soundId.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!OpenFPS.Common.ModelKindTable.Is(soundId, OpenFPS.Common.ModelSynth.Rail)) return false;
         if (!_signalTrains.TryGetValue(soundId, out string? train))
         {
             train = null;
@@ -2422,7 +2285,7 @@ public partial class ClientAudioSystem
             }
             var path = VehiclePath(world, snap, eyePos);
             // Behind a car's grille, a little above the bumper; on a locomotive's cab roof.
-            bool rail = snap.Definition.SoundEmitter.SoundId?.StartsWith("rail:", StringComparison.OrdinalIgnoreCase) == true;
+            bool rail = OpenFPS.Common.ModelKindTable.BodyOf(snap.Definition.SoundEmitter.SoundId) == OpenFPS.Common.ModelBody.Rails;
             Vector3 pos = snap.Transform.Position
                         + Vector3.Transform(rail ? new Vector3(0f, 4.2f, 0f) : new Vector3(0f, 0.6f, Grille(snap)),
                                             snap.Transform.Rotation);
@@ -2595,10 +2458,8 @@ public partial class ClientAudioSystem
             if (!OpenFPS.Common.VehicleSignalBits.IsManual(snap.Signals)) continue;
             bool held = OpenFPS.Common.VehicleSignalBits.HornHeld(snap.Signals);
             if (!held && !_heldHorns.ContainsKey(snap.Id)) continue;
-            string? sid = snap.Definition.SoundEmitter.SoundId;
-            if (sid == null || !sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-                || !OpenFPS.Common.MachineRegistry.Knows(sid[7..])) continue;
-            string horn = OpenFPS.Common.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor(sid[7..]));
+            if (OpenFPS.Common.ModelKindTable.Vehicle(snap.Definition.SoundEmitter.SoundId) is not { } vehicle) continue;
+            string horn = OpenFPS.Common.VehicleProfile.HornFor(vehicle);
             if (held) _heldHorns[snap.Id] = double.NaN;
             else if (double.IsNaN(_heldHorns[snap.Id])) _heldHorns[snap.Id] = now;
             HeldHornVoice(world, snap, horn, held, eyePos);
@@ -2731,10 +2592,8 @@ public partial class ClientAudioSystem
     /// </summary>
     internal static float Grille(in EntitySnapshot snap)
     {
-        string? sid = snap.Definition.SoundEmitter.SoundId;
-        if (sid != null && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-            && OpenFPS.Common.MachineRegistry.Knows(sid[7..]))
-            return MathF.Max(0.5f, OpenFPS.Common.MachineRegistry.VehicleFor(sid[7..]).LengthMetres * 0.5f - 0.25f);
+        if (OpenFPS.Common.ModelKindTable.Vehicle(snap.Definition.SoundEmitter.SoundId) is { } vehicle)
+            return MathF.Max(0.5f, vehicle.LengthMetres * 0.5f - 0.25f);
         return 1.9f;
     }
 
@@ -2890,7 +2749,8 @@ public partial class ClientAudioSystem
                 physicalKey = resolvedSoundId;
                 // A stretch of shore carries its geometry (fetch, which way its water lies) in its box
                 // (tools/gen_osm.py); the voice reads it from the key.
-                if (physicalKey.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+                var physicalSynth = OpenFPS.Common.ModelKindTable.KindOf(physicalKey)!.Synth;
+                if (physicalSynth == OpenFPS.Common.ModelSynth.Shore)
                     physicalKey = OpenFPS.Common.ShoreSpec.KeyFor(physicalKey, def.Collider.Size, snap.Transform.Rotation);
                 // Placed by its declared level and size: inside its extent the level is flat, and the
                 // gain is paid down so the far field is unchanged (Loudness.Widen; widening without
@@ -2907,7 +2767,7 @@ public partial class ClientAudioSystem
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
                 earLevel = levelDb;
                 extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey);
-                if (physicalKey.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
+                if (physicalSynth == OpenFPS.Common.ModelSynth.Aircraft)
                 {
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
                     onGround = OnTheWheels(snap, world, eyePos, out float height);
@@ -2928,7 +2788,7 @@ public partial class ClientAudioSystem
                         else if (height < piston.WingspanMetres && snap.Velocity.Y < -0.2f) powerLever = GroundIdleLever;
                     }
                 }
-                else if (physicalKey.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
+                else if (physicalSynth == OpenFPS.Common.ModelSynth.Rail)
                 {
                     // The notch from what the speed does (pulling away full, holding a little, braking
                     // none), carried in the lever slot; the wake slot carries the speed, for rolling noise.
@@ -2941,16 +2801,15 @@ public partial class ClientAudioSystem
                     rotorWake = speed;
                 }
             }
-            else if (resolvedSoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-                && OpenFPS.Common.MachineRegistry.Knows(resolvedSoundId[7..]))
+            else if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(resolvedSoundId) is { } vehiclePreset)
             {
                 // A vehicle: its own live engine, or a borrowed voice (DistantEngine).
                 if (!_liveEngines.Contains(snap.Id))
                 {
-                    DistantEngine(snap, def, resolvedSoundId[7..], world.PositionsSampledAt);
+                    DistantEngine(snap, def, vehiclePreset, world.PositionsSampledAt);
                     return;
                 }
-                engineKey = resolvedSoundId[7..];
+                engineKey = vehiclePreset;
                 var profile = OpenFPS.Common.MachineRegistry.VehicleFor(engineKey);
                 // Its own measured level: a stock car is 14 dB over a road car, a diesel pickup 30 under.
                 float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
@@ -2996,6 +2855,8 @@ public partial class ClientAudioSystem
                     cabinEar = Vector3.Transform(eyePos - snap.Transform.Position, Quaternion.Inverse(snap.Transform.Rotation));
                 }
             }
+            else if (OpenFPS.Common.ModelKindTable.KindOf(resolvedSoundId) == null)
+                OpenFPS.Common.ModelKindTable.Fail(resolvedSoundId, "is synthesised but names no kind of model");
         }
         else
         {

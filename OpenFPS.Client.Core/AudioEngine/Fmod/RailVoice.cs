@@ -271,14 +271,7 @@ public sealed class TrainVoiceState
     /// <summary>"rail:&lt;preset&gt;/&lt;train&gt;/&lt;source index&gt;" — what the server writes as the
     /// SoundId of each entity of a consist.</summary>
     public static bool ParseKey(string soundId, out string preset, out string train, out int index)
-    {
-        preset = ""; train = ""; index = -1;
-        if (soundId == null || !soundId.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)) return false;
-        var parts = soundId[5..].Split('/');
-        if (parts.Length != 3) return false;
-        preset = parts[0]; train = parts[1];
-        return int.TryParse(parts[2], out index);
-    }
+        => OpenFPS.Common.ModelKindTable.TryRailSource(soundId, out preset, out train, out index);
 
     /// <summary>"rail:&lt;preset&gt;/&lt;train&gt;/@&lt;slot&gt;" — one of a train's voices (the client's own
     /// key; nothing on the wire carries it).</summary>

@@ -274,6 +274,10 @@ public sealed record SmallMachineSpec
     [Tunable("m", 0.1, 10, "How big the machine is acoustically: inside this the level is flat.", Label = "size", Step = 0.1)]
     public float ExtentMetres { get; init; } = 0.8f;
 
+    /// <summary>Somebody walks behind it: its body walks (ModelKindTable.BodyOf), so it has their footsteps.</summary>
+    [Tunable("", 0, 1, "Somebody walks behind it, so their footsteps are heard with it.", Label = "walked behind")]
+    public bool WalkedBehind { get; init; }
+
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -306,6 +310,7 @@ public sealed record SmallMachineSpec
         // engine 91 and the blade in its deck 85.
         SourceLevelDb = 92f,
         ExtentMetres = 0.6f,
+        WalkedBehind = true,
     };
 
     /// <summary>

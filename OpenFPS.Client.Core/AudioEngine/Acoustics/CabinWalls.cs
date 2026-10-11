@@ -42,13 +42,7 @@ public sealed class CabinWalls
     }
 
     /// <summary>The vehicle profile an entity is voiced as, or null for anything that is not a vehicle.</summary>
-    public static VehicleProfile? Vehicle(EntitySnapshot snap)
-    {
-        string? sid = snap.Definition?.SoundEmitter.SoundId;
-        if (sid == null || !sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) return null;
-        string preset = sid[7..];
-        return MachineRegistry.Knows(preset) ? MachineRegistry.VehicleFor(preset) : null;
-    }
+    public static VehicleProfile? Vehicle(EntitySnapshot snap) => ModelKindTable.Vehicle(snap.Definition?.SoundEmitter.SoundId);
 
     /// <summary>Whether a vehicle has a closed cabin at all: a motorcycle and a formula car do not.</summary>
     public static bool HasCabin(VehicleProfile v)

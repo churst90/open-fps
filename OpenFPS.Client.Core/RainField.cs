@@ -670,10 +670,9 @@ public sealed class RainSurvey
         foreach (var e in world.DynamicEntities)
         {
             if (e.Id == ownEntityId) continue;
-            string sound = e.Definition.SoundEmitter.SoundId ?? "";
-            if (!sound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
+            if (ModelKindTable.VehiclePreset(e.Definition.SoundEmitter.SoundId) is not { } preset) continue;
             if (Vector3.DistanceSquared(e.Transform.Position, ear) > (radius + 10f) * (radius + 10f)) continue;
-            AddVehicle(e, sound[7..]);
+            AddVehicle(e, preset);
         }
     }
 
@@ -709,11 +708,12 @@ public sealed class RainSurvey
     {
         var def = e.Definition;
         string sound = def.SoundEmitter.SoundId ?? "";
-        if (sound.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
+        if (ModelKindTable.Is(sound, ModelSynth.Foliage))
         {
             // A tree: its crown is its spec's, round the point the crown is placed at.
             FoliageSpec spec;
-            try { spec = FoliageSpec.ByName(sound[8..]); } catch { return; }
+            try { spec = FoliageSpec.ByName(sound[8..]); }
+            catch (Exception ex) { ModelKindTable.Fail(sound, ex.Message); return; }
             _things.Add(new Thing
             {
                 Id = e.Id, Centre = e.Transform.Position, Sphere = true, Radius = spec.CrownRadiusMetres,

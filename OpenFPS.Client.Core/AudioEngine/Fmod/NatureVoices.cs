@@ -157,14 +157,7 @@ public sealed class WaterFeatureVoice
     /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;": one tap of one feature on a map. A plain
     /// "water:&lt;preset&gt;" is the whole feature at one point and is not a tap.</summary>
     public static bool ParseKey(string? soundId, out string preset, out string feature, out int tap)
-    {
-        preset = ""; feature = ""; tap = -1;
-        if (soundId == null || !soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase)) return false;
-        var parts = soundId[6..].Split('/');
-        if (parts.Length != 3) return false;
-        preset = parts[0]; feature = parts[1];
-        return int.TryParse(parts[2], out tap) && tap >= 0;
-    }
+        => OpenFPS.Common.ModelKindTable.TryWaterTap(soundId, out preset, out feature, out tap);
 }
 
 /// <summary>One tap of a water feature, as a voice. See <see cref="WaterFeatureVoice"/>.</summary>

@@ -195,10 +195,9 @@ public sealed class DrivingAids
 
         float halfWidth = 0.95f;
         VehicleProfile? profile = null;
-        if (car.Definition.SoundEmitter.SoundId is { } sid && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-            && MachineRegistry.Knows(sid[7..]))
+        if (ModelKindTable.Vehicle(car.Definition.SoundEmitter.SoundId) is { } known)
         {
-            profile = MachineRegistry.VehicleFor(sid[7..]);
+            profile = known;
             halfWidth = profile.WidthMetres * 0.5f;
         }
 
@@ -298,10 +297,7 @@ public sealed class DrivingAids
         if (AssistEnabled && speed > 1.5f && MathF.Abs(offRoadLine) < AssistWithinDegrees)
         {
             // The preset's wheelbase and lock; an unknown car gets the default chassis.
-            var chassis = car.Definition.SoundEmitter.SoundId is { } s2 && s2.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-                          && MachineRegistry.Knows(s2[7..])
-                ? MachineRegistry.VehicleFor(s2[7..]).Running
-                : null;
+            var chassis = ModelKindTable.Vehicle(car.Definition.SoundEmitter.SoundId)?.Running;
             float wheelbase = chassis != null ? MathF.Max(0.5f, chassis.Wheelbase) : DefaultWheelbase;
             float fullLock = chassis?.MaxSteerAngleRad ?? DefaultLockRadians;
             float alpha = SignedDegrees(forward, aim) * MathF.PI / 180f;
@@ -655,7 +651,7 @@ public sealed class DrivingAids
         {
             if (!world.Entities.TryGetValue(id, out var e)) continue;
             var em = e.Definition.SoundEmitter;
-            if (em.SoundId != null && em.SoundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase)
+            if (ModelKindTable.Is(em.SoundId, ModelSynth.Bell)
                 && Vector3.DistanceSquared(new Vector3(e.Transform.Position.X, 0f, e.Transform.Position.Z),
                                            new Vector3(c.Centre.X, 0f, c.Centre.Z)) < 100f)
                 return em.SynthRunning;
