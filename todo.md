@@ -86,6 +86,10 @@ other at login. The server and the Windows zip go out together.
    P1 done 2026-10-11, unheard: the pavement's pops were the way over the top giving up after four boxes
    (fixed, 41-56 a minute to 0); the stairwell's are the barrier model (Acoustics, below), not the source
    pool, whose faults (S4) never fired and are closed anyway; S5 done.
+   P8 done 2026-10-11, unheard, except S21 (`VehicleShadow` on the shared `Diffraction`), waiting on the
+   barrier model: the FMOD fallback voice's distance law and Doppler, one occlusion-floor default, one law
+   and one reference for the speed of sound, the world's speed where a heard law wrote 343. Gravity, air
+   density, brakes, rolling resistance and the two winds are physics stage 2's.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
