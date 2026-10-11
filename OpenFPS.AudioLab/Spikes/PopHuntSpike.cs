@@ -31,6 +31,7 @@ public static class PopHuntSpike
         public Watch MidWatch = new(), HighWatch = new();
         public string Prov = "";
         public Vector3 AnsweredAt;
+        public double WrappedAt = double.NegativeInfinity;   // when it last jumped to its lane's other end
     }
 
     private sealed class Watch
@@ -113,6 +114,13 @@ public static class PopHuntSpike
         int n = 0, excursions = 0, excursionsHigh = 0;
         double next = 0;
         var worst = new List<(float Rise, string Line)>();
+        // How far behind each car its answer is, as time: where the answer says the car was against where it
+        // is, over its speed. The ask cadence, the worker's queue and a turned-away tick together.
+        var lagMs = new List<float>();
+        // The same against where the answer was traced from (a held one is older than it says), and how often
+        // the askers' rule would refuse it (AcousticPathData.Answers).
+        var tracedLagMs = new List<float>();
+        int refused = 0;
         while (clock.Elapsed.TotalSeconds < seconds)
         {
             double now = clock.Elapsed.TotalSeconds;
@@ -120,7 +128,7 @@ public static class PopHuntSpike
             {
                 float len = Vector3.Distance(c.A, c.B);
                 c.S += c.Speed * (float)frame;
-                if (c.S > len) c.S -= len; else if (c.S < 0) c.S += len;
+                if (c.S > len) { c.S -= len; c.WrappedAt = now; } else if (c.S < 0) { c.S += len; c.WrappedAt = now; }
                 c.Pos = Vector3.Lerp(c.A, c.B, c.S / len);
                 float dist = Vector3.Distance(ear, c.Pos);
                 int rate = dist > 50f ? 10 : dist > 15f ? 2 : 1;
@@ -142,6 +150,12 @@ public static class PopHuntSpike
                 mid = MathF.Max(-80f, mid); high = MathF.Max(-80f, high);
                 if (worker.Provenance.TryGetValue(c.Id, out var prov)) c.Prov = prov;
                 c.AnsweredAt = p.SourcePosition;
+                if (now - c.WrappedAt > 3.0)
+                {
+                    lagMs.Add(1000f * Vector3.Distance(c.Pos, p.SourcePosition) / MathF.Abs(c.Speed));
+                    tracedLagMs.Add(1000f * Vector3.Distance(c.Pos, p.SimulatedFrom) / MathF.Abs(c.Speed));
+                    if (!p.Answers(c.Pos, MathF.Abs(c.Speed), ear, 0f)) refused++;
+                }
                 if (verbose && (MathF.Abs(mid - c.Mid) > 3f || float.IsNaN(c.Mid)))
                     Console.WriteLine($"  {now,7:F3} e{c.Id} ({c.Pos.X:F0}, {c.Pos.Z:F0}) {Vector3.Distance(ear, c.Pos):F0} m: mid {mid:F0} high {high:F0} occ {p.Occlusion:F2}  [{c.Prov}]");
                 c.Mid = mid;
@@ -165,7 +179,19 @@ public static class PopHuntSpike
             double sleep = next - clock.Elapsed.TotalSeconds;
             if (sleep > 0) Thread.Sleep(TimeSpan.FromSeconds(sleep));
         }
-        Console.WriteLine($"  {n} frames in {clock.Elapsed.TotalSeconds:F1} s; {excursions} mid-band excursion(s), {excursionsHigh} high-band; worker: {worker.RouteCostSummary}; degraded {worker.IsDegraded}");
+        static void Lag(string what, List<float> ms)
+        {
+            if (ms.Count == 0) return;
+            ms.Sort();
+            float Q(double q) => ms[(int)Math.Min(ms.Count - 1, q * ms.Count)];
+            Console.WriteLine($"  path lag ({what}): mean {ms.Average():F0} ms, "
+                            + $"median {Q(0.5):F0}, 95th {Q(0.95):F0}, 99th {Q(0.99):F0}, max {ms[^1]:F0}, over {ms.Count} reads");
+        }
+        Lag("each car against where its answer says it was", lagMs);
+        Lag("against where it was traced from", tracedLagMs);
+        Console.WriteLine($"  {refused} of {lagMs.Count} reads not an answer for here by the askers' rule");
+        Console.WriteLine($"  {n} frames in {clock.Elapsed.TotalSeconds:F1} s; {excursions} mid-band excursion(s), {excursionsHigh} high-band; worker: {worker.RouteCostSummary}; degraded {worker.IsDegraded}; "
+                        + $"{worker.Ticks} worker ticks");
         return 0;
     }
 

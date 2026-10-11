@@ -147,20 +147,14 @@ public sealed class WorldAudioPlayer
             SourceRadius = AudioEmission.MinOcclusionRadius,
         });
 
-    /// <summary>The simulator's answer for a sounding entity, if it has one for about this point,
-    /// moved to it.</summary>
-    private bool TryAsked(int entityId, Vector3 at, out AcousticPathData path)
+    /// <summary>The simulator's answer for a sounding entity, if it has one for about this point and this
+    /// ear, moved to it.</summary>
+    private bool TryAsked(int entityId, Vector3 at, Vector3 listener, out AcousticPathData path)
     {
         path = default;
-        if (Worker == null || !Worker.TryGetResult(SourceProbeId(entityId), out var paths)) return false;
-        foreach (var p in paths)
-        {
-            if (p.IsReflection) continue;
-            if (Vector3.Distance(p.SourcePosition, at) > 1f) return false;
-            path = p with { ApparentPosition = p.ApparentPosition + (at - p.SourcePosition), SourcePosition = at };
-            return true;
-        }
-        return false;
+        if (Worker == null || !Worker.TryGetDirectFor(SourceProbeId(entityId), at, 0f, listener, ListenerSpeed, out var p)) return false;
+        path = p with { ApparentPosition = p.ApparentPosition + (at - p.SourcePosition), SourcePosition = at };
+        return true;
     }
 
     /// <param name="audio">The engine the sounds are registered with and submitted to.</param>
@@ -520,6 +514,10 @@ public sealed class WorldAudioPlayer
 
     /// <summary>The vehicle the listener is sitting in, or -1. Its own sounds are not heard through its glass.</summary>
     public int ListenerVehicleId { get; set; } = -1;
+
+    /// <summary>How fast the ear is going, m/s: how far from here an answer traced a moment ago may have
+    /// been asked (<see cref="AcousticPathData.Answers"/>).</summary>
+    public float ListenerSpeed { get; set; }
     /// <summary>The listener's own entity, and where the client has its body now (feet, facing): a
     /// sound made on your own body is placed on you, not where the server last had you.</summary>
     public int SelfId { get; set; } = -1;
@@ -658,7 +656,7 @@ public sealed class WorldAudioPlayer
                 };
             // Start on the simulator's answer for the source, or for the nearest source it heard a
             // moment ago, moved here; the hand-rolled tracer only without one.
-            else if (item.SourceEntityId >= 0 && TryAsked(item.SourceEntityId, item.Sound.Position, out var asked))
+            else if (item.SourceEntityId >= 0 && TryAsked(item.SourceEntityId, item.Sound.Position, listenerPosition, out var asked))
             {
                 path = path with
                 {
@@ -939,7 +937,7 @@ public sealed class WorldAudioPlayer
             // The simulator's answer for the speaker, as for any other source; the hand-rolled tracer
             // only until it has one.
             if (f.SourceEntityId >= 0) AskAbout(f.SourceEntityId, listenerPosition, at);
-            if (f.SourceEntityId < 0 || !TryAsked(f.SourceEntityId, at, out var path))
+            if (f.SourceEntityId < 0 || !TryAsked(f.SourceEntityId, at, listenerPosition, out var path))
                 path = _acoustics.CalculateAcousticPath(world, f.SourceEntityId, listenerPosition, at);
             var e = f.Emitter;
             e.Position = at;

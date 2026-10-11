@@ -29,8 +29,6 @@ public class AsyncAcousticWorker : IDisposable
     private readonly SpatialAcoustics _acoustics;
     private readonly ConcurrentQueue<AcousticRequest> _requestQueue = new();
     private readonly ConcurrentDictionary<int, List<AcousticPathData>> _results = new();
-    /// <summary>Where the listener was when each result was asked for.</summary>
-    private readonly ConcurrentDictionary<int, Vector3> _askedFrom = new();
     private readonly CancellationTokenSource _cts = new();
     private Thread? _workerThread;
 
@@ -161,21 +159,36 @@ public class AsyncAcousticWorker : IDisposable
     private readonly List<AcousticRequest> _carried = new();
     /// <summary>The sources given a place in the pool this tick: the first SaMaxSources in line.</summary>
     private readonly HashSet<int> _served = new();
+    /// <summary>The sources whose inputs were staged this tick: the only ones whose results are this tick's.
+    /// Every source in the pool is traced every run, staged or not, from the inputs it was last given.</summary>
+    private readonly HashSet<int> _staged = new();
+    private readonly List<int> _earScratch = new();
+    /// <summary>Whose source each source was lent this tick, for the provenance trace.</summary>
+    private readonly Dictionary<int, int> _lentFrom = new();
+    /// <summary>Simulator ticks run (lab instrument).</summary>
+    public long Ticks;
 
-    /// <summary>Stamps a result with where the source was when asked, so the consumer can tell a result for
-    /// this sound from one left by a previous user of a pooled id.</summary>
-    private void Store(AcousticRequest req, List<AcousticPathData> paths)
+    /// <summary>
+    /// Stamps a result with the request it answers (<see cref="AcousticPathData.SourcePosition"/>, so a
+    /// pooled id's next occupant can tell it is not its own) and with what traced it from where: a held
+    /// answer keeps the source and ear it was traced for, so an asker can refuse it
+    /// (<see cref="AcousticPathData.Answers"/>).
+    /// </summary>
+    private void Store(AcousticRequest req, List<AcousticPathData> paths, PathProvenance made)
     {
         for (int i = 0; i < paths.Count; i++)
         {
             var p = paths[i];
             p.SourcePosition = req.SourcePos;
+            if (made != PathProvenance.Held) { p.SimulatedFrom = req.SourcePos; p.ListenerPosition = req.ListenerPos; }
+            p.Provenance = made;
             paths[i] = p;
         }
-        _askedFrom[req.EntityId] = req.ListenerPos;
         _results[req.EntityId] = paths;
-        foreach (var p in paths)
-            if (!p.IsReflection) { Remember(req, p); break; }
+        // Only the simulator's own answer stands in for a source near it (TryGetNearby).
+        if (made == PathProvenance.Simulated)
+            foreach (var p in paths)
+                if (!p.IsReflection) { Remember(req, p); break; }
     }
 
     // ── What was heard near here a moment ago ─────────────────────────────────────────────────
@@ -231,18 +244,32 @@ public class AsyncAcousticWorker : IDisposable
         return _results.TryGetValue(entityId, out paths!);
     }
 
-    /// <summary>A result and where the listener was when it was asked for.</summary>
-    public bool TryGetResult(int entityId, out List<AcousticPathData> paths, out Vector3 listener)
+    /// <summary>The result for this id only if it was traced for this source and this ear
+    /// (<see cref="AcousticPathData.Answers"/>): the rule every asker uses.</summary>
+    public bool TryGetResultFor(int entityId, Vector3 source, float sourceSpeed, Vector3 ear, float earSpeed,
+                                out List<AcousticPathData> paths)
     {
-        listener = _askedFrom.TryGetValue(entityId, out var at) ? at : new Vector3(float.NaN);
-        return _results.TryGetValue(entityId, out paths!);
+        if (!_results.TryGetValue(entityId, out paths!)) return false;
+        foreach (var p in paths)
+            if (!p.IsReflection) return p.Answers(source, sourceSpeed, ear, earSpeed);
+        return false;
+    }
+
+    /// <summary>The direct path of <see cref="TryGetResultFor"/>.</summary>
+    public bool TryGetDirectFor(int entityId, Vector3 source, float sourceSpeed, Vector3 ear, float earSpeed,
+                                out AcousticPathData direct)
+    {
+        direct = default;
+        if (!TryGetResultFor(entityId, source, sourceSpeed, ear, earSpeed, out var paths)) return false;
+        foreach (var p in paths)
+            if (!p.IsReflection) { direct = p; return true; }
+        return false;
     }
 
     /// <summary>Drops a removed entity's result; its Steam Audio source goes with the idle sweep.</summary>
     public void Forget(int entityId)
     {
         _results.TryRemove(entityId, out _);
-        _askedFrom.TryRemove(entityId, out _);
     }
 
     public WorldSnapshot? GetLastWorld()
@@ -275,11 +302,18 @@ public class AsyncAcousticWorker : IDisposable
             AcousticRequest newest = default;
             while (_requestQueue.TryDequeue(out var req)) { _pending[req.EntityId] = req; newest = req; any = true; }
             if (!any && _pending.Count == 0) { if (once) return; Thread.Sleep(1); continue; }
-            // A carried request is answered for where the listener is now.
-            if (any && _carried.Count > 0)
-                foreach (var c in _carried)
-                    if (_pending.TryGetValue(c.EntityId, out var held) && held.ListenerPos != newest.ListenerPos)
-                        _pending[c.EntityId] = held with { ListenerPos = newest.ListenerPos };
+            // One ear a tick, the newest: the simulator runs against one listener, and an answer is stamped
+            // with the ear it was traced for. Taken from whichever request came first, a tick that drained
+            // requests from both sides of a teleport traced them all from the old place. A carried request
+            // is answered for where the listener is now.
+            if (any)
+            {
+                _earScratch.Clear();
+                foreach (var kv in _pending)
+                    if (kv.Value.ListenerPos != newest.ListenerPos) _earScratch.Add(kv.Key);
+                foreach (int id in _earScratch)
+                    _pending[id] = _pending[id] with { ListenerPos = newest.ListenerPos };
+            }
 
             WorldSnapshot? world;
             lock (_worldLock) { world = _latestWorld; }
@@ -299,7 +333,7 @@ public class AsyncAcousticWorker : IDisposable
                     if (sim != null && sim.TryGetValue(req.EntityId, out var r))
                     {
                         var built = BuildSimPath(world, req, r);
-                        Store(req, built);
+                        Store(req, built, PathProvenance.Simulated);
                         _lastSimPath[req.EntityId] = (built, Environment.TickCount64);
                     }
                     else if (sim != null && _lastSimPath.ContainsKey(req.EntityId))
@@ -321,7 +355,7 @@ public class AsyncAcousticWorker : IDisposable
                                 m.ApparentPosition += req.SourcePos - hp.SourcePosition;
                                 moved.Add(m);
                             }
-                            Store(req, moved);
+                            Store(req, moved, PathProvenance.Held);
                             if (TraceProvenance) Provenance[req.EntityId] = "held";
                         }
                     }
@@ -329,13 +363,14 @@ public class AsyncAcousticWorker : IDisposable
                     {
                         // Never answered by the simulator: the tracer stands in, and a source the pool
                         // refused is asked first next tick.
-                        Store(req, HandRolledPath(world, req));
+                        if (HandRolledPath(world, req) is { } traced) Store(req, traced, PathProvenance.HandRolled);
                         if (TraceProvenance) Provenance[req.EntityId] = "hand-rolled";
                         if (sim != null) _carried.Add(req);
                         degraded++;
                     }
                 }
                 ReportSimCoverage(degraded, _pending.Count, sim == null);
+                Ticks++;
                 // Transient sounds get a new id each time: drop the held answers nobody can use.
                 if (_lastSimPath.Count > 512)
                 {
@@ -353,7 +388,7 @@ public class AsyncAcousticWorker : IDisposable
             {
                 // No simulator (no phonon library, or OPENFPS_STEAMAUDIO_SIM=0): the hand-rolled tracer.
                 foreach (var kv in _pending)
-                    Store(kv.Value, HandRolledPath(world, kv.Value));
+                    if (HandRolledPath(world, kv.Value) is { } traced) Store(kv.Value, traced, PathProvenance.HandRolled);
             }
 
             _pending.Clear();
@@ -363,10 +398,10 @@ public class AsyncAcousticWorker : IDisposable
 
     /// <summary>
     /// The hand-rolled tracer's paths for one source: a worse model than the simulator's, but always better
-    /// than "clear". If it throws, the source keeps its last result; only one that never had any gets a clear
-    /// path, and that is logged.
+    /// than "clear". If it throws, the source keeps its last result (null); only one that never had any gets
+    /// a clear path, and that is logged.
     /// </summary>
-    private List<AcousticPathData> HandRolledPath(WorldSnapshot world, AcousticRequest req)
+    private List<AcousticPathData>? HandRolledPath(WorldSnapshot world, AcousticRequest req)
     {
         try
         {
@@ -375,7 +410,7 @@ public class AsyncAcousticWorker : IDisposable
         catch (Exception ex)
         {
             ReportTracerFailure(req.EntityId, ex);
-            if (_results.TryGetValue(req.EntityId, out var previous) && previous.Count > 0) return previous;
+            if (_results.TryGetValue(req.EntityId, out var previous) && previous.Count > 0) return null;
             return new List<AcousticPathData>
             {
                 new()
@@ -530,6 +565,8 @@ public class AsyncAcousticWorker : IDisposable
             // With every source keeping its own, the same sixteen of eighty were turned away for good and
             // popped between -63 and -15 dB through the hand-rolled tracer.
             Serve(_pending.Keys, SaMaxSources, _served);
+            _staged.Clear();
+            _lentFrom.Clear();
             foreach (var kv in _pending)
             {
                 // The listener from the first request, served or not: else a full pool drops the whole tick.
@@ -540,6 +577,7 @@ public class AsyncAcousticWorker : IDisposable
                 if (src == IntPtr.Zero) continue;
                 float radius = kv.Value.SourceRadius > 0f ? kv.Value.SourceRadius : AudioEmission.DefaultOcclusionRadius;
                 _saSim.SetSourceInputs(src, kv.Value.SourcePos, radius);
+                _staged.Add(kv.Key);
                 _saLastSeen[kv.Key] = now;
             }
             if (!haveListener) return null;   // nothing pending; not a degradation
@@ -557,7 +595,9 @@ public class AsyncAcousticWorker : IDisposable
             int listenerRegion = routes != null ? hereRegion : AcousticConstants.GlobalRegionId;
             foreach (var kv in _pending)
             {
-                if (!_saSources.TryGetValue(kv.Key, out var src) || src == IntPtr.Zero) continue;
+                // Only what was staged this tick. Every source in the pool is traced every run from the inputs
+                // it last had, so one held but not staged reads back an answer from where it was then.
+                if (!_staged.Contains(kv.Key) || !_saSources.TryGetValue(kv.Key, out var src)) continue;
                 var direct = _saSim.GetResult(src);
 
                 if (_saDebug && kv.Key >= 0)
@@ -722,6 +762,7 @@ public class AsyncAcousticWorker : IDisposable
         (path.AirLowDb, path.AirMidDb, path.AirHighDb) = AudioPhysics.AirLossDb(
             dist, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
 
+        if (trace != null && _lentFrom.TryGetValue(req.EntityId, out int lender)) trace += $"; on e{lender}'s source";
         if (trace != null) Provenance[req.EntityId] = trace;
         var paths = new List<AcousticPathData>(1 + EarlyReflections.MaxArrivals) { path };
         AddEarlyReflections(paths, world, req, region);
@@ -1353,7 +1394,12 @@ public class AsyncAcousticWorker : IDisposable
             // refused and heard through the hand-rolled tracer, the city's pool past 64 within five seconds.
             int victim = PickSourceToReclaim(_saSources, _saLastSeen, _served);
             if (victim != int.MinValue && _saSources.Remove(victim, out src))
+            {
                 _saLastSeen.Remove(victim);   // its last result stays in _results until it asks again
+                // Handed on clean, as a released one is: nothing of the last owner's goes with it.
+                _saSim.ClearSource(src);
+                if (TraceProvenance) _lentFrom[entityId] = victim;
+            }
             else
                 return IntPtr.Zero;
         }
@@ -1416,7 +1462,6 @@ public class AsyncAcousticWorker : IDisposable
             _saLastSeen.Remove(id);
             _saDebugLastPrint.Remove(id);
             _results.TryRemove(id, out _);
-            _askedFrom.TryRemove(id, out _);
             _routeCache.Forget(id);
         }
     }

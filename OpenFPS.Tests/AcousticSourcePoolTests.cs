@@ -69,6 +69,9 @@ public class AcousticSourcePoolTests
             foreach (int id in served) seen[id] = tick;
             Assert.All(served, id => Assert.True(held.ContainsKey(id), $"tick {tick}: {id} served without a source"));
             carried = pending.Keys.Where(id => !served.Contains(id)).ToList();
+            // A full pool is all served sources: nobody turned away still holds one whose stale inputs the
+            // read-back could take for this tick's answer (the worker reads back only what it staged anyway).
+            Assert.All(carried, id => Assert.False(held.ContainsKey(id), $"tick {tick}: {id} turned away but holding a source"));
             Assert.Empty(carried.Where(refusedLastTick.Contains));
             refusedLastTick = carried.ToHashSet();
         }
