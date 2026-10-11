@@ -262,6 +262,53 @@ byte-identical. The five add 260 KB gzipped (the old three are 441 KB). Read a s
   the silent fallbacks of S27 that belong to a model (horn kind, aircraft size, cabin door port) fail at
   load.
 
+**P2 as built (2026-10-11).** `OpenFPS.Sound/ModelKindTable.cs` (namespace `OpenFPS.Common`), next to
+`MachineRegistry` and `ModelLibrary`. One row per prefix (engine, machine, aircraft, rail, siren, bell, gate,
+water, fire, foliage, wood, flow, shore, stove, horn, rain): its `ModelSynth` (which constructor the
+provider uses), its `ModelBody` (Fixed, Walks, Rolls, Flies, Rails), the `ModelLibrary` kind the editor
+edits it as, and how an id of it declares its level and size, headroom and places. `KindOf`, `TryLevel`,
+`Headroom`, `BodyOf`, `IsVehicle`, `VehiclePreset`, `KnownVehiclePreset`, `Vehicle` and `Resolves` are the
+questions; `TryRailSource` and `TryWaterTap` are the two keys' parsers, which the client's own now call.
+
+- Read by: `LookUpPhysicalLevel` and `PhysicalHeadroom` (their memos stay in CAS, cleared by
+  `ModelChanged`); the provider's factory switch and `NaturePlace`; `ExtendedSources.Make` (each kind's layout
+  is a method the row points at); `ModelKinds.TryModelOfSound`; the S8 tests: CAS `PlaysCopies` (the
+  `ENGINE/` test goes), the ride-in preset, `ChooseLiveEngines`, `UpdateSirens` (its prefix lines only),
+  `SilentSignal`, the horn's mount, `UpdateHeldHorns`, `Grille`, `PhysicalAircraft`, the emitter pass's
+  shore, aircraft, rail and engine tests, `VoiceKey` and `Dry`; `CabinWalls.Vehicle`, `DrivingAids` (both
+  chassis reads and the crossing bell), `RainField` (674 and 712), `Scope.Classify`, `OtherBodies`,
+  `AudioEmission.LocalOffset`, `Fuel.ForThing`, `OccupancyService`'s door chime.
+- The push mower declares `SmallMachineSpec.WalkedBehind`; `OtherBodies` gives legs to a body whose sound
+  names no model or a model whose body walks, and no longer names `machine:mower_push`.
+- Fails loudly: a model that will not load, an unknown vehicle preset and a synthesised id that names no
+  kind are each logged once by id (`ModelKindTable.Fail`, `Failures`). `ModelKindTableTests` loads every
+  shipped map (city, speedway, the test map, Albany and Magnolia, with traffic, trains and crossings
+  spawned) and every prefab: every synthesised id resolves, no recording wears a model's prefix, and on
+  every body placed the footsteps and the scope's answer equal the replaced lists'.
+- Disagreements and what was chosen, none changing behaviour:
+  - Scope and OtherBodies on mowers. OtherBodies walked the push mower by its id; Scope's comment said
+    "somebody pushing a push mower is a person" but its code made every NPC with a `machine:` sound not a
+    person. The table says a small machine's body is Fixed (its spec's doc: "stands still and runs") and the
+    push mower's Walks. OtherBodies keeps its footsteps; Scope picks out a person only when the sound names
+    no model, so the push mower stays unpicked as before. Open for Cody: whether the scope should call it a
+    person (one line in `Scope.Classify`).
+  - The riding mower moves on the city but its body is Fixed, as every small machine's is: the scope did not
+    call it a vehicle and still does not. A `Rolls` body for it would make it a vehicle to the scope.
+  - IsSynth. OtherBodies asked it for aircraft, rail and machine but not engine; the table reads the id
+    alone. No shipped recording wears a model's prefix (tested), so nothing changes.
+  - A body whose sound is a fixed model (a fire or a fountain on an NPC) walked under the old list and does
+    not now. Nothing shipped is one (tested).
+  - `ModelKinds.TryModelOfSound` misses rail, wood, horn, aircraft, gate, siren and rain. Kept as it was:
+    answering for rail and wood would let the editor restart and edit trains and woods through their sound,
+    a change in the editor. Their rows have no `LibraryKind` until that is decided.
+- Not done here: S26's two caches (`AudioEmission._presetOffsets`, `_outletSeparation`) and S27's model
+  fallbacks (horn kind, aircraft size, cabin door port) are as they were; the server's id writers
+  (`VehicleSystem`'s prefix, `CrossingSystem`) and its readers outside P2's list (`WorldEditor.Menus`,
+  `MapDrainage`, `MapTiles`, `Program.cs`'s flow test, `ClientWorldState`'s foliage test, which Part C owns)
+  still spell prefixes.
+- Guards: all eight replay streams and the render fingerprints unchanged, not regenerated; the boundary
+  ratchet gains the one library file and no crossing.
+
 #### P3. The registry, one writer, one start (3 to 4 sessions, in order)
 
 The heart of it. Four sessions, each mergeable on its own.

@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- One table of model kinds (part P2 of docs/SPECIAL_CASES_AUDIT.md), no change heard. `ModelKindTable` in the
+  sound library says, for any sound id, which kind of model it is, what synth makes it, how it moves (fixed,
+  walks, rolls, flies, rails), its level and size, its headroom and its places. The level and headroom
+  lookups, the voice factory, the places, the editor, the scope, the footsteps and the sixteen "is it a
+  vehicle" tests read it instead of each keeping its own list of prefixes, so a new kind cannot be silent in
+  one of them as the crossing bell was. A model that will not load is logged once by id instead of dropped
+  without a word, and a test loads every shipped map and prefab and checks each synthesised sound resolves
+  (they all do). The push mower says it is walked behind (`WalkedBehind`) instead of being named in the
+  footstep code. All eight replay streams and the render fingerprints are unchanged.
 - Openings framed from where the rooms' air meets them, unheard (docs/GEOMETRY.md 12.6, "Openings from the
   floods"). A flooded room no longer has openings found in its box's faces: on Albany 1,530 rooms had 33,342 m2 of
   openings to the outdoors that their walls do not have (a box's face across its own house's wing, walls the face
