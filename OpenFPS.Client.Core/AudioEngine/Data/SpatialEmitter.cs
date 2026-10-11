@@ -52,9 +52,10 @@ public struct SpatialEmitter
     public bool InsideListenersVehicle;
 
     /// <summary>
-    /// The band gains, air loss and room here are the path, and a re-submission while playing updates
-    /// them: for a caller that works out the path itself (a person talking as they walk). Otherwise the
-    /// acoustic worker owns the path and re-submissions leave the tone alone.
+    /// The band gains, air loss, room and room gain here are the path, and a re-submission while playing
+    /// updates them: for a caller that works out the path itself (a person talking as they walk), and for
+    /// every voice of a moving thing, handed its owner's path by the registry's pass. Otherwise the path
+    /// pass owns the path and re-submissions leave the tone alone.
     /// </summary>
     public bool CarriesPath;
     public Vector3 ListenerOffset;
@@ -221,6 +222,10 @@ public struct SpatialEmitter
     /// path update to bring these in, so they ride on the emitter from the start.</summary>
     public float AirLowDb, AirMidDb, AirHighDb;
 
+    /// <summary>The small-room lift the path found (AcousticPathData.RoomGain), 1 for none: part of the path
+    /// with <see cref="CarriesPath"/>.</summary>
+    public float RoomGain;
+
     /// <summary>
     /// A loudspeaker's mouth (Radiator): the voice is shaped per band toward the listener from
     /// <see cref="Direction"/>, in place of the cone, and a room is fed with what it radiates all round
@@ -268,5 +273,6 @@ public struct SpatialEmitter
         EqLow = 1.0f;
         EqMid = 1.0f;
         EqHigh = 1.0f;
+        RoomGain = 1.0f;
     }
 }

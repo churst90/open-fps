@@ -63,13 +63,19 @@ public class ClientAudioSystemTests
         bool allStarted = h.TickUntil(() => voices.All(h.Mixer.WasStarted), 120);
         Assert.True(allStarted, "not started: " + string.Join(", ", voices.Where(v => !h.Mixer.WasStarted(v))));
 
-        bool allPathed = h.TickUntil(() => voices.All(h.Mixer.HasPath), 300);
-        _o.WriteLine(string.Join("\n", voices.Select(v => $"{v}: started {h.Mixer.WasStarted(v)}, paths {h.Mixer.Paths.GetValueOrDefault(v)?.Count ?? 0}")));
-        Assert.True(allPathed, "no acoustic path for: " + string.Join(", ", voices.Where(v => !h.Mixer.HasPath(v))));
+        // Each in its own emitter, from the registry's pass: the voices of a moving thing have no other writer.
+        bool allPathed = h.TickUntil(() => voices.All(h.Mixer.HasCarried), 300);
+        _o.WriteLine(string.Join("\n", voices.Select(v => $"{v}: started {h.Mixer.WasStarted(v)}, paths {h.Mixer.Carried.GetValueOrDefault(v)?.Count ?? 0}")));
+        Assert.True(allPathed, "no acoustic path for: " + string.Join(", ", voices.Where(v => !h.Mixer.HasCarried(v))));
+        Assert.DoesNotContain(voices, h.Mixer.HasPath);
 
         // A borrowed voice and a horn are behind whatever their car is behind: the car's own path.
-        Assert.Equal(h.Mixer.LastPath(DistantNear).Occlusion, h.Mixer.LastPath(ClientAudioHarness.DistantVoice(DistantNear)).Occlusion);
-        Assert.Equal(h.Mixer.LastPath(DistantNear).AirHighDb, h.Mixer.LastPath(ClientAudioHarness.DistantVoice(DistantNear)).AirHighDb);
+        h.Tick();
+        var borrowed = h.Mixer.LastCarried(ClientAudioHarness.DistantVoice(DistantNear));
+        var horn = h.Mixer.LastCarried(ClientAudioHarness.HornVoice(DistantNear));
+        Assert.Equal(borrowed.Occlusion, horn.Occlusion);
+        Assert.Equal(borrowed.AirHighDb, horn.AirHighDb);
+        Assert.Equal(borrowed.EqMid, horn.EqMid);
     }
 
     /// <summary>A car voiced from afar is darkened by the air with distance (110 m more than 45 m, both more
@@ -79,12 +85,12 @@ public class ClientAudioSystemTests
     {
         var h = Field();
         int nearVoice = ClientAudioHarness.DistantVoice(DistantNear), farVoice = ClientAudioHarness.DistantVoice(DistantFar);
-        Assert.True(h.TickUntil(() => h.Mixer.HasPath(nearVoice) && h.Mixer.HasPath(farVoice) && h.Mixer.HasPath(NearCar), 300),
+        Assert.True(h.TickUntil(() => h.Mixer.HasCarried(nearVoice) && h.Mixer.HasCarried(farVoice) && h.Mixer.HasCarried(NearCar), 300),
             "the borrowed voices were never given a path");
 
-        float live = h.Mixer.LastPath(NearCar).AirHighDb;
-        float at45 = h.Mixer.LastPath(nearVoice).AirHighDb;
-        float at110 = h.Mixer.LastPath(farVoice).AirHighDb;
+        float live = h.Mixer.LastCarried(NearCar).AirHighDb;
+        float at45 = h.Mixer.LastCarried(nearVoice).AirHighDb;
+        float at110 = h.Mixer.LastCarried(farVoice).AirHighDb;
         _o.WriteLine($"air, high band: live at 20 m {live:F2} dB, borrowed at 45 m {at45:F2} dB, borrowed at 110 m {at110:F2} dB");
 
         Assert.True(at45 > live, $"45 m ({at45}) should be darker than 20 m ({live})");
@@ -210,8 +216,8 @@ public class ClientAudioSystemTests
         Assert.True(first.Occlusion > 0.5f, $"started with occlusion {first.Occlusion:F2}");
 
         // Where the worker then puts it, so the start is not an answer of its own.
-        Assert.True(h.TickUntil(() => h.Mixer.HasPath(NearCar), 300), "the worker never answered");
-        var worker = h.Mixer.LastPath(NearCar);
+        Assert.True(h.TickUntil(() => h.Mixer.HasCarried(NearCar), 300), "the worker never answered");
+        var worker = h.Mixer.LastCarried(NearCar);
         _o.WriteLine($"worker: occlusion {worker.Occlusion:F2}, bands {Db(worker.EqLow):F1}/{Db(worker.EqMid):F1}/{Db(worker.EqHigh):F1} dB");
         Assert.True(Db(first.EqMid) <= Db(worker.EqMid) + 6f,
             $"started {Db(first.EqMid) - Db(worker.EqMid):F1} dB above the worker's answer in the mid band");

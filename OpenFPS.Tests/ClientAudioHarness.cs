@@ -149,12 +149,30 @@ internal sealed class RecordingMixer : IAudioProvider
     public readonly Dictionary<(string Train, int Slot), TrainSlotPlan> Plans = new();
     public void PlanTrainSlot(string preset, string train, int slot, TrainSlotPlan plan) => Plans[(preset + "/" + train, slot)] = plan;
 
+    /// <summary>Every path handed to each voice in its own emitter (SpatialEmitter.CarriesPath), in order:
+    /// how the voices of moving things are given theirs (ClientAudioSystem.HandPath).</summary>
+    public readonly Dictionary<int, List<AcousticPathData>> Carried = new();
+
     public bool HasPath(int id) => Paths.ContainsKey(id);
     public AcousticPathData LastPath(int id) => Paths[id][^1];
+    public bool HasCarried(int id) => Carried.ContainsKey(id);
+    public AcousticPathData LastCarried(int id) => Carried[id][^1];
     public bool WasStarted(int id) => Started.Exists(e => e.EntityId == id);
 
     public void PlaySpatialSound(SpatialEmitter e) { Started.Add(e); Latest[e.EntityId] = e; Live.Add(e.EntityId); }
-    public void UpdateSpatialAttributes(SpatialEmitter e) => Latest[e.EntityId] = e;
+    public void UpdateSpatialAttributes(SpatialEmitter e)
+    {
+        Latest[e.EntityId] = e;
+        if (!e.CarriesPath) return;
+        if (!Carried.TryGetValue(e.EntityId, out var list)) Carried[e.EntityId] = list = new List<AcousticPathData>();
+        list.Add(new AcousticPathData
+        {
+            Occlusion = e.Occlusion, ApparentPosition = e.ApparentPosition, EffectiveDistance = e.EffectiveDistance,
+            ApertureFactor = e.ApertureFactor, TransmissionBleed = e.TransmissionBleed, RegionId = e.TargetRegionId,
+            EqLow = e.EqLow, EqMid = e.EqMid, EqHigh = e.EqHigh,
+            AirLowDb = e.AirLowDb, AirMidDb = e.AirMidDb, AirHighDb = e.AirHighDb, RoomGain = e.RoomGain,
+        });
+    }
     public void SetAcousticPath(int id, AcousticPathData p)
     {
         if (!Paths.TryGetValue(id, out var list)) Paths[id] = list = new List<AcousticPathData>();

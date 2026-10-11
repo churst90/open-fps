@@ -232,7 +232,7 @@ public partial class ClientAudioSystem
                 weights[i] = TrainVoicing.Weight(v.Layout[i].LevelDb, src.Gain, v.SlotLevelDb, slotGain);
             }
             _audio.PlanTrainSlot(v.Preset, v.Name, slot, new TrainSlotPlan(weights.Keys.ToArray(), weights.Values.ToArray()));
-            PlaceTrainVoice(world, eyePos, v, slot, rep, centre, v.SlotLevelDb, 0f, speed, lever);
+            PlaceTrainVoice(world, eyePos, v, slot, VoiceKind.TrainField, rep, centre, v.SlotLevelDb, 0f, speed, lever);
         }
 
         // The horn and the bell, each its own voice while it sounds: at full weight, where it is.
@@ -251,7 +251,7 @@ public partial class ClientAudioSystem
         }
         var entry = v.Layout[index];
         _audio.PlanTrainSlot(v.Preset, v.Name, slot, new TrainSlotPlan(new[] { index }, new[] { 1f }));
-        PlaceTrainVoice(world, eyePos, v, slot, src.Snap, src.At, entry.LevelDb, entry.ExtentMetres, speed, lever);
+        PlaceTrainVoice(world, eyePos, v, slot, VoiceKind.TrainSignal, src.Snap, src.At, entry.LevelDb, entry.ExtentMetres, speed, lever);
     }
 
     private void StopTrainVoice(TrainVoicer v, int slot)
@@ -271,11 +271,10 @@ public partial class ClientAudioSystem
 
     /// <summary>One of a train's voices, placed at <paramref name="at"/> and heard through the path of the
     /// source nearest there.</summary>
-    private void PlaceTrainVoice(WorldSnapshot world, Vector3 eyePos, TrainVoicer v, int slot, EntitySnapshot rep,
+    private void PlaceTrainVoice(WorldSnapshot world, Vector3 eyePos, TrainVoicer v, int slot, VoiceKind kind, EntitySnapshot rep,
                                  Vector3 at, float levelDb, float extent, float speed, float lever)
     {
         int voiceId = TrainVoiceId(v, slot);
-        var path = VehiclePath(world, rep, eyePos);
         var (gain, reference) = Loudness.Place(levelDb, extent);
         var e = new SpatialEmitter
         {
@@ -286,9 +285,6 @@ public partial class ClientAudioSystem
             EngineKey = "",
             Mode = PlaybackMode.LoopOne,
             Type = EmitterType.EntityAttached,
-            Position = at,
-            // From where it is now, turned toward the path's edge only when blocked (as a horn's).
-            ApparentPosition = SirenApparent(path, at, eyePos),
             Velocity = rep.Velocity,
             PositionSampledAt = world.PositionsSampledAt,
             Direction = Vector3.Transform(Vector3.UnitZ, rep.Transform.Rotation),
@@ -303,14 +299,11 @@ public partial class ClientAudioSystem
             // The speed in the wake slot and the notch over eight in the lever's, as the server's taps carried them.
             RotorWake = speed,
             PowerLever = lever,
-            Occlusion = path.Occlusion,
-            EqLow = path.EqLow, EqMid = path.EqMid, EqHigh = path.EqHigh,
-            AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
-            ApertureFactor = path.ApertureFactor,
-            TransmissionBleed = path.TransmissionBleed,
-            EffectiveDistance = path.EffectiveDistance,
-            TargetRegionId = path.RegionId,
         };
+        // Its path every frame, from the registry's pass like every voice of a moving thing. Its ids are not
+        // entities', and the path pass once skipped them: a horn begun on a stale outdoor answer played flat
+        // through Marlow Tower's brick (2026-10-10, 74 dB in a corridor).
+        HandPath(ref e, kind, world, rep, at, levelDb, eyePos);
         ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId))
         {
@@ -318,18 +311,8 @@ public partial class ClientAudioSystem
             _audio.UpdateSpatialAttributes(e);
         }
         else _audio.PlayPhysicalSoundDirect(e);
-        // Handed the path every frame, as a siren's is. A re-submission leaves a voice's tone alone and the
-        // path pass skips voice ids, so a train kept the walls of wherever its voice started: a horn begun
-        // on a stale outdoor answer played flat through Marlow Tower's brick (2026-10-10, 74 dB in a corridor).
-        var placed = path;
-        placed.ApparentPosition = e.ApparentPosition;
-        _audio.SetAcousticPath(voiceId, placed);
         v.Playing[slot] = true;
-        _trainPathIds.Add(rep.Id);
     }
-
-    /// <summary>The entities whose paths the trains' voices borrow this frame (asked for in step 5).</summary>
-    private readonly HashSet<int> _trainPathIds = new();
 
     /// <summary>Every train voice silenced at once (leaving a map).</summary>
     private void ForgetTrains()

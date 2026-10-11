@@ -363,7 +363,7 @@ internal sealed class Replay
 
     // ── The world ───────────────────────────────────────────────────────────────────────────────
 
-    private void Wall(int id, Vector3 centre, Vector3 size, string material)
+    internal void Wall(int id, Vector3 centre, Vector3 size, string material)
         => World.RegisterDefinition(new EntityDefinition
         {
             EntityId = id,
@@ -374,7 +374,7 @@ internal sealed class Replay
         });
 
     /// <summary>A car as the server puts one on the map: an engine emitter on a moving entity.</summary>
-    private void Car(int id, string preset, Vector3 at, Vector3 velocity)
+    internal void Car(int id, string preset, Vector3 at, Vector3 velocity)
     {
         var profile = MachineRegistry.VehicleFor(preset);
         var def = new EntityDefinition
@@ -492,11 +492,11 @@ internal sealed class Replay
     /// is 32, and a scenario of 33 cars would be a stream many times the size for the same behaviour. The
     /// replay's mixer reports no load, so nothing gives it back.
     /// </summary>
-    private void ShedEnginesTo(int engines)
+    internal void ShedEnginesTo(int engines)
         => typeof(ClientAudioSystem).GetField("_adaptiveBudget", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(Audio, engines);
 
     /// <summary>A driver's switches as the wire carries them (EntityState.Signals).</summary>
-    private static byte Driven(bool horn = false, OpenFPS.Common.SirenMode siren = OpenFPS.Common.SirenMode.Off)
+    internal static byte Driven(bool horn = false, OpenFPS.Common.SirenMode siren = OpenFPS.Common.SirenMode.Off)
         => OpenFPS.Common.VehicleSignalBits.Encode(true, horn, siren != OpenFPS.Common.SirenMode.Off, siren);
 
     // ── The scenarios ───────────────────────────────────────────────────────────────────────────
