@@ -61,6 +61,10 @@ other at login. The server and the Windows zip go out together.
    engine follows the same rule: each part (geometry, acoustics, sound, physics, the world and its generators,
    networking, the client UI) its own project with stated dependencies and no reach into the host. Not
    started; comes after the special-cases audit's parts.
+   The order agreed with Cody, 2026-10-11: (1) regions become places, steps 3 to 5, with the audit's small
+   name and prefix parts beside them; (2) the audit's voice registry (one list of voices, one writer a
+   frame, one way to start a voice), then stage 5's audio clock slice; (3) the physics boundary survey, a doc,
+   alongside (2); (4) physics stages with geometry stage 6; (5) library stages 6 to 8 on the clean voices.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
