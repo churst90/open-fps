@@ -53,9 +53,9 @@ since the last deploy" list below.
      Windows zip). Waiting on Cody: whether a bus shelter's canopy is "a roof" to the scope, and which doors
      Alex's haunts take as front entrances. Left: storeys in `MapTracker.Floors` from the building; the glass
      door's sound key reading the prefab's glazing.
-   - Under way: the barrier model's way round one thing that passes through another (Acoustics, below),
-     which P1 found in Marlow Tower's floor 1 stairwell; the compass words in one function and P2's
-     leftovers.
+   - The barrier model P1 found in Marlow Tower's floor 1 stairwell: round one thing and through another, a
+     solid gone into by its edge, and when an edge is buried (docs/GEOMETRY.md 12.6), all 2026-10-11 and
+     unheard (Acoustics, below). Under way: the compass words in one function and P2's leftovers.
    - P3a, the registry for moving things: DONE 2026-10-11, unheard (the audit's "P3a as built"). The one path
      pass for every voice of a moving thing Cody asked for ("shouldn't all mobile sound sources like vehicles,
      trains, sirens, etc use the same path so there's consistency?"): engines, intakes, borrowed cars, horns,
@@ -276,9 +276,15 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
 - The pops (audit P1): on the Main Street pavement before Marlow Tower's entrance (`/tp -6.4 -103.5
   0.12`) with traffic, no pops from the cars on Wharf Avenue over the car park and the tower. Marlow
   Tower's floor 1 stairwell (`/tp -10.8 -104.2 3.28`, the pop hunt's ear `/tp -11.0 -100.8 3.3`): no pops
-  from cars on Dock Street since the barrier model and the slab's edge (2026-10-11); a short dip in their
-  low end as they pass the stair's head. Lines along walls and slabs elsewhere, quieter now: Brandt Court
-  flat 30B `/tp -27.6 161.6 9.4` (Main Street), Marlow Tower corridor floor 4 `/tp -20.5 -50.0 12.4`;
+  from cars on Dock Street since the barrier model and the slab's edge (2026-10-11), and no dip in their
+  low end as they pass the stair's head (an edge buried in the front, gone round through the brick). The
+  street through a front just over a floor slab's edge, heard now: Brandt Court flat 33F `/tp -10.6 203.5
+  9.4`, Selby House flat 31F `/tp 12.9 183.9 9.4` (Main Street, south). Nothing under a slab or a barn
+  through the earth: Albany 1303 Tamarack Court `/tp -385.4 276.6 -1.1` (the street below), Magnolia 17902
+  Country Fields `/tp -819.5 984.7 0.6` (outside to the west); two walls at a corner, through the one
+  beside it: Magnolia 26522 South Barnett Lane `/tp -340.3 1060.0 -2.5`. Lines along walls and slabs
+  elsewhere, quieter now: Brandt Court flat 30B `/tp -27.6 161.6 9.4` (Main Street), Marlow Tower corridor
+  floor 4 `/tp -20.5 -50.0 12.4`;
   Magnolia 26706 Barnett Lane `/tp -357.1 1336.6 -4.2`; Albany 6229 Warwick Court's bathroom `/tp -142.1
   -35.1 0.0`, 1333 Morse Lane `/tp -377.0 204.6 -1.1`.
 - State by map: with someone on another map at the same time (the speedway while you drive on the city),
@@ -450,21 +456,20 @@ and the server's voice line.
   (docs/GEOMETRY.md 12.6, "Round one thing, through another"), so beside the stretch it is -45/-70/-100, and
   11 excursions in two minutes are 8. The stretch itself is done too (2026-10-11, unheard): a solid gone
   into by its edge pays what the line runs through of it (docs/GEOMETRY.md 12.6, "A solid gone into by its
-  edge"), and the stairwell has no pops (10 to 0 in two minutes). Left there: a dip, not a jump. For those
-  4 m of road the line through the slab (-57/-78/-100) is 11/9 dB under the brick beside it, because a
-  straight-line model has no way through the brick just over a slab's edge buried in the front. A way round
-  an edge buried in another box, its legs paying that box once, would close it; listen first. Older finds
+  edge"), and the stairwell has no pops (10 to 0 in two minutes). The dip left there is filled too
+  (2026-10-11, unheard): a way round an edge buried in another box pays that box once (docs/GEOMETRY.md
+  12.6, "When an edge is buried"), so those 4 m of road are -45/-67/-93, within Maekawa's grazing loss of
+  the brick beside them; listen. Older finds
   of `--pop-hunt`: a car's straight line through one wall as it passes a gap (-80 to -62 dB for 200-400 ms),
   and up to 19 dB between over the wall and over the roof under the covered hall west of Main Street.
-- The barrier model goes round a slab's underside through the earth on the real places (found 2026-10-11 with
-  the floors as constructions, docs/GEOMETRY.md 12.6). A finish on a slab's top face buries its top edges
-  (`OpeningRoutes.Buried`), so the search takes a bottom edge, which is in the ground, and the terrain is no
-  box: 1303 Tamarack Court Southwest from the street below, -78/-100/-100 to -29/-58/-93. About 2 pairs in 1,000
-  on each place. Two rules: a layer of the same construction does not bury an edge, and the ground does.
 - 58 Alder Street's fenced back garden is indoors to the server's survey, with nothing over it (found by the
   city's floor test, 2026-10-11).
 - A made-up driveway is a straight strip: a house with none clear from the road (Albany 25, Magnolia 4, most
   behind another house) has none. A drive that bends round would give them one.
+- A leg of a way round that dips under a hill between its two bends is not stopped: legs and the string over
+  the top pay boxes, and the terrain is none (docs/GEOMETRY.md 12.6, "When an edge is buried"; the edges
+  themselves are the ground's since 2026-10-11). The straight leg of a route through the earth is the same.
+  The terrain as an obstacle in the legs and in the profile, as ISO 9613-2 takes a ground profile.
 - The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost
   25 MB and twice the convolution (Cody).
 - Below 120 Hz the tail of a room you are not in is identical in both ears.

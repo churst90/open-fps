@@ -180,6 +180,15 @@ public static class LayeredFaces
         return true;
     }
 
+    /// <summary>Whether two fixed boxes are layers of one construction: both sheets, facing the same way, their
+    /// faces in contact and sharing some of their face (the rule <see cref="Make"/> groups them by).</summary>
+    public static bool InContact(Vector3 centreA, Vector3 sizeA, Quaternion rotationA, Vector3 centreB, Vector3 sizeB, Quaternion rotationB)
+    {
+        if (!Constructions.IsSheet(sizeA) || !Constructions.IsSheet(sizeB)) return false;
+        static Quaternion Unit(Quaternion q) => q.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(q);
+        return InContact(FrameOf(0, new Solid(centreA, sizeA, Unit(rotationA), "")), FrameOf(1, new Solid(centreB, sizeB, Unit(rotationB), "")));
+    }
+
     private static bool InContact(in Frame a, in Frame b)
     {
         if (!Footprint(a, b, out float lo, out float hi, out float u0, out float u1, out float v0, out float v1)) return false;

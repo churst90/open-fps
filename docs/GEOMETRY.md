@@ -2158,8 +2158,8 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      face, so the barrier search counts each top edge as buried in it (`OpeningRoutes.Buried`) and takes a bottom
      edge, which on the real places is in the earth, and the earth is no box. 1303 Tamarack Court Southwest,
      the street below, -78/-100/-100 to -29/-58/-93; 1974 Antelope Court Southwest -76/-100/-100 to
-     -29/-56/-89. Two rules would close it, both the barrier model's (todo): a layer of the same construction
-     (`Constructions`' contact) does not bury an edge, and the ground buries one.
+     -29/-56/-89. Two rules close it, both the barrier model's: a layer of the same construction that ends
+     with the edge does not bury it, and the ground does (done since, below, "When an edge is buried").
    **A solid gone into by its edge (2026-10-11, unheard).** The last of the stairwell's pops.
    - **How a line was charged.** Every box a straight line touches paid its panel figure once: the material
      and the box's smallest side as the thickness, the other two as the face (`WallTransmission.BandGains`,
@@ -2211,8 +2211,8 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      beside it. A real front radiates into the stairwell over its whole inner face, so the brick a few
      centimetres over the slab's edge would be heard there; a straight-line model has only the line, and the
      barrier model does not go round the slab's edge, which is buried in the brick (its legs would pay the
-     brick twice). A way round an edge buried in another box, its legs paying that box once, would close it
-     (todo).
+     brick twice). A way round an edge buried in another box, its legs paying that box once, closes it (done
+     since, below, "When an edge is buried").
    - **The pavement** (`--pop-hunt ear=-6.4,1.77,-103.5`, 120 s, two runs): 2 mid and 4 high, then 3 and 2,
      before; 1 and 3, then 3 and 6, after. Each is a car on Wharf Avenue 229 to 327 m off: seen clear between
      two buildings (visibility 0.75 to 1), or the clear search's way over an edge (0 m against 6 m a moment
@@ -2264,6 +2264,129 @@ in every part); `RealPlaceMapTests`' entity cap is 60,000 (Albany 49,732).
      EN 12354-1 Annex E, K_ij for rigid junctions; the heavy-junction catalogue that tests it:
      https://upcommons.upc.edu/entities/publication/1935d59a-5a5e-4350-bcc5-aa8a2102ad01/full. The panel model's
      own sources are in `WallTransmission` (Sharp 1978, EN 12354-1 Annex C).
+
+   **When an edge is buried (2026-10-11, unheard).** The barrier model's ways round one thing and through
+   another (above) skipped any edge within the 5 cm joint of another box: a guard's foot in its floor was no
+   edge to go round. Two finds argued with that rule, from opposite sides: a finish laid on a slab buried every
+   edge of the floor, so the way went under the slab into the earth, which is no box (1303 Tamarack Court
+   Southwest from the street below, -29/-58/-94 dB where the line gives -100); and a slab's edge buried in the
+   brick front built on it could not be gone round, so a straight line that went into the slab's 15 cm edge was
+   11/9 dB under the brick a few centimetres higher (Marlow Tower's floor 1 stairwell over Dock Street). Three
+   rules now, in `OpeningRoutes` (`Buried`, `EdgeBurial`, `WaysRound`, `LegsThrough`, `Passage`), one each for
+   every asker of the barrier search: the worker's simulated path, every leg of the routes by the openings,
+   one-offs, sirens and trains. The hand-rolled tracer has no barrier search and is unchanged.
+   - **A layer that ends with the edge does not bury it.** A sheet in contact with the box, facing the same
+     way (`LayeredFaces.InContact`, the rule the Steam Audio scene groups constructions by), whose own edge
+     runs through the same point (within the joint of two of its sides), is a layer of the same construction
+     ending there: the point is on the construction's edge, in the air. A 2 cm finish cut to its slab's
+     outline buried the slab's top edges and the slab buried every edge of the finish (2 cm is inside the
+     joint); now the finish's top edge is the floor's edge and is gone round. A layer that runs on past the
+     edge (a carpet over a slab's end) still buries it. The basis: what an edge does to sound depends on the
+     wedge it makes with the air, its exterior angle (Svensson, Fred and Vanderkooy 1999), not on how the
+     solid behind it is layered; a construction is one panel to what crosses it (`Constructions`, EN 12354-1).
+     Approximate: the edge is taken where the layer's own edge is, so the way round is short by nothing more
+     than the joint; the legs still pay every box they touch, so a way round a slab's top edge, its finish
+     touched at the bend, pays the finish (the finish's own top edge, the better way, is found too).
+   - **The ground buries every edge at or under its surface.** The terrain is no box, so the searches saw
+     nothing under a slab graded into a hill or a wall standing on the ground, and a way under its bottom
+     edge went through the earth for nothing. Now every way round a box (`WaysRound`: the clear search, the
+     ways round one thing and through another, and the bends of their legs) is dropped where it bends at or
+     under the terrain (`OpeningRoutes.Ground`, the heightfields of the scene: from the world's tiles of ground
+     for the box list, `WorldSnapshot.TerrainSolids`, and from the triangle store's pieces for the tile build).
+     The basis: the ground's impedance is so far above air's that outdoor propagation treats it as a boundary
+     that reflects and absorbs, never one sound crosses (Attenborough, Li and Horoshenkov); ISO 9613-2 screens
+     only over and round obstacles; Steam Audio's terrain is a 20 m deep panel no sound goes through
+     (`Heightfield.Depth`). Approximate: a leg between two bends in the air that dips under a hill between them
+     is still not stopped (legs pay boxes, and the terrain is none): the way over the brow is the over-the-top
+     string's, which also reads boxes only (todo).
+   - **Round an edge buried in another box, that box paid once.** After the ways round edges in the air, a
+     second search, of its own so it only adds: each box's most promising way that comes before any way of it in
+     the air, its edge buried in other boxes. Its legs pay each of those boxes once, by the leg that runs
+     furthest inside it (never bent round: it is what the way goes through), and one no leg touches is paid as
+     its panel (the edge is within the joint of it). The basis: what a front lets through radiates from its
+     whole face, and where that face ends at the slab built into it, the field behind the edge is the field
+     through the panel diffracted at the panel's edge, as through an aperture (Kirchhoff, Born and Wolf §8.3, the
+     rule the openings already use); a ray through a sequence of edges and walls keeps the product of what
+     each does (Funkhouser et al. 2004). So the slab's edge is gone round through the brick: Maekawa's grazing
+     loss times the brick, never more than the brick alone lets through (the cap, as before).
+   - **Which face the sound passes.** Sound goes from the air into a solid, or out of it, only by a face open to
+     the air (`Passage`). Where the bend is at a corner of the box it is buried in, a face against the box gone
+     round passes nothing but what that box lets through (a slab's underside on the brick front it bears on is a
+     junction, EN 12354-1's K_ij, Hopkins): the face is judged a few centimetres along from the corner. By a
+     broad face the box is crossed as a panel (the brick over the slab's edge, from the street); by a narrow
+     one the leg has gone into it by its edge and pays the run (the slab's 15 cm edge, round the top of the brick
+     under it: "A solid gone into by its edge"); by none, only through the box gone round, there is no way.
+     Without this rule a way round the top of a storey's brick front went into the slab on it by the slab's
+     underside, which lies on the brick, and came out 40 dB louder than the line (Kestrel House flat 50B from
+     the street, -76/-100/-100 to -40/-56/-85; now -76/-100/-100).
+   - **Where it is approximate.** The buried way's bend is a ray's, so at the shadow boundary it takes
+     Maekawa's grazing 5 dB where the field through an aperture is 6 dB down and joins the lit side smoothly;
+     the line just over the edge pays the brick with no loss, so a 5 dB step is left where the dip was 11/9 dB.
+     One buried way a box and four in all; their legs go straight (bent round what stands by the bend, as the
+     ways in the air are, they cost three times as much and gained 6 pairs in 4,000 on the city up to 10 dB).
+     Freeing an edge with rule 1 can move which way of a box is tried within the search's budget: 3 street pairs
+     in 2,000 on the city came out quieter, stairwells heard from the street at -81 to -93 dB in the low band
+     now -96 to -100 (flights of stacked steps, now one construction, offered a worse way of the same box first).
+   - **The examples** (the worker with Steam Audio for the stairwell, the routes' legs against the openings for
+     the rest, low/mid/high dB, main against this build):
+     - Marlow Tower floor 1 stairwell, still sources on Dock Street at z -128.5, x -19.5 to -15.5:
+       -57/-78/-100 to -45/-67/-93 (round the slab's edge through the brick front, -40/-62/-87, Maekawa's
+       grazing loss); either side as it was, -45/-69/-100 to -46/-71/-100 over the guard; x -14 -91/-100/-100
+       to -83/-100/-100. The stretch is now within 0.4/2.3/6.9 dB of the guard's beside it.
+     - 1303 Tamarack Court Southwest from the street below: -29/-58/-94 to -100/-100/-100 (the way went under a
+       neighbour's slab, 24644, into the earth; its edges are the ground's now, and the deck on it ends with
+       it); 1974 Antelope Court Southwest -29/-56/-89 to -59/-87/-100.
+     - `--pop-hunt` (40 cars, 30 still sources, 60 s): the stairwell 0 excursions on both builds; the pavement
+       (`ear=-6.4,1.77,-103.5`) 0 on both.
+   - **The three maps** (`--barrier-sweep map=X n=4000 seed=1` and `outdoor n=2000`, main's build and this one,
+     the same pairs set side by side from `dump=`; louder or quieter by more than 0.5 dB, low/mid/high):
+     | map | between places, louder | median, most (dB) | quieter | street heard inside, louder | median, most | quieter |
+     |---|---|---|---|---|---|---|
+     | city | 8.1/3.0/0.8 % | 12.9/20.9/5.4, 55.3/33.3/25.3 | none | 19.2/8.1/2.4 % | 21.2/26.0/4.6, 55.3/33.4/12.3 | 0.15/0/0 % |
+     | Magnolia | 6.5/0.4/0.1 % | 10.9/6.7/8.2, 45.7/42.8/19.3 | 0.25/0/0 % | 6.9/2.9/2.2 % | 11.5/20.3/7.5, 60.8/46.6/19.3 | 1.2/1.1/1.0 % |
+     | Albany | 6.0/0.3/0.0 % | 11.8/9.8/15.1, 47.5/32.2/15.1 | 0.3/0/0 % | 9.3/2.8/1.4 % | 11.2/18.4/11.7, 62.3/46.5/21.4 | 0.6/0.3/0.3 % |
+
+     The 90th percentile levels did not move; the median of the street heard inside rose in the low band on the
+     city (-77.6 to -66.2 dB) and Albany (-53.1 to -51.4), where most lines stay at -100. The biggest:
+     - louder, a tower flat or stairwell and the street, the line into a floor slab by its edge, now heard
+       through the front just over that edge (every city building): Brandt Court flat 33F from Main Street,
+       -100/-100/-100 to -46/-71/-100; Selby House flat 31F from Main Street, -100 to -48/-76/-100; Marlow
+       Tower stairwell floor 6 from the Dock Street sidewalk, -100 to -45/-67/-92. These undo the edge-on
+       rule's -100 where a real front would be heard, at the brick's own figure less Maekawa's grazing loss;
+     - louder, two walls meeting at a corner on the real places, the line along one wall's length into the
+       other, now through the other beside the corner: 26522 South Barnett Lane, room to room, -87/-100/-100 to
+       -42/-61/-92; houses on Magnolia across their gardens, -100 to -65 in the low band;
+     - quieter, a way under a slab, a barn or a shed into the earth: 17902 Country Fields from outside past
+       the barn to the west, -29/-55/-89 to -90/-100/-100 (by the openings); 17403 Pine Lane -43/-65/-98 to
+       -91/-100/-100; 4684 Willetta Street Southwest from the house beside, -59/-100/-100 to -100; and
+       Tamarack Court above.
+   - **The cost.** A blocked straight leg, the same pairs both ways: city 1,913 to 2,193 µs, Magnolia 1,263
+     to 1,431, Albany 1,925 to 2,277 (+15, +13 and +18 %): the second search's legs, and the ground looked up
+     at every bend. The worker in the stairwell (`--pop-hunt`): 3,609 and 3,446 µs a route query, the pavement
+     76 and 68 (the same within the noise).
+   - **The guards.** RenderFingerprint, EmitterStreamReplay (all eight, at the default and at four
+     processors), VoiceIdBand, PhysicsBoundary, the physics replays and LibraryBoundary unchanged: the replay
+     runs without Steam Audio or terrain, and none of its scenarios has a route leg these rules move. The
+     terrain reaches the box list's routes as a value (`OpeningGraph.Build`'s `terrains`): the worker passes the
+     tiles it already read, and `SpatialAcoustics` reads the map once where it read it three times, so no
+     library file gained a host reference (its allowance for `WorldSnapshot` lowered, 31 to 29). Tests: `OpeningRoutesBarrierTests` (a finish cut to its slab, a slab
+     built into a front, round a wall's top into the slab it bears, a wall on the ground from the box list
+     and the triangle store, the rules only adding where there is no ground or finish).
+   - **Where to listen** (each `--walk-pair map=X ears=...`, z the floor): city: Marlow Tower floor 1
+     stairwell, the pop hunt's ear `/tp -11.0 -100.8 3.3` (cars on Dock Street, south: no dip in the low end
+     as they pass the stair's head); Brandt Court flat 33F `/tp -10.6 203.5 9.4` and Selby House flat 31F
+     `/tp 12.9 183.9 9.4` (Main Street, south: through the front now, not silent); Albany: 1303 Tamarack Court
+     Southwest `/tp -385.4 276.6 -1.1` and 1974 Antelope Court Southwest `/tp -848.7 790.5 -3.9` (the street
+     below, quieter); Magnolia: 26522 South Barnett Lane `/tp -340.3 1060.0 -2.5` (the room to the north,
+     across the corner, louder) and 17902 Country Fields `/tp -819.5 984.7 0.6` (outside to the west past the
+     barn, quieter).
+   - **References.** Svensson, Fred and Vanderkooy, "An analytic secondary source model of edge diffraction
+     impulse responses", JASA 106 (1999) 2331-2344, https://doi.org/10.1121/1.428071 (an edge's diffraction
+     from its wedge). Attenborough, Li and Horoshenkov, Predicting Outdoor Sound, Taylor and Francis 2007,
+     https://www.taylorfrancis.com/books/9780419235101 (the ground as an impedance boundary). Born and Wolf,
+     Principles of Optics, 7th ed., Cambridge 1999, https://doi.org/10.1017/CBO9781139644181 (Kirchhoff's
+     aperture). Funkhouser et al. 2004, Maekawa 1968, Kurze and Anderson 1971, ISO 9613-2 and Hopkins 2007 as
+     cited above.
    **Openings from the floods (step 3, 2026-10-11, approved by ear 2026-10-11).** A flood keeps the cells of each opening its air meets
    and the cells of open sky it meets (`Room.OpeningCells`, `Room.SkyCells`). `FloodOpenings` frames them: an
    opening's cells in its own plane, joined where they touch, a frame each piece (a pier or a post parts it), as wide

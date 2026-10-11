@@ -5,6 +5,9 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Systems;
 using Xunit.Abstractions;
+using Heightfield = OpenFPS.Common.Geometry.Heightfield;
+using SolidSpec = OpenFPS.Common.Geometry.SolidSpec;
+using TriangleWorldBuilder = OpenFPS.Common.Geometry.TriangleWorldBuilder;
 
 namespace OpenFPS.Tests;
 
@@ -250,5 +253,221 @@ public class OpeningRoutesBarrierTests
         float delta = routes.BarrierPathDifference(new Vector3(0, 0.45f, -60), new Vector3(0, 1.6f, 0), out _, out bool verified);
         _o.WriteLine($"verified {verified}, {delta:F2} m");
         Assert.False(verified);
+    }
+
+    // ═══ When an edge is buried (docs/GEOMETRY.md 12.6, "When an edge is buried") ═══════════════════════
+
+    private static OpeningRoutes Boxes(IEnumerable<(Vector3 Centre, Vector3 Size, string Material)> boxes,
+                                       IReadOnlyList<SolidSpec>? terrains = null)
+    {
+        AcousticRegistry.EnsureInitialized();
+        var solids = boxes.Select(b => new OpeningRoutes.Solid(b.Centre, b.Size, Quaternion.Identity, b.Material)).ToList();
+        return OpeningRoutes.Build(solids, null, Array.Empty<OpeningRoutes.Declared>(), null, terrains);
+    }
+
+    private static Vector3 Old(Func<Vector3> leg)
+    {
+        OpeningRoutes.OldBurialForLab = true;
+        try { return leg(); }
+        finally { OpeningRoutes.OldBurialForLab = false; }
+    }
+
+    /// <summary>
+    /// A timber room on the ground, a patio slab before it with a 2 cm deck laid on it to its outline, and a
+    /// source down the slope beyond (1303 Tamarack Court Southwest from the street below): the deck is a layer
+    /// of the slab's construction, so the way round the patio's edge goes over its top, as it would with no
+    /// deck, and its legs pay the room's wall. Before, the deck buried the slab's top edges and the slab the
+    /// deck's, and the way went under the foot of the room's wall, through the earth, for nothing.
+    /// </summary>
+    [Fact]
+    public void A_finish_cut_to_its_slab_leaves_the_slab_s_edge_to_go_round()
+    {
+        var room = new List<(Vector3, Vector3, string)>
+        {
+            (new Vector3(0, 1.375f, 4.125f), new Vector3(6.5f, 2.75f, 0.25f), "Wood"),
+            (new Vector3(0, 1.375f, 10.125f), new Vector3(6.5f, 2.75f, 0.25f), "Wood"),
+            (new Vector3(-3.125f, 1.375f, 7.125f), new Vector3(0.25f, 2.75f, 6.25f), "Wood"),
+            (new Vector3(3.125f, 1.375f, 7.125f), new Vector3(0.25f, 2.75f, 6.25f), "Wood"),
+            (new Vector3(0, 2.875f, 7.125f), new Vector3(6.5f, 0.25f, 6.5f), "Wood"),
+        };
+        var slab = (new Vector3(0, 0.125f, 1.5f), new Vector3(6, 0.25f, 5), "Concrete");
+        var deck = (new Vector3(0, 0.26f, 1.5f), new Vector3(6, 0.02f, 5), "Wood");
+        var ground = new[] { Hillside() };
+        var bare = Boxes(room.Append(slab), ground);
+        var decked = Boxes(room.Append(slab).Append(deck), ground);
+        var none = Array.Empty<int>();
+        var ear = new Vector3(0, 1.6f, 6);
+        for (float x = -1f; x <= 1f; x += 1f)
+        {
+            // 0.5 m over the slope: the line goes down through the wall, the deck and the slab, then the earth.
+            var src = new Vector3(x, -2.0f, -6);
+            var a = Db3(bare.LegGains(src, ear, none, none));
+            var b = Db3(decked.LegGains(src, ear, none, none));
+            var before = Db3(Old(() => decked.LegGains(src, ear, none, none)));
+            decked.BarrierGains(src, ear, WallTransmission.SoundSpeed, out _, out _, out var edge, out _);
+            var edgeBefore = Vector3.Zero;
+            Old(() => { decked.BarrierGains(src, ear, WallTransmission.SoundSpeed, out _, out _, out edgeBefore, out _); return Vector3.Zero; });
+            _o.WriteLine($"x {x:F0}: slab alone {a}, with its deck {b} round {edge}; the deck burying the edge {before} round {edgeBefore}");
+            for (int k = 0; k < 3; k++)
+            {
+                float ak = k == 0 ? a.X : k == 1 ? a.Y : a.Z, bk = k == 0 ? b.X : k == 1 ? b.Y : b.Z;
+                Assert.InRange(bk, ak - 1f, ak + 0.01f);
+            }
+            Assert.True(edge.Y > 0.2f, $"x {x:F0}: the way round goes at {edge.Y:F2} m, under the patio");
+            Assert.True(edgeBefore.Y < 0.05f, $"x {x:F0}: before, the way went at {edgeBefore.Y:F2} m");
+        }
+    }
+
+    /// <summary>
+    /// A floor slab built into a brick front, its edge flush with the outer face and the next storey's brick on
+    /// it, in a closed building (Marlow Tower's floor 1 stairwell over Dock Street): a line from the street that
+    /// goes into the slab by its edge pays half a metre of concrete, 10 dB under the brick a metre higher, where
+    /// the brick a few centimetres over the edge radiates into the room over its whole face. The way round the
+    /// slab's edge, through the brick its edge is buried in, the brick paid once, leaves Maekawa's grazing loss
+    /// of the dip (5 dB), never louder than the brick alone lets through.
+    /// </summary>
+    [Fact]
+    public void A_slab_built_into_a_front_is_heard_through_the_front_beside_its_edge()
+    {
+        var above = (new Vector3(0, 4.65f, 0.175f), new Vector3(20, 3.0f, 0.35f), "Brick");
+        var routes = Boxes(new[]
+        {
+            (new Vector3(0, -0.125f, 0), new Vector3(200, 0.25f, 200), "Concrete"),
+            (new Vector3(0, 1.5f, 0.175f), new Vector3(20, 3.0f, 0.35f), "Brick"),
+            (new Vector3(0, 3.075f, 5), new Vector3(20, 0.15f, 10), "Concrete"),
+            above,
+            (new Vector3(-10.175f, 3.075f, 5), new Vector3(0.35f, 6.15f, 10.7f), "Brick"),
+            (new Vector3(10.175f, 3.075f, 5), new Vector3(0.35f, 6.15f, 10.7f), "Brick"),
+            (new Vector3(0, 3.075f, 10.175f), new Vector3(20, 6.15f, 0.35f), "Brick"),
+            (new Vector3(0, 6.275f, 5), new Vector3(21, 0.25f, 11), "Concrete"),
+        });
+        var none = Array.Empty<int>();
+        var ear = new Vector3(0, 3.6f, 4);
+        var (bl, bm, bh) = WallTransmission.BandGains("Brick", above.Item2, default);
+        var brick = Db3(new Vector3(bl, bm, bh));
+        for (float x = -4f; x <= 4f; x += 2f)
+        {
+            // The line meets the front at 3.08 m, in the slab's 15 cm edge, and comes out of its top 0.5 m in.
+            var car = new Vector3(x, 0.5f, -20);
+            var before = Db3(Old(() => routes.LegGains(car, ear, none, none)));
+            var after = Db3(routes.LegGains(car, ear, none, none));
+            // A metre higher, the line crosses the brick over the slab.
+            var beside = Db3(routes.LegGains(car + new Vector3(0, 1f, 0), ear, none, none));
+            _o.WriteLine($"x {x:F0}: into the slab's edge {before}, now {after}; through the brick beside it {beside}; the brick alone {brick}");
+            Assert.True(after.X > before.X + 4f, $"x {x:F0}: the dip is still there ({after.X:F1} against {before.X:F1} dB)");
+            for (int k = 0; k < 3; k++)
+            {
+                float a = k == 0 ? after.X : k == 1 ? after.Y : after.Z, w = k == 0 ? brick.X : k == 1 ? brick.Y : brick.Z;
+                float s = k == 0 ? beside.X : k == 1 ? beside.Y : beside.Z;
+                Assert.True(a <= w + 0.01f, $"x {x:F0}, band {k}: louder ({a:F1} dB) than the brick alone lets through ({w:F1})");
+                Assert.True(a >= s - 7f, $"x {x:F0}, band {k}: {a:F1} dB, more than Maekawa's grazing loss under the brick beside it ({s:F1})");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The storey below's brick front bears the slab, whose edge is flush with it (Kestrel House flat 50B from
+    /// the street): round the top of that brick is into the slab, and the slab's underside there lies on the
+    /// brick, so the only face the sound can go in by is the slab's 15 cm edge. That is the slab gone into by
+    /// its edge, and it pays the run: the way is no louder than the line through the brick and the floor. Paid
+    /// as the slab crossed face to face, it came out 40 dB louder. The storey above's front is a metre of
+    /// concrete here, so no other way through a front competes.
+    /// </summary>
+    [Fact]
+    public void Round_a_wall_s_top_into_the_slab_it_bears_is_into_the_slab_s_edge()
+    {
+        var routes = Boxes(new[]
+        {
+            (new Vector3(0, -0.125f, 0), new Vector3(200, 0.25f, 200), "Concrete"),
+            (new Vector3(0, 1.5f, 0.175f), new Vector3(20, 3.0f, 0.35f), "Brick"),
+            (new Vector3(0, 3.075f, 5), new Vector3(20, 0.15f, 10), "Concrete"),
+            (new Vector3(0, 4.65f, 1.0f), new Vector3(20, 3.0f, 2.0f), "Concrete"),
+            (new Vector3(-10.175f, 3.075f, 5), new Vector3(0.35f, 6.15f, 10.7f), "Brick"),
+            (new Vector3(10.175f, 3.075f, 5), new Vector3(0.35f, 6.15f, 10.7f), "Brick"),
+            (new Vector3(0, 3.075f, 10.175f), new Vector3(20, 6.15f, 0.35f), "Brick"),
+            (new Vector3(0, 6.275f, 5), new Vector3(21, 0.25f, 11), "Concrete"),
+        });
+        var none = Array.Empty<int>();
+        var ear = new Vector3(0, 3.4f, 8);
+        for (float x = -4f; x <= 4f; x += 2f)
+        {
+            // The line goes through the brick below the slab, at 2.1 m, and up through the slab 5.5 m in.
+            var car = new Vector3(x, 0.5f, -10);
+            // Under -100 dB is nothing the mixer plays.
+            var before = Vector3.Max(Db3(Old(() => routes.LegGains(car, ear, none, none))), new Vector3(-100f));
+            var after = Vector3.Max(Db3(routes.LegGains(car, ear, none, none)), new Vector3(-100f));
+            _o.WriteLine($"x {x:F0}: before {before}, now {after}");
+            Assert.True(after.X <= before.X + 1f && after.Y <= before.Y + 1f && after.Z <= before.Z + 1f,
+                        $"x {x:F0}: {after}, louder than the line through the brick and the floor ({before})");
+        }
+    }
+
+    /// <summary>The ground on a slope, from 0 m at z = -1 down to -3 m at z = -7, flat each side, as a tile of terrain.</summary>
+    private static SolidSpec Hillside()
+    {
+        const int posts = 126;
+        const float spacing = 2f;
+        var heights = new float[posts * posts];
+        for (int j = 0; j < posts; j++)
+            for (int i = 0; i < posts; i++)
+            {
+                float z = -125f + j * spacing;
+                heights[j * posts + i] = z >= -1f ? 0f : z <= -7f ? -3f : (z + 1f) * 0.5f;
+            }
+        return SolidSpec.OfTerrain(1, Vector3.Zero, new Heightfield(posts, spacing, heights, null, null),
+                                   OpenFPS.Client.Core.AudioEngine.SteamAudio.SceneTerrain.Surface);
+    }
+
+    /// <summary>A wall standing on the ground, the ear behind it and a source down the slope in front: the wall's
+    /// foot is in the earth, which is no box, so there is no way under it. Before, the way round its bottom
+    /// edge went through the hillside for nothing. The same from the box list and from the triangle store.</summary>
+    [Fact]
+    public void A_wall_on_the_ground_is_not_gone_under()
+    {
+        var wall = (new Vector3(0, 1.25f, 0), new Vector3(40, 2.5f, 0.35f), "Brick");
+        var ground = new[] { Hillside() };
+        var routes = Boxes(new[] { wall }, ground);
+        var builder = new TriangleWorldBuilder(250f);
+        var spec = new SolidSpec(2, wall.Item1, Quaternion.Identity, wall.Item2, EntityGeometry.SurfaceOf("Brick", wall.Item2, 0, 0, false, 0, 0, false, false, false));
+        var tiled = OpeningRoutes.Build(builder.Build(new[] { spec, ground[0] }, Array.Empty<SolidSpec>()), null,
+                                        Array.Empty<OpeningRoutes.Declared>(), null, new OpeningRoutes.TileCache());
+        var none = Array.Empty<int>();
+        var ear = new Vector3(0, 1.6f, 3);
+        var (wl, wm, wh) = WallTransmission.BandGains("Brick", wall.Item2, default);
+        for (float z = -6f; z <= -4f; z += 1f)
+        {
+            // 0.5 m over the slope: the line meets the wall at its foot.
+            var src = new Vector3(0.5f, (z + 1f) * 0.5f + 0.5f, z);
+            var before = Db3(Old(() => routes.LegGains(src, ear, none, none)));
+            var after = Db3(routes.LegGains(src, ear, none, none));
+            var fromTiles = Db3(tiled.LegGains(src, ear, none, none));
+            float over = routes.BarrierPathDifference(src, ear, out _, out bool verified);
+            _o.WriteLine($"z {z:F0}: under the wall's foot {before}, now {after} (from the tiles {fromTiles}); the way round {over:F2} m, verified {verified}");
+            Assert.True(after.Y < before.Y - 10f, $"z {z:F0}: still under the wall ({after.Y:F1} against {before.Y:F1} dB)");
+            Assert.True(over > 0.5f, $"z {z:F0}: the way round is {over:F2} m, under the foot");
+            Assert.True(Vector3.Distance(after, fromTiles) < 0.1f, $"z {z:F0}: the box list {after}, the triangle store {fromTiles}");
+            Assert.True(after.Y >= Db(wm) - 0.01f, $"z {z:F0}: quieter ({after.Y:F1} dB) than the wall lets through ({Db(wm):F1})");
+        }
+    }
+
+    /// <summary>The rules only ever take away a way through the earth: on a scene with no terrain and no
+    /// layers in contact, the barrier model is what it was, or louder by a way round an edge in another box.</summary>
+    [Fact]
+    public void Without_ground_or_finishes_the_new_rules_only_add()
+    {
+        var routes = Routes(ClosedRoom(
+            (new Vector3(0, 0.535f, -2), new Vector3(6, 1.07f, 0.1f), "Concrete"),
+            (new Vector3(2, 1.0f, 2), new Vector3(0.1f, 2.0f, 3f), "Plasterboard"),
+            (new Vector3(0, 0.9f, -12), new Vector3(8, 1.8f, 0.05f), "Wood")));
+        var none = Array.Empty<int>();
+        var rng = new Random(11);
+        for (int i = 0; i < 200; i++)
+        {
+            var ear = new Vector3((float)rng.NextDouble() * 8 - 4, 0.5f + (float)rng.NextDouble() * 1.8f, (float)rng.NextDouble() * 8 - 4);
+            var src = new Vector3((float)rng.NextDouble() * 60 - 30, 0.3f + (float)rng.NextDouble() * 2f, -8 - (float)rng.NextDouble() * 30);
+            var before = Old(() => routes.LegGains(src, ear, none, none));
+            var after = routes.LegGains(src, ear, none, none);
+            Assert.True(after.X >= before.X && after.Y >= before.Y && after.Z >= before.Z, $"{src} -> {ear}: {Db3(before)} became {Db3(after)}");
+        }
     }
 }

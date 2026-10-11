@@ -187,7 +187,7 @@ string[] usage =
     "                                                what the room round a listener measures, and its send",
     "  --path-probe [map=city] ear=x,y,z src=x,y,z [door= open= swings= traced legcost explain panels root=]",
     "                                                what the occlusion worker hands the mixer",
-    "  --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor] [panels] [pair=E;S] [server=DIR] [dump=FILE]",
+    "  --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor] [panels|buried] [pair=E;S] [server=DIR] [dump=FILE]",
     "                                                behind walls with and without ways round one thing and through another",
     "  --siren-route [map=city] [track=downtown] [preset=police_interceptor] [lane=1.8] [at=x,z] [from=] [sec=60] [every=10]",
     "                                                a car's path to a fixed listener, frame by frame",
