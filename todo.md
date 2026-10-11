@@ -47,6 +47,11 @@ other at login. The server and the Windows zip go out together.
    `ClientAudioSystem` (~:697-741) and the trains' separate writer (`ClientAudioSystem.Trains.cs`), which kept a
    horn on a stale outdoor path through Marlow Tower's brick (2026-10-10). Gated by EmitterStreamReplay: no
    change except where a voice was stale. Start after the Marlow Tower leak fix is merged.
+   Before it (Cody, 2026-10-11): a read-only audit of special cases in the audio, acoustics and sound code
+   (voices told apart by id ranges, kinds read from names or sound-id prefixes, several writers to one voice,
+   every source starting its own voice), ranked by how likely each is to cause the next bug, with the fix
+   for each; written after the leak and play agents finish, then a couple of agents per part. The path pass
+   above becomes one of those parts, planned to cover every voice range, not only moving things.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
