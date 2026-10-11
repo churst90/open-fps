@@ -52,6 +52,15 @@ other at login. The server and the Windows zip go out together.
    every source starting its own voice), ranked by how likely each is to cause the next bug, with the fix
    for each; written after the leak and play agents finish, then a couple of agents per part. The path pass
    above becomes one of those parts, planned to cover every voice range, not only moving things.
+   Physics as its own project (Cody, 2026-10-11: "all parts of this game engine need to be separated in their
+   own packages and all work cohesively together"): `OpenFPS.Physics` on Geometry, holding bodies with mass and
+   velocity, contacts and momentum, movement (from Common's `SharedMovementEngine`, `PhysicsUtils`), vehicles,
+   wheels and doors (from Sound's `Chassis`, `WheelDynamics`, `VehicleBody`, `DoorPhysics`; this replaces the
+   2026-10-06 placement of vehicle physics in Sound) and moving air; the server steps it and Sound reads its
+   state. Planned the way the sound library was: a boundary survey first, guards, then stages. The rest of the
+   engine follows the same rule: each part (geometry, acoustics, sound, physics, the world and its generators,
+   networking, the client UI) its own project with stated dependencies and no reach into the host. Not
+   started; comes after the special-cases audit's parts.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
@@ -437,7 +446,7 @@ aluminium sheet is far too sustained and tonal. Kept in the game meanwhile.
   wheels and doors in Sound (`Chassis`, `WheelDynamics`, `VehicleBody`, `DoorPhysics`, by the 2026-10-06
   decision), collision in Geometry, the stepping in the server (`MovementSystem`, `DrivingSystem`).
   Proposed: an `OpenFPS.Physics` project on Geometry (bodies, contacts, momentum, air), with Sound reading
-  physics state rather than owning it. Cody's call (it revisits the vehicle-physics-in-Sound decision).
+  physics state rather than owning it.
 
 ### Doors as live models (filed 2026-10-05, not started)
 The door models are physical but rendered once per key, slower than real time, and replayed from the
