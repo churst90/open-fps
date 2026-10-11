@@ -65,6 +65,12 @@ other at login. The server and the Windows zip go out together.
    networking, the client UI) its own project with stated dependencies and no reach into the host. Not
    started; comes after the special-cases audit's parts. Surveyed 2026-10-11: docs/PHYSICS_BOUNDARY.md (the
    boundary, what the physics is missing, stages 0 to 6 at 20 to 30 sessions, ten decisions for Cody).
+   Stage 0 built 2026-10-11 (section 14 there; not merged): the ratchet, the movement, driving, traffic and
+   train replays, the ballistics table, `--physics-parity`, and the Jolt trial in AudioLab. Open from it:
+   standing on anything that moves parts the server and the client by a centimetre a tick (the server's ground
+   probe counts moving things, the client's does not), for stage 3's one world view; Jolt's binding sets a
+   body's motion quality wrongly from its creation settings (use the body interface); Jolt's run-to-run
+   repeatability and its native build's determinism option not yet checked.
    The order agreed with Cody, 2026-10-11: (1) regions become places, steps 3 to 5, with the audit's small
    name and prefix parts beside them; (2) the audit's voice registry (one list of voices, one writer a
    frame, one way to start a voice), then stage 5's audio clock slice; (3) the physics boundary survey, a doc,
