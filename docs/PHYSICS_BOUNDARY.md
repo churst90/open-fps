@@ -281,9 +281,14 @@ map's gravity from its `ZoneComponent` (:59-66). The teleport check `CheckCollis
   stops dead and the impact is heard (`Collision` :483-501), the struck thing's mass taken as fifty times the
   car's when it has no `Velocity` ("effectively the planet", :495) or its box volume times its density.
   `:388`: "TODO: the impulse and the damage: a car that hits something should be damaged and push it."
-- State: `_running`, a static `ConcurrentDictionary` keyed by entity id (:91), and a thread-static map id
-  (:95). Each map is its own Arch `World` with its own ids, so two driven cars with the same id on two maps
-  would share one `WheelDynamics` when their presets match. Probable, not reproduced.
+- State: `_running`, a static table of each world's driven cars by entity id (:95), and a thread-static map
+  id (:100). Until 2026-10-11 it was one `ConcurrentDictionary` keyed by entity id alone: each map is its own
+  Arch `World` with its own ids, so two driven cars with the same id on two maps shared one `WheelDynamics`
+  when their presets matched, and the broadcast sent either car the other's wheels. Reproduced
+  (`MapScopedStateTests`: a parked car on one world stopped the wheels of a car doing 20 m/s on another) and
+  fixed: the table is a `ConditionalWeakTable` per `World`, an entry carries its entity's version, and a car
+  no longer driven is dropped at the end of the world's step. The same sweep found the same fault in eight
+  more places (changes.md, 2026-10-11).
 
 **`VehicleSystem`** (`OpenFPS.Server/Systems/VehicleSystem*.cs`, ten files, 2,679 lines): traffic,
 aircraft, small machines and walkers. Kinematic: a vehicle's place is a sample of its `RaceLine` and its speed
@@ -656,7 +661,7 @@ changes one is finished only when the change is the one intended and its commit 
 
 | Stage | What | Sessions | Main risk |
 |---|---|---:|---|
-| 0 | Guards: the ratchet, the movement replay, the driving and traffic replays, the ballistics table, the parity harness | 1.5 to 2 | the driving replay depends on statics (`_running`) |
+| 0 | Guards: the ratchet, the movement replay, the driving and traffic replays, the ballistics table, the parity harness | 1.5 to 2 | the driving replay depends on statics (the thread-static map id) |
 | 1 | `OpenFPS.Physics`; move what moves whole; the four crossing fixes; the wire hash covers it | 1.5 to 2 | the engine render fingerprint moves with `Gearbox` |
 | 2 | Split the presets and the mixed types; one law per law | 2 to 3 | approved sound depends on the sound's half reading the same numbers |
 | 3 | The state types; one world view both sides fill; the parity divergences; contact events; `DrivingSystem`'s mechanics into a vehicle step | 3 to 4 | movement parity |
@@ -680,7 +685,8 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   Fails if either side's path changes or a gap passes 1 mm.
 - **Driving replay** (`DrivingReplayTests`): scripted inputs through `DrivingSystem.Update` on a test map
   (pull away, shift through the gears, a bend at the grip, a brake to a stop, a kerb under one side, a wet
-  patch, a wall); stored per tick, the pose, speed and the wheels' bytes. Needs `_running` cleared per run.
+  patch, a wall); stored per tick, the pose, speed and the wheels' bytes. A fresh `World` per run starts
+  with no `_running` state.
 - **Traffic replay**: `VehicleSystem` for a minute of the city's buses and cars, stored poses and wheel
   bytes; and `RailSystem` for a train through a station.
 - **Ballistics table**: the flight tables `ExternalBallistics.Fly` makes for every weapon at 100 m steps,
@@ -845,8 +851,8 @@ state types, with physics 5 and 6 beside or after them.
   replay first.
 - **The wire.** `WheelState`, `WindAir`, `BulletState` move; the hash must follow (stage 1) or a client and a
   server of different versions misread each other. `PhysicsPropertyComponent` is positional: append only.
-- **Statics across maps.** `DrivingSystem._running` (3.4) and the thread-static map id; per-world state
-  removes them, and the driving replay must clear them meanwhile.
+- **Statics across maps.** The thread-static map id; `DrivingSystem._running` (3.4) is per world since
+  2026-10-11. Per-world state removes the rest.
 - **Cost on the server tick.** 30 Hz with 40 cars, a street's walkers and their bodies; a rigid-body solver
   adds contacts per body per sub-step. Sleeping and only waking bodies near players keep it bounded; measure
   before stage 4 merges (`PerfProbe`).
@@ -934,7 +940,7 @@ state types, with physics 5 and 6 beside or after them.
 - No walk was run: `--walk-pair` lives in the lab, and only the survey tool was built. The divergences of 3.7
   are read from the code; whether each moves a body by over a millimetre on the real maps is stage 0's first
   measurement.
-- The probable shared state across maps in `DrivingSystem._running` (3.4) was read, not reproduced.
+- The shared state across maps in `DrivingSystem._running` (3.4) was reproduced and fixed on 2026-10-11.
 - How far `TorqueFraction` is from the engine model's own torque: not rendered.
 - The cost of rigid bodies, the air's disturbances or traffic under `WheelDynamics.Step` on the server tick.
 - The library facts in decision 1 (licences, determinism, features) are from memory.
@@ -1058,8 +1064,8 @@ Statics that can change in what moves: `PhysicsUtils`' five thread-static scratc
 `Chassis.cs:249, 260`; `MagicCurve.Cache`, `WheelDynamics.cs:21`; `ExternalBallistics.Mach`, `Cd`,
 `_zeroCache`, `ExternalBallistics.cs:65, 75, 175`; `Ricochet._faces`, `Harmonics`, `Ricochet.cs:89, 309`;
 `VehicleProfile._cache`, `Vehicles.cs:633`; `WindField.Eddies`, `Wind.cs:45`; `WindWeather.Default`,
-`Wind.cs:242`); and in the stepper, `DrivingSystem._running` and `_mapId` (`DrivingSystem.cs:91, 95`). None
-is written from outside its type.
+`Wind.cs:242`); and in the stepper, `DrivingSystem._running` (per world) and `_mapId`
+(`DrivingSystem.cs:95, 100`). None is written from outside its type.
 
 ### B. The crossings
 

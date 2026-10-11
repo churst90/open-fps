@@ -52,8 +52,9 @@ public sealed class DoorSystem
     /// <summary>Doors somebody has come into the doorway of since they opened, by world and entity.</summary>
     private readonly HashSet<(World World, int Id)> _entered = new();
 
-    /// <summary>The aperture each door was last announced at.</summary>
-    private readonly Dictionary<int, float> _announced = new();
+    /// <summary>The aperture each door was last announced at, by world and entity id: ids start again in
+    /// every map's world.</summary>
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<World, Dictionary<int, float>> _announced = new();
     private readonly List<Entity> _doors = new();
     private readonly List<(Entity Who, Vector3 At)> _people = new();
     private bool _peopleFound;
@@ -70,15 +71,24 @@ public sealed class DoorSystem
         _peopleFound = false;
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e) => _doors.Add(e));
 
+        var announced = _announced.GetValue(world, static _ => new());
+        // Doors gone with a tile or the editor: an id given to a new door starts unannounced.
+        if (announced.Count > _doors.Count)
+        {
+            var here = new HashSet<int>(_doors.Select(d => d.Id));
+            foreach (int id in announced.Keys.ToList())
+                if (!here.Contains(id)) announced.Remove(id);
+        }
+
         foreach (var door in _doors)
         {
-            try { Step(world, door, dt, announce, heard); }
+            try { Step(world, door, dt, announce, heard, announced); }
             catch (Exception ex) { Log.Error(ex, "DoorSystem: door {Id} failed to move.", door.Id); }
         }
     }
 
     private void Step(World world, Entity entity, float dt, Action<int> announce,
-                      Action<int, string, IReadOnlyList<TransientSound>>? heard)
+                      Action<int, string, IReadOnlyList<TransientSound>>? heard, Dictionary<int, float> announced)
     {
         ref var door = ref world.Get<DoorComponent>(entity);
         bool parented = world.Has<ParentComponent>(entity);
@@ -126,12 +136,12 @@ public sealed class DoorSystem
             float aperture = door.Openness * door.Aperture;
             portal.ApertureSize = aperture;
 
-            if (!_announced.TryGetValue(entity.Id, out float last)
+            if (!announced.TryGetValue(entity.Id, out float last)
                 || MathF.Abs(aperture - last) >= AnnounceStep * MathF.Max(0.01f, door.Aperture)
                 || (aperture <= 0f && last > 0f)
                 || (door.Openness >= 1f && last < door.Aperture))
             {
-                _announced[entity.Id] = aperture;
+                announced[entity.Id] = aperture;
                 announce(entity.Id);
             }
         }
@@ -1041,5 +1051,8 @@ public sealed class DoorSystem
         => !world.IsAlive(entity) || !world.Has<DoorComponent>(entity) || world.Get<DoorComponent>(entity).Openness >= 0.9f;
 
     /// <summary>Forgets a door that no longer exists.</summary>
-    public void Forget(int entityId) => _announced.Remove(entityId);
+    public void Forget(World world, int entityId)
+    {
+        if (_announced.TryGetValue(world, out var announced)) announced.Remove(entityId);
+    }
 }

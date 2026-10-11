@@ -470,7 +470,7 @@ public class StreetBodiesTests
         Assert.True(vehicles.RetireWalker("city", world, walker));
         Assert.False(world.IsAlive(walker));
         Assert.Contains(walker.Id, removed);
-        Assert.True(vehicles.IsRetiredForTest(walker.Id));
+        Assert.True(vehicles.IsRetiredForTest("city", walker.Id));
         for (int i = 0; i < 30; i++) vehicles.Update("city", world, 1f / 30f);   // nobody walking it meanwhile
 
         var fresh = vehicles.ReplaceWalker("city", world, walker.Id);
@@ -480,7 +480,7 @@ public class StreetBodiesTests
         Assert.Equal(voice, world.Get<Pedestrian>(fresh).Voice);
         Assert.Equal(PhysicsConstants.PersonMaterial, world.Get<MaterialComponent>(fresh).Material);
         Assert.False(world.Has<DeadComponent>(fresh));
-        Assert.False(vehicles.IsRetiredForTest(walker.Id));
+        Assert.False(vehicles.IsRetiredForTest("city", walker.Id));
         Assert.Equal(Entity.Null, vehicles.ReplaceWalker("city", world, walker.Id));   // once only
     }
 

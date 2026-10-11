@@ -38,11 +38,11 @@ public sealed class CrossingSystem
     /// until they are up the road is still held.</summary>
     private const float MinimumClosedSeconds = 6f;
 
-    private readonly Action<int>? _resendDefinition;
+    private readonly Action<string, int>? _resendDefinition;
 
     /// <param name="resendDefinition">Asks the server to send an entity's definition again: the bell's
-    /// and gates' state (SynthRunning) lives there, not in the transform.</param>
-    public CrossingSystem(RailSystem rail, Action<int>? resendDefinition = null)
+    /// and gates' state (SynthRunning) lives there, not in the transform. Given the map and the entity.</param>
+    public CrossingSystem(RailSystem rail, Action<string, int>? resendDefinition = null)
     {
         _rail = rail;
         _resendDefinition = resendDefinition;
@@ -277,7 +277,7 @@ public sealed class CrossingSystem
                 ref var gem = ref world.Get<SoundEmitterComponent>(gate);
                 if (gem.SynthRunning == c.Closed) continue;
                 gem.SynthRunning = c.Closed;
-                _resendDefinition?.Invoke(gate.Id);
+                _resendDefinition?.Invoke(mapId, gate.Id);
             }
             if (c.Bell != Entity.Null && world.IsAlive(c.Bell))
             {
@@ -287,7 +287,7 @@ public sealed class CrossingSystem
                     em.SynthRunning = c.Closed;
                     // The definition must go out again: a dirty transform sends only position and
                     // velocity, and without this the bell rang on the server and nowhere else.
-                    _resendDefinition?.Invoke(c.Bell.Id);
+                    _resendDefinition?.Invoke(mapId, c.Bell.Id);
                 }
             }
         }

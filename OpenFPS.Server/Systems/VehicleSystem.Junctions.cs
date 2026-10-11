@@ -41,7 +41,9 @@ public sealed partial class VehicleSystem
     }
 
     private readonly Dictionary<(string Map, string Junction), AtJunction> _atJunction = new();
-    private readonly Dictionary<(int, int, int, int), bool> _conflicts = new();
+    /// <summary>Whether two ways through a junction meet, by map and lane segment indices: every map's
+    /// roads number their segments from zero.</summary>
+    private readonly Dictionary<(string Map, int, int, int, int), bool> _conflicts = new();
 
     /// <summary>How far out a vehicle counts as coming to a junction, metres: far enough that the longest
     /// critical gap and the time to cross still cover a vehicle at city speed (7.1 s + 3 s at 14 m/s).</summary>
@@ -117,12 +119,12 @@ public sealed partial class VehicleSystem
         var here = Slot(v.MapId, j);
         bool wait = false;
         foreach (var (o, m) in here.Inside)
-            if (o != v && Conflict(mine, m)) { wait = true; break; }
+            if (o != v && Conflict(v.MapId, mine, m)) { wait = true; break; }
         // ...and so does one already committed to it, or two drivers who each decided before the other
         // entered both go, and meet.
         if (!wait)
             foreach (var (o, m, oToLine) in here.Coming)
-                if (o != v && m.In != mine.In && !o.Holding && Committed(o, oToLine) && Conflict(mine, m)
+                if (o != v && m.In != mine.In && !o.Holding && Committed(o, oToLine) && Conflict(v.MapId, mine, m)
                     && (!Committed(v, toLine) || oToLine < toLine || (oToLine == toLine && o.Entity.Id < v.Entity.Id)))
                 { wait = true; break; }
         if (!wait)
@@ -130,7 +132,7 @@ public sealed partial class VehicleSystem
             int myRank = Rank(j, mine);
             foreach (var (o, m, oToLine) in here.Coming)
             {
-                if (o == v || m.In == mine.In || !Conflict(mine, m)) continue;
+                if (o == v || m.In == mine.In || !Conflict(v.MapId, mine, m)) continue;
                 int theirRank = Rank(j, m);
                 // Side by side on the same approach (two lanes of one road): whoever is further back
                 // waits. Otherwise the higher standing goes first, and between equals the one on the right.
@@ -157,9 +159,9 @@ public sealed partial class VehicleSystem
             v.WaitedSeconds += dt;
             // ...but not in front of somebody about to arrive: that is not a deadlock, it is traffic.
             if (v.WaitedSeconds > life.GiveWayPatienceSeconds && (here.LetGo == null || here.LetGo == v)
-                && !here.Inside.Any(x => x.V != v && Conflict(mine, x.M))
+                && !here.Inside.Any(x => x.V != v && Conflict(v.MapId, mine, x.M))
                 && !here.Coming.Any(x => x.V != v && x.M.In != mine.In && x.V.Speed > 0.5f
-                                         && x.ToLine / x.V.Speed < ImminentSeconds && Conflict(mine, x.M)))
+                                         && x.ToLine / x.V.Speed < ImminentSeconds && Conflict(v.MapId, mine, x.M)))
             {
                 wait = false;
                 here.LetGo = v;
@@ -223,11 +225,11 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>Two ways through the same junction meet: into the same lane, or their paths cross.</summary>
-    private bool Conflict(Movement a, Movement b)
+    private bool Conflict(string mapId, Movement a, Movement b)
     {
         if (a.In == b.In) return false;                        // the same approach: following handles it
         if (a.Out == b.Out) return true;                       // into the same lane
-        var key = (a.In.Index, a.Out.Index, b.In.Index, b.Out.Index);
+        var key = (mapId, a.In.Index, a.Out.Index, b.In.Index, b.Out.Index);
         if (_conflicts.TryGetValue(key, out bool c)) return c;
         var pa = LaneRoutes.Connector(a.In.Path, a.Out.Path);
         var pb = LaneRoutes.Connector(b.In.Path, b.Out.Path);
@@ -235,7 +237,7 @@ public sealed partial class VehicleSystem
         // apart centre to centre (traced 2026-09-28).
         c = Cross(pa, pb) || Closest(pa, pb) < BodyClearanceMetres;
         _conflicts[key] = c;
-        _conflicts[(b.In.Index, b.Out.Index, a.In.Index, a.Out.Index)] = c;
+        _conflicts[(mapId, b.In.Index, b.Out.Index, a.In.Index, a.Out.Index)] = c;
         return c;
     }
 

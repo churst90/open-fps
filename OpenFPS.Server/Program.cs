@@ -36,7 +36,9 @@ public class GameServer
     private MapManager _maps = null!;
     private readonly IUserRepository _userRepo;
     private CommandHandler _commands = null!;
-    private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
+    /// <summary>Definitions to send again at the next broadcast, by map and entity id; a null map is the
+    /// id on whichever map has it, for a caller that does not say.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(string? MapId, int Id)> _dirtyAudioEntities = new();
     private readonly VehicleSystem _vehicles = new();
     private readonly PedestrianSpeech _speech = new();
     private readonly CharacterSystem _characters = new();
@@ -275,9 +277,16 @@ public class GameServer
     /// teardown runs on the loop thread, so nothing is disposed under a simulation step.</summary>
     public void Stop() => _isRunning = false;
 
+    /// <summary>Sends an entity's definition again at the next broadcast, on whichever map has that id.</summary>
     public void SyncAudioComponent(int entityId)
     {
-        _dirtyAudioEntities.Enqueue(entityId);
+        _dirtyAudioEntities.Enqueue((null, entityId));
+    }
+
+    /// <summary>Sends an entity's definition again at the next broadcast, to the players on its map only.</summary>
+    public void SyncAudioComponent(string mapId, int entityId)
+    {
+        _dirtyAudioEntities.Enqueue((mapId, entityId));
     }
 
     /// <summary>The models the world editor has changed, every version kept (model_versions/). In memory
@@ -285,7 +294,7 @@ public class GameServer
     public OpenFPS.Server.Editor.ModelStore Models { get; set; } = new(null);
 
     /// <summary>The entities whose definitions go out again at the next broadcast. For tests.</summary>
-    internal IReadOnlyCollection<int> PendingDefinitionResends => _dirtyAudioEntities.ToArray();
+    internal IReadOnlyCollection<int> PendingDefinitionResends => _dirtyAudioEntities.Select(x => x.Id).ToArray();
 
     /// <summary>
     /// Puts a player's team on their body and re-sends its definition, which carries the team and is
@@ -977,7 +986,7 @@ public class GameServer
                     // Doors swing before ParentSystem places the parts, or the swing of a door in a
                     // building is overwritten. Re-sending the door's definition carries its aperture to
                     // the client.
-                    _doors.Update(world, dt, SyncAudioComponent,
+                    _doors.Update(world, dt, id => SyncAudioComponent(entry.Key, id),
                                   (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     ParentSystem.Update(world, lookup);
                     // Door leaves where they now are in the triangle world, and any static spawned this
@@ -1628,7 +1637,9 @@ public class GameServer
     /// <summary>The spatial grid's cell (MapManager makes it 10 m): things up to a cell beyond earshot are
     /// sent, as when the broadcast asked the grid.</summary>
     private const float BroadcastCellMetres = 10f;
-    private readonly HashSet<int> _dirtyAudioBuffer = new();
+    private readonly HashSet<(string? MapId, int Id)> _dirtyAudioBuffer = new();
+    /// <summary>Whether this broadcast sends an entity's definition again: asked for on its own map, or on none.</summary>
+    private bool Resent(string mapId, int id) => _dirtyAudioBuffer.Contains((mapId, id)) || _dirtyAudioBuffer.Contains((null, id));
     private readonly List<int> _removedBuffer = new();
 
     /// <summary>One tick of the tile streamer for one player (TileStreamer.Update), with what it sends
@@ -1699,7 +1710,7 @@ public class GameServer
     private void BroadcastWorldState(long tick)
     {
         _dirtyAudioBuffer.Clear();
-        while (_dirtyAudioEntities.TryDequeue(out int id)) _dirtyAudioBuffer.Add(id);
+        while (_dirtyAudioEntities.TryDequeue(out var resend)) _dirtyAudioBuffer.Add(resend);
 
         foreach (var mapEntry in _maps.GetAllMaps())
         {
@@ -1758,7 +1769,7 @@ public class GameServer
                     {
                         // Unmoved geometry this client already has: most of the city, settled by one lookup.
                         bool known = session.KnownEntities.Contains(e.Id);
-                        if (!isDynamic && !isDirty && known && !_dirtyAudioBuffer.Contains(e.Id)) continue;
+                        if (!isDynamic && !isDirty && known && !Resent(mapEntry.Key, e.Id)) continue;
                         // On a streamed map the map's own geometry is the tile streamer's to send.
                         if (!isDynamic && !known && tiles != null && tiles.IsTiled(e.Id)) continue;
                         // Removed earlier this tick: asking a dead entity anything throws and would skip
@@ -1774,7 +1785,7 @@ public class GameServer
 
                         // The definition before the first state, once: KnownEntities keeps it to once.
                         bool isNew = session.KnownEntities.Add(e.Id);
-                        bool defined = isNew || _dirtyAudioBuffer.Contains(e.Id);
+                        bool defined = isNew || Resent(mapEntry.Key, e.Id);
                         // Into or out of a seat: the definition says which (EntityDefinition.RidingEntityId),
                         // or a body moving at a car's speed sounds as if it is running. Noticed here
                         // rather than at each of the many ways in and out of a seat.
@@ -1793,13 +1804,13 @@ public class GameServer
                         if (world.Has<Velocity>(e)) state.LinearVelocity = world.Get<Velocity>(e).Linear;
                         // How hard it works its tyres, which only the server knows: from a velocity alone
                         // every car on a banked oval reads as sliding. See EntityState.TyreDemand.
-                        if (_vehicles.TryGetTyreDemand(e.Id, out float tyreDemand))
+                        if (_vehicles.TryGetTyreDemand(mapEntry.Key, e.Id, out float tyreDemand))
                             state.TyreDemand = NetworkEntityState.EncodeTyreDemand(tyreDemand);
                         // ...and a car somebody is driving, which is not traffic.
                         else if (world.Has<DriveComponent>(e))
                             state.TyreDemand = NetworkEntityState.EncodeTyreDemand(world.Get<DriveComponent>(e).TyreDemand);
                         // Each wheel: its load, slip, speed and the surface under it (WheelDynamics).
-                        if (_vehicles.TryGetWheels(e.Id, out var wheels) || DrivingSystem.TryGetWheels(e.Id, out wheels))
+                        if (_vehicles.TryGetWheels(mapEntry.Key, e.Id, out var wheels) || DrivingSystem.TryGetWheels(world, e, out wheels))
                             state.Wheels = wheels;
                         // A driven vehicle's horn and siren switches: nothing a listener can observe
                         // says a hand is on the horn.

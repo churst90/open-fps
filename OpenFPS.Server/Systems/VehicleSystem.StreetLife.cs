@@ -136,11 +136,11 @@ public sealed partial class VehicleSystem
         v.HardBrakeLeft = (v.Speed - v.HardBrakeTo) / v.HardBrakeDecel + 0.6f;
     }
 
-    /// <summary>The same stop, asked for by entity, for tests.</summary>
-    internal bool BrakeHard(int entityId, float toSpeed)
+    /// <summary>The same stop, asked for by map and entity, for tests.</summary>
+    internal bool BrakeHard(string mapId, int entityId, float toSpeed)
     {
         foreach (var v in _vehicles)
-            if (v.Entity.Id == entityId) { BrakeHard(v, toSpeed); return true; }
+            if (v.MapId == mapId && v.Entity.Id == entityId) { BrakeHard(v, toSpeed); return true; }
         return false;
     }
 

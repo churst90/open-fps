@@ -4,15 +4,16 @@ namespace OpenFPS.Server.Systems;
 /// frozen), and to forget one that is about to be vaporized.</summary>
 public sealed partial class VehicleSystem
 {
-    /// <summary>Whether the traffic moves this entity: a vehicle on its route or somebody walking.</summary>
-    public bool Moves(int entityId) => _byEntity.ContainsKey(entityId);
+    /// <summary>Whether the traffic moves this entity on this map: a vehicle on its route or somebody walking.</summary>
+    public bool Moves(string mapId, int entityId) => _byEntity.ContainsKey((mapId, entityId));
 
     /// <summary>Stops moving an entity that is about to be removed. True if it was one of ours.</summary>
     public bool Forget(string mapId, int entityId)
     {
-        if (!_byEntity.TryGetValue(entityId, out var v) || v.MapId != mapId) return false;
-        _byEntity.Remove(entityId);
+        if (!_byEntity.Remove((mapId, entityId), out var v)) return false;
         _vehicles.Remove(v);
+        // A car gone from the kerb frees the door its driver went in by.
+        if (v.Park is { } pk) _doorsInUse.Remove((mapId, pk.Spot.Door.Id));
         return true;
     }
 }

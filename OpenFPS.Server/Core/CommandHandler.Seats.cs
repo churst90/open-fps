@@ -162,7 +162,7 @@ public partial class CommandHandler
     {
         if (!DrivenVehicle(session, reply, out var world, out var root)) return;
         if (!world.Has<DriveComponent>(root)) { Say(reply, "This has no horn."); return; }
-        VehicleSignals.Tap(root.Id);
+        VehicleSignals.Tap(world, root);
     }
 
     /// <summary>/window [down|up|half]: the side windows, from any seat; on its own, the other way, as R does.</summary>

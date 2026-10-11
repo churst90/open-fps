@@ -92,15 +92,20 @@ public class MapScopedStateTests : IDisposable
             vehicles.Update("beta", beta, Dt);
         }
 
-        Assert.True(vehicles.TryGetWheels(car.Id, out var wheels), "alpha's car has no wheels on the wire");
+        Assert.True(vehicles.TryGetWheels("alpha", car.Id, out var wheels), "alpha's car has no wheels on the wire");
         Assert.NotNull(wheels);
         Assert.Contains(wheels!, w => w.AngularSpeedRadPerSec > 1f);
-        Assert.True(vehicles.TryGetTyreDemand(car.Id, out float demand));
+        Assert.True(vehicles.TryGetTyreDemand("alpha", car.Id, out float demand));
         Assert.True(demand > 0f, "alpha's car, lapping a 60 m circle, works its tyres not at all");
+
+        Assert.False(vehicles.TryGetWheels("beta", walker.Id, out _), "beta's walker has alpha's car's wheels");
+        Assert.True(vehicles.Moves("beta", walker.Id));
 
         // The admin gun forgets beta's walker before vaporizing it, and alpha's car goes on lapping.
         Assert.True(vehicles.Forget("beta", walker.Id), "beta's walker was not one of the traffic's");
-        Assert.True(vehicles.TryGetWheels(car.Id, out _), "forgetting beta's walker forgot alpha's car");
+        Assert.False(vehicles.Moves("beta", walker.Id));
+        Assert.True(vehicles.Moves("alpha", car.Id));
+        Assert.True(vehicles.TryGetWheels("alpha", car.Id, out _), "forgetting beta's walker forgot alpha's car");
     }
 
     /// <summary>A driven car's whole simulation is its own: a parked car with the same id on another map,
@@ -131,8 +136,78 @@ public class MapScopedStateTests : IDisposable
             }
 
             Assert.True(one.Get<DriveComponent>(moving).Speed > 15f);
-            Assert.True(DrivingSystem.TryGetWheels(moving.Id, out var wheels));
+            Assert.True(DrivingSystem.TryGetWheels(one, moving, out var wheels));
             Assert.Contains(wheels!, w => w.AngularSpeedRadPerSec > 20f);
+        }
+        finally
+        {
+            World.Destroy(one);
+            World.Destroy(two);
+        }
+    }
+
+    /// <summary>A player sitting in a car that is not turning keeps facing where they face, whatever a bus
+    /// with the same id on another map is doing.</summary>
+    [Fact]
+    public void ARiderTurnsOnlyWithWhatTheyAreRidingIn()
+    {
+        var one = World.Create();
+        var two = World.Create();
+        try
+        {
+            Entity Root(World w, float yaw) => w.Create(
+                new Transform { Position = Vector3.Zero, Rotation = Quaternion.CreateFromYawPitchRoll(yaw, 0f, 0f) },
+                new OccupancyComponent { Seats = new List<Seat> { new() { Name = "driver", LocalPosition = Vector3.Zero } } });
+            var car = Root(one, 0f);
+            var bus = Root(two, 1.5f);
+            Assert.Equal(car.Id, bus.Id);
+            var rider = one.Create(new Transform(), new PlayerComponent { Username = "cody", Yaw = 0.3f },
+                                   new OccupantComponent { RootEntityId = car.Id, SeatIndex = 0 });
+            var alex = two.Create(new Transform(), new OccupantComponent { RootEntityId = bus.Id, SeatIndex = 0 });
+            var lookupOne = new Dictionary<int, Entity> { [car.Id] = car, [rider.Id] = rider };
+            var lookupTwo = new Dictionary<int, Entity> { [bus.Id] = bus, [alex.Id] = alex };
+
+            var seats = new OccupancySystem();
+            for (int i = 0; i < 5; i++)
+            {
+                seats.Update(one, lookupOne);
+                seats.Update(two, lookupTwo);
+            }
+            Assert.Equal(0.3f, one.Get<PlayerComponent>(rider).Yaw, 4);
+        }
+        finally
+        {
+            World.Destroy(one);
+            World.Destroy(two);
+        }
+    }
+
+    /// <summary>A door's aperture is announced when it changes, per world: a door that has not moved is not
+    /// re-sent because a door with the same id on another map is open.</summary>
+    [Fact]
+    public void ADoorIsAnnouncedForItsOwnMovesOnly()
+    {
+        var one = World.Create();
+        var two = World.Create();
+        try
+        {
+            Entity Door(World w, float openness) => w.Create(
+                new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity },
+                new DoorComponent { Openness = openness, Target = openness, Aperture = 1f, Captured = true },
+                new PortalComponent());
+            var shut = Door(one, 0f);
+            var open = Door(two, 1f);
+            Assert.Equal(shut.Id, open.Id);
+
+            var doors = new DoorSystem();
+            var announced = new List<int>();
+            for (int i = 0; i < 3; i++)
+            {
+                doors.Update(one, Dt, id => announced.Add(id));
+                doors.Update(two, Dt, _ => { });
+            }
+            // Announced once when first seen, and never again: it has not moved.
+            Assert.Single(announced);
         }
         finally
         {

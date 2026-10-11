@@ -17,13 +17,15 @@ namespace OpenFPS.Server.Systems;
 /// </summary>
 public sealed class OccupancySystem
 {
-    /// <summary>Last tick's heading for every root that is carrying somebody.</summary>
-    private readonly Dictionary<int, float> _headings = new();
+    /// <summary>Last tick's heading for every root that is carrying somebody, by world: ids start again in
+    /// every map's world, and one map's cars must not turn the players riding another's.</summary>
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<World, Dictionary<int, float>> _headings = new();
     private readonly List<(Entity Occupant, int RootId)> _stranded = new();
 
     public void Update(World world, Dictionary<int, Entity> lookup)
     {
         _stranded.Clear();
+        var headings = _headings.GetValue(world, static _ => new());
 
         var query = new QueryDescription().WithAll<Transform, OccupantComponent, PlayerComponent>();
         world.Query(in query, (Entity e, ref Transform transform, ref OccupantComponent occupant, ref PlayerComponent player) =>
@@ -49,7 +51,7 @@ public sealed class OccupancySystem
             var seat = seats[occupant.SeatIndex];
 
             MathHelper.ToYawPitch(rootTransform.Rotation, out float rootYaw, out _);
-            if (_headings.TryGetValue(root.Id, out float previous))
+            if (headings.TryGetValue(root.Id, out float previous))
             {
                 float turned = MathHelper.WrapAngle(rootYaw - previous);
                 if (turned != 0f) player.Yaw = MathHelper.WrapAngle(player.Yaw + turned);
@@ -103,13 +105,13 @@ public sealed class OccupancySystem
         }
 
         // Rebuilt each tick, so roots that no longer carry anyone are forgotten.
-        _headings.Clear();
+        headings.Clear();
         var carrying = new QueryDescription().WithAll<OccupantComponent>();
         world.Query(in carrying, (ref OccupantComponent o) =>
         {
             if (!lookup.TryGetValue(o.RootEntityId, out var root) || !world.IsAlive(root) || !world.Has<Transform>(root)) return;
             MathHelper.ToYawPitch(world.Get<Transform>(root).Rotation, out float yaw, out _);
-            _headings[o.RootEntityId] = yaw;
+            headings[o.RootEntityId] = yaw;
         });
     }
 }

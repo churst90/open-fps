@@ -77,6 +77,8 @@ public static class DrivingSystem
     private sealed class Running
     {
         public required string Preset;
+        /// <summary>The entity's version: an id taken again by a new car is a new simulation.</summary>
+        public required int Version;
         public required WheelDynamics Body;
         public required WheelState[] Wire;
         public byte Surface = RoadSurfaces.IndexOf(RoadData.DefaultSurface);
@@ -88,25 +90,30 @@ public static class DrivingSystem
         public bool AtEdge;
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, Running> _running = new();
+    /// <summary>Each world's driven cars, by entity id. By world, because ids start again in every map's
+    /// world, and a world that goes takes its cars with it.</summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<World,
+        System.Collections.Concurrent.ConcurrentDictionary<int, Running>> _running = new();
 
     /// <summary>The map being stepped, for the water on its roads (RoadWaterSystem); null in tests that
     /// do not say, which drive on a dry road.</summary>
     [ThreadStatic] private static string? _mapId;
 
-    private static Running RunningFor(int id, string preset, VehicleProfile profile)
+    private static Running RunningFor(World world, Entity root, string preset, VehicleProfile profile)
     {
-        if (_running.TryGetValue(id, out var r) && r.Preset == preset) return r;
+        var cars = _running.GetValue(world, static _ => new());
+        if (cars.TryGetValue(root.Id, out var r) && r.Preset == preset && r.Version == root.Version) return r;
         var body = new WheelDynamics(profile);
-        r = new Running { Preset = preset, Body = body, Wire = new WheelState[body.Wheels.Length] };
-        _running[id] = r;
+        r = new Running { Preset = preset, Version = root.Version, Body = body, Wire = new WheelState[body.Wheels.Length] };
+        cars[root.Id] = r;
         return r;
     }
 
     /// <summary>A driven car's wheels as last worked out, for the wire.</summary>
-    public static bool TryGetWheels(int entityId, out WheelState[]? wheels)
+    public static bool TryGetWheels(World world, Entity car, out WheelState[]? wheels)
     {
-        wheels = _running.TryGetValue(entityId, out var r) ? r.Wire : null;
+        wheels = _running.TryGetValue(world, out var cars) && cars.TryGetValue(car.Id, out var r) && r.Version == car.Version
+            ? r.Wire : null;
         return wheels != null;
     }
 
@@ -177,6 +184,11 @@ public static class DrivingSystem
             try { Step(world, grid, root, mapMin, mapMax, dt, heard, fence, stopped); }
             catch (Exception ex) { Log.Error(ex, "DrivingSystem: entity {Id} failed to move.", root.Id); }
         }
+
+        // A car destroyed or no longer driven is forgotten, so its id is free for whatever is made next.
+        if (_running.TryGetValue(world, out var cars) && !cars.IsEmpty)
+            foreach (var (id, r) in cars)
+                if (!driven.Exists(e => e.Id == id && e.Version == r.Version)) cars.TryRemove(id, out _);
     }
 
     /// <summary>Whether a tile not built yet lies within <paramref name="metres"/> of <paramref name="at"/>
@@ -237,7 +249,7 @@ public static class DrivingSystem
         // On the world, braked to a stop short of ground not built yet: its stopping distance at 80 % of the
         // tyres' grip, two ticks' travel and the margin, looked along the way it is going. Kept braking
         // while that holds, whatever the driver asks; backing away is never stopped.
-        var edgeState = RunningFor(root.Id, drive.Preset, profile);
+        var edgeState = RunningFor(world, root, drive.Preset, profile);
         float going = speed > StandstillSpeed ? MathF.Sign(v) : MathF.Sign(drive.Throttle);
         if (fence is { } f && going != 0f)
         {
@@ -271,7 +283,7 @@ public static class DrivingSystem
         else if (MathF.Abs(drive.Throttle) < 0.01f) longitudinal = 0f;
 
         // ── What the steering is asking for ─────────────────────────────────────────────────────
-        var running = RunningFor(root.Id, drive.Preset, profile);
+        var running = RunningFor(world, root, drive.Preset, profile);
         var body = running.Body;
         var chassis = body.Chassis;
         float wheelbase = MathF.Max(0.5f, body.Wheelbase);

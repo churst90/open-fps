@@ -58,10 +58,11 @@ public sealed partial class VehicleSystem
     /// <summary>An entity has gone and everyone must be told. Set by the server.</summary>
     public Action<string, int>? Removed { get; set; }
     /// <summary>An entity's sound emitter changed (an engine switched off or on). Set by the server.</summary>
-    public Action<int>? AudioChanged { get; set; }
+    public Action<string, int>? AudioChanged { get; set; }
 
     private readonly HashSet<string> _spotsFound = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<int> _doorsInUse = new();
+    /// <summary>Doors a parked car's driver is using, by map and entity id: ids start again in every map's world.</summary>
+    private readonly HashSet<(string MapId, int Id)> _doorsInUse = new();
     private readonly DoorManners _manners = new();
 
     /// <summary>Walking pace, m/s.</summary>
@@ -111,7 +112,7 @@ public sealed partial class VehicleSystem
             }
             foreach (var d in doors)
             {
-                if (_doorsInUse.Contains(d.E.Id)) continue;
+                if (_doorsInUse.Contains((mapId, d.E.Id))) continue;
                 var best = samples.MinBy(sm => Vector2.DistanceSquared(new(sm.P.X, sm.P.Z), new(d.P.X, d.P.Z)));
                 if (MathF.Abs(d.P.Y - best.P.Y) > 2.2f) continue;       // an upstairs door
                 var right = RightOf(best.H);
@@ -185,14 +186,14 @@ public sealed partial class VehicleSystem
         ParkingSpot? chosen = null; float nearest = float.MaxValue;
         foreach (var sp in v.Spots)
         {
-            if (_doorsInUse.Contains(sp.Door.Id) || !world.IsAlive(sp.Door)) continue;
+            if (_doorsInUse.Contains((mapId, sp.Door.Id)) || !world.IsAlive(sp.Door)) continue;
             float ahead = sp.At - v.Lap;
             if (ahead < 0f) ahead += v.Line!.Length;
             if (ahead < needs || ahead > 400f || ahead >= nearest) continue;
             nearest = ahead; chosen = sp;
         }
         if (chosen == null) return;
-        _doorsInUse.Add(chosen.Door.Id);
+        _doorsInUse.Add((mapId, chosen.Door.Id));
         bool ridden = VehicleProfile.Presets.ContainsKey(v.Preset) && VehicleProfile.ByName(v.Preset).TyreCount <= 2;
         v.Park = new ParkState
         {
@@ -294,7 +295,7 @@ public sealed partial class VehicleSystem
                 SetRunning(world, v, true); pk.Step++; break;
             case 14 when pk.Clock >= 6.5f:                     // mirror, signal, away
                 pk.Phase = ParkPhase.PullOut;
-                _doorsInUse.Remove(pk.Spot.Door.Id);
+                _doorsInUse.Remove((v.MapId, pk.Spot.Door.Id));
                 Log.Information("Street: {Name} pulls out.", v.DisplayName);
                 PulledOut(v.MapId, world, v, _streetClocks.GetValueOrDefault(v.MapId));
                 break;
@@ -359,7 +360,7 @@ public sealed partial class VehicleSystem
         ref var em = ref world.Get<SoundEmitterComponent>(v.Entity);
         if (em.SynthRunning == running) return;
         em.SynthRunning = running;
-        AudioChanged?.Invoke(v.Entity.Id);
+        AudioChanged?.Invoke(v.MapId, v.Entity.Id);
     }
 
     private void Say(DemoVehicle v, string label, IReadOnlyList<TransientSound> sounds)

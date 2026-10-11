@@ -148,7 +148,8 @@ public sealed partial class VehicleSystem
     private enum State { Waiting, Driving, Turning, Ground }
 
     private readonly List<DemoVehicle> _vehicles = new();
-    private readonly Dictionary<int, DemoVehicle> _byEntity = new();
+    /// <summary>Each vehicle and walker by its map and entity id: ids start again in every map's world.</summary>
+    private readonly Dictionary<(string MapId, int Id), DemoVehicle> _byEntity = new();
     /// <summary>Walking pairs already given their first member's voice.</summary>
     private readonly HashSet<(string, string)> PairSeen = new();
 
@@ -426,7 +427,7 @@ public sealed partial class VehicleSystem
                 if (v.OnStreet) v.DriverVoice = PedestrianSpeech.NextDriverVoice(mapId);
                 if (data.StreetLife != null) _streetLife[mapId] = data.StreetLife;
                 _vehicles.Add(v);
-                _byEntity[e.Id] = v;
+                _byEntity[(mapId, e.Id)] = v;
                 if (line != null)
                     Log.Information("Map {Map}: {Name} (entity {Id}) laps '{Track}' — {Length:F0} m lap, {Min:F0}-{Max:F0} km/h, starting {At:F0} m round",
                                     mapId, display, e.Id, vd.Track, line.Length, line.MinSpeed * 3.6f, line.MaxSpeed * 3.6f, vd.StartOffsetMetres);
@@ -486,7 +487,7 @@ public sealed partial class VehicleSystem
                 {
                     v.ServingStop = serving;
                     world.Get<SoundEmitterComponent>(v.Entity).ServingStop = serving;
-                    AudioChanged?.Invoke(v.Entity.Id);
+                    AudioChanged?.Invoke(v.MapId, v.Entity.Id);
                 }
                 // OPENFPS_TRACE_SHUTTLE, as for shuttles: a racer that fails to stop looks like one with no stops.
                 if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } rtrace
@@ -911,9 +912,9 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>A vehicle's wheels as last worked out, or false for anything without them.</summary>
-    public bool TryGetWheels(int entityId, out OpenFPS.Common.Networking.WheelState[]? wheels)
+    public bool TryGetWheels(string mapId, int entityId, out OpenFPS.Common.Networking.WheelState[]? wheels)
     {
-        wheels = _byEntity.TryGetValue(entityId, out var v) ? v.WireWheels : null;
+        wheels = _byEntity.TryGetValue((mapId, entityId), out var v) ? v.WireWheels : null;
         return wheels != null;
     }
 
@@ -971,9 +972,9 @@ public sealed partial class VehicleSystem
 
     /// <summary>How hard a vehicle is working its tyres, 0..2 with 1 the limit. False for anything
     /// that is not one of ours.</summary>
-    public bool TryGetTyreDemand(int entityId, out float demand)
+    public bool TryGetTyreDemand(string mapId, int entityId, out float demand)
     {
-        if (_byEntity.TryGetValue(entityId, out var v)) { demand = v.TyreDemand; return true; }
+        if (_byEntity.TryGetValue((mapId, entityId), out var v)) { demand = v.TyreDemand; return true; }
         demand = 0f;
         return false;
     }
@@ -986,10 +987,10 @@ public sealed partial class VehicleSystem
                                                bool OnStreet, string Horn, float Wait,
                                                int Spots, string Park, int ParkStep, float SpotAt, float SpotShift);
 
-    internal bool TryInspect(int entityId, out Inspection state)
+    internal bool TryInspect(string mapId, int entityId, out Inspection state)
     {
         foreach (var v in _vehicles)
-            if (v.Entity.Id == entityId)
+            if (v.MapId == mapId && v.Entity.Id == entityId)
             {
                 state = new Inspection(v.Speed, v.Lap, v.Laps, v.DwellLeft, v.KerbShift, v.TyreDemand,
                                        v.Line?.Length ?? 0f, v.NextStop, v.Brake, v.Accel, v.OnStreet, v.Horn, v.WaitSeconds,

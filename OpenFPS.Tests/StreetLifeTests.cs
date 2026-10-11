@@ -75,7 +75,7 @@ public class StreetLifeTests
         Entity car = Entity.Null;
         world.Query(new QueryDescription().WithAll<VehicleComponent, Transform>(), (Entity e, ref VehicleComponent vc) =>
         {
-            if (car == Entity.Null && vc.Speed > 8f && vehicles.TryInspect(e.Id, out _)) car = e;
+            if (car == Entity.Null && vc.Speed > 8f && vehicles.TryInspect("city", e.Id, out _)) car = e;
         });
         Assert.NotEqual(Entity.Null, car);
         var t = world.Get<Transform>(car);
@@ -121,7 +121,7 @@ public class StreetLifeTests
         var heard = Run(vehicles, world, 10 * 60, _ =>
         {
             foreach (int id in ids)
-                if (vehicles.TryGetTyreDemand(id, out float d))
+                if (vehicles.TryGetTyreDemand("city", id, out float d))
                 {
                     worst = MathF.Max(worst, d);
                     if (d >= TyreFriction.SquealOnset) squealing++;
@@ -141,7 +141,7 @@ public class StreetLifeTests
         var removed = new List<int>();
         var engine = new List<(int Id, bool Running)>();
         vehicles.Removed = (map, id) => removed.Add(id);
-        vehicles.AudioChanged = id =>
+        vehicles.AudioChanged = (_, id) =>
         {
             foreach (var kv in maps.GetAllMaps())
                 if (kv.Key == "city" && kv.Value.lookup.TryGetValue(id, out var e) && world.Has<SoundEmitterComponent>(e))

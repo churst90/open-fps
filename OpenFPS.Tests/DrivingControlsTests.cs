@@ -81,25 +81,62 @@ public class DrivingControlsTests
     [Fact]
     public void TheHornSoundsWhileHeldAndLetsGoWhenThePacketsStop()
     {
-        int id = 880_001;
-        VehicleSignals.Horn(id, true);
-        Assert.True(VehicleSignals.HornSounding(id));
-        // Packets every tick keep it going.
-        for (int i = 0; i < 30; i++) { VehicleSignals.Horn(id, true); VehicleSignals.Update(1f / 30f); }
-        Assert.True(VehicleSignals.HornSounding(id));
-        // Key up.
-        VehicleSignals.Horn(id, false);
-        Assert.False(VehicleSignals.HornSounding(id));
-        // Down, then the driver goes quiet: let go within the hold time.
-        VehicleSignals.Horn(id, true);
-        for (int i = 0; i < 12; i++) VehicleSignals.Update(1f / 30f);
-        Assert.False(VehicleSignals.HornSounding(id));
-        // A tap from a text session blows for half a second.
-        VehicleSignals.Tap(id);
-        for (int i = 0; i < 10; i++) VehicleSignals.Update(1f / 30f);
-        Assert.True(VehicleSignals.HornSounding(id));
-        for (int i = 0; i < 10; i++) VehicleSignals.Update(1f / 30f);
-        Assert.False(VehicleSignals.HornSounding(id));
+        var world = World.Create();
+        try
+        {
+            var car = world.Create(new DriveComponent { Preset = "i4_economy" });
+            VehicleSignals.Horn(world, car, true);
+            Assert.True(VehicleSignals.HornSounding(world, car));
+            // Packets every tick keep it going.
+            for (int i = 0; i < 30; i++) { VehicleSignals.Horn(world, car, true); VehicleSignals.Update(1f / 30f); }
+            Assert.True(VehicleSignals.HornSounding(world, car));
+            // Key up.
+            VehicleSignals.Horn(world, car, false);
+            Assert.False(VehicleSignals.HornSounding(world, car));
+            // Down, then the driver goes quiet: let go within the hold time.
+            VehicleSignals.Horn(world, car, true);
+            for (int i = 0; i < 12; i++) VehicleSignals.Update(1f / 30f);
+            Assert.False(VehicleSignals.HornSounding(world, car));
+            // A tap from a text session blows for half a second.
+            VehicleSignals.Tap(world, car);
+            for (int i = 0; i < 10; i++) VehicleSignals.Update(1f / 30f);
+            Assert.True(VehicleSignals.HornSounding(world, car));
+            for (int i = 0; i < 10; i++) VehicleSignals.Update(1f / 30f);
+            Assert.False(VehicleSignals.HornSounding(world, car));
+        }
+        finally { World.Destroy(world); }
+    }
+
+    /// <summary>The switches are the vehicle's own: a siren switched on in one world is not on a vehicle
+    /// with the same id in another, nor on a new vehicle given a destroyed one's id.</summary>
+    [Fact]
+    public void ASirenIsOnlyOnTheVehicleItWasSwitchedOnIn()
+    {
+        var city = World.Create();
+        var speedway = World.Create();
+        try
+        {
+            var police = city.Create(new DriveComponent { Preset = "police_interceptor" });
+            var other = speedway.Create(new DriveComponent { Preset = "police_interceptor" });
+            Assert.Equal(police.Id, other.Id);
+            Assert.Equal("Siren on, wail.", VehicleSignals.SirenCommand(city, police, Array.Empty<string>()));
+            VehicleSignals.Tap(city, police);
+
+            Assert.True(VehicleSignals.Siren(city, police).On);
+            Assert.False(VehicleSignals.Siren(speedway, other).On);
+            Assert.False(VehicleSignals.HornSounding(speedway, other));
+            Assert.Equal(SirenMode.Off, VehicleSignalBits.Siren(VehicleSignals.WireByte(speedway, other)));
+
+            city.Destroy(police);
+            var next = city.Create(new DriveComponent { Preset = "police_interceptor" });
+            Assert.Equal(police.Id, next.Id);
+            Assert.False(VehicleSignals.Siren(city, next).On);
+        }
+        finally
+        {
+            World.Destroy(city);
+            World.Destroy(speedway);
+        }
     }
 
     [Fact]
