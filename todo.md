@@ -83,6 +83,9 @@ other at login. The server and the Windows zip go out together.
    the scope calls somebody pushing a push mower a person (today, as before, it picks out no machine), and
    whether the editor should edit trains and woods through their sound ids. Left for later: S26's two caches
    and S27's model fallbacks, and the server's own prefix spellings outside P2's list.
+   P1 done 2026-10-11, unheard: the pavement's pops were the way over the top giving up after four boxes
+   (fixed, 41-56 a minute to 0); the stairwell's are the barrier model (Acoustics, below), not the source
+   pool, whose faults (S4) never fired and are closed anyway; S5 done.
 3. Sound library stage 5 (statics to instances) with geometry stage 6 (vehicles and bodies in the acoustic
    scene: docs/GEOMETRY.md section 7, "Bodies and wheels" stage 2 below). First slice built 2026-10-10 on its
    branch, not merged (docs/SOUND_LIBRARY_BOUNDARY.md section 18): the traced places per provider, the wind,
@@ -352,12 +355,18 @@ and the server's voice line.
 - The room answering at once (early tail): clap in a main-street lobby and in flat 01F. Is 20-100 ms
   too strong? Speech and steady sounds get no copies; a per-source early part would fix it (Cody).
 - Pops on the Main Street pavement and in Selby House and Marlow Tower; is the city too busy with cars
-  heard over the roofs (Cody)? `--pop-hunt` still finds a car's straight line through one wall as it
-  passes a gap (-80 to -62 dB for 200-400 ms), and up to 19 dB between over the wall and over the roof
-  under the covered hall west of Main Street. Marlow Tower's stairwell, floor 1 (2026-10-11, `--pop-hunt
-  ear=-11.05,4.9,-100.84`): 3 to 6 a minute, the same before the floods' step 2; each a moving car on Dock Street
-  near x -23 whose simulated transmission jumps from -80/-100 to -35/-52/-80 dB. No still source there gives it
-  (`--path-probe`), and 32 transmission surfaces instead of 8 changed nothing. To try next: the source pool's lending.
+  heard over the roofs (Cody)? The pavement's are gone (2026-10-11: the way over the car park and the tower
+  gave up after four boxes; 41-56 a minute to 0). Left: Marlow Tower's floor 1 stairwell, 4 to 11 a minute
+  (`--pop-hunt ear=-11.05,4.9,-100.84`, `/tp -10.8 -104.2 3.28`), a car on Dock Street from -57/-83/-100 to
+  -35/-52/-80 dB for 4 m of road, x -19.5 to -15.5. Still sources do it: the line crosses the slab's edge all
+  along and, either side of that stretch, the stair's 1.07 m concrete guard. The way over the guard is 3 cm,
+  but its leg runs on through the brick front, so it is not believed and the guard is charged as a whole
+  wall. The barrier model needs a way round one thing that passes through another, paid as the diffraction
+  times what the leg's walls let through per band, competing with the straight line as now. That changes
+  what is heard behind walls everywhere (louder where a near low wall stands in front of a heavier one), so
+  a part of its own, measured on the three maps (docs/GEOMETRY.md 12.6, "Marlow Tower's leaks"). Older finds
+  of `--pop-hunt`: a car's straight line through one wall as it passes a gap (-80 to -62 dB for 200-400 ms),
+  and up to 19 dB between over the wall and over the roof under the covered hall west of Main Street.
 - The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost
   25 MB and twice the convolution (Cody).
 - Below 120 Hz the tail of a room you are not in is identical in both ears.

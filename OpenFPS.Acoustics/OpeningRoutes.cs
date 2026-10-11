@@ -1500,9 +1500,14 @@ public sealed class OpeningRoutes
     /// <summary>Width of the bins the profile is swept through, metres.</summary>
     private const float ProfileBinMetres = 1f;
 
-    /// <summary>Times the string over the top is pulled again over something hung above the line that it
-    /// was found to cut.</summary>
-    private const int OverTheTopPasses = 4;
+    /// <summary>
+    /// Times the string over the top is pulled again over something hung above the line that it was found
+    /// to cut. Each pass adds a box or gives up, so this only bounds a pathological scene. It was 4: a
+    /// multi-storey car park is a parapet and a slab a storey, and from the Main Street pavement a car on
+    /// Wharf Avenue 200 m off had the way over it for a metre, none for the next eight, -25 then -90 dB,
+    /// 56 pops a minute (2026-10-11, --pop-hunt).
+    /// </summary>
+    private const int OverTheTopPasses = 256;
 
     private static float Lerp(float a, float b, float t) => a + (b - a) * t;
 

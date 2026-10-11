@@ -116,23 +116,10 @@ public partial class ClientAudioSystem
         }
     }
 
-    /// <summary>How far a result's source may be from where a non-entity voice is now and still be
-    /// taken as that voice's own. A pooled one-shot id reused a few seconds later is almost always
-    /// further than this from its previous occupant; a car between two ticks is not a non-entity.</summary>
-    internal const float StaleResultMetres = 1.0f;
-    /// <summary>A vehicle's answer asked from further than this from where the ear is now is an old one: half a
-    /// second of running, where a teleport or a minute's walk is tens of metres.</summary>
-    internal const float StaleListenerMetres = 3.0f;
+    /// <summary>How fast the ear is going this frame, m/s: how far from here an answer traced a moment ago
+    /// may have been asked (<see cref="AcousticPathData.Answers"/>).</summary>
+    private float _earSpeed;
 
-    /// <summary>Is this cached result an answer about THIS voice? An entity keeps its last result
-    /// between ticks; a voice that is not an entity — a footstep, a shot, anything from an id pool —
-    /// takes a result only if it was computed for roughly where the voice is now, because the
-    /// worker's cache is keyed by id and the id's previous occupant was somewhere else.</summary>
-    internal static bool ResultIsForThisVoice(WorldSnapshot world, int id, Vector3 sourcePos, List<AcousticPathData> paths)
-    {
-        if (paths.Count == 0 || world.Entities.ContainsKey(id)) return true;
-        return Vector3.DistanceSquared(paths[0].SourcePosition, sourcePos) <= StaleResultMetres * StaleResultMetres;
-    }
     private readonly List<(int Id, float Key, float D2)> _engineDistances = new();
     private double _lastEngineTime;
 
@@ -568,11 +555,13 @@ public partial class ClientAudioSystem
 
         // The mixer reads the wind field itself once a block (EarWindVoice); this is where the head is,
         // which way it faces and what is round it.
+        _earSpeed = listenerVelocity.Length();
         var earListener = EarListener(world, visualEyePos, listenerVelocity, listenerRotation);
         _audio.SetEarWind(earListener);
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
         WorldAudio.ListenerVehicleId = _state.RidingEntityId;
+        WorldAudio.ListenerSpeed = _earSpeed;
         WorldAudio.Cabins = _cabins;
         WorldAudio.SelfId = OwnEntityId;
         WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
@@ -667,10 +656,12 @@ public partial class ClientAudioSystem
             // samples blocked on open road).
             Vector3 sourcePos;
             float sourceRadius = OpenFPS.Common.AudioEmission.DefaultOcclusionRadius;
+            float sourceSpeed = 0f;
             if (world.Entities.TryGetValue(id, out var snap))
             {
                 sourcePos = OpenFPS.Common.AudioEmission.PointFor(snap);
                 sourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap);
+                sourceSpeed = snap.Velocity.Length();
             }
             else
             {
@@ -694,7 +685,9 @@ public partial class ClientAudioSystem
                 });
             }
             
-            if (_acousticWorker.TryGetResult(id, out var paths) && ResultIsForThisVoice(world, id, sourcePos, paths))
+            // Only an answer for this source and this ear: an entity's from a moment ago, never a pooled id's
+            // last occupant's, nor one asked from before a teleport. Refused, the voice keeps what it has.
+            if (_acousticWorker.TryGetResultFor(id, sourcePos, sourceSpeed, visualEyePos, _earSpeed, out var paths))
             {
                 Array.Clear(_slotLive);
                 if (_pathSlot.Length < paths.Count) _pathSlot = new int[paths.Count * 2];
@@ -2122,7 +2115,10 @@ public partial class ClientAudioSystem
     /// <summary>The rain round the listener: the surfaces it lands on, as a few voices. See RainField.</summary>
     private readonly RainField _rain;
 
-    /// <summary>Vehicles carrying a siren, found this frame.</summary>
+    /// <summary>Paths asked for horns, sirens and trains, for a test.</summary>
+    internal long VehiclePathsAsked;
+
+    /// <summary>Vehicles whose siren is sounding, found this frame.</summary>
     private readonly HashSet<int> _sirenCars = new();
     private readonly List<int> _sirensGone = new();
 
@@ -2139,9 +2135,18 @@ public partial class ClientAudioSystem
             string? sid = snap.Definition.SoundEmitter.SoundId;
             if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(sid) is not { } preset
                 || OpenFPS.Common.MachineRegistry.VehicleFor(preset).Siren is not { } sirenKey) continue;
+            // Asked about only while it sounds: switched off, every patrol car on the map asked the worker
+            // every frame and was added to the path pass, and with no engine voice ran the hand-rolled tracer
+            // on this thread for nothing.
+            var mode = SirenModeOf(snap, world.PositionsSampledAt);
+            if (mode == OpenFPS.Common.SirenMode.Off)
+            {
+                if (_sirenVoiced.Remove(snap.Id)) _audio.StopSound(SirenVoiceBase - Math.Abs(snap.Id));
+                continue;
+            }
             _sirenCars.Add(snap.Id);
             var path = VehiclePath(world, snap, eyePos);
-            SirenVoice(snap, sirenKey, path, world.PositionsSampledAt, eyePos);
+            SirenVoice(snap, sirenKey, mode, path, world.PositionsSampledAt, eyePos);
         }
         _sirensGone.Clear();
         foreach (int id in _sirenVoiced) if (!_sirenCars.Contains(id)) _sirensGone.Add(id);
@@ -2160,6 +2165,7 @@ public partial class ClientAudioSystem
     /// </summary>
     private AcousticPathData VehiclePath(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos)
     {
+        VehiclePathsAsked++;
         var at = OpenFPS.Common.AudioEmission.PointFor(snap);
         if (!_audio.IsPlaying(snap.Id))
             _acousticWorker.EnqueueRequest(new AcousticRequest
@@ -2169,15 +2175,7 @@ public partial class ClientAudioSystem
             });
         // An answer for where the source was long ago is not one: a train's horn is asked about only while
         // it sounds, so the next horn began on the answer the last one left, minutes and a street away.
-        float moved = StaleResultMetres + snap.Velocity.Length() * 0.5f;
-        if (_acousticWorker.TryGetResult(snap.Id, out var paths, out var askedFrom))
-            foreach (var p in paths)
-            {
-                if (p.IsReflection) continue;
-                if (Vector3.DistanceSquared(p.SourcePosition, at) <= moved * moved
-                    && Vector3.DistanceSquared(askedFrom, eyePos) <= StaleListenerMetres * StaleListenerMetres) return p;
-                break;
-            }
+        if (_acousticWorker.TryGetDirectFor(snap.Id, at, snap.Velocity.Length(), eyePos, _earSpeed, out var p)) return p;
         return _acoustics.CalculateAcousticPath(world, snap.Id, eyePos, at);
     }
 
@@ -2522,23 +2520,14 @@ public partial class ClientAudioSystem
     /// (SirenVoiceState). A driven vehicle sounds as switched; traffic's mode is read off what the car
     /// does (<see cref="SirenModeFor"/>).
     /// </summary>
-    private void SirenVoice(EntitySnapshot snap, string sirenKey, in AcousticPathData path, double sampledAt, Vector3 eyePos)
+    private void SirenVoice(EntitySnapshot snap, string sirenKey, OpenFPS.Common.SirenMode mode, in AcousticPathData path,
+                            double sampledAt, Vector3 eyePos)
     {
         OpenFPS.Common.SirenSpec spec;
         try { spec = OpenFPS.Common.SirenSpec.ByName(sirenKey); }
         catch { return; }
 
-        float speed = snap.Velocity.Length();
-        // A vehicle somebody can drive sounds its siren as the driver switched it; traffic, as it drives.
-        var mode = OpenFPS.Common.VehicleSignalBits.IsManual(snap.Signals)
-            ? OpenFPS.Common.VehicleSignalBits.Siren(snap.Signals)
-            : SirenModeFor(snap.Id, speed, sampledAt);
         int voiceId = SirenVoiceBase - Math.Abs(snap.Id);
-        if (mode == OpenFPS.Common.SirenMode.Off)
-        {
-            if (_sirenVoiced.Remove(snap.Id)) _audio.StopSound(voiceId);
-            return;
-        }
 
         Vector3 pos = SirenMouth(snap);
         var (gain, reference) = OpenFPS.Common.Loudness.Place(spec.SourceLevelDb, spec.HornMouthMetres);
@@ -2622,6 +2611,12 @@ public partial class ClientAudioSystem
     /// decision has hysteresis and lives in <see cref="OpenFPS.Common.SirenController"/>, where a test can
     /// drive it; deceleration alone flipped wail and yelp at every corner.
     /// </summary>
+    /// <summary>What a vehicle's siren is doing: as its driver switched it, or for traffic, as it drives.</summary>
+    private OpenFPS.Common.SirenMode SirenModeOf(EntitySnapshot snap, double sampledAt)
+        => OpenFPS.Common.VehicleSignalBits.IsManual(snap.Signals)
+            ? OpenFPS.Common.VehicleSignalBits.Siren(snap.Signals)
+            : SirenModeFor(snap.Id, snap.Velocity.Length(), sampledAt);
+
     private OpenFPS.Common.SirenMode SirenModeFor(int entityId, float speed, double at)
     {
         if (!_sirenControl.TryGetValue(entityId, out var held))
@@ -2702,8 +2697,9 @@ public partial class ClientAudioSystem
             return;
 
         // The worker's last answer; until it has one, FirstAnswer. Never "nothing in the way".
-        AcousticPathData acousticPath = _acousticWorker.TryGetResult(snap.Id, out var cachedPaths)
-            ? cachedPaths.FirstOrDefault(p => !p.IsReflection)
+        AcousticPathData acousticPath = _acousticWorker.TryGetDirectFor(snap.Id, OpenFPS.Common.AudioEmission.PointFor(snap),
+                                                                        snap.Velocity.Length(), eyePos, _earSpeed, out var cached)
+            ? cached
             : FirstAnswer(world, snap, eyePos);
 
         string resolvedSoundId = "";
@@ -3108,12 +3104,8 @@ public partial class ClientAudioSystem
             {
                 EntityId = id, ListenerPos = eyePos, SourcePos = mouth, SourceRadius = 0.15f,
             });
-            AcousticPathData path = default;
-            bool found = false;
-            if (_acousticWorker.TryGetResult(id, out var paths))
-                foreach (var p in paths)
-                    if (!p.IsReflection) { path = p; found = true; break; }
-            if (!found) path = _acoustics.CalculateAcousticPath(world, id, eyePos, mouth);
+            if (!_acousticWorker.TryGetDirectFor(id, mouth, snap.Velocity.Length(), eyePos, _earSpeed, out var path))
+                path = _acoustics.CalculateAcousticPath(world, id, eyePos, mouth);
 
             var e = new SpatialEmitter
             {

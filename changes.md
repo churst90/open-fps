@@ -45,6 +45,39 @@ Recent work, newest first. `git log` has the rest.
     editor's hands, stacks and touches, build sessions, and each session's known entities.
 - Build warnings: the ten xUnit analyzer warnings in the tests and the four stack buffers made in a loop in the
   lab's glass and street spikes are gone; the server, the GTK client, the lab and the tests build with none.
+- The pops (part P1 of docs/SPECIAL_CASES_AUDIT.md), unheard. Measured with `--pop-hunt`, 40 cars and 30
+  still sources, 60 s:
+  - Main Street pavement before Marlow Tower's entrance: 41 to 56 pops a minute before, 0 after. Cars on
+    Wharf Avenue 200 m off, behind the multi-storey car park and the tower, went from -90 dB to -25 and back
+    in a third of a second. Not the source pool: still sources do it too, a metre of the lane with a way over
+    the top and eight without. The search over the top gave up after four boxes, and the car park is a
+    parapet and a slab a storey. It now goes on until it is clear or blocked for good.
+  - Marlow Tower's floor 1 stairwell: 4 to 11 a minute before and after; not fixed. Not the source pool either:
+    a still source on Dock Street gives the same -35/-52/-80 dB between x -19.5 and -15.5, and -57/-83/-100
+    on either side. The line from the stairwell to the street crosses the slab's edge, and on either side of
+    that stretch also the stair's 1.07 m concrete guard. The way over the guard is 3 cm, but its legs still
+    run through the brick front, so it is not believed, and the guard is charged as a whole wall: 22 to 31 dB
+    for 4 m of road. A way round one thing that passes through another is never paid as through that other
+    thing; that is a change to the barrier model (todo, Acoustics).
+  - The source pool's serving (audit S4): results are read back only for sources staged this tick, and a
+    lent source is cleared before its new owner's inputs. Neither was ever seen to happen: a full pool is all
+    served sources (64 served take all 64), so nobody turned away holds one, and a new owner's inputs replace
+    the old at once. 0 stale read-backs in 60 s with 70 or 120 sources.
+  - Every answer says what traced it (simulator, held over a full pool, hand-rolled) and for which source
+    position and ear (`AcousticPathData.SimulatedFrom`, `ListenerPosition`, `Provenance`). Every asker (the
+    path pass, a new voice's first path, horns, sirens and trains, talkers, one-shots' sources) takes an
+    answer only if it was traced within a metre of the source and three of the ear, plus 1.5 s of each one's
+    speed (`AcousticPathData.Answers`). The horn and siren check was half a second, and refused about one
+    answer in twenty, which the worker gives 380 to 470 ms behind at the median and up to 1.5 s on a busy
+    machine; each refusal went to the hand-rolled tracer. A tick traces every source from the newest ear: taken from the first
+    request, a tick that drained requests from both sides of a teleport traced them all from the old place.
+  - A patrol car with its siren off asks for no siren path (audit S5): every one asked every frame and,
+    with no engine voice, ran the hand-rolled tracer on the game thread for nothing.
+  - Path lag, a car's position against its answer's, the same within the machine's own noise (two rounds,
+    before and after run in turn): medians 400 and 333 ms before, 383 and 367 after on the pavement; 567 and
+    417 before, 400 and 500 after in the stairwell.
+  - Where to listen: `/tp -10.8 -104.2 3.28` (floor 1 stairwell, Dock Street through the front), `/tp -6.4
+    -103.5 0.12` (the pavement before the entrance, Wharf Avenue over the roofs).
 - Openings framed from where the rooms' air meets them, unheard (docs/GEOMETRY.md 12.6, "Openings from the
   floods"). A flooded room no longer has openings found in its box's faces: on Albany 1,530 rooms had 33,342 m2 of
   openings to the outdoors that their walls do not have (a box's face across its own house's wing, walls the face

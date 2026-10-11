@@ -988,6 +988,7 @@ public class ClientAudioSelectionTests
         h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f), new Vector3(17f, 0f, 0f));
         int siren = ClientAudioSystem.SirenVoiceBase - car;
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(siren), 1200), "the siren never sounded");
+        Assert.True(h.Audio.VehiclePathsAsked > 0, "a sounding siren takes its car's path");
         var spec = SirenSpec.ByName(MachineRegistry.VehicleFor("police_interceptor").Siren!);
         var (gain, reference) = Loudness.Place(spec.SourceLevelDb, spec.HornMouthMetres);
         Assert.Equal(reference, h.Mixer.Latest[siren].MinDistance, 4);
@@ -997,5 +998,19 @@ public class ClientAudioSelectionTests
         h.Tick(3);
         Assert.Contains(siren, h.Mixer.Stopped);
         Assert.DoesNotContain(siren, h.Mixer.Live);
+    }
+
+    /// <summary>A patrol car with its siren off asks for no siren path: it asked the worker every frame and,
+    /// with no engine voice, ran the hand-rolled tracer on the game thread for nothing (audit S5).</summary>
+    [Fact]
+    public void ASilentSirenAsksForNoPath()
+    {
+        int car = PromptCallId();
+        var h = new ClientAudioHarness();
+        h.StandAt(Vector3.Zero);
+        h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f));   // parked: traffic's siren is off at rest
+        h.Tick(120);
+        Assert.DoesNotContain(ClientAudioSystem.SirenVoiceBase - car, h.Mixer.Live);
+        Assert.Equal(0, h.Audio.VehiclePathsAsked);
     }
 }

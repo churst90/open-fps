@@ -178,11 +178,14 @@ public class AsyncAcousticWorkerTests
         var fresh = new Vector3(20f, 1f, -5f);
         worker.EnqueueRequest(Ask(7, moved));
         worker.EnqueueRequest(Ask(8, fresh));
-        Await(() => worker.TryGetResult(8, out _) && ResultOf(worker, 7)[0].SourcePosition == moved,
-              "answered against the broken world");
+        // Asked after 7, so answered no sooner.
+        Await(() => worker.TryGetResult(8, out _), "answered against the broken world");
 
+        // Kept as it was, still saying where it was traced: not passed off as an answer for where 7 is now.
         var kept = ResultOf(worker, 7).First(p => !p.IsReflection);
         Assert.Equal(occlusion, kept.Occlusion);
+        Assert.Equal(Behind, kept.SimulatedFrom);
+        Assert.False(kept.Answers(moved + new Vector3(2f, 0f, 0f), 0f, Ear, 0f));
 
         var clear = Assert.Single(ResultOf(worker, 8));
         Assert.False(clear.IsReflection);
@@ -193,6 +196,47 @@ public class AsyncAcousticWorkerTests
         Assert.Equal(fresh, clear.ApparentPosition);
         Assert.Equal(fresh, clear.SourcePosition);
         Assert.Equal(Vector3.Distance(Ear, fresh), clear.EffectiveDistance, 4);
+    }
+
+    /// <summary>An answer says what traced it, for which source position and from which ear, so an asker can
+    /// refuse one that is not for here (AcousticPathData.Answers).</summary>
+    [Fact]
+    public void AnAnswerSaysWhatTracedItAndFromWhere()
+    {
+        using var worker = new AsyncAcousticWorker(new SpatialAcoustics()) { Manual = true };
+        worker.UpdateWorld(Walled());
+        worker.EnqueueRequest(Ask(7, Behind));
+        worker.StepForTest();
+
+        Assert.All(ResultOf(worker, 7), p =>
+        {
+            Assert.Equal(Behind, p.SimulatedFrom);
+            Assert.Equal(Ear, p.ListenerPosition);
+            Assert.Equal(PathProvenance.HandRolled, p.Provenance);
+        });
+        Assert.True(worker.TryGetResultFor(7, Behind, 0f, Ear, 0f, out _));
+        Assert.False(worker.TryGetResultFor(7, Behind + new Vector3(30f, 0f, 0f), 0f, Ear, 0f, out _), "another place's source");
+        Assert.False(worker.TryGetResultFor(7, Behind, 0f, Ear + new Vector3(0f, 0f, 30f), 0f, out _), "another place's ear");
+    }
+
+    /// <summary>
+    /// One ear a tick, the newest: the simulator traces every source against one listener, so requests
+    /// drained together from frames either side of a teleport are all answered, and stamped, for where the
+    /// ear is now. Taken from whichever came first, a tick traced them all from the old place.
+    /// </summary>
+    [Fact]
+    public void RequestsDrainedTogetherAreAnsweredForTheNewestEar()
+    {
+        using var worker = new AsyncAcousticWorker(new SpatialAcoustics()) { Manual = true };
+        worker.UpdateWorld(Walled());
+        var before = Ear + new Vector3(0f, 0f, -60f);   // beyond the wall, beside the source
+        worker.EnqueueRequest(Ask(7, Behind) with { ListenerPos = before });
+        worker.EnqueueRequest(Ask(8, Behind + new Vector3(2f, 0f, 0f)));
+        worker.StepForTest();
+
+        Assert.Equal(Ear, ResultOf(worker, 7)[0].ListenerPosition);
+        Assert.Equal(Ear, ResultOf(worker, 8)[0].ListenerPosition);
+        Assert.True(ResultOf(worker, 7).First(p => !p.IsReflection).Occlusion > 0f, "traced from the ear's side of the wall");
     }
 
     /// <summary>Disposed without ever being started, the worker has nothing to join and nothing to free.</summary>

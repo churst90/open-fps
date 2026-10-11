@@ -782,6 +782,8 @@ public class StairsTests : IClassFixture<StairsTests.City>
     [InlineData(-6.4f, -103.5f, 0.12f)]       // Main Street pavement, before the front entrance
     [InlineData(-14.2f, -102.7f, 9.28f)]      // floor 3 stairwell, its open floor by the door
     [InlineData(-10.65f, -103.9f, 24.25f)]    // the roof access, on its landing before the door
+    [InlineData(-10.8f, -104.2f, 3.28f)]      // floor 1 stairwell, where the pops were (audit P1)
+    [InlineData(-11.05f, -100.84f, 3.28f)]    // floor 1 stairwell, --pop-hunt's ear (-11.05, 4.9, -100.84)
     public void AListeningSpotIsWhereABodyStands(float x, float y, float z)
     {
         var feet = PlayerCoordinates.ToWorld(x, y, z);
