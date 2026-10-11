@@ -74,7 +74,7 @@ public partial class WorldEditorPhase3Tests
         var again = new Rig(_dir, UserRole.Player, mapDir: rig.MapDir);
         var kept = again.Editor.Versions.Of("yard");
         Assert.Equal(new[] { "before the market", "before restoring version 1" }, kept.Select(v => v.Name));
-        Assert.Equal(1, kept[0].Overlay.Added.Count);
+        Assert.Single(kept[0].Overlay.Added);
     }
 
     [Fact]

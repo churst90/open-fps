@@ -69,7 +69,7 @@ public class AcousticSourcePoolTests
             foreach (int id in served) seen[id] = tick;
             Assert.All(served, id => Assert.True(held.ContainsKey(id), $"tick {tick}: {id} served without a source"));
             carried = pending.Keys.Where(id => !served.Contains(id)).ToList();
-            Assert.Empty(carried.Where(refusedLastTick.Contains));
+            Assert.DoesNotContain(carried, refusedLastTick.Contains);
             refusedLastTick = carried.ToHashSet();
         }
     }

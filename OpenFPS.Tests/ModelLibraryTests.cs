@@ -113,8 +113,8 @@ public class ModelLibraryTests : IDisposable
         _o.WriteLine($"stock {stock.DiameterMetres * 1000f:F0} mm -> authored {got.DiameterMetres * 1000f:F0} mm");
 
         // And it is listed once.
-        Assert.Single(ModelLibrary.Ids(ModelLibrary.Kinds.Bell).Where(
-            i => i.Equals("crossing_gong", StringComparison.OrdinalIgnoreCase)));
+        Assert.Single(ModelLibrary.Ids(ModelLibrary.Kinds.Bell),
+            i => i.Equals("crossing_gong", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>A road vehicle's air horn comes from the library, as a train's does, at its own level.

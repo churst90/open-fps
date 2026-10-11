@@ -145,6 +145,9 @@ public static class VehicleSpike
             Console.WriteLine($"  You stand on the west pavement, 3 m from the wall. Passes at {string.Join("/", speeds)} km/h.\n");
 
             int nextEcho = -92000;
+            // One pair of buffers for every car, cleared as a fresh stackalloc would be.
+            Span<Reflection> first = stackalloc Reflection[8];
+            Span<Reflection> second = stackalloc Reflection[8];
             foreach (var presetKey in presets)
             {
                 var v = VehicleProfile.ByName(presetKey);
@@ -180,8 +183,8 @@ public static class VehicleSpike
                 provider.PlaySpatialSound(Engine(pos, Vector3.Zero, 0f));
                 // Echo voices, keyed by the facade they answer for.
                 var voices = new Dictionary<int, (int VoiceId, float Silent)>();
-                Span<Reflection> first = stackalloc Reflection[8];
-                Span<Reflection> second = stackalloc Reflection[8];
+                first.Clear();
+                second.Clear();
 
                 int pass = 0; float speed = 0f, progress = 0f, phase = 0f; string state = "wait";
                 float from = roadStart, to = roadEnd;

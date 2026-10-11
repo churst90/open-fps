@@ -127,6 +127,8 @@ public static class GlassSpike
         var rawTakes = new List<(string Name, float[] Pa)>();
         var notes = new List<string>();
         int fileNo = 1;
+        // One buffer for every break, cleared as a fresh stackalloc would be.
+        Span<GlassEvent> buf = stackalloc GlassEvent[48];
         foreach (var pane in Panes.Take(2))
             foreach (var weapon in new[] { WeaponRegistry.Glock, WeaponRegistry.Akm })
             {
@@ -143,7 +145,7 @@ public static class GlassSpike
                 {
                     float centreY = scene.Drop + pane.H / 2;
                     var glass = new GlassPane(new Vector3(0, centreY, 0), new Vector2(pane.W, pane.H), Vector3.UnitZ, pane.Type, scene.Drop);
-                    Span<GlassEvent> buf = stackalloc GlassEvent[48];
+                    buf.Clear();
                     int n = GlassBreak.Resolve(glass, glass.Centre, weapon, 1, buf);
                     var events = new List<GlassEvent>();
                     for (int i = 0; i < n; i++) events.Add(buf[i]);
@@ -164,7 +166,7 @@ public static class GlassSpike
         {
             var pane = Panes[0];
             var glass = new GlassPane(new Vector3(0, 3.9f + pane.H / 2, 0), new Vector2(pane.W, pane.H), Vector3.UnitZ, pane.Type, 3.9f);
-            Span<GlassEvent> buf = stackalloc GlassEvent[48];
+            buf.Clear();
             int n = GlassBreak.Resolve(glass, glass.Centre, WeaponRegistry.Glock, 1, buf);
             var events = new List<GlassEvent>();
             for (int i = 0; i < n; i++) events.Add(buf[i]);
