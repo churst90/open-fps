@@ -38,10 +38,9 @@ public static class RainSurfaces
     /// <summary>The kind of surface a material of this skin thickness is to rain.</summary>
     public static RainSurfaceKind KindOf(string material, float skinMetres)
     {
-        if (string.Equals(material, "Water", StringComparison.OrdinalIgnoreCase)) return RainSurfaceKind.Pool;
-        if (string.Equals(material, "Foliage", StringComparison.OrdinalIgnoreCase)) return RainSurfaceKind.Canopy;
-        // Generic quietly: the registry's fallback warns per call, and a surveyor asks about every box.
-        var p = AcousticRegistry.GetProperties(AcousticRegistry.IsKnown(material) ? material : "Generic");
+        var p = AcousticRegistry.GetProperties(material);
+        if (p.Family == "liquid") return RainSurfaceKind.Pool;
+        if (p.Leaves) return RainSurfaceKind.Canopy;
         if (p.DensityKgM3 <= 0f) return RainSurfaceKind.None;
         if (p.YoungsModulusGPa < SoftBelowGPa) return RainSurfaceKind.Soft;
         if (skinMetres > 0f && skinMetres <= PlateMaxSkinMetres) return RainSurfaceKind.Plate;
@@ -213,7 +212,7 @@ public readonly record struct RainPlate
         MountedLossFactor = mountedLossFactor;
     }
 
-    public MaterialProperties Properties => Custom ?? AcousticRegistry.GetProperties(AcousticRegistry.IsKnown(Material) ? Material : "Generic");
+    public MaterialProperties Properties => Custom ?? AcousticRegistry.GetProperties(Material);
 
     /// <summary>The stuff itself, for a plate of something the registry has no name for (a boat's
     /// aluminium or fibreglass hull, ShoreSynth). Null: <see cref="Material"/>'s registry entry.</summary>

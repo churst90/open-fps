@@ -314,6 +314,10 @@ public partial class MapManifest : IMessage
     public double FrameNorthing;
     public float FrameBaseY;
 
+    /// <summary>Every door model key this map's doors can send (DoorSystem.RenderKeys): the client renders them as
+    /// the map arrives, since a first hearing cannot wait the seconds a render takes. Appended.</summary>
+    public string[] DoorRenderKeys = Array.Empty<string>();
+
     public MapManifest() { }
 }
 

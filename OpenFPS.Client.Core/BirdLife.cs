@@ -114,7 +114,7 @@ public sealed class BirdLife
             if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) continue;
             float hash = Hash(e.Id);
 
-            if (string.Equals(def.Material.Material, "Foliage", StringComparison.OrdinalIgnoreCase))
+            if (AcousticRegistry.IsLeaves(def.Material.Material))
             {
                 // A sparrow group in one hedge in six, a dove in one in twelve.
                 if (hash < 0.16f) _perched.Add(Settle(BirdSpecies.HouseSparrow, e, size, onTop: false));

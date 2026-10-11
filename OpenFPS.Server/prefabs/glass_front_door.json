@@ -3,6 +3,7 @@
   "Name": "Glass Front Door",
   "Description": "A building's front door: a 12 mm toughened glass leaf in an aluminium frame, a push bar inside, a key cylinder outside, and a closer that shuts it three seconds after the doorway is clear. The key side is the leaf's own +Z face, the street: from there it is locked, and is unlocked with a key and pulled open. From inside its push bar pushes it open, outward (PushSide -1), the way an exit door swings.",
   "Material": "Glass",
+  "Glazing": "Tempered",
   "ColliderSize": { "X": 1.0, "Y": 2.1, "Z": 0.012 },
   "IsSolid": true,
   "Type": "StaticObject",

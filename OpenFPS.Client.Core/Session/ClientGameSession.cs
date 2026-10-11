@@ -851,6 +851,8 @@ public sealed partial class ClientGameSession : IDisposable
                 // would use the previous map's air.
                 _world.ApplyManifestAtmosphere(manifest);
                 _audioSystem.Beacons.SetMapPolicy(manifest.BeaconPolicy);
+                // The map's doors, rendered while it loads: a first swing cannot wait for a render.
+                _audioSystem.WorldAudio.PrewarmDoors(manifest.DoorRenderKeys ?? Array.Empty<string>());
                 // A new map's roads come with its data; until then there are none.
                 _audioSystem.Driving.SetRoads(null);
                 _audioSystem.SetCrossings(null);

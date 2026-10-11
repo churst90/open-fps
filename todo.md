@@ -46,8 +46,15 @@ since the last deploy" list below.
      occlusion-floor default, one law and one reference for the speed of sound, the world's speed where a
      heard law wrote 343. Gravity, air density, brakes, rolling resistance and the two winds are physics
      stage 2's.
-   - Under way: P5 (names and materials to properties) and the barrier model's way round one thing that
-     passes through another (Acoustics, below), which P1 found in Marlow Tower's floor 1 stairwell.
+   - P5, names and materials to properties: DONE 2026-10-11, streams unchanged, unheard (the audit's "P5 as
+     built"): one material table, declared glazing, roofs and entrances from geometry and what openings join,
+     one door model table, each map's door prewarm from the map (a manifest field: restart the server, new
+     Windows zip). Waiting on Cody: whether a bus shelter's canopy is "a roof" to the scope, and which doors
+     Alex's haunts take as front entrances. Left: storeys in `MapTracker.Floors` from the building; the glass
+     door's sound key reading the prefab's glazing.
+   - Under way: the barrier model's way round one thing that passes through another (Acoustics, below),
+     which P1 found in Marlow Tower's floor 1 stairwell; the compass words in one function and P2's
+     leftovers.
    - Then P3a to P3d, the voice registry: one list of voices, one writer a frame, one way to start a voice.
      It is the one path pass for every voice of a moving thing that Cody asked for on 2026-10-11 ("shouldn't
      all mobile sound sources like vehicles, trains, sirens, etc use the same path so there's

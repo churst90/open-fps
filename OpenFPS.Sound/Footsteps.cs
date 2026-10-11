@@ -222,22 +222,13 @@ public static class Footsteps
 
     /// <summary>How far a floor of this stuff spans between its supports, metres: the stiffeners set the
     /// note, not the size of the sheet. A slab bears on the ground everywhere and has none.</summary>
-    public static float FreeSpanM(string surface) => surface.ToLowerInvariant() switch
-    {
-        "wood" => 0.40f,          // boards on joists at 16 inches
-        "metal" => 0.60f,         // a steel deck or a walkway plate
-        "glass" => 0.80f,
-        _ => 0f,                  // bearing on the ground: no span, no note
-    };
+    public static float FreeSpanM(string surface) => UnderfootOf(surface).DeckSpanMetres;
 
     /// <summary>How thick that deck is, metres.</summary>
-    public static float DeckThicknessM(string surface) => surface.ToLowerInvariant() switch
-    {
-        "wood" => 0.021f,
-        "metal" => 0.005f,
-        "glass" => 0.012f,
-        _ => 0f,
-    };
+    public static float DeckThicknessM(string surface) => UnderfootOf(surface).DeckMetres;
+
+    /// <summary>What a material is underfoot, from the material table (AcousticRegistry), aliases and all.</summary>
+    public static Underfoot UnderfootOf(string surface) => AcousticRegistry.GetProperties(surface).Underfoot ?? Underfoot.Ground;
 
     // ── The ground at the scale of a grain of grit ──────────────────────────────────────────────
 
@@ -247,24 +238,11 @@ public static class Footsteps
     /// concrete is acoustically specular and still gritty, and carpet scatters sound and is smooth
     /// underfoot.
     /// </summary>
-    public static (float GrainMm, float Coverage) ContactTexture(string surface) => surface.ToLowerInvariant() switch
+    public static (float GrainMm, float Coverage) ContactTexture(string surface)
     {
-        // A cast or floated slab: sand and exposed aggregate, and enough of it to hear.
-        "concrete" => (0.45f, 0.80f),
-        // Polished stone. Nearly nothing there, which is why a marble hall is all click and no scrape.
-        "marble" => (0.03f, 0.25f),
-        "glass" => (0.02f, 0.15f),
-        // Sawn and sealed boards: a fine grain, and much less of it than concrete.
-        "wood" => (0.12f, 0.45f),
-        // Plate or chequer: smooth between the pattern, sharp on it.
-        "metal" => (0.08f, 0.35f),
-        // The sole sinks into soft things: nothing to rattle over.
-        "carpet" => (0.05f, 0.20f),
-        "grass" => (0.30f, 0.35f),
-        "dirt" => (0.60f, 0.70f),
-        "gravel" => (2.00f, 0.95f),
-        _ => (0.25f, 0.50f),
-    };
+        var u = UnderfootOf(surface);
+        return (u.GrainMm, u.Coverage);
+    }
 
     /// <summary>
     /// How long one grain of grit (or tread block) is in contact, seconds. With mass going as the cube of
@@ -282,13 +260,11 @@ public static class Footsteps
 
     /// <summary>How many loose pieces a foot disturbs on a heap (gravel, dirt, grass), and how big they
     /// are, mm; zero for anything solid. Each pair that slips is its own tiny impact.</summary>
-    public static (int Count, float GrainMm) LooseMaterial(string surface) => surface.ToLowerInvariant() switch
+    public static (int Count, float GrainMm) LooseMaterial(string surface)
     {
-        "gravel" => (70, 12f),
-        "dirt" => (22, 4f),
-        "grass" => (30, 1.5f),    // blades, not stones: many, tiny, and very quiet
-        _ => (0, 0f),
-    };
+        var u = UnderfootOf(surface);
+        return (u.LooseCount, u.LooseGrainMm);
+    }
 
     // ── Rendering ───────────────────────────────────────────────────────────────────────────────
 

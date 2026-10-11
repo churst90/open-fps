@@ -7,23 +7,25 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Server.Systems;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
 /// Every door on the city is heard the first time it is opened. A door model's render takes seconds and a
 /// first hearing waits a tenth of one, so a sound the client has not rendered before is silent: Cody,
-/// 2026-10-05, "it doesn't play a sound for the first few times I open it". The client renders a list at
-/// start (WorldAudioPlayer.PrewarmKeys) and keeps each on disk (DoorRenderCache); these tests hold the
-/// list to what the city's doors ask for, and the cache to giving back what it was given.
+/// 2026-10-05, "it doesn't play a sound for the first few times I open it". The client renders a list as the
+/// map arrives (MapManifest.DoorRenderKeys, from DoorSystem.RenderKeys) and keeps each on disk (DoorRenderCache);
+/// these tests hold the list to what each map's doors ask for, and the cache to giving back what it was given.
 /// </summary>
 public class DoorPrewarmTests
 {
-    public DoorPrewarmTests() { AcousticRegistry.Initialize(); }
+    private readonly Xunit.Abstractions.ITestOutputHelper _o;
+    public DoorPrewarmTests(Xunit.Abstractions.ITestOutputHelper o) { _o = o; AcousticRegistry.Initialize(); }
 
     /// <summary>The keys DoorSystem sends for a door, built as it builds them (KnobDoorSound, PushBarSound,
     /// GlassDoorSound): every opening from either side, and every close.</summary>
-    private static IEnumerable<string> KeysFor(World world, Entity e)
+    internal static IEnumerable<string> KeysFor(World world, Entity e)
     {
         var door = world.Get<DoorComponent>(e);
         var size = world.Get<ColliderComponent>(e).Size;
@@ -49,15 +51,10 @@ public class DoorPrewarmTests
         }
     }
 
-    [Fact]
-    public void EveryHingedDoorOnTheCityIsRenderedAtStart()
+    /// <summary>What a map's manifest carries for its doors, against the keys its doors send: every one is in it.</summary>
+    internal static void EveryDoorIsRenderedAsTheMapArrives(World world, int atLeast)
     {
-        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")),
-                                  new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
-        maps.Initialize();
-        Assert.True(maps.TryGetMap("city", out var world, out _, out _, out _));
-
-        var prewarmed = WorldAudioPlayer.PrewarmKeys().ToHashSet();
+        var prewarmed = DoorSystem.RenderKeys(world).ToHashSet();
         var missing = new SortedSet<string>();
         int doors = 0;
         world.Query(new QueryDescription().WithAll<DoorComponent, ColliderComponent>(), (Entity e) =>
@@ -66,8 +63,37 @@ public class DoorPrewarmTests
             foreach (string key in KeysFor(world, e))
                 if (!prewarmed.Contains(key)) missing.Add(key);
         });
-        Assert.True(doors > 400, $"{doors} doors on the city");
-        Assert.True(missing.Count == 0, "not rendered at start: " + string.Join(", ", missing.Take(12)));
+        Assert.True(doors > atLeast, $"{doors} doors");
+        Assert.True(missing.Count == 0, "not rendered as the map arrives: " + string.Join(", ", missing.Take(12)));
+        Assert.All(prewarmed, k => Assert.True(WorldAudioPlayer.IsDoorModelKey(k), k));
+    }
+
+    [Fact]
+    public void EveryDoorOnTheCityIsRenderedAsTheMapArrives()
+    {
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")),
+                                  new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out var world, out _, out _, out _));
+        EveryDoorIsRenderedAsTheMapArrives(world, 400);
+        _o.WriteLine($"city: {DoorSystem.RenderKeys(world).Length} door renders");
+    }
+
+    /// <summary>One table of door models: each key prefix once, none the start of another, and a key no row names is
+    /// not rendered as a door (it went to the knob door's renderer and came back as sixteen samples of silence).</summary>
+    [Fact]
+    public void EachDoorModelIsOneRowAndNothingElseIsADoor()
+    {
+        var prefixes = WorldAudioPlayer.DoorModels.Select(m => m.Prefix).ToList();
+        Assert.Equal(prefixes.Count, prefixes.Distinct().Count());
+        foreach (var a in prefixes)
+            Assert.DoesNotContain(prefixes, b => b != a && b.StartsWith(a, StringComparison.Ordinal));
+        foreach (var p in new[] { KnobDoor.KeyPrefix, PushBarDoor.KeyPrefix, SlidingDoor.KeyPrefix, GlassDoor.KeyPrefix,
+                                  LockCylinder.KeyPrefix, ElevatorDoor.KeyPrefix, CarWindow.KeyPrefix, GlassFracture.KeyPrefix })
+            Assert.Contains(p, prefixes);
+        Assert.False(WorldAudioPlayer.IsDoorModelKey("revolvingdoor:open:0"));
+        Assert.Throws<ArgumentException>(() => WorldAudioPlayer.RenderDoorKey("revolvingdoor:open:0", new()));
+        Assert.Equal(WorldAudioPlayer.GlassRenderLateness, WorldAudioPlayer.DoorModelOf(GlassFracture.KeyPrefix + "break:x")!.Value.Lateness);
     }
 
     [Fact]
@@ -112,6 +138,13 @@ public class DoorPrewarmTests
     {
         var session = new ClientGameSession(new ClientNetworkService(), new Silent(), new NoShell(), new AudioEngineFacade(),
             microphone: new NullMicrophoneCapture("none"), enableAudio: false);
+        Assert.Equal(0, session.AudioSystemForTest.WorldAudio.RendersOutstanding);
+        // Nor when a map arrives with its doors.
+        session.HandleMessage(new OpenFPS.Common.Networking.MapManifest
+        {
+            MapName = "test", WorldSize = new System.Numerics.Vector3(100, 20, 100),
+            DoorRenderKeys = new[] { KnobDoor.Key(false, KnobDoor.Construction.HollowCore, 1, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f) },
+        });
         Assert.Equal(0, session.AudioSystemForTest.WorldAudio.RendersOutstanding);
     }
 

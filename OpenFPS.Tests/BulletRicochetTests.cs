@@ -201,25 +201,25 @@ public class BulletRicochetTests : IDisposable
     // ── Impacts ─────────────────────────────────────────────────────────────────────────────────
 
     [Theory]
-    [InlineData("Concrete", BulletImpact.Kind.Brittle)]
-    [InlineData("Brick", BulletImpact.Kind.Brittle)]
-    [InlineData("Asphalt", BulletImpact.Kind.Brittle)]
-    [InlineData("Marble", BulletImpact.Kind.Brittle)]
-    [InlineData("Metal", BulletImpact.Kind.Metal)]
-    [InlineData("Wood", BulletImpact.Kind.Wood)]
-    [InlineData("Plaster", BulletImpact.Kind.Panel)]
-    [InlineData("Dirt", BulletImpact.Kind.Soil)]
-    [InlineData("Grass", BulletImpact.Kind.Soil)]
-    [InlineData("Gravel", BulletImpact.Kind.Soil)]
-    [InlineData("Water", BulletImpact.Kind.Water)]
-    [InlineData("Carpet", BulletImpact.Kind.Soft)]
-    public void EachMaterialHasItsOwnStrikeAtTheConventionsLevel(string material, BulletImpact.Kind kind)
+    [InlineData("Concrete", StrikeKind.Brittle)]
+    [InlineData("Brick", StrikeKind.Brittle)]
+    [InlineData("Asphalt", StrikeKind.Brittle)]
+    [InlineData("Marble", StrikeKind.Brittle)]
+    [InlineData("Metal", StrikeKind.Metal)]
+    [InlineData("Wood", StrikeKind.Wood)]
+    [InlineData("Plaster", StrikeKind.Panel)]
+    [InlineData("Dirt", StrikeKind.Soil)]
+    [InlineData("Grass", StrikeKind.Soil)]
+    [InlineData("Gravel", StrikeKind.Soil)]
+    [InlineData("Water", StrikeKind.Water)]
+    [InlineData("Carpet", StrikeKind.Soft)]
+    public void EachMaterialHasItsOwnStrikeAtTheConventionsLevel(string material, StrikeKind kind)
     {
         Assert.Equal(kind, BulletImpact.KindOf(material));
         var w = WeaponRegistry.Glock;
-        bool wall = kind is BulletImpact.Kind.Brittle or BulletImpact.Kind.Metal or BulletImpact.Kind.Wood or BulletImpact.Kind.Panel
+        bool wall = kind is StrikeKind.Brittle or StrikeKind.Metal or StrikeKind.Wood or StrikeKind.Panel
                     && material != "Asphalt";
-        var size = kind == BulletImpact.Kind.Metal ? new Vector3(1f, 1f, 0.006f) : new Vector3(2f, 3f, 0.12f);
+        var size = kind == StrikeKind.Metal ? new Vector3(1f, 1f, 0.006f) : new Vector3(2f, 3f, 0.12f);
         var hit = BulletImpact.From(material, 360f, w, wall ? MathF.PI / 2f : MathF.PI / 4f, 0f, size, "Concrete", wall ? 1.2f : 0f);
         string key = BulletImpact.HitKey(hit);
         Assert.StartsWith(BulletImpact.HitPrefix + material + ":", key);

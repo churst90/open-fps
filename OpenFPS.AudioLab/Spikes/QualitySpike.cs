@@ -547,11 +547,10 @@ public static class QualitySpike
         Environment.SetEnvironmentVariable("OPENFPS_RENDER_CACHE", Path.Combine(Path.GetTempPath(), "openfps-quality-rendercache"));
         int sr = TransientSynth.SampleRate;
         var full = new System.Collections.Concurrent.ConcurrentDictionary<string, float>();
-        var keys = WorldAudioPlayer.PrewarmKeys();
         var renders = new List<(string Name, float[] Pcm)>
         {
-            ("knob door opening", WorldAudioPlayer.RenderDoorKey(keys[0], full)),
-            ("knob door shutting", WorldAudioPlayer.RenderDoorKey(keys[2], full)),
+            ("knob door opening", WorldAudioPlayer.RenderDoorKey(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full)),
+            ("knob door shutting", WorldAudioPlayer.RenderDoorKey(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full)),
             ("car door shutting", CarDoor.Render(true, sr, 3)),
             ("clap", Applause.RenderClap(sr, 2)),
             ("struck ring", TransientSynth.Render(new TransientSound { Character = SoundCharacter.Ring, Hz = 1400f, DecaySeconds = 1.2f, Noisiness = 0.2f }, 5)),

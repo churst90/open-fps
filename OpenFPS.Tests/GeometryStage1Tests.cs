@@ -11,11 +11,11 @@ namespace OpenFPS.Tests;
 public class GeometryStage1Tests
 {
     private static Surface Plain(string material = "Concrete")
-        => EntityGeometry.SurfaceOf(material, Vector3.One, 0, 0, false, 0, 0, emitter: false, moves: false, doorLeaf: false, name: null);
+        => EntityGeometry.SurfaceOf(material, Vector3.One, 0, 0, false, 0, 0, emitter: false, moves: false, doorLeaf: false);
 
     private static SolidSpec Box(int owner, Vector3 at, Vector3 size, float yaw = 0f, string material = "Concrete")
         => new(owner, at, Quaternion.CreateFromYawPitchRoll(yaw, 0, 0), size,
-               EntityGeometry.SurfaceOf(material, size, 0, 0, false, 0, 0, false, false, false, null));
+               EntityGeometry.SurfaceOf(material, size, 0, 0, false, 0, 0, false, false, false));
 
     /// <summary>A scattered town of boxes, turned about the vertical, seeded.</summary>
     private static List<SolidSpec> Town(int seed, int count = 300, float extent = 600f)
@@ -255,7 +255,7 @@ public class GeometryStage1Tests
     public void A_mover_and_a_surface_layer_filter_what_queries_see()
     {
         var emitter = new SolidSpec(5, new Vector3(0, 1, 5), Quaternion.Identity, Vector3.One,
-                                    EntityGeometry.SurfaceOf("Metal", Vector3.One, 0, 0, false, 0, 0, emitter: true, moves: false, doorLeaf: false, name: null));
+                                    EntityGeometry.SurfaceOf("Metal", Vector3.One, 0, 0, false, 0, 0, emitter: true, moves: false, doorLeaf: false));
         var world = new TriangleWorldBuilder(250f).Build(new[] { emitter }, Array.Empty<SolidSpec>());
         var all = new AcceptAll();
         // A sound source's own box is in the way of a body, not of sound.

@@ -3,6 +3,7 @@
   "Name": "Glass Door",
   "Description": "A shop's glass door: a 12 mm toughened glass leaf in an aluminium frame, pulled open by its handle from outside (its +Z face) and pushed open from inside, so it swings out (PushSide -1), and shut again by its closer three seconds after the doorway is clear.",
   "Material": "Glass",
+  "Glazing": "Tempered",
   "ColliderSize": { "X": 1.0, "Y": 2.1, "Z": 0.012 },
   "IsSolid": true,
   "Type": "StaticObject",

@@ -1278,6 +1278,7 @@ public class GameServer
             MapMin = new Vector3(-50, 0, -50),
             MapMax = new Vector3(50, 20, 50),
             TileMetres = streamed ? tiles.TileMetres : 0f,
+            DoorRenderKeys = OpenFPS.Server.Systems.DoorSystem.RenderKeys(world),
         };
 
         if (_maps.TryGetMapData(mapId, out var mapData))

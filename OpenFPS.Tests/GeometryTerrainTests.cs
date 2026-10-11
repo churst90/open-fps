@@ -22,7 +22,7 @@ public class GeometryTerrainTests
     private const int Posts = 126;
     private const float Spacing = 2f;
 
-    private static readonly Surface Ground = EntityGeometry.SurfaceOf("Dirt", Vector3.One, 0, 0, false, 0, 0, false, false, false, "Ground");
+    private static readonly Surface Ground = EntityGeometry.SurfaceOf("Dirt", Vector3.One, 0, 0, false, 0, 0, false, false, false);
 
     private static float[] Heights(Func<float, float, float> h, float cornerX = 0f, float cornerZ = 0f)
     {
@@ -45,7 +45,7 @@ public class GeometryTerrainTests
     private static TriangleWorld WorldOf(params SolidSpec[] statics)
         => new TriangleWorldBuilder(250f).Build(statics, Array.Empty<SolidSpec>());
 
-    private static Surface Concrete(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false, null);
+    private static Surface Concrete(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false);
 
     [Fact]
     public void HeightsAreThePostsAndPlanesBetweenThem()

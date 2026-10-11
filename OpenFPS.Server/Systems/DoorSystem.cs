@@ -966,6 +966,88 @@ public sealed class DoorSystem
         });
     }
 
+    /// <summary>
+    /// Every door model key a door can send, built as its sounds above build them: each opening (pushed, pulled, the
+    /// key held), each close (and each way a knob door is shut), and the key in its lock if it has one. A model's
+    /// render takes seconds and a first hearing waits a tenth of one, so the client renders these when the map
+    /// arrives (MapManifest.DoorRenderKeys).
+    /// </summary>
+    public static IEnumerable<string> RenderKeysOf(World world, Entity entity)
+    {
+        if (!world.Has<DoorComponent>(entity)) yield break;
+        var door = world.Get<DoorComponent>(entity);
+        var kind = (DoorKind)door.Kind;
+        var size = world.Has<ColliderComponent>(entity) ? world.Get<ColliderComponent>(entity).Size : Vector3.Zero;
+        int id = entity.Id;
+        float closeTravel = door.CloseSeconds > 0f ? door.CloseSeconds : door.SwingSeconds;
+        switch (kind)
+        {
+            case DoorKind.Hinged:
+                if (size == Vector3.Zero) size = new Vector3(0.9f, 2.1f, 0.05f);
+                yield return KnobDoor.Key(false, KnobDoor.Construction.HollowCore, id, door.SwingSeconds, KnobDoor.Shut.Normal, size.X, size.Y);
+                yield return KnobDoor.Key(false, KnobDoor.Construction.HollowCore, id, door.SwingSeconds, KnobDoor.Shut.Normal, size.X, size.Y, push: true);
+                foreach (var how in new[] { KnobDoor.Shut.Normal, KnobDoor.Shut.Gentle, KnobDoor.Shut.Hard })
+                    yield return KnobDoor.Key(true, KnobDoor.Construction.HollowCore, id, door.SwingSeconds, how, size.X, size.Y);
+                break;
+            case DoorKind.PushBar:
+                if (size == Vector3.Zero) size = new Vector3(1.0f, 2.1f, 0.08f);
+                yield return PushBarDoor.Key(false, id, door.SwingSeconds, size.X, size.Y);
+                yield return PushBarDoor.Key(false, id, door.SwingSeconds, size.X, size.Y, pull: true);
+                yield return PushBarDoor.Key(true, id, door.SwingSeconds, size.X, size.Y);
+                break;
+            case DoorKind.GlassPushBar or DoorKind.GlassPull:
+            {
+                if (size == Vector3.Zero) size = new Vector3(1.0f, 2.1f, 0.012f);
+                var glass = kind == DoorKind.GlassPushBar ? GlassDoor.Kind.PushBar : GlassDoor.Kind.Pull;
+                var opens = kind == DoorKind.GlassPushBar
+                    ? new[] { GlassDoor.Opening.Push, GlassDoor.Opening.Pull, GlassDoor.Opening.Key }
+                    : new[] { GlassDoor.Opening.Pull, GlassDoor.Opening.Push };
+                foreach (var how in opens)
+                    yield return GlassDoor.Key(glass, false, how, GlassDoor.Glazing.Tempered, id, door.SwingSeconds, size.X, size.Y);
+                yield return GlassDoor.Key(glass, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, id, door.SwingSeconds, size.X, size.Y);
+                break;
+            }
+            case DoorKind.AutoSliding or DoorKind.PatioSliding:
+            {
+                var slide = kind == DoorKind.AutoSliding ? SlidingDoor.Kind.Automatic : SlidingDoor.Kind.Patio;
+                if (size == Vector3.Zero) size = new Vector3(slide == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f, 0.02f);
+                yield return SlidingDoor.Key(slide, false, id, door.SwingSeconds, size.X, size.Y);
+                yield return SlidingDoor.Key(slide, true, id, closeTravel, size.X, size.Y);
+                break;
+            }
+            case DoorKind.Elevator:
+                if (size == Vector3.Zero) size = new Vector3(0.55f, 2.1f, 0.04f);
+                yield return ElevatorDoor.Key(false, id, door.SwingSeconds, size.X, size.Y, door.HingeSide > 0f);
+                yield return ElevatorDoor.Key(true, id, closeTravel, size.X, size.Y, door.HingeSide > 0f);
+                break;
+        }
+        // The key in its lock, from the keyed side (KeySound); a sliding leaf has no cylinder.
+        if (door.KeyedSide != 0f && !door.Slides)
+        {
+            var host = kind switch
+            {
+                DoorKind.GlassPushBar or DoorKind.GlassPull => LockCylinder.Host.AluminiumStile,
+                DoorKind.PushBar => LockCylinder.Host.SteelDoor,
+                _ => LockCylinder.Host.WoodDoor,
+            };
+            yield return LockCylinder.Key(host, id);
+        }
+    }
+
+    /// <summary>Every door model key the doors of a map can send, each once, the commonest first and the glass doors,
+    /// the slowest to render, last.</summary>
+    public static string[] RenderKeys(World world)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        world.Query(new QueryDescription().WithAll<DoorComponent>(), (Entity e) =>
+        {
+            foreach (string key in RenderKeysOf(world, e)) counts[key] = counts.GetValueOrDefault(key) + 1;
+        });
+        return counts.OrderBy(k => k.Key.StartsWith(GlassDoor.KeyPrefix, StringComparison.Ordinal))
+                     .ThenByDescending(k => k.Value).ThenBy(k => k.Key, StringComparer.Ordinal)
+                     .Select(k => k.Key).ToArray();
+    }
+
     /// <summary>What fills a hollow door between its skins, kg/m^3: kraft honeycomb or mineral core,
     /// with the edge channels and the lock reinforcement averaged in.</summary>
     private const float HollowCoreKgM3 = 150f;

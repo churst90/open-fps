@@ -435,6 +435,61 @@ The heart of it. Four sessions, each mergeable on its own.
   the same calls). Map tests: the roof, glass and entrance answers for every entity on the three maps
   equal today's except where a name was misleading, listed.
 
+**P5 as built (2026-10-11).** No map file changed and no generator; nothing heard changed on a shipped map.
+
+- **One material table (S22).** `MaterialProperties` carries a round's strike (`StrikeBehaviour`: kind, crater
+  energy, chip, chip contact, a debris density where the debris is something else, the spray's low band) and its
+  ricochet (`RicochetFace`, null where a round goes in), and `Leaves` (a volume of leaves) and `Underfoot` (deck
+  span and thickness, grit, loose pieces). `BulletImpact.StuffOf`, `Ricochet.TryFace` and Footsteps' span, deck,
+  texture and loose-piece tables read them through `GetProperties`, so an alias is its material ("Steel" strikes,
+  skips and rings as Metal) and a material made "like" another strikes as its family does with its own density
+  (stainless, aluminium, cast iron as metal; oak, pine, plywood as wood). Debris weighs what the material does; the
+  tables' densities were the registry's but for grass (1,500, the soil under the turf, kept as its debris density).
+  Every material has a strike (an error at load if not; a test); ice, snow, fabric and foam were given theirs
+  (ice brittle and skipping as concrete, snow a soil, both EST). The registry's unknown-name message is an error
+  now, and rain no longer tests `IsKnown` to keep it quiet. `MaterialStrikeTests` holds every number of the old
+  three tables.
+- **Glazing (S9).** `PrefabTemplate.Glazing` (Annealed, Tempered, Laminated), in the schema and so in the editor;
+  the validator rejects glass without it and anything else with it. The five glass prefabs say Tempered. `GlassKind`
+  reads it (a car's glass is still chosen by where it is in the car); a pane that declares none is an error once by
+  prefab and breaks as tempered. Every pane on the four shipped maps is the glass the names made it
+  (`GlassKindTests`). Glass is the material's family (`AcousticRegistry.IsGlass`) in combat, `EntityGeometry`'s
+  flag and the sight test, so laminated glass breaks and is seen through too.
+- **Roofs (S9).** `Scope.StandsOnRoof`: the surface under you is a roof shape (`SurfaceFlags.Roof`, from the
+  shape library), or you are under the open sky, in no room, with a room's air within 3 m under what you stand on.
+  The name test in `EntityGeometry` is gone, not kept as a fallback: nothing else read the flag. Over every top
+  wide enough to stand on: the city 1,439 the same, the two bus shelters' canopies (metal_roof, no room under)
+  no longer "on a roof"; Albany 13,605 the same; Magnolia 10,768 the same and one more, 15969 North Cooter Street's
+  ceiling, which its roof form leaves under the sky. The landings called "to the roof" are inside their stairwells
+  and were never stood on as roofs.
+- **Entrances (S9).** `MapTracker.IsEntrance`: an exit beacon, or an opening joining a room and the open air (its
+  portal's two sides), a door because it is made to be walked through and an opening with no leaf where a floor
+  lies within half a metre of its sill on both sides. An opening is said by the room it is the way into ("Hangar
+  entrance"). City: 143 the same; the wall over the hangar's front ("Hangar front entrance") is not one and the
+  opening under it is; the tunnel's two mouths and the garage's street-level east side are; the garage's sides
+  over their parapets and its upper decks' east sides are not. Albany 1,521 the same, Magnolia 1,136: the 22
+  concrete landings named for their entrance are floors, and Magnolia's three barn doorways (no leaf) are
+  entrances. The server's `Haunts` still finds front entrances by name: every house door joins a room and the
+  open air, and Alex would wait at all of them, so which doors are front entrances is Cody's to say.
+- **Door models (S10).** One table in `WorldAudioPlayer` (`DoorModels`: prefix, renderer, lateness); a key no row
+  names is not a door model, and `RenderDoorKey` throws for one instead of handing it to the knob door.
+- **Door prewarm (S32).** `DoorSystem.RenderKeysOf` builds every key a door can send as its sounds build them
+  (every opening, every close and knob shut, the key in its lock), `RenderKeys` a map's, commonest first and glass
+  last; `MapManifest.DoorRenderKeys` (appended) carries them and the client renders them as the map arrives, with
+  the cars' windows after. City 87 (the old list made 140 for the city), Magnolia 120, Albany 105. The old list
+  missed every door on the places (knob doors 0.9 to 1.05 m wide, glass pull doors 1.1 m). `--prerender-doors`
+  reads every shipped map.
+- **Leaves and families.** Rain's pool and canopy, the birds' hedges, the crown that burns as a tree and the
+  foliage flag read `Leaves`; a pool is a liquid's family; the fuel trunk is any wood. Nothing shipped is made of
+  anything these widen to.
+- **Left.** The storey in `MapTracker.Floors` from the building (S32); the glass door's key still says tempered
+  in `DoorSystem` rather than reading the prefab; a declared roofing field if the shelters' canopies should be roofs
+  (it would have to reach the client); the server's `Haunts` (above).
+- **Guards.** Render fingerprints, the eight replay streams, `VoiceIdBandTests` and `ModelKindTableTests`
+  unchanged. The wire hash changes, as any change to the libraries' sources does, and the protocol by one appended
+  manifest field. `Glass.cs` and `AcousticRegistry.cs` are door model sources, so the door render cache's name
+  changes and each door is rendered once more; the renders are the same.
+
 #### P6. One path model for every asker (0.5 session, or inside P3b)
 
 - **Changes.** Birds, beacons and rain patches ask the worker under probe ids, as one-offs do

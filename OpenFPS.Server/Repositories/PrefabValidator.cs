@@ -59,6 +59,15 @@ public static class PrefabValidator
             r.Errors.Add($"Material '{t.Material}' is not a known material — it would silently fall back to 'Generic'. " +
                          $"Known: {string.Join(", ", AcousticRegistry.KnownMaterials())}.");
 
+        // --- Glazing: how glass breaks is what kind of glass it is, which its name cannot say.
+        bool glass = !string.IsNullOrEmpty(t.Material) && AcousticRegistry.IsKnown(t.Material)
+                     && AcousticRegistry.GetProperties(t.Material).Family == "glass";
+        if (glass && t.Glazing == null)
+            r.Errors.Add($"Material '{t.Material}' is glass but Glazing is not set. Say what kind it is (Annealed, Tempered or " +
+                         "Laminated): it decides whether a shot pane shatters, drills or holds.");
+        else if (!glass && t.Glazing != null)
+            r.Errors.Add($"Glazing is set but Material '{t.Material}' is not glass, so nothing reads it.");
+
         // --- Collider -------------------------------------------------------------------------------
         bool hasCollider = t.ColliderSize.HasValue;
         var shape = t.Shape ?? ColliderShape.Box;

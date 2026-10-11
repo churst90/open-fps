@@ -64,8 +64,7 @@ public static class EntityGeometry
         var a = def.Acoustics;
         bool emitter = !string.IsNullOrEmpty(def.SoundEmitter.SoundId);
         var surface = SurfaceOf(def.Material.Material, def.Collider.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow,
-                                a.ShellThickness, a.Absorption, emitter, moves: false, doorLeaf: role == GeometryRole.Mover,
-                                def.Identity.Name);
+                                a.ShellThickness, a.Absorption, emitter, moves: false, doorLeaf: role == GeometryRole.Mover);
         if (role == GeometryRole.SightOnly) surface = SightOnly(surface);
         if (def.Collider.Shape == Components.ColliderShape.Terrain)
             return def.Terrain is { Posts: >= 2 } terrain ? TerrainSpec(def.EntityId, transform.Position, terrain, surface) : default;
@@ -83,21 +82,23 @@ public static class EntityGeometry
 
     /// <summary>
     /// The surface of a solid box entity. Every physical layer, and the acoustic one unless it is a sound
-    /// source's own box or something that moves (the rule SteamAudioScene.BoxesFromWorld applies).
+    /// source's own box or something that moves (the rule SteamAudioScene.BoxesFromWorld applies). Glass by its
+    /// material's family. Nothing here is read from a name: a box that is a roof is told by what is under it
+    /// (Scope.StandsOnRoof), a roof shape by its shape.
     /// </summary>
     public static Surface SurfaceOf(string? material, Vector3 size, float leafMetres, float studSpacingMetres,
                                     bool hollow, float shellThickness, float absorption, bool emitter, bool moves,
-                                    bool doorLeaf, string? name)
+                                    bool doorLeaf)
     {
         // Kept empty when empty: some queries read that as "Generic", some pass it on.
         var mat = material ?? "";
         var layers = GeometryLayers.Physical;
         if (!emitter && !moves) layers |= GeometryLayers.Acoustics;
         var flags = SurfaceFlags.None;
-        if (string.Equals(mat, "Glass", StringComparison.OrdinalIgnoreCase)) flags |= SurfaceFlags.Glass;
+        if (AcousticRegistry.IsGlass(mat)) flags |= SurfaceFlags.Glass;
+        if (AcousticRegistry.IsLeaves(mat)) flags |= SurfaceFlags.Foliage;
         if (doorLeaf) flags |= SurfaceFlags.DoorLeaf;
         if (hollow) flags |= SurfaceFlags.Hollow;
-        if (name != null && name.Contains("roof", StringComparison.OrdinalIgnoreCase)) flags |= SurfaceFlags.Roof;
         return new Surface(mat, new Construction(size, new WallBuild(leafMetres, studSpacingMetres), shellThickness),
                            layers, flags, absorption);
     }

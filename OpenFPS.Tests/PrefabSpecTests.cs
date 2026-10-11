@@ -119,6 +119,20 @@ public class PrefabSpecTests
     [Fact]
     public void MissingName_IsRejected() => Rejects(new PrefabTemplate { Id = "x" }, "Name is missing");
 
+    /// <summary>Glass says what kind of glass it is, and only glass says it (GlassKind).</summary>
+    [Fact]
+    public void GlassWithoutGlazing_IsRejected()
+    {
+        var t = Valid();
+        t.Material = "LaminatedGlass";
+        Rejects(t, "Glazing is not set");
+        t.Glazing = OpenFPS.Common.GlassType.Laminated;
+        Assert.True(PrefabValidator.Validate(t).IsValid);
+        var brick = Valid();
+        brick.Glazing = OpenFPS.Common.GlassType.Annealed;
+        Rejects(brick, "is not glass");
+    }
+
     [Fact]
     public void UnknownMaterial_IsRejected()
     {

@@ -66,6 +66,7 @@ shape of it.
 |---|---|---|
 | Identity | `Id`, `Name`, `Description`, `Announce`, `Type`, `Material` | `NameComponent`, `IdentityComponent`, `EntityType`, `MaterialComponent` |
 | Collider | `ColliderSize`, `Shape`, `IsSolid` | `ColliderComponent` |
+| Glazing | `Glazing` (`Annealed`, `Tempered`, `Laminated`): required on anything of glass, refused on anything else; how a shot pane breaks | read from the prefab by the server (`GlassKind`) |
 | Health | `MaxHealth` | `HealthComponent` |
 | Crowd | `CrowdPeople`, `CrowdReactRadiusMetres` | `CrowdComponent` |
 | Item | `IsItem`, `ItemWeight`, `Hands`, `WeaponId`, `Premium` | `ItemComponent` |
