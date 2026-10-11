@@ -573,7 +573,9 @@ public static partial class PhysicsReplays
     /// <paramref name="tolerance"/> of the stored one (the maths library rounds differently on other
     /// machines). Null when they agree; else the first line that does not, both ways.
     /// </summary>
-    public static string? Compare(string stored, string now, Func<int, double> tolerance)
+    /// <remarks>An <paramref name="angle"/> column is radians, compared round the circle: a heading due south
+    /// is pi on one machine and -pi on another (GitHub's runner, 2026-10-11).</remarks>
+    public static string? Compare(string stored, string now, Func<int, double> tolerance, Func<int, bool>? angle = null)
     {
         var a = stored.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
         var b = now.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
@@ -589,7 +591,7 @@ public static partial class PhysicsReplays
             {
                 if (ca[c] == cb[c]) continue;
                 same = double.TryParse(ca[c], NumberStyles.Float, Inv, out double x) && double.TryParse(cb[c], NumberStyles.Float, Inv, out double y)
-                       && Math.Abs(x - y) <= tolerance(c);
+                       && (angle != null && angle(c) ? Math.Abs(Math.IEEERemainder(x - y, 2 * Math.PI)) : Math.Abs(x - y)) <= tolerance(c);
             }
             if (!same) return $"line {i + 1}:\n  stored {a[i]}\n  now    {b[i]}";
         }

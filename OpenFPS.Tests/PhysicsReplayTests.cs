@@ -54,12 +54,12 @@ public static class PhysicsStore
 
     /// <summary>Compares a run with its stored copy, or stores it when writing. Fails on the first line that
     /// moved past its column's tolerance, both lines shown.</summary>
-    public static void Check(string path, string now, Func<int, double> tolerance, string what)
+    public static void Check(string path, string now, Func<int, double> tolerance, string what, Func<int, bool>? angle = null)
     {
         if (Writing) { Write(path, now); return; }
         string stored = Read(path);
         Assert.False(stored.Length == 0, $"no stored {what} at {path}: run with OPENFPS_PHYSICS_WRITE=1 to make it");
-        string? diff = PhysicsReplays.Compare(stored, now, tolerance);
+        string? diff = PhysicsReplays.Compare(stored, now, tolerance, angle);
         Assert.True(diff == null, $"{what} changed from its stored copy ({Path.GetFileName(path)}). If the change is intended, "
             + $"regenerate with OPENFPS_PHYSICS_WRITE=1 and say why in the commit.\n{diff}");
     }
@@ -176,7 +176,7 @@ public class DrivingReplayTests : IClassFixture<PhysicsStore.Maps>
         var map = _maps.Get(script.Map);
         string track = PhysicsReplays.Drive(map, script);
         Assert.True(track == PhysicsReplays.Drive(map, script), "the same drive twice took two tracks");
-        PhysicsStore.Check(PhysicsStore.PathOf("drives", name + ".tsv"), track, DriveTolerance, $"drive {name}");
+        PhysicsStore.Check(PhysicsStore.PathOf("drives", name + ".tsv"), track, DriveTolerance, $"drive {name}", c => c == 5);
     }
 
     private static double MoverTolerance(int column) => column switch { 3 or 4 or 5 or 6 or 7 => 2e-3, >= 8 => 1, _ => 0 };
@@ -186,7 +186,7 @@ public class DrivingReplayTests : IClassFixture<PhysicsStore.Maps>
     {
         string text = PhysicsReplays.Traffic(PhysicsReplays.Load("city", PhysicsStore.Folders));
         Assert.True(text == PhysicsReplays.Traffic(PhysicsReplays.Load("city", PhysicsStore.Folders)), "the same minute of traffic twice ran two ways");
-        PhysicsStore.Check(PhysicsStore.PathOf("traffic.tsv.gz"), text, MoverTolerance, "the city's traffic");
+        PhysicsStore.Check(PhysicsStore.PathOf("traffic.tsv.gz"), text, MoverTolerance, "the city's traffic", c => c == 6);
     }
 }
 
@@ -199,7 +199,7 @@ public class RailReplayTests
     {
         string text = PhysicsReplays.Rail(PhysicsReplays.Load("city", PhysicsStore.Folders));
         Assert.True(text == PhysicsReplays.Rail(PhysicsReplays.Load("city", PhysicsStore.Folders)), "the same trains twice ran two ways");
-        PhysicsStore.Check(PhysicsStore.PathOf("rail.tsv.gz"), text, c => c is 3 or 4 or 5 or 6 or 7 ? 2e-3 : c >= 8 ? 1 : 0, "the city's trains");
+        PhysicsStore.Check(PhysicsStore.PathOf("rail.tsv.gz"), text, c => c is 3 or 4 or 5 or 6 or 7 ? 2e-3 : c >= 8 ? 1 : 0, "the city's trains", c => c == 6);
     }
 }
 
