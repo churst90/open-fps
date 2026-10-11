@@ -117,7 +117,7 @@ public class ServerHardeningTests : IDisposable
         var rig = new WorldEditorTests.Rig(_dir, UserRole.Player);
         rig.On("mine");
         Assert.StartsWith("Placed", rig.Run("edit", "place", "concrete_wall"));
-        string said = rig.Run("set_sound", "AMBIENCE/woods_mid_day", volume);
+        string said = rig.Run("set_sound", "BEACONS/chirp", volume);
         Assert.Contains("volume", said);
         var volumes = new List<float>();
         rig.World("mine").Query(new Arch.Core.QueryDescription().WithAll<SoundEmitterComponent>(), (ref SoundEmitterComponent em) => volumes.Add(em.Volume));
@@ -130,7 +130,7 @@ public class ServerHardeningTests : IDisposable
         var rig = new WorldEditorTests.Rig(_dir, UserRole.Player);
         rig.On("mine");
         Assert.StartsWith("Placed", rig.Run("edit", "place", "concrete_wall"));
-        Assert.StartsWith("Attached sound", rig.Run("set_sound", "AMBIENCE/woods_mid_day", "0.8"));
+        Assert.StartsWith("Attached sound", rig.Run("set_sound", "BEACONS/chirp", "0.8"));
     }
 
     [Theory]

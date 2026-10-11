@@ -2,10 +2,8 @@
 """
 Turn a drop folder of downloaded audio into the shape the engine actually reads.
 
-Nothing arrives usable. Ambisonic beds come at 96 kHz and seven minutes long, which is 650 MB of RAM
-once the bed DSP loads one as float. Footstep "samples" are ninety-second studio takes with a hundred
-and seventy steps in them, not one-shots. Stereo ambiences are 128 kbps MP3 at whatever level the
-uploader felt like. And the engine wants one sample rate, mono for anything it will spatialize, and a
+Nothing arrives usable. Footstep "samples" are ninety-second studio takes with a hundred and seventy
+steps in them, not one-shots. And the engine wants one sample rate, mono for anything it will spatialize, and a
 specific folder layout it resolves by name.
 
 So this is the step between "downloaded" and "committed". It reads `inbox/`, writes into the ASSETS
@@ -40,11 +38,6 @@ DEFAULT_OUT = REPO / "OpenFPS.Client" / "ASSETS" / "SOUNDS"
 # shipping 96 kHz costs memory and disk and buys nothing at all. Files already in ASSETS at 44.1 kHz
 # play correctly (FMOD's spline resampler brings them up).
 TARGET_RATE = 48000
-
-# An ambisonic bed is held in memory as float PCM for its whole length. 90 seconds of first order at
-# 48 kHz is about 69 MB; the seven-minute 96 kHz original is 647 MB.
-MAX_BED_SECONDS = 90
-MAX_STEREO_BED_SECONDS = 120
 
 # Peak target for one-shots. Short of full scale so the mix has room before the master limiter.
 ONESHOT_PEAK_DB = -3.0
@@ -144,109 +137,6 @@ class Manifest:
             by_source[e["source"]] = e
         path.write_text(json.dumps({"entries": list(by_source.values())}, indent=2) + "\n")
         return path
-
-
-# ── Ambisonic beds ──────────────────────────────────────────────────────────────────────────────
-
-def ingest_ambisonic(src_dir: Path, out_dir: Path, manifest: Manifest, dry, force):
-    """Resample and trim a soundfield WITHOUT touching its channel order.
-
-    sox, not ffmpeg, and deliberately: ffmpeg gives a 4-channel WAV the 'quad' speaker layout and is
-    entitled to reorder or downmix it during a format conversion. To sox the channels are opaque and
-    numbered, which is exactly what an ambisonic signal needs — W, Y, Z, X are not speakers and must
-    arrive in the order they left.
-    """
-    dest = out_dir / "AMBIENCE"
-    count = 0
-    for src in sorted(src_dir.glob("*")):
-        if not src.is_file():
-            continue
-        info = probe(src)
-        if not info:
-            print(f"  SKIP {src.name}: not readable as audio")
-            continue
-
-        order = round(info["channels"] ** 0.5) - 1
-        if (order + 1) ** 2 != info["channels"] or order < 1:
-            print(f"  SKIP {src.name}: {info['channels']} channels is not a full-sphere ambisonic "
-                  f"layout (4, 9 or 16)")
-            continue
-
-        out = dest / f"{slug(src.stem)}.wav"
-        trimmed = min(info["duration"], MAX_BED_SECONDS)
-        note = (f"first-order ambisonic, {info['rate']} Hz -> {TARGET_RATE} Hz, "
-                f"{info['duration']:.0f}s -> {trimmed:.0f}s")
-        print(f"  {src.name}: {info['channels']}ch {info['rate']}Hz {info['duration']:.0f}s -> "
-              f"{out.name} ({note})")
-
-        if dry:
-            count += 1
-            continue
-        if out.exists() and not force:
-            print(f"    exists, skipping (use --force to replace)")
-            continue
-
-        dest.mkdir(parents=True, exist_ok=True)
-        # `gain -n -3` normalizes the whole FILE by one factor, not per channel. Per-channel
-        # normalization would rescale W against X/Y/Z and tilt the entire soundfield.
-        # 16-bit, not 24: an ambience bed is diffuse background at low level, the bed DSP holds it as
-        # float32 in memory either way, and 24-bit only doubles what sits in the repository.
-        r = run(["sox", str(src), "-b", "16", "-r", str(TARGET_RATE), str(out),
-                 "trim", "0", str(trimmed), "gain", "-n", "-3"])
-        if r.returncode != 0:
-            print(f"    FAILED: {r.stderr.strip().splitlines()[:1]}")
-            continue
-
-        check = probe(out)
-        if not check or check["channels"] != info["channels"]:
-            print(f"    FAILED: channel count changed ({info['channels']} -> "
-                  f"{check['channels'] if check else '?'}). The soundfield would be wrong; removing.")
-            out.unlink(missing_ok=True)
-            continue
-
-        manifest.add(src, [out], note)
-        count += 1
-    return count
-
-
-# ── Stereo ambience beds ────────────────────────────────────────────────────────────────────────
-
-def ingest_stereo_beds(src_dir: Path, out_dir: Path, manifest: Manifest, dry, force):
-    """Head-locked diffuse beds. Legitimate for content with nothing localizable in it — distant
-    traffic, crickets, wind wash — and wrong for anything a player might try to point at."""
-    dest = out_dir / "AMBIENCE" / "stereo"
-    count = 0
-    for src in sorted(src_dir.glob("*")):
-        if not src.is_file():
-            continue
-        info = probe(src)
-        if not info:
-            print(f"  SKIP {src.name}: not readable as audio")
-            continue
-
-        # Stays compressed. These sources are 128 kbps MP3; decoding one to WAV inflates it tenfold
-        # and recovers nothing, and AudioBank indexes .ogg as happily as .wav.
-        out = dest / f"{slug(src.stem)}.ogg"
-        trimmed = min(info["duration"], MAX_STEREO_BED_SECONDS)
-        print(f"  {src.name}: {info['channels']}ch {info['rate']}Hz {info['duration']:.0f}s -> {out.name}")
-        if dry:
-            count += 1
-            continue
-        if out.exists() and not force:
-            print(f"    exists, skipping (use --force to replace)")
-            continue
-
-        dest.mkdir(parents=True, exist_ok=True)
-        r = run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-t", str(trimmed),
-                 "-ar", str(TARGET_RATE), "-ac", "2",
-                 "-af", "loudnorm=I=-23:TP=-2:LRA=7",
-                 "-c:a", "libvorbis", "-q:a", "4", str(out)])
-        if r.returncode != 0:
-            print(f"    FAILED: {r.stderr.strip().splitlines()[:1]}")
-            continue
-        manifest.add(src, [out], f"stereo bed, head-locked; {info['rate']} Hz -> {TARGET_RATE} Hz")
-        count += 1
-    return count
 
 
 # ── Footsteps ───────────────────────────────────────────────────────────────────────────────────
@@ -1737,8 +1627,6 @@ def slug(name: str) -> str:
 # The two that take --per-pool are marked, because they slice or choose from a pool rather than
 # converting one file to one file.
 CATEGORIES = {
-    "ambisonic": ("ambisonic ambiance", ingest_ambisonic, False),
-    "stereo": ("outdoor ambiance non ambisonic", ingest_stereo_beds, False),
     "footsteps": ("foot steps sounds", ingest_footsteps, True),
     "weapons": ("weapons", ingest_weapons, True),
     "glass": ("glass breaking", ingest_glass, False),

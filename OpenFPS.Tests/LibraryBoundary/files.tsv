@@ -27,7 +27,6 @@ OpenFPS.Client.Core/AudioEngine/Acoustics/OpeningGraph.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Acoustics/RouteAnswers.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	lib	Audio	
-OpenFPS.Client.Core/AudioEngine/Core/AmbisonicFormat.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/AudioBank.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/AudioEngineFacade.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	lib	Audio	
@@ -65,7 +64,6 @@ OpenFPS.Client.Core/AudioEngine/Fmod/TakeLevels.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/AcousticGeometry.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbiAxes.cs	lib	Audio	
-OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbisonicBedDsp.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/DiffuseLate.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/EarDecorrelator.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/EarlyCopies.cs	lib	Audio	

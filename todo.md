@@ -420,6 +420,25 @@ aluminium sheet is far too sustained and tonal. Kept in the game meanwhile.
 
 ## Next
 
+### Air moved by things, leaves, impacts, a physics project (asked 2026-10-11, to discuss)
+- A passing bus moves no air today. Wind is the weather's field (`WindField`) and the ear wind reads it; a
+  vehicle only blocks sound (`VehicleShadow`). Wanted: a moving body pushes air (a pressure pulse ahead, a
+  turbulent wake behind that decays with distance and time) into the same local air the ear wind, foliage
+  and loose things read, so a bus at close range is felt at the ears and stirs what lies about.
+- Leaves on the ground: leaf litter exists only as a ground material (`LandCover` forest floor, footsteps in
+  leaves). Proposed: a litter layer as data per ground cell (cover and depth, like the puddles and run-off),
+  lifted and skittered when the local air passes a threshold speed, heard as texture events at that rate,
+  read by footsteps; not one object per leaf.
+- Impacts: a vehicle that hits something stops and the impact is heard (`ImpactAcoustics`), but no momentum
+  passes on (`DrivingSystem.cs:388`, "TODO: the impulse and the damage"). Wanted: bodies with mass and
+  velocity, momentum exchanged on contact with restitution, a struck person or object thrown and landing
+  (`BodyFall` for the sound), damage from the closing speed.
+- Physics is not one project: player movement in Common (`SharedMovementEngine`, `PhysicsUtils`), vehicles,
+  wheels and doors in Sound (`Chassis`, `WheelDynamics`, `VehicleBody`, `DoorPhysics`, by the 2026-10-06
+  decision), collision in Geometry, the stepping in the server (`MovementSystem`, `DrivingSystem`).
+  Proposed: an `OpenFPS.Physics` project on Geometry (bodies, contacts, momentum, air), with Sound reading
+  physics state rather than owning it. Cody's call (it revisits the vehicle-physics-in-Sound decision).
+
 ### Doors as live models (filed 2026-10-05, not started)
 The door models are physical but rendered once per key, slower than real time, and replayed from the
 handle; the leaf does not swing in the world. Cody wants the squeak in the hinge and the leaf's sound

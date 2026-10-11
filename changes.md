@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- The ambience recordings are gone (Cody: "remove those ambiences completely we simply don't need them"): the
+  three four-channel beds and six stereo ones (90 MB, never in git), every copy in the build and publish
+  folders, the ambisonic bed stage and its format helpers (`AmbisonicBedDsp`, `AmbisonicFormat`), the lab's
+  `--ambisonic` and the ingest tool's two bed categories. The client no longer decodes 10 million samples at
+  start that nothing played, and the Windows zip loses 90 MB. The traced reverb's own ambisonic decode
+  (`PhononAmbisonics`) is untouched.
+- Build warnings cleared: the server and the GTK client build with none. SQLite's native library under EF Core
+  to 3.50.3 (2.1.10 bundled SQLite before 3.50.2, CVE-2025-6965); stack buffers made once outside their loops;
+  a train voice whose group has no source this frame is skipped instead of reading an empty snapshot.
 - What Cody heard in Marlow Tower on 2026-10-10, traced and fixed, unheard (docs/GEOMETRY.md 12.6, "Marlow
   Tower's leaks"). Three causes, none of them the rooms' floods:
   - **The train "clear as day" in the floor 3 corridor** was its horn, playing at 74 dB at the ear with nothing

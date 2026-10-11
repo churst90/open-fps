@@ -694,26 +694,6 @@ public class DspCallbackTests
     }
 
     /// <summary>
-    /// The ambisonic bed without Steam Audio: a bed with no decoder, or a block of the wrong size, is
-    /// silence, and the bed says why it bailed. Nothing allocated. (The decode needs the native library.)
-    /// </summary>
-    [Fact]
-    public void AnAmbisonicBedWithNoDecoderIsSilentAndSaysWhy()
-    {
-        var read = Callback(typeof(AmbisonicBedDsp));
-        var bed = new AmbisonicBedState { FrameSize = Block, Channels = 4, Order = 1, SourceSampleRate = Rate, Pcm = Enumerable.Repeat(0.3f, 4 * Rate).ToArray() };
-        using var dsp = new FakeDsp(bed);
-        using var output = new Pinned(Block * 2);
-        Array.Fill(output.Data, 9f);
-        Run(read, dsp, IntPtr.Zero, output, Block, 0, 2);
-        Assert.All(output.Data, v => Assert.Equal(0f, v));
-        Assert.Equal(2, bed.Bailed);                                   // no decode effect
-        Run(read, dsp, IntPtr.Zero, output, Block / 2, 0, 2);
-        Assert.Equal(1, bed.Bailed);                                   // not the effect's block
-        Assert.Equal(0, AllocatedOver(() => Run(read, dsp, IntPtr.Zero, output, Block, 0, 2), 8));
-    }
-
-    /// <summary>
     /// The traced reverb stage without a trace: silence, counted as a bail; and a send with a NaN in it
     /// is silence, the input named once. Nothing allocated. (The convolution and the decode need the
     /// native library.)
@@ -824,7 +804,6 @@ public class DspCallbackTests
     [InlineData(typeof(GranularProcessor), "ReadCallback", false)]
     [InlineData(typeof(EarWindProcessor), "ReadCallback", false)]
     [InlineData(typeof(OwnVoiceProcessor), "ReadCallback", false)]
-    [InlineData(typeof(AmbisonicBedDsp), "ReadCallback", false)]
     [InlineData(typeof(TracedReverbDsp), "Read", false)]
     [InlineData(typeof(EarProcessor), "ReadCallback", true)]
     [InlineData(typeof(BoundaryProximityProcessor), "ReadCallback", true)]

@@ -56,7 +56,6 @@ FILE_RULES = [
     (CC + 'AudioEngine/Core/AudioEngineFacade.cs', 'a', 'Audio', ''),
     (CC + 'AudioEngine/Core/VoiceManager.cs', 'a', 'Audio', ''),
     (CC + 'AudioEngine/Core/AudioBank.cs', 'a', 'Audio', ''),
-    (CC + 'AudioEngine/Core/AmbisonicFormat.cs', 'a', 'Audio', ''),
     (CC + 'AudioEngine/Core/DoorRenderCache.cs', 'a', 'Audio', 'disk cache of door renders'),
     # Synthesis: managed, no FMOD
     (CC + 'AudioEngine/Core/', 'a', 'Sound', 'synthesis'),

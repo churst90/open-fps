@@ -83,7 +83,7 @@ public partial class CommandHandler
 
     /// <summary>Every client opens a sound id as a file, so only a relative name under its sounds folder.</summary>
     private static string NotASoundId(string id)
-        => $"'{AuthService.ForLog(id)}' is not a sound id: a name under the sounds folder, like AMBIENCE/woods_mid_day.";
+        => $"'{AuthService.ForLog(id)}' is not a sound id: a name under the sounds folder, like BEACONS/chirp.";
 
     private void HandleSetSound(UserSession session, string[] args, Action<IMessage> reply)
     {

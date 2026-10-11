@@ -216,7 +216,6 @@ string[] usage =
     "  --geometry-parity [map=city] [n=4000] [only=rays,ground,...]",
     "                                                old box path and triangle world side by side, every difference",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
-    "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
     "  --eq-onset [out=FILE]                         THREE_EQ at a voice's start and when its gains change",
     "  --quality resampler|orbit|echo|ceiling|quant|lsb|output|limiter|thunderfile|scene=NAME [out=DIR] [tag=]",
@@ -1276,13 +1275,6 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
     Environment.Exit(code);
 }
 
-if (args.Contains("--ambisonic"))
-{
-    Console.WriteLine("--- Ambisonics: does a recorded soundfield rotate with the listener and decode to the right ear? ---");
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.AmbisonicSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
 
 if (args.Contains("--room-walk"))
 {
