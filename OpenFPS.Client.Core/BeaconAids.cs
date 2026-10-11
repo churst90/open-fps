@@ -336,7 +336,7 @@ public sealed class BeaconAids
         // Nor is a marker nothing can bump into, such as the end of a flight of stairs.
         foreach (int id in world.MarkerEntityIds)
             if (world.Entities.TryGetValue(id, out var e)) Consider(e);
-        found.Sort((a, b) => a.D.CompareTo(b.D));
+        found.Sort(static (a, b) => (a.D, a.Id).CompareTo((b.D, b.Id)));
         var result = new List<(int, Vector3)>();
         var seen = new HashSet<int>();
         foreach (var f in found)

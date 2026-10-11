@@ -37,6 +37,9 @@ public sealed class BirdLife
         public required BirdSpecies Species;
         public required Vector3 Centre;
         public required Bird[] Birds;
+        /// <summary>What the group perches on: the order groups are woken in, and so draw from the one
+        /// generator in.</summary>
+        public int Perch;
         public double QuietUntil;
         public bool Awake;
         /// <summary>Geese only: where the skein is and where it is going.</summary>
@@ -129,6 +132,9 @@ public sealed class BirdLife
             if (hash < 0.5f) _perched.Add(Settle(BirdSpecies.Pigeon, e, size, onTop: true));
             else if (hash > 0.85f) _perched.Add(Settle(BirdSpecies.Crow, e, size, onTop: true));
         }
+        // By perch, not the order the world listed them in (which follows the processor count): the groups
+        // draw their timings from one generator in this order.
+        _perched.Sort(static (a, b) => a.Perch.CompareTo(b.Perch));
         Serilog.Log.Information("Birds: {Census}", string.Join(", ", CensusText()));
     }
 
@@ -214,7 +220,7 @@ public sealed class BirdLife
                 CallsLeft = 0,
             };
         }
-        return new Group { Species = species, Centre = perch.Transform.Position, Birds = birds };
+        return new Group { Species = species, Centre = perch.Transform.Position, Birds = birds, Perch = perch.Id };
     }
 
     private static string[] Pick(IReadOnlyList<string> calls, Random rng, int count)

@@ -131,6 +131,10 @@ public sealed class SteamAudioScene : IDisposable
                               new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), snap.Id, def.Collider.Form,
                               OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(def)));
         }
+        // In id order, not the order the world listed them in (a ConcurrentDictionary's, which follows the
+        // processor count): a box's place in the list is its surfaces' ids (EarlyReflections.SurfaceId),
+        // and so which wall each reflection voice is and which of two equal walls is kept.
+        boxes.Sort(static (a, b) => a.EntityId.CompareTo(b.EntityId));
         return boxes;
     }
 

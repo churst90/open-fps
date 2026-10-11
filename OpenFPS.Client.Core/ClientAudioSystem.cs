@@ -1324,6 +1324,7 @@ public partial class ClientAudioSystem
                 if (rail) { g.Train = group; g.Live = _liveTrains.Contains(group); g.Held = _trainStarted.TryGetValue(group, out double t0) && now - t0 < EngineMinimumHoldSeconds; }
             }
             g.Members.Add(entityId);
+            g.FirstId = g.Members.Count == 1 ? entityId : Math.Min(g.FirstId, entityId);
             g.Level = MathF.Max(g.Level, level);
             if (rail) continue;
             if (_liveMachines.Contains(entityId)) g.Live = true;
@@ -1340,7 +1341,10 @@ public partial class ClientAudioSystem
         }
         _groupOrder.Clear();
         _groupOrder.AddRange(_machineGroups.Values);
-        _groupOrder.Sort((x, y) => x.Key.CompareTo(y.Key));
+        // Ties (every group still held is -infinity) by the group's lowest id, not the order the world listed
+        // them in: the world's dictionaries list in an order that follows the processor count, and a 4-core
+        // machine revived a held fountain and air conditioner the other way round.
+        _groupOrder.Sort(static (x, y) => (x.Key, x.FirstId).CompareTo((y.Key, y.FirstId)));
 
         // In voices, the loudest first, the first whatever it costs. A group not yet playing is only
         // started while the binaural pool can take it and still keep a reserve: past that, a voice would
@@ -1422,6 +1426,8 @@ public partial class ClientAudioSystem
     {
         public readonly List<int> Members = new();
         public float Level, Key;
+        /// <summary>The lowest member's id: what a tie in <see cref="Key"/> is broken by.</summary>
+        public int FirstId;
         public bool Live, Held;
         /// <summary>"preset/train" for a train's group, else null.</summary>
         public string? Train;
@@ -1560,7 +1566,8 @@ public partial class ClientAudioSystem
             if (entityId == _state.RidingEntityId) key = float.NegativeInfinity;
             _engineDistances.Add((entityId, key, d2));
         }
-        _engineDistances.Sort((a, b) => a.Key.CompareTo(b.Key));
+        // Ties (every held car is -1) by id, so every machine keeps the same cars (VoiceManager.Update).
+        _engineDistances.Sort(static (a, b) => (a.Key, a.Id).CompareTo((b.Key, b.Id)));
 
         int keep = Math.Min(_adaptiveBudget, _engineDistances.Count);
 
@@ -1696,7 +1703,7 @@ public partial class ClientAudioSystem
             // "told" steady and "own" or "rpm" sagging: the synthesis; "told" falling: the car really is.
             _censusOrder.Clear();
             foreach (var e in _engineDistances) if (_liveEngines.Contains(e.Id)) _censusOrder.Add((e.D2, e.Id));
-            _censusOrder.Sort(static (x, y) => x.D2.CompareTo(y.D2));
+            _censusOrder.Sort(static (x, y) => x.CompareTo(y));
             for (int i = 0; i < Math.Min(3, _censusOrder.Count); i++)
             {
                 int id = _censusOrder[i].Id;
@@ -1799,7 +1806,7 @@ public partial class ClientAudioSystem
             if (!OpenFPS.Common.Localisation.Resolvable(separation, MathF.Sqrt(d2))) continue;
             _frontCandidates.Add((id, d2));
         }
-        _frontCandidates.Sort((a, b) => a.D2.CompareTo(b.D2));
+        _frontCandidates.Sort(static (a, b) => (a.D2, a.Id).CompareTo((b.D2, b.Id)));
 
         // A front voice given back fades, not cut: the tap is a running waveform.
         foreach (int id in _frontVoiced)
@@ -2007,7 +2014,7 @@ public partial class ClientAudioSystem
                     OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), MathF.Sqrt(d2)) <= 0f) continue;
             _placeCandidates.Add((d2, id, layout.Length - 1));
         }
-        _placeCandidates.Sort(static (a, b) => a.D2.CompareTo(b.D2));
+        _placeCandidates.Sort(static (a, b) => (a.D2, a.Id).CompareTo((b.D2, b.Id)));
         int left = _adaptivePlaces;
         foreach (var (_, id, outer) in _placeCandidates)
         {
@@ -3564,7 +3571,7 @@ public partial class ClientAudioSystem
         _acoustics.FindReflections(world, mouth, ear, arrivals, AudioPhysics.CurrentSpeedOfSound,
                                                  maxOrder: 2, keep: OwnVoiceCopies * 2,
                                                  maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
-        arrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
+        arrivals.Sort(static (a, b) => (b.GainMid, a.SurfaceId, a.Order, a.PathLength).CompareTo((a.GainMid, b.SurfaceId, b.Order, b.PathLength)));
         float direct = Vector3.Distance(mouth, ear);
         float c = AudioPhysics.CurrentSpeedOfSound;
         int slot = 0, secondOrder = 0;
@@ -3650,7 +3657,7 @@ public partial class ClientAudioSystem
         _acoustics.FindReflections(world, stepPos, ear, _stepArrivals, AudioPhysics.CurrentSpeedOfSound,
                                              maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
                                              maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
-        _stepArrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
+        _stepArrivals.Sort(static (a, b) => (b.GainMid, a.SurfaceId, a.Order, a.PathLength).CompareTo((a.GainMid, b.SurfaceId, b.Order, b.PathLength)));
         float direct = Vector3.Distance(stepPos, ear);
         int added = 0, secondOrder = 0;
         foreach (var a in _stepArrivals)

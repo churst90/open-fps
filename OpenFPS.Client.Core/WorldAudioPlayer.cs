@@ -1150,7 +1150,7 @@ public sealed class WorldAudioPlayer
         into.Clear();
         // Loudest first: in surface order, with more in the window than voices (twenty-two in flat
         // 01F, twelve voices), which walls answered depended on their order in the map.
-        found.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
+        found.Sort(static (a, b) => (b.GainMid, a.SurfaceId, a.Order, a.PathLength).CompareTo((a.GainMid, b.SurfaceId, b.Order, b.PathLength)));
         int added = 0, secondOrder = 0;
         foreach (var a in found)
         {

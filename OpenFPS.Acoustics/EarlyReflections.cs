@@ -303,14 +303,15 @@ public static class EarlyReflections
             if (sa != sb) return sb.CompareTo(sa);
             float ea = MathF.Max(a.GainLow, MathF.Max(a.GainMid, a.GainHigh));
             float eb = MathF.Max(b.GainLow, MathF.Max(b.GainMid, b.GainHigh));
-            return eb.CompareTo(ea);
+            // Ties by surface, then path: two equal walls are kept the same way whatever order they were met in.
+            return (eb, a.SurfaceId, a.Order, a.PathLength).CompareTo((ea, b.SurfaceId, b.Order, b.PathLength));
         });
         if (keep <= 0) keep = flutter ? MaxFlutterArrivals : MaxArrivals;
         if (into.Count > keep) into.RemoveRange(keep, into.Count - keep);
 
         // Back into surface order, so a voice slot means the same wall from tick to tick: in loudness
         // order two near-equal arrivals swap slots when the listener shifts, and each voice jumps.
-        into.Sort(static (a, b) => a.SurfaceId.CompareTo(b.SurfaceId));
+        into.Sort(static (a, b) => (a.SurfaceId, a.Order, a.PathLength).CompareTo((b.SurfaceId, b.Order, b.PathLength)));
     }
 
     /// <summary>One mirror a higher-order copy can come off: a face, and what it keeps per band.</summary>

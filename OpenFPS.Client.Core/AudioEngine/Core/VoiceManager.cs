@@ -168,7 +168,10 @@ public class VoiceManager
         foreach (var id in _keysToRemove) _activeSubmissions.Remove(id);
         _keysToRemove.Clear();
 
-        _scoredCandidates.Sort((a, b) => b.Score.CompareTo(a.Score));
+        // Ties by id, the highest first: the submissions come in the order the world listed them, which is not
+        // the same on two machines (a ConcurrentDictionary's order follows the processor count). Highest first
+        // because the voice pools hand their ids out downward from their base: the order they were handed out.
+        _scoredCandidates.Sort(static (a, b) => (b.Score, b.EntityId).CompareTo((a.Score, a.EntityId)));
         int activeCount = Math.Min(_scoredCandidates.Count, Math.Max(1, MaxVoices));
 
         foreach (var kvp in _activeSubmissions)

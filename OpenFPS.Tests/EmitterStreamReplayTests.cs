@@ -26,7 +26,7 @@ namespace OpenFPS.Tests;
 ///
 /// Everything left to threads, the clock or chance is pinned (the acoustic worker answers on the test's
 /// thread, without Steam Audio; the geometry and rain survey are built in place; birds, near drops and
-/// footsteps are seeded), and each scenario must agree with itself twice before the comparison. Where the
+/// footsteps are seeded; voice chat decodes with the managed Opus codec, never a system libopus), and each scenario must agree with itself twice before the comparison. Where the
 /// maths library matches the machine the streams were made on (RenderFingerprintTests.MathsProbe) the stream
 /// must match to the character; elsewhere the same calls, every number within a part in a thousand.
 ///
@@ -320,6 +320,12 @@ internal sealed class Replay
         OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled = true;
         OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = true;
         RainField.RoofRidesWithHead = true;
+        // The talker's voice through Concentus's own C#, not a system libopus: the talker is placed at the
+        // level measured off the decoded audio (OwnVoiceRing.SpeechRmsDbfs), and a libopus where there is one
+        // (Linux with it installed) decodes a little differently from the managed codec where there is not
+        // (the GitHub runners): the talker's Volume and Range came out a part in a thousand apart.
+        bool nativeOpus = Concentus.OpusCodecFactory.AttemptToUseNativeLibrary;
+        Concentus.OpusCodecFactory.AttemptToUseNativeLibrary = false;
         try
         {
             var r = new Replay();
@@ -338,6 +344,7 @@ internal sealed class Replay
              (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
               DrivingCues.BrakeCue, DrivingCues.SpeedWarning)) = saved;
             OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
+            Concentus.OpusCodecFactory.AttemptToUseNativeLibrary = nativeOpus;
         }
     }
 

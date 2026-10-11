@@ -102,7 +102,7 @@ public static class ScopeView
             seen.Add(new Sighting(e.Id, kind, NameOf(e, kind), e.Transform.Position, aim, e.Velocity,
                                   distance, r, u, onCrosshair, halfWidth));
         }
-        seen.Sort((a, b) => a.Right.CompareTo(b.Right));
+        seen.Sort(static (a, b) => (a.Right, a.Id).CompareTo((b.Right, b.Id)));
         return seen;
     }
 
