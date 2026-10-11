@@ -77,6 +77,10 @@ since the last deploy" list below.
      owned by the registry, mounts and levels from the model, ranges from the level). Then library stage 5's
      `AudioClock` slice (`IAudioClock`, its `WorldTime` from `WindField.Now()`; docs/SOUND_LIBRARY_BOUNDARY.md
      18.3).
+   - Beacons onto the worker's path, the model every other sound uses (Cody, 2026-10-11: "I'd move them to the
+     new model if that would be more realistic"): whether a blip sounds, where it comes from and how loud,
+     from the worker's answer (routes through doorways, the barrier model) instead of the hand-rolled
+     tracer's straight line against 0.5. With P3d, then a listening list: a corridor, a house, parked cars.
    - Then P4 (one ranking), the rest of P6 (beacons, birds and rain asking the worker), P7 (machine state from
      the server: a wire change, shipped with a deploy).
 3. The physics boundary survey: DONE 2026-10-11 (docs/PHYSICS_BOUNDARY.md). Cody asked for it the same day:
