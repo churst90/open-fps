@@ -77,7 +77,7 @@ public static class ProviderOrbit
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, flying ? 2f : 0.6f);
             return new SpatialEmitter
             {
-                EntityId = eid,
+                EntityId = eid, Seed = eid,
                 Type = EmitterType.EntityAttached,
                 IsSynth = true,
                 PhysicalKey = key,
@@ -225,7 +225,7 @@ public static class ProviderOrbit
             {
                 provider.PlaySpatialSound(new SpatialEmitter
                 {
-                    EntityId = ++id,
+                    EntityId = ++id, Seed = id,
                     Type = EmitterType.WorldLocked,
                     SoundId = $"reap_{rnd.Next(8)}",
                     Volume = 0.2f,
@@ -301,7 +301,7 @@ public static class ProviderOrbit
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, engine ? 3.5f : flying ? 2f : 0.6f);
             return new SpatialEmitter
             {
-                EntityId = eid,
+                EntityId = eid, Seed = eid,
                 Type = EmitterType.EntityAttached,
                 IsSynth = true,
                 EngineKey = engine ? key[7..] : "",
@@ -444,7 +444,7 @@ public static class ProviderOrbit
                 if (ownRoom && rnd.Next(10) < 6) { target = listenerRegion; pos = listenerPos; }
                 provider.PlaySpatialSound(new SpatialEmitter
                 {
-                    EntityId = ++id,
+                    EntityId = ++id, Seed = id,
                     Type = EmitterType.WorldLocked,
                     SoundId = $"send_{rnd.Next(lengthsMs.Length)}",
                     Volume = 0.2f,

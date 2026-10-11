@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -33,6 +34,8 @@ public class EngineReflectionsTests
         public readonly RecordingMixer Mixer = new();
         public readonly AudioEngineFacade Audio;
         public readonly EngineReflections Echoes = new();
+        /// <summary>What gives the echoes their ids, as the client's registry does.</summary>
+        public readonly VoiceRegistry Voices = new();
         public readonly WorldSnapshot World = new();
         private int _nextId = 9000;
 
@@ -41,6 +44,7 @@ public class EngineReflectionsTests
             AcousticRegistry.Initialize();
             Audio = new AudioEngineFacade(Mixer);
             Audio.InitializeForTest();
+            Echoes.VoiceOf = (engine, n) => (Voices.IdFor(VoiceKind.EngineEcho, engine, n), VoiceRegistry.SeedOf(VoiceKind.EngineEcho, engine, n));
         }
 
         public void Box(Vector3 centre, Vector3 size, string material = "Concrete", bool moves = false, string? sound = null)
@@ -109,7 +113,7 @@ public class EngineReflectionsTests
         r.Pump();
 
         var id = Assert.Single(r.EchoIds);
-        Assert.Equal(EngineReflections.EchoVoiceIdBase, id);
+        Assert.Equal(r.Voices.IdFor(VoiceKind.EngineEcho, Car, 0), id);
         Assert.Equal(1, r.Echoes.VoiceCount);
         var echo = r.Mixer.Latest[id];
         var want = Expected();
@@ -299,7 +303,7 @@ public class EngineReflectionsTests
         r.Pump();
         var ids = r.EchoIds.ToList();
         Assert.Equal(2, ids.Count);
-        Assert.All(ids, id => Assert.True(id <= EngineReflections.EchoVoiceIdBase));
+        Assert.Equal(new[] { r.Voices.IdFor(VoiceKind.EngineEcho, Car, 0), r.Voices.IdFor(VoiceKind.EngineEcho, OtherCar, 1) }, ids);
         int mine = r.Mixer.Started.First(e => e.EchoOfEntity == Car).EntityId;
         int theirs = r.Mixer.Started.First(e => e.EchoOfEntity == OtherCar).EntityId;
         Assert.NotEqual(mine, theirs);

@@ -78,7 +78,8 @@ public sealed class EngineReflections
 
     private sealed class Echo
     {
-        public int VoiceId;
+        /// <summary>Which echo it is, counted over every engine: what its id and seed are given by (VoiceOf).</summary>
+        public int Number;
         public float Silent;
         public bool Seen;
         /// <summary>What the release fades out: a dying echo is not moved.</summary>
@@ -88,11 +89,11 @@ public sealed class EngineReflections
 
     // Keyed by engine entity, then by the surface that answers for it.
     private readonly Dictionary<int, Dictionary<int, Echo>> _voices = new();
-    private int _nextVoiceId = EchoVoiceIdBase;
+    private int _nextEcho;
 
-    /// <summary>Echo voices have their own band of negative ids, so nothing collides with them and
-    /// ClientAudioSystem knows one on sight.</summary>
-    public const int EchoVoiceIdBase = -600000;
+    /// <summary>The id and seed of an engine's echo by its number, given by the host, so an echo shares an id
+    /// with nothing else.</summary>
+    public Func<int, int, (int Id, int Seed)> VoiceOf { get; set; } = (_, _) => throw new InvalidOperationException("The echoes have no ids: their host gives them (VoiceOf).");
 
     /// <summary>
     /// Rebuilds the reflecting surfaces if the static geometry changed, judged by the entity count and then
@@ -251,15 +252,16 @@ public sealed class EngineReflections
 
             if (!mine.TryGetValue(r.SurfaceId, out var echo))
             {
-                echo = new Echo { VoiceId = _nextVoiceId-- };
+                echo = new Echo { Number = _nextEcho++ };
                 mine[r.SurfaceId] = echo;
             }
             // Asked whether it plays, not remembered: on the car's first frame the engine's voice (whose
             // ring the echo reads) is made later in the tick, the start fails, and the next frame retries.
-            var e = Make(echo.VoiceId, entityId, direct, r, gain);
+            var (id, seed) = VoiceOf(entityId, echo.Number);
+            var e = Make(id, seed, entityId, direct, r, gain);
             CarryPath(ref e, directPath, r, listener, directDist);
-            Voiced?.Invoke(echo.VoiceId, entityId);
-            if (audio.IsPlaying(echo.VoiceId)) audio.UpdateSpatialAttributes(e);
+            Voiced?.Invoke(id, entityId);
+            if (audio.IsPlaying(id)) audio.UpdateSpatialAttributes(e);
             else audio.PlayPhysicalSoundDirect(e);
             echo.Seen = true;
             echo.Silent = 0f;
@@ -275,17 +277,18 @@ public sealed class EngineReflections
             var echo = kv.Value;
             if (echo.Seen) continue;
             echo.Silent += dt;
+            var (id, seed) = VoiceOf(entityId, echo.Number);
             if (echo.Silent >= ReleaseSeconds)
             {
-                audio.StopSound(echo.VoiceId);
+                audio.StopSound(id);
                 (drop ??= new List<int>()).Add(kv.Key);
                 continue;
             }
             // Only the level goes: moving a dying echo would Doppler it into a whistle.
             float fade = 1f - echo.Silent / ReleaseSeconds;
-            var dying = Make(echo.VoiceId, entityId, direct, echo.Last, echo.Gain * fade);
+            var dying = Make(id, seed, entityId, direct, echo.Last, echo.Gain * fade);
             CarryPath(ref dying, directPath, echo.Last, listener, directDist);
-            Voiced?.Invoke(echo.VoiceId, entityId);
+            Voiced?.Invoke(id, entityId);
             audio.UpdateSpatialAttributes(dying);
         }
         if (drop != null) foreach (int k in drop) mine.Remove(k);
@@ -298,7 +301,7 @@ public sealed class EngineReflections
     public void Forget(int entityId, AudioEngineFacade audio)
     {
         if (!_voices.TryGetValue(entityId, out var mine)) return;
-        foreach (var e in mine.Values) audio.StopSound(e.VoiceId);
+        foreach (var e in mine.Values) audio.StopSound(VoiceOf(entityId, e.Number).Id);
         _voices.Remove(entityId);
     }
 
@@ -436,10 +439,11 @@ public sealed class EngineReflections
         return (direct.AirLowDb * k, direct.AirMidDb * k, direct.AirHighDb * k);
     }
 
-    private static SpatialEmitter Make(int voiceId, int engineId, in SpatialEmitter direct,
+    private static SpatialEmitter Make(int voiceId, int seed, int engineId, in SpatialEmitter direct,
                                        in Reflection r, float gain) => new()
     {
         EntityId = voiceId,
+        Seed = seed,
         SoundId = "engine-echo",
         IsSynth = true,
         EchoOfEntity = engineId,

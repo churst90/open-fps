@@ -7,6 +7,12 @@ using OpenFPS.Words;
 
 namespace OpenFPS.Client.Core;
 
+/// <summary>Which of the driver's cues a voice is: the owner of an aid's voice (VoiceRegistry.IdFor).</summary>
+internal enum AidVoice
+{
+    Guide, Centre, Kerb, CentreTone, KerbTone, CentreRumble, KerbRumble, Turn, Align, Relay, OverSpeed, Brake,
+}
+
 /// <summary>
 /// What a driver who cannot see the road needs to hear, each cue a different kind of sound so none is
 /// mistaken for another (docs/DRIVING_AIDS.md):
@@ -32,9 +38,7 @@ public sealed class DrivingAids
     /// <summary>What Z says while driving: road, direction, lane, speed.</summary>
     public string? Readout { get; private set; }
 
-    // Voice ids: a block of their own, well clear of every other pool.
-    private const int GuideBaseId = -961000, CentreBaseId = -962000, KerbBaseId = -963000, Pool = 6;
-    private const int CentreToneId = -964001, KerbToneId = -964002;
+    // Each beep its own voice (AidVoice, VoiceRegistry.IdFor), counted.
     private int _guideIdx, _centreIdx, _kerbIdx;
 
     private const string GuideSound = "SYNTH/drive_guide", CentreSound = "SYNTH/drive_centre", KerbSound = "SYNTH/drive_kerb";
@@ -64,7 +68,6 @@ public sealed class DrivingAids
     // Cody: "It's hard to know how far I'm turning, and I overshoot the lane." A click every 15
     // degrees (six is a right angle) and a rising chime when in line with the road: straighten now.
     private const float TurnClickDegrees = 15f, AlignedDegrees = 4f, UnalignedDegrees = 8f;
-    private const int TurnBaseId = -965000, AlignId = -966001;
     private const string TurnSound = "SYNTH/drive_turn", AlignSound = "SYNTH/drive_aligned";
     private int _turnIdx, _lastClickSector = int.MinValue;
     private bool _aligned;
@@ -113,7 +116,6 @@ public sealed class DrivingAids
     private float _lastHeading = float.NaN;
     private const float FlashSeconds = 1f / 3f;
     private const float CancelAfterDegrees = 45f;
-    private const int RelayId = -966010;
     private const string TickSound = "SYNTH/drive_relay_on", TockSound = "SYNTH/drive_relay_off";
 
     /// <summary>J (-1) or L (+1): that side's indicator on, or off if it already was. What to say.</summary>
@@ -136,7 +138,6 @@ public sealed class DrivingAids
     // limit). A wet road gives less, so the same corner calls for it sooner.
     private double _nextBrake;
     private int _brakeIdx;
-    private const int BrakeBaseId = -967100;
     private static readonly string[] BrakeSounds = { "", "SYNTH/drive_brake_1", "SYNTH/drive_brake_2", "SYNTH/drive_brake_3", "SYNTH/drive_brake_4" };
     private static readonly float[] BrakeHz = { 0f, 330f, 440f, 587f, 784f };
     /// <summary>Seconds between notes at the bottom and top of each band.</summary>
@@ -146,7 +147,6 @@ public sealed class DrivingAids
     // ── The speed limit ──────────────────────────────────────────────────────────────────────
     private double _nextOverSpeed;
     private bool _wasOver;
-    private const int OverSpeedId = -966011;
     private const string OverSpeedSound = "SYNTH/drive_overspeed";
     /// <summary>Over the limit by this much before it says so, m/s (5 km/h): a speedometer's own error.</summary>
     private const float OverSpeedMargin = 5f / 3.6f;
@@ -158,7 +158,6 @@ public sealed class DrivingAids
     // The tyres on the centre line's raised markers (Botts' dots every 1.2 m) or the edge's milled
     // rumble strip (grooves every 0.3 m): a loop of strikes from that side's front wheel at speed over
     // spacing.
-    private const int CentreRumbleId = -964003, KerbRumbleId = -964004;
     private const string DotsSound = "SYNTH/drive_dots", StripSound = "SYNTH/drive_strip";
     private const float DotSpacing = 1.2f, GrooveSpacing = 0.3f;
     /// <summary>Strikes per second in each loop as it is made: the pitch is the speed's rate over this.</summary>
@@ -290,7 +289,7 @@ public sealed class DrivingAids
         if (!_aligned && MathF.Abs(offRoadLine) < AlignedDegrees)
         {
             _aligned = true;
-            if (DrivingCues.Enabled && DrivingCues.TurnClicks) Play(AlignSound, AlignId, forward * 3f, SensorVolume);
+            if (DrivingCues.Enabled && DrivingCues.TurnClicks) Play(AlignSound, AidVoice.Align, 0, forward * 3f, SensorVolume);
         }
         else if (_aligned && MathF.Abs(offRoadLine) > UnalignedDegrees) _aligned = false;
 
@@ -467,7 +466,7 @@ public sealed class DrivingAids
         float yaw = MathF.Atan2(forward.X, forward.Z) * 180f / MathF.PI;
         int sector = (int)MathF.Floor(yaw / TurnClickDegrees);
         if (_lastClickSector != int.MinValue && sector != _lastClickSector && DrivingCues.Enabled && DrivingCues.TurnClicks)
-            Play(TurnSound, TurnBaseId - (_turnIdx++ % Pool), forward * 2f, SensorVolume * 0.7f);
+            Play(TurnSound, AidVoice.Turn, _turnIdx++, forward * 2f, SensorVolume * 0.7f);
         _lastClickSector = sector;
     }
 
@@ -481,20 +480,20 @@ public sealed class DrivingAids
         if (_now < _nextGuide) return;
         // A beep every 0.6 s crawling, every 0.2 s at motorway speed: the rate is the speed.
         _nextGuide = _now + Math.Clamp(6f / MathF.Max(speed, 0.1f), 0.2f, 0.6f);
-        Play(GuideSound, GuideBaseId - (_guideIdx++ % Pool), offset, GuideVolume);
+        Play(GuideSound, AidVoice.Guide, _guideIdx++, offset, GuideVolume);
     }
 
     private void Sensor((float Gap, LaneGuide.Line Kind, float Offset) side, Vector3 driverRight, float speed, VehicleProfile? profile)
     {
         if (side.Kind == LaneGuide.Line.Lane || side.Gap == float.MaxValue) return;
         bool centre = side.Kind == LaneGuide.Line.Centre;
-        int toneId = centre ? CentreToneId : KerbToneId;
-        int rumbleId = centre ? CentreRumbleId : KerbRumbleId;
+        var tone = centre ? AidVoice.CentreTone : AidVoice.KerbTone;
+        var rumble = centre ? AidVoice.CentreRumble : AidVoice.KerbRumble;
         var offset = driverRight * side.Offset;
         if (!DrivingCues.Enabled || !DrivingCues.LineSensors)
         {
-            if (_audio.IsPlaying(toneId)) _audio.StopSound(toneId);
-            if (_audio.IsPlaying(rumbleId)) _audio.StopSound(rumbleId);
+            StopIfPlaying(Id(tone));
+            StopIfPlaying(Id(rumble));
             return;
         }
 
@@ -504,42 +503,53 @@ public sealed class DrivingAids
             float rate = speed / (centre ? DotSpacing : GrooveSpacing);
             if (speed > 0.5f)
             {
-                if (_audio.IsPlaying(toneId)) _audio.StopSound(toneId);
+                StopIfPlaying(Id(tone));
                 // The front wheel on that side, about 0.9 m behind the nose.
                 float frontAxle = MathF.Max(0.5f, (profile?.LengthMetres ?? 4.4f) * 0.5f - 0.9f);
                 var wheelSide = driverRight * (MathF.Sign(side.Offset) * (profile?.WidthMetres ?? 1.8f) * 0.5f);
-                Rumble(rumbleId, centre ? DotsSound : StripSound, wheelSide + ForwardOf(driverRight) * frontAxle,
+                Rumble(rumble, centre ? DotsSound : StripSound, wheelSide + ForwardOf(driverRight) * frontAxle,
                        rate / (centre ? DotsLoopHz : StripLoopHz));
             }
             else
             {
-                if (_audio.IsPlaying(rumbleId)) _audio.StopSound(rumbleId);
-                Tone(toneId, offset, centre ? 660f : 220f, centre ? SynthWaveType.Sine : SynthWaveType.Triangle);
+                StopIfPlaying(Id(rumble));
+                Tone(tone, offset, centre ? 660f : 220f, centre ? SynthWaveType.Sine : SynthWaveType.Triangle);
             }
             return;
         }
-        if (_audio.IsPlaying(toneId)) _audio.StopSound(toneId);
-        if (_audio.IsPlaying(rumbleId)) _audio.StopSound(rumbleId);
+        StopIfPlaying(Id(tone));
+        StopIfPlaying(Id(rumble));
         if (side.Gap > SensorRangeMetres) return;
 
         ref double next = ref centre ? ref _nextCentre : ref _nextKerb;
         if (_now < next) return;
         float closeness = 1f - side.Gap / SensorRangeMetres;             // 0 far .. 1 touching
         next = _now + 0.6 - 0.5 * closeness;                             // 0.6 s down to 0.1 s
-        if (centre) Play(CentreSound, CentreBaseId - (_centreIdx++ % Pool), offset, SensorVolume);
-        else Play(KerbSound, KerbBaseId - (_kerbIdx++ % Pool), offset, SensorVolume);
+        if (centre) Play(CentreSound, AidVoice.Centre, _centreIdx++, offset, SensorVolume);
+        else Play(KerbSound, AidVoice.Kerb, _kerbIdx++, offset, SensorVolume);
     }
 
-    /// <summary>Where every aid's voice is declared (ClientAudioSystem's registry): in the head, no path.</summary>
-    internal VoiceRegistry? Voices { get; set; }
+    /// <summary>Where every aid's voice is given its id and declared: ClientAudioSystem's registry, or one of
+    /// its own on its own. In the head, no path.</summary>
+    internal VoiceRegistry Voices { get; set; } = new();
 
-    private void Play(string sound, int id, Vector3 offset, float volume)
+    /// <summary>The id of an aid's voice, the <paramref name="n"/>th of its kind.</summary>
+    private int Id(AidVoice aid, int n = 0) => Voices.IdFor(VoiceKind.Aid, (int)aid, n);
+
+    private void StopIfPlaying(int id)
+    {
+        if (_audio.IsPlaying(id)) _audio.StopSound(id);
+    }
+
+    private void Play(string sound, AidVoice aid, int n, Vector3 offset, float volume)
     {
         if (!_registered) return;
-        Voices?.DeclareEvent(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
+        int id = Id(aid, n);
+        Voices.DeclareEvent(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
         _audio.Submit(new SpatialEmitter
         {
             EntityId = id,
+            Seed = VoiceRegistry.SeedOf(VoiceKind.Aid, (int)aid, n),
             SoundId = sound,
             Mode = OpenFPS.Common.Components.PlaybackMode.Single,
             FollowsListener = true,
@@ -554,11 +564,13 @@ public sealed class DrivingAids
         });
     }
 
-    private void Tone(int id, Vector3 offset, float hz, SynthWaveType wave)
+    private void Tone(AidVoice aid, Vector3 offset, float hz, SynthWaveType wave)
     {
+        int id = Id(aid);
         var e = new SpatialEmitter
         {
             EntityId = id,
+            Seed = VoiceRegistry.SeedOf(VoiceKind.Aid, (int)aid),
             SoundId = "SYNTH",
             IsSynth = true,
             SynthWave = wave,
@@ -573,15 +585,15 @@ public sealed class DrivingAids
             Essential = true,
             Type = EmitterType.UI,           // in the head: dry, panned, not out on the road
         };
-        Voices?.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
+        Voices.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
         if (_audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);
     }
 
     private void StopTones()
     {
-        if (_audio.IsPlaying(CentreToneId)) _audio.StopSound(CentreToneId);
-        if (_audio.IsPlaying(KerbToneId)) _audio.StopSound(KerbToneId);
+        StopIfPlaying(Id(AidVoice.CentreTone));
+        StopIfPlaying(Id(AidVoice.KerbTone));
     }
 
     private void Silence()
@@ -592,20 +604,22 @@ public sealed class DrivingAids
 
     private void StopRumble()
     {
-        if (_audio.IsPlaying(CentreRumbleId)) _audio.StopSound(CentreRumbleId);
-        if (_audio.IsPlaying(KerbRumbleId)) _audio.StopSound(KerbRumbleId);
+        StopIfPlaying(Id(AidVoice.CentreRumble));
+        StopIfPlaying(Id(AidVoice.KerbRumble));
     }
 
     /// <summary>The way a car faces, from the direction to its right.</summary>
     private static Vector3 ForwardOf(Vector3 right) => new(-right.Z, 0f, right.X);
 
     /// <summary>A loop of strikes from one side, at the rate the speed rolls them.</summary>
-    private void Rumble(int id, string sound, Vector3 offset, float pitch)
+    private void Rumble(AidVoice aid, string sound, Vector3 offset, float pitch)
     {
         if (!_registered) return;
+        int id = Id(aid);
         var e = new SpatialEmitter
         {
             EntityId = id,
+            Seed = VoiceRegistry.SeedOf(VoiceKind.Aid, (int)aid),
             SoundId = sound,
             Mode = OpenFPS.Common.Components.PlaybackMode.LoopOne,
             FollowsListener = true,
@@ -620,7 +634,7 @@ public sealed class DrivingAids
         };
         // The budget holds this voice and places it from what it holds: re-placed past it, the rate stayed
         // at the speed the strip was first touched at and the range was measured from there (S11).
-        Voices?.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
+        Voices.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Aid, offset);
         if (_audio.IsPlaying(id)) _audio.Refresh(e);
         else _audio.Submit(e);
     }
@@ -707,7 +721,7 @@ public sealed class DrivingAids
         if (!on) _flashOn = false;
         float h = float.IsNaN(_lastHeading) ? 0f : _lastHeading;
         var ahead = Vector3.Transform(new Vector3(0f, -0.35f, 0.6f), Quaternion.CreateFromYawPitchRoll(h, 0f, 0f));
-        Play(on ? TickSound : TockSound, RelayId, ahead, 0.22f);
+        Play(on ? TickSound : TockSound, AidVoice.Relay, 0, ahead, 0.22f);
     }
 
     /// <summary>The limit when you join a road with a different one, and the two notes when over it.</summary>
@@ -724,7 +738,7 @@ public sealed class DrivingAids
         {
             _nextOverSpeed = _now + OverSpeedRepeat;
             if (DrivingCues.Enabled && DrivingCues.SpeedWarning)
-                Play(OverSpeedSound, OverSpeedId, Vector3.Transform(new Vector3(0f, -0.2f, 0.7f), Quaternion.CreateFromYawPitchRoll(_lastHeading, 0f, 0f)), 0.2f);
+                Play(OverSpeedSound, AidVoice.OverSpeed, 0, Vector3.Transform(new Vector3(0f, -0.2f, 0.7f), Quaternion.CreateFromYawPitchRoll(_lastHeading, 0f, 0f)), 0.2f);
             if (!_wasOver) Log.Information("[DRIVE] over the limit: {Kmh:F0} in a {Limit:F0}", speed * 3.6f, plan.SpeedLimitMps * 3.6f);
         }
         _wasOver = over;
@@ -746,7 +760,7 @@ public sealed class DrivingAids
         var toward = plan.HazardPoint - at;
         toward.Y = 0f;
         var dir = toward.LengthSquared() > 1f ? Vector3.Normalize(toward) : Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(_lastHeading, 0f, 0f));
-        Play(BrakeSounds[band], BrakeBaseId - (_brakeIdx++ % Pool), dir * 2.5f, BrakeVolume);
+        Play(BrakeSounds[band], AidVoice.Brake, _brakeIdx++, dir * 2.5f, BrakeVolume);
         TracePlan(plan, speed);
     }
 

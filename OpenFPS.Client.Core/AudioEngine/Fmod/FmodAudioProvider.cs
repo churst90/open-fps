@@ -2299,16 +2299,16 @@ public partial class FmodAudioProvider : IAudioProvider
             ? ShoreVoice(emitter, rate)
             : kind == OpenFPS.Common.ModelSynth.Wood && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(woodPreset), places, rate,
-                                    emitter.EntityId * 43 + 17, emitter.Position, Weather)
+                                    emitter.Seed * 43 + 17, emitter.Position, Weather)
               { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey)?[1..], TargetTrees = emitter.Trees }
             : kind == OpenFPS.Common.ModelSynth.Flow
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.RunningWaterSpec.ByName(preset), rate,
-                                    emitter.EntityId * 47 + 19, emitter.Position, Weather)
+                                    emitter.Seed * 47 + 19, emitter.Position, Weather)
             : kind == OpenFPS.Common.ModelSynth.Fire
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FireSpec.ByName(preset), places, rate,
-                                    emitter.EntityId * 41 + 13, emitter.Position, Weather)
+                                    emitter.Seed * 41 + 13, emitter.Position, Weather)
             : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(preset), places, rate,
-                                    emitter.EntityId * 43 + 17, emitter.Position, Weather);
+                                    emitter.Seed * 43 + 17, emitter.Position, Weather);
         voice.TargetSpread = emitter.Spread;
         voice.TargetQuench = emitter.Quench;
         return new NaturePlaceState(voice, 0, rate, emitter.Position);
@@ -2320,7 +2320,7 @@ public partial class FmodAudioProvider : IAudioProvider
         OpenFPS.Common.ShoreSpec.ParseKey(emitter.PhysicalKey, out string shorePreset, out var geometry);
         var spec = OpenFPS.Common.ShoreSpec.ByName(shorePreset);
         return new PlacedNatureVoice(emitter.PhysicalKey, spec, geometry ?? spec.DefaultGeometry, rate,
-                                     emitter.EntityId * 53 + 23, emitter.Position, Weather);
+                                     emitter.Seed * 53 + 23, emitter.Position, Weather);
     }
 
     /// <summary>How many voices a rain slot is played as (RainFeeds.PartsFor).</summary>
@@ -2330,11 +2330,11 @@ public partial class FmodAudioProvider : IAudioProvider
     // <preset>/<feature> is made on the first tap, at the mixer's rate. See NatureVoices.cs.
     private readonly Dictionary<string, WaterFeatureVoice> _waterFeatures = new();
 
-    private PhysicalVoiceState? Water(string key, int rate, int entityId, System.Numerics.Vector3 position, in SpatialEmitter emitter)
+    private PhysicalVoiceState? Water(string key, int rate, int seed, System.Numerics.Vector3 position, in SpatialEmitter emitter)
     {
         if (!WaterFeatureVoice.ParseKey(key, out string preset, out string feature, out int tap))
             return new WaterVoiceState(OpenFPS.Common.WaterFeatureSpec.ByName(key[(key.IndexOf(':') + 1)..]),
-                                       rate, entityId * 37 + 11, position, Weather);
+                                       rate, seed * 37 + 11, position, Weather);
         string shared = preset + "/" + feature;
         if (emitter.PlaceOfEntity != 0)
         {
@@ -2673,7 +2673,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 TargetGain = emitter.EchoGain,
                 OwnCursor = !emitter.IsReflection,
                 Scattering = emitter.IsReflection ? emitter.EchoScattering : -1f,
-                Seed = emitter.EntityId,
+                Seed = emitter.Seed,
             };
             if (EchoProcessor.CreateDSP(_system, echo, out engineDsp, out engineHandle) != RESULT.OK) return;
             engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
@@ -2736,9 +2736,9 @@ public partial class FmodAudioProvider : IAudioProvider
                 machineState = kind?.Synth switch
                 {
                     OpenFPS.Common.ModelSynth.Machine => new MachineVoiceState(OpenFPS.Common.SmallMachineSpec.ByName(preset),
-                                                       mrate, emitter.EntityId, emitter.EntityId * 31 + 7),
+                                                       mrate, emitter.Seed, emitter.Seed * 31 + 7),
                     OpenFPS.Common.ModelSynth.Aircraft => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
-                                                         mrate, emitter.EntityId * 17 + 3,
+                                                         mrate, emitter.Seed * 17 + 3,
                                                          lever: emitter.PowerLever),
                     OpenFPS.Common.ModelSynth.Rail => RailSlot(emitter.PhysicalKey, mrate),
                     // Its own voice: 35 dB over the car's exhaust, the two cannot share one full-scale
@@ -2746,11 +2746,11 @@ public partial class FmodAudioProvider : IAudioProvider
                     OpenFPS.Common.ModelSynth.Siren => new SirenVoiceState(OpenFPS.Common.SirenSpec.ByName(preset), mrate),
                     // Running is the server's word, not worked out locally (BellVoiceState).
                     OpenFPS.Common.ModelSynth.Bell => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
-                                                 mrate, emitter.EntityId * 13 + 5),
+                                                 mrate, emitter.Seed * 13 + 5),
                     // The arm follows the crossing's closed signal (Running, the server's word).
                     OpenFPS.Common.ModelSynth.Gate => new GateVoiceState(OpenFPS.Common.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
                     // Given their place: they read the wind where they stand (NatureVoiceState).
-                    OpenFPS.Common.ModelSynth.Water => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
+                    OpenFPS.Common.ModelSynth.Water => Water(emitter.PhysicalKey, mrate, emitter.Seed, emitter.Position, emitter),
                     // Heard from places across it (ExtendedSources), all reading the middle's synth.
                     OpenFPS.Common.ModelSynth.Fire or OpenFPS.Common.ModelSynth.Foliage or OpenFPS.Common.ModelSynth.Flow
                         or OpenFPS.Common.ModelSynth.Shore or OpenFPS.Common.ModelSynth.Wood => NaturePlace(kind!.Synth, preset, emitter, mrate),
@@ -2762,10 +2762,10 @@ public partial class FmodAudioProvider : IAudioProvider
                         : null,
                     // A gas hob: its knobs' settings and when they were turned are in the key (HobKey).
                     OpenFPS.Common.ModelSynth.Stove => new StoveVoiceState(OpenFPS.Common.GasHobSpec.ByName(emitter.PhysicalKey), emitter.PhysicalKey,
-                                                   mrate, emitter.EntityId * 59 + 29),
+                                                   mrate, emitter.Seed * 59 + 29),
                     // The rhythm of the hand on the horn is in the key (Honk).
                     OpenFPS.Common.ModelSynth.Horn => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
-                        ? new HornVoiceState(hornKey, rhythm, mrate, emitter.EntityId * 29 + 1)
+                        ? new HornVoiceState(hornKey, rhythm, mrate, emitter.Seed * 29 + 1)
                         : null,
                     _ => null,
                 };
@@ -2802,7 +2802,7 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             if (!_isInitialized) return;
             _system.getSoftwareFormat(out int rate, out _, out _);
-            engineState = new EngineVoiceState(OpenFPS.Common.MachineRegistry.VehicleFor(emitter.EngineKey), rate, emitter.EntityId)
+            engineState = new EngineVoiceState(OpenFPS.Common.MachineRegistry.VehicleFor(emitter.EngineKey), rate, emitter.Seed)
             {
                 TargetSpeed = emitter.EngineSpeed,
                 Running = emitter.EngineRunning,
@@ -2978,7 +2978,7 @@ public partial class FmodAudioProvider : IAudioProvider
         if (emitter.IsReflection && !emitter.IsSynth && !emitter.IsGranular && emitter.Type != EmitterType.UI
             && EchoWashState.Applies(emitter.EchoScattering))
         {
-            wash = GetWashDsp(emitter.EchoScattering, emitter.EchoMirrorShare, emitter.EntityId);
+            wash = GetWashDsp(emitter.EchoScattering, emitter.EchoMirrorShare, emitter.Seed);
             if (wash != null && channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, wash.Dsp) != RESULT.OK)
             {
                 _washPool.Push(wash);

@@ -181,7 +181,7 @@ public static class RoomWalkSpike
                     var image = new Vector3(7f, 1.5f, 25f);   // mirrored through the north wall
                     provider.PlaySpatialSound(new SpatialEmitter
                     {
-                        EntityId = -30000 - (MegaphoneId * 5),
+                        EntityId = -30000 - (MegaphoneId * 5), Seed = -30000 - (MegaphoneId * 5),
                         SoundId = "BEACONS/megaphone",
                         Mode = PlaybackMode.LoopOne,
                         Type = EmitterType.WorldLocked,
@@ -258,7 +258,7 @@ public static class RoomWalkSpike
             provider.UpdateListener(new Vector3(0, 1.7f, 0), Quaternion.Identity, Vector3.Zero, -1);
             SpatialEmitter Step(int id, float delayMs, string sound, bool reflection) => new()
             {
-                EntityId = id, SoundId = sound, Mode = PlaybackMode.Single, Type = EmitterType.WorldLocked,
+                EntityId = id, Seed = id, SoundId = sound, Mode = PlaybackMode.Single, Type = EmitterType.WorldLocked,
                 Position = new Vector3(0, 0.1f, 1f), ApparentPosition = new Vector3(0, 0.1f, 1f),
                 Volume = 1f, Range = 15f, MinDistance = 1f, Pitch = 1f,
                 ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,

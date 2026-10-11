@@ -49,7 +49,7 @@ public class SirenApparentTests
         var at = new Vector3(-40f, 0f, 90f);
         var vel = new Vector3(17f, 0f, 0f);
         h.AddCar(id, "police_interceptor", at, vel);
-        int siren = ClientAudioSystem.SirenVoiceBase - Math.Abs(id);
+        int siren = h.Voice(VoiceKind.Siren, id);
         Assert.True(h.TickUntil(() => h.Mixer.HasCarried(siren) && h.Mixer.Latest.ContainsKey(siren), 1200),
                     "the siren never sounded with a path");
 

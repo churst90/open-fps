@@ -128,7 +128,7 @@ public static class NatureSpike
             var (gain, reference) = Loudness.Place(level, extent);
             var emitter = new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
             {
-                EntityId = 777001,
+                EntityId = 777001, Seed = 777001,
                 Type = OpenFPS.Client.AudioEngine.Data.EmitterType.EntityAttached,
                 IsSynth = true,
                 PhysicalKey = key,

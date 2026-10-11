@@ -13,6 +13,9 @@ public enum SynthWaveType { Sine, Square, Triangle, Saw, Noise }
 public struct SpatialEmitter
 {
     public int EntityId;
+    /// <summary>What the voice's chance is drawn from (a synth's noise, a wall's smear): its host's, from what
+    /// the voice is the sound of and never from its id, so a voice given another id renders the same.</summary>
+    public int Seed;
     public string SoundId;
     public string StartSoundId; // played when the emitter becomes active
     public string StopSoundId;  // played when it is stopped
@@ -241,6 +244,7 @@ public struct SpatialEmitter
     public SpatialEmitter()
     {
         EntityId = 0;
+        Seed = 0;
         SoundId = "";
         StartSoundId = "";
         StopSoundId = "";

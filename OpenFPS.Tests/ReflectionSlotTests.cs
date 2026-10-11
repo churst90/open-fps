@@ -1,4 +1,5 @@
 using System.Numerics;
+using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -57,8 +58,6 @@ public class ReflectionSlotTests
         return h;
     }
 
-    private static int VoiceOf(int slot) => -30000 - Speaker * (EarlyReflections.MaxArrivals + 1) - slot;
-
     [Fact]
     public void AWallsCopyStaysOnItsOwnVoiceAsYouWalk()
     {
@@ -83,7 +82,7 @@ public class ReflectionSlotTests
                 Thread.Sleep(2);
                 for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
                 {
-                    int id = VoiceOf(slot);
+                    int id = h.Voice(VoiceKind.Reflection, Speaker, slot);
                     if (!h.Mixer.Live.Contains(id) || !h.Mixer.Latest.TryGetValue(id, out var e)) continue;
                     if (seen.Add(id)) voices++;
                     int starts = h.Mixer.Started.Count(s => s.EntityId == id);

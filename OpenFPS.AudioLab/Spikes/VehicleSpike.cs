@@ -46,7 +46,7 @@ public static class VehicleSpike
             var (gain, reference) = Loudness.Place(116f);
             SpatialEmitter Make(Vector3 p, Vector3 vel, float speed) => new()
             {
-                EntityId = Id,
+                EntityId = Id, Seed = Id,
                 SoundId = "engine:" + preset,
                 IsSynth = true,
                 EngineKey = preset,
@@ -160,7 +160,7 @@ public static class VehicleSpike
 
                 SpatialEmitter Engine(Vector3 p, Vector3 vel, float speed) => new()
                 {
-                    EntityId = Id, SoundId = "engine:" + presetKey, IsSynth = true, EngineKey = presetKey,
+                    EntityId = Id, Seed = Id, SoundId = "engine:" + presetKey, IsSynth = true, EngineKey = presetKey,
                     EngineSpeed = speed, EngineRunning = true,
                     Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                     Position = p + Vector3.Transform(new Vector3(0f, 0.3f, v.ExhaustOffsetZ * 0.6f), Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f)),
@@ -170,7 +170,7 @@ public static class VehicleSpike
                 };
                 SpatialEmitter Echo(int id, Reflection r, float g) => new()
                 {
-                    EntityId = id, SoundId = "echo", IsSynth = true, EchoOfEntity = Id,
+                    EntityId = id, Seed = id, SoundId = "echo", IsSynth = true, EchoOfEntity = Id,
                     EchoDelaySeconds = r.DelaySeconds, EchoGain = g,
                     Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                     Position = r.ApparentPosition, Velocity = Vector3.Zero,

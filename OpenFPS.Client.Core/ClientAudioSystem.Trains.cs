@@ -17,9 +17,6 @@ namespace OpenFPS.Client.Core;
 /// </summary>
 public partial class ClientAudioSystem
 {
-    /// <summary>Voice ids for trains: TrainVoiceBase − (the train's ordinal × Slots + voice).</summary>
-    internal const int TrainVoiceBase = -2_300_000;
-
     /// <summary>How often a train's sources are regrouped, seconds. The weights follow every frame.</summary>
     private const double TrainRegroupSeconds = 0.5;
 
@@ -67,7 +64,8 @@ public partial class ClientAudioSystem
         return field + signals;
     }
 
-    private int TrainVoiceId(TrainVoicer v, int slot) => TrainVoiceBase - (v.Ordinal * TrainVoicing.Slots + slot);
+    /// <summary>A train's voice, by the train's number and the voice's slot (its field voices, then its horn and bell).</summary>
+    private int TrainVoiceId(TrainVoicer v, int slot) => _voices.IdFor(VoiceKind.TrainField, v.Ordinal, slot);
 
     /// <summary>
     /// Places every admitted train's voices and tells each what it carries; lets go of the voices of
@@ -279,6 +277,7 @@ public partial class ClientAudioSystem
         var e = new SpatialEmitter
         {
             EntityId = voiceId,
+            Seed = VoiceRegistry.SeedOf(VoiceKind.TrainField, v.Ordinal, slot),
             SoundId = "rail",
             IsSynth = true,
             PhysicalKey = TrainVoiceState.SlotKey(v.Preset, v.Name, slot),

@@ -44,8 +44,7 @@ public class ClientAudioSelectionTests
         h.Tick(3);
         Assert.Equal(9, LiveCars());
         // Nobody was voiced from afar on the way: there was room for every car.
-        Assert.DoesNotContain(h.Mixer.Started, e => e.EntityId <= ClientAudioSystem.DistantVoiceBase
-                                                  && e.EntityId > ClientAudioSystem.DistantVoiceBase - 1000);
+        Assert.Empty(h.Mixer.StartedAs(VoiceKind.Borrowed));
     }
 
     /// <summary>The nearest car of every preset gets a real engine whatever the budget says: a car
@@ -65,7 +64,7 @@ public class ClientAudioSelectionTests
         h.Wait(3.0);                       // past the hold on a newly built engine
         h.Tick(budget);
         Assert.Equal("school_bus", h.Mixer.Latest[Lone].EngineKey);
-        Assert.False(h.Mixer.WasStarted(ClientAudioHarness.DistantVoice(Lone)), "the bus borrowed a voice it could not have had");
+        Assert.False(h.Mixer.WasStarted(h.DistantVoice(Lone)), "the bus borrowed a voice it could not have had");
         // ...and on top of the budget, not out of it: the budget's own cars are the nearest of the rest.
         Assert.Equal(budget, Enumerable.Range(1, budget).Count(h.Mixer.Live.Contains));
     }
@@ -143,14 +142,14 @@ public class ClientAudioSelectionTests
         for (int i = 0; i < n; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i * 3f, 0f, 0f));
         h.Tick(budget);
 
-        var borrowing = Enumerable.Range(1, n).Where(id => h.Mixer.Live.Contains(ClientAudioHarness.DistantVoice(id))).ToList();
+        var borrowing = Enumerable.Range(1, n).Where(id => h.Mixer.Live.Contains(h.DistantVoice(id))).ToList();
         _o.WriteLine($"borrowing: {string.Join(", ", borrowing)}");
         Assert.Equal(12, borrowing.Count);
         Assert.Equal(Enumerable.Range(budget + 1, 12), borrowing);
         for (int id = budget + 13; id <= n; id++)
         {
             Assert.DoesNotContain(id, h.Mixer.Live);
-            Assert.False(h.Mixer.WasStarted(ClientAudioHarness.DistantVoice(id)), $"car {id} is past both budgets and was voiced");
+            Assert.False(h.Mixer.WasStarted(h.DistantVoice(id)), $"car {id} is past both budgets and was voiced");
         }
     }
 
@@ -170,7 +169,7 @@ public class ClientAudioSelectionTests
         var velocity = new Vector3(0f, 0f, 22f);
         h.AddCar(a, Preset, new Vector3(0f, 0f, -80f), velocity);
         h.AddCar(b, Preset, new Vector3(0f, 0f, -90f), -velocity);
-        int va = ClientAudioHarness.DistantVoice(a), vb = ClientAudioHarness.DistantVoice(b);
+        int va = h.DistantVoice(a), vb = h.DistantVoice(b);
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(va) && h.Mixer.Latest.ContainsKey(vb), 60));
 
         foreach (var (car, voice, v) in new[] { (a, va, velocity), (b, vb, -velocity) })
@@ -220,13 +219,13 @@ public class ClientAudioSelectionTests
         Assert.Equal(0.7f, engine.EffectiveDistance);
         Assert.NotEqual(Vector3.Zero, engine.ListenerOffset);
         // No front voice from inside: both ends come through the body.
-        Assert.False(h.Mixer.WasStarted(ClientAudioSystem.IntakeVoiceBase - Car));
+        Assert.Empty(h.Mixer.StartedAs(VoiceKind.Intake));
 
         var eye = h.Player.VisualPosition + new Vector3(0f, h.Player.EyeHeight, 0f);
-        var cabinIds = Enumerable.Range(1, layout.Count - 1).Select(p => ClientAudioSystem.CabinVoiceBase - p).ToArray();
+        var cabinIds = Enumerable.Range(1, layout.Count - 1).Select(p => h.Voice(VoiceKind.Cabin, VoiceRegistry.NoEntity, p)).ToArray();
         for (int p = 1; p < layout.Count; p++)
         {
-            int id = ClientAudioSystem.CabinVoiceBase - p;
+            int id = cabinIds[p - 1];
             Assert.True(h.Mixer.Live.Contains(id), $"cabin path {p} ({layout.Paths[p].Kind}) has no voice");
             var e = h.Mixer.Latest[id];
             Assert.Equal(Car, e.CabinOfEntity);
@@ -263,13 +262,13 @@ public class ClientAudioSelectionTests
         for (int i = 0; i < 9; i++) h.AddCar(i + 1, Preset, new Vector3(4f + i * 0.5f, 0f, 3f));
         h.AddCar(20, Preset, new Vector3(0f, 0f, 250f));
         h.Tick(8);
-        var split = Enumerable.Range(1, 9).Where(id => h.Mixer.Live.Contains(ClientAudioSystem.IntakeVoiceBase - id)).ToList();
+        var split = Enumerable.Range(1, 9).Where(id => h.Mixer.Live.Contains(h.Voice(VoiceKind.Intake, id))).ToList();
         _o.WriteLine("split: " + string.Join(", ", split));
         Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, split);
-        Assert.False(h.Mixer.WasStarted(ClientAudioSystem.IntakeVoiceBase - 20), "a car 250 m off was split");
+        Assert.DoesNotContain(h.Mixer.StartedAs(VoiceKind.Intake), e => e.IntakeOfEntity == 20);
 
         // The front voice is the same machine: the same level reference, read off the car's engine.
-        var front = h.Mixer.Latest[ClientAudioSystem.IntakeVoiceBase - 1];
+        var front = h.Mixer.Latest[h.Voice(VoiceKind.Intake, 1)];
         var back = h.Mixer.Latest[1];
         Assert.Equal(1, front.IntakeOfEntity);
         Assert.Equal(back.Volume, front.Volume);
@@ -632,8 +631,8 @@ public class ClientAudioSelectionTests
     /// <summary>The counts the budget controls, read off what the mixer was told.</summary>
     private static (int Engines, int Borrowed, int Fronts, int Machines) Counts(ClientAudioHarness h, int cars, int machines)
         => (Enumerable.Range(1, cars).Count(h.Mixer.Live.Contains),
-            Enumerable.Range(1, cars).Count(id => h.Mixer.Live.Contains(ClientAudioHarness.DistantVoice(id))),
-            Enumerable.Range(1, cars).Count(id => h.Mixer.Live.Contains(ClientAudioSystem.IntakeVoiceBase - id)),
+            Enumerable.Range(1, cars).Count(id => h.Mixer.Live.Contains(h.DistantVoice(id))),
+            Enumerable.Range(1, cars).Count(id => h.Mixer.Live.Contains(h.Voice(VoiceKind.Intake, id))),
             Enumerable.Range(1000, machines).Count(h.Mixer.Live.Contains));
 
     private static ClientAudioHarness LoadedField(out int cars, out int machines)
@@ -807,9 +806,8 @@ public class ClientAudioSelectionTests
                 PrecipitationIntensity = 0.8f,
             });
             int[] far = { 5, 6, 7, 8 };
-            bool NearDrop(SpatialEmitter e) => e.EntityId <= RainField.NearVoiceBase && e.EntityId > RainField.NearVoiceBase - RainField.NearVoicePool;
-            Assert.True(h.TickUntil(() => far.All(s => h.Mixer.Latest.ContainsKey(RainField.VoiceBase - s))
-                                       && h.Mixer.Started.Count(NearDrop) >= 5, 5000, TimeSpan.FromSeconds(90)),
+            Assert.True(h.TickUntil(() => far.All(s => h.Mixer.Latest.ContainsKey(h.Voice(VoiceKind.Rain, s)))
+                                       && h.Mixer.StartedAs(VoiceKind.RainDrop).Count() >= 5, 5000, TimeSpan.FromSeconds(90)),
                         "the rain was never voiced");
 
             var ear = new Vector3(0f, h.Player.EyeHeight, 0f);
@@ -817,7 +815,7 @@ public class ClientAudioSelectionTests
             Func<Vector3, bool>[] side = { p => p.X > MathF.Abs(p.Z), p => p.Z > MathF.Abs(p.X), p => -p.X > MathF.Abs(p.Z), p => -p.Z > MathF.Abs(p.X) };
             for (int k = 0; k < far.Length; k++)
             {
-                var e = h.Mixer.Latest[RainField.VoiceBase - far[k]];
+                var e = h.Mixer.Latest[h.Voice(VoiceKind.Rain, far[k])];
                 float d = new Vector2(e.Position.X, e.Position.Z).Length();
                 _o.WriteLine($"slot {far[k]}: at {e.Position}, {d:F1} m, {e.Volume:F4} at {e.MinDistance:F2} m");
                 Assert.True(side[k](e.Position), $"slot {far[k]} is not on its own side: {e.Position}");
@@ -827,7 +825,7 @@ public class ClientAudioSelectionTests
                 Assert.True(e.Volume > 0f && float.IsFinite(e.Volume));
             }
 
-            var drops = h.Mixer.Started.Where(NearDrop).ToList();
+            var drops = h.Mixer.StartedAs(VoiceKind.RainDrop).ToList();
             _o.WriteLine($"{drops.Count} near drops");
             foreach (var e in drops)
             {
@@ -986,7 +984,7 @@ public class ClientAudioSelectionTests
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
         h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f), new Vector3(17f, 0f, 0f));
-        int siren = ClientAudioSystem.SirenVoiceBase - car;
+        int siren = h.Voice(VoiceKind.Siren, car);
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(siren), 1200), "the siren never sounded");
         Assert.True(h.Audio.VehiclePathsAsked > 0, "a sounding siren takes its car's path");
         var spec = SirenSpec.ByName(MachineRegistry.VehicleFor("police_interceptor").Siren!);
@@ -1010,7 +1008,7 @@ public class ClientAudioSelectionTests
         h.StandAt(Vector3.Zero);
         h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f));   // parked: traffic's siren is off at rest
         h.Tick(120);
-        Assert.DoesNotContain(ClientAudioSystem.SirenVoiceBase - car, h.Mixer.Live);
+        Assert.Empty(h.Mixer.StartedAs(VoiceKind.Siren));
         Assert.Equal(0, h.Audio.VehiclePathsAsked);
     }
 }
