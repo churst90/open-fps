@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- Nothing laid along a line goes into a building (docs/GEOMETRY.md 12.6, "A road stops at a wall"), unheard. On
+  the real places 276 pieces on Albany and 110 on Magnolia of a road, verge, sidewalk, drive or path lay in a
+  footprint: 1034 Belmont Avenue's made-up driveway through 1024's living room, a service road through the Exxon's
+  forecourt canopy, footways through the college's cafeteria, mapped drives into their garages. Now a building the
+  carriageway runs into is not made (the world's tiles' rule, now gen_osm.py's too: 4 on Albany, 5 on Magnolia;
+  built and left out, so no other building's id moves); a made-up driveway goes along the lot to where it is clear
+  of every other building, or there is none (25 and 4 houses); and every piece stops 2 cm short of any wall it
+  would enter, the cut that keeps the most of it. A test over both places and the world's tiles
+  (`SurfacesClear`). Both maps regenerated; world tiles remade (generator 9). Sound: a handful of pairs in a
+  thousand move, and Country Food Market is 25 dB more open to its forecourt.
 - The voices of moving things have one path each, from one pass (part P3a of docs/SPECIAL_CASES_AUDIT.md),
   unheard. Cody asked "shouldn't all mobile sound sources like vehicles, trains, sirens, etc use the same path
   so there's consistency?" after a train horn played through a brick wall. Every engine, intake, borrowed far

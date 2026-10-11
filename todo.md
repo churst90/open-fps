@@ -132,6 +132,10 @@ hash changed, so the server and the Windows zip go out together.
   tracker's "behind a wall". Unheard.
 - Floors as constructions on the real places and the world's tiles: a home's carpet or boards on the concrete
   slab, not 27 cm of finish on the ground (docs/GEOMETRY.md 12.6). Unheard; world tiles remade (generator 8).
+- Nothing laid along a line enters a building on the real places and the world's tiles: a building the
+  carriageway runs into is not made, a made-up driveway goes round a neighbour, every road, sidewalk, drive and
+  path piece stops at a wall (docs/GEOMETRY.md 12.6, "A road stops at a wall"). Unheard; world tiles remade
+  (generator 9). Listen: Country Food Market and the Exxon forecourt on Magnolia, 1024 Belmont Avenue Southwest.
 - Connecting: the Connecting window holds focus, Escape cancels, a server that is not up yet is tried for
   30 s; the in-game reconnect the same way. Unheard.
 - The special-cases audit's P0 (replay guards), P1 (the pavement pops, answer provenance, one freshness
@@ -439,9 +443,8 @@ and the server's voice line.
   (`OpeningRoutes.Buried`), so the search takes a bottom edge, which is in the ground, and the terrain is no
   box: 1303 Tamarack Court Southwest from the street below, -78/-100/-100 to -29/-58/-93. About 2 pairs in 1,000
   on each place. Two rules: a layer of the same construction does not bury an edge, and the ground does.
-- Driveways and service roads laid through other buildings: nine rooms on the places have one 6 to 8 cm over
-  their finished floor (1024 Belmont Avenue Southwest's living room has 1034's driveway in it; the Exxon on
-  Magnolia a service road). gen_osm.py and the world's driveways should stop at another footprint.
+- A made-up driveway is a straight strip: a house with none clear from the road (Albany 25, Magnolia 4, most
+  behind another house) has none. A drive that bends round would give them one.
 - The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost
   25 MB and twice the convolution (Cody).
 - Below 120 Hz the tail of a room you are not in is identical in both ears.

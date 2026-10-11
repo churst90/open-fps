@@ -564,6 +564,52 @@ public class WorldBuildingsTests : IDisposable
         Assert.True(graded > 0);
     }
 
+    /// <summary>
+    /// Nothing laid along a line goes into a building (docs/GEOMETRY.md 12.6, "A road stops at a wall"), on a made-up
+    /// street in one tile: a house behind another (a flag lot) has its made-up driveway moved along its front past the
+    /// house in front; a mapped driveway drawn 4 m into its house stops at the wall; a parking aisle drawn through a
+    /// shop is two pieces, one each side; and no piece of any of them overlaps a footprint (SurfacesClear).
+    /// </summary>
+    [Fact]
+    public async Task A_drive_stops_at_a_wall_and_goes_round_a_neighbour()
+    {
+        var osm = new MadeUpOsm();
+        var b = new MadeUpBuildings();
+        double x0 = A.Easting + 60, n0 = A.Northing + 60;
+        osm.Add(1, new() { ["highway"] = "residential", ["name"] = "Elm Street" }, (x0 - 50, n0), (x0 + 170, n0));
+        b.Box("front", x0 + 20, n0 + 18, 12, 10);
+        b.Box("back", x0 + 22, n0 + 52, 14, 10);
+        b.Box("garaged", x0 + 90, n0 + 20, 14, 10);
+        osm.Add(2, new() { ["highway"] = "service", ["service"] = "driveway" }, (x0 + 93, n0 + 3), (x0 + 93, n0 + 19));
+        b.Box("shop", x0 + 140, n0 + 40, 20, 12, cls: "retail");
+        osm.Add(3, new() { ["highway"] = "service", ["service"] = "parking_aisle" }, (x0 + 120, n0 + 40), (x0 + 160, n0 + 40));
+        var tile = await Service("clear", osm, b).GetAsync(A);
+        Assert.NotNull(tile);
+        double lx = x0 - A.Easting, ln = n0 - A.Northing;
+        var drives = tile!.Entities.Where(x => x.Layer == "drives").ToList();
+        foreach (var d in drives) _o.WriteLine($"{d.Name} at ({d.Position.X - lx:F2}, {d.Position.Z - ln:F2}), {Extent(d).X:F2} by {Extent(d).Z:F2}");
+
+        var clear = SurfacesClear.Check(tile.Entities, Prefabs);
+        Assert.True(clear.Found.Count == 0, string.Join("; ", clear.Found));
+        Assert.True(clear.Footprints >= 4, $"{clear.Footprints} footprints");
+
+        // The house behind: its drive runs east of the house in front (x 14 to 26), up to its own front (n 47).
+        var made = drives.Where(x => x.Name == "House off Elm Street driveway").ToList();
+        var behind = made.Where(x => x.Position.Z - ln > 26).ToList();
+        Assert.NotEmpty(behind);
+        Assert.All(behind, x => Assert.InRange(x.Position.X - lx, 27.8, 30.3));
+        // The mapped driveway: it ends at the garaged house's wall (n 15), not 4 m inside it.
+        var mapped = drives.Where(x => x.Name == "Driveway").ToList();
+        Assert.NotEmpty(mapped);
+        double reach = mapped.Max(x => x.Position.Z - ln + Extent(x).X / 2);
+        Assert.InRange(reach, 14.8, 15.0);
+        // The parking aisle: a piece each side of the shop (x 130 to 150), none inside it.
+        var aisle = drives.Where(x => x.Name == "Parking aisle").ToList();
+        Assert.Contains(aisle, x => x.Position.X - lx < 130);
+        Assert.Contains(aisle, x => x.Position.X - lx > 150);
+        Assert.DoesNotContain(aisle, x => x.Position.X - lx is > 130 and < 150);
+    }
+
     /// <summary>Nothing generated reaches into a real place: no building whose footprint touches one of its tiles.</summary>
     [Fact]
     public async Task No_building_reaches_into_a_real_place()
@@ -805,6 +851,14 @@ public class WorldBuildingsTests : IDisposable
         }
         _o.WriteLine($"{floorRooms} rooms, every floor on a structure");
         Assert.True(floorRooms > 50);
+
+        // Nothing laid along a line enters a building (SurfacesClear), across the nine tiles in one frame: a piece is
+        // stored by the tile its middle is in and a building by the tile its own middle is in.
+        var clear = SurfacesClear.Check(keys.Zip(tiles).SelectMany(kt => kt.Second.Entities.Select(x =>
+            (x, new Vector3((float)(kt.First.Easting - centre.Easting), 0f, (float)(kt.First.Northing - centre.Northing))))), Prefabs);
+        _o.WriteLine($"{clear.Pieces} pieces, {clear.Footprints} footprints, {clear.Overlapping} pieces in a building");
+        Assert.True(clear.Pieces > 200 && clear.Footprints > 50, $"{clear.Pieces} pieces, {clear.Footprints} footprints");
+        Assert.True(clear.Found.Count == 0, string.Join("; ", clear.Found.Take(5)));
 
         // The other order, a fresh store, the same caches and no network: the same tiles.
         var offline = new FixtureNet { Fail = true };
