@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-11
 
+- Every floor on the real places and the world's tiles is a construction (docs/GEOMETRY.md 12.6, "A floor is a
+  construction"), unheard. A home at medium detail stood on 27 cm of carpet or wood laid on the ground, with no
+  slab: 1,441 rooms on Magnolia, 1,959 on Albany, and every home of the world's tiles. Now every building stands
+  on the 25 cm concrete slab and a home's carpet or boards are a 2 cm finish on it, in gen_osm.py and its port
+  alike; what you stand on and what a room measures are unchanged. Both maps regenerated (the slab keeps its id,
+  the finishes are appended); world tiles are remade (generator 8). A test over every room of both places and of
+  the world's buildings checks that a structure stands under each floor, by material and thickness. The sound
+  barely moves: a few pairs in a thousand quieter by about 20 dB, and as many louder, where the barrier model
+  now goes round a slab's underside through the earth (todo). The lab's `--barrier-sweep` takes `server=DIR`
+  and `dump=FILE` to set two maps' pairs side by side.
 - Behind walls, a way round one thing that runs on through another is counted (docs/GEOMETRY.md 12.6, "Round
   one thing, through another"), unheard. It was thrown out, and a low wall before a heavier one was charged its
   whole transmission: in Marlow Tower's floor 1 stairwell a car on Dock Street jumped 22 to 31 dB as its line

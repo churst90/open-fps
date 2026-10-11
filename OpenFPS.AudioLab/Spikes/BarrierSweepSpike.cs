@@ -18,7 +18,8 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// the routes' own (Constructions.Through for what the line passes through); the simulator's through figure
 /// stands in for it in the game's direct path. outdoor takes ears indoors only and sources out of doors, 10 m to
 /// range off, 0.5 m over the ground (the street heard inside). pair=x,y,z;x,y,z spells one ear and source out.
-/// Game coordinates (y up).
+/// server=DIR reads the maps and prefabs under DIR in place of the checkout's OpenFPS.Server (a map before a change);
+/// dump=FILE writes every pair, tab-separated, so two runs with one seed can be set side by side. Game coordinates (y up).
 /// </summary>
 public static class BarrierSweepSpike
 {
@@ -33,7 +34,7 @@ public static class BarrierSweepSpike
         var rng = new Random(int.Parse(Arg(args, "seed") ?? "1", CultureInfo.InvariantCulture));
         bool outdoor = args.Contains("outdoor");
 
-        var world = PathProbeSpike.LoadAsClient(OpenFPS.AudioLab.LabPaths.Server(), mapId);
+        var world = PathProbeSpike.LoadAsClient(Arg(args, "server") ?? OpenFPS.AudioLab.LabPaths.Server(), mapId);
         var acoustics = new SpatialAcoustics();
         var routes = acoustics.RoutesFor(world)!;
         var oldAcoustics = new SpatialAcoustics();
@@ -138,6 +139,11 @@ public static class BarrierSweepSpike
             var dl = legRows.Select(r => Db(Get(r.New, b)) - Db(Get(r.Old, b))).ToList();
             Console.WriteLine($"  the straight leg alone, {new[] { "low", "mid", "high" }[b]}: {dl.Count(x => x > 0.5f)} louder by more than 0.5 dB, over 10 dB {dl.Count(x => x > 10f)}, quieter {dl.Count(x => x < -0.01f)}");
         }
+        if (Arg(args, "dump") is { } dump)
+            File.WriteAllLines(dump, rows.Select(r => string.Join('\t', new[] { r.Ear.X, r.Ear.Y, r.Ear.Z, r.Src.X, r.Src.Y, r.Src.Z,
+                                                                               Db(r.Old.X), Db(r.Old.Y), Db(r.Old.Z), Db(r.New.X), Db(r.New.Y), Db(r.New.Z) }
+                                                                         .Select(v => v.ToString("F3", CultureInfo.InvariantCulture)))
+                                                   + $"\t{r.EarPlace}\t{r.SrcPlace}\t{Name(map, r.EarPlace)}\t{Name(map, r.SrcPlace)}"));
         Console.WriteLine("  as heard (the straight leg against the openings, per band the better, OpeningRoutes.Better):");
 
         string[] band = { "low", "mid", "high" };
