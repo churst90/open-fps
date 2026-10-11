@@ -173,22 +173,34 @@ public partial class RealPlaceMapTests
             checkedSlabs++;
             if (hit.Triangle < 0 || terrain.Contains(hit.Owner)) bad.Add($"{e.Name ?? e.PrefabId} ({e.Layer}) at ({e.Position.X:F1}, {e.Position.Z:F1})");
         }
-        // And under every room, at nine points over its box: the floor, not the ground. Floors are their footprints'
-        // prisms since geometry stage 4, and the grading left them out: footsteps in 1,253 of Albany's rooms and 377
-        // of Magnolia's were on dirt somewhere, and the rooms measured their floors as a field.
+        // And under every room, at nine points over its air (its flood's bounds, where the flood holds the point): the
+        // floor, not the ground. Floors are their footprints' prisms since geometry stage 4, and the grading left them
+        // out: footsteps in 1,253 of Albany's rooms and 377 of Magnolia's were on dirt somewhere, and the rooms
+        // measured their floors as a field.
         int checkedRooms = 0;
+        var floods = OpenFPS.Server.Core.MapManager.RoomsOf(p.Ecs);
+        Assert.NotNull(floods);
+        var notTerrain = new NotIn { Owners = terrain };
         p.Ecs.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (Entity e, ref Transform t, ref RegionComponent r) =>
         {
-            if (!r.IsIndoor || r.RoomSize.X <= 0f) return;
-            var q = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
+            if (!r.IsIndoor || !floods!.TryAir(e.Id, out var lo, out var hi, out _)) return;
             checkedRooms++;
             for (int i = 0; i < 3; i++)
                 for (int k = 0; k < 3; k++)
                 {
-                    var at = t.Position + Vector3.Transform(new Vector3((0.25f * i - 0.25f) * r.RoomSize.X, -0.5f * r.RoomSize.Y + 1f,
-                                                                        (0.25f * k - 0.25f) * r.RoomSize.Z), q);
-                    world.FloorAt(at.X, at.Z, at.Y, GeometryLayers.Ground, ref all, out var hit);
-                    if (hit.Triangle >= 0 && terrain.Contains(hit.Owner)) { bad.Add($"{r.FriendlyName} ({e.Id}) at ({at.X:F1}, {at.Z:F1})"); return; }
+                    // Down from the top of its air to whatever is under it, where the room is (a room over steps and
+                    // landings has its air at more than one height).
+                    var at = new Vector3(lo.X + (hi.X - lo.X) * (0.25f + 0.25f * i), hi.Y, lo.Z + (hi.Z - lo.Z) * (0.25f + 0.25f * k));
+                    float y = world.FloorAt(at.X, at.Z, at.Y, GeometryLayers.Ground, ref all, out var hit);
+                    // In its air, not its walls' cells: a wall at an angle to the grid holds cells whose middles are just
+                    // outside the footprint, where no floor is.
+                    if (!floods.TryAirAt(new Vector3(at.X, y + 0.5f, at.Z), out int inRoom) || inRoom != e.Id) continue;
+                    if (hit.Triangle >= 0 && terrain.Contains(hit.Owner))
+                    {
+                        float floor = world.FloorAt(at.X, at.Z, at.Y, GeometryLayers.Ground, ref notTerrain, out _);
+                        bad.Add($"{r.FriendlyName} ({e.Id}) at ({at.X:F1}, {at.Z:F1}): the ground at {y:F2}, the floor at {floor:F2}, the air from {lo.Y:F2}");
+                        return;
+                    }
                 }
         });
         foreach (var b in bad.Take(15)) _o.WriteLine(b);
@@ -263,5 +275,12 @@ public partial class RealPlaceMapTests
             }
         _o.WriteLine($"{id}: {points} points, {holes} without ground; {TerrainIds(p.Ecs).Count} tiles of ground");
         Assert.Equal(0, holes);
+    }
+
+    /// <summary>Counts everything but these owners (the terrain's tiles).</summary>
+    private struct NotIn : IGeometryFilter
+    {
+        public HashSet<int> Owners;
+        public readonly bool Accept(int owner, in Surface surface) => !Owners.Contains(owner);
     }
 }

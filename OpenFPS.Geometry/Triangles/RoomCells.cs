@@ -12,8 +12,9 @@ public sealed class RoomCells
     public static readonly RoomCells Empty = new(Array.Empty<Span>(), new HashSet<int>(), new Dictionary<int, RoomFlood.Lining>(), Vector3.Zero,
                                                  new List<FloodOpenings.Frame>(), new Dictionary<int, (Vector3, Vector3, float)>());
 
-    /// <summary>Cells x0 to x1 of row (y, z), the room's id.</summary>
-    private readonly record struct Span(long Row, int X0, int X1, int Room);
+    /// <summary>Cells x0 to x1 of row (y, z), the room's id, and whether they are its walls' cells next to its air (an
+    /// opening's too) rather than its air.</summary>
+    private readonly record struct Span(long Row, int X0, int X1, int Room, bool Wall = false);
 
     private readonly Span[] _spans;
     private readonly HashSet<int> _flooded;
@@ -87,18 +88,18 @@ public sealed class RoomCells
             if (room.Lining != null) linings[id] = room.Lining;
             origin = room.Origin;
             foreach (var r in room.AirRuns) spans.Add(new Span(RowOf(r.Y, r.Z), r.X, r.X + r.Length - 1, id));
-            foreach (var r in room.EdgeRuns) edges.Add(new Span(RowOf(r.Y, r.Z), r.X, r.X + r.Length - 1, id));
+            foreach (var r in room.EdgeRuns) edges.Add(new Span(RowOf(r.Y, r.Z), r.X, r.X + r.Length - 1, id, true));
         }
         // Rooms flooded apart can both hold a wall's or an opening's cells between them: the air's first, then the
         // lower id, so whoever floods with whatever else, a cell is one room's.
         var seedOf = new Dictionary<int, Vector3>();
         foreach (var (id, room) in rooms) seedOf[id] = room.Seed;
         spans = Disjoint(spans, edges, seedOf, origin);
-        // A room's air and its wall cells side by side in a row are one span.
+        // A room's air side by side in a row is one span, and so are its wall cells.
         var merged = new List<Span>(spans.Count);
         foreach (var s in spans)
         {
-            if (merged.Count > 0 && merged[^1] is var last && last.Row == s.Row && last.Room == s.Room && last.X1 + 1 == s.X0)
+            if (merged.Count > 0 && merged[^1] is var last && last.Row == s.Row && last.Room == s.Room && last.Wall == s.Wall && last.X1 + 1 == s.X0)
                 merged[^1] = last with { X1 = s.X1 };
             else merged.Add(s);
         }
@@ -131,7 +132,7 @@ public sealed class RoomCells
                 if (al != null && al.Any(a => a.X0 <= x0 && a.X1 >= x1)) continue;
                 var over = list.Where(e => e.X0 <= x0 && e.X1 >= x1).Select(e => e.Room).Distinct().OrderBy(id => id).ToList();
                 if (over.Count == 0) continue;
-                if (over.Count == 1) { result.Add(new Span(r, x0, x1, over[0])); continue; }
+                if (over.Count == 1) { result.Add(new Span(r, x0, x1, over[0], true)); continue; }
                 for (int x = x0; x <= x1; x++)
                 {
                     var c = RoomFlood.CentreOf(x, y, z, origin);
@@ -142,7 +143,7 @@ public sealed class RoomCells
                         float d = Vector3.DistanceSquared(c, seedOf.GetValueOrDefault(id));
                         if (d < bd) { bd = d; best = id; }
                     }
-                    result.Add(new Span(r, x, x, best));
+                    result.Add(new Span(r, x, x, best, true));
                 }
             }
         }
@@ -156,8 +157,14 @@ public sealed class RoomCells
         foreach (var s in _spans) each(s.Room, (int)(uint)(s.Row & 0xFFFFFFFF), (int)(s.Row >> 32), s.X0, s.X1);
     }
 
-    /// <summary>The flooded room whose cells hold <paramref name="p"/>, or false.</summary>
-    public bool TryRoomAt(Vector3 p, out int room)
+    /// <summary>The flooded room whose cells hold <paramref name="p"/> (its air or its walls' cells next to it), or false.</summary>
+    public bool TryRoomAt(Vector3 p, out int room) => TryAt(p, wallsToo: true, out room);
+
+    /// <summary>The flooded room whose air holds <paramref name="p"/>, or false: not a cell of its walls (a wall's cell
+    /// is solid only for most of it: a wall at an angle to the grid holds cells whose middles are just outside it).</summary>
+    public bool TryAirAt(Vector3 p, out int room) => TryAt(p, wallsToo: false, out room);
+
+    private bool TryAt(Vector3 p, bool wallsToo, out int room)
     {
         room = 0;
         if (_spans.Length == 0) return false;
@@ -174,7 +181,7 @@ public sealed class RoomCells
         }
         if (at < 0) return false;
         ref readonly var hit = ref _spans[at];
-        if (hit.Row != row || x > hit.X1) return false;
+        if (hit.Row != row || x > hit.X1 || (hit.Wall && !wallsToo)) return false;
         room = hit.Room;
         return true;
     }
