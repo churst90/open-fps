@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Physics stage 2, the ground probes and the body's constants (docs/PHYSICS_BOUNDARY.md 16.4). Nothing a
+  player sees or hears changes. Where the floor is under a body and where its foot goes down are asked of a
+  triangle world by the physics (`Footing`); the game's `PhysicsUtils` keeps the server's and a client's
+  ways of asking. The body's box, mass, jump, turn and pace with a load are `BodyConstants`' with the rest
+  of it, and the step height is one number where it was three. The wire hash changes, so the server and the
+  Windows client go out together.
+
 - A door's sound no longer takes minutes to make on an Intel processor. A door model's modes decayed into
   numbers too small to be normal (under 1e-308) and stayed there, and Intel works on those about a hundred
   times slower: the glass front door opened with a key took seven minutes to render, 14 seconds on AMD. A

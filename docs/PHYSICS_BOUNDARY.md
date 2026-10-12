@@ -41,7 +41,7 @@ stages come after the special-cases audit's parts.
 13. Appendices: the inventory, the crossings, the presets' members
 14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
-16. Stage 2 as it is built: the tyre, the vehicle, the engine (2026-10-12)
+16. Stage 2 as it is built: the tyre, the vehicle, the engine, the ground probes and the body (2026-10-12)
 
 ---
 
@@ -357,7 +357,7 @@ dead reckoning, part of the network, stays there.
 | Gravity | `TyreFriction.cs:13` (= `WheelDynamics.G`), `ExternalBallistics.cs:50`, `StruckThings.cs:178`, `Aircraft.cs:432` | 9.80665: 4 times in 4 files |
 | The map's gravity | `ZoneComponent.Gravity`, read by `MovementSystem.cs:64` only | drops, falls, tyres, bullets and water ignore it |
 | Air density | `DrivingSystem.cs:71` and `Driveline.cs:57` (1.225); `Precipitation.cs:101`, `WallTransmission.cs:83`, `DoorPhysics.cs:13` (1.21); `BulletImpact.cs:275`, `GlassFracture.cs:87`, `ExhaustNetwork.cs:36`, `IntakeNetwork.cs:27`, `Waveguide.cs:511`, `GasHobSynth.cs:40` (1.2) | the ballistics alone work it out from the world's temperature and pressure (`Air`) |
-| Step height | `PhysicsConstants.cs:57` and two locals in `PhysicsUtils.cs:34, 182` | 0.4 |
+| Step height | `PhysicsConstants.cs:57` and two locals in `PhysicsUtils.cs:34, 182` | 0.4. One number since 16.4: `BodyConstants.StepHeight` |
 | Foot padding | `SharedMovementEngine.cs:329`, `WorldEditor.cs:28` (0.15); `MovementSystem.cs:254`, `OccupancyService.cs:376` (0.4) | two values for one body |
 | Brakes | `DrivingSystem.cs:262` (all the grip) and `Driveline.cs:35` (7.5 m/s²) | one car, two laws |
 | Rolling resistance and drag | `DrivingSystem.cs:260-261` and `Driveline.cs:57-58` | the same law twice |
@@ -1626,6 +1626,39 @@ and after, are the same byte for byte, and the guards pass unregenerated.
   (gravity, air density, rolling resistance and drag, brakes) and `WindModel` folded into `WindField`, which
   change numbers. The presets' members that forward to their halves go when the Models catalogue hands out
   the halves by id (docs/ENGINE_PACKAGES.md, stage 2).
+
+### 16.4 The ground probes and the body's constants (2026-10-12)
+
+Made on Windows and sent back as a patch, on main `e47be9ac`. Nothing a player sees or hears changes: every
+number is what it was, and the guards pass unregenerated.
+
+- **The question is the physics'.** `Footing` (`OpenFPS.Physics/Footing.cs`) asks a triangle world where the
+  floor is under a body (`Ground`: five points across its footprint, the highest top within a step of its
+  feet) and where its foot goes down (`FootOnFloor`, moved whole with its tolerance). It reads the body's
+  radius and step from `BodyConstants` and nothing of the game.
+- **The game keeps the adapters.** `PhysicsUtils` (Common) still has the server's probe (`World`,
+  `SpatialGrid<Entity>`) and a client's (`WorldSnapshot`), each with its own filter and the solids its
+  triangle world does not hold: what moves on the server, the unindexed statics on a client, and the box
+  path where there is no triangle world. Where they asked the triangle world themselves they ask `Footing`.
+  The two things in which they still differ (3.7: the server counts what moves; the server remembers) are as
+  they were.
+- **The step is one number.** The two local 0.4s in `PhysicsUtils` are `BodyConstants.StepHeight`.
+- **The body's numbers are `BodyConstants`'.** Its box, what it is made of, its mass, its pace with a load,
+  `FootSpeed`, its jump and how fast it turns joined its radius, height, walk, run, step and gravity there.
+  `PhysicsConstants` (Common) keeps every name, each reading `BodyConstants`, for the 1,100 places that ask
+  the game; what is its own is the game's reach and bounds (`InteractionRange`, `PickUpReach`,
+  `MapMinimumY`), the tick and the input limits.
+- **The ratchet:** `Footing` is on the list of the physics' types. `PhysicsUtils` and `PhysicsConstants`
+  are the game's now and off it, as `TyreFriction` went off it when the sound kept it. The allowance stays
+  empty.
+- **Tests** (`GeometryStage2Tests`): the floor under a body is within a step of its feet, by the body's own
+  step and radius; the body's numbers are the physics' and the game reads them there, each what it was.
+- **The wire hash** changes (46bf531b6e44 at `e47be9ac`, 7cd68fbff151 after). Nothing sent changed.
+  `DoorModelFingerprint` is unchanged (cfb37eeb081b).
+- **Left of stage 2:** `Ricochet` (its bounce reads a face from the material table, which is in Acoustics
+  until package stage 1 makes Materials: it follows that stage); `VehicleSpec`'s `VehicleChassisSpec` (16.2);
+  one constant for each law (gravity, air density, rolling resistance and drag, brakes) and `WindModel`
+  folded into `WindField`, which change numbers.
 
 ## Decisions (Cody, 2026-10-11)
 
