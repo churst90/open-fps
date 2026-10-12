@@ -72,8 +72,8 @@ public sealed record AxleSpec
 {
     /// <summary>
     /// Metres forward of the body's centre. Unset, it is placed from the profile, where the sound rig
-    /// puts the axles: the first at <see cref="VehicleProfile.FrontAxleZ"/>, any other at
-    /// <see cref="VehicleProfile.RearAxleZ"/> plus <see cref="TandemOffset"/>.
+    /// puts the axles: the first at <c>VehicleProfile.FrontAxleZ</c>, any other at
+    /// <c>VehicleProfile.RearAxleZ</c> plus <see cref="TandemOffset"/>.
     /// </summary>
     public float Z { get; init; } = float.NaN;
 
@@ -99,7 +99,7 @@ public sealed record AxleSpec
 }
 
 /// <summary>
-/// The running gear of a vehicle and where its mass sits. See <see cref="VehicleProfile.Chassis"/>.
+/// The running gear of a vehicle and where its mass sits. See <c>VehicleProfile.Chassis</c>.
 /// </summary>
 public sealed record ChassisSpec
 {
@@ -140,15 +140,18 @@ public sealed record ChassisSpec
         return true;
     }
 
-    /// <summary>This chassis with every axle placed (see <see cref="AxleSpec.Z"/>).</summary>
-    public ChassisSpec PlacedOn(VehicleProfile p)
+    /// <summary>This chassis with every axle placed (see <see cref="AxleSpec.Z"/>): the first where the
+    /// vehicle says its front axle is, any other at its rear axle plus the axle's own tandem offset.</summary>
+    /// <param name="frontAxleZ">The front axle, metres ahead of the body's middle.</param>
+    /// <param name="rearAxleZ">The rear axle, metres ahead of the body's middle (negative).</param>
+    public ChassisSpec PlacedOn(float frontAxleZ, float rearAxleZ)
     {
         if (Axles.All(a => !float.IsNaN(a.Z))) return this;
         var placed = new AxleSpec[Axles.Length];
         for (int i = 0; i < Axles.Length; i++)
         {
             var a = Axles[i];
-            placed[i] = float.IsNaN(a.Z) ? a with { Z = i == 0 ? p.FrontAxleZ : p.RearAxleZ + a.TandemOffset } : a;
+            placed[i] = float.IsNaN(a.Z) ? a with { Z = i == 0 ? frontAxleZ : rearAxleZ + a.TandemOffset } : a;
         }
         return this with { Axles = placed };
     }
@@ -190,24 +193,27 @@ public sealed record ChassisSpec
     public float Ackermann { get; init; } = 1f;
 
     /// <summary>
-    /// A chassis for a preset that declares none, from what it does declare: two axles at its axle
+    /// A chassis for a vehicle that declares none, from what it does declare: two axles at its axle
     /// positions, rear-wheel drive, a track of <see cref="DefaultTrackOverWidth"/> of its width, the
     /// centre of gravity mid-body, and the 255/40R19 (0.337 m rolling radius) the tyre tone assumed.
     /// Drums above five tonnes, discs below, as the brake squeal had it.
     /// </summary>
-    public static ChassisSpec Default(VehicleProfile p)
+    /// <param name="tyreCount">Its tyres on the road.</param>
+    /// <param name="widthMetres">Its body's width.</param>
+    /// <param name="massKg">Its mass.</param>
+    public static ChassisSpec Default(int tyreCount, float widthMetres, float massKg)
     {
-        bool single = p.TyreCount <= 2;
-        float track = single ? 0f : p.WidthMetres * DefaultTrackOverWidth;
+        bool single = tyreCount <= 2;
+        float track = single ? 0f : widthMetres * DefaultTrackOverWidth;
         var tyre = TyreSize.Parse("255/40R19");
-        var brake = p.MassKg > 5000f ? BrakeKind.Drum : BrakeKind.Disc;
+        var brake = massKg > 5000f ? BrakeKind.Drum : BrakeKind.Disc;
         return new ChassisSpec
         {
             Axles = new[]
             {
                 new AxleSpec { TrackMetres = track, Tyre = tyre, Steered = true, Brake = brake },
                 new AxleSpec { TrackMetres = track, Tyre = tyre, Driven = true, Brake = brake,
-                               TyresPerWheel = single ? 1 : Math.Max(1, (p.TyreCount - 2) / 2) },
+                               TyresPerWheel = single ? 1 : Math.Max(1, (tyreCount - 2) / 2) },
             },
         };
     }

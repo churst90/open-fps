@@ -15,6 +15,18 @@ public static class BodyConstants
     /// radius of the upright cylinder a person is hit as.</summary>
     public const float TorsoWidth = 0.45f;
 
+    /// <summary>The radius of the upright capsule a body on foot walks as, metres.</summary>
+    public const float PlayerRadius = 0.3f;
+
+    /// <summary>The highest step a body on foot takes without jumping, metres, and how far it steps down.</summary>
+    public const float StepHeight = 0.4f;
+
+    /// <summary>How far round a body the walk gathers what it might meet in a tick, metres.</summary>
+    public const float CollisionSearchRadius = 5.0f;
+
+    /// <summary>The height a ground probe answers when there is no ground under a body: far below any map.</summary>
+    public const float DefaultGroundCheckLimit = -900.0f;
+
     /// <summary>The walk, metres per second, client and server.</summary>
     public const float WalkSpeed = 4.5f;
 

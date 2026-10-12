@@ -5,7 +5,7 @@ namespace OpenFPS.Common;
 public static class PhysicsConstants
 {
     public static readonly Vector3 PlayerSize = new(0.6f, 1.8f, 0.6f);
-    public const float PlayerRadius = 0.3f;
+    public const float PlayerRadius = BodyConstants.PlayerRadius;
     /// <summary>A person's height, metres (<see cref="BodyConstants.PersonHeight"/>).</summary>
     public const float PlayerHeight = BodyConstants.PersonHeight;
 
@@ -54,17 +54,17 @@ public static class PhysicsConstants
 
     /// <summary>The Earth's, m/s² (<see cref="BodyConstants.Gravity"/>).</summary>
     public const float Gravity = BodyConstants.Gravity;
-    public const float StepHeight = 0.4f;
+    public const float StepHeight = BodyConstants.StepHeight;
     public const float RotationSpeed = 1.5f; // SHARED: Radians per second at full stick/key
 
     // --- Simulation Bounds & Environment ---
     public const float MapMinimumY = -10.0f;
-    public const float DefaultGroundCheckLimit = -900.0f;
+    public const float DefaultGroundCheckLimit = BodyConstants.DefaultGroundCheckLimit;
     public const float InteractionRange = 5.0f;
     /// <summary>How far E reaches for something on the ground, metres: an arm and a step. The client
     /// chooses which thing within it (PickUp); the server counts what is left within it.</summary>
     public const float PickUpReach = 2.0f;
-    public const float CollisionSearchRadius = 5.0f;
+    public const float CollisionSearchRadius = BodyConstants.CollisionSearchRadius;
 
     // --- Simulation Timing ---
     // One rate for the server's tick, the client's prediction step and the interpolator: a mismatch

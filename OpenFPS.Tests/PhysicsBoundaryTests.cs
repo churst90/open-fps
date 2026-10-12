@@ -53,6 +53,56 @@ public class PhysicsBoundaryTests
             + string.Join("\n  ", missing));
     }
 
+    /// <summary>
+    /// The physics project references the runtime, the geometry and the editor's attribute, and nothing else
+    /// (section 9; decision 7 for the attribute). The compiler refuses a type from a project that is not
+    /// referenced; this refuses the reference itself, which is what someone would add to make that error go
+    /// away.
+    /// </summary>
+    [Fact]
+    public void PhysicsReferencesOnlyGeometry()
+    {
+        var allowed = new[] { "OpenFPS.Geometry", "OpenFPS.Schema" };
+        var wrong = typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetReferencedAssemblies()
+            .Select(r => r.Name!)
+            .Where(n => !(n == "System" || n.StartsWith("System.", StringComparison.Ordinal) || n is "netstandard" or "mscorlib"
+                          || n.StartsWith("Microsoft.Win32.", StringComparison.Ordinal) || allowed.Contains(n)))
+            .ToList();
+        Assert.Equal("OpenFPS.Physics", typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetName().Name);
+        Assert.True(wrong.Count == 0, $"OpenFPS.Physics references {string.Join(", ", wrong)}: it may reference the runtime, "
+            + "OpenFPS.Geometry and OpenFPS.Schema only.");
+    }
+
+    /// <summary>What steps the world. The sound may read the physics' values and presets; it never steps it
+    /// (section 9). A stepper added later (a physics world, a vehicle step) goes on this list.</summary>
+    private static readonly string[] Steppers = { "OpenFPS.Common.SharedMovementEngine" };
+
+    /// <summary>
+    /// Nothing in the sound project names a stepper: the server steps the physics, the client predicts the
+    /// player's own body with it, and the sound takes its inputs from the state they produce.
+    /// </summary>
+    [Fact]
+    public void TheSoundNeverStepsThePhysics()
+    {
+        var compilation = Compilation.Value;
+        var found = new List<string>();
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            if (!tree.FilePath.StartsWith("OpenFPS.Sound/", StringComparison.Ordinal)) continue;
+            var model = compilation.GetSemanticModel(tree);
+            foreach (var name in tree.GetRoot().DescendantNodes().OfType<SimpleNameSyntax>())
+            {
+                var info = model.GetSymbolInfo(name);
+                var sym = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
+                var type = sym as INamedTypeSymbol ?? sym?.ContainingType;
+                while (type?.ContainingType != null) type = type.ContainingType;
+                if (type != null && Steppers.Contains(type.ToDisplayString(Plain)))
+                    found.Add($"{tree.FilePath}:{name.GetLocation().GetLineSpan().StartLinePosition.Line + 1}: {name.Parent}");
+            }
+        }
+        Assert.True(found.Count == 0, "The sound steps the physics (docs/PHYSICS_BOUNDARY.md, section 9):\n  " + string.Join("\n  ", found));
+    }
+
     [Fact]
     public void NoNewCrossings()
     {

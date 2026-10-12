@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common.Components;
-using static OpenFPS.Common.PhysicsConstants;
+using static OpenFPS.Common.BodyConstants;
 
 namespace OpenFPS.Common;
 
