@@ -140,7 +140,7 @@ FILE_RULES = [
 
 # ── Type exceptions: full name -> (group, project, note) ─────────────────────────────────────────
 TYPE_RULES = {
-    'OpenFPS.Common.Networking.WheelState': ('c', 'Sound', 'a sound value in the network namespace'),
+    'OpenFPS.Common.Networking.WheelState': ('c', 'Physics', 'a wheel\'s state, on the wire (physics stage 1)'),
     'OpenFPS.Common.Networking.WorldAudioEvent': ('b', '', 'network message carrying a TransientSound'),
     'OpenFPS.Common.Components.PlaybackMode': ('c', 'Sound', 'an enum the emitter component and the voices share'),
     'OpenFPS.Common.Components.WeatherType': ('c', 'Sound', ''),
@@ -148,7 +148,7 @@ TYPE_RULES = {
     'OpenFPS.Common.TileKey': ('c', 'Geometry', 'a tile of the world; the tile scenes key on it'),
     'OpenFPS.Common.Precipitation': ('c', 'Sound', 'weather value in the snapshot'),
     'OpenFPS.Common.PrecipitationKind': ('c', 'Sound', ''),
-    'OpenFPS.Common.WindAir': ('c', 'Sound', 'the wind the server sends'),
+    'OpenFPS.Common.WindAir': ('c', 'Physics', 'the wind the server sends (physics stage 1)'),
     'OpenFPS.Common.LightningStrike': ('c', 'Sound', 'the flash the server sends'),
     'OpenFPS.Common.FlashKind': ('c', 'Sound', ''),
     'OpenFPS.Common.DoorKind': ('c', 'Sound', 'stored in DoorComponent'),

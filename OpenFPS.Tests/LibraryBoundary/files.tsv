@@ -31,7 +31,7 @@ OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Core/AudioBank.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/AudioEngineFacade.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	lib	Audio
-OpenFPS.Client.Core/AudioEngine/Core/PlacementThread.cs	lib	Audio
+OpenFPS.Client.Core/AudioEngine/Core/PlacementThread.cs	lib	Sound
 OpenFPS.Client.Core/AudioEngine/Core/VoiceManager.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Data/AcousticPathData.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Data/SpatialEmitter.cs	lib	Audio	
