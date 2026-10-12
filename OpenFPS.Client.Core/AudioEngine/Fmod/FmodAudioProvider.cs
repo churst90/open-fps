@@ -340,7 +340,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     /// <summary>A wash unit and the state its callback reads. Pooled with its handle, so a footstep's
     /// copies do not leave a handle behind for every step.</summary>
-    private sealed class PooledWashDsp
+    internal sealed class PooledWashDsp
     {
         public FMOD.DSP Dsp;
         public System.Runtime.InteropServices.GCHandle Handle;
@@ -362,7 +362,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>A loudspeaker's beam unit and the state its callback reads, pooled with its handle.</summary>
-    private sealed class PooledRadiatorDsp
+    internal sealed class PooledRadiatorDsp
     {
         public FMOD.DSP Dsp;
         public System.Runtime.InteropServices.GCHandle Handle;
@@ -523,7 +523,7 @@ public partial class FmodAudioProvider : IAudioProvider
         if (dsp.hasHandle() && state != null) { _synthPool.Push(new PooledSynthDsp(dsp, handle, state)); }
     }
 
-    private class ActiveSound
+    internal sealed class ActiveSound
     {
         public int EntityId; 
         public string SoundId = ""; 
@@ -596,6 +596,23 @@ public partial class FmodAudioProvider : IAudioProvider
         public float Range; 
         public float MinDistance;
         public float BaseVolume; 
+        /// <summary>How much of <see cref="BaseVolume"/> only gives a quieter render its headroom back
+        /// (SpatialEmitter.HeadroomGain), 0 for none; with the declared level, the key its spectrum is measured
+        /// under and whether it is physical, the numbers the budget ranks it by (VoiceManager.Audibility).</summary>
+        public float HeadroomGain, EarLevelDb;
+        public string RankKey = "";
+        public bool Physical;
+        /// <summary>Takes those numbers from the emitter it is played from, as the budget reads them.</summary>
+        public void RankAs(in SpatialEmitter e)
+        {
+            HeadroomGain = e.HeadroomGain;
+            EarLevelDb = e.EarLevelDb;
+            RankKey = OpenFPS.Client.AudioEngine.Core.VoiceManager.RankKey(e);
+            Physical = OpenFPS.Client.AudioEngine.Core.VoiceManager.IsPhysical(e);
+        }
+        /// <summary>How loud it is at the ear by what it radiates here, the one rank (<see cref="HeardHere"/>),
+        /// worked out once an update for every ordering the provider makes.</summary>
+        public float Heard;
         public float Pitch;
         
         public float CurrentOcclusion;
@@ -726,39 +743,69 @@ public partial class FmodAudioProvider : IAudioProvider
     private EngineRenderPool? _enginePool;
     private readonly List<IRenderedVoice> _engineSnapshot = new();
 
-    private readonly List<(float Distance, int Id, int Lane, IRenderedVoice Voice)> _engineOrder = new();
+    private readonly List<RenderSlot> _engineOrder = new();
+
+    /// <summary>One entry of the render pool's list: a voice, or one of a train's lanes listed with the voice
+    /// of that train it goes ahead of (<see cref="RenderAhead"/>).</summary>
+    internal readonly record struct RenderSlot(float Level, int Id, int Lane, IRenderedVoice Voice);
+
+    /// <summary>The lane of an entry that is a voice: after the lanes listed with it.</summary>
+    internal const int VoiceLane = int.MaxValue;
 
     /// <summary>
-    /// Every voice the pool renders ahead, engines and standing machines in one list, nearest first;
-    /// copied under the lock so the pool never walks a list the mixer is changing. One list, so a
-    /// distant condenser is never rendered ahead of the truck beside you; nearest first, so when the
-    /// machine cannot keep every ring ahead (a map's first seconds) the shortfall lands on a whisper.
+    /// Every voice the pool renders ahead, engines and standing machines in one list, loudest at the ear
+    /// first (<see cref="RenderAhead"/>); copied under the lock so the pool never walks a list the mixer is
+    /// changing. One list, so a distant condenser is never rendered ahead of the truck beside you.
     /// </summary>
     private List<IRenderedVoice> SnapshotEngineVoices()
     {
         _engineSnapshot.Clear();
-        _engineOrder.Clear();
-        _snapshotTrains.Clear();
-        lock (_lock)
-            foreach (var a in _activeSounds)
-            {
-                if (a.EngineState != null) _engineOrder.Add((a.EffectiveDistance, a.EntityId, -1, a.EngineState));
-                else if (a.MachineState != null)
-                {
-                    _engineOrder.Add((a.EffectiveDistance, a.EntityId, -1, a.MachineState));
-                    // A train's lanes render what its voices read: listed once, just ahead of its nearest voice.
-                    if (a.MachineState is TrainSlotState tv && _snapshotTrains.Add(tv.Shared))
-                    {
-                        int l = 0;
-                        foreach (var lane in tv.Shared.Lanes) _engineOrder.Add((a.EffectiveDistance - 0.01f, a.EntityId, l++, lane));
-                    }
-                }
-            }
-        // Ties by voice id, then lane: the same order on every machine whatever order the voices started in.
-        _engineOrder.Sort(static (x, y) => (x.Distance, x.Id, x.Lane).CompareTo((y.Distance, y.Id, y.Lane)));
+        lock (_lock) RenderAhead(_activeSounds, _engineOrder, _snapshotTrains);
         foreach (var e in _engineOrder) _engineSnapshot.Add(e.Voice);
         if (_ranksAsked) PublishRenderOrder();
         return _engineSnapshot;
+    }
+
+    /// <summary>
+    /// The render pool's order: loudest at the ear first (<see cref="ActiveSound.Heard"/>, the one rank), so when
+    /// the machine cannot keep every ring ahead (a map's first seconds) the shortfall lands on the quietest voice,
+    /// not the furthest. Nearest first, a garden fire pit's dozen places 3 m off, or the rain round you, came ahead
+    /// of every car on the street; by loudness the cars at 8, 14, 22 and 105 m come first (--driving set=ranks),
+    /// and the fire pit 35 m off, the nearest of the far sources, last. A train's lanes render what its voices read:
+    /// listed once, just ahead of its loudest voice. Ties by voice id, then lane: the same order on every
+    /// machine whatever order the voices started in.
+    /// </summary>
+    internal static void RenderAhead(List<ActiveSound> sounds, List<RenderSlot> order, Dictionary<TrainVoiceState, (float Level, int Id)> trains)
+    {
+        order.Clear();
+        trains.Clear();
+        foreach (var a in sounds)
+        {
+            IRenderedVoice? voice = a.EngineState != null ? a.EngineState : a.MachineState;
+            if (voice == null) continue;
+            order.Add(new RenderSlot(a.Heard, a.EntityId, VoiceLane, voice));
+            if (a.MachineState is TrainSlotState tv
+                && (!trains.TryGetValue(tv.Shared, out var best) || LoudestFirst(a.Heard, a.EntityId, best.Level, best.Id) < 0))
+                trains[tv.Shared] = (a.Heard, a.EntityId);
+        }
+        foreach (var (train, ahead) in trains)
+        {
+            int l = 0;
+            foreach (var lane in train.Lanes) order.Add(new RenderSlot(ahead.Level, ahead.Id, l++, lane));
+        }
+        order.Sort(static (x, y) =>
+        {
+            int c = LoudestFirst(x.Level, x.Id, y.Level, y.Id);
+            return c != 0 ? c : x.Lane.CompareTo(y.Lane);
+        });
+    }
+
+    /// <summary>The one order of the provider's rankings: the louder first, and between two as loud the lower id,
+    /// so the order does not follow the order the voices were listed in (which is not the same on two machines).</summary>
+    internal static int LoudestFirst(float levelX, int idX, float levelY, int idY)
+    {
+        int c = levelY.CompareTo(levelX);
+        return c != 0 ? c : idX.CompareTo(idY);
     }
 
     /// <summary>The render pool's order as last listed, by voice (a train's lanes left out), once the lab has
@@ -766,7 +813,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private void PublishRenderOrder()
     {
         var ids = new List<int>(_engineOrder.Count);
-        foreach (var e in _engineOrder) if (e.Lane < 0) ids.Add(e.Id);
+        foreach (var e in _engineOrder) if (e.Lane == VoiceLane) ids.Add(e.Id);
         _renderAheadIds = ids.ToArray();
     }
     private volatile bool _ranksAsked;
@@ -796,7 +843,7 @@ public partial class FmodAudioProvider : IAudioProvider
     internal sealed record RankedVoice(int Id, string Sound, float Distance, OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail? Detail,
                                        bool LateField, bool Echoes);
     internal sealed record ProviderRanks(IReadOnlyList<RankedVoice> Voices, int[] RenderAhead);
-    private readonly HashSet<TrainVoiceState> _snapshotTrains = new();
+    private readonly Dictionary<TrainVoiceState, (float Level, int Id)> _snapshotTrains = new();
 
     /// <summary>
     /// Makeup gain on the master, dB: how loud the game plays, decided in this one place (see the
@@ -1517,41 +1564,42 @@ public partial class FmodAudioProvider : IAudioProvider
     private static readonly bool AllEnginesReduced = Environment.GetEnvironmentVariable("OPENFPS_ENGINE_DETAIL") == "always";
 
     /// <summary>
-    /// Sets each engine's detail from how loud it is here against the loudest machine (engines, standing
-    /// machines, trains and aircraft alike): what it radiates at this distance, not what occlusion lets
-    /// through, as the echoes are ranked, so a car passing behind a pillar is not handed over twice.
+    /// Sets each engine's detail from how loud it is at the ear against the loudest machine (engines, standing
+    /// machines, trains and aircraft alike), by the one rank (<see cref="ActiveSound.Heard"/>): what it radiates
+    /// here, not what occlusion lets through, so a car passing behind a pillar is not handed over twice. Ranked
+    /// on the played gain, a garden fire pit 3 m off counted the 29 dB that only give its quiet render its
+    /// headroom back, and every car on the street, the one 8 m off too, ran at reduced detail beside it, and in
+    /// rain (--driving set=ranks).
     /// </summary>
-    private void ChooseEngineDetail(Vector3 listener)
+    internal static void ChooseEngineDetail(List<ActiveSound> sounds, Vector3 listener)
     {
         float loudest = 0f;
-        foreach (var a in _activeSounds)
+        foreach (var a in sounds)
         {
             if (a.EngineState == null && a.MachineState == null) continue;
             if (a.IsReflection || a.FadeTarget <= 0f) continue;
-            loudest = MathF.Max(loudest, RadiatedHere(a, listener));
+            loudest = MathF.Max(loudest, a.Heard);
         }
-        foreach (var a in _activeSounds)
+        foreach (var a in sounds)
         {
             if (a.IsReflection) continue;
             if (a.MachineState is MachineVoiceState machine)
             {
                 // A machine with an engine (a mower): the same law.
-                float here = RadiatedHere(a, listener);
                 var was = machine.Detail;
-                machine.Detail = DetailFor(was, here, loudest, ReducedFarEngines, AllEnginesReduced);
+                machine.Detail = DetailFor(was, a.Heard, loudest, ReducedFarEngines, AllEnginesReduced);
                 if (machine.Detail != was)
                     Log.Debug("Engine detail: machine {Id} {Detail} at {Dist:F0} m, {Db:F1} dB under the loudest.",
-                              a.EntityId, machine.Detail, Vector3.Distance(listener, a.Position), 20f * MathF.Log10(loudest / MathF.Max(1e-9f, here)));
+                              a.EntityId, machine.Detail, Vector3.Distance(listener, a.Position), 20f * MathF.Log10(loudest / MathF.Max(1e-9f, a.Heard)));
                 continue;
             }
             if (a.EngineState is not { } state) continue;
             var now = state.Detail;
-            float level = RadiatedHere(a, listener);
-            var want = DetailFor(now, level, loudest, ReducedFarEngines, AllEnginesReduced);
+            var want = DetailFor(now, a.Heard, loudest, ReducedFarEngines, AllEnginesReduced);
             if (want == now) continue;
             state.Detail = want;
             Log.Debug("Engine detail: entity {Id} {Detail} at {Dist:F0} m, {Db:F1} dB under the loudest.",
-                      a.EntityId, want, Vector3.Distance(listener, a.Position), 20f * MathF.Log10(loudest / MathF.Max(1e-9f, level)));
+                      a.EntityId, want, Vector3.Distance(listener, a.Position), 20f * MathF.Log10(loudest / MathF.Max(1e-9f, a.Heard)));
         }
     }
 
@@ -1567,8 +1615,23 @@ public partial class FmodAudioProvider : IAudioProvider
                                     : OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
     }
 
-    private static float RadiatedHere(ActiveSound a, Vector3 listener)
-        => a.BaseVolume * Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, Vector3.Distance(listener, a.Position));
+    /// <summary>
+    /// How loud a voice is at the ear by what it radiates here: the one rank (VoiceManager.HeardLevel, what the
+    /// budget ranks by) over the numbers it is played with, less the gain that only gives a quieter render its
+    /// headroom back (<see cref="ActiveSound.HeadroomGain"/>), which is no louder at the ear. No path: occlusion and
+    /// the cone swing as a siren passes behind a building, and ranking the echoes on them flickered the trace.
+    /// </summary>
+    internal static float HeardHere(ActiveSound a, Vector3 listener)
+        => OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(
+               OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(a.BaseVolume, a.HeadroomGain), a.MinDistance, a.Range,
+               Vector3.Distance(listener, a.Position), 0f, a.EarLevelDb, a.RankKey, a.Physical);
+
+    /// <summary>Every voice's <see cref="ActiveSound.Heard"/>, once an update, before the orderings that read it.</summary>
+    internal static void RankVoices(List<ActiveSound> sounds, Vector3 listener)
+    {
+        foreach (var a in sounds) a.Heard = HeardHere(a, listener);
+    }
+
     /// <summary>
     /// Far sources only: close to, a traced response stacked a second set of strong early reflections
     /// a few milliseconds behind the direct sound, a comb (boxy, flanged). In from this distance, out
@@ -1691,7 +1754,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     // Each source's own late sound (LateField).
-    private readonly List<(ActiveSound A, float Level)> _lateCandidates = new();
+    private readonly List<ActiveSound> _lateCandidates = new();
     private readonly int[] _lateIds = new int[LateField.MaxSources];
     private int _lateCount;
     private readonly Vector3[] _lateAt = new Vector3[LateField.MaxSources];
@@ -1713,26 +1776,17 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         var lf = Traced.LateField;
         if (lf == null || !TracedActive || !_steamAudioEnabled) { _lateLawK = float.NaN; _tailBias = Vector3.Zero; _lateCount = 0; return; }
-        _lateCandidates.Clear();
-        foreach (var a in _activeSounds)
-        {
-            if (a.IsReflection || a.FadeTarget <= 0f || a.TargetRegionId != _listenerRegionId) continue;
-            if (!a.SourceReverbConnection.hasHandle()) continue;
-            // Cabin paths send at the interior voice's send; given slots, they pushed the rain on the
-            // roof out of them (+2 dB, the rain falling back on the stand-in law).
-            if (a.TapState is { CabinPath: > 0 }) continue;
-            float dist = Vector3.Distance(_listenerPos, a.Position);
-            _lateCandidates.Add((a, a.BaseVolume * Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist)));
-        }
-        _lateCandidates.Sort(static (x, y) => (y.Level, x.A.EntityId).CompareTo((x.Level, y.A.EntityId)));
+        LateCandidates(_activeSounds, _listenerRegionId, _lateCandidates);
         int n = Math.Min(LateField.MaxSources, _lateCandidates.Count);
         _lateCount = n;
         _lateLevel.Clear();
         for (int i = 0; i < n; i++)
         {
-            _lateIds[i] = _lateCandidates[i].A.EntityId;
-            _lateAt[i] = _lateCandidates[i].A.Position;
-            _lateLevel[_lateIds[i]] = _lateCandidates[i].Level;
+            var a = _lateCandidates[i];
+            _lateIds[i] = a.EntityId;
+            _lateAt[i] = a.Position;
+            // The lean's weight is the level as played, as it was before the slots were ranked by the heard level.
+            _lateLevel[a.EntityId] = a.BaseVolume * Loudness.RenderedGain(1f, a.MinDistance, a.Range, Vector3.Distance(_listenerPos, a.Position));
         }
         lf.Want(_listenerPos, _lateIds.AsSpan(0, n), _lateAt.AsSpan(0, n));
 
@@ -1765,6 +1819,27 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     private volatile float _lateLawKNow = float.NaN, _tailLeanNow;
+
+    /// <summary>
+    /// Who the late field traces: the sources sending to the listener's place, loudest at the ear first (the one
+    /// rank, <see cref="ActiveSound.Heard"/>). Ranked on the played gain, a garden fire pit's places 3 m off took 12
+    /// of the 16 slots from the cars round it and the rain's patches 15, each counting the 29 dB that only give its
+    /// quiet render its headroom back; by loudness they hold 10 and 9 (--driving set=ranks).
+    /// </summary>
+    internal static void LateCandidates(List<ActiveSound> sounds, int listenerRegion, List<ActiveSound> into)
+    {
+        into.Clear();
+        foreach (var a in sounds)
+        {
+            if (a.IsReflection || a.FadeTarget <= 0f || a.TargetRegionId != listenerRegion) continue;
+            if (!a.SourceReverbConnection.hasHandle()) continue;
+            // Cabin paths send at the interior voice's send; given slots, they pushed the rain on the
+            // roof out of them (+2 dB, the rain falling back on the stand-in law).
+            if (a.TapState is { CabinPath: > 0 }) continue;
+            into.Add(a);
+        }
+        into.Sort(static (x, y) => LoudestFirst(x.Heard, x.EntityId, y.Heard, y.EntityId));
+    }
 
     private string LateFieldStatus()
     {
@@ -1806,51 +1881,8 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_echoRigs.Count == 0) return;
         echoes.SetListener(_listenerPos);
 
-        // Who: sustained sources with a binaural voice of their own, by the level they render at.
-        _echoCandidates.Clear();
-        float loudest = 0f;
-        foreach (var a in _activeSounds)
-        {
-            if (!a.SaDsp.hasHandle() || a.IsReflection || a.EchoState != null || a.TapState != null) continue;
-            if (a.EngineState == null && a.MachineState == null) continue;
-            if (a.FadeTarget <= 0f || a.LastVolume <= 0f) continue;
-            float dist = Vector3.Distance(_listenerPos, a.CurrentApparentPosition);
-            if (dist < (a.EchoRig != null && !a.EchoLeaving ? EchoHoldMetres : EchoEnterMetres)) continue;
-            // Ranked by what it radiates here, not what gets through: occlusion and the cone swing as a
-            // siren passes behind a building, and ranking on them flickered the trace ("reflect, cut
-            // out, cut in, cut out").
-            float level = a.BaseVolume * Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, dist);
-            bool held = a.EchoRig != null && !a.EchoLeaving;
-            float score = level * (held ? MathF.Pow(10f, EchoHoldDb / 20f) : 1f);
-            loudest = MathF.Max(loudest, level);
-            _echoCandidates.Add((a, score));
-        }
-        _echoCandidates.Sort(static (x, y) => (y.Score, x.A.EntityId).CompareTo((x.Score, y.A.EntityId)));
-        float floor = loudest * MathF.Pow(10f, -EchoWithinDb / 20f);
-        int allowed = _echoRigs.Count;
         var keep = new HashSet<ActiveSound>();
-        // A train is a line of sources on one synth; its two loudest carry its echoes, so one train
-        // cannot take every rig from the cars and the siren.
-        var perTrain = new Dictionary<string, int>();
-        foreach (var (a, score) in _echoCandidates)
-        {
-            if (keep.Count >= allowed || score < floor) break;
-            // ...and so is a tree, a fire or a fountain heard from several places.
-            string? sharedKey = a.MachineState switch
-            {
-                TrainSlotState trainVoice => trainVoice.Shared.Key,
-                NaturePlaceState place => "place:" + place.Shared.GetHashCode(),
-                WaterTapState water => "water:" + water.Shared.Key,
-                _ => null,
-            };
-            if (sharedKey != null)
-            {
-                perTrain.TryGetValue(sharedKey, out int c);
-                if (c >= MaxEchoTapsPerTrain) continue;
-                perTrain[sharedKey] = c + 1;
-            }
-            keep.Add(a);
-        }
+        ChooseEchoSources(_activeSounds, _listenerPos, _echoRigs.Count, _echoCandidates, keep);
         double nowS = System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
         foreach (var a in _activeSounds)
         {
@@ -1907,6 +1939,56 @@ public partial class FmodAudioProvider : IAudioProvider
                     parts.Add($"{a.SoundId}#{a.EntityId} {20 * Math.Log10(Math.Max(1e-9, a.LastVolume)):F0} dB in {20 * Math.Log10(Math.Max(1e-9, r.InRms)):F0} out {20 * Math.Log10(Math.Max(1e-9, r.OutRms)):F0}");
             if (parts.Count > 0)
                 Log.Information("Traced echoes: {N} source(s), trace {Ms:F0} ms: {List}", parts.Count, echoes.LastRunMs, string.Join("; ", parts));
+        }
+    }
+
+    /// <summary>
+    /// Who gets the traced echoes (at most <paramref name="allowed"/>, into <paramref name="keep"/>): sustained
+    /// sources with a binaural voice of their own, far enough off, loudest at the ear first by what they radiate
+    /// here (the one rank, <see cref="ActiveSound.Heard"/>), not what gets through: occlusion and the cone swing as
+    /// a siren passes behind a building, and ranking on them flickered the trace ("reflect, cut out, cut in, cut
+    /// out"). Ranked on the played gain, a garden fire pit 35 m off took a rig from a car 160 m off, counting
+    /// the 29 dB that only give its quiet render its headroom back.
+    /// </summary>
+    internal static void ChooseEchoSources(List<ActiveSound> sounds, Vector3 listener, int allowed,
+                                           List<(ActiveSound A, float Score)> candidates, HashSet<ActiveSound> keep)
+    {
+        candidates.Clear();
+        float loudest = 0f;
+        foreach (var a in sounds)
+        {
+            if (!a.SaDsp.hasHandle() || a.IsReflection || a.EchoState != null || a.TapState != null) continue;
+            if (a.EngineState == null && a.MachineState == null) continue;
+            if (a.FadeTarget <= 0f || a.LastVolume <= 0f) continue;
+            float dist = Vector3.Distance(listener, a.CurrentApparentPosition);
+            if (dist < (a.EchoRig != null && !a.EchoLeaving ? EchoHoldMetres : EchoEnterMetres)) continue;
+            bool held = a.EchoRig != null && !a.EchoLeaving;
+            candidates.Add((a, a.Heard * (held ? MathF.Pow(10f, EchoHoldDb / 20f) : 1f)));
+            loudest = MathF.Max(loudest, a.Heard);
+        }
+        candidates.Sort(static (x, y) => LoudestFirst(x.Score, x.A.EntityId, y.Score, y.A.EntityId));
+        float floor = loudest * MathF.Pow(10f, -EchoWithinDb / 20f);
+        // A train is a line of sources on one synth; its two loudest carry its echoes, so one train
+        // cannot take every rig from the cars and the siren.
+        var perTrain = new Dictionary<string, int>();
+        foreach (var (a, score) in candidates)
+        {
+            if (keep.Count >= allowed || score < floor) break;
+            // ...and so is a tree, a fire or a fountain heard from several places.
+            string? sharedKey = a.MachineState switch
+            {
+                TrainSlotState trainVoice => trainVoice.Shared.Key,
+                NaturePlaceState place => "place:" + place.Shared.GetHashCode(),
+                WaterTapState water => "water:" + water.Shared.Key,
+                _ => null,
+            };
+            if (sharedKey != null)
+            {
+                perTrain.TryGetValue(sharedKey, out int c);
+                if (c >= MaxEchoTapsPerTrain) continue;
+                perTrain[sharedKey] = c + 1;
+            }
+            keep.Add(a);
         }
     }
 
@@ -3187,6 +3269,9 @@ public partial class FmodAudioProvider : IAudioProvider
             }
 
             AttachEar(activeSound, emitter);
+            activeSound.RankAs(emitter);
+            // Ranked from its first listing, not at the bottom of the render pool until the next update.
+            activeSound.Heard = HeardHere(activeSound, _listenerPos);
             AddActive(activeSound);
 
             // The first block is heard through the voice's path. Until the next attribute pass a new voice
@@ -3228,6 +3313,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 active.EffectiveDistance = emitter.EffectiveDistance; active.Velocity = emitter.Velocity; 
                 active.Direction = emitter.Direction; active.Range = emitter.Range; 
                 active.BaseVolume = emitter.Volume * TakeGain(emitter);
+                active.RankAs(emitter);
                 UpdateEarLevel(active, emitter);
                 if (emitter.CarriesPath)
                 {
@@ -3643,8 +3729,9 @@ public partial class FmodAudioProvider : IAudioProvider
                 _dbgFrame++;
                 UpdateActiveReverbs(lPosVec);
                 UpdateTracedStages();
+                RankVoices(_activeSounds, lPosVec);
                 UpdateTracedEchoes();
-                ChooseEngineDetail(lPosVec);
+                ChooseEngineDetail(_activeSounds, lPosVec);
                 UpdateLateField();
                 ApplySimulatedReverb();
 

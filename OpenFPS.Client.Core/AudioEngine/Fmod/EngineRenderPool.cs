@@ -18,8 +18,8 @@ public sealed class EngineRenderPool : IDisposable
     /// <summary>
     /// The voices to render, republished as a whole array, never mutated: workers read the reference
     /// without a lock. If it is swapped between two workers' reads, two may reach for one voice and the
-    /// second finds its producer already claimed. Sorted nearest first, so when the machine cannot fill
-    /// every ring in time the cars it fills are the ones you can hear.
+    /// second finds its producer already claimed. Sorted loudest at the ear first, so when the machine cannot
+    /// fill every ring in time the cars it fills are the ones you can hear.
     /// </summary>
     private volatile IRenderedVoice[] _voices = Array.Empty<IRenderedVoice>();
 
@@ -83,10 +83,10 @@ public sealed class EngineRenderPool : IDisposable
     private long _busySince = System.Diagnostics.Stopwatch.GetTimestamp();
 
     /// <summary>
-    /// Every worker takes the next voice of one shared sweep down the list, nearest first, rather than a
+    /// Every worker takes the next voice of one shared sweep down the list, loudest first, rather than a
     /// fixed share of it: with fixed shares, a worker held up by one slow voice starves every voice in its
     /// share while the others have time. When the pool cannot fill every ring in time, the voices at the
-    /// end of the list, the furthest, are the ones that starve, and the budget gives those up.
+    /// end of the list, the quietest, are the ones that starve, and the budget gives those up.
     /// </summary>
     private void Work(int id, int stride)
     {

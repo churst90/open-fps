@@ -38,7 +38,7 @@ public partial class FmodAudioProvider
     private const double EarPublishSeconds = 5.0;
     private double _earReportAt;
 
-    private sealed class EarVoice
+    internal sealed class EarVoice
     {
         public FMOD.DSP Dsp;
         public GCHandle Handle;

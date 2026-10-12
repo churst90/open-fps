@@ -368,12 +368,8 @@ public class VoiceManager
     /// </summary>
     internal static float Audibility(in SpatialEmitter e, float distance, bool playing)
     {
-        // The gain that gives a quieter render its headroom back is in its volume and is not loudness: counted,
-        // a voice rendered 45 dB under full scale (a rain patch, the larger fires) ranked 29 dB over a machine as
-        // loud, the shared headroom being 16.
-        float volume = e.HeadroomGain > 0f ? e.Volume / e.HeadroomGain : e.Volume;
-        float level = HeardLevel(volume, e.MinDistance, e.Range, distance, e.Occlusion, e.EarLevelDb,
-                                 string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey, IsPhysical(e));
+        float level = HeardLevel(WithoutHeadroom(e.Volume, e.HeadroomGain), e.MinDistance, e.Range, distance, e.Occlusion,
+                                 e.EarLevelDb, RankKey(e), IsPhysical(e));
         if (playing) level *= PlayingHysteresis;
         // Pinned, not weighted: essential voices rank above all others, and among themselves by level.
         return e.Essential ? level + EssentialPin : level;
@@ -404,9 +400,17 @@ public class VoiceManager
         return level;
     }
 
+    /// <summary>A voice's volume less the gain that only gives a quieter render its headroom back
+    /// (SpatialEmitter.HeadroomGain, 0 for none). That gain is not loudness: counted, a voice rendered 45 dB under
+    /// full scale (a rain patch, the larger fires) ranked 29 dB over a machine as loud, the shared headroom being 16.</summary>
+    internal static float WithoutHeadroom(float volume, float headroomGain) => headroomGain > 0f ? volume / headroomGain : volume;
+
+    /// <summary>The key a voice's spectrum is measured and ranked under: its physical key, else its sound.</summary>
+    internal static string RankKey(in SpatialEmitter e) => string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId ?? "" : e.PhysicalKey;
+
     /// <summary>Whether a voice is physical (declared level is its RMS) rather than a recording (declared
     /// level is full scale), read from what will build its DSP. Consulted until its spectrum is measured.</summary>
-    private static bool IsPhysical(in SpatialEmitter e)
+    internal static bool IsPhysical(in SpatialEmitter e)
         => e.IsSynth || e.IsGranular || !string.IsNullOrEmpty(e.PhysicalKey) || !string.IsNullOrEmpty(e.EngineKey);
 
     /// <summary>About two decibels. See <see cref="Audibility"/>.</summary>

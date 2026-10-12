@@ -31,7 +31,7 @@ Where the parts stand (2026-10-11):
 | P3b, every other voice | done 2026-10-11 ("P3b as built"), unheard: every voice an entry, one writer each; woods take their path, engine echoes carry theirs; P6 for talkers and S23. Blocked engines heard round the edge (Cody, the same day) |
 | P3c, seeds then ids | done 2026-10-11 ("P3c as built") |
 | P3d, one start and declared levels | steps 1 to 5 built 2026-10-11, step 6 (the reseed) 2026-10-12 ("P3d as built"), unheard. Left: the rain and bump start levels (a decision). Rain patches under probes: done with P6. The two default ranges: one now (S24) |
-| P4, one ranking | the choosers built 2026-10-12 ("P4 as built"), unheard: one rank, cars and places by loudness, a render's headroom out of the rank. Three decisions for Cody there; the provider's orderings (S20) left |
+| P4, one ranking | the choosers built 2026-10-12 ("P4 as built"), unheard: one rank, cars and places by loudness, a render's headroom out of the rank. Three decisions for Cody there. The provider's orderings (S20) built 2026-10-12 ("S20 as built"), unheard |
 | P6, one path model for every asker | done: talkers and S23 in P3b; beacons and perched birds in P3d; rain patches 2026-10-12 ("P6, the rain, as built"), unheard |
 | P7, machine state from the server | last; a wire change, shipped with a server deploy |
 
@@ -120,7 +120,7 @@ worlds would share, a number tuned to one map. Ranked the same way.
 | Id | Where | What | Bug it has caused or would cause | Sev | Fix in a sentence |
 |---|---|---|---|---|---|
 | S19 | `ChooseLiveMachines` CAS:1443-1449 against the emitter CAS:2900-2902; `docs/THE_CITY.md:252` | The machine ranking leaves out the headroom gain the emitter applies and reads the timbre by `SoundId` where the emitter uses `VoiceKey`. The engine ranking by distance (S12) contradicts THE_CITY.md's "The budget is ranked by LEVEL, not by distance". | A source picked on one set of numbers and played at another: the reason `PhysicalLevel` was memoised for both (CAS:1043-1047). | B | P4: the ranking reads the entry's placed gain, the same number the emitter plays. |
-| S20 | Provider orders: `FmodAudioProvider.cs:749` (render-ahead, nearest first by `EffectiveDistance`), `:4160-4182` (the 4 nearest region buses), `:1512`, `:1665`, `:1761` (engine detail, late field, echo candidates by `BaseVolume × RenderedGain`, each with its own hysteresis: `:1450`, `:1529`, `VoiceManager.cs:388`) | More rankings inside the provider, each by its own law. A voice fed `EffectiveDistance` 0 (S3, engine echoes) sorts first in the render pool. | When the render pool is short, a loud far engine starves before a quiet near one. | C | P4: the same audibility, computed once per voice per tick, read by every ordering. |
+| S20 | Provider orders: `FmodAudioProvider.cs:749` (render-ahead, nearest first by `EffectiveDistance`), `:4160-4182` (the 4 nearest region buses), `:1512`, `:1665`, `:1761` (engine detail, late field, echo candidates by `BaseVolume × RenderedGain`, each with its own hysteresis: `:1450`, `:1529`, `VoiceManager.cs:388`) | More rankings inside the provider, each by its own law. A voice fed `EffectiveDistance` 0 (S3, engine echoes) sorts first in the render pool. | When the render pool is short, a loud far engine starves before a quiet near one. | C | P4: the same audibility, computed once per voice per tick, read by every ordering. Done 2026-10-12 ("S20 as built"). |
 | S21 | `AudioEngine/Acoustics/VehicleShadow.cs:16`, `:22`, `:62-66` against `OpenFPS.Acoustics/Diffraction.cs:27-40` | Two diffraction laws. `VehicleShadow` has its own Maekawa (0 dB at grazing, 15 dB cap, bands 150/1000/4000 Hz, its own detour), the shared one 5 dB at grazing, a 24 dB cap, bands 200/1250/8000. | A bus and a building of the same height and detour shadow a source by different amounts. | B | Closed as deferred (Cody, 2026-10-11): the bus keeps its own law until geometry stage 6 puts vehicles' bodies in the acoustic scene and retires `VehicleShadow`. |
 | S22 | `OpenFPS.Sound/BulletImpact.cs:76-107`, `OpenFPS.Sound/Ricochet.cs:89-110`, `Services/SoundMappingService.cs:35-55`, `:74` against `OpenFPS.Acoustics/AcousticRegistry.cs:491-493`, `:556-566` | Second and third material tables beside the registry, restating its densities and without its aliases: "Steel", "MildSteel", "Stainless", "Aluminium" become Generic (brittle) for impacts and ricochets. `RainField.cs:323` and `RainSurfaces.cs:44`, `:216` test `IsKnown` first, so they reach Generic without the registry's warning. | The project note "registry falls back silently": unknown material is Generic, and steel is "Metal". A steel post struck by a bullet chips like plaster. | B | P5: one material table with aliases; impact and ricochet behaviour as its fields; no caller bypasses its warning. |
 | S23 | `AudioEngine/Acoustics/SpatialAcoustics.cs:31`, `:324` | "The local player" for the hand-rolled path is the first Player entity within 2 m of the listener. | Two players standing together: the wrong body is left out of the occlusion rays, so your own body can block what you hear, or theirs is ignored. | B | P6: the caller passes `OwnEntityId` (CAS already knows it, CAS:40-46). |
@@ -832,11 +832,9 @@ hash does not. Three commits.
     leaves the path out for a reason heard ("ranking on them flickered the trace").
   - **Sirens, horns, held horns and talkers** still take a voice each with no budget (S12's last line). They
     have no count to be ranked into; giving them one is a new budget.
-  - **The provider's orderings (S20).** Render-ahead is still nearest first by `EffectiveDistance`; engine
-    detail, the late field and the echo candidates rank on `BaseVolume × RenderedGain`, which carries the
-    headroom's return: near a fire or in rain, "the loudest" that engine detail is measured against is up to
-    29 dB over what is heard. `SpatialEmitter.HeadroomGain` is there for them to divide out. They need FMOD to
-    run and no test here reaches them.
+  - **The provider's orderings (S20).** Render-ahead was still nearest first by `EffectiveDistance`; engine
+    detail, the late field and the echo candidates ranked on `BaseVolume × RenderedGain`, which carries the
+    headroom's return. Built 2026-10-12 on Cody's machine ("S20 as built", below).
 - **Streams** (each commit says line by line). The headroom field: all eight, every `Play` line gains
   `HeadroomGain=` and no other line changes. Cars by loudness: sirens_and_far_traffic, 3,490 lines to 3,729
   (the engines were the horn car and the patrol car, the two nearest; they are the horn car and car 504, a
@@ -844,6 +842,53 @@ hash does not. Three commits.
   the only one of its kind; six cars borrow where seven did); walk (28 lines) and traffic_rain (852),
   `ReviveEngine` lines in another order within their frames, the same lines in every frame. Places: none. All
   regenerated on Windows.
+
+**S20 as built (2026-10-12), the provider's orderings.** Unheard. Made on Cody's machine with FMOD and Steam
+Audio. Only `OpenFPS.Client.Core`, the lab and the tests changed: no stream changes and the wire hash does not.
+Two commits: the instrument first (`--driving set=ranks`, measured on the old code), then the change.
+
+- **One rank, worked out once an update.** A voice carries the numbers the budget ranks it by
+  (`ActiveSound.RankAs`: the headroom gain, the declared level, the key its spectrum is measured under,
+  whether it is physical). `FmodAudioProvider.HeardHere` asks `VoiceManager.HeardLevel` with them, less the
+  headroom's return and with no path, for every voice once an update (`RankVoices`, into `ActiveSound.Heard`),
+  and the four orderings read that number. Ties go to the lower id (`LoudestFirst`). It is the budget's number
+  for the same voice to a part in ten thousand (`ProviderOneRankTests`); the provider's gain carries the take
+  gain of a recording as well, which the budget does not know.
+- **Render-ahead**: loudest first, so a short pool starves the quietest voice. A train's lanes go just ahead
+  of its loudest voice (they went ahead of whichever of its voices was listed first).
+- **Engine detail**: against the loudest machine by the heard level; the 15 and 12 dB thresholds stay.
+- **The late field**: its sixteen sources by the heard level. Its lean is still weighted by the level as
+  played, headroom and all (a question below).
+- **Traced echoes**: by the heard level at the source's own position (it was the distance to where it is heard
+  from, the diffracted bearing's point); the path stays out, the 4 dB hold and the 30 dB floor stay. The rig's
+  input gain is a signal level and keeps the headroom.
+- **Region buses**: unchanged, they order rooms.
+- **Measured** in the real mixer (`--driving set=ranks`: ten cars idling on a street at 8 to 160 m, FMOD and
+  Steam Audio, 0 direct voices without HRTF), the last of six samples a second apart:
+
+  | Scene | | Before | After |
+  |---|---|---|---|
+  | Cars alone | full detail | 6 of 10 | the same 6 |
+  | | render order | nearest first | 8, 22, 14, 105, 32, 45, 60, 80, 130, 160 m |
+  | Fire pit 3 m off | full detail | none | the same 6 as alone |
+  | | late field | 12 fire places, 4 car voices | 10 fire places, 6 car voices |
+  | | render order | the 12 fire places first | the 4 loudest cars, then the places and the rest |
+  | Fire pit 35 m off | full detail | 4 (the bus at 32 m, the car at 45 m reduced) | the same 6 as alone |
+  | | traced echoes | the fire pit takes the 160 m car's rig | the six cars from 45 m out |
+  | | render order | the fire pit fifth | the fire pit last |
+  | Moderate rain | full detail | none | the same 6 as alone |
+  | | late field | 15 rain patches, 1 car | 9 rain patches, 7 car voices |
+  | | render order | the 12 nearest patches first | the 5 loudest cars, then the patches and the rest |
+
+  The fire's places 3 m off rank between the bus at 32 m and the car at 45 m, so they still hold ten slots.
+  The cars-alone render order changes because the ear model is in the rank now: an idling car ranks by its
+  declared level (the budget's law, P4), so the glasspack V8 at 105 m comes before the bus at 32 m.
+- **Tests.** `ProviderOneRankTests`, six, each seen to fail with the code broken: the headroom counted (five
+  fail), ties to the higher id and lanes after their voice (two), the lanes with the quietest voice (one).
+- **Questions for Cody.** The late field's lean, the way the tail leans toward its sources, is weighted by each
+  traced source's level as played, so a fire pit's or a rain patch's place pulls it 29 dB harder than it is
+  heard. Weighting it by the heard level is the same fix as these, but it changes what is heard (the lean), so
+  it waits. Recommended: weight it by the heard level.
 
 #### P5. Names and materials to properties (1 to 2 sessions)
 
