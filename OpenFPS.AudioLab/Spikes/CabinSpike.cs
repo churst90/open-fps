@@ -256,23 +256,28 @@ public static class CabinSpike
         int nextId = 100;
         double lastLog = 0;
 
+        // The longest frame of each segment: the update and the audio thread's tick, which place every source.
+        double worstFrameMs = 0;
         void Pump(double seconds)
         {
             var until = clock.Elapsed.TotalSeconds + seconds;
             while (clock.Elapsed.TotalSeconds < until)
             {
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
+                long f0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 audio.Update(world.GetSnapshot());
                 facade.PumpForTest();
+                worstFrameMs = Math.Max(worstFrameMs, System.Diagnostics.Stopwatch.GetElapsedTime(f0).TotalMilliseconds);
                 Thread.Sleep(4);
             }
         }
         void Record(string name, double seconds, string note)
         {
             double start = clock.Elapsed.TotalSeconds;
+            worstFrameMs = 0;
             Pump(seconds);
             segments.Add(new Segment(name, start, seconds, note));
-            Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  {note}");
+            Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  {note}  [worst frame {worstFrameMs:F0} ms]");
             Console.WriteLine($"           cabin trace {(provider.Traced.Cabin != null ? "ready" : "none")}, listener trace {(provider.Traced.Listener != null ? "ready" : "none")}, HRTF voices free {provider.SpatialVoicesFree}, "
                               + $"cabin tap blocks in line {EngineTapState.AlignedBlocks} / on their own clock {EngineTapState.UnalignedBlocks}");
         }
@@ -389,13 +394,17 @@ public static class CabinSpike
                 player.Rotation = heading;
                 if (t - lastLog > 5) { lastLog = t; }
             };
+            worstFrameMs = 0;
             Pump(4.0);
+            double gettingIn = worstFrameMs;
             Record(label, seconds, $"{note}; {SeatNote(v, seat)}");
             perFrame = null;
             player.RidingEntityId = -1;
             Remove(id);
             if (room >= 0) Remove(room);
+            worstFrameMs = 0;
             Pump(1.5);
+            Console.WriteLine($"           getting in: worst frame {gettingIn:F0} ms; getting out: worst frame {worstFrameMs:F0} ms");
         }
 
         try

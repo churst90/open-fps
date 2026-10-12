@@ -22,10 +22,12 @@ internal static class HrtfBands
 
     /// <summary>The ears' mean power per band, dB, through <paramref name="hrtf"/> from
     /// <paramref name="direction"/> (Steam Audio's frame: x right, y up, z back). Null if Steam Audio
-    /// would not make an effect. Allocates; game thread.</summary>
+    /// would not make an effect. Allocates; never on a thread that places sounds (about 20 ms), and never
+    /// through an HRTF the mixer is applying at the same time.</summary>
     public static float[]? Measure(IntPtr context, IntPtr hrtf, int rate, int frame, Vector3 direction)
     {
         if (context == IntPtr.Zero || hrtf == IntPtr.Zero || frame <= 0) return null;
+        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("An HRTF's bands for a cabin path");
         var au = new Phonon.IPLAudioSettings { samplingRate = rate, frameSize = frame };
         var es = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
         if (Phonon.iplBinauralEffectCreate(context, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS) return null;

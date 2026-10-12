@@ -884,13 +884,6 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private IntPtr _saContext;
     private IntPtr _saHrtf;
-    /// <summary>The HRTF the traced reverb decodes through, made for its own block
-    /// (TracedReverb.TracedFrame): one built for the mixer's 1024 and run at another size comes out 2 dB
-    /// hot and is not the same head (measured with --traced-reverb and SA_HRTF_FRAME).</summary>
-    private IntPtr _saHrtfTraced;
-    private int _saHrtfTracedFrame;
-    /// <summary>How long a traced stage's input waits, samples (TracedReverbDsp.StagePreDelay); -1 until measured.</summary>
-    private int _tracedPreDelay = -1;
     private int _saFrameSize = 1024;
     private bool _steamAudioEnabled;
 
@@ -1429,16 +1422,12 @@ public partial class FmodAudioProvider : IAudioProvider
         _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _regionDecaySeconds.Clear();
         foreach (var (st, _, handle) in _traced.Values)
         {
-            st.Trace = null;
-            if (st.Effect != IntPtr.Zero) Phonon.iplReflectionEffectRelease(ref st.Effect);
-            if (st.Decode != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectRelease(ref st.Decode);
-            st.Diffuse?.Release(); st.Diffuse = null;
-            if (st.Mono.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.WorkerContext, ref st.Mono);
-            if (st.Ambi.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.WorkerContext, ref st.Ambi);
-            if (st.Stereo.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.ProviderContext, ref st.Stereo);
+            TracedStages.Free(st);
             if (handle.IsAllocated) handle.Free();
         }
-        _traced.Clear(); _tracedRunning.Clear();
+        _traced.Clear(); _tracedRunning.Clear(); _handOvers.Clear();
+        // Another map's rooms: what was worked out for this one's ids means nothing there.
+        _fieldHere.Clear(); _fieldsPending.Clear();
     }
 
     private void UpdateActiveReverbs(Vector3 listenerPos)
@@ -2118,11 +2107,18 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         var listenerTrace = Traced.Listener;
         if (listenerTrace == null || !_steamAudioEnabled || _saContext == IntPtr.Zero) return;
+        // Stages are made ahead on a thread of their own (TracedStages) and taken here as they are ready,
+        // the room you are in first; a bus still waiting for one has nothing sent to it (UpdateSends).
+        bool stagesLeft = true;
+        if (!_traced.ContainsKey(_listenerRegionId) && _reverbDsps.TryGetValue(_listenerRegionId, out var ownSfx)
+            && _reverbBuses.TryGetValue(_listenerRegionId, out var ownBus))
+            stagesLeft = AddTracedStage(_listenerRegionId, ownBus, ownSfx, listenerTrace);
         foreach (var kv in _reverbDsps)
         {
+            if (!stagesLeft) break;
             if (_traced.ContainsKey(kv.Key)) continue;
             if (!_reverbBuses.TryGetValue(kv.Key, out var bus)) continue;
-            AddTracedStage(kv.Key, bus, kv.Value, listenerTrace);
+            stagesLeft = AddTracedStage(kv.Key, bus, kv.Value, listenerTrace);
         }
 
         // The room you are in: yours (the cabin's, riding in one). Any other room: its own, from its
@@ -2141,11 +2137,13 @@ public partial class FmodAudioProvider : IAudioProvider
                      && _fieldHere.TryGetValue(kv.Key, out var field) && field.Region == _listenerRegionId && field.Gain > 0f
                      && _reverbVolumes.TryGetValue(kv.Key, out float openVol) && openVol > 0.001f)
                 trace = Traced.ForRoom(kv.Key, field.InField) ?? listenerTrace;
+            trace = HandOver(kv.Key, kv.Value.State, trace);
             kv.Value.State.Trace = trace;
             // Your own place plays the late tail alone, its early part being placed copies
             // (WorldAudioPlayer.QueueEarlyEchoes). A cabin keeps its whole response: nothing is placed
             // inside a vehicle.
-            bool tailOnly = kv.Key == _listenerRegionId && !ReferenceEquals(trace, cabin);
+            bool inCabin = trace is { IsCabin: true };
+            bool tailOnly = kv.Key == _listenerRegionId && !inCabin;
             // Made here, not on the mixer thread, and only for your own room's stage: it holds half a
             // second per direction.
             if (tailOnly && kv.Value.State.DiffuseLateConv == null && trace != null && kv.Value.State.SubFrame > 0
@@ -2155,7 +2153,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // A cabin's response is the whole of the room you sit in, not reflections beside a direct
             // sound, so it plays at its traced level: trimmed, a bus ride was muffled, the doors and
             // the street gone and no way to tell the bus was stopping.
-            kv.Value.State.Gain = ReferenceEquals(trace, cabin) ? MathF.Pow(10f, CabinDb / 20f) : TailTrim;
+            kv.Value.State.Gain = inCabin ? MathF.Pow(10f, CabinDb / 20f) : TailTrim;
         }
 
         // Only where it can be heard: a stage costs about half a millisecond a block whatever its bus's
@@ -2195,81 +2193,79 @@ public partial class FmodAudioProvider : IAudioProvider
         => BusVolumeFor(volume, _traced.ContainsKey(regionId),
                         _tracedRunning.TryGetValue(regionId, out bool running) && running);
 
-    private void AddTracedStage(int regionId, FMOD.ChannelGroup bus, FMOD.DSP sfx, TracedReverb tr)
+    /// <summary>Puts a made stage (TracedStages) on a region's bus. False when none is made yet: the bus
+    /// gets one on a later tick, and nothing is sent to it until then.</summary>
+    private bool AddTracedStage(int regionId, FMOD.ChannelGroup bus, FMOD.DSP sfx, TracedReverb tr)
     {
         // In pieces of TracedReverb.TracedFrame: the convolution answers a block late, and that is its
         // own block, not the mixer's.
         int sub = tr.FrameSize;
-        if (_saFrameSize % sub != 0) { Log.Warning("Traced reverb: mixer block {Block} is not a multiple of {Sub}.", _saFrameSize, sub); return; }
+        if (_saFrameSize % sub != 0) { Log.Warning("Traced reverb: mixer block {Block} is not a multiple of {Sub}.", _saFrameSize, sub); return true; }
         // A trace at another rate would play every delay time-scaled (8 % between 44.1 and 48 kHz).
         // Only a trace made before the mixer can be; say so rather than play it wrong.
         if (tr.SampleRate != MixerQuality.MixerRate)
         {
             Log.Warning("Traced reverb: the trace runs at {Trace} Hz and the mixer at {Mixer} Hz; region {Id} plays without it.",
                         tr.SampleRate, MixerQuality.MixerRate, regionId);
-            return;
+            return true;
         }
-        var au = new Phonon.IPLAudioSettings { samplingRate = tr.SampleRate, frameSize = sub };
-        var es = new Phonon.IPLReflectionEffectSettings
-        {
-            type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = tr.IrSize, numChannels = TracedReverb.Channels,
-        };
-        if (Phonon.iplReflectionEffectCreate(tr.Context, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS)
-        { Log.Warning("Traced reverb: Steam Audio would not make a reflection effect for region {Id}.", regionId); return; }
-        if (_saHrtfTraced == IntPtr.Zero || _saHrtfTracedFrame != sub)
-        {
-            if (_saHrtfTraced != IntPtr.Zero) Phonon.iplHRTFRelease(ref _saHrtfTraced);
-            var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
-            if (Phonon.iplHRTFCreate(_saContext, ref au, ref hs, out _saHrtfTraced) != Phonon.IPL_STATUS_SUCCESS)
-            { _saHrtfTraced = IntPtr.Zero; Phonon.iplReflectionEffectRelease(ref effect); return; }
-            _saHrtfTracedFrame = sub;
-        }
-        // The voices' binaural stage (a frame four times as long) delays a sound more than this one, so
-        // its input waits the difference and the room answers after the sound, not 4 ms before it
-        // (TracedReverbDsp.StagePreDelay). Measured once.
-        if (_tracedPreDelay < 0)
-        {
-            int voice = TracedReverbDsp.BinauralOnset(_saContext, _saHrtf, _saFrameSize);
-            int stage = TracedReverbDsp.BinauralOnset(_saContext, _saHrtfTraced, sub);
-            _tracedPreDelay = TracedReverbDsp.StagePreDelay(voice, stage);
-            Log.Information("Traced reverb: voices render {Voice} samples late, the traced stage {Stage}; its input waits {Wait}.",
-                            voice, stage, _tracedPreDelay);
-        }
-        var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = _saHrtfTraced, maxOrder = TracedReverb.Order };
-        if (Phonon.iplAmbisonicsDecodeEffectCreate(_saContext, ref au, ref ds, out IntPtr decode) != Phonon.IPL_STATUS_SUCCESS)
-        { Phonon.iplReflectionEffectRelease(ref effect); return; }
-        var st = new TracedReverbState
-        {
-            FrameSize = _saFrameSize, SubFrame = sub, SampleRate = tr.SampleRate, WorkerContext = tr.Context, ProviderContext = _saContext,
-            Effect = effect, Decode = decode, Hrtf = _saHrtfTraced, Trace = tr,
-            MonoScratch = new float[sub], StereoScratch = new float[sub * 2],
-            AmbiScratch = new float[sub * TracedReverb.Channels],
-            Orientation = Phonon.ListenerFrame(_listenerRot),
-            // Its own reader in every trace it plays (TracedReverb.MaxReaders); never the last, which
-            // is the tracer's own for reading the late tail back.
-            Reader = Math.Min(_traced.Count, TracedReverb.ExtractReader - 1),
-            LateConv = new LateTailConvolver(sub, tr.MaxLatePartitions),
-            SdmConv = new SharedInputConvolver(sub, SdmTailIr.PartitionsFor(tr.SampleRate, sub), DiffuseBranch.Count),
-            LateOut = new float[sub],
-            // The room you are in: its late tail as a field round the head, not one channel.
-            Diffuse = DiffuseTail.Create(_saContext, sub, TracedReverb.Channels, _saHrtfTraced, tr.SampleRate),
-            Delay = _tracedPreDelay > 0 ? new PreDelay(_tracedPreDelay) : null,
-            Region = regionId,
-        };
-        Phonon.iplAudioBufferAllocate(tr.Context, 1, sub, ref st.Mono);
-        Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, sub, ref st.Ambi);
-        Phonon.iplAudioBufferAllocate(_saContext, 2, sub, ref st.Stereo);
-        if (TracedReverbDsp.Create(_system, st, out var dsp, out var handle) != RESULT.OK) return;
+        _stages ??= new TracedStages(_saContext, _saFrameSize);
+        var st = _stages.Take(new TracedStages.Shape(tr.Context, tr.SampleRate, tr.IrSize, tr.MaxLatePartitions, sub));
+        if (st == null) return false;
+        st.Trace = tr;
+        st.Orientation = Phonon.ListenerFrame(_listenerRot);
+        // Its own reader in every trace it plays (TracedReverb.MaxReaders); never the last, which
+        // is the tracer's own for reading the late tail back.
+        st.Reader = Math.Min(_traced.Count, TracedReverb.ExtractReader - 1);
+        st.Region = regionId;
+        if (TracedReverbDsp.Create(_system, st, out var dsp, out var handle) != RESULT.OK) { TracedStages.Free(st); return true; }
         // Just downstream of the SFXREVERB: index 0 is the output end, so inserting at the reverb's
         // index puts this after it.
         int at = -1;
         bus.getNumDSPs(out int count);
         for (int i = 0; i < count; i++)
             if (bus.getDSP(i, out var d) == RESULT.OK && d.handle == sfx.handle) { at = i; break; }
-        if (at < 0 || bus.addDSP(at, dsp) != RESULT.OK) { dsp.release(); handle.Free(); return; }
+        if (at < 0 || bus.addDSP(at, dsp) != RESULT.OK) { dsp.release(); handle.Free(); TracedStages.Free(st); return true; }
         dsp.setBypass(true);                 // UpdateTracedStages runs it once its bus is heard
         _traced[regionId] = (st, dsp, handle);
+        return true;
     }
+
+    /// <summary>Stages made ahead, off the audio thread; null until the first is asked for.</summary>
+    private TracedStages? _stages;
+
+    /// <summary>The longest a stage keeps playing its old trace while the new one has not answered it.</summary>
+    internal const double HandOverLimitSeconds = 2.0;
+    private readonly Dictionary<int, (TracedReverb Wanted, long Since)> _handOvers = new();
+
+    /// <summary>
+    /// The trace a stage plays this tick: <paramref name="wanted"/>, once it has answered this stage's
+    /// reader (TracedReverb.HasTraced). Until then a stage reads nothing from it and plays silence, which
+    /// is what a cabin just got into and a room's own trace just made gave for the length of a trace; so a
+    /// heard stage keeps the trace it plays until the new one answers, at most HandOverLimitSeconds.
+    /// </summary>
+    private TracedReverb? HandOver(int regionId, TracedReverbState st, TracedReverb? wanted)
+    {
+        var playing = st.Trace;
+        if (wanted == null || playing == null || ReferenceEquals(wanted, playing)) { _handOvers.Remove(regionId); return wanted; }
+        wanted.EnsureReader(st.Reader);
+        bool heard = _tracedRunning.TryGetValue(regionId, out bool running) && running;
+        bool answered = wanted.HasTraced(st.Reader);
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (!_handOvers.TryGetValue(regionId, out var since) || !ReferenceEquals(since.Wanted, wanted))
+            since = (wanted, now);
+        double heldMs = System.Diagnostics.Stopwatch.GetElapsedTime(since.Since, now).TotalMilliseconds;
+        if (KeepsTheOldTrace(answered, heard, heldMs / 1000.0)) { _handOvers[regionId] = since; return playing; }
+        if (_handOvers.Remove(regionId) && heldMs > 0)
+            Log.Information("Traced reverb: region {Id} moved to its new trace after {Ms:F0} ms{How}.", regionId, heldMs,
+                            answered ? ", playing the one before until it answered" : ", which had not answered yet");
+        return wanted;
+    }
+
+    /// <summary>Whether a stage keeps the trace it plays rather than move to one that has not answered it:
+    /// only while it is heard (unheard, nothing is lost by moving), and at most HandOverLimitSeconds.</summary>
+    internal static bool KeepsTheOldTrace(bool answered, bool heard, double heldSeconds)
+        => !answered && heard && heldSeconds < HandOverLimitSeconds;
 
     /// <summary>
     /// A cap, not a recycler: nothing is torn down while the mixer runs. Releasing silent buses would
@@ -2613,6 +2609,8 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     internal int ReverbBusCountForLab => _reverbBuses.Count;
+    internal int ListenerRegionForLab => _listenerRegionId;
+    internal int TracedStageCountForLab => _traced.Count;
     internal string ReverbBlendsForLab => string.Join(" ", _reverbSaVoices.Values.Select(v => v.State.SpatialBlend.ToString("F2")));
 
     /// <summary>Lab only: a voice's binaural stage as it last ran, each ear's level and how placed it
@@ -4386,7 +4384,8 @@ public partial class FmodAudioProvider : IAudioProvider
     private void UpdateReverbBuses(Vector3 lPosVec, int listenerRegionId)
     {
         if (_acousticMap == null) return;
-        
+        TakeFields();
+
         // The listener's room first, then the nearest; every other bus fades out.
         var candidates = _activeRegionIds
             .Select(id => new { 
@@ -4418,11 +4417,14 @@ public partial class FmodAudioProvider : IAudioProvider
                 else if (_routesSource?.Invoke() is { } routes
                          && routes.NodeOf(regionId) != routes.NodeOf(listenerRegionId))
                 {
-                    if (FieldHere(routes, regionId, lPosVec, listenerRegionId, out float gain, out Vector3 via))
+                    bool? fieldHere = FieldHere(routes, regionId, lPosVec, listenerRegionId, out float gain, out Vector3 via);
+                    if (fieldHere == true)
                     {
                         targetVol = gain;
                         SetReverbDirection(regionId, bus, via, outside: true, lPosVec);
                     }
+                    // Not known yet from the room you are in now: held where it is (its direction too).
+                    else if (fieldHere == null) targetVol = _reverbVolumes[regionId];
                 }
                 else
                 {
@@ -4473,30 +4475,79 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     // The cabin's paths, equalised for their directions (CabinPaths, HrtfBands).
+    //
+    // Made on a thread of their own: a trim is the HRTF's bands measured (HrtfBands) and an equaliser
+    // fitted to them (BandEq.Design, twenty rounds over twenty-four bands), about 20 ms each, and getting
+    // into a car asks for nine at once. Made where sounds are placed they held every source still for
+    // 170-420 ms (AudioLab --driving, 2026-10-12). A path plays without its trim until it is made, a few
+    // tens of milliseconds a direction; each direction is made once.
 
-    /// <summary>The ears' mean power per band in each direction asked about, by direction to a degree
-    /// or so, and in the one interior voice's direction.</summary>
-    private readonly Dictionary<(int, int, int), float[]?> _hrtfBands = new();
+    /// <summary>The trim for each direction asked about, by direction to a degree or so; null where Steam
+    /// Audio would not measure one.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(int, int, int), OpenFPS.Client.AudioEngine.Core.Engine.BandEq?> _cabinTrims = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<((int, int, int) Key, Vector3 Dir)> _trimsAsked = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(int, int, int), byte> _trimsPending = new();
+    private System.Threading.Tasks.Task _trimsMaking = System.Threading.Tasks.Task.CompletedTask;
+    /// <summary>The ears' mean power per band in the one interior voice's direction. Trim thread.</summary>
     private float[]? _hrtfOnePlace;
+    private bool _hrtfOnePlaceMeasured;
+    /// <summary>The head the trims are measured through: the same as the voices', another Steam Audio
+    /// object. The mixer applies the voices' own in every voice, and an HRTF applied from two threads at
+    /// once gives both garbage (TracedPlacementTests).</summary>
+    private IntPtr _hrtfMeasureHead;
 
-    /// <summary>The ears' mean power per band from <paramref name="dir"/>, measured once a direction. A
-    /// measurement is a millisecond or two of the game thread and getting into a car asks for nine, so
-    /// at most one every <see cref="HrtfMeasureSeconds"/>; false when this one must wait its turn.</summary>
-    private bool HrtfBandsAt(Vector3 dir, out float[]? db)
+    /// <summary>The trim for a path from <paramref name="dir"/>, if it is made; else false, and it is
+    /// started. Asked again every update until made.</summary>
+    private bool CabinTrimFor(Vector3 dir, out OpenFPS.Client.AudioEngine.Core.Engine.BandEq? eq)
     {
         var key = ((int)MathF.Round(dir.X * 50f), (int)MathF.Round(dir.Y * 50f), (int)MathF.Round(dir.Z * 50f));
-        if (_hrtfBands.TryGetValue(key, out db)) return true;
-        double now = Clock.Now;
-        if (now - _hrtfMeasuredAt < HrtfMeasureSeconds) return false;
-        _hrtfMeasuredAt = now;
-        db = HrtfBands.Measure(_saContext, _saHrtf, MixerQuality.MixerRate, _saFrameSize, dir);
-        if (_hrtfBands.Count > 512) _hrtfBands.Clear();
-        _hrtfBands[key] = db;
-        return true;
+        if (_cabinTrims.TryGetValue(key, out eq)) return true;
+        if (_trimsPending.TryAdd(key, 0)) _trimsAsked.Enqueue((key, dir));
+        // Asked again every update until made, so one asked as the thread finished is not left waiting.
+        if (_trimsMaking.IsCompleted && !_trimsAsked.IsEmpty) _trimsMaking = System.Threading.Tasks.Task.Run(MakeCabinTrims);
+        return false;
     }
 
-    private double _hrtfMeasuredAt = double.NegativeInfinity;
-    private const double HrtfMeasureSeconds = 0.01;
+    /// <summary>Makes every trim asked for. Thread pool; one at a time.</summary>
+    private void MakeCabinTrims()
+    {
+        try
+        {
+            if (_hrtfMeasureHead == IntPtr.Zero)
+            {
+                var au = new Phonon.IPLAudioSettings { samplingRate = MixerQuality.MixerRate, frameSize = _saFrameSize };
+                var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
+                if (Phonon.iplHRTFCreate(_saContext, ref au, ref hs, out _hrtfMeasureHead) != Phonon.IPL_STATUS_SUCCESS) _hrtfMeasureHead = IntPtr.Zero;
+            }
+            if (!_hrtfOnePlaceMeasured)
+            {
+                var one = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace;
+                _hrtfOnePlace = HrtfBands.Measure(_saContext, _hrtfMeasureHead, MixerQuality.MixerRate, _saFrameSize,
+                                                  Vector3.Normalize(new Vector3(one.X, one.Y, -one.Z)));
+                _hrtfOnePlaceMeasured = true;
+            }
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            int made = 0;
+            while (_trimsAsked.TryDequeue(out var ask))
+            {
+                made++;
+                var here = HrtfBands.Measure(_saContext, _hrtfMeasureHead, MixerQuality.MixerRate, _saFrameSize, ask.Dir);
+                OpenFPS.Client.AudioEngine.Core.Engine.BandEq? eq = null;
+                if (_hrtfOnePlace != null && here != null)
+                {
+                    var trim = new float[here.Length];
+                    for (int k = 0; k < trim.Length; k++) trim[k] = Math.Clamp(_hrtfOnePlace[k] - here[k], -12f, 12f);
+                    eq = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Design(trim, MixerQuality.MixerRate);
+                }
+                if (_cabinTrims.Count > 512) _cabinTrims.Clear();
+                _cabinTrims[ask.Key] = eq;
+                _trimsPending.TryRemove(ask.Key, out _);
+            }
+            Log.Information("Cabin paths: {Count} direction(s) trimmed in {Ms:F0} ms, off the audio threads; the paths played untrimmed until then.",
+                            made, System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds);
+        }
+        catch (Exception ex) { Log.Warning(ex, "Cabin paths: a path's trim could not be made."); }
+    }
 
     /// <summary>
     /// The equaliser that takes a cabin path's HRTF colouring back to the one interior voice's (a little
@@ -4507,17 +4558,13 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         if (!_steamAudioEnabled || _saHrtf == IntPtr.Zero) return;
         if (active.CabinTrimDir != Vector3.Zero && Vector3.Dot(dir, active.CabinTrimDir) > 0.9994f) return;   // 2 degrees
-        var one = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace;
-        if (_hrtfOnePlace == null && !HrtfBandsAt(Vector3.Normalize(new Vector3(one.X, one.Y, -one.Z)), out _hrtfOnePlace)) return;
-        if (!HrtfBandsAt(dir, out var here)) return;   // its turn comes next update
+        if (!CabinTrimFor(dir, out var eq)) return;   // its turn comes once made
         active.CabinTrimDir = dir;
-        if (_hrtfOnePlace == null || here == null) return;
-        Span<float> trim = stackalloc float[here.Length];
-        for (int k = 0; k < trim.Length; k++) trim[k] = Math.Clamp(_hrtfOnePlace[k] - here[k], -12f, 12f);
         // On the binaural stage, after the room's send: on the path itself it took the correction off
         // the send too, and the cabin's boom fell 1-2 dB.
-        if (active.SaState != null) active.SaState.PreEq = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Design(trim, MixerQuality.MixerRate);
+        if (eq != null && active.SaState != null) active.SaState.PreEq = eq;
     }
+
 
     /// <summary>
     /// The listener in the frame a machine's parts are placed in (x across, y up, z forward, origin at
@@ -4546,21 +4593,60 @@ public partial class FmodAudioProvider : IAudioProvider
     private const float FieldLeakRange = 60f;
     private readonly Dictionary<int, (double At, Vector3 Where, int Region, float Gain, Vector3 Via, Vector3 InField)> _fieldHere = new();
 
+    // Each room's field where you stand is worked out on the thread pool: the first time from a new room it
+    // routes through every opening in range, and on the audio thread that held every source still for
+    // 200 ms as you walked through Marlow Tower's front door (AudioLab --room-change, 2026-10-12).
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(OpenFPS.Common.OpeningRoutes Routes, int Region, Vector3 Listener, int ListenerRegion, double At)> _fieldsAsked = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(int Region, (double At, Vector3 Where, int Region, float Gain, Vector3 Via, Vector3 InField) Field)> _fieldsMade = new();
+    private readonly HashSet<int> _fieldsPending = new();
+    private System.Threading.Tasks.Task _fieldsMaking = System.Threading.Tasks.Task.CompletedTask;
+
     /// <summary>Another room's reverberant field where the listener stands (OpeningRoutes.FieldAt),
-    /// asked at most every quarter second or half metre.</summary>
-    private bool FieldHere(OpenFPS.Common.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion,
-                           out float gain, out Vector3 via)
+    /// asked again every quarter second or half metre; the last answer stands while the next is made.
+    /// Null while none is known from the room the listener is in: the bus is held where it is until one
+    /// is, then moves by its own slew.</summary>
+    private bool? FieldHere(OpenFPS.Common.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion,
+                            out float gain, out Vector3 via)
     {
         double now = Clock.Now;
-        if (_fieldHere.TryGetValue(regionId, out var c) && c.Region == listenerRegion
-            && now - c.At < 0.25 && Vector3.DistanceSquared(c.Where, listener) < 0.25f)
+        if (_fieldHere.TryGetValue(regionId, out var c) && c.Region == listenerRegion)
         {
+            if (now - c.At >= 0.25 || Vector3.DistanceSquared(c.Where, listener) >= 0.25f)
+                AskField(routes, regionId, listener, listenerRegion, now);
             gain = c.Gain; via = c.Via;
             return gain > 0f;
         }
-        gain = routes.FieldAt(regionId, listener, listenerRegion, FieldLeakRange, out via, out var inField);
-        _fieldHere[regionId] = (now, listener, listenerRegion, gain, via, inField);
-        return gain > 0f;
+        AskField(routes, regionId, listener, listenerRegion, now);
+        gain = 0f; via = listener;
+        return null;
+    }
+
+    private void AskField(OpenFPS.Common.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion, double now)
+    {
+        if (_fieldsPending.Add(regionId)) _fieldsAsked.Enqueue((routes, regionId, listener, listenerRegion, now));
+        if (_fieldsMaking.IsCompleted && !_fieldsAsked.IsEmpty) _fieldsMaking = System.Threading.Tasks.Task.Run(MakeFields);
+    }
+
+    /// <summary>Works out every field asked for. Thread pool; one at a time.</summary>
+    private void MakeFields()
+    {
+        while (_fieldsAsked.TryDequeue(out var a))
+        {
+            float gain = 0f; Vector3 via = a.Listener, inField = a.Listener;
+            try { gain = a.Routes.FieldAt(a.Region, a.Listener, a.ListenerRegion, FieldLeakRange, out via, out inField); }
+            catch (Exception ex) { Log.Warning(ex, "Reverb: region {Id}'s field could not be worked out.", a.Region); }
+            _fieldsMade.Enqueue((a.Region, (a.At, a.Listener, a.ListenerRegion, gain, via, inField)));
+        }
+    }
+
+    /// <summary>The fields worked out since the last update, into the table. Audio thread.</summary>
+    private void TakeFields()
+    {
+        while (_fieldsMade.TryDequeue(out var made))
+        {
+            _fieldHere[made.Region] = made.Field;
+            _fieldsPending.Remove(made.Region);
+        }
     }
 
     /// <summary>
@@ -5343,8 +5429,10 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             _saAllVoices.Clear();
             _saPool.Clear();
+            _stages?.Release(); _stages = null;
+            _trimsMaking.Wait(5000);
+            if (_hrtfMeasureHead != IntPtr.Zero) Phonon.iplHRTFRelease(ref _hrtfMeasureHead);
             Phonon.iplHRTFRelease(ref _saHrtf);
-            if (_saHrtfTraced != IntPtr.Zero) Phonon.iplHRTFRelease(ref _saHrtfTraced);
             Phonon.iplContextRelease(ref _saContext);
             _steamAudioEnabled = false;
         }

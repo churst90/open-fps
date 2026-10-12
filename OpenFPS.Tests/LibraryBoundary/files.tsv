@@ -64,6 +64,7 @@ OpenFPS.Client.Core/AudioEngine/Fmod/StoveVoiceState.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/SynthProcessor.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/TakeLevels.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	lib	Audio
+OpenFPS.Client.Core/AudioEngine/Fmod/TracedStages.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/VoiceBuilds.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/SteamAudio/AcousticGeometry.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbiAxes.cs	lib	Audio	
