@@ -8,17 +8,6 @@ namespace OpenFPS.Common.Components;
 /// off the server's last owner (docs/SERVER_SECURITY.md).</summary>
 public enum UserRole { Player, Dev, Admin, Moderator, Owner }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
-/// <summary>Terrain is a tile of ground (TerrainTileComponent); its collider is not solid, so the readers of
-/// boxes pass it by, and the triangle world takes it as a heightfield. Append new shapes only.</summary>
-public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon, Terrain }
-
-public static class ColliderShapes
-{
-    /// <summary>Round in plan: what a fire burning over it takes as a circle (FireShape.Footprint).</summary>
-    public static bool IsRound(this ColliderShape shape)
-        => shape is ColliderShape.Cylinder or ColliderShape.Sphere or ColliderShape.Cone;
-}
-
 /// <summary>
 /// A tile of ground (docs/GEOMETRY.md 2.3): <see cref="Posts"/> a side, <see cref="Spacing"/> apart, from
 /// the entity's position less half the tile's size in x and z. Heights are whole centimetres over the

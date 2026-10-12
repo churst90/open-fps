@@ -152,7 +152,7 @@ OpenFPS.Common/Ammunition.cs	host
 OpenFPS.Common/AudioEmission.cs	lib	Sound	
 OpenFPS.Common/AudioEvents.cs	host		
 OpenFPS.Common/Beacons.cs	host		
-OpenFPS.Common/Components.cs	mixed	Geometry	ColliderShape
+OpenFPS.Common/Components.cs	host		
 OpenFPS.Common/DirectionWords.cs	host		
 OpenFPS.Common/DistantMotion.cs	host		
 OpenFPS.Common/DrivingCuePlanner.cs	host		
@@ -181,6 +181,7 @@ OpenFPS.Common/UpdateThrottle.cs	host
 OpenFPS.Common/WorldSnapshot.cs	host		
 OpenFPS.Geometry/BoxColumns.cs	lib	Geometry	
 OpenFPS.Geometry/BoxContainment.cs	lib	Geometry	
+OpenFPS.Geometry/ColliderShape.cs	lib	Geometry	
 OpenFPS.Geometry/GeometryUtils.cs	lib	Geometry	
 OpenFPS.Geometry/PerfProbe.cs	lib	Geometry	
 OpenFPS.Geometry/SpatialGrid.cs	lib	Geometry	
