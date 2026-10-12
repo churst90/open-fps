@@ -136,6 +136,7 @@ OpenFPS.Client.Core/Session/ClientGameSession.Scope.cs	host
 OpenFPS.Client.Core/Session/ClientGameSession.Tracker.cs	host		
 OpenFPS.Client.Core/Session/ClientGameSession.cs	host		
 OpenFPS.Client.Core/Session/ConnectRetry.cs	host		
+OpenFPS.Client.Core/SettingsFolder.cs	host		
 OpenFPS.Client.Core/SightGrid.cs	host		
 OpenFPS.Client.Core/SightWatch.cs	host		
 OpenFPS.Client.Core/Sightline.cs	host		

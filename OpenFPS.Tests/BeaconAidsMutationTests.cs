@@ -605,20 +605,18 @@ public class BeaconAidsMutationTests
     public void TheGapIsKeptBetweenSessions()
     {
         string dir = Path.Combine(Path.GetTempPath(), "openfps-beacon-every-" + Guid.NewGuid().ToString("N"));
-        string? was = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        string file = Path.Combine(dir, "beacons.json");
         try
         {
-            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
-            var first = BeaconPreferences.Load();
+            var first = BeaconPreferences.Load(file);
             first.Set(Beacons.Door, false);
             first.SetEvery(2.5);
-            var again = BeaconPreferences.Load();
+            var again = BeaconPreferences.Load(file);
             Assert.Equal(2.5, again.Every);
             Assert.False(again.Choice(Beacons.Door));
         }
         finally
         {
-            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", was);
             try { Directory.Delete(dir, true); } catch { }
         }
     }
@@ -661,39 +659,38 @@ public class BeaconAidsMutationTests
     }
 }
 
-/// <summary>Tests that set XDG_CONFIG_HOME or HOME, which are the whole process's, run alone.</summary>
+/// <summary>Tests that move the settings folder, which is the whole process's, run alone.</summary>
 [CollectionDefinition(nameof(BeaconPreferenceFiles), DisableParallelization = true)]
 public class BeaconPreferenceFiles { }
 
 /// <summary>
-/// The player's beacon switches, kept between sessions in $XDG_CONFIG_HOME/openfps/beacons.json, or
-/// ~/.config/openfps/beacons.json without it.
+/// The player's beacon switches, kept between sessions in beacons.json in the settings folder
+/// (<see cref="SettingsFolder"/>), beside client.json.
 /// </summary>
 [Collection(nameof(BeaconPreferenceFiles))]
 public class BeaconPreferenceFileTests
 {
-    private static void With(string? xdg, string? home, Action act)
+    /// <summary>Runs <paramref name="act"/> with the settings folder moved to <paramref name="folder"/>
+    /// (null or empty: not moved at all), and puts it back.</summary>
+    private static void In(string? folder, Action act)
     {
-        string? oldXdg = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
-        string? oldHome = Environment.GetEnvironmentVariable("HOME");
+        string? was = Environment.GetEnvironmentVariable(SettingsFolder.Variable);
         try
         {
-            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", xdg);
-            if (home != null) Environment.SetEnvironmentVariable("HOME", home);
+            Environment.SetEnvironmentVariable(SettingsFolder.Variable, folder);
             act();
         }
         finally
         {
-            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", oldXdg);
-            Environment.SetEnvironmentVariable("HOME", oldHome);
+            Environment.SetEnvironmentVariable(SettingsFolder.Variable, was);
         }
     }
 
     private static string Scratch() => Path.Combine(Path.GetTempPath(), "openfps-beacons-" + Guid.NewGuid().ToString("N"));
 
     /// <summary>
-    /// A switch set in one session is there in the next: written to openfps/beacons.json under
-    /// XDG_CONFIG_HOME — the folder made if it is not there — and read back.
+    /// A switch set in one session is there in the next: written to beacons.json in the settings folder
+    /// — the folder made if it is not there — and read back.
     /// </summary>
     [Fact]
     public void ASwitchSurvivesARestart()
@@ -701,13 +698,13 @@ public class BeaconPreferenceFileTests
         string root = Scratch();
         try
         {
-            With(root, null, () =>
+            In(root, () =>
             {
                 var first = BeaconPreferences.Load();
                 Assert.Null(first.Choice(Beacons.Door));
                 first.Set(Beacons.Door, false);
                 first.Set(Beacons.Vehicle, true);
-                Assert.True(File.Exists(Path.Combine(root, "openfps", "beacons.json")));
+                Assert.True(File.Exists(Path.Combine(root, "beacons.json")));
 
                 var second = BeaconPreferences.Load();
                 Assert.False(second.Choice(Beacons.Door));
@@ -718,22 +715,56 @@ public class BeaconPreferenceFileTests
         finally { try { Directory.Delete(root, true); } catch { } }
     }
 
-    /// <summary>Without XDG_CONFIG_HOME the file lives in .config/openfps under the home folder.</summary>
+    /// <summary>The beacons' file and the client's settings are in the one folder, wherever it is moved.</summary>
     [Fact]
-    public void WithoutXdgTheFileIsUnderHome()
+    public void TheFileIsBesideTheClientsSettings()
     {
-        string home = Scratch();
+        string root = Scratch();
+        In(root, () =>
+        {
+            Assert.Equal(Path.Combine(root, "beacons.json"), BeaconPreferences.DefaultPath);
+            Assert.Equal(Path.Combine(root, "client.json"), ClientSettings.DefaultPath);
+        });
+        Assert.False(Directory.Exists(root));
+    }
+
+    /// <summary>
+    /// Moved nowhere, the folder is "openfps" in the platform's own per-user config folder: %APPDATA% on
+    /// Windows, $XDG_CONFIG_HOME or ~/.config on Linux. Only asked for here, never read or written.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void MovedNowhereTheFolderIsThePlatformsOwn(string? unset)
+    {
+        string own = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openfps");
+        In(unset, () =>
+        {
+            Assert.Equal(own, SettingsFolder.Path);
+            Assert.Equal(Path.Combine(own, "beacons.json"), BeaconPreferences.DefaultPath);
+            Assert.Equal(Path.Combine(own, "client.json"), ClientSettings.DefaultPath);
+        });
+        Assert.NotEqual(own, SettingsFolder.Path);
+    }
+
+    /// <summary>A file named to Load is the one read and written, and the settings folder is left alone.</summary>
+    [Fact]
+    public void ANamedFileIsTheOneUsed()
+    {
+        string root = Scratch(), elsewhere = Scratch();
         try
         {
-            Directory.CreateDirectory(home);
-            With("", home, () =>
+            In(root, () =>
             {
-                BeaconPreferences.Load().Set(Beacons.Exit, false);
-                Assert.True(File.Exists(Path.Combine(home, ".config", "openfps", "beacons.json")));
-                Assert.False(BeaconPreferences.Load().Choice(Beacons.Exit));
+                string file = Path.Combine(elsewhere, "mine.json");
+                BeaconPreferences.Load(file).Set(Beacons.Exit, false);
+                Assert.True(File.Exists(file));
+                Assert.False(BeaconPreferences.Load(file).Choice(Beacons.Exit));
+                Assert.Null(BeaconPreferences.Load().Choice(Beacons.Exit));
+                Assert.False(Directory.Exists(root));
             });
         }
-        finally { try { Directory.Delete(home, true); } catch { } }
+        finally { try { Directory.Delete(elsewhere, true); } catch { } }
     }
 
     /// <summary>A file that says nothing, or nonsense, is no switches at all — not a crash.</summary>
@@ -743,12 +774,12 @@ public class BeaconPreferenceFileTests
         string root = Scratch();
         try
         {
-            Directory.CreateDirectory(Path.Combine(root, "openfps"));
-            With(root, null, () =>
+            Directory.CreateDirectory(root);
+            In(root, () =>
             {
-                File.WriteAllText(Path.Combine(root, "openfps", "beacons.json"), "null");
+                File.WriteAllText(Path.Combine(root, "beacons.json"), "null");
                 Assert.Null(BeaconPreferences.Load().Choice(Beacons.Door));
-                File.WriteAllText(Path.Combine(root, "openfps", "beacons.json"), "{ not json");
+                File.WriteAllText(Path.Combine(root, "beacons.json"), "{ not json");
                 Assert.Null(BeaconPreferences.Load().Choice(Beacons.Door));
             });
         }
@@ -762,7 +793,7 @@ public class BeaconPreferenceFileTests
         string root = Scratch();
         try
         {
-            With(root, null, () =>
+            In(root, () =>
             {
                 var prefs = BeaconPreferences.InMemory();
                 prefs.Set(Beacons.Door, false);
@@ -780,7 +811,7 @@ public class BeaconPreferenceFileTests
         string root = Scratch();
         try
         {
-            With(root, null, () =>
+            In(root, () =>
             {
                 BeaconPreferences.Load().Set(Beacons.Item, false);
                 var aids = new BeaconAids(new AudioEngineFacade(new EmitterRecordingProvider()));

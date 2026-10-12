@@ -21,8 +21,7 @@ public sealed class SavedServer
 
 /// <summary>
 /// Everything the client remembers between runs: interface sounds, audio devices, saved servers.
-/// One file for every client head, in the platform's per-user config folder (~/.config/openfps on
-/// Linux, %APPDATA%\openfps on Windows, ~/Library/Application Support/openfps on a Mac).
+/// One file for every client head, client.json in the settings folder (<see cref="SettingsFolder"/>).
 /// </summary>
 public sealed class ClientSettings
 {
@@ -132,8 +131,7 @@ public sealed class ClientSettings
 
     // ── The file ───────────────────────────────────────────────────────────────────────────────
 
-    public static string DefaultPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openfps", "client.json");
+    public static string DefaultPath => SettingsFolder.File("client.json");
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 

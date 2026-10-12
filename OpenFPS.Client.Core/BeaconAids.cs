@@ -626,8 +626,8 @@ public sealed class BeaconAids
 
 /// <summary>
 /// The player's beacon choices (categories on or off, interval, level), kept in beacons.json beside
-/// client.json: %APPDATA%\openfps on Windows, $XDG_CONFIG_HOME/openfps or ~/.config/openfps elsewhere.
-/// A category never touched has no entry and follows the map's default.
+/// client.json in the settings folder (<see cref="SettingsFolder"/>). A category never touched has no entry
+/// and follows the map's default.
 /// </summary>
 public sealed class BeaconPreferences
 {
@@ -651,15 +651,14 @@ public sealed class BeaconPreferences
     /// <summary>A store that is never written, for tests.</summary>
     public static BeaconPreferences InMemory() => new(null, new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase));
 
-    public static BeaconPreferences Load()
+    /// <summary>The player's own file.</summary>
+    public static string DefaultPath => SettingsFolder.File("beacons.json");
+
+    /// <summary>The choices kept in <paramref name="path"/>, the player's own file when none is named;
+    /// every change is written back to it.</summary>
+    public static BeaconPreferences Load(string? path = null)
     {
-        // The same folder as ClientSettings.DefaultPath.
-        string dir = OperatingSystem.IsWindows()
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openfps")
-            : Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-                ? Path.Combine(x, "openfps")
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "openfps");
-        string path = Path.Combine(dir, "beacons.json");
+        path ??= DefaultPath;
         var choices = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         double every = BeaconAids.DefaultEvery, level = BeaconAids.DefaultLevelDb;
         try
