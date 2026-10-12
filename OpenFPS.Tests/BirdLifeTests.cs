@@ -26,7 +26,7 @@ public class BirdLifeTests
         while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS"))) dir = dir.Parent;
         // The build output carries its own copy when the repository is not above it.
         return dir != null ? Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS")
-                           : "/home/cody/external-rescue/Github/open-fps/OpenFPS.Client/ASSETS/SOUNDS";
+                           : TestPaths.Sounds();
     }
 
     private static (WorldSnapshot World, BirdLife Birds, VoiceLifecycleTests.RecordingProvider Mixer, AudioEngineFacade Audio) City()
@@ -41,7 +41,7 @@ public class BirdLifeTests
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
         var mixer = new VoiceLifecycleTests.RecordingProvider();
         var audio = new AudioEngineFacade(mixer);
-        if (!Directory.Exists("/home/cody/external-rescue/Github/open-fps/OpenFPS.Client/ASSETS/SOUNDS/BIRDS")
+        if (!Directory.Exists(Path.Combine(TestPaths.Sounds(), "BIRDS"))
             && !Directory.Exists(Path.Combine(Sounds(), "BIRDS")))
             throw new InvalidOperationException("no bird samples");
         audio.InitializeForTest(Sounds());

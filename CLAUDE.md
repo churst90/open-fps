@@ -43,6 +43,17 @@ Resonance repo, as described below.
 - Build only through `tools/build-local.sh <artifacts-dir> <project>`, and test only through
   `tools/test-local.sh <artifacts-dir> "<filter>"`. They pin the CPU and allow two test runs at once. Never
   run the whole suite locally; Cody's GitHub Actions runs it after the patches land. Never use coverage.
+- **On Windows** those two scripts don't run (they need `taskset`, `flock` and `/proc`). Use `dotnet`
+  directly with the same limits:
+  - build with `dotnet build <project> --artifacts-path %USERPROFILE%\.cache\openfps-build\<name>`;
+  - test with `dotnet test OpenFPS.Tests --artifacts-path <same> --no-build --filter
+    "Category!=Timing&(<filter>)" -- xUnit.MaxParallelThreads=4 RunConfiguration.MaxCpuCount=1`;
+  - keep it to at most two test runs at once.
+
+  Streams regenerated on Windows carry Windows' maths line. Cody's machine compares them within tolerance
+  and regenerates them on Linux after `git am`; say in the README when you regenerated any.
+- The tests find the sound bank through `TestPaths.Sounds()`: `OPENFPS_SOUNDS` if set, else the checkout's
+  `OpenFPS.Client/ASSETS/SOUNDS`.
 - Put artifacts outside the checkout, for example `~/.cache/openfps-build/<name>`.
 - Run the guards on every change: LibraryBoundary, RenderFingerprint, EmitterStreamReplay, VoiceIdBand,
   VoiceRegistry, ModelKindTable, MapScoped, PhysicsBoundary, and the physics replays. Also run the replays

@@ -402,7 +402,7 @@ public class PedestrianSpeechTests
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS"))) dir = dir.Parent;
         return dir != null ? Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS")
-                           : "/home/cody/external-rescue/Github/open-fps/OpenFPS.Client/ASSETS/SOUNDS";
+                           : TestPaths.Sounds();
     }
 
     /// <summary>No pedestrian walks through anything solid, checked at knee and chest height against the
