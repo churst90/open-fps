@@ -1,0 +1,541 @@
+file	package	why
+OpenFPS.Acoustics/AcousticConstants.cs	Acoustics	
+OpenFPS.Acoustics/AcousticMap.cs	Acoustics	
+OpenFPS.Acoustics/AcousticRegistry.cs	Acoustics	
+OpenFPS.Acoustics/Assemblies.cs	Acoustics	
+OpenFPS.Acoustics/Constructions.cs	Acoustics	
+OpenFPS.Acoustics/Diffraction.cs	Acoustics	
+OpenFPS.Acoustics/EarlyReflections.cs	Acoustics	
+OpenFPS.Acoustics/Enclosure.cs	Acoustics	
+OpenFPS.Acoustics/ImageSource.cs	Acoustics	
+OpenFPS.Acoustics/LayeredFaces.cs	Acoustics	
+OpenFPS.Acoustics/Localisation.cs	Acoustics	
+OpenFPS.Acoustics/Opening.cs	Acoustics	
+OpenFPS.Acoustics/OpeningRoutes.cs	Acoustics	
+OpenFPS.Acoustics/PanelAcoustics.cs	Acoustics	
+OpenFPS.Acoustics/Room.cs	Acoustics	
+OpenFPS.Acoustics/RoomAcoustics.cs	Acoustics	
+OpenFPS.Acoustics/SparseAcousticOctree.cs	Acoustics	
+OpenFPS.Acoustics/Systems/AcousticVolumeGenerator.cs	Acoustics	
+OpenFPS.Acoustics/Systems/FaceOpenings.cs	Acoustics	
+OpenFPS.Acoustics/WallTransmission.cs	Acoustics	
+OpenFPS.Astronomy/AstroMath.cs	Astronomy	
+OpenFPS.Astronomy/Crossings.cs	Astronomy	
+OpenFPS.Astronomy/Moon.cs	Astronomy	
+OpenFPS.Astronomy/Sky.cs	Astronomy	
+OpenFPS.Astronomy/SkyWords.cs	Astronomy	
+OpenFPS.Astronomy/Sun.cs	Astronomy	
+OpenFPS.Client.Core/AudioDiagnostics.cs	game	
+OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Acoustics/CabinWalls.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Acoustics/EngineReflections.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Acoustics/GroundReflection.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Acoustics/OpeningGraph.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Acoustics/RouteAnswers.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Core/AudioBank.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Core/AudioEngineFacade.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Core/PlacementThread.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Core/VoiceManager.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Data/AcousticPathData.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Data/SpatialEmitter.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/BoundaryProximityProcessor.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/DspFault.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/EarStage.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/EarWindVoice.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/EchoWashProcessor.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/EngineProcessor.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/EngineRenderPool.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.Ear.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/FmodDebugLog.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/GranularBank.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/GranularProcessor.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/IAudioProvider.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/MachineProcessor.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/MasterDither.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/MasterLimiter.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/MasterTap.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/MixerProfile.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/MixerQuality.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/NatureVoices.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/NonFinite.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/OwnVoice.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/RadiatorProcessor.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/RailVoice.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/RainVoices.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/StoveVoiceState.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/SynthProcessor.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/TakeLevels.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/TracedStages.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/Fmod/VoiceBuilds.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/AcousticGeometry.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbiAxes.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/DiffuseLate.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/EarDecorrelator.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/EarlyCopies.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/HrtfBands.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/LateField.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/LateTail.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SceneTerrain.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SmoothTail.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioDsp.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioScene.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioSimulator.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/TileSceneSet.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedEchoes.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverb.cs	Audio	library stage 6
+OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverbDsp.cs	Audio	library stage 6
+OpenFPS.Client.Core/BeaconAids.cs	Accessibility	
+OpenFPS.Client.Core/BirdLife.cs	game	library stage 7 (host until split)
+OpenFPS.Client.Core/BuildForm.cs	Editor	
+OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	game	library stage 7 (host until split)
+OpenFPS.Client.Core/ClientAudioSystem.Voices.cs	game	library stage 7 (host until split)
+OpenFPS.Client.Core/ClientAudioSystem.cs	game	library stage 7 (host until split)
+OpenFPS.Client.Core/ClientGeometry.cs	game	
+OpenFPS.Client.Core/ClientNetworkService.cs	game	
+OpenFPS.Client.Core/ClientPhysicsSystem.cs	game	
+OpenFPS.Client.Core/ClientSettings.cs	game	
+OpenFPS.Client.Core/ClientWorldState.cs	game	
+OpenFPS.Client.Core/DiagnosticSwitches.cs	game	
+OpenFPS.Client.Core/DrivingAids.cs	Accessibility	
+OpenFPS.Client.Core/DrivingCueSounds.cs	Accessibility	
+OpenFPS.Client.Core/EditorDialog.cs	Editor	
+OpenFPS.Client.Core/EditorKeys.cs	Editor	
+OpenFPS.Client.Core/EditorValuePrompt.cs	Editor	
+OpenFPS.Client.Core/Input/InputCommandMapper.cs	game	
+OpenFPS.Client.Core/Input/InputStateBuffer.cs	game	
+OpenFPS.Client.Core/ListMenu.cs	Accessibility	
+OpenFPS.Client.Core/ListeningCalibration.cs	Accessibility	
+OpenFPS.Client.Core/LocalPlayerController.cs	game	
+OpenFPS.Client.Core/LocalPlayerState.cs	game	
+OpenFPS.Client.Core/LoudspeakerVoices.cs	Audio	programs rendered through their speakers
+OpenFPS.Client.Core/MapTracker.cs	Accessibility	
+OpenFPS.Client.Core/MeshAssetFetcher.cs	game	
+OpenFPS.Client.Core/NamedPlaces.cs	Accessibility	
+OpenFPS.Client.Core/NearDrops.cs	Audio	library stage 6
+OpenFPS.Client.Core/OtherBodies.cs	game	
+OpenFPS.Client.Core/PickUp.cs	game	
+OpenFPS.Client.Core/Platform/FmodMicrophoneCapture.cs	game	
+OpenFPS.Client.Core/Platform/GameKey.cs	game	
+OpenFPS.Client.Core/Platform/IClientShell.cs	game	
+OpenFPS.Client.Core/Platform/IMicrophoneCapture.cs	game	
+OpenFPS.Client.Core/Platform/ISpeechOutput.cs	Accessibility	
+OpenFPS.Client.Core/Platform/SpeechDispatcherOutput.cs	Accessibility	
+OpenFPS.Client.Core/Platform/SpeechLog.cs	Accessibility	
+OpenFPS.Client.Core/Platform/TimerResolution.cs	game	
+OpenFPS.Client.Core/Platform/VoiceCodec.cs	game	
+OpenFPS.Client.Core/PredictionReconciler.cs	game	
+OpenFPS.Client.Core/ProcessLifeLog.cs	game	
+OpenFPS.Client.Core/RainField.cs	Audio	library stage 6
+OpenFPS.Client.Core/Scope.cs	game	
+OpenFPS.Client.Core/ScopeSounds.cs	game	
+OpenFPS.Client.Core/Services/ChatManager.cs	game	
+OpenFPS.Client.Core/Services/SoundMappingService.cs	Audio	which bank file a footstep plays
+OpenFPS.Client.Core/Session/ClientGameSession.Connection.cs	game	
+OpenFPS.Client.Core/Session/ClientGameSession.Editor.cs	game	
+OpenFPS.Client.Core/Session/ClientGameSession.PickUp.cs	game	
+OpenFPS.Client.Core/Session/ClientGameSession.Scope.cs	game	
+OpenFPS.Client.Core/Session/ClientGameSession.Tracker.cs	game	
+OpenFPS.Client.Core/Session/ClientGameSession.cs	game	
+OpenFPS.Client.Core/Session/ConnectRetry.cs	game	
+OpenFPS.Client.Core/SettingsFolder.cs	game	
+OpenFPS.Client.Core/SightGrid.cs	Accessibility	
+OpenFPS.Client.Core/SightWatch.cs	Accessibility	
+OpenFPS.Client.Core/Sightline.cs	Accessibility	
+OpenFPS.Client.Core/SpatialService.cs	game	
+OpenFPS.Client.Core/StairCues.cs	Accessibility	
+OpenFPS.Client.Core/StrideAccumulator.cs	game	
+OpenFPS.Client.Core/TurnNarration.cs	Accessibility	
+OpenFPS.Client.Core/UiSounds.cs	Accessibility	
+OpenFPS.Client.Core/VoiceRegistry.Lifecycle.cs	Audio	the voices' ids and kinds (audit P3)
+OpenFPS.Client.Core/VoiceRegistry.cs	Audio	the voices' ids and kinds (audit P3)
+OpenFPS.Client.Core/WallBumps.cs	Accessibility	
+OpenFPS.Client.Core/WorldAudioPlayer.cs	game	library stage 7 (host until split)
+OpenFPS.Client.Core/ZoneSettle.cs	Accessibility	
+OpenFPS.Common/Ammunition.cs	Models	what a round and a fire selector are
+OpenFPS.Common/AudioEmission.cs	Common	entity adapter: where an entity sounds from
+OpenFPS.Common/AudioEvents.cs	Common	wire
+OpenFPS.Common/Beacons.cs	Accessibility	beacon categories and map policy
+OpenFPS.Common/Components.cs	Common	wire and entity model
+OpenFPS.Common/DirectionWords.cs	Words	bearings in words
+OpenFPS.Common/DistantMotion.cs	Common	how sent states are carried between packets
+OpenFPS.Common/DrivingCuePlanner.cs	Accessibility	the driver's cues, planned
+OpenFPS.Common/EntityAcoustics.cs	Common	entity adapter: rooms and openings
+OpenFPS.Common/EntityGeometry.cs	Common	entity adapter: geometry
+OpenFPS.Common/GroundProbeMemo.cs	game	physics survey: a server cache
+OpenFPS.Common/JsonConverters.cs	Common	wire
+OpenFPS.Common/LaneGuide.cs	Accessibility	the painted lines from the driver's seat
+OpenFPS.Common/LaneRoutes.cs	Agents	a vehicle's tour of lanes
+OpenFPS.Common/LineFollower.cs	Agents	a driver steering to a line
+OpenFPS.Common/Messages.cs	Common	wire
+OpenFPS.Common/MoverPoses.cs	game	a server counter
+OpenFPS.Common/PhysicsConstants.cs	Common	the game's reach and bounds, the tick, the input limits (the body: BodyConstants)
+OpenFPS.Common/PhysicsUtils.cs	Common	entity adapter: the ground probes of a world and of a snapshot (the question: Footing)
+OpenFPS.Common/PlayerCoordinates.cs	Accessibility	coordinates as a player reads and types them
+OpenFPS.Common/RaceLine.cs	Agents	speeds along a line
+OpenFPS.Common/RoadMapData.cs	World	roads as sent to a driver
+OpenFPS.Common/Roads.cs	World	roads as a map declares them
+OpenFPS.Common/Scopes.cs	Models	what a scope is (ScopeMath and ScopeSway: game, by type)
+OpenFPS.Common/Speech/Speech.cs	Models	the voices: who exists and what each can say
+OpenFPS.Common/StatePacking.cs	Common	wire
+OpenFPS.Common/Tiles.cs	World	tile detail and streaming radii
+OpenFPS.Common/TrackClearance.cs	World	a map's drive route checked at load
+OpenFPS.Common/UpdateThrottle.cs	Common	a fixed-rate gate
+OpenFPS.Common/WorldSnapshot.cs	Common	the client's world for one frame
+OpenFPS.Geometry/BoxColumns.cs	Geometry	
+OpenFPS.Geometry/BoxContainment.cs	Geometry	
+OpenFPS.Geometry/ColliderShape.cs	Geometry	
+OpenFPS.Geometry/GeometryUtils.cs	Geometry	
+OpenFPS.Geometry/PerfProbe.cs	Geometry	
+OpenFPS.Geometry/SpatialGrid.cs	Geometry	
+OpenFPS.Geometry/TileKey.cs	Geometry	
+OpenFPS.Geometry/Triangles/BodyShell.cs	Geometry	
+OpenFPS.Geometry/Triangles/Bvh.cs	Geometry	
+OpenFPS.Geometry/Triangles/Facets.cs	Geometry	
+OpenFPS.Geometry/Triangles/FloodOpenings.cs	Geometry	
+OpenFPS.Geometry/Triangles/GeometryPiece.cs	Geometry	
+OpenFPS.Geometry/Triangles/Heightfield.cs	Geometry	
+OpenFPS.Geometry/Triangles/MeshAssets.cs	Geometry	
+OpenFPS.Geometry/Triangles/MeshImport.cs	Geometry	
+OpenFPS.Geometry/Triangles/Polygons.cs	Geometry	
+OpenFPS.Geometry/Triangles/RoomCells.cs	Geometry	
+OpenFPS.Geometry/Triangles/RoomFlood.cs	Geometry	
+OpenFPS.Geometry/Triangles/Shapes.More.cs	Geometry	
+OpenFPS.Geometry/Triangles/Shapes.cs	Geometry	
+OpenFPS.Geometry/Triangles/SolidContact.cs	Geometry	
+OpenFPS.Geometry/Triangles/StraightSkeleton.cs	Geometry	
+OpenFPS.Geometry/Triangles/Surfaces.cs	Geometry	
+OpenFPS.Geometry/Triangles/TriangleGeometry.cs	Geometry	
+OpenFPS.Geometry/Triangles/TriangleWorld.cs	Geometry	
+OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	Geometry	
+OpenFPS.Geometry/Triangles/WheelRays.cs	Geometry	
+OpenFPS.Geometry/WallBuild.cs	Geometry	
+OpenFPS.Native/FmodNative/fmod.cs	Native	
+OpenFPS.Native/FmodNative/fmod_dsp.cs	Native	
+OpenFPS.Native/FmodNative/fmod_errors.cs	Native	
+OpenFPS.Native/FmodNative/fmod_studio.cs	Native	
+OpenFPS.Native/Platform/BackgroundPriority.cs	Native	
+OpenFPS.Native/Platform/NativeAudioLibraries.cs	Native	
+OpenFPS.Native/SteamAudio/Phonon.cs	Native	
+OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	Native	
+OpenFPS.Native/SteamAudio/PhononSim.cs	Native	
+OpenFPS.Physics/BodyConstants.cs	Physics	
+OpenFPS.Physics/Chassis.cs	Physics	
+OpenFPS.Physics/EngineMechanics.cs	Physics	
+OpenFPS.Physics/ExternalBallistics.cs	Physics	
+OpenFPS.Physics/Footing.cs	Physics	
+OpenFPS.Physics/Gearbox.cs	Physics	
+OpenFPS.Physics/RoadGrip.cs	Physics	
+OpenFPS.Physics/RunningGear.cs	Physics	
+OpenFPS.Physics/SharedMovementEngine.cs	Physics	
+OpenFPS.Physics/TyreGrip.cs	Physics	
+OpenFPS.Physics/VehicleMechanics.cs	Physics	
+OpenFPS.Physics/WheelDynamics.cs	Physics	
+OpenFPS.Physics/WheelState.cs	Physics	
+OpenFPS.Physics/Wind.cs	Physics	
+OpenFPS.Physics/WindModel.cs	Physics	
+OpenFPS.Schema/Tunable.cs	Schema	
+OpenFPS.Server/Core/Arms.cs	game	
+OpenFPS.Server/Core/AuthService.cs	game	
+OpenFPS.Server/Core/Bans.cs	game	
+OpenFPS.Server/Core/Bodies.cs	game	
+OpenFPS.Server/Core/BoundedLineReader.cs	game	
+OpenFPS.Server/Core/BuildSession.cs	Editor	
+OpenFPS.Server/Core/CombatService.AdminGun.cs	game	
+OpenFPS.Server/Core/CombatService.cs	game	
+OpenFPS.Server/Core/CommandCatalog.cs	game	
+OpenFPS.Server/Core/CommandHandler.Admin.cs	game	
+OpenFPS.Server/Core/CommandHandler.Bans.cs	game	
+OpenFPS.Server/Core/CommandHandler.Building.cs	game	
+OpenFPS.Server/Core/CommandHandler.Doors.cs	game	
+OpenFPS.Server/Core/CommandHandler.Hands.cs	game	
+OpenFPS.Server/Core/CommandHandler.Maps.cs	game	
+OpenFPS.Server/Core/CommandHandler.People.cs	game	
+OpenFPS.Server/Core/CommandHandler.Precipitation.cs	game	
+OpenFPS.Server/Core/CommandHandler.Scan.cs	game	
+OpenFPS.Server/Core/CommandHandler.Scope.cs	game	
+OpenFPS.Server/Core/CommandHandler.Seats.cs	game	
+OpenFPS.Server/Core/CommandHandler.Sound.cs	game	
+OpenFPS.Server/Core/CommandHandler.Spawning.cs	game	
+OpenFPS.Server/Core/CommandHandler.Teams.cs	game	
+OpenFPS.Server/Core/CommandHandler.Teleport.cs	game	
+OpenFPS.Server/Core/CommandHandler.Weather.cs	game	
+OpenFPS.Server/Core/CommandHandler.cs	game	
+OpenFPS.Server/Core/CompositeAcoustics.cs	game	
+OpenFPS.Server/Core/CompositeService.cs	game	
+OpenFPS.Server/Core/EntityDefinitionFactory.cs	game	
+OpenFPS.Server/Core/FragmentGuard.cs	game	
+OpenFPS.Server/Core/HandsService.cs	game	
+OpenFPS.Server/Core/IMessageDispatcher.cs	game	
+OpenFPS.Server/Core/MapManager.Rooms.cs	game	
+OpenFPS.Server/Core/MapManager.cs	game	
+OpenFPS.Server/Core/MapRoadsBuilder.cs	World	
+OpenFPS.Server/Core/MapTemplates.cs	game	host
+OpenFPS.Server/Core/MapTiles.cs	game	host: adapts entities to World's tiles
+OpenFPS.Server/Core/MessageDispatcher.cs	game	
+OpenFPS.Server/Core/MessageLimits.cs	game	
+OpenFPS.Server/Core/MudGateway.cs	game	
+OpenFPS.Server/Core/NetworkService.cs	game	
+OpenFPS.Server/Core/OccupancyService.cs	game	
+OpenFPS.Server/Core/Permissions.cs	game	
+OpenFPS.Server/Core/PlayerState.cs	game	
+OpenFPS.Server/Core/PlayerStore.cs	game	
+OpenFPS.Server/Core/RateLimiter.cs	game	
+OpenFPS.Server/Core/RestingStates.cs	game	
+OpenFPS.Server/Core/SafeText.cs	game	
+OpenFPS.Server/Core/ServerGeometry.cs	game	
+OpenFPS.Server/Core/SessionManager.cs	game	
+OpenFPS.Server/Core/StandingSpots.cs	game	
+OpenFPS.Server/Core/Teleporter.cs	game	
+OpenFPS.Server/Core/TerrainBuilder.cs	World	grading the survey; its entity making is the host's
+OpenFPS.Server/Core/TerrainTiles.cs	game	host: World's terrain as entities
+OpenFPS.Server/Core/TileStreamer.cs	game	host: World's tiles to each session
+OpenFPS.Server/Core/UserSession.cs	game	
+OpenFPS.Server/Core/VehicleShell.cs	game	
+OpenFPS.Server/Core/WireCheck.cs	game	
+OpenFPS.Server/Editor/EntitySettings.cs	Editor	
+OpenFPS.Server/Editor/LiveState.cs	Editor	
+OpenFPS.Server/Editor/MapOverlay.cs	Editor	
+OpenFPS.Server/Editor/MapVersions.cs	Editor	
+OpenFPS.Server/Editor/ModelCatalog.cs	Editor	the kinds the editor edits
+OpenFPS.Server/Editor/ModelStore.cs	Editor	
+OpenFPS.Server/Editor/OverlayRoute.cs	Editor	
+OpenFPS.Server/Editor/WorldEditor.Build.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Changed.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Dialog.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Groups.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Map.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Menus.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Models.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Ops.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.People.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Place.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Placed.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Routes.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Shapes.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Vehicles.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.Versions.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/Editor/WorldEditor.cs	game	host: the editor's commands over sessions and maps
+OpenFPS.Server/OneWorld/Elevation.cs	World	
+OpenFPS.Server/OneWorld/Geocoder.cs	World	
+OpenFPS.Server/OneWorld/LandCover.cs	World	
+OpenFPS.Server/OneWorld/Osm.cs	World	
+OpenFPS.Server/OneWorld/Overture.cs	World	
+OpenFPS.Server/OneWorld/Utm.cs	World	
+OpenFPS.Server/OneWorld/WorldBuildings.cs	World	
+OpenFPS.Server/OneWorld/WorldFeatures.Buildings.cs	World	
+OpenFPS.Server/OneWorld/WorldFeatures.Clear.cs	World	
+OpenFPS.Server/OneWorld/WorldFeatures.cs	World	
+OpenFPS.Server/OneWorld/WorldMaps.cs	game	host: sessions arriving in World's places
+OpenFPS.Server/OneWorld/WorldPlaces.cs	game	host: places laid on World's tiles as entities
+OpenFPS.Server/OneWorld/WorldSettings.cs	World	
+OpenFPS.Server/OneWorld/WorldStore.cs	World	
+OpenFPS.Server/OneWorld/WorldTile.cs	World	
+OpenFPS.Server/OneWorld/WorldTileKey.cs	World	
+OpenFPS.Server/OneWorld/WorldTileService.cs	World	
+OpenFPS.Server/Program.cs	game	
+OpenFPS.Server/Repositories/AppDbContext.cs	game	
+OpenFPS.Server/Repositories/CompositeRepository.cs	World	composite templates and placements: map data
+OpenFPS.Server/Repositories/FriendRepository.cs	game	
+OpenFPS.Server/Repositories/IUserRepository.cs	game	
+OpenFPS.Server/Repositories/MapAccessRepository.cs	game	
+OpenFPS.Server/Repositories/MapElevation.cs	World	
+OpenFPS.Server/Repositories/MapRepository.cs	World	the map file format
+OpenFPS.Server/Repositories/PrefabRepository.cs	game	host: World's prefabs made into entities
+OpenFPS.Server/Repositories/PrefabTemplate.cs	World	the prefab format
+OpenFPS.Server/Repositories/PrefabValidator.cs	World	
+OpenFPS.Server/Repositories/RoleRepository.cs	game	
+OpenFPS.Server/Repositories/SqliteUserRepository.cs	game	
+OpenFPS.Server/Repositories/TeamRepository.cs	game	
+OpenFPS.Server/Repositories/UserRepository.cs	game	
+OpenFPS.Server/Services/DiscoveryService.cs	game	
+OpenFPS.Server/Services/SocialService.cs	game	
+OpenFPS.Server/Systems/CharacterSystem.cs	game	host: steps Agents
+OpenFPS.Server/Systems/CrossingSystem.cs	game	host: steps Agents
+OpenFPS.Server/Systems/CrowdSystem.cs	game	host: steps Agents
+OpenFPS.Server/Systems/DoorManners.cs	game	host: Agents once it reads a view
+OpenFPS.Server/Systems/DoorSystem.cs	game	
+OpenFPS.Server/Systems/DrivingSystem.cs	game	
+OpenFPS.Server/Systems/FireSystem.cs	game	host: steps Environment
+OpenFPS.Server/Systems/GroundWaterSystem.cs	Environment	the water on the ground, by map
+OpenFPS.Server/Systems/Haunts.cs	game	host: Agents once it reads a view
+OpenFPS.Server/Systems/LightningSystem.cs	game	host: steps Environment
+OpenFPS.Server/Systems/MovementSystem.cs	game	
+OpenFPS.Server/Systems/OccupancySystem.cs	game	
+OpenFPS.Server/Systems/ParentSystem.cs	game	
+OpenFPS.Server/Systems/Pavements.cs	game	host: Agents once it reads a view
+OpenFPS.Server/Systems/PedestrianSpeech.Homeless.cs	game	host: steps Agents (the lines are Speech)
+OpenFPS.Server/Systems/PedestrianSpeech.cs	game	host: steps Agents (the lines are Speech)
+OpenFPS.Server/Systems/RailSystem.cs	game	host: steps Agents (physics survey: trains kinematic)
+OpenFPS.Server/Systems/RoadWaterSystem.cs	game	host: steps Environment
+OpenFPS.Server/Systems/VehicleSignals.cs	game	
+OpenFPS.Server/Systems/VehicleSystem.AdminGun.cs	game	host: steps Agents
+OpenFPS.Server/Systems/VehicleSystem.Casualties.cs	game	host: steps Agents
+OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs	Agents	where a walker crosses a road: extract
+OpenFPS.Server/Systems/VehicleSystem.Drivers.cs	game	host: steps Agents
+OpenFPS.Server/Systems/VehicleSystem.Following.cs	Agents	the gap to the car in front (IDM): extract from the partial class
+OpenFPS.Server/Systems/VehicleSystem.Junctions.cs	Agents	who goes first: extract from the partial class
+OpenFPS.Server/Systems/VehicleSystem.Parking.cs	game	host: steps Agents
+OpenFPS.Server/Systems/VehicleSystem.Routes.cs	Agents	tours of lanes from the road network: extract
+OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs	Agents	the street's random events: extract
+OpenFPS.Server/Systems/VehicleSystem.cs	game	host: steps Agents
+OpenFPS.Server/Systems/WindowSystem.cs	game	
+OpenFPS.Server/Systems/WorldEnvironmentSystem.cs	game	host: steps Environment
+OpenFPS.Server/Water/Drainage.cs	Environment	one tile's drainage from its ground
+OpenFPS.Server/Water/DrainageNetwork.cs	Environment	a map's drainage from its tiles'
+OpenFPS.Server/Water/MapDrainage.cs	game	host: adapts the map to Environment
+OpenFPS.Server/Water/SurfaceRaster.cs	game	host: adapts the map to Environment
+OpenFPS.Sound/AdminGun.cs	Sound	
+OpenFPS.Sound/Aircraft.cs	Sound	
+OpenFPS.Sound/AircraftGroundRun.cs	Agents	an aeroplane driven along its runway
+OpenFPS.Sound/Applause.cs	Sound	
+OpenFPS.Sound/AudioClock.cs	Sound	
+OpenFPS.Sound/Ballistics.cs	Sound	
+OpenFPS.Sound/Birds.cs	Sound	
+OpenFPS.Sound/Breathing.cs	Sound	
+OpenFPS.Sound/BulletFlyby.cs	Sound	
+OpenFPS.Sound/BulletImpact.cs	Sound	
+OpenFPS.Sound/CarDoor.cs	Sound	
+OpenFPS.Sound/CarWindow.cs	Sound	
+OpenFPS.Sound/Core/AdminGunSynth.cs	Sound	
+OpenFPS.Sound/Core/Aircraft/AircraftSynth.cs	Sound	
+OpenFPS.Sound/Core/At44k.cs	Sound	
+OpenFPS.Sound/Core/AudioPhysics.cs	Sound	
+OpenFPS.Sound/Core/BoundaryModel.cs	Sound	
+OpenFPS.Sound/Core/BrakeSqueal.cs	Sound	
+OpenFPS.Sound/Core/EarTimbres.cs	Sound	
+OpenFPS.Sound/Core/Engine/BandEq.cs	Sound	
+OpenFPS.Sound/Core/Engine/BayRadiation.cs	Sound	
+OpenFPS.Sound/Core/Engine/CabinPaths.cs	Sound	
+OpenFPS.Sound/Core/Engine/CoolingSystem.cs	Sound	
+OpenFPS.Sound/Core/Engine/Driveline.cs	Sound	
+OpenFPS.Sound/Core/Engine/EngineSynth.Detail.cs	Sound	
+OpenFPS.Sound/Core/Engine/EngineSynth.cs	Sound	
+OpenFPS.Sound/Core/Engine/ExhaustNetwork.cs	Sound	
+OpenFPS.Sound/Core/Engine/ExhaustRadiation.cs	Sound	
+OpenFPS.Sound/Core/Engine/IntakeNetwork.cs	Sound	
+OpenFPS.Sound/Core/Engine/Waveguide.cs	Sound	
+OpenFPS.Sound/Core/Nature/EarWindSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/EventSum.cs	Sound	
+OpenFPS.Sound/Core/Nature/ExtendedSources.cs	Sound	
+OpenFPS.Sound/Core/Nature/FallingWaterSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/FireReferences.cs	Sound	
+OpenFPS.Sound/Core/Nature/FireSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/FoliageSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/PowerLawNoise.cs	Sound	
+OpenFPS.Sound/Core/Nature/RainPatch.cs	Sound	
+OpenFPS.Sound/Core/Nature/RainSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/Resonator.cs	Sound	
+OpenFPS.Sound/Core/Nature/RunningWaterSynth.Basin.cs	Sound	
+OpenFPS.Sound/Core/Nature/RunningWaterSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/ShoreReferences.cs	Sound	
+OpenFPS.Sound/Core/Nature/ShoreSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/TextureStatistics.cs	Sound	
+OpenFPS.Sound/Core/Pneumatics/AirSystem.cs	Sound	
+OpenFPS.Sound/Core/Rail/ElectricDrive.cs	Sound	
+OpenFPS.Sound/Core/Rail/RailNoise.cs	Sound	
+OpenFPS.Sound/Core/Rail/SteamFrontEnd.cs	Sound	
+OpenFPS.Sound/Core/Rail/TrainSynth.cs	Sound	
+OpenFPS.Sound/Core/Rail/TrainVoicing.cs	Sound	
+OpenFPS.Sound/Core/RenderRate.cs	Sound	
+OpenFPS.Sound/Core/ReportMeasure.cs	Sound	
+OpenFPS.Sound/Core/Signals/ChimeHorn.cs	Sound	
+OpenFPS.Sound/Core/Signals/ElectricHorn.cs	Sound	
+OpenFPS.Sound/Core/Signals/ElectronicSiren.cs	Sound	
+OpenFPS.Sound/Core/Signals/HeadShadow.cs	Sound	
+OpenFPS.Sound/Core/Signals/LoudspeakerChain.cs	Sound	
+OpenFPS.Sound/Core/Signals/Modes.cs	Sound	
+OpenFPS.Sound/Core/Signals/RadiatorBands.cs	Sound	
+OpenFPS.Sound/Core/Signals/SteamWhistle.cs	Sound	
+OpenFPS.Sound/Core/Signals/StruckBell.cs	Sound	
+OpenFPS.Sound/Core/SincResampler.cs	Sound	
+OpenFPS.Sound/Core/Stove/GasHobSynth.cs	Sound	
+OpenFPS.Sound/Core/Thunder.cs	Sound	
+OpenFPS.Sound/Core/TransientSynth.cs	Sound	
+OpenFPS.Sound/Core/VehicleSynth.cs	Sound	
+OpenFPS.Sound/Core/WeaponSynth.cs	Sound	
+OpenFPS.Sound/Core/WetTyres.cs	Sound	
+OpenFPS.Sound/Core/WheelStrikes.cs	Sound	
+OpenFPS.Sound/Core/Yard/SmallMachineSynth.cs	Sound	
+OpenFPS.Sound/Core/Yard/Thermostat.cs	Sound	
+OpenFPS.Sound/CrossingGates.cs	Sound	
+OpenFPS.Sound/DesignedSoundKit.cs	Sound	
+OpenFPS.Sound/DoorKnock.cs	Sound	
+OpenFPS.Sound/DoorPhysics.cs	Sound	
+OpenFPS.Sound/Doors.cs	Sound	
+OpenFPS.Sound/EarWind.cs	Sound	
+OpenFPS.Sound/Editing/FieldDescriptor.cs	Schema	a field as the editor types it
+OpenFPS.Sound/Editing/ModelKinds.cs	Models	each kind's fields for the editor
+OpenFPS.Sound/ElevatorDoor.cs	Sound	
+OpenFPS.Sound/Engines.cs	Sound	
+OpenFPS.Sound/Fire.cs	Environment	what is burning and its shape: the fire's description, which its sound reads
+OpenFPS.Sound/FireShape.cs	Environment	a fire's burning area
+OpenFPS.Sound/FireSpread.cs	Environment	fire spreading through fuel
+OpenFPS.Sound/Footsteps.cs	Sound	
+OpenFPS.Sound/Fuel.cs	Environment	what a thing burns as
+OpenFPS.Sound/GasHob.cs	Sound	
+OpenFPS.Sound/Glass.cs	Sound	
+OpenFPS.Sound/GlassDoor.cs	Sound	
+OpenFPS.Sound/GlassFracture.cs	Sound	
+OpenFPS.Sound/GroundChannels.cs	Sound	
+OpenFPS.Sound/GroundWater.cs	Environment	hydrology of the ground
+OpenFPS.Sound/HandOverSounds.cs	Sound	
+OpenFPS.Sound/Hearing/BandAnalyser.cs	Sound	
+OpenFPS.Sound/Hearing/EarModel.cs	Sound	
+OpenFPS.Sound/Hearing/EqualLoudness.cs	Sound	
+OpenFPS.Sound/Hearing/LoudnessCompensation.cs	Sound	
+OpenFPS.Sound/Hearing/ReferenceVoice.cs	Sound	
+OpenFPS.Sound/Hearing/Timbre.cs	Sound	
+OpenFPS.Sound/Hearing/ZwickerLoudness.cs	Sound	
+OpenFPS.Sound/Honk.cs	Sound	
+OpenFPS.Sound/ImpactAcoustics.cs	Sound	
+OpenFPS.Sound/KnobDoor.cs	Sound	
+OpenFPS.Sound/Lightning.cs	Environment	strikes, their schedule and channel
+OpenFPS.Sound/LockCylinder.cs	Sound	
+OpenFPS.Sound/Loudness.cs	Sound	
+OpenFPS.Sound/Loudspeakers.cs	Sound	
+OpenFPS.Sound/MachinePower.cs	Agents	how hard a driver works a machine: a notch, a power lever
+OpenFPS.Sound/Machines.cs	Models	machines as parts lists, the registry
+OpenFPS.Sound/ModelKindTable.cs	Models	the one table of model kinds
+OpenFPS.Sound/ModelLibrary.cs	Models	the models a map can name
+OpenFPS.Sound/NatureModels.cs	Sound	
+OpenFPS.Sound/PlaybackMode.cs	Sound	
+OpenFPS.Sound/Pneumatics.cs	Sound	
+OpenFPS.Sound/Precipitation.cs	Environment	what falls and its spectrum
+OpenFPS.Sound/PushBarDoor.cs	Sound	
+OpenFPS.Sound/Rain.cs	Environment	rain rates and drop sizes
+OpenFPS.Sound/RainSurfaces.cs	Sound	
+OpenFPS.Sound/Ricochet.cs	Sound	
+OpenFPS.Sound/RoadWater.cs	Environment	water on the road and its puddles
+OpenFPS.Sound/RunningWater.cs	Sound	
+OpenFPS.Sound/Runoff.cs	Environment	rain on its way to the drains
+OpenFPS.Sound/ShapedNoise.cs	Sound	
+OpenFPS.Sound/Signals.cs	Sound	
+OpenFPS.Sound/SlidingDoor.cs	Sound	
+OpenFPS.Sound/SmallMachines.cs	Sound	
+OpenFPS.Sound/Spectrum.cs	Sound	
+OpenFPS.Sound/StruckModes.cs	Sound	
+OpenFPS.Sound/StruckThings.cs	Sound	
+OpenFPS.Sound/TeleporterSounds.cs	Sound	
+OpenFPS.Sound/TrainSignals.cs	Sound	
+OpenFPS.Sound/Trains.cs	Sound	
+OpenFPS.Sound/TransientSound.cs	Sound	
+OpenFPS.Sound/TyreFriction.cs	Sound	
+OpenFPS.Sound/Vector3Converter.cs	Sound	
+OpenFPS.Sound/VehicleBody.cs	Sound	
+OpenFPS.Sound/VehicleBodyShell.cs	Sound	
+OpenFPS.Sound/VehicleCabin.cs	Sound	
+OpenFPS.Sound/VehicleSignalBits.cs	Sound	
+OpenFPS.Sound/VehicleSpec.cs	Sound	
+OpenFPS.Sound/Vehicles.cs	Sound	
+OpenFPS.Sound/Waves.cs	Sound	
+OpenFPS.Sound/WeaponHandling.cs	Sound	
+OpenFPS.Sound/Weapons.cs	Sound	
+OpenFPS.Sound/WeatherType.cs	Environment	wire
+OpenFPS.Sound/WoodChorus.cs	Sound	
+OpenFPS.Sound/WorldWeather.cs	Environment	one world's weather state
+OpenFPS.Words/CompassWords.cs	Words	

@@ -1,0 +1,18 @@
+package	layer	may_reference
+Geometry	0	
+Materials	0	
+Native	0	
+Schema	0	
+Words	0	
+Acoustics	1	Geometry,Materials
+Astronomy	1	Words
+Physics	1	Geometry,Materials,Schema
+Environment	2	Astronomy,Geometry,Materials,Physics,Schema,Words
+Sound	3	Acoustics,Environment,Geometry,Materials,Physics,Schema
+Models	4	Acoustics,Environment,Geometry,Materials,Physics,Schema,Sound
+Audio	5	Acoustics,Environment,Geometry,Materials,Models,Native,Physics,Schema,Sound
+World	5	Acoustics,Astronomy,Environment,Geometry,Materials,Models,Physics,Schema,Sound,Words
+Agents	6	Environment,Geometry,Materials,Models,Physics,Schema,Sound,Words,World
+Common	6	Acoustics,Astronomy,Environment,Geometry,Materials,Models,Physics,Schema,Sound,Words,World
+Accessibility	7	Acoustics,Agents,Audio,Environment,Geometry,Materials,Models,Physics,Schema,Sound,Words,World
+Editor	8	Accessibility,Acoustics,Common,Environment,Geometry,Materials,Models,Physics,Schema,Sound,Words,World

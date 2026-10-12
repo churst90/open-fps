@@ -54,10 +54,13 @@ public class LibraryBoundaryTests
     }
 
     /// <summary>Every .cs file of the sorted projects, repository-relative with forward slashes.</summary>
-    private static IEnumerable<string> SourceFiles()
+    private static IEnumerable<string> SourceFiles() => SourceFiles(SortedProjects);
+
+    /// <summary>Every .cs file of <paramref name="projects"/>, repository-relative with forward slashes.</summary>
+    internal static IEnumerable<string> SourceFiles(IEnumerable<string> projects)
     {
         string root = RepoRoot();
-        foreach (var project in SortedProjects)
+        foreach (var project in projects)
         {
             string dir = Path.Combine(root, project);
             if (!Directory.Exists(dir)) continue;
@@ -157,12 +160,16 @@ public class LibraryBoundaryTests
     }
 
     /// <summary>All sorted projects' sources in one compilation, each tree named by its repository path.</summary>
-    internal static CSharpCompilation CompileSorted()
+    internal static CSharpCompilation CompileSorted() => Compile(SortedProjects, "LibraryBoundary");
+
+    /// <summary>The sources of <paramref name="projects"/> in one compilation, each tree named by its repository
+    /// path (EnginePackagesTests compiles the server and the two small projects as well).</summary>
+    internal static CSharpCompilation Compile(IEnumerable<string> projects, string name)
     {
         string root = RepoRoot();
         var parse = new CSharpParseOptions(LanguageVersion.Preview);
         var trees = new List<SyntaxTree>();
-        foreach (var rel in SourceFiles().OrderBy(f => f, StringComparer.Ordinal))
+        foreach (var rel in SourceFiles(projects).OrderBy(f => f, StringComparer.Ordinal))
             trees.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(root, rel)), parse, rel, Encoding.UTF8));
         // What the build adds: the implicit usings, and the two classes Common's project file writes.
         trees.Add(CSharpSyntaxTree.ParseText(string.Join("\n", new[]
@@ -173,7 +180,7 @@ public class LibraryBoundaryTests
         trees.Add(CSharpSyntaxTree.ParseText(
             "namespace OpenFPS.Common; public static class WireContract { public const string Hash = \"test\"; }\n"
             + "public static class DoorModelFingerprint { public const string Hash = \"test\"; }", parse, "<generated>/Generated.g.cs"));
-        return CSharpCompilation.Create("LibraryBoundary", trees, References(),
+        return CSharpCompilation.Create(name, trees, References(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true,
                 nullableContextOptions: NullableContextOptions.Enable));
     }

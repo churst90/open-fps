@@ -8,6 +8,8 @@ static_refs, assets). Output in OUT_DIR:
   packages_tables.md     every table the document quotes
   packages_files.tsv     every source file of the sorted projects, its package, lines and why
   packages_crossings.tsv every reference from a package to one its layer may not reference
+  ratchet/               the four lists EnginePackagesTests holds (OpenFPS.Tests/EnginePackages): files.tsv,
+                         types.tsv, layers.tsv and allowed.tsv
 
 A file goes to the package of the first FILE_RULES pattern it matches; a type goes to its TYPE_RULES entry,
 else to its file's package. A file no rule matches is reported as UNSORTED, so a new file cannot slip past.
@@ -116,8 +118,8 @@ FILE_RULES = [
     ('OpenFPS.Common/LineFollower.cs', 'Agents', 'a driver steering to a line'),
     ('OpenFPS.Common/Messages.cs', 'Common', 'wire'),
     ('OpenFPS.Common/MoverPoses.cs', 'game', 'a server counter'),
-    ('OpenFPS.Common/PhysicsConstants.cs', 'Physics', P + ': the body and gravity; the tick stays in Common'),
-    ('OpenFPS.Common/PhysicsUtils.cs', 'Physics', P + ': the probes; the World and snapshot overloads stay'),
+    ('OpenFPS.Common/PhysicsConstants.cs', 'Common', 'the game\'s reach and bounds, the tick, the input limits (the body: BodyConstants)'),
+    ('OpenFPS.Common/PhysicsUtils.cs', 'Common', 'entity adapter: the ground probes of a world and of a snapshot (the question: Footing)'),
     ('OpenFPS.Common/PlayerCoordinates.cs', 'Accessibility', 'coordinates as a player reads and types them'),
     ('OpenFPS.Common/RaceLine.cs', 'Agents', 'speeds along a line'),
     ('OpenFPS.Common/RoadMapData.cs', 'World', 'roads as sent to a driver'),
@@ -592,4 +594,27 @@ w()
 
 with open(os.path.join(out, 'packages_tables.md'), 'w', encoding='utf-8') as f:
     f.write('\n'.join(lines_md) + '\n')
+
+# ── The ratchet's lists (EnginePackagesTests) ──────────────────────────────────────────────
+# What the test holds, with nothing in them that changes when a file is only edited: no line counts.
+ratchet = os.path.join(out, 'ratchet')
+os.makedirs(ratchet, exist_ok=True)
+with open(os.path.join(ratchet, 'files.tsv'), 'w', encoding='utf-8', newline='\n') as f:
+    f.write('file\tpackage\twhy\n')
+    for path in sorted(FILES):
+        pkg, why = file_rule(path)
+        f.write(f'{path}\t{pkg}\t{why}\n')
+with open(os.path.join(ratchet, 'types.tsv'), 'w', encoding='utf-8', newline='\n') as f:
+    f.write('type\tpackage\n')
+    for t in sorted(TYPE_RULES):
+        f.write(f'{t}\t{TYPE_RULES[t]}\n')
+with open(os.path.join(ratchet, 'layers.tsv'), 'w', encoding='utf-8', newline='\n') as f:
+    f.write('package\tlayer\tmay_reference\n')
+    for p in sorted(ALLOWED, key=lambda p: (LAYER[p], p)):
+        f.write(f'{p}\t{LAYER[p]}\t{",".join(sorted(ALLOWED[p]))}\n')
+by_file = collections.Counter((e['file'], PKG[e['to_type']]) for e in crossings)
+with open(os.path.join(ratchet, 'allowed.tsv'), 'w', encoding='utf-8', newline='\n') as f:
+    f.write('file\tto_package\tcount\n')
+    for (path, to), n in sorted(by_file.items()):
+        f.write(f'{path}\t{to}\t{n}\n')
 print(f'files {len(FILES)}, unsorted {len(unsorted)}, crossings {len(crossings)}')

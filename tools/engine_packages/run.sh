@@ -21,3 +21,4 @@ if [ "${SURVEY_SKIP_READER:-0}" != 1 ]; then
 fi
 python3 -I "$here/classify.py" "$repo" "$out" "$out"
 echo "tables: $out/packages_tables.md  files: $out/packages_files.tsv  crossings: $out/packages_crossings.tsv"
+echo "the ratchet's lists (copy into OpenFPS.Tests/EnginePackages): $out/ratchet/"
