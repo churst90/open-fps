@@ -1311,6 +1311,11 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
 }
 
 
+if (args.Contains("--room-change"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.RoomChangeSpike.Run(args));
+}
+
 if (args.Contains("--room-walk"))
 {
     Console.WriteLine("--- Room walk: the wood room with the megaphone on, walked, the mix captured to a WAV ---");

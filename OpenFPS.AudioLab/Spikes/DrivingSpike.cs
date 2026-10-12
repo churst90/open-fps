@@ -123,14 +123,18 @@ public static class DrivingSpike
         Action<double>? perFrame = null;
         int nextId = 1000;
 
+        // The longest frame of each scene: the update and the audio thread's tick, which place every source.
+        double worstFrameMs = 0;
         void Pump(double seconds)
         {
             var until = clock.Elapsed.TotalSeconds + seconds;
             while (clock.Elapsed.TotalSeconds < until)
             {
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
+                long f0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 audio.Update(world.GetSnapshot());
                 facade.PumpForTest();
+                worstFrameMs = Math.Max(worstFrameMs, System.Diagnostics.Stopwatch.GetElapsedTime(f0).TotalMilliseconds);
                 Thread.Sleep(4);
             }
         }
@@ -138,21 +142,23 @@ public static class DrivingSpike
         const double Preroll = 0.8;
         void Record(string name, double seconds, string note)
         {
+            worstFrameMs = 0;
             if (!name.StartsWith("silence", StringComparison.Ordinal)) Pump(Preroll);
             double start = clock.Elapsed.TotalSeconds;
             Pump(seconds);
             segments.Add(new Segment(name, start, seconds, note));
-            Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  {note}");
+            Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  {note}  [worst frame {worstFrameMs:F0} ms; traced reverb {(provider.TracedActive ? "on" : "off")}, cabin trace {(provider.Traced.Cabin != null ? "ready" : "none")}]");
         }
         void RecordUntil(string name, Func<bool> done, double limit, string note)
         {
+            worstFrameMs = 0;
             Pump(Preroll);
             double start = clock.Elapsed.TotalSeconds;
             while (!done() && clock.Elapsed.TotalSeconds - start < limit) Pump(0.05);
             Pump(1.5);
             double seconds = clock.Elapsed.TotalSeconds - start;
             segments.Add(new Segment(name, start, seconds, note));
-            Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  {note}");
+            Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  {note}  [worst frame {worstFrameMs:F0} ms; traced reverb {(provider.TracedActive ? "on" : "off")}, cabin trace {(provider.Traced.Cabin != null ? "ready" : "none")}]");
         }
 
         int AddVehicle(string preset, Vector3 at, Quaternion heading)
