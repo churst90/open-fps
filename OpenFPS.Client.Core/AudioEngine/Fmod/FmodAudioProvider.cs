@@ -1785,8 +1785,7 @@ public partial class FmodAudioProvider : IAudioProvider
             var a = _lateCandidates[i];
             _lateIds[i] = a.EntityId;
             _lateAt[i] = a.Position;
-            // The lean's weight is the level as played, as it was before the slots were ranked by the heard level.
-            _lateLevel[a.EntityId] = a.BaseVolume * Loudness.RenderedGain(1f, a.MinDistance, a.Range, Vector3.Distance(_listenerPos, a.Position));
+            _lateLevel[a.EntityId] = LeanWeight(a);
         }
         lf.Want(_listenerPos, _lateIds.AsSpan(0, n), _lateAt.AsSpan(0, n));
 
@@ -1819,6 +1818,11 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     private volatile float _lateLawKNow = float.NaN, _tailLeanNow;
+
+    /// <summary>How hard a source pulls the tail's lean: its level at the ear, the one rank (<see cref="ActiveSound.Heard"/>).
+    /// On the played gain a fire's or a rain patch's place pulled 29 dB harder than it is heard, the gain that only gives
+    /// its quiet render its headroom back (Cody, 2026-10-12).</summary>
+    internal static float LeanWeight(ActiveSound a) => a.Heard;
 
     /// <summary>
     /// Who the late field traces: the sources sending to the listener's place, loudest at the ear first (the one

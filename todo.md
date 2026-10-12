@@ -93,8 +93,8 @@ since the last deploy" list below.
      at the choosers (the worker would have to be asked about every contender), a budget for sirens, horns and
      talkers. The provider's orderings (S20): BUILT 2026-10-12, unheard (the audit's "S20 as built"): the render
      pool, engine detail, the late field and the traced echoes by the same heard level, the headroom's return
-     out; measured with `--driving set=ranks`. For Cody: the late field's lean is still weighted by the played
-     level (recommended: the heard level).
+     out; measured with `--driving set=ranks`. The late field's lean by the heard level too (Cody,
+     2026-10-12).
    - The rest of P6, rain asking the worker: BUILT 2026-10-12, unheard (made on Windows and sent back as a patch; the
      audit's "P6, the rain, as built"): the heaviest surface of each rain patch behind walls is asked of the
      worker under a probe of its own; the pool not yet measured with `--pop-hunt` (it needs Steam Audio).

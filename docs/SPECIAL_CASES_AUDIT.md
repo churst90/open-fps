@@ -857,8 +857,8 @@ Two commits: the instrument first (`--driving set=ranks`, measured on the old co
 - **Render-ahead**: loudest first, so a short pool starves the quietest voice. A train's lanes go just ahead
   of its loudest voice (they went ahead of whichever of its voices was listed first).
 - **Engine detail**: against the loudest machine by the heard level; the 15 and 12 dB thresholds stay.
-- **The late field**: its sixteen sources by the heard level. Its lean is still weighted by the level as
-  played, headroom and all (a question below).
+- **The late field**: its sixteen sources by the heard level. Its lean is weighted by the heard level too
+  (`LeanWeight`; Cody, 2026-10-12): by the level as played, a fire pit's place pulled it 29 dB harder than heard.
 - **Traced echoes**: by the heard level at the source's own position (it was the distance to where it is heard
   from, the diffracted bearing's point); the path stays out, the 4 dB hold and the 30 dB floor stay. The rig's
   input gain is a signal level and keeps the headroom.
@@ -888,7 +888,7 @@ Two commits: the instrument first (`--driving set=ranks`, measured on the old co
 - **Questions for Cody.** The late field's lean, the way the tail leans toward its sources, is weighted by each
   traced source's level as played, so a fire pit's or a rain patch's place pulls it 29 dB harder than it is
   heard. Weighting it by the heard level is the same fix as these, but it changes what is heard (the lean), so
-  it waits. Recommended: weight it by the heard level.
+  it waited. Cody decided 2026-10-12: by the heard level, done.
 
 #### P5. Names and materials to properties (1 to 2 sessions)
 

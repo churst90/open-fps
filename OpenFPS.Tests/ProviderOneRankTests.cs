@@ -182,4 +182,18 @@ public class ProviderOneRankTests
         FmodAudioProvider.ChooseEchoSources(listed, Ear, 4, new List<(ActiveSound, float)>(), keep);
         Assert.Equal(new[] { 1000, 1001, 1002, 1003 }, keep.Select(a => a.EntityId).Order());
     }
+
+    /// <summary>
+    /// The late field's lean weighs each source by its level at the ear: a fire pit's place with 45 dB of headroom
+    /// pulls the tail as hard as a machine heard as loud, not 29 dB harder.
+    /// </summary>
+    [Fact]
+    public void The_tail_leans_toward_a_source_by_how_loud_it_is_heard()
+    {
+        var machine = Voice(1, At(10f), 0.05f);
+        var fire = Voice(2, At(10f), 0.05f, FireHeadroom);
+        FmodAudioProvider.RankVoices(new List<ActiveSound> { machine, fire }, Ear);
+        Assert.True(FmodAudioProvider.LeanWeight(machine) > 0f);
+        Assert.InRange(FmodAudioProvider.LeanWeight(fire) / FmodAudioProvider.LeanWeight(machine), 0.999f, 1.001f);
+    }
 }
