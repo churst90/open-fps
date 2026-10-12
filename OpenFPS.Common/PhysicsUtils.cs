@@ -5,7 +5,11 @@ using OpenFPS.Common.Components;
 
 namespace OpenFPS.Common;
 
-/// <summary>The ground probes, shared so the client and the server agree where the floor is.</summary>
+/// <summary>
+/// The ground probes, shared so the client and the server agree where the floor is. The question itself is
+/// <see cref="Footing"/>'s, asked of a triangle world; these ask it of the server's world and of a client's
+/// snapshot, each adding the solids its triangle world does not hold.
+/// </summary>
 public static class PhysicsUtils
 {
     // The candidate gather runs on the server tick thread, the client game thread and the acoustic worker
@@ -31,7 +35,7 @@ public static class PhysicsUtils
     public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos,
                                         ICollection<Entity>? ignore, out string material)
     {
-        const float stepHeight = 0.4f;
+        const float stepHeight = PhysicsConstants.StepHeight;
 
         if (grid.Geometry != null && Geometry.TriangleGeometry.Enabled)
             return GroundFromGeometry(world, grid, pos, ignore, stepHeight, out material);
@@ -80,7 +84,7 @@ public static class PhysicsUtils
     {
         var filter = new IgnoreEntities(ignore);
         var geo = grid.Geometry!;
-        float ground = geo.Ground(pos, PhysicsConstants.PlayerRadius, stepHeight, Geometry.GeometryLayers.Ground, ref filter, out var solid, out _);
+        float ground = Footing.Ground(geo, ref filter, pos, out var solid);
         material = ground > -1000f ? GroundMaterial(geo.SurfaceOf(solid).Material) : "Generic";
 
         var candidates = _entityScratch ??= new List<Entity>(64);
@@ -179,7 +183,7 @@ public static class PhysicsUtils
     /// <summary>The floor height under a point, on the client.</summary>
     public static float GetGroundHeight(WorldSnapshot snapshot, Vector3 pos, int ownEntityId, out string material)
     {
-        const float stepHeight = 0.4f;
+        const float stepHeight = PhysicsConstants.StepHeight;
 
         if (snapshot.Geometry != null && Geometry.TriangleGeometry.Enabled)
         {
@@ -187,7 +191,7 @@ public static class PhysicsUtils
             // it does not hold; nothing that moves, as the box path counted only the static grid.
             var filter = new SnapshotGround { Stale = snapshot.GeometryStale, Own = ownEntityId };
             var geo = snapshot.Geometry;
-            float y = geo.Ground(pos, PhysicsConstants.PlayerRadius, stepHeight, Geometry.GeometryLayers.Ground, ref filter, out var solid, out _);
+            float y = Footing.Ground(geo, ref filter, pos, out var solid);
             string m = "Generic";
             if (y > -1000f) { var raw = geo.SurfaceOf(solid).Material; m = string.IsNullOrEmpty(raw) ? "Generic" : raw; }
             if (snapshot.UnindexedStatics.Count > 0)
@@ -230,11 +234,9 @@ public static class PhysicsUtils
     }
 
     /// <summary>
-    /// Where a foot goes down, and on what (docs/GEOMETRY.md 3.8). The body stands at the highest floor
-    /// under its footprint, so on a flight a foot under its middle was in the air over the lower tread.
-    /// The foot goes on the floor the body stands on: under the foot, or a body's radius ahead along
-    /// <paramref name="way"/>. Nothing at the body's height (a vehicle's floor) leaves the foot where it
-    /// was and <paramref name="material"/> null.
+    /// Where a foot goes down on a client, and on what (<see cref="Footing.FootOnFloor"/>): on the snapshot's
+    /// triangle world, not counting the body itself or a solid whose place there is stale. No triangle world
+    /// leaves the foot where it was and <paramref name="material"/> null.
     /// </summary>
     public static Vector3 FootOnFloor(WorldSnapshot snapshot, Vector3 foot, Vector3 feet, Vector3 way, int ownEntityId, out string? material)
     {
@@ -242,43 +244,8 @@ public static class PhysicsUtils
         var geo = snapshot.Geometry;
         if (geo == null || !Geometry.TriangleGeometry.Enabled) return foot;
         var filter = new SnapshotGround { Stale = snapshot.GeometryStale, Own = ownEntityId };
-        return FootOnFloor(geo, ref filter, foot, feet, way, out material);
+        return Footing.FootOnFloor(geo, ref filter, foot, feet, way, out material);
     }
-
-    /// <summary><see cref="FootOnFloor(WorldSnapshot, Vector3, Vector3, Vector3, int, out string?)"/> asked of a
-    /// triangle world directly (the server's, a lab's).</summary>
-    public static Vector3 FootOnFloor<F>(Geometry.TriangleWorld geo, ref F filter, Vector3 foot, Vector3 feet, Vector3 way, out string? material)
-        where F : Geometry.IGeometryFilter
-    {
-        material = null;
-        float top = feet.Y + PhysicsConstants.StepHeight;
-        var ahead = new Vector3(way.X, 0f, way.Z);
-        ahead = ahead.LengthSquared() > 1e-8f ? Vector3.Normalize(ahead) * PhysicsConstants.PlayerRadius : Vector3.Zero;
-        float under = geo.FloorAt(foot.X, foot.Z, top, Geometry.GeometryLayers.Ground, ref filter, out var underHit);
-        // On the floor the body stands on, under the foot...
-        if (under > -1000f && MathF.Abs(under - feet.Y) <= FootOnFloorTolerance) return On(geo, foot, under, underHit, out material);
-        // ...or a stride ahead, the tread a body climbing a flight is stepping up onto...
-        if (ahead != Vector3.Zero)
-        {
-            var at = foot + ahead;
-            float y = geo.FloorAt(at.X, at.Z, top, Geometry.GeometryLayers.Ground, ref filter, out var hit);
-            if (y > -1000f && MathF.Abs(y - feet.Y) <= FootOnFloorTolerance) return On(geo, at, y, hit, out material);
-        }
-        // ...or whatever is under the foot within a step: going down, the body is held on the tread it is
-        // leaving while the foot is already on the one below.
-        if (under > -1000f && MathF.Abs(under - feet.Y) <= PhysicsConstants.StepHeight + 0.01f) return On(geo, foot, under, underHit, out material);
-        return foot;
-
-        static Vector3 On(Geometry.TriangleWorld geo, Vector3 at, float y, in Geometry.GeometryHit hit, out string? material)
-        {
-            var raw = geo.SurfaceOf(hit).Material;
-            material = string.IsNullOrEmpty(raw) ? "Generic" : raw;
-            return new Vector3(at.X, y, at.Z);
-        }
-    }
-
-    /// <summary>How near the body's height a floor is to be the one it stands on, metres.</summary>
-    public const float FootOnFloorTolerance = 0.002f;
 
     private struct SnapshotGround : Geometry.IGeometryFilter
     {

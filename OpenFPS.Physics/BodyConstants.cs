@@ -18,6 +18,19 @@ public static class BodyConstants
     /// <summary>The radius of the upright capsule a body on foot walks as, metres.</summary>
     public const float PlayerRadius = 0.3f;
 
+    /// <summary>The box a body on foot takes up, metres: as wide and deep as twice its radius, as tall as it is.</summary>
+    public static readonly System.Numerics.Vector3 PlayerSize = new(0.6f, 1.8f, 0.6f);
+
+    /// <summary>
+    /// What a person is made of to anything that meets one: soft and lossy (the material table's "Skin").
+    /// Not "Generic", the knock of a stone pillar, and not the floor under them, which movement once
+    /// wrote into their material (Cody, 2026-10-05: "am I made of concrete too?").
+    /// </summary>
+    public const string PersonMaterial = "Skin";
+
+    /// <summary>A person's mass, kilograms: an adult, what a body over your shoulder weighs.</summary>
+    public const float PersonMassKg = 70f;
+
     /// <summary>The highest step a body on foot takes without jumping, metres, and how far it steps down.</summary>
     public const float StepHeight = 0.4f;
 
@@ -38,6 +51,33 @@ public static class BodyConstants
 
     /// <summary>Metres per second at a run, client and server.</summary>
     public const float SprintSpeed = WalkSpeed * SprintMultiplier;
+
+    /// <summary>
+    /// Metres per second at most, walking or running, with a person over your shoulder (anything heavier
+    /// than the hands' carrying capacity). About three quarters of an unloaded walk (1.3 to 1.4 m/s; the
+    /// city's walkers go at 1.35): an adult is about the carrier's weight, beyond any pack in the
+    /// load-carriage studies, which show the pace falling with load. An estimate, not a measurement.
+    /// </summary>
+    public const float CarryingSpeed = 1.0f;
+
+    /// <summary>
+    /// How fast a body moves on foot this step: the walk or the run, held under a positive
+    /// <paramref name="limit"/>. Asked by client and server alike, or prediction is pulled back every step.
+    /// </summary>
+    public static float FootSpeed(bool sprint, float limit)
+    {
+        float speed = sprint ? SprintSpeed : WalkSpeed;
+        return limit > 0f && limit < speed ? limit : speed;
+    }
+
+    /// <summary>
+    /// Metres per second straight up as a standing jump leaves the ground: sqrt(2 g h) for a rise of
+    /// half a metre, about what a person manages from a standstill.
+    /// </summary>
+    public const float JumpPower = 3.13f;
+
+    /// <summary>How fast a body on foot turns with the key or the stick held right over, radians per second.</summary>
+    public const float RotationSpeed = 1.5f;
 
     /// <summary>
     /// The Earth's, m/s² (Cody, 2026-10-04: "shouldn't you fall at the speed of gravity on earth?"). A

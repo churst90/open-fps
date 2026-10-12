@@ -2,22 +2,25 @@ using System.Numerics;
 
 namespace OpenFPS.Common;
 
+/// <summary>
+/// The game's rules of movement and the network's: how far a hand reaches, how far a map goes down, the
+/// tick, and what the server takes of a client's input. The body's own numbers (its size, mass, walk, run,
+/// jump, step and gravity) are <see cref="BodyConstants"/>', in the physics; the names here read them there,
+/// for the 1,100 places that ask the game.
+/// </summary>
 public static class PhysicsConstants
 {
-    public static readonly Vector3 PlayerSize = new(0.6f, 1.8f, 0.6f);
+    /// <summary>The box a body on foot takes up, metres (<see cref="BodyConstants.PlayerSize"/>).</summary>
+    public static Vector3 PlayerSize => BodyConstants.PlayerSize;
     public const float PlayerRadius = BodyConstants.PlayerRadius;
     /// <summary>A person's height, metres (<see cref="BodyConstants.PersonHeight"/>).</summary>
     public const float PlayerHeight = BodyConstants.PersonHeight;
 
-    /// <summary>
-    /// What a person is made of to anything that meets one: soft and lossy (AcousticRegistry "Skin").
-    /// Not "Generic", the knock of a stone pillar, and not the floor under them, which movement once
-    /// wrote into their material (Cody, 2026-10-05: "am I made of concrete too?").
-    /// </summary>
-    public const string PersonMaterial = "Skin";
+    /// <summary>What a person is made of to anything that meets one (<see cref="BodyConstants.PersonMaterial"/>).</summary>
+    public const string PersonMaterial = BodyConstants.PersonMaterial;
 
-    /// <summary>A person's mass, kilograms: an adult, what a body over your shoulder weighs.</summary>
-    public const float PersonMassKg = 70f;
+    /// <summary>A person's mass, kilograms (<see cref="BodyConstants.PersonMassKg"/>).</summary>
+    public const float PersonMassKg = BodyConstants.PersonMassKg;
 
     /// <summary>Metres per second at a walk (<see cref="BodyConstants.WalkSpeed"/>).</summary>
     public const float WalkSpeed = BodyConstants.WalkSpeed;
@@ -28,34 +31,22 @@ public static class PhysicsConstants
     /// <summary>Metres per second at a run, client and server (<see cref="BodyConstants.SprintSpeed"/>).</summary>
     public const float SprintSpeed = BodyConstants.SprintSpeed;
 
-    /// <summary>
-    /// Metres per second at most, walking or running, with a person over your shoulder (anything heavier
-    /// than HandsService.CarryCapacityKg). About three quarters of an unloaded walk (1.3 to 1.4 m/s; the
-    /// city's walkers go at 1.35): an adult is about the carrier's weight, beyond any pack in the
-    /// load-carriage studies, which show the pace falling with load. An estimate, not a measurement.
-    /// </summary>
-    public const float CarryingSpeed = 1.0f;
+    /// <summary>Metres per second at most with a person over your shoulder, anything heavier than
+    /// HandsService.CarryCapacityKg (<see cref="BodyConstants.CarryingSpeed"/>).</summary>
+    public const float CarryingSpeed = BodyConstants.CarryingSpeed;
 
-    /// <summary>
-    /// How fast a body moves on foot this step: the walk or the run, held under a positive
-    /// <paramref name="limit"/>. Asked by client and server alike, or prediction is pulled back every step.
-    /// </summary>
-    public static float FootSpeed(bool sprint, float limit)
-    {
-        float speed = sprint ? SprintSpeed : WalkSpeed;
-        return limit > 0f && limit < speed ? limit : speed;
-    }
+    /// <summary>How fast a body moves on foot this step (<see cref="BodyConstants.FootSpeed"/>).</summary>
+    public static float FootSpeed(bool sprint, float limit) => BodyConstants.FootSpeed(sprint, limit);
 
-    /// <summary>
-    /// Metres per second straight up as a standing jump leaves the ground: sqrt(2 g h) for a rise of
-    /// half a metre, about what a person manages from a standstill.
-    /// </summary>
-    public const float JumpPower = 3.13f;
+    /// <summary>Metres per second straight up as a standing jump leaves the ground (<see cref="BodyConstants.JumpPower"/>).</summary>
+    public const float JumpPower = BodyConstants.JumpPower;
 
     /// <summary>The Earth's, m/s² (<see cref="BodyConstants.Gravity"/>).</summary>
     public const float Gravity = BodyConstants.Gravity;
+    /// <summary>The highest step a body on foot takes without jumping, metres (<see cref="BodyConstants.StepHeight"/>).</summary>
     public const float StepHeight = BodyConstants.StepHeight;
-    public const float RotationSpeed = 1.5f; // SHARED: Radians per second at full stick/key
+    /// <summary>How fast a body on foot turns, radians per second (<see cref="BodyConstants.RotationSpeed"/>).</summary>
+    public const float RotationSpeed = BodyConstants.RotationSpeed;
 
     // --- Simulation Bounds & Environment ---
     public const float MapMinimumY = -10.0f;

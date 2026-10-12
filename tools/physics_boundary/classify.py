@@ -42,11 +42,12 @@ EN = 'OpenFPS.Client.AudioEngine.Core.Engine.'
 RULES = [
     # Common: player movement and the ground probes
     (C + 'SharedMovementEngine', 'P', 'one movement step, client and server'),
-    (C + 'PhysicsUtils', 'PS', 'ground probes: the triangle-world parts move; the World/WorldSnapshot overloads are host adapters'),
-    (C + 'PhysicsConstants', 'PS', 'body and gravity to Physics; tick rate and input integrity stay with the network'),
+    (C + 'Footing', 'P', 'the floor under a body and where its foot goes down, asked of a triangle world'),
+    (C + 'PhysicsUtils', 'H', 'the server\'s and a client\'s ground probes: adapters over Footing (physics stage 2)'),
+    (C + 'PhysicsConstants', 'H', 'the game\'s reach and bounds, the tick and input integrity; the body\'s numbers are BodyConstants\' (physics stage 2)'),
     (C + 'GroundProbeMemo', 'H', 'the server\'s per-session cache of the ground probe'),
     # Sound: the body constants, wheels, tyres, chassis, presets
-    (C + 'BodyConstants', 'P', 'person height, walk, run, gravity'),
+    (C + 'BodyConstants', 'P', 'the body: size, mass, walk, run, jump, step, turn, and gravity'),
     (C + 'ChassisSpec', 'P', 'axles, centre of gravity, roll stiffness, steering lock'),
     (C + 'AxleSpec', 'P', ''),
     (C + 'TyreSize', 'P', ''),

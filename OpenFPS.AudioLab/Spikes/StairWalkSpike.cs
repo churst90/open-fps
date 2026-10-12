@@ -103,7 +103,7 @@ public static class StairWalkSpike
                 if (!fall.Stepped) continue;
                 // Where the client puts the foot down (PhysicsUtils.FootOnFloor, as LocalPlayerController and
                 // OtherBodies do), and then, independently, the floor under that point and what it is.
-                var foot = PhysicsUtils.FootOnFloor(geo, ref all, fall.StepPosition, pos, vel, out _);
+                var foot = Footing.FootOnFloor(geo, ref all, fall.StepPosition, pos, vel, out _);
                 float floor = geo.FloorAt(foot.X, foot.Z, foot.Y + PhysicsConstants.StepHeight, GeometryLayers.Ground, ref all, out var hit);
                 string material = floor > -1000f ? geo.SurfaceOf(hit).Material : "-";
                 falls.Add(new Footfall(ticks, foot, fall, floor, material, ctx.Grade));

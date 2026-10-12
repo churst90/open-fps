@@ -325,7 +325,7 @@ public class GeometryStage2Tests : IDisposable
             last = at;
             var fall = stride.Update(at, vel, true, Quaternion.Identity);
             if (!fall.Stepped) continue;
-            var foot = PhysicsUtils.FootOnFloor(world, ref all, fall.StepPosition, at, vel, out var material);
+            var foot = Footing.FootOnFloor(world, ref all, fall.StepPosition, at, vel, out var material);
             float floor = world.FloorAt(foot.X, foot.Z, foot.Y + 0.4f, GeometryLayers.Ground, ref all, out var hit);
             Assert.True(MathF.Abs(foot.Y - floor) < 2e-3f, $"foot at {foot} over a floor at {floor}");
             string under = world.SurfaceOf(hit).Material;
@@ -336,6 +336,126 @@ public class GeometryStage2Tests : IDisposable
         // Two treads a footfall: about eight up sixteen treads and down fifteen.
         Assert.InRange(onConcrete, 6, 10);
         Assert.InRange(onWood, 5, 10);
+    }
+
+    /// <summary>
+    /// The floor under a body is the highest top within a step of its feet (Footing.Ground), and the step is
+    /// the body's one number: a slab two centimetres under a step up is stood on, one two centimetres over
+    /// is a wall, and the floor is still the ground.
+    /// </summary>
+    [Fact]
+    public void TheFloorUnderABodyIsWithinAStepOfItsFeet()
+    {
+        var all = new AcceptAll();
+        foreach (float rise in new[] { 0.1f, BodyConstants.StepHeight - 0.02f, BodyConstants.StepHeight + 0.02f, 1.5f })
+        {
+            // On the level ground WorldOf lays, its top at 0.
+            var world = WorldOf(Shaped(2, new Vector3(0, rise / 2f, 0), new Vector3(2f, rise, 2f), null));
+            float ground = Footing.Ground(world, ref all, Vector3.Zero, out var solid);
+            Assert.Equal(rise < BodyConstants.StepHeight ? rise : 0f, ground, 3);
+            Assert.Equal("Concrete", world.SurfaceOf(solid).Material);
+            // Beside the slab, further off than the body is wide, the floor is the ground whatever the slab is.
+            Assert.Equal(0f, Footing.Ground(world, ref all, new Vector3(1f + BodyConstants.PlayerRadius + 0.05f, 0, 0), out _), 3);
+            // A body's edge over the slab stands on it, if it is a step.
+            float edge = Footing.Ground(world, ref all, new Vector3(1f + BodyConstants.PlayerRadius - 0.05f, 0, 0), out _);
+            Assert.Equal(rise < BodyConstants.StepHeight ? rise : 0f, edge, 3);
+        }
+        // Off the edge of everything there is no floor: the answer is far below any map.
+        Assert.True(Footing.Ground(WorldOf(), ref all, new Vector3(500f, 0, 0), out _) < BodyConstants.DefaultGroundCheckLimit);
+    }
+
+    /// <summary>
+    /// The server's ground probe and a client's ask the physics of their own triangle world: on a new map
+    /// with one slab laid on its ground, both answer what Footing.Ground answers there, on the slab, at its
+    /// edge and off it; a slab two centimetres under a step up is stood on by both and one two centimetres
+    /// over by neither.
+    /// </summary>
+    [Theory]
+    [InlineData(-0.02f)]
+    [InlineData(0.02f)]
+    public void TheServersFloorAndAClientsAreThePhysics(float over)
+    {
+        float rise = BodyConstants.StepHeight + over;
+        string mapDir = Path.Combine(_dir, Guid.NewGuid().ToString("N"), "maps");
+        Directory.CreateDirectory(mapDir);
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(mapDir), prefabs);
+        maps.Initialize();
+        Assert.True(maps.CreateMap(MapTemplates.Flat("plot", "tester"), out string error), error);
+        Assert.True(maps.TryGetMap("plot", out var world, out _, out var grid, out _));
+        Assert.True(maps.TryGetMapData("plot", out var data));
+        var middle = (data.MinBound + data.MaxBound) / 2f;
+        float ground = PhysicsUtils.GetGroundHeight(world, grid, new Vector3(middle.X, 1f, middle.Z), out _);
+        Assert.InRange(ground, -1f, 1f);
+
+        var slab = prefabs.Spawn(world, "concrete_floor", new Vector3(middle.X, ground + rise / 2f, middle.Z), Quaternion.Identity);
+        world.Get<ColliderComponent>(slab).Size = new Vector3(2f, rise, 2f);
+        maps.IndexEntity("plot", slab);
+        maps.RefreshGrid("plot");
+        Assert.True(maps.TryGetGeometry("plot", out var geometry));
+        Assert.NotNull(grid.Geometry);
+
+        // A client's world built at once, where the game builds it on a worker.
+        var client = new OpenFPS.Client.Core.ClientWorldState();
+        client.Geometry.Runner = work => work();
+        client.RefreshRunner = work => work();
+        client.Clear(data.Size);
+        foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
+        client.GetSnapshot();
+        var snap = client.GetSnapshot();
+        Assert.NotNull(snap.Geometry);
+        Assert.Empty(snap.UnindexedStatics);
+
+        var all = new AcceptAll();
+        var on = new Vector3(middle.X, ground, middle.Z);
+        foreach (var at in new[] { on, on + new Vector3(1.2f, 0, 0), on + new Vector3(0, 0, -1.25f), on + new Vector3(4f, 0, 3f) })
+        {
+            float physics = Footing.Ground(geometry.World, ref all, at, out _);
+            Assert.Equal(physics, PhysicsUtils.GetGroundHeight(world, grid, at, out _));
+            Assert.Equal(physics, PhysicsUtils.GetGroundHeight(snap, at, -1, out _), 4);
+        }
+        float want = over < 0f ? ground + rise : ground;
+        Assert.Equal(want, PhysicsUtils.GetGroundHeight(world, grid, on, out _), 3);
+        Assert.Equal(want, PhysicsUtils.GetGroundHeight(snap, on, -1, out _), 3);
+    }
+
+    /// <summary>
+    /// The body's numbers are the physics' (BodyConstants), and the game's names for them (PhysicsConstants)
+    /// read them there: one number each, and each is what it was.
+    /// </summary>
+    [Fact]
+    public void TheBodysNumbersAreThePhysicsAndTheGameReadsThemThere()
+    {
+        Assert.Equal(new Vector3(0.6f, 1.8f, 0.6f), BodyConstants.PlayerSize);
+        Assert.Equal("Skin", BodyConstants.PersonMaterial);
+        Assert.Equal(70f, BodyConstants.PersonMassKg);
+        Assert.Equal(1.0f, BodyConstants.CarryingSpeed);
+        Assert.Equal(3.13f, BodyConstants.JumpPower);
+        Assert.Equal(1.5f, BodyConstants.RotationSpeed);
+        Assert.Equal(0.4f, BodyConstants.StepHeight);
+        // The box is the capsule's: as wide as twice its radius, as tall as the person.
+        Assert.Equal(2f * BodyConstants.PlayerRadius, BodyConstants.PlayerSize.X);
+        Assert.Equal(BodyConstants.PersonHeight, BodyConstants.PlayerSize.Y);
+
+        Assert.Equal(BodyConstants.PlayerSize, PhysicsConstants.PlayerSize);
+        Assert.Equal(BodyConstants.PersonMaterial, PhysicsConstants.PersonMaterial);
+        Assert.Equal(BodyConstants.PersonMassKg, PhysicsConstants.PersonMassKg);
+        Assert.Equal(BodyConstants.CarryingSpeed, PhysicsConstants.CarryingSpeed);
+        Assert.Equal(BodyConstants.JumpPower, PhysicsConstants.JumpPower);
+        Assert.Equal(BodyConstants.RotationSpeed, PhysicsConstants.RotationSpeed);
+        Assert.Equal(BodyConstants.StepHeight, PhysicsConstants.StepHeight);
+
+        // On foot: the walk or the run, held under a limit that is under it, and by nothing else.
+        foreach (bool sprint in new[] { false, true })
+        {
+            float free = sprint ? BodyConstants.SprintSpeed : BodyConstants.WalkSpeed;
+            foreach (float limit in new[] { 0f, -1f, 1.0f, free, 100f })
+            {
+                float want = limit > 0f && limit < free ? limit : free;
+                Assert.Equal(want, BodyConstants.FootSpeed(sprint, limit));
+                Assert.Equal(want, PhysicsConstants.FootSpeed(sprint, limit));
+            }
+        }
     }
 
     /// <summary>
