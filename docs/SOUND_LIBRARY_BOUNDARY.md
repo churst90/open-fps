@@ -1820,6 +1820,9 @@ see the acoustics), `TileKey` out of `Tiles.cs`. Then, by `git mv`, namespaces u
 
 ### 15.2 Not moved: `ColliderShape`
 
+(Moved since, with physics stage 1: the body on foot asks how a collider stands, and the physics may not
+reference the entity model. It is `OpenFPS.Geometry/ColliderShape.cs`, namespace unchanged: docs/PHYSICS_BOUNDARY.md 15.2.)
+
 Section 8 listed `ColliderShape` for this stage. It stays in `Components.cs`, for Cody to confirm:
 
 - nothing in the geometry uses it (the triangle world has its own `ShapeKind`; the entity adapter,

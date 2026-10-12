@@ -37,6 +37,7 @@ stages come after the special-cases audit's parts.
 12. What was not measured
 13. Appendices: the inventory, the crossings, the presets' members
 14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
+15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
 
 ---
 
@@ -671,7 +672,7 @@ changes one is finished only when the change is the one intended and its commit 
 | Stage | What | Sessions | Main risk |
 |---|---|---:|---|
 | 0 | Guards: the ratchet, the movement replay, the driving and traffic replays, the ballistics table, the parity harness; the Jolt trial. **Built 2026-10-11, section 14** | 1.5 to 2 | the driving replay depends on statics (the thread-static map id) |
-| 1 | `OpenFPS.Physics`; move what moves whole; the four crossing fixes; the wire hash covers it | 1.5 to 2 | the engine render fingerprint moves with `Gearbox` |
+| 1 | `OpenFPS.Physics`; move what moves whole; the four crossing fixes; the wire hash covers it. **Built 2026-10-12, section 15** | 1.5 to 2 | the engine render fingerprint moves with `Gearbox` |
 | 2 | Split the presets and the mixed types; one law per law | 2 to 3 | approved sound depends on the sound's half reading the same numbers |
 | 3 | The state types; one world view both sides fill; the parity divergences; contact events; `DrivingSystem`'s mechanics into a vehicle step | 3 to 4 | movement parity |
 | 4 | Rigid bodies and contacts, with geometry stage 6 | 5 to 8 | solver cost and stability on the server tick |
@@ -1438,6 +1439,74 @@ Regenerating on another machine writes that machine's maths line, and then this 
 for other maths until it is regenerated here.
 
 Cost: `PhysicsCrossMachineTests` about 6 s, nearly all of it the rounded minute of traffic.
+
+## 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
+
+Made on Windows and sent back as patches, on main `91aee50e`. Nothing a player sees or hears changes: every
+number is where it was, and the guards pass unregenerated.
+
+### 15.1 Two projects
+
+- **`OpenFPS.Physics`** references `OpenFPS.Geometry` and `OpenFPS.Schema`, and nothing else of ours.
+  `OpenFPS.Sound` and `OpenFPS.Common` reference it; the server, the client, the lab and the tests reach it
+  through them. Namespaces are the ones the files had.
+- **`OpenFPS.Schema`** (decision 7) is the editor's attribute alone, `TunableAttribute`, in the namespace it
+  had (`OpenFPS.Common.Editing`). It references nothing. The field descriptors and the model kinds that read
+  the attribute stay in `OpenFPS.Sound/Editing`.
+
+### 15.2 The four crossings
+
+| Crossing | Refs | What was done |
+|---|---:|---|
+| `SharedMovementEngine` to `ColliderShape` | 5 | the enum and its `IsRound` are `OpenFPS.Geometry/ColliderShape.cs`, namespace unchanged |
+| `Gearbox` and `VehicleChassisSpec` to `TunableAttribute` | 43 | the attribute is `OpenFPS.Schema/Tunable.cs` |
+| `ExternalBallistics` to `WeaponDefinition` | 12 | the flight takes a `Projectile` (muzzle speed, G7 coefficient, mass, diameter), which `WeaponDefinition.Projectile` makes; the torso's width is `BodyConstants.TorsoWidth` |
+| `WheelDynamics` to `RoadWaterLaw` | 2 | the wet road's grip (`RoadTexture`, the surfaces' table, `HoldsMm`, `AquaplaningKmh`, `GripFactor`) is `RoadGripLaw` in `OpenFPS.Physics/RoadGrip.cs`; the water's own laws and the squeal stay in the sound's `RoadWaterLaw` |
+
+Each is its own commit, and the physics ratchet's allowance went 62, 57, 14, 2, 0.
+
+### 15.3 What moved
+
+Whole, with `git mv`: `BodyConstants.cs`, `Chassis.cs`, `RunningGear.cs`, `WheelState.cs`,
+`ExternalBallistics.cs`, `Wind.cs`, `WindModel.cs` (from `OpenFPS.Sound`) and `SharedMovementEngine.cs` (from
+`OpenFPS.Common`). `Gearbox` out of `Vehicles.cs` into `OpenFPS.Physics/Gearbox.cs`.
+
+Two small seams let two of them move whole, with no number changed:
+
+- **`Chassis.cs`** named the sound's preset in two methods. `ChassisSpec.PlacedOn` takes the two axle
+  positions and `ChassisSpec.Default` the tyre count, width and mass; `VehicleProfile.Running`, their one
+  caller, hands them over.
+- **`SharedMovementEngine.cs`** read four of the game's constants. `PlayerRadius`, `StepHeight`,
+  `CollisionSearchRadius` and `DefaultGroundCheckLimit` are `BodyConstants`' now, and `PhysicsConstants` reads
+  them from there, as it already read the walk, the run and gravity.
+
+### 15.4 Not moved: `WheelDynamics.cs`
+
+Section 7 lists it to move whole. It cannot yet: it holds a `TyreProfile`, reads `TyreFriction.G` and
+`TyreFriction.SquealOnset`, and is made from a `VehicleProfile`, three types that stage 2 splits between the
+physics and the sound (4.2). It stays in `OpenFPS.Sound` until that split, `MagicCurve` with it, and reads the
+running gear and the grip law from the physics. Its crossing (the road water) is fixed.
+
+### 15.5 The guards
+
+- `PhysicsBoundaryTests.NoNewCrossings`: the allowance is empty. A type in `OpenFPS.Physics` or
+  `OpenFPS.Schema` counts as the physics' own, as one in `OpenFPS.Geometry` did. `Projectile`, `RoadGripLaw`
+  and `RoadTexture` are on the list of sorted types (`types.tsv`, `tools/physics_boundary/classify.py`).
+- `PhysicsBoundaryTests.PhysicsReferencesOnlyGeometry` (section 9): the assembly references the runtime,
+  `OpenFPS.Geometry` and `OpenFPS.Schema`.
+- `PhysicsBoundaryTests.TheSoundNeverStepsThePhysics` (section 9): nothing in `OpenFPS.Sound` names a stepper.
+  One stepper today, `SharedMovementEngine`; a physics world and a vehicle step join the list when they exist.
+- The library's ratchet sorts both new projects (`LibraryBoundaryTests.SortedProjects`, `files.tsv`,
+  `tools/sound_boundary/classify.py`), lets the sound reference them, and holds that `OpenFPS.Schema`
+  references nothing. `Components.cs` is a host file now: its one library type left it.
+
+### 15.6 The wire hash and the door fingerprint
+
+- `WireContract.Hash` covers `OpenFPS.Physics` and `OpenFPS.Schema` (`OpenFPS.Common.csproj`,
+  `WireLibrarySource`): `WheelState`, `WindAir` and `BulletState` are on the wire. It changes, as files it
+  covers moved (812896a959fb at `91aee50e`, 23112534dcd8 after). Nothing sent changed. A client and a server from either
+  side of this refuse each other at login.
+- `DoorModelFingerprint` is unchanged (ab2b953cc671): it lists no file that moved.
 
 ## Decisions (Cody, 2026-10-11)
 

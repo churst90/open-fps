@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Physics stage 1 (docs/PHYSICS_BOUNDARY.md, section 15). Nothing a player sees or hears changes. There is a
+  project `OpenFPS.Physics`, on the geometry alone: the body on foot, a vehicle's chassis, running gear and
+  gearbox, a wheel's state, a bullet's flight, the wind, and a tyre's grip on a wet road are in it. The
+  editor's attribute is a small project of its own, `OpenFPS.Schema`, so the physics' presets can carry it.
+  A bullet's flight takes a projectile, which a weapon makes. The physics ratchet's allowance is empty (62
+  crossings when it was made), and two tests hold that the physics references only the geometry and that the
+  sound never steps it. The wire hash changes, so the server and the Windows client go out together.
+
 - Audit S20, the mixer's own orderings (docs/SPECIAL_CASES_AUDIT.md, "S20 as built"), unheard. Which engines
   the mixer renders first, which run at full detail, which sources its late-field trace and its traced echoes
   go to are decided by how loud each is at the ear, the number the voice budget ranks by. Near a fire or in
