@@ -11,6 +11,11 @@ Recent work, newest first. `git log` has the rest.
   a sound's decoding, the microphone) reads one monotonic counter, `RealTime`. No library file reads the
   machine's clocks but `AudioClock.cs` and `Wind.cs`, and a test holds that. The wire hash changes, so the
   server and the Windows client go out together.
+- Physics stage 2, the vehicle (docs/PHYSICS_BOUNDARY.md 16.2). Nothing a player sees or hears changes: all 45
+  vehicles' numbers are the same byte for byte. A vehicle's mass, drag, rolling resistance, size, axle places,
+  running gear and gearbox are its physics half's now (`VehicleMechanics`); the sound's `VehicleProfile` holds
+  that half and reads and writes it member by member, so every preset and every reader is as it was. The wire
+  hash changes, so the server and the Windows client go out together.
 - Physics stage 2, the tyre (docs/PHYSICS_BOUNDARY.md 16.1). Nothing a player sees or hears changes. A tyre
   preset is two halves joined by its id: its mechanics (grip, the shape of its force against slip, pressure,
   tread depth) are the physics', and its sound (tread tone, roar, squeal) the sound's. A tyre is still

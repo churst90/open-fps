@@ -41,7 +41,7 @@ stages come after the special-cases audit's parts.
 13. Appendices: the inventory, the crossings, the presets' members
 14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
-16. Stage 2 as it is built: the tyre (2026-10-12)
+16. Stage 2 as it is built: the tyre, the vehicle (2026-10-12)
 
 ---
 
@@ -1553,9 +1553,43 @@ number is where it was, and the guards pass unregenerated.
   stored and edited in the shape it had; a vehicle's wheels are made from its mechanics.
 - **The wire hash** changes, as files it covers changed and one moved (6670f1e3b2c1 at `1df7f8d8`,
   8244346e803c after). Nothing sent changed. `DoorModelFingerprint` is unchanged (ab2b953cc671).
-- **Left of stage 2:** `VehicleProfile`, `EngineProfile` and `VehicleSpec` as two halves, the same way;
-  `Ricochet`, `PhysicsUtils` and the rest of `PhysicsConstants` split as in 4.2; one constant for each law
-  (gravity, air density, rolling resistance and drag, brakes); `WindModel` folded into `WindField`.
+- **Left of stage 2** when the tyre was sent: `VehicleProfile`, `EngineProfile` and `VehicleSpec` as two
+  halves, the same way; `Ricochet`, `PhysicsUtils` and the rest of `PhysicsConstants` split as in 4.2; one
+  constant for each law (gravity, air density, rolling resistance and drag, brakes); `WindModel` folded into
+  `WindField`.
+
+### 16.2 The vehicle (2026-10-12)
+
+Made on Windows and sent back as a patch, on the tyre's patches (16.1) on main `936576a4`. Nothing a player
+sees or hears changes: all 45 vehicles' numbers, written out before and after, are the same byte for byte,
+and the guards pass unregenerated.
+
+- **The vehicle's mechanical numbers are its physics half's.** `VehicleMechanics`
+  (`OpenFPS.Physics/VehicleMechanics.cs`) holds the mass, the drag area, the rolling resistance, where the two
+  axles are, the body's length, width and height, the tyre count, the running gear (or none, for the one the
+  numbers imply), the gearbox and the tyres' mechanics; `Running`, the running gear with every axle placed, is
+  worked out there. They were members of `VehicleProfile`.
+- **The sound's half keeps its name and its members.** `VehicleProfile.Mechanics` is the physics half, held,
+  not made each time it is asked for. The eleven mechanical members of `VehicleProfile` read and write it,
+  so the 45 presets, the parts lists' assembly and every reader are as they were. Its tyres are both halves'
+  at once: giving a vehicle tyres gives its mechanics those tyres' mechanics, the same object.
+- **Not stored, so no shape to keep.** A `VehicleProfile` is never written to disk: an edited vehicle is
+  stored as a `VehicleSpec`, which builds one. `VehicleSpec` and its `VehicleChassisSpec` are as they were
+  (see "left", below).
+- **Tests** (`PresetHalvesTests`): each mechanical member of the sound's half is its mechanics' and moves
+  nothing else; a vehicle's tyres and gearbox are its mechanics' too, for every vehicle the catalogue knows
+  and for one given other tyres; a wheel model made from the half has that grip.
+- **The wire hash** changes (8244346e803c after the tyre, ce76d41bd048 after this). Nothing sent changed.
+  `DoorModelFingerprint` is unchanged (ab2b953cc671).
+- **Left of stage 2:**
+  - `EngineProfile` as two halves: the mechanics read its idle, its redline and its peak torque with its
+    rpm. `VehicleMechanics` gets the engine's half then.
+  - `VehicleSpec`: its `VehicleChassisSpec` is listed to move whole (4.2), but it is the shape an edited
+    vehicle is stored in and it carries one number of the sound's (`SourceLevelDb`). It goes with the editor's
+    model to the catalogue (docs/ENGINE_PACKAGES.md, stage 2) unless that number leaves it first.
+  - `Ricochet`, `PhysicsUtils` and the rest of `PhysicsConstants` split as in 4.2.
+  - One constant for each law (gravity, air density, rolling resistance and drag, brakes); `WindModel` folded
+    into `WindField`. These change numbers.
 
 ## Decisions (Cody, 2026-10-11)
 
