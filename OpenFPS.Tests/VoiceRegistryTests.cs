@@ -22,7 +22,8 @@ public class VoiceRegistryTests
     /// <summary>
     /// Two seconds in front of a brick building with one of every voice of a moving thing about: a car near
     /// enough for its intake to be a voice of its own, honking; a patrol car behind the building, its driver
-    /// on the siren and the horn; three cars beyond the engine budget, borrowing; a train's source. Each
+    /// on the siren and the horn; three more cars than the engine budget, one of them in the open and loud enough
+    /// for the second engine, the other two (one behind the building) borrowing; a train's source. Each
     /// frame's entries are collected.
     /// </summary>
     private static (Replay Run, Dictionary<int, VoiceKind> Seen) EveryKind()
@@ -38,7 +39,8 @@ public class VoiceRegistryTests
             r.Car(502, "police_interceptor", patrolAt, patrolV);
             var far = new (int Id, Vector3 At, Vector3 V)[]
             {
-                (503, new Vector3(-30f, 0.5f, 70f), new Vector3(11f, 0f, 0f)),
+                // In the open and nearer than the one behind the building: the second loudest, so it has the engine.
+                (503, new Vector3(-30f, 0.5f, 30f), new Vector3(11f, 0f, 0f)),
                 (504, new Vector3(-20f, 0.5f, -40f), new Vector3(10f, 0f, 0f)),
                 (505, new Vector3(150f, 0.5f, 10f), new Vector3(0f, 0f, 12f)),
             };

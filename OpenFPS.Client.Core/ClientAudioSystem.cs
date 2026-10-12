@@ -119,13 +119,16 @@ public partial class ClientAudioSystem
     /// may have been asked (<see cref="AcousticPathData.Answers"/>).</summary>
     private float _earSpeed;
 
-    private readonly List<(int Id, float Key, float D2)> _engineDistances = new();
+    /// <summary>The cars in the order engines go to them: the one you sit in (tier 0), those whose engine has
+    /// just started (1), the rest (2); within a tier the loudest at the ear first (the key is its level, negated,
+    /// a sounding car's with its keep bias), ties by id.</summary>
+    private readonly List<(int Id, int Tier, float Key, float D2)> _engineOrder = new();
     private double _lastEngineTime;
 
     /// <summary>
-    /// A sounding car ranks as if this much nearer, so a silent one must be decisively closer to take its
-    /// voice. Ranking by distance alone churns: on an oval two cars swap order several times a lap, and
-    /// each swap restarts a synth with cold pipes and a stopped crank, heard as a car stuttering.
+    /// A sounding car ranks as if at this share of its distance (2.5 dB up), so a silent one must be decisively
+    /// louder to take its voice. Ranking with no bias churns: on an oval two cars swap order several times a
+    /// lap, and each swap restarts a synth with cold pipes and a stopped crank, heard as a car stuttering.
     /// </summary>
     private const float EngineKeepBias = 0.75f;
 
@@ -1273,7 +1276,6 @@ public partial class ClientAudioSystem
         double now = _now();
         _machineOrder.Clear();
         _machineGroups.Clear();
-        _machineHeard.Clear();
         // Trees the budget left without a voice last frame are heard in their wood (WoodChorus.Weigh).
         if (world.Woods != null) world.Woods.Weigh(eyePos, _woodWeights, _isLiveMachine ??= id => _liveMachines.Contains(id));
         else { _woodWeights.Individual.Clear(); _woodWeights.Woods.Clear(); }
@@ -1305,7 +1307,7 @@ public partial class ClientAudioSystem
             float range = MathF.Max(1f, MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb)));
             float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(
                 gain * em.Volume * chorus, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(snap, voiceKey), physical: true);
-            _machineHeard[entityId] = level;
+            _heardInRanking[entityId] = level;
 
             // A water feature's taps are one fountain the same way, and come and go together.
             bool rail = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _);
@@ -1425,12 +1427,13 @@ public partial class ClientAudioSystem
         return !IsWood(world, entityId);
     }
 
-    /// <summary>How loud each standing model was at the ear in this frame's ranking (VoiceManager.HeardLevel),
-    /// for what is chosen among them afterwards (ChoosePlaces).</summary>
-    private readonly Dictionary<int, float> _machineHeard = new();
+    /// <summary>How loud each car and each standing model was at the ear in this frame's rankings
+    /// (VoiceManager.HeardLevel; the cars are ranked first and clear it), for what is chosen among them afterwards
+    /// (ChoosePlaces).</summary>
+    private readonly Dictionary<int, float> _heardInRanking = new();
 
-    /// <summary>How loud the ranking took a standing model to be this frame, for a test; NaN, not ranked.</summary>
-    internal float HeardInRanking(int entityId) => _machineHeard.GetValueOrDefault(entityId, float.NaN);
+    /// <summary>How loud the ranking took a car or a standing model to be this frame, for a test; NaN, not ranked.</summary>
+    internal float HeardInRanking(int entityId) => _heardInRanking.GetValueOrDefault(entityId, float.NaN);
 
     /// <summary>The key a standing model's voice is built and measured under: its voice key, and for a stretch
     /// of shore its geometry with it (fetch, which way its water lies), which it carries in its box
@@ -1561,8 +1564,9 @@ public partial class ClientAudioSystem
             settled: ;
         }
 
-        _engineDistances.Clear();
+        _engineOrder.Clear();
         _carPreset.Clear();
+        _heardInRanking.Clear();
         foreach (var entityId in world.AudioEntityIds)
         {
             if (entityId == OwnEntityId) continue;
@@ -1573,21 +1577,37 @@ public partial class ClientAudioSystem
             _carPreset[entityId] = preset;
 
             float d2 = Vector3.DistanceSquared(snap.Transform.Position, eyePos);
-            // The keep bias and the hold stop the set churning as cars trade places (EngineKeepBias).
-            float key = _liveEngines.Contains(entityId) ? d2 * (EngineKeepBias * EngineKeepBias) : d2;
+            // Ranked by how loud it is at the ear (VoiceManager.HeardLevel, the one rank), with the numbers its
+            // engine's emitter plays (ProcessAudioEmitter): its declared level placed over the length it radiates
+            // from, its range and its spectrum. By distance alone a 132 dB stock car lost its engine to a quiet
+            // electric car a metre nearer.
+            var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
+            float levelDb = DeclaredLevel(preset, profile);
+            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, OutletSeparation(preset));
+            float heard = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(
+                gain * em.Volume, reference, MathF.Max(1f, MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb))),
+                Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos), UnaskedOcclusion, levelDb, VoiceKey(snap.Definition), physical: true);
+            // Louder sorts first, so negated. The keep bias and the hold stop the set churning as cars trade
+            // places (EngineKeepBias).
+            _heardInRanking[entityId] = heard;
+            float key = _liveEngines.Contains(entityId) ? -heard / EngineKeepBias : -heard;
+            int tier = 2;
             // A donor (last pass's) is not held: held, a new donor ranked first, took a slot inside the
             // budget and turned out the car at its edge for 2.5 s.
             if (_engineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds
                 && !_presetDonors.Contains(entityId))
-                key = -1f;
+                tier = 1;
             // The one you are sitting in is never ranked out: it is the loudest thing in your world.
-            if (entityId == _state.RidingEntityId) key = float.NegativeInfinity;
-            _engineDistances.Add((entityId, key, d2));
+            if (entityId == _state.RidingEntityId) tier = 0;
+            _engineOrder.Add((entityId, tier, key, d2));
         }
-        // Ties (every held car is -1) by id, so every machine keeps the same cars (VoiceManager.Update).
-        _engineDistances.Sort(static (a, b) => (a.Key, a.Id).CompareTo((b.Key, b.Id)));
+        // The held cars loudest first among themselves too: all alike and so by id, the first of a kind (whose
+        // ring the cars borrowing that kind read) was another car while two of a kind were held, and every
+        // borrowed voice of the kind was stopped and started on the other ring, and again when the hold ended.
+        // Ties (every car out of earshot) by id, so every machine keeps the same cars (VoiceManager.Update).
+        _engineOrder.Sort(static (a, b) => (a.Tier, a.Key, a.Id).CompareTo((b.Tier, b.Key, b.Id)));
 
-        int keep = Math.Min(_adaptiveBudget, _engineDistances.Count);
+        int keep = Math.Min(_adaptiveBudget, _engineOrder.Count);
 
         // The cars kept outside the budget as their preset's only engine (below), found before anything
         // is let go so a donor keeps its engine and start time. Let go and re-admitted, a donor was held
@@ -1595,17 +1615,17 @@ public partial class ClientAudioSystem
         // borrowed voice rebuilt from nothing every 2.5 s while the field stood still.
         _presetsKept.Clear();
         _presetDonors.Clear();
-        for (int i = 0; i < _engineDistances.Count; i++)
+        for (int i = 0; i < _engineOrder.Count; i++)
         {
-            if (!_carPreset.TryGetValue(_engineDistances[i].Id, out string? kept)) continue;
-            if (_presetsKept.Add(kept) && i >= keep) _presetDonors.Add(_engineDistances[i].Id);
+            if (!_carPreset.TryGetValue(_engineOrder[i].Id, out string? kept)) continue;
+            if (_presetsKept.Add(kept) && i >= keep) _presetDonors.Add(_engineOrder[i].Id);
         }
 
         // A car that lost its engine fades it out rather than being cut mid-waveform.
         foreach (int id in _liveEngines)
         {
             bool survives = _presetDonors.Contains(id);
-            for (int i = 0; i < keep && !survives; i++) if (_engineDistances[i].Id == id) { survives = true; break; }
+            for (int i = 0; i < keep && !survives; i++) if (_engineOrder[i].Id == id) { survives = true; break; }
             if (survives) continue;
             _engineEchoes.Forget(id, _audio);
             _engineStarted.Remove(id);
@@ -1621,7 +1641,7 @@ public partial class ClientAudioSystem
         _engineSourceByPreset.Clear();
         for (int i = 0; i < keep; i++)
         {
-            int id = _engineDistances[i].Id;
+            int id = _engineOrder[i].Id;
             if (!_engineStarted.ContainsKey(id))
             {
                 if (admitted >= NewEnginesPerUpdate) continue;
@@ -1641,9 +1661,9 @@ public partial class ClientAudioSystem
         // budget borrows the ring of the nearest car of its own preset, and with none live it is silent
         // (DistantEngine): the city's two slip-on motorcycles, the loudest thing on their street, went
         // silent together. At most one engine per preset in use (eleven on the city, budget 32).
-        for (int i = keep; i < _engineDistances.Count; i++)
+        for (int i = keep; i < _engineOrder.Count; i++)
         {
-            int id = _engineDistances[i].Id;
+            int id = _engineOrder[i].Id;
             if (!_carPreset.TryGetValue(id, out string? preset)) continue;
             if (_engineSourceByPreset.ContainsKey(preset)) continue;     // already has a donor
             _liveEngines.Add(id);
@@ -1657,10 +1677,10 @@ public partial class ClientAudioSystem
 
         ChooseFrontVoices();
 
-        // Whatever is left over, nearest first, borrows.
+        // Whatever is left over, loudest first, borrows.
         _distantVoiced.Clear();
-        for (int i = keep; i < _engineDistances.Count && i < keep + _adaptiveDistant; i++)
-            _distantVoiced.Add(_engineDistances[i].Id);
+        for (int i = keep; i < _engineOrder.Count && i < keep + _adaptiveDistant; i++)
+            _distantVoiced.Add(_engineOrder[i].Id);
 
         foreach (int car in new List<int>(_distantBoundTo.Keys))
         {
@@ -1674,10 +1694,10 @@ public partial class ClientAudioSystem
         if (now - _lastCensus >= 5.0)
         {
             _lastCensus = now;
-            int cars = _engineDistances.Count;
+            int cars = _engineOrder.Count;
             // Sorted by the keep-biased key, so [0] is not necessarily the nearest.
             float nearestD2 = float.MaxValue;
-            foreach (var e in _engineDistances) if (e.D2 < nearestD2) nearestD2 = e.D2;
+            foreach (var e in _engineOrder) if (e.D2 < nearestD2) nearestD2 = e.D2;
             float nearest = cars > 0 ? MathF.Sqrt(nearestD2) : 0f;
             Log.Information("Cars: {Cars} on the map — {Live} synthesized, {Borrowed} borrowed, {Silent} out of budget; "
                           + "nearest {Nearest:F0} m; {Echoes} reflection(s) per engine; machines {MachineVoices} of {MachineBudget} voice(s), {Trains} train(s) voiced.",
@@ -1709,7 +1729,7 @@ public partial class ClientAudioSystem
             // car slowing, the world reporting too low a speed, the driver not holding it, or a shift up.
             // "told" steady and "own" or "rpm" sagging: the synthesis; "told" falling: the car really is.
             _censusOrder.Clear();
-            foreach (var e in _engineDistances) if (_liveEngines.Contains(e.Id)) _censusOrder.Add((e.D2, e.Id));
+            foreach (var e in _engineOrder) if (_liveEngines.Contains(e.Id)) _censusOrder.Add((e.D2, e.Id));
             _censusOrder.Sort(static (x, y) => x.CompareTo(y));
             for (int i = 0; i < Math.Min(3, _censusOrder.Count); i++)
             {
@@ -1801,7 +1821,7 @@ public partial class ClientAudioSystem
     private void ChooseFrontVoices()
     {
         _frontCandidates.Clear();
-        foreach (var (id, _, d2) in _engineDistances)
+        foreach (var (id, _, _, d2) in _engineOrder)
         {
             if (!_liveEngines.Contains(id)) continue;
             // From inside, the two ends of the car are not two sources: both come through the body.
