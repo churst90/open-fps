@@ -206,7 +206,7 @@ public class WheelSquealTests
     public void The_squealing_side_is_louder_on_its_own_side()
     {
         var profile = VehicleProfile.ByName("i4_midsize");
-        var body = new WheelDynamics(profile, 0.85f);
+        var body = new WheelDynamics(profile.Mechanics, 0.85f);
         var wire = RightSideSquealing(body);
         var quiet = new WheelState[wire.Length];
         for (int i = 0; i < quiet.Length; i++)
@@ -239,7 +239,7 @@ public class WheelSquealTests
     public void Front_wheel_squeal_goes_out_of_the_front()
     {
         var profile = VehicleProfile.ByName("i4_midsize");
-        var body = new WheelDynamics(profile, 0.85f);
+        var body = new WheelDynamics(profile.Mechanics, 0.85f);
         var wire = new WheelState[body.Wheels.Length];
         for (int i = 0; i < wire.Length; i++)
         {

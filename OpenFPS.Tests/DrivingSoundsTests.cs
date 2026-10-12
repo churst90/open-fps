@@ -104,7 +104,7 @@ public class DrivingSoundsTests
         }
         foreach (var s in strikes.OrderBy(s => s.At))
             _o.WriteLine($"wheel {s.Wheel} at {s.At - t0:F3} s, {20 * Math.Log10(s.Pascals / 20e-6):F1} dB peak, contact {s.ContactSeconds * 1000:F1} ms");
-        var body = new WheelDynamics(MachineRegistry.VehicleFor(preset));
+        var body = new WheelDynamics(MachineRegistry.VehicleFor(preset).Mechanics);
         Assert.Equal(body.Wheels.Length * 2, strikes.Count);
         Assert.Equal(strikes.Count, strikes.Select(s => (s.Wheel, Math.Round(s.At, 3))).Distinct().Count());
         // Each wheel: the two rails a rail-centre apart in time.

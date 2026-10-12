@@ -81,7 +81,7 @@ public class CabinPathsTests
             Assert.Equal(paths, voice.CabinLayout != null);
             voice.PlaceAtSpeed(speed);
             voice.Revive();
-            var body = new WheelDynamics(v);
+            var body = new WheelDynamics(v.Mechanics);
             body.Hold(speed, 0f, 0f);
             voice.Wheels = body.Wheels.Select(w => OpenFPS.Common.Networking.WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, 0f)).ToArray();
             var buf = new float[1024];
@@ -144,7 +144,7 @@ public class CabinPathsTests
     public void EachWheelsSprayAddsUpToTheCabinsSpray()
     {
         var v = MachineRegistry.VehicleFor("i4_economy");
-        var body = new WheelDynamics(v);
+        var body = new WheelDynamics(v.Mechanics);
         var wet = new WetTyres(v, body.Wheels.Select(w => w.Front).ToArray(), body.Wheels.Select(w => w.Axle).ToArray(), Rate, 5);
         int n = body.Wheels.Length;
         var water = Enumerable.Repeat(1.2f, n).ToArray();

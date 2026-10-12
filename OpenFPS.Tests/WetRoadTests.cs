@@ -219,7 +219,7 @@ public class WetRoadTests
         var car = MachineRegistry.VehicleFor("i4_midsize");
         float Stop(float water)
         {
-            var body = new WheelDynamics(car) { Vx = 50f / 3.6f };
+            var body = new WheelDynamics(car.Mechanics) { Vx = 50f / 3.6f };
             for (int i = 0; i < body.Wheels.Length; i++) body.SetWater(i, water);
             float s = 0f;
             for (int k = 0; k < 600 && body.Vx > 0.1f; k++)
@@ -232,7 +232,7 @@ public class WetRoadTests
         float dry = Stop(0f), wet = Stop(1.2f), flooded = Stop(4f);
         _o.WriteLine($"stopping from 50 km/h: dry {dry:F1} m, wet {wet:F1} m, 4 mm of water {flooded:F1} m");
         Assert.True(wet > dry * 1.25f && flooded > wet);
-        var b = new WheelDynamics(car) { Vx = 15f };
+        var b = new WheelDynamics(car.Mechanics) { Vx = 15f };
         float dryLimit = b.SteadyTurn(15f, 1f / 30f);
         for (int i = 0; i < b.Wheels.Length; i++) b.SetWater(i, 1.2f);
         b.Step(1f / 60f, 0f, 0f);                              // works out the wet grip
@@ -279,7 +279,7 @@ public class WetRoadTests
         const int rate = 48000;
         var v = MachineRegistry.VehicleFor(preset);
         float speed = kmh / 3.6f;
-        var body = new WheelDynamics(v);
+        var body = new WheelDynamics(v.Mechanics);
         body.Hold(speed, 0f, 0f);
         var wire = body.Wheels.Select(w => WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, water)).ToArray();
         var voice = new EngineVoiceState(v, rate, 7) { TargetSpeed = speed, CompensateLevel = false, Interior = inside };

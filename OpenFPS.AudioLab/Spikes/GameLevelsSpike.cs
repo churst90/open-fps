@@ -504,7 +504,7 @@ public static class GameLevelsSpike
                       Func<WheelDynamics, float, (float Speed, float Curvature)> plan)
         {
             var profile = MachineRegistry.VehicleFor(preset);
-            var body = new WheelDynamics(profile, grip) { ForwardOnly = true, Vx = startSpeed };
+            var body = new WheelDynamics(profile.Mechanics, grip) { ForwardOnly = true, Vx = startSpeed };
             Stand(ear, 0f);
             float heading = MathF.PI / 2f, steer = 0f;
             Vector3 at = from;

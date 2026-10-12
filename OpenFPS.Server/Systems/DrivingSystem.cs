@@ -103,7 +103,7 @@ public static class DrivingSystem
     {
         var cars = _running.GetValue(world, static _ => new());
         if (cars.TryGetValue(root.Id, out var r) && r.Preset == preset && r.Version == root.Version) return r;
-        var body = new WheelDynamics(profile);
+        var body = new WheelDynamics(profile.Mechanics);
         r = new Running { Preset = preset, Version = root.Version, Body = body, Wire = new WheelState[body.Wheels.Length] };
         cars[root.Id] = r;
         return r;
@@ -231,7 +231,7 @@ public static class DrivingSystem
         float speed = MathF.Abs(v);
         float mass = MathF.Max(1f, profile.MassKg);
         float grip = MathF.Max(0.1f, profile.Tyres.PeakGripG);
-        float capacity = grip * TyreFriction.G;          // the most this car can do, any direction
+        float capacity = grip * TyreGrip.G;          // the most this car can do, any direction
 
         // ── What the engine is pulling ──────────────────────────────────────────────────────────
         var gb = profile.Gearbox;
@@ -270,7 +270,7 @@ public static class DrivingSystem
 
         // ── What is holding it back ─────────────────────────────────────────────────────────────
         float drag = 0.5f * AirDensity * profile.DragArea * v * v;
-        float rolling = profile.RollingResistance * mass * TyreFriction.G;
+        float rolling = profile.RollingResistance * mass * TyreGrip.G;
         float braking = Math.Clamp(drive.Brake, 0f, 1f) * capacity * mass;
         float engineBraking = (1f - MathF.Abs(drive.Throttle))
                             * profile.Engine.PeakTorqueNm * EngineBrakingFraction

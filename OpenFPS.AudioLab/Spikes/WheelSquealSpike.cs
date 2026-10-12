@@ -110,7 +110,7 @@ public static class WheelSquealSpike
     {
         if (Binaural) { RoadsideBinaural(name, preset, grip, modulated, plan, startSpeed, seconds); return; }
         var profile = VehicleProfile.ByName(preset);
-        var body = new WheelDynamics(profile, grip) { ForwardOnly = true, Modulated = modulated, Vx = startSpeed };
+        var body = new WheelDynamics(profile.Mechanics, grip) { ForwardOnly = true, Modulated = modulated, Vx = startSpeed };
         var ears = new[] { new Vector3(-2.5f, 1.6f, 0f), new Vector3(2.5f, 1.6f, 0f) };
         var voices = ears.Select(_ => new EngineVoiceState(profile, Sr, 7) { TargetSpeed = startSpeed }).ToArray();
         foreach (var v in voices) v.PlaceAtSpeed(startSpeed);
@@ -123,7 +123,7 @@ public static class WheelSquealSpike
         var shadow = new VehicleSynth.WheelSquealVoice[body.Wheels.Length];
         var shadowRng = new Random(11);
         var energy = new List<float[]>();
-        var probe = new WheelDynamics(profile);
+        var probe = new WheelDynamics(profile.Mechanics);
         float refVs = 12f * MathF.Tan(probe.SteeredPeakSlip());
         float steer = 0f;
         int ticks = (int)(seconds * 30);
@@ -219,7 +219,7 @@ public static class WheelSquealSpike
                                          float startSpeed, float seconds)
     {
         var profile = VehicleProfile.ByName(preset);
-        var body = new WheelDynamics(profile, grip) { ForwardOnly = true, Modulated = modulated, Vx = startSpeed };
+        var body = new WheelDynamics(profile.Mechanics, grip) { ForwardOnly = true, Modulated = modulated, Vx = startSpeed };
         int ticks = (int)(seconds * 30);
         // Pass 1: the drive, its pose (x east, z north; heading 0 = east, a left turn turns north) and wheels.
         var poses = new (Vector3 At, float Heading, float Speed, WheelState[] Wire)[ticks];

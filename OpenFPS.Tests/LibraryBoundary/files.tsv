@@ -223,6 +223,9 @@ OpenFPS.Physics/Gearbox.cs	lib	Physics
 OpenFPS.Physics/RoadGrip.cs	lib	Physics	
 OpenFPS.Physics/RunningGear.cs	lib	Physics	
 OpenFPS.Physics/SharedMovementEngine.cs	lib	Physics	
+OpenFPS.Physics/TyreGrip.cs	lib	Physics	
+OpenFPS.Physics/VehicleMechanics.cs	lib	Physics	
+OpenFPS.Physics/WheelDynamics.cs	lib	Physics	
 OpenFPS.Physics/WheelState.cs	lib	Physics	
 OpenFPS.Physics/Wind.cs	lib	Physics	
 OpenFPS.Physics/WindModel.cs	lib	Physics	
@@ -374,6 +377,5 @@ OpenFPS.Sound/Waves.cs	lib	Sound
 OpenFPS.Sound/WeaponHandling.cs	lib	Sound	
 OpenFPS.Sound/Weapons.cs	lib	Sound	
 OpenFPS.Sound/WeatherType.cs	lib	Sound	
-OpenFPS.Sound/WheelDynamics.cs	lib	Sound	
 OpenFPS.Sound/WoodChorus.cs	lib	Sound	
 OpenFPS.Sound/WorldWeather.cs	lib	Sound	

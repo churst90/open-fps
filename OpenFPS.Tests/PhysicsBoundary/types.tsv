@@ -12,11 +12,12 @@ OpenFPS.Common.RoadSurfaces	V
 OpenFPS.Common.RoadTexture	V
 OpenFPS.Common.MagicCurve	P
 OpenFPS.Common.WheelDynamics	P
-OpenFPS.Common.TyreFriction	PS
+OpenFPS.Common.TyreGrip	P
+OpenFPS.Common.TyreMechanics	P
+OpenFPS.Common.VehicleMechanics	P
 OpenFPS.Common.RunningGear	P
 OpenFPS.Common.Networking.WheelState	V
 OpenFPS.Common.Gearbox	P
-OpenFPS.Common.TyreProfile	PS
 OpenFPS.Common.VehicleProfile	PS
 OpenFPS.Common.EngineProfile	PS
 OpenFPS.Common.VehicleSpec	PS

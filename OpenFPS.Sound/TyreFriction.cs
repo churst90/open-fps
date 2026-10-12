@@ -10,20 +10,9 @@ namespace OpenFPS.Common;
 /// </summary>
 public static class TyreFriction
 {
-    public const float G = 9.80665f;
-
-    /// <summary>The fraction of available grip in use: 0 coasting straight, 1 the limit, above 1
-    /// sliding. Longitudinal and lateral combine as a vector (the friction circle), not a sum.</summary>
-    public static float Demand(float longitudinalMps2, float lateralMps2, float gripG)
-    {
-        float capacity = MathF.Max(0.05f, gripG) * G;
-        float used = MathF.Sqrt(longitudinalMps2 * longitudinalMps2 + lateralMps2 * lateralMps2);
-        return used / capacity;
-    }
-
-    /// <summary>Where the squeal begins, as a fraction of capacity. Below this the contact patch is
-    /// gripping almost everywhere and the tyre just rolls.</summary>
-    public const float SquealOnset = 0.78f;
+    /// <summary>Where the squeal begins, as a fraction of capacity (<see cref="TyreGrip.Demand"/>): where the
+    /// contact patch begins to slide. Below this it grips almost everywhere and the tyre just rolls.</summary>
+    public const float SquealOnset = TyreGrip.PatchSlidesFrom;
 
     /// <summary>Where the patch is fully sliding and the stick-slip cycle stops being periodic.</summary>
     public const float SlideOnset = 1.02f;

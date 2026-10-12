@@ -19,13 +19,13 @@ public class TyreAndTurboTests
     public void BrakingAndCorneringShareOneFrictionBudget()
     {
         const float grip = 1.0f;
-        float g = TyreFriction.G;
+        float g = TyreGrip.G;
 
-        Assert.Equal(1.0f, TyreFriction.Demand(0f, g, grip), 2);        // all of it sideways
-        Assert.Equal(1.0f, TyreFriction.Demand(g, 0f, grip), 2);        // all of it braking
+        Assert.Equal(1.0f, TyreGrip.Demand(0f, g, grip), 2);        // all of it sideways
+        Assert.Equal(1.0f, TyreGrip.Demand(g, 0f, grip), 2);        // all of it braking
 
         // Half of each is NOT half the budget — it is 0.707 of it, and two of those is over the limit.
-        float both = TyreFriction.Demand(g * 0.8f, g * 0.8f, grip);
+        float both = TyreGrip.Demand(g * 0.8f, g * 0.8f, grip);
         Assert.True(both > 1.1f, $"0.8 g of each should exceed a 1 g tyre; got {both:F2}");
     }
 
@@ -34,8 +34,8 @@ public class TyreAndTurboTests
     [Fact]
     public void MoreGripMeansLessDemandForTheSameCorner()
     {
-        float road = TyreFriction.Demand(0f, 12f, TyreProfile.SportsOnAsphalt.PeakGripG);
-        float slick = TyreFriction.Demand(0f, 12f, TyreProfile.RaceSlick.PeakGripG);
+        float road = TyreGrip.Demand(0f, 12f, TyreProfile.SportsOnAsphalt.PeakGripG);
+        float slick = TyreGrip.Demand(0f, 12f, TyreProfile.RaceSlick.PeakGripG);
         Assert.True(slick < road * 0.5f, $"a slick should be far less bothered; road {road:F2}, slick {slick:F2}");
     }
 
@@ -248,7 +248,7 @@ public class TyreAndTurboTests
         float corneringG = (gripG + tan) / (1f - gripG * tan);
 
         // What a listener differentiating velocity and dividing by FLAT grip would conclude.
-        float naive = TyreFriction.Demand(0f, corneringG * 9.81f, gripG);
+        float naive = TyreGrip.Demand(0f, corneringG * 9.81f, gripG);
         Assert.True(naive > TyreFriction.SlideOnset,
             $"the naive reading was {naive:F2}, which would not have shown the bug");
 

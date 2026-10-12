@@ -144,9 +144,19 @@ public sealed record EngineBaySpec
     public static EngineBaySpec Van => new() { GrilleOpenM2 = 0.35f, UndersideOpenM2 = 1.2f, AbsorptionM2 = 0.5f };
 }
 
-/// <summary>The tyre and the road under it.</summary>
+/// <summary>
+/// The tyre and the road under it, as the sound hears them: its tread's tone, its roar, its squeal. What it
+/// pushes on the road with is its mechanics (<see cref="TyreMechanics"/>, the physics' half of the preset,
+/// under the same id), which the members below that are mechanical read and write, so a tyre is still one
+/// thing to whoever edits or stores it.
+/// </summary>
 public sealed record TyreProfile
 {
+    /// <summary>The physics' half of this tyre: its grip, the shape of its force against slip, its pressure and
+    /// its tread depth. Not stored or edited as a part of its own: the mechanical members here are its.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public TyreMechanics Mechanics { get; init; } = new();
+
     /// <summary>Tread blocks around the circumference. Their passing rate is the tone in tyre roar that
     /// rises in pitch with speed.</summary>
     [Tunable("", 0, 150, "Tread blocks around the circumference. Their passing rate is the tone of the tyre roar. Zero for a slick or a grooved bike tyre.")]
@@ -173,7 +183,7 @@ public sealed record TyreProfile
     /// on dry asphalt is about 0.95, a performance tyre 1.1, a loaded truck tyre 0.75.
     /// </summary>
     [Tunable("g", 0.3, 5, "Peak friction the tyre can deliver before it slides. A road tyre on dry asphalt is about 0.95, a loaded truck tyre 0.75.", Label = "peak grip", Step = 0.05)]
-    public float PeakGripG { get; init; } = 0.95f;
+    public float PeakGripG { get => Mechanics.PeakGripG; init => Mechanics = Mechanics with { PeakGripG = value }; }
 
     /// <summary>The stick-slip resonance of a tread element, Hz: the squeal's fundamental. It falls as
     /// tyres get bigger; a kart tyre shrieks, a truck tyre groans.</summary>
@@ -202,33 +212,33 @@ public sealed record TyreProfile
 
     /// <summary>Lateral shape factor C (PCY1).</summary>
     [Tunable("", 0.8, 2, "Magic Formula lateral shape factor C (PCY1).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float LateralShape { get; init; } = 1.193f;
+    public float LateralShape { get => Mechanics.LateralShape; init => Mechanics = Mechanics with { LateralShape = value }; }
     /// <summary>Lateral curvature factor E (PEY1).</summary>
     [Tunable("", -3, 1, "Magic Formula lateral curvature factor E (PEY1).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float LateralCurvature { get; init; } = -1.003f;
+    public float LateralCurvature { get => Mechanics.LateralCurvature; init => Mechanics = Mechanics with { LateralCurvature = value }; }
     /// <summary>Cornering stiffness at the nominal load, over that load, before the saturation
     /// (PKY1): K = PKY1 Fz0 sin(2 atan(Fz / (PKY2 Fz0))), per radian.</summary>
     [Tunable("per radian", 3, 40, "Cornering stiffness at the nominal load, over that load (PKY1).", Step = 0.05, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float CorneringStiffness { get; init; } = 14.95f;
+    public float CorneringStiffness { get => Mechanics.CorneringStiffness; init => Mechanics = Mechanics with { CorneringStiffness = value }; }
     /// <summary>The load, in nominal loads, at which the cornering stiffness stops rising (PKY2).</summary>
     [Tunable("", 0.5, 6, "The load, in nominal loads, at which the cornering stiffness stops rising (PKY2).", Step = 0.01, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float CorneringStiffnessLoad { get; init; } = 2.130f;
+    public float CorneringStiffnessLoad { get => Mechanics.CorneringStiffnessLoad; init => Mechanics = Mechanics with { CorneringStiffnessLoad = value }; }
     /// <summary>Longitudinal shape factor C (PCX1).</summary>
     [Tunable("", 0.8, 2.5, "Magic Formula longitudinal shape factor C (PCX1).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float LongitudinalShape { get; init; } = 1.685f;
+    public float LongitudinalShape { get => Mechanics.LongitudinalShape; init => Mechanics = Mechanics with { LongitudinalShape = value }; }
     /// <summary>Longitudinal curvature factor E (PEX1).</summary>
     [Tunable("", -3, 1, "Magic Formula longitudinal curvature factor E (PEX1).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float LongitudinalCurvature { get; init; } = 0.344f;
+    public float LongitudinalCurvature { get => Mechanics.LongitudinalCurvature; init => Mechanics = Mechanics with { LongitudinalCurvature = value }; }
     /// <summary>Longitudinal slip stiffness over load, per unit slip (PKX1), and its change with load (PKX2).</summary>
     [Tunable("", 3, 60, "Longitudinal slip stiffness over load, per unit slip (PKX1).", Step = 0.05, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float SlipStiffness { get; init; } = 21.51f;
+    public float SlipStiffness { get => Mechanics.SlipStiffness; init => Mechanics = Mechanics with { SlipStiffness = value }; }
     [Tunable("", -1, 1, "Change of the slip stiffness with load (PKX2).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float SlipStiffnessLoad { get; init; } = -0.163f;
+    public float SlipStiffnessLoad { get => Mechanics.SlipStiffnessLoad; init => Mechanics = Mechanics with { SlipStiffnessLoad = value }; }
     /// <summary>How the friction coefficient changes with load, per nominal load: PDY2 over PDY1,
     /// 0.145 / 0.990, falling. Loaded half as hard again it grips about 7 % less per newton, which is
     /// why load transfer in a corner costs the axle grip.</summary>
     [Tunable("", -0.5, 0, "Change of the friction coefficient with load, per nominal load (PDY2 over PDY1). Negative: a harder loaded tyre grips less per newton.", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
-    public float LoadSensitivity { get; init; } = -0.146f;
+    public float LoadSensitivity { get => Mechanics.LoadSensitivity; init => Mechanics = Mechanics with { LoadSensitivity = value }; }
 
     // ── Water ───────────────────────────────────────────────────────────────────────────────────
     //
@@ -239,11 +249,11 @@ public sealed record TyreProfile
 
     /// <summary>Inflation pressure, kPa. The force data above are for the tyre at 2.2 bar.</summary>
     [Tunable("kPa", 80, 1000, "Inflation pressure. It sets the speed the tyre aquaplanes at.", Label = "inflation pressure", Step = 5)]
-    public float InflationKPa { get; init; } = 220f;
+    public float InflationKPa { get => Mechanics.InflationKPa; init => Mechanics = Mechanics with { InflationKPa = value }; }
 
     /// <summary>Tread depth, mm: a car tyre is 8 mm new and 1.6 at the legal limit; a part-worn one, 5.</summary>
     [Tunable("mm", 0, 30, "Tread depth. A car tyre is 8 mm new and 1.6 at the legal limit. Deeper grooves clear water better.", Label = "tread depth", Step = 0.5)]
-    public float TreadDepthMm { get; init; } = 5f;
+    public float TreadDepthMm { get => Mechanics.TreadDepthMm; init => Mechanics = Mechanics with { TreadDepthMm = value }; }
 
     /// <summary>A decent road tyre on dry asphalt.</summary>
     public static TyreProfile SportsOnAsphalt => new();
@@ -254,12 +264,10 @@ public sealed record TyreProfile
     /// </summary>
     public static TyreProfile SportBikeRoad => new()
     {
+        Mechanics = TyreMechanics.SportBikeRoad,
         TreadBlocks = 0, SurfaceRoughness = 0.45f,
         // Narrower than a car tyre (120-180 mm against 225): about 4 dB less rolling noise each.
         ReferenceDb = 80f,
-        PeakGripG = 1.1f,
-        // 2.5 bar front and 2.9 rear on a sports bike; 5-6 mm of tread new, 3 part-worn.
-        InflationKPa = 270f, TreadDepthMm = 3f,
     };
 
     /// <summary>
@@ -268,22 +276,17 @@ public sealed record TyreProfile
     /// </summary>
     public static TyreProfile RaceSlick => new()
     {
+        Mechanics = TyreMechanics.RaceSlick,
         TreadBlocks = 0, SurfaceRoughness = 0.35f, ReferenceDb = 82f,
-        // Effective grip on a banked oval, not the slick's 1.75 g on the flat: the client measures
-        // lateral acceleration in the world frame, banking included, and cannot see a bank angle.
-        // TODO: send the server's friction demand from the racing line instead (a protocol change).
-        PeakGripG = 3.1f, SquealHz = 620f, SquealQ = 17f, SquealDb = 99f,
-        // No grooves at all, run at 1.4-1.8 bar hot: it aquaplanes on any film.
-        InflationKPa = 160f, TreadDepthMm = 0f,
+        SquealHz = 620f, SquealQ = 17f, SquealDb = 99f,
     };
 
     /// <summary>A loaded truck tyre: coarse tread, a lot of roar, and it gives up early and groans.</summary>
     public static TyreProfile TruckOnAsphalt => new()
     {
+        Mechanics = TyreMechanics.TruckOnAsphalt,
         TreadBlocks = 96, SurfaceRoughness = 0.72f, ReferenceDb = 85f,
-        PeakGripG = 0.75f, SquealHz = 430f, SquealQ = 9f, SquealDb = 97f,
-        // 7.6 bar (110 psi) and 12 mm of tread part-worn (a drive tyre is 20-26 mm new).
-        InflationKPa = 760f, TreadDepthMm = 12f,
+        SquealHz = 430f, SquealQ = 9f, SquealDb = 97f,
     };
 
     /// <summary>Every tyre by key, so a machine's parts list can name one (see MachinePart).</summary>
@@ -497,6 +500,10 @@ public sealed record VehicleProfile
     public ChassisSpec? Chassis { get; init; }
 
     /// <summary>The chassis this vehicle runs on: its own, or the one its other fields imply.</summary>
+    /// <summary>The physics' half of this vehicle: its running gear, its tyres' mechanics and its mass.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public VehicleMechanics Mechanics => new(Running, Tyres.Mechanics, MassKg);
+
     public ChassisSpec Running => (Chassis ?? ChassisSpec.Default(TyreCount, WidthMetres, MassKg)).PlacedOn(FrontAxleZ, RearAxleZ);
 
     /// <summary>

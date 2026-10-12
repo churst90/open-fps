@@ -262,7 +262,7 @@ public sealed partial class VehicleSystem
                     // turn in which the most-worked tyre reaches its squeal onset, from its chassis.
                     if (profile != null)
                     {
-                        var tyres = new WheelDynamics(profile, vd.GripG > 0 ? vd.GripG : grip);
+                        var tyres = new WheelDynamics(profile.Mechanics, vd.GripG > 0 ? vd.GripG : grip);
                         corneringG = MathF.Min(grip, tyres.SteadyLateralLimit(TyreFriction.SquealOnset) / WheelDynamics.G);
                         grip = corneringG;
                     }
@@ -413,7 +413,7 @@ public sealed partial class VehicleSystem
                 v.IsWalker = isWalker;
                 if (profile != null)
                 {
-                    v.Wheels = new WheelDynamics(profile, v.Grip) { ForwardOnly = true };
+                    v.Wheels = new WheelDynamics(profile.Mechanics, v.Grip) { ForwardOnly = true };
                     v.WireWheels = new OpenFPS.Common.Networking.WheelState[v.Wheels.Wheels.Length];
                     if (route != null)
                     {

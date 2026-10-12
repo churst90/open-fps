@@ -2354,7 +2354,7 @@ public partial class ClientAudioSystem
     {
         if (_wheelLayouts.TryGetValue(preset, out var l)) return l;
         var v = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
-        var body = new OpenFPS.Common.WheelDynamics(v);
+        var body = new WheelDynamics(v.Mechanics);
         float cog = v.Running.CentreOfGravityZ;
         int n = body.Wheels.Length;
         l = (new Vector3[n], new float[n], new float[n]);

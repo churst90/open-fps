@@ -151,7 +151,6 @@ FILE_RULES = [
     ('OpenFPS.Sound/Editing/FieldDescriptor.cs', 'Schema', 'a field as the editor types it'),
     ('OpenFPS.Sound/MachinePower.cs', 'Agents', 'how hard a driver works a machine: a notch, a power lever'),
     ('OpenFPS.Sound/AircraftGroundRun.cs', 'Agents', 'an aeroplane driven along its runway'),
-    ('OpenFPS.Sound/WheelDynamics.cs', 'Physics', P + ': waits for the tyre split'),
     ('OpenFPS.Sound/*', 'Sound', ''),
 
     # ── Client.Core ──

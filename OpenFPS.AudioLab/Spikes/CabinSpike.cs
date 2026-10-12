@@ -54,7 +54,7 @@ public static class CabinSpike
     private sealed class Rig
     {
         public readonly WheelDynamics Body;
-        public Rig(VehicleProfile v) { Body = new WheelDynamics(v); }
+        public Rig(VehicleProfile v) { Body = new WheelDynamics(v.Mechanics); }
         public WheelState[] Wire(float speed, float accel, float water)
         {
             Body.Hold(speed, accel, 0f);

@@ -55,7 +55,7 @@ public class WheelDynamicsTests
         foreach (var key in VehicleProfile.Presets.Keys)
         {
             var p = VehicleProfile.ByName(key);
-            var body = new WheelDynamics(p);
+            var body = new WheelDynamics(p.Mechanics);
             body.Loads(0f, 0f);
             float weight = p.MassKg * G;
             float sum = body.Wheels.Sum(w => w.Load);
@@ -73,7 +73,7 @@ public class WheelDynamicsTests
     public void Hard_braking_moves_load_to_the_front_by_m_a_h_over_the_wheelbase()
     {
         var p = VehicleProfile.ByName("i4_midsize");
-        var body = new WheelDynamics(p);
+        var body = new WheelDynamics(p.Mechanics);
         body.Loads(0f, 0f);
         float frontStatic = body.Wheels.Where(w => w.Front).Sum(w => w.Load);
         const float decel = 8f;
@@ -90,7 +90,7 @@ public class WheelDynamicsTests
     public void In_a_corner_the_outside_wheels_gain_load()
     {
         var p = VehicleProfile.ByName("i4_economy");
-        var body = new WheelDynamics(p);
+        var body = new WheelDynamics(p.Mechanics);
         body.Loads(0f, 0f);
         var still = body.Wheels.Select(w => w.Load).ToArray();
         const float ay = 5f;                              // turning right
@@ -116,7 +116,7 @@ public class WheelDynamicsTests
     public void A_free_rolling_wheel_turns_at_speed_over_rolling_radius()
     {
         var p = VehicleProfile.ByName("i4_turbo");
-        var body = new WheelDynamics(p) { Vx = 20f };
+        var body = new WheelDynamics(p.Mechanics) { Vx = 20f };
         body.Step(1f / 30f, 0f, 0f);
         foreach (var w in body.Wheels)
         {
@@ -148,7 +148,7 @@ public class WheelDynamicsTests
     {
         var p = VehicleProfile.ByName("i4_economy");
         const float r = 50f;
-        var body = new WheelDynamics(p);
+        var body = new WheelDynamics(p.Mechanics);
         float frontAt = 0f, rearAt = 0f;
         WheelDynamics.Wheel[]? atLimit = null;
         for (float v = 5f; v < 40f && frontAt == 0f; v += 0.05f)
@@ -220,7 +220,7 @@ public class WheelDynamicsTests
     public void A_corner_at_speed_stays_on_the_lane()
     {
         var line = new RaceLine(Stadium(40f, 200f), 0f, 25f, 0.5f, 4f);
-        var body = new WheelDynamics(VehicleProfile.ByName("i4_midsize"), 0.85f) { ForwardOnly = true, Modulated = true, Vx = 10f };
+        var body = new WheelDynamics(VehicleProfile.ByName("i4_midsize").Mechanics, 0.85f) { ForwardOnly = true, Modulated = true, Vx = 10f };
         var driver = new LineFollower(body);
         float at = 0f, worstOffset = 0f, fastestInBend = 0f;
         float worst = Lap(line, driver, ref at, 0.5f, 2.5f, 4f, _ => 0f, 30 * 120, t =>
@@ -245,7 +245,7 @@ public class WheelDynamicsTests
     public void A_lane_change_at_speed_settles_in_the_new_lane()
     {
         var line = new RaceLine(Stadium(60f, 1200f), 0f, 15f, 0.5f, 4f);
-        var body = new WheelDynamics(VehicleProfile.ByName("i4_midsize"), 0.85f) { ForwardOnly = true, Modulated = true, Vx = 15f };
+        var body = new WheelDynamics(VehicleProfile.ByName("i4_midsize").Mechanics, 0.85f) { ForwardOnly = true, Modulated = true, Vx = 15f };
         var driver = new LineFollower(body);
         float at = 0f, most = 0f, settledAt = float.NaN;
         const float change = 3f, lane = 3.5f, takes = 4f;
@@ -269,7 +269,7 @@ public class WheelDynamicsTests
     public void A_steered_vehicle_costs_microseconds_a_tick()
     {
         var line = new RaceLine(Stadium(40f, 200f), 0f, 25f, 0.5f, 4f);
-        var body = new WheelDynamics(VehicleProfile.ByName("i4_midsize"), 0.85f) { ForwardOnly = true, Modulated = true, Vx = 10f };
+        var body = new WheelDynamics(VehicleProfile.ByName("i4_midsize").Mechanics, 0.85f) { ForwardOnly = true, Modulated = true, Vx = 10f };
         var driver = new LineFollower(body);
         float at = 0f;
         Lap(line, driver, ref at, 0.5f, 2.5f, 4f, _ => 0f, 300);

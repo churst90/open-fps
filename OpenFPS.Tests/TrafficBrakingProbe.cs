@@ -149,7 +149,7 @@ public class SteadyTurnProbe
         foreach (var (preset, grip) in new[] { ("i4_midsize", 0.85f), ("v6", 0.85f), ("cummins_compound", 0.75f), ("transit_bus", 0.7f), ("mail_truck", 0.75f) })
         {
             var p = MachineRegistry.VehicleFor(preset);
-            var wd = new WheelDynamics(p, grip);
+            var wd = new WheelDynamics(p.Mechanics, grip);
             _o.WriteLine($"{preset}: steady lateral limit at onset {wd.SteadyLateralLimit(TyreFriction.SquealOnset) / 9.81f:F2} g, at 1.0 {wd.SteadyLateralLimit(1f) / 9.81f:F2} g");
             foreach (float r in new[] { 8f, 12f, 20f })
             {

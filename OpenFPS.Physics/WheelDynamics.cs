@@ -93,7 +93,7 @@ public sealed class MagicCurve
 /// load-equalising suspension makes them.
 ///
 /// Each tyre's lateral force comes from its slip angle through the Magic Formula
-/// (<see cref="TyreProfile"/>), its peak from the grip, the surface and the load. The longitudinal
+/// (<see cref="TyreMechanics"/>), its peak from the grip, the surface and the load. The longitudinal
 /// force is what the driver asks of it — drive split equally over the driven wheels (an open
 /// differential), braking in proportion to load (the ideal brake proportioning of Limpert, Brake
 /// Design and Safety, 2nd ed. 1999) — held to the friction circle left over by the cornering
@@ -109,7 +109,7 @@ public sealed class MagicCurve
 /// </summary>
 public sealed class WheelDynamics
 {
-    public const float G = TyreFriction.G;
+    public const float G = TyreGrip.G;
 
     /// <summary>Speeds the kinematic model hands over to the dynamic one between, m/s.</summary>
     public const float KinematicBelow = 3f, DynamicAbove = 6f;
@@ -137,7 +137,7 @@ public sealed class WheelDynamics
         public float AngularSpeed;
         /// <summary>Forces on the tyre, in its own frame: along it and to its right, newtons.</summary>
         public float Fx, Fy;
-        /// <summary>Its share of its grip in use: 1 at the peak, over 1 sliding. See TyreFriction.</summary>
+        /// <summary>Its share of its grip in use: 1 at the peak, over 1 sliding. See TyreGrip.</summary>
         public float Demand;
         /// <summary>The surface under it (<see cref="RoadSurfaces"/>) and the grip that gives.</summary>
         public byte Surface;
@@ -155,7 +155,7 @@ public sealed class WheelDynamics
 
     public Wheel[] Wheels { get; }
     public ChassisSpec Chassis { get; }
-    public TyreProfile Tyre { get; }
+    public TyreMechanics Tyre { get; }
 
     /// <summary>Peak friction on dry asphalt, g. The preset's tyre unless the map says otherwise.</summary>
     public float GripG { get; set; }
@@ -169,10 +169,10 @@ public sealed class WheelDynamics
 
     /// <summary>
     /// For a modulated driver, the share of a driven wheel's grip the throttle may use beside the
-    /// cornering: <see cref="TyreFriction.SquealOnset"/>, the point where a tyre starts to sing,
+    /// cornering: <see cref="TyreGrip.PatchSlidesFrom"/>, the point where a tyre starts to sing,
     /// because pulling away does not make an ordinary driver's tyres squeal.
     /// </summary>
-    public float PullingUse { get; set; } = TyreFriction.SquealOnset;
+    public float PullingUse { get; set; } = TyreGrip.PatchSlidesFrom;
 
     /// <summary>The same for the brakes: all of the circle. Held to the squeal onset, traffic could
     /// not shed speed beside the cornering at a junction's entry and arrived too fast.</summary>
@@ -218,12 +218,14 @@ public sealed class WheelDynamics
     private readonly float _lateralRate;
     private float _induced;
 
-    public WheelDynamics(VehicleProfile profile, float? gripG = null)
+    /// <param name="vehicle">The vehicle's mechanics: its running gear, its tyres and its mass.</param>
+    /// <param name="gripG">The grip its tyres have here, in g; their own peak when not given.</param>
+    public WheelDynamics(VehicleMechanics vehicle, float? gripG = null)
     {
-        Chassis = profile.Running;
-        Tyre = profile.Tyres;
-        GripG = gripG ?? profile.Tyres.PeakGripG;
-        Mass = MathF.Max(1f, profile.MassKg);
+        Chassis = vehicle.Running;
+        Tyre = vehicle.Tyres;
+        GripG = gripG ?? vehicle.Tyres.PeakGripG;
+        Mass = MathF.Max(1f, vehicle.MassKg);
         _lat = MagicCurve.Of(Tyre.LateralShape, Tyre.LateralCurvature);
         _lon = MagicCurve.Of(Tyre.LongitudinalShape, Tyre.LongitudinalCurvature);
 
@@ -584,7 +586,7 @@ public sealed class WheelDynamics
 
     /// <summary>
     /// The hardest steady turn on the flat, as a lateral acceleration in m/s^2, in which no tyre is
-    /// worked past <paramref name="demand"/> of its grip (1 is the limit; <see cref="TyreFriction.SquealOnset"/>
+    /// worked past <paramref name="demand"/> of its grip (1 is the limit; <see cref="TyreGrip.PatchSlidesFrom"/>
     /// is where a tyre starts to squeal).
     ///
     /// In a steady turn each axle group makes its share of m ay by moments about the centre of gravity

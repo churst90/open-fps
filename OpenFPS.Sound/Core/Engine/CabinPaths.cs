@@ -113,7 +113,7 @@ public static class CabinPaths
                                                      Math.Clamp(pipe.Z, g.Back, g.Front)), -1, 0));
 
         // Every wheel at its corner, at floor height: the arch and the floor over it.
-        var body = new WheelDynamics(v);
+        var body = new WheelDynamics(v.Mechanics);
         var axles = v.Running.Axles;
         float cogZ = v.Running.CentreOfGravityZ;
         int n = body.Wheels.Length;

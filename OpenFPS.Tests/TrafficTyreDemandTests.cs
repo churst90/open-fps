@@ -36,7 +36,7 @@ public class TrafficTyreDemandTests
     [MemberData(nameof(CityVehicles))]
     public void An_ordinary_stop_from_50_is_quiet_on_every_wheel(string preset, float grip)
     {
-        var body = new WheelDynamics(VehicleProfile.ByName(preset), grip) { ForwardOnly = true, Modulated = true, Vx = 50f / 3.6f };
+        var body = new WheelDynamics(VehicleProfile.ByName(preset).Mechanics, grip) { ForwardOnly = true, Modulated = true, Vx = 50f / 3.6f };
         float b = ServiceBrake(grip);
         const float dt = 1f / 30f;
         float worst = 0f, slip = 0f;
@@ -118,7 +118,7 @@ public class TrafficTyreDemandTests
     public void Turning_at_city_junctions_does_not_scrub(string preset, float grip)
     {
         var line = new RaceLine(Block(10f, 60f), 0f, 50f / 3.6f, 0.5f, ServiceBrake(grip));
-        var body = new WheelDynamics(VehicleProfile.ByName(preset), grip) { ForwardOnly = true, Modulated = true };
+        var body = new WheelDynamics(VehicleProfile.ByName(preset).Mechanics, grip) { ForwardOnly = true, Modulated = true };
         var driver = new LineFollower(body);
         float worst = 0f, angle = 0f, fastest = 0f;
         int tick = 0;
@@ -144,7 +144,7 @@ public class TrafficTyreDemandTests
     [Fact]
     public void Slip_is_bounded_and_smooth_at_walking_pace()
     {
-        var body = new WheelDynamics(VehicleProfile.ByName("i4_midsize"), 0.85f) { ForwardOnly = true, Modulated = true };
+        var body = new WheelDynamics(VehicleProfile.ByName("i4_midsize").Mechanics, 0.85f) { ForwardOnly = true, Modulated = true };
         const float dt = 1f / 30f;
         float[] lastRatio = new float[body.Wheels.Length], lastAngle = new float[body.Wheels.Length];
         float worstRatio = 0f, worstAngle = 0f, jumpRatio = 0f, jumpAngle = 0f;

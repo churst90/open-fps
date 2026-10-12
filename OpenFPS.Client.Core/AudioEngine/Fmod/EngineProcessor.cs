@@ -518,7 +518,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _frontRadius = chassis.Axles.Length > 0 ? chassis.Axles[0].Tyre.RollingRadiusMetres : 0.337f;
         _rearRadius = chassis.Axles.Length > 0 ? chassis.Axles[^1].Tyre.RollingRadiusMetres : 0.337f;
         // The wheels as the server's model lays them out, so order, loads and positions match the wire.
-        var body = new WheelDynamics(v);
+        var body = new WheelDynamics(v.Mechanics);
         int nw = body.Wheels.Length;
         _wheelSqueal = new VehicleSynth.WheelSquealVoice[nw];
         _wheelFront = new bool[nw]; _wheelDriven = new bool[nw];

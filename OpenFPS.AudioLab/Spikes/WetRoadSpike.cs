@@ -118,7 +118,7 @@ public static class WetRoadSpike
         public readonly float CogZ;
         public Rig(VehicleProfile v, float speed)
         {
-            Body = new WheelDynamics(v);
+            Body = new WheelDynamics(v.Mechanics);
             CogZ = v.Running.CentreOfGravityZ;
             Body.Hold(speed, 0f, 0f);
         }

@@ -120,7 +120,7 @@ public static class VehicleSynth
                 }
                 tyreGear = driveline.Gear;
                 chirp *= 0.99985f;   // about a tenth of a second for the driveline to resolve it
-                float slip = TyreFriction.Demand(aLong, 0f, v.Tyres.PeakGripG) + chirp;
+                float slip = TyreGrip.Demand(aLong, 0f, v.Tyres.PeakGripG) + chirp;
                 tyres[at] = Tyre(v.Tyres, driveline.Speed, slip, rng, ref tyreVoice);
                 distance[at] = driveline.Distance;
                 rpmTrace[at] = engine.Rpm;
@@ -398,7 +398,7 @@ public static class VehicleSynth
     /// </summary>
     /// <param name="t">The tyre.</param>
     /// <param name="speed">Road speed, m/s.</param>
-    /// <param name="slip">Fraction of available grip in use. See <see cref="TyreFriction.Demand"/>.</param>
+    /// <param name="slip">Fraction of available grip in use. See <see cref="TyreGrip.Demand"/>.</param>
     /// <param name="rng">The voice's noise source.</param>
     /// <param name="v">This tyre's state between samples.</param>
     /// <param name="rollingPa">
