@@ -48,6 +48,7 @@ FILE_RULES = [
     ('OpenFPS.Sound/', 'a', 'Sound', ''),
     ('OpenFPS.Native/', 'a', 'Native', ''),
     ('OpenFPS.Audio/', 'a', 'Audio', ''),
+    ('OpenFPS.Schema/', 'a', 'Schema', 'the editor attribute on a model property'),
     # The real-time runtime: FMOD DSPs, voices, Steam Audio, the acoustic worker
     (CC + 'AudioEngine/Data/', 'c', 'Audio', 'the source description the host fills'),
     (CC + 'AudioEngine/Fmod/', 'a', 'Audio', ''),
@@ -182,7 +183,7 @@ ALLOWED = {
 
 # Projects whose files are sorted by the rules above; every other project is host.
 SCANNED = ('OpenFPS.Common', 'OpenFPS.Client.Core', 'OpenFPS.Geometry', 'OpenFPS.Acoustics', 'OpenFPS.Sound',
-           'OpenFPS.Native', 'OpenFPS.Audio')
+           'OpenFPS.Native', 'OpenFPS.Audio', 'OpenFPS.Schema')
 
 
 def classify(t):

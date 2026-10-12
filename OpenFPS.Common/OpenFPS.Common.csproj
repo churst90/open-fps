@@ -46,6 +46,7 @@
     <WireLibrarySource Include="..\OpenFPS.Geometry\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Acoustics\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Sound\**\*.cs" Exclude="..\OpenFPS.Sound\Core\**" />
+    <WireLibrarySource Include="..\OpenFPS.Schema\**\*.cs" />
   </ItemGroup>
   <Import Project="..\tools\build\SourceHash.targets" />
 

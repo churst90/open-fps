@@ -18,7 +18,7 @@ public class LibraryBoundaryTests
     internal static readonly string[] SortedProjects =
     {
         "OpenFPS.Common", "OpenFPS.Client.Core",
-        "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Native", "OpenFPS.Audio",
+        "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Schema",
     };
 
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")
@@ -275,7 +275,9 @@ public class LibraryBoundaryTests
                        new[] { "OpenFPS.Geometry", "Serilog" } },
         // The sound models and the synthesis. MemoryPack: TransientSound is on the wire.
         new object[] { typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name!,
-                       new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "MemoryPack.Core", "Serilog" } },
+                       new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Schema", "MemoryPack.Core", "Serilog" } },
+        // The editor's attribute on a model's property: nothing but the runtime.
+        new object[] { typeof(OpenFPS.Common.Editing.TunableAttribute).Assembly.GetName().Name!, Array.Empty<string>() },
     };
 
     [Theory]
