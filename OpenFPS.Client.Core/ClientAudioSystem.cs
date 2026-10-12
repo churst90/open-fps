@@ -579,6 +579,9 @@ public partial class ClientAudioSystem
                 local = Vector3.Transform(visualEyePos - ride.Transform.Position, Quaternion.Inverse(ride.Transform.Rotation));
             }
             _acousticWorker.Traced.RideIn(preset, local);
+            // The cabin of the nearest vehicle within a few steps, traced before you get in (the order is
+            // last frame's): made when you sat down, the street played until it was.
+            if (preset == null) PrepareNearestCabin();
         }
         _groundWorld = world;
 
@@ -1916,6 +1919,19 @@ public partial class ClientAudioSystem
     private int _cabinSeenFrame = -1;
 
     /// <summary>The voice of a path into the cabin you sit in, whichever vehicle that is.</summary>
+    /// <summary>How near a vehicle has to be for its cabin to be traced ahead: a few steps from its door.</summary>
+    internal const float CabinAheadMetres = 8f;
+
+    private void PrepareNearestCabin()
+    {
+        int nearest = -1;
+        float best = CabinAheadMetres * CabinAheadMetres;
+        foreach (var e in _engineOrder)
+            if (e.D2 < best) { best = e.D2; nearest = e.Id; }
+        if (nearest >= 0 && _carPreset.TryGetValue(nearest, out string? preset))
+            _acousticWorker.Traced.Prepare(preset);
+    }
+
     private int CabinVoiceId(int path) => _voices.IdFor(VoiceKind.Cabin, VoiceRegistry.NoEntity, path);
 
     /// <summary>

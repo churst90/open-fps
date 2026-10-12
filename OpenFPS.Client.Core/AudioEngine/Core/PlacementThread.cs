@@ -3,8 +3,10 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// <summary>
 /// The threads that place every sound: the audio update (ClientAudioSystem.Update) and the audio thread
 /// (AudioEngineFacade's tick). While either is busy no source moves, so work that can take longer than a
-/// frame (a model calibrating itself, a train's model, the routes through a map's openings) is done
-/// elsewhere (VoiceBuilds). A train's first horn once held every sound still for 0.8 s this way.
+/// frame (a model calibrating itself, a train's model, the routes through a map's openings, a room's reverb
+/// stage, a cabin's trace, a cabin path's trim, another room's field) is done elsewhere (VoiceBuilds,
+/// TracedStages, TracedReverbSet). A train's first horn once held every sound still for 0.8 s this way, and
+/// getting into a car up to 0.55 s.
 /// </summary>
 public static class PlacementThread
 {

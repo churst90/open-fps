@@ -481,8 +481,12 @@ internal sealed class DiffuseTail
         foreach (var x in SdmOut) Array.Clear(x);
     }
 
-    /// <summary>The tail's renderer, or null when Steam Audio will not make its ears.</summary>
-    public static DiffuseTail? Create(IntPtr context, int subFrame, int channels, IntPtr hrtf, int sampleRate)
+    /// <summary>The tail's renderer, or null when Steam Audio will not make its ears. It plays through
+    /// <paramref name="hrtf"/>; <paramref name="calibrateWith"/> (the same head, another Steam Audio
+    /// object) is what its calibration applies, when it is made on another thread than the one that plays
+    /// <paramref name="hrtf"/>: an HRTF applied from two threads at once gives both garbage (two
+    /// calibrations at once measured the head's diffuse-field gain at +17 to +30 dB, alone -0.64).</summary>
+    public static DiffuseTail? Create(IntPtr context, int subFrame, int channels, IntPtr hrtf, int sampleRate, IntPtr calibrateWith = default)
     {
         if (hrtf == IntPtr.Zero) return null;
         // Its ears are calibrated on a second of noise: 100-450 ms, made where a room's reverb stage is added.
@@ -493,9 +497,10 @@ internal sealed class DiffuseTail
         d.LateIn = new float[DiffuseBranch.Count][];
         for (int i = 0; i < DiffuseBranch.Count; i++) d.LateIn[i] = new float[subFrame];
         Phonon.iplAudioBufferAllocate(context, 1, subFrame, ref d.Mono);
-        if (!d.CreateEars(context, subFrame, hrtf)) { d.Release(); return null; }
+        if (!d.CreateEars(context, subFrame, calibrateWith != IntPtr.Zero ? calibrateWith : hrtf)) { d.Release(); return null; }
         d.CalibrateBinaural(subFrame, channels);
         d.SdmReady = d.CreateSdmEars(subFrame);
+        d.EarHrtf = hrtf;
         return d;
     }
 

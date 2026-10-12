@@ -275,16 +275,41 @@ internal sealed class TracedReverb : IDisposable
         }
     }
 
-    /// <summary>Makes sure reader <paramref name="index"/> has its own source. Game thread; cheap
-    /// once it exists. The new source is committed before the next trace.</summary>
+    /// <summary>Asks for reader <paramref name="index"/> to have its own source. Never waits: a trace
+    /// holds the tracer's lock for hundreds of milliseconds in a hard hall, and the audio thread asking
+    /// here held every source still that long. The tracer makes the source before its next trace, which
+    /// the asking brings forward.</summary>
     public void EnsureReader(int index)
     {
         if (index <= 0 || index >= MaxReaders || _readers[index] != IntPtr.Zero || !IsValid) return;
-        lock (_gate)
+        int bit = 1 << index;
+        if ((Interlocked.Or(ref _wantedReaders, bit) & bit) == 0) _wake.Set();
+    }
+    private int _wantedReaders;
+    private readonly ManualResetEventSlim _wake = new(false);
+
+    /// <summary>Whether a trace has run since reader <paramref name="reader"/> had its source: until then
+    /// a stage reading it gets nothing and plays silence.</summary>
+    public bool HasTraced(int reader)
+        => reader >= 0 && reader < MaxReaders && (Volatile.Read(ref _tracedReaders) & (1 << reader)) != 0;
+    private int _tracedReaders;
+
+    /// <summary>Traced once and then left alone until asked again: a cabin made ahead of riding in it.</summary>
+    public volatile bool Idle;
+
+    /// <summary>A vehicle's cabin, traced in its own frame (TracedReverbSet.RideIn): played whole, at its
+    /// traced level.</summary>
+    public bool IsCabin { get; init; }
+
+    /// <summary>Makes the sources asked for (EnsureReader). Tracer thread, under the tracer's lock.</summary>
+    private void AddWantedReaders()
+    {
+        int wanted = Interlocked.Exchange(ref _wantedReaders, 0);
+        for (int index = 1; wanted != 0 && index < MaxReaders; index++)
         {
-            if (_readers[index] != IntPtr.Zero || !_haveScene) return;
+            if ((wanted & (1 << index)) == 0 || _readers[index] != IntPtr.Zero) continue;
             var ss = new Phonon.IPLSourceSettings { flags = Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS };
-            if (Phonon.iplSourceCreate(_simulator, ref ss, out IntPtr src) != Phonon.IPL_STATUS_SUCCESS) return;
+            if (Phonon.iplSourceCreate(_simulator, ref ss, out IntPtr src) != Phonon.IPL_STATUS_SUCCESS) continue;
             Phonon.iplSourceAdd(src, _simulator);
             _readersDirty = true;
             _readers[index] = src;
@@ -310,6 +335,7 @@ internal sealed class TracedReverb : IDisposable
         {
             try
             {
+                if (Idle && Runs > 0 && Volatile.Read(ref _wantedReaders) == 0) { _wake.Wait(_refreshMs); _wake.Reset(); continue; }
                 Vector3 at; int place;
                 lock (_listenerGate) { at = _listener; place = _place; }
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -329,11 +355,15 @@ internal sealed class TracedReverb : IDisposable
                         reverbScale0 = 1f, reverbScale1 = 1f, reverbScale2 = 1f,
                         hybridReverbTransitionTime = DurationSeconds, hybridReverbOverlapPercent = 0.25f,
                     };
+                    AddWantedReaders();
                     if (_readersDirty) { Phonon.iplSimulatorCommit(_simulator); _readersDirty = false; }
                     foreach (var r in _readers)
                         if (r != IntPtr.Zero) Phonon.iplSourceSetInputs(r, Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref inputs);
                     Phonon.iplSimulatorSetSharedInputs(_simulator, Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref shared);
                     Phonon.iplSimulatorRunReflections(_simulator);
+                    int traced = 0;
+                    for (int r = 0; r < MaxReaders; r++) if (_readers[r] != IntPtr.Zero) traced |= 1 << r;
+                    Volatile.Write(ref _tracedReaders, traced);
                 }
                 LastRunMs = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 Runs++;
@@ -392,7 +422,9 @@ internal sealed class TracedReverb : IDisposable
                 }
             }
             catch (Exception ex) { Serilog.Log.Warning(ex, "Traced reverb: a trace failed."); }
-            Thread.Sleep(_refreshMs);
+            // Woken early by a stage asking for its reader (EnsureReader), so a new room is heard within a trace.
+            _wake.Wait(_refreshMs);
+            _wake.Reset();
         }
     }
 
@@ -475,6 +507,7 @@ internal sealed class TracedReverb : IDisposable
     public void Dispose()
     {
         _running = false;
+        _wake.Set();
         _thread?.Join(2000);
         lock (_gate)
         {
@@ -506,12 +539,62 @@ internal sealed class TracedReverbSet
     private readonly object _gate = new();
     private IntPtr _context;
     private SteamAudioScene? _scene;
+    /// <summary>Counts every Configure: a room traced against an older scene is handed the new one.</summary>
+    private int _sceneVersion;
     private TracedReverb? _listener;
     private TracedEchoes? _echoes;
     private LateField? _late;
     private readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> _rooms = new();
+    private readonly HashSet<int> _roomsMaking = new();
     /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
     private const int MaxRooms = 6;
+
+    // ── Made off the threads that place sounds ───────────────────────────────────────────────
+    //
+    // A trace's simulator, a cabin's scene: tens of milliseconds, and the audio thread reads this set's
+    // lock every tick (Listener, Echoes, LateField, Cabin). Made under that lock on the audio update, a
+    // car's cabin held the update 20-45 ms as you got in and the audio thread waited on the lock too
+    // (AudioLab --driving, 2026-10-12). Each is made on the thread pool and put in under the lock when it
+    // is done; until then the place plays what it played before (FmodAudioProvider.HandOver).
+    private readonly List<System.Threading.Tasks.Task> _making = new();
+
+    /// <summary>A trace or a cabin's scene made while this set's lock was held (a fault: the audio thread
+    /// waits on that lock), since the set was made.</summary>
+    internal int MadeUnderLock => Volatile.Read(ref _madeUnderLock);
+    private int _madeUnderLock;
+
+    /// <summary>Tests: called as each trace starts being made, with what it is, on the thread making it.</summary>
+    internal Action<string>? MakingForTests;
+
+    private void Making(string what)
+    {
+        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy(what);
+        if (Monitor.IsEntered(_gate))
+        {
+            if (Interlocked.Increment(ref _madeUnderLock) == 1)
+                Serilog.Log.Warning("{What} was made under the traced reverb's lock: the audio thread waited for it.", what);
+        }
+        MakingForTests?.Invoke(what);
+    }
+
+    /// <summary>Starts <paramref name="make"/> on the thread pool. Under the gate.</summary>
+    private void Start(Action make)
+    {
+        _making.RemoveAll(t => t.IsCompleted);
+        _making.Add(System.Threading.Tasks.Task.Run(() =>
+        {
+            try { make(); }
+            catch (Exception ex) { Serilog.Log.Warning(ex, "Traced reverb: a trace could not be made."); }
+        }));
+    }
+
+    /// <summary>Waits until every trace being made is in (tests and the lab).</summary>
+    internal void WaitForMaking(int timeoutMs = 10000)
+    {
+        System.Threading.Tasks.Task[] now;
+        lock (_gate) now = _making.ToArray();
+        System.Threading.Tasks.Task.WaitAll(now, timeoutMs);
+    }
 
     /// <summary>The worker hands over its <paramref name="context"/> and <paramref name="scene"/> once
     /// built and after every rebuild. <paramref name="listenerScene"/> is the same geometry without its
@@ -519,23 +602,35 @@ internal sealed class TracedReverbSet
     /// <paramref name="scene"/>.</summary>
     public void Configure(IntPtr context, SteamAudioScene scene, SteamAudioScene? listenerScene = null)
     {
-        // The tracers are handed the scene outside the gate: each SetScene waits for its own trace, and
-        // under the gate the game thread and the mixer (Listener, Echoes, LateField, Cabin every frame)
-        // waited too: a door swinging within 50 m froze every sound for up to a second (2026-09-30).
-        TracedReverb listener; TracedEchoes echoes; LateField late; List<TracedReverb> rooms;
-        lock (_gate)
+        // The tracers are made and handed the scene outside the gate: each SetScene waits for its own
+        // trace, and under the gate the game thread and the mixer (Listener, Echoes, LateField, Cabin
+        // every frame) waited too: a door swinging within 50 m froze every sound for up to a second
+        // (2026-09-30).
+        bool missing;
+        lock (_gate) missing = _listener == null || _echoes == null || _late == null;
+        TracedReverb? madeListener = null; TracedEchoes? madeEchoes = null; LateField? madeLate = null;
+        if (missing)
         {
-            _context = context; _scene = scene;
-            listener = _listener ??= new TracedReverb(context) { ExtractLate = true };
+            madeListener = new TracedReverb(context) { ExtractLate = true };
             // On the scene without its open ground too: every voice carries its own ground bounce
             // (GroundReflection), and traced again a car at 30 m had it twice, a comb under a millisecond
             // late at about the direct level.
-            echoes = _echoes ??= new TracedEchoes(context);
+            madeEchoes = new TracedEchoes(context);
             // Each source's own late energy and its direction, on the listener's scene (LateField).
-            late = _late ??= new LateField(context);
+            madeLate = new LateField(context);
+        }
+        TracedReverb listener; TracedEchoes echoes; LateField late; List<TracedReverb> rooms;
+        lock (_gate)
+        {
+            _context = context; _scene = scene; _sceneVersion++;
+            if (_listener == null) { _listener = madeListener; madeListener = null; }
+            if (_echoes == null) { _echoes = madeEchoes; madeEchoes = null; }
+            if (_late == null) { _late = madeLate; madeLate = null; }
+            listener = _listener!; echoes = _echoes!; late = _late!;
             rooms = new List<TracedReverb>();
             foreach (var r in _rooms.Values) rooms.Add(r.Trace);
         }
+        madeListener?.Dispose(); madeEchoes?.Dispose(); madeLate?.Dispose();
         if (listener.IsValid) listener.SetScene(listenerScene ?? scene);
         if (echoes.IsValid) echoes.SetScene(listenerScene ?? scene);
         foreach (var r in rooms) r.SetScene(scene);
@@ -557,7 +652,12 @@ internal sealed class TracedReverbSet
 
     /// <summary>Where the listener is, and the region they are in (a new one starts the averaged tail
     /// again; int.MinValue: not known, and only distance counts).</summary>
-    public void SetListener(Vector3 at, int place = int.MinValue) { lock (_gate) { _listener?.SetListener(at, place); DisposeRetired(); } }
+    public void SetListener(Vector3 at, int place = int.MinValue)
+    {
+        List<IDisposable>? due;
+        lock (_gate) { _listener?.SetListener(at, place); due = TakeRetired(); }
+        DisposeElsewhere(due);
+    }
 
     /// <summary>The per-source tracer, or null before the scene exists.</summary>
     public TracedEchoes? Echoes { get { lock (_gate) return _echoes is { IsValid: true } e ? e : null; } }
@@ -568,8 +668,9 @@ internal sealed class TracedReverbSet
     /// <summary>The listener's own trace, or null before the scene exists.</summary>
     public TracedReverb? Listener { get { lock (_gate) return _listener is { IsValid: true } l && l.Source != IntPtr.Zero ? l : null; } }
 
-    /// <summary>A room's trace from a point in it, made on first asking. Null before the scene exists
-    /// or past the cap (then the room is played through the listener's trace).</summary>
+    /// <summary>A room's trace from a point in it. The first asking starts it being made and returns null,
+    /// as does every asking until it is made, before the scene exists, or past the cap: then the room is
+    /// played through the listener's trace.</summary>
     public TracedReverb? ForRoom(int regionId, Vector3 at)
     {
         lock (_gate)
@@ -580,14 +681,36 @@ internal sealed class TracedReverbSet
                 if (Vector3.DistanceSquared(r.At, at) > 1f) { r.Trace.SetListener(at); _rooms[regionId] = (r.Trace, at); }
                 return r.Trace;
             }
-            if (_rooms.Count >= MaxRooms) return null;
-            var t = new TracedReverb(_context, refreshMs: 1000);
-            if (!t.IsValid) { t.Dispose(); return null; }
-            t.SetScene(_scene);
-            t.SetListener(at);
-            _rooms[regionId] = (t, at);
-            return t;
+            if (_roomsMaking.Contains(regionId) || _rooms.Count + _roomsMaking.Count >= MaxRooms) return null;
+            _roomsMaking.Add(regionId);
+            var (context, scene, version) = (_context, _scene, _sceneVersion);
+            Start(() => MakeRoom(regionId, at, context, scene, version));
+            return null;
         }
+    }
+
+    private void MakeRoom(int regionId, Vector3 at, IntPtr context, SteamAudioScene scene, int version)
+    {
+        Making("A room's trace");
+        long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+        var t = new TracedReverb(context, refreshMs: 1000);
+        if (t.IsValid) { t.SetListener(at); t.SetScene(scene); }
+        bool keep;
+        SteamAudioScene? newer = null;
+        lock (_gate)
+        {
+            _roomsMaking.Remove(regionId);
+            keep = t.IsValid && _context == context && _scene != null;
+            if (keep)
+            {
+                _rooms[regionId] = (t, at);
+                if (_sceneVersion != version) newer = _scene;
+            }
+        }
+        if (!keep) { t.Dispose(); return; }
+        if (newer != null) t.SetScene(newer);
+        Serilog.Log.Debug("Traced reverb: region {Id}'s own trace made in {Ms:F0} ms.", regionId,
+                          System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds);
     }
 
     // ── The vehicle you are riding in ────────────────────────────────────────────────────────
@@ -595,59 +718,168 @@ internal sealed class TracedReverbSet
     // Inside a vehicle the room is its cabin. A vehicle moves, so it is not in the map's traced scene
     // (from a bus seat the world scene answers with the street), but it does not move relative to you:
     // it is traced as a scene of its own in the vehicle's frame, from the shell the server builds
-    // (VehicleCabin).
+    // (VehicleCabin). One trace per kind of vehicle, kept for the last few kinds, so getting out and in
+    // again makes nothing; the kind you stand beside is made before you get in (Prepare).
+    private sealed class CabinTrace
+    {
+        public required SteamAudioScene Scene;
+        public required TracedReverb Trace;
+    }
+    /// <summary>Made, by preset; null: that vehicle has no cabin to trace.</summary>
+    private readonly Dictionary<string, CabinTrace?> _cabins = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The presets in _cabins, the one used longest ago first.</summary>
+    private readonly List<string> _cabinOrder = new();
+    private readonly HashSet<string> _cabinsMaking = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Cabins kept: the one you ride in, the one you stand beside, the one you last rode in.</summary>
+    private const int MaxCabins = 3;
     private string? _cabinPreset;
-    private SteamAudioScene? _cabinScene;
+    private Vector3 _cabinLocal;
     private TracedReverb? _cabin;
     private bool _riding;
 
-    /// <summary>The cabin's trace while riding in something that has a cabin, else null.</summary>
+    /// <summary>The cabin's trace while riding in something that has a cabin and once it is made, else null.</summary>
     public TracedReverb? Cabin { get { lock (_gate) return _riding && _cabin is { IsValid: true } c && c.Source != IntPtr.Zero ? c : null; } }
 
     /// <summary>Riding in <paramref name="preset"/> (null: on foot), with the ear at
-    /// <paramref name="local"/> in the vehicle's own frame.</summary>
+    /// <paramref name="local"/> in the vehicle's own frame. Never makes anything here: a cabin not yet
+    /// made is started, and the street is heard until it is.</summary>
     public void RideIn(string? preset, Vector3 local)
     {
         lock (_gate)
         {
-            if (preset == null || _context == IntPtr.Zero || !MachineRegistry.Knows(preset)) { _riding = false; return; }
+            if (preset == null || _context == IntPtr.Zero || !MachineRegistry.Knows(preset))
+            {
+                if (_cabin != null) _cabin.Idle = true;
+                _riding = false; _cabin = null; _cabinPreset = null;
+                return;
+            }
             if (!string.Equals(preset, _cabinPreset, StringComparison.OrdinalIgnoreCase))
             {
-                // Retired, not disposed: a reverb stage on the mixer thread may hold this trace until
-                // the audio update next hands it the new one. Disposed a few seconds on (DisposeRetired).
-                long now = DateTime.UtcNow.Ticks;
-                if (_cabin != null) _retiredCabins.Add((_cabin, now));
-                if (_cabinScene != null) _retiredCabins.Add((_cabinScene, now));
-                _cabin = null; _cabinScene = null;
+                if (_cabin != null) _cabin.Idle = true;
                 _cabinPreset = preset;
-                var v = MachineRegistry.VehicleFor(preset);
-                if (VehicleCabin.Measure(v) is { } g)
-                {
-                    var boxes = new List<SteamAudioScene.Box>();
-                    foreach (var (prefab, at, size) in VehicleCabin.Shell(v, g))
-                        boxes.Add(new SteamAudioScene.Box(at, size, Quaternion.Identity, VehicleCabin.MaterialOf(prefab)));
-                    _cabinScene = new SteamAudioScene(_context);
-                    _cabinScene.Build(boxes);
-                    if (_cabinScene.IsBuilt)
-                    {
-                        _cabin = new TracedReverb(_context, refreshMs: 1000);
-                        if (_cabin.IsValid) _cabin.SetScene(_cabinScene); else { _cabin.Dispose(); _cabin = null; }
-                    }
-                }
+                _cabin = null;
+                if (_cabins.TryGetValue(preset, out var made)) { _cabin = made?.Trace; Used(preset); }
+                else MakeCabin(preset);
             }
-            _cabin?.SetListener(local);
-            _riding = _cabin != null;
+            _riding = true;
+            _cabinLocal = local;
+            if (_cabin != null) { _cabin.Idle = false; _cabin.SetListener(local); }
         }
     }
 
-    private readonly List<(IDisposable Item, long At)> _retiredCabins = new();
-
-    /// <summary>Disposes cabin traces and scenes retired more than five seconds ago. Under the gate.</summary>
-    private void DisposeRetired()
+    /// <summary>The cabin of a vehicle you may get into, made now so it is there when you do.</summary>
+    public void Prepare(string preset)
     {
+        lock (_gate)
+        {
+            if (_context == IntPtr.Zero || _cabins.ContainsKey(preset) || _cabinsMaking.Contains(preset)) return;
+            if (!MachineRegistry.Knows(preset)) return;
+            MakeCabin(preset);
+        }
+    }
+
+    /// <summary>Starts <paramref name="preset"/>'s cabin being made. Under the gate.</summary>
+    private void MakeCabin(string preset)
+    {
+        if (!_cabinsMaking.Add(preset)) return;
+        var context = _context;
+        Start(() => BuildCabin(preset, context));
+    }
+
+    private void BuildCabin(string preset, IntPtr context)
+    {
+        Making("A cabin's trace");
+        long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+        SteamAudioScene? scene = null;
+        TracedReverb? trace = null;
+        var v = MachineRegistry.VehicleFor(preset);
+        if (VehicleCabin.Measure(v) is { } g)
+        {
+            var boxes = new List<SteamAudioScene.Box>();
+            foreach (var (prefab, at, size) in VehicleCabin.Shell(v, g))
+                boxes.Add(new SteamAudioScene.Box(at, size, Quaternion.Identity, VehicleCabin.MaterialOf(prefab)));
+            scene = new SteamAudioScene(context);
+            scene.Build(boxes);
+            if (scene.IsBuilt)
+            {
+                trace = new TracedReverb(context, refreshMs: 1000) { IsCabin = true };
+                // Its first trace from the middle of the cabin, until a seat is known.
+                if (trace.IsValid) { trace.SetListener(new Vector3(0f, g.FloorTop + g.Hc * 0.5f, g.Cz)); trace.SetScene(scene); }
+                else { trace.Dispose(); trace = null; }
+            }
+        }
+        if (trace == null) { scene?.Dispose(); scene = null; }
+        var drop = new List<IDisposable>();
+        bool riding = false;
+        lock (_gate)
+        {
+            _cabinsMaking.Remove(preset);
+            if (_context != context)
+            {
+                if (trace != null) drop.Add(trace);
+                if (scene != null) drop.Add(scene);
+            }
+            else
+            {
+                _cabins[preset] = trace != null ? new CabinTrace { Scene = scene!, Trace = trace } : null;
+                Used(preset);
+                riding = _riding && string.Equals(_cabinPreset, preset, StringComparison.OrdinalIgnoreCase);
+                if (riding) { _cabin = trace; trace?.SetListener(_cabinLocal); }
+                // Traced once from the middle and left until you get in.
+                else if (trace != null) trace.Idle = true;
+                Evict();
+            }
+        }
+        foreach (var d in drop) d.Dispose();
+        Serilog.Log.Information("Traced reverb: {Preset}'s cabin {What} in {Ms:F0} ms, off the audio threads{Riding}.", preset,
+                                trace != null ? "made" : "has nothing to trace, found", System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds,
+                                riding ? "; riding in it, the street heard until its first trace" : "");
+    }
+
+    /// <summary>Marks <paramref name="preset"/>'s cabin the last used. Under the gate.</summary>
+    private void Used(string preset)
+    {
+        _cabinOrder.RemoveAll(p => string.Equals(p, preset, StringComparison.OrdinalIgnoreCase));
+        _cabinOrder.Add(preset);
+    }
+
+    /// <summary>Retires the cabins used longest ago past the cap, never the one ridden. Under the gate.</summary>
+    private void Evict()
+    {
+        long now = DateTime.UtcNow.Ticks;
+        for (int i = 0; _cabins.Count > MaxCabins && i < _cabinOrder.Count; )
+        {
+            string p = _cabinOrder[i];
+            if (string.Equals(p, _cabinPreset, StringComparison.OrdinalIgnoreCase)) { i++; continue; }
+            _cabinOrder.RemoveAt(i);
+            if (_cabins.Remove(p, out var c) && c != null)
+            {
+                // Retired, not disposed: a reverb stage on the mixer thread may hold this trace until
+                // the audio update next hands it another. Disposed a few seconds on (TakeRetired).
+                _retired.Add((c.Trace, now));
+                _retired.Add((c.Scene, now));
+            }
+        }
+    }
+
+    private readonly List<(IDisposable Item, long At)> _retired = new();
+
+    /// <summary>Cabin traces and scenes retired more than five seconds ago, taken off the list. Under the gate.</summary>
+    private List<IDisposable>? TakeRetired()
+    {
+        if (_retired.Count == 0) return null;
         long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
-        for (int i = _retiredCabins.Count - 1; i >= 0; i--)
-            if (_retiredCabins[i].At < cutoff) { _retiredCabins[i].Item.Dispose(); _retiredCabins.RemoveAt(i); }
+        List<IDisposable>? due = null;
+        for (int i = _retired.Count - 1; i >= 0; i--)
+            if (_retired[i].At < cutoff) { (due ??= new()).Add(_retired[i].Item); _retired.RemoveAt(i); }
+        return due;
+    }
+
+    /// <summary>Disposes on the thread pool: a trace's Dispose waits for its thread, up to a trace long.</summary>
+    private static void DisposeElsewhere(List<IDisposable>? items)
+    {
+        if (items == null) return;
+        System.Threading.Tasks.Task.Run(() => { foreach (var d in items) d.Dispose(); });
     }
 
     /// <summary>Everything traced so far, for the /reverb readout.</summary>
@@ -661,21 +893,31 @@ internal sealed class TracedReverbSet
         }
     }
 
-    /// <summary>Lets go of every trace before the context they were made on is released. The set can be
-    /// configured again after, on a new context.</summary>
+    /// <summary>Lets go of every trace before the context they were made on is released, waiting for any
+    /// being made. The set can be configured again after, on a new context.</summary>
     public void Release()
     {
+        // No new trace is started from here on; those started already find the context gone and drop
+        // what they made, and are waited for, so nothing is made on a context after it is released.
+        System.Threading.Tasks.Task[] making;
+        lock (_gate) { _context = IntPtr.Zero; making = _making.ToArray(); }
+        System.Threading.Tasks.Task.WaitAll(making, 10000);
+        var all = new List<IDisposable>();
         lock (_gate)
         {
-            _listener?.Dispose(); _listener = null;
-            _echoes?.Dispose(); _echoes = null;
-            _late?.Dispose(); _late = null;
-            _cabin?.Dispose(); _cabin = null; _cabinScene?.Dispose(); _cabinScene = null; _cabinPreset = null; _riding = false;
-            foreach (var (item, _) in _retiredCabins) item.Dispose();
-            _retiredCabins.Clear();
-            foreach (var r in _rooms.Values) r.Trace.Dispose();
+            if (_listener != null) all.Add(_listener);
+            if (_echoes != null) all.Add(_echoes);
+            if (_late != null) all.Add(_late);
+            _listener = null; _echoes = null; _late = null;
+            foreach (var c in _cabins.Values) if (c != null) { all.Add(c.Trace); all.Add(c.Scene); }
+            _cabins.Clear(); _cabinOrder.Clear(); _cabin = null; _cabinPreset = null; _riding = false;
+            foreach (var (item, _) in _retired) all.Add(item);
+            _retired.Clear();
+            foreach (var r in _rooms.Values) all.Add(r.Trace);
             _rooms.Clear();
-            _scene = null; _context = IntPtr.Zero;
+            _making.Clear();
+            _scene = null;
         }
+        foreach (var d in all) d.Dispose();
     }
 }
