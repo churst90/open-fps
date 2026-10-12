@@ -9,7 +9,8 @@ models for method and depth are docs/SOUND_LIBRARY_BOUNDARY.md and docs/PHYSICS_
 - The counts come from `tools/engine_packages/run.sh`: the sound boundary's Roslyn reader
   (`tools/sound_boundary/Program.cs`, which now also parses `OpenFPS.Words` and `OpenFPS.Astronomy`) and a
   classifier of its own (`tools/engine_packages/classify.py`). It writes `packages_tables.md`,
-  `packages_files.tsv` and `packages_crossings.tsv` into the output folder. Run it again after any move.
+  `packages_files.tsv` and `packages_crossings.tsv` into the output folder, and the ratchet's four lists into
+  `ratchet` there (stage 0). Run it again after any move.
 - Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy. Planned with their
   own documents and not planned again here: `OpenFPS.Audio` and the split of `ClientAudioSystem` (sound library
   stages 6 to 8), and physics stages 2 to 6. This survey says where its packages meet them.
@@ -638,6 +639,25 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   `EmitterStreamReplayTests`, `VoiceIdBandTests`, `VoiceRegistryTests`, `ModelKindTableTests`,
   `MapScopedStateTests`, and the physics replays (`MovementReplayTests`, `DrivingReplayTests`, `RailReplayTests`),
   also run with `DOTNET_PROCESSOR_COUNT=4`. All run on GitHub Actions; locally only through `tools/test-local.sh`.
+
+- **Built 2026-10-12, the packages ratchet** (made on Windows and sent back as a patch, on main `e47be9ac`
+  with physics stage 2's fourth piece). `EnginePackagesTests` holds four lists in
+  `OpenFPS.Tests/EnginePackages`, which `tools/engine_packages/run.sh` writes into its `ratchet` folder:
+  `files.tsv` (540 files, each in a package or in the game), `types.tsv` (the 24 types sorted by a rule of
+  their own), `layers.tsv` (what each package may reference, and its layer) and `allowed.tsv` (1,301
+  crossings, by file and the package referred to, in 75 lines).
+  - It binds the sources of the eleven sorted projects in one compilation and counts as the survey counts;
+    its count and the survey's are the same line for line.
+  - It fails on a file in no package, a listed file that is gone, a type rule that names no type, a cycle
+    in the layers, a new crossing, an allowance left higher than the count (lower it with
+    `OPENFPS_BOUNDARY_WRITE=1`) or raised past 1,301, and a package's project that references a project
+    its layer does not allow (the eight that are projects already; a new one joins the list when it is made).
+  - The survey said 1,384 crossings at `6dce0ba6`. It is 1,301 now: the tyre, the vehicle and the engine took
+    theirs out, and `PhysicsUtils.cs` and `PhysicsConstants.cs` are sorted to Common (they were "Physics,
+    until split"; the split is done, 16.4 of docs/PHYSICS_BOUNDARY.md), which took 72 from Physics and gave
+    15: 12 to the files of Accessibility and World that read the body's numbers by the game's names, and 3
+    to `PhysicsUtils.cs` itself, which names the server's `GroundProbeMemo`.
+  - Not built yet: the spoken-lines replay.
 
 ### Stage 1: Materials (1 session)
 

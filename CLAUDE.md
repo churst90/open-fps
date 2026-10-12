@@ -67,7 +67,7 @@ stage 6's scene instances, anything "measured with --pop-hunt") are Cody's machi
   `OpenFPS.Client/ASSETS/SOUNDS`.
 - Put artifacts outside the checkout, for example `~/.cache/openfps-build/<name>`.
 - Run the guards on every change: LibraryBoundary, RenderFingerprint, EmitterStreamReplay, VoiceIdBand,
-  VoiceRegistry, ModelKindTable, MapScoped, PhysicsBoundary, and the physics replays. Also run the replays
+  VoiceRegistry, ModelKindTable, MapScoped, PhysicsBoundary, EnginePackages, and the physics replays. Also run the replays
   with `-e DOTNET_PROCESSOR_COUNT=4`: streams must not depend on the machine (memory "ci-differs-from-local").
 - Builds stay at 0 warnings: server, GTK client, AudioLab, Tests, and the Windows client
   (`-p:EnableWindowsTargeting=true`).

@@ -4,6 +4,11 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- The packages ratchet (docs/ENGINE_PACKAGES.md, stage 0). A new guard, `EnginePackagesTests`: every source
+  file of the engine is in a package, and no file may gain a reference to a package its own may not use. It
+  holds the 1,301 such references there are today, by file, and the number only goes down. Nothing a player
+  sees or hears changes, and nothing the game is built from: tests, lists and the survey's tool only.
+
 - Physics stage 2, the ground probes and the body's constants (docs/PHYSICS_BOUNDARY.md 16.4). Nothing a
   player sees or hears changes. Where the floor is under a body and where its foot goes down are asked of a
   triangle world by the physics (`Footing`); the game's `PhysicsUtils` keeps the server's and a client's
