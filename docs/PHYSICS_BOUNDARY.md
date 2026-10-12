@@ -14,6 +14,9 @@ physics lives in Sound (docs/SOUND_LIBRARY_BOUNDARY.md, decision 2).
   crossings as surveyed are checked in beside the tool. Run it again after any move.
 - The model is docs/SOUND_LIBRARY_BOUNDARY.md: survey, guards, then stages that each leave the game
   working.
+- The rest of the engine's packages (materials, the model catalogue, the environment, the world, agents,
+  accessibility, the editor) are surveyed in docs/ENGINE_PACKAGES.md, which places its materials and catalogue
+  stages before stage 2 here.
 
 Where it stands (2026-10-11): surveyed, and Cody's decisions recorded the same day (the last section: all ten
 as recommended, with soft bodies wanted as well as rigid ones, gravity a property of the world, and the engine

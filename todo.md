@@ -114,6 +114,7 @@ since the last deploy" list below.
    2026-10-06 placement of vehicle physics in Sound. The rest of the engine follows the same rule: each part
    (geometry, acoustics, sound, physics, the world and its generators, networking, the client UI) its own
    project with stated dependencies and no reach into the host.
+   - The rest of the engine's packages: SURVEYED 2026-10-12 (docs/ENGINE_PACKAGES.md): Materials, Environment, Models, World, Agents, Accessibility and Editor, eleven stages at 17 to 25 sessions; stages 0 to 2 (guards, materials, the catalogue) before physics stage 2. Thirteen decisions for Cody (its section 13).
 4. (Geometry stage 6's first half, each vehicle's body as one closed mesh from its parts list: BUILT 2026-10-12, made on Windows and sent back as a patch; docs/GEOMETRY.md, stage 6. Nothing uses the mesh yet. Left: the meshes in the Steam Audio scene, moved with their bodies, the cost with 40 cars, the hearing.)
    The physics stages, with geometry stage 6 (vehicles and bodies in the acoustic scene: docs/GEOMETRY.md
    section 7, "Bodies and wheels" stage 2 below). Stage 0 DONE 2026-10-11 (PHYSICS_BOUNDARY.md section 14):

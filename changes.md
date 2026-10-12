@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- The engine packages survey (docs/ENGINE_PACKAGES.md). No engine code changed. Every file of the eleven
+  projects is sorted into a package or the game, and the references between them counted
+  (`tools/engine_packages/run.sh`). Seven new packages are proposed: Materials (the material table, which
+  references nothing), Environment (weather, water and fire), Models (the catalogue of what things are), World
+  (maps, prefabs, roads, tiles and the one world), Agents (drivers and traffic's laws), Accessibility (the aids,
+  menus, interface sounds, speech and keys) and Editor (the editor's model). 1,384 references cross the proposed
+  layers, 455 of them already planned by the library and physics surveys. Eleven stages, 17 to 25 sessions, and
+  thirteen decisions for Cody. The survey's reader now also parses `OpenFPS.Words` and `OpenFPS.Astronomy`; the
+  library and physics surveys reproduce their lists unchanged.
 - Physics stage 1 (docs/PHYSICS_BOUNDARY.md, section 15). Nothing a player sees or hears changes. There is a
   project `OpenFPS.Physics`, on the geometry alone: the body on foot, a vehicle's chassis, running gear and
   gearbox, a wheel's state, a bullet's flight, the wind, and a tyre's grip on a wet road are in it. The

@@ -8,6 +8,8 @@ library that open-fps and Resonance both reference. Step 1 of
 - Every number below comes from `tools/sound_boundary/run.sh`. Run it again after any move; it
   rewrites the tables into `/tmp/openfps-wt-survey/out/tables.md` and every crossing line into
   `crossings.tsv`.
+- The rest of the engine's packages, beyond this library and the physics, are surveyed in
+  docs/ENGINE_PACKAGES.md; its accessibility stage reads the world input of stage 6 here.
 
 ## Contents
 
