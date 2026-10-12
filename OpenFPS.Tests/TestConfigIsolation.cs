@@ -19,7 +19,9 @@ internal static class TestConfigIsolation
         string scratch = Path.Combine(Path.GetTempPath(), "openfps-test-config-" + Environment.ProcessId);
         Directory.CreateDirectory(scratch);
         Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", scratch);
-        Environment.SetEnvironmentVariable(SettingsFolder.Variable, Path.Combine(scratch, "openfps"));
+        // A folder of its own, not $XDG_CONFIG_HOME/openfps: on Linux that is the platform's folder in a test,
+        // and a test that unsets the variable must see the folder change.
+        Environment.SetEnvironmentVariable(SettingsFolder.Variable, Path.Combine(scratch, "settings"));
         // And the player's data: DoorRenderCache prunes other builds' folders beside its own.
         string data = Path.Combine(scratch, "data");
         Directory.CreateDirectory(data);
