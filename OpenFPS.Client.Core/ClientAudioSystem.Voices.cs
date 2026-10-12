@@ -61,6 +61,17 @@ public partial class ClientAudioSystem
         return p;
     }
 
+    /// <summary>
+    /// What a chooser (which cars, which standing machines, which of their places get a voice) takes for how
+    /// much a thing's path blocks it: nothing. The worker is asked only about what already has a voice, so only
+    /// those have a path to count. Counted for them alone, a voiced machine behind a wall ranks under an
+    /// unvoiced one behind the same wall and gives it its voice; the newcomer's path then comes back as blocked
+    /// too, and the two change places each time the worker lets the loser's answer go (5 s). The budget
+    /// (VoiceManager.Audibility) counts the path, among the voices it holds, which all carry theirs. To count
+    /// it here the worker would have to be asked about every contender, voiced or not.
+    /// </summary>
+    private const float UnaskedOcclusion = 0f;
+
     /// <summary>An answer with the vehicles between the source and the ear put back as barriers.</summary>
     private OwnerPath Shadowed(WorldSnapshot world, int ownerId, in AcousticPathData direct, Vector3 at, Vector3 ear)
     {

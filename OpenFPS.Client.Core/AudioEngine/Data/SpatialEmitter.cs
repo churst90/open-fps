@@ -241,6 +241,11 @@ public struct SpatialEmitter
     public float[]? RadiatorBandEnergy;
     /// <summary>The share of the on-axis pressure a loudspeaker radiates all round (Radiator.RadiatedGain).</summary>
     public float RadiatedGain;
+    /// <summary>How much of <see cref="Volume"/> gives back the headroom this voice renders with over the shared
+    /// one (PhysicalVoiceState.HeadroomGain: a fire renders 45 dB under full scale for its crackles, and is
+    /// played that much up). It makes up for a quieter render and is no louder at the ear, so whoever ranks
+    /// the voice divides it out (VoiceManager.Audibility). 0: none.</summary>
+    public float HeadroomGain;
 
     public SpatialEmitter()
     {

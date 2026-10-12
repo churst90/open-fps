@@ -1075,6 +1075,7 @@ public sealed class RainField
             Position = centre,
             ApparentPosition = centre,
             Volume = gain * PhysicalVoiceState.HeadroomGain(RainVoiceState.HeadroomDb),
+            HeadroomGain = PhysicalVoiceState.HeadroomGain(RainVoiceState.HeadroomDb),
             EarLevelDb = level,
             MinDistance = reference,
             ExtentMetres = extent,

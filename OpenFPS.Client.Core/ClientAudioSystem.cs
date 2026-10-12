@@ -1273,6 +1273,7 @@ public partial class ClientAudioSystem
         double now = _now();
         _machineOrder.Clear();
         _machineGroups.Clear();
+        _machineHeard.Clear();
         // Trees the budget left without a voice last frame are heard in their wood (WoodChorus.Weigh).
         if (world.Woods != null) world.Woods.Weigh(eyePos, _woodWeights, _isLiveMachine ??= id => _liveMachines.Contains(id));
         else { _woodWeights.Individual.Clear(); _woodWeights.Woods.Clear(); }
@@ -1295,16 +1296,16 @@ public partial class ClientAudioSystem
             if (chorus <= 0f || chorusTrees <= 1e-3f) continue;
             chorus *= MathF.Sqrt(chorusTrees);
 
+            // Ranked by how loud it is at the ear (VoiceManager.HeardLevel, the one rank), with the numbers its
+            // emitter plays (ProcessAudioEmitter): its placed gain, its range and the key its spectrum is measured
+            // under. Not the gain that gives a quieter render its headroom back, which is no louder at the ear.
+            string voiceKey = VoiceKey(snap.Definition);
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
-            float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
-            // Ranked by loudness at the ear (docs/EAR_MODEL.md, Ranking), as VoiceManager.Audibility ranks
-            // every voice: the gain the mixer plays it at, turned into loudness by its measured spectrum.
-            // Not the corrected gain itself, which plays what the ear hears less of louder.
-            var timbre = OpenFPS.Client.AudioEngine.Core.EarTimbres.Find(em.SoundId);
-            gain *= MathF.Pow(10f, OpenFPS.Common.Loudness.TimbreCorrectionDb(levelDb, timbre) / 20f);
-            float level = OpenFPS.Common.Loudness.HeardGain(
-                OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume * chorus, reference, range, d), timbre, physical: true);
+            float range = MathF.Max(1f, MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb)));
+            float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(
+                gain * em.Volume * chorus, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(snap, voiceKey), physical: true);
+            _machineHeard[entityId] = level;
 
             // A water feature's taps are one fountain the same way, and come and go together.
             bool rail = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _);
@@ -1423,6 +1424,21 @@ public partial class ClientAudioSystem
         voiceId = entityId;
         return !IsWood(world, entityId);
     }
+
+    /// <summary>How loud each standing model was at the ear in this frame's ranking (VoiceManager.HeardLevel),
+    /// for what is chosen among them afterwards (ChoosePlaces).</summary>
+    private readonly Dictionary<int, float> _machineHeard = new();
+
+    /// <summary>How loud the ranking took a standing model to be this frame, for a test; NaN, not ranked.</summary>
+    internal float HeardInRanking(int entityId) => _machineHeard.GetValueOrDefault(entityId, float.NaN);
+
+    /// <summary>The key a standing model's voice is built and measured under: its voice key, and for a stretch
+    /// of shore its geometry with it (fetch, which way its water lies), which it carries in its box
+    /// (tools/gen_osm.py) and its voice reads from the key.</summary>
+    private static string PhysicalKeyOf(in EntitySnapshot snap, string voiceKey)
+        => OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth == OpenFPS.Common.ModelSynth.Shore
+            ? OpenFPS.Common.ShoreSpec.KeyFor(voiceKey, snap.Definition.Collider.Size, snap.Transform.Rotation)
+            : voiceKey;
 
     private sealed class MachineGroup
     {
@@ -2688,6 +2704,8 @@ public partial class ClientAudioSystem
         float chorusTrees = 1f;
         // The declared level, for the ear model; 0 for an authored source with only a volume.
         float earLevel = 0f;
+        // How much of its volume gives a quieter render its headroom back (SpatialEmitter.HeadroomGain); 0: none.
+        float headroomGain = 0f;
         // A recording played through a loudspeaker: its render, level and beam.
         OpenFPS.Client.AudioEngine.Core.Signals.LoudspeakerRender? speaker = null;
         // An authored source with a size (a fountain, a grille): as for a machine, the reference widens to
@@ -2713,20 +2731,16 @@ public partial class ClientAudioSystem
                 if (!_liveMachines.Contains(snap.Id)) return;
                 // The ranking's memoised numbers, so the two cannot disagree.
                 if (!PhysicalLevel(resolvedSoundId, out float levelDb, out float extent)) return;
-                physicalKey = resolvedSoundId;
-                // A stretch of shore carries its geometry (fetch, which way its water lies) in its box
-                // (tools/gen_osm.py); the voice reads it from the key.
-                var physicalSynth = OpenFPS.Common.ModelKindTable.KindOf(physicalKey)!.Synth;
-                if (physicalSynth == OpenFPS.Common.ModelSynth.Shore)
-                    physicalKey = OpenFPS.Common.ShoreSpec.KeyFor(physicalKey, def.Collider.Size, snap.Transform.Rotation);
+                physicalKey = PhysicalKeyOf(snap, resolvedSoundId);
+                var physicalSynth = OpenFPS.Common.ModelKindTable.KindOf(resolvedSoundId)!.Synth;
                 // Placed by its declared level and size: inside its extent the level is flat, and the
                 // gain is paid down so the far field is unchanged (Loudness.Widen; widening without
                 // paying once handed every quiet vehicle eight decibels).
                 var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
                 // A voice rendered with more headroom than the shared one (a fire's crackles) gets the
                 // difference back, so it is placed by its level and not its peaks.
-                engineVolume = gain * def.SoundEmitter.Volume
-                             * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
+                headroomGain = OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
+                engineVolume = gain * def.SoundEmitter.Volume * headroomGain;
                 // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus).
                 engineVolume *= ChorusShare(world, snap.Id, out chorusTrees);
                 engineMinDistance = reference;
@@ -2887,6 +2901,7 @@ public partial class ClientAudioSystem
                 snap.Transform.Rotation),
             Volume = engineVolume,
             EarLevelDb = earLevel,
+            HeadroomGain = headroomGain,
             Range = Math.Max(1.0f, engineRange),
             Pitch = 1.0f,
             Type = EmitterType.EntityAttached,

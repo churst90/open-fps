@@ -298,6 +298,7 @@ public partial class ClientAudioSystem
             Direction = Vector3.Transform(Vector3.UnitZ, rep.Transform.Rotation),
             // A voice carrying many sources renders with more headroom; the difference comes back here.
             Volume = gain * PhysicalVoiceState.HeadroomGain(TrainSlotState.HeadroomDb),
+            HeadroomGain = PhysicalVoiceState.HeadroomGain(TrainSlotState.HeadroomDb),
             EarLevelDb = levelDb,
             MinDistance = reference,
             ExtentMetres = extent,

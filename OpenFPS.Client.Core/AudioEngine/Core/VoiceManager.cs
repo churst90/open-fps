@@ -368,21 +368,40 @@ public class VoiceManager
     /// </summary>
     internal static float Audibility(in SpatialEmitter e, float distance, bool playing)
     {
-        float level = OpenFPS.Common.Loudness.RenderedGain(e.Volume, e.MinDistance, e.Range, distance);
-        level *= 1f - Math.Clamp(e.Occlusion, 0f, 1f);
-        // Ranked by loudness at the ear from the measured spectrum (docs/EAR_MODEL.md, Ranking), not by
-        // the law's gain: the law plays what the ear hears less of louder (a 25 Hz rumble about 21 dB
-        // up), and ranking on that gain put the rumble at the top.
-        if (e.EarLevelDb > 0f)
-        {
-            string key = string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey;
-            float db = EarTimbres.CorrectionDb(key, e.EarLevelDb);
-            if (db != 0f) level *= MathF.Pow(10f, db / 20f);
-            level = OpenFPS.Common.Loudness.HeardGain(level, EarTimbres.Find(key), IsPhysical(e));
-        }
+        // The gain that gives a quieter render its headroom back is in its volume and is not loudness: counted,
+        // a voice rendered 45 dB under full scale (a rain patch, the larger fires) ranked 29 dB over a machine as
+        // loud, the shared headroom being 16.
+        float volume = e.HeadroomGain > 0f ? e.Volume / e.HeadroomGain : e.Volume;
+        float level = HeardLevel(volume, e.MinDistance, e.Range, distance, e.Occlusion, e.EarLevelDb,
+                                 string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey, IsPhysical(e));
         if (playing) level *= PlayingHysteresis;
         // Pinned, not weighted: essential voices rank above all others, and among themselves by level.
         return e.Essential ? level + EssentialPin : level;
+    }
+
+    /// <summary>
+    /// The one rank (docs/SPECIAL_CASES_AUDIT.md, P4): how loud a voice placed so is at the ear. The mixer's
+    /// distance law over the gain, reference distance and range its emitter plays at (less the gain that only
+    /// gives a render its headroom back, SpatialEmitter.HeadroomGain), times what its path lets through, as loudness by its measured spectrum (<paramref name="key"/>, what its emitter is keyed by; a
+    /// declared level of 0, an authored source with only a volume, ranks at its played gain). Whoever chooses
+    /// which things get a voice (cars, standing machines, their places) asks this with the numbers the voice
+    /// would be played with, so nothing is picked on one set of numbers and played at another.
+    /// </summary>
+    internal static float HeardLevel(float volume, float reference, float range, float distance, float occlusion,
+                                     float earLevelDb, string key, bool physical)
+    {
+        float level = OpenFPS.Common.Loudness.RenderedGain(volume, reference, range, distance);
+        level *= 1f - Math.Clamp(occlusion, 0f, 1f);
+        // Ranked by loudness at the ear from the measured spectrum (docs/EAR_MODEL.md, Ranking), not by
+        // the law's gain: the law plays what the ear hears less of louder (a 25 Hz rumble about 21 dB
+        // up), and ranking on that gain put the rumble at the top.
+        if (earLevelDb > 0f)
+        {
+            float db = EarTimbres.CorrectionDb(key, earLevelDb);
+            if (db != 0f) level *= MathF.Pow(10f, db / 20f);
+            level = OpenFPS.Common.Loudness.HeardGain(level, EarTimbres.Find(key), physical);
+        }
+        return level;
     }
 
     /// <summary>Whether a voice is physical (declared level is its RMS) rather than a recording (declared
