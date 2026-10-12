@@ -52,6 +52,8 @@ RULES = [
     (C + 'TyreSize', 'P', ''),
     (C + 'BrakeKind', 'V', 'mechanics, and the brake squeal reads it'),
     (C + 'RoadSurfaces', 'V', 'surface grip (Physics) and the surface index the tyres sound by'),
+    (C + 'RoadGripLaw', 'P', 'a tyre on a wet road: the film, aquaplaning, the grip left'),
+    (C + 'RoadTexture', 'V', 'a surface as the wet grip and the water read it'),
     (C + 'MagicCurve', 'P', 'the Magic Formula'),
     (C + 'WheelDynamics', 'P', 'planar per-wheel vehicle dynamics'),
     (C + 'TyreFriction', 'PS', 'the friction-circle demand is mechanics; the squeal onsets are sound'),

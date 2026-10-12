@@ -137,7 +137,8 @@ public class PhysicsBoundaryTests
             if (types.ContainsKey(outer.ToDisplayString(Plain))) return true;
             // OpenFPS.Schema is the editor's attribute alone, under every part (decision 7).
             return outer.DeclaringSyntaxReferences.All(r => r.SyntaxTree.FilePath.StartsWith("OpenFPS.Geometry/", StringComparison.Ordinal)
-                                                       || r.SyntaxTree.FilePath.StartsWith("OpenFPS.Schema/", StringComparison.Ordinal));
+                                                       || r.SyntaxTree.FilePath.StartsWith("OpenFPS.Schema/", StringComparison.Ordinal)
+                                                       || r.SyntaxTree.FilePath.StartsWith("OpenFPS.Physics/", StringComparison.Ordinal));
         }
         var counts = new Dictionary<(string, string), int>();
         foreach (var type in AllTypes(compilation))

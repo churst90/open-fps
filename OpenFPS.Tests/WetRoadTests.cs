@@ -48,7 +48,7 @@ public class WetRoadTests
         var w = Settled(0f);
         Assert.Equal(0f, w.WaterMm(Asphalt, 2.5f, 1f, 3.5f));
         Assert.Equal(0f, w.PuddleFill);
-        Assert.Equal(1f, RoadWaterLaw.GripFactor(Asphalt, 0f, 20f, 220f, 5f));
+        Assert.Equal(1f, RoadGripLaw.GripFactor(Asphalt, 0f, 20f, 220f, 5f));
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public class WetRoadTests
     {
         var light = Settled(Rainfall.LightRate);
         var heavy = Settled(Rainfall.HeavyRate);
-        float holds = RoadWaterLaw.HoldsMm(Asphalt);
+        float holds = RoadGripLaw.HoldsMm(Asphalt);
         Assert.Equal(holds, light.TextureMm(Asphalt), 3);
         Assert.True(Settled(Rainfall.ViolentRate).WaterMm(Asphalt, 3f, 0.5f, 3.5f) > holds + 0.2f, "violent rain stands above the texture by the kerb");
         // In heavy rain the gutter's flow reaches into the road: the kerb is wetter than the crown.
@@ -67,7 +67,7 @@ public class WetRoadTests
     public void The_sheet_drains_in_minutes_and_the_texture_dries_by_evaporation()
     {
         var w = Settled(Rainfall.HeavyRate);
-        float holds = RoadWaterLaw.HoldsMm(Asphalt);
+        float holds = RoadGripLaw.HoldsMm(Asphalt);
         for (int k = 0; k < 60; k++) w.Step(0f, 0f, 10f);              // ten minutes, no evaporation
         float afterTen = w.WaterMm(Asphalt, 2.5f, 1f, 3.5f);
         _o.WriteLine($"ten minutes after heavy rain, no evaporation: {afterTen:F2} mm");
@@ -187,30 +187,30 @@ public class WetRoadTests
     [Fact]
     public void Gallaways_aquaplaning_speed_sits_by_hornes()
     {
-        float car = RoadWaterLaw.AquaplaningKmh(2f, 0.7f, 220f, 5f);
+        float car = RoadGripLaw.AquaplaningKmh(2f, 0.7f, 220f, 5f);
         float horne = 6.34f * MathF.Sqrt(220f);
         _o.WriteLine($"car tyre, 2 mm film: {car:F0} km/h; Horne {horne:F0}");
         Assert.InRange(car, 0.85f * horne, 1.05f * horne);
-        Assert.True(RoadWaterLaw.AquaplaningKmh(2f, 0.7f, 760f, 12f) > car + 30f, "a truck tyre at 7.6 bar holds on far longer");
-        Assert.True(RoadWaterLaw.AquaplaningKmh(2f, 0.7f, 160f, 0f) < car, "a slick goes first");
+        Assert.True(RoadGripLaw.AquaplaningKmh(2f, 0.7f, 760f, 12f) > car + 30f, "a truck tyre at 7.6 bar holds on far longer");
+        Assert.True(RoadGripLaw.AquaplaningKmh(2f, 0.7f, 160f, 0f) < car, "a slick goes first");
     }
 
     [Fact]
     public void Wet_grip_is_wongs_at_town_speed_and_falls_with_speed_and_film()
     {
-        float holds = RoadWaterLaw.HoldsMm(Asphalt);
-        float wet50 = RoadWaterLaw.GripFactor(Asphalt, holds, 50f / 3.6f, 220f, 5f);
+        float holds = RoadGripLaw.HoldsMm(Asphalt);
+        float wet50 = RoadGripLaw.GripFactor(Asphalt, holds, 50f / 3.6f, 220f, 5f);
         Assert.Equal(0.6f / 0.85f, wet50, 2);
-        float damp = RoadWaterLaw.GripFactor(Asphalt, holds * 0.5f, 50f / 3.6f, 220f, 5f);
+        float damp = RoadGripLaw.GripFactor(Asphalt, holds * 0.5f, 50f / 3.6f, 220f, 5f);
         Assert.True(damp > wet50 && damp < 1f);
-        float wet100 = RoadWaterLaw.GripFactor(Asphalt, holds, 100f / 3.6f, 220f, 5f);
-        float film100 = RoadWaterLaw.GripFactor(Asphalt, holds + 3f, 100f / 3.6f, 220f, 5f);
-        float slick100 = RoadWaterLaw.GripFactor(Asphalt, holds + 3f, 100f / 3.6f, 160f, 0f);
+        float wet100 = RoadGripLaw.GripFactor(Asphalt, holds, 100f / 3.6f, 220f, 5f);
+        float film100 = RoadGripLaw.GripFactor(Asphalt, holds + 3f, 100f / 3.6f, 220f, 5f);
+        float slick100 = RoadGripLaw.GripFactor(Asphalt, holds + 3f, 100f / 3.6f, 160f, 0f);
         _o.WriteLine($"50 wet {wet50:F2}, damp {damp:F2}; 100 wet {wet100:F2}, 3 mm film {film100:F2}, slick {slick100:F2}");
         Assert.True(wet100 < wet50 && film100 < wet100 && slick100 < film100);
         // Gravel drains; ice is not the water model's.
-        Assert.Equal(1f, RoadWaterLaw.GripFactor(RoadSurfaces.IndexOf("Gravel"), 2f, 20f, 220f, 5f));
-        Assert.Equal(1f, RoadWaterLaw.GripFactor(RoadSurfaces.IndexOf("Ice"), 2f, 20f, 220f, 5f));
+        Assert.Equal(1f, RoadGripLaw.GripFactor(RoadSurfaces.IndexOf("Gravel"), 2f, 20f, 220f, 5f));
+        Assert.Equal(1f, RoadGripLaw.GripFactor(RoadSurfaces.IndexOf("Ice"), 2f, 20f, 220f, 5f));
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public class WetRoadTests
         Assert.Equal(life.HeavyRainSpeedReduction, heavy.Speed, 3);
         Assert.Equal(life.HeavyRainHeadwayIncrease, heavy.Headway, 3);
         // The water under a wheel on the server, on a street with puddles.
-        Assert.True(OpenFPS.Server.Systems.RoadWaterSystem.WaterAt("wet_test_heavy", new Vector3(0f, 0f, 0f), Asphalt) >= RoadWaterLaw.HoldsMm(Asphalt) - 1e-3f);
+        Assert.True(OpenFPS.Server.Systems.RoadWaterSystem.WaterAt("wet_test_heavy", new Vector3(0f, 0f, 0f), Asphalt) >= RoadGripLaw.HoldsMm(Asphalt) - 1e-3f);
         Assert.Equal(0f, OpenFPS.Server.Systems.RoadWaterSystem.WaterAt("wet_test_dry", new Vector3(0f, 0f, 0f), Asphalt));
     }
 

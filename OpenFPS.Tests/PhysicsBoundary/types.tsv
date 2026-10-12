@@ -7,7 +7,9 @@ OpenFPS.Common.ChassisSpec	P
 OpenFPS.Common.AxleSpec	P
 OpenFPS.Common.TyreSize	P
 OpenFPS.Common.BrakeKind	V
+OpenFPS.Common.RoadGripLaw	P
 OpenFPS.Common.RoadSurfaces	V
+OpenFPS.Common.RoadTexture	V
 OpenFPS.Common.MagicCurve	P
 OpenFPS.Common.WheelDynamics	P
 OpenFPS.Common.TyreFriction	PS

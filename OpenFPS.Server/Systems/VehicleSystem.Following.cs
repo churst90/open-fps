@@ -64,7 +64,7 @@ public sealed partial class VehicleSystem
         var water = RoadWaterSystem.WaterOf(mapId);
         if (water == null) return (0f, 0f);
         byte asphalt = RoadSurfaces.IndexOf(RoadData.DefaultSurface);
-        float wet = Math.Clamp(water.TextureMm(asphalt) / MathF.Max(0.05f, RoadWaterLaw.HoldsMm(asphalt)), 0f, 1f);
+        float wet = Math.Clamp(water.TextureMm(asphalt) / MathF.Max(0.05f, RoadGripLaw.HoldsMm(asphalt)), 0f, 1f);
         float heavy = Math.Clamp(water.RainMmPerHour / Rainfall.HeavyRate, 0f, 1f);
         float speed = wet * life.WetSpeedReduction + heavy * MathF.Max(0f, life.HeavyRainSpeedReduction - life.WetSpeedReduction);
         float headway = wet * life.WetHeadwayIncrease + heavy * MathF.Max(0f, life.HeavyRainHeadwayIncrease - life.WetHeadwayIncrease);

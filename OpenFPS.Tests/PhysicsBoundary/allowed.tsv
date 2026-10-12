@@ -1,2 +1,1 @@
 from_type	to_type	count
-OpenFPS.Common.WheelDynamics	OpenFPS.Common.RoadWaterLaw	2

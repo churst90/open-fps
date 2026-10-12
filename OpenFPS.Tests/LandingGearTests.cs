@@ -61,7 +61,7 @@ public class LandingGearTests
         // a few dB over its mean.
         var gear = p.Gear!;
         double expected = gear.Tyre.SquealDb
-                        + 10 * System.Math.Log10(gear.WeightOnWheelsAtTouchdown * p.ApproachSpeedMps / (12 * RoadWaterLaw.PeakSlip))
+                        + 10 * System.Math.Log10(gear.WeightOnWheelsAtTouchdown * p.ApproachSpeedMps / (12 * RoadGripLaw.PeakSlip))
                         + 10 * System.Math.Log10(gear.Wheels);
         _o.WriteLine($"{preset}: {loudest:F0} dB at a metre for {sliding * 10} ms (the friction work says {expected:F0}), then rolling at {rolling:F0}");
         Assert.InRange(sliding * 0.01, atLeast, atMost);

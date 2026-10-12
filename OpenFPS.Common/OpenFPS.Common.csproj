@@ -13,6 +13,7 @@
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
     <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
     <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
+    <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -47,6 +48,7 @@
     <WireLibrarySource Include="..\OpenFPS.Acoustics\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Sound\**\*.cs" Exclude="..\OpenFPS.Sound\Core\**" />
     <WireLibrarySource Include="..\OpenFPS.Schema\**\*.cs" />
+    <WireLibrarySource Include="..\OpenFPS.Physics\**\*.cs" />
   </ItemGroup>
   <Import Project="..\tools\build\SourceHash.targets" />
 

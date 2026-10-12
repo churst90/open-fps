@@ -19,6 +19,8 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
     <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
+    <!-- The physics, for the state the sound reads and the laws of contact it shares (one way). -->
+    <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
     <!-- The editor's attribute on the models' properties (TunableAttribute). -->
     <ProjectReference Include="..\OpenFPS.Schema\OpenFPS.Schema.csproj" />
   </ItemGroup>

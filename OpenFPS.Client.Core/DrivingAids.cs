@@ -651,7 +651,7 @@ public sealed class DrivingAids
 
     /// <summary>
     /// What the tyres can give on this road now, m/s²: the car's peak grip, less what the water under
-    /// its wheels takes (RoadWaterLaw.GripFactor), the worst wheel. Without wheels on the wire, dry.
+    /// its wheels takes (RoadGripLaw.GripFactor), the worst wheel. Without wheels on the wire, dry.
     /// </summary>
     private static float AvailableDecel(EntitySnapshot car, VehicleProfile? profile, float speed)
     {
@@ -659,7 +659,7 @@ public sealed class DrivingAids
         float factor = 1f;
         if (car.Wheels is { Length: > 0 } wheels && profile != null)
             foreach (var w in wheels)
-                factor = MathF.Min(factor, RoadWaterLaw.GripFactor(w.Surface, w.WaterMm, speed,
+                factor = MathF.Min(factor, RoadGripLaw.GripFactor(w.Surface, w.WaterMm, speed,
                                                                      profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm));
         return grip * factor;
     }

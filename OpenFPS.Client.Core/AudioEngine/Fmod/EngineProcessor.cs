@@ -1227,7 +1227,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             bool sent = perWheel && wheels != null;
             byte surface = sent ? wheels![k].Surface : OpenFPS.Common.RoadSurfaces.IndexOf(OpenFPS.Common.RoadSurfaces.Default);
             _wetWater[k] = sent ? wheels![k].WaterMm : fallbackWater;
-            _wetTexture[k] = OpenFPS.Common.RoadWaterLaw.HoldsMm(surface);
+            _wetTexture[k] = OpenFPS.Common.RoadGripLaw.HoldsMm(surface);
             if (!sent) _wheelGain[k] = 1f;
         }
         _wet.Block(_wetWater, _wheelGain, _wetTexture, Driveline.Speed, count);

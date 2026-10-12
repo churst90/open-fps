@@ -67,7 +67,7 @@ public sealed class AircraftSynth
     private readonly float _squealPascals;
     /// <summary>The slip velocity at which one tyre squeals at its declared level: peak slip at 12 m/s,
     /// the road speed the declared squeal levels were set at (EngineProcessor.SquealReferenceSpeed).</summary>
-    private const float SquealReferenceSlipVelocity = 12f * RoadWaterLaw.PeakSlip;
+    private const float SquealReferenceSlipVelocity = 12f * RoadGripLaw.PeakSlip;
     private bool _onGround;
     private const int SlowEvery = 64;
 
@@ -305,7 +305,7 @@ public sealed class AircraftSynth
             // (Pacejka) it is sliding, so touchdown is a full skid and the chirp is the slip falling
             // through the peak. Read as the slip ratio, a light single's 57 ms spin-up passed the squeal
             // window faster than the tyre's attack and was silent.
-            float demand = slip / RoadWaterLaw.PeakSlip;
+            float demand = slip / RoadGripLaw.PeakSlip;
             // The patch follows its slip over a relaxation length of about the wheel radius (Pacejka).
             // The tyre model's own smoothing (a driver's demand settling) would hold a 57 ms slide for
             // three times as long, so it is stood aside here.

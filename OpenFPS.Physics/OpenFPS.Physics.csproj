@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The physics both games share (docs/PHYSICS_BOUNDARY.md, stage 1): the body on foot, a vehicle's
+       running gear, wheels and tyres, the gearbox, a bullet's flight, the wind, and the laws of contact
+       between them and the world. It uses the geometry and nothing else of ours: no sound, no acoustics,
+       no entities. The server steps it, the client predicts the player's own body with it, and the sound
+       reads its state.
+
+       OpenFPS.Schema is the editor's attribute alone, which its presets carry (decision 7).
+
+       Namespaces are those the files had (OpenFPS.Common.*), as for the sound library's moves. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Schema\OpenFPS.Schema.csproj" />
+  </ItemGroup>
+
+</Project>

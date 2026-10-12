@@ -8,6 +8,7 @@
   <Project Path="OpenFPS.Common/OpenFPS.Common.csproj" />
   <Project Path="OpenFPS.Geometry/OpenFPS.Geometry.csproj" />
   <Project Path="OpenFPS.Native/OpenFPS.Native.csproj" />
+  <Project Path="OpenFPS.Physics/OpenFPS.Physics.csproj" />
   <Project Path="OpenFPS.Schema/OpenFPS.Schema.csproj" />
   <Project Path="OpenFPS.Server/OpenFPS.Server.csproj" />
   <Project Path="OpenFPS.Sound/OpenFPS.Sound.csproj" />

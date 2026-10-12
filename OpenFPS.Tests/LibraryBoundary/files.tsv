@@ -215,6 +215,7 @@ OpenFPS.Native/Platform/NativeAudioLibraries.cs	lib	Native
 OpenFPS.Native/SteamAudio/Phonon.cs	lib	Native	
 OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	lib	Native	
 OpenFPS.Native/SteamAudio/PhononSim.cs	lib	Native	
+OpenFPS.Physics/RoadGrip.cs	lib	Physics	
 OpenFPS.Schema/Tunable.cs	lib	Schema	
 OpenFPS.Sound/AdminGun.cs	lib	Sound	
 OpenFPS.Sound/Aircraft.cs	lib	Sound	

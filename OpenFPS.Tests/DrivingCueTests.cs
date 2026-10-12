@@ -129,7 +129,7 @@ public class DrivingCueTests
     {
         var p = new DrivingCuePlanner(City()) { Indicator = +1 };
         var dry = p.Update(MainStreetNorth(50f), Vector3.UnitZ, 50f / 3.6f, Dry, HalfCar);
-        float wetGrip = RoadWaterLaw.GripFactor(RoadSurfaces.IndexOf("Asphalt"), 1.5f, 50f / 3.6f, 220f, 5f);
+        float wetGrip = RoadGripLaw.GripFactor(RoadSurfaces.IndexOf("Asphalt"), 1.5f, 50f / 3.6f, 220f, 5f);
         var wet = p.Update(MainStreetNorth(50f), Vector3.UnitZ, 50f / 3.6f, Dry * wetGrip, HalfCar);
         _o.WriteLine($"grip factor {wetGrip:F2}: ratio dry {dry.BrakeRatio:F2}, wet {wet.BrakeRatio:F2}");
         Assert.True(wetGrip < 1f);

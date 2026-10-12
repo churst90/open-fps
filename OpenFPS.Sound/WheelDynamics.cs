@@ -143,7 +143,7 @@ public sealed class WheelDynamics
         public byte Surface;
         public float SurfaceGrip;
         /// <summary>The water under it, mm from the bottom of the road's texture (RoadWater), and the
-        /// share of its dry grip that leaves it at the body's speed (RoadWaterLaw.GripFactor), worked
+        /// share of its dry grip that leaves it at the body's speed (RoadGripLaw.GripFactor), worked
         /// out at the start of each step.</summary>
         public float Water, WetGrip;
 
@@ -328,7 +328,7 @@ public sealed class WheelDynamics
         for (int i = 0; i < Wheels.Length; i++)
         {
             ref var w = ref Wheels[i];
-            w.WetGrip = w.Water > 0f ? RoadWaterLaw.GripFactor(w.Surface, w.Water, Vx, Tyre.InflationKPa, Tyre.TreadDepthMm) : 1f;
+            w.WetGrip = w.Water > 0f ? RoadGripLaw.GripFactor(w.Surface, w.Water, Vx, Tyre.InflationKPa, Tyre.TreadDepthMm) : 1f;
         }
     }
 
