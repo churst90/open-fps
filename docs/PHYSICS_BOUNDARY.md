@@ -41,7 +41,7 @@ stages come after the special-cases audit's parts.
 13. Appendices: the inventory, the crossings, the presets' members
 14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
-16. Stage 2 as it is built: the tyre, the vehicle (2026-10-12)
+16. Stage 2 as it is built: the tyre, the vehicle, the engine (2026-10-12)
 
 ---
 
@@ -1581,15 +1581,51 @@ and the guards pass unregenerated.
   and for one given other tyres; a wheel model made from the half has that grip.
 - **The wire hash** changes (8244346e803c after the tyre, ce76d41bd048 after this). Nothing sent changed.
   `DoorModelFingerprint` is unchanged (ab2b953cc671).
-- **Left of stage 2:**
+- **Left of stage 2** when the vehicle was sent:
   - `EngineProfile` as two halves: the mechanics read its idle, its redline and its peak torque with its
-    rpm. `VehicleMechanics` gets the engine's half then.
+    rpm. `VehicleMechanics` gets the engine's half then. (Built: 16.3.)
   - `VehicleSpec`: its `VehicleChassisSpec` is listed to move whole (4.2), but it is the shape an edited
     vehicle is stored in and it carries one number of the sound's (`SourceLevelDb`). It goes with the editor's
     model to the catalogue (docs/ENGINE_PACKAGES.md, stage 2) unless that number leaves it first.
   - `Ricochet`, `PhysicsUtils` and the rest of `PhysicsConstants` split as in 4.2.
   - One constant for each law (gravity, air density, rolling resistance and drag, brakes); `WindModel` folded
     into `WindField`. These change numbers.
+
+### 16.3 The engine (2026-10-12)
+
+Made on Windows and sent back as a patch, on main `9a595473` (which has the tyre and the vehicle, 16.1 and
+16.2). Nothing a player sees or hears changes: all 48 engines and all 45 vehicles, written out before
+and after, are the same byte for byte, and the guards pass unregenerated.
+
+- **The four numbers that move a car are the engine's physics half.** `EngineMechanics`
+  (`OpenFPS.Physics/EngineMechanics.cs`) holds where the engine idles, how far it revs, the most torque it
+  makes and the speed it makes it at: the four of its 87 members that anything stepping a car reads (4.4;
+  the server's `DrivingSystem`). Everything else of an engine is its sound.
+- **The sound's half keeps its name, its members and its stored shape.** `EngineProfile.Mechanics` is the
+  physics half, held in the record. `IdleRpm`, `RedlineRpm`, `PeakTorqueNm` and `PeakTorqueRpm` are still
+  members of `EngineProfile` where they were, the first two still required, each with what the editor says
+  of it; each reads and writes `Mechanics`, which is not stored or listed (`[JsonIgnore]`). An engine is
+  stored as an `EngineProfile`, so this matters: an engine saved before reads back the same, with its keys
+  in the order they had.
+- **A vehicle's mechanics have their engine's.** `VehicleMechanics.Engine` is the engine's physics half, the
+  same object the vehicle's engine holds; a vehicle given another engine has that engine's. With the tyres'
+  mechanics, the gearbox and the vehicle's own numbers, a car's physics half is now whole for what steps it
+  today.
+- **Not moved: the engine's inertia and friction** (`InertiaKgM2`, `FrictionNm`, `FrictionNmPerKrpm`).
+  Only the sound's own engine reads them (4.4). They join the mechanics when a car's drivetrain is stepped
+  from the engine's own torque (stage 6).
+- **The ratchet:** `EngineMechanics` is on the list of the physics' types; `EngineProfile` stays "to be
+  split" on it while those three numbers are the sound's. The allowance stays empty.
+- **Tests** (`PresetHalvesTests`): each of the four is its mechanics' for every engine and keeps its
+  editor's attribute; an engine is stored and edited in the shape it had; a vehicle's engine is its
+  mechanics' too.
+- **The wire hash** changes (3c2387e63af0 at `9a595473`, 7ada58fcb510 after). Nothing sent changed.
+  `DoorModelFingerprint` is unchanged (ab2b953cc671).
+- **Left of stage 2:** `VehicleSpec`'s `VehicleChassisSpec` (it goes with the editor's model, 16.2);
+  `Ricochet`, `PhysicsUtils` and the rest of `PhysicsConstants` split as in 4.2; one constant for each law
+  (gravity, air density, rolling resistance and drag, brakes) and `WindModel` folded into `WindField`, which
+  change numbers. The presets' members that forward to their halves go when the Models catalogue hands out
+  the halves by id (docs/ENGINE_PACKAGES.md, stage 2).
 
 ## Decisions (Cody, 2026-10-11)
 

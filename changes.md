@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Physics stage 2, the engine (docs/PHYSICS_BOUNDARY.md 16.3). Nothing a player sees or hears changes: all 48
+  engines and 45 vehicles are the same byte for byte. The four numbers of an engine that move a car (where it
+  idles, how far it revs, its peak torque and where) are its physics half's (`EngineMechanics`), and a
+  vehicle's mechanics have them. An engine is still stored and edited as one thing, in the shape it had. The
+  wire hash changes, so the server and the Windows client go out together.
+
 - Library stage 5, the world time and the machine's clocks (docs/SOUND_LIBRARY_BOUNDARY.md 18.7). Nothing a
   player hears changes. The gusts, a fire's age, the rain's swell and a hob's knob are told on their world's
   clock (`IAudioClock.WorldTime`), and so is how old a traced answer, a held path or a route is, and how often
