@@ -21,7 +21,9 @@ public sealed class StoveVoiceState : PhysicalVoiceState
     /// arrival. Two clients a fraction of a second apart then render the same light-up.</summary>
     public const double LateSeconds = 1.0;
 
-    public StoveVoiceState(GasHobSpec spec, string key, float sampleRate, int seed)
+    /// <param name="clock">Its world's clock, which the mixer gives it: a knob's turn is aged on its world
+    /// time. None for one of its own (an offline render), which reads the shared world time.</param>
+    public StoveVoiceState(GasHobSpec spec, string key, float sampleRate, int seed, IAudioClock? clock = null)
         : base(spec.SourceLevelDb, sampleRate, spec.PeakHeadroomDb)
     {
         Hob = new GasHobSynth(spec, sampleRate, seed);
@@ -29,7 +31,7 @@ public sealed class StoveVoiceState : PhysicalVoiceState
         string off = HobKey.Off(spec.Burners.Length);
         if (HobKey.TryParse(key, out var k) && k.To.Length > 0)
         {
-            double age = WindField.Now() - k.At;
+            double age = (clock ?? new StopwatchAudioClock()).WorldTime - k.At;
             Hob.Begin(k.From, k.To, age < LateSeconds ? 0f : (float)Math.Min(age, 120.0));
             _settings = k.To;
         }

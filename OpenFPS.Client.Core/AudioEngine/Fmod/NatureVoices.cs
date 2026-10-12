@@ -31,7 +31,7 @@ public abstract class NatureVoiceState : PhysicalVoiceState
 
     /// <summary>m/s, read once a block against gusts that last seconds; each synth glides between the
     /// readings.</summary>
-    protected float WindHere() => Weather.SpeedAt(Position.X, WindHeight, Position.Z, WindField.Now());
+    protected float WindHere() => Weather.SpeedAt(Position.X, WindHeight, Position.Z, Weather.Now);
 
     protected override void PushListener(Vector3 frame) { }
 }
@@ -212,7 +212,7 @@ public sealed class FireVoiceState : NatureVoiceState
     {
         Fire.Lit = Running;
         Fire.Wind = WindHere();
-        if (LitAt is double lit) Fire.Age = WindField.Now() - lit;
+        if (LitAt is double lit) Fire.Age = Weather.Now - lit;
         Fire.Control(dt);
     }
 
@@ -233,7 +233,7 @@ public sealed class FoliageVoiceState : NatureVoiceState
     protected override void Control(float seconds, float dt)
     {
         // Each bough reads the wind where it is in the crown, not all of them at its middle.
-        Foliage.ReadWind(Weather.Wind, Position.X, Position.Z, WindField.Now());
+        Foliage.ReadWind(Weather.Wind, Position.X, Position.Z, Weather.Now);
         Foliage.Control(dt);
     }
 
@@ -359,7 +359,7 @@ public sealed class PlacedNatureVoice
     private void Control(float dt)
     {
         float spread = Math.Clamp(TargetSpread, 0f, 1f);
-        double now = WindField.Now();
+        double now = Weather.Now;
         if (Foliage != null)
         {
             Foliage.Spread = spread;

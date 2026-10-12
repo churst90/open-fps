@@ -544,6 +544,10 @@ internal sealed class TracedReverbSet
     private TracedReverb? _listener;
     private TracedEchoes? _echoes;
     private LateField? _late;
+
+    /// <summary>The clock of the world these places are traced for, which whoever holds the set gives it (the
+    /// mixer, or a worker with a set of its own): a late answer's age is told on it.</summary>
+    public OpenFPS.Common.IAudioClock Clock { get; set; } = new OpenFPS.Common.StopwatchAudioClock();
     private readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> _rooms = new();
     private readonly HashSet<int> _roomsMaking = new();
     /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
@@ -617,7 +621,7 @@ internal sealed class TracedReverbSet
             // late at about the direct level.
             madeEchoes = new TracedEchoes(context);
             // Each source's own late energy and its direction, on the listener's scene (LateField).
-            madeLate = new LateField(context);
+            madeLate = new LateField(context, clock: Clock);
         }
         TracedReverb listener; TracedEchoes echoes; LateField late; List<TracedReverb> rooms;
         lock (_gate)
@@ -846,7 +850,7 @@ internal sealed class TracedReverbSet
     /// <summary>Retires the cabins used longest ago past the cap, never the one ridden. Under the gate.</summary>
     private void Evict()
     {
-        long now = DateTime.UtcNow.Ticks;
+        long now = OpenFPS.Common.RealTime.Ticks;
         for (int i = 0; _cabins.Count > MaxCabins && i < _cabinOrder.Count; )
         {
             string p = _cabinOrder[i];
@@ -868,7 +872,7 @@ internal sealed class TracedReverbSet
     private List<IDisposable>? TakeRetired()
     {
         if (_retired.Count == 0) return null;
-        long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
+        long cutoff = OpenFPS.Common.RealTime.Ticks - 5 * TimeSpan.TicksPerSecond;
         List<IDisposable>? due = null;
         for (int i = _retired.Count - 1; i >= 0; i--)
             if (_retired[i].At < cutoff) { (due ??= new()).Add(_retired[i].Item); _retired.RemoveAt(i); }

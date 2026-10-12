@@ -71,7 +71,7 @@ internal sealed class TracedStages
             }
             if (_ready.Count > 0) taken = _ready.Dequeue();
             // After a stage Steam Audio would not make, not again every tick: every five seconds.
-            if (_making.IsCompleted && _ready.Count < Spare && Environment.TickCount64 - _failedAt > 5000)
+            if (_making.IsCompleted && _ready.Count < Spare && OpenFPS.Common.RealTime.Milliseconds - _failedAt > 5000)
             {
                 // A thread of its own, niced: a stage is a few hundred milliseconds of work that must lose to the mixer.
                 var done = new System.Threading.Tasks.TaskCompletionSource();
@@ -107,7 +107,7 @@ internal sealed class TracedStages
                     shape = _shape;
                 }
                 var st = Make(shape);
-                if (st == null) { _failedAt = Environment.TickCount64; return; }
+                if (st == null) { _failedAt = OpenFPS.Common.RealTime.Milliseconds; return; }
                 bool keep;
                 lock (_gate)
                 {
@@ -117,7 +117,7 @@ internal sealed class TracedStages
                 if (!keep) { Free(st); return; }
             }
         }
-        catch (Exception ex) { _failedAt = Environment.TickCount64; Serilog.Log.Warning(ex, "Traced reverb: a stage could not be made."); }
+        catch (Exception ex) { _failedAt = OpenFPS.Common.RealTime.Milliseconds; Serilog.Log.Warning(ex, "Traced reverb: a stage could not be made."); }
     }
     private long _failedAt = long.MinValue / 2;
 

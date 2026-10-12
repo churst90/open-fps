@@ -1500,7 +1500,20 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The clock this mixer and its voices tell time by: how old a position is, when a horn was
     /// sounded, when a fade ends. One of its own unless its host gives it one; either way the host's game loop
     /// reads this one (AudioEngineFacade.Clock), so a position is stamped on the clock it is aged on.</summary>
-    public IAudioClock Clock { get; init; } = new StopwatchAudioClock();
+    public IAudioClock Clock
+    {
+        get => _clock;
+        // Its weather and its traced places read the same clock: the gusts and a fire's age are told on the
+        // world time of this one, and a late answer is aged on the clock it was stamped on.
+        init { _clock = value; Weather.Clock = value; Traced.Clock = value; }
+    }
+    private readonly IAudioClock _clock = new StopwatchAudioClock();
+
+    public FmodAudioProvider()
+    {
+        Weather.Clock = _clock;
+        Traced.Clock = _clock;
+    }
 
     /// <summary>The models made off the placing threads (VoiceBuilds), on this mixer's clock.</summary>
     private VoiceBuilds _voiceBuilds => LazyInitializer.EnsureInitialized(ref _builds, () => new VoiceBuilds(Clock));
@@ -1794,7 +1807,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // The law, through the origin in log-log (a source at a metre raises what one at the listener
         // does), fitted to what was traced lately.
         int m = lf.CopyAnswers(_lateAnswers);
-        long fresh = DateTime.UtcNow.Ticks - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond);
+        long fresh = Clock.StampTicks() - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond);
         double sxy = 0, sxx = 0, wSum = 0;
         Vector3 lean = Vector3.Zero;
         int used = 0;
@@ -1866,7 +1879,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         var lf = Traced.LateField;
         if (lf != null && lf.TryGet(a.EntityId, out var ans)
-            && ans.When >= DateTime.UtcNow.Ticks - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond)
+            && ans.When >= Clock.StampTicks() - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond)
             && float.IsFinite(ans.Ratio))
             return d * MathF.Sqrt(Math.Clamp(ans.Ratio, 1e-4f, 4f));
         if (!float.IsNaN(_lateLawK))
@@ -2949,11 +2962,11 @@ public partial class FmodAudioProvider : IAudioProvider
                     // the ear and the near quarters are several parts each (RainFeeds.PartsFor).
                     OpenFPS.Common.ModelSynth.Rain => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
                                 && rainPart < RainParts(rainSlot)
-                        ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23 + rainPart * 7919, rainPart, RainParts(rainSlot))
+                        ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23 + rainPart * 7919, rainPart, RainParts(rainSlot), Clock)
                         : null,
                     // A gas hob: its knobs' settings and when they were turned are in the key (HobKey).
                     OpenFPS.Common.ModelSynth.Stove => new StoveVoiceState(OpenFPS.Common.GasHobSpec.ByName(emitter.PhysicalKey), emitter.PhysicalKey,
-                                                   mrate, emitter.Seed * 59 + 29),
+                                                   mrate, emitter.Seed * 59 + 29, Clock),
                     _ => null,
                 };
             }
@@ -3546,7 +3559,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// The latest request per entity wins, so a re-triggered emitter never queues twice.</summary>
     private void DeferPlay(SpatialEmitter emitter)
     {
-        long deadline = Environment.TickCount64 + DeferredPlayTimeoutMs;
+        long deadline = RealTime.Milliseconds + DeferredPlayTimeoutMs;
         lock (_deferredLock)
         {
             for (int i = 0; i < _deferredPlays.Count; i++)
@@ -3565,7 +3578,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private void DrainDeferredPlays()
     {
         List<DeferredPlay>? due = null;
-        long now = Environment.TickCount64;
+        long now = RealTime.Milliseconds;
 
         lock (_deferredLock)
         {

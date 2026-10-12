@@ -218,7 +218,7 @@ public class ClientWorldState
         // to WindField: kept here, so a world built in a test does not blow on every other test's trees.
         var air = WindAir.FromBroadcast(update.WindVelocity, update.WindGustiness,
                                         update.WindClock, update.WindTravelEast, update.WindTravelNorth);
-        Wind = Wind.Following(air, WindField.Now());
+        Wind = Wind.Following(air, Clock.WorldTime);
         Touch();
     }
 

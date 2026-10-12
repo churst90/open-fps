@@ -141,14 +141,16 @@ public sealed class RainVoiceState : PhysicalVoiceState
     private float _norm;
     private readonly float _alpha;
 
-    public RainVoiceState(RainFeed feed, float sampleRate, int seed, int part = 0, int parts = 1)
+    /// <param name="clock">Its world's clock, which the mixer gives it; none for one of its own (an offline
+    /// render), which reads the shared world time.</param>
+    public RainVoiceState(RainFeed feed, float sampleRate, int seed, int part = 0, int parts = 1, IAudioClock? clock = null)
         : base(ReferenceDb, sampleRate, HeadroomDb)
     {
         _feed = feed;
         Parts = Math.Max(1, parts);
         Part = Math.Clamp(part, 0, Parts - 1);
-        // On the clock every rain voice shares, so the patches round a listener swell together.
-        Synth = new RainSynth(sampleRate, seed) { Clock = OpenFPS.Common.WindField.Now() };
+        // On the world time every rain voice shares, so the patches round a listener swell together.
+        Synth = new RainSynth(sampleRate, seed) { Clock = (clock ?? new StopwatchAudioClock()).WorldTime };
         _alpha = 1f / (LevelSeconds * sampleRate);
     }
 

@@ -341,6 +341,46 @@ public class DoorTypeTests : IDisposable
         Assert.Equal(1f, TauAt(false, 1f), 3);
     }
 
+    /// <summary>
+    /// How often the routes are made again while a door swings is told on the world's clock
+    /// (SpatialAcoustics.Clock), not the machine's: a first move starts a new graph; a second, with the clock
+    /// standing still, is answered by the graph already made however long the machine waits; and once the
+    /// clock is past the wait the next ask starts one.
+    /// </summary>
+    [Fact]
+    public void ASwingingDoorsRoutesAreMadeAgainOnTheWorldsClock()
+    {
+        var clock = new SteppedAudioClock();
+        var acoustics = new SpatialAcoustics { Clock = clock };
+        var portal = new PortalComponent { RegionAId = Lobby, RegionBId = AcousticConstants.GlobalRegionId };
+        var turned = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
+        var lobby = Lobby1(new Vector3(-0.15f, 1.075f, 3.5f), turned, portal);
+        // The same map, its door somewhere else.
+        WorldSnapshot Moved(float z)
+        {
+            var w = Lobby1(new Vector3(-0.15f, 1.075f, z), turned, portal);
+            w.AcousticMap = lobby.AcousticMap;
+            return w;
+        }
+        bool Until(Func<bool> done) => SpinWait.SpinUntil(done, TimeSpan.FromSeconds(30));
+
+        var shut = acoustics.RoutesFor(lobby)!;                      // a new map: made at once
+        Assert.Same(shut, acoustics.RoutesFor(Moved(4.0f)));         // the leaf moved: the old graph answers meanwhile
+        Assert.True(Until(() => !ReferenceEquals(acoustics.RoutesFor(Moved(4.0f)), shut)), "the moved door's graph never came");
+        var moved = acoustics.RoutesFor(Moved(4.0f))!;
+
+        // It moves again. The machine waits longer than the 0.3 s between two rebuilds; the world's clock has not moved.
+        Thread.Sleep(350);
+        for (int i = 0; i < 20; i++)
+        {
+            Assert.Same(moved, acoustics.RoutesFor(Moved(4.5f)));
+            Thread.Sleep(10);
+        }
+        // The world's clock moves past the wait: the next ask starts a graph with the leaf where it is.
+        clock.Now = 0.31;
+        Assert.True(Until(() => !ReferenceEquals(acoustics.RoutesFor(Moved(4.5f)), moved)), "no new graph once the world's clock had moved on");
+    }
+
     private const int Lobby = 701;
 
     /// <summary>A lobby x 0..6, z 0..8, with a doorway in its west wall at z 3..4 and the leaf as given.</summary>

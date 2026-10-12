@@ -2221,7 +2221,7 @@ public class GameServer
         if (nearest == null) return false;
         ref var hob = ref world.Get<SoundEmitterComponent>(nearest.Value);
         string line;
-        try { line = HobControls.Press(hob.SoundId, WindField.Now(), out string key); hob.SoundId = key; }
+        try { line = HobControls.Press(hob.SoundId, Clock.WorldTime, out string key); hob.SoundId = key; }
         catch (ArgumentException) { return false; }
         hob.SynthRunning = HobKey.TryParse(hob.SoundId, out var state) && state.AnyOn;
         SyncAudioComponent(nearest.Value.Id);
@@ -2329,7 +2329,7 @@ public class GameServer
     {
         var perMap = new Dictionary<string, WorldStateUpdate>();
         // One moment for every map: the wind's eddies are the server's, not a map's.
-        double clock = WindField.Now();
+        double clock = Clock.WorldTime;
         var travel = _environment.WindTravel;
 
         foreach (var session in _sessions.GetAllSessions())

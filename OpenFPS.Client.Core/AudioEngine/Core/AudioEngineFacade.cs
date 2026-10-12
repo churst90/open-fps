@@ -67,8 +67,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public AudioEngineFacade(IAudioProvider provider, IAudioClock? clock = null)
     {
         _provider = provider;
-        Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather();
         Clock = (provider as FmodAudioProvider)?.Clock ?? clock ?? new StopwatchAudioClock();
+        Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather { Clock = Clock };
     }
 
     /// <summary>The clock this world tells time by, for the host to read wherever it stamps something the mixer
@@ -104,7 +104,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     {
         while (_isRunning)
         {
-            var start = DateTime.Now;
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
             
             try
             {
@@ -120,7 +120,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             // 11 m away steps 2.7 % at 60 Hz (a staircase on a V10's note), 0.65 % at 250 Hz, under the
             // threshold where a pitch change is heard as a step.
             const int PeriodMs = 4;
-            int elapsed = (int)(DateTime.Now - start).TotalMilliseconds;
+            int elapsed = (int)System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;
             int sleep = Math.Max(1, PeriodMs - elapsed);
             Thread.Sleep(sleep);
             ReportTickRate();

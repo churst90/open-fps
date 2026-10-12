@@ -329,4 +329,39 @@ public class LibraryBoundaryTests
         Assert.Equal(6, all["Game.Snapshot"]);
         Assert.Empty(Crossings(compilation, libTree, new[] { "Clean" }, isHost));
     }
+
+    /// <summary>
+    /// No file of the library reads the machine's clocks but the two that are the clocks: AudioClock.cs (the
+    /// stopwatch behind IAudioClock, and RealTime for what waits on real work) and Wind.cs (the shared world
+    /// time, which IAudioClock.WorldTime gives out). A read anywhere else is a second timebase
+    /// (docs/SOUND_LIBRARY_BOUNDARY.md 4.1 and 4.3).
+    /// </summary>
+    [Fact]
+    public void The_library_reads_the_machines_clocks_in_one_place()
+    {
+        string root = RepoRoot();
+        // By name, wherever they live: Wind.cs goes to the physics project (docs/PHYSICS_BOUNDARY.md, stage 1).
+        var clocks = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "AudioClock.cs", "Wind.cs" };
+        var reads = new[] { "Environment.TickCount", "DateTime.UtcNow", "DateTime.Now", "DateTimeOffset.UtcNow", "DateTimeOffset.Now" };
+        var found = new List<string>();
+        int files = 0;
+        foreach (var entry in ReadFiles())
+        {
+            if (entry.Group != "lib" || clocks.Contains(Path.GetFileName(entry.Path))) continue;
+            string path = Path.Combine(root, entry.Path.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(path)) continue;
+            files++;
+            int n = 0;
+            foreach (string code in File.ReadLines(path))
+            {
+                n++;
+                string text = code.TrimStart();
+                if (text.StartsWith("//", StringComparison.Ordinal)) continue;
+                foreach (string read in reads)
+                    if (code.Contains(read, StringComparison.Ordinal)) found.Add($"{entry.Path}:{n}: {text}");
+            }
+        }
+        Assert.True(files > 200, $"only {files} library files found");
+        Assert.True(found.Count == 0, "the machine's clock is read outside AudioClock.cs and Wind.cs:\n  " + string.Join("\n  ", found));
+    }
 }

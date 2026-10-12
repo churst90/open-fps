@@ -57,7 +57,7 @@ public static class PaLeakSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         var provider = new FmodAudioProvider();
         // Kept running while the scenes play: it traces the reverb at the ear into the provider's set, as in the game.
-        using var worker = new AsyncAcousticWorker(acoustics, provider.Traced);
+        using var worker = new AsyncAcousticWorker(acoustics, provider.Traced, provider.Clock);
         {
             worker.UpdateWorld(world);
             worker.Start();

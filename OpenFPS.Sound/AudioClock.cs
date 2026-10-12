@@ -20,6 +20,38 @@ public interface IAudioClock
     double WorldTime { get; }
 }
 
+/// <summary>
+/// A world's clock as a whole-number stamp, for the holders that keep one in a long and read zero as "never":
+/// counted from a day before the clock's own zero, so no real stamp is ever zero or near it, whatever the clock
+/// reads (a stepped clock starts at nought). Only ever subtracted from another stamp of the same clock.
+/// </summary>
+public static class AudioClockStamps
+{
+    private const double OriginSeconds = 86_400.0;
+
+    /// <summary>Milliseconds on <paramref name="clock"/>.</summary>
+    public static long StampMs(this IAudioClock clock) => (long)((clock.Now + OriginSeconds) * 1000.0);
+
+    /// <summary>Ticks of 100 ns on <paramref name="clock"/>.</summary>
+    public static long StampTicks(this IAudioClock clock) => (long)((clock.Now + OriginSeconds) * TimeSpan.TicksPerSecond);
+}
+
+/// <summary>
+/// Real elapsed time, for what waits on real work and not on the world: how long a native scene that a tracer's
+/// thread may still hold is kept before it is freed, how long a sound's decoding is given, whether the
+/// microphone is still delivering, how long a build took. Never a world's clock: a stepped clock that jumped
+/// five seconds would free a scene under a running trace, and one standing still would never free it.
+/// Monotonic, where the calendar clock (DateTime.UtcNow) can step.
+/// </summary>
+public static class RealTime
+{
+    /// <summary>Milliseconds on a counter that only goes forward.</summary>
+    public static long Milliseconds => Environment.TickCount64;
+
+    /// <summary>Ticks of 100 ns on a counter that only goes forward.</summary>
+    public static long Ticks => (long)(Stopwatch.GetTimestamp() * ((double)TimeSpan.TicksPerSecond / Stopwatch.Frequency));
+}
+
 /// <summary>The clock a running game gives its audio: a stopwatch started when it is made, and the shared
 /// world time.</summary>
 public sealed class StopwatchAudioClock : IAudioClock

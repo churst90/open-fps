@@ -368,7 +368,7 @@ public partial class ClientAudioSystem
         _state = state;
         _drivingAids = new DrivingAids(audio);
         _spatial = new SpatialService();
-        _acoustics = new SpatialAcoustics(_spatial);
+        _acoustics = new SpatialAcoustics(_spatial) { Clock = audio.Clock };
         // After the acoustics, which it needs: a beacon behind a wall is not blipped.
         _beacons = new BeaconAids(audio, beacons, acoustics: _acoustics);
         // Shares this system's acoustics, so a rendered latch takes exactly the path a recorded one would.
@@ -398,7 +398,7 @@ public partial class ClientAudioSystem
         WorldAudio.Received = message => _birds.Heard(message, _audio.Clock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
-        _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced) { Manual = manualAcoustics };
+        _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced, audio.Clock) { Manual = manualAcoustics };
         WorldAudio.Worker = _acousticWorker;
         // Blips, the perched birds' calls and the loudest surface of each rain patch are heard by the worker's
         // answer, as every sustained voice is (P6).
@@ -1225,7 +1225,7 @@ public partial class ClientAudioSystem
         if (OpenFPS.Common.HobKey.IsKey(soundId))
         {
             if (!OpenFPS.Common.HobKey.TryParse(soundId, out var hob) || hob.AnyOn) return false;
-            return OpenFPS.Common.WindField.Now() - hob.At > OpenFPS.Common.HobKey.QuietAfterSeconds;
+            return _audio.Clock.WorldTime - hob.At > OpenFPS.Common.HobKey.QuietAfterSeconds;
         }
         if (!OpenFPS.Common.ModelKindTable.Is(soundId, OpenFPS.Common.ModelSynth.Flow)) return false;
         try

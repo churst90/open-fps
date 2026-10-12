@@ -59,7 +59,7 @@ public sealed class EarWindState : IGuardedUnit
         float target = Math.Clamp(listener.Exposure, 0f, 1f);
         if (_exposure < 0f) _exposure = target;
         _exposure += (target - _exposure) * (1f - MathF.Exp(-dt / ExposureSeconds));
-        var ears = EarWind.Hear(_weather.Wind, listener with { Exposure = _exposure }, WindField.Now());
+        var ears = EarWind.Hear(_weather.Wind, listener with { Exposure = _exposure }, _weather.Now);
         Synth.Control(ears);
     }
 }

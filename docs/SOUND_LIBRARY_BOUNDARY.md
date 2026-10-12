@@ -2260,7 +2260,8 @@ unregenerated (18.5).
 
 ### 18.3 What is left of stage 5
 
-`AudioClock` behind `IAudioClock` is built (18.6). In the order of section 8, the rest: `AudioPhysics` and
+`AudioClock` behind `IAudioClock` is built (18.6), and the world time and the machine's clocks with it (18.7).
+In the order of section 8, the rest: `AudioPhysics` and
 `MixerQuality.MixerRate` into the world's atmosphere and mixer format; `EarModel` and `Loudness` into
 `HearingSettings`; `MachineRegistry` and `ModelLibrary` into a `ModelCatalog`; the console levers into
 `MixSettings`; the lab levers into `LabLevers`. Seen on the way and left for those:
@@ -2346,7 +2347,7 @@ before and after, run on one machine, are the same line for line, and the guards
   server's. What stamps a death and what later asks how long ago it was read one clock, as before.
 - **The replay** gives its facade a stepped clock reading the replay's own time, from the start; the
   `AudioClock.UseForTest` override is gone with the static.
-- **Not moved, and why.** `WindField.Now()` is still read directly (the nature voices, the ear wind, the rain's
+- **Not moved, and why** (moved since: 18.7)**.** `WindField.Now()` is still read directly (the nature voices, the ear wind, the rain's
   clock, the stove, `ClientWorldState`'s wind ramp, the server's hob and weather broadcast): `IAudioClock.WorldTime`
   is there for them, and `StopwatchAudioClock` answers it with `WindField.Now()`, so moving them is the same
   mechanical change whenever it is wanted. The `Environment.TickCount64` and `DateTime.UtcNow` reads of 4.1
@@ -2373,3 +2374,64 @@ before and after, run on one machine, are the same line for line, and the guards
 - Why (Cody, 2026-10-07): "we're separating concerns in the code not just for resonance's use, but because
   it's just good coding practice." The split is judged as open-fps's own architecture: clear boundaries and
   one-way dependencies between the projects, whatever Resonance ends up consuming.
+
+### 18.7 The world time and the machine's clocks (third slice, 2026-10-12)
+
+Made on Windows and sent back as a patch. Nothing a player hears changes: in the game the world's clock is a
+stopwatch and the world time is the shared UTC count, as before.
+
+- **The world time is the clock's.** Every reader of `WindField.Now()` in the library and its two hosts now
+  reads its own world's `IAudioClock.WorldTime`:
+  - the weather: `WorldWeather.Clock` and `WorldWeather.Now`, which its `MeanSpeed`, `FromDegrees` and
+    `Turbulence` read;
+  - through the weather they already hold, the nature voices (the wind at a tree or a fountain, a fire's age,
+    the placed voices' control) and the ear wind;
+  - the rain's swell and a hob's knob: `RainVoiceState` and `StoveVoiceState` take the clock as they are
+    made, optional as a train's is, and the mixer passes its own;
+  - `ClientAudioSystem` (whether a hob has gone quiet) reads its facade's clock, `ClientWorldState` (where
+    the wind's ramp starts) its own, the server (a hob's press, the weather broadcast) `GameServer.Clock`.
+- **`WindField.Now()` stays as what the shared world time is.** `StopwatchAudioClock.WorldTime` and a
+  `SteppedAudioClock` whose world time was not set answer with it. The lab's three spikes and the tests that
+  make a fire's or a hob's key by hand still call it: they make keys for voices that read that same time.
+- **Who gives the weather its clock.** The mixer: `FmodAudioProvider.Weather` and `Traced` are on its
+  `Clock`, from the constructor and again when a host gives it one (`init`). A facade with no FMOD mixer
+  makes its weather on the clock it was given. A `WorldWeather` made alone has a clock of its own.
+- **The machine's clocks, by what each read was for.** The 34 reads of `Environment.TickCount64` and
+  `DateTime.UtcNow` in 7 library files (4.3), and three more the new guard found.
+  - *How old something in the world is: the world's clock, 19 reads.* `AsyncAcousticWorker` (15): how long a
+    simulated path is held when the pool is full (1 s), how long a recent answer stands for a neighbour
+    (1.5 s), when a source nobody asks about is released (5 s), how long a route is reused (0.5 s, 2 s at
+    most), its three log limiters, and how often the doors' scene (0.3 s) and the routes (3 s) are made again.
+    `SpatialAcoustics` (1): the same door wait for the routes it makes itself. `LateField` (1) stamps its
+    answers and `FmodAudioProvider` (2) ages them. `ClientAudioSystem` gives the worker and its
+    `SpatialAcoustics` the facade's clock; `LateField` has its set's (`TracedReverbSet.Clock`, the mixer's).
+    A worker or a `SpatialAcoustics` made alone has a clock of its own.
+  - *Waits on real work: `RealTime`, 14 reads of the survey's and three written since.* The five seconds a retired native scene or tile set is kept
+    before it is freed (the worker, 5) and a retired cabin trace (`TracedReverb`, 2): a tracer's thread may
+    still hold it, so a stepped clock that jumped would free it under a running trace, and one standing still
+    would never free it. How long a scene's build took (the worker, 3). How long a sound's decoding is given
+    before it is reported (`FmodAudioProvider`, 2). Whether the microphone is still delivering (`OwnVoice`,
+    2). Written since the survey, and of the same kind: how long after Steam Audio would not make a traced
+    stage before one is tried again (`TracedStages`, 3). `RealTime` is a monotonic counter (`Environment.TickCount64`, `Stopwatch`), where
+    `DateTime.UtcNow` could step when the machine's calendar is corrected.
+  - *The shared world time itself:* `Wind.cs`, 1 read.
+  - *Three the survey did not count:* `AudioEngineFacade`'s loop timed each pass with `DateTime.Now` (a
+    `Stopwatch` measure now), and `RainField` seeded its near drops from `Environment.TickCount` when given
+    no seed (`Random.Shared` now).
+- **Stamps.** The worker and the late field keep their stamps as whole numbers and read zero as "never".
+  `AudioClockStamps.StampMs` and `StampTicks` count from a day before the clock's own zero, so a stamp is
+  never zero or near it whatever the clock reads (a stepped clock starts at nought), and the arithmetic round
+  each read is unchanged.
+- **The guard.** `LibraryBoundaryTests.The_library_reads_the_machines_clocks_in_one_place`: no library file
+  but `AudioClock.cs` and `Wind.cs` reads `Environment.TickCount`, `DateTime.UtcNow` or `DateTime.Now`.
+  A new read anywhere else fails it with the file and the line.
+- **In a test or an offline render** the waits above follow the stepped clock: a door's scene is made again
+  after 0.3 s of the world's time, not the machine's. A harness whose clock never moves makes the first
+  rebuild (nothing has been stamped yet) and then waits for its clock.
+- **Statics.** None gone and none that can change added: `RealTime` and `AudioClockStamps` hold nothing.
+  `files.tsv` and `allowed.tsv` are unchanged (no new file, no new crossing).
+- **The wire hash** changes, as `AudioClock.cs` and `WorldWeather.cs` are in `OpenFPS.Sound` outside
+  `Core/` (6670f1e3b2c1 at 936576a4, 20438ce0ed1c after). Nothing sent changed. A client and a server from either
+  side of this refuse each other at login.
+- **Not run here** (no Steam Audio on the Windows machine): the worker's simulated paths, its scene rebuilds
+  and retired scenes, the late field and the cabin traces. The patch's README lists them by file and method.

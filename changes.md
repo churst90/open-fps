@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Library stage 5, the world time and the machine's clocks (docs/SOUND_LIBRARY_BOUNDARY.md 18.7). Nothing a
+  player hears changes. The gusts, a fire's age, the rain's swell and a hob's knob are told on their world's
+  clock (`IAudioClock.WorldTime`), and so is how old a traced answer, a held path or a route is, and how often
+  a swinging door's scene is made again. What only waits on real work (a retired native scene's five seconds,
+  a sound's decoding, the microphone) reads one monotonic counter, `RealTime`. No library file reads the
+  machine's clocks but `AudioClock.cs` and `Wind.cs`, and a test holds that. The wire hash changes, so the
+  server and the Windows client go out together.
 - The engine packages survey (docs/ENGINE_PACKAGES.md). No engine code changed. Every file of the eleven
   projects is sorted into a package or the game, and the references between them counted
   (`tools/engine_packages/run.sh`). Seven new packages are proposed: Materials (the material table, which

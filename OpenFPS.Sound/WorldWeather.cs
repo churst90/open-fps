@@ -11,10 +11,19 @@ namespace OpenFPS.Common;
 /// The host fills it with the conditions it knows and it fetches nothing itself: open-fps's client gives it
 /// the server's broadcast (the wind ramp, the rain, the ground's water); a lab gives it numbers. Whatever
 /// drives the host's weather, a simulation or observations of a real place, reaches the sound the same way.
-/// The gusts are read on the shared world clock (<see cref="WindField.Now"/>), so every client agrees.
+/// The gusts are read on its world's clock (<see cref="IAudioClock.WorldTime"/>), the one time the server and
+/// every client agree on.
 /// </summary>
 public sealed class WorldWeather
 {
+    /// <summary>The clock of the world this is the weather of, which whoever holds both gives it (the mixer:
+    /// FmodAudioProvider.Clock). One of its own until then, which reads the shared world time.</summary>
+    public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
+
+    /// <summary>The world time now, s (<see cref="IAudioClock.WorldTime"/>): the moment the gusts, a lit fire's
+    /// age and the rain's swell are read at.</summary>
+    public double Now => Clock.WorldTime;
+
     /// <summary>The wind: a ramp from the last state of the air to the newest (<see cref="WindWeather.Following"/>).
     /// Swapped whole, so a reader on the mixer thread never sees half of one broadcast and half of the next.</summary>
     public WindWeather Wind
@@ -37,16 +46,16 @@ public sealed class WorldWeather
     /// direction and turbulence.</summary>
     public float MeanSpeed
     {
-        get => Wind.At(WindField.Now()).Speed;
-        set { var a = Wind.At(WindField.Now()); Wind = WindWeather.Steady(value, a.FromDegrees, a.Turbulence); }
+        get => Wind.At(Now).Speed;
+        set { var a = Wind.At(Now); Wind = WindWeather.Steady(value, a.FromDegrees, a.Turbulence); }
     }
 
     /// <summary>Where it blows FROM now, degrees clockwise from north (the way a forecast says it). Setting it
     /// makes a steady wind.</summary>
     public float FromDegrees
     {
-        get => Wind.At(WindField.Now()).FromDegrees;
-        set { var a = Wind.At(WindField.Now()); Wind = WindWeather.Steady(a.Speed, value, a.Turbulence); }
+        get => Wind.At(Now).FromDegrees;
+        set { var a = Wind.At(Now); Wind = WindWeather.Steady(a.Speed, value, a.Turbulence); }
     }
 
     /// <summary>Standard deviation of the speed over its mean, now: about 1 / ln(z / z0) (EN 1991-1-4,
@@ -56,8 +65,8 @@ public sealed class WorldWeather
     /// gustiness moves it a little (<see cref="WindAir.TurbulenceFor"/>). Setting it makes a steady wind.</summary>
     public float Turbulence
     {
-        get => Wind.At(WindField.Now()).Turbulence;
-        set { var a = Wind.At(WindField.Now()); Wind = WindWeather.Steady(a.Speed, a.FromDegrees, value); }
+        get => Wind.At(Now).Turbulence;
+        set { var a = Wind.At(Now); Wind = WindWeather.Steady(a.Speed, a.FromDegrees, value); }
     }
 
     /// <summary>The wind speed at a place and moment under this weather, m/s (<see cref="WindField.SpeedAt(WindWeather, float, float, float, double)"/>).</summary>

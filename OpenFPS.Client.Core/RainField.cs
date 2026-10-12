@@ -821,12 +821,12 @@ public sealed class RainField
     public RainSurvey.Result? LastSurvey => _last;
 
     /// <summary>The rain voices on <paramref name="audio"/>, with paths through <paramref name="acoustics"/>
-    /// when given; <paramref name="seed"/> seeds the near drops, from the clock when null (the game).</summary>
+    /// when given; <paramref name="seed"/> seeds the near drops, a fresh one when null (the game).</summary>
     public RainField(AudioEngineFacade audio, SpatialAcoustics? acoustics, int? seed = null)
     {
         _audio = audio;
         _acoustics = acoustics;
-        _nearDrops = new NearDrops(seed ?? Environment.TickCount);
+        _nearDrops = new NearDrops(seed ?? Random.Shared.Next());
     }
 
     /// <summary>The survey runs on the caller's thread, so its answer is taken up on the next update every
