@@ -41,6 +41,7 @@ stages come after the special-cases audit's parts.
 13. Appendices: the inventory, the crossings, the presets' members
 14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
+16. Stage 2 as it is built: the tyre (2026-10-12)
 
 ---
 
@@ -1485,6 +1486,8 @@ Two small seams let two of them move whole, with no number changed:
 
 ### 15.4 Not moved: `WheelDynamics.cs`
 
+(Moved since, with the tyre's split: 16.1.)
+
 Section 7 lists it to move whole. It cannot yet: it holds a `TyreProfile`, reads `TyreFriction.G` and
 `TyreFriction.SquealOnset`, and is made from a `VehicleProfile`, three types that stage 2 splits between the
 physics and the sound (4.2). It stays in `OpenFPS.Sound` until that split, `MagicCurve` with it, and reads the
@@ -1510,6 +1513,49 @@ running gear and the grip law from the physics. Its crossing (the road water) is
   covers moved (812896a959fb at `91aee50e`, 23112534dcd8 after). Nothing sent changed. A client and a server from either
   side of this refuse each other at login.
 - `DoorModelFingerprint` is unchanged (ab2b953cc671): it lists no file that moved.
+
+## 16. Stage 2 as it is built
+
+Stage 2 comes in pieces, each sent as it is finished. Each says what it changed and what is left.
+
+### 16.1 The tyre (2026-10-12)
+
+Made on Windows and sent back as a patch, on main `1df7f8d8`. Nothing a player sees or hears changes: every
+number is where it was, and the guards pass unregenerated.
+
+- **Two halves joined by the preset's id.** A tyre's mechanics are `TyreMechanics` in
+  `OpenFPS.Physics/TyreGrip.cs`: its peak grip, the nine Magic Formula numbers, its inflation pressure and its
+  tread depth, with a preset under each id the sound's `TyreProfile.Presets` has (`sports_asphalt`,
+  `race_slick`, `truck_asphalt`). The sound's half keeps its name. `TyreProfile.Mechanics` is its physics
+  half, and a preset of the sound's names the mechanics of the same id.
+- **One place for each number, one shape for whoever stores it.** The twelve mechanical members are still
+  members of `TyreProfile`, where they were, with what the editor says of each; each reads and writes
+  `Mechanics`. `Mechanics` itself is not stored or listed (`[JsonIgnore]`, which the editor's reader also
+  skips). So a vehicle saved before this reads back the same, the editor's list of a tyre's fields is the
+  same eighteen in the same order, and a parts list's tyre settings assemble as before. When the Models
+  catalogue takes the two halves over (docs/ENGINE_PACKAGES.md, stage 2), it finds them under one id and
+  renames nothing.
+- **The friction circle is the physics'.** `TyreGrip` holds `G`, `Demand` and `PatchSlidesFrom` (0.78 of
+  capacity, where the contact patch begins to slide). The sound's `TyreFriction` keeps the squeal: its onset
+  is `TyreGrip.PatchSlidesFrom`, one number, and the amounts, the pitch and the shift chirp are as they were.
+- **A vehicle's physics half begins:** `VehicleMechanics` (`OpenFPS.Physics/VehicleMechanics.cs`) is its
+  running gear with every axle placed, its tyres' mechanics and its mass, and `VehicleProfile.Mechanics`
+  makes one. The rest of the vehicle's mechanical members (drag area, rolling resistance, the gearbox, the
+  engine's torque) join it as the vehicle preset is split.
+- **`WheelDynamics.cs` moved** to `OpenFPS.Physics`, `MagicCurve` with it (stage 1 could not move it:
+  15.4). It is made from a `VehicleMechanics` and holds a `TyreMechanics`. The 32 places that made one from a
+  `VehicleProfile` make it from the vehicle's `Mechanics`.
+- **The ratchet.** `TyreFriction` and `TyreProfile` are the sound's alone now, so they are off the list of
+  types the physics may name; `TyreGrip`, `TyreMechanics` and `VehicleMechanics` are on it. The allowance
+  stays empty.
+- **Tests** (`PresetHalvesTests`): the two halves under one id; each mechanical member of the sound's half
+  is its mechanics' and keeps its editor's attribute; the presets' numbers are what they were; a tyre is
+  stored and edited in the shape it had; a vehicle's wheels are made from its mechanics.
+- **The wire hash** changes, as files it covers changed and one moved (6670f1e3b2c1 at `1df7f8d8`,
+  8244346e803c after). Nothing sent changed. `DoorModelFingerprint` is unchanged (ab2b953cc671).
+- **Left of stage 2:** `VehicleProfile`, `EngineProfile` and `VehicleSpec` as two halves, the same way;
+  `Ricochet`, `PhysicsUtils` and the rest of `PhysicsConstants` split as in 4.2; one constant for each law
+  (gravity, air density, rolling resistance and drag, brakes); `WindModel` folded into `WindField`.
 
 ## Decisions (Cody, 2026-10-11)
 

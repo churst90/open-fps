@@ -11,6 +11,11 @@ Recent work, newest first. `git log` has the rest.
   a sound's decoding, the microphone) reads one monotonic counter, `RealTime`. No library file reads the
   machine's clocks but `AudioClock.cs` and `Wind.cs`, and a test holds that. The wire hash changes, so the
   server and the Windows client go out together.
+- Physics stage 2, the tyre (docs/PHYSICS_BOUNDARY.md 16.1). Nothing a player sees or hears changes. A tyre
+  preset is two halves joined by its id: its mechanics (grip, the shape of its force against slip, pressure,
+  tread depth) are the physics', and its sound (tread tone, roar, squeal) the sound's. A tyre is still
+  stored and edited as one thing, in the shape it had. The wheel model moved to the physics project, made
+  from a vehicle's mechanics. The wire hash changes, so the server and the Windows client go out together.
 - The engine packages survey (docs/ENGINE_PACKAGES.md). No engine code changed. Every file of the eleven
   projects is sorted into a package or the game, and the references between them counted
   (`tools/engine_packages/run.sh`). Seven new packages are proposed: Materials (the material table, which
