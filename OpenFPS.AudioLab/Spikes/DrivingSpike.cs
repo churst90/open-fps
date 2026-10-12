@@ -22,6 +22,12 @@ namespace OpenFPS.AudioLab.Spikes;
 /// and the aids' speech in DIR/speech.csv. Scenes: horns and the siren from kerb and seat (compare adds
 /// street life's honk), a right turn off Main Street with and without the brake cue, drifting onto the
 /// lines, rails, a crossing's gates and bell, a light single landing and taking off.
+///
+/// set=ranks (not in all): the provider's own orderings (docs/SPECIAL_CASES_AUDIT.md, S20). Ten cars idle on a
+/// street ahead at 8 to 160 m, alone, then with a garden fire pit 3 m off, then with it 35 m off, then in
+/// moderate rain (six cars from 45 m out and the far fire pit for six traced echo rigs); each second it notes which
+/// engines run at full detail, which voices hold the late field's slots and the traced echoes, and the render
+/// pool's order, in DIR/ranks.txt, the last of each scene printed.
 /// </summary>
 public static class DrivingSpike
 {
@@ -577,11 +583,121 @@ public static class DrivingSpike
             Pump(1.0);
         }
 
+        // ── The provider's own orderings (S20) ──────────────────────────────────────────────────
+        var ranksLog = new StringBuilder();
+        void Ranks()
+        {
+            string[] presets = { "i4_compact", "i4_midsize", "v8_mild", "transit_bus", "i6_street", "boxer4_street", "sportbike", "v8_glasspack", "charger440", "i4_midsize" };
+            float[] metres = { 8f, 14f, 22f, 32f, 45f, 60f, 80f, 105f, 130f, 160f };
+            var names = new Dictionary<int, string>();
+            var cars = new List<(int Id, Vector3 At, Quaternion Heading, Rig Rig)>();
+            // The street as a place of its own, as a map's are: the late field traces only sources sending to the
+            // listener's place.
+            int I(string m) => AcousticRegistry.TryGetResonanceIndex(m, out int k) ? k : 0;
+            int street = nextId++;
+            world.RegisterDefinition(new EntityDefinition
+            {
+                EntityId = street, Type = EntityType.Trigger,
+                Transform = new Transform { Position = new Vector3(0f, 10f, 0f), Rotation = Quaternion.Identity, Scale = Vector3.One },
+                Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(300f, 20f, 300f), IsSolid = false },
+                Region = new RegionComponent
+                {
+                    FriendlyName = "Ranks street", IsIndoor = false, RoomSize = new Vector3(300f, 20f, 300f), ReverbTimeScale = 1f,
+                    Materials = new[] { I("Asphalt"), I("Asphalt"), I("Brick"), I("Brick"), I("Brick"), I("Brick") },
+                },
+            });
+            Stand(Vector3.Zero, 0f);
+            for (int i = 0; i < presets.Length; i++)
+            {
+                // Along a street 6 m ahead, east and west in turn, each car `metres` from the ear.
+                float side = i % 2 == 0 ? 1f : -1f;
+                var at = new Vector3(side * MathF.Sqrt(metres[i] * metres[i] - 36f), 0f, 6f);
+                var heading = Quaternion.CreateFromAxisAngle(Vector3.UnitY, side * MathF.PI / 2f);
+                int id = AddVehicle(presets[i], at, heading);
+                names[id] = $"{presets[i]}@{metres[i]:0}m";
+                cars.Add((id, at, heading, new Rig(MachineRegistry.VehicleFor(presets[i]))));
+            }
+            perFrame = _ =>
+            {
+                foreach (var (id, at, heading, rig) in cars) State(id, at, heading, Vector3.Zero, rig.Wire(0f, 0f), Sig(false));
+            };
+            string Name(FmodAudioProvider.RankedVoice v)
+                => names.TryGetValue(v.Id, out var n) ? n : $"{v.Sound}#{v.Id}@{v.Distance:0}m";
+            void Phase(string label, double settle, int samples)
+            {
+                Pump(settle);
+                double start = clock.Elapsed.TotalSeconds;
+                for (int k = 0; k < samples; k++)
+                {
+                    Pump(1.0);
+                    var r = provider.Ranks();
+                    var byId = new Dictionary<int, FmodAudioProvider.RankedVoice>();
+                    foreach (var v in r.Voices) byId[v.Id] = v;
+                    var full = r.Voices.Where(v => v.Detail == OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full).OrderBy(v => v.Distance).Select(Name);
+                    var reduced = r.Voices.Where(v => v.Detail == OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced).OrderBy(v => v.Distance).Select(Name);
+                    var late = r.Voices.Where(v => v.LateField).OrderBy(v => v.Distance).Select(Name);
+                    var echoes = r.Voices.Where(v => v.Echoes).OrderBy(v => v.Distance).Select(Name);
+                    var order = r.RenderAhead.Select(id => byId.TryGetValue(id, out var v) ? Name(v) : $"#{id}");
+                    string line = $"[{label} {k + 1}] full: {string.Join(", ", full)}\n"
+                                + $"    reduced: {string.Join(", ", reduced)}\n"
+                                + $"    late field: {string.Join(", ", late)}\n"
+                                + $"    traced echoes: {string.Join(", ", echoes)}\n"
+                                + $"    render ahead: {string.Join(", ", order)}\n";
+                    ranksLog.Append(line);
+                    if (k == samples - 1) Console.Write(line);
+                }
+                segments.Add(new Segment(label, start, clock.Elapsed.TotalSeconds - start, "ranks"));
+            }
+            // A garden fire pit as its prefab places it (fire_pit.json): 45 dB of headroom, given back as 29 dB of gain.
+            int AddFire(float x, float z)
+            {
+                var spec = FireSpec.ByName("fire_pit");
+                int fire = nextId++;
+                var fireDef = new EntityDefinition
+                {
+                    EntityId = fire, Type = EntityType.StaticObject,
+                    Transform = new Transform { Position = new Vector3(x, FireSpike.Height(spec), z), Rotation = Quaternion.Identity, Scale = Vector3.One },
+                    Collider = new ColliderComponent { Shape = ColliderShape.Box, IsSolid = false,
+                                                       Size = new Vector3(spec.AreaWidth, MathF.Max(0.5f, spec.FlameHeightMetres), spec.AreaDepth) },
+                    Material = new MaterialComponent { Material = "None" },
+                };
+                fireDef.SoundEmitter = new SoundEmitterComponent
+                {
+                    IsSynth = true, SoundId = FireSpec.KeyFor("fire_pit"), Mode = PlaybackMode.LoopOne, Volume = 1f, Range = 120f, MinDistance = 1f,
+                };
+                world.RegisterDefinition(fireDef);
+                names[fire] = $"fire_pit@{new Vector2(x, z).Length():0}m";
+                return fire;
+            }
+            Phase("cars", 4.0, 6);
+            int near = AddFire(3f, 0f);
+            Phase("cars+fire", 4.0, 6);
+            Remove(near);
+            Pump(2.0);
+            // Past the distance traced echoes start at (30 m), where it is one of their candidates.
+            int far = AddFire(-5f, 35f);
+            Phase("cars+far fire", 4.0, 6);
+            Remove(far);
+            Pump(2.0);
+            world.UpdateAtmosphere(new WorldStateUpdate
+            {
+                Temperature = 15f, Humidity = 0.8f, AirPressure = 1013.25f, AirAbsorptionMultiplier = 1f,
+                PrecipitationIntensity = 0.5f, RainRateMmPerHour = Rainfall.ModerateRate,
+            });
+            Phase("cars+rain", 6.0, 6);
+            world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 15f, Humidity = 0.6f, AirPressure = 1013.25f, AirAbsorptionMultiplier = 1f });
+            perFrame = null;
+            Remove(cars.Select(c => c.Id).Append(street).ToArray());
+            Pump(2.0);
+            File.WriteAllText(Path.Combine(outDir, "ranks.txt"), ranksLog.ToString());
+        }
+
         try
         {
             Stand(new Vector3(0f, 0f, -300f), 0f);
             Pump(2.0);
             Record("silence", 2.0, "");
+            if (set.Split(',').Contains("ranks")) Ranks();
             if (Want("horn"))
             {
                 Horn("i4_economy", seated: false, "horn_car_kerb");

@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Audit S20, the mixer's own orderings (docs/SPECIAL_CASES_AUDIT.md, "S20 as built"), unheard. Which engines
+  the mixer renders first, which run at full detail, which sources its late-field trace and its traced echoes
+  go to are decided by how loud each is at the ear, the number the voice budget ranks by. Near a fire or in
+  rain every car's engine went to reduced detail, the near ones too, because the fire's and the rain's quiet
+  renders count 29 dB of make-up gain that is no louder at the ear; they stay at full detail now. In rain the
+  rain round you no longer takes almost every late-field slot from the traffic (15 of 16, now 9), and a garden
+  fire 35 m off no longer takes a far car's traced echoes. Measured with `--driving set=ranks`.
 - Audit P6, the rain (docs/SPECIAL_CASES_AUDIT.md, "P6, the rain, as built"), unheard. Rain behind walls is
   heard by the acoustic worker's answer, as cars, beacons and birds are: the heaviest surface of each patch is
   asked under a probe of its own, and the hand-rolled tracer stands in until the answer comes and for the
