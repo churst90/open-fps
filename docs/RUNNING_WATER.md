@@ -475,7 +475,8 @@ its gutter outlet at the eaves (64 each). All appended at the end of `tools/gen_
 
 ### 10.7 Not modelled
 
-- Toilet flush and cistern refill: not built (they would need a timed sequence and a valve's hiss).
+- Toilet flush and cistern refill: not built (they would need a timed sequence and a valve's hiss). The parts
+  are written down in section 14.
 - The plug as its own control; a person standing in the shower; washing-up liquid.
 - A filling vessel's rising note (the basin is too wide for it to matter); a kettle or a bucket.
 - People in the flats using their taps (NPC use).
@@ -923,3 +924,46 @@ second of Magnolia's ground water on the server (the ladders and 2,210 ponds) 0.
 - Culverts as sound (the fall out of the pipe at each driveway is a ditch's loudest place), weirs and steps.
 - A wider world window or Barnes's tiled Priority-Flood (13.3). Base flow from the climate when the weather has one.
 - Other liquids (oil, fuel) on the same lines with their own density and viscosity.
+
+## 14. A toilet flush and refill: the parts (not built, filed 2026-10-12)
+
+Written down for when it is built. The parts and numbers come from a sketch made for Resonance on 2026-10-12
+(a Python renderer there, from the physics, checked against no recording). Nothing of it is in open-fps: built
+here it is a live model of its parts, with the tank's water level as the state every part reads (the roar from
+the outflow, the filling note from the air left, the valve's hiss from its gap), fitted to the three toilet
+recordings in the round 2 references (`~/openfps-scratch-archive/running-water-round2-2026-10-06/refs`), measured
+as round 1 before anyone listens. The flush is a door's kind of event (a body works the handle); the refill
+then runs on its own for about 45 s.
+
+The toilet: a tank of 6 L (1.6 US gallons), a 2 inch flush valve, a float fill valve. In the order heard:
+
+1. **The trip lever.** The pivot clicks on the porcelain (2.9 and 4.6 kHz), the arm knocks (600 Hz), the chain's
+   links tick as they come taut (5 to 7 kHz). The handle springs back about 0.55 s later, quieter.
+2. **The flapper** lifts off the flush valve's seat: a low pop (85 Hz) as its seal breaks.
+3. **The tank empties.** By Torricelli the flow falls in a straight line, Q(t) = Q0 (1 - t/T), with Q0 = 2.4 L/s
+   and T = 5 s for 6 L. The water's power is flow times head, so the roar's pressure goes as (1 - t/T)^1.5. Heard
+   twice: in the tank under the lid as a low rush (a band at 350 Hz), and in the open bowl as the roar.
+4. **The bowl.** Water in at the rim and the jet: bright splashing (2.5 to 6 kHz) over the roar. At about 1.2 s the
+   trapway is full and the siphon starts: the splashing drops, the roar deepens from 950 to 550 Hz, and a rumble
+   below 160 Hz comes in as the bowl is drawn down.
+5. **The siphon breaks.** At about 4.5 s air reaches the trap and it breaks in gulps (nine in the sketch): each a
+   bubble at Minnaert's note, f = 3.26 / R (R from 12 to 26 mm, 270 to 125 Hz), with water slurping round it,
+   each slower and deeper than the last, then one last deep gulp near 100 Hz.
+6. **The flapper drops back** as the tank runs out: a soft thud (70 Hz) and a small splash.
+7. **The fill valve** opens within the first second, hidden under the roar. Mains water at 3 to 4 bar through a
+   small orifice, about 25 m/s: a hiss between 2 and 10 kHz, heard through the tank and its lid. It runs about
+   0.13 L/s, so the tank takes about 46 s.
+8. **The tank fills.** The inlet's splash and bubbles (1 to 3.5 mm, ringing at 900 to 3,300 Hz), loud on the bare
+   bottom and fading within a few seconds as the outlet goes under. The air over the water is a pipe closed at
+   the water, a quarter wave of its depth, so its note climbs from 27 cm of air (about 320 Hz) to 7 cm (about
+   1,200 Hz).
+9. **The refill tube** trickles down the overflow pipe, refilling the bowl's trap: a thin hollow note at the
+   pipe's quarter wave (25 cm, 343 Hz) and its third, with drips.
+10. **The valve shuts.** Over its last 3 s the float closes the valve: the hiss climbs from 4.8 to 8.5 kHz and thins
+    as it fades, then the valve seats with a click and the pipe knocks once. A few drips after.
+
+What to read from the place rather than fix: the tank's size and the valve (older toilets hold 13 L; dual flush
+has two volumes), the mains pressure, the room's surfaces (a tiled bathroom answers the roar), and whether the
+lid is on. Already in the engine to build on: bubbles at Minnaert's note and falling water (section 12), a
+valve's hiss as an orifice jet, struck rings for the lever and the porcelain.
+

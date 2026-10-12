@@ -524,7 +524,7 @@ and the server's voice line.
   the kerb.
 - Showers 11-22 dB darker than the recordings at 4-16 kHz; the dripping tap rings steel where real
   drips plink into water; the violent-rain gutter outlet 4-6 dB heavy at 250-500 Hz.
-- Not built: toilet flush and cistern refill; the plug as its own control; NPCs using taps; pipe walls
+- Not built: toilet flush and cistern refill (its parts written down, docs/RUNNING_WATER.md section 14); the plug as its own control; NPCs using taps; pipe walls
   radiating; trap seals; snowmelt.
 - Water over the ground: approved by ear 2026-10-10 (inbox/water-over-terrain-2026-10-10, "water over
   terrain sounds good"); keep how it sounds. Next (docs/RUNNING_WATER.md 13.9): the shallow-water model
