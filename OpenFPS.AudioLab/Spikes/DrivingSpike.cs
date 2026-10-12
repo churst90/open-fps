@@ -538,6 +538,9 @@ public static class DrivingSpike
                 last = t;
                 Vector3 pos, vel;
                 float hdg;
+                // Its lever as the server that flies it would send it (MachinePower.AircraftLever).
+                AircraftGroundRun? onWheels = null;
+                bool liftedOff = false;
                 if (run == null && phase == "approach")
                 {
                     float remaining = -along;
@@ -555,6 +558,7 @@ public static class DrivingSpike
                     pos = run.Position; vel = run.Velocity; hdg = run.Heading;
                     if (run.State == AircraftGroundRun.Phase.Done)
                     {
+                        liftedOff = true;
                         phase = "climb";
                         climbFrom = run.Position;
                         climbDir = Vector3.Normalize(new Vector3(run.Velocity.X, 0f, run.Velocity.Z));
@@ -572,7 +576,9 @@ public static class DrivingSpike
                     if (climbFor > 12) done = true;
                 }
                 var rot = Quaternion.CreateFromYawPitchRoll(hdg, 0f, 0f);
-                world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = pos, Rotation = rot }), LinearVelocity = vel } });
+                if (phase == "ground") onWheels = run;
+                float lever = liftedOff ? 1f : MachinePower.AircraftLever(air, onWheels, phase == "approach", pos.Y - touchdown.Y, vel);
+                world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = pos, Rotation = rot }), LinearVelocity = vel, Lever = MachinePower.Encode(lever) } });
                 log.Append(CultureInfo.InvariantCulture, $"{t - t0:F2},{phase}{(run != null ? "/" + run.State : "")},{pos.X:F1},{pos.Y:F1},{pos.Z:F1},{vel.Length():F1}\n");
             };
             RecordUntil(label, () => done, 200, $"{air.Name}: a 3-degree approach from 700 m, touchdown, landing roll, the turn round, a 4 s hold, the take-off roll and the climb-out; "

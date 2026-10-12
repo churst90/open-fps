@@ -1820,6 +1820,13 @@ public class GameServer
                         // A driven vehicle's horn and siren switches: nothing a listener can observe
                         // says a hand is on the horn.
                         if (isDynamic) state.Signals = VehicleSignals.WireByte(world, e);
+                        // A patrol car in traffic has nobody's hand on its switch: its siren is what the
+                        // server's own controller has it doing, the same for every client.
+                        if (state.Signals == 0 && _vehicles.TryGetSiren(mapEntry.Key, e.Id, out var sirenMode) && sirenMode != SirenMode.Off)
+                            state.Signals = VehicleSignalBits.Encode(manual: false, horn: false, sirenOn: true, sirenMode);
+                        // How hard a train or an aeroplane is working, which the server knows from driving it.
+                        if (_rail.TryGetLever(mapEntry.Key, e.Id, out float lever) || _vehicles.TryGetLever(mapEntry.Key, e.Id, out lever))
+                            state.Lever = MachinePower.Encode(lever);
 
                         // A dynamic entity is corrected by the next tick, so unreliable; a moved static is
                         // never resent, so reliable, or a dropped packet leaves a wall where none is. A

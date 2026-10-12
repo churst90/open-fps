@@ -140,8 +140,9 @@ public static class GameLevelsSpike
             Move(id, at, rot, velocity);
             return id;
         }
-        void Move(int id, Vector3 at, Quaternion rot, Vector3 velocity)
-            => world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = rot }), LinearVelocity = velocity } });
+        // lever: a train's notch or an aeroplane's power lever, as the server that drives it sends it (MachinePower).
+        void Move(int id, Vector3 at, Quaternion rot, Vector3 velocity, float lever = 0f)
+            => world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = rot }), LinearVelocity = velocity, Lever = MachinePower.Encode(lever) } });
         int AddEmitter(string soundId, Vector3 at, float range, float minDistance)
         {
             int id = nextId++;
@@ -402,8 +403,13 @@ public static class GameLevelsSpike
             def.SoundEmitter.Range = Loudness.AudibleRange(p.SourceLevelDb);
             def.SoundEmitter.MinDistance = 3f;
             world.RegisterDefinition(def);
-            Move(id, at0, rot, vel0);
-            perFrame = t => { var (a, v) = Path(t); Move(id, a, rot, v); };
+            // Down the approach its flight path's lever, a piston's closed throttle in the flare; on its wheels
+            // the roll-out's (the path here slows it by hand, with no ground run of its own).
+            float Lever(Vector3 a, Vector3 v) => a.Y > wheels
+                ? MachinePower.AircraftLever(p, null, landing: true, a.Y - wheels, v)
+                : MachinePower.GroundLever(AircraftGroundRun.Phase.Rollout, v.Length(), p.Power);
+            Move(id, at0, rot, vel0, Lever(at0, vel0));
+            perFrame = t => { var (a, v) = Path(t); Move(id, a, rot, v, Lever(a, v)); };
             Pump(1.5);
             Console.WriteLine($"    {preset}: approach {vApp:F0} m/s, spin-up {p.Gear?.SpinUpSeconds(vApp) * 1000f:F0} ms at touchdown");
             Record($"landing {preset} {offset:0}m", approach + rollout);
@@ -447,14 +453,15 @@ public static class GameLevelsSpike
                 def.SoundEmitter.Range = Loudness.AudibleRange(src.LevelDb);
                 def.SoundEmitter.MinDistance = 3f;
                 world.RegisterDefinition(def);
-                Move(id, at, rot, vel);
+                Move(id, at, rot, vel, MachinePower.TrainHolding);
             }
             bool sounded = false;
             perFrame = t =>
             {
                 float head = Head(t);
                 for (int i = 0; i < layout.Count; i++)
-                    if (ids[i] is int id) Move(id, new Vector3(head - layout[i].AlongMetres, layout[i].HeightMetres, 0f), rot, vel);
+                    // Holding its speed past the crossing: the notch the server sends for it.
+                    if (ids[i] is int id) Move(id, new Vector3(head - layout[i].AlongMetres, layout[i].HeightMetres, 0f), rot, vel, MachinePower.TrainHolding);
                 float eta = -head / speed;
                 if (!sounded && eta <= hornLead)
                 {

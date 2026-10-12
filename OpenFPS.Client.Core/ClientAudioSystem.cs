@@ -480,7 +480,6 @@ public partial class ClientAudioSystem
         }
         if (_spreading.Remove(entityId, out var spreading) && spreading.Voiced) StopOuter(entityId, spreading, now: true);
         if (_sirenVoiced.Remove(entityId)) _voices.Stop(SirenVoiceId(entityId));
-        _sirenControl.Remove(entityId);
         if (_heldHorns.Remove(entityId)) _voices.Stop(HeldHornVoiceId(entityId));
         _placed.Remove(entityId);
         _speakerOf.Remove(entityId);
@@ -1105,43 +1104,18 @@ public partial class ClientAudioSystem
     private static (float LevelDb, float Extent)? LookUpPhysicalLevel(string soundId)
         => OpenFPS.Common.ModelKindTable.TryLevel(soundId, out float level, out float extent) ? (level, extent) : null;
 
-    private readonly Dictionary<int, (float Speed, double At)> _lastRailSpeed = new();
-    private readonly Dictionary<int, (float Speed, double At)> _lastAirSpeed = new();
-
     /// <summary>
-    /// The power lever of an aeroplane on its wheels, from what it is doing (AircraftGroundRun): pulling
-    /// away down the runway is take-off power; slowing hard from speed after touchdown is the reversers,
-    /// which run the engines up again; taxiing is idle with a little breakaway thrust; standing is idle.
+    /// A rotor's wake from what the aircraft is doing: it slaps descending into its own downwash, or fast
+    /// forward. Read off the motion, which says it; the power lever is the server's (EntitySnapshot.Lever).
     /// </summary>
-    internal static float GroundPower(float speed, float accel)
-    {
-        if (accel > 0.4f && speed > 3f) return 1f;
-        if (accel < -0.8f && speed > 30f) return 0.55f;
-        if (speed > 0.5f) return 0.3f;
-        return 0.25f;
-    }
-    /// <summary>A piston aeroplane's lever rolling out or taxiing: idle, FlightPower's own floor. A piston
-    /// engine has no reverser, so after touchdown it idles and its tyres are heard.</summary>
-    internal const float GroundIdleLever = 0.06f;
-
-    /// <summary>
-    /// The power lever and a rotor's wake from what the aircraft is doing, which nothing on the wire
-    /// carries: climbing is full power, level is cruise, descending is idle, so a map's descending path
-    /// is an approach without saying so. A rotor slaps descending into its downwash or fast forward.
-    /// </summary>
-    private static (float Lever, float Wake) FlightPower(Vector3 velocity)
+    private static float RotorWake(Vector3 velocity)
     {
         float speed = velocity.Length();
-        if (speed < 0.5f) return (0.25f, 0f);                  // sitting on the apron at idle
+        if (speed < 0.5f) return 0f;
         float climb = velocity.Y / speed;                      // sine of the flight path angle
-        // Full power by about six degrees up, idle by about four down: a climb needs everything and a
-        // descent nothing, so the lever falls faster than it rises.
-        float lever = climb >= 0f
-            ? Math.Clamp(0.62f + climb * 3.6f, 0f, 1f)
-            : Math.Clamp(0.62f + climb * 8.0f, 0.06f, 1f);
         float wake = Math.Clamp(-climb * 6f, 0f, 1f) * 0.7f
                    + Math.Clamp((speed - 25f) / 45f, 0f, 1f) * 0.3f;
-        return (lever, Math.Clamp(wake, 0f, 1f));
+        return Math.Clamp(wake, 0f, 1f);
     }
 
     /// <summary>
@@ -2159,7 +2133,7 @@ public partial class ClientAudioSystem
             // Asked about only while it sounds: switched off, every patrol car on the map asked the worker
             // every frame and was added to the path pass, and with no engine voice ran the hand-rolled tracer
             // on this thread for nothing.
-            var mode = SirenModeOf(snap, world.PositionsSampledAt);
+            var mode = SirenModeOf(snap);
             if (mode == OpenFPS.Common.SirenMode.Off)
             {
                 if (_sirenVoiced.Remove(snap.Id)) _voices.Stop(SirenVoiceId(snap.Id));
@@ -2631,30 +2605,14 @@ public partial class ClientAudioSystem
         return ear + Vector3.Normalize(toApparent) * Vector3.Distance(ear, mouth);
     }
 
-    /// <summary>One mode decision per vehicle, kept between frames: it has state (SirenController).</summary>
-    private readonly Dictionary<int, (OpenFPS.Common.SirenController C, double At)> _sirenControl = new();
-
     /// <summary>
-    /// What a patrol car's siren is doing, from what the car does (nothing on the wire carries it): off
-    /// standing or with the traffic, wail moving with purpose, yelp braking hard into a junction. The
-    /// decision has hysteresis and lives in <see cref="OpenFPS.Common.SirenController"/>, where a test can
-    /// drive it; deceleration alone flipped wail and yelp at every corner.
+    /// What a vehicle's siren is doing, as the server sends it (EntityState.Signals): its driver's switch, or for
+    /// a patrol car in traffic the mode the server's own SirenController chose from how it is driving (off
+    /// standing or with the traffic, wail on a call, yelp braking hard into a junction). Each client decided
+    /// that for itself, from the moment it first saw the car, so two players beside one car heard two sirens.
     /// </summary>
-    /// <summary>What a vehicle's siren is doing: as its driver switched it, or for traffic, as it drives.</summary>
-    private OpenFPS.Common.SirenMode SirenModeOf(EntitySnapshot snap, double sampledAt)
-        => OpenFPS.Common.VehicleSignalBits.IsManual(snap.Signals)
-            ? OpenFPS.Common.VehicleSignalBits.Siren(snap.Signals)
-            : SirenModeFor(snap.Id, snap.Velocity.Length(), sampledAt);
-
-    private OpenFPS.Common.SirenMode SirenModeFor(int entityId, float speed, double at)
-    {
-        if (!_sirenControl.TryGetValue(entityId, out var held))
-            held = (new OpenFPS.Common.SirenController(entityId), at);
-        float dt = (float)Math.Clamp(at - held.At, 1.0 / 240.0, 0.25);
-        var mode = held.C.Update(speed, dt);
-        _sirenControl[entityId] = (held.C, at);
-        return mode;
-    }
+    private static OpenFPS.Common.SirenMode SirenModeOf(EntitySnapshot snap)
+        => OpenFPS.Common.VehicleSignalBits.Siren(snap.Signals);
 
     /// <summary>
     /// A car too far away for its own engine, voiced by borrowing a near one: it reads the ring of the
@@ -2796,36 +2754,18 @@ public partial class ClientAudioSystem
                 extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey);
                 if (physicalSynth == OpenFPS.Common.ModelSynth.Aircraft)
                 {
-                    (powerLever, rotorWake) = FlightPower(snap.Velocity);
-                    onGround = OnTheWheels(snap, world, eyePos, out float height);
-                    // On its wheels the climb angle says nothing: the lever comes from the speed's change.
-                    float groundSpeed = snap.Velocity.Length();
-                    float accel = 0f;
-                    if (_lastAirSpeed.TryGetValue(snap.Id, out var was) && world.PositionsSampledAt > was.At)
-                        accel = (groundSpeed - was.Speed) / (float)Math.Max(0.02, world.PositionsSampledAt - was.At);
-                    _lastAirSpeed[snap.Id] = (groundSpeed, world.PositionsSampledAt);
-                    if (onGround) powerLever = GroundPower(groundSpeed, accel);
-                    // A piston aeroplane has no reversers: on the ground it idles unless taking off, and in
-                    // the flare (within a wingspan of the ground) its throttle is closed, so its tyres are
-                    // heard. At approach power its exhaust stood within 5 dB of a 109 dB touchdown in the
-                    // squeal's band; at idle, 10 to 15 dB under. Jets and turboprops keep GroundPower.
-                    if (PhysicalAircraft(snap) is { Power: OpenFPS.Common.AircraftPower.Piston } piston)
-                    {
-                        if (onGround) powerLever = powerLever >= 1f ? 1f : GroundIdleLever;
-                        else if (height < piston.WingspanMetres && snap.Velocity.Y < -0.2f) powerLever = GroundIdleLever;
-                    }
+                    // Its power lever as the server that flies it sends it (MachinePower: from its flight path
+                    // in the air and its ground run on its wheels, a piston's closed throttle in the flare).
+                    powerLever = snap.Lever;
+                    rotorWake = RotorWake(snap.Velocity);
+                    onGround = OnTheWheels(snap, world, eyePos, out _);
                 }
                 else if (physicalSynth == OpenFPS.Common.ModelSynth.Rail)
                 {
-                    // The notch from what the speed does (pulling away full, holding a little, braking
-                    // none), carried in the lever slot; the wake slot carries the speed, for rolling noise.
-                    float speed = snap.Velocity.Length();
-                    float accel = 0f;
-                    if (_lastRailSpeed.TryGetValue(snap.Id, out var prev) && world.PositionsSampledAt > prev.At)
-                        accel = (speed - prev.Speed) / (float)Math.Max(0.02, world.PositionsSampledAt - prev.At);
-                    _lastRailSpeed[snap.Id] = (speed, world.PositionsSampledAt);
-                    powerLever = accel > 0.08f ? 0.9f : accel < -0.15f ? 0f : speed > 0.5f ? 0.3f : 0f;
-                    rotorWake = speed;
+                    // The notch its driver has it in, as the server sends it (MachinePower.TrainNotch), carried
+                    // in the lever slot; the wake slot carries the speed, for rolling noise.
+                    powerLever = snap.Lever;
+                    rotorWake = snap.Velocity.Length();
                 }
             }
             else if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(resolvedSoundId) is { } vehiclePreset)

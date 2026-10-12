@@ -48,7 +48,9 @@ internal sealed class ClientAudioHarness
 
     /// <summary>A car as the server puts one (VehicleSystem, CompositeService): an engine emitter on a
     /// moving entity, its position arriving as state.</summary>
-    public void AddCar(int id, string preset, Vector3 position, Vector3 velocity = default)
+    /// <param name="signals">Its horn and siren as the server sends them (EntityState.Signals): a driver's
+    /// switches, or for a patrol car in traffic the siren the server's controller has it at.</param>
+    public void AddCar(int id, string preset, Vector3 position, Vector3 velocity = default, byte signals = 0)
     {
         var profile = MachineRegistry.VehicleFor(preset);
         var def = new EntityDefinition
@@ -70,6 +72,7 @@ internal sealed class ClientAudioHarness
             EntityId = id,
             Transform = QuantizedTransform.FromTransform(def.Transform),
             LinearVelocity = velocity,
+            Signals = signals,
         } });
     }
 
@@ -134,6 +137,9 @@ internal sealed class ClientAudioHarness
     public int Voice(VoiceKind kind, int owner, int part = 0) => Audio.Voices.Hold(kind, owner, part);
     /// <summary>The id a car's borrowed voice plays under.</summary>
     public int DistantVoice(int carId) => Voice(VoiceKind.Borrowed, carId);
+    /// <summary>A patrol car in traffic on a call, as the server sends it: nobody's switch, the siren wailing.</summary>
+    public static readonly byte OnACall = VehicleSignalBits.Encode(manual: false, horn: false, sirenOn: true, SirenMode.Wail);
+
     /// <summary>The id a car's horn plays under.</summary>
     public int HornVoice(int carId) => Voice(VoiceKind.Horn, carId);
 }

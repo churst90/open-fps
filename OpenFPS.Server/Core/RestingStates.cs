@@ -16,6 +16,8 @@ public sealed class SentState
     public byte TyreDemand;
     /// <summary>The horn and siren byte (EntityState.Signals).</summary>
     public byte Signals;
+    /// <summary>A train's notch or an aeroplane's power lever (EntityState.Lever).</summary>
+    public byte Lever;
     /// <summary>A copy: the vehicle systems refill one array in place every tick.</summary>
     public WheelState[]? Wheels;
     /// <summary>The tick the state (or the wheels) last differed from the one before it.</summary>
@@ -35,7 +37,7 @@ public sealed class SentState
     public Vector3 ToldPosition, ToldVelocity;
     public Quaternion ToldRotation = Quaternion.Identity;
     public DistantMotion.Rates ToldRates;
-    public byte ToldDemand, ToldSignals;
+    public byte ToldDemand, ToldSignals, ToldLever;
     /// <summary>The wheels last sent, or null.</summary>
     public WheelState[]? ToldWheels;
     /// <summary>The last far state went for a change: it goes again next tick, so one lost or late packet
@@ -100,12 +102,13 @@ public static class RestingStates
         if (velocity != Vector3.Zero && distance >= DistantMotion.RatesMetres) rates.WriteTo(ref state);
 
         if (fresh || !Same(last.Transform, state.Transform) || last.Velocity != velocity || last.TyreDemand != state.TyreDemand
-            || last.Signals != state.Signals)
+            || last.Signals != state.Signals || last.Lever != state.Lever)
         {
             last.Transform = state.Transform;
             last.Velocity = velocity;
             last.TyreDemand = state.TyreDemand;
             last.Signals = state.Signals;
+            last.Lever = state.Lever;
             last.ChangedAt = tick;
         }
         if (state.Wheels != null && (last.Wheels == null || !SameWheels(last.Wheels, state.Wheels)))
@@ -141,7 +144,7 @@ public static class RestingStates
 
     /// <summary>
     /// Whether a far moving thing is due: <see cref="DistantMotion.IntervalTicks"/> since it last went, the
-    /// tick after one that went for a change, or a change: its horn, its tyres audibly (the demand, or the
+    /// tick after one that went for a change, or a change: its horn, its notch or lever, its tyres audibly (the demand, or the
     /// surface or water under a wheel), or the client's prediction from what it was last sent has strayed
     /// (<see cref="DistantMotion.Strayed"/>). <paramref name="changed"/> says it went for a change, and so
     /// goes again next tick: the stream is unreliable, and a change lost or overtaken would otherwise be
@@ -155,6 +158,7 @@ public static class RestingStates
                                               (tick - last.ToldAt) * PhysicsConstants.FixedDeltaTime);
         var now = state.Transform.ToTransform();
         changed = state.Signals != last.ToldSignals
+               || MathF.Abs(state.LeverFraction - MachinePower.Decode(last.ToldLever)) > DistantMotion.LeverTolerance
                || MathF.Abs(state.TyreDemandFraction - last.ToldDemand / 127.5f) > DistantMotion.DemandTolerance
                || state.Wheels != null && WheelsStrayed(last.ToldWheels, state.Wheels)
                || DistantMotion.Strayed(predicted, now.Position, velocity, now.Rotation, distance);
@@ -186,6 +190,7 @@ public static class RestingStates
         last.ToldRates = DistantMotion.Rates.Of(state);
         last.ToldDemand = state.TyreDemand;
         last.ToldSignals = state.Signals;
+        last.ToldLever = state.Lever;
         if (state.Wheels != null) last.ToldWheels = (WheelState[])state.Wheels.Clone();
     }
 

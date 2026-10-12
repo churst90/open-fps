@@ -582,12 +582,23 @@ public partial struct EntityState
     public short SpeedRate;
     public short TurnX, TurnY, TurnZ;
 
+    /// <summary>
+    /// How hard a driven machine is working, as the server that drives it has it
+    /// (<see cref="OpenFPS.Common.MachinePower"/>): a train's notch on each of its sources, an aeroplane's power
+    /// lever. In two-hundredths; zero for anything else. Sent, because a client reading it off the motion took a
+    /// train braking down a grade for one coasting.
+    /// </summary>
+    public byte Lever;
+
     public EntityState()
     {
         EntityId = 0;
         Transform = new QuantizedTransform();
         LinearVelocity = Vector3.Zero;
     }
+
+    /// <summary>The lever as a fraction, 0..1.</summary>
+    public float LeverFraction => OpenFPS.Common.MachinePower.Decode(Lever);
 
     /// <summary>The demand as a fraction, 0..2.</summary>
     public float TyreDemandFraction => TyreDemand / 127.5f;

@@ -199,7 +199,9 @@ public static class TrainSceneSpike
                     if (!city.IsAlive(e)) continue;
                     var t = city.Get<Transform>(e);
                     var v = city.Has<Velocity>(e) ? city.Get<Velocity>(e).Linear : Vector3.Zero;
-                    states.Add(new EntityState { EntityId = e.Id + Offset, Transform = QuantizedTransform.FromTransform(t), LinearVelocity = v });
+                    // A train's source carries its notch, as the server's broadcast sends it.
+                    byte notch = rail.TryGetLever("city", e.Id, out float lever) ? MachinePower.Encode(lever) : (byte)0;
+                    states.Add(new EntityState { EntityId = e.Id + Offset, Transform = QuantizedTransform.FromTransform(t), LinearVelocity = v, Lever = notch });
                 }
                 foreach (var (id, phase) in carIds)
                 {

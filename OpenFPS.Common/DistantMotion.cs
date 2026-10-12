@@ -59,6 +59,11 @@ public static class DistantMotion
     /// <summary>How far a tyre demand may move before it goes, as a fraction of the limit.</summary>
     public const float DemandTolerance = 0.05f;
 
+    /// <summary>How far a train's notch or an aeroplane's power lever may move before it goes (EntityState.Lever):
+    /// under the smallest step between two of the laws' own values (MachinePower: standing to taxiing, 0.05), so
+    /// every one of those goes, and a lever following a curving flight path does not go every tick.</summary>
+    public const float LeverTolerance = 0.04f;
+
     /// <summary>How a thing is changing: its speed's rate (m/s²), and its heading's turn as a rotation vector
     /// (radians a second about its axis). The body turns with the heading.</summary>
     public readonly struct Rates

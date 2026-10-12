@@ -156,6 +156,62 @@ public class RailRunTests : IDisposable
         Assert.InRange(stands[0].At, 397f, 402f);
     }
 
+    // ── The notch ───────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A train's notch is what its driver is doing with the power, worked out here where it is driven and sent
+    /// on every source of the train (audit P7): full pulling away from a platform, a little holding its speed,
+    /// none braking for the platform and none standing at it. The client took it from the speed's change
+    /// between two network states.
+    /// </summary>
+    [Fact]
+    public void A_trains_notch_follows_its_driver_round_a_line_with_a_platform()
+    {
+        var f = new Fixture(_dir, topSpeedKmh: 40f, startMetres: 0f,
+                            stops: new[] { new TrackStopData { AtMetres = 400f, DwellSeconds = 6f, Kind = "platform" } });
+        var sources = new List<int>();
+        f.World.Query(new QueryDescription().WithAll<Transform, SoundEmitterComponent>(), (Entity e, ref Transform t, ref SoundEmitterComponent em) =>
+        {
+            if (em.SoundId != null && em.SoundId.StartsWith("rail:")) sources.Add(e.Id);
+        });
+        Assert.True(sources.Count > 3, $"{sources.Count} sources");
+        Assert.False(f.Rail.TryGetLever(f.MapId, sources.Max() + 100_000, out _));
+        Assert.False(f.Rail.TryGetLever("another map", sources[0], out _));
+
+        float pulling = 0f, holding = 0f, brakingMoving = 0f, standing = 0f;
+        float was = 0f;
+        for (int i = 0; i < (int)(240 / Dt); i++)
+        {
+            float before = f.Distance;
+            f.Tick();
+            float speed = (f.Distance - before) / Dt;
+            Assert.True(f.Rail.TryGetLever(f.MapId, sources[0], out float notch));
+            // Every source of the train says the same.
+            foreach (int id in sources)
+            {
+                Assert.True(f.Rail.TryGetLever(f.MapId, id, out float other));
+                Assert.Equal(notch, other);
+            }
+            if (i > 0)
+            {
+                if (notch == MachinePower.TrainPulling) { pulling += Dt; Assert.True(speed >= was - 1e-3f, $"pulling away while slowing ({was:F2} to {speed:F2})"); }
+                else if (notch == MachinePower.TrainHolding) { holding += Dt; Assert.InRange(speed - was, -0.05f, 0.05f); Assert.True(speed > MachinePower.TrainMovingMps); }
+                else
+                {
+                    Assert.Equal(0f, notch);
+                    if (speed > 0.05f) { brakingMoving += Dt; Assert.True(speed <= was + 1e-3f, $"no power while speeding up ({was:F2} to {speed:F2})"); }
+                    else standing += Dt;
+                }
+            }
+            was = speed;
+        }
+        _o.WriteLine($"in 240 s: pulling away {pulling:F1} s, holding {holding:F1} s, braking {brakingMoving:F1} s, standing {standing:F1} s");
+        Assert.True(pulling > 5f, "it never pulled away");
+        Assert.True(holding > 5f, "it never held its speed");
+        Assert.True(brakingMoving > 2f, "it never braked");
+        Assert.True(standing > 5f, "it never stood at its platform");
+    }
+
     // ── Fixture ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>

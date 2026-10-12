@@ -967,27 +967,16 @@ public class ClientAudioSelectionTests
         Assert.Equal(starts, h.Mixer.Started.Count(e => e.EntityId == Beacon));
     }
 
-    /// <summary>A car id whose siren controller starts a call promptly (as SirenApparentTests).</summary>
-    private static int PromptCallId()
-    {
-        for (int id = 1; id < 20000; id++)
-        {
-            var c = new SirenController(id);
-            for (int k = 0; k < 400; k++)
-                if (c.Update(17f, 1f / 240f) != SirenMode.Off) return id;
-        }
-        throw new InvalidOperationException("no car id starts a call promptly");
-    }
-
     /// <summary>A siren is placed every frame whatever its car's engine does, and stops when the car
     /// leaves the world rather than wailing on where it was.</summary>
     [Fact]
     public void ASirenStopsWhenItsCarLeavesTheWorld()
     {
-        int car = PromptCallId();
+        const int car = 31;
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f), new Vector3(17f, 0f, 0f));
+        // On a call, as the server says it is: the client decides nothing about a siren (P7).
+        h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f), new Vector3(17f, 0f, 0f), ClientAudioHarness.OnACall);
         int siren = h.Voice(VoiceKind.Siren, car);
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(siren), 1200), "the siren never sounded");
         Assert.True(h.Audio.VehiclePathsAsked > 0, "a sounding siren takes its car's path");
@@ -1007,10 +996,10 @@ public class ClientAudioSelectionTests
     [Fact]
     public void ASilentSirenAsksForNoPath()
     {
-        int car = PromptCallId();
+        const int car = 31;
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f));   // parked: traffic's siren is off at rest
+        h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f));   // parked: the server sends no siren
         h.Tick(120);
         Assert.Empty(h.Mixer.StartedAs(VoiceKind.Siren));
         Assert.Equal(0, h.Audio.VehiclePathsAsked);

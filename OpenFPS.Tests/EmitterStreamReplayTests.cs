@@ -526,18 +526,21 @@ internal sealed class Replay
         Move(id, at, velocity);
     }
 
-    internal void Move(int id, Vector3 at, Vector3 velocity, byte signals = 0)
+    /// <param name="lever">How hard a train's source or an aeroplane is working, as the server that drives it
+    /// sends it (EntityState.Lever, MachinePower).</param>
+    internal void Move(int id, Vector3 at, Vector3 velocity, byte signals = 0, float lever = 0f)
         => World.SyncState(new[] { new EntityState
         {
             EntityId = id,
             Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = Facing(velocity) }),
             LinearVelocity = velocity,
             Signals = signals,
+            Lever = MachinePower.Encode(lever),
         } });
 
     /// <summary>One source of a train as the server places it (RailSystem): an NPC entity whose SoundId
     /// names the train and the source.</summary>
-    internal void RailSource(int id, string soundId, float levelDb, Vector3 at, Vector3 velocity)
+    internal void RailSource(int id, string soundId, float levelDb, Vector3 at, Vector3 velocity, float lever = 0f)
     {
         var def = new EntityDefinition
         {
@@ -553,7 +556,7 @@ internal sealed class Replay
         def.SoundEmitter.Range = Loudness.AudibleRange(levelDb);
         def.SoundEmitter.MinDistance = 3f;
         World.RegisterDefinition(def);
-        Move(id, at, velocity);
+        Move(id, at, velocity, lever: lever);
     }
 
     /// <summary>Turned to face along its velocity, or north when it stands. Forward is +Z, as the server
@@ -784,7 +787,7 @@ internal sealed class Replay
         for (int i = 0; i < layout.Count; i++)
         {
             var (at, v) = Source(i);
-            r.RailSource(601 + i, $"rail:{train}/{i}", layout[i].LevelDb, at, v);
+            r.RailSource(601 + i, $"rail:{train}/{i}", layout[i].LevelDb, at, v, MachinePower.TrainHolding);
         }
         var feet = new Vector3(0f, 0f, 0f);
         for (int f = 0; f < 120; f++)
@@ -792,7 +795,8 @@ internal sealed class Replay
             for (int i = 0; i < layout.Count; i++)
             {
                 var (at, v) = Source(i);
-                r.Move(601 + i, at, v);
+                // Holding its speed: the notch the server sends for it on every source (MachinePower.TrainNotch).
+                r.Move(601 + i, at, v, lever: MachinePower.TrainHolding);
             }
             if (f == 20) r.Audio.WorldAudio.TrainSignalReceived!(train, new[] { 2f, 1f, 2f, 1f, 1f, 1f, 3f }, 6f);
             r.Listener(feet, Vector3.Zero, 180f);

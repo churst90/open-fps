@@ -110,4 +110,8 @@ public struct EntitySnapshot
     /// <summary>A vehicle's horn and siren switches as the server last sent them
     /// (<see cref="OpenFPS.Common.VehicleSignalBits"/>); zero for anything without.</summary>
     public byte Signals;
+
+    /// <summary>How hard a train or an aeroplane is working as the server last sent it, 0..1
+    /// (EntityState.Lever); zero for anything else.</summary>
+    public float Lever;
 }

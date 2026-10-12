@@ -324,6 +324,7 @@ OpenFPS.Sound/Lightning.cs	lib	Sound
 OpenFPS.Sound/LockCylinder.cs	lib	Sound	
 OpenFPS.Sound/Loudness.cs	lib	Sound	
 OpenFPS.Sound/Loudspeakers.cs	lib	Sound	
+OpenFPS.Sound/MachinePower.cs	lib	Sound	
 OpenFPS.Sound/Machines.cs	lib	Sound	
 OpenFPS.Sound/ModelKindTable.cs	lib	Sound	
 OpenFPS.Sound/ModelLibrary.cs	lib	Sound	

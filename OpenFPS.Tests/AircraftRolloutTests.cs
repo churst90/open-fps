@@ -112,4 +112,161 @@ public class AircraftRolloutTests
         Assert.True(liftoffAt > touchdownAt, "it never took off again");
         Assert.InRange(last.Z, to.Z - 30f, to.Z + 5f);
     }
+
+    /// <summary>
+    /// An aeroplane's power lever is worked out by the server that flies it and sent (audit P7). A piston single
+    /// down an approach and back out: on the way down its lever is its flight path's, low; within a wingspan of
+    /// the runway its throttle is closed; on its wheels it idles until the take-off roll, which is everything;
+    /// and it climbs out on full power. The client guessed all of it from the motion.
+    /// </summary>
+    [Fact]
+    public void AnAeroplanesLeverIsWhatItIsBeingFlownThrough()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out var world, out _, out _, out _));
+        var vehicles = new VehicleSystem();
+        var air = AircraftProfile.ByName("piston_single");
+        var from = new Vector3(380f, 90f, -1700f);
+        var to = new Vector3(380f, 0.1f, -250f);
+        var e = vehicles.SpawnOne(maps, null, "city", new VehicleData
+        {
+            Name = "Test single", Preset = "piston_single", RoadStart = from, RoadEnd = to,
+            SpeedsKmh = new[] { air.ApproachSpeedMps * 3.6f, 160f }, AccelerationMps2 = 1.5f, BrakingMps2 = 2f,
+            WaitSeconds = 6f,
+        });
+        Assert.NotEqual(Entity.Null, e);
+        Assert.False(vehicles.TryGetLever("city", e.Id + 100_000, out _));
+
+        float dt = 1f / 30f, t = 0f;
+        float approach = 0f, flare = 0f, idleOnWheels = 0f, takeoffRoll = 0f, climb = 0f;
+        bool touched = false;
+        while (t < 400f && climb < 3f)
+        {
+            vehicles.Update("city", world, dt);
+            t += dt;
+            var p = world.Get<Transform>(e).Position;
+            var v = world.Get<Velocity>(e).Linear;
+            Assert.True(vehicles.TryGetLever("city", e.Id, out float lever));
+            bool ground = p.Y < 0.2f;
+            if (ground) touched = true;
+            float height = p.Y - to.Y;
+            if (!touched && v.Y < -0.2f && height >= air.WingspanMetres)
+            {
+                // Down the approach, above the flare: the flight path's lever.
+                Assert.Equal(MachinePower.FlightLever(v), lever);
+                Assert.True(lever < 0.62f, $"{lever} coming down");
+                approach += dt;
+            }
+            else if (!touched && v.Y < -0.2f)
+            {
+                Assert.Equal(MachinePower.PistonIdle, lever);
+                flare += dt;
+            }
+            else if (ground && takeoffRoll == 0f && lever < 1f)
+            {
+                Assert.Equal(MachinePower.PistonIdle, lever);
+                idleOnWheels += dt;
+            }
+            else if (ground && lever == 1f) takeoffRoll += dt;
+            else if (takeoffRoll > 0f)
+            {
+                // From the tick its wheels leave: never down to cruise between the roll and the climb.
+                Assert.True(lever > 0.62f, $"{lever} climbing out");
+                climb += dt;
+            }
+        }
+        _o.WriteLine($"approach {approach:F1} s, flare {flare:F1} s, idle on its wheels {idleOnWheels:F1} s, take-off roll {takeoffRoll:F1} s, climb-out {climb:F1} s");
+        Assert.True(approach > 2f, "it never came down the approach");
+        Assert.True(flare > 0.3f, "it never flared");
+        Assert.True(idleOnWheels > 5f, "it never rolled out and taxied");
+        Assert.True(takeoffRoll > 2f, "it never ran up for take-off");
+        Assert.True(climb >= 3f, "it never climbed out");
+    }
+
+    /// <summary>
+    /// An aircraft lapping a circuit has its lever from its flight path every tick, as the client worked it out:
+    /// a circuit is flown level, so once it is under way it is at cruise. It kept the lever it was made with,
+    /// standing.
+    /// </summary>
+    [Fact]
+    public void AnAircraftOnACircuitHasItsFlightPathsLever()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out var world, out _, out _, out _));
+        Assert.True(maps.TryGetMapData("city", out var data));
+        // A circle 600 m across, 240 m up.
+        var circuit = new List<Vector3>();
+        for (int i = 0; i < 48; i++)
+        {
+            float a = i * MathF.Tau / 48f;
+            circuit.Add(new Vector3(300f * MathF.Cos(a), 240f, -1500f + 300f * MathF.Sin(a)));
+        }
+        data.Tracks ??= new List<TrackData>();
+        data.Tracks.Add(new TrackData { Id = "test circuit", Waypoints = circuit });
+        var vehicles = new VehicleSystem();
+        var e = vehicles.SpawnOne(maps, null, "city", new VehicleData
+        {
+            Name = "Test single", Preset = "piston_single", Track = "test circuit", TopSpeedKmh = 180f,
+        });
+        Assert.NotEqual(Entity.Null, e);
+
+        float dt = 1f / 30f, underWay = 0f;
+        for (float t = 0f; t < 60f; t += dt)
+        {
+            vehicles.Update("city", world, dt);
+            var v = world.Get<Velocity>(e).Linear;
+            Assert.True(vehicles.TryGetLever("city", e.Id, out float lever));
+            Assert.Equal(MachinePower.FlightLever(v), lever);
+            if (v.Length() > 20f) { Assert.Equal(0.62f, lever); underWay += dt; }
+        }
+        _o.WriteLine($"under way for {underWay:F0} s of 60, at cruise");
+        Assert.True(underWay > 30f, "it never got under way");
+    }
+
+    /// <summary>
+    /// A patrol car's siren is one decision, made by the server from how the car is driven and the same for
+    /// every client (audit P7): what the server says of it is what a controller of the car's own says, fed the
+    /// speed it is driven at each tick, and in ten minutes it has been on a call and off one. A car with no
+    /// siren has nothing said of it.
+    /// </summary>
+    [Fact]
+    public void APatrolCarsSirenIsDecidedByTheServerThatDrivesIt()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out var world, out _, out _, out _));
+        var vehicles = new VehicleSystem();
+        var road = (From: new Vector3(380f, 0.1f, -1700f), To: new Vector3(380f, 0.1f, -250f));
+        Entity Spawn(string name, string preset, float x) => vehicles.SpawnOne(maps, null, "city", new VehicleData
+        {
+            Name = name, Preset = preset, RoadStart = road.From + new Vector3(x, 0f, 0f), RoadEnd = road.To + new Vector3(x, 0f, 0f),
+            SpeedsKmh = new[] { 60f }, AccelerationMps2 = 2f, BrakingMps2 = 3f, WaitSeconds = 2f,
+        });
+        var patrol = Spawn("Test patrol car", "police_interceptor", 0f);
+        var saloon = Spawn("Test car", "v8_muscle", 8f);
+        Assert.NotEqual(Entity.Null, patrol);
+        Assert.NotEqual(Entity.Null, saloon);
+        Assert.False(vehicles.TryGetSiren("city", saloon.Id, out _));
+
+        var own = new SirenController(patrol.Id);
+        float dt = 1f / 30f, on = 0f, off = 0f;
+        var modes = new HashSet<SirenMode>();
+        for (float t = 0f; t < 600f; t += dt)
+        {
+            vehicles.Update("city", world, dt);
+            Assert.True(vehicles.TryGetSiren("city", patrol.Id, out var mode));
+            Assert.True(vehicles.TryInspect("city", patrol.Id, out var state));
+            Assert.Equal(own.Update(state.Speed, dt), mode);
+            modes.Add(mode);
+            if (mode == SirenMode.Off) off += dt; else on += dt;
+        }
+        _o.WriteLine($"in ten minutes: on a call {on:F0} s, off {off:F0} s; modes {string.Join(", ", modes)}");
+        Assert.True(on > 10f, "it was never on a call");
+        Assert.True(off > 10f, "it never went off one");
+    }
 }

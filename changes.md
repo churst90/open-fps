@@ -11,6 +11,14 @@ Recent work, newest first. `git log` has the rest.
   renders count 29 dB of make-up gain that is no louder at the ear; they stay at full detail now. In rain the
   rain round you no longer takes almost every late-field slot from the traffic (15 of 16, now 9), and a garden
   fire 35 m off no longer takes a far car's traced echoes. Measured with `--driving set=ranks`.
+- Audit P7, machine state from the server (docs/SPECIAL_CASES_AUDIT.md, "P7 as built"), unheard. A wire change:
+  the server and the Windows client go out together. A train's notch, an aeroplane's power lever and a patrol
+  car's siren are worked out by the server that drives them and sent; the client guessed all three from motion.
+  A train braking down a grade no longer sounds as if it is under power, and one pulling away gently no longer
+  sounds as if it is coasting. An aeroplane's take-off roll is at full power from its first metre, and its
+  reversers are heard only in the roll-out. Two players beside one patrol car hear the same siren, on and off
+  at the same moments; each client ran its own, started when it first saw the car.
+
 - Audit P6, the rain (docs/SPECIAL_CASES_AUDIT.md, "P6, the rain, as built"), unheard. Rain behind walls is
   heard by the acoustic worker's answer, as cars, beacons and birds are: the heaviest surface of each patch is
   asked under a probe of its own, and the hand-rolled tracer stands in until the answer comes and for the

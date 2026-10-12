@@ -42,6 +42,15 @@ public sealed partial class VehicleSystem
         public float ApproachSpeed;
         public AircraftGroundRun? Run;
 
+        /// <summary>An aircraft's model, for its power lever; null for anything else.</summary>
+        public AircraftProfile? Air;
+        /// <summary>An aircraft's power lever as it is flown, 0..1 (MachinePower), sent as EntityState.Lever.</summary>
+        public float Lever;
+        /// <summary>A patrol car's siren in traffic: the one decision of what it is doing, made here from how
+        /// the car is driven and sent to every client (EntityState.Signals). Null for a vehicle with no siren.</summary>
+        public SirenController? Siren;
+        public SirenMode SirenMode;
+
         // Racing. Null for a shuttling vehicle.
         public RaceLine? Line;
         /// <summary>The tour of lanes it drives, for a vehicle on a map's roads; null on a track.</summary>
@@ -423,6 +432,9 @@ public sealed partial class VehicleSystem
                 v.LaneOffset = vd.LaneOffsetMetres;
                 if (profile != null) v.LengthMetres = profile.LengthMetres;
                 v.Horn = profile != null ? VehicleProfile.HornFor(profile) : "";
+                v.Air = air;
+                if (air != null) v.Lever = MachinePower.FlightLever(Vector3.Zero);
+                if (profile?.Siren != null) v.Siren = new SirenController(e.Id);
                 v.OnStreet = data.StreetLife != null && profile != null && !isAircraft && !isMachine && !isWalker;
                 if (v.OnStreet) v.DriverVoice = PedestrianSpeech.NextDriverVoice(mapId);
                 if (data.StreetLife != null) _streetLife[mapId] = data.StreetLife;
@@ -481,6 +493,10 @@ public sealed partial class VehicleSystem
             if (v.Line != null)
             {
                 if (!HoldParked(v, world, ref t, ref vel, dt)) UpdateRacer(v, ref t, ref vel, dt);
+                // A patrol car's siren, from how it is being driven this tick.
+                if (v.Siren != null) v.SirenMode = v.Siren.Update(v.Speed, dt);
+                // An aircraft lapping a circuit is flown along it and has no ground run: its flight path's lever.
+                if (v.Air != null) v.Lever = MachinePower.FlightLever(vel.Linear);
                 bool serving = v.DwellLeft > 0f && v.Stops.Length > 0
                                && string.Equals(v.Stops[v.NextStop].Kind, "bus_stop", StringComparison.OrdinalIgnoreCase);
                 if (serving != v.ServingStop && world.Has<SoundEmitterComponent>(v.Entity))
@@ -515,6 +531,9 @@ public sealed partial class VehicleSystem
                 Log.Information("SHUTTLE {Name}: {State} pos {Pos} speed {Speed:F2} progress {Prog:F1}",
                                 v.DisplayName, v.Current, t.Position, v.Speed, v.Progress);
 
+            // The tick its wheels leave the runway an aeroplane is still at take-off power: its ground run is
+            // over and its velocity is still the roll's, level, which read alone is cruise.
+            bool liftedOff = false;
             switch (v.Current)
             {
                 case State.Waiting:
@@ -597,6 +616,7 @@ public sealed partial class VehicleSystem
                         v.Run = null;
                         v.Current = State.Driving;
                         v.Phase = 0f;
+                        liftedOff = true;
                         Log.Information("{Name} lifted off at {Speed:F0} m/s.", v.DisplayName, v.Speed);
                     }
                     break;
@@ -619,6 +639,8 @@ public sealed partial class VehicleSystem
             }
             t.Rotation = Quaternion.CreateFromYawPitchRoll(v.Heading, 0f, 0f);
             t.IsDirty = true;
+            if (v.Air != null) v.Lever = liftedOff ? 1f : AircraftLever(v, t.Position, vel.Linear);
+            if (v.Siren != null) v.SirenMode = v.Siren.Update(v.Speed, dt);
             if (v.Wheels != null)
             {
                 // A shuttle runs a straight road: the wheels carry its braking and pulling away, and
@@ -633,6 +655,28 @@ public sealed partial class VehicleSystem
                 vc.Speed = v.Speed;
             }
         }
+    }
+
+    /// <summary>An aircraft's power lever from what it is being flown through (MachinePower.AircraftLever).</summary>
+    private static float AircraftLever(DemoVehicle v, Vector3 position, Vector3 velocity)
+        => MachinePower.AircraftLever(v.Air!, v.Run, v.Current == State.Driving && Landing(v), position.Y - v.To.Y, velocity);
+
+    /// <summary>An aircraft's power lever, 0..1 (EntityState.Lever). False for anything that is not an aircraft
+    /// of ours on this map.</summary>
+    public bool TryGetLever(string mapId, int entityId, out float lever)
+    {
+        if (_byEntity.TryGetValue((mapId, entityId), out var v) && v.Air != null) { lever = v.Lever; return true; }
+        lever = 0f;
+        return false;
+    }
+
+    /// <summary>What a patrol car in traffic has its siren doing (EntityState.Signals). False for anything
+    /// with no siren, or not ours.</summary>
+    public bool TryGetSiren(string mapId, int entityId, out SirenMode mode)
+    {
+        if (_byEntity.TryGetValue((mapId, entityId), out var v) && v.Siren != null) { mode = v.SirenMode; return true; }
+        mode = SirenMode.Off;
+        return false;
     }
 
     /// <summary>The flare's deceleration from approach speed to touchdown speed, m/s²: the last few

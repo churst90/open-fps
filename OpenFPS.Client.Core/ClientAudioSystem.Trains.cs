@@ -152,17 +152,13 @@ public partial class ClientAudioSystem
         }
         if (_trainSources.Count == 0 && warningEntity < 0 && bellEntity < 0) return;
 
-        // The train's speed and effort, from its leading source: the notch from what the speed does
-        // (pulling away full, holding a little, braking none).
+        // The train's speed and effort, from its leading source: the notch its driver has it in, as the server
+        // sends it on every source of the train (MachinePower.TrainNotch).
         float speed = 0f, lever = 0f;
         if (lead >= 0 && world.Entities.TryGetValue(lead, out var leadSnap))
         {
             speed = leadSnap.Velocity.Length();
-            float accel = 0f;
-            if (_lastRailSpeed.TryGetValue(lead, out var prev) && world.PositionsSampledAt > prev.At)
-                accel = (speed - prev.Speed) / (float)Math.Max(0.02, world.PositionsSampledAt - prev.At);
-            _lastRailSpeed[lead] = (speed, world.PositionsSampledAt);
-            lever = accel > 0.08f ? 0.9f : accel < -0.15f ? 0f : speed > 0.5f ? 0.3f : 0f;
+            lever = leadSnap.Lever;
         }
 
         // Regrouped twice a second: where the groups fall changes as the train moves, not every frame.

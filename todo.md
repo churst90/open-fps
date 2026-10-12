@@ -98,8 +98,11 @@ since the last deploy" list below.
    - The rest of P6, rain asking the worker: BUILT 2026-10-12, unheard (made on Windows and sent back as a patch; the
      audit's "P6, the rain, as built"): the heaviest surface of each rain patch behind walls is asked of the
      worker under a probe of its own; the pool not yet measured with `--pop-hunt` (it needs Steam Audio).
-   - Then P7 (machine state from
-     the server: a wire change, shipped with a deploy).
+   - P7, machine state from the server: BUILT 2026-10-12, unheard (made on Windows and sent back as a patch; the
+     audit's "P7 as built"): a train's notch, an aeroplane's power lever and a patrol car's siren are sent by the
+     server that drives them (`EntityState.Lever`, `Signals`; the laws in `MachinePower`), and the client plays
+     what it is sent. A wire change: the server and the Windows client go out together. Left: an aircraft on a
+     circuit has no ground run, so one whose circuit came down to a runway would be at cruise on it.
    - S24's two defaults are one (Cody, 2026-10-12): a sound that declares no range or reference distance carries
      50 m with 3 m in the server's component and the client's emitter alike (`AcousticConstants.DefaultRange`,
      `DefaultMinDistance`). Left for Cody: the rain's 40 dB and a bump's 85 dB starting levels (P3d step 6's notes).

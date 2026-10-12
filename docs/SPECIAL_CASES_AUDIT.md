@@ -33,7 +33,7 @@ Where the parts stand (2026-10-11):
 | P3d, one start and declared levels | steps 1 to 5 built 2026-10-11, step 6 (the reseed) 2026-10-12 ("P3d as built"), unheard. Left: the rain and bump start levels (a decision). Rain patches under probes: done with P6. The two default ranges: one now (S24) |
 | P4, one ranking | the choosers built 2026-10-12 ("P4 as built"), unheard: one rank, cars and places by loudness, a render's headroom out of the rank. Three decisions for Cody there. The provider's orderings (S20) built 2026-10-12 ("S20 as built"), unheard |
 | P6, one path model for every asker | done: talkers and S23 in P3b; beacons and perched birds in P3d; rain patches 2026-10-12 ("P6, the rain, as built"), unheard |
-| P7, machine state from the server | last; a wire change, shipped with a server deploy |
+| P7, machine state from the server | built 2026-10-12 ("P7 as built"), unheard: a train's notch, an aeroplane's lever and a patrol car's siren sent by the server. A wire change: the server and the Windows client go out together |
 
 That is the order agreed with Cody on 2026-10-11 (todo.md, "Next, in order", item 2). It puts sound library
 stage 5's `AudioClock` slice after the registry; section 3 below, written first, put P3 after it. The agreed
@@ -108,7 +108,7 @@ docs and the project notes.
 | S13 | `VehiclePath` CAS:2298-2320, `ResultIsForThisVoice` CAS:133-137, `ProcessAudioEmitter` CAS:2846-2848, `FirstAnswer` CAS:2329-2350, `UpdateTalkers` CAS:3246-3255 | Four rules for when the worker's answer is fresh. `VehiclePath` refuses an answer for a source moved more than 1 m plus half a second of its speed, or asked from more than 3 m away. The path pass accepts any answer for an entity. `ProcessAudioEmitter` takes any cached answer. A talker accepts any answer and asks under the player's own entity id, at the mouth, the id the path pass asks about at the feet. | The horn that began on the answer the last horn left, minutes earlier and a street away (2026-10-10). A talker's path and the same player's emitter path overwriting one cache entry. | B | P3: one freshness rule in the worker's read (`TryGetResult` returns fresh or nothing), and every question under its own probe id (`WorldAudioPlayer.SourceProbeId` already does this for one-shots). |
 | S14 | `BirdLife.cs:325`, `BeaconAids.cs:199`, `RainField.cs:866-887`, `WorldAudioPlayer.cs:647` | Several sources are placed by the hand-rolled tracer (`CalculateAcousticPath`, id -1 for birds and rain) and never by the simulator: birds, beacons, rain patches; one-offs start from it and take the simulator's answer when it has one. | The hand-rolled tracer and Steam Audio have disagreed by 48 dB on one car (-15 against -63 dB, 2026-10-03). A bird behind a building is heard on other terms than the car beside it. | C | P6: they ask the worker under probe ids, as one-offs do; the tracer stays the stand-in until the answer comes. |
 | S15 | CAS:2797, :2956 with `EngineSourceLevelDb` CAS:163; `Grille` CAS:2732-2738; CAS:2425-2427; `BeaconAids.cs:184`; `DrivingAids.cs` (all literal gains) | Levels and points guessed where the model is silent. A vehicle with no declared level plays at 116 dB, written twice. A vehicle the client cannot name has its grille 1.9 m ahead. Any `rail:` horn sits 4.2 m above the entity's origin. Beacons have a 40 m range literal instead of the audible range of their level. | Past: a police car given a pace car's 132 dB open pipes (project note "the police car was a pace car"); three undeclared duplicate constants in front of paths that had declared themselves (block × 0.4, `FrontMix` 0.35, the intake with no airbox; project note "three undeclared duplicates"). | B | P3 and P2: a voice entry carries its declared level and its offset on the owner from the model, and a model without them fails to load. |
-| S16 | CAS:2934-2940 and `ClientAudioSystem.Trains.cs:150-159`; `FlightPower` CAS:1248-1268; `SirenModeFor` CAS:2759-2775 | Machine state guessed on the client from motion: a train's notch from its acceleration (the same formula written twice), an aircraft's power lever from its climb angle, a patrol car's siren mode from its speed and braking. The server drives all three. | The two notch formulas drift apart the first time one is tuned. A train braking on a down grade read as coasting; an aircraft descending at climb power read as idle. | C | P7: the server sends the state it already has (append-only, positionally, docs/COMPONENT notes); the client reads it. |
+| S16 | CAS:2934-2940 and `ClientAudioSystem.Trains.cs:150-159`; `FlightPower` CAS:1248-1268; `SirenModeFor` CAS:2759-2775 | Machine state guessed on the client from motion: a train's notch from its acceleration (the same formula written twice), an aircraft's power lever from its climb angle, a patrol car's siren mode from its speed and braking. The server drives all three. | The two notch formulas drift apart the first time one is tuned. A train braking on a down grade read as coasting; an aircraft descending at climb power read as idle. | C | P7: the server sends the state it already has (append-only, positionally, docs/COMPONENT notes); the client reads it. Built 2026-10-12 ("P7 as built"). |
 | S17 | CAS:684-688 | How often a source's path is asked for is set by distance alone: every frame inside 15 m, every second frame to 50 m, every tenth beyond. | A car at 30 m/s at 60 m moves 5 m between answers; its answer is then used as fresh (S13). | C | P3: ask by how far the source and the listener have moved since the last answer, not by distance. |
 | S18 | `RainField.cs:906` against `:956-984`; `WorldAudioPlayer.cs:927-931`, `VoiceManager.cs:101`, `:193-197`; `BirdLife.cs:328`, `BeaconAids.cs:169` | Smaller lifecycle gaps from each source keeping its own: a rain slot that drops to one part leaves its other parts playing; a followed spoken line re-submitted in the tick it ends starts again from the top; pooled one-shot ids (birds 48, beacons 24, rain drops 48, step echoes 48) move the voice still playing under a reused id instead of starting a new one. | A doubled rain patch after a lever change; a pedestrian repeating the start of a line; a bird call moved mid-call. | C | P3: the registry owns stop, fade and reuse; a pool id is free only when its voice has stopped. |
 
@@ -1005,6 +1005,53 @@ Only `OpenFPS.Client.Core` and the tests changed, so the wire hash does not.
 - **Files.** `OpenFPS.Common` (EntityState), server `RailSystem`, the aircraft and traffic systems, CAS.
 - **Conflicts.** CAS with P3 and P4; the wire hash and the Windows zip (a deploy with the server).
 - **Guards show.** Streams change in the scenarios with a train or a siren: the lever values. Heard by Cody.
+
+**P7 as built (2026-10-12).** Made on Windows and sent back as a patch. Unheard. **A wire change:** the server
+and the Windows client have to go out together (wire hash `b4fad80918a5` to `6053c17cc1ca` on `0c1d72bd`).
+
+- **The wire.** `EntityState.Lever`, one byte, the last member (the format is positional): how hard a train's
+  source or an aeroplane is working, 0 to 1 in steps of a two-hundredth, so the laws' own values cross it
+  exactly (`MachinePower.Encode`, `Decode`). A patrol car's siren needed no new field: `EntityState.Signals`
+  already carries a siren's mode, and the server now fills it for a car in traffic, with the "somebody's hand
+  is on the switch" bit clear. A driven car's switches are sent as before and are never overridden.
+- **The laws, in one place.** `OpenFPS.Sound/MachinePower.cs` (the library's Sound part, no state): a train's
+  notch from what its driver wants of the speed (`TrainNotch`: 0.9 pulling away, 0.3 holding, 0 braking and at a
+  platform), an aeroplane's lever from its flight path (`FlightLever`, the client's old law moved unchanged)
+  and from its ground run's phase (`GroundLever`: the take-off roll is full power, the roll-out above 30 m/s the
+  reversers, taxiing and standing idle; a piston aeroplane idles through all but the take-off roll), and the
+  two put together with a piston's closed throttle in the flare (`AircraftLever`).
+- **The server.** `RailSystem` sets a train's notch where it drives it, before the speed changes, and says it for
+  every source of the train (`TryGetLever`). `VehicleSystem` keeps an aeroplane's lever (`MachinePower.AircraftLever`: its
+  ground run on its wheels, a piston's closed throttle within a wingspan of the runway on the way down, its
+  flight path otherwise; full power on the tick its wheels leave; on a circuit its flight path, which is level,
+  so cruise, as the client had it) and runs one
+  `SirenController` for each patrol car in traffic from the moment the car is made (`TryGetSiren`). The
+  broadcast puts both into the state. `RestingStates` counts the lever with everything else the wire carries:
+  near, a change goes that tick and the next; far, when it has moved by more than
+  `DistantMotion.LeverTolerance` (0.04, under the smallest step between two of the laws' values).
+- **The client.** Plays what it is sent: `EntitySnapshot.Lever` for a train's voices and an aeroplane's, and the
+  siren's mode from `Signals` alone. Gone: the notch formula written twice, `FlightPower`'s lever,
+  `GroundPower`, the two tables of last speeds they differenced, and the siren controller each client ran from
+  the moment it first saw the car. Left on the client, from the motion every client sees alike: a rotor's wake
+  (`RotorWake`), and whether an aeroplane is on its wheels for its tyres (`OnTheWheels`).
+- **What is different to the ear.** A train braking down a grade has no power on (it read as holding or pulling
+  when gravity kept its speed up); a train pulling away gently is pulling (under 0.08 m/s² it read as holding).
+  An aeroplane's take-off roll is at full power from its first metre (under 3 m/s it read as taxiing), and its
+  reversers come on only in the roll-out (any hard slowing above 30 m/s read as reversers). Two players beside
+  one patrol car hear one siren, on and off at the same moments, in the same mode; when its calls come has
+  changed, since the one controller starts when the server makes the car.
+- **Streams.** None changes. The train in `train_behind_wall` runs at a steady 12 m/s, which the client guessed
+  as holding and the replay now sends as holding (`MachinePower.TrainHolding`, as the server would); the siren
+  in `sirens_and_far_traffic` is switched by a driver's hand, which was always sent.
+- **Tests.** `MachineStateTests` (the laws, the wire, the world keeping the lever, a train's and an aeroplane's
+  voices playing what is sent, a siren that only the server switches, the lever in `RestingStates` near and far,
+  and the broadcast itself on the city), `RailRunTests` (the notch round a line with a platform),
+  `AircraftRolloutTests` (the lever down an approach, through the flare, the ground run and the climb-out; on a
+  circuit; a patrol car's siren against a controller of its own).
+- **The lab.** The scenes that move a train or an aeroplane by hand send the lever as the server would:
+  `--train-scene` (the rail system's own notch), `--driving`'s aircraft scene (`MachinePower.AircraftLever` over
+  its own ground run) and `--game-levels`' landings and train at a crossing.
+- **Not heard, and not run with FMOD:** the sounds themselves. See the patch's README for the checks to make.
 
 #### P8. Laws in one place (1 session)
 

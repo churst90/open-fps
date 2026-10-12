@@ -18,19 +18,6 @@ public class SirenApparentTests
     private readonly ITestOutputHelper _o;
     public SirenApparentTests(ITestOutputHelper o) => _o = o;
 
-    /// <summary>A car id whose siren controller starts a call within a couple of seconds, so the
-    /// test does not wait out a quiet phase of a minute or two.</summary>
-    private static int PromptCallId()
-    {
-        for (int id = 1; id < 20000; id++)
-        {
-            var c = new SirenController(id);
-            for (int k = 0; k < 400; k++)
-                if (c.Update(17f, 1f / 240f) != SirenMode.Off) return id;
-        }
-        throw new InvalidOperationException("no car id starts a call promptly");
-    }
-
     private static float Bearing(Vector3 ear, Vector3 p) => MathF.Atan2(p.X - ear.X, p.Z - ear.Z) * 180f / MathF.PI;
 
     /// <summary>
@@ -41,14 +28,15 @@ public class SirenApparentTests
     [Fact]
     public void A_siren_is_placed_in_one_place_by_one_writer()
     {
-        int id = PromptCallId();
+        const int id = 31;
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
         var ear = new Vector3(0f, h.Player.EyeHeight, 0f);
         // A patrol car crossing in front, far enough out to be asked about every tenth frame.
         var at = new Vector3(-40f, 0f, 90f);
         var vel = new Vector3(17f, 0f, 0f);
-        h.AddCar(id, "police_interceptor", at, vel);
+        // On a call, as the server says it is: the client decides nothing about a siren (P7).
+        h.AddCar(id, "police_interceptor", at, vel, ClientAudioHarness.OnACall);
         int siren = h.Voice(VoiceKind.Siren, id);
         Assert.True(h.TickUntil(() => h.Mixer.HasCarried(siren) && h.Mixer.Latest.ContainsKey(siren), 1200),
                     "the siren never sounded with a path");
@@ -62,6 +50,7 @@ public class SirenApparentTests
                 EntityId = id,
                 Transform = OpenFPS.Common.Networking.QuantizedTransform.FromTransform(new OpenFPS.Common.Components.Transform { Position = at, Rotation = Quaternion.CreateFromYawPitchRoll(MathF.PI / 2, 0f, 0f) }),
                 LinearVelocity = vel,
+                Signals = ClientAudioHarness.OnACall,
             } });
             h.Tick();
             System.Threading.Thread.Sleep(2);

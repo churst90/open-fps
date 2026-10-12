@@ -26,6 +26,8 @@ public sealed class RailSystem
         /// <summary>Each source's own height above the rail, metres.</summary>
         public required float[] Heights;
         public float Head, Speed, TopSpeed, Accel, Brake;
+        /// <summary>The notch its driver has it in (MachinePower.TrainNotch), sent on every source of it.</summary>
+        public float Notch;
         /// <summary>Head to tail, metres: the sum of the vehicles' lengths.</summary>
         public float LengthMetres;
 
@@ -65,6 +67,29 @@ public sealed class RailSystem
     private const float HornLeadSeconds = 18f;
 
     private readonly List<Consist> _trains = new();
+    /// <summary>Each train by a source entity of it, per map.</summary>
+    private readonly Dictionary<(string MapId, int EntityId), Consist> _bySource = new();
+
+    private void Index(Consist tr)
+    {
+        foreach (var e in tr.Entities) if (e != Entity.Null) _bySource[(tr.MapId, e.Id)] = tr;
+    }
+
+    private void Unindex(Consist tr)
+    {
+        foreach (var e in tr.Entities) if (e != Entity.Null) _bySource.Remove((tr.MapId, e.Id));
+    }
+
+    /// <summary>
+    /// The notch of the train this entity is a source of, 0..1: what its driver is doing with the power
+    /// (EntityState.Lever). False for anything that is not a source of a train on this map.
+    /// </summary>
+    public bool TryGetLever(string mapId, int entityId, out float lever)
+    {
+        if (_bySource.TryGetValue((mapId, entityId), out var tr)) { lever = tr.Notch; return true; }
+        lever = 0f;
+        return false;
+    }
 
     public void Spawn(MapManager maps) => Spawn(maps, null, null);
 
@@ -107,6 +132,7 @@ public sealed class RailSystem
             }
         }
         if (pick == null) return null;
+        Unindex(pick);
         foreach (var e in pick.Entities) if (e != Entity.Null) maps.DestroyEntity(mapId, e);
         _trains.Remove(pick);
         Log.Information("Map {Map}: train '{Name}' taken off the track ({Sources} source(s)).", mapId, pick.Name, pick.Entities.Length);
@@ -121,6 +147,7 @@ public sealed class RailSystem
     {
         var pick = _trains.FirstOrDefault(t => t.MapId.Equals(mapId, StringComparison.OrdinalIgnoreCase) && t.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
         if (pick == null) return false;
+        Unindex(pick);
         foreach (var e in pick.Entities) if (e != Entity.Null) maps.DestroyEntity(mapId, e);
         _trains.Remove(pick);
         Log.Information("Map {Map}: train '{Name}' taken off the track ({Sources} source(s)).", mapId, pick.Name, pick.Entities.Length);
@@ -210,6 +237,7 @@ public sealed class RailSystem
                 };
                 consist.NextStop = FirstStopAhead(consist.Stops, consist.Head);
                 _trains.Add(consist);
+                Index(consist);
                 int spawned = 0; foreach (var e in ents) if (e != Entity.Null) spawned++;
                 Log.Information("Map {Map}: {Name} ({Profile}) runs '{Track}' — {Length:F0} m loop, {Sources} source(s) over {Consist:F0} m, {Min:F0}-{Max:F0} km/h",
                                 mapId, name, profile.Name, td.Track, line.Length, spawned, profile.LengthMetres, line.MinSpeed * 3.6f, line.MaxSpeed * 3.6f);
@@ -228,6 +256,7 @@ public sealed class RailSystem
             {
                 tr.DwellLeft -= dt;
                 tr.Speed = 0f;
+                tr.Notch = MachinePower.TrainNotch(dwelling: true, 0f, 0f);
                 PlaceConsist(tr, world);
                 if (tr.DwellLeft <= 0f && tr.Stops.Length > 0)
                 {
@@ -253,10 +282,13 @@ public sealed class RailSystem
                 {
                     tr.DwellLeft = MathF.Max(1f, tr.Stops[tr.NextStop].Dwell);
                     tr.Speed = 0f;
+                    tr.Notch = MachinePower.TrainNotch(dwelling: true, 0f, 0f);
                     PlaceConsist(tr, world);
                     continue;
                 }
             }
+            // The notch from what the driver is about to do with the speed, before it is done.
+            tr.Notch = MachinePower.TrainNotch(dwelling: false, tr.Speed, want);
             if (want > tr.Speed) tr.Speed = MathF.Min(want, tr.Speed + tr.Accel * dt);
             else tr.Speed = MathF.Max(want, tr.Speed - tr.Brake * dt);
             tr.Head += tr.Speed * dt;
