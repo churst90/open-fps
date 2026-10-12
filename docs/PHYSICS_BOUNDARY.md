@@ -573,7 +573,8 @@ None of this is to be built now. The boundary and the value types must not need 
   closing speed, two materials and two masses, which `ImpactAcoustics.Between` already takes.
 - People: a capsule body for being struck, pushed and carried, with the walk on top of it when standing.
   Knocked over, the capsule becomes a few linked parts (trunk, legs, head) long enough to fall and land, then
-  lies as the body item it is today (`Bodies.cs`). Not a full ragdoll at first.
+  lies as the body item it is today (`Bodies.cs`). Not a full ragdoll at first. Superseded 2026-10-12: a
+  person is eleven parts all the time (section 11, decision 11).
 - What this gives: `DrivingSystem.cs:388` done; a car that strikes a person throws them and they land where
   the momentum says, heard as the impact, the flight's silence and the landing on what is there.
 
@@ -642,7 +643,7 @@ against the code (grep and reading); "none" means nothing was found.
 | 14 | **A car leaving the ground**: vertical motion, rollover, jumps | none: horizontal velocity only (`DrivingSystem.cs:408`) | a car off a ledge falling and landing, a rollover's sequence, a speed bump taken fast | medium | stage 6 (needs 5) |
 | 15 | **Buoyancy, wading and swimming** | none (grep: no buoyancy, swim or wade); water depth exists (`GroundWater`, `RoadWater`), waves are sound only (`Waves.cs`) | wading heard from the real depth; swimming; things that float and knock against a hull or a bank; a splash from what falls in | medium to large | later, after stage 4 |
 | 16 | **Pressure waves**: blasts, a door slam pushing air | none; a door model feels air on its leaf (`KnobDoor.cs:898`) but pushes none into the room | a slammed door rattling another in its frame; a blast that breaks windows by overpressure | medium | later, on 5.2's disturbances |
-| 17 | **Draughts and the stack effect** | none | a draught whistling under a door when a window is open across the house; doors drawn shut | medium | later, with the rooms' openings |
+| 17 | **Draughts and the stack effect** | none | a draught whistling under a door when a window is open across the house; doors drawn shut | medium | later, with the rooms' openings (by pressure, section 11, decision 15) |
 | 18 | **Rail dynamics**: mass, tractive effort, grade, adhesion, coupler slack | map constants (`RailSystem.cs:260-261`) | the clank running down a freight train as it starts and stops (slack run-in), wheelslip and sanding on a grade, braking distances | medium | later |
 | 19 | **Damage and deformation from impulse**; fracture of other materials | glass breaks well (`Glass.cs`, `GlassFracture.cs`, panes removed `CombatService.cs:1154-1156`); nothing else breaks | crumpled panels and their changed ring, wood splintering, plaster and tile chips; debris as bodies | large | later, after stage 4 |
 | 20 | **Projectiles, the rest**: penetration by energy, spin drift, momentum to what is hit | G7 point mass with wind drift (good, `ExternalBallistics.cs:36-48`); ricochet (`Ricochet.cs`); glass puncture | a round heard through a door or a car's body with its impact on the far side; consistent drift with the one air field | small to medium | stage 2 (one wind), later (penetration) |
@@ -949,6 +950,37 @@ state types, with physics 5 and 6 beside or after them.
 
 10. **When.** Stages 0 and 1 are cheap and can follow the voice registry at once. Stage 4 is the one Cody
     asked for (impacts) and waits for geometry stage 6's shapes; stage 5 is the bus's air and the leaves.
+
+Decided 2026-10-12 (Cody), from questions asked on the Resonance side; both games take these through the
+libraries:
+
+11. **A person is their parts all the time.** Eleven parts (hips, trunk, head, two upper arms, two forearms with
+    hands, two thighs, two lower legs with feet), present whether standing or down, so each can be hit, reached
+    with and stood on. Standing and walking, the parts follow the walk's pose kinematically (Jolt's ragdoll
+    driven to a pose); the movement controller still moves the body, since balancing on two legs is not
+    simulated. Struck, the part takes the impulse and the joints' motors try to hold the pose: a light hit
+    jolts a limb, a heavy one makes the body stumble. Knocked down or out, the motors let go and the body
+    falls as one. This replaces "a capsule, then a few parts" in 5.1 and stage 4. Footsteps can then come
+    from the foot that lands, at its own mass.
+12. **The body plan is data, owned by `OpenFPS.Physics`.** Parts, sizes, masses, centres of mass and joints
+    with their limits, scaled from a body's height and mass by published segment tables (Dempster; de Leva's
+    adjustments) and measured ranges of motion. One format for both games; Resonance makes none of its own.
+    The same format describes animals later.
+13. **A vehicle's body and its sound preset are separate.** A map's vehicle carries its own length, width and
+    height; the preset is the engine (and the parts the sound reads). Exhaust and intake positions come from
+    the body by the vehicle's layout (a stack behind the cab, a tailpipe at the rear), not from the car the
+    engine was measured in. `diesel_truck` stays a tractor's engine.
+14. **A trailer is a second body joined at its pin.** Its own wheels and no engine, coupled by a constraint at
+    the kingpin or hitch, so its tail swings and it can jackknife. Built in stage 6 (vehicles in full), after
+    cars are on Jolt; one box until then. With it: the coupling's clunk pulling away and braking, the trailer's
+    tyres scrubbing on a tight turn, an empty trailer rattling, its own air brakes.
+15. **Draughts by pressure (item 17 of section 6).** Wind sets a pressure on each face of a building from which
+    way the face meets it (windward pushes, leeward and side faces pull); flow through an opening follows the
+    orifice law from its area and the pressure across it (Q = Cd A sqrt(2 dp / rho)). One opening alone
+    passes little, a pulse with the gusts; openings on two faces give a through-draught. The flow is fastest
+    in the opening and spreads and slows into the room; the ear's wind reads the air speed at the head. It
+    comes through the libraries' rooms and openings, so both games get it, and it drives later doors pushed
+    or slammed by the wind and the whistle at a gap.
 
 ---
 
