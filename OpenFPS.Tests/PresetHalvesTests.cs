@@ -149,4 +149,85 @@ public class PresetHalvesTests
         Assert.Equal("OpenFPS.Physics", typeof(TyreMechanics).Assembly.GetName().Name);
         Assert.Equal("OpenFPS.Sound", typeof(TyreProfile).Assembly.GetName().Name);
     }
+
+    // ── The vehicle ─────────────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Each mechanical number of a vehicle is in one place, its physics half: the sound's half reads and writes
+    /// it member by member, so the server's car, the wheel model and the sound's own driveline cannot hold
+    /// different masses.
+    /// </summary>
+    [Fact]
+    public void A_vehicles_mechanical_members_are_its_mechanics()
+    {
+        var mechanical = typeof(VehicleMechanics).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(m => m.SetMethod != null && m.Name != nameof(VehicleMechanics.Tyres)).ToList();
+        Assert.Equal(new[] { "MassKg", "DragArea", "RollingResistance", "FrontAxleZ", "RearAxleZ", "LengthMetres", "WidthMetres",
+                             "HeightMetres", "TyreCount", "Chassis", "Gearbox" }, mechanical.Select(m => m.Name));
+        var v = MachineRegistry.VehicleFor("diesel_truck");
+        var clone = typeof(VehicleProfile).GetMethod("<Clone>$")!;
+        float n = 1f;
+        foreach (var m in mechanical)
+        {
+            var onSound = typeof(VehicleProfile).GetProperty(m.Name);
+            Assert.True(onSound != null, $"VehicleProfile has no {m.Name}");
+            Assert.Equal(m.GetValue(v.Mechanics), onSound!.GetValue(v));
+            object value = m.PropertyType == typeof(float) ? 0.5f + n++
+                         : m.PropertyType == typeof(int) ? 6
+                         : m.Name == "Gearbox" ? Gearbox.SixSpeedSports
+                         : ChassisSpec.Default(2, 0.8f, 200f);
+            var set = (VehicleProfile)clone.Invoke(v, null)!;
+            onSound.SetValue(set, value);
+            Assert.Equal(value, m.GetValue(set.Mechanics));
+            // Nothing else of the mechanics moved, and the vehicle it was copied from is as it was.
+            foreach (var other in mechanical.Where(o => o != m))
+                Assert.Equal(other.GetValue(v.Mechanics), other.GetValue(set.Mechanics));
+            Assert.Same(v.Mechanics.Tyres, set.Mechanics.Tyres);
+            Assert.NotEqual(value, m.GetValue(v.Mechanics));
+        }
+        // The sound's own numbers are not the mechanics'.
+        Assert.Null(typeof(VehicleMechanics).GetProperty(nameof(VehicleProfile.SourceLevelDb)));
+        Assert.Null(typeof(VehicleMechanics).GetProperty(nameof(VehicleProfile.ExhaustOffsetZ)));
+        // A vehicle nobody has set a number of has the numbers a vehicle always had.
+        var plain = new VehicleMechanics();
+        Assert.Equal((1620f, 0.62f, 0.013f, 1.25f, -1.35f), (plain.MassKg, plain.DragArea, plain.RollingResistance, plain.FrontAxleZ, plain.RearAxleZ));
+        Assert.Equal((4.6f, 1.9f, 1.4f, 4), (plain.LengthMetres, plain.WidthMetres, plain.HeightMetres, plain.TyreCount));
+        Assert.Null(plain.Chassis);
+    }
+
+    /// <summary>
+    /// A vehicle's tyres and gearbox are its mechanics' too, the same objects, whatever it was made from: a
+    /// preset, a parts list, or another vehicle with other tyres. And its mechanics are held, not made each time
+    /// they are asked for.
+    /// </summary>
+    [Fact]
+    public void A_vehicles_tyres_and_gearbox_are_its_mechanics_too()
+    {
+        MachineRegistry.EnsureLoaded(Path.Combine(AppContext.BaseDirectory, "machines"));
+        int vehicles = 0;
+        foreach (string id in MachineRegistry.Ids)
+        {
+            var v = MachineRegistry.VehicleFor(id);
+            vehicles++;
+            Assert.Same(v.Tyres.Mechanics, v.Mechanics.Tyres);
+            Assert.Same(v.Gearbox, v.Mechanics.Gearbox);
+            Assert.Same(v.Mechanics, v.Mechanics);
+            Assert.Equal(v.MassKg, v.Mechanics.MassKg);
+            Assert.Equal(v.Running.Wheelbase, v.Mechanics.Running.Wheelbase);
+        }
+        Assert.True(vehicles >= 40, $"only {vehicles} vehicles");
+
+        var car = MachineRegistry.VehicleFor("i4_midsize");
+        var onSlicks = car with { Tyres = TyreProfile.RaceSlick };
+        Assert.Same(onSlicks.Tyres.Mechanics, onSlicks.Mechanics.Tyres);
+        Assert.Equal(3.1f, onSlicks.Mechanics.Tyres.PeakGripG);
+        Assert.Equal(car.MassKg, onSlicks.MassKg);
+        // The car it was made from keeps its own tyres.
+        Assert.Same(car.Tyres.Mechanics, car.Mechanics.Tyres);
+        Assert.NotEqual(3.1f, car.Mechanics.Tyres.PeakGripG);
+        // A grip changed on the sound's half of the tyres reaches the vehicle's mechanics with the tyres.
+        var worn = car with { Tyres = car.Tyres with { PeakGripG = 0.6f } };
+        Assert.Equal(0.6f, worn.Mechanics.Tyres.PeakGripG);
+        Assert.Equal(0.6f, new WheelDynamics(worn.Mechanics).GripG);
+    }
 }

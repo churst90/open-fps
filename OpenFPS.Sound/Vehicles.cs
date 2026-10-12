@@ -308,11 +308,17 @@ public sealed record VehicleProfile
 {
     public required string Name { get; init; }
     public required EngineProfile Engine { get; init; }
-    public required Gearbox Gearbox { get; init; }
-    public required TyreProfile Tyres { get; init; }
-    public float MassKg { get; init; } = 1620f;
-    public float DragArea { get; init; } = 0.62f;      // Cd * A
-    public float RollingResistance { get; init; } = 0.013f;
+    public required Gearbox Gearbox { get => _mechanics.Gearbox!; init => _mechanics = _mechanics with { Gearbox = value }; }
+    /// <summary>The tyres as the sound hears them; their mechanics are this vehicle's mechanics' too.</summary>
+    public required TyreProfile Tyres
+    {
+        get => _tyres;
+        init { _tyres = value; _mechanics = _mechanics with { Tyres = value.Mechanics }; }
+    }
+    private readonly TyreProfile _tyres = null!;
+    public float MassKg { get => _mechanics.MassKg; init => _mechanics = _mechanics with { MassKg = value }; }
+    public float DragArea { get => _mechanics.DragArea; init => _mechanics = _mechanics with { DragArea = value }; }      // Cd * A
+    public float RollingResistance { get => _mechanics.RollingResistance; init => _mechanics = _mechanics with { RollingResistance = value }; }
 
     /// <summary>Where each emitter sits relative to the car's centre, metres (x right, y up, z forward).
     /// At close range the exhaust three metres behind the intake tells a listener which way the car
@@ -363,16 +369,16 @@ public sealed record VehicleProfile
     /// compromise a single voice sits at.</summary>
     public Vector3 ExhaustSlot => new(ExhaustOffsetX, ExhaustHeight, ExhaustOffsetZ);
 
-    public float FrontAxleZ { get; init; } = 1.25f;
-    public float RearAxleZ { get; init; } = -1.35f;
+    public float FrontAxleZ { get => _mechanics.FrontAxleZ; init => _mechanics = _mechanics with { FrontAxleZ = value }; }
+    public float RearAxleZ { get => _mechanics.RearAxleZ; init => _mechanics = _mechanics with { RearAxleZ = value }; }
 
     /// <summary>
     /// The body's outside size, metres: bumper to bumper, mirror-less width, ground to roof. What you
     /// walk into; declared because nothing else on the profile knows where the bumpers are.
     /// </summary>
-    public float LengthMetres { get; init; } = 4.6f;
-    public float WidthMetres { get; init; } = 1.9f;
-    public float HeightMetres { get; init; } = 1.4f;
+    public float LengthMetres { get => _mechanics.LengthMetres; init => _mechanics = _mechanics with { LengthMetres = value }; }
+    public float WidthMetres { get => _mechanics.WidthMetres; init => _mechanics = _mechanics with { WidthMetres = value }; }
+    public float HeightMetres { get => _mechanics.HeightMetres; init => _mechanics = _mechanics with { HeightMetres = value }; }
 
     /// <summary>How far ahead of the middle the grille is, metres: a quarter of a metre in from the nose.</summary>
     public float GrilleZ => MathF.Max(0.5f, LengthMetres * 0.5f - 0.25f);
@@ -493,18 +499,24 @@ public sealed record VehicleProfile
 
     /// <summary>How many tyres are on the road; the rolling noise is one tyre's
     /// (<see cref="TyreProfile.ReferenceDb"/>) summed over them.</summary>
-    public int TyreCount { get; init; } = 4;
+    public int TyreCount { get => _mechanics.TyreCount; init => _mechanics = _mechanics with { TyreCount = value }; }
 
     /// <summary>The running gear (<see cref="ChassisSpec"/>), or null for
     /// <see cref="ChassisSpec.Default"/>, built from the fields above.</summary>
-    public ChassisSpec? Chassis { get; init; }
+    public ChassisSpec? Chassis { get => _mechanics.Chassis; init => _mechanics = _mechanics with { Chassis = value }; }
+
+    /// <summary>
+    /// The physics' half of this vehicle (<see cref="VehicleMechanics"/>), under the same id: its mass, its drag
+    /// and rolling resistance, its size, where its axles are, its running gear, its gearbox and its tyres'
+    /// mechanics. The members here that are mechanical read and write it, so a vehicle is still one thing to
+    /// whoever makes or reads one, and each of those numbers is in one place.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public VehicleMechanics Mechanics => _mechanics;
+    private readonly VehicleMechanics _mechanics = new();
 
     /// <summary>The chassis this vehicle runs on: its own, or the one its other fields imply.</summary>
-    /// <summary>The physics' half of this vehicle: its running gear, its tyres' mechanics and its mass.</summary>
-    [System.Text.Json.Serialization.JsonIgnore]
-    public VehicleMechanics Mechanics => new(Running, Tyres.Mechanics, MassKg);
-
-    public ChassisSpec Running => (Chassis ?? ChassisSpec.Default(TyreCount, WidthMetres, MassKg)).PlacedOn(FrontAxleZ, RearAxleZ);
+    public ChassisSpec Running => _mechanics.Running;
 
     /// <summary>
     /// What this vehicle measures at one metre at full load, dB SPL: the number the audio chain hangs
