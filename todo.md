@@ -91,6 +91,9 @@ since the last deploy" list below.
      component's 50). Then library stage 5's `AudioClock` slice (docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
    - Then P4 (one ranking), the rest of P6 (rain asking the worker), P7 (machine state from
      the server: a wire change, shipped with a deploy).
+   - S24's two defaults are one (Cody, 2026-10-12): a sound that declares no range or reference distance carries
+     50 m with 3 m in the server's component and the client's emitter alike (`AcousticConstants.DefaultRange`,
+     `DefaultMinDistance`). Left for Cody: the rain's 40 dB and a bump's 85 dB starting levels (P3d step 6's notes).
 3. The physics boundary survey: DONE 2026-10-11 (docs/PHYSICS_BOUNDARY.md). Cody asked for it the same day:
    "all parts of this game engine need to be separated in their own packages and all work cohesively
    together". The boundary of an `OpenFPS.Physics` on Geometry, 24 missing pieces ranked, stages 0 to 6 at

@@ -255,7 +255,7 @@ public struct SpatialEmitter
         EffectiveDistance = 0;
         Occlusion = 0;
         Volume = 1.0f;
-        Range = 100.0f;
+        Range = OpenFPS.Common.AcousticConstants.DefaultRange;
         Pitch = 1.0f;
         Type = EmitterType.EntityAttached;
         Essential = false;
@@ -266,7 +266,7 @@ public struct SpatialEmitter
         ConeInside = 360f;
         ConeOutside = 360f;
         ConeOutsideVolume = 1.0f;
-        MinDistance = 3.0f;
+        MinDistance = OpenFPS.Common.AcousticConstants.DefaultMinDistance;
         TargetRegionId = -1;
         Direction = Vector3.UnitZ;
         Velocity = Vector3.Zero;

@@ -3,6 +3,10 @@ namespace OpenFPS.Common;
 /// <summary>Tuning for the acoustics, shared so the client and the server agree.</summary>
 public static class AcousticConstants
 {
+    /// <summary>The range and reference distance of a sound that declares neither, one pair for the server's
+    /// component and the client's emitter (audit S24, Cody 2026-10-12): a declared level's audible range wins.</summary>
+    public const float DefaultRange = 50f, DefaultMinDistance = 3f;
+
     // --- Architecture & Hierarchy ---
     public const int GlobalRegionId = -1; // The Global Environment world ID
     public const float DefaultVoxelResolution = 0.5f;

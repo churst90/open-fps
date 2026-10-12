@@ -242,7 +242,7 @@ public partial struct MaterialComponent
 public partial struct SoundEmitterComponent 
 { 
     public float Volume { get; set; } = 1.0f; 
-    public float Range { get; set; } = 50.0f; 
+    public float Range { get; set; } = OpenFPS.Common.AcousticConstants.DefaultRange; 
     public string SoundId { get; set; } = ""; 
     public string StartSoundId { get; set; } = "";
     public string StopSoundId { get; set; } = "";
@@ -251,7 +251,7 @@ public partial struct SoundEmitterComponent
     public float ConeInsideAngle { get; set; } = 360f;
     public float ConeOutsideAngle { get; set; } = 360f;
     public float ConeOutsideVolume { get; set; } = 1.0f;
-    public float MinDistance { get; set; } = 3.0f;
+    public float MinDistance { get; set; } = OpenFPS.Common.AcousticConstants.DefaultMinDistance;
 
     /// <summary>
     /// Replay this sound every N seconds; zero is not a repeater. Any emitter's, not a PA system's: a
