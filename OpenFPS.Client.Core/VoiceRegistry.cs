@@ -332,6 +332,10 @@ internal sealed partial class VoiceRegistry
     /// voice's (part 0), from a point of its own (a door's face).</summary>
     public const int BeaconProbe = 1;
 
+    /// <summary>The part of nobody's probe a rain patch's loudest surface is asked under, by its slot: below
+    /// zero, beside the perched birds' (their perch's entity id, which is never just below zero).</summary>
+    public static int RainProbe(int slot) => -1 - slot;
+
     /// <summary>
     /// The id of one voice: <paramref name="kind"/> of <paramref name="owner"/>, the <paramref name="part"/>th of
     /// them. The owner is an entity, or for a voice no entity owns what it belongs to (a train's number, a rain

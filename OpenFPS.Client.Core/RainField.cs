@@ -784,6 +784,36 @@ public sealed class RainField
     private int _surveys;
     private bool _surveyFailed;
 
+    /// <summary>A surface is asked about from this far over it, m: on it, the question starts inside the
+    /// surface it lies on.</summary>
+    private const float PathLiftMetres = 0.3f;
+
+    /// <summary>The acoustic worker the loudest surface of each ring patch is heard by (P6); null, the hand-rolled
+    /// tracer alone.</summary>
+    internal AsyncAcousticWorker? Worker { get; set; }
+
+    /// <summary>The id a ring patch's loudest surface is asked of the worker under, given by the rain's host
+    /// (a probe: no voice sounds under it); null, the tracer alone.</summary>
+    public Func<int, int>? SlotProbe { get; set; }
+
+    /// <summary>How fast the ear moves, m/s: how far from here an answer traced a moment ago may have been asked
+    /// (AcousticPathData.Answers).</summary>
+    internal float EarSpeed { get; set; }
+
+    /// <summary>Ring patches' loudest surfaces placed by the worker's answer rather than the tracer's, counted
+    /// each frame, for a test.</summary>
+    internal int AnsweredByWorker { get; private set; }
+    private int _askFrame;
+
+    /// <summary>A ring patch's path from the paths to its surfaces known for where they are now.</summary>
+    private AcousticPathData? Combined(int slot)
+    {
+        var sources = _last!.Sources[slot];
+        return Combine(_last, slot, j => _sourcePaths[slot, j] is { Path: { } p } done
+                                         && Vector3.DistanceSquared(done.At, sources.Count > 0 ? sources[j].At : _last.Centres[slot]) < 0.25f
+                                         ? p : null);
+    }
+
     /// <summary>For the lab: play only this slot's voices and near drops (the roof over the ear alone); -1 all.</summary>
     internal int OnlySlot = -1;
 
@@ -858,6 +888,32 @@ public sealed class RainField
 
         PlayNear(ear, now, listenerRegion);
 
+        // The loudest surface of each ring patch is heard by the acoustic worker's answer, as a car or a bird
+        // is: asked under the patch's own probe as often as a voice that far off is asked about (every frame
+        // within 15 m, every second frame within 50), and taken when it is an answer for that surface and this
+        // ear. Until one comes the tracer below stands in, as for the patch's other surfaces.
+        _askFrame++;
+        if (_acoustics != null && Worker != null && SlotProbe != null)
+            for (int s = 0; s < RainFeeds.Slots; s++)
+            {
+                if (s == RainSurvey.OverheadSlot || _last.Patches[s] == null || _last.Direct[s]) continue;
+                var sources = _last.Sources[s];
+                Vector3 at = sources.Count > 0 ? sources[0].At : _last.Centres[s];
+                Vector3 from = at + new Vector3(0f, PathLiftMetres, 0f);
+                int probe = SlotProbe(s);
+                float distance = Vector3.Distance(ear, from);
+                int every = distance > 50f ? 10 : distance > 15f ? 2 : 1;
+                if (_askFrame % every == s % every)
+                    Worker.EnqueueRequest(new AcousticRequest
+                    {
+                        EntityId = probe, ListenerPos = ear, SourcePos = from, SourceRadius = AudioEmission.MinOcclusionRadius,
+                    });
+                if (!Worker.TryGetDirectFor(probe, from, 0f, ear, EarSpeed, out var answer)) continue;
+                AnsweredByWorker++;
+                _sourcePaths[s, 0] = (answer, at, now);
+                _paths[s] = Combined(s) ?? _paths[s];
+            }
+
         // One path a frame, to one surface of one ring patch: the walls and windows between the ear and it.
         if (_acoustics != null)
         {
@@ -873,11 +929,9 @@ public sealed class RainField
                 Vector3 at = sources.Count > 0 ? sources[k].At : _last.Centres[s];
                 ref var known = ref _sourcePaths[s, k];
                 if (known.Path != null && now - known.When < PathSeconds && Vector3.DistanceSquared(known.At, at) < 0.25f) continue;
-                try { known = (_acoustics.CalculateAcousticPath(world, -1, ear, at + new Vector3(0f, 0.3f, 0f)), at, now); }
+                try { known = (_acoustics.CalculateAcousticPath(world, -1, ear, at + new Vector3(0f, PathLiftMetres, 0f)), at, now); }
                 catch { known = (null, at, now); }
-                _paths[s] = Combine(_last, s, j => _sourcePaths[s, j] is { Path: { } p } done
-                                                   && Vector3.DistanceSquared(done.At, sources.Count > 0 ? sources[j].At : _last.Centres[s]) < 0.25f
-                                                   ? p : null) ?? _paths[s];
+                _paths[s] = Combined(s) ?? _paths[s];
                 break;
             }
         }

@@ -400,9 +400,12 @@ public partial class ClientAudioSystem
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
         _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced) { Manual = manualAcoustics };
         WorldAudio.Worker = _acousticWorker;
-        // Blips and the perched birds' calls are heard by the worker's answer, as every sustained voice is (P6).
+        // Blips, the perched birds' calls and the loudest surface of each rain patch are heard by the worker's
+        // answer, as every sustained voice is (P6).
         _beacons.Worker = _acousticWorker;
         _birds.Worker = _acousticWorker;
+        _rain.Worker = _acousticWorker;
+        _rain.SlotProbe = slot => _voices.IdFor(VoiceKind.Probe, VoiceRegistry.NoEntity, VoiceRegistry.RainProbe(slot));
         _acousticWorker.Start();
     }
 
@@ -854,6 +857,7 @@ public partial class ClientAudioSystem
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _birds.EarSpeed = _earSpeed;
         _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        _rain.EarSpeed = _earSpeed;
         _rain.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
         _partMs[2] += Ms(partAt);
 
@@ -2110,6 +2114,9 @@ public partial class ClientAudioSystem
 
     /// <summary>The rain round the listener: the surfaces it lands on, as a few voices. See RainField.</summary>
     private readonly RainField _rain;
+
+    /// <summary>The rain, for a test.</summary>
+    internal RainField Rain => _rain;
 
     /// <summary>Paths asked for horns, sirens and trains, for a test.</summary>
     internal long VehiclePathsAsked;

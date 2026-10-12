@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Audit P6, the rain (docs/SPECIAL_CASES_AUDIT.md, "P6, the rain, as built"), unheard. Rain behind walls is
+  heard by the acoustic worker's answer, as cars, beacons and birds are: the heaviest surface of each patch is
+  asked under a probe of its own, and the hand-rolled tracer stands in until the answer comes and for the
+  patch's other surfaces. With Steam Audio, rain through a window or round a corner is now on the same terms
+  as the car beside it. Up to eight sources more on the worker's pool while it rains.
+
 - Audit P4, one rank, the choosers (docs/SPECIAL_CASES_AUDIT.md, "P4 as built"), unheard. Which cars have an
   engine, which standing machines a voice and which trees and fires are heard across their width is decided by
   how loud each is at the ear, one law for all three and the mixer's budget (it was the nearest cars, the

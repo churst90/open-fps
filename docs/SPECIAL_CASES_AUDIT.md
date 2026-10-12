@@ -30,9 +30,9 @@ Where the parts stand (2026-10-11):
 | P3a, the registry for moving things | done 2026-10-11 ("P3a as built"), unheard: intakes and borrowed cars take their path, one writer per voice, the rumble follows the speed (S11). S21 closed as deferred the same day (Cody): the bus keeps its own law until geometry stage 6 |
 | P3b, every other voice | done 2026-10-11 ("P3b as built"), unheard: every voice an entry, one writer each; woods take their path, engine echoes carry theirs; P6 for talkers and S23. Blocked engines heard round the edge (Cody, the same day) |
 | P3c, seeds then ids | done 2026-10-11 ("P3c as built") |
-| P3d, one start and declared levels | steps 1 to 5 built 2026-10-11, step 6 (the reseed) 2026-10-12 ("P3d as built"), unheard. Left: the rain and bump start levels (a decision), rain patches under probes, the two default ranges |
+| P3d, one start and declared levels | steps 1 to 5 built 2026-10-11, step 6 (the reseed) 2026-10-12 ("P3d as built"), unheard. Left: the rain and bump start levels (a decision). Rain patches under probes: done with P6. The two default ranges: one now (S24) |
 | P4, one ranking | the choosers built 2026-10-12 ("P4 as built"), unheard: one rank, cars and places by loudness, a render's headroom out of the rank. Three decisions for Cody there; the provider's orderings (S20) left |
-| P6, one path model for every asker | talkers and S23 in P3b; beacons and perched birds in P3d; rain patches left |
+| P6, one path model for every asker | done: talkers and S23 in P3b; beacons and perched birds in P3d; rain patches 2026-10-12 ("P6, the rain, as built"), unheard |
 | P7, machine state from the server | last; a wire change, shipped with a server deploy |
 
 That is the order agreed with Cody on 2026-10-11 (todo.md, "Next, in order", item 2). It puts sound library
@@ -771,7 +771,12 @@ OpenFPS.Sound changed (step 2), so the wire hash does.
 - **Next (not done):**
   - The rain's 40 dB start level and the bump's 85 dB stand until measured; the rain voice measures itself by
     running, so holding it back silent would leave the replay's rain silent. Decide, then do.
-  - Rain patches asked under probes (P6's last asker), measured with `--pop-hunt`.
+  - Rain patches asked under probes (P6's last asker): done 2026-10-12 ("P6, the rain, as built"). The pool,
+    measured on Linux with Steam Audio (`--pop-hunt map=city`, Marlow Tower stairwell floor 3, 60 s, seeds 1 and 2):
+    30 still sources against 38, the rain's eight more. No more excursions with 38 (1 and 0, against 0 and 1; the
+    one is the same car at -80 to -62 dB in both); the start tick's fallback to the tracer 10 or 11 of 78 sources
+    against 2 or 3 of 70 (64 a tick), recovered within the run. So the heaviest surface only: all four (32 more)
+    would keep the pool over.
   - SpatialEmitter's two default ranges (100/3 against 50/3, S24).
   - Cody to hear: the listening list in the report of 2026-10-11.
 
@@ -927,6 +932,25 @@ hash does not. Three commits.
 - **Conflicts.** P1 (worker load: more askers on the same pool; measure after P1). P3b.
 - **Guards show.** Streams change for birds, beacons and talkers in the new scenarios, where the
   simulator and the tracer disagree; named.
+
+**P6, the rain, as built (2026-10-12).** Made on Windows and sent back as a patch. Unheard.
+Only `OpenFPS.Client.Core` and the tests changed, so the wire hash does not.
+
+- **What is asked.** A ring patch behind walls is heard by the paths to the things it falls on, up to four a
+  patch (`RainSurvey.Result.Sources`, heaviest first). The heaviest of each is asked of the worker under a probe
+  of the patch's own (`VoiceRegistry.RainProbe(slot)`, nobody's probe; the host gives `RainField.SlotProbe`), at
+  the cadence a voice that far off is asked about (every frame within 15 m, every second frame within 50), and
+  the patch takes the answer when it is one for that surface and this ear. At most eight sources more on the
+  worker's pool, while it rains and only for patches not in plain view. The roof over the ear and patches in
+  plain view ask nothing, as before.
+- **The stand-in.** Until an answer comes, and for a patch's other surfaces, the hand-rolled tracer, one
+  surface a frame, as before.
+- **Streams.** None changes: in traffic_rain every patch is in plain view, so nothing there asks. The replay
+  has no scenario with rain behind walls; `RainProbeTests` is that scene (a closed room in the rain: eight
+  patches, eight probes, the answer taken every frame from the second).
+- **Not measured here:** the pool. This machine has no Steam Audio, so the worker's answers in the tests are the
+  tracer's. `--pop-hunt` with eight more still sources (`extra=38` against `extra=30`) is the measure, where
+  Steam Audio runs.
 
 #### P7. Machine state from the server (1 session)
 
