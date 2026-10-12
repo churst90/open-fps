@@ -20,6 +20,12 @@ internal static class DoorPhysics
 
     internal const int Oversample = 4;
 
+    /// <summary>Below this a force is no force and a mode is at rest. A mode left alone decays without end, and
+    /// under 1e-308 a number is subnormal: a processor that works on those in microcode (Intel's) takes about
+    /// a hundred times as long over each. This is far above them and far below anything that reaches a
+    /// sample, so a render is the same bit for bit.</summary>
+    internal const double Rest = 1e-200;
+
     /// <summary>Modes stepped exactly: with the force held over a step each damped oscillator moves by a
     /// fixed 2x2 matrix, so a mode at 14 kHz is as accurate as one at 40 Hz.</summary>
     internal sealed class Modes
@@ -65,6 +71,7 @@ internal static class DoorPhysics
                 double q = Q[k], v = V[k];
                 Q[k] = a11[k] * q + a12[k] * v + b1[k] * a;
                 V[k] = a21[k] * q + a22[k] * v + b2[k] * a;
+                if (Math.Abs(Q[k]) < Rest && Math.Abs(V[k]) < Rest) { Q[k] = 0; V[k] = 0; }
                 F[k] = 0;
             }
             return p;
@@ -72,6 +79,7 @@ internal static class DoorPhysics
 
         public void Push(double[] shape, double force)
         {
+            if (Math.Abs(force) < Rest) return;
             for (int k = 0; k < N; k++) F[k] += shape[k] * force;
         }
 

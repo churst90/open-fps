@@ -79,6 +79,60 @@ public class DoorModelTests
         Assert.InRange(PeakDb(pcm, GlassDoor.PascalsAtFullScale), 80, 115);
     }
 
+    /// <summary>
+    /// A mode left alone comes to rest. It would otherwise decay into subnormal numbers (under 1e-308) and
+    /// stay there for the rest of the render, and a processor that works on those in microcode takes about a
+    /// hundred times as long over each: the front door above took seven minutes to render on one.
+    /// </summary>
+    [Fact]
+    public void AModeLeftAloneComesToRest()
+    {
+        // Two lossy modes: the upper one has lost 300 orders of magnitude after 30 ms, the lower after half a second.
+        double dt = 1.0 / (48000 * DoorPhysics.Oversample);
+        var modes = new DoorPhysics.Modes(new[] { 14000.0, 900.0 }, new[] { 0.5, 0.5 }, new[] { 0.01, 0.01 }, new[] { 1.0, 1.0 }, dt);
+        modes.Push(new[] { 1.0, 1.0 }, 100);
+        double loudest = 0;
+        int steps = 48000 * DoorPhysics.Oversample * 2;
+        for (int i = 0; i < steps; i++)
+        {
+            loudest = Math.Max(loudest, Math.Abs(modes.Step()));
+            for (int k = 0; k < modes.N; k++)
+                if (double.IsSubnormal(modes.Q[k]) || double.IsSubnormal(modes.V[k]) || double.IsSubnormal(modes.Acc[k]))
+                    Assert.Fail($"mode {k} is on subnormal numbers at step {i}: {modes.Q[k]:E3}, {modes.V[k]:E3}");
+        }
+        Assert.True(loudest > 1, $"the modes rang ({loudest})");
+        Assert.All(modes.Q, q => Assert.Equal(0.0, q));
+        Assert.All(modes.V, v => Assert.Equal(0.0, v));
+        Assert.Equal(0.0, modes.Step());
+    }
+
+    /// <summary>
+    /// A force too small to move anything is no force. A latch or a seal that has all but stopped goes on
+    /// pushing its plate with numbers that small, every step, and each one put every mode of the plate on
+    /// subnormal numbers again.
+    /// </summary>
+    [Fact]
+    public void AForceTooSmallToMoveAnythingIsNoForce()
+    {
+        double dt = 1.0 / (48000 * DoorPhysics.Oversample);
+        var modes = new DoorPhysics.Modes(new[] { 440.0, 5000.0 }, new[] { 0.02, 0.02 }, new[] { 0.5, 0.5 }, new[] { 1.0, 1.0 }, dt);
+        var shape = new[] { 1.0, 0.25 };
+        foreach (double tiny in new[] { double.Epsilon, 1e-310, -1e-310, 1e-250, -1e-201 })
+        {
+            modes.Push(shape, tiny);
+            Assert.All(modes.F, f => Assert.Equal(0.0, f));
+            Assert.Equal(0.0, modes.Step());
+            Assert.All(modes.Q, q => Assert.Equal(0.0, q));
+            Assert.All(modes.V, v => Assert.Equal(0.0, v));
+        }
+        // One that is not too small is still a force, however small, and is kept whole.
+        modes.Push(shape, 1e-150);
+        Assert.Equal(1e-150, modes.F[0]);
+        Assert.Equal(0.25e-150, modes.F[1]);
+        modes.Step();
+        Assert.NotEqual(0.0, modes.Q[0]);
+    }
+
     [Fact]
     public void TheLiftDoorRunsInTheServersTime()
     {
