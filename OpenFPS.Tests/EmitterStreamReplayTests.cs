@@ -353,6 +353,9 @@ internal sealed class Replay
         ["places_and_woods"] = PlacesAndWoods,
         ["talker_and_aids"] = TalkerAndAids,
         ["high_ids"] = HighIds,
+        // Rain with every patch behind walls (docs/SPECIAL_CASES_AUDIT.md, P6): traffic_rain has every patch in
+        // plain view, so nothing there shows how a patch behind a wall is heard.
+        ["rain_behind_walls"] = RainBehindWalls,
     };
 
     public static List<string> Run(string scenario) => RunScript(Scenarios[scenario]).Mixer.Lines;
@@ -912,6 +915,41 @@ internal sealed class Replay
             r.Move(patrol, patrolAt, Vector3.Zero, Driven(siren: OpenFPS.Common.SirenMode.Wail));
             r.Tick();
             at += east * (float)Dt;
+        }
+    }
+
+    /// <summary>
+    /// Two seconds in a closed brick room with a concrete roof, on the third floor of a block, in 8 mm/h of rain,
+    /// walking from its middle toward its east wall. Nothing of the street is in plain view, so no patch is heard
+    /// directly: each ring patch is behind the walls and is heard by the paths to the things it falls on (S14,
+    /// P6: the heaviest of them asked of the acoustic worker under a probe of the patch's own, the hand-rolled
+    /// tracer for the rest and until an answer comes). Its lines are the rain's eight patches placed behind
+    /// 30 cm of brick, and how they move as the ear nears one wall.
+    /// </summary>
+    private static void RainBehindWalls(Replay r)
+    {
+        const float floor = 9f;
+        r.Wall(9951, new Vector3(0f, -0.25f, 0f), new Vector3(200f, 0.5f, 200f), "Asphalt");
+        r.Wall(9952, new Vector3(0f, floor - 0.15f, 0f), new Vector3(6.6f, 0.3f, 6.6f), "Concrete");
+        r.Wall(9953, new Vector3(0f, floor + 3.15f, 0f), new Vector3(6.6f, 0.3f, 6.6f), "Concrete");
+        r.Wall(9954, new Vector3(-3.15f, floor + 1.5f, 0f), new Vector3(0.3f, 3f, 6.6f), "Brick");
+        r.Wall(9955, new Vector3(3.15f, floor + 1.5f, 0f), new Vector3(0.3f, 3f, 6.6f), "Brick");
+        r.Wall(9956, new Vector3(0f, floor + 1.5f, -3.15f), new Vector3(6.6f, 3f, 0.3f), "Brick");
+        r.Wall(9957, new Vector3(0f, floor + 1.5f, 3.15f), new Vector3(6.6f, 3f, 0.3f), "Brick");
+        r.Wall(9958, new Vector3(0f, (floor - 0.3f) / 2f, 0f), new Vector3(6.6f, floor - 0.3f, 6.6f), "Brick");
+        r.World.UpdateAtmosphere(new WorldStateUpdate
+        {
+            Temperature = 12f, Humidity = 0.9f, AirPressure = 1008f, AirAbsorptionMultiplier = 1f,
+            PrecipitationIntensity = 0.5f, RainRateMmPerHour = 8f, PrecipitationKind = (int)PrecipitationKind.Rain,
+            RainMedianDropMm = 1.4f,
+        });
+        var feet = new Vector3(0f, floor, 0f);
+        var walking = new Vector3(1f, 0f, 0f);
+        for (int f = 0; f < 120; f++)
+        {
+            r.Listener(feet, walking, 90f);
+            r.Tick();
+            feet += walking * (float)Dt;
         }
     }
 }
