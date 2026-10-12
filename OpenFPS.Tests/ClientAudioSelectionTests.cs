@@ -756,13 +756,17 @@ public class ClientAudioSelectionTests
         Assert.NotNull(snapshot.Woods);
         var wood = Assert.Single(snapshot.Woods!.Woods);
         Assert.True(h.World.IsWood(wood.Id));
+        // Its voice is under an id the registry gives, not the wood's own: nothing sounds under that.
+        int woodVoice = h.Voice(VoiceKind.Wood, wood.Id);
+        Assert.NotEqual(wood.Id, woodVoice);
 
         // 250 m off: the wood, and no tree.
         h.StandAt(new Vector3(1016f, 0f, 1016f - 250f));
-        Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(wood.Id), 30), "the wood was never voiced");
+        Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(woodVoice), 30), "the wood was never voiced");
         h.Tick(5);
         Assert.DoesNotContain(trees, h.Mixer.WasStarted);
-        var far = h.Mixer.Latest[wood.Id];
+        Assert.False(h.Mixer.WasStarted(wood.Id), "a voice was started under the wood's entity id");
+        var far = h.Mixer.Latest[woodVoice];
         _o.WriteLine($"from 250 m: the wood stands for {far.Trees:F2} trees, gain {far.Volume:F4}, key {far.PhysicalKey}");
         Assert.Equal(trees.Count, far.Trees, 2);
         Assert.Equal(wood.Key, far.PhysicalKey);
@@ -773,10 +777,10 @@ public class ClientAudioSelectionTests
         h.Wait(3.0);
         h.Tick(30);
         int voiced = trees.Count(h.Mixer.Live.Contains);
-        var near = h.Mixer.Latest[wood.Id];
+        var near = h.Mixer.Latest[woodVoice];
         _o.WriteLine($"inside: {voiced} trees voiced, the wood stands for {near.Trees:F2}");
         // The wood holds a voice of the machine budget itself; its nearest trees have the rest.
-        Assert.Contains(wood.Id, h.Mixer.Live);
+        Assert.Contains(woodVoice, h.Mixer.Live);
         Assert.Equal(Math.Min(ClientAudioSystem.MachineVoiceBudget - 1, trees.Count), voiced);
         Assert.Equal(trees.Count - voiced, near.Trees, 1);
         // A tree within the hand-over has the whole of itself in its own voice.

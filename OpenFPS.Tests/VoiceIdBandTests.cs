@@ -44,7 +44,7 @@ public class VoiceIdBandTests
                 foreach (int id in x.Mixer.GetActiveSpatialSoundIds())
                 {
                     checkedVoices++;
-                    if (id >= 0 || id <= WoodChorus.FirstId) continue;           // an entity's own voice, a wood's
+                    if (id >= 0) continue;                                       // an entity's own voice
                     if (!x.Audio.Voices.TryKeyOf(id, out _)) problems.Add($"frame {x.Frame}: {id} sounds and no id is held for it");
                 }
                 foreach (var e in x.Audio.Voices.Entries)
@@ -61,6 +61,46 @@ public class VoiceIdBandTests
         _o.WriteLine($"{scenario}: {given} ids given, {checkedVoices} voice-frames checked");
         Assert.True(problems.Count == 0, string.Join("\n", problems.Take(20)));
         Assert.True(given > 0, "no id was given: nothing was checked");
+    }
+
+    /// <summary>
+    /// A place of a tree, a tap or a wood reads its middle's synth, which the mixer finds by the id the place
+    /// names (SpatialEmitter.PlaceOfEntity): by the end of the frame a place starts in, a voice sounds under that
+    /// id. A wood's voice is under an id given out, so its places name that and not the wood's entity.
+    /// </summary>
+    [Fact]
+    public void A_place_names_a_voice_that_sounds()
+    {
+        var live = new HashSet<string>();
+        var started = new List<(string Place, string Middle)>();
+        var problems = new List<string>();
+        var middles = new HashSet<string>();
+        string frame = "";
+        void EndFrame()
+        {
+            foreach (var (place, middle) in started)
+                if (!live.Contains(middle)) problems.Add($"frame {frame}: place {place} names {middle}, which is no voice");
+            started.Clear();
+        }
+        foreach (var line in Replay.Run("places_and_woods"))
+        {
+            var p = line.Split(' ');
+            if (p.Length < 3) continue;
+            if (p[0] != frame) { EndFrame(); frame = p[0]; }
+            if (p[1] == "Stop") live.Remove(p[2]);
+            if (p[1] != "Play") continue;
+            live.Add(p[2]);
+            string middle = p.First(f => f.StartsWith("PlaceOfEntity=", StringComparison.Ordinal))["PlaceOfEntity=".Length..];
+            if (middle == "0") continue;
+            started.Add((p[2], middle));
+            middles.Add(middle);
+        }
+        EndFrame();
+        _o.WriteLine($"places_and_woods: places of {middles.Count} sources ({string.Join(", ", middles)})");
+        Assert.True(problems.Count == 0, string.Join("\n", problems.Take(20)));
+        // The tap, the tree and four of the woods spread here; a wood's middle is under an id given out, below zero.
+        int woods = middles.Count(m => m.StartsWith('-'));
+        Assert.True(woods >= 4 && middles.Count >= 6, $"{middles.Count} sources had places, {woods} of them woods: the woods' were not checked");
     }
 
     /// <summary>The entity ids S6's overlaps start from, Albany's and Magnolia's counts, and the furthest it checked.</summary>
@@ -89,10 +129,11 @@ public class VoiceIdBandTests
                 Give(kind, e);
             for (int k = 1; k < ExtendedSources.MaxPlaces; k++) Give(VoiceKind.Place, e, k);
             for (int k = 0; k < 2; k++) Give(VoiceKind.EngineEcho, e, e * 2 + k);
+            Give(VoiceKind.Wood, WoodChorus.FirstId - e);
             Give(VoiceKind.Place, WoodChorus.FirstId - e, 1);
         }
         foreach (var aid in Enum.GetValues<AidVoice>())
-            for (int n = 0; n < Math.Max(1, VoiceRegistry.TurnsOf(VoiceKind.Aid, (int)aid)); n++) Give(VoiceKind.Aid, (int)aid, n);
+            for (int n = 0; n < Math.Max(1, OldVoiceIds.TurnsOf(VoiceKind.Aid, (int)aid)); n++) Give(VoiceKind.Aid, (int)aid, n);
         foreach (var (kind, n) in new[] { (VoiceKind.Transient, 64), (VoiceKind.Beacon, 24), (VoiceKind.Bird, 48), (VoiceKind.StepEcho, 48),
                                           (VoiceKind.RainDrop, 48), (VoiceKind.OwnStep, 12), (VoiceKind.Footstep, 64),
                                           (VoiceKind.OwnVoiceCopy, 8), (VoiceKind.Reference, 2) })
@@ -138,14 +179,19 @@ public class VoiceIdBandTests
     /// <summary>
     /// An id is held while its voice is an entry, while the mixer still has it (a voice fading out after its
     /// owner let it go), and in the frame it was asked for; then it is the next voice's. A question's id is held
-    /// as long as the worker keeps what it traced. An entity's own voice is under its entity id.
+    /// as long as the worker keeps what it traced. An entity's own voice is under its entity id, a wood's under
+    /// an id given out.
     /// </summary>
     [Fact]
     public void An_id_is_held_until_its_voice_has_stopped_then_free()
     {
         var reg = new VoiceRegistry { Frame = 1, ProbeHoldFrames = 3 };
         Assert.Equal(4242, reg.IdFor(VoiceKind.Engine, 4242));
-        Assert.Equal(WoodChorus.FirstId - 3, reg.IdFor(VoiceKind.Wood, WoodChorus.FirstId - 3));
+        // A wood is an entity the client made: its voice is under an id given out, the same while it is held.
+        int wood = reg.Hold(VoiceKind.Wood, WoodChorus.FirstId - 3);
+        Assert.InRange(wood, VoiceRegistry.LastId, VoiceRegistry.FirstId);
+        Assert.Equal(wood, reg.IdFor(VoiceKind.Wood, WoodChorus.FirstId - 3));
+        Assert.True(reg.TryKeyOf(wood, out var woodKey) && woodKey == new VoiceKey(VoiceKind.Wood, WoodChorus.FirstId - 3, 0));
 
         int place = reg.IdFor(VoiceKind.Place, 9, 1);
         reg.Declare(place, 9, VoiceKind.Place, default);

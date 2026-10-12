@@ -181,7 +181,8 @@ public struct SpatialEmitter
     /// of its middle (which side's windows the outside comes in by).</summary>
     public float CabinEarX;
     /// <summary>
-    /// When non-zero, this voice is place <see cref="Place"/> of that entity's tree or fire: one of the
+    /// When non-zero, this voice is place <see cref="Place"/> of a tree, a fire or a wood, named by the id of
+    /// its middle's voice (an entity's own id, or for a wood the id its voice was given): one of the
     /// independent streams its synth renders across its extent (ExtendedSources, NaturePlaceState). Its
     /// PhysicalKey is the source's own.
     /// </summary>

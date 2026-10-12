@@ -454,6 +454,12 @@ public partial class ClientAudioSystem
     {
         _groundCache.Remove(entityId);
         _voices.Stop(entityId);
+        // A wood's voice is under an id of its own.
+        if (_voices.TryIdOf(VoiceKind.Wood, entityId, 0, out int wood))
+        {
+            _groundCache.Remove(wood);
+            _voices.Stop(wood);
+        }
         _liveEngines.Remove(entityId);
         _engineStarted.Remove(entityId);
         _engineEchoes.Forget(entityId, _audio);
@@ -1361,13 +1367,15 @@ public partial class ClientAudioSystem
         _machineVoicesSpent = spent;
 
         // A machine given up fades out, the registry's to finish; one wanted again before it is silent comes back.
+        // Each by its voice's id, which for a wood is not its entity's.
         foreach (int id in _liveMachines)
         {
             if (_wantedMachines.Contains(id)) continue;
             _machineStarted.Remove(id);
-            _voices.Retire(id);
+            if (MachineVoiceId(world, id, out int voice)) _voices.Retire(voice);
         }
-        foreach (int id in _wantedMachines) _voices.Unretire(id);
+        foreach (int id in _wantedMachines)
+            if (MachineVoiceId(world, id, out int voice)) _voices.Unretire(voice);
 
         int admittedGroups = 0;
         _liveMachines.Clear();
@@ -1400,10 +1408,20 @@ public partial class ClientAudioSystem
             foreach (int id in g.Members)
             {
                 _liveMachines.Add(id);
-                _audio.ReviveEngine(id);
+                // A wood is given its voice's id here if it has none: it is sounded under it later this frame.
+                _audio.ReviveEngine(IsWood(world, id) ? _voices.IdFor(VoiceKind.Wood, id) : id);
                 if (!_machineStarted.ContainsKey(id)) _machineStarted[id] = now;
             }
         }
+    }
+
+    /// <summary>The id a machine's own voice is under, by its entity: the entity's, or for a wood the id its
+    /// voice was given. False for a wood whose voice has none (asking for an id gives one out).</summary>
+    private bool MachineVoiceId(WorldSnapshot world, int entityId, out int voiceId)
+    {
+        if (_voices.TryIdOf(VoiceKind.Wood, entityId, 0, out voiceId)) return true;
+        voiceId = entityId;
+        return !IsWood(world, entityId);
     }
 
     private sealed class MachineGroup
@@ -2010,7 +2028,8 @@ public partial class ClientAudioSystem
             e.Seed = VoiceRegistry.SeedOf(VoiceKind.Place, sourceId, k);
             e.Position = sp.At[k];
             e.ApparentPosition = middle.ApparentPosition + (sp.At[k] - middle.Position);
-            e.PlaceOfEntity = sourceId;
+            // The voice whose synth it reads, by that voice's id.
+            e.PlaceOfEntity = middle.EntityId;
             e.Place = k;
             e.Spread = 0f;
             e.StartSoundId = "";

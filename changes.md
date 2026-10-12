@@ -2,6 +2,18 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-12
+
+- Audit P3d, step 6, the reseed (docs/SPECIAL_CASES_AUDIT.md, "P3d as built"), unheard. What a voice draws its
+  chance from (an engine's jitter, a tree's gusts, a wall's smear) is a hash of what it is the sound of: its
+  kind, owner and part. It was the id the voice had before ids were given out, an entity's id for its engine, so
+  two cars next to each other in the map's numbering shared noise between their parts, and a wood's voice had to
+  stay under its entity id. Every seeded model is another draw of the same sound: engines, machines, aircraft,
+  bells, fountains, trees, woods, fires, creeks, horns and wall smears are within 0.5 dB as a whole and 1.2 dB
+  in any band of what they were. Which air conditioners are running at a given moment has changed (a
+  thermostat's phase is drawn from its seed). The woods' voices are under ids the registry gives. The stream
+  replay on a machine with other maths compares a rendered sound by its name, length and rate, not its hash.
+
 ## 2026-10-11
 
 - The ground in the way (docs/GEOMETRY.md 12.6, "The ground in the way"), unheard. Straight segments went

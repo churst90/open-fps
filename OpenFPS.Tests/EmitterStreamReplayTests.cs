@@ -220,24 +220,29 @@ public class EmitterStreamReplayTests
     }
 
     /// <summary>
-    /// The stream with every id the registry gave put back to the id that voice had before ids were given
-    /// out (by its kind, owner and part, VoiceRegistry.SeedOf) is the stream from before, line for line: what
-    /// the mixer is told is the same but for the numbers voices are under (docs/SPECIAL_CASES_AUDIT.md, P3c).
-    /// OPENFPS_REPLAY_BEFORE names a folder of the streams from before, stored as these are; without it
-    /// there is nothing to compare with and the test says so.
+    /// The stream with every voice written under the id it had before ids were given out (by its kind, owner
+    /// and part, OldVoiceIds) and seeded by that id, as voices were until the reseed, is the stream from before,
+    /// line for line: what the mixer is told is the same but for the numbers voices are under and draw their
+    /// chance from (docs/SPECIAL_CASES_AUDIT.md, P3c and P3d). For a change to ids or seeds: before it, run
+    /// with OPENFPS_REPLAY_DUMP=dir, which writes each scenario so (scenario.mapped.txt); after it, with
+    /// OPENFPS_REPLAY_BEFORE=dir. With neither there is nothing to do and the test says so.
     /// </summary>
     [Theory]
     [MemberData(nameof(Scenarios))]
     public void UnderTheIdMapTheStreamIsTheOneBefore(string scenario)
     {
         string? before = Environment.GetEnvironmentVariable("OPENFPS_REPLAY_BEFORE");
-        if (string.IsNullOrEmpty(before)) { _o.WriteLine("OPENFPS_REPLAY_BEFORE is not set: nothing to compare with."); return; }
+        if (string.IsNullOrEmpty(before) && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENFPS_REPLAY_DUMP")))
+        {
+            _o.WriteLine("Neither OPENFPS_REPLAY_BEFORE nor OPENFPS_REPLAY_DUMP is set: nothing to compare with or to write.");
+            return;
+        }
         // Each written whole (Expand): two voices that shared an id before were written as changes from each
         // other, and are two voices now.
-        var (_, stored) = Read(Path.Combine(before, scenario + ".txt.gz"));
-        var old = Expand(stored);
         var (now, given) = Replay.RunUnderOldIds(scenario);
         Dump(scenario + ".mapped", now);
+        if (string.IsNullOrEmpty(before)) { _o.WriteLine($"{scenario}: written under the old ids, {now.Count} lines, {given} ids given"); return; }
+        var old = File.ReadAllLines(Path.Combine(before, scenario + ".mapped.txt")).ToList();
         var differ = new List<int>();
         for (int i = 0; i < Math.Min(old.Count, now.Count); i++) if (old[i] != now[i]) differ.Add(i);
         _o.WriteLine($"{scenario}: {now.Count} lines ({old.Count} before), {given} ids given, {differ.Count} lines differ under the map");
@@ -356,9 +361,10 @@ internal sealed class Replay
 
     /// <summary>
     /// A scenario's stream, each line written whole (EmitterStreamReplayTests.Expand), with each id the registry
-    /// gave written as the id that voice had before ids were given out: its seed, by kind, owner and part
-    /// (VoiceRegistry.SeedOf). An id stands for what it was last given for, from the moment it was given; entity
-    /// ids, under which an entity's own voice is, stay. And how many ids were given.
+    /// gave written as the id that voice had before ids were given out, by kind, owner and part (OldVoiceIds),
+    /// and each voice's seed as that id, which seeded it until seeds became a hash of the three. An id stands
+    /// for what it was last given for, from the moment it was given; entity ids, under which an entity's own
+    /// voice is, stay. And how many ids were given.
     /// </summary>
     internal static (List<string> Lines, int Given) RunUnderOldIds(string scenario)
     {
@@ -370,7 +376,7 @@ internal sealed class Replay
             {
                 if (key.Kind == VoiceKind.Probe) return;
                 given++;
-                x.Mixer.Lines.Add($"{Mark}{id} {VoiceRegistry.SeedOf(key.Kind, key.Owner, key.Part)}");
+                x.Mixer.Lines.Add($"{Mark}{id} {OldVoiceIds.Of(key.Kind, key.Owner, key.Part)}");
             };
             Scenarios[scenario](x);
         });
@@ -385,15 +391,26 @@ internal sealed class Replay
                 continue;
             }
             var parts = line.Split(' ');
-            if (parts.Length >= 3 && VoiceVerbs.Contains(parts[1]) && int.TryParse(parts[2], CultureInfo.InvariantCulture, out int id)
-                && oldOf.TryGetValue(id, out var was))
+            if (parts.Length < 3 || !VoiceVerbs.Contains(parts[1]) || !int.TryParse(parts[2], CultureInfo.InvariantCulture, out int id))
             {
-                parts[2] = was;
-                for (int i = 3; i < parts.Length; i++)
-                    if (parts[i].StartsWith("EntityId=", StringComparison.Ordinal)) { parts[i] = "EntityId=" + was; break; }
-                lines.Add(string.Join(' ', parts));
+                lines.Add(line);
+                continue;
             }
-            else lines.Add(line);
+            // An entity's own voice keeps its id, and that id was its seed.
+            string was = oldOf.GetValueOrDefault(id, parts[2]);
+            parts[2] = was;
+            for (int i = 3; i < parts.Length; i++)
+            {
+                if (parts[i].StartsWith("EntityId=", StringComparison.Ordinal)) parts[i] = "EntityId=" + was;
+                // A voice nothing seeds (0) stays unseeded.
+                else if (parts[i].StartsWith("Seed=", StringComparison.Ordinal) && parts[i] != "Seed=0") parts[i] = "Seed=" + was;
+                // A place names its middle's voice, which for a wood is an id given out too.
+                else if (parts[i].StartsWith("PlaceOfEntity=", StringComparison.Ordinal)
+                         && int.TryParse(parts[i]["PlaceOfEntity=".Length..], CultureInfo.InvariantCulture, out int middle)
+                         && oldOf.TryGetValue(middle, out var middleWas))
+                    parts[i] = "PlaceOfEntity=" + middleWas;
+            }
+            lines.Add(string.Join(' ', parts));
         }
         return (lines, given);
     }

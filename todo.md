@@ -83,9 +83,12 @@ since the last deploy" list below.
      audit's "P3d as built"): one way to start and stop, fades owned by the registry, the facade's lost stop and
      silent replacement; mounts, levels and ranges from the model; every one-off its own voice; beacons and
      perched birds on the worker's path (P6). Also fixed: Steam Audio never built Magnolia's scene (a 64-corner
-     buffer overrun). Next: step 6, the reseed (stable hash seeds, the woods' ids into the allocator, all streams
-     regenerated, render check by band); the rain and bump start levels; rain patches under probes. Then library
-     stage 5's `AudioClock` slice (docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
+     buffer overrun). Step 6, the reseed: BUILT 2026-10-12, unheard (made on Windows on the Resonance side, sent
+     back as patches): a voice's seed is a hash of its kind, owner and part, the seed table is gone, the woods'
+     voices are under ids given out, all eight streams regenerated (on Windows: regenerate them on Linux), a
+     render check by band (`SeedBandLevelTests`). Next: the rain's 40 dB and the bump's 85 dB start levels
+     (Cody's decision); rain patches under probes; `SpatialEmitter`'s default range (100 m against the
+     component's 50). Then library stage 5's `AudioClock` slice (docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
    - Then P4 (one ranking), the rest of P6 (rain asking the worker), P7 (machine state from
      the server: a wire change, shipped with a deploy).
 3. The physics boundary survey: DONE 2026-10-11 (docs/PHYSICS_BOUNDARY.md). Cody asked for it the same day:

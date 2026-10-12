@@ -28,7 +28,7 @@ internal enum VoiceKind : byte
     /// <summary>A physical model on a thing that stays where it is: a machine, a tree, a fire, a fountain's
     /// tap, a bell. Its own voice, under its entity id.</summary>
     Machine,
-    /// <summary>A wood heard as one (WoodChorus), under the wood's own entity id.</summary>
+    /// <summary>A wood heard as one (WoodChorus): an entity the client made, its voice under an id given out.</summary>
     Wood,
     /// <summary>An authored recording's own voice, or the render a loudspeaker plays of one.</summary>
     Recording,
@@ -396,30 +396,10 @@ internal sealed partial class VoiceRegistry
     /// as the worker keeps its answer (<see cref="ProbeHoldFrames"/>).</summary>
     public int ProbeFor(int entityId) => IdFor(VoiceKind.Probe, entityId);
 
-    /// <summary>
-    /// How many one-offs of a kind took turns at a voice before each was a voice of its own (P3d): the next after
-    /// that many was the first's turn again and cut it off if it still sounded. Only the seed table reads it now,
-    /// so a one-off's synth is seeded as it was (<see cref="SeedOf"/>); its id is its own.
-    /// </summary>
-    public static int TurnsOf(VoiceKind kind, int owner) => kind switch
-    {
-        VoiceKind.Transient => 400_000,
-        VoiceKind.Beacon => 24,
-        VoiceKind.Bird or VoiceKind.StepEcho or VoiceKind.RainDrop => 48,
-        VoiceKind.OwnStep => 12,
-        VoiceKind.Footstep => 64,
-        VoiceKind.Aid => (AidVoice)owner is AidVoice.Guide or AidVoice.Centre or AidVoice.Kerb or AidVoice.Turn or AidVoice.Brake ? 6 : 0,
-        _ => 0,
-    };
-
-    /// <summary>Which turn the <paramref name="part"/>th one-off of a kind took (<see cref="TurnsOf"/>), for its
-    /// seed; a landing's part, below zero, is its own.</summary>
-    private static int Turn(VoiceKind kind, int owner, int part)
-        => TurnsOf(kind, owner) is int turns and > 0 && part >= 0 ? part % turns : part;
-
-    /// <summary>Whether a kind is an entity's own voice, which is under the entity's id.</summary>
+    /// <summary>Whether a kind is an entity's own voice, which is under the entity's id. A wood's is not: a wood
+    /// is an entity the client made of its far trees, and its voice is given an id as any other voice is.</summary>
     public static bool IsOwnVoice(VoiceKind kind)
-        => kind is VoiceKind.Engine or VoiceKind.Aircraft or VoiceKind.Machine or VoiceKind.Wood or VoiceKind.Recording;
+        => kind is VoiceKind.Engine or VoiceKind.Aircraft or VoiceKind.Machine or VoiceKind.Recording;
 
     /// <summary>What an id is held for now, if anything.</summary>
     public bool TryKeyOf(int id, out VoiceKey key)
@@ -436,59 +416,47 @@ internal sealed partial class VoiceRegistry
     public int IdsHeld { get { lock (_lock) return _given.Count; } }
 
     /// <summary>
-    /// What a voice's chance is drawn from (<see cref="OpenFPS.Client.AudioEngine.Data.SpatialEmitter.Seed"/>),
-    /// by what it is the sound of: the ids voices had before they were given out, so nothing rendered moves.
-    /// An entity's own voice is seeded by its entity id.
+    /// What a voice's chance is drawn from (<see cref="OpenFPS.Client.AudioEngine.Data.SpatialEmitter.Seed"/>):
+    /// a hash of what it is the sound of, its kind, owner and part. The same on every machine and in every run,
+    /// so two clients hear the same mower. Never below zero, as an entity's id never was while that seeded its
+    /// engine (a model may take its seed's remainder). Neighbours' seeds are far apart: seeded by their ids, one
+    /// car's rear tyres drew the numbers the next car's front tyres did.
     /// </summary>
-    public static int SeedOf(VoiceKind kind, int owner, int part = 0) => SeedOfTurn(kind, owner, Turn(kind, owner, part));
-
-    private static int SeedOfTurn(VoiceKind kind, int owner, int part) => kind switch
+    public static int SeedOf(VoiceKind kind, int owner, int part = 0)
     {
-        VoiceKind.Engine or VoiceKind.Aircraft or VoiceKind.Machine or VoiceKind.Wood or VoiceKind.Recording => owner,
-        VoiceKind.Reflection => -30_000 - owner * (OpenFPS.Common.EarlyReflections.MaxArrivals + 1) - part,
-        VoiceKind.Transient => -100_000 - part,
-        VoiceKind.EngineEcho => -600_000 - part,
-        VoiceKind.Borrowed => -700_000 - Math.Abs(owner),
-        VoiceKind.Intake => -800_000 - Math.Abs(owner),
-        VoiceKind.Siren => -900_000 - Math.Abs(owner),
-        VoiceKind.Aid => AidSeed((AidVoice)owner, part),
-        VoiceKind.Beacon => -967_000 - part,
-        VoiceKind.Bird => -970_000 - part,
-        VoiceKind.Horn => -1_200_000 - Math.Abs(owner),
-        VoiceKind.OwnVoice => -1_300_000,
-        VoiceKind.OwnVoiceCopy => -1_300_001 - part,
-        VoiceKind.Talker => -1_400_000 - Math.Abs(owner),
-        VoiceKind.Cabin => -1_600_000 - part,
-        VoiceKind.TalkerCopy => -1_700_000 - owner * 8 - part,
-        VoiceKind.StepEcho => -1_800_000 - part,
-        VoiceKind.HeldHorn => -2_100_000 - Math.Abs(owner),
-        VoiceKind.TrainField or VoiceKind.TrainSignal => -2_300_000 - (owner * OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots + part),
-        VoiceKind.Rain => part == 0 ? -2_400_000 - owner : -2_400_100 - owner * 8 - part,
-        VoiceKind.RainDrop => -2_401_000 - part,
-        VoiceKind.Place => -5_000_000 - Math.Abs(owner) * OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MaxPlaces - part,
-        VoiceKind.Reference => -7_900_000 - part,
-        VoiceKind.Probe => -3_000_000 - owner,
-        VoiceKind.OwnStep => part == Landing ? -50 : -100 - part,
-        VoiceKind.Footstep => part == Landing ? -50 : -300 - part,
-        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "no seed"),
-    };
+        uint h = Scramble(KindSeeds[(int)kind] ^ unchecked((uint)owner));
+        return (int)(Scramble(h ^ unchecked((uint)part)) & 0x7fffffff);
+    }
 
-    private static int AidSeed(AidVoice aid, int part) => aid switch
+    /// <summary>Where each kind's seeds start, from its name: a kind added between two others, which renumbers
+    /// those after it, moves no seed.</summary>
+    private static readonly uint[] KindSeeds = KindSeedsByName();
+
+    private static uint[] KindSeedsByName()
     {
-        AidVoice.Guide => -961_000 - part,
-        AidVoice.Centre => -962_000 - part,
-        AidVoice.Kerb => -963_000 - part,
-        AidVoice.CentreTone => -964_001,
-        AidVoice.KerbTone => -964_002,
-        AidVoice.CentreRumble => -964_003,
-        AidVoice.KerbRumble => -964_004,
-        AidVoice.Turn => -965_000 - part,
-        AidVoice.Align => -966_001,
-        AidVoice.Relay => -966_010,
-        AidVoice.OverSpeed => -966_011,
-        AidVoice.Brake => -967_100 - part,
-        _ => throw new ArgumentOutOfRangeException(nameof(aid), aid, "no seed"),
-    };
+        var kinds = Enum.GetValues<VoiceKind>();
+        var seeds = new uint[kinds.Max(k => (int)k) + 1];
+        foreach (var kind in kinds)
+        {
+            // FNV-1a over the name's characters, not string.GetHashCode (randomised per process).
+            uint h = 2166136261u;
+            foreach (char c in kind.ToString()) h = unchecked((h ^ c) * 16777619u);
+            seeds[(int)kind] = h;
+        }
+        return seeds;
+    }
+
+    /// <summary>Every bit of the answer from every bit of the question, one to one (MurmurHash3's finaliser).</summary>
+    private static uint Scramble(uint h)
+    {
+        unchecked
+        {
+            h ^= h >> 16; h *= 0x85ebca6bu;
+            h ^= h >> 13; h *= 0xc2b2ae35u;
+            h ^= h >> 16;
+        }
+        return h;
+    }
 
     /// <summary>A point in the owner's frame, from one in the world.</summary>
     public static Vector3 MountOf(Vector3 ownerAt, Quaternion ownerRotation, Vector3 at)

@@ -30,7 +30,7 @@ Where the parts stand (2026-10-11):
 | P3a, the registry for moving things | done 2026-10-11 ("P3a as built"), unheard: intakes and borrowed cars take their path, one writer per voice, the rumble follows the speed (S11). S21 closed as deferred the same day (Cody): the bus keeps its own law until geometry stage 6 |
 | P3b, every other voice | done 2026-10-11 ("P3b as built"), unheard: every voice an entry, one writer each; woods take their path, engine echoes carry theirs; P6 for talkers and S23. Blocked engines heard round the edge (Cody, the same day) |
 | P3c, seeds then ids | done 2026-10-11 ("P3c as built") |
-| P3d, one start and declared levels | steps 1 to 5 of 6 built 2026-10-11 ("P3d as built"), unheard, not merged; the reseed next |
+| P3d, one start and declared levels | steps 1 to 5 built 2026-10-11, step 6 (the reseed) 2026-10-12 ("P3d as built"), unheard. Left: the rain and bump start levels (a decision), rain patches under probes, the two default ranges |
 | P4, one ranking | after P3 |
 | P6, one path model for every asker | talkers and S23 in P3b; beacons and perched birds in P3d; rain patches left |
 | P7, machine state from the server | last; a wire change, shipped with a server deploy |
@@ -723,11 +723,52 @@ OpenFPS.Sound changed (step 2), so the wire hash does.
   train_behind_wall, high_ids (no-op revives and cancels gone); step 2 drive, talker_and_aids, high_ids (interior
   0.7 to 0.72 m; loudspeaker copies' range 320 to 400); step 3 traffic_rain; steps 4 and 5 none (no beacon or bird
   in any scenario). All eight equal at DOTNET_PROCESSOR_COUNT=4.
+- **The reseed** (step 6, 2026-10-12, made on Windows on the Resonance side and sent back as patches). Unheard.
+  Only `OpenFPS.Client.Core` and the tests changed, so the wire hash does not.
+  - **Seeds.** `VoiceRegistry.SeedOf(kind, owner, part)` is a hash of the three: FNV-1a over the kind's name (so a
+    kind added between two others moves no seed), then MurmurHash3's finaliser over the owner and over the part,
+    the top bit dropped. The same on every machine and in every run; never below zero, as an entity's id never
+    was while that seeded its engine (`CoolingSystem` takes its seed's remainder). The seed table is gone from
+    the game, and `TurnsOf` with it: a one-off's seed is its own, as its id has been since step 3. Neighbours are
+    far apart now. A model makes its parts' seeds by adding small numbers to its own (wet tyres its seed and 131,
+    the rear axle one more), so seeded by entity ids car 102's front tyres drew the numbers car 101's rear tyres
+    did.
+  - **The woods' voices** are under ids the registry gives (`IsOwnVoice` without `Wood`): a wood is an entity the
+    client made, and nothing needs its voice under its entity id now that the id seeds nothing. The machine
+    budget retires, brings back and revives a machine by its voice's id (`MachineVoiceId`); a place names its
+    middle by its middle's voice id (`SpatialEmitter.PlaceOfEntity`); a wood forgotten has its voice stopped
+    under that id. The woods' entity ids stay `ClientWorldState`'s, under the ids given out (the worker is asked
+    about a wood by its entity id).
+  - **The old table** is `OpenFPS.Tests/OldVoiceIds.cs`, names only. `UnderTheIdMapTheStreamIsTheOneBefore`
+    writes each scenario with every voice under its old id and seeded by it (`OPENFPS_REPLAY_DUMP`) and compares
+    with a folder written so before a change (`OPENFPS_REPLAY_BEFORE`).
+  - **Streams**, all eight regenerated. Written so before and after on one machine, all eight are equal line for
+    line, with no line out of order. In the streams themselves: walk 8 lines changed, drive 14, traffic_rain
+    94, sirens_and_far_traffic 14, train_behind_wall 6, talker_and_aids 19, high_ids 23, each a `Play` line in
+    which only `Seed=` changed. places_and_woods: 6 such lines, and 4,027 in which an id changed (40 `Play`,
+    3,508 `Place`, 471 `ReviveEngine`, 7 `FadeEngine`, 7 `Stop`): its five woods (one of park trees, four of
+    pines) are under `-1015`, `-1036`, `-1037`, `-1058` and `-1059` instead of `-20000000` to `-20000004`, their
+    places name them so (`PlaceOfEntity`), and the thirty ids given after the first wood's are one, three or
+    five further down. 74 ids given, 69 before. They were regenerated on Windows
+    (maths `8;8f85b41491a557ea448dbf82`, the streams before `8;e39fea91ef91332c21b478ff`), so on the Linux
+    machines they compare within a part in a thousand until they are regenerated there.
+  - **The render check by band** (`SeedBandLevelTests`; the fingerprints render with seeds of their own and do
+    not move). Each model the mixer seeds, made as the mixer makes it, rendered as voice 101 with the seed it had,
+    with the seed it has, and as voice 102, and compared in nine bands. dB between the old seed and the new, the
+    whole and the worst band: engine (v8_muscle, 15 m/s) 0.09 and 0.43; push mower 0.06 and 0.14; airliner 0.02
+    and 0.52; crossing bell 0.23 and 0.23; fountain 0.03 and 0.77; park tree 0.39 and 0.63; a wood of pines 0.11
+    and 0.39; fire pit 0.44 and 0.71; creek 0.34 and 1.13; electric horn 0.03 and 0.04; air horn 0.00 and 0.02; a
+    wall's smear 0.00 and 0.06. Between two neighbours under the new seeds the whole is within 0.46 dB for all
+    of them; one band of few events is a seed's own draw (the fountain's 125 to 250 Hz 3.0 dB, the fire's crackle
+    3.2, the creek's 250 to 500 Hz 3.2). The test holds the whole to 1 dB and a band to 4.
+    A sea's edge takes minutes, since its waves come in groups: over 40 s the old seed and the new were 6.4 dB
+    apart, over five minutes 0.47 dB as a whole and 3.0 dB at 60 to 125 Hz (rendered on request,
+    `OPENFPS_SEED_BANDS_SHORE=1`: it takes about eight minutes).
+    Not rendered: the gas hob (its key carries the wall clock) and an air conditioner (its thermostat's phase is
+    drawn from its seed, so which units are running at a given moment has changed, as it would for any reseed).
+  - **Also in the patches:** on a machine with other maths the stream replay compared a rendered sound's hash,
+    which no tolerance forgives; it compares its name, length and rate there now (own commit).
 - **Next (not done):**
-  - Step 6, the reseed: the seed table goes, every synth seeded by a stable hash of kind, owner and part; the
-    woods' voices into the allocator (`IsOwnVoice` without `Wood`, `PlaceOfEntity` the middle's voice id, the
-    machine budget's retire and revive by voice id); the old table kept in the tests for `RunUnderOldIds`; every
-    stream regenerated; the render check by band levels (the fingerprints use fixed seeds, so they will not move).
   - The rain's 40 dB start level and the bump's 85 dB stand until measured; the rain voice measures itself by
     running, so holding it back silent would leave the replay's rain silent. Decide, then do.
   - Rain patches asked under probes (P6's last asker), measured with `--pop-hunt`.
@@ -981,8 +1022,9 @@ Things that look special-cased but are physics, or the right shape already.
 ## 5. Appendix: every voice band
 
 As of `700cb635`. Since P3c these are not ids: every voice's id is given by `VoiceRegistry.IdFor` (an entity's own
-voice its entity id), and the formulas below are only the seed table, `VoiceRegistry.SeedOf`, each voice's seed
-("P3c as built"). Since P3b every band is a `VoiceRegistry` entry and its "Path from" is its kind's
+voice its entity id), and the formulas below were each voice's seed ("P3c as built") until the reseed, when a
+seed became a hash of the voice's kind, owner and part ("P3d as built"). They are kept as names for voices in
+the tests (`OpenFPS.Tests/OldVoiceIds.cs`). Since P3b every band is a `VoiceRegistry` entry and its "Path from" is its kind's
 (`VoiceRegistry.HeardFromOf`, "P3b as built"). "id" is the entity id as the client sees it (`EntitySnapshot.Id`), which reaches 18,024
 on Albany's join and 32,598 over all of Magnolia.
 

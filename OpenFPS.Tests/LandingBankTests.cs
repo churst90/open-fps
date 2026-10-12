@@ -9,8 +9,10 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class LandingBankTests
 {
-    /// <summary>A landing, found by what it is (its seed), whatever id it was given.</summary>
+    /// <summary>Your own landing, found by what it is (its seed), whatever id it was given.</summary>
     private static readonly int LandingSeed = VoiceRegistry.SeedOf(VoiceKind.OwnStep, VoiceRegistry.NoEntity, VoiceRegistry.Landing);
+    /// <summary>Somebody else's.</summary>
+    private static readonly int TheirLandingSeed = VoiceRegistry.SeedOf(VoiceKind.Footstep, VoiceRegistry.NoEntity, VoiceRegistry.Landing);
 
     private static string Sounds()
     {
@@ -42,7 +44,7 @@ public class LandingBankTests
         h.Tick();
         h.Audio.OnPlayerLand(new Vector3(3f, 0f, 2f), "Tile", "0");
         h.Tick(3);
-        var landing = Assert.Single(h.Mixer.Started, e => e.Seed == LandingSeed);
+        var landing = Assert.Single(h.Mixer.Started, e => e.Seed == TheirLandingSeed);
         Assert.StartsWith("LANDING/Tile/", landing.SoundId, StringComparison.OrdinalIgnoreCase);
     }
 
