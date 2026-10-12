@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- The settings folder is named in one place, and the tests cannot reach a player's own on any system. On
+  Windows the tests read and wrote the real `%APPDATA%\openfps\beacons.json`, and four of them failed, because
+  a process cannot move `%APPDATA%` as it can `XDG_CONFIG_HOME`. `SettingsFolder` now says where `client.json`
+  and `beacons.json` are (the platform's folder as before, or the one `OPENFPS_SETTINGS_DIR` names), and the
+  tests name a scratch folder there and for the two caches. Nothing a player sees or hears changes. On a Mac
+  `beacons.json` is now beside `client.json` in `~/Library/Application Support/openfps`.
+
 - Physics stage 2, the engine (docs/PHYSICS_BOUNDARY.md 16.3). Nothing a player sees or hears changes: all 48
   engines and 45 vehicles are the same byte for byte. The four numbers of an engine that move a car (where it
   idles, how far it revs, its peak torque and where) are its physics half's (`EngineMechanics`), and a

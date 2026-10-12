@@ -36,7 +36,8 @@ What the Windows client has, against the GTK client:
 - Main menu: Connect, Create account, Saved Servers, Settings, Quit, as on Linux. Open log folder is
   in Settings. Settings and
   servers are `%APPDATA%\openfps\client.json`, the same format as `~/.config/openfps/client.json`.
-  Beacon choices are `%APPDATA%\openfps\beacons.json`.
+  Beacon choices are `%APPDATA%\openfps\beacons.json`. `OPENFPS_SETTINGS_DIR` names another folder for
+  both files, on every system; the tests use it, because Windows does not let a process move `%APPDATA%`.
 - Voice chat through NAudio, on the microphone chosen in Settings. Linux records through FMOD
   and sends the same Opus packets (64 kbit/s, 20 ms frames, numbered). The server relays each one
   to everyone on the sender's map as it arrives.

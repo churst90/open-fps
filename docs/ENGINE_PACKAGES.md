@@ -375,9 +375,10 @@ handed in from elsewhere, and the Python generators. Lines are declaration spans
 
   `UiSounds` maps chat and presence messages to cues; the mapping stays in the session and the cue meanings move.
 - **Statics.** Nine tables (timbres, brake sounds, ring orders).
-- **Files.** `BeaconAids.cs:658-712` reads and writes the player's `beacons.json` under the application data or
-  `XDG_CONFIG_HOME` (the folder a mutation run once wrote over: memory "mutation runs touched real config"). The
-  host names the folder.
+- **Files.** `BeaconPreferences` (`BeaconAids.cs`) reads and writes the player's `beacons.json` in the settings
+  folder (the folder a mutation run once wrote over: memory "mutation runs touched real config"). The host names
+  the folder: `SettingsFolder` is the one place that says where it is, and `BeaconPreferences.Load(path)` takes
+  any other file.
 - **Wire.** 4 files are hashed today, only because they are in Common; none is on the wire. Accessibility need
   not be in the hash.
 - **Risks.** These are the most heard and least measured parts of the client: nothing replays what is said.
@@ -569,7 +570,7 @@ The rest are tables filled once, shared HTTP clients and per-thread scratch.
 | Models | 0 | 5 | 8 | `machines/`, `models/` from the working directory; exports |
 | World | 0 | 27 | 98 | the tile store, `world.json`, maps, prefabs, `world_places.json`; five network sources |
 | Agents | 0 | 0 | 0 | |
-| Accessibility | 1 | 1 | 4 | the player's `beacons.json` (`XDG_CONFIG_HOME` or application data) |
+| Accessibility | 1 | 1 | 4 | the player's `beacons.json` (in the settings folder, `SettingsFolder`) |
 | Editor | 0 | 5 | 22 | map overlays and versions, model versions |
 
 The rule is the library's (its section 7.4): a package reads only the folders its host names. Models, World,
