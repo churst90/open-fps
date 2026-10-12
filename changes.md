@@ -4,6 +4,27 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Getting into a car and walking through a door no longer hold every sound still. Sitting down froze the
+  street for 110-490 ms (870 ms on a bus), and going through Marlow Tower's front door for 150 ms, in a
+  release build (AudioLab `--driving set=all`, `--cabin game`, `--room-change`); now the worst frame is
+  1-17 ms seated and 4-6 ms through the door. Four things were made where sounds are placed: a new room's
+  reverb stage, which calibrates its ears on a second of noise; the cabin's trace and a room's trace, made
+  under the lock the audio thread reads every tick; each cabin path's trim, an HRTF measured and an
+  equaliser fitted, about 20 ms a path and nine paths at once; and, the first time from a new room, the
+  other rooms' fields through the openings (200 ms). All four are made on other threads now: stages are
+  kept made ahead, two spare, and taken in no time (every stage is the same until it is put on a bus);
+  traces are made on the thread pool and put in under the lock when done; the cabin of a car within 8 m is
+  traced before you get in, and the last three kinds of cabin are kept. Meanwhile nothing goes silent or
+  jumps: a room keeps the trace it plays until the new one has answered it (30-190 ms measured), a room's
+  bus is held where it is until its field from the new room is known and then moves by its own slew, and a
+  cabin path plays untrimmed for 25-220 ms until its trim is made. Asking a trace for a stage's reader no
+  longer waits out a trace in progress either. Found on the way: Steam Audio's HRTF gives garbage when
+  applied from two threads at once (two calibrations at once read the head's diffuse-field gain at +17 to
+  +30 dB, alone -0.64), and the stage calibrations and the cabin trims went through the HRTFs the mixer was
+  applying; they have heads of their own now. A cabin path's trim could have been measured wrong that way
+  before. The renders and the calibration are the same as before, to the bit (TracedPlacementTests).
+  The city's load holds sounds still for less as well: 3.7 s to 1.8 s in release (its 24 stages were made in
+  one tick), nearly all of what is left the birds' first pass (todo.md, "Placing sounds").
 - Audit S20, the mixer's own orderings (docs/SPECIAL_CASES_AUDIT.md, "S20 as built"), unheard. Which engines
   the mixer renders first, which run at full detail, which sources its late-field trace and its traced echoes
   go to are decided by how loud each is at the ear, the number the voice budget ranks by. Near a fire or in

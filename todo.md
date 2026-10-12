@@ -483,13 +483,13 @@ and the server's voice line.
 
 ### Placing sounds
 Nothing that takes longer than a frame belongs on the two threads that place sounds (PlacementThread;
-models are made in VoiceBuilds since 2026-10-12). Still made there, each logged once a session as "was made
-on a thread that places sounds":
-- A room's traced reverb stage (`FmodAudioProvider.AddTracedStage`, `DiffuseTail.Create` calibrating its ears
-  on a second of noise): 100-450 ms on the audio thread when a new region's reverb bus comes in, sitting in a
-  car in the driving lab (`--driving set=all`, 130-640 ms ticks).
-- The cabin's trace (`TracedReverbSet.RideIn`) and a room's trace (`ForRoom`) are made under the set's lock,
-  which the audio thread takes every tick (`Listener`, `LateField`): it waits out the making.
+models are made in VoiceBuilds, reverb stages in TracedStages, traces off TracedReverbSet's lock, cabin
+path trims and other rooms' fields on the thread pool, all 2026-10-12). Left, each to be moved the same way:
+- A map's birds, worked out on the first pass after the map loads: 1.3-2.6 s on the city, every source still
+  (`--room-change`, "birds" in the stall line). It is the map load, not a room change, but it is heard.
+- The ear model's recompute (`FmodAudioProvider.RecomputeEar`, every 0.1 s a voice): 5-7 ms a voice in a
+  debug build, and voices started together recompute in the same tick (40-80 ms ticks in a debug lab, 4-6 ms
+  in release). Fine in the game's release build; spread or move it if it grows.
 - Smaller, and within a frame or two: each new voice's first path (`FirstAnswer`, the hand-rolled tracer,
   1-4 ms, 10-20 cold), and the first frame of a session compiling the audio code (170-190 ms in the train
   lab).
