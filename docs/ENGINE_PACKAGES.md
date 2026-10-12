@@ -802,6 +802,12 @@ beside physics 3 and 4 where the files allow; stage 9 follows library 6; stage 1
 
 ## 13. Decisions for Cody
 
+Decided 2026-10-12: Cody approved all thirteen as recommended, with one change to 13. Physics stage 2 was already
+under way on the other machine, so it goes ahead: each preset's mechanical half and sound half stay joined by the
+preset's id, so the catalogue (stage 2 here) takes both over afterwards without renaming. Stage 0 runs beside it;
+stage 1 runs beside it only where the two touch no file in common (`Chassis.cs`'s road surfaces and `TyreFriction`
+are the likely ones), and otherwise after it; stage 2 follows physics stage 2.
+
 1. **Materials as their own package.** Recommended: `OpenFPS.Materials` at the bottom, referenced by Physics,
    Acoustics, Sound, Environment and World; cost 1 session, nothing heard changes. Alternative: leave the table in
    Acoustics and let Physics reference Acoustics; Physics would then carry the acoustics with it, against the
