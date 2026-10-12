@@ -20,6 +20,10 @@ namespace OpenFPS.Server;
 
 public class GameServer
 {
+    /// <summary>The server's clock: seconds, monotonic, never reset. What stamps a moment here (a death, a line
+    /// spoken, a crowd's reaction) and what later asks how long ago it was read this one.</summary>
+    public IAudioClock Clock { get; } = new StopwatchAudioClock();
+
     private readonly NetworkService _network = new();
     private SessionManager _sessions = new();
     private readonly WorldEnvironmentSystem _environment = new();
@@ -221,7 +225,7 @@ public class GameServer
         _sessions = sessions;
         _seats = seats!;
         _hands = hands!;
-        _store = new PlayerStore(_userRepo, maps, hands ?? new HandsService(maps));
+        _store = new PlayerStore(_userRepo, maps, hands ?? new HandsService(maps), Clock);
     }
 
     /// <summary>Runs everything queued for the tick thread, the only place other threads' world changes
@@ -326,7 +330,7 @@ public class GameServer
         if (sounds.Count == 0) return;
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return;
         // People in the street hear it too, and some of them say so.
-        _speech.Heard(mapId, label, sounds, AudioClock.Now);
+        _speech.Heard(mapId, label, sounds, Clock.Now);
 
         // Where it happened, for the earshot test: the loudest of its own sounds.
         Vector3 at = sounds[0].Position;
@@ -474,7 +478,7 @@ public class GameServer
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps, EmitWorldAudio);
         _hands = new HandsService(_maps) { Carried = SyncAudioComponent, Removed = BroadcastRemoval };
-        _store = new PlayerStore(_userRepo, _maps, _hands);
+        _store = new PlayerStore(_userRepo, _maps, _hands, Clock);
         StartWorld(OpenFPS.Server.OneWorld.WorldSettings.Load());
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
@@ -950,12 +954,12 @@ public class GameServer
                     var weather = _environment.GetStateForMap(_maps.TryGetMapData(entry.Key, out var speechMap)
                         ? MapAtmosphere.Of(speechMap)
                         : MapAtmosphere.Default);
-                    _speech.Update(entry.Key, world, AudioClock.Now,
+                    _speech.Update(entry.Key, world, Clock.Now,
                                    SpeechConditions.From(weather, _environment.CurrentScenario),
                                    (id, label, sound) => EmitWorldAudio(entry.Key, id, label, new[] { sound }));
 
                     // ...and the people watching them: a source with a place and a size, no loop.
-                    CrowdSystem.Update(entry.Key, world, AudioClock.Now, (crowdId, at, spec) =>
+                    CrowdSystem.Update(entry.Key, world, Clock.Now, (crowdId, at, spec) =>
                         EmitWorldAudio(entry.Key, crowdId, "crowd", new[]
                         {
                             new TransientSound
@@ -1549,7 +1553,7 @@ public class GameServer
             if (remembered) Log.Information("{User} is back where they left {Map}.", session.Username, mapId);
             if (world.Has<DeadComponent>(session.Entity))
             {
-                double left = world.Get<DeadComponent>(session.Entity).DiedAt + CombatService.PlayerRespawnSeconds - AudioClock.Now;
+                double left = world.Get<DeadComponent>(session.Entity).DiedAt + CombatService.PlayerRespawnSeconds - Clock.Now;
                 SendToSession(session, new TextEvent { Text = $"You are dead. You come back in {Math.Max(1, Math.Ceiling(left)):0} seconds." });
             }
 

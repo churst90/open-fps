@@ -322,7 +322,7 @@ public class PlayerPersistenceTests : IDisposable
         var world = rig.World(alice);
         world.Get<Transform>(alice.Entity).Position += new Vector3(3f, 0f, 2f);
         world.Get<HealthComponent>(alice.Entity).Current = 0;
-        world.Add(alice.Entity, new DeadComponent { DiedAt = AudioClock.Now - CombatService.PlayerRespawnSeconds - 5 });
+        world.Add(alice.Entity, new DeadComponent { DiedAt = rig.Server.Clock.Now - CombatService.PlayerRespawnSeconds - 5 });
 
         rig.LogOut(alice);
         var back = await rig.Arrive("alice");
@@ -342,14 +342,14 @@ public class PlayerPersistenceTests : IDisposable
         var alice = await rig.Arrive("alice");
         var world = rig.World(alice);
         world.Get<HealthComponent>(alice.Entity).Current = 0;
-        world.Add(alice.Entity, new DeadComponent { DiedAt = AudioClock.Now - 10 });
+        world.Add(alice.Entity, new DeadComponent { DiedAt = rig.Server.Clock.Now - 10 });
 
         rig.LogOut(alice);
         var back = await rig.Arrive("alice");
 
         world = rig.World(back);
         Assert.True(world.Has<DeadComponent>(back.Entity), "came back alive after ten seconds dead");
-        double left = world.Get<DeadComponent>(back.Entity).DiedAt + CombatService.PlayerRespawnSeconds - AudioClock.Now;
+        double left = world.Get<DeadComponent>(back.Entity).DiedAt + CombatService.PlayerRespawnSeconds - rig.Server.Clock.Now;
         Assert.InRange(left, CombatService.PlayerRespawnSeconds - 20, CombatService.PlayerRespawnSeconds - 9);
         Assert.Equal(0, world.Get<HealthComponent>(back.Entity).Current);
         Assert.Equal(rig.Maps.GetSpawnPoint("default").Position, world.Get<Transform>(back.Entity).Position);
@@ -365,7 +365,7 @@ public class PlayerPersistenceTests : IDisposable
         var alice = await rig.Arrive("alice");
         var world = rig.World(alice);
         world.Get<HealthComponent>(alice.Entity).Current = 0;
-        world.Add(alice.Entity, new DeadComponent { DiedAt = AudioClock.Now });
+        world.Add(alice.Entity, new DeadComponent { DiedAt = rig.Server.Clock.Now });
 
         Assert.False(rig.Hands.Give(alice, "glock_pistol", 1, out _, out _, out string why));
         Assert.Contains("dead", why);

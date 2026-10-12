@@ -62,11 +62,18 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
     public AudioEngineFacade() : this(new FmodAudioProvider()) { }
 
-    public AudioEngineFacade(IAudioProvider provider)
+    /// <param name="clock">The clock when the provider has none of its own (a test's mixer): the test's stepped
+    /// one, or none for a stopwatch.</param>
+    public AudioEngineFacade(IAudioProvider provider, IAudioClock? clock = null)
     {
         _provider = provider;
         Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather();
+        Clock = (provider as FmodAudioProvider)?.Clock ?? clock ?? new StopwatchAudioClock();
     }
+
+    /// <summary>The clock this world tells time by, for the host to read wherever it stamps something the mixer
+    /// will age (a position, a strike, a sound's moment): the mixer's when there is one (FmodAudioProvider.Clock).</summary>
+    public IAudioClock Clock { get; }
 
     /// <summary>The weather this world hears, for the host to fill: the mixer's when there is one
     /// (FmodAudioProvider.Weather), so its voices read what the host writes.</summary>

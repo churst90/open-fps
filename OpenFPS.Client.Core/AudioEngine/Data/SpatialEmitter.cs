@@ -74,7 +74,7 @@ public struct SpatialEmitter
     public int TargetRegionId;
     public Vector3 Velocity;
     /// <summary>
-    /// When <see cref="Position"/> was true, seconds on <see cref="OpenFPS.Common.AudioClock"/>; zero
+    /// When <see cref="Position"/> was true, seconds on <see cref="OpenFPS.Common.IAudioClock"/>; zero
     /// is unknown, taken as now. Stamped at sample time, never at submission: stamped on submission,
     /// dead reckoning was reset by every re-submission and a close fast car moved in a 30 Hz staircase
     /// (2.3 semitones and 60 degrees a step at 3 m and 235 km/h), heard as "it stops for a second and

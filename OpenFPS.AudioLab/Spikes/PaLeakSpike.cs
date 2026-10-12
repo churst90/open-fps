@@ -153,7 +153,7 @@ public static class PaLeakSpike
                     ConeOutside = def.SoundEmitter.ConeOutsideAngle,
                     ConeOutsideVolume = def.SoundEmitter.ConeOutsideVolume,
                     TargetRegionId = path.RegionId,
-                    PositionSampledAt = AudioClock.Now,
+                    PositionSampledAt = provider.Clock.Now,
                 };
                 double start = clock.Elapsed.TotalSeconds;
                 provider.PlaySpatialSound(e);

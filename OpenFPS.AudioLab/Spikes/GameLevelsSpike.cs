@@ -70,6 +70,8 @@ public static class GameLevelsSpike
         var player = new LocalPlayerState();
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
+        // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
+        world.Clock = facade.Clock;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
 
         // The ground: asphalt, as a street is.
@@ -263,14 +265,14 @@ public static class GameLevelsSpike
                     DecaySeconds = take.Seconds, Noisiness = 0.5f, SynthKey = Speech.Key(take.Voice, take.Line),
                 } },
             };
-            foreach (var take in takes) audio.WorldAudio.Receive(Line(take, 1), AudioClock.Now);
+            foreach (var take in takes) audio.WorldAudio.Receive(Line(take, 1), provider.Clock.Now);
             Pump(2.0);
             double start = clock.Elapsed.TotalSeconds;
             int k = 0; double next = start + 0.2;
             perFrame = t =>
             {
                 if (t < next || k >= takes.Count) return;
-                audio.WorldAudio.Receive(Line(takes[k], 1), AudioClock.Now);
+                audio.WorldAudio.Receive(Line(takes[k], 1), provider.Clock.Now);
                 next += takes[k].Seconds + 0.4;
                 k++;
             };
@@ -294,15 +296,15 @@ public static class GameLevelsSpike
                     SynthKey = KnobDoor.Key(closing, KnobDoor.Construction.HollowCore, 4242, 1.0f, KnobDoor.Shut.Normal, 0.9f, 2.1f, false),
                 } },
             };
-            audio.WorldAudio.Receive(Ev(false), AudioClock.Now);
-            audio.WorldAudio.Receive(Ev(true), AudioClock.Now);
+            audio.WorldAudio.Receive(Ev(false), provider.Clock.Now);
+            audio.WorldAudio.Receive(Ev(true), provider.Clock.Now);
             Pump(4.0);
             double start = clock.Elapsed.TotalSeconds;
             bool opened = false, shut = false;
             perFrame = t =>
             {
-                if (!opened && t > start + 0.3) { opened = true; audio.WorldAudio.Receive(Ev(false), AudioClock.Now); }
-                if (!shut && t > start + 3.0) { shut = true; audio.WorldAudio.Receive(Ev(true), AudioClock.Now); }
+                if (!opened && t > start + 0.3) { opened = true; audio.WorldAudio.Receive(Ev(false), provider.Clock.Now); }
+                if (!shut && t > start + 3.0) { shut = true; audio.WorldAudio.Receive(Ev(true), provider.Clock.Now); }
             };
             Record($"door knob open+close {d:0.#}m", seconds);
             perFrame = null;
@@ -343,7 +345,7 @@ public static class GameLevelsSpike
             {
                 SourceEntityId = -1, Label = "thunder", Seed = 7,
                 Sounds = new List<TransientSound> { new TransientSound { SynthKey = strike.Key(), Position = player.Position } },
-            }, AudioClock.Now);
+            }, provider.Clock.Now);
             Record($"thunder {d / 1000f:0.#}km", seconds);
             Pump(2.0);
         }
@@ -484,7 +486,7 @@ public static class GameLevelsSpike
                     Character = SoundCharacter.Ring, Position = Vector3.Zero, LevelDb = layout[from].LevelDb,
                     DecaySeconds = TrainSignal.Duration(warning, bell), SynthKey = TrainSignal.Key(preset, trainKey, warning, bell),
                 } },
-            }, AudioClock.Now);
+            }, provider.Clock.Now);
         }
 
         // A car driven on the per-wheel model (WheelDynamics), its wheels sent with its state as the

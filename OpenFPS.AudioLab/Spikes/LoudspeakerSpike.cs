@@ -136,6 +136,8 @@ public static class LoudspeakerSpike
         var player = new LocalPlayerState();
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
+        // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
+        world.Clock = facade.Clock;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
 

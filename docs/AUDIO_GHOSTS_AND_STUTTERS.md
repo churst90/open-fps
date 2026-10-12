@@ -357,7 +357,7 @@ and the full suite (355 tests) passes.
 `DeadReckon` were both measured on `_loadClock` — a `Stopwatch` that `ReportMixerLoad` **restarts
 every 250 ms**. For most of every quarter second, "now" was smaller than the stamp, the age came out
 negative, and `DeadReckon` returned the position unchanged. The session-5 fix was inert twice over.
-All timestamps now come from `OpenFPS.Common.AudioClock`, a process-wide monotonic clock that nothing
+All timestamps now come from one `OpenFPS.Common.IAudioClock` (the mixer's, shared with the game loop; a static `AudioClock` until 2026-10-12), a monotonic clock that nothing
 restarts; the load timer keeps its own stopwatch and is named for what it does.
 
 `MaxDeadReckonSeconds` went from 0.05 to 0.08 — not to hide anything, but because with an honest

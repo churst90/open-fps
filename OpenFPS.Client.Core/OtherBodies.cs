@@ -15,6 +15,10 @@ namespace OpenFPS.Client.Core;
 /// </summary>
 public sealed class OtherBodies
 {
+    /// <summary>The clock other bodies' steps and breath are timed on: the audio world's, given by the session.
+    /// One of its own until then.</summary>
+    public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
+
     /// <summary>
     /// How fast a body may be moving vertically and still be standing on something, m/s. The server
     /// zeroes a grounded body's vertical velocity, and one tick of free fall is about 0.3 m/s, so the
@@ -54,7 +58,7 @@ public sealed class OtherBodies
 
     public void Update(WorldSnapshot snapshot, int localPlayerId)
     {
-        double now = AudioClock.Now;
+        double now = Clock.Now;
 
         foreach (var body in snapshot.DynamicEntities)
         {

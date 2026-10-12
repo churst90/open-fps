@@ -337,6 +337,8 @@ public static class StoveSpike
         var player = new LocalPlayerState();
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
+        // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
+        world.Clock = facade.Clock;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         int id = 1;
         foreach (var b in boxes)

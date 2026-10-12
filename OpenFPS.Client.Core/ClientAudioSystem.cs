@@ -395,7 +395,7 @@ public partial class ClientAudioSystem
         _rain.DropVoice = n => (_voices.IdFor(VoiceKind.RainDrop, VoiceRegistry.NoEntity, n), VoiceRegistry.SeedOf(VoiceKind.RainDrop, VoiceRegistry.NoEntity, n));
         _engineEchoes.VoiceOf = (engine, n) => (_voices.IdFor(VoiceKind.EngineEcho, engine, n), VoiceRegistry.SeedOf(VoiceKind.EngineEcho, engine, n));
         _stepRandom = seed is int s ? new Random(s) : Random.Shared;
-        WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
+        WorldAudio.Received = message => _birds.Heard(message, _audio.Clock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
         _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced) { Manual = manualAcoustics };
@@ -519,6 +519,13 @@ public partial class ClientAudioSystem
     /// Called every frame from the game loop (throttled to <see cref="UpdateHz"/>). The listener is at the
     /// smoothed VisualPosition, so a server correction is not heard as a jump.
     /// </summary>
+    /// <summary>How far past the audio clock's now a position's stamp may be before it is taken as another
+    /// clock's, s: on one clock it is never past it at all.</summary>
+    private const double OtherClockSeconds = 0.05;
+
+    /// <summary>Whether a snapshot's positions were found stamped on another clock than the audio's.</summary>
+    internal bool WorldOnAnotherClock { get; private set; }
+
     public void Update(WorldSnapshot world)
     {
         if (!_throttle.ShouldRun(_now())) return;
@@ -547,7 +554,18 @@ public partial class ClientAudioSystem
         var previous = _lastSnapshot;
         _lastSnapshot = world;
         _acousticWorker.UpdateWorld(world);
-        
+
+        // A position stamped after now was stamped on another clock: its age, and so where the mixer reckons
+        // the thing has got to, is out by the two clocks' difference. Whoever holds the world and this gives the
+        // world this one's clock (ClientWorldState.Clock = AudioEngineFacade.Clock). Said once.
+        if (!WorldOnAnotherClock && world.PositionsSampledAt > _audio.Clock.Now + OtherClockSeconds)
+        {
+            WorldOnAnotherClock = true;
+            Log.Warning("Audio: the world's positions are stamped {Ahead:F2} s after the audio's clock reads: the world "
+                      + "state was not given the audio's clock (ClientWorldState.Clock), so moving things are placed late or early.",
+                        world.PositionsSampledAt - _audio.Clock.Now);
+        }
+
         Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
         _groundEar = visualEyePos;
         // The cabin you sit in, for the traced reverb: which vehicle, and your ear in its frame.
@@ -645,7 +663,7 @@ public partial class ClientAudioSystem
         UpdateAcousticState(world, visualEyePos, listenerRegionId);
         // Through the echo system: the grandstand that answers a car answers the people on it too, on the
         // same terms (obstruction-tested).
-        WorldAudio.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, _engineEchoes);
+        WorldAudio.Update(world, visualEyePos, _audio.Clock.Now, _engineEchoes);
 
         // Six rays out of the head, turned by its rotation, so the answer is "concrete half a metre to my
         // left"; each becomes its own early reflection (BoundaryModel, BoundaryProximityProcessor). This is
@@ -818,7 +836,7 @@ public partial class ClientAudioSystem
         {
             var p = world.Precipitation;
             float wet = p.Falling ? (p.Kind == OpenFPS.Common.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : world.RainRateMmPerHour;
-            _audio.Weather.Runoff.Update(wet, OpenFPS.Common.AudioClock.Now);
+            _audio.Weather.Runoff.Update(wet, _audio.Clock.Now);
         }
         ChooseLiveMachines(world, visualEyePos);
         ChoosePlaces(world, visualEyePos);
@@ -849,16 +867,16 @@ public partial class ClientAudioSystem
 
         long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         UpdateTrains(world, visualEyePos, engineDt);
-        UpdateHorns(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        UpdateHorns(world, visualEyePos, _audio.Clock.Now);
         UpdateSirens(world, visualEyePos);
-        UpdateOwnVoice(visualEyePos, OpenFPS.Common.AudioClock.Now);
-        UpdateTalkers(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        UpdateOwnVoice(visualEyePos, _audio.Clock.Now);
+        UpdateTalkers(world, visualEyePos, _audio.Clock.Now);
         _partMs[3] += Ms(partAt);
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _birds.EarSpeed = _earSpeed;
-        _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        _birds.Update(world, visualEyePos, _audio.Clock.Now);
         _rain.EarSpeed = _earSpeed;
-        _rain.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
+        _rain.Update(world, visualEyePos, _audio.Clock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
         _partMs[2] += Ms(partAt);
 
         // Every source has been offered to the reflection system: it sets what next frame's reflections
@@ -2243,7 +2261,7 @@ public partial class ClientAudioSystem
     {
         if (_horns.Remove(entityId)) _voices.Stop(HornVoiceId(entityId));
         _horns[entityId] = (OpenFPS.Common.Honk.Key(horn, rhythm),
-                            OpenFPS.Common.AudioClock.Now + OpenFPS.Common.Honk.Duration(rhythm) + 1.0);
+                            _audio.Clock.Now + OpenFPS.Common.Honk.Duration(rhythm) + 1.0);
     }
 
     /// <summary>Places every sounding horn at the front of its vehicle, through the vehicle's own path.</summary>
@@ -3070,7 +3088,7 @@ public partial class ClientAudioSystem
     /// reads (UpdateTalkers).
     /// </summary>
     public void ReceiveVoice(int senderId, ushort sequence, byte[] opusData)
-        => OpenFPS.Client.AudioEngine.Fmod.Talkers.For(senderId).Receive(sequence, opusData, OpenFPS.Common.AudioClock.Now);
+        => OpenFPS.Client.AudioEngine.Fmod.Talkers.For(senderId).Receive(sequence, opusData, _audio.Clock.Now);
 
     /// <summary>The voice of somebody talking on voice chat, from their mouth.</summary>
     private int TalkerVoiceId(int playerId) => _voices.IdFor(VoiceKind.Talker, playerId);
@@ -3461,7 +3479,7 @@ public partial class ClientAudioSystem
         if (_footTrace)
             Serilog.Log.Information("[STEP] other {Id} at ({X:F2},{Y:F2},{Z:F2}) occ {Occ:F2} eq {L:F4}/{M:F4}/{H:F4} bleed {B:F2} aperture {A:F2} apparent ({AX:F1},{AY:F1},{AZ:F1}) region {R} t {T:F3}",
                 step.EntityId, at.X, at.Y, at.Z, path.Occlusion, path.EqLow, path.EqMid, path.EqHigh, path.TransmissionBleed,
-                path.ApertureFactor, path.ApparentPosition.X, path.ApparentPosition.Y, path.ApparentPosition.Z, path.RegionId, OpenFPS.Common.AudioClock.Now);
+                path.ApertureFactor, path.ApparentPosition.X, path.ApparentPosition.Y, path.ApparentPosition.Z, path.RegionId, _audio.Clock.Now);
     }
 
     private readonly List<OpenFPS.Common.EarlyReflections.Arrival> _stepArrivals = new();
@@ -3795,7 +3813,7 @@ public partial class ClientAudioSystem
 
         // The rays are the cost: cast again only once the source or the ear has moved a metre, or after
         // a quarter of a second.
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = _audio.Clock.Now;
         if (!_groundCache.TryGetValue(e.EntityId, out var c)
             || Vector3.DistanceSquared(c.Src, src) > 1f || Vector3.DistanceSquared(c.Ear, ear) > 1f || now - c.At > 0.25)
         {

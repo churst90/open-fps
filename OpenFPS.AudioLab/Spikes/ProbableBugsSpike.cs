@@ -67,6 +67,8 @@ public static class ProbableBugsSpike
         var player = new LocalPlayerState();
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
+        // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
+        world.Clock = facade.Clock;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
 
@@ -267,8 +269,8 @@ public static class ProbableBugsSpike
                 WeaponRegistry.TryGet("glock", out var glock);
                 var shot = Shot("weapon:glock", player.Position + new Vector3(0f, 1.5f, 0.5f), Loudness.MuzzleBlastDb(glock), 0.6f);
                 // The first event of a key renders and is dropped.
-                audio.WorldAudio.Receive(clap, AudioClock.Now);
-                audio.WorldAudio.Receive(shot, AudioClock.Now);
+                audio.WorldAudio.Receive(clap, provider.Clock.Now);
+                audio.WorldAudio.Receive(shot, provider.Clock.Now);
                 Pump(3.0);
                 void Repeat(string name, Action fire, int count, double every, double seconds)
                 {
@@ -279,8 +281,8 @@ public static class ProbableBugsSpike
                     perFrame = null;
                     Pump(1.0);
                 }
-                Repeat($"claps {material}", () => audio.WorldAudio.Receive(clap, AudioClock.Now), 4, 1.5, 6.5);
-                Repeat($"pistol {material}", () => audio.WorldAudio.Receive(shot, AudioClock.Now), 3, 2.0, 6.5);
+                Repeat($"claps {material}", () => audio.WorldAudio.Receive(clap, provider.Clock.Now), 4, 1.5, 6.5);
+                Repeat($"pistol {material}", () => audio.WorldAudio.Receive(shot, provider.Clock.Now), 3, 2.0, 6.5);
                 int steps = 0;
                 Repeat($"steps {material}", () => audio.OnOwnFootstep(player.Position + new Vector3((steps++ & 1) == 0 ? 0.12f : -0.12f, 0f, 0f), "Concrete", "0"),
                        8, 0.52, 5.0);

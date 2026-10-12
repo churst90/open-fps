@@ -301,6 +301,10 @@ public sealed class MachineVoiceState : PhysicalVoiceState
     public readonly SmallMachineSpec Spec;
     public readonly SmallMachineSynth Machine;
 
+    /// <summary>The clock its thermostat cycles on: its world's, which the mixer gives it as it makes it. One of
+    /// its own until then, as in an offline render.</summary>
+    public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
+
     // What the machine is doing, which nothing on the wire says (a mower's grass, a thermostat's
     // call), is driven here from a seed taken from the entity id: two clients hear the same mower
     // the same way, and forty window units on a wall are forty machines, not one forty times.
@@ -382,7 +386,7 @@ public sealed class MachineVoiceState : PhysicalVoiceState
         if (_thermostat != null)
         {
             float air = float.IsNaN(AmbientCelsius) ? OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius : AmbientCelsius;
-            Machine.CompressorOn = _thermostat.Step(dt, air, AudioClock.Now);
+            Machine.CompressorOn = _thermostat.Step(dt, air, Clock.Now);
             float wander = 0.6f * MathF.Sin(_wanderPhase1 + MathF.Tau * _wanderHz1 * seconds)
                          + 0.4f * MathF.Sin(_wanderPhase2 + MathF.Tau * _wanderHz2 * seconds);
             Machine.CompressorLoad = CompressorSpec.LoadAt(air) * (1f + 0.04f * wander);

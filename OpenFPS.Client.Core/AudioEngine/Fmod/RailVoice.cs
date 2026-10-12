@@ -90,15 +90,18 @@ public sealed class TrainVoiceState
     /// <summary>What each voice carries (TrainVoicing), published by the game thread.</summary>
     private readonly TrainSlotPlan?[] _plans = new TrainSlotPlan?[TrainVoicing.Slots];
 
-    public TrainVoiceState(string key, TrainProfile p, float sampleRate, int seed)
+    /// <param name="clock">The clock the train's timeline runs on: its world's, from the mixer that makes it
+    /// (a signal's moment is on that clock). None: one of its own, as in an offline render.</param>
+    public TrainVoiceState(string key, TrainProfile p, float sampleRate, int seed, IAudioClock? clock = null)
     {
+        Clock = clock ?? new StopwatchAudioClock();
         Key = key;
         Profile = p;
         Rate = sampleRate;
         Seed = seed;
         Train = new TrainSynth(p, sampleRate, seed);
         Layout = TrainLayout.Sources(p);
-        _t0 = AudioClock.Now;
+        _t0 = Clock.Now;
         _speed = TargetSpeed = p.TypicalSpeedMps;
 
         // The point sources, grouped into lanes: each prime mover with its own fans on a lane of its own
@@ -130,7 +133,10 @@ public sealed class TrainVoiceState
     public static bool IsRollingStock(TrainLayout.Kind kind) => kind is TrainLayout.Kind.Bogie or TrainLayout.Kind.Body;
 
     /// <summary>The sample of the train's timeline that is playing now.</summary>
-    public long NowSample => (long)((AudioClock.Now - _t0) * Rate);
+    public long NowSample => (long)((Clock.Now - _t0) * Rate);
+
+    /// <summary>The clock the train's timeline runs on, which its voices read too.</summary>
+    public IAudioClock Clock { get; }
 
     /// <summary>The ring of a point source, or null for rolling stock.</summary>
     internal float[]? Ring(int source) => _rings[source];
@@ -183,7 +189,7 @@ public sealed class TrainVoiceState
     internal TrainSlotState[] LiveSlots()
     {
         var slots = Volatile.Read(ref _slots);
-        double now = AudioClock.Now;
+        double now = Clock.Now;
         bool stale = false;
         foreach (var s in slots) if (now - s.LastRendered > 2.0) { stale = true; break; }
         if (!stale) return slots;
@@ -436,8 +442,8 @@ public sealed class TrainSlotState : PhysicalVoiceState
     private long _blockIndex = -1;
     private bool _carriesHorn;
 
-    /// <summary>When this voice last rendered (AudioClock), so a released one stops holding its lanes back.</summary>
-    internal double LastRendered = AudioClock.Now;
+    /// <summary>When this voice last rendered (its train's clock), so a released one stops holding its lanes back.</summary>
+    internal double LastRendered;
 
     /// <summary>The sample of the train's timeline this voice renders next.</summary>
     internal long Cursor => Volatile.Read(ref _cursor);
@@ -450,6 +456,7 @@ public sealed class TrainSlotState : PhysicalVoiceState
         : base(levelDb, sampleRate, HeadroomDb)
     {
         Shared = shared;
+        LastRendered = shared.Clock.Now;
         Slot = slot;
         _dt = 1f / sampleRate;
         // On the train's timeline at the sample now playing: the warm-up it renders first is thrown away
@@ -468,13 +475,13 @@ public sealed class TrainSlotState : PhysicalVoiceState
     protected override void Control(float seconds, float dt)
     {
         Shared.Running = Running;
-        LastRendered = AudioClock.Now;
+        LastRendered = Shared.Clock.Now;
     }
 
     /// <summary>As many samples as every lane this voice reads has rendered, from the cursor on.</summary>
     protected override int Ready(int want)
     {
-        LastRendered = AudioClock.Now;
+        LastRendered = Shared.Clock.Now;
         TakePlan();
         long at = Volatile.Read(ref _cursor);
         long ready = want;

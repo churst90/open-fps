@@ -12,6 +12,11 @@ namespace OpenFPS.Client.Core;
 /// </summary>
 public class ClientWorldState
 {
+    /// <summary>The clock positions are stamped on as they arrive (PositionsSampledAt): the audio world's, which
+    /// ages them, given by whoever holds both (the session: AudioEngineFacade.Clock). One of its own until then,
+    /// which is enough for a world nothing is listening to.</summary>
+    public OpenFPS.Common.IAudioClock Clock { get; set; } = new OpenFPS.Common.StopwatchAudioClock();
+
     private readonly ConcurrentDictionary<int, EntityDefinition> _definitions = new();
     private readonly ConcurrentDictionary<int, Transform> _serverTransforms = new();
 
@@ -58,7 +63,7 @@ public class ClientWorldState
     private const double MaxDriftBeforeSnap = 0.5;
 
     /// <summary>When the interpolated transforms were last advanced, seconds on
-    /// <see cref="OpenFPS.Common.AudioClock"/>. Copied into every snapshot built from them.</summary>
+    /// <see cref="OpenFPS.Common.IAudioClock"/>. Copied into every snapshot built from them.</summary>
     private double _positionsSampledAt;
     private double _clientInterpolationTime = 0;
 
@@ -622,7 +627,7 @@ public class ClientWorldState
         // says how old a position is, and dead reckoning downstream measures from it.
         if (moved)
         {
-            _positionsSampledAt = OpenFPS.Common.AudioClock.Now;
+            _positionsSampledAt = Clock.Now;
             Touch();
         }
     }
@@ -804,7 +809,7 @@ public class ClientWorldState
             _serverSignals[s.EntityId] = s.Signals;
             if (s.Wheels != null) _serverWheels[s.EntityId] = s.Wheels;
         }
-        _positionsSampledAt = OpenFPS.Common.AudioClock.Now;
+        _positionsSampledAt = Clock.Now;
         Touch();
     }
 

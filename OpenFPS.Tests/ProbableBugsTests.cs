@@ -60,7 +60,7 @@ public class ProbableBugsTests
     {
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        h.Audio.WorldAudio.Receive(LateKnock(), AudioClock.Now);
+        h.Audio.WorldAudio.Receive(LateKnock(), h.Facade.Clock.Now);
         Assert.True(h.Audio.WorldAudio.Outstanding > 0);
 
         h.Audio.LeaveWorld(Array.Empty<int>());

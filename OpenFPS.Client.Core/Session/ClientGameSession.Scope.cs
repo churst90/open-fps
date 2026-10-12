@@ -158,7 +158,7 @@ public sealed partial class ClientGameSession
     private void UpdateGuidance()
     {
         if (!_scope.Raised || !_scope.ToneOn || !Ui.Enabled) { StopGuidance(); return; }
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = _audioEngine.Clock.Now;
         if (now - _guidanceAt < GuidanceEverySeconds) return;
         _guidanceAt = now;
         var g = Guidance.For(LookThrough(), _scope.FieldOfViewDegrees);

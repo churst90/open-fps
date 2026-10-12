@@ -86,7 +86,7 @@ since the last deploy" list below.
      buffer overrun). Step 6, the reseed: BUILT 2026-10-12, unheard (made on Windows and sent back as patches): a voice's seed is a hash of its kind, owner and part, the seed table is gone, the woods'
      voices are under ids given out, all eight streams regenerated (on Linux), a
      render check by band (`SeedBandLevelTests`). Next: the rain's 40 dB and the bump's 85 dB start levels
-     (Cody's decision). Rain patches under probes: BUILT 2026-10-12 with P6. (`SpatialEmitter`'s default range is the component's 50 m now, S24.) Then library stage 5's `AudioClock` slice (docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
+     (Cody's decision). Rain patches under probes: BUILT 2026-10-12 with P6. (`SpatialEmitter`'s default range is the component's 50 m now, S24.) Library stage 5's `AudioClock` slice: BUILT 2026-10-12 (docs/SOUND_LIBRARY_BOUNDARY.md 18.6; the wire hash changes).
    - P4 (one ranking): the choosers BUILT 2026-10-12, unheard (made on Windows and sent back as patches; the audit's
      "P4 as built"): one rank (`VoiceManager.HeardLevel`), engines to the loudest cars and not the nearest,
      places to the loudest source, a render's headroom out of the budget's rank. For Cody to decide: the path

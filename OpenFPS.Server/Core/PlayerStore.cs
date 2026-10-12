@@ -34,8 +34,14 @@ public sealed class PlayerStore
     /// (MapManager.VerifySpawnPoint), and less than a storey.</summary>
     public const float StandingTolerance = 1.5f;
 
-    public PlayerStore(IUserRepository users, MapManager maps, HandsService hands)
+    /// <param name="clock">The clock deaths are stamped on (the server's: GameServer.Clock); none, one of its
+    /// own.</param>
+    /// <summary>The clock a death's moment is read against when somebody leaves and comes back.</summary>
+    public IAudioClock Clock { get; }
+
+    public PlayerStore(IUserRepository users, MapManager maps, HandsService hands, IAudioClock? clock = null)
     {
+        Clock = clock ?? new StopwatchAudioClock();
         _users = users;
         _maps = maps;
         _hands = hands;
@@ -132,7 +138,7 @@ public sealed class PlayerStore
             // up, and still dead until the wait is over: leaving does not skip it.
             state.SetPlace(mapId, null);
             state.Health = state.MaxHealth = null;
-            double left = world.Get<DeadComponent>(body).DiedAt + CombatService.PlayerRespawnSeconds - AudioClock.Now;
+            double left = world.Get<DeadComponent>(body).DiedAt + CombatService.PlayerRespawnSeconds - Clock.Now;
             if (left > 0) state.DeadUntilUtc = DateTime.UtcNow.AddSeconds(Math.Min(left, CombatService.PlayerRespawnSeconds));
         }
         else
@@ -183,7 +189,7 @@ public sealed class PlayerStore
         if (state?.DeadUntilUtc is DateTime until && until > DateTime.UtcNow)
         {
             double left = Math.Min((until - DateTime.UtcNow).TotalSeconds, CombatService.PlayerRespawnSeconds);
-            world.Add(body, new DeadComponent { DiedAt = AudioClock.Now - (CombatService.PlayerRespawnSeconds - left) });
+            world.Add(body, new DeadComponent { DiedAt = Clock.Now - (CombatService.PlayerRespawnSeconds - left) });
             if (world.Has<HealthComponent>(body)) world.Get<HealthComponent>(body).Current = 0;
         }
 

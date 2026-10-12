@@ -68,7 +68,7 @@ public class WorldSnapshot
     public WoodChorus? Woods;
 
     /// <summary>
-    /// When the transforms in this snapshot were sampled, seconds on <see cref="AudioClock"/>. Readers
+    /// When the transforms in this snapshot were sampled, seconds on <see cref="IAudioClock"/>. Readers
     /// run more often than the simulation step, and with this can tell a fresh position from one a step old.
     /// </summary>
     public double PositionsSampledAt;

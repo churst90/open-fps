@@ -9,6 +9,11 @@ Recent work, newest first. `git log` has the rest.
   asked under a probe of its own, and the hand-rolled tracer stands in until the answer comes and for the
   patch's other surfaces. With Steam Audio, rain through a window or round a corner is now on the same terms
   as the car beside it. Up to eight sources more on the worker's pool while it rains.
+- Library stage 5, the clock (docs/SOUND_LIBRARY_BOUNDARY.md 18.6). No sound changes. The audio's clock was
+  one per process, a static every reader reached for; it is an instance now (`IAudioClock`), held by the mixer
+  beside its weather and shared out to the game loop, so each audio world has its own. The server keeps one of
+  its own. The wire hash changes (the clock's file is in the library the hash covers), so a client and a server
+  from either side of this refuse each other at login.
 
 - Audit P4, one rank, the choosers (docs/SPECIAL_CASES_AUDIT.md, "P4 as built"), unheard. Which cars have an
   engine, which standing machines a voice and which trees and fires are heard across their width is decided by

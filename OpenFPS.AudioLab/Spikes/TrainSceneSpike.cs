@@ -107,6 +107,8 @@ public static class TrainSceneSpike
         var player = new LocalPlayerState();
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
+        // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
+        world.Clock = facade.Clock;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         world.RegisterDefinition(new EntityDefinition
         {

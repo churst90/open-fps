@@ -18,6 +18,10 @@ public enum StepSlope { Level, Up, Down }
 /// </summary>
 public sealed class StrideAccumulator
 {
+    /// <summary>The clock a stride is timed on: the audio world's, given by whoever walks the body. One of its
+    /// own until then.</summary>
+    public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
+
     /// <summary>Hip height on a 1.8 m body, metres: the one number the gait is built on (a leg is a
     /// pendulum).</summary>
     public const float LegLengthMetres = 0.95f;
@@ -163,7 +167,7 @@ public sealed class StrideAccumulator
     /// walking from being moved; <paramref name="facing"/> decides which side a foot goes down.</summary>
     public Footfall Update(Vector3 position, Vector3 velocity, bool isGrounded, Quaternion facing)
     {
-        double now = AudioClock.Now;
+        double now = Clock.Now;
         bool landed = false;
 
         if (!isGrounded)

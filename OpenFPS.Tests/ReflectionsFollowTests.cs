@@ -164,8 +164,8 @@ public class ReflectionsFollowTests
 
     private static ushort _seq = 1;
 
-    /// <summary>A fifth of a second of Sean talking, arriving now.</summary>
-    private static void SeanSays()
+    /// <summary>A fifth of a second of Sean talking, arriving now on the harness's clock, which hears it.</summary>
+    private static void SeanSays(ClientAudioHarness h)
     {
         var enc = new VoiceFrameEncoder();
         var frame = new float[VoiceCodec.FrameSamples];
@@ -173,7 +173,7 @@ public class ReflectionsFollowTests
         for (int f = 0; f < 10; f++)
         {
             for (int i = 0; i < frame.Length; i++) frame[i] = 0.3f * MathF.Sin(2f * MathF.PI * 180f * i / VoiceCodec.Rate);
-            enc.Push(frame, p => stream.Receive(_seq++, p, AudioClock.Now));
+            enc.Push(frame, p => stream.Receive(_seq++, p, h.Facade.Clock.Now));
         }
     }
 
@@ -193,7 +193,7 @@ public class ReflectionsFollowTests
             h.StandAt(new Vector3(-1.5f, 0f, -2f));
             AddPlayer(h, Sean, new Vector3(0.6f, 0f, 1.1f));
             h.Tick();
-            SeanSays();
+            SeanSays(h);
             int voice = h.Voice(VoiceKind.Talker, Sean);
             Assert.True(h.TickUntil(() => h.Mixer.Live.Contains(voice) && SeansCopies(h).Count > 0, 120), "Sean's voice and its copies never started");
 
@@ -215,11 +215,11 @@ public class ReflectionsFollowTests
             h.StandAt(new Vector3(-1.5f, Storey, -2f));
             MovePlayer(h, Sean, new Vector3(0.6f, Storey, 1.1f));
             System.Threading.Thread.Sleep(150);
-            SeanSays();
+            SeanSays(h);
             Assert.True(h.TickUntil(() => h.Mixer.Latest[voice].TargetRegionId == Floor1Room, 240),
                 $"Sean's voice stayed in region {h.Mixer.Latest[voice].TargetRegionId} after he went up a floor");
             System.Threading.Thread.Sleep(150);
-            SeanSays();
+            SeanSays(h);
             h.Tick(3);
             AssertSameUpAStorey(below.Select(c => c.Position).ToList(), SeansCopies(h).Select(c => c.Position).ToList(),
                                 "Sean's voice's copies");

@@ -12,6 +12,13 @@ public class LocalPlayerController
 {
     private readonly LocalPlayerState _state;
     private readonly StrideAccumulator _stride = new();
+
+    /// <summary>The clock the breath and the stride run on: the audio world's, given by the session.</summary>
+    public OpenFPS.Common.IAudioClock Clock
+    {
+        get => _stride.Clock;
+        set => _stride.Clock = value;
+    }
     private readonly Breathing _lungs = new();
     private double _lastUpdateAt = -1;
 
@@ -76,7 +83,7 @@ public class LocalPlayerController
     /// frame rate.</summary>
     private void Breathe(Vector3 position, Vector3 velocity)
     {
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         if (_lastUpdateAt < 0) { _lastUpdateAt = now; return; }
 
         float dt = (float)(now - _lastUpdateAt);

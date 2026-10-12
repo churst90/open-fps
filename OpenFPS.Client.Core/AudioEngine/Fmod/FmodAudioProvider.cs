@@ -571,7 +571,7 @@ public partial class FmodAudioProvider : IAudioProvider
         /// <summary>A voice of the player's own room answering their microphone (OwnVoiceTap).</summary>
         public OwnVoiceTap? OwnVoice;
 
-        /// <summary>When this voice's position was last true, seconds on <see cref="OpenFPS.Common.AudioClock"/>:
+        /// <summary>When this voice's position was last true, seconds on <see cref="OpenFPS.Common.IAudioClock"/>:
         /// the emitter's sample time, not when it was handed over. A voice nobody updates keeps playing
         /// where it was while the thing making it drives away.</summary>
         public double LastAttributeAt;
@@ -1289,7 +1289,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// </summary>
     private void AdvanceListenerRoom()
     {
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         float dt = _roomAdvancedAt > 0 ? (float)(now - _roomAdvancedAt) : 0f;
         _roomAdvancedAt = now;
         if (dt <= 0f || dt > 0.5f) return;   // a stall is not a walk across a room
@@ -1423,6 +1423,11 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The weather this mixer's voices hear: the trees, fires and water read its wind and run-off,
     /// the ear wind its wind. The host fills it (AudioEngineFacade.Weather).</summary>
     public WorldWeather Weather { get; } = new();
+
+    /// <summary>The clock this mixer and its voices tell time by: how old a position is, when a horn was
+    /// sounded, when a fade ends. One of its own unless its host gives it one; either way the host's game loop
+    /// reads this one (AudioEngineFacade.Clock), so a position is stamped on the clock it is aged on.</summary>
+    public IAudioClock Clock { get; init; } = new StopwatchAudioClock();
 
     /// <summary>Whether there is a trace to play yet (the scene is built after the map loads).</summary>
     internal bool TracedActive => Traced.Listener != null;
@@ -1944,7 +1949,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// when the sound arrives, not when it was sent.</summary>
     private void Overload(float db, double afterSeconds)
     {
-        lock (_overloadPending) _overloadPending.Add((OpenFPS.Common.AudioClock.Now + Math.Max(0.0, afterSeconds), db));
+        lock (_overloadPending) _overloadPending.Add((Clock.Now + Math.Max(0.0, afterSeconds), db));
     }
 
     /// <summary>One step of the overload: arrivals, the hold, the recovery. Audio update.</summary>
@@ -2223,7 +2228,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         lock (_trains)
         {
-            _trainSignals[train] = (warning, bellSeconds, OpenFPS.Common.AudioClock.Now - secondsAgo);
+            _trainSignals[train] = (warning, bellSeconds, Clock.Now - secondsAgo);
             if (_trains.TryGetValue(train, out var t)) t.Signal(warning, bellSeconds, secondsAgo);
         }
         Log.Information("Train '{Train}' sounds: horn {Warning} s, bell {Bell:F1} s", train,
@@ -2239,7 +2244,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // client and every run hears the same train.
         int seed = 17;
         foreach (char c in train) seed = unchecked(seed * 31 + c);
-        t = new TrainVoiceState(shared, OpenFPS.Common.TrainProfile.ByName(preset), rate, seed & 0x7fff);
+        t = new TrainVoiceState(shared, OpenFPS.Common.TrainProfile.ByName(preset), rate, seed & 0x7fff, Clock);
         _trains[shared] = t;
         Log.Information("Train '{Train}' ({Profile}): one model, {Sources} source(s) over {Length:F0} m, heard through at most {Voices} voice(s); {Lanes} lane(s) render its engines and signals",
                         shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres,
@@ -2247,7 +2252,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // Sounding already: the horn came in before any of the train had a voice.
         if (_trainSignals.TryGetValue(shared, out var sig))
         {
-            double ago = OpenFPS.Common.AudioClock.Now - sig.At;
+            double ago = Clock.Now - sig.At;
             if (ago < OpenFPS.Common.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
         }
         return t;
@@ -2754,7 +2759,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 machineState = kind?.Synth switch
                 {
                     OpenFPS.Common.ModelSynth.Machine => new MachineVoiceState(OpenFPS.Common.SmallMachineSpec.ByName(preset),
-                                                       mrate, emitter.Seed, emitter.Seed * 31 + 7),
+                                                       mrate, emitter.Seed, emitter.Seed * 31 + 7) { Clock = Clock },
                     OpenFPS.Common.ModelSynth.Aircraft => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
                                                          mrate, emitter.Seed * 17 + 3,
                                                          lever: emitter.PowerLever),
@@ -2822,6 +2827,7 @@ public partial class FmodAudioProvider : IAudioProvider
             _system.getSoftwareFormat(out int rate, out _, out _);
             engineState = new EngineVoiceState(OpenFPS.Common.MachineRegistry.VehicleFor(emitter.EngineKey), rate, emitter.Seed)
             {
+                Clock = Clock,
                 TargetSpeed = emitter.EngineSpeed,
                 Running = emitter.EngineRunning,
                 ServingStop = emitter.ServingStop,
@@ -3061,7 +3067,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 OwnVoice = ownVoice,
                 TapState = tapState,
                 Position = emitter.Position, ApparentPosition = emitter.ApparentPosition,
-                LastAttributeAt = emitter.PositionSampledAt > 0 ? emitter.PositionSampledAt : OpenFPS.Common.AudioClock.Now,
+                LastAttributeAt = emitter.PositionSampledAt > 0 ? emitter.PositionSampledAt : Clock.Now,
                 CurrentApparentPosition = (emitter.ApparentPosition != Vector3.Zero) ? emitter.ApparentPosition : emitter.Position, 
                 EffectiveDistance = emitter.EffectiveDistance, Velocity = emitter.Velocity, Direction = emitter.Direction, 
                 Range = emitter.Range, MinDistance = emitter.MinDistance, BaseVolume = emitter.Volume * TakeGain(emitter), Pitch = emitter.Pitch,
@@ -3177,7 +3183,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 // emitter with no sample time is as fresh as this call.
                 active.LastAttributeAt = emitter.PositionSampledAt > 0
                     ? emitter.PositionSampledAt
-                    : OpenFPS.Common.AudioClock.Now;
+                    : Clock.Now;
                 active.Position = emitter.Position; active.ApparentPosition = emitter.ApparentPosition; 
                 active.FollowsListener = emitter.FollowsListener; active.ListenerOffset = emitter.ListenerOffset;
                 active.EffectiveDistance = emitter.EffectiveDistance; active.Velocity = emitter.Velocity; 
@@ -3425,7 +3431,7 @@ public partial class FmodAudioProvider : IAudioProvider
     public float MixerLoad => _mixerLoad;
     private volatile float _mixerLoad;
     /// <summary>The load sample's interval timer, restarted every quarter second: never a timebase for
-    /// positions (a restart gives a negative age). Timestamps come from <see cref="OpenFPS.Common.AudioClock"/>.</summary>
+    /// positions (a restart gives a negative age). Timestamps come from <see cref="OpenFPS.Common.IAudioClock"/>.</summary>
     private readonly System.Diagnostics.Stopwatch _loadSampleClock = System.Diagnostics.Stopwatch.StartNew();
 
     /// <summary>FMOD's own DSP load, per cent of the mixer's deadline, now. The lab's cost figures.</summary>
@@ -3466,7 +3472,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // absorb), and real channels against the limit (past it the quietest voices go silent).
         // The worst any one voice went unplaced, apart from the audio system's figure on purpose: that
         // says the placement pass ran, this that it reached every voice ("some of the cars stop").
-        double nowSec = OpenFPS.Common.AudioClock.Now;
+        double nowSec = Clock.Now;
         double worstStale = 0; int worstId = 0;
         lock (_lock)
         {
@@ -3581,7 +3587,7 @@ public partial class FmodAudioProvider : IAudioProvider
         _attributeDt = _attributeTickAt == 0 ? 0.004f
             : Math.Clamp((now - _attributeTickAt) / (float)System.Diagnostics.Stopwatch.Frequency, 0f, 0.25f);
         _attributeTickAt = now;
-        StepOverload(OpenFPS.Common.AudioClock.Now, _attributeDt);
+        StepOverload(Clock.Now, _attributeDt);
 
         _updateTimer.Restart();
         ReportMixerLoad();
@@ -3610,7 +3616,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     if (!isPlaying) {
                         // Out of the voices now, its units taken off later (ReleaseRetired).
                         RemoveActiveAt(i);
-                        _retiring.Add((active, OpenFPS.Common.AudioClock.Now));
+                        _retiring.Add((active, Clock.Now));
                         continue;
                     }
                     
@@ -3626,7 +3632,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 }
 
                 UpdateReverbBuses(lPosVec, listenerRegionId);
-                ReleaseRetired(OpenFPS.Common.AudioClock.Now);
+                ReleaseRetired(Clock.Now);
                 ReportEar();
             }
         }
@@ -3882,7 +3888,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private void UpdateSpatialPositioning(ActiveSound active, Vector3 lPosVec)
     {
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         // A voice pinned to the listener has no position to go stale (see ReportMixerLoad).
         double positionAge = active.FollowsListener || active.LastAttributeAt <= 0
             ? 0 : now - active.LastAttributeAt;
@@ -4080,7 +4086,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // source position carried forward to now (DeadReckon), not the apparent one.
         if (active.SaState != null)
         {
-            Vector3 sourceNow = DeadReckon(active, active.Position, OpenFPS.Common.AudioClock.Now);
+            Vector3 sourceNow = DeadReckon(active, active.Position, Clock.Now);
             float doppler = OpenFPS.Client.AudioEngine.Core.AudioPhysics.DopplerFactor(
                 lPosVec, _listenerVel, sourceNow, active.Velocity, speedOfSound: _speedOfSound);
             float basePitch = (active.GranularState != null || active.SynthState != null || active.EngineState != null || active.EchoState != null) ? 1.0f : active.Pitch;
@@ -4300,7 +4306,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         var key = ((int)MathF.Round(dir.X * 50f), (int)MathF.Round(dir.Y * 50f), (int)MathF.Round(dir.Z * 50f));
         if (_hrtfBands.TryGetValue(key, out db)) return true;
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         if (now - _hrtfMeasuredAt < HrtfMeasureSeconds) return false;
         _hrtfMeasuredAt = now;
         db = HrtfBands.Measure(_saContext, _saHrtf, MixerQuality.MixerRate, _saFrameSize, dir);
@@ -4365,7 +4371,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private bool FieldHere(OpenFPS.Common.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion,
                            out float gain, out Vector3 via)
     {
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         if (_fieldHere.TryGetValue(regionId, out var c) && c.Region == listenerRegion
             && now - c.At < 0.25 && Vector3.DistanceSquared(c.Where, listener) < 0.25f)
         {
@@ -4386,7 +4392,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private void WatchForPops(ActiveSound a, Vector3 listener)
     {
         if (a.Type == EmitterType.UI || a.IsReflection) return;
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         if (a.FirstSeenAt < 0) a.FirstSeenAt = now;
         float level = 20f * MathF.Log10(MathF.Max(1e-6f, a.LastVolume)) + a.LastEqDb.Mid;
         if (float.IsNaN(a.PopBaseDb) || now - a.PopBaseAt > 0.15 || level < a.PopBaseDb)
@@ -4680,7 +4686,7 @@ public partial class FmodAudioProvider : IAudioProvider
     public void StopSound(int entityId) { 
         lock (_lock) { 
             if (!_activeById.TryGetValue(entityId, out var voices)) return;
-            double now = OpenFPS.Common.AudioClock.Now;
+            double now = Clock.Now;
             foreach (var sound in voices) {
                 sound.Channel.stop();
                 // Its units come off once the mixer is done with it, as for a voice that ends.

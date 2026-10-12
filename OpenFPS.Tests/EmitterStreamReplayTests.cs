@@ -330,7 +330,9 @@ internal sealed class Replay
         World.Geometry.Runner = work => work();
         World.RefreshRunner = work => work();
         World.Clear(new Vector3(4000, 400, 4000));
-        Facade = new AudioEngineFacade(Mixer);
+        // The replay's own clock, read by everything from the start: the same moment on every run.
+        Facade = new AudioEngineFacade(Mixer, new SteppedAudioClock(() => Now));
+        World.Clock = Facade.Clock;
         // A still day: the weather's wind is read on the wall clock (WindField.Now). The run-off is this
         // world's own, so it starts empty.
         Facade.Weather.Wind = WindWeather.Steady(0f, 0f, 0f);
@@ -453,8 +455,7 @@ internal sealed class Replay
         try
         {
             var r = new Replay();
-            using (AudioClock.UseForTest(() => r.Now))
-                script(r);
+            script(r);
             return r;
         }
         finally

@@ -33,6 +33,8 @@ internal sealed class ClientAudioHarness
         World.Clear(new Vector3(4000, 400, 4000));
         Facade = new AudioEngineFacade(Mixer);
         Facade.InitializeForTest(soundsPath);
+        // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
+        World.Clock = Facade.Clock;
         var sounds = new SoundMappingService(Player);
         if (soundsPath != null) sounds.Initialize(soundsPath);
         // No door prewarm: with the render cache empty (TestConfigIsolation) every harness rendered the

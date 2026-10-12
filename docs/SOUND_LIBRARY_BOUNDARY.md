@@ -2255,8 +2255,7 @@ unregenerated (18.5).
 
 ### 18.3 What is left of stage 5
 
-In the order of section 8: `AudioClock` behind `IAudioClock` (read by the mixer's callbacks, the provider, the
-game loop's dead reckoning and the server; `ClientWorldState` among them); `AudioPhysics` and
+`AudioClock` behind `IAudioClock` is built (18.6). In the order of section 8, the rest: `AudioPhysics` and
 `MixerQuality.MixerRate` into the world's atmosphere and mixer format; `EarModel` and `Loudness` into
 `HearingSettings`; `MachineRegistry` and `ModelLibrary` into a `ModelCatalog`; the console levers into
 `MixSettings`; the lab levers into `LabLevers`. Seen on the way and left for those:
@@ -2310,6 +2309,50 @@ game loop's dead reckoning and the server; `ClientWorldState` among them); `Audi
   Audio) reports "listener trace ready", six traced echo rigs, and a traced tail of 0.8 s T20 in the flat.
 
 ---
+
+### 18.6 The clock (second slice, 2026-10-12)
+
+Made on Windows and sent back as a patch. Behaviour unchanged: the eight streams from
+before and after, run on one machine, are the same line for line, and the guards pass unregenerated.
+
+- **The static is gone.** `AudioClock` (a `Stopwatch` started at type load, with a test's override) is deleted;
+  nothing compiles that reads it. In its file (`OpenFPS.Sound/AudioClock.cs`): `IAudioClock` (`Now`, a monotonic
+  clock never reset, and `WorldTime`, the shared UTC count), `StopwatchAudioClock` (a running game's) and
+  `SteppedAudioClock` (a test's or an offline render's: set by hand, or reading its holder's own time).
+- **Who holds it.** The provider, beside `Traced` and `Weather`: `FmodAudioProvider.Clock`, one of its own
+  unless its host gives it one (`init`). `AudioEngineFacade.Clock` is that one, or the one the facade was given
+  when its mixer has none (a test's), or a stopwatch. The audio world of stage 7 takes it over.
+- **The library's readers take it.** The provider and its ear loop read `Clock` (20 reads). A train's timeline
+  is given it as it is made (`TrainVoiceState`'s constructor, since it reads the clock there; its voices read
+  their train's). An engine's wheel strikes and a machine's thermostat read `EngineVoiceState.Clock` and
+  `MachineVoiceState.Clock`, which the provider sets as it makes them. Made alone, as in an offline render or a
+  test, each of the three has a clock of its own: nothing is stamped for it there.
+- **The host's readers.** `ClientAudioSystem` reads its facade's (12 reads). The session gives the same one to
+  its `ClientWorldState` (which stamps positions as they arrive), its `LocalPlayerController` (and through it the
+  stride) and its `OtherBodies`, and reads it itself. So a position is stamped on the clock it is aged on, as
+  when there was one clock per process.
+- **A world on another clock is said.** Each of those host classes has a clock of its own until it is given one,
+  so a `ClientWorldState` nothing listens to needs none. The mistake that leaves is a world listened to and
+  never given the audio's clock: every moving thing placed early or late by the two clocks' difference. Its
+  stamps then read after the audio's now, which on one clock cannot be, and `ClientAudioSystem.Update` logs it
+  once (`WorldOnAnotherClock`). The lab's sixteen instruments that build a world and an audio system give the
+  world the facade's clock.
+- **The server keeps its own:** `GameServer.Clock`, which it hands its `PlayerStore`; `CombatService` reads its
+  server's. What stamps a death and what later asks how long ago it was read one clock, as before.
+- **The replay** gives its facade a stepped clock reading the replay's own time, from the start; the
+  `AudioClock.UseForTest` override is gone with the static.
+- **Not moved, and why.** `WindField.Now()` is still read directly (the nature voices, the ear wind, the rain's
+  clock, the stove, `ClientWorldState`'s wind ramp, the server's hob and weather broadcast): `IAudioClock.WorldTime`
+  is there for them, and `StopwatchAudioClock` answers it with `WindField.Now()`, so moving them is the same
+  mechanical change whenever it is wanted. The `Environment.TickCount64` and `DateTime.UtcNow` reads of 4.1
+  (34 in 7 library files) are not moved either. `ClientAudioSystem`'s own `Func<double>` clock (a second
+  stopwatch in the game, the frame clock in tests) is as it was.
+- **Statics.** One library static that can change is gone (`AudioClock._test`), with the readonly `_clock`.
+  No crossing was in it, so `allowed.tsv` and `files.tsv` are unchanged (`AudioClock.cs` keeps its name).
+- **The wire hash** covers `OpenFPS.Sound` outside `Core/`, and `AudioClock.cs` is there, so it changes: a client
+  and a server from either side of this refuse each other at login, as for any edit to Common (b4fad80918a5 at
+  092caf08, 2a0f2a6e1c1d after). Nothing sent
+  changed.
 
 ## Decisions (Cody, 2026-10-06)
 

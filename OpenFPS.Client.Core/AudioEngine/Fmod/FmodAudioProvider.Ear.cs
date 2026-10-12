@@ -95,7 +95,7 @@ public partial class FmodAudioProvider
         else if (sample) RequestTimbre(ear.Key);
         ear.Timbre = engine == null ? EarTimbres.Find(ear.Key) : null;
         active.Ear = ear;
-        RecomputeEar(active, ear, _listenerPos, OpenFPS.Common.AudioClock.Now);
+        RecomputeEar(active, ear, _listenerPos, Clock.Now);
     }
 
     /// <summary>Takes a voice's ear stage off its channel and back to the pool. Before the channel stops.</summary>
@@ -126,7 +126,7 @@ public partial class FmodAudioProvider
     {
         var ear = active.Ear;
         if (ear == null) return 1f;
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         if (now >= ear.NextAt) RecomputeEar(active, ear, listener, now);
         float step = EarVoiceState.SlewDbPerSecond * MathF.Max(dt, 0f);
         ear.GainDb += Math.Clamp(ear.CorrectionDb - ear.GainDb, -step, step);
@@ -287,7 +287,7 @@ public partial class FmodAudioProvider
     private void UpdateEarWind(float dt)
     {
         if (_windEar == null || _earWind == null) return;
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         if (now >= _windEarAt)
         {
             _windEarAt = now + EarRecomputeSeconds;
@@ -320,7 +320,7 @@ public partial class FmodAudioProvider
     private void ReportEar()
     {
         UpdateEarWind(_attributeDt);
-        double now = OpenFPS.Common.AudioClock.Now;
+        double now = Clock.Now;
         if (now < _earReportAt) return;
         _earReportAt = now + 10.0;
         var top = new System.Collections.Generic.List<(float Played, string Line)>();

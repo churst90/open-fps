@@ -326,4 +326,16 @@ public class AnnouncementAndLoginTests
             enableAudio: false);
         return (session, speech, shell);
     }
+
+    /// <summary>
+    /// A session's world is stamped on its audio engine's clock, the one the mixer ages positions on
+    /// (docs/SOUND_LIBRARY_BOUNDARY.md, stage 5): two clocks would place every moving thing early or late by
+    /// their difference.
+    /// </summary>
+    [Fact]
+    public void A_sessions_world_is_on_its_audio_engines_clock()
+    {
+        var (session, _, _) = NewSession();
+        Assert.Same(session.Audio.Clock, session.World.Clock);
+    }
 }

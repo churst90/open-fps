@@ -26,8 +26,8 @@ public sealed partial class CombatService
     private readonly GameServer _server;
     private readonly SessionManager _sessions;
 
-    /// <summary>Seconds, monotonic. A test sets its own.</summary>
-    public Func<double> Clock { get; set; } = () => AudioClock.Now;
+    /// <summary>Seconds, monotonic: the server's clock (GameServer.Clock). A test sets its own.</summary>
+    public Func<double> Clock { get; set; }
 
     /// <summary>Takes a dead pedestrian off the street, if they are one of the map's walkers (or a driver
     /// out of a parked car): true when somebody is to walk the same way again later, by
@@ -80,6 +80,7 @@ public sealed partial class CombatService
         _maps = maps;
         _server = server;
         _sessions = sessions;
+        Clock = () => server.Clock.Now;
     }
 
     private static void Say(Action<IMessage> reply, string text) => reply(new TextEvent { Text = text });

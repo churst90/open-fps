@@ -81,6 +81,11 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private readonly float[] _wetWater, _wetTexture, _wheelWetSqueal;
     /// <summary>Whether the engine should be running. Game thread writes.</summary>
     public volatile bool Running = true;
+
+    /// <summary>The clock a wheel's strikes are timed on: its world's, which the mixer gives it as it makes it
+    /// (the strikes are stamped by the game loop on that clock). One of its own until then, as in an offline
+    /// render, where nothing is stamped.</summary>
+    public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
     /// <summary>Standing at a stop that takes passengers: set the spring brakes, kneel, open the
     /// doors. Anywhere else a stopped vehicle just holds its service brake.</summary>
     public volatile bool ServingStop;
@@ -1155,7 +1160,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private void Synthesize(int count)
     {
         float dt = 1f / SampleRate;
-        _strikes.Drain(_written, Volatile.Read(ref _played), OpenFPS.Common.AudioClock.Now, SampleRate, ConsumeRate);
+        _strikes.Drain(_written, Volatile.Read(ref _played), Clock.Now, SampleRate, ConsumeRate);
         long strikeBase = _written;
         float gain = 1f / MathF.Max(1f, PascalsAtFullScale);
         float target = TargetSpeed;

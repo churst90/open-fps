@@ -126,12 +126,13 @@ public sealed partial class ClientGameSession : IDisposable
         MachineRegistry.EnsureLoaded();
         ModelLibrary.EnsureLoaded();
 
-        _world = new ClientWorldState();
+        // One clock for the game loop and the mixer: a position is stamped on the clock it is aged on.
+        _world = new ClientWorldState { Clock = audioEngine.Clock };
         _state = new LocalPlayerState();
         _physics = new ClientPhysicsSystem(_state, new SpatialService());
         _reconciler = new PredictionReconciler(_state, _physics);
-        _controller = new LocalPlayerController(_state);
-        _others = new OtherBodies();
+        _controller = new LocalPlayerController(_state) { Clock = audioEngine.Clock };
+        _others = new OtherBodies { Clock = audioEngine.Clock };
         _sounds = new SoundMappingService(_state);
         // Without sound (the tests) no doors are rendered: each session's renders took minutes of every
         // core, and the next test's login waited behind them.
@@ -1015,7 +1016,7 @@ public sealed partial class ClientGameSession : IDisposable
             case WorldAudioEvent audioEvent:
                 // Rendered on arrival, each part queued for its own moment: a latch precedes its impact,
                 // and a pane's glass lands a second and a half after it broke.
-                _audioSystem.WorldAudio.Receive(audioEvent, OpenFPS.Common.AudioClock.Now);
+                _audioSystem.WorldAudio.Receive(audioEvent, _audioEngine.Clock.Now);
                 break;
 
             case WorldStateUpdate wsu:
@@ -1227,7 +1228,7 @@ public sealed partial class ClientGameSession : IDisposable
                 Label = "bump",
                 Seed = unchecked(++_bumpSeed),
                 Sounds = sounds,
-            }, OpenFPS.Common.AudioClock.Now);
+            }, _audioEngine.Clock.Now);
         _speech.Speak(name, interrupt: true);
     }
 

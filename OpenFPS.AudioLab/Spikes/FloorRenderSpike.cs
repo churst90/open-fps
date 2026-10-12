@@ -65,6 +65,8 @@ public static class FloorRenderSpike
         // floor, and the player's beacons.json is neither read nor written.
         var beacons = BeaconPreferences.InMemory();
         foreach (var category in Beacons.Categories) beacons.Set(category, false);
+        // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
+        world.Clock = facade.Clock;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds, beacons: beacons);
 
         var segments = new List<Segment>();
@@ -82,7 +84,7 @@ public static class FloorRenderSpike
         }
         void Record(string name, double seconds)
         {
-            double start = clock.Elapsed.TotalSeconds, audioStart = AudioClock.Now;
+            double start = clock.Elapsed.TotalSeconds, audioStart = provider.Clock.Now;
             Pump(seconds);
             segments.Add(new Segment(name, start, seconds));
             // The audio clock too, to line the capture up with the debug log's timed lines.
@@ -154,7 +156,7 @@ public static class FloorRenderSpike
             perFrame = t =>
             {
                 if (t < next || k >= takes.Count) return;
-                audio.WorldAudio.Receive(Line(takes[k], mouth, effortDb, Talker), AudioClock.Now);
+                audio.WorldAudio.Receive(Line(takes[k], mouth, effortDb, Talker), provider.Clock.Now);
                 next += takes[k].Seconds + 0.4;
                 k++;
             };
@@ -169,7 +171,7 @@ public static class FloorRenderSpike
             Stand(below, 0f);
             Pump(10.0);
             foreach (var take in takes)
-                audio.WorldAudio.Receive(Line(take, below + new Vector3(0f, Speech.MouthHeight, 3f), Speech.NormalDb, -1), AudioClock.Now);
+                audio.WorldAudio.Receive(Line(take, below + new Vector3(0f, Speech.MouthHeight, 3f), Speech.NormalDb, -1), provider.Clock.Now);
             Pump(3.0);
             Record("silence start", 1.0);
 
