@@ -757,8 +757,45 @@ public partial class FmodAudioProvider : IAudioProvider
         // Ties by voice id, then lane: the same order on every machine whatever order the voices started in.
         _engineOrder.Sort(static (x, y) => (x.Distance, x.Id, x.Lane).CompareTo((y.Distance, y.Id, y.Lane)));
         foreach (var e in _engineOrder) _engineSnapshot.Add(e.Voice);
+        if (_ranksAsked) PublishRenderOrder();
         return _engineSnapshot;
     }
+
+    /// <summary>The render pool's order as last listed, by voice (a train's lanes left out), once the lab has
+    /// asked for it (<see cref="Ranks"/>).</summary>
+    private void PublishRenderOrder()
+    {
+        var ids = new List<int>(_engineOrder.Count);
+        foreach (var e in _engineOrder) if (e.Lane < 0) ids.Add(e.Id);
+        _renderAheadIds = ids.ToArray();
+    }
+    private volatile bool _ranksAsked;
+    private volatile int[] _renderAheadIds = Array.Empty<int>();
+
+    /// <summary>What the provider's own orderings hand out now (docs/SPECIAL_CASES_AUDIT.md, S20), for the lab
+    /// (--driving set=ranks): every voice that is not a reflection, with the detail its engine runs at, whether it
+    /// is one of the late field's sources and whether it has traced echoes; and the render pool's order.</summary>
+    internal ProviderRanks Ranks()
+    {
+        _ranksAsked = true;
+        var voices = new List<RankedVoice>();
+        lock (_lock)
+        {
+            var late = new HashSet<int>(_lateIds.AsSpan(0, _lateCount).ToArray());
+            foreach (var a in _activeSounds)
+            {
+                if (a.IsReflection) continue;
+                var detail = a.EngineState?.Detail ?? (a.MachineState as MachineVoiceState)?.Detail;
+                voices.Add(new RankedVoice(a.EntityId, a.SoundId, Vector3.Distance(_listenerPos, a.Position), detail,
+                                           late.Contains(a.EntityId), a.EchoRig != null && !a.EchoLeaving));
+            }
+        }
+        return new ProviderRanks(voices, _renderAheadIds);
+    }
+
+    internal sealed record RankedVoice(int Id, string Sound, float Distance, OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail? Detail,
+                                       bool LateField, bool Echoes);
+    internal sealed record ProviderRanks(IReadOnlyList<RankedVoice> Voices, int[] RenderAhead);
     private readonly HashSet<TrainVoiceState> _snapshotTrains = new();
 
     /// <summary>
@@ -1656,6 +1693,7 @@ public partial class FmodAudioProvider : IAudioProvider
     // Each source's own late sound (LateField).
     private readonly List<(ActiveSound A, float Level)> _lateCandidates = new();
     private readonly int[] _lateIds = new int[LateField.MaxSources];
+    private int _lateCount;
     private readonly Vector3[] _lateAt = new Vector3[LateField.MaxSources];
     private readonly LateField.Answer[] _lateAnswers = new LateField.Answer[LateField.MaxSources];
     private readonly Dictionary<int, float> _lateLevel = new();
@@ -1674,7 +1712,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private void UpdateLateField()
     {
         var lf = Traced.LateField;
-        if (lf == null || !TracedActive || !_steamAudioEnabled) { _lateLawK = float.NaN; _tailBias = Vector3.Zero; return; }
+        if (lf == null || !TracedActive || !_steamAudioEnabled) { _lateLawK = float.NaN; _tailBias = Vector3.Zero; _lateCount = 0; return; }
         _lateCandidates.Clear();
         foreach (var a in _activeSounds)
         {
@@ -1688,6 +1726,7 @@ public partial class FmodAudioProvider : IAudioProvider
         }
         _lateCandidates.Sort(static (x, y) => (y.Level, x.A.EntityId).CompareTo((x.Level, y.A.EntityId)));
         int n = Math.Min(LateField.MaxSources, _lateCandidates.Count);
+        _lateCount = n;
         _lateLevel.Clear();
         for (int i = 0; i < n; i++)
         {
