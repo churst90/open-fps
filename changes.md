@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- A door's sound no longer takes minutes to make on an Intel processor. A door model's modes decayed into
+  numbers too small to be normal (under 1e-308) and stayed there, and Intel works on those about a hundred
+  times slower: the glass front door opened with a key took seven minutes to render, 14 seconds on AMD. A
+  force or a mode's state under 1e-200 is now nothing (`DoorPhysics.Rest`). No sample of any render changes.
+  The door models' fingerprint does, so kept renders are made again once and the shipped ones with the next
+  Windows zip.
+
 - The settings folder is named in one place, and the tests cannot reach a player's own on any system. On
   Windows the tests read and wrote the real `%APPDATA%\openfps\beacons.json`, and four of them failed, because
   a process cannot move `%APPDATA%` as it can `XDG_CONFIG_HOME`. `SettingsFolder` now says where `client.json`

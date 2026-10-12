@@ -40,7 +40,7 @@ changes approved sounds and needs listening rounds.
 | 11 | Steam Audio binaural frame steps. | Orbit at 360°/s: residual -95 dB under a 300 Hz tone; 90°/s: -103 dB; still: -107 dB. | No | None. Steam Audio crossfades. | |
 | 12 | Voices' SoftCeiling. | 0 % of samples bent at cruise for nine engines; fire 0.001 % (-77 dB). | No | None | |
 | 13 | Noise generators. | System.Random (31-bit doubles) and xorshift generators, nothing shared between threads. | No | None | |
-| 14 | Denormals. | No flush-to-zero anywhere; glides toward zero and ringing resonators can sit on subnormals. Not measured. | Indirect (CPU, then starves) | Recommendation: measure | Small |
+| 14 | Denormals. | No flush-to-zero anywhere; glides toward zero and ringing resonators can sit on subnormals. Measured 2026-10-12 in the door models, on an Intel processor: a 1.9 s render took 431 s. Fixed there (`DoorPhysics.Rest`). The producers that run while playing are not measured. | Indirect (CPU, then starves) | Recommendation: measure | Small |
 
 ## 1. The textures are noise, not events
 
@@ -193,7 +193,11 @@ across them. Each place is an independent stream of the one synth, not a copy of
   small; ramp them if a model is reopened.
 - Denormals: measure the producer threads' time on a voice ringing down to silence. If it rises, add a
   tiny offset or flush values under 1e-20 in the glides and resonators listed in the survey
-  (GroundReflection, BoundaryProximityProcessor, Modes, the all-passes).
+  (GroundReflection, BoundaryProximityProcessor, Modes, the all-passes). The door models' `Modes` are done
+  (2026-10-12): on an Intel i7-13700HX the glass front door opened with a key took 431 s to render in a
+  Release build, 485 s in Debug, and 10 s and 28 s with a floor of 1e-200 under each bank's pushed forces and
+  its states, every sample the same. An AMD processor hardly slows on subnormal numbers, which is why the
+  same test took 14 s on one. The measurement has to be made on an Intel machine.
 - The mixer at 48 kHz: devices and PipeWire run at 48 kHz, the renders are 48 kHz, and the mixer is
   44.1 kHz. Moving it means every hard-coded 44100: Steam Audio's IPLAudioSettings in five places,
   TracedReverbDsp, EarDecorrelator, EarlyCopies, SynthProcessor, GranularProcessor, AmbisonicBedDsp,

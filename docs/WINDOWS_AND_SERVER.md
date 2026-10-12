@@ -164,3 +164,7 @@ the client renders at start (AudioLab `--prerender-doors`, about two minutes) in
 (`%LOCALAPPDATA%\OpenFPS\rendercache\<build>` on Windows, `~/.local/share/OpenFPS/rendercache/<build>`
 on Linux); folders for other builds are removed. `OPENFPS_RENDER_CACHE=off` turns the cache off, or
 names another folder.
+
+A door that is not in either folder is rendered when it is first used, and is silent until then. That took
+minutes for one door on an Intel processor until 2026-10-12 (its modes decayed into subnormal numbers, which
+Intel works on about a hundred times slower); it is seconds now, as on AMD.
