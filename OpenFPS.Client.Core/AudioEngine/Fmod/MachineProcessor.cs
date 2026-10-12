@@ -481,6 +481,8 @@ public sealed class SirenVoiceState : PhysicalVoiceState
     public SirenVoiceState(SirenSpec spec, float sampleRate)
         : base(spec.SourceLevelDb, sampleRate)
     {
+        // The head measures its own chain across a whole wail: 70-100 ms.
+        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A siren's model");
         Siren = new ElectronicSiren(spec, sampleRate);
     }
 
@@ -516,6 +518,8 @@ public sealed class HornVoiceState : PhysicalVoiceState
     public HornVoiceState(string horn, float[] pattern, float sampleRate, int seed)
         : base(Honk.LevelDb(horn), sampleRate)
     {
+        // Each horn is blown once in silence to set its level: 10-25 ms.
+        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A horn's model");
         Pattern = pattern;
         int colon = horn.IndexOf(':');
         string kind = colon > 0 ? horn[..colon] : "";
@@ -562,6 +566,8 @@ public sealed class BellVoiceState : PhysicalVoiceState
     public BellVoiceState(StruckBellSpec spec, float sampleRate, int seed)
         : base(spec.ReferenceDb, sampleRate, spec.PeakHeadroomDb)
     {
+        // Rung for three seconds in silence to set its level: 13-30 ms.
+        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A bell's model");
         Bell = new StruckBell(spec, sampleRate, seed);
     }
 

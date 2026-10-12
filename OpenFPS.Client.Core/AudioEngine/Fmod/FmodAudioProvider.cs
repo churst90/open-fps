@@ -1513,6 +1513,19 @@ public partial class FmodAudioProvider : IAudioProvider
     /// reads this one (AudioEngineFacade.Clock), so a position is stamped on the clock it is aged on.</summary>
     public IAudioClock Clock { get; init; } = new StopwatchAudioClock();
 
+    /// <summary>The models made off the placing threads (VoiceBuilds), on this mixer's clock.</summary>
+    private VoiceBuilds _voiceBuilds => LazyInitializer.EnsureInitialized(ref _builds, () => new VoiceBuilds(Clock));
+    private VoiceBuilds? _builds;
+
+    /// <summary>See IAudioProvider.PrepareVoice.</summary>
+    public void PrepareVoice(string physicalKey, int seed)
+    {
+        if (!_isInitialized) return;
+        if (OpenFPS.Common.ModelKindTable.KindOf(physicalKey)?.Synth is not { } kind || !VoiceBuilds.Makes(kind)) return;
+        _system.getSoftwareFormat(out int rate, out _, out _);
+        _voiceBuilds.Prepare(kind, physicalKey, seed, rate);
+    }
+
     /// <summary>Whether there is a trace to play yet (the scene is built after the map loads).</summary>
     internal bool TracedActive => Traced.Listener != null;
 
@@ -2341,12 +2354,16 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     // Trains: one model per consist, heard through a handful of voices (RailVoice.cs). The client asks for
-    // voice k of a train as "rail:<preset>/<train>/@k"; the model for <preset>/<train> is made on the
-    // first voice or the first plan.
+    // voice k of a train as "rail:<preset>/<train>/@k". The model for <preset>/<train> is made off the
+    // placing threads (VoiceBuilds.Train), ahead when the client first sees the train (PrepareTrain):
+    // made on its first voice, a freight's took 440 ms with every sound held still.
     private readonly Dictionary<string, TrainVoiceState> _trains = new();
 
     /// <summary>The last signal each train was given, and when, for a synth made after it arrived.</summary>
     private readonly Dictionary<string, (float[] Warning, float Bell, double At)> _trainSignals = new();
+
+    /// <summary>What each voice of a train still being made is to carry, handed to the model once made.</summary>
+    private readonly Dictionary<string, TrainSlotPlan?[]> _trainPlans = new();
 
     /// <summary>A train sounds its horn (or whistle) and bell: see TrainVoiceState.Signal.</summary>
     public void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo)
@@ -2360,26 +2377,39 @@ public partial class FmodAudioProvider : IAudioProvider
                         string.Join(",", warning.Select(w => w.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))), bellSeconds);
     }
 
-    /// <summary>The model of a train, made on first use. Caller holds the lock on _trains.</summary>
-    private TrainVoiceState TrainFor(string preset, string train, int rate)
+    /// <summary>See IAudioProvider.PrepareTrain.</summary>
+    public void PrepareTrain(string preset, string train)
+    {
+        if (!_isInitialized) return;
+        _system.getSoftwareFormat(out int rate, out _, out _);
+        lock (_trains)
+        {
+            try { TrainFor(preset, train, rate); }
+            catch (Exception ex) { Log.Warning("Train '{Preset}/{Train}': {Message}", preset, train, ex.Message); }
+        }
+    }
+
+    /// <summary>The model of a train, or null while it is being made. Caller holds the lock on _trains.</summary>
+    private TrainVoiceState? TrainFor(string preset, string train, int rate)
     {
         string shared = preset + "/" + train;
         if (_trains.TryGetValue(shared, out var t)) return t;
-        // The seed from the name's characters, not string.GetHashCode (randomised per process): every
-        // client and every run hears the same train.
-        int seed = 17;
-        foreach (char c in train) seed = unchecked(seed * 31 + c);
-        t = new TrainVoiceState(shared, OpenFPS.Common.TrainProfile.ByName(preset), rate, seed & 0x7fff, Clock);
+        t = _voiceBuilds.Train(preset, train, rate);
+        if (t == null) return null;
         _trains[shared] = t;
         Log.Information("Train '{Train}' ({Profile}): one model, {Sources} source(s) over {Length:F0} m, heard through at most {Voices} voice(s); {Lanes} lane(s) render its engines and signals",
                         shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres,
                         OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots, t.Lanes.Length);
-        // Sounding already: the horn came in before any of the train had a voice.
+        // Sounding already: the horn came in before the model was made. On the train's own timeline, so the
+        // blast is where the signal put it however late the model came.
         if (_trainSignals.TryGetValue(shared, out var sig))
         {
             double ago = Clock.Now - sig.At;
             if (ago < OpenFPS.Common.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
         }
+        if (_trainPlans.Remove(shared, out var plans))
+            for (int slot = 0; slot < plans.Length; slot++)
+                if (plans[slot] is { } plan) t.SetPlan(slot, plan);
         return t;
     }
 
@@ -2390,17 +2420,30 @@ public partial class FmodAudioProvider : IAudioProvider
         _system.getSoftwareFormat(out int rate, out _, out _);
         lock (_trains)
         {
-            try { TrainFor(preset, train, rate).SetPlan(slot, plan); }
+            try
+            {
+                if (TrainFor(preset, train, rate) is { } t) t.SetPlan(slot, plan);
+                else if (slot >= 0 && slot < OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots)
+                {
+                    string shared = preset + "/" + train;
+                    if (!_trainPlans.TryGetValue(shared, out var plans))
+                        _trainPlans[shared] = plans = new TrainSlotPlan?[OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots];
+                    plans[slot] = plan;
+                }
+            }
             catch (Exception ex) { Log.Warning("Train '{Preset}/{Train}': {Message}", preset, train, ex.Message); }
         }
     }
 
-    private PhysicalVoiceState? RailSlot(string key, int rate)
+    /// <summary>One of a train's voices; <paramref name="making"/> while its model is still being made.</summary>
+    private PhysicalVoiceState? RailSlot(string key, int rate, out bool making)
     {
+        making = false;
         if (!TrainVoiceState.ParseSlotKey(key, out string preset, out string train, out int slot)) return null;
         lock (_trains)
         {
             var t = TrainFor(preset, train, rate);
+            if (t == null) { making = true; return null; }
             // Declared at the train's loudest field source; a signal's voice at the signal's own level.
             float level = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout);
             int signal = slot == OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.WarningSlot ? OpenFPS.Common.TrainSignal.WarningSource(t.Layout)
@@ -2879,22 +2922,24 @@ public partial class FmodAudioProvider : IAudioProvider
             _system.getSoftwareFormat(out int mrate, out _, out _);
             var kind = OpenFPS.Common.ModelKindTable.KindOf(emitter.PhysicalKey);
             string preset = kind != null ? kind.Rest(emitter.PhysicalKey) : emitter.PhysicalKey;
+            bool making = false;
             try
             {
-                machineState = kind?.Synth switch
+                if (VoiceBuilds.Makes(kind?.Synth))
                 {
-                    OpenFPS.Common.ModelSynth.Machine => new MachineVoiceState(OpenFPS.Common.SmallMachineSpec.ByName(preset),
-                                                       mrate, emitter.Seed, emitter.Seed * 31 + 7) { Clock = Clock },
-                    OpenFPS.Common.ModelSynth.Aircraft => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
-                                                         mrate, emitter.Seed * 17 + 3,
-                                                         lever: emitter.PowerLever),
-                    OpenFPS.Common.ModelSynth.Rail => RailSlot(emitter.PhysicalKey, mrate),
-                    // Its own voice: 35 dB over the car's exhaust, the two cannot share one full-scale
-                    // reference (SirenVoiceState).
-                    OpenFPS.Common.ModelSynth.Siren => new SirenVoiceState(OpenFPS.Common.SirenSpec.ByName(preset), mrate),
-                    // Running is the server's word, not worked out locally (BellVoiceState).
-                    OpenFPS.Common.ModelSynth.Bell => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
-                                                 mrate, emitter.Seed * 13 + 5),
+                    // Made off this thread (VoiceBuilds), the voice starting when next asked for once it is: a model
+                    // that renders itself to set its level, made here, held every voice's placing still while it did.
+                    switch (_voiceBuilds.Take(emitter, kind!.Synth, mrate, out machineState, out string? failure))
+                    {
+                        case VoiceBuilds.Taken.Making: return;
+                        case VoiceBuilds.Taken.Failed:
+                            Log.Warning("Physical voice: '{Key}' for entity {Id} — {Message}", emitter.PhysicalKey, emitter.EntityId, failure);
+                            return;
+                    }
+                }
+                else machineState = kind?.Synth switch
+                {
+                    OpenFPS.Common.ModelSynth.Rail => RailSlot(emitter.PhysicalKey, mrate, out making),
                     // The arm follows the crossing's closed signal (Running, the server's word).
                     OpenFPS.Common.ModelSynth.Gate => new GateVoiceState(OpenFPS.Common.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
                     // Given their place: they read the wind where they stand (NatureVoiceState).
@@ -2911,10 +2956,6 @@ public partial class FmodAudioProvider : IAudioProvider
                     // A gas hob: its knobs' settings and when they were turned are in the key (HobKey).
                     OpenFPS.Common.ModelSynth.Stove => new StoveVoiceState(OpenFPS.Common.GasHobSpec.ByName(emitter.PhysicalKey), emitter.PhysicalKey,
                                                    mrate, emitter.Seed * 59 + 29),
-                    // The rhythm of the hand on the horn is in the key (Honk).
-                    OpenFPS.Common.ModelSynth.Horn => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
-                        ? new HornVoiceState(hornKey, rhythm, mrate, emitter.Seed * 29 + 1)
-                        : null,
                     _ => null,
                 };
             }
@@ -2924,6 +2965,8 @@ public partial class FmodAudioProvider : IAudioProvider
                             emitter.PhysicalKey, emitter.EntityId, ex.Message);
                 return;
             }
+            // Its train's model is still being made (VoiceBuilds.Train); a train's voices are asked for every frame.
+            if (making) return;
             if (machineState == null)
             {
                 // An outer place whose source has no voice this frame; asked again next frame.
@@ -2950,19 +2993,25 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             if (!_isInitialized) return;
             _system.getSoftwareFormat(out int rate, out _, out _);
-            engineState = new EngineVoiceState(OpenFPS.Common.MachineRegistry.VehicleFor(emitter.EngineKey), rate, emitter.Seed)
+            // Made off this thread (VoiceBuilds), the voice starting when next asked for once it is.
+            switch (_voiceBuilds.TakeEngine(emitter, rate, out var made, out string? failure))
             {
-                Clock = Clock,
-                TargetSpeed = emitter.EngineSpeed,
-                Running = emitter.EngineRunning,
-                ServingStop = emitter.ServingStop,
-                WindowsOpen = emitter.WindowsOpen,
-                Interior = emitter.Interior,
-                CabinEarX = emitter.CabinEarX,
-                RoadWaterMm = emitter.RoadWaterMm,
-                // The loudness law on what the engine is doing now, not only its declared level.
-                CompensateLevel = true,
-            };
+                case VoiceBuilds.Taken.Making: return;
+                case VoiceBuilds.Taken.Failed:
+                    Log.Warning("Engine voice: '{Key}' for entity {Id} — {Message}", emitter.EngineKey, emitter.EntityId, failure);
+                    return;
+            }
+            engineState = made!;
+            engineState.Clock = Clock;
+            engineState.TargetSpeed = emitter.EngineSpeed;
+            engineState.Running = emitter.EngineRunning;
+            engineState.ServingStop = emitter.ServingStop;
+            engineState.WindowsOpen = emitter.WindowsOpen;
+            engineState.Interior = emitter.Interior;
+            engineState.CabinEarX = emitter.CabinEarX;
+            engineState.RoadWaterMm = emitter.RoadWaterMm;
+            // The loudness law on what the engine is doing now, not only its declared level.
+            engineState.CompensateLevel = true;
             // Start the engine at the car's speed, not spinning up from rest in the first 80 ms.
             engineState.PlaceAtSpeed(emitter.EngineSpeed);
             if (emitter.WheelStrikes != null) engineState.QueueStrikes(emitter.WheelStrikes);
@@ -3722,6 +3771,7 @@ public partial class FmodAudioProvider : IAudioProvider
         ReportMixerLoad();
 
         DrainDeferredPlays();
+        _builds?.Sweep();
 
         try
         {
@@ -4813,8 +4863,10 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    public void StopSound(int entityId) { 
-        lock (_lock) { 
+    public void StopSound(int entityId) {
+        // A model still being made for it is let go.
+        _builds?.Cancel(entityId);
+        lock (_lock) {
             if (!_activeById.TryGetValue(entityId, out var voices)) return;
             double now = Clock.Now;
             foreach (var sound in voices) {

@@ -485,6 +485,8 @@ internal sealed class DiffuseTail
     public static DiffuseTail? Create(IntPtr context, int subFrame, int channels, IntPtr hrtf, int sampleRate)
     {
         if (hrtf == IntPtr.Zero) return null;
+        // Its ears are calibrated on a second of noise: 100-450 ms, made where a room's reverb stage is added.
+        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A room's traced tail");
         var d = new DiffuseTail(sampleRate) { Context = context };
         for (int i = 0; i < DiffuseBranch.Count; i++) d.Branches[i] = new DiffuseBranch(i, rate: d.SampleRate);
         d.W = new float[subFrame]; d.Branch = new float[subFrame]; d.Low = new float[subFrame];

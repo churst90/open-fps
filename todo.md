@@ -287,6 +287,10 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
 here are checked to stand on (docs/LISTENING_SPOTS.md).
+- Nothing standing still when a train first blows (2026-10-12). At the Mill Road crossing (`/tp -160.0
+  -175.0 0.1`) with traffic about, the first train to blow and ring for it: the cars keep moving through the
+  horn's first blast, the bell starts with the crossing closing. Also at the Main Street crossing (`/tp 0.0
+  -180.0 0.2`). A patrol car's siren switching on, and a car horn, without the street stopping.
 - The play fixes of 2026-10-11. E between two doors: in Marlow Tower's floor 3 corridor (`/tp -19.95
   -101.5 9.29`) the flats' doors face each other; E opens the one you face. Walking into every room on
   Magnolia and Albany: the back door on Bobcat Lane at Magnolia's spawn (`/join magnolia tx`), clear of the
@@ -476,6 +480,19 @@ and the server's voice line.
   the data); a knock on a wall (StruckThings) reads its box as one stuff; a lintel too short to be a sheet is crossed
   apart from its plasterboard (Constructions.IsSheet).
 - Diffraction is evaluated at 200/1250/8000 Hz, not the band averages transmission uses.
+
+### Placing sounds
+Nothing that takes longer than a frame belongs on the two threads that place sounds (PlacementThread;
+models are made in VoiceBuilds since 2026-10-12). Still made there, each logged once a session as "was made
+on a thread that places sounds":
+- A room's traced reverb stage (`FmodAudioProvider.AddTracedStage`, `DiffuseTail.Create` calibrating its ears
+  on a second of noise): 100-450 ms on the audio thread when a new region's reverb bus comes in, sitting in a
+  car in the driving lab (`--driving set=all`, 130-640 ms ticks).
+- The cabin's trace (`TracedReverbSet.RideIn`) and a room's trace (`ForRoom`) are made under the set's lock,
+  which the audio thread takes every tick (`Listener`, `LateField`): it waits out the making.
+- Smaller, and within a frame or two: each new voice's first path (`FirstAnswer`, the hand-rolled tracer,
+  1-4 ms, 10-20 cold), and the first frame of a session compiling the audio code (170-190 ms in the train
+  lab).
 
 ### Acoustics
 - The room answering at once (early tail): clap in a main-street lobby and in flat 01F. Is 20-100 ms

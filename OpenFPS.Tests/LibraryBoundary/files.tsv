@@ -30,7 +30,8 @@ OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/AudioBank.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/AudioEngineFacade.cs	lib	Audio	
-OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	lib	Audio
+OpenFPS.Client.Core/AudioEngine/Core/PlacementThread.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Core/VoiceManager.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Data/AcousticPathData.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Data/SpatialEmitter.cs	lib	Audio	
@@ -62,7 +63,8 @@ OpenFPS.Client.Core/AudioEngine/Fmod/RainVoices.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/StoveVoiceState.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/SynthProcessor.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/TakeLevels.cs	lib	Audio	
-OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	lib	Audio
+OpenFPS.Client.Core/AudioEngine/Fmod/VoiceBuilds.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/SteamAudio/AcousticGeometry.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbiAxes.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/DiffuseLate.cs	lib	Audio	

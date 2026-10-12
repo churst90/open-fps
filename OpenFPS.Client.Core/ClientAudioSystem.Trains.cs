@@ -80,7 +80,7 @@ public partial class ClientAudioSystem
             if (!_trainVoicers.TryGetValue(train, out var voicer))
             {
                 int slash = train.IndexOf('/');
-                var layout = TrainLayout.Sources(TrainProfile.ByName(train[..slash]));
+                var layout = TrainLayoutOf(train[..slash]);
                 voicer = new TrainVoicer
                 {
                     Preset = train[..slash], Name = train[(slash + 1)..], Key = train,
@@ -325,5 +325,17 @@ public partial class ClientAudioSystem
         _liveTrains.Clear();
         _trainStarted.Clear();
         _trainMembers.Clear();
+        _trainsSeen.Clear();
+    }
+
+    /// <summary>Trains whose model has been asked for ahead (PrepareTrain), by "preset/train".</summary>
+    private readonly HashSet<string> _trainsSeen = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A train seen for the first time, wherever it is on the map: its model is made now, off the
+    /// threads that place sounds, so it is there when the train is first heard or first blows for a
+    /// crossing. Made on its first voice, a freight's held every sound still for 440 ms.</summary>
+    private void SeenTrain(string preset, string train)
+    {
+        if (_trainsSeen.Add(preset + "/" + train)) _audio.PrepareTrain(preset, train);
     }
 }

@@ -18,7 +18,22 @@ Recent work, newest first. `git log` has the rest.
   sounds as if it is coasting. An aeroplane's take-off roll is at full power from its first metre, and its
   reversers are heard only in the roll-out. Two players beside one patrol car hear the same siren, on and off
   at the same moments; each client ran its own, started when it first saw the car.
-
+- Sounds no longer stand still while a model is made. A freight's first horn for the Main Street crossing
+  held every source in place for up to a second (AudioLab `--train-scene horn=1`: 740-1110 ms over six runs):
+  the train's model, a 440-680 ms calibration of every bogie, was made on the thread that places every sound,
+  and the first path asked on a new map made the routes through its openings there too (200 ms). Now
+  nothing that takes longer than a frame is made where sounds are placed (`PlacementThread`): a train's
+  model, a siren head (70-100 ms), a bell (13-30), a horn (10-25), an engine (15-70), a standing machine
+  and an aircraft are made on other threads (`VoiceBuilds`), each voice starting when next asked for once
+  its model is made, late by its making as before but with nothing else held up. What the map holds that
+  waits for a signal is made ahead: a train when it is first seen, a crossing's bell and a siren while
+  switched off within earshot, so they start on time. A new map's routes are made in the background, the
+  first voices heard without them for that moment. The same run now stalls 290-460 ms, all of it the
+  client's very first frame (its code compiled on first use), which in the game is the login, not the horn;
+  with the horn 25 s into the run (`lead=45`) nothing stalls when it blows, and its voice joins the signal
+  1-11 ms after it, as before. The renders are unchanged (the models are made the same way elsewhere). Two
+  causes left, both on the audio thread (the driving lab's 130-640 ms stalls): a room's traced reverb
+  stage made where it is added, and the cabin's trace made under the lock the mixer reads.
 - Audit P6, the rain (docs/SPECIAL_CASES_AUDIT.md, "P6, the rain, as built"), unheard. Rain behind walls is
   heard by the acoustic worker's answer, as cars, beacons and birds are: the heaviest surface of each patch is
   asked under a probe of its own, and the hand-rolled tracer stands in until the answer comes and for the
