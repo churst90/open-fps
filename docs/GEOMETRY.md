@@ -835,6 +835,46 @@ Built with streaming stage 2 (2026-10-09; section 11): the order of work was doc
   commit a step for all of them: to be measured with 40); the engine voices' tuning was done with no
   body around them, so the change will be audible and must be judged by ear.
 
+**The first half as built (2026-10-12): the mesh.** Made on Windows and sent back as a patch. Nothing uses
+it yet, so nothing seen or heard changes.
+
+- **The builder** (`OpenFPS.Geometry/Triangles/BodyShell.cs`) knows nothing of vehicles. It is given a body
+  as a few numbers (`BodyShellSpec`: the width, the underside's height off the road, the waist, and the
+  body's lengths from back to front with the height of each, a cabin marked as one) and makes the outside of
+  it as one `MeshAsset`: closed, wound outward, each triangle's surface slot what the face is
+  (`BodyFace`: panel, door, glass, roof, floor). The shell is the union of the lengths' boxes and its faces
+  are cut on one grid (the two sides, the lengths' ends, every height a face begins or ends at), so every
+  edge is shared by exactly two triangles whatever the heights. A saloon (boot, cabin, bonnet) is 36 triangles, a motorcycle 12.
+- **A cabin's faces:** its sides are doors to the waist and glass above it, its top is the roof, its ends
+  where it stands above the bonnet and the boot are the windscreen and the back window, and below the waist
+  an end is a panel. Everything else is panels, and the underside is the floor.
+- **The sources.** `BodyShell.Build` is given where each part that makes sound sits, and gives back where
+  each comes out: where it sat when that is outside already (a tyre on the road under the body), else the
+  nearest point outside the shell (`Outside`) and 5 cm on (`SourceClearance`), so a ray from it to a
+  listener outside does not start in a face. A tailpipe comes out of the back, a side pipe out of the side,
+  an intake at the foot of the windscreen or through the nose, whichever is nearer.
+- **A vehicle's shell** (`OpenFPS.Sound/VehicleBodyShell.cs`) is made from its parts list
+  (`MachineRegistry.Describe`): the cabin is `VehicleCabin.Measure`'s, the one the server builds to sit in
+  and the client traces; the bonnet and the boot stand to the waist; an end under 20 cm is the cabin's own
+  (a van's nose); a body with no cabin is one length as high as it is. Its sources are the exhaust part, the
+  intake part and a tyre for every wheel of its running gear. A face's material is the body part's panel
+  material, and glass is glass.
+- **The size is the body's** (docs/PHYSICS_BOUNDARY.md, decision 13): `VehicleBodyShell.For` takes a width,
+  height and length, meshes the body at them, and moves the parts with it (a tailpipe at the back of the
+  preset's car is at the back of the longer one). With none given it is the preset's body. A map's vehicle
+  does not carry a size of its own yet; when it does, it is handed in here.
+- **One shape per body.** The acoustic scene will instance this mesh and the physics' contacts (physics
+  stage 4) will meet the same one. Its hash is its contents', so the same body is the same mesh on every
+  machine.
+- **Tests** (`VehicleBodyShellTests`), over every vehicle the presets, the authored machines and the maps
+  hold (45), each at its own size and at three given ones: every edge walked once each way, every face
+  outward with the body behind it, the volume the body's; the bounds the size it was given; every source
+  outside, and none nearer a way out than the one it took; a cabin's faces what they are and made of what the
+  parts list says.
+- **Left for the second half** (it needs Steam Audio and an ear): the meshes in the acoustic scene, each its
+  own instance moved with its body; the cost with 40 cars; the sources placed at these points;
+  `VehicleShadow` retired; what is heard.
+
 ### Order and why
 
 Stage 1 is the foundation and pays for itself in speed (Enclosure, doors, streaming tiles) before

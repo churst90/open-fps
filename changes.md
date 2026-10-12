@@ -11,6 +11,12 @@ Recent work, newest first. `git log` has the rest.
   A bullet's flight takes a projectile, which a weapon makes. The physics ratchet's allowance is empty (62
   crossings when it was made), and two tests hold that the physics references only the geometry and that the
   sound never steps it. The wire hash changes, so the server and the Windows client go out together.
+- Geometry stage 6, its first half (docs/GEOMETRY.md, stage 6). Nothing seen or heard changes: nothing uses
+  it yet. Each vehicle's body can be made as one closed mesh from its parts list: the bonnet, the cabin and
+  the boot as one outside surface, every face marked as panel, door, glass, roof or floor with its material,
+  and the points on the outside of it where the exhaust, the intake and each tyre are heard from. The size
+  is the body's, so a vehicle given its own length, width and height is meshed at them. The wire hash
+  changes (two new files in the library it covers), so the server and the Windows client go out together.
 
 - Audit S20, the mixer's own orderings (docs/SPECIAL_CASES_AUDIT.md, "S20 as built"), unheard. Which engines
   the mixer renders first, which run at full detail, which sources its late-field trace and its traced echoes

@@ -114,7 +114,8 @@ since the last deploy" list below.
    2026-10-06 placement of vehicle physics in Sound. The rest of the engine follows the same rule: each part
    (geometry, acoustics, sound, physics, the world and its generators, networking, the client UI) its own
    project with stated dependencies and no reach into the host.
-4. The physics stages, with geometry stage 6 (vehicles and bodies in the acoustic scene: docs/GEOMETRY.md
+4. (Geometry stage 6's first half, each vehicle's body as one closed mesh from its parts list: BUILT 2026-10-12, made on Windows and sent back as a patch; docs/GEOMETRY.md, stage 6. Nothing uses the mesh yet. Left: the meshes in the Steam Audio scene, moved with their bodies, the cost with 40 cars, the hearing.)
+   The physics stages, with geometry stage 6 (vehicles and bodies in the acoustic scene: docs/GEOMETRY.md
    section 7, "Bodies and wheels" stage 2 below). Stage 0 DONE 2026-10-11 (PHYSICS_BOUNDARY.md section 14):
    the guards (a ratchet, 19 movement replays server against client, driving, traffic and rail tracks, the
    ballistics table, `--physics-parity`) and the Jolt trial (a city tile as one mesh in 11 to 19 ms, 500
