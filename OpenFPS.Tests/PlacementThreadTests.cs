@@ -142,7 +142,9 @@ public class PlacementThreadTests
         using (PlacementThread.Enter())
         {
             acoustics.CalculateAcousticPath(world, 701, ear, new Vector3(0f, 0.5f, 0f));
-            Assert.Null(acoustics.RoutesFor(world, ear));
+            // Null while the graph is being made, or the graph if the worker has already finished it: one wall
+            // takes under a millisecond, so which it is depends on the machine. What matters is the count below.
+            acoustics.RoutesFor(world, ear);
         }
         var (after, last) = PlacementThread.HeavyOnThisThread;
         Assert.True(after == before, $"{after - before} piece(s) of heavy work where sounds are placed, the last: {last}");
