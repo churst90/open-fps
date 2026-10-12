@@ -65,6 +65,7 @@ RULES = [
     (C + 'Gearbox', 'P', 'ratios, final drive, shift points'),
     (C + 'TyreProfile', 'S', 'tread and cavity (its mechanics are TyreMechanics, physics stage 2)'),
     (C + 'VehicleProfile', 'PS', 'a preset: mass, drag, rolling resistance, running gear are mechanics; the rest is sound'),
+    (C + 'EngineMechanics', 'P', 'the physics half of an engine preset: idle, redline, peak torque and its rpm'),
     (C + 'EngineProfile', 'PS', 'a preset: torque, inertia, friction, idle and redline are mechanics; the gas path is sound'),
     (C + 'VehicleSpec', 'PS', 'the editable vehicle kind: chassis to Physics, exhaust and intake to Sound'),
     (C + 'VehicleChassisSpec', 'P', ''),

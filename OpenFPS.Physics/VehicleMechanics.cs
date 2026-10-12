@@ -4,8 +4,7 @@ namespace OpenFPS.Common;
 /// A vehicle's mechanics: the physics' half of a vehicle preset, under the same id as the sound's half
 /// (VehicleProfile, which holds one: <c>VehicleProfile.Mechanics</c>). What holds it on the road and moves it:
 /// its mass, how it meets the air and the road, its size, where its axles are, its running gear, its gearbox and
-/// its tyres' mechanics. The wheel model (<see cref="WheelDynamics"/>) is made from it. Its engine's mechanics
-/// (the torque it pulls with) join it when the engine preset is parted.
+/// its tyres' and its engine's mechanics. The wheel model (<see cref="WheelDynamics"/>) is made from it.
 /// </summary>
 public sealed record VehicleMechanics
 {
@@ -41,6 +40,9 @@ public sealed record VehicleMechanics
 
     /// <summary>The tyres' mechanics.</summary>
     public TyreMechanics Tyres { get; init; } = new();
+
+    /// <summary>The engine's mechanics: where it idles, how far it revs, the torque it pulls with.</summary>
+    public EngineMechanics Engine { get; init; } = new();
 
     /// <summary>The running gear with every axle placed: its own, or the one the other numbers imply.</summary>
     public ChassisSpec Running => (Chassis ?? ChassisSpec.Default(TyreCount, WidthMetres, MassKg)).PlacedOn(FrontAxleZ, RearAxleZ);

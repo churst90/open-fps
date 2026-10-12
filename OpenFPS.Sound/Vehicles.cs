@@ -307,7 +307,13 @@ public sealed record TyreProfile
 public sealed record VehicleProfile
 {
     public required string Name { get; init; }
-    public required EngineProfile Engine { get; init; }
+    /// <summary>The engine as the sound hears it; its mechanics are this vehicle's mechanics' too.</summary>
+    public required EngineProfile Engine
+    {
+        get => _engine;
+        init { _engine = value; _mechanics = _mechanics with { Engine = value.Mechanics }; }
+    }
+    private readonly EngineProfile _engine = null!;
     public required Gearbox Gearbox { get => _mechanics.Gearbox!; init => _mechanics = _mechanics with { Gearbox = value }; }
     /// <summary>The tyres as the sound hears them; their mechanics are this vehicle's mechanics' too.</summary>
     public required TyreProfile Tyres
@@ -508,7 +514,7 @@ public sealed record VehicleProfile
     /// <summary>
     /// The physics' half of this vehicle (<see cref="VehicleMechanics"/>), under the same id: its mass, its drag
     /// and rolling resistance, its size, where its axles are, its running gear, its gearbox and its tyres'
-    /// mechanics. The members here that are mechanical read and write it, so a vehicle is still one thing to
+    /// and its engine's mechanics. The members here that are mechanical read and write it, so a vehicle is still one thing to
     /// whoever makes or reads one, and each of those numbers is in one place.
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]

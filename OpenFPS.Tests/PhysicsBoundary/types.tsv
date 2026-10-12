@@ -19,6 +19,7 @@ OpenFPS.Common.RunningGear	P
 OpenFPS.Common.Networking.WheelState	V
 OpenFPS.Common.Gearbox	P
 OpenFPS.Common.VehicleProfile	PS
+OpenFPS.Common.EngineMechanics	P
 OpenFPS.Common.EngineProfile	PS
 OpenFPS.Common.VehicleSpec	PS
 OpenFPS.Common.VehicleChassisSpec	P

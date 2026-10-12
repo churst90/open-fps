@@ -161,7 +161,7 @@ public class PresetHalvesTests
     public void A_vehicles_mechanical_members_are_its_mechanics()
     {
         var mechanical = typeof(VehicleMechanics).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(m => m.SetMethod != null && m.Name != nameof(VehicleMechanics.Tyres)).ToList();
+            .Where(m => m.SetMethod != null && m.Name is not (nameof(VehicleMechanics.Tyres) or nameof(VehicleMechanics.Engine))).ToList();
         Assert.Equal(new[] { "MassKg", "DragArea", "RollingResistance", "FrontAxleZ", "RearAxleZ", "LengthMetres", "WidthMetres",
                              "HeightMetres", "TyreCount", "Chassis", "Gearbox" }, mechanical.Select(m => m.Name));
         var v = MachineRegistry.VehicleFor("diesel_truck");
@@ -183,6 +183,7 @@ public class PresetHalvesTests
             foreach (var other in mechanical.Where(o => o != m))
                 Assert.Equal(other.GetValue(v.Mechanics), other.GetValue(set.Mechanics));
             Assert.Same(v.Mechanics.Tyres, set.Mechanics.Tyres);
+            Assert.Same(v.Mechanics.Engine, set.Mechanics.Engine);
             Assert.NotEqual(value, m.GetValue(v.Mechanics));
         }
         // The sound's own numbers are not the mechanics'.
@@ -210,6 +211,7 @@ public class PresetHalvesTests
             var v = MachineRegistry.VehicleFor(id);
             vehicles++;
             Assert.Same(v.Tyres.Mechanics, v.Mechanics.Tyres);
+            Assert.Same(v.Engine.Mechanics, v.Mechanics.Engine);
             Assert.Same(v.Gearbox, v.Mechanics.Gearbox);
             Assert.Same(v.Mechanics, v.Mechanics);
             Assert.Equal(v.MassKg, v.Mechanics.MassKg);
@@ -229,5 +231,106 @@ public class PresetHalvesTests
         var worn = car with { Tyres = car.Tyres with { PeakGripG = 0.6f } };
         Assert.Equal(0.6f, worn.Mechanics.Tyres.PeakGripG);
         Assert.Equal(0.6f, new WheelDynamics(worn.Mechanics).GripG);
+    }
+
+    // ── The engine ──────────────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The four numbers of an engine that move a car (where it idles, how far it revs, the most torque it
+    /// makes and where) are in one place, its physics half: the sound's half reads and writes it member by
+    /// member, and keeps what the editor says of each.
+    /// </summary>
+    [Fact]
+    public void An_engines_mechanical_members_are_its_mechanics()
+    {
+        var mechanical = typeof(EngineMechanics).GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(m => m.SetMethod != null).ToList();
+        Assert.Equal(new[] { "IdleRpm", "RedlineRpm", "PeakTorqueNm", "PeakTorqueRpm" }, mechanical.Select(m => m.Name));
+        int engines = 0;
+        foreach (var (id, make) in EngineProfile.Presets)
+        {
+            var e = make();
+            engines++;
+            Assert.Equal((e.IdleRpm, e.RedlineRpm, e.PeakTorqueNm, e.PeakTorqueRpm),
+                         (e.Mechanics.IdleRpm, e.Mechanics.RedlineRpm, e.Mechanics.PeakTorqueNm, e.Mechanics.PeakTorqueRpm));
+            Assert.True(e.Mechanics.IdleRpm > 0f && e.Mechanics.RedlineRpm > e.Mechanics.IdleRpm, $"{id}: idles at {e.IdleRpm}, revs to {e.RedlineRpm}");
+            Assert.Same(e.Mechanics, e.Mechanics);
+        }
+        Assert.True(engines >= 40, $"only {engines} engines");
+
+        var engine = EngineProfile.Presets.First().Value();
+        var clone = typeof(EngineProfile).GetMethod("<Clone>$")!;
+        float n = 1f;
+        foreach (var m in mechanical)
+        {
+            var onSound = typeof(EngineProfile).GetProperty(m.Name);
+            Assert.True(onSound != null, $"EngineProfile has no {m.Name}");
+            float value = 1234.5f + n++;
+            var set = (EngineProfile)clone.Invoke(engine, null)!;
+            onSound!.SetValue(set, value);
+            Assert.Equal(value, (float)m.GetValue(set.Mechanics)!);
+            foreach (var other in mechanical.Where(o => o != m))
+                Assert.Equal((float)other.GetValue(engine.Mechanics)!, (float)other.GetValue(set.Mechanics)!);
+            Assert.NotEqual(value, (float)m.GetValue(engine.Mechanics)!);
+            Assert.True(onSound.GetCustomAttribute<TunableAttribute>() != null, $"EngineProfile.{m.Name} lost its editor's attribute");
+        }
+        // The sound's own numbers are not the mechanics': its inertia and friction are read by its own engine only.
+        Assert.Null(typeof(EngineMechanics).GetProperty(nameof(EngineProfile.InertiaKgM2)));
+        Assert.Null(typeof(EngineMechanics).GetProperty(nameof(EngineProfile.FrictionNm)));
+        Assert.Null(typeof(EngineMechanics).GetProperty(nameof(EngineProfile.BoreMm)));
+        // An engine nobody set the torque of makes what an engine always did.
+        Assert.Equal((500f, 4200f), (new EngineMechanics().PeakTorqueNm, new EngineMechanics().PeakTorqueRpm));
+        Assert.Equal("OpenFPS.Physics", typeof(EngineMechanics).Assembly.GetName().Name);
+    }
+
+    /// <summary>
+    /// An engine is stored and edited in the shape it had: the four numbers where they were among its
+    /// members, no part named for its mechanics, and it reads back the same.
+    /// </summary>
+    [Fact]
+    public void An_engine_is_stored_and_edited_in_the_shape_it_had()
+    {
+        var engine = EngineProfile.Presets.First().Value();
+        string json = ModelLibrary.SpecJson(engine);
+        var keys = JsonNode.Parse(json)!.AsObject().Select(kv => kv.Key).ToList();
+        Assert.DoesNotContain("Mechanics", keys);
+        // Each still between the members it stood between.
+        Assert.Equal(new[] { "IdleRoughness", "IdleRpm", "RedlineRpm", "CrankingRpm" }, keys.Skip(keys.IndexOf("IdleRoughness")).Take(4));
+        Assert.Equal(new[] { "FrictionNmPerKrpm", "PeakTorqueNm", "PeakTorqueRpm", "IdleGovernorGain" }, keys.Skip(keys.IndexOf("FrictionNmPerKrpm")).Take(4));
+        var back = (EngineProfile)ModelLibrary.FromSpecJson(ModelLibrary.Kinds.Engine, json);
+        Assert.Equal(engine.Mechanics, back.Mechanics);
+        Assert.Equal(json, ModelLibrary.SpecJson(back));
+        // An engine saved without its idle is refused, as it was: the member is still required.
+        var without = JsonNode.Parse(json)!.AsObject();
+        without.Remove("IdleRpm");
+        Assert.ThrowsAny<Exception>(() => ModelLibrary.FromSpecJson(ModelLibrary.Kinds.Engine, without.ToJsonString()));
+        // The editor lists the four as the engine's own, each to be changed.
+        var fields = ModelKinds.Describe(typeof(EngineProfile));
+        Assert.DoesNotContain(fields, f => f.Name == "Mechanics");
+        foreach (string name in new[] { "IdleRpm", "RedlineRpm", "PeakTorqueNm", "PeakTorqueRpm" })
+            Assert.NotNull(fields.Single(f => f.Name == name).Field);
+    }
+
+    /// <summary>
+    /// A vehicle's engine's mechanics are its mechanics' too, the same object, and a vehicle given another
+    /// engine has that engine's.
+    /// </summary>
+    [Fact]
+    public void A_vehicles_engine_is_its_mechanics_too()
+    {
+        var car = MachineRegistry.VehicleFor("i4_midsize");
+        Assert.Same(car.Engine.Mechanics, car.Mechanics.Engine);
+        Assert.Equal(car.Engine.PeakTorqueNm, car.Mechanics.Engine.PeakTorqueNm);
+        var other = MachineRegistry.VehicleFor("diesel_truck").Engine;
+        var swapped = car with { Engine = other };
+        Assert.Same(other.Mechanics, swapped.Mechanics.Engine);
+        Assert.Equal(other.RedlineRpm, swapped.Mechanics.Engine.RedlineRpm);
+        Assert.Equal(car.MassKg, swapped.Mechanics.MassKg);
+        Assert.Same(car.Tyres.Mechanics, swapped.Mechanics.Tyres);
+        // The car it was made from keeps its own engine.
+        Assert.Same(car.Engine.Mechanics, car.Mechanics.Engine);
+        Assert.NotEqual(other.RedlineRpm, car.Mechanics.Engine.RedlineRpm);
+        // An engine retuned on the sound's half reaches the vehicle's mechanics with the engine.
+        var tuned = car with { Engine = car.Engine with { PeakTorqueNm = 777f } };
+        Assert.Equal(777f, tuned.Mechanics.Engine.PeakTorqueNm);
     }
 }

@@ -427,9 +427,9 @@ public sealed record EngineProfile
 
     // ── Rotating assembly and the way it is driven ──────────────────────────────────────────────
     [Tunable("rpm", 200, 5000, "The speed the engine settles at with the throttle shut.", Label = "idle speed", Step = 10)]
-    public required float IdleRpm { get; init; }
+    public required float IdleRpm { get => _mechanics.IdleRpm; init => _mechanics = _mechanics with { IdleRpm = value }; }
     [Tunable("rpm", 500, 20000, "The highest speed the engine is run to.", Label = "redline", Step = 100)]
-    public required float RedlineRpm { get; init; }
+    public required float RedlineRpm { get => _mechanics.RedlineRpm; init => _mechanics = _mechanics with { RedlineRpm = value }; }
     /// <summary>The speed the starter turns it at, rpm: 150-250 for a diesel, 200-300 for a petrol
     /// engine (Pearson, Diesel Engine Starting Systems); six recorded starts beat at 150-225.</summary>
     [Tunable("rpm", 50, 1000, "How fast the starter turns the engine: 150 to 250 for a diesel, 200 to 300 for petrol.", Label = "cranking speed", Step = 10, Source = "Pearson, Diesel Engine Starting Systems; six recorded starts at 150 to 225")]
@@ -456,9 +456,19 @@ public sealed record EngineProfile
     [Tunable("Nm per 1000 rpm", 0, 1500, "How much the friction torque rises for each thousand rpm.", Label = "friction rise", Step = 0.1)]
     public float FrictionNmPerKrpm { get; init; } = 9f;
     [Tunable("Nm", 1, 40000, "The most torque the engine makes.", Label = "peak torque", Step = 1)]
-    public float PeakTorqueNm { get; init; } = 500f;
+    public float PeakTorqueNm { get => _mechanics.PeakTorqueNm; init => _mechanics = _mechanics with { PeakTorqueNm = value }; }
     [Tunable("rpm", 200, 18000, "The speed at which the engine makes its peak torque.", Label = "peak torque speed", Step = 50)]
-    public float PeakTorqueRpm { get; init; } = 4200f;
+    public float PeakTorqueRpm { get => _mechanics.PeakTorqueRpm; init => _mechanics = _mechanics with { PeakTorqueRpm = value }; }
+
+    /// <summary>
+    /// The physics' half of this engine (<see cref="EngineMechanics"/>), under the same id: where it idles, how
+    /// far it revs, the most torque it makes and where. The four members above that are those numbers read and
+    /// write it, so an engine is still one thing to whoever edits or stores it. Not stored or listed as a part
+    /// of its own.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public EngineMechanics Mechanics => _mechanics;
+    private readonly EngineMechanics _mechanics = new();
     /// <summary>How the idle control fights the engine's own unevenness: the gain of the governor, 1/s.
     /// Electronic throttle idle control is quick (3-5); a carburettor's idle screw is zero.</summary>
     [Tunable("per second", 0, 20, "How hard the idle control corrects the speed. Electronic idle control is 3 to 5; a carburettor's idle screw is 0.", Label = "idle control gain", Step = 0.1)]
