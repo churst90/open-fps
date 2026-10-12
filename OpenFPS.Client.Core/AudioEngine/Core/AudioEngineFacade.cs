@@ -157,6 +157,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     private void Tick()
     {
         if (!_isInitialized) return;
+        // Every voice is started and placed here: nothing that takes longer than a frame belongs in it.
+        using var placing = PlacementThread.Enter();
 
         Vector3 lPos, lVel;
         Quaternion lRot;
@@ -311,6 +313,18 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Client.AudioEngine.Fmod.TrainSlotPlan plan)
     {
         if (_isInitialized) _provider.PlanTrainSlot(preset, train, slot, plan);
+    }
+
+    /// <summary>See IAudioProvider.PrepareTrain.</summary>
+    public void PrepareTrain(string preset, string train)
+    {
+        if (_isInitialized) _provider.PrepareTrain(preset, train);
+    }
+
+    /// <summary>See IAudioProvider.PrepareVoice.</summary>
+    public void PrepareVoice(string physicalKey, int seed)
+    {
+        if (_isInitialized) _provider.PrepareVoice(physicalKey, seed);
     }
 
     public void SetListenerEnclosure(float lowDb, float midDb, float highDb)

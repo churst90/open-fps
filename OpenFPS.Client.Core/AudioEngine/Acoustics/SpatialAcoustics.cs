@@ -152,38 +152,67 @@ public class SpatialAcoustics
         var map = world.AcousticMap;
         if (map == null) return null;
         long doors = DoorPoses(world, listener);
+        System.Threading.Tasks.Task first;
         lock (_localRoutesLock)
         {
             var current = _localRoutes;
-            if (current == null || !ReferenceEquals(_localRoutesMap, map))
+            if (current != null && ReferenceEquals(_localRoutesMap, map))
             {
-                current = BuildLocalRoutes(world);
-                _localRoutes = current;
-                _localRoutesMap = map;
+                // Tiles arriving or leaving count as a door moving: the graph is rebuilt in the background,
+                // the old one answering meanwhile.
+                if (_localRoutesVersion != world.GeometryVersion) { _localRoutesVersion = world.GeometryVersion; _localRoutesDoors = ~doors; }
+                if (_localRoutesDoors == doors || _localRoutesBuild is { IsCompleted: false }) return current;
+                long now = Environment.TickCount64;
+                if (now - _localRoutesStartedAt < DoorRebuildSeconds * 1000) return current;
+                _localRoutesStartedAt = now;
                 _localRoutesDoors = doors;
-                _localRoutesVersion = world.GeometryVersion;
+                _localRoutesBuild = System.Threading.Tasks.Task.Run(() =>
+                {
+                    var built = BuildLocalRoutes(world);
+                    lock (_localRoutesLock)
+                        if (ReferenceEquals(_localRoutesMap, map)) _localRoutes = built;
+                });
                 return current;
             }
-            // Tiles arriving or leaving count as a door moving: the graph is rebuilt in the background.
-            if (_localRoutesVersion != world.GeometryVersion) { _localRoutesVersion = world.GeometryVersion; _localRoutesDoors = ~doors; }
-            if (_localRoutesDoors == doors || _localRoutesBuild is { IsCompleted: false }) return current;
-            long now = Environment.TickCount64;
-            if (now - _localRoutesStartedAt < DoorRebuildSeconds * 1000) return current;
-            _localRoutesStartedAt = now;
-            _localRoutesDoors = doors;
-            _localRoutesBuild = System.Threading.Tasks.Task.Run(() =>
+            // A new map's graph, made once in the background. On a thread that places sounds the voices that
+            // ask meanwhile are heard without the openings (200 ms on an open lot, more on the city): made
+            // there, it held every source still that long. Anywhere else the asker waits for it.
+            if (!ReferenceEquals(_firstRoutesMap, map))
             {
-                var built = BuildLocalRoutes(world);
-                lock (_localRoutesLock)
-                    if (ReferenceEquals(_localRoutesMap, map)) _localRoutes = built;
-            });
-            return current;
+                _firstRoutesMap = map;
+                long version = world.GeometryVersion;
+                _firstRoutes = System.Threading.Tasks.Task.Run(() =>
+                {
+                    var built = BuildLocalRoutes(world);
+                    lock (_localRoutesLock)
+                    {
+                        if (!ReferenceEquals(_firstRoutesMap, map)) return;
+                        _localRoutes = built;
+                        _localRoutesMap = map;
+                        _localRoutesDoors = doors;
+                        _localRoutesVersion = version;
+                    }
+                });
+            }
+            if (PlacementThread.IsCurrent) return null;
+            first = _firstRoutes!;
         }
+        PlacementThread.Heavy("Waiting for a map's routes through its openings");
+        first.Wait();
+        lock (_localRoutesLock)
+            return ReferenceEquals(_localRoutesMap, map) ? _localRoutes : null;
     }
 
+    /// <summary>The map whose first graph is being made or was, and the making.</summary>
+    private object? _firstRoutesMap;
+    private System.Threading.Tasks.Task? _firstRoutes;
+
     private OpeningRoutes BuildLocalRoutes(WorldSnapshot world)
-        => OpeningGraph.Build(world, OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world),
-                              p => GetRegionAt(world, p), world.TerrainSolids());
+    {
+        PlacementThread.Heavy("A map's routes through its openings");
+        return OpeningGraph.Build(world, OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world),
+                                  p => GetRegionAt(world, p), world.TerrainSolids());
+    }
 
     /// <summary>Where the door leaves near the listener stand, folded into one number.</summary>
     private static long DoorPoses(WorldSnapshot world, Vector3? listener)

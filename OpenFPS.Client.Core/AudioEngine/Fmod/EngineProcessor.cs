@@ -445,6 +445,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
     public EngineVoiceState(VehicleProfile v, float sampleRate, int seed)
     {
+        // The engine, its driveline and its body calibrate themselves: 15-70 ms.
+        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("An engine's model");
         Ground = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(sampleRate);
         Vehicle = v;
         PascalsAtFullScale = v.PascalsAtFullScale;

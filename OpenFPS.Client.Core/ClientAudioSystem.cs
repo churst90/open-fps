@@ -531,6 +531,8 @@ public partial class ClientAudioSystem
         if (!_throttle.ShouldRun(_now())) return;
 
         using var _perf = PerfProbe.Measure("audio.update");
+        // Every source is placed here: nothing that takes longer than a frame belongs in it (PlacementThread).
+        using var _placing = OpenFPS.Client.AudioEngine.Core.PlacementThread.Enter();
 
         // This is the only place an emitter's position is resubmitted, so the gap between two runs is how
         // long a car's engine sits still in the air while the car drives on. Measured here for that.
@@ -1330,6 +1332,11 @@ public partial class ClientAudioSystem
             float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(
                 gain * em.Volume * chorus, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(snap, voiceKey), physical: true);
             _heardInRanking[entityId] = level;
+            // Switched off by the server (a crossing's bell between trains) and within earshot: the voice it
+            // would start with is made now, off the threads that place sounds, so it starts when switched on.
+            if (!em.SynthRunning && d < range && !_liveMachines.Contains(entityId)
+                && OpenFPS.Client.AudioEngine.Fmod.VoiceBuilds.Makes(OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth))
+                _audio.PrepareVoice(PhysicalKeyOf(snap, voiceKey), VoiceRegistry.SeedOf(OwnVoiceKind(world, snap.Definition, true), entityId));
 
             // A water feature's taps are one fountain the same way, and come and go together.
             bool rail = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _);
@@ -1340,7 +1347,7 @@ public partial class ClientAudioSystem
             if (!_machineGroups.TryGetValue(group, out var g))
             {
                 _machineGroups[group] = g = new MachineGroup();
-                if (rail) { g.Train = group; g.Live = _liveTrains.Contains(group); g.Held = _trainStarted.TryGetValue(group, out double t0) && now - t0 < EngineMinimumHoldSeconds; }
+                if (rail) { SeenTrain(preset, train); g.Train = group; g.Live = _liveTrains.Contains(group); g.Held = _trainStarted.TryGetValue(group, out double t0) && now - t0 < EngineMinimumHoldSeconds; }
             }
             g.Members.Add(entityId);
             g.FirstId = g.Members.Count == 1 ? entityId : Math.Min(g.FirstId, entityId);
@@ -2163,6 +2170,9 @@ public partial class ClientAudioSystem
             if (mode == OpenFPS.Common.SirenMode.Off)
             {
                 if (_sirenVoiced.Remove(snap.Id)) _voices.Stop(SirenVoiceId(snap.Id));
+                // Within earshot, its head is made now off the threads that place sounds, so it sounds the
+                // moment it is switched on: made then, it held every source still for 70-100 ms.
+                else PrepareSiren(snap, sirenKey, eyePos);
                 continue;
             }
             _sirenCars.Add(snap.Id);
@@ -2235,7 +2245,7 @@ public partial class ClientAudioSystem
             {
                 try
                 {
-                    var layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset));
+                    var layout = TrainLayoutOf(preset);
                     if (index >= 0 && index < layout.Count && layout[index].IsSignal) train = preset + "/" + name;
                 }
                 catch (Exception) { }
@@ -2247,6 +2257,16 @@ public partial class ClientAudioSystem
 
     /// <summary>Which train a signal source belongs to, by SoundId; null for every other source.</summary>
     private readonly Dictionary<string, string?> _signalTrains = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A kind of train's sources, by preset. Once each: worked out per source, the 160 of a freight
+    /// built its whole layout 160 times on the frame it was first seen (30 ms).</summary>
+    private IReadOnlyList<OpenFPS.Common.TrainLayout.Entry> TrainLayoutOf(string preset)
+    {
+        if (!_trainLayouts.TryGetValue(preset, out var layout))
+            _trainLayouts[preset] = layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset)).ToArray();
+        return layout;
+    }
+    private readonly Dictionary<string, IReadOnlyList<OpenFPS.Common.TrainLayout.Entry>> _trainLayouts = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Horns being sounded: the vehicle, the key its voice was built from, and when the
     /// voice may be let go.</summary>
@@ -2494,6 +2514,19 @@ public partial class ClientAudioSystem
         ApplyGround(ref e, _groundWorld);
         _voices.Sound(e);
     }
+
+    /// <summary>A switched-off siren within earshot of its level: the head its voice would start with, made
+    /// ahead (VoiceBuilds).</summary>
+    private void PrepareSiren(EntitySnapshot snap, string sirenKey, Vector3 eyePos)
+    {
+        OpenFPS.Common.SirenSpec spec;
+        try { spec = OpenFPS.Common.SirenSpec.ByName(sirenKey); }
+        catch { return; }
+        if (Vector3.Distance(SirenMouth(snap), eyePos) > OpenFPS.Common.Loudness.AudibleRange(spec.SourceLevelDb)) return;
+        if (!_sirenKeys.TryGetValue(sirenKey, out string? key)) _sirenKeys[sirenKey] = key = "siren:" + sirenKey;
+        _audio.PrepareVoice(key, VoiceRegistry.SeedOf(VoiceKind.Siren, snap.Id));
+    }
+    private readonly Dictionary<string, string> _sirenKeys = new(StringComparer.Ordinal);
 
     /// <summary>
     /// A vehicle's siren: its own voice at its own level, at the grille. A siren head is 130 dB at a metre

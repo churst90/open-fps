@@ -94,6 +94,8 @@ public sealed class TrainVoiceState
     /// (a signal's moment is on that clock). None: one of its own, as in an offline render.</param>
     public TrainVoiceState(string key, TrainProfile p, float sampleRate, int seed, IAudioClock? clock = null)
     {
+        // Every bogie calibrates itself: 440 ms for a fifty-wagon freight.
+        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A train's model");
         Clock = clock ?? new StopwatchAudioClock();
         Key = key;
         Profile = p;

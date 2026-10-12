@@ -76,6 +76,13 @@ public interface IAudioProvider : IDisposable
     /// <summary>What one of a train's voices carries (TrainVoicing, TrainSlotPlan): "preset/train", the
     /// voice, its sources and their weights. Kept until replaced; the voice reads it as it renders.</summary>
     void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Client.AudioEngine.Fmod.TrainSlotPlan plan) { }
+    /// <summary>A train ("preset/train") the client has seen: its model is made now, off the threads that
+    /// place sounds (VoiceBuilds), so it is there when the train is first heard or first blows.</summary>
+    void PrepareTrain(string preset, string train) { }
+    /// <summary>A model waiting for a signal (a crossing's bell, a siren switched off) within earshot: the
+    /// voice it would start with, made now off the threads that place sounds, so it starts when the signal
+    /// comes. Cheap to ask every frame.</summary>
+    void PrepareVoice(string physicalKey, int seed) { }
     /// <summary>
     /// A car engine's told road speed, its own driveline's speed, its crank speed and gear. "The cars
     /// sound like they are slowing down" has four causes that sound alike (they are, the world reports
