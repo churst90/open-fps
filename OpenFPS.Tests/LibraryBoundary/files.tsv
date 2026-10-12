@@ -204,6 +204,7 @@ OpenFPS.Geometry/Triangles/TriangleGeometry.cs	lib	Geometry
 OpenFPS.Geometry/Triangles/TriangleWorld.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/WheelRays.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/BodyShell.cs	lib	Geometry	
 OpenFPS.Geometry/WallBuild.cs	lib	Geometry	
 OpenFPS.Native/FmodNative/fmod.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_dsp.cs	lib	Native	
@@ -363,6 +364,7 @@ OpenFPS.Sound/TransientSound.cs	lib	Sound
 OpenFPS.Sound/TyreFriction.cs	lib	Sound	
 OpenFPS.Sound/Vector3Converter.cs	lib	Sound	
 OpenFPS.Sound/VehicleBody.cs	lib	Sound	
+OpenFPS.Sound/VehicleBodyShell.cs	lib	Sound	
 OpenFPS.Sound/VehicleCabin.cs	lib	Sound	
 OpenFPS.Sound/VehicleSignalBits.cs	lib	Sound	
 OpenFPS.Sound/VehicleSpec.cs	lib	Sound	
