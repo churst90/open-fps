@@ -1,3 +1,2 @@
 from_type	to_type	count
-OpenFPS.Common.ExternalBallistics	OpenFPS.Common.WeaponDefinition	12
 OpenFPS.Common.WheelDynamics	OpenFPS.Common.RoadWaterLaw	2

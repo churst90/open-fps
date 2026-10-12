@@ -282,7 +282,7 @@ public sealed partial class CombatService
     /// </summary>
     internal static Vector3 Onto(WeaponDefinition weapon, Vector3 from, Vector3 point, Vector3 velocity, Air air)
     {
-        float bc = ExternalBallistics.CoefficientOf(weapon);
+        float bc = ExternalBallistics.CoefficientOf(weapon.Projectile);
         Vector3 aimAt = point;
         for (int pass = 0; pass < 3; pass++)
         {
@@ -504,7 +504,7 @@ public sealed partial class CombatService
 
         Vector3 eye = position + new Vector3(0f, EyeHeight, 0f);
         float elevation = Math.Clamp(float.IsFinite(shot.ElevationMil) ? shot.ElevationMil : 0f, 0f, scope.MaxElevationMil);
-        float angle = ExternalBallistics.ZeroAngle(weapon, scope.BaseZeroMetres, scope.SightHeightMetres) + elevation / 1000f;
+        float angle = ExternalBallistics.ZeroAngle(weapon.Projectile, scope.BaseZeroMetres, scope.SightHeightMetres) + elevation / 1000f;
         Vector3 barrel = ExternalBallistics.Raise(sight, angle);
         // The bore is under the scope, and the muzzle most of a metre ahead of the eye.
         Vector3 down = -Vector3.Normalize(Vector3.Cross(sight, Vector3.Normalize(Vector3.Cross(Vector3.UnitY, sight) + new Vector3(1e-6f, 0f, 0f))));
@@ -657,7 +657,7 @@ public sealed partial class CombatService
     private static void Fly(ref BulletState state, Slug slug, WeaponDefinition weapon, float seconds, Air air, Vector3 wind)
     {
         if (slug.Tumbling) Ricochet.Advance(ref state, seconds, slug, air, wind);
-        else ExternalBallistics.Advance(ref state, seconds, ExternalBallistics.CoefficientOf(weapon), air, wind);
+        else ExternalBallistics.Advance(ref state, seconds, ExternalBallistics.CoefficientOf(weapon.Projectile), air, wind);
     }
 
     /// <summary>What one listener hears of a ricochet's slug: its crack while it is still faster than

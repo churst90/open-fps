@@ -127,7 +127,7 @@ public class BulletRicochetTests : IDisposable
         var slug = new BulletState { Velocity = o.Velocity };
         var bullet = new BulletState { Velocity = o.Velocity };
         while (slug.Travelled < 50f) Ricochet.Advance(ref slug, 0.01f, o.Slug, Still, Vector3.Zero);
-        while (bullet.Travelled < 50f) ExternalBallistics.Advance(ref bullet, 0.01f, ExternalBallistics.CoefficientOf(w), Still, Vector3.Zero);
+        while (bullet.Travelled < 50f) ExternalBallistics.Advance(ref bullet, 0.01f, ExternalBallistics.CoefficientOf(w.Projectile), Still, Vector3.Zero);
         _o.WriteLine($"after 50 m: slug {slug.Velocity.Length():F0} m/s, bullet {bullet.Velocity.Length():F0} m/s (left at {o.Velocity.Length():F0})");
         Assert.True(slug.Velocity.Length() < 0.8f * bullet.Velocity.Length());
     }
@@ -300,7 +300,7 @@ public class BulletRicochetTests : IDisposable
     public void AWaterStrikeSplashesRatherThanTinkles(string weaponId, float metres)
     {
         var w = WeaponRegistry.Get(weaponId)!;
-        float speed = ExternalBallistics.Fly(w, metres, 0f, 0f, Air.Standard, Vector3.Zero).Speed;
+        float speed = ExternalBallistics.Fly(w.Projectile, metres, 0f, 0f, Air.Standard, Vector3.Zero).Speed;
         var hit = BulletImpact.From("Water", speed, w, MathF.PI / 4f, 0f, new Vector3(10f, 10f, 1f), "Water", 0f);
         var drops = BulletImpact.Splash(hit);
         Assert.InRange(drops.Count, 300, BulletImpact.MaxRenderedDrops);
@@ -361,7 +361,7 @@ public class BulletRicochetTests : IDisposable
     {
         var s = new BulletState { Position = from, Velocity = Vector3.Normalize(dir) * w.MuzzleVelocity };
         var path = new List<FlightSample> { new(0f, s.Position, s.Velocity) };
-        float bc = ExternalBallistics.CoefficientOf(w);
+        float bc = ExternalBallistics.CoefficientOf(w.Projectile);
         while (s.Seconds < 2f)
         {
             ExternalBallistics.Advance(ref s, 0.01f, bc, Still, Vector3.Zero);

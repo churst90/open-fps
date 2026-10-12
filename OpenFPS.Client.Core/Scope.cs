@@ -330,7 +330,7 @@ public sealed class ScopeController
     public string ZeroFor(float metres)
     {
         if (Scope == null || Weapon == null) return "No scope.";
-        float mil = ExternalBallistics.ComeUpMil(Weapon, MathF.Max(Scope.BaseZeroMetres, metres), Scope.BaseZeroMetres, Scope.SightHeightMetres);
+        float mil = ExternalBallistics.ComeUpMil(Weapon.Projectile, MathF.Max(Scope.BaseZeroMetres, metres), Scope.BaseZeroMetres, Scope.SightHeightMetres);
         _clicks = Math.Clamp((int)MathF.Round(mil / Scope.ClickMil), 0, MaxClicks);
         return $"{Capital(ZeroWords())}, {_clicks} {(_clicks == 1 ? "click" : "clicks")} up.";
     }
@@ -342,8 +342,8 @@ public sealed class ScopeController
         {
             if (Scope == null || Weapon == null) return null;
             if (_clicks == 0) return Scope.BaseZeroMetres;
-            float angle = ExternalBallistics.ZeroAngle(Weapon, Scope.BaseZeroMetres, Scope.SightHeightMetres) + ElevationMil / 1000f;
-            return ExternalBallistics.ZeroDistanceFor(Weapon, angle, Scope.SightHeightMetres);
+            float angle = ExternalBallistics.ZeroAngle(Weapon.Projectile, Scope.BaseZeroMetres, Scope.SightHeightMetres) + ElevationMil / 1000f;
+            return ExternalBallistics.ZeroDistanceFor(Weapon.Projectile, angle, Scope.SightHeightMetres);
         }
     }
 

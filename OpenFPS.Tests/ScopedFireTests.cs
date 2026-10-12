@@ -74,7 +74,7 @@ public class ScopedFireTests : IDisposable
     public void AWalkingTargetIsMissedUnledAndHitLed()
     {
         const float range = 300f, walk = 1.5f;
-        var tof = ExternalBallistics.Fly(WeaponRegistry.M700, range, ExternalBallistics.ZeroAngle(WeaponRegistry.M700, range, 0.038f),
+        var tof = ExternalBallistics.Fly(WeaponRegistry.M700.Projectile, range, ExternalBallistics.ZeroAngle(WeaponRegistry.M700.Projectile, range, 0.038f),
                                          0.038f, Air.Standard, Vector3.Zero).Seconds;
 
         var unled = new Field(_dir);
@@ -107,7 +107,7 @@ public class ScopedFireTests : IDisposable
     }
 
     private static float ComeUp(float metres)
-        => ExternalBallistics.ComeUpMil(WeaponRegistry.M700, metres, 100f, ScopeRegistry.Scope4To12.SightHeightMetres);
+        => ExternalBallistics.ComeUpMil(WeaponRegistry.M700.Projectile, metres, 100f, ScopeRegistry.Scope4To12.SightHeightMetres);
 
     /// <summary>
     /// Open ground off the edge of the default map's buildings: nothing between the shooter and the

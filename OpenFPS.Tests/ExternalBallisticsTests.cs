@@ -25,7 +25,7 @@ public class ExternalBallisticsTests
     private const float SightHeight = 1.5f * Inch;
 
     private static FlightPoint At(float metres, float zeroMetres, Vector3 wind = default)
-        => ExternalBallistics.Fly(Rifle, metres, ExternalBallistics.ZeroAngle(Rifle, zeroMetres, SightHeight),
+        => ExternalBallistics.Fly(Rifle.Projectile, metres, ExternalBallistics.ZeroAngle(Rifle.Projectile, zeroMetres, SightHeight),
                                   SightHeight, Air.Standard, wind);
 
     [Fact]
@@ -78,7 +78,7 @@ public class ExternalBallisticsTests
         _out.WriteLine($"600 m: {p.Seconds:F3} s, {p.Height:F2} m ({mil:F2} mil), {p.Speed:F0} m/s");
         Assert.InRange(p.Seconds, 0.92f, 1.03f);
         Assert.InRange(mil, 5.2f, 6.0f);
-        float angle = ExternalBallistics.ZeroAngle(Rifle, 100f, SightHeight);
+        float angle = ExternalBallistics.ZeroAngle(Rifle.Projectile, 100f, SightHeight);
         float vacuum = 0.5f * ExternalBallistics.Gravity * p.Seconds * p.Seconds - 600f * angle - SightHeight;
         Assert.InRange(-p.Height, 0.7f * vacuum, vacuum);
         var p300 = At(300f, 100f);
@@ -116,20 +116,20 @@ public class ExternalBallisticsTests
         var scope = ScopeRegistry.Scope4To12;
         foreach (float metres in new[] { 200f, 400f, 600f, 800f })
         {
-            float mil = ExternalBallistics.ComeUpMil(Rifle, metres, 100f, scope.SightHeightMetres);
-            float angle = ExternalBallistics.ZeroAngle(Rifle, 100f, scope.SightHeightMetres) + mil / 1000f;
-            float? back = ExternalBallistics.ZeroDistanceFor(Rifle, angle, scope.SightHeightMetres);
+            float mil = ExternalBallistics.ComeUpMil(Rifle.Projectile, metres, 100f, scope.SightHeightMetres);
+            float angle = ExternalBallistics.ZeroAngle(Rifle.Projectile, 100f, scope.SightHeightMetres) + mil / 1000f;
+            float? back = ExternalBallistics.ZeroDistanceFor(Rifle.Projectile, angle, scope.SightHeightMetres);
             _out.WriteLine($"{metres} m: {mil:F2} mil up, zeroed back at {back:F1} m");
             Assert.NotNull(back);
             Assert.InRange(back!.Value, metres - 1f, metres + 1f);
         }
         // The come-up grows with the range, and faster the further out.
-        float c3 = ExternalBallistics.ComeUpMil(Rifle, 300f, 100f, scope.SightHeightMetres);
-        float c6 = ExternalBallistics.ComeUpMil(Rifle, 600f, 100f, scope.SightHeightMetres);
+        float c3 = ExternalBallistics.ComeUpMil(Rifle.Projectile, 300f, 100f, scope.SightHeightMetres);
+        float c6 = ExternalBallistics.ComeUpMil(Rifle.Projectile, 600f, 100f, scope.SightHeightMetres);
         Assert.True(c6 > 2f * c3);
         // Nothing dialled is a 100 m zero.
-        float baseAngle = ExternalBallistics.ZeroAngle(Rifle, 100f, scope.SightHeightMetres);
-        Assert.InRange(ExternalBallistics.ZeroDistanceFor(Rifle, baseAngle, scope.SightHeightMetres)!.Value, 99f, 101f);
+        float baseAngle = ExternalBallistics.ZeroAngle(Rifle.Projectile, 100f, scope.SightHeightMetres);
+        Assert.InRange(ExternalBallistics.ZeroDistanceFor(Rifle.Projectile, baseAngle, scope.SightHeightMetres)!.Value, 99f, 101f);
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class ExternalBallisticsTests
     private static bool Strikes(float leadMetres, float range = 300f)
     {
         const float walk = 1.4f;             // m/s, to the right
-        float zeroAngle = ExternalBallistics.ZeroAngle(Rifle, range, 0.038f);
+        float zeroAngle = ExternalBallistics.ZeroAngle(Rifle.Projectile, range, 0.038f);
         Vector3 eye = new(0f, 1.7f, 0f);
         // The body starts on the line (its chest at eye height: same level) and walks to +X.
         Vector3 feet = new(0f, 0.5f, range);

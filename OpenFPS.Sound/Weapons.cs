@@ -127,7 +127,11 @@ public sealed record WeaponDefinition
     }
 
     /// <summary>The width of a person's torso, metres: what a shotgun's pattern has to land on.</summary>
-    public const float BodyWidthMetres = 0.45f;
+    public const float BodyWidthMetres = BodyConstants.TorsoWidth;
+
+    /// <summary>The bullet as its flight needs it (<see cref="ExternalBallistics"/>): its muzzle speed, its
+    /// coefficient, its mass and its calibre, and nothing of the gun.</summary>
+    public Projectile Projectile => new(MuzzleVelocity, BallisticCoefficientG7, BulletMassKg, BulletDiameterMetres);
 
     // ── In flight ───────────────────────────────────────────────────────────────────────────────
 

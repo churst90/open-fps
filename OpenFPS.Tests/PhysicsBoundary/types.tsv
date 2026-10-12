@@ -23,6 +23,7 @@ OpenFPS.Client.AudioEngine.Core.Engine.Driveline	PS
 OpenFPS.Common.ExternalBallistics	P
 OpenFPS.Common.BulletState	V
 OpenFPS.Common.FlightPoint	P
+OpenFPS.Common.Projectile	V
 OpenFPS.Common.Air	V
 OpenFPS.Common.Ricochet	PS
 OpenFPS.Common.WindField	P

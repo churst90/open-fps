@@ -20,6 +20,18 @@ public readonly record struct Air(float TemperatureC, float PressureMb)
 }
 
 /// <summary>A bullet in flight: where it is, how fast it is going, and for how long it has flown.</summary>
+/// <summary>
+/// What flies: a bullet as its flight needs it, with nothing of the gun that fired it. A weapon makes one
+/// (WeaponDefinition.Projectile).
+/// </summary>
+/// <param name="MuzzleVelocity">Its speed as it leaves the barrel, m/s.</param>
+/// <param name="CoefficientG7">Its G7 ballistic coefficient, lb/in², as its maker publishes it: how well it
+/// keeps its speed. Zero: a round nobody shoots far enough for it to matter, flown with
+/// <see cref="ExternalBallistics.FallbackG7"/>.</param>
+/// <param name="MassKg">Its mass, kg. Zero: not said.</param>
+/// <param name="DiameterMetres">Its diameter, metres: its calibre. Zero: not said.</param>
+public readonly record struct Projectile(float MuzzleVelocity, float CoefficientG7, float MassKg = 0f, float DiameterMetres = 0f);
+
 public struct BulletState
 {
     public Vector3 Position;
@@ -97,8 +109,8 @@ public static class ExternalBallistics
         return Cd[hi - 1] + t * (Cd[hi] - Cd[hi - 1]);
     }
 
-    /// <summary>The coefficient a weapon's bullet flies with.</summary>
-    public static float CoefficientOf(WeaponDefinition w) => w.BallisticCoefficientG7 > 0f ? w.BallisticCoefficientG7 : FallbackG7;
+    /// <summary>The coefficient a bullet flies with.</summary>
+    public static float CoefficientOf(Projectile p) => p.CoefficientG7 > 0f ? p.CoefficientG7 : FallbackG7;
 
     /// <summary>Drag and gravity together, m/s², for a bullet at <paramref name="velocity"/> in air
     /// moving at <paramref name="wind"/>.</summary>
@@ -151,7 +163,7 @@ public static class ExternalBallistics
     /// <paramref name="sightHeight"/> metres under the sight, raised <paramref name="angle"/> radians
     /// above it, and says where it is when it has gone <paramref name="range"/> metres downrange.
     /// </summary>
-    public static FlightPoint Fly(WeaponDefinition w, float range, float angle, float sightHeight, Air air, Vector3 wind)
+    public static FlightPoint Fly(Projectile w, float range, float angle, float sightHeight, Air air, Vector3 wind)
     {
         var s = new BulletState
         {
@@ -182,7 +194,7 @@ public static class ExternalBallistics
     /// air, because that is the day a zero is set on and the turret then holds that angle whatever the
     /// day turns out to be.
     /// </summary>
-    public static float ZeroAngle(WeaponDefinition w, float zeroMetres, float sightHeight)
+    public static float ZeroAngle(Projectile w, float zeroMetres, float sightHeight)
     {
         zeroMetres = Math.Clamp(zeroMetres, 10f, 3000f);
         var key = (w.MuzzleVelocity, CoefficientOf(w), (int)MathF.Round(zeroMetres * 10f), (int)MathF.Round(sightHeight * 1000f));
@@ -204,7 +216,7 @@ public static class ExternalBallistics
     /// through the line of sight: the distance a turret setting is zeroed for. Null when it never
     /// comes back within <paramref name="maxMetres"/>, or never rises to the line at all.
     /// </summary>
-    public static float? ZeroDistanceFor(WeaponDefinition w, float angle, float sightHeight, float maxMetres = 2000f)
+    public static float? ZeroDistanceFor(Projectile w, float angle, float sightHeight, float maxMetres = 2000f)
     {
         var s = new BulletState
         {
@@ -231,7 +243,7 @@ public static class ExternalBallistics
 
     /// <summary>The elevation, milliradians, to dial over a zero at <paramref name="baseZeroMetres"/>
     /// to be zeroed at <paramref name="metres"/> instead: the come-up a dope card lists.</summary>
-    public static float ComeUpMil(WeaponDefinition w, float metres, float baseZeroMetres, float sightHeight)
+    public static float ComeUpMil(Projectile w, float metres, float baseZeroMetres, float sightHeight)
         => 1000f * (ZeroAngle(w, metres, sightHeight) - ZeroAngle(w, baseZeroMetres, sightHeight));
 
     /// <summary>
@@ -295,7 +307,7 @@ public static class ExternalBallistics
     }
 
     /// <summary>The radius of the upright cylinder a person is hit as: the 45 cm torso, halved.</summary>
-    public const float BodyRadius = WeaponDefinition.BodyWidthMetres * 0.5f;
+    public const float BodyRadius = BodyConstants.TorsoWidth * 0.5f;
     /// <summary>A person's height, to the top of the head.</summary>
     public const float BodyHeight = BodyConstants.PersonHeight;
     /// <summary>The top of a person that is the head: above this, a hit is a head shot.</summary>

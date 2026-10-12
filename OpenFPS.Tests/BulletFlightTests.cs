@@ -252,7 +252,7 @@ public class BulletFlightTests : IDisposable
         g.Arm(shooter, "m700");
         var walker = g.Walker(feet + new Vector3(0f, 0f, 400f));
         // Held up for the drop, from the hip at 1.5 m to the chest at 1.2 m, 400 m off.
-        float up = ExternalBallistics.ZeroAngle(WeaponRegistry.M700, 400f, -(CombatService.HipHeight - 1.2f));
+        float up = ExternalBallistics.ZeroAngle(WeaponRegistry.M700.Projectile, 400f, -(CombatService.HipHeight - 1.2f));
         g.Face(shooter, 0f, -up);
 
         g.Fire(shooter);
@@ -509,7 +509,7 @@ public class BulletFlightTests : IDisposable
     {
         var s = new BulletState { Position = from, Velocity = Vector3.Normalize(dir) * w.MuzzleVelocity };
         var path = new List<FlightSample> { new(0f, s.Position, s.Velocity) };
-        float bc = ExternalBallistics.CoefficientOf(w);
+        float bc = ExternalBallistics.CoefficientOf(w.Projectile);
         while (s.Seconds < 2f)
         {
             ExternalBallistics.Advance(ref s, step, bc, Still, Vector3.Zero);

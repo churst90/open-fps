@@ -104,7 +104,7 @@ public static class BulletPassSpike
     {
         var s = new BulletState { Position = new Vector3(0f, 0f, 0.5f), Velocity = Vector3.UnitZ * w.MuzzleVelocity };
         var path = new List<FlightSample> { new(0f, s.Position, s.Velocity) };
-        float bc = ExternalBallistics.CoefficientOf(w);
+        float bc = ExternalBallistics.CoefficientOf(w.Projectile);
         while (s.Seconds < 3f)
         {
             ExternalBallistics.Advance(ref s, 0.01f, bc, air, Vector3.Zero);

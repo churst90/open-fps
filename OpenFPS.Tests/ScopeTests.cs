@@ -208,7 +208,7 @@ public class ScopeTests
 
         // /zero 400 dials the nearest click to the come-up, and says what that is zeroed for.
         string set = scope.ZeroFor(400f);
-        int clicks = (int)MathF.Round(ExternalBallistics.ComeUpMil(WeaponRegistry.M700, 400f, 100f, Scope.SightHeightMetres) / Scope.ClickMil);
+        int clicks = (int)MathF.Round(ExternalBallistics.ComeUpMil(WeaponRegistry.M700.Projectile, 400f, 100f, Scope.SightHeightMetres) / Scope.ClickMil);
         Assert.Equal(clicks, scope.Clicks);
         Assert.InRange(scope.ZeroMetres!.Value, 390f, 410f);
         Assert.Matches(@"^Zeroed for (395|400|405) metres, \d+ clicks up\.$", set);

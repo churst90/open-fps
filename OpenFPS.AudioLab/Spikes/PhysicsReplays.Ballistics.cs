@@ -14,7 +14,7 @@ public static partial class PhysicsReplays
     private static IEnumerable<(string Case, float Angle, Air Air, Vector3 Wind)> Cases(WeaponDefinition w)
     {
         const float sight = 0.04f;
-        float zero = ExternalBallistics.ZeroAngle(w, 100f, sight);
+        float zero = ExternalBallistics.ZeroAngle(w.Projectile, 100f, sight);
         yield return ("zero100", zero, Air.Standard, Vector3.Zero);
         yield return ("level", 0f, Air.Standard, Vector3.Zero);
         yield return ("up5deg", 5f * MathF.PI / 180f, Air.Standard, Vector3.Zero);
@@ -39,7 +39,7 @@ public static partial class PhysicsReplays
             foreach (var (name, angle, air, wind) in Cases(w))
                 foreach (float range in Ranges(w))
                 {
-                    var p = ExternalBallistics.Fly(w, range, angle, 0.04f, air, wind);
+                    var p = ExternalBallistics.Fly(w.Projectile, range, angle, 0.04f, air, wind);
                     sb.Append(w.Id).Append('\t').Append(name).Append('\t').Append(F(angle * 1000f, 4)).Append('\t').Append(F(p.Range, 1)).Append('\t')
                       .Append(F(p.Height, 4)).Append('\t').Append(F(p.Drift, 4)).Append('\t').Append(F(p.Seconds, 5)).Append('\t')
                       .Append(F(p.Speed, 2)).Append('\n');

@@ -325,7 +325,7 @@ public static class BulletRound2Spike
     {
         var s = new BulletState { Position = from, Velocity = Vector3.Normalize(dir) * w.MuzzleVelocity };
         var path = new List<FlightSample> { new(0f, s.Position, s.Velocity) };
-        float bc = ExternalBallistics.CoefficientOf(w);
+        float bc = ExternalBallistics.CoefficientOf(w.Projectile);
         while (s.Seconds < seconds)
         {
             var before = s;

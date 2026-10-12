@@ -79,6 +79,7 @@ RULES = [
     (C + 'ExternalBallistics', 'P', 'point-mass flight with drag'),
     (C + 'BulletState', 'V', ''),
     (C + 'FlightPoint', 'P', ''),
+    (C + 'Projectile', 'V', 'what flies, made by a weapon'),
     (C + 'Air', 'V', 'temperature and pressure: density for drag, and the sound\'s air'),
     (C + 'Ballistics', 'S', 'the crack and the muzzle blast'),
     (C + 'Ricochet', 'PS', 'the bounce and the tumbling flight are mechanics; the whine is sound'),

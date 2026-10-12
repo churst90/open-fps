@@ -11,6 +11,10 @@ public static class BodyConstants
     /// <summary>A person's height to the top of the head, metres.</summary>
     public const float PersonHeight = 1.8f;
 
+    /// <summary>The width of a person's torso, metres: what a shotgun's pattern has to land on, and twice the
+    /// radius of the upright cylinder a person is hit as.</summary>
+    public const float TorsoWidth = 0.45f;
+
     /// <summary>The walk, metres per second, client and server.</summary>
     public const float WalkSpeed = 4.5f;
 
