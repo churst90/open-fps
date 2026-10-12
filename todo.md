@@ -83,13 +83,16 @@ since the last deploy" list below.
      audit's "P3d as built"): one way to start and stop, fades owned by the registry, the facade's lost stop and
      silent replacement; mounts, levels and ranges from the model; every one-off its own voice; beacons and
      perched birds on the worker's path (P6). Also fixed: Steam Audio never built Magnolia's scene (a 64-corner
-     buffer overrun). Step 6, the reseed: BUILT 2026-10-12, unheard (made on Windows on the Resonance side, sent
-     back as patches): a voice's seed is a hash of its kind, owner and part, the seed table is gone, the woods'
-     voices are under ids given out, all eight streams regenerated (on Windows: regenerate them on Linux), a
+     buffer overrun). Step 6, the reseed: BUILT 2026-10-12, unheard (made on Windows and sent back as patches): a voice's seed is a hash of its kind, owner and part, the seed table is gone, the woods'
+     voices are under ids given out, all eight streams regenerated (on Linux), a
      render check by band (`SeedBandLevelTests`). Next: the rain's 40 dB and the bump's 85 dB start levels
-     (Cody's decision); rain patches under probes; `SpatialEmitter`'s default range (100 m against the
-     component's 50). Then library stage 5's `AudioClock` slice (docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
-   - Then P4 (one ranking), the rest of P6 (rain asking the worker), P7 (machine state from
+     (Cody's decision); rain patches under probes. (`SpatialEmitter`'s default range is the component's 50 m now, S24.) Then library stage 5's `AudioClock` slice (docs/SOUND_LIBRARY_BOUNDARY.md 18.3).
+   - P4 (one ranking): the choosers BUILT 2026-10-12, unheard (made on Windows and sent back as patches; the audit's
+     "P4 as built"): one rank (`VoiceManager.HeardLevel`), engines to the loudest cars and not the nearest,
+     places to the loudest source, a render's headroom out of the budget's rank. For Cody to decide: the path
+     at the choosers (the worker would have to be asked about every contender), a budget for sirens, horns and
+     talkers. Left: the provider's orderings (S20), which need FMOD to run.
+   - Then the rest of P6 (rain asking the worker), P7 (machine state from
      the server: a wire change, shipped with a deploy).
    - S24's two defaults are one (Cody, 2026-10-12): a sound that declares no range or reference distance carries
      50 m with 3 m in the server's component and the client's emitter alike (`AcousticConstants.DefaultRange`,

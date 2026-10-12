@@ -31,7 +31,7 @@ Where the parts stand (2026-10-11):
 | P3b, every other voice | done 2026-10-11 ("P3b as built"), unheard: every voice an entry, one writer each; woods take their path, engine echoes carry theirs; P6 for talkers and S23. Blocked engines heard round the edge (Cody, the same day) |
 | P3c, seeds then ids | done 2026-10-11 ("P3c as built") |
 | P3d, one start and declared levels | steps 1 to 5 built 2026-10-11, step 6 (the reseed) 2026-10-12 ("P3d as built"), unheard. Left: the rain and bump start levels (a decision), rain patches under probes, the two default ranges |
-| P4, one ranking | after P3 |
+| P4, one ranking | the choosers built 2026-10-12 ("P4 as built"), unheard: one rank, cars and places by loudness, a render's headroom out of the rank. Three decisions for Cody there; the provider's orderings (S20) left |
 | P6, one path model for every asker | talkers and S23 in P3b; beacons and perched birds in P3d; rain patches left |
 | P7, machine state from the server | last; a wire change, shipped with a server deploy |
 
@@ -723,7 +723,7 @@ OpenFPS.Sound changed (step 2), so the wire hash does.
   train_behind_wall, high_ids (no-op revives and cancels gone); step 2 drive, talker_and_aids, high_ids (interior
   0.7 to 0.72 m; loudspeaker copies' range 320 to 400); step 3 traffic_rain; steps 4 and 5 none (no beacon or bird
   in any scenario). All eight equal at DOTNET_PROCESSOR_COUNT=4.
-- **The reseed** (step 6, 2026-10-12, made on Windows on the Resonance side and sent back as patches). Unheard.
+- **The reseed** (step 6, 2026-10-12, made on Windows and sent back as patches). Unheard.
   Only `OpenFPS.Client.Core` and the tests changed, so the wire hash does not.
   - **Seeds.** `VoiceRegistry.SeedOf(kind, owner, part)` is a hash of the three: FNV-1a over the kind's name (so a
     kind added between two others moves no seed), then MurmurHash3's finaliser over the owner and over the part,
@@ -788,6 +788,57 @@ OpenFPS.Sound changed (step 2), so the wire hash does.
 - **Conflicts.** After P3. Nothing else in CAS at the same time.
 - **Guards show.** walk, drive and traffic_rain unchanged (fewer cars than the budget). `sirens_and_far_traffic`
   changes in which cars are live: named in the commit. Must be heard by Cody on the city with traffic.
+
+**P4 as built (2026-10-12), the choosers; the provider's orderings (S20) not yet.** Made on Windows and sent
+back as patches. Unheard. Only `OpenFPS.Client.Core` and the tests changed, so the wire
+hash does not. Three commits.
+
+- **The one rank.** `VoiceManager.HeardLevel(volume, reference, range, distance, occlusion, level, key,
+  physical)`: the budget's own law taken out of `Audibility` so that others can ask it. Cars
+  (`ChooseLiveEngines`), standing machines (`ChooseLiveMachines`) and the places of trees and fires
+  (`ChoosePlaces`) ask it with the numbers their voices are played with, and `Audibility` is it with the
+  playing voice's 2 dB and the essential pin. `OneRankTests` holds each chooser's number and the budget's for
+  the emitter then played to a part in a thousand, for four kinds of car and eight kinds of standing model.
+- **A render's headroom is not loudness** (S19, the other way round). S19 said the machine ranking left out the
+  headroom gain its emitter applies. It was right to: a voice that renders with more headroom than the shared
+  16 dB is played that much up to give it back, and is no louder at the ear. The budget was wrong to count it.
+  It ranked on the emitter's volume, so a rain patch or a fire rendering 45 dB under full scale ranked 29 dB
+  over a machine as loud, a train's voice 20, a crossing bell 16, a fountain or a tree 6.
+  `SpatialEmitter.HeadroomGain` says how much of a voice's volume is that return, and `Audibility` divides it
+  out. The other half of S19 was so and is mended: the machine ranking reads the key its voice is built and
+  measured under (`PhysicalKeyOf`), not `SoundId`.
+- **Cars by loudness** (S12). Engines go to the cars loudest at the ear, and the cars left over borrow in the
+  same order. The keep bias is what it was in decibels (a sounding car as if at three quarters of its distance,
+  2.5 dB) and the hold is 2.5 s. Which cars have a front outlet of their own is still by distance: whether two
+  ends can be told apart is geometry.
+- **Places by loudness** (S12): to the loudest source at the ear first, not the nearest.
+- **Found and fixed:** the held cars (an engine started within 2.5 s) were all alike in the order and so came
+  by id. A car out of the budget borrows the ring of the first car of its kind with an engine, so with two of a
+  kind held the first was the one with the lower id and, when the hold ended, the louder: every borrowed voice
+  of the kind was stopped and started on another ring, twice. The held are loudest first among themselves.
+- **Not built, each a decision for Cody:**
+  - **The path at the choosers.** The spec says "with its path's gains". The worker is asked only about what
+    already has a voice, so only those have a path to count. Counted for them alone, a voiced machine behind a
+    wall ranks under an unvoiced one behind the same wall and gives it its voice; the newcomer's path then
+    comes back as blocked too, and the two change places each time the worker lets the loser's answer go
+    (5 s). So the choosers count no path (`ClientAudioSystem.UnaskedOcclusion`), and the budget counts it among
+    the voices it holds, as before. To count walls at the choosers the worker has to be asked about every
+    contender, voiced or not: more sources against the Steam Audio pool. The echo candidates' ranking already
+    leaves the path out for a reason heard ("ranking on them flickered the trace").
+  - **Sirens, horns, held horns and talkers** still take a voice each with no budget (S12's last line). They
+    have no count to be ranked into; giving them one is a new budget.
+  - **The provider's orderings (S20).** Render-ahead is still nearest first by `EffectiveDistance`; engine
+    detail, the late field and the echo candidates rank on `BaseVolume × RenderedGain`, which carries the
+    headroom's return: near a fire or in rain, "the loudest" that engine detail is measured against is up to
+    29 dB over what is heard. `SpatialEmitter.HeadroomGain` is there for them to divide out. They need FMOD to
+    run and no test here reaches them.
+- **Streams** (each commit says line by line). The headroom field: all eight, every `Play` line gains
+  `HeadroomGain=` and no other line changes. Cars by loudness: sirens_and_far_traffic, 3,490 lines to 3,729
+  (the engines were the horn car and the patrol car, the two nearest; they are the horn car and car 504, a
+  muscle car 48 m off and louder from here than the patrol car at 35 m, and the patrol car keeps an engine as
+  the only one of its kind; six cars borrow where seven did); walk (28 lines) and traffic_rain (852),
+  `ReviveEngine` lines in another order within their frames, the same lines in every frame. Places: none. All
+  regenerated on Windows.
 
 #### P5. Names and materials to properties (1 to 2 sessions)
 

@@ -1986,11 +1986,11 @@ public partial class ClientAudioSystem
     }
     private readonly Dictionary<int, Spreading> _spreading = new();
     private readonly HashSet<int> _placesGranted = new();
-    private readonly List<(float D2, int Id, int Outer)> _placeCandidates = new();
+    private readonly List<(float Key, int Id, int Outer)> _placeCandidates = new();
 
-    /// <summary>Which live extended sources may spread this frame: nearest first, while their outer
-    /// places fit in <see cref="_adaptivePlaces"/>. One that wants none (too far to be heard as wide)
-    /// asks for nothing.</summary>
+    /// <summary>Which live extended sources may spread this frame: the loudest at the ear first (the level the
+    /// machines were ranked by, VoiceManager.HeardLevel), while their outer places fit in
+    /// <see cref="_adaptivePlaces"/>. One that wants none (too far to be heard as wide) asks for nothing.</summary>
     private void ChoosePlaces(WorldSnapshot world, Vector3 eyePos)
     {
         _placesGranted.Clear();
@@ -2004,9 +2004,10 @@ public partial class ClientAudioSystem
             float d2 = Vector3.DistanceSquared(at, eyePos);
             if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
                     OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), MathF.Sqrt(d2)) <= 0f) continue;
-            _placeCandidates.Add((d2, id, layout.Length - 1));
+            // Louder sorts first, so negated.
+            _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, layout.Length - 1));
         }
-        _placeCandidates.Sort(static (a, b) => (a.D2, a.Id).CompareTo((b.D2, b.Id)));
+        _placeCandidates.Sort(static (a, b) => (a.Key, a.Id).CompareTo((b.Key, b.Id)));
         int left = _adaptivePlaces;
         foreach (var (_, id, outer) in _placeCandidates)
         {

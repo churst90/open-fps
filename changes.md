@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Audit P4, one rank, the choosers (docs/SPECIAL_CASES_AUDIT.md, "P4 as built"), unheard. Which cars have an
+  engine, which standing machines a voice and which trees and fires are heard across their width is decided by
+  how loud each is at the ear, one law for all three and the mixer's budget (it was the nearest cars, the
+  machines on numbers of their own, the nearest places). With more cars than engines the engines are the
+  loudest cars. A voice rendered with extra headroom (rain, fires, trains, bells, fountains, trees) no longer
+  outranks a louder one by that headroom when voices are short: up to 29 dB. Borrowed engine voices are no
+  longer restarted on another car's ring when two cars of a kind start together. Walls are not counted when
+  choosing (the mixer's budget counts them), a decision for Cody.
+
 - Audit P3d, step 6, the reseed (docs/SPECIAL_CASES_AUDIT.md, "P3d as built"), unheard. What a voice draws its
   chance from (an engine's jitter, a tree's gusts, a wall's smear) is a hash of what it is the sound of: its
   kind, owner and part. It was the id the voice had before ids were given out, an entity's id for its engine, so

@@ -228,4 +228,32 @@ public class OneRankTests
         Assert.Contains(9, h.Mixer.Live);
         Assert.Contains(4, h.Mixer.Live);
     }
+
+    /// <summary>
+    /// The places a tree or a fire is heard from across its width go to the loudest source at the ear first, not
+    /// the nearest (S12). A bonfire 14 m off and a park tree 9 m off, and places enough for the fire alone: the
+    /// fire, the louder from here, is the one heard across its width.
+    /// </summary>
+    [Fact]
+    public void The_places_go_to_the_loudest_source_not_the_nearest()
+    {
+        var h = new ClientAudioHarness();
+        h.Facade.Weather.Wind = WindWeather.Steady(6f, 270f, 0f);
+        h.StandAt(Vector3.Zero);
+        const int Tree = 31, Fire = 32;
+        AddSource(h, Tree, "foliage:park_tree", new Vector3(9f, 0f, 0f));
+        AddSource(h, Fire, "fire:bonfire", new Vector3(-14f, 0f, 0f), new Vector3(3f, 1f, 3f));
+        Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Tree) && h.Mixer.Latest.ContainsKey(Fire), 60), "the two were never voiced");
+        int treePlaces = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(h.Mixer.Latest[Tree].PhysicalKey)!.Length - 1;
+        int firePlaces = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(h.Mixer.Latest[Fire].PhysicalKey)!.Length - 1;
+        _o.WriteLine($"the tree: {treePlaces} places, {20 * MathF.Log10(h.Audio.HeardInRanking(Tree)):F1} dB at 9 m; the fire: {firePlaces} places, {20 * MathF.Log10(h.Audio.HeardInRanking(Fire)):F1} dB at 14 m");
+        Assert.True(h.Audio.HeardInRanking(Fire) > h.Audio.HeardInRanking(Tree), "the fire is not the louder from here");
+        Assert.True(treePlaces > 0 && firePlaces > 0);
+        // Places for the fire's, and so not for both: given to the tree first, too few are left for the fire.
+        typeof(ClientAudioSystem).GetField("_adaptivePlaces", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(h.Audio, firePlaces);
+        // Ten seconds: the one that lost its places draws in to its middle, holds them two seconds and fades them.
+        for (int i = 0; i < 40; i++) { h.Wait(0.25); h.Tick(2); }
+        Assert.True(h.Mixer.Live.Contains(h.Voice(VoiceKind.Place, Fire, 1)), "the louder source has no places");
+        Assert.False(h.Mixer.Live.Contains(h.Voice(VoiceKind.Place, Tree, 1)), "the nearer, quieter source has the places");
+    }
 }
