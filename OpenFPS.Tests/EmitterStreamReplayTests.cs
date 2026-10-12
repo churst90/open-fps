@@ -28,7 +28,8 @@ namespace OpenFPS.Tests;
 /// thread, without Steam Audio; the geometry and rain survey are built in place; birds, near drops and
 /// footsteps are seeded; voice chat decodes with the managed Opus codec, never a system libopus), and each scenario must agree with itself twice before the comparison. Where the
 /// maths library matches the machine the streams were made on (RenderFingerprintTests.MathsProbe) the stream
-/// must match to the character; elsewhere the same calls, every number within a part in a thousand.
+/// must match to the character; elsewhere the same calls, every number within a part in a thousand, and a
+/// sound rendered for the mixer by its name, length and rate (its bits follow the maths, so its hash does).
 ///
 /// An intended change regenerates the stream in the same commit, saying why: OPENFPS_REPLAY_WRITE=1 dotnet
 /// test --filter EmitterStreamReplayTests. OPENFPS_REPLAY_DUMP=dir writes each run's stream as text.
@@ -78,7 +79,17 @@ public class EmitterStreamReplayTests
         var a = Expand(stored);
         var b = Expand(first);
         for (int i = 0; i < a.Count; i++)
-            Assert.True(Near(a[i], b[i]), $"{scenario}: line {i + 1} differs beyond rounding:\n  stored: {a[i]}\n  now:    {b[i]}");
+            Assert.True(Near(WithoutRenderHash(a[i]), WithoutRenderHash(b[i])), $"{scenario}: line {i + 1} differs beyond rounding:\n  stored: {a[i]}\n  now:    {b[i]}");
+    }
+
+    /// <summary>A Register line without the hash of the sound's samples: on another maths library a render
+    /// differs in its last bits, and a hash is then another hash, not a near one. Every other line as it is.</summary>
+    internal static string WithoutRenderHash(string line)
+    {
+        var parts = SplitTop(line);
+        if (parts.Count != 6 || parts[1] != "Register") return line;
+        parts[4] = "\"\"";
+        return string.Join(' ', parts);
     }
 
     /// <summary>The stream with every Play, Place and Path line written whole: each voice's fields as
@@ -270,6 +281,14 @@ public class EmitterStreamReplayTests
         Assert.Contains("Volume=0.1", s);
         Assert.True(Near("a=1.0001 b=(2,3)", "a=1.0002 b=(2,3)"));
         Assert.False(Near("a=1.01 b=(2,3)", "a=1.02 b=(2,3)"));
+
+        // On another maths library a rendered sound is compared by its name, length and rate, not its bits.
+        const string here = "1 Register \"SYNTH/drive_brake_3\" 8640 \"8D6C842614213F96\" 48000";
+        Assert.False(Near(here, here.Replace("8D6C", "4202")));
+        Assert.Equal(WithoutRenderHash(here), WithoutRenderHash(here.Replace("8D6C", "4202")));
+        Assert.NotEqual(WithoutRenderHash(here), WithoutRenderHash(here.Replace("8640", "8641")));
+        Assert.NotEqual(WithoutRenderHash(here), WithoutRenderHash(here.Replace("drive_brake_3", "drive_brake_4")));
+        Assert.Equal("3 Stop 5", WithoutRenderHash("3 Stop 5"));
 
         // A re-placing writes what changed; expanded, every line says everything.
         var expanded = Expand(new List<string>
