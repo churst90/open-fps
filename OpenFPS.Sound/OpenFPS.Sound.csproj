@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
     <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
     <!-- The physics, for the state the sound reads and the laws of contact it shares (one way). -->
     <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
@@ -54,7 +55,7 @@
        lever for anything else. A listed file that is gone fails the build. -->
   <Import Project="..\tools\build\SourceHash.targets" />
   <ItemGroup>
-    <DoorModelSource Include="KnobDoor.cs;PushBarDoor.cs;SlidingDoor.cs;GlassDoor.cs;LockCylinder.cs;ElevatorDoor.cs;CarWindow.cs;GlassFracture.cs;DoorPhysics.cs;Doors.cs;Glass.cs;VehicleCabin.cs;VehicleBody.cs;..\OpenFPS.Acoustics\AcousticRegistry.cs"
+    <DoorModelSource Include="KnobDoor.cs;PushBarDoor.cs;SlidingDoor.cs;GlassDoor.cs;LockCylinder.cs;ElevatorDoor.cs;CarWindow.cs;GlassFracture.cs;DoorPhysics.cs;Doors.cs;Glass.cs;VehicleCabin.cs;VehicleBody.cs;..\OpenFPS.Materials\AcousticRegistry.cs"
                      HashName="%(Filename)%(Extension)" />
   </ItemGroup>
   <Target Name="GenerateDoorModelFingerprint" BeforeTargets="CoreCompile" Inputs="@(DoorModelSource);$(MSBuildProjectFullPath)"

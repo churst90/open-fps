@@ -1,7 +1,6 @@
 file	group	projects	library_types
 OpenFPS.Acoustics/AcousticConstants.cs	lib	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	lib	Acoustics	
-OpenFPS.Acoustics/AcousticRegistry.cs	lib	Acoustics	
 OpenFPS.Acoustics/Assemblies.cs	lib	Acoustics	
 OpenFPS.Acoustics/Constructions.cs	lib	Acoustics	
 OpenFPS.Acoustics/Diffraction.cs	lib	Acoustics	
@@ -208,6 +207,8 @@ OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	lib	Geometry
 OpenFPS.Geometry/Triangles/WheelRays.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/BodyShell.cs	lib	Geometry	
 OpenFPS.Geometry/WallBuild.cs	lib	Geometry	
+OpenFPS.Materials/AcousticRegistry.cs	lib	Materials	
+OpenFPS.Materials/RoadSurfaces.cs	lib	Materials	
 OpenFPS.Native/FmodNative/fmod.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_dsp.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_errors.cs	lib	Native	

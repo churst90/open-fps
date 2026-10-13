@@ -86,7 +86,7 @@ def layers():
 
 
 LAYER = layers()
-NEW = {'Materials', 'Environment', 'Models', 'World', 'Agents', 'Accessibility', 'Editor'}
+NEW = {'Environment', 'Models', 'World', 'Agents', 'Accessibility', 'Editor'}
 PLANNED = {'Audio'}
 
 # ── Files: (glob, package, why) ─────────────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ L7 = 'library stage 7 (host until split)'
 FILE_RULES = [
     # The projects that are packages already map to themselves.
     ('OpenFPS.Words/*', 'Words', ''), ('OpenFPS.Schema/*', 'Schema', ''), ('OpenFPS.Native/*', 'Native', ''),
-    ('OpenFPS.Geometry/*', 'Geometry', ''), ('OpenFPS.Astronomy/*', 'Astronomy', ''),
+    ('OpenFPS.Geometry/*', 'Geometry', ''), ('OpenFPS.Materials/*', 'Materials', ''), ('OpenFPS.Astronomy/*', 'Astronomy', ''),
     ('OpenFPS.Physics/*', 'Physics', ''), ('OpenFPS.Acoustics/*', 'Acoustics', ''),
 
     # ── Common ──
@@ -243,13 +243,6 @@ FILE_RULES = [
 
 # Types that do not go where their file goes.
 TYPE_RULES = {
-    'OpenFPS.Common.MaterialProperties': 'Materials',
-    'OpenFPS.Common.AcousticRegistry': 'Materials',
-    'OpenFPS.Common.Underfoot': 'Materials',
-    'OpenFPS.Common.StrikeKind': 'Materials',
-    'OpenFPS.Common.StrikeBehaviour': 'Materials',
-    'OpenFPS.Common.RicochetFace': 'Materials',
-    'OpenFPS.Common.RoadSurfaces': 'Materials',
     'OpenFPS.Common.ScopeMath': 'game',
     'OpenFPS.Common.ScopeSway': 'game',
     'OpenFPS.Common.WindWaves': 'Environment',
@@ -269,7 +262,7 @@ TYPE_RULES = {
     'OpenFPS.Server.Core.SafeText': 'Words',
 }
 
-SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Astronomy',
+SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',
                    'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Common', 'OpenFPS.Client.Core',
                    'OpenFPS.Server')
 USERS = ('OpenFPS.Server', 'OpenFPS.Client.Core', 'OpenFPS.Client', 'OpenFPS.Client.Gtk', 'OpenFPS.AudioLab',
@@ -329,7 +322,7 @@ def from_pkg(e):
 def hashed(path):
     if path.startswith('OpenFPS.Common/'):
         return True
-    for pre in ('OpenFPS.Geometry/', 'OpenFPS.Acoustics/', 'OpenFPS.Schema/', 'OpenFPS.Physics/'):
+    for pre in ('OpenFPS.Geometry/', 'OpenFPS.Materials/', 'OpenFPS.Acoustics/', 'OpenFPS.Schema/', 'OpenFPS.Physics/'):
         if path.startswith(pre):
             return True
     return path.startswith('OpenFPS.Sound/') and not path.startswith('OpenFPS.Sound/Core/')

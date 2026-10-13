@@ -18,7 +18,8 @@ public class LibraryBoundaryTests
     internal static readonly string[] SortedProjects =
     {
         "OpenFPS.Common", "OpenFPS.Client.Core",
-        "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Schema", "OpenFPS.Physics",
+        "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Schema",
+        "OpenFPS.Physics",
     };
 
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")
@@ -277,12 +278,14 @@ public class LibraryBoundaryTests
         new object[] { typeof(OpenFPS.Common.Geometry.TriangleWorld).Assembly.GetName().Name!, new[] { "MemoryPack.Core" } },
         // FMOD's wrapper and the Steam Audio bindings. Serilog: BackgroundPriority logs (decision 5).
         new object[] { typeof(FMOD.System).Assembly.GetName().Name!, new[] { "Serilog" } },
-        // Materials, walls, diffraction, reflections, the octree. Serilog: an unknown material is logged.
-        new object[] { typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name!,
-                       new[] { "OpenFPS.Geometry", "Serilog" } },
+        // The material table and the road surfaces: nothing of ours. Serilog: an unknown material is logged.
+        new object[] { typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name!, new[] { "Serilog" } },
+        // Walls, diffraction, reflections, the octree, the rooms.
+        new object[] { typeof(OpenFPS.Common.AcousticConstants).Assembly.GetName().Name!,
+                       new[] { "OpenFPS.Geometry", "OpenFPS.Materials" } },
         // The sound models and the synthesis. MemoryPack: TransientSound is on the wire.
         new object[] { typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name!,
-                       new[] { "OpenFPS.Geometry", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "MemoryPack.Core", "Serilog" } },
+                       new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "MemoryPack.Core", "Serilog" } },
         // The editor's attribute on a model's property: nothing but the runtime.
         new object[] { typeof(OpenFPS.Common.Editing.TunableAttribute).Assembly.GetName().Name!, Array.Empty<string>() },
     };

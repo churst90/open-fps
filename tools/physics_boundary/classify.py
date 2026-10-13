@@ -3,8 +3,8 @@
 
 Input: the TSVs tools/sound_boundary's Roslyn reader writes (types, edges, members, statics, static_refs).
 Output: <out>/physics_tables.md (every table the document quotes) and <out>/physics_crossings.tsv (every
-reference from a type bound for OpenFPS.Physics to a type it may not reference: anything but Geometry and
-Physics itself).
+reference from a type bound for OpenFPS.Physics to a type it may not reference: anything but Geometry,
+Materials and Physics itself).
 
 Groups (the first rule that matches a type):
   P   moves to OpenFPS.Physics whole
@@ -52,7 +52,7 @@ RULES = [
     (C + 'AxleSpec', 'P', ''),
     (C + 'TyreSize', 'P', ''),
     (C + 'BrakeKind', 'V', 'mechanics, and the brake squeal reads it'),
-    (C + 'RoadSurfaces', 'V', 'surface grip (Physics) and the surface index the tyres sound by'),
+    (C + 'RoadSurfaces', 'V', 'surface grip (Physics) and the surface index the tyres sound by; in OpenFPS.Materials since package stage 1'),
     (C + 'RoadGripLaw', 'P', 'a tyre on a wet road: the film, aquaplaning, the grip left'),
     (C + 'RoadTexture', 'V', 'a surface as the wet grip and the water read it'),
     (C + 'MagicCurve', 'P', 'the Magic Formula'),
@@ -140,6 +140,8 @@ def project_class(t):
     p = r['project']
     if p == 'OpenFPS.Geometry':
         return 'geometry'
+    if p == 'OpenFPS.Materials':
+        return 'materials'
     if p in ('OpenFPS.Sound', 'OpenFPS.Acoustics', 'OpenFPS.Native'):
         return 'sound' if p != 'OpenFPS.Acoustics' else 'acoustics'
     if p in SKIP_PROJECTS:
@@ -161,7 +163,7 @@ def allowed_for_physics(t):
     g = group(t)
     if g in ('P', 'PS', 'V', 'G'):
         return True
-    return project_class(t) == 'geometry'
+    return project_class(t) in ('geometry', 'materials')
 
 
 def short(t):

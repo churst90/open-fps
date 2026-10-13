@@ -11,6 +11,7 @@
          (stage 2), the acoustics and the sound models (stage 3). Never OpenFPS.Native: the server
          references this project and must not load FMOD. -->
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
     <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
     <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
     <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
@@ -45,6 +46,7 @@
        and it was never in the hash. -->
   <ItemGroup>
     <WireLibrarySource Include="..\OpenFPS.Geometry\**\*.cs" />
+    <WireLibrarySource Include="..\OpenFPS.Materials\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Acoustics\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Sound\**\*.cs" Exclude="..\OpenFPS.Sound\Core\**" />
     <WireLibrarySource Include="..\OpenFPS.Schema\**\*.cs" />

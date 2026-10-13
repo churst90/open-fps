@@ -21,7 +21,7 @@ public class EnginePackagesTests
     /// heads use the packages and are in none.</summary>
     internal static readonly string[] SortedProjects =
     {
-        "OpenFPS.Words", "OpenFPS.Schema", "OpenFPS.Native", "OpenFPS.Geometry", "OpenFPS.Astronomy", "OpenFPS.Physics",
+        "OpenFPS.Words", "OpenFPS.Schema", "OpenFPS.Native", "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Astronomy", "OpenFPS.Physics",
         "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Common", "OpenFPS.Client.Core", "OpenFPS.Server",
     };
 
@@ -190,7 +190,8 @@ public class EnginePackagesTests
         new object[] { "Native", typeof(FMOD.System).Assembly.GetName().Name! },
         new object[] { "Astronomy", typeof(OpenFPS.Astronomy.Moon).Assembly.GetName().Name! },
         new object[] { "Physics", typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetName().Name! },
-        new object[] { "Acoustics", typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name! },
+        new object[] { "Materials", typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name! },
+        new object[] { "Acoustics", typeof(OpenFPS.Common.AcousticConstants).Assembly.GetName().Name! },
         new object[] { "Sound", typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name! },
     };
 

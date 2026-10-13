@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What each material is (docs/ENGINE_PACKAGES.md, 3.1 and stage 1): one table of physical properties
+       (how a material absorbs, scatters and passes sound, what it does struck, shot or walked on, how a
+       round skips off it) and the road surfaces a wheel stands on. The physics, the acoustics, the sound
+       and the game read it. It uses nothing of ours: it is the lowest layer.
+
+       Namespaces are those the files had (OpenFPS.Common), as for the other library projects' moves. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- AcousticRegistry logs an unknown material (decision 5: Serilog's static Log stays). -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+</Project>

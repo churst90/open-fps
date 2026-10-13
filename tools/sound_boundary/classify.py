@@ -44,6 +44,7 @@ CO = 'OpenFPS.Common/'
 FILE_RULES = [
     # The library's own projects, once a stage has made them: everything in one is that project's.
     ('OpenFPS.Geometry/', 'a', 'Geometry', ''),
+    ('OpenFPS.Materials/', 'a', 'Materials', 'docs/ENGINE_PACKAGES.md, stage 1'),
     ('OpenFPS.Acoustics/', 'a', 'Acoustics', ''),
     ('OpenFPS.Sound/', 'a', 'Sound', ''),
     ('OpenFPS.Native/', 'a', 'Native', ''),
@@ -183,7 +184,7 @@ ALLOWED = {
 
 
 # Projects whose files are sorted by the rules above; every other project is host.
-SCANNED = ('OpenFPS.Common', 'OpenFPS.Client.Core', 'OpenFPS.Geometry', 'OpenFPS.Acoustics', 'OpenFPS.Sound',
+SCANNED = ('OpenFPS.Common', 'OpenFPS.Client.Core', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Acoustics', 'OpenFPS.Sound',
            'OpenFPS.Native', 'OpenFPS.Audio', 'OpenFPS.Schema', 'OpenFPS.Physics')
 
 

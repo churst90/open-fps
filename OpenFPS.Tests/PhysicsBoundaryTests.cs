@@ -54,15 +54,15 @@ public class PhysicsBoundaryTests
     }
 
     /// <summary>
-    /// The physics project references the runtime, the geometry and the editor's attribute, and nothing else
-    /// (section 9; decision 7 for the attribute). The compiler refuses a type from a project that is not
+    /// The physics project references the runtime, the geometry, the materials and the editor's attribute, and
+    /// nothing else (section 9; decision 7 for the attribute; docs/ENGINE_PACKAGES.md stage 1 for the materials). The compiler refuses a type from a project that is not
     /// referenced; this refuses the reference itself, which is what someone would add to make that error go
     /// away.
     /// </summary>
     [Fact]
     public void PhysicsReferencesOnlyGeometry()
     {
-        var allowed = new[] { "OpenFPS.Geometry", "OpenFPS.Schema" };
+        var allowed = new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Schema" };
         var wrong = typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
             .Where(n => !(n == "System" || n.StartsWith("System.", StringComparison.Ordinal) || n is "netstandard" or "mscorlib"
@@ -70,7 +70,7 @@ public class PhysicsBoundaryTests
             .ToList();
         Assert.Equal("OpenFPS.Physics", typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetName().Name);
         Assert.True(wrong.Count == 0, $"OpenFPS.Physics references {string.Join(", ", wrong)}: it may reference the runtime, "
-            + "OpenFPS.Geometry and OpenFPS.Schema only.");
+            + "OpenFPS.Geometry, OpenFPS.Materials and OpenFPS.Schema only.");
     }
 
     /// <summary>What steps the world. The sound may read the physics' values and presets; it never steps it
@@ -187,6 +187,7 @@ public class PhysicsBoundaryTests
             if (types.ContainsKey(outer.ToDisplayString(Plain))) return true;
             // OpenFPS.Schema is the editor's attribute alone, under every part (decision 7).
             return outer.DeclaringSyntaxReferences.All(r => r.SyntaxTree.FilePath.StartsWith("OpenFPS.Geometry/", StringComparison.Ordinal)
+                                                       || r.SyntaxTree.FilePath.StartsWith("OpenFPS.Materials/", StringComparison.Ordinal)
                                                        || r.SyntaxTree.FilePath.StartsWith("OpenFPS.Schema/", StringComparison.Ordinal)
                                                        || r.SyntaxTree.FilePath.StartsWith("OpenFPS.Physics/", StringComparison.Ordinal));
         }

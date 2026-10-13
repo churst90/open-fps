@@ -4,7 +4,8 @@
        a wall, a panel and a layered construction let through, diffraction over an edge, reflections and
        image sources, how enclosed a place is, the voxel octree, the constants they share, and the rooms and
        openings (Room, Opening, AcousticMap, RoomAcoustics, OpeningRoutes, FaceOpenings,
-       AcousticVolumeGenerator), which the host fills from its own entities. It uses only the geometry.
+       AcousticVolumeGenerator), which the host fills from its own entities. It uses only the geometry and the
+       materials (OpenFPS.Materials, where the material table went: docs/ENGINE_PACKAGES.md, stage 1).
 
        Namespaces are those the files had in OpenFPS.Common (decision 6). -->
 
@@ -16,11 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- AcousticRegistry logs an unknown material (decision 5: Serilog's static Log stays). -->
-    <PackageReference Include="Serilog" Version="4.2.0" />
+    <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
   </ItemGroup>
 
   <ItemGroup>

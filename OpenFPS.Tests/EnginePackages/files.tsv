@@ -1,7 +1,6 @@
 file	package	why
 OpenFPS.Acoustics/AcousticConstants.cs	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	Acoustics	
-OpenFPS.Acoustics/AcousticRegistry.cs	Acoustics	
 OpenFPS.Acoustics/Assemblies.cs	Acoustics	
 OpenFPS.Acoustics/Constructions.cs	Acoustics	
 OpenFPS.Acoustics/Diffraction.cs	Acoustics	
@@ -214,6 +213,8 @@ OpenFPS.Geometry/Triangles/TriangleWorld.cs	Geometry
 OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	Geometry	
 OpenFPS.Geometry/Triangles/WheelRays.cs	Geometry	
 OpenFPS.Geometry/WallBuild.cs	Geometry	
+OpenFPS.Materials/AcousticRegistry.cs	Materials	
+OpenFPS.Materials/RoadSurfaces.cs	Materials	
 OpenFPS.Native/FmodNative/fmod.cs	Native	
 OpenFPS.Native/FmodNative/fmod_dsp.cs	Native	
 OpenFPS.Native/FmodNative/fmod_errors.cs	Native	
