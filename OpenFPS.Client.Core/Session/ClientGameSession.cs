@@ -110,7 +110,25 @@ public sealed partial class ClientGameSession : IDisposable
         AudioEngineFacade audioEngine,
         IMicrophoneCapture? microphone = null,
         bool enableAudio = true)
+        : this(network, speech, shell, audioEngine, microphone, enableAudio, replayClock: null) { }
+
+    /// <summary>
+    /// For the spoken-lines replay, which must come out the same on every run: with
+    /// <paramref name="replayClock"/> (seconds, as the test steps them) the announcements that wait on the
+    /// wall clock (the arrival line, a zone holding, a stair cue speaking for its landing) wait on it instead,
+    /// and the audio system is on it too, its acoustic worker stepped by hand, what it leaves to chance
+    /// seeded, the beacon choices its own and no door rendered in the background. Null is the game.
+    /// </summary>
+    internal ClientGameSession(
+        ClientNetworkService network,
+        ISpeechOutput speech,
+        IClientShell shell,
+        AudioEngineFacade audioEngine,
+        IMicrophoneCapture? microphone,
+        bool enableAudio,
+        Func<double>? replayClock)
     {
+        if (replayClock != null) _wallSeconds = replayClock;
         _network = network;
         _speechLog = new SpeechLog(speech);
         _speech = _speechLog;
@@ -136,7 +154,10 @@ public sealed partial class ClientGameSession : IDisposable
         _sounds = new SoundMappingService(_state);
         // Without sound (the tests) no doors are rendered: each session's renders took minutes of every
         // core, and the next test's login waited behind them.
-        _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state, prewarm: enableAudio);
+        _audioSystem = replayClock == null
+            ? new ClientAudioSystem(_audioEngine, _sounds, _state, prewarm: enableAudio)
+            : new ClientAudioSystem(_audioEngine, _sounds, _state, replayClock, manualAcoustics: true, seed: ReplaySeed,
+                                    prewarm: false, beacons: BeaconPreferences.InMemory());
         _chat = new ChatManager(_speech);
         Ui = new UiSounds(audioEngine);
         _menus = new MenuStack(_speech, Ui);
@@ -996,7 +1017,7 @@ public sealed partial class ClientGameSession : IDisposable
                 FadeWorldIn();
                 // Arriving, a player is told where: once the body is placed in a zone, so the map and the
                 // zone are one sentence (AnnounceZoneChanges).
-                _arrivalPendingSince = DateTime.UtcNow;
+                _arrivalPendingSince = _wallSeconds();
                 break;
 
             case ServerStateUpdate update:
@@ -1426,16 +1447,16 @@ public sealed partial class ClientGameSession : IDisposable
     private void AnnounceZoneChanges(WorldSnapshot snapshot)
     {
         // Held long enough, the body moving as a body moves, to be walked into (ZoneSettle).
-        double now = (DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds;
+        double now = _wallSeconds();
         bool settled = _zoneSettle.Update(_state.CurrentRegionId, _state.Position, now);
 
         if (_arrivalPendingSince is { } since)
         {
             string here = _state.CurrentRegion;
-            var waited = DateTime.UtcNow - since;
+            double waited = now - since;
             // The audio update places the zone a few frames after the spawn; past 1.5 s it is not coming.
-            bool placed = waited > TimeSpan.FromSeconds(0.25) && here != LocalPlayerState.UnknownArea;
-            if (!placed && waited < TimeSpan.FromSeconds(1.5)) return;
+            bool placed = waited > 0.25 && here != LocalPlayerState.UnknownArea;
+            if (!placed && waited < 1.5) return;
             // "at outside" and "at under shelter" name no place: the map alone is said.
             if (here is LocalPlayerState.UnknownArea or ClientAudioSystem.UnderShelter or ClientAudioSystem.Outside
                 || here.StartsWith(ClientAudioSystem.DoorwayPrefix)) here = "";
@@ -1495,7 +1516,7 @@ public sealed partial class ClientGameSession : IDisposable
         string? line = _stairs.Update(snapshot, _state.Position, _state.Rotation, _state.CurrentRoomId);
         if (line == null) return;
         Serilog.Log.Information("[STAIRS] '{Line}' at {Pos}", line, _state.Position);
-        _stairCueAt = (DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds;
+        _stairCueAt = _wallSeconds();
         _speech.Speak(line, interrupt: false);
     }
 
@@ -1503,8 +1524,15 @@ public sealed partial class ClientGameSession : IDisposable
     internal static string ArrivalLine(string map, string? zone) =>
         string.IsNullOrWhiteSpace(zone) ? $"You're in {map}." : $"You're in {map}, at {zone}.";
 
-    /// <summary>Set on arriving on a map, until the arrival line has been said.</summary>
-    private DateTime? _arrivalPendingSince;
+    /// <summary>Set on arriving on a map, until the arrival line has been said: when, on the announcements'
+    /// clock.</summary>
+    private double? _arrivalPendingSince;
+
+    /// <summary>The clock the announcements wait on, seconds: the wall clock, or a replay's.</summary>
+    private readonly Func<double> _wallSeconds = () => (DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds;
+
+    /// <summary>What a replay's audio system is seeded with.</summary>
+    internal const int ReplaySeed = 20261012;
     private int _lastAnnouncedRegionId = int.MinValue;
     private readonly ZoneSettle _zoneSettle = new();
     private string _mapName = "";
