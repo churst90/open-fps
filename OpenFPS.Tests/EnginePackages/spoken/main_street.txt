@@ -1,0 +1,41 @@
+1 ui ui:progress:1
+1 ui ui:progress:2
+1 ui ui:progress:3
+1 ui ui:progress:4
+1 ui ui:progress:5
+1 ui ui:progress:6
+1 ui ui:progress:7
+1 ui ui:progress:10
+1 ui ui:EnterWorld
+8 say! You're in city, at Main Street sidewalk.
+10 cue Beacon SYNTH/beacon_door_chime
+58 cue Beacon SYNTH/beacon_door_chime
+106 cue Beacon SYNTH/beacon_door_chime
+117 say! Selby House west wall, 2 metres
+135 interrupt
+143 say! Selby House front entrance, 2 metres
+154 cue Beacon SYNTH/beacon_door_chime
+171 say! Selby House front entrance
+202 cue Beacon SYNTH/beacon_door_chime
+206 say! Selby House front entrance, right here.
+206 cue Beacon SYNTH/beacon_door_chime
+250 cue Beacon SYNTH/beacon_door_chime
+254 say! Entrances, 4 nearby.
+298 cue Beacon SYNTH/beacon_door_chime
+302 say! Selby House front entrance, right here.
+302 cue Beacon SYNTH/beacon_door_chime
+346 cue Beacon SYNTH/beacon_door_chime
+349 say! 9.4, 157.2, 0.1
+381 say! Turn narration off.
+394 cue Beacon SYNTH/beacon_door_chime
+442 cue Beacon SYNTH/beacon_door_chime
+465 say! Turn narration on.
+490 cue Beacon SYNTH/beacon_door_chime
+505 say! Open, North West
+523 interrupt
+531 say! Brandt Court front entrance, 19 metres
+538 cue Beacon SYNTH/beacon_door_chime
+583 say Main Street, block 8
+586 cue Beacon SYNTH/beacon_door_chime
+634 cue Beacon SYNTH/beacon_door_chime
+639 say! Main Street, block 8

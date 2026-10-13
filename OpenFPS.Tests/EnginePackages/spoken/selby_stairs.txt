@@ -1,0 +1,52 @@
+1 ui ui:progress:1
+1 ui ui:progress:2
+1 ui ui:progress:3
+1 ui ui:progress:4
+1 ui ui:progress:5
+1 ui ui:progress:6
+1 ui ui:progress:7
+1 ui ui:progress:10
+1 ui ui:EnterWorld
+1 say Stairs up, 19 steps, to floor 1
+8 say! You're in city, at Selby House landing, floor 0.
+43 cue Beacon SYNTH/beacon_stairs_steps
+61 say! North, looking straight
+70 say Selby House front entrance, 8 metres
+72 cue Beacon SYNTH/beacon_door_chime
+103 say! Selby House stairwell wall, 14 metres
+133 say! Stairs down, 19 steps, to floor 0, 1 metre
+154 say Selby House landing, floor 1
+155 cue Beacon SYNTH/beacon_door_chime
+163 say Selby House stairwell wall, 10 metres
+164 cue Beacon SYNTH/beacon_stairs_steps
+183 interrupt
+191 say! Selby House corridor wall, floor 1, 12 metres
+203 cue Beacon SYNTH/beacon_door_chime
+209 interrupt
+212 cue Beacon SYNTH/beacon_stairs_steps
+217 say! Selby House stairwell door, floor 1, 8 metres
+251 interrupt
+251 cue Beacon SYNTH/beacon_door_chime
+259 say! Selby House stairwell wall, 8 metres
+260 cue Beacon SYNTH/beacon_stairs_steps
+277 interrupt
+285 say! Stairs up, 17 steps, to floor 2, 1 metre
+299 cue Beacon SYNTH/beacon_door_chime
+303 say Stairs up, 17 steps, to floor 2
+308 cue Beacon SYNTH/beacon_stairs_steps
+357 say Selby House south wall, 5 metres
+380 cue Beacon SYNTH/beacon_stairs_steps
+387 say! Selby House south wall, 0.8 metres
+388 cue Beacon SYNTH/beacon_door_chime
+391 say! Selby House south wall
+391 say Selby House landing, floor 2
+423 say! Selby House south wall, brick, 0.3 metres ahead.
+428 cue Beacon SYNTH/beacon_stairs_steps
+436 cue Beacon SYNTH/beacon_door_chime
+455 say! Selby House stairwell door, floor 2, left behind, 11 metres.
+455 cue Beacon SYNTH/beacon_door_chime
+476 cue Beacon SYNTH/beacon_stairs_steps
+484 cue Beacon SYNTH/beacon_door_chime
+502 say! Selby House landing, floor 2
+524 cue Beacon SYNTH/beacon_stairs_steps
+532 cue Beacon SYNTH/beacon_door_chime
