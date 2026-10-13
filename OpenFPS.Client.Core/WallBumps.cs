@@ -85,7 +85,7 @@ public sealed class WallBumps
             return null;
         // Anything whose top is within a step of the feet is a step, whatever its shape: a stair
         // tread built as a column, a low kerb block. You step up it, you do not walk into it.
-        if (Sightline.WorldBounds(struck).Max.Y <= c.Feet.Y + PhysicsConstants.StepHeight + 0.05f) return null;
+        if (Sightline.WorldBounds(struck).Max.Y <= c.Feet.Y + BodyConstants.StepHeight + 0.05f) return null;
         return c;
     }
 
@@ -128,7 +128,7 @@ public sealed class WallBumps
         float lo = MathF.Max(c.Feet.Y + 0.2f, min.Y + 0.05f);
         float hi = MathF.Min(c.Feet.Y + 1.4f, max.Y - 0.05f);
         float y = hi >= lo ? hi : 0.5f * (min.Y + max.Y);
-        Vector3 p = c.Feet - n * (PhysicsConstants.PlayerRadius - 0.02f);
+        Vector3 p = c.Feet - n * (BodyConstants.PlayerRadius - 0.02f);
         return new Vector3(p.X, y, p.Z);
     }
 
@@ -211,7 +211,7 @@ public sealed class WallBumps
         float density = props.DensityKgM3 > 0f ? props.DensityKgM3 : 500f;
         // A person is not their collision box full of flesh (680 kg): they weigh what a person weighs.
         float massKg = Sightline.IsPerson(struck)
-            ? PhysicsConstants.PersonMassKg
+            ? BodyConstants.PersonMassKg
             : Math.Clamp(size.X * size.Y * size.Z * density, 1f, 1e6f);
         float closing = (running ? RunningPace : WalkingPace) * Math.Clamp(c.Intent, 0f, 1f);
         closing = MathF.Max(closing, ImpactAcoustics.MinimumSpeed + 0.05f);

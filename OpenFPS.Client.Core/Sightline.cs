@@ -49,7 +49,7 @@ public static class Sightline
         float height = max.Y - min.Y;
         float span = MathF.Min(max.X - min.X, max.Z - min.Z);
         if (height > span) return false;                       // taller than it is wide: a wall, a post
-        if (max.Y <= feetY + PhysicsConstants.StepHeight + 0.05f) return true;   // underfoot, a kerb, a step
+        if (max.Y <= feetY + BodyConstants.StepHeight + 0.05f) return true;   // underfoot, a kerb, a step
         return height <= FloorThickness && max.Y < eyeY;       // a floor or tread you look down at
     }
 

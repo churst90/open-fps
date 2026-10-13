@@ -109,7 +109,7 @@ public class MapData
 
     // AirPressure is millibars, not atmospheres: a 1.0 made every map a near-vacuum to the client's air
     // absorption. NormalizeAtmosphere catches it.
-    public float Gravity { get; set; } = PhysicsConstants.Gravity;
+    public float Gravity { get; set; } = BodyConstants.Gravity;
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
     public float AirPressure { get; set; } = 1013.25f;
