@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- The spoken-lines replay (docs/ENGINE_PACKAGES.md, stage 0). A new guard, `SpokenLinesReplayTests`: two
+  scripted walks on the city through the client's own session, up Selby House's stairs and along Main
+  Street, with every line the aids say and every cue they start held in a list by tick. Until now nothing
+  held what is said. The session can be put on a replay's clock for it; the game is as it was, and nothing a
+  player sees or hears changes.
+
 - The packages ratchet (docs/ENGINE_PACKAGES.md, stage 0). A new guard, `EnginePackagesTests`: every source
   file of the engine is in a package, and no file may gain a reference to a package its own may not use. It
   holds the 1,301 such references there are today, by file, and the number only goes down. Nothing a player

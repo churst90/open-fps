@@ -657,7 +657,30 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
     until split"; the split is done, 16.4 of docs/PHYSICS_BOUNDARY.md), which took 72 from Physics and gave
     15: 12 to the files of Accessibility and World that read the body's numbers by the game's names, and 3
     to `PhysicsUtils.cs` itself, which names the server's `GroundProbeMemo`.
-  - Not built yet: the spoken-lines replay.
+- **Built 2026-10-12, the spoken-lines replay, its walks** (made on Windows and sent back as a patch, on the
+  packages ratchet). `SpokenLinesReplayTests` runs the client's own session (`ClientGameSession`: its
+  bindings, its prediction, its aids and its audio system) on a piece of the city as the server sends it, with
+  a script at the keys, and compares every line given to the speech output and every cue started, each with
+  its tick, with a stored list in `OpenFPS.Tests/EnginePackages/spoken`.
+  - Two walks, each about twenty seconds of the game: `selby_stairs` (the arrival on a named landing, the
+    compass, two flights with their cues, the landings by name, quarter turns with what is ahead after each,
+    a wall walked into, the look-ahead, the tracker, the zone by its key) and `main_street` (the arrival in a
+    zone, along the pavement, a turn to a front door and into it, the tracker stepped and its kind changed,
+    the coordinates, the narration turned off and on, off the kerb into the street's zone). The door and
+    stair beacons sound through both.
+  - A line is "tick say text" (said after what is being said), "tick say! text" (over it), "tick interrupt",
+    "tick ui id" or "tick cue kind sound". Cues are the interface sounds and the voices of the beacons' and
+    the aids' kinds. A knock on a wall walked into is a render played when a worker has made it, so its
+    moment is not the same on every run: it is not in the list, and the wall's name said with it is.
+  - **The session has a clock for it.** Three announcements waited on the wall clock (the arrival line, a
+    zone holding before it is said, a stair cue speaking for its landing), and the session's audio system ran
+    on a stopwatch with its acoustic worker on a thread. An internal constructor takes a replay's clock: the
+    three wait on it, and the audio system is on it with the worker stepped by hand, as the emitter-stream
+    replay has it. The game's constructor is as it was.
+  - The same run says the same on the same tick every time (`TheSameRunSaysTheSame`), and the two lists come
+    out the same run after run on the machine they were written on.
+  - **Not built:** a drive (the driving cues need the server's states for a vehicle, tick by tick), other
+    people passing, and what the menus, the editor and chat say.
 
 ### Stage 1: Materials (1 session)
 
