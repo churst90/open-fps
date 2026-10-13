@@ -11,7 +11,8 @@ models for method and depth are docs/SOUND_LIBRARY_BOUNDARY.md and docs/PHYSICS_
   classifier of its own (`tools/engine_packages/classify.py`). It writes `packages_tables.md`,
   `packages_files.tsv` and `packages_crossings.tsv` into the output folder, and the ratchet's four lists into
   `ratchet` there (stage 0). Run it again after any move.
-- Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy. Planned with their
+- Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy; and Materials since
+  stage 1 was built (2026-10-12). Planned with their
   own documents and not planned again here: `OpenFPS.Audio` and the split of `ClientAudioSystem` (sound library
   stages 6 to 8), and physics stages 2 to 6. This survey says where its packages meet them.
 
@@ -692,6 +693,25 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   restitution added as columns with sources, read by nothing yet.
 - Check: every project builds at 0 warnings; the render fingerprint bit for bit; the emitter-stream replay and the
   physics replays unchanged; `AcousticRegistryTests`, `MaterialStrikeTests`.
+
+- **Built 2026-10-12, the project and the two moves** (made on Windows and sent back as a patch, on the
+  spoken-lines replay). `OpenFPS.Materials` references nothing of ours. `AcousticRegistry.cs` moved whole
+  from Acoustics with `git mv`, not a line changed, and `RoadSurfaces` whole out of `Chassis.cs` into
+  `RoadSurfaces.cs`. Acoustics, Physics, Sound and Common reference it; Acoustics no longer references
+  Serilog itself.
+  - The wire hash changes (7cd68fbff151 to ab1cd0862ca3): the hashed files moved and `WireLibrarySource`
+    gained Materials. **The door models' fingerprint does not** (cfb37eeb081b): it hashes what its files
+    hold, not where they are, so no kept render is made again. (The risk written in 3.1 did not come about.)
+  - The guards followed: the library's ratchet (the sorted projects, `files.tsv`, each assembly's allowed
+    references), the physics' (`PhysicsReferencesOnlyGeometry` allows Materials, and a type declared there
+    may be named), the packages' (the seven type rules are gone, the files are sorted by project, the
+    assembly is checked against its layer). The reader parses the new project and the three classifiers
+    sort it.
+  - In a second commit, the twelve names: `Sightline.cs`, `WallBumps.cs`, `MapRepository.cs` and
+    `PrefabValidator.cs` read the body's step, radius and mass and gravity from `BodyConstants`, where
+    they read them by the game's names. The allowance is 1,289.
+  - **Not built yet:** the four name tests of 3.1 made to read properties, and friction and restitution as
+    columns with their sources.
 
 ### Stage 2: Models (2 to 3 sessions)
 

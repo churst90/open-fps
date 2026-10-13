@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-12
 
+- Package stage 1, Materials (docs/ENGINE_PACKAGES.md). The material table and the road surfaces are in a
+  project of their own, `OpenFPS.Materials`, which uses nothing else of ours; the acoustics, the physics,
+  the sound and the game read it there. No line of the moved code changed, so nothing a player sees or
+  hears changes, and no kept door render is made again. The wire hash changes, so the server and the
+  Windows client go out together.
+
 - The spoken-lines replay (docs/ENGINE_PACKAGES.md, stage 0). A new guard, `SpokenLinesReplayTests`: two
   scripted walks on the city through the client's own session, up Selby House's stairs and along Main
   Street, with every line the aids say and every cue they start held in a list by tick. Until now nothing
