@@ -1779,7 +1779,8 @@ public partial class FmodAudioProvider : IAudioProvider
     /// listener goes as distance^-k, k fitted to the traced ones. NaN when there are too few.</summary>
     private float _lateLawK = float.NaN;
     private Vector3 _tailBias;
-    /// <summary>An answer older than this is a place you have left.</summary>
+    /// <summary>An answer older than this is stale: its source has moved on. A place left is told by the
+    /// answer's own place (<see cref="SpeaksFor"/>), not by its age.</summary>
     private const double LateAnswerSeconds = 3.0;
 
     /// <summary>
@@ -1802,30 +1803,23 @@ public partial class FmodAudioProvider : IAudioProvider
             _lateAt[i] = a.Position;
             _lateLevel[a.EntityId] = LeanWeight(a);
         }
-        lf.Want(_listenerPos, _lateIds.AsSpan(0, n), _lateAt.AsSpan(0, n));
+        lf.Want(_listenerPos, _listenerRegionId, _lateIds.AsSpan(0, n), _lateAt.AsSpan(0, n));
 
-        // The law, through the origin in log-log (a source at a metre raises what one at the listener
-        // does), fitted to what was traced lately.
         int m = lf.CopyAnswers(_lateAnswers);
         long fresh = Clock.StampTicks() - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond);
-        double sxy = 0, sxx = 0, wSum = 0;
+        _lateLawK = LateLaw(_lateAnswers.AsSpan(0, m), _listenerPos, _listenerRegionId, fresh);
+        double wSum = 0;
         Vector3 lean = Vector3.Zero;
-        int used = 0;
         for (int i = 0; i < m; i++)
         {
             var ans = _lateAnswers[i];
-            // Not "Ratio <= 0" alone: a NaN passes that, and a NaN here is a NaN send into the bus.
-            if (ans.When < fresh || !(ans.Ratio > 0f) || !float.IsFinite(ans.Ratio) || !float.IsFinite(ans.Directivity)
-                || !float.IsFinite(ans.Direction.X + ans.Direction.Y + ans.Direction.Z)) continue;
-            float d = Vector3.Distance(_listenerPos, ans.At);
-            if (d > 1.5f) { double x = Math.Log(d), y = Math.Log(ans.Ratio); sxy += x * y; sxx += x * x; used++; }
+            if (!Fits(ans, _listenerRegionId, fresh)) continue;
             // The lean: each source's late direction, weighted by the late energy it raises here.
             float level = _lateLevel.TryGetValue(ans.Id, out float lv) ? lv : 0f;
             double w = (double)ans.Ratio * level * level;
             lean += (float)w * ans.Directivity * ans.Direction;
             wSum += w;
         }
-        _lateLawK = used >= 2 && sxx > 1e-6 ? Math.Clamp((float)(-sxy / sxx), 0f, 4f) : float.NaN;
         var target = wSum > 1e-12 ? lean / (float)wSum : Vector3.Zero;
         _tailBias += (target - _tailBias) * MathF.Min(1f, _attributeDt / 0.5f);
         if (_traced.TryGetValue(_listenerRegionId, out var stage)) stage.State.Diffuse?.SetBias(_tailBias);
@@ -1833,6 +1827,37 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     private volatile float _lateLawKNow = float.NaN, _tailLeanNow;
+
+    /// <summary>Whether a late answer is the listener's now: traced lately, from the place they stand in. A
+    /// place's answers are its own: a shop's law (k 0, a far source as loud as a near one) taken into the open
+    /// air sends every car on the road into the tail at full until the first trace from outside.</summary>
+    internal static bool SpeaksFor(in LateField.Answer ans, int place, long fresh)
+        => ans.Place == place && ans.When >= fresh && float.IsFinite(ans.Ratio);
+
+    /// <summary>An answer the law and the lean are fitted to: the listener's (<see cref="SpeaksFor"/>), with
+    /// late energy and a finite direction. Not "Ratio &lt;= 0" alone: a NaN passes that, and a NaN here is a NaN
+    /// send into the bus.</summary>
+    private static bool Fits(in LateField.Answer ans, int place, long fresh)
+        => SpeaksFor(ans, place, fresh) && ans.Ratio > 0f && float.IsFinite(ans.Directivity)
+           && float.IsFinite(ans.Direction.X + ans.Direction.Y + ans.Direction.Z);
+
+    /// <summary>
+    /// The place's law for the sources not traced, k in distance^-k: fitted through the origin in log-log (a
+    /// source at a metre raises what one at the listener does) to the answers traced lately from
+    /// <paramref name="place"/> more than 1.5 m from <paramref name="listener"/>. NaN with fewer than two.
+    /// </summary>
+    internal static float LateLaw(ReadOnlySpan<LateField.Answer> answers, Vector3 listener, int place, long fresh)
+    {
+        double sxy = 0, sxx = 0;
+        int used = 0;
+        foreach (var ans in answers)
+        {
+            if (!Fits(ans, place, fresh)) continue;
+            float d = Vector3.Distance(listener, ans.At);
+            if (d > 1.5f) { double x = Math.Log(d), y = Math.Log(ans.Ratio); sxy += x * y; sxx += x * x; used++; }
+        }
+        return used >= 2 && sxx > 1e-6 ? Math.Clamp((float)(-sxy / sxx), 0f, 4f) : float.NaN;
+    }
 
     /// <summary>How hard a source pulls the tail's lean: its level at the ear, the one rank (<see cref="ActiveSound.Heard"/>).
     /// On the played gain a fire's or a rain patch's place pulled 29 dB harder than it is heard, the gain that only gives
@@ -1878,13 +1903,18 @@ public partial class FmodAudioProvider : IAudioProvider
     private float LateSend(ActiveSound a, float d)
     {
         var lf = Traced.LateField;
-        if (lf != null && lf.TryGet(a.EntityId, out var ans)
-            && ans.When >= Clock.StampTicks() - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond)
-            && float.IsFinite(ans.Ratio))
-            return d * MathF.Sqrt(Math.Clamp(ans.Ratio, 1e-4f, 4f));
-        if (!float.IsNaN(_lateLawK))
-            return d * MathF.Pow(MathF.Max(d, 1f), -_lateLawK / 2f);
-        return MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
+        LateField.Answer? own = lf != null && lf.TryGet(a.EntityId, out var ans)
+            && SpeaksFor(ans, _listenerRegionId, Clock.StampTicks() - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond)) ? ans : null;
+        return LateSend(d, own, _lateLawK, _listenerEnclosure);
+    }
+
+    /// <summary>The late send at distance <paramref name="d"/>: from the source's own answer, else the place's law
+    /// <paramref name="lawK"/>, else the stand-in, distance raised to the <paramref name="enclosure"/>.</summary>
+    internal static float LateSend(float d, LateField.Answer? own, float lawK, float enclosure)
+    {
+        if (own is { } ans) return d * MathF.Sqrt(Math.Clamp(ans.Ratio, 1e-4f, 4f));
+        if (!float.IsNaN(lawK)) return d * MathF.Pow(MathF.Max(d, 1f), -lawK / 2f);
+        return MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(enclosure, 0f, 1f));
     }
 
     private void UpdateTracedEchoes()

@@ -28,8 +28,9 @@ internal sealed class LateField : IDisposable
 
     /// <summary>One source's answer. <see cref="Ratio"/>: its late energy against a source at the
     /// listener's position. <see cref="Direction"/>: the way it arrives, game world, unit.
-    /// <see cref="Directivity"/>: |I|/E, 0 from everywhere, 1 from one way.</summary>
-    public readonly record struct Answer(int Id, float Ratio, Vector3 Direction, float Directivity, Vector3 At, long When);
+    /// <see cref="Directivity"/>: |I|/E, 0 from everywhere, 1 from one way. <see cref="Place"/>: the place
+    /// the listener stood in for it, whose answer it is.</summary>
+    public readonly record struct Answer(int Id, float Ratio, Vector3 Direction, float Directivity, Vector3 At, long When, int Place);
 
     public IntPtr Context { get; }
     public int SampleRate { get; }
@@ -40,6 +41,7 @@ internal sealed class LateField : IDisposable
     private readonly IntPtr[] _sources = new IntPtr[MaxSources + 1];
     private readonly object _gate = new(), _simGate = new();
     private Vector3 _listener;
+    private int _place;
     private readonly int[] _wantId = new int[MaxSources];
     private readonly Vector3[] _wantAt = new Vector3[MaxSources];
     private int _wantCount;
@@ -110,13 +112,13 @@ internal sealed class LateField : IDisposable
         }
     }
 
-    /// <summary>Where the listener is and which sources to trace, loudest first. Game or audio
-    /// thread; takes only the request lock.</summary>
-    public void Want(Vector3 listener, ReadOnlySpan<int> ids, ReadOnlySpan<Vector3> at)
+    /// <summary>Where the listener is, the place they stand in (stamped on the answers), and which
+    /// sources to trace, loudest first. Game or audio thread; takes only the request lock.</summary>
+    public void Want(Vector3 listener, int place, ReadOnlySpan<int> ids, ReadOnlySpan<Vector3> at)
     {
         lock (_gate)
         {
-            _listener = listener;
+            _listener = listener; _place = place;
             _wantCount = Math.Min(MaxSources, Math.Min(ids.Length, at.Length));
             for (int i = 0; i < _wantCount; i++) { _wantId[i] = ids[i]; _wantAt[i] = at[i]; }
         }
@@ -150,15 +152,15 @@ internal sealed class LateField : IDisposable
         {
             try
             {
-                Vector3 listener; int count;
+                Vector3 listener; int place, count;
                 lock (_gate)
                 {
-                    listener = _listener; count = _wantCount;
+                    listener = _listener; place = _place; count = _wantCount;
                     Array.Copy(_wantId, ids, count); Array.Copy(_wantAt, at, count);
                 }
                 if (!_haveScene || count == 0) { Thread.Sleep(RefreshMs); continue; }
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                lock (_simGate) Trace(listener, ids, at, count);
+                lock (_simGate) Trace(listener, place, ids, at, count);
                 LastRunMs = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 Runs++;
             }
@@ -167,7 +169,7 @@ internal sealed class LateField : IDisposable
         }
     }
 
-    private void Trace(Vector3 listener, int[] ids, Vector3[] at, int count)
+    private void Trace(Vector3 listener, int place, int[] ids, Vector3[] at, int count)
     {
         var shared = new Phonon.IPLSimulationSharedInputs
         {
@@ -196,7 +198,7 @@ internal sealed class LateField : IDisposable
         for (int i = 0; i < count; i++)
         {
             if (!Measure(i + 1, out float e, out Vector3 dir, out float directivity)) continue;
-            _answers[written] = new Answer(ids[i], e / eRef, dir, directivity, at[i], now);
+            _answers[written] = new Answer(ids[i], e / eRef, dir, directivity, at[i], now, place);
             Volatile.Write(ref _answerId[written], ids[i]);
             written++;
         }

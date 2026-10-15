@@ -71,7 +71,7 @@ public static class LateFieldSpike
             using var lf = new LateField(ctx);
             lf.SetScene(scene);
             var ids = Enumerable.Range(1, srcs.Length).ToArray();
-            lf.Want(ear, ids, srcs);
+            lf.Want(ear, 0, ids, srcs);
             for (int t = 0; t < 200 && lf.Runs < 3; t++) Thread.Sleep(100);
             Console.WriteLine($"\n===== {name}: ear {ear}, enclosure {enc:F2}, {lf.Runs} traces, last {lf.LastRunMs:F0} ms");
             Console.WriteLine("   dist | late energy re a source at the ear | tail/direct, new send  old send | |I|/E  arrives from the source's side (cos)");

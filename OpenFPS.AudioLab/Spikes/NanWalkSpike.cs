@@ -89,7 +89,7 @@ public static class NanWalkSpike
                     pts[i] = at + new Vector3((float)(r * Math.Cos(a)), (float)(rng.NextDouble() * 2.4 - 1.6), (float)(r * Math.Sin(a)));
                 }
                 int runs = lf.Runs;
-                lf.Want(at, ids, pts);
+                lf.Want(at, 0, ids, pts);
                 for (int t = 0; t < 400 && lf.Runs < runs + 2; t++) Thread.Sleep(10);
                 int m = lf.CopyAnswers(answersBuf);
                 for (int i = 0; i < m; i++)
