@@ -2,6 +2,17 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-14
+
+- No rush into the tail stepping out of a small room. The late field's answers, and the distance law
+  fitted to them for the sources it did not trace, were used for three seconds wherever the listener went.
+  In a small room the law is 0 (a far source rings as loud as a near one); the moment the listener stood in
+  the open air, every source out there took it and was sent at full into the tail until the first trace
+  from outside. Found in Resonance's copy beside a shop's open doorway on a busy highway: 10 to 13 dB over
+  the whole mix for a sixth of a second. Each answer now carries the place it was traced for, and is used
+  only while the listener is in that place; until the new place is traced, the stand-in. Nothing changes
+  while the listener stays in one place.
+
 ## 2026-10-12
 
 - Package stage 1, Materials (docs/ENGINE_PACKAGES.md). The material table and the road surfaces are in a

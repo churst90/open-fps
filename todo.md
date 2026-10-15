@@ -289,6 +289,10 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
 here are checked to stand on (docs/LISTENING_SPOTS.md).
+- No rush stepping out of a doorway (2026-10-14). With traffic on Main Street, inside Marlow Tower's front
+  entrance (`/tp -12.0 -103.0 0.1`), the door open, walk east out to the pavement (`/tp -7.0 -103.0 0.2`)
+  and back, a few times: the street's reverb comes in as you cross, with no burst of it for a moment at the
+  threshold.
 - Nothing standing still when a train first blows (2026-10-12). At the Mill Road crossing (`/tp -160.0
   -175.0 0.1`) with traffic about, the first train to blow and ring for it: the cars keep moving through the
   horn's first blast, the bell starts with the crossing closing. Also at the Main Street crossing (`/tp 0.0

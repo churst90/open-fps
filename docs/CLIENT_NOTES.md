@@ -477,6 +477,15 @@ of reflection, crossfaded as they move. They are chosen by the level they render
 reaches as it comes close and loses as it goes, so only sources loud enough to be heard reflecting pay
 for a trace.
 
+The late field: how much of the listener's tail each source raises is traced from where the source is, for
+the loudest sixteen in the listener's place (LateField), and the place's distance law is fitted to those
+answers for every source not traced. Both are the place's they were traced in: each answer carries it, and
+is used only while the listener stands there (FmodAudioProvider.SpeaksFor). In a small room the law is 0,
+a far source as loud as a near one; taken through the doorway into the open air it sent every car on the
+road into the tail at full until the first trace from outside (10 to 13 dB over the mix, measured in
+Resonance's copy on a busy highway). Until a place is traced the send is the stand-in, distance raised to
+the enclosure.
+
 ## The reflections trim
 
 Every trimmed path is a copy of the source arriving a few tens of milliseconds late. What the ear does
