@@ -67,6 +67,7 @@ string[] usage =
     "  --loudspeaker bench|game [out=DIR]               the loudspeaker model: datasheet numbers and renders; game: the PA and megaphone through the real mixer",
     "  --probable-bugs scene=pa|landing|bell|yard|rooms|upmix|scatter [out=DIR] [room=flat|stair|street] [wall=Glass|Brick]",
     "                                                the 2026-10-07 probable bugs through the real mixer, captured",
+    "  --extent-walk [walks=creek,creek-out,gutter,shore,fountain,fountain-out,fire] [render] [out=DIR] [speed=]",
     "  --wide-sources [out=DIR] [set=measure|roofs|tree|render|level|all] [wide=on|off] [sec=] [turbulence=] [collapse=on] [spread=] | cost",
     "                                                a tree, the fountain, the fire and rain through the game path, for interaural coherence; cost: what they cost the mixer",
     "  --textures stats FILE... | wave FILE... | compare REF... -- FILE... | render out=DIR [before=DIR] [sec=]",
@@ -748,6 +749,11 @@ if (args.Contains("--loudspeaker"))
 if (args.Contains("--probable-bugs"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.ProbableBugsSpike.Run(args));
+}
+
+if (args.Contains("--extent-walk"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ExtentWalkSpike.Run(args));
 }
 
 if (args.Contains("--wide-sources"))
