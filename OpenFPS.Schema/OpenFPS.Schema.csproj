@@ -1,11 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- What a model's property says of itself to an editor (docs/PHYSICS_BOUNDARY.md, decision 7): the
-       attribute alone, under every project whose presets carry it. The physics' presets (a gearbox, a
-       chassis) and the sound's are both read by the world editor's schema (OpenFPS.Sound/Editing), and the
-       physics may not reference the sound. It references no other project.
+       attribute, under every project whose presets carry it, and the field it describes (FieldDescriptor,
+       docs/ENGINE_PACKAGES.md stage 2), which the catalogue's kinds, the editor and a placed thing's own
+       settings all read. The physics' presets (a gearbox, a chassis) and the sound's are both read by the
+       world editor's schema, and the physics may not reference the sound. It references no other project.
 
-       The namespace is the one the attribute had in OpenFPS.Sound (OpenFPS.Common.Editing). -->
+       The namespace is the one both had in OpenFPS.Sound (OpenFPS.Common.Editing). -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

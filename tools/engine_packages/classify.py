@@ -148,7 +148,6 @@ FILE_RULES = [
     ('OpenFPS.Sound/ModelKindTable.cs', 'Models', 'the one table of model kinds'),
     ('OpenFPS.Sound/ModelLibrary.cs', 'Models', 'the models a map can name'),
     ('OpenFPS.Sound/Editing/ModelKinds.cs', 'Models', 'each kind\'s fields for the editor'),
-    ('OpenFPS.Sound/Editing/FieldDescriptor.cs', 'Schema', 'a field as the editor types it'),
     ('OpenFPS.Sound/MachinePower.cs', 'Agents', 'how hard a driver works a machine: a notch, a power lever'),
     ('OpenFPS.Sound/AircraftGroundRun.cs', 'Agents', 'an aeroplane driven along its runway'),
     ('OpenFPS.Sound/*', 'Sound', ''),

@@ -241,6 +241,7 @@ OpenFPS.Physics/WheelDynamics.cs	lib	Physics
 OpenFPS.Physics/WheelState.cs	lib	Physics	
 OpenFPS.Physics/Wind.cs	lib	Physics	
 OpenFPS.Physics/WindModel.cs	lib	Physics	
+OpenFPS.Schema/FieldDescriptor.cs	lib	Schema	
 OpenFPS.Schema/Tunable.cs	lib	Schema	
 OpenFPS.Sound/AdminGun.cs	lib	Sound	
 OpenFPS.Sound/AirLayers.cs	lib	Sound	
@@ -323,7 +324,6 @@ OpenFPS.Sound/DoorKnock.cs	lib	Sound
 OpenFPS.Sound/DoorPhysics.cs	lib	Sound	
 OpenFPS.Sound/Doors.cs	lib	Sound	
 OpenFPS.Sound/EarWind.cs	lib	Sound	
-OpenFPS.Sound/Editing/FieldDescriptor.cs	lib	Sound	
 OpenFPS.Sound/Editing/ModelKinds.cs	lib	Sound	
 OpenFPS.Sound/ElevatorDoor.cs	lib	Sound	
 OpenFPS.Sound/Engines.cs	lib	Sound	

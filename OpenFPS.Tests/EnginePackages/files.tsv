@@ -247,6 +247,7 @@ OpenFPS.Physics/WheelDynamics.cs	Physics
 OpenFPS.Physics/WheelState.cs	Physics	
 OpenFPS.Physics/Wind.cs	Physics	
 OpenFPS.Physics/WindModel.cs	Physics	
+OpenFPS.Schema/FieldDescriptor.cs	Schema	
 OpenFPS.Schema/Tunable.cs	Schema	
 OpenFPS.Server/Core/Arms.cs	game	
 OpenFPS.Server/Core/AuthService.cs	game	
@@ -479,7 +480,6 @@ OpenFPS.Sound/DoorKnock.cs	Sound
 OpenFPS.Sound/DoorPhysics.cs	Sound	
 OpenFPS.Sound/Doors.cs	Sound	
 OpenFPS.Sound/EarWind.cs	Sound	
-OpenFPS.Sound/Editing/FieldDescriptor.cs	Schema	a field as the editor types it
 OpenFPS.Sound/Editing/ModelKinds.cs	Models	each kind's fields for the editor
 OpenFPS.Sound/ElevatorDoor.cs	Sound	
 OpenFPS.Sound/Engines.cs	Sound	
