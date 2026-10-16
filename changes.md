@@ -2,6 +2,17 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-16
+
+- A door's jamb is not a wall. The near-wall copies took any surface a probe met within 3 m as a whole
+  wall, so standing in a doorway put a copy of everything at each ear off the jambs and the head. Each probe
+  now looks again across the surface it met, on its plane, half and a whole first Fresnel zone each way, and
+  its copy is as whole as the surface there (docs/CLIENT_NOTES.md, "The near-boundary reflection"). A wall
+  stays whole however it is built and however the head is turned; the set's budget is still taken on whole
+  walls, so a copy only ever gets quieter. Marlow Tower's front entrance: the copies were 4.4 to 5.7 dB over
+  the lobby's, now 2.4 under to 2.9 over. Rooms unchanged: 3,820 of 3,837 standing spots and headings.
+  Found in Resonance's copy (a shop's open doorway).
+
 ## 2026-10-14
 
 - No rush into the tail stepping out of a small room. The late field's answers, and the distance law

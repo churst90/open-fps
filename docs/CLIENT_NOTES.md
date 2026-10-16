@@ -432,6 +432,26 @@ It replaced a fixed-ish 0.1-1.2 ms FMOD echo with 45 % feedback: the wrong delay
 single reflection tracking the geometry), and every direction collapsed into one scalar, so a ceiling
 and a wall behind you sounded the same.
 
+A copy is only as whole as the surface round the point the probe met (`BoundaryProbe.Share`). A wall gives
+a whole copy when it covers about the first Fresnel zone at 1 kHz round that point, a radius of
+sqrt(c/1000 x d/2): 0.29 m at half a metre, 0.40 m at one. Each probe that meets something (not the floor,
+which makes no copy) looks again at eight points on the plane of the surface it met, half and a whole radius
+each way on two axes across it, and per axis the copy keeps (1 + the looks that landed) / 5. A look lands
+when it stops no more than 10 cm behind that plane; nearer counts, since a corner reflects too. The looks
+are on the surface's plane, not across the probe's line, because the probes turn with the head: judged
+across the line, a flat wall met at 30 degrees came out a fifth of one. A wall of any number of pieces
+stays whole; a door's jamb a foot deep, met between the ears, is a fifth of a wall; a lamp post is little.
+Found in Resonance's copy (a shop's open doorway, 2026-10-14). The six probes and their looks cost 0.01 to
+0.03 ms a frame (`--near-walls`).
+
+The set's budget (`MaxBoundaryReflectionSum`) is taken on the surfaces as whole walls, and each copy then
+pays its share. Taken on the shared copies, a doorway's jamb and head fell under the budget, the trim let go,
+and the wall that stayed whole beside them came out 1.4 dB louder than before (Marlow Tower flat 00B's door).
+Measured with `--near-walls` on the city: in Marlow Tower's front entrance (door open) the copies were 4.4
+to 5.7 dB over the lobby's and are now 2.4 dB under to 2.9 dB over; in flat 00B's doorway 4.8 dB over,
+now 0.4 to 3.7 dB over. At 3,837 room standing spots and headings, 3,820 are unchanged; the other 17 are
+on pavements beside something narrow, 2.4 to 6.4 dB down.
+
 ## Gain staging and the master makeup
 
 Every source is rendered at its true level relative to every other: Loudness.Place turns a source's dB SPL
