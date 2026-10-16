@@ -181,7 +181,8 @@ over and cancels part of the direct sound, which is a large part of why traffic 
   more than reckoned, so the ground takes less from a car than it should; and a texture's ground, reckoned
   as a comb (a source at the ground has its copy in phase either way).
   The ground is judged at the one bounce point, so it changes as that point crosses a kerb (Nord2000's
-  Fresnel-zone mixing would blend it). μ² is fixed at 5e-6, not taken from the weather.
+  Fresnel-zone mixing would blend it). μ² is fixed at 5e-6, not taken from the weather: the weather's would
+  move a lawn's middle band up to 4.5 dB at 100 m ("The air's stir from the surface layer", below).
 
 ## Sound bent by the wind and the air's layers
 
@@ -210,7 +211,7 @@ or on a clear night, sound arcs down and its ground bounce comes in steeper, so 
 - The flicker: past 100 m a far sound rises and falls with the stir, the Rytov law
   χ² = (√π/2) μ² k² L L0 with L0 = 1.1 m, at most 3 dB (one standard deviation), mean power kept. The stir
   signal is the wind field's two smallest eddy layers at the way's middle (`WindField.Stir`); μ² is the
-  thunder's (`Refraction.StirVariance`, which Thunder.TurbulenceVariance now reads unchanged).
+  surface layer's since the same day ("The air's stir from the surface layer", below).
 - Where: the mixer works it out for every voice in the world every 0.1 s (`FmodAudioProvider.Bend`,
   `Bending.Along`, 1 µs a voice), from where the voice is placed (a sound heard over a roof comes from
   above it, and is bent less), with the wind where the way's middle is at that moment (gusts move the
@@ -231,8 +232,75 @@ or on a clear night, sound arcs down and its ground bounce comes in steeper, so 
   thunder keeps its own profile and its single 25 dB until Cody hears it (a question).
 - Known short of the whole: land or water is the bounce point's (a shore path flips); the log term's height
   is the higher end's for raised sources, an extension of Harmonoise's relation; fences and buildings do not
-  yet shadow less under sound bent down; the stir's flicker swings sounds even in still air (the calm stir
-  is the thunder's judgement), the treble most.
+  yet shadow less under sound bent down.
+
+## The air's stir from the surface layer
+
+Built 2026-10-16, unheard (Cody approved the task that day). The flicker past 100 m and the shadow's floor read
+the variance of the refractive index, μ². It was the thunder's judgement (0.5 K of temperature swing and 0.2 m/s
+of wind in still air), so a far sound's treble swung about 3 dB, one standard deviation, on the stillest night.
+Now it is the air's own, from the surface layer the bending already works out.
+
+- The eddies (`AirLayers.Layer.EddiesAt`), by Monin-Obukhov scaling from the layer's u*, θ* and L, which the
+  layer now keeps. The wind swings 2.4 u* along the mean and 1.9 u* across it (Panofsky and Dutton,
+  "Atmospheric Turbulence", 1984; their ratio is the wind field's `CrossShare`) and 1.25 u* up, the vertical
+  growing as (1 − 3 z/L)^1/3 in unstable air (Panofsky, Tennekes, Lenschow and Wyngaard 1977). The temperature
+  swings 2 |θ*| in neutral and stable air and 2 |θ*| (1 + 9.5 |z/L|)^-1/3 in unstable air, which tends to
+  Tillman's free-convection 0.95 |θ*| (−z/L)^-1/3 (Kaimal and Finnigan, "Atmospheric Boundary Layer Flows",
+  1994, ch. 1; Tillman 1972). The along and across swings stay at their neutral values: in unstable air they
+  grow with the boundary layer's depth, which the weather does not carry, and eddies that large bend sound
+  rather than scatter it.
+- μ² (`Refraction.StirVariance`, read through `Bending.StirVariance`): the Gaussian model's
+  σ_T²/(4T²) + σ_v²/c² (Ostashev and Wilson, "Acoustics in Moving Inhomogeneous Media", 2nd ed. 2015, ch. 6;
+  Salomons, "Computational Atmospheric Acoustics", 2001, appendix I), σ_v² the mean of the three components'
+  variances (the model is isotropic; the same turbulent energy). It is taken at the way's mean height over its
+  ground, land or water. The eddies' outer scale is that height (`Refraction.OuterScale`, at most 10 m): for a
+  car's exhaust heard standing, 1.1 m, the figure Daigle, Piercy and Embleton (1983) fitted near the ground.
+- What it comes to 1.1 m up (day 172, 45°, clear): still neutral air 0; a calm (0.5 m/s) clear night 1.2e-7
+  (u* 0.02 m/s, θ* 0.09 K); a calm sunny afternoon 3.7e-6 (the sun's heat, σ_T 1.1 K); a 4.5 m/s breeze 7.5e-6
+  by day and 4.9e-6 by night; 10 m/s 2.9e-5. The judgement gave 1.1e-6 to 4.4e-6 for the same air. Daigle et
+  al. measured 1e-6 to 1e-5 near the ground.
+- The shadow's floor still reads 30 dB at the judged still-air stir (`CalmStirVariance`, 1.1e-6) and ten less
+  for each tenfold: a calm night keeps 30, a calm sunny afternoon 25, a breeze 21.5, a wind 20.
+- The thunder keeps its judged stir (`Refraction.JudgedStirVariance`, which `Thunder.TurbulenceVariance`
+  reads): its way runs kilometres up, out of the surface layer, and it was approved with it. `--thunder`
+  before and after: every band of every case the same (only the render times and Steam Audio's traced street
+  tail, which differs from run to run by about a decibel, moved).
+- The ground's coherence (`GroundAnswer.Coherence`) keeps its 5e-6. With the surface layer's μ² in its
+  place (measured on flat ground, a source 0.3 m and 0.05 m up and a standing ear, 10 to 100 m): concrete,
+  asphalt and water within 0.7 dB; a lawn within 0.1 dB at 10 and 25 m, but at 100 m a car's middle band 3.5 dB
+  lower on a calm night and 4.5 dB higher in a 10 m/s wind, and a rill's treble 4.3 lower and 5.4 higher. That
+  moves an approved sound, so it waits for Cody.
+- Measured (AudioLab `--refraction`, exhaust 0.5 m, ear 1.7 m, across grass, a west wind; the change in the
+  mean and the swing's standard deviation over ten minutes, before and after, low/middle/high dB):
+
+| air | way | m | mean change | swing before | swing after |
+|---|---|---|---|---|---|
+| calm night (0.5 m/s, 03:00) | downwind | 150 | 0.0 / +0.3 / +0.3 | 0.1 / 1.2 / 2.7 | 0.0 / 0.4 / 2.4 |
+| | | 300 | 0.0 / +1.4 / 0.0 | 0.3 / 2.3 / 2.6 | 0.1 / 0.7 / 2.6 |
+| | | 600 | +0.1 / +1.4 / 0.0 | 0.4 / 2.3 / 2.2 | 0.1 / 1.1 / 2.2 |
+| | upwind | 600 | +0.1 / +1.1 / 0.0 | 0.5 / 3.0 / 2.9 | 0.1 / 1.4 / 2.9 |
+| calm sunny afternoon (0.5 m/s) | downwind | 150 | 0.0 / −0.6 / 0.0 | 0.2 / 1.2 / 2.8 | 0.3 / 2.2 / 2.8 |
+| | | 300 | −0.1 / −0.3 / +5.2 | 0.3 / 2.2 / 2.6 | 0.4 / 2.5 / 2.6 |
+| | | 600 | −0.1 / +5.2 / +5.2 | 0.5 / 2.3 / 2.3 | 0.8 / 2.3 / 2.3 |
+| breezy afternoon (4.5 m/s) | downwind | 150 | 0.0 / −0.7 / 0.0 | 0.2 / 1.6 / 2.9 | 0.4 / 2.9 / 2.9 |
+| | | 600 | −0.2 / 0.0 / 0.0 | 0.6 / 2.9 / 2.9 | 1.2 / 2.9 / 2.9 |
+| | upwind | 300 | −0.1 / +4.3 / +6.3 | 1.1 / 3.5 / 2.9 | 1.3 / 2.9 / 2.9 |
+| | | 600 | −0.2 / +6.4 / +6.4 | 1.5 / 2.9 / 2.9 | 1.8 / 2.9 / 2.9 |
+| windy afternoon (10 m/s) | downwind | 300 | −0.3 / 0.0 / 0.0 | 0.6 / 3.0 / 2.9 | 1.5 / 3.0 / 2.9 |
+| | | 600 | −0.6 / 0.0 / 0.0 | 0.9 / 2.9 / 2.9 | 2.3 / 2.9 / 2.9 |
+| | upwind | 300 | −0.2 / +4.0 / +4.1 | 2.3 / 3.0 / 3.0 | 2.7 / 3.0 / 3.0 |
+| still neutral air | any | 300 | +0.1 / +1.8 / +2.3 | 0.3 / 2.3 / 2.7 | 0 / 0 / 0 |
+
+  Still air swings nothing and loses nothing to the flicker's mean. A calm clear night's middle band swings a
+  third as much as before. A sunny afternoon, a breeze or a wind swing as much as before or more (the law was
+  already at its 3 dB cap for most of them), and a sound deep in shadow there keeps 4 to 6 dB more, the
+  stirrier air scattering more into it. Across the wind (not in the table) the shadow's edge moving with the
+  swing dominates, as before. `Bending.Along` still costs about 2 µs a voice.
+- Known short: a calm clear night still swings the treble (the high band, about 7 kHz) 2.4 to 2.9 dB past
+  150 m, since the Rytov law grows as the frequency squared and is near its cap there even at 1.2e-7. The
+  afternoon's convective eddies are left out. The way is one height: a source high over a low ear reads the
+  mean of the two.
 
 ## Where the wind comes from
 

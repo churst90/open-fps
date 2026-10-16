@@ -714,7 +714,9 @@ coherence; it only takes from the approved copy. Asphalt is dense asphalt, Nord2
 - what the law would add (the far top over any ground, water and concrete at a hundred metres, 1 to 4 dB),
   held back as approved (Cody's call);
 - roughness and the scattered share (the 20 dB floor stands in); the ground mixed over the Fresnel zone
-  instead of one bounce point; μ² from the weather; the tyre share and textures seen by the law;
+  instead of one bounce point; μ² from the weather (measured 2026-10-16: the surface layer's would move a lawn's
+  middle band 3.5 dB down on a calm night and 4.5 up in a 10 m/s wind at 100 m; held, Cody's call); the tyre
+  share and textures seen by the law;
 - speech could take the ground as band gains with no copy at all, which cannot flange.
 Moving bodies go into the acoustic scene with Bodies and wheels stage 2.
 
@@ -914,8 +916,12 @@ Some may already be fixed; confirm before fixing again.
 ### Sound synthesis to come
 - Refraction: built 2026-10-16, unheard (docs/CLIENT_NOTES.md, "Sound bent by the wind and the air's
   layers"). Left: the thunder on the same profile and depth (it moves up to 25 dB, Cody's call); fences and
-  buildings shadowing less under sound bent down; the shore (land or water by one point); the still air's
-  flicker (the calm stir is the thunder's judgement); a map's own latitude.
+  buildings shadowing less under sound bent down; the shore (land or water by one point); a map's own latitude.
+  The stir comes from the surface layer since 2026-10-16 (CLIENT_NOTES.md, "The air's stir from the surface
+  layer"): still air swings nothing. Left: a calm clear night still swings the treble 2.4 to 2.9 dB past 150 m
+  by the Rytov law (a question for Cody); the afternoon's convective eddies (they scale with the boundary
+  layer's depth, which the weather does not have); the ground's coherence on the same stir (it moves a lawn's
+  middle band up to 4.5 dB at 100 m, so it stays at 5e-6 until Cody says).
 - The wind's direction: built 2026-10-16, unheard (docs/CLIENT_NOTES.md, "Where the wind comes from"). Left:
   a prevailing direction per world or real place (one for the server now, 250), and real weather's direction
   where a place has it (docs/REAL_WEATHER.md); the southern hemisphere's turns are the other way; rain does not

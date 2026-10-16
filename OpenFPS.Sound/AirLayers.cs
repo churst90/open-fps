@@ -36,8 +36,34 @@ public sealed record AirLayers(float TemperatureC, float WindSpeed, float Gustin
     /// <param name="WindLinear">The wind's linear term per m/s of ten-metre wind, per metre: 4.7 (u*/κ) / (U L) in
     /// stable air, else zero.</param>
     /// <param name="ObukhovMetres">L: negative unstable, positive stable, infinite neutral.</param>
-    public readonly record struct Layer(float ThermalLog, float ThermalLinear, float WindLog, float WindLinear, float ObukhovMetres)
+    /// <param name="FrictionVelocity">u*, m/s: zero in still air.</param>
+    /// <param name="TemperatureScale">θ*, K: negative when the ground heats the air, positive when it cools it.</param>
+    public readonly record struct Layer(float ThermalLog, float ThermalLinear, float WindLog, float WindLinear, float ObukhovMetres,
+                                        float FrictionVelocity, float TemperatureScale)
     {
+        /// <summary>
+        /// The air's turbulent fluctuations <paramref name="heightMetres"/> over the surface, by surface-layer similarity.
+        /// The wind's along and across the mean are 2.4 u* and 1.9 u* (Panofsky and Dutton, "Atmospheric Turbulence",
+        /// 1984, ch. 7; WindField.CrossShare is their ratio) at any stability: they follow the boundary layer's depth
+        /// rather than the height, and those large eddies bend sound rather than scatter it. The vertical is 1.25 u*,
+        /// growing as (1 − 3 z/L)^(1/3) in unstable air (Panofsky, Tennekes, Lenschow and Wyngaard, Boundary-Layer
+        /// Meteorol. 11, 1977). The temperature's is 2 |θ*| in neutral and stable air and 2 |θ*| (1 + 9.5 |z/L|)^(-1/3)
+        /// in unstable air, whose free-convection limit is Tillman's 0.95 |θ*| (−z/L)^(-1/3) (Kaimal and Finnigan,
+        /// "Atmospheric Boundary Layer Flows", 1994, ch. 1; Tillman, J. Appl. Meteorol. 11, 1972).
+        /// </summary>
+        public Eddies EddiesAt(float heightMetres)
+        {
+            float zl = float.IsFinite(ObukhovMetres) && ObukhovMetres != 0f ? MathF.Max(0.01f, heightMetres) / ObukhovMetres : 0f;
+            float up = UpPerFriction * FrictionVelocity, temperature = TemperaturePerScale * MathF.Abs(TemperatureScale);
+            if (zl < 0f)
+            {
+                up *= MathF.Cbrt(1f - 3f * zl);
+                temperature /= MathF.Cbrt(1f - 9.5f * zl);
+            }
+            return new Eddies(AlongPerFriction * FrictionVelocity, AlongPerFriction * WindField.CrossShare * FrictionVelocity,
+                              up, temperature);
+        }
+
         /// <summary>The profile's log coefficient (m/s) and linear coefficient (per second) along a way the ten-metre
         /// wind blows <paramref name="toward"/> m/s down.</summary>
         public (float Log, float Linear) Along(float toward)
@@ -47,6 +73,16 @@ public sealed record AirLayers(float TemperatureC, float WindSpeed, float Gustin
     /// <summary>The day of the year to take when a server does not say: the March equinox (day 80), the sun at its
     /// year's middle height.</summary>
     public const int EquinoxDay = 80;
+
+    /// <summary>The surface layer's wind fluctuation along the mean and up, and its temperature fluctuation, over u* and
+    /// over |θ*| in neutral air (Panofsky and Dutton 1984; Kaimal and Finnigan 1994; see <see cref="Layer.EddiesAt"/>).</summary>
+    public const float AlongPerFriction = 2.4f, UpPerFriction = 1.25f, TemperaturePerScale = 2f;
+
+    /// <summary>
+    /// The air's turbulent fluctuations at a height, one standard deviation each: the wind along the mean wind, across it
+    /// and up, m/s, and the temperature, K (<see cref="Layer.EddiesAt"/>).
+    /// </summary>
+    public readonly record struct Eddies(float Along, float Across, float Up, float TemperatureK);
 
     /// <summary>Von Kármán's constant.</summary>
     public const float Karman = 0.4f;
@@ -131,7 +167,7 @@ public sealed record AirLayers(float TemperatureC, float WindSpeed, float Gustin
     {
         float t = temperatureC + 273.15f;
         float lapse = -SpeedOfSound(temperatureC) / (2f * t) * Gravity / Cp;
-        return new Layer(0f, lapse, 1f / MathF.Log(WindHeight / WindField.RoughnessMetres), 0f, float.PositiveInfinity);
+        return new Layer(0f, lapse, 1f / MathF.Log(WindHeight / WindField.RoughnessMetres), 0f, float.PositiveInfinity, 0f, 0f);
     }
 
     /// <summary>
@@ -160,7 +196,7 @@ public sealed record AirLayers(float TemperatureC, float WindSpeed, float Gustin
         float thermalLinear = lapse + (stable ? ct * 4.7f * theta / (Karman * l) : 0f);
         float windLog = ustar / Karman / u;
         float windLinear = stable ? 4.7f * windLog / l : 0f;
-        return new Layer(thermalLog, thermalLinear, windLog, windLinear, l);
+        return new Layer(thermalLog, thermalLinear, windLog, windLinear, l, ustar, theta);
     }
 
     /// <summary>The momentum profile's departure from the log law at z/L (Businger et al. 1971; Paulson's integral of

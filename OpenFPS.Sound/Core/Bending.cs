@@ -29,6 +29,17 @@ public static class Bending
     public const float WindHeightMetres = 10f;
 
     /// <summary>
+    /// The variance of the refractive index, μ², over land or open water for a way whose mean height over it is
+    /// <paramref name="heightMetres"/>: the surface layer's own eddies (AirLayers.Layer.EddiesAt) against the speed of
+    /// sound (Refraction.StirVariance). Zero in still neutral air.
+    /// </summary>
+    public static float StirVariance(AirLayers layers, bool overWater, float heightMetres, float speedOfSound)
+    {
+        var e = (overWater ? layers.Water : layers.Land).EddiesAt(heightMetres);
+        return Refraction.StirVariance(e.Along, e.Across, e.Up, e.TemperatureK, layers.TemperatureC, speedOfSound);
+    }
+
+    /// <summary>
     /// The bending of the way from <paramref name="source"/> to <paramref name="ear"/>, both over ground at
     /// <paramref name="groundY"/>, over open water or land, at <paramref name="seconds"/> on the world's clock.
     /// </summary>
@@ -45,9 +56,11 @@ public static class Bending
         var (log, linear) = (overWater ? layers.Water : layers.Land).Along(toward);
         float hs = MathF.Max(0.05f, source.Y - groundY), hr = MathF.Max(0.05f, ear.Y - groundY);
         float curvature = Refraction.Curvature(new Refraction.Profile(log, linear), distance, hs, hr, speedOfSound);
-        float stir = Refraction.StirVariance(layers.WindSpeed, layers.Gustiness, layers.TemperatureC, speedOfSound);
+        // The stir is the surface layer's at the way's mean height, and so is the eddies' size.
+        float height = 0.5f * (hs + hr);
+        float stir = StirVariance(layers, overWater, height, speedOfSound);
         var shadow = Refraction.Shadow(distance, hs, hr, curvature, stir, speedOfSound);
-        var sigma = Refraction.Flicker(distance, stir, speedOfSound);
+        var sigma = Refraction.Flicker(distance, stir, Refraction.OuterScale(height), speedOfSound);
         var swing = Refraction.Bands.None;
         if (sigma.High > 0f)
         {

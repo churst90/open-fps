@@ -53,28 +53,45 @@ public static class Refraction
     /// </summary>
     public const float DeepestShadowDb = 30f, ShallowestFloorDb = 20f;
 
-    // ── The air's stir (shared with the thunder) ───────────────────────────────────────────────────
+    // ── The air's stir ─────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The variance of the refractive index, μ², of air whose wind swings <paramref name="along"/>,
+    /// <paramref name="across"/> and <paramref name="up"/> m/s and whose temperature swings
+    /// <paramref name="temperatureSigmaK"/> K (one standard deviation each; the surface layer's, AirLayers.Layer.EddiesAt),
+    /// at <paramref name="temperatureC"/>: σ_T²/(4T²) + σ_v²/c², the Gaussian model's effective variance (Ostashev and
+    /// Wilson, "Acoustics in Moving Inhomogeneous Media", 2nd ed. 2015, ch. 6; Salomons, "Computational Atmospheric
+    /// Acoustics", 2001, appendix I). The model takes the turbulence as isotropic, so σ_v² is the mean of the three
+    /// components' variances: the same turbulent energy.
+    /// </summary>
+    public static float StirVariance(float along, float across, float up, float temperatureSigmaK, float temperatureC, float speedOfSound)
+    {
+        float velocity = (along * along + across * across + up * up) / 3f;
+        float st = temperatureSigmaK / (2f * (temperatureC + 273.15f));
+        return velocity / (speedOfSound * speedOfSound) + st * st;
+    }
 
     /// <summary>The temperature's fluctuation, K, and the wind's turbulent velocity in still air and per m/s of wind,
-    /// doubled at full gustiness (a storm's 18 m/s gusting gives about 1.2 m/s, the order Ostashev and Wilson,
-    /// "Acoustics in Moving Inhomogeneous Media", 2nd ed. 2015, ch. 6, give for a windy day). Judgements, the
-    /// thunder's since 2026-09: the server has one wind and a gustiness.</summary>
+    /// doubled at full gustiness (a storm's 18 m/s gusting gives about 1.2 m/s, the order Ostashev and Wilson 2015,
+    /// ch. 6, give for a windy day). The thunder's judgement since 2026-09, which it keeps (Thunder.TurbulenceVariance):
+    /// its sound was approved with it, and its way runs kilometres up, out of the surface layer.</summary>
     public const float TemperatureSigmaK = 0.5f, CalmVelocitySigma = 0.2f, TurbulenceIntensity = 0.03f;
 
     /// <summary>
-    /// The variance of the refractive index, μ²: the wind's turbulent velocity and the temperature's fluctuation, each
-    /// against the speed of sound. <paramref name="windSpeed"/> the mean wind, m/s; <paramref name="gustiness"/> the
-    /// server's 0..1.
+    /// The thunder's judged μ²: the wind's turbulent velocity and the temperature's fluctuation, each against the speed
+    /// of sound. <paramref name="windSpeed"/> the mean wind, m/s; <paramref name="gustiness"/> the server's 0..1.
     /// </summary>
-    public static float StirVariance(float windSpeed, float gustiness, float temperatureC, float speedOfSound)
+    public static float JudgedStirVariance(float windSpeed, float gustiness, float temperatureC, float speedOfSound)
     {
         float sv = CalmVelocitySigma + TurbulenceIntensity * windSpeed * (1f + Math.Clamp(gustiness, 0f, 1f));
         float st = TemperatureSigmaK / (2f * (temperatureC + 273.15f));
         return sv * sv / (speedOfSound * speedOfSound) + st * st;
     }
 
-    /// <summary>The stir of still air on the standard day (Air.Standard), μ², the shadow's floor is measured from.</summary>
-    public static readonly float CalmStirVariance = StirVariance(0f, 0f, Air.Standard.TemperatureC, Air.Standard.SpeedOfSound);
+    /// <summary>The μ² the shadow's floor is measured from, 30 dB down: the judged stir of still air on the standard
+    /// day (Air.Standard), 1.1e-6, at the bottom of the 1e-6 to 1e-5 measured near the ground (Daigle, Piercy and
+    /// Embleton, J. Acoust. Soc. Am. 74, 1983). Still air off the surface layer stirs less and keeps the 30.</summary>
+    public static readonly float CalmStirVariance = JudgedStirVariance(0f, 0f, Air.Standard.TemperatureC, Air.Standard.SpeedOfSound);
 
     // ── The curvature ──────────────────────────────────────────────────────────────────────────────
 
@@ -164,8 +181,21 @@ public static class Refraction
     // ── The stir: a far sound rises and falls ──────────────────────────────────────────────────────
 
     /// <summary>The eddies' outer scale near the ground, metres: the ground's coherence's (Rietdijk, Chalmers 2017, eqs.
-    /// 2.55 to 2.58; GroundAnswer.Coherence).</summary>
+    /// 2.55 to 2.58; GroundAnswer.Coherence), fitted by Daigle et al. (1983) to sound between ends 1 to 2 m up.</summary>
     public const float OuterScaleMetres = 1.1f;
+
+    /// <summary>The largest outer scale a way near the ground is given, metres: the height the surface layer's figures
+    /// are taken at, the server's ten-metre wind. A way higher up is a source's in the open air, which the flicker's cap
+    /// already holds. A judgement.</summary>
+    public const float MostOuterScaleMetres = 10f;
+
+    /// <summary>
+    /// The eddies' outer scale for a way whose mean height over the ground is <paramref name="heightMetres"/>, metres:
+    /// the height itself. Near the ground eddies are about as big as their height (the mixing length κz; Ostashev and
+    /// Wilson 2015, ch. 6, take the shear's eddies' scale in proportion to height); a car's exhaust 0.5 m up heard by a
+    /// standing ear gives 1.1 m, Daigle's figure. Held to <see cref="MostOuterScaleMetres"/>.
+    /// </summary>
+    public static float OuterScale(float heightMetres) => Math.Clamp(heightMetres, 0.05f, MostOuterScaleMetres);
 
     /// <summary>
     /// The most a far sound swings, one standard deviation of its level, nepers: 3 dB. A single tone through strong
@@ -184,16 +214,17 @@ public static class Refraction
     /// <summary>
     /// How much a sound <paramref name="distance"/> off swings with the stir, per band, one standard deviation of its log
     /// amplitude, nepers: weak scattering of a spherical wave through Gaussian turbulence, χ² = (√π/2) μ² k² L L0 (the
-    /// Rytov approximation; Ostashev and Wilson 2015, ch. 7), L the way past <see cref="FlickerFromMetres"/>, capped.
+    /// Rytov approximation; Ostashev and Wilson 2015, ch. 7), L the way past <see cref="FlickerFromMetres"/>, L0 the
+    /// eddies' <paramref name="outerScale"/> (<see cref="OuterScale"/>), capped.
     /// </summary>
-    public static Bands Flicker(float distance, float stirVariance, float speedOfSound)
+    public static Bands Flicker(float distance, float stirVariance, float outerScale, float speedOfSound)
     {
         float l = distance - FlickerFromMetres;
         if (!(l > 0f)) return Bands.None;
         float Sigma(float hz)
         {
             float k = 2f * MathF.PI * hz / speedOfSound;
-            float chi2 = 0.5f * MathF.Sqrt(MathF.PI) * stirVariance * k * k * l * OuterScaleMetres;
+            float chi2 = 0.5f * MathF.Sqrt(MathF.PI) * stirVariance * k * k * l * outerScale;
             return MathF.Min(MostFlickerNepers, MathF.Sqrt(chi2));
         }
         var (lo, mid, hi) = AcousticBands.GeometricCentresHz;

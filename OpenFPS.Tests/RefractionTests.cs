@@ -71,7 +71,7 @@ public class RefractionTests
 
     /// <summary>
     /// The stir scatters sound into a shadow and holds it 20 to 30 dB down (Embleton 1996): 30 in a calm, ten less for a
-    /// tenfold stir, never under 20; and the thunder reads the same stir.
+    /// tenfold stir, never under 20; and the thunder keeps its own judged stir.
     /// </summary>
     [Fact]
     public void TheStirHoldsAShadowTwentyToThirtyDecibelsDown()
@@ -206,7 +206,7 @@ public class RefractionTests
     [Fact]
     public void AFarSoundSwingsWithTheStirAndANearOneKeepsSteady()
     {
-        var weather = Weather(AirLayers.Neutral(15f), 4.5f, fromDegrees: 0f);
+        var weather = Weather(Breezy, 4.5f, fromDegrees: 0f);
         var src = new Vector3(13.7f, 0.5f, 21.3f);
         double sum = 0, sq = 0, power = 0;
         const int N = 2000;
@@ -220,6 +220,89 @@ public class RefractionTests
         double sd = Math.Sqrt(sq / N - (sum / N) * (sum / N));
         Assert.InRange(sd, 1.0, 3.5);
         Assert.InRange(10.0 * Math.Log10(power / N), -1.5, 1.5);
+    }
+
+    /// <summary>
+    /// The stir is the air's own: in still neutral air nothing swings a far sound at all, and on a calm clear night (0.5 m/s)
+    /// the middle band 300 m off swings less than a decibel (one standard deviation), where a 10 m/s wind swings it the
+    /// full 3 dB the law allows.
+    /// </summary>
+    [Fact]
+    public void StillAirSwingsNothingAndACalmNightLittle()
+    {
+        var src = new Vector3(13.7f, 0.5f, 21.3f);
+        var ear = src + new Vector3(300f, 1.2f, 0f);
+        var still = Weather(AirLayers.Neutral(15f), 0f, fromDegrees: 0f);
+        for (int i = 0; i < 50; i++)
+            Assert.Equal(Refraction.Bands.None, Bending.Along(still, src, src + new Vector3(600f, 1.2f, 0f), 0f, false, i * 3.1, C).SwingDb);
+        double Sd(WorldWeather weather)
+        {
+            double sum = 0, sq = 0;
+            const int N = 2000;
+            for (int i = 0; i < N; i++)
+            {
+                float swing = Bending.Along(weather, src, ear, 0f, false, i * 1.7, C).SwingDb.Mid;
+                sum += swing; sq += swing * swing;
+            }
+            return Math.Sqrt(sq / N - (sum / N) * (sum / N));
+        }
+        double calm = Sd(Weather(AirLayers.From(3f, 172, 45f, 0f, 0.4f, 12f, 1013.25f, 0.5f, 0.1f), 0.5f, fromDegrees: 0f));
+        double windy = Sd(Weather(AirLayers.From(3f, 172, 45f, 0f, 0.4f, 12f, 1013.25f, 10f, 0.5f), 10f, fromDegrees: 0f));
+        Assert.True(calm < 1.0, $"calm night: {calm:F2} dB");
+        Assert.True(windy > 2.5, $"windy: {windy:F2} dB");
+    }
+
+    // ── The stir from the surface layer ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The surface layer's eddies by similarity: in neutral air the wind swings 2.4 u* along the mean, 1.9 u* across it and
+    /// 1.25 u* up (Panofsky and Dutton 1984), the temperature 2 |θ*|; in unstable air the vertical grows as
+    /// (1 − 3 z/L)^(1/3) (Panofsky et al. 1977) and the temperature's falls toward Tillman's free-convection
+    /// 0.95 |θ*| (−z/L)^(-1/3) (Kaimal and Finnigan 1994).
+    /// </summary>
+    [Fact]
+    public void TheSurfaceLayersEddiesAreTheMeasuredOnes()
+    {
+        var neutral = new AirLayers.Layer(0f, 0f, 0f, 0f, float.PositiveInfinity, 0.5f, 0f).EddiesAt(2f);
+        Assert.Equal(1.2f, neutral.Along, 4);
+        Assert.InRange(neutral.Across / 0.5f, 1.85f, 1.95f);
+        Assert.Equal(0.625f, neutral.Up, 4);
+        Assert.Equal(0f, neutral.TemperatureK);
+        var stable = new AirLayers.Layer(0f, 0f, 0f, 0f, 50f, 0.2f, 0.1f).EddiesAt(2f);
+        Assert.Equal(0.2f, stable.TemperatureK, 4);
+        Assert.Equal(0.25f, stable.Up, 4);
+        // Unstable, z/L = -1: the vertical by Panofsky's law, the temperature within 5 % of the free-convection limit.
+        var lifted = new AirLayers.Layer(0f, 0f, 0f, 0f, -10f, 0.2f, -0.5f).EddiesAt(10f);
+        Assert.Equal(1.25f * 0.2f * MathF.Cbrt(4f), lifted.Up, 4);
+        Assert.InRange(lifted.TemperatureK / (0.95f * 0.5f), 0.95f, 1.0f);
+        // z/L = -10: within 3 % of it.
+        var free = new AirLayers.Layer(0f, 0f, 0f, 0f, -1f, 0.2f, -0.5f).EddiesAt(10f);
+        Assert.InRange(free.TemperatureK / (0.95f * 0.5f * MathF.Cbrt(0.1f)), 0.97f, 1.03f);
+    }
+
+    /// <summary>
+    /// μ² is the Gaussian model's σ_T²/(4T²) + σ_v²/c², σ_v² the mean of the three components' variances (Ostashev and
+    /// Wilson 2015): 1 K and 1 m/s each way at 20 °C and 343 m/s is 2.9e-6 + 8.5e-6. Off the weather, a calm clear night
+    /// stirs the air less than a third of the least Daigle et al. (1983) measured near the ground (1e-6 to 1e-5), a breeze
+    /// within that, a sunny calm afternoon ten times the night by its heat, a 10 m/s wind more than either, and still air
+    /// not at all. The eddies' size is the way's mean height: 1.1 m for a car's exhaust heard standing, Daigle's figure.
+    /// </summary>
+    [Fact]
+    public void CalmAirIsStirredLittleAndWindOrSunMuch()
+    {
+        float t = 293.15f;
+        Assert.Equal(1f / (4f * t * t) + 1f / (343f * 343f), Refraction.StirVariance(1f, 1f, 1f, 1f, 20f, 343f), 9);
+        Assert.Equal(1f / 3f / (343f * 343f), Refraction.StirVariance(1f, 0f, 0f, 0f, 20f, 343f), 9);
+        float Mu2(float hour, float wind, float temperature)
+            => Bending.StirVariance(AirLayers.From(hour, 172, 45f, 0f, 0.4f, temperature, 1013.25f, wind, 0.1f), false, 1.1f, C);
+        float calmNight = Mu2(3f, 0.5f, 12f), calmDay = Mu2(15f, 0.5f, 20f), breezy = Mu2(15f, 4.5f, 20f), windy = Mu2(15f, 10f, 20f);
+        Assert.True(calmNight < 3e-7f, $"calm night {calmNight:E2}");
+        Assert.InRange(breezy, 1e-6f, 1e-5f);
+        Assert.True(calmDay > 10f * calmNight, $"calm afternoon {calmDay:E2} against the night's {calmNight:E2}");
+        Assert.True(windy > breezy && windy > calmDay, $"windy {windy:E2}");
+        Assert.Equal(0f, Bending.StirVariance(AirLayers.Neutral(15f), false, 1.1f, C));
+        Assert.Equal(Refraction.OuterScaleMetres, Refraction.OuterScale(0.5f * (0.5f + Ear)), 4);
+        Assert.Equal(Refraction.MostOuterScaleMetres, Refraction.OuterScale(300f));
     }
 
     /// <summary>
@@ -259,6 +342,9 @@ public class RefractionTests
         Assert.InRange(sum / N, -0.05, 0.05);
         Assert.InRange(Math.Sqrt(sq / N - (sum / N) * (sum / N)), 0.85, 1.15);
     }
+
+    /// <summary>A clear summer afternoon in a 4.5 m/s breeze.</summary>
+    private static readonly AirLayers Breezy = AirLayers.From(15f, 172, 45f, 0f, 0.4f, 20f, 1013.25f, 4.5f, 0.1f);
 
     private static WorldWeather Weather(AirLayers layers, float windSpeed, float fromDegrees = 270f)
         => new() { Layers = layers, Wind = WindWeather.Steady(windSpeed, fromDegrees, WindAir.TurbulenceFor(0.1f)) };

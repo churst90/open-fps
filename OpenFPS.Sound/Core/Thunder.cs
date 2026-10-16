@@ -127,7 +127,8 @@ public static class Thunder
     public const float TurbulenceScaleMetres = 10f;
 
     /// <summary>The temperature's fluctuation, K, and the wind's turbulent velocity in still air and
-    /// per m/s of wind: the air's stir every sound reads (Refraction.StirVariance).</summary>
+    /// per m/s of wind: the thunder's judged stir (Refraction.JudgedStirVariance). Other sounds read the
+    /// surface layer's (AirLayers.StirVariance); the thunder's way runs kilometres up, out of it.</summary>
     public const float TemperatureSigmaK = Refraction.TemperatureSigmaK, CalmVelocitySigma = Refraction.CalmVelocitySigma,
                        TurbulenceIntensity = Refraction.TurbulenceIntensity;
 
@@ -135,9 +136,9 @@ public static class Thunder
     /// longer holds (the scattering saturates), and thunder from 20 km is not a minute long.</summary>
     public const float MaxScatterSeconds = 0.6f;
 
-    /// <summary>The variance of the refractive index, mu^2, as every sound reads it (Refraction.StirVariance).</summary>
+    /// <summary>The variance of the refractive index, mu^2, the thunder's judgement (Refraction.JudgedStirVariance).</summary>
     public static float TurbulenceVariance(Air air, float c)
-        => Refraction.StirVariance(new Vector2(air.Wind.X, air.Wind.Z).Length(), air.Gustiness, air.TemperatureC, c);
+        => Refraction.JudgedStirVariance(new Vector2(air.Wind.X, air.Wind.Z).Length(), air.Gustiness, air.TemperatureC, c);
 
     /// <summary>How fast turbulence takes the coherent wave at <paramref name="f"/> Hz, per metre (intensity).</summary>
     public static float ScatterPerMetre(float f, float mu2, float c)

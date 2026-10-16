@@ -6,6 +6,17 @@ Recent work, newest first. `git log` has the rest.
 
 - Clay and leaves are named underfoot: open clay ground is "clay" and foliage lying on the ground "leaves", where both
   were "outside" (Cody, 2026-10-16). No map lays either as ground yet.
+- The air's stir comes from the air (docs/CLIENT_NOTES.md, "The air's stir from the surface layer"; Cody
+  approved). A far sound's rise and fall and the depth of a shadow read how turbulent the air is near the
+  ground, which was the thunder's fixed judgement, so on the stillest night a far sound's treble swung 3 dB. Now
+  it is the surface layer's: the wind's swings from the friction velocity and the temperature's from the
+  heat the ground gives or takes (Panofsky and Dutton; Kaimal and Finnigan), the eddies as big as the way is
+  high. Still air swings nothing; a calm clear night's middle band swings a third as much (0.4 to 1.4 dB at 150
+  to 600 m); a sunny afternoon, a breeze or a wind as much as before or more, and a shadow there keeps 4 to 6 dB
+  more of its middle and top. Thunder keeps its own stir and is unchanged; the ground's coherence keeps 5e-6,
+  since the weather's would move a lawn's middle band up to 4.5 dB at 100 m (a question for Cody). No message
+  changes; the wire hash does (Acoustics and Sound are in it), so the server and the Windows client go out
+  together. The stored streams do not change.
 - The wind's direction comes from the weather (docs/CLIENT_NOTES.md, "Where the wind comes from"; Cody: "wind
   sound should actually follow the wind directions, not random"). Each front blows from round a prevailing
   west-south-west, turned as a depression turns it (rain backed 60 degrees, a storm veered 45, snow veered 60, a

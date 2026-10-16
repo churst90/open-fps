@@ -63,6 +63,10 @@ public static class RefractionSpike
             weather.Wind = WindWeather.Steady(w, 270f, WindAir.TurbulenceFor(gust));
             var land = layers.Land;
             Console.WriteLine($"  {name}: L {land.ObukhovMetres:F0} m, thermal log {land.ThermalLog:F3} m/s, linear {land.ThermalLinear:F4} /s, wind log {land.WindLog:F3}, linear {land.WindLinear:F4} /m");
+            float mid = 0.5f * (srcHeight + 1.7f);
+            var eddies = land.EddiesAt(mid);
+            Console.WriteLine($"    stir at {mid:F1} m: u* {land.FrictionVelocity:F3} m/s, θ* {land.TemperatureScale:F3} K; σ along/across/up {eddies.Along:F2}/{eddies.Across:F2}/{eddies.Up:F2} m/s, "
+                            + $"σT {eddies.TemperatureK:F2} K; μ² {Bending.StirVariance(layers, false, mid, c):E2} (the judged stir {Refraction.JudgedStirVariance(layers.WindSpeed, layers.Gustiness, layers.TemperatureC, c):E2}), L0 {Refraction.OuterScale(mid):F2} m");
             foreach (var (dir, toEar) in new[] { ("upwind", new Vector3(-1f, 0f, 0f)), ("downwind", new Vector3(1f, 0f, 0f)), ("across", new Vector3(0f, 0f, 1f)) })
             {
                 if (w == 0f && dir != "upwind") continue;
