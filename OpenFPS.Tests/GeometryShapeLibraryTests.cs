@@ -287,7 +287,7 @@ public class GeometryShapeLibraryTests
     {
         var size = new Vector3(1.2f, 2.8f, 4.48f);
         var stairs = new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16, Materials = new[] { "", "Carpet" } };
-        var world = WorldOf(SolidSpec.OfShape(7, new Vector3(0, 1.4f, 0), Quaternion.Identity, size, Concrete(size), stairs));
+        var world = WorldOf(SolidSpec.OfShape(7, new Vector3(0, 1.4f, 0), Quaternion.Identity, size, Concrete(size), stairs, AcousticRegistry.IsGlass));
         var all = new AcceptAll();
         Assert.True(world.Closest(new Vector3(0, 5, 0), -Vector3.UnitY, 10f, GeometryLayers.Physical, RayFaces.Front, ref all, out var down));
         Assert.Equal("Carpet", world.SurfaceOf(down).Material);
@@ -297,7 +297,7 @@ public class GeometryShapeLibraryTests
 
         var roofSize = new Vector3(12, 2, 8);
         var roof = new ShapeSpec { Kind = ShapeKind.Roof, Outline = Pairs((0, 0), (12, 0), (12, 8), (0, 8)) };
-        var spec = SolidSpec.OfShape(8, new Vector3(0, 4, 0), Quaternion.Identity, roofSize, Concrete(roofSize), roof);
+        var spec = SolidSpec.OfShape(8, new Vector3(0, 4, 0), Quaternion.Identity, roofSize, Concrete(roofSize), roof, AcousticRegistry.IsGlass);
         Assert.Equal(new Vector3(12, Shapes.RoofDeckMetres, 8), spec.Surface.Construction.PanelSize);
         var rw = WorldOf(spec);
         Assert.True(rw.Closest(new Vector3(0, 9, 0), -Vector3.UnitY, 10f, GeometryLayers.Physical, RayFaces.Front, ref all, out var slope));
@@ -312,7 +312,7 @@ public class GeometryShapeLibraryTests
     public void Echoes_come_off_a_shape_s_facets()
     {
         var size = new Vector3(6f, 2f, 6f);
-        var ramp = SolidSpec.OfShape(9, new Vector3(0, 1f, 0), Quaternion.Identity, size, Concrete(size), new ShapeSpec { Kind = ShapeKind.Wedge });
+        var ramp = SolidSpec.OfShape(9, new Vector3(0, 1f, 0), Quaternion.Identity, size, Concrete(size), new ShapeSpec { Kind = ShapeKind.Wedge }, AcousticRegistry.IsGlass);
         var world = WorldOf(ramp);
         var arrivals = new List<EarlyReflections.Arrival>();
         var source = new Vector3(-1f, 3f, 0f); var listener = new Vector3(1f, 3f, 0f);

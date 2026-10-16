@@ -46,8 +46,10 @@ public static partial class Shapes
             : size;
 
     /// <summary>Each of a shape's surfaces (<see cref="SurfaceNames"/>) as <paramref name="main"/> with the form's
-    /// material for it, and a roof's slopes marked roof; null when every one is <paramref name="main"/>.</summary>
-    public static Surface[]? SlotSurfaces(ShapeSpec form, in Surface main)
+    /// material for it, glass where <paramref name="isGlass"/> says that material is (the material table's family,
+    /// which this package does not hold), and a roof's slopes marked roof; null when every one is
+    /// <paramref name="main"/>.</summary>
+    public static Surface[]? SlotSurfaces(ShapeSpec form, in Surface main, Func<string, bool> isGlass)
     {
         var names = SurfaceNames(form);
         // An imported mesh's surfaces come with the materials its import gave them.
@@ -61,7 +63,7 @@ public static partial class Shapes
                         : given != null && i < given.Length && !string.IsNullOrWhiteSpace(given[i]) ? given[i] : null;
             if (mat != null && !string.Equals(mat, main.Material, StringComparison.OrdinalIgnoreCase))
             {
-                var flags = string.Equals(mat, "Glass", StringComparison.OrdinalIgnoreCase) ? s.Flags | SurfaceFlags.Glass : s.Flags & ~SurfaceFlags.Glass;
+                var flags = isGlass(mat) ? s.Flags | SurfaceFlags.Glass : s.Flags & ~SurfaceFlags.Glass;
                 s = s with { Material = mat, Flags = flags };
             }
             if (form.Kind == ShapeKind.Roof && i == 0) s = s with { Flags = s.Flags | SurfaceFlags.Roof };

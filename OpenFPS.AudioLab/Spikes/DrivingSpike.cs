@@ -76,7 +76,7 @@ public static class DrivingSpike
         crossingSystem.Spawn(maps);
         var roads = MapRoadsBuilder.Build(cityData, crossingSystem.Rails("city"));
         var roadBoxes = EntityDefinitionFactory.StaticDefinitions(cityWorld)
-            .Where(d => string.Equals(d.Material.Material, "Asphalt", StringComparison.OrdinalIgnoreCase)
+            .Where(d => AcousticRegistry.IsCarriageway(d.Material.Material)
                      && MathF.Abs(d.Transform.Position.X) < 160f && MathF.Abs(d.Transform.Position.Z) < 160f)
             .ToList();
         Console.WriteLine($"City: {roads.Roads.Count} roads, {roads.Crossings.Count} crossings, {roadBoxes.Count} carriageway boxes near Main and Central.");

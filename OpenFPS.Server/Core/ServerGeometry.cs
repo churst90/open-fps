@@ -342,6 +342,6 @@ public sealed class ServerGeometry
         if (c.Shape == ColliderShape.Terrain)
             return world.Has<TerrainTileComponent>(e) && world.Get<TerrainTileComponent>(e) is { Posts: >= 2 } terrain
                 ? EntityGeometry.TerrainSpec(e.Id, t.Position, terrain, surface) : default;
-        return SolidSpec.OfShape(e.Id, t.Position, t.Rotation, c.Size, surface, c.Form);
+        return SolidSpec.OfShape(e.Id, t.Position, t.Rotation, c.Size, surface, c.Form, AcousticRegistry.IsGlass);
     }
 }

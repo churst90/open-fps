@@ -60,7 +60,7 @@ public static class BumpSpike
         AcousticRegistry.Initialize();
         foreach (var s in Surfaces)
         {
-            if (s.Material == "Foliage") { Console.WriteLine($"  {s.Name,-18} skipped: brushing through leaves is a rustle, not a bump"); continue; }
+            if (AcousticRegistry.IsLeaves(s.Material)) { Console.WriteLine($"  {s.Name,-18} skipped: brushing through leaves is a rustle, not a bump"); continue; }
             var m = AcousticRegistry.GetProperties(s.Material);
             int n = TransientSynth.SampleRate * 2;
             var p = new double[n];

@@ -177,9 +177,9 @@ public sealed partial class WorldEditor
             .OrderBy(d => d.Item1 == "knob" ? 0 : 1).ThenBy(d => d.Item1, StringComparer.Ordinal)
             .ToList();
 
-    /// <summary>What a window is made of: the first plain glass wall.</summary>
+    /// <summary>What a window is made of: the first wall of glass (the material's family, whatever the glass).</summary>
     private PrefabTemplate? Glazing(UserSession s)
-        => BuildMaterials(s, "wall").Where(m => m.Material == "Glass").Select(m => m.Prefab).FirstOrDefault();
+        => BuildMaterials(s, "wall").Where(m => AcousticRegistry.IsGlass(m.Material)).Select(m => m.Prefab).FirstOrDefault();
 
     // ── The form the dialog is built from ───────────────────────────────────────────────────────
 

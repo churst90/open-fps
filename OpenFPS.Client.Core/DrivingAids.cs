@@ -422,7 +422,7 @@ public sealed class DrivingAids
         {
             if (!world.Entities.TryGetValue(eid, out var e)) continue;
             var def = e.Definition;
-            if (!string.Equals(def.Material.Material, "Asphalt", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!AcousticRegistry.IsCarriageway(def.Material.Material)) continue;
             var inv = Quaternion.Inverse(e.Transform.Rotation);
             var local = Vector3.Transform(at - e.Transform.Position, inv);
             var half = def.Collider.Size * 0.5f;
@@ -878,7 +878,7 @@ public sealed class DrivingAids
     // ── Finding the road ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The asphalt at a point: the road, its name, and whether it is a junction. Where a carriageway
+    /// The carriageway at a point (a box of a material roads are laid in): the road, its name, and whether it is a junction. Where a carriageway
     /// and a junction overlap, the junction wins — it is the part of the road with no lanes — and
     /// where two carriageways overlap, the one running the way you are pointing.
     /// </summary>
@@ -892,7 +892,7 @@ public sealed class DrivingAids
         {
             if (!world.Entities.TryGetValue(eid, out var e)) continue;
             var def = e.Definition;
-            if (!string.Equals(def.Material.Material, "Asphalt", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!AcousticRegistry.IsCarriageway(def.Material.Material)) continue;
             var candidate = new LaneGuide.Road(e.Transform.Position, def.Collider.Size, e.Transform.Rotation);
             if (!LaneGuide.Locate(candidate, at, forward, out _)) continue;
             string n = def.Identity.Name ?? "";

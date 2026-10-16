@@ -69,7 +69,7 @@ public static class EntityGeometry
         if (def.Collider.Shape == Components.ColliderShape.Terrain)
             return def.Terrain is { Posts: >= 2 } terrain ? TerrainSpec(def.EntityId, transform.Position, terrain, surface) : default;
         return SolidSpec.OfShape(def.EntityId, transform.Position, transform.Rotation, def.Collider.Size, surface,
-                                 def.Collider.Form);
+                                 def.Collider.Form, AcousticRegistry.IsGlass);
     }
 
     /// <summary>A tile of ground as a solid: its heightfield, from the entity's position (the middle of the

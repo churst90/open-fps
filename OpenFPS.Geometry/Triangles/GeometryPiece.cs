@@ -94,16 +94,18 @@ public readonly record struct SolidSpec(int Owner, Vector3 Position, Quaternion 
     /// <summary>
     /// A solid of a form (null or a box: a box of <paramref name="size"/>), with the shape's own surfaces: each
     /// of <see cref="Shapes.SurfaceNames"/> is <paramref name="surface"/> with the form's material for it, a
-    /// roof's slopes are roof, and a roof's panel is its deck (<see cref="Shapes.PanelOf"/>).
+    /// roof's slopes are roof, and a roof's panel is its deck (<see cref="Shapes.PanelOf"/>). <paramref name="isGlass"/>
+    /// says which of the form's materials are glass (the material table's family).
     /// </summary>
-    public static SolidSpec OfShape(int owner, Vector3 position, Quaternion rotation, Vector3 size, Surface surface, ShapeSpec? form)
+    public static SolidSpec OfShape(int owner, Vector3 position, Quaternion rotation, Vector3 size, Surface surface, ShapeSpec? form,
+                                    Func<string, bool> isGlass)
     {
         var mesh = Shapes.Make(form, size);
         if (mesh == null || form == null) return Of(owner, position, rotation, size, surface, null);
         var main = surface with { Construction = surface.Construction with { PanelSize = Shapes.PanelOf(form, size) } };
         // A mesh a body cannot be met against (a sheet of more triangles than it has pieces for) is not in its way.
         if (!mesh.Outer.Convex && (mesh.Parts == null || mesh.Parts.Length == 0)) main = main with { Layers = main.Layers & ~GeometryLayers.Movement };
-        return new(owner, position, rotation, size, main, mesh.Outer, mesh.Parts, Slots: Shapes.SlotSurfaces(form, main));
+        return new(owner, position, rotation, size, main, mesh.Outer, mesh.Parts, Slots: Shapes.SlotSurfaces(form, main, isGlass));
     }
 
     /// <summary>A terrain tile whose middle is at <paramref name="centre"/> (heights are its own, in the

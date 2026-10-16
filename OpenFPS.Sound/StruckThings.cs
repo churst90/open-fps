@@ -883,8 +883,8 @@ public static class StruckThings
     /// <item>A wall of two leaves on studs: one leaf between two studs, the cavity behind it.</item>
     /// <item>A vehicle: its body panels (VehicleBody: steel skin, the span between stiffeners, fitted loss), over
     /// the cabin, with a part loose in the door (lock rods, the window in its channel: EST 0.3 kg, 0.8 mm).</item>
-    /// <item>A palisade fence: a pale, pinned between its rails a metre apart, on its bolt with 0.3 mm of play
-    /// (EST).</item>
+    /// <item>A material of pales (MaterialProperties.Pales, a palisade fence): one pale, pinned between its rails, on
+    /// its bolt with 0.3 mm of play (EST).</item>
     /// <item>A thing that moves and is thin (a door leaf): a plate in its frame, loose in its latch by the glass
     /// door model's keeper play (GlassDoor: the seal's compression plus half a millimetre, about 2 mm).</item>
     /// <item>Anything else thin (its thickness under a fifth of its face): a plate, built in.</item>
@@ -957,13 +957,14 @@ public static class StruckThings
                 Thickness = leafMetres, Support = StruckSupport.Built, Cavity = thick - 2 * leafMetres,
             };
         }
-        if (string.Equals(AcousticRegistry.Canonical(mat), "Fence", StringComparison.OrdinalIgnoreCase))
+        if (AcousticRegistry.GetProperties(mat).Pales is { } pale)
         {
-            // A pale: a pressed steel section about 65 mm wide and 3 mm thick, pinned between rails a metre apart.
+            // One pale between its rails.
             lengthIsUp = standing;
             return new StruckThing
             {
-                Material = mat, Shape = StruckShape.Bar, Length = MathF.Min(1f, standing ? up : longSide), Width = 0.065f, Thickness = 0.003f,
+                Material = mat, Shape = StruckShape.Bar, Length = MathF.Min(pale.RailSpacingMetres, standing ? up : longSide),
+                Width = pale.WidthMetres, Thickness = pale.ThicknessMetres,
                 Support = StruckSupport.Built, PlayMm = 0.3f, LooseMaterial = "Metal",
             };
         }

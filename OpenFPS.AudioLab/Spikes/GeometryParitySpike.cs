@@ -657,7 +657,7 @@ public static class GeometryParitySpike
             var acoustic = AcousticGeometry.FromBoxes(boxes, data.TileMetres);
             // In woods (a tree's crown, Foliage) and anywhere: a source within forty metres of a listener.
             // Crowns and woods are not solid (no surface sends a sound back off them): where they stand.
-            var crowns = newSnap.Entities.Values.Where(e => e.Definition != null && string.Equals(e.Definition.Material.Material, "Foliage", StringComparison.OrdinalIgnoreCase))
+            var crowns = newSnap.Entities.Values.Where(e => e.Definition != null && AcousticRegistry.IsLeaves(e.Definition.Material.Material))
                 .Select(e => new SteamAudioScene.Box(e.Transform.Position, Vector3.Max(e.Definition!.Collider.Size, new Vector3(1f)), e.Transform.Rotation, "Foliage")).ToList();
             var kinds = new (string Name, int Order, bool Flutter, bool Separate, float Extra)[]
             {

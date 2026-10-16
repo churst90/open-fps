@@ -33,7 +33,7 @@ public static class SurfaceRaster
             if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<RegionComponent>(e) || world.Has<PortalComponent>(e)) return;
             if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
             string? material = world.Has<MaterialComponent>(e) ? world.Get<MaterialComponent>(e).Material : null;
-            bool canopy = !c.IsSolid && string.Equals(material, "Foliage", StringComparison.OrdinalIgnoreCase);
+            bool canopy = !c.IsSolid && AcousticRegistry.IsLeaves(material);
             if (!c.IsSolid && !canopy) return;
             var s = c.Size;
             if (s.X <= 0f || s.Z <= 0f) return;

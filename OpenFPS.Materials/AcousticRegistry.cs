@@ -103,6 +103,18 @@ public struct MaterialProperties
     /// swishes through it, and over a trunk it burns as a tree.</summary>
     public bool Leaves { get; set; }
 
+    /// <summary>What open ground of it is called to someone standing on it ("sidewalk", "road"), where no named place is
+    /// over them; null where it has no such name, and the place is "outside".</summary>
+    public string? GroundName { get; set; }
+
+    /// <summary>What a road's carriageway is laid in: a box of it is a stretch of road to the driving aids. Asphalt alone:
+    /// the generators lay the footways in concrete, so concrete is not a road by its material.</summary>
+    public bool Carriageway { get; set; }
+
+    /// <summary>A material that is a row of pales, not a slab (a palisade fence): a blow on a box of it meets one pale of
+    /// this section between its rails. Null for anything solid.</summary>
+    public PaleSection? Pales { get; set; }
+
     /// <summary>What it is underfoot (Footsteps); null where it is a slab bearing on the ground with an ordinary grit,
     /// <see cref="Common.Underfoot.Ground"/>.</summary>
     public Underfoot? Underfoot { get; set; }
@@ -147,6 +159,9 @@ public readonly record struct Underfoot(float DeckSpanMetres, float DeckMetres, 
     /// <summary>A slab on the ground with some grit on it: anything that says nothing else.</summary>
     public static readonly Underfoot Ground = new(0f, 0f, 0.25f, 0.50f);
 }
+
+/// <summary>One pale of a palisade: its width and thickness, and how far apart the rails it is pinned between are, metres.</summary>
+public readonly record struct PaleSection(float WidthMetres, float ThicknessMetres, float RailSpacingMetres);
 
 /// <summary>What a struck material does with a round (BulletImpact's sections).</summary>
 public enum StrikeKind { Brittle, Metal, Soil, Water, Wood, Panel, Soft }
@@ -264,6 +279,7 @@ public static class AcousticRegistry
             AddMatter(reg);
             AddStrikesAfterMatter(reg);
             AddGroundImpedance(reg);
+            AddGroundUse(reg);
 
             foreach (var kvp in reg)
                 if (kvp.Value.Strike == null)
@@ -581,6 +597,28 @@ public static class AcousticRegistry
         Flow("Ice", float.PositiveInfinity);
     }
 
+    /// <summary>
+    /// What each material is to a player and to a blow: its name underfoot on open ground, whether a road's carriageway is
+    /// laid in it, and whether it is a row of pales. Set row by row, never through <c>Solid</c>'s "like": ice is water's face to sound, not "water" underfoot,
+    /// and an oak floor is not a boardwalk until it is said to be.
+    /// </summary>
+    private static void AddGroundUse(Dictionary<string, MaterialProperties> reg)
+    {
+        void Name(string name, string word) { var p = reg[name]; p.GroundName = word; reg[name] = p; }
+        Name("Concrete", "sidewalk");
+        Name("Asphalt", "road");
+        Name("Grass", "grass");
+        Name("Dirt", "dirt");
+        Name("Gravel", "gravel");
+        Name("Sand", "sand");
+        Name("Wood", "boardwalk");
+        Name("Metal", "metal grating");
+        Name("Water", "water");
+        var asphalt = reg["Asphalt"]; asphalt.Carriageway = true; reg["Asphalt"] = asphalt;
+        // A palisade's pale: a pressed steel section about 65 mm wide and 3 mm thick, pinned between rails a metre apart.
+        var fence = reg["Fence"]; fence.Pales = new PaleSection(0.065f, 0.003f, 1f); reg["Fence"] = fence;
+    }
+
     /// <summary>The properties beyond sound for a material already in the table.</summary>
     private static void Matter(Dictionary<string, MaterialProperties> reg, string name, string family,
                                float poisson, float lossExponent, float hardnessMPa, float roughnessMm,
@@ -715,6 +753,12 @@ public static class AcousticRegistry
 
     /// <summary>Whether a material is a volume of leaves (<see cref="MaterialProperties.Leaves"/>).</summary>
     public static bool IsLeaves(string? type) => !string.IsNullOrEmpty(type) && GetProperties(type).Leaves;
+
+    /// <summary>Whether a road's carriageway is laid in a material (<see cref="MaterialProperties.Carriageway"/>).</summary>
+    public static bool IsCarriageway(string? type) => !string.IsNullOrEmpty(type) && GetProperties(type).Carriageway;
+
+    /// <summary>What open ground of a material is called (<see cref="MaterialProperties.GroundName"/>); null for none.</summary>
+    public static string? GroundNameOf(string? type) => string.IsNullOrEmpty(type) ? null : GetProperties(type).GroundName;
 
     /// <summary>Whether a material is liquid (its family): what falls on it falls into a pool.</summary>
     public static bool IsLiquid(string? type) => !string.IsNullOrEmpty(type) && GetProperties(type).Family == "liquid";

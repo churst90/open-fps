@@ -350,7 +350,7 @@ public class RoomFloodTests
         var solids = Room().Where(s => s.Position.Y < 2.7f).ToList();
         var form = new ShapeSpec { Kind = ShapeKind.Roof, Style = RoofStyle.Hip, Outline = new[] { -2.25f, -1.75f, 2.25f, -1.75f, 2.25f, 1.75f, -2.25f, 1.75f } };
         var size = new Vector3(4.5f, 0.6f, 3.5f);
-        solids.Add(SolidSpec.OfShape(90, new Vector3(0, 3.0f, 0), Quaternion.Identity, size, S(size), form));
+        solids.Add(SolidSpec.OfShape(90, new Vector3(0, 3.0f, 0), Quaternion.Identity, size, S(size), form, AcousticRegistry.IsGlass));
         var r = RoomFlood.Flood(World(solids), new[] { Hint() }, Origin)[500];
         Assert.False(r.Open);
         Assert.DoesNotContain(r.Cells, p => p.Y > 3.3f);

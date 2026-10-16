@@ -1033,20 +1033,9 @@ public partial class ClientAudioSystem
         return ground;
     }
 
-    /// <summary>What to call open ground by its surface; <see cref="Outside"/> for anything unrecognised.</summary>
-    internal static string OutdoorNameFor(string material) => material switch
-    {
-        "Concrete" => "sidewalk",
-        "Asphalt" => "road",
-        "Grass" => "grass",
-        "Dirt" => "dirt",
-        "Gravel" => "gravel",
-        "Sand" => "sand",
-        "Wood" => "boardwalk",
-        "Metal" => "metal grating",
-        "Water" => "water",
-        _ => Outside,
-    };
+    /// <summary>What to call open ground by its surface (the material's <see cref="MaterialProperties.GroundName"/>);
+    /// <see cref="Outside"/> for a surface that has none.</summary>
+    internal static string OutdoorNameFor(string material) => AcousticRegistry.GroundNameOf(material) ?? Outside;
 
     /// <summary>Open ground of no recognised surface, outside every zone.</summary>
     internal const string Outside = "outside";
