@@ -2444,7 +2444,8 @@ stopwatch and the world time is the shared UTC count, as before.
 
 The rest of stage 5 but the model catalogue (package stage 2's `Catalogue`). Each static went with its last
 reader, so nothing compiles that still reads one. Behaviour unchanged: the stored streams, the render
-fingerprints and the spoken lines pass unregenerated, and the door fingerprint is the same (ba2b645a8813).
+fingerprints and the spoken lines pass unregenerated, and the door fingerprint is the same (f401bda46391). Made
+on bbd3f7f8 and rebased onto a5bada00 (package stage 2's catalogue, the wind's direction, the air's stir).
 
 - **Who holds what.** The mixer, beside `Clock`, `Weather` and `Traced`, and `AudioEngineFacade` reaches the
   same ones (or ones of its own when the mixer is not FMOD, as in the tests):
@@ -2508,8 +2509,8 @@ fingerprints and the spoken lines pass unregenerated, and the door fingerprint i
   - `TriangleGeometry.Enabled` and `Incremental`, `MeshLibrary.Shared`, `PerfProbe.Enabled`: the geometry's and
     the server's as much as the sound's (docs/GEOMETRY.md), and a diagnostic.
   - `RainField.RoofRidesWithHead`: the host's.
-- **Statics** (the survey's section 4, `tools/sound_boundary/run.sh`): 387 library statics that can change before,
-  337 after; written from outside their type 63 to 24, reassigned by their own type 57 to 50. The 50 gone are
+- **Statics** (the survey's section 4, `tools/sound_boundary/run.sh`): 393 library statics that can change at
+  a5bada00, 343 after; written from outside their type 63 to 24, reassigned by their own type 50 to 43. The 50 gone are
   those of the table above and their backing fields; by the survey's kinds, 39 written from outside, 7 reassigned
   by their own type, 2 never written (the fire's two estimates), a cache and a table. The ones that came in are
   the host's (the lab's `LabHearing` and a few spikes' own levers, the tests' `Law`, each read only by its own
@@ -2518,25 +2519,26 @@ fingerprints and the spoken lines pass unregenerated, and the door fingerprint i
   `HearingSettings.cs` (library, by the Sound folder rule), and the engine packages' list the same four (Sound).
   The physics survey's crossings are unchanged.
 - **The wire hash** changes, as `Loudness.cs`, `EarModel.cs`, `HearingSettings.cs`, `EarWind.cs`, `WoodChorus.cs`
-  and others are in `OpenFPS.Sound` outside `Core/` (d93a25bb75da at bbd3f7f8, 4fde7879fd68 after). Nothing sent
+  and others are in `OpenFPS.Sound` outside `Core/` (35a66e29964c at a5bada00, 73481dde067d after the
+  air's commit, b5d6b5b0a99d after this one). Nothing sent
   changed. A client and a server from either side of this refuse each other at login.
-- **Checks.** Every project builds with no warnings: the server, the GTK client, the Windows client
-  (`-p:EnableWindowsTargeting=true`), the lab and the tests. Filtered runs, each on its own:
+- **Checks** (on a5bada00). Every project builds with no warnings: the server, the GTK client, the Windows
+  client (`-p:EnableWindowsTargeting=true`), the lab and the tests. Filtered runs, each on its own:
   - the guards (LibraryBoundary, EnginePackages, RenderFingerprint, EmitterStreamReplay, SpokenLinesReplay,
     VoiceIdBand, VoiceRegistry, ModelKindTable, MapScoped, PhysicsBoundary, PhysicsReplay, PhysicsCrossMachine,
-    RicochetTable, OneConstantPerLaw, MaterialName, Refraction): 171 passed;
-  - the hearing's and the rate's readers with the guards (ear model, level compression, listening calibration,
-    the client audio, ear overload, doors, wind at the ears, woods, trains, the budget and the one rank, birds,
-    crowds, loudspeakers, stairs, nature, wide sources, machines, cabins, the mixer's callbacks, the mixer's rate,
-    login, the scope, chat, weapons, early tail, the placing thread, the clock, fire): 837 passed, 3 skipped;
+    RicochetTable, OneConstantPerLaw, MaterialName, Refraction), with WeatherWind, ModelLibrary, PresetHalves,
+    Machine and the hearing's and the rate's readers (ear model, level compression, listening calibration, the
+    client audio, ear overload, doors, woods, trains, the budget and the one rank, birds, crowds, loudspeakers,
+    stairs, nature, wide sources, vehicles, cabins, the mixer's rate, login, the scope, chat, weapons, early tail,
+    the placing thread, the clock, fire): 880 passed, 3 skipped;
   - the mix's, the talkers' and the lab's readers (traced echoes and reverb, Steam Audio, reflections following,
     own voice, talkers, borrowed voices, engine reads, propellers, tile scenes, routes, diffuse late, smooth tail,
-    gas hob, engines, struck things, running water, the provider's rank, callbacks, the worker): 585 passed, 9
+    gas hob, engines, struck things, running water, the provider's rank, callbacks, the worker): 352 passed, 9
     skipped (the Steam Audio opt-ins);
   - with `OPENFPS_STEAMAUDIO_TESTS` set, TileSceneSet, DiffuseLate, LayersInContact, TracedPlacement, ThinPanel and
     LateLawPlace: 34 passed;
-  - on the final tree with `DOTNET_PROCESSOR_COUNT=4`, the boundaries, the stored streams, the spoken lines, the
-    physics replays and the fingerprints, with the tests changed last: 134 passed.
+  - with `DOTNET_PROCESSOR_COUNT=4`, the boundaries, the stored streams, the spoken lines, the physics replays and
+    the fingerprints: 82 passed.
   None regenerated anything. The three surveys' `run.sh` agree with the lists in the tree.
 - **Not run here:** nothing through FMOD. The mixer's own reads (the voices' rates, `HasTracedEchoes`, the
   console's levers on a live mix, `/levels` and `/listening` in a session) want a session or the lab's

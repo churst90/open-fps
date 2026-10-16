@@ -8,8 +8,8 @@ Recent work, newest first. `git log` has the rest.
   (`Atmosphere`), the mixer's rate, how a world is heard (`HearingSettings`: /levels, /ear, /listening), the
   console's levers (`MixSettings`: /tail, /copies, /echoes, /cabin, /valveflow, /enginedetail), the voice chat's
   streams and the microphone's ring, and the lab's levers (`LabLevers`) are the mixer's, where they were statics
-  every world shared; the host reaches them through its facade. 50 of the library's statics are gone (387 to
-  337). The wire hash changes, so the server and the Windows client go out together.
+  every world shared; the host reaches them through its facade. 50 of the library's statics are gone (393 to
+  343). The wire hash changes, so the server and the Windows client go out together.
 - Clay and leaves are named underfoot: open clay ground is "clay" and foliage lying on the ground "leaves", where both
   were "outside" (Cody, 2026-10-16). No map lays either as ground yet.
 - The air's stir comes from the air (docs/CLIENT_NOTES.md, "The air's stir from the surface layer"; Cody
