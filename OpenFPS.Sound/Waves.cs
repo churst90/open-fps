@@ -522,7 +522,7 @@ public sealed record ShoreSpec
 /// </summary>
 public static class WindWaves
 {
-    public const float Gravity = 9.81f;
+    public const float Gravity = Earth.StandardGravity;
 
     /// <summary>Under this wind (m/s at 10 m) the water stays glassy: wind waves need a friction velocity
     /// of a few centimetres a second to start (Kahma and Donelan 1988).</summary>

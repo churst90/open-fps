@@ -15,7 +15,7 @@ namespace OpenFPS.Server.Systems;
 ///
 /// A vehicle either SHUTTLES between two points (out and back at each speed in a list) or follows a
 /// <see cref="RaceLine"/>: a track or a route on the roads, whose speed at every point comes from the
-/// curvature (sqrt(g * 9.81 * R)) pulled down by a backward braking pass. Nothing about a lap is
+/// curvature (sqrt(g G R), G standard gravity) pulled down by a backward braking pass. Nothing about a lap is
 /// scripted; it falls out of the shape of the line and the grip of the car.
 /// </summary>
 public sealed partial class VehicleSystem
@@ -855,7 +855,7 @@ public sealed partial class VehicleSystem
         float latFraction = float.IsInfinity(cornerLimit) || cornerLimit < 0.5f
             ? 0f
             : (v.Speed / cornerLimit) * (v.Speed / cornerLimit) * cornerShare;
-        float longFraction = v.Grip > 0.01f ? MathF.Abs(v.Speed - wasSpeed) / MathF.Max(1e-4f, dt) / (v.Grip * 9.81f) : 0f;
+        float longFraction = v.Grip > 0.01f ? MathF.Abs(v.Speed - wasSpeed) / MathF.Max(1e-4f, dt) / (v.Grip * Earth.StandardGravity) : 0f;
         v.TyreDemand = MathF.Min(2f, MathF.Sqrt(latFraction * latFraction + longFraction * longFraction));
 
         Advance(v, line, v.Speed * dt);

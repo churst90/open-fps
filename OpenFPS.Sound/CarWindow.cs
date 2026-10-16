@@ -207,7 +207,7 @@ public static class CarWindow
     /// <summary>Internal steps per output sample: one, as the stiffest parts are a rubber lip (about 500 Hz,
     /// its bristles a few kilohertz) and the brushes' 0.2 ms knocks, and a window renders when first heard.</summary>
     private const int Over = 1;
-    private const double G = 9.81;
+    private const double G = Earth.StandardGravity;
     private const double GlassE = 70e9, GlassRho = 2500, SteelE = 200e9, SteelRho = 7850;
     /// <summary>The pane: a front door's toughened glass, 0.75 by 0.55 m, 4 mm, about 4.1 kg, and the
     /// regulator's clamp and lifter plate under it. Its drop is 0.45 m from shut to fully down.</summary>

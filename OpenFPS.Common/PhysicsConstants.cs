@@ -5,8 +5,8 @@ namespace OpenFPS.Common;
 /// <summary>
 /// The game's rules of movement and the network's: how far a hand reaches, how far a map goes down, the
 /// tick, and what the server takes of a client's input. The body's own numbers (its size, mass, walk, run,
-/// jump, step and gravity) are <see cref="BodyConstants"/>', in the physics; the names here read them there,
-/// for the 1,100 places that ask the game.
+/// jump and step) are <see cref="BodyConstants"/>', and gravity <see cref="Earth"/>'s, in the physics; the
+/// names here read them there, for the 1,100 places that ask the game.
 /// </summary>
 public static class PhysicsConstants
 {
@@ -41,8 +41,8 @@ public static class PhysicsConstants
     /// <summary>Metres per second straight up as a standing jump leaves the ground (<see cref="BodyConstants.JumpPower"/>).</summary>
     public const float JumpPower = BodyConstants.JumpPower;
 
-    /// <summary>The Earth's, m/s² (<see cref="BodyConstants.Gravity"/>).</summary>
-    public const float Gravity = BodyConstants.Gravity;
+    /// <summary>The Earth's, m/s² (<see cref="Earth.StandardGravity"/>); a map's own is its zone's.</summary>
+    public const float Gravity = Earth.StandardGravity;
     /// <summary>The highest step a body on foot takes without jumping, metres (<see cref="BodyConstants.StepHeight"/>).</summary>
     public const float StepHeight = BodyConstants.StepHeight;
     /// <summary>How fast a body on foot turns, radians per second (<see cref="BodyConstants.RotationSpeed"/>).</summary>

@@ -226,7 +226,7 @@ public sealed class WetTyres
                 sum.Burst(at, 0.004f, 0.05f + 0.02f * MathF.Min(3f, k), pa, 250f, 7000f);
                 // The sheet falls back as drops for as long as it flies (2 v sin / g, thrown up at about
                 // a tenth of the road speed): a few tenths of a second.
-                float flight = MathF.Min(0.6f, 2f * 0.12f * _speed / 9.81f + 0.1f);
+                float flight = MathF.Min(0.6f, 2f * 0.12f * _speed / Earth.StandardGravity + 0.1f);
                 int n = sum.Poisson(FallbackDrops * MathF.Min(3f, k) * MathF.Min(1.5f, u));
                 for (int d = 0; d < n; d++)
                 {

@@ -84,7 +84,7 @@ public static class GlassFracture
     private const double SlugMetres = 0.016;
     /// <summary>The share of a tempered die's motion in the sheet that is out of the sheet's plane (estimate).</summary>
     private const double OutOfPlane = 0.2;
-    private const double Rho0 = 1.2, C0 = 343, G = 9.81;
+    private const double Rho0 = 1.2, C0 = 343, G = Earth.StandardGravity;
 
     /// <summary>The plate's longitudinal speed, sqrt(E / (rho (1 - nu^2))), about 5500 m/s.</summary>
     private static readonly double PlateSpeed = Math.Sqrt(YoungsPa / (Density * (1 - Poisson * Poisson)));

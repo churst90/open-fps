@@ -66,9 +66,9 @@ public static class WheelSquealSpike
         Scenario("3-fast-turn", "i4_midsize", 0.85f, modulated: false, report, (body, t) =>
         {
             // A 40 m left-hand bend at a speed that rises from 0.3 g to past the limit.
-            float speed = MathF.Sqrt(MathF.Min(1.05f, 0.3f + 0.09f * t) * 9.81f * 40f);
+            float speed = MathF.Sqrt(MathF.Min(1.05f, 0.3f + 0.09f * t) * Earth.StandardGravity * 40f);
             return (speed, -1f / 40f);
-        }, startSpeed: MathF.Sqrt(0.3f * 9.81f * 40f), seconds: 10f);
+        }, startSpeed: MathF.Sqrt(0.3f * Earth.StandardGravity * 40f), seconds: 10f);
 
         Scenario("4-wheelspin-pull-away", "v8_muscle", 0.9f, modulated: false, report, (body, t) =>
         {

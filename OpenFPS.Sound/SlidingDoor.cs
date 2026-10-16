@@ -197,7 +197,7 @@ public static class SlidingDoor
 
     // ── Constants, each a property of a part ─────────────────────────────────────────────────────
 
-    private const double G = 9.81;
+    private const double G = Earth.StandardGravity;
     private const double AlE = 70e9, AlRho = 2700, GlassE = 70e9, GlassRho = 2500;
     /// <summary>A patio leaf's glass: a sealed unit of two 4 mm panes. An automatic door's: one 6 mm
     /// toughened pane. The frame round it: aluminium sections, 1.5 mm walls, about 0.15 m round.</summary>

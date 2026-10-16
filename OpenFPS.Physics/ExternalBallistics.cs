@@ -61,7 +61,7 @@ public readonly record struct FlightPoint(float Range, float Height, float Drift
 /// </summary>
 public static class ExternalBallistics
 {
-    public const float Gravity = 9.80665f;
+    public const float Gravity = Earth.StandardGravity;
 
     /// <summary>The integration step, seconds. Half a millisecond moves a rifle bullet 40 cm; the
     /// second-order step below is then accurate to well under a millimetre of drop at 600 m.</summary>

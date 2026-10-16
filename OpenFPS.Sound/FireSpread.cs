@@ -437,7 +437,7 @@ public sealed class FireSpread
     private void Lean(Part p, double now, in FireWeather weather)
     {
         float d = MathF.Max(0.3f, 2f * p.Radius);
-        float ub = MathF.Pow(9.81f * p.HeatKw / (1.2f * 1.0f * 293f * d), 1f / 3f);
+        float ub = MathF.Pow(Earth.StandardGravity * p.HeatKw / (1.2f * 1.0f * 293f * d), 1f / 3f);
         var v = WindAt(weather, p.Centre.X, MathF.Max(0.5f, p.Centre.Y + 0.5f * p.Flame), p.Centre.Z, now);
         float u = v.Length();
         p.Lean = u > 1e-3f ? v / u : Vector2.UnitX;

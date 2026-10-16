@@ -150,14 +150,14 @@ public class SteadyTurnProbe
         {
             var p = MachineRegistry.VehicleFor(preset);
             var wd = new WheelDynamics(p.Mechanics, grip);
-            _o.WriteLine($"{preset}: steady lateral limit at onset {wd.SteadyLateralLimit(TyreFriction.SquealOnset) / 9.81f:F2} g, at 1.0 {wd.SteadyLateralLimit(1f) / 9.81f:F2} g");
+            _o.WriteLine($"{preset}: steady lateral limit at onset {wd.SteadyLateralLimit(TyreFriction.SquealOnset) / Earth.StandardGravity:F2} g, at 1.0 {wd.SteadyLateralLimit(1f) / Earth.StandardGravity:F2} g");
             foreach (float r in new[] { 8f, 12f, 20f })
             {
                 float vOn = wd.SteadyTurnSpeed(1f / r, TyreFriction.SquealOnset);
-                string row = $"  R {r} m: onset speed {vOn:F2} m/s ({vOn * vOn / r / 9.81f:F2} g);";
+                string row = $"  R {r} m: onset speed {vOn:F2} m/s ({vOn * vOn / r / Earth.StandardGravity:F2} g);";
                 foreach (float g in new[] { 0.2f, 0.3f, 0.4f, 0.5f })
                 {
-                    float v = MathF.Sqrt(g * 9.81f * r);
+                    float v = MathF.Sqrt(g * Earth.StandardGravity * r);
                     row += $" {g:F1}g->{wd.SteadyTurn(v, 1f / r):F2}";
                 }
                 _o.WriteLine(row);

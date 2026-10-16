@@ -228,6 +228,7 @@ OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	Native
 OpenFPS.Native/SteamAudio/PhononSim.cs	Native	
 OpenFPS.Physics/BodyConstants.cs	Physics	
 OpenFPS.Physics/Chassis.cs	Physics	
+OpenFPS.Physics/Earth.cs	Physics	
 OpenFPS.Physics/EngineMechanics.cs	Physics	
 OpenFPS.Physics/ExternalBallistics.cs	Physics	
 OpenFPS.Physics/Footing.cs	Physics	

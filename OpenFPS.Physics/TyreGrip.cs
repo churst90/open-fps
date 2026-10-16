@@ -7,7 +7,7 @@ namespace OpenFPS.Common;
 public static class TyreGrip
 {
     /// <summary>Standard gravity, m/s²: a grip in g is a force over the load it presses with.</summary>
-    public const float G = 9.80665f;
+    public const float G = Earth.StandardGravity;
 
     /// <summary>The fraction of available grip in use: 0 coasting straight, 1 the limit, above 1
     /// sliding. Longitudinal and lateral combine as a vector (the friction circle), not a sum.</summary>

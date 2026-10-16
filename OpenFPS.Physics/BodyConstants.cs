@@ -1,10 +1,10 @@
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The person and the world the sound models assume: how tall a person is, how fast they walk and run,
-/// and how fast things fall. Glass, breathing, the wind at the ears and a bullet meeting a body read them
-/// here; the game's movement (<c>PhysicsConstants</c>) takes the same values from here, so the sound and
-/// the movement cannot disagree.
+/// The person the sound models assume: how tall a person is, how fast they walk and run. Glass,
+/// breathing, the wind at the ears and a bullet meeting a body read them here (how fast things fall is
+/// <see cref="Earth.StandardGravity"/>); the game's movement (<c>PhysicsConstants</c>) takes the same
+/// values from here, so the sound and the movement cannot disagree.
 /// </summary>
 public static class BodyConstants
 {
@@ -78,11 +78,4 @@ public static class BodyConstants
 
     /// <summary>How fast a body on foot turns with the key or the stick held right over, radians per second.</summary>
     public const float RotationSpeed = 1.5f;
-
-    /// <summary>
-    /// The Earth's, m/s² (Cody, 2026-10-04: "shouldn't you fall at the speed of gravity on earth?"). A
-    /// fall is heard, so it is a claim about the world: the eighteen metres off the Brandt Court roof
-    /// take 1.92 s, against 1.55 s at the 15 once chosen for how a jump felt.
-    /// </summary>
-    public const float Gravity = 9.81f;
 }

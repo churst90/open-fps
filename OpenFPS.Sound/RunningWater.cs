@@ -616,7 +616,7 @@ public sealed record RunningWaterSpec
 /// </summary>
 public static class Hydraulics
 {
-    public const float Gravity = 9.81f;
+    public const float Gravity = Earth.StandardGravity;
 
     /// <summary>Depth (m), mean speed (m/s) and Froude number of a flow in a channel.</summary>
     public readonly record struct State(float DepthMetres, float SpeedMetresPerSecond, float WettedWidthMetres)

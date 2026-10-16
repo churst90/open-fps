@@ -2,6 +2,7 @@ type	group
 OpenFPS.Common.SharedMovementEngine	P
 OpenFPS.Common.Footing	P
 OpenFPS.Common.BodyConstants	P
+OpenFPS.Common.Earth	P
 OpenFPS.Common.ChassisSpec	P
 OpenFPS.Common.AxleSpec	P
 OpenFPS.Common.TyreSize	P

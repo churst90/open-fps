@@ -125,7 +125,7 @@ public class VehicleMotionTests : IDisposable
 
     // ── Cornering ─────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Round a constant bend a car settles at sqrt(mu * 9.81 * R), using all of its cornering and
+    /// <summary>Round a constant bend a car settles at sqrt(mu G R), using all of its cornering and
     /// all of its tyres when the map gives no separate grip.</summary>
     [Fact]
     public void RoundABendACarHoldsTheSpeedItsCorneringAllows()
@@ -133,7 +133,7 @@ public class VehicleMotionTests : IDisposable
         var rig = Build(Circle(60f), Car(corneringG: 0.5f));
         rig.Tick(600);
         var s = rig.State;
-        float limit = MathF.Sqrt(0.5f * 9.81f * 60f);
+        float limit = MathF.Sqrt(0.5f * Earth.StandardGravity * 60f);
         Assert.InRange(s.Speed, limit * 0.95f, limit * 1.02f);
         Assert.InRange(s.TyreDemand, 0.9f, 1.05f);
     }
@@ -146,7 +146,7 @@ public class VehicleMotionTests : IDisposable
         var rig = Build(Circle(60f), Car(corneringG: 0.4f, gripG: 0.8f));
         rig.Tick(600);
         var s = rig.State;
-        Assert.InRange(s.Speed, MathF.Sqrt(0.4f * 9.81f * 60f) * 0.95f, MathF.Sqrt(0.4f * 9.81f * 60f) * 1.02f);
+        Assert.InRange(s.Speed, MathF.Sqrt(0.4f * Earth.StandardGravity * 60f) * 0.95f, MathF.Sqrt(0.4f * Earth.StandardGravity * 60f) * 1.02f);
         Assert.InRange(s.TyreDemand, 0.45f, 0.55f);
     }
 
@@ -158,7 +158,7 @@ public class VehicleMotionTests : IDisposable
         rig.Tick(600);
         Assert.InRange(rig.State.Speed, 9.9f, 10.01f);
         // Under its corner limit it uses (v / limit)^2 of its tyres, not all of them.
-        float share = 10f / MathF.Sqrt(1.0f * 9.81f * 60f);
+        float share = 10f / MathF.Sqrt(1.0f * Earth.StandardGravity * 60f);
         Assert.InRange(rig.State.TyreDemand, share * share * 0.9f, share * share * 1.1f);
     }
 
@@ -169,7 +169,7 @@ public class VehicleMotionTests : IDisposable
     {
         const float r = 30f, brake = 3f;
         var rig = Build(Stadium(r), Car(topKmh: 90f, corneringG: 0.5f, brake: brake));
-        float bend = MathF.Sqrt(0.5f * 9.81f * r);
+        float bend = MathF.Sqrt(0.5f * Earth.StandardGravity * r);
         float prev = rig.State.Speed, worstDecel = 0f, fastestInBend = 0f;
         for (int i = 0; i < 30 * 60; i++)
         {
@@ -298,7 +298,7 @@ public class VehicleMotionTests : IDisposable
         Assert.Equal(5.5f, rig.State.Brake);
         Assert.Equal(3.2f, rig.State.Accel);
         // It starts at speed: a lap in progress, not a standing start.
-        Assert.InRange(rig.State.Speed, MathF.Sqrt(0.5f * 9.81f * 60f) * 0.95f, MathF.Sqrt(0.5f * 9.81f * 60f) * 1.02f);
+        Assert.InRange(rig.State.Speed, MathF.Sqrt(0.5f * Earth.StandardGravity * 60f) * 0.95f, MathF.Sqrt(0.5f * Earth.StandardGravity * 60f) * 1.02f);
     }
 
     /// <summary>A lane offset wider than the road is held to the road: no further out than half the
@@ -338,7 +338,7 @@ public class VehicleMotionTests : IDisposable
             lowest = MathF.Min(lowest, s.Speed);
             prev = s.Speed;
         }
-        float expected = 0.92f * 0.8f * 9.81f;
+        float expected = 0.92f * 0.8f * Earth.StandardGravity;
         Assert.InRange(worstDecel, expected * 0.97f, expected * 1.01f);
         Assert.InRange(lowest, 2.9f, 3.3f);
         Assert.InRange(worstDemand, 0.85f, 1.0f);

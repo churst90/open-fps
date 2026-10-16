@@ -387,7 +387,7 @@ public sealed class RainSynth
             float d = RainSurfaces.DripDiameterMm * (0.8f + 0.4f * _sum.Uniform());
             float vt = Rainfall.TerminalSpeed(d);
             float h = layer.DripFallMetres * (0.5f + _sum.Uniform());
-            float v = vt * MathF.Sqrt(1f - MathF.Exp(-2f * 9.81f * h / (vt * vt)));
+            float v = vt * MathF.Sqrt(1f - MathF.Exp(-2f * Earth.StandardGravity * h / (vt * vt)));
             float r = distance * (0.8f + 0.4f * _sum.Uniform());
             var was = _particle;
             _particle = PrecipitationKind.Rain;
@@ -523,7 +523,7 @@ public sealed class RainSynth
         if (ice && e > 0.2f && !_single)
         {
             float up = e * v;
-            int later = at + (int)(2f * up / 9.81f * _rate);
+            int later = at + (int)(2f * up / Earth.StandardGravity * _rate);
             if (later < Block + _sum.Horizon / 2)
             {
                 float rebound = up;

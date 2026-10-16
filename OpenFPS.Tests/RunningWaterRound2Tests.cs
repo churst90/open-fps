@@ -151,7 +151,7 @@ public class RunningWaterRound2Tests
         double loudest = peaks.Max();
         for (int i = 1; i < peaks.Count; i++)
             if (peaks[i] > 30 * median && peaks[i] > 0.1 * loudest && i - last > 120) { count++; last = i; }
-        float volume = 2f * MathF.PI * spec.DripLipMm * 1e-3f * 0.072f * 0.6f / (1000f * 9.81f);
+        float volume = 2f * MathF.PI * spec.DripLipMm * 1e-3f * 0.072f * 0.6f / (1000f * Earth.StandardGravity);
         float expected = leak * 1e-3f / volume * 30f;
         _o.WriteLine($"  {count} drips in 30 s, Tate's law {expected:F0}; the sink holds {s.Level * 1000:F2} mm");
         Assert.InRange(count, expected * 0.75f, expected * 1.25f);
@@ -182,7 +182,7 @@ public class RunningWaterRound2Tests
         var shape = RunningWaterSynth.Shape(spec, shoe, 0.3f);
         float terminal = RunningWaterSynth.TerminalFilmSpeed(0.3f, spec.Cavity!.DiameterMetres);
         _o.WriteLine($"  at 0.3 L/s: film {terminal:F2} m/s, lands as if from {shape.FallMetres:F2} m");
-        Assert.InRange(shape.FallMetres, shoe.DropMetres + 0.9f * terminal * terminal / (2f * 9.81f), shoe.DropMetres + 1.1f * terminal * terminal / (2f * 9.81f));
+        Assert.InRange(shape.FallMetres, shoe.DropMetres + 0.9f * terminal * terminal / (2f * Earth.StandardGravity), shoe.DropMetres + 1.1f * terminal * terminal / (2f * Earth.StandardGravity));
     }
 
     /// <summary>

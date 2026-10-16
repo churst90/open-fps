@@ -118,7 +118,7 @@ public class SpeedwayTests
     public void CornerSpeedComesFromTheTurnAndNotFromTheWaypointJoins()
     {
         float g = 2.9f;
-        float physical = MathF.Sqrt(g * 9.81f * R);       // 65.3 m/s = 235 km/h
+        float physical = MathF.Sqrt(g * Earth.StandardGravity * R);       // 65.3 m/s = 235 km/h
         var line = new RaceLine(Oval(), 0f, 300f / 3.6f, g, 8f);
 
         // Within a few per cent of the real corner speed, and never above it.

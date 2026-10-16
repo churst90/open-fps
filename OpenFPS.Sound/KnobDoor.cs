@@ -240,7 +240,7 @@ public static class KnobDoor
     // ---------------------------------------------------------------------------------------------
     // Constants, each a property of a part. None is a level or a tone.
 
-    private const double G = 9.81;
+    private const double G = Earth.StandardGravity;
 
     // Hollow core: HDF skins (E 4 GPa, 850 kg/m3), 3.2 mm, 28 mm apart; core and frame add 3.1 kg.
     private const double SkinE = 4.0e9, SkinRho = 850, SkinT = 0.0032, CoreDepth = 0.028, CoreAndFrameKg = 3.1;

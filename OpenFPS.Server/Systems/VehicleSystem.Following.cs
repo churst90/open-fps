@@ -82,7 +82,7 @@ public sealed partial class VehicleSystem
         float idm = a * (1f - (sStar / s) * (sStar / s));
         float accel = Acc(idm, wasSpeed, ahead.Lead.Speed, ahead.Lead.Wheels?.Ax ?? 0f, s, a, b);
         // No harder than a staged hard stop, which leaves the wheels turning.
-        accel = MathF.Max(accel, -MathF.Max(b, HardBrakeGripFraction * v.Grip * 9.81f));
+        accel = MathF.Max(accel, -MathF.Max(b, HardBrakeGripFraction * v.Grip * Earth.StandardGravity));
         float allowed = MathF.Max(0f, wasSpeed + accel * dt);
         if (allowed < v.Speed) v.Speed = allowed;
     }

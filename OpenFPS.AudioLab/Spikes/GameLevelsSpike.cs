@@ -587,8 +587,8 @@ public static class GameLevelsSpike
                          (b, t) => t < 2f ? (70f / 3.6f, 0f) : (MathF.Max(0f, b.Vx - 11f / 30f), 0f));
                 // A 40 m left-hand bend taken at a speed rising from 0.3 g to past the limit, 7.5 m
                 // outside its middle.
-                CarDrive("car cornering 7.5m", "i4_midsize", 0.85f, MathF.Sqrt(0.3f * 9.81f * 40f), new Vector3(-60f, 0f, -40f), new Vector3(0f, 0f, 7.5f), 10.0,
-                         (b, t) => (MathF.Sqrt(MathF.Min(1.05f, 0.3f + 0.09f * t) * 9.81f * 40f), t < 1.5f ? 0f : -1f / 40f));
+                CarDrive("car cornering 7.5m", "i4_midsize", 0.85f, MathF.Sqrt(0.3f * Earth.StandardGravity * 40f), new Vector3(-60f, 0f, -40f), new Vector3(0f, 0f, 7.5f), 10.0,
+                         (b, t) => (MathF.Sqrt(MathF.Min(1.05f, 0.3f + 0.09f * t) * Earth.StandardGravity * 40f), t < 1.5f ? 0f : -1f / 40f));
             }
             if (set is "faults-landing")
             {

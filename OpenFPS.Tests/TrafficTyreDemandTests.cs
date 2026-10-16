@@ -17,7 +17,8 @@ public class TrafficTyreDemandTests
     public TrafficTyreDemandTests(ITestOutputHelper o) => _o = o;
 
     /// <summary>The city's presets with the grip the map gives them, and the service brake the map
-    /// derives from it (a third of the grip, tools/gen_city.py brake_for).</summary>
+    /// derives from it (a third of the grip, tools/gen_city.py brake_for, which still writes g as 9.81:
+    /// the maps' numbers are what this checks).</summary>
     public static IEnumerable<object[]> CityVehicles() => new[]
     {
         new object[] { "i4_midsize", 0.85f }, new object[] { "v6", 0.85f }, new object[] { "i4_economy", 0.85f },
@@ -187,7 +188,7 @@ public class TrafficTyreDemandTests
         Assert.Equal(0.26f, DriverSteering.ComfortSideFriction(20f * 0.44704f), 3);
         Assert.Equal(0.20f, DriverSteering.ComfortSideFriction(30f * 0.44704f), 3);
         float v = DriverSteering.ComfortTurnSpeed(1f / 10f);
-        _o.WriteLine($"10 m turn: {v * 3.6f:F1} km/h, {v * v / 10f / 9.81f:F2} g");
+        _o.WriteLine($"10 m turn: {v * 3.6f:F1} km/h, {v * v / 10f / Earth.StandardGravity:F2} g");
         Assert.InRange(v * 3.6f, 17f, 23f);
         Assert.Equal(v, DriverSteering.ComfortTurnSpeed(-1f / 10f));
     }

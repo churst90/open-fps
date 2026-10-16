@@ -109,7 +109,7 @@ public class MapData
 
     // AirPressure is millibars, not atmospheres: a 1.0 made every map a near-vacuum to the client's air
     // absorption. NormalizeAtmosphere catches it.
-    public float Gravity { get; set; } = BodyConstants.Gravity;
+    public float Gravity { get; set; } = Earth.StandardGravity;
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
     public float AirPressure { get; set; } = 1013.25f;
@@ -404,7 +404,7 @@ public class VehicleData
     public string? Track { get; set; }
     /// <summary>What this car will do on the straight, km/h. Its own limit, not the track's.</summary>
     public float TopSpeedKmh { get; set; }
-    /// <summary>How hard it corners, g: the corner speed is sqrt(g * 9.81 * R), which is the sound of a
+    /// <summary>How hard it corners, g: the corner speed is sqrt(g G R) (G standard gravity), which is the sound of a
     /// lap. A road car on a flat bend 0.9, a stock car on a banked oval nearer 2.8, a winged formula car
     /// 4 and up.</summary>
     public float CorneringG { get; set; }

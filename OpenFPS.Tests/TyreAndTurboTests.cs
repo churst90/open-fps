@@ -248,7 +248,7 @@ public class TyreAndTurboTests
         float corneringG = (gripG + tan) / (1f - gripG * tan);
 
         // What a listener differentiating velocity and dividing by FLAT grip would conclude.
-        float naive = TyreGrip.Demand(0f, corneringG * 9.81f, gripG);
+        float naive = TyreGrip.Demand(0f, corneringG * Earth.StandardGravity, gripG);
         Assert.True(naive > TyreFriction.SlideOnset,
             $"the naive reading was {naive:F2}, which would not have shown the bug");
 

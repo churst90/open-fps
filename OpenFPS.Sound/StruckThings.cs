@@ -174,9 +174,6 @@ public static class StruckThings
     /// <summary>How far a body's clothes and flesh give before its measured spring is met, metres (EST).</summary>
     private const double ClothesM = 0.003;
 
-    /// <summary>Standard gravity, m/s^2: a resting thing's weight is its contact's preload.</summary>
-    private const double StandardGravity = 9.80665;
-
     /// <summary>What a thing resting on the ground pushes into: a 150 mm concrete slab, kg/m^2.</summary>
     public const float GroundSurfaceDensity = 2400f * 0.15f;
 
@@ -368,7 +365,7 @@ public static class StruckThings
         bool moves = thing.Support != StruckSupport.Built || (loose && thing.LooseKg <= 0f);
         double rigidMass = thing.Support == StruckSupport.Held ? total + HandKg
                          : loose && thing.LooseKg <= 0f && thing.Support == StruckSupport.Built ? total / 3 : total;
-        double weight = total * StandardGravity;
+        double weight = total * Earth.StandardGravity;   // its weight is its contact's preload
         double rigidK = thing.Support == StruckSupport.Held ? HandStiffness
                       : resting ? RestingStiffness(m, weight)
                       : loose && thing.LooseKg <= 0f ? 400 : 0;   // a seal or a closer holding a door in the middle of its play (EST)

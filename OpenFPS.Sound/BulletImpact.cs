@@ -527,7 +527,7 @@ public static class BulletImpact
         {
             float v = MathF.Sqrt(vx * vx + vy * vy);
             vx -= k * v * vx * dt;
-            vy -= (9.81f + k * v * vy) * dt;
+            vy -= (Earth.StandardGravity + k * v * vy) * dt;
             y += vy * dt;
             t += dt;
             if (y <= -drop && vy < 0f) break;
@@ -607,8 +607,8 @@ public static class BulletImpact
         foreach (var p in Pieces(h))
         {
             float size = MathF.Cbrt(p.Mass / MathF.Max(100f, s.Kind == Kind.Water ? 1000f : s.DebrisDensity));
-            float terminal = MathF.Sqrt(2f * p.Mass * 9.81f / (RhoAir * size * size));
-            float v = MathF.Max(p.Speed, MathF.Min(terminal, MathF.Sqrt(p.Speed * p.Speed + 2f * 9.81f * h.Drop)));
+            float terminal = MathF.Sqrt(2f * p.Mass * Earth.StandardGravity / (RhoAir * size * size));
+            float v = MathF.Max(p.Speed, MathF.Min(terminal, MathF.Sqrt(p.Speed * p.Speed + 2f * Earth.StandardGravity * h.Drop)));
             best = MathF.Max(best, LandingPascals(p.Mass, v) * (s.Kind == Kind.Water ? 1.6f : 1f));
         }
         return 2f * best;
@@ -955,7 +955,7 @@ public static class BulletImpact
             landings.Add((t, pa, contact, false, 0f));
             // One bounce, at a third of the speed, after its own short hop.
             float vb = 0.33f * v;
-            landings.Add((t + 2f * vb * 0.5f / 9.81f + 0.004f, LandingPascals(q.Mass, vb), contact, false, 0f));
+            landings.Add((t + 2f * vb * 0.5f / Earth.StandardGravity + 0.004f, LandingPascals(q.Mass, vb), contact, false, 0f));
         }
         float end = 0.05f;
         foreach (var l in landings) end = MathF.Max(end, l.At + (l.Bubble ? 0.02f : 0.005f));

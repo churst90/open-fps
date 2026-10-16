@@ -203,7 +203,7 @@ public sealed class NearDrops
             {
                 float e = Hydrometeors.Restitution(c.Surface.ModulusGPa);
                 float up = e * v;
-                double airborne = 2.0 * up / 9.81;
+                double airborne = 2.0 * up / Earth.StandardGravity;
                 if (up > 0.5f && airborne < 3.0)
                 {
                     // It lands a short way off: up to 5 cm for every metre a second it rebounds with.

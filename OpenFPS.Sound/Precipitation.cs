@@ -120,7 +120,7 @@ public static class Hydrometeors
     };
 
     private static float IceSphereSpeed(float diameterMm, float density)
-        => MathF.Sqrt(4f * 9.81f * diameterMm * 1e-3f * density / (3f * AirDensity * HailDrag));
+        => MathF.Sqrt(4f * Earth.StandardGravity * diameterMm * 1e-3f * density / (3f * AirDensity * HailDrag));
 
     /// <summary>The mass of one particle, kg.</summary>
     public static float Mass(PrecipitationKind kind, float diameterMm)

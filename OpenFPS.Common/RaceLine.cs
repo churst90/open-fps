@@ -6,7 +6,7 @@ namespace OpenFPS.Common;
 /// <summary>
 /// A driveable line round a closed circuit, and the fastest a given car can take every metre of it.
 /// The waypoints are resampled evenly, offset onto this car's lane, and each node's limit is the
-/// lower of the bend's grip limit, sqrt(g 9.81 R), and what the brakes can still shed before the
+/// lower of the bend's grip limit, sqrt(g G R) with G standard gravity, and what the brakes can still shed before the
 /// slower node after it (v^2 = u^2 + 2 a s, worked backwards, twice round because the loop is
 /// closed). The backward pass is why a car brakes before a corner (docs/ENGINE_SYNTHESIS.md).
 /// </summary>
@@ -205,7 +205,7 @@ public sealed class RaceLine
         if (s < 0f) s += Length;
         Locate(s, out int i, out _);
         int n = _points.Length;
-        float muG = MathF.Max(0.01f, corneringG) * 9.81f;
+        float muG = MathF.Max(0.01f, corneringG) * Earth.StandardGravity;
 
         // The nodes ahead within the span, and how far each is.
         Span<int> nodes = stackalloc int[64];
@@ -236,7 +236,7 @@ public sealed class RaceLine
                 if (comfortG != null)
                 {
                     // (b_x / brake)^2 + (a_y / side)^2 = 1.
-                    float side = MathF.Min(muG, MathF.Max(0.01f, comfortG(v)) * 9.81f);
+                    float side = MathF.Min(muG, MathF.Max(0.01f, comfortG(v)) * Earth.StandardGravity);
                     float used = lateral / side;
                     room *= MathF.Sqrt(MathF.Max(0f, 1f - used * used));
                 }
@@ -386,11 +386,11 @@ public sealed class RaceLine
     private static float CorneringSpeed(float radius, float corneringG, float bankingDegrees)
     {
         float mu = MathF.Max(0f, corneringG);
-        if (bankingDegrees <= 0f) return MathF.Sqrt(MathF.Max(0f, mu * 9.81f * radius));
+        if (bankingDegrees <= 0f) return MathF.Sqrt(MathF.Max(0f, mu * Earth.StandardGravity * radius));
         float tan = MathF.Tan(bankingDegrees * MathF.PI / 180f);
         float denom = 1f - mu * tan;
         if (denom <= 1e-3f) return float.PositiveInfinity;   // the bank holds it; power is the only limit
-        return MathF.Sqrt(MathF.Max(0f, radius * 9.81f * (mu + tan) / denom));
+        return MathF.Sqrt(MathF.Max(0f, radius * Earth.StandardGravity * (mu + tan) / denom));
     }
 
 }

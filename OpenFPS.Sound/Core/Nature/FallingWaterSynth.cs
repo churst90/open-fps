@@ -319,7 +319,7 @@ public sealed class FallingWaterSynth
         s.ChunkMax = 3f * s.ChunkMean;
         s.ChunkMeanVolume = 4f / 3f * MathF.PI * MeanCube(s.ChunkMean, MinDropRadius, s.ChunkMax, s.LumpOrder);
         s.ChunkRate = (1f - s.DropShare) * q / s.ChunkMeanVolume;
-        s.ChunkSpeed = MathF.Sqrt(2f * 9.81f * s.FallMetres);
+        s.ChunkSpeed = MathF.Sqrt(2f * Earth.StandardGravity * s.FallMetres);
         float entrain = s.Rock ? 0f : PlungeAirShare * MathF.Max(0f, s.ChunkSpeed - 1f) / 2f;
         s.BubbleRate = (1f - s.DropShare) * q * entrain / s.BubbleMeanVolume;
     }
@@ -426,7 +426,7 @@ public sealed class FallingWaterSynth
     public static float ArrivalSpeed(float r, float h)
     {
         float vt = TerminalSpeed(r);
-        return vt * MathF.Sqrt(1f - MathF.Exp(-2f * 9.81f * h / (vt * vt)));
+        return vt * MathF.Sqrt(1f - MathF.Exp(-2f * Earth.StandardGravity * h / (vt * vt)));
     }
 
     /// <summary>A bubble's decay rate, 1/s, for a radius in mm: d = 0.13 / R + 0.0072 R^−3/2, R in

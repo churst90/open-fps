@@ -182,7 +182,7 @@ public class RunningWaterTests
         for (int i = 0; i + w <= x.Length; i += w) peaks.Add(x.Skip(i).Take(w).Max(v => Math.Abs((double)v)));
         double median = peaks.OrderBy(p => p).ElementAt(peaks.Count / 2) + floor;
         for (int i = 1; i < peaks.Count; i++) if (peaks[i] > 30 * median && peaks[i - 1] <= 30 * median) count++;
-        float volume = 2f * MathF.PI * spec.DripLipMm * 1e-3f * 0.072f * 0.6f / (1000f * 9.81f);
+        float volume = 2f * MathF.PI * spec.DripLipMm * 1e-3f * 0.072f * 0.6f / (1000f * Earth.StandardGravity);
         float expected = flow * 1e-3f / volume * 20f;
         _o.WriteLine($"  {count} drops in 20 s, Tate's law says {expected:F0}");
         Assert.InRange(count, expected * 0.8f, expected * 1.2f);

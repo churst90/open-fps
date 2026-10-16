@@ -117,7 +117,7 @@ public static class ElevatorDoor
 
     // ── Constants ─────────────────────────────────────────────────────────────────────────────────
 
-    private const double G = 9.81, SteelE = 200e9, SteelRho = 7900;
+    private const double G = Earth.StandardGravity, SteelE = 200e9, SteelRho = 7900;
     /// <summary>The panel: a 1.2 mm face, pressed stiffeners 25 mm deep, deadening; 25 kg on a 0.55 m leaf.</summary>
     private const double FaceT = 0.0012, StiffenerDepth = 0.025, PanelKgPerM2 = 21.5;
     /// <summary>The stiffened panel's low modes lose about 0.03 to the deadening; the face between the

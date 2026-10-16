@@ -1227,13 +1227,13 @@ public sealed class FireSynth
             {
                 float drop = (height - fallen) * (0.2f + 0.4f * _sum.Uniform());
                 fallen += drop;
-                when += MathF.Sqrt(2f * drop / 9.81f);
-                Later(when, place, _fallOnWood.At(mass * 0.5f, MathF.Sqrt(2f * 9.81f * drop)), 0.6f);
+                when += MathF.Sqrt(2f * drop / Earth.StandardGravity);
+                Later(when, place, _fallOnWood.At(mass * 0.5f, MathF.Sqrt(2f * Earth.StandardGravity * drop)), 0.6f);
             }
         }
         float rest = MathF.Max(0.3f, height - fallen);
-        when += MathF.Sqrt(2f * rest / 9.81f);
-        Later(when, place, _fallOnGround.At(mass, MathF.Sqrt(2f * 9.81f * rest)), 1f);
+        when += MathF.Sqrt(2f * rest / Earth.StandardGravity);
+        Later(when, place, _fallOnGround.At(mass, MathF.Sqrt(2f * Earth.StandardGravity * rest)), 1f);
     }
 
     /// <summary>A strike <paramref name="seconds"/> from now.</summary>
@@ -1258,7 +1258,7 @@ public sealed class FireSynth
         for (int k = 0; k < pieces; k++)
         {
             float mass = 5f + 60f * size * _sum.Uniform() * _sum.Uniform();
-            float speed = MathF.Sqrt(2f * 9.81f * MathF.Max(1f, Spec.FuelHeightMetres * (0.4f + 0.6f * _sum.Uniform())));
+            float speed = MathF.Sqrt(2f * Earth.StandardGravity * MathF.Max(1f, Spec.FuelHeightMetres * (0.4f + 0.6f * _sum.Uniform())));
             Later(_sum.Uniform() * _sum.Uniform() * span, place, _fallOnGround.At(mass, speed), 1f);
         }
         _sums[place].Burst((int)(0.2f * _rate), 0.05f, 0.4f * size + 0.2f, SmallestCracklePascals * 4f * size, 800f, 8000f);

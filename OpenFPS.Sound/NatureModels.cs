@@ -60,7 +60,7 @@ public sealed record WaterFallSpec
     public static WaterFallSpec Jet(string name, float nozzleMm, float riseMetres, float nozzleAboveWaterMetres,
                                     float dropShare = 0.55f, float meanDropRadiusMm = 1.4f, float chunkRadiusMm = 5f)
     {
-        float v = MathF.Sqrt(2f * 9.81f * riseMetres);
+        float v = MathF.Sqrt(2f * Earth.StandardGravity * riseMetres);
         float area = MathF.PI * MathF.Pow(nozzleMm * 0.5e-3f, 2f);
         return new WaterFallSpec
         {

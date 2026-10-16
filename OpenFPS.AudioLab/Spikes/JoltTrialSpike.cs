@@ -3,6 +3,7 @@ using System.Numerics;
 using JoltPhysicsSharp;
 using OpenFPS.Common.Geometry;
 using OpenFPS.Instruments;
+using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab;
 
@@ -22,7 +23,6 @@ public static class JoltTrialSpike
     private static readonly ObjectLayer NonMoving = 0;
     private static readonly ObjectLayer Moving = 1;
     private const float Dt = 1f / 120f;
-    private const float StandardGravity = 9.80665f;
 
     private static long RssKb()
     {
@@ -56,7 +56,7 @@ public static class JoltTrialSpike
                 ObjectLayerPairFilter = pairs, BroadPhaseLayerInterface = broad,
                 ObjectVsBroadPhaseLayerFilter = new ObjectVsBroadPhaseLayerFilterTable(broad, 2, pairs, 2),
             };
-            System = new PhysicsSystem(settings) { Gravity = new Vector3(0f, -StandardGravity, 0f) };
+            System = new PhysicsSystem(settings) { Gravity = new Vector3(0f, -Earth.StandardGravity, 0f) };
             Jobs = new JobSystemThreadPool(new JobSystemThreadPoolConfig { maxJobs = 2048, maxBarriers = 8, numThreads = threads });
         }
 

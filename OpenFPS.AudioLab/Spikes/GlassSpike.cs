@@ -46,7 +46,7 @@ public static class GlassSpike
                 double th = rng.NextDouble() < 0.5 ? 0.003 : 0.006, drop = 0.1 + 0.3 * rng.NextDouble();
                 var pa = GlassFracture.RenderDrop(lx, ly, th, drop, "Concrete", Rate, i, out double pf);
                 pfSum += pf;
-                double ke = 2500 * lx * ly * 0.75 * th * 9.81 * drop;
+                double ke = 2500 * lx * ly * 0.75 * th * Earth.StandardGravity * drop;
                 keSum += ke; acSum += GlassFracture.AcousticJoules(pa, Rate, false);
                 all.AddRange(pa.Take(Rate / 2).Select(x => (float)(x / 50)));
             }

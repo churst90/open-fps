@@ -39,7 +39,7 @@ public sealed class StrideAccumulator
     public static float StepLength(float speedMps)
     {
         float v = MathF.Max(0.15f, speedMps);
-        float froude = v * v / (9.81f * LegLengthMetres);
+        float froude = v * v / (Earth.StandardGravity * LegLengthMetres);
         float stride = 2.3f * MathF.Pow(froude, 0.3f) * LegLengthMetres;
         return MathF.Max(MinStepLength, 0.5f * stride);
     }

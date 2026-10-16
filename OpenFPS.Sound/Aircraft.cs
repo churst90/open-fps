@@ -141,7 +141,7 @@ public sealed record LandingGearSpec
         get
         {
             float v = MathF.Max(0f, TouchdownSinkMps);
-            float n = v * v / (2f * 9.81f * Math.Clamp(StrokeEfficiency, 0.1f, 1f) * MathF.Max(0.01f, StrokeMetres));
+            float n = v * v / (2f * Earth.StandardGravity * Math.Clamp(StrokeEfficiency, 0.1f, 1f) * MathF.Max(0.01f, StrokeMetres));
             return Math.Clamp(n, 0.01f, 1f);
         }
     }
@@ -151,7 +151,7 @@ public sealed record LandingGearSpec
     {
         float r = MathF.Max(0.05f, WheelRadiusMetres);
         float inertia = 0.5f * MathF.Max(1f, WheelMassKg) * r * r;
-        float loadN = MathF.Max(1f, LandingMassKg) * 9.81f
+        float loadN = MathF.Max(1f, LandingMassKg) * Earth.StandardGravity
                     * Math.Clamp(WeightOnWheelsAtTouchdown, 0.01f, 1f) / MathF.Max(1, Wheels);
         float torque = MathF.Max(1f, SlidingMu * loadN * r);
         return MathF.Max(0.001f, inertia * (MathF.Max(0f, groundSpeedMps) / r) / torque);
@@ -429,5 +429,5 @@ public sealed record GroundRunSpec
     /// <summary>The take-off roll's mean acceleration, m/s².</summary>
     public float TakeoffAccel => RotateSpeedMps * RotateSpeedMps / (2f * MathF.Max(1f, TakeoffRollMetres));
     /// <summary>The speed it takes the turn at: no more than taxi speed, and no more than a tenth of a g sideways.</summary>
-    public float TurnSpeedMps => MathF.Min(TaxiSpeedMps, MathF.Sqrt(0.1f * 9.80665f * TurnRadiusMetres));
+    public float TurnSpeedMps => MathF.Min(TaxiSpeedMps, MathF.Sqrt(0.1f * Earth.StandardGravity * TurnRadiusMetres));
 }

@@ -122,7 +122,7 @@ public static class LockCylinder
 
     // ── Constants, each a property of a part ─────────────────────────────────────────────────────
 
-    private const double G = 9.81;
+    private const double G = Earth.StandardGravity;
     /// <summary>Keys: nickel silver (E 125 GPa, 8700 kg/m3), a 55 mm key about 2.3 mm thick through the
     /// blade and 22 mm across the bow, about 6 g. Hanging on the ring by its bow hole, 40 mm from the ring to
     /// its centre of mass.</summary>
