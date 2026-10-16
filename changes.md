@@ -13,6 +13,15 @@ Recent work, newest first. `git log` has the rest.
   100 m it rises and falls with the stir. A car's exhaust 300 m upwind of a 4.5 m/s breeze on a sunny afternoon
   loses 13/27/29 dB (low/middle/high); downwind it keeps 1 dB more of its middle. Still neutral air bends
   nothing inside 700 m. Thunder unchanged. Stored streams: one new field, false everywhere. The wire hash changes.
+- The accessibility interface's first half in a project of its own (docs/ENGINE_PACKAGES.md, stage 7):
+  `OpenFPS.Accessibility` holds the keys the game knows, the speech output, the beacons' categories, the
+  coordinates as a player reads them, the painted lines from the driver's seat, the turn narration, a zone held
+  before it is said, the driving cues' sounds, the spoken lists and what each interface sound means. It uses
+  nothing else of the game's; the words for where something is from the way you face ("in front", "left
+  behind") went to `OpenFPS.Words`. Nothing a
+  player hears or is told changes: the moved files are as they were, and the spoken-lines replay passes
+  unchanged. The wire hash changes, as four of the files left it, so the server and the Windows client go out
+  together.
 - Materials are told by what they are, not by their names (docs/ENGINE_PACKAGES.md, stage 1). Five places decided
   by a material's name: the place's name underfoot, the driving aids' road, the rain's canopy, the editor's windows
   and a shape's glass, and a struck fence's pale. Each reads a property of the material table now, so a material

@@ -36,9 +36,9 @@ public sealed class MenuStack
 {
     private readonly Stack<ListMenu> _open = new();
     private readonly ISpeechOutput _speech;
-    private readonly UiSounds? _ui;
+    private readonly IUiCues? _ui;
 
-    public MenuStack(ISpeechOutput speech, UiSounds? ui)
+    public MenuStack(ISpeechOutput speech, IUiCues? ui)
     {
         _speech = speech;
         _ui = ui;

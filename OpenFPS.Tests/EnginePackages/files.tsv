@@ -1,14 +1,17 @@
 file	package	why
 OpenFPS.Accessibility/Beacons.cs	Accessibility	
 OpenFPS.Accessibility/DrivingCueSounds.cs	Accessibility	
+OpenFPS.Accessibility/IUiCues.cs	Accessibility	
 OpenFPS.Accessibility/Keys/GameKey.cs	Accessibility	
 OpenFPS.Accessibility/Keys/KeyModifiers.cs	Accessibility	
 OpenFPS.Accessibility/LaneGuide.cs	Accessibility	
+OpenFPS.Accessibility/ListMenu.cs	Accessibility	
 OpenFPS.Accessibility/PlayerCoordinates.cs	Accessibility	
 OpenFPS.Accessibility/Speech/ISpeechOutput.cs	Accessibility	
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	Accessibility	
 OpenFPS.Accessibility/Speech/SpeechLog.cs	Accessibility	
 OpenFPS.Accessibility/TurnNarration.cs	Accessibility	
+OpenFPS.Accessibility/UiCue.cs	Accessibility	
 OpenFPS.Accessibility/ZoneSettle.cs	Accessibility	
 OpenFPS.Acoustics/AcousticConstants.cs	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	Acoustics	
@@ -119,7 +122,6 @@ OpenFPS.Client.Core/EditorKeys.cs	Editor
 OpenFPS.Client.Core/EditorValuePrompt.cs	Editor	
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	game	
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	game	
-OpenFPS.Client.Core/ListMenu.cs	Accessibility	
 OpenFPS.Client.Core/ListeningCalibration.cs	Accessibility	
 OpenFPS.Client.Core/LocalPlayerController.cs	game	
 OpenFPS.Client.Core/LocalPlayerState.cs	game	

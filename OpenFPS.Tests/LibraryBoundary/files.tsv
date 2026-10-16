@@ -1,14 +1,17 @@
 file	group	projects	library_types
 OpenFPS.Accessibility/Beacons.cs	host		
 OpenFPS.Accessibility/DrivingCueSounds.cs	host		
+OpenFPS.Accessibility/IUiCues.cs	host		
 OpenFPS.Accessibility/Keys/GameKey.cs	host		
 OpenFPS.Accessibility/Keys/KeyModifiers.cs	host		
 OpenFPS.Accessibility/LaneGuide.cs	host		
+OpenFPS.Accessibility/ListMenu.cs	host		
 OpenFPS.Accessibility/PlayerCoordinates.cs	host		
 OpenFPS.Accessibility/Speech/ISpeechOutput.cs	host		
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	host		
 OpenFPS.Accessibility/Speech/SpeechLog.cs	host		
 OpenFPS.Accessibility/TurnNarration.cs	host		
+OpenFPS.Accessibility/UiCue.cs	host		
 OpenFPS.Accessibility/ZoneSettle.cs	host		
 OpenFPS.Acoustics/AcousticConstants.cs	lib	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	lib	Acoustics	
@@ -113,7 +116,6 @@ OpenFPS.Client.Core/EditorKeys.cs	host
 OpenFPS.Client.Core/EditorValuePrompt.cs	host		
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	host		
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	host		
-OpenFPS.Client.Core/ListMenu.cs	host		
 OpenFPS.Client.Core/ListeningCalibration.cs	host		
 OpenFPS.Client.Core/LocalPlayerController.cs	host		
 OpenFPS.Client.Core/LocalPlayerState.cs	host		

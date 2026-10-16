@@ -170,7 +170,6 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/SightGrid.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/SightWatch.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/NamedPlaces.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/ListMenu.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/UiSounds.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/WallBumps.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/MapTracker.cs', 'Accessibility', ''),

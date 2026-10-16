@@ -12,7 +12,7 @@ models for method and depth are docs/SOUND_LIBRARY_BOUNDARY.md and docs/PHYSICS_
   `packages_files.tsv` and `packages_crossings.tsv` into the output folder, and the ratchet's four lists into
   `ratchet` there (stage 0). Run it again after any move.
 - Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy; and Materials since
-  stage 1 was built (2026-10-12). Planned with their
+  stage 1 was built (2026-10-12), and Accessibility, its clean half, since stage 7 (2026-10-16). Planned with their
   own documents and not planned again here: `OpenFPS.Audio` and the split of `ClientAudioSystem` (sound library
   stages 6 to 8), and physics stages 2 to 6. This survey says where its packages meet them.
 
@@ -832,6 +832,36 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
 - Create `OpenFPS.Accessibility`. Move the twelve clean files, the keys (`GameKey`, `KeyModifiers`) and the speech
   output; `DirectionWords` to Words. The heads' key maps reference it.
 - Check: the spoken-lines replay, `BeaconTests`, `DrivingAidsTests`, `EditorDialogTests`, `ListeningCalibrationTests`.
+
+- **Built 2026-10-16, ten of the twelve, the keys and the speech output** (on Linux, in two commits on main
+  `ef7c115f`). `OpenFPS.Accessibility` references nothing of ours (Serilog, as the speech-dispatcher output logs):
+  14 files.
+  - Moved whole with `git mv`, not a line changed: `Beacons`, `LaneGuide` and `PlayerCoordinates` from Common;
+    `DrivingCueSounds`, `TurnNarration` and `ZoneSettle` from Client.Core; the speech output (`ISpeechOutput`,
+    `SpeechDispatcherOutput`, `SpeechLog`) and `GameKey` from `Client.Core/Platform`. `KeyModifiers` was cut
+    whole out of `InputCommandMapper.cs`. `DirectionWords` moved whole to Words. Namespaces as they were.
+    Client.Core, the server and both heads reference it: the heads' key maps and speech outputs use it directly.
+  - **`ListMenu` needed more than the keys.** It plays the menu cues through `UiSounds`, which plays through the
+    client's mixer (`AudioEngineFacade`, Audio's, in Client.Core until library stage 6). `UiCue`, what each
+    interface sound means, was cut whole out of `UiSounds.cs` into Accessibility (3.6's "the cue meanings move",
+    done early), beside `IUiCues`, which plays one; `UiSounds` is an `IUiCues`, and `MenuStack` takes one (two
+    lines changed). The game hands it the same `UiSounds` as before.
+  - **Not moved, two of the twelve.** Each is clean by package, but a type it reads is still in Common, which no
+    package's project may reference. `ListeningCalibration` reads `Speech` (Models', stage 2) and `UiSounds`: it
+    moves once `Speech` is in Models, taking an `IUiCues` as the lists do. `DrivingCuePlanner` reads the roads and
+    the race line (`RoadNetwork`, `RoadMapData`, `JunctionData`, `CrossingRails`, World's; `RaceLine`,
+    `LaneRoutes`, `DriverSteering`, Agents'): it moves after stages 4 and 5.
+  - The wire hash changes (b38f858c04f8 to f6a935f51398): `Beacons`, `LaneGuide`, `PlayerCoordinates` and
+    `DirectionWords` were hashed only because they were in Common, and Accessibility and Words are not (decision
+    11). The server and the Windows client go out together.
+  - The guards followed: the packages ratchet (Accessibility a sorted project and an assembly checked against its
+    layer; the type rules for `GameKey` and `KeyModifiers` gone with their files), the library's (Accessibility
+    sorted, all host). The reader parses the new project; the packages and library classifiers sort it; the
+    physics classifier sorts a project it does not know as host, which Accessibility is to it, and its crossings
+    are unchanged. No crossing came or went: 1,289.
+  - The spoken-lines replay passes unregenerated, line for line, and with `DOTNET_PROCESSOR_COUNT=4`. So do the
+    guards, the stage's four checks and the 40 classes that name a moved type (849 tests), and the replays with
+    four processors (60).
 
 ### Stage 8: Editor (1 to 2 sessions)
 
