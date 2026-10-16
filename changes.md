@@ -13,6 +13,12 @@ Recent work, newest first. `git log` has the rest.
   the lobby's, now 2.4 under to 2.9 over. Rooms unchanged: 3,820 of 3,837 standing spots and headings.
   Found in Resonance's copy (a shop's open doorway).
 
+- Physics stage 2, the ricochet (docs/PHYSICS_BOUNDARY.md 16.5). Whether a round skips off a face, how it
+  leaves and how the tumbling slug flies are the physics' now (`RicochetLaw`); the sound's `Ricochet` keeps
+  the whine. A new guard, the ricochet table (`RicochetTableTests`), holds every weapon's round off every
+  kind of face and half a second of its flight after; stored before the move, it passes unchanged, so
+  nothing a player sees or hears changes. The wire hash changes, so the server and the Windows client go out
+  together.
 ## 2026-10-14
 
 - No rush into the tail stepping out of a small room. The late field's answers, and the distance law

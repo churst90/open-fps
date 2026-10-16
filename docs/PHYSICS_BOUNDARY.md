@@ -41,7 +41,8 @@ stages come after the special-cases audit's parts.
 13. Appendices: the inventory, the crossings, the presets' members
 14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
-16. Stage 2 as it is built: the tyre, the vehicle, the engine, the ground probes and the body (2026-10-12)
+16. Stage 2 as it is built: the tyre, the vehicle, the engine, the ground probes and the body (2026-10-12), the
+    ricochet (2026-10-16)
 
 ---
 
@@ -1298,10 +1299,10 @@ regenerates them in its own commit.
 |---|---|---|
 | `allowed.tsv` | a crossing fixed: lower it | `OPENFPS_BOUNDARY_WRITE=1` with the filter `PhysicsBoundaryTests` (only lowers) |
 | `types.tsv` | a type renamed, or sorted into another group | by hand, with `classify.py` |
-| `walks/`, `walks.tsv`, `drives/`, `traffic.tsv.gz`, `rail.tsv.gz`, `ballistics.tsv` | movement, driving, traffic, trains or ballistics changed on purpose | `OPENFPS_PHYSICS_WRITE=1` with the filters `MovementReplayTests`, `DrivingReplayTests`, `RailReplayTests`, `BallisticsTableTests` |
+| `walks/`, `walks.tsv`, `drives/`, `traffic.tsv.gz`, `rail.tsv.gz`, `ballistics.tsv`, `ricochet.tsv` | movement, driving, traffic, trains, ballistics or ricochets changed on purpose | `OPENFPS_PHYSICS_WRITE=1` with the filters `MovementReplayTests`, `DrivingReplayTests`, `RailReplayTests`, `BallisticsTableTests`, `RicochetTableTests` (16.5) |
 | a walk's `KnownGapMm` | a parity risk fixed | lower it, or take it off below 1 mm |
 
-`--physics-replay [walks|drives|traffic|rail|ballistics|all] [name=] [track]` prints what each guard stores
+`--physics-replay [walks|drives|traffic|rail|ballistics|ricochet|all] [name=] [track]` prints what each guard stores
 without writing it; `hills map=` finds the steepest smooth ground on a map.
 
 The tracks were written on this machine (glibc 2.43). Each store says which maths it was made on, and another
@@ -1656,9 +1657,57 @@ number is what it was, and the guards pass unregenerated.
 - **The wire hash** changes (46bf531b6e44 at `e47be9ac`, 7cd68fbff151 after). Nothing sent changed.
   `DoorModelFingerprint` is unchanged (cfb37eeb081b).
 - **Left of stage 2:** `Ricochet` (its bounce reads a face from the material table, which is in Acoustics
-  until package stage 1 makes Materials: it follows that stage); `VehicleSpec`'s `VehicleChassisSpec` (16.2);
+  until package stage 1 makes Materials: it follows that stage; built: 16.5); `VehicleSpec`'s `VehicleChassisSpec` (16.2);
   one constant for each law (gravity, air density, rolling resistance and drag, brakes) and `WindModel`
   folded into `WindField`, which change numbers.
+
+### 16.5 The ricochet (2026-10-16)
+
+Made on Linux, on main `d0116bb5` (which has package stage 1's Materials). Nothing a player sees or hears
+changes: every round's bounce and flight, stored before the move, is the same to the last digit, and the
+guards pass unregenerated.
+
+- **The bounce and the tumbling flight are the physics'.** `RicochetLaw` (`OpenFPS.Physics/RicochetLaw.cs`)
+  says whether a round skips off a face (`TryFace`, `CriticalRadians`, `TryBounce`), how it leaves and what it
+  is afterwards (`Outcome`), and how the tumbling slug flies (`TumblingDrag`, `Acceleration`, `Advance`).
+  `Slug`, what a round is in flight, is beside it. They were cut whole, line for line, out of the sound's
+  `Ricochet.cs`, with the parts of its comment that describe them. The faces are the material table's
+  (`AcousticRegistry`, `RicochetFace`), in `OpenFPS.Materials` since package stage 1, which the physics may
+  reference.
+- **The sound's half keeps its name.** `Ricochet` is the whine: its key, its render, the sounds the server
+  sends, and its own line of the slug's flight (in still air and without gravity, all the whine needs), with
+  the tumble's relaxation and autorotation (`TipSpeedRatio`, `AutorotationRadPerSec`), which only the whine
+  reads. The line reads `RicochetLaw.TumblingDrag`.
+- **The weapon makes the slug.** `Slug.Of(WeaponDefinition)` is `WeaponDefinition.Slug`, as `Projectile` is
+  (15.2): the physics does not know the weapon. Its lines are as they were, the 9 mm 124-grain round's sizes
+  where a weapon gives none.
+- **Callers follow:** the server's `CombatService` (the bounce, and `Fly` for a tumbling slug),
+  `BulletRicochetTests`, `MaterialStrikeTests` and the lab's `--bullet-round2`.
+- **Where it reads gravity and the air,** unchanged for the piece that makes one gravity and one air
+  everywhere: `RicochetLaw.Acceleration` falls at `ExternalBallistics.Gravity` (9.80665 m/s²) and drags with
+  `Air.Density` (from the air's temperature and pressure, `ExternalBallistics.cs`); `CriticalRadians` takes
+  water as 1,000 kg/m³ for Birkhoff's angle (`slug.Density / 1000f`). The whine's line drags with
+  `Air.Density` and has no gravity.
+- **A new guard: the ricochet table** (`RicochetTableTests`, `ricochet.tsv`, `--physics-replay ricochet`).
+  Every weapon's round at its muzzle speed onto one material of each face the table holds (nine: Aluminium for
+  the metals, Asphalt, Brick, Clay, Concrete, Granite, Gravel, Tile, Water), at 0.3, 0.9 and 1.0 of the
+  critical angle with three dice, on a tilted face from an oblique heading: whether it skips, its velocity
+  out, the slug it leaves as, the energy dumped, the graze and the share kept, then half a second of
+  tumbling flight through a standard day in a 2 m/s wind. 567 strikes, 441 ricochets. Stored on the code
+  before the move, in a commit of its own. On the same maths no digit may differ; on other maths a few
+  units in the last place stored of the bounce, and 0.1 mm of where the slug is. Proven by breaking each
+  part: the share of speed lost drawn from 0.8 to 1.21 instead of 1.2 (the bounce), gravity 9.81 for
+  9.80665 in the flight (0.25 mm; failed on the same maths and with `OPENFPS_PHYSICS_FOREIGN=1`), and a
+  weapon's slug 0.1 % longer (the seam; failed as other maths).
+- **The ratchet:** `RicochetLaw` (P) and `Slug` (V) are on the list of the physics' types; `Ricochet` is
+  the sound's (S) and off it, as `TyreFriction` went. The allowance stays empty. The library's and the
+  packages' `files.tsv` have the new file, as the surveys write them; no crossing came or went (the library's
+  allowance 358, the packages' 1,289, before and after).
+- **The wire hash** changes (ab1cd0862ca3 at `d0116bb5`, 8ecbf9e9f48c after). Nothing sent changed.
+  `DoorModelFingerprint` is unchanged (cfb37eeb081b).
+- **Left of stage 2:** `VehicleSpec`'s `VehicleChassisSpec` (16.2); one constant for each law (gravity, air
+  density, rolling resistance and drag, brakes) and `WindModel` folded into `WindField`, which change
+  numbers.
 
 ## Decisions (Cody, 2026-10-11)
 
