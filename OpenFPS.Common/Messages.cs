@@ -590,6 +590,14 @@ public partial struct EntityState
     /// </summary>
     public byte Lever;
 
+    /// <summary>
+    /// Whether a body on foot is standing on something, as the server's step left it (BodyState.Grounding):
+    /// sent, so a client hears somebody land when they land. Until physics stage 3 the client guessed it from
+    /// the vertical speed, and a jump's top, where that speed passes zero, read as standing. Unknown for
+    /// anything no step stands (a car, a crate).
+    /// </summary>
+    public OpenFPS.Common.Grounding Grounding;
+
     public EntityState()
     {
         EntityId = 0;

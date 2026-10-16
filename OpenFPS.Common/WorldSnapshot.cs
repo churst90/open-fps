@@ -114,4 +114,8 @@ public struct EntitySnapshot
     /// <summary>How hard a train or an aeroplane is working as the server last sent it, 0..1
     /// (EntityState.Lever); zero for anything else.</summary>
     public float Lever;
+
+    /// <summary>Whether a body on foot stands on something, as the server's step left it
+    /// (EntityState.Grounding); Unknown for anything no step stands.</summary>
+    public Grounding Grounding;
 }

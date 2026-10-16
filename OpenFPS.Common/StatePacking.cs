@@ -24,6 +24,7 @@ namespace OpenFPS.Common.Networking;
 /// is not zero (<see cref="DistantMotion"/>);</item>
 /// <item>the wheels, a count and <see cref="WheelBytes"/> each, when they are sent.</item>
 /// </list>
+/// A body on foot's grounding (EntityState.Grounding) is two bits of the flags, so it costs nothing.
 ///
 /// No wheels sent does not mean no wheels: the client keeps the last, and the server leaves them out
 /// while they are the same.
@@ -34,7 +35,7 @@ public static class StatePacking
     public const float MillimetreRange = short.MaxValue / 1000f;
 
     private const byte VelocityNone = 0, VelocityMillimetres = 1, VelocityFloats = 2, VelocityMask = 3;
-    private const byte HasTyreDemand = 4, HasWheels = 8, HasSignals = 16, HasRates = 32;
+    private const byte HasTyreDemand = 4, HasWheels = 8, HasSignals = 16, HasRates = 32, Grounded = 64, Airborne = 128;
 
     /// <summary>One wheel on the wire, as its bytes: the struct's own size, which grows when a field is
     /// appended to it (WheelState.Water made it ten).</summary>
@@ -126,6 +127,8 @@ public static class StatePacking
             BinaryPrimitives.WriteInt16LittleEndian(into[at..], s.TurnY); at += 2;
             BinaryPrimitives.WriteInt16LittleEndian(into[at..], s.TurnZ); at += 2;
         }
+        if (s.Grounding == OpenFPS.Common.Grounding.Grounded) flags |= Grounded;
+        else if (s.Grounding == OpenFPS.Common.Grounding.Airborne) flags |= Airborne;
         if (s.Wheels != null)
         {
             flags |= HasWheels;
@@ -174,6 +177,8 @@ public static class StatePacking
                     at += 12;
                     break;
             }
+            s.Grounding = (flags & Grounded) != 0 ? OpenFPS.Common.Grounding.Grounded
+                        : (flags & Airborne) != 0 ? OpenFPS.Common.Grounding.Airborne : OpenFPS.Common.Grounding.Unknown;
             if ((flags & HasTyreDemand) != 0) s.TyreDemand = data[at++];
             if ((flags & HasSignals) != 0) s.Signals = data[at++];
             if ((flags & HasRates) != 0)

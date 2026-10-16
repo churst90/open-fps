@@ -20,12 +20,21 @@ public sealed class OtherBodies
     public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
 
     /// <summary>
-    /// How fast a body may be moving vertically and still be standing on something, m/s. The server
-    /// zeroes a grounded body's vertical velocity, and one tick of free fall is about 0.3 m/s, so the
-    /// velocity answers it; probing the floor per body per frame (five points through the grid) costs
-    /// real time for an answer that changes twice a second.
+    /// How fast a body no step stands (a walker placed on its path) may be moving vertically and still be
+    /// standing on something, m/s: one tick of free fall is about 0.3 m/s. A player's body says whether it
+    /// stands (EntityState.Grounding, physics stage 3); before that every body was read this way, and a jump's
+    /// top, where the vertical speed passes zero, read as standing.
     /// </summary>
     public const float GroundedVerticalSpeed = 0.15f;
+
+    /// <summary>Whether a body stands: as the server's step says, or from its vertical speed where no step
+    /// stands it.</summary>
+    public static bool Grounded(in EntitySnapshot body) => body.Grounding switch
+    {
+        Grounding.Grounded => true,
+        Grounding.Airborne => false,
+        _ => MathF.Abs(body.Velocity.Y) < GroundedVerticalSpeed,
+    };
 
     /// <summary>Head above feet, metres: where a breath comes from, audible in the elevation.</summary>
     public const float HeadHeight = OpenFPS.Common.Speech.MouthHeight;
@@ -97,7 +106,7 @@ public sealed class OtherBodies
                     OnBreath?.Invoke(body.Id, body.Transform.Position + new Vector3(0, HeadHeight, 0), breath);
             }
 
-            bool grounded = MathF.Abs(body.Velocity.Y) < GroundedVerticalSpeed;
+            bool grounded = Grounded(body);
             var fall = state.Stride.Update(body.Transform.Position, body.Velocity, grounded, body.Transform.Rotation);
             if (!fall.Anything) continue;
 

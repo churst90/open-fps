@@ -18,6 +18,8 @@ public sealed class SentState
     public byte Signals;
     /// <summary>A train's notch or an aeroplane's power lever (EntityState.Lever).</summary>
     public byte Lever;
+    /// <summary>Whether a body on foot stands (EntityState.Grounding).</summary>
+    public Grounding Grounding;
     /// <summary>A copy: the vehicle systems refill one array in place every tick.</summary>
     public WheelState[]? Wheels;
     /// <summary>The tick the state (or the wheels) last differed from the one before it.</summary>
@@ -38,6 +40,7 @@ public sealed class SentState
     public Quaternion ToldRotation = Quaternion.Identity;
     public DistantMotion.Rates ToldRates;
     public byte ToldDemand, ToldSignals, ToldLever;
+    public Grounding ToldGrounding;
     /// <summary>The wheels last sent, or null.</summary>
     public WheelState[]? ToldWheels;
     /// <summary>The last far state went for a change: it goes again next tick, so one lost or late packet
@@ -102,13 +105,14 @@ public static class RestingStates
         if (velocity != Vector3.Zero && distance >= DistantMotion.RatesMetres) rates.WriteTo(ref state);
 
         if (fresh || !Same(last.Transform, state.Transform) || last.Velocity != velocity || last.TyreDemand != state.TyreDemand
-            || last.Signals != state.Signals || last.Lever != state.Lever)
+            || last.Signals != state.Signals || last.Lever != state.Lever || last.Grounding != state.Grounding)
         {
             last.Transform = state.Transform;
             last.Velocity = velocity;
             last.TyreDemand = state.TyreDemand;
             last.Signals = state.Signals;
             last.Lever = state.Lever;
+            last.Grounding = state.Grounding;
             last.ChangedAt = tick;
         }
         if (state.Wheels != null && (last.Wheels == null || !SameWheels(last.Wheels, state.Wheels)))
@@ -157,7 +161,7 @@ public static class RestingStates
         var predicted = DistantMotion.Predict(last.ToldPosition, last.ToldVelocity, last.ToldRotation, last.ToldRates,
                                               (tick - last.ToldAt) * PhysicsConstants.FixedDeltaTime);
         var now = state.Transform.ToTransform();
-        changed = state.Signals != last.ToldSignals
+        changed = state.Signals != last.ToldSignals || state.Grounding != last.ToldGrounding
                || MathF.Abs(state.LeverFraction - MachinePower.Decode(last.ToldLever)) > DistantMotion.LeverTolerance
                || MathF.Abs(state.TyreDemandFraction - last.ToldDemand / 127.5f) > DistantMotion.DemandTolerance
                || state.Wheels != null && WheelsStrayed(last.ToldWheels, state.Wheels)
@@ -191,6 +195,7 @@ public static class RestingStates
         last.ToldDemand = state.TyreDemand;
         last.ToldSignals = state.Signals;
         last.ToldLever = state.Lever;
+        last.ToldGrounding = state.Grounding;
         if (state.Wheels != null) last.ToldWheels = (WheelState[])state.Wheels.Clone();
     }
 

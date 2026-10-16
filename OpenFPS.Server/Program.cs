@@ -1810,6 +1810,10 @@ public class GameServer
                             Transform = QuantizedTransform.FromTransform(t)
                         };
                         if (world.Has<Velocity>(e)) state.LinearVelocity = world.Get<Velocity>(e).Linear;
+                        // A player's body: whether it stands, as its step left it (BodyState.Grounding). Nothing
+                        // else on foot is stepped (walkers are placed on their paths), so nothing else says.
+                        if (world.Has<PlayerComponent>(e))
+                            state.Grounding = world.Get<PlayerComponent>(e).IsGrounded ? OpenFPS.Common.Grounding.Grounded : OpenFPS.Common.Grounding.Airborne;
                         // How hard it works its tyres, which only the server knows: from a velocity alone
                         // every car on a banked oval reads as sliding. See EntityState.TyreDemand.
                         if (_vehicles.TryGetTyreDemand(mapEntry.Key, e.Id, out float tyreDemand))

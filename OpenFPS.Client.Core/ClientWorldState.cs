@@ -44,6 +44,8 @@ public class ClientWorldState
     private readonly ConcurrentDictionary<int, byte> _serverSignals = new();
     /// <summary>Each train source's and aeroplane's lever as last sent (EntityState.Lever).</summary>
     private readonly ConcurrentDictionary<int, float> _serverLevers = new();
+    /// <summary>Each body on foot's grounding as last sent (EntityState.Grounding).</summary>
+    private readonly ConcurrentDictionary<int, Grounding> _serverGrounding = new();
     /// <summary>Each vehicle's wheels, as last sent. Not interpolated: a wheel's load and slip are
     /// read for sound, which smooths what it reads.</summary>
     private readonly ConcurrentDictionary<int, WheelState[]> _serverWheels = new();
@@ -263,6 +265,7 @@ public class ClientWorldState
         _serverTyreDemand.Clear();
         _serverSignals.Clear();
         _serverLevers.Clear();
+        _serverGrounding.Clear();
         _serverWheels.Clear();
         _audioEntityIds.Clear();
         _regionEntityIds.Clear();
@@ -486,6 +489,7 @@ public class ClientWorldState
             _serverTyreDemand.TryRemove(id, out _);
             _serverSignals.TryRemove(id, out _);
             _serverLevers.TryRemove(id, out _);
+            _serverGrounding.TryRemove(id, out _);
             _serverWheels.TryRemove(id, out _);
             _audioEntityIds.TryRemove(id, out _);
             _regionEntityIds.TryRemove(id, out _);
@@ -805,6 +809,7 @@ public class ClientWorldState
         _serverTyreDemand[id] = said.TyreDemandFraction;
         _serverSignals[id] = said.Signals;
         _serverLevers[id] = said.LeverFraction;
+        _serverGrounding[id] = said.Grounding;
     }
 
     public void SyncState(IEnumerable<EntityState> states)
@@ -817,6 +822,7 @@ public class ClientWorldState
             _serverTyreDemand[s.EntityId] = s.TyreDemandFraction;
             _serverSignals[s.EntityId] = s.Signals;
             _serverLevers[s.EntityId] = s.LeverFraction;
+            _serverGrounding[s.EntityId] = s.Grounding;
             if (s.Wheels != null) _serverWheels[s.EntityId] = s.Wheels;
         }
         _positionsSampledAt = Clock.Now;
@@ -896,6 +902,7 @@ public class ClientWorldState
                 TyreDemand = _serverTyreDemand.GetValueOrDefault(id, 0f),
                 Signals = _serverSignals.GetValueOrDefault(id),
                 Lever = _serverLevers.GetValueOrDefault(id),
+                Grounding = _serverGrounding.GetValueOrDefault(id),
                 Wheels = _serverWheels.GetValueOrDefault(id),
             };
             snap.Entities[id] = s;
