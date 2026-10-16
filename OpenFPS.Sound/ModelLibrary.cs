@@ -332,6 +332,69 @@ public static class ModelLibrary
     public static LoudspeakerSpec Loudspeaker(string id) => Get<LoudspeakerSpec>(Kinds.Loudspeaker, id);
     public static GasHobSpec GasHob(string id) => Get<GasHobSpec>(Kinds.GasHob, id);
 
+    /// <summary>The speaker a placed emitter names, an authored one first; false for one there is not.</summary>
+    public static bool TryLoudspeaker(string? id, out LoudspeakerSpec spec)
+    {
+        spec = null!;
+        if (string.IsNullOrEmpty(id) || !Knows(Kinds.Loudspeaker, id)) return false;
+        spec = Loudspeaker(id);
+        return true;
+    }
+
+    // ── The presets by key, as a sound model is handed them ─────────────────────────────────────
+
+    /// <summary>
+    /// The library as the sound models are handed it (<see cref="IPresets"/>): a preset by name or by key, a
+    /// map's own first. The presets' own lookups through the library (EngineProfile.ByName, FireSpec.ByName and
+    /// the rest) were these before the catalogue sat above the sound (docs/ENGINE_PACKAGES.md, stage 2).
+    /// </summary>
+    public static IPresets Presets { get; } = new PresetSource();
+
+    private sealed class PresetSource : IPresets
+    {
+        // As changed in the world editor if it has been (it is a library kind, Kinds.Engine), otherwise as built.
+        // Every vehicle, small machine, train and aircraft that names it has the change.
+        public EngineProfile Engine(string key)
+            => IsAuthored(Kinds.Engine, key) ? Get<EngineProfile>(Kinds.Engine, key)
+             : EngineProfile.Presets.TryGetValue(key, out var make) ? make()
+             : throw new ArgumentException($"No engine preset '{key}'. Known: {string.Join(", ", EngineProfile.Presets.Keys)}");
+
+        public ChimeHornSpec Horn(string id) => ModelLibrary.Horn(id);
+        public WhistleSpec Whistle(string id) => ModelLibrary.Whistle(id);
+        public StruckBellSpec Bell(string id) => ModelLibrary.Bell(id);
+        public AirSystemSpec Air(string id) => ModelLibrary.Air(id);
+        public SmallMachineSpec SmallMachine(string key) => ModelLibrary.SmallMachine(key);
+        public WaterFeatureSpec Water(string key) => ModelLibrary.Water(key);
+        public FoliageSpec Foliage(string key) => ModelLibrary.Foliage(key);
+
+        // A drainage line of the ground's key says what it is ("ground/...", GroundChannels).
+        public RunningWaterSpec Flow(string key)
+            => GroundChannels.TryParse(key, out var ground) ? ground : ModelLibrary.Flow(key);
+
+        // A map's key with its geometry ("shore:lake_sand/300/90/20") names its preset.
+        public ShoreSpec Shore(string key)
+        {
+            ShoreSpec.ParseKey(key, out string preset, out _);
+            return ModelLibrary.Shore(preset);
+        }
+
+        // Burning over the shape the key gives it.
+        public FireSpec Fire(string key)
+        {
+            FireSpec.ParseKey(key, out string preset, out _, out var shape);
+            var spec = ModelLibrary.Fire(preset);
+            return shape == null ? spec : spec.WithShape(shape);
+        }
+
+        public GasHobSpec GasHob(string key)
+        {
+            HobKey.TryParse(key, out var k);
+            return ModelLibrary.GasHob(k.Preset.Length > 0 ? k.Preset : key);
+        }
+
+        public System.Numerics.Vector3[]? Places(string soundId) => ModelKindTable.Places(soundId);
+    }
+
     // ── Writing ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>The file one model would be written as: the wrapper, then the spec.</summary>

@@ -148,7 +148,7 @@ public class MachineStateTests
     {
         var run = Replay.RunScript(r =>
         {
-            var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"));
+            var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"), ModelLibrary.Presets);
             const float speed = 12f;
             float head = -10f;
             (Vector3 At, Vector3 V) Source(int i) => (new Vector3(head - layout[i].AlongMetres, layout[i].HeightMetres, -25f), new Vector3(speed, 0f, 0f));

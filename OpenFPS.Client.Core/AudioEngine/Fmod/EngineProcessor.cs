@@ -575,7 +575,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
         // The paths into the cabin, if it has one (CabinPaths). Each wheel rolls at its share of its
         // axle group's power, so the wheels together are the two axles.
-        _cabinLayout = CabinPaths.For(v);
+        _cabinLayout = CabinPaths.For(v, ModelLibrary.Presets);
         if (_cabinLayout is { } cl && cl.PathOfWheel.Length == nw)
         {
             _cabinTapLive = new int[cl.Count];

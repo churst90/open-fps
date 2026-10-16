@@ -172,7 +172,7 @@ public static class CabinSpike
         foreach (var (key, seatName) in new[] { ("i4_economy", "driver"), ("transit_bus", "middle"), ("police_interceptor", "driver") })
         {
             var v = MachineRegistry.VehicleFor(key);
-            var layout = CabinPaths.Build(v);
+            var layout = CabinPaths.Build(v, ModelLibrary.Presets);
             if (layout == null) continue;
             var ear = Seat(v, seatName) + new Vector3(0f, 1.0f, 0f);
             One(key, seatName, "one", "OnePlace", CabinPaths.OnePlace);

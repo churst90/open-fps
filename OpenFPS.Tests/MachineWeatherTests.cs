@@ -20,7 +20,7 @@ public class MachineWeatherTests
     [Fact]
     public void Two_window_units_turn_at_their_own_speeds()
     {
-        var spec = SmallMachineSpec.ByName("ac_window");
+        var spec = ModelLibrary.Presets.SmallMachine("ac_window");
         var a = new MachineVoiceState(spec, Rate, entityId: 1001, seed: 5) { AmbientCelsius = 36f };
         var b = new MachineVoiceState(spec, Rate, entityId: 1002, seed: 5) { AmbientCelsius = 36f };
         var buf = new float[(int)(Rate * 6f)];
@@ -40,7 +40,7 @@ public class MachineWeatherTests
         float lo = float.MaxValue, hi = float.MinValue;
         foreach (int seed in new[] { 192, 100, 4769, 440, 11, 17, 5, 3 })
         {
-            var s = new SmallMachineSynth(SmallMachineSpec.ByName("ac_condenser"), 44100f, seed) { CompressorOn = false };
+            var s = new SmallMachineSynth(ModelLibrary.Presets.SmallMachine("ac_condenser"), ModelLibrary.Presets, 44100f, seed) { CompressorOn = false };
             double e = 0; int n = 0;
             for (int i = 0; i < 88200; i++) { s.Step(); if (i < 22050) continue; e += s.Blades * (double)s.Blades; n++; }
             float db = (float)(10 * Math.Log10(e / n / 4e-10));
@@ -85,7 +85,7 @@ public class MachineWeatherTests
         Assert.True(comp.PulsationHzAt(CompressorSpec.LoadAt(38f)) < comp.PulsationHzAt(CompressorSpec.LoadAt(22f)) - 0.3f);
         Assert.Equal(comp.PulsationHz, comp.PulsationHzAt(CompressorSpec.LoadAt(35f)), 2);   // the rating point
 
-        var cool = new MachineVoiceState(SmallMachineSpec.ByName("ac_window"), Rate, entityId: 77, seed: 1) { AmbientCelsius = 10f };
+        var cool = new MachineVoiceState(ModelLibrary.Presets.SmallMachine("ac_window"), Rate, entityId: 77, seed: 1) { AmbientCelsius = 10f };
         cool.Render(new float[(int)(Rate * 1f)]);
         Assert.False(cool.CompressorCalled, "a 10 °C day called for the compressor");
         Assert.False(cool.Machine.CompressorOn);

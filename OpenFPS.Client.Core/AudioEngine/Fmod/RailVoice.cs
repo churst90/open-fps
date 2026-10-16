@@ -101,8 +101,8 @@ public sealed class TrainVoiceState
         Profile = p;
         Rate = sampleRate;
         Seed = seed;
-        Train = new TrainSynth(p, sampleRate, seed);
-        Layout = TrainLayout.Sources(p);
+        Train = new TrainSynth(p, ModelLibrary.Presets, sampleRate, seed);
+        Layout = TrainLayout.Sources(p, ModelLibrary.Presets);
         _t0 = Clock.Now;
         _speed = TargetSpeed = p.TypicalSpeedMps;
 

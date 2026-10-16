@@ -87,14 +87,15 @@ public static class CabinPaths
 
     private static readonly ConcurrentDictionary<string, Layout?> _layouts = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The paths into this vehicle's cabin, or null if it has no cabin (or the split is off).</summary>
-    public static Layout? For(VehicleProfile v)
+    /// <summary>The paths into this vehicle's cabin, or null if it has no cabin (or the split is off). Its air
+    /// system, which says where the door is, is <paramref name="presets"/>' (the catalogue's).</summary>
+    public static Layout? For(VehicleProfile v, IPresets presets)
     {
         if (!Enabled || v == null) return null;
-        return _layouts.GetOrAdd(v.Name ?? "", _ => Build(v));
+        return _layouts.GetOrAdd(v.Name ?? "", _ => Build(v, presets));
     }
 
-    internal static Layout? Build(VehicleProfile v)
+    internal static Layout? Build(VehicleProfile v, IPresets presets)
     {
         if (VehicleCabin.Measure(v) is not { } g) return null;
         var paths = new List<Path>();
@@ -158,10 +159,10 @@ public static class CabinPaths
         if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
         {
             float along = 1f, side = 1f;
-            string air = ModelLibrary.Kinds.Air + ":" + v.AirSystem;
+            string air = "air:" + v.AirSystem;
             try
             {
-                var spec = ModelLibrary.Air(v.AirSystem);
+                var spec = presets.Air(v.AirSystem);
                 bool found = false;
                 foreach (var p in spec.Ports)
                     if (string.Equals(p.Name, "door", StringComparison.OrdinalIgnoreCase))
@@ -171,9 +172,9 @@ public static class CabinPaths
                         found = true;
                         break;
                     }
-                if (!found) ModelKindTable.Fail(air, "has no door port; the door is put a metre from the front, kerb side");
+                if (!found) ModelFailures.Fail(air, "has no door port; the door is put a metre from the front, kerb side");
             }
-            catch (Exception ex) { ModelKindTable.Fail(air, ex.Message + "; the door is put a metre from the front, kerb side"); }
+            catch (Exception ex) { ModelFailures.Fail(air, ex.Message + "; the door is put a metre from the front, kerb side"); }
             float z = Math.Clamp(v.LengthMetres * 0.5f - along, g.Back, g.Front);
             door = paths.Count;
             paths.Add(new Path(Kind.Door, new Vector3(side * halfW, g.RoofUnder - 0.2f, z), -1, (int)side));

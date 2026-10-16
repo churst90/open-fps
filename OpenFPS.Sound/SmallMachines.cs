@@ -396,8 +396,4 @@ public sealed record SmallMachineSpec
             ["ac_condenser"] = () => AirConditionerCondenser,
             ["ac_window"] = () => AirConditionerWindow,
         };
-
-    /// <summary>A preset by name, through the <see cref="ModelLibrary"/> rather than
-    /// <see cref="Presets"/>, so a map's own authored machine of that name wins.</summary>
-    public static SmallMachineSpec ByName(string key) => ModelLibrary.SmallMachine(key);
 }

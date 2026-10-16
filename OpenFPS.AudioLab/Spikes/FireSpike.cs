@@ -61,7 +61,7 @@ public static class FireSpike
 
         foreach (var key in presets)
         {
-            var spec = FireSpec.ByName(key);
+            var spec = ModelLibrary.Presets.Fire(key);
             var sw = Stopwatch.StartNew();
             var (pa, census) = Render(spec, sec, seed, wind, age, heard, parts);
             double cost = sw.Elapsed.TotalSeconds / (sec + Settle());
@@ -293,7 +293,7 @@ public static class FireSpike
         // its life matters (FireSpec.KeyFor).
         int Add(string preset, Vector3 at, float yawDegrees = 0f)
         {
-            var spec = FireSpec.ByName(preset);
+            var spec = ModelLibrary.Presets.Fire(preset);
             double age = GameAge(spec);
             string key = double.IsNaN(age) ? FireSpec.KeyFor(preset) : FireSpec.KeyFor(preset, WindField.Now() - age);
             int id = nextId++;
@@ -326,7 +326,7 @@ public static class FireSpike
         // Turned by yaw: a car turned 90 degrees is seen side-on, its length across the way you face.
         void FireTurned(string preset, float yawDegrees, params float[] distances)
         {
-            var spec = FireSpec.ByName(preset);
+            var spec = ModelLibrary.Presets.Fire(preset);
             var middle = new Vector3(0f, Height(spec), 0f);
             int id = Add(preset, middle, yawDegrees);
             Pump(4.0);
@@ -367,7 +367,7 @@ public static class FireSpike
                 Fire("house_fire", 30f);
                 segments[^1] = segments[^1] with { Name = "house_fire one voice 30m" };
                 ExtendedSources.Enabled = true;
-                var crown = FireSpec.ByName("crown_fire");
+                var crown = ModelLibrary.Presets.Fire("crown_fire");
                 var cm = new Vector3(0f, Height(crown), 0f);
                 int cid = Add("crown_fire", cm);
                 Pump(4.0);
@@ -392,7 +392,7 @@ public static class FireSpike
             if (set is "all" or "walk")
             {
                 // Walking up to a burning wood from 150 m to 10 m from its middle (2.5 m from its edge).
-                var spec = FireSpec.ByName("burning_trees");
+                var spec = ModelLibrary.Presets.Fire("burning_trees");
                 var middle = new Vector3(0f, Height(spec), 0f);
                 int id = Add("burning_trees", middle);
                 Stand(new Vector3(0f, 0f, -150f), middle);

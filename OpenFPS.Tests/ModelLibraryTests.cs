@@ -126,7 +126,7 @@ public class ModelLibraryTests : IDisposable
         var mine = ChimeHornSpec.BusAirHorn with { Name = "a bus horn somebody wrote", ReferenceDb = 121f };
         ModelLibrary.Add(ModelLibrary.Kinds.Horn, "authored_bus_horn", mine);
 
-        Assert.Equal(121f, Honk.LevelDb("air:authored_bus_horn"));
+        Assert.Equal(121f, Honk.LevelDb("air:authored_bus_horn", ModelLibrary.Presets));
         var voice = new HornVoiceState("air:authored_bus_horn", new[] { 0.3f }, 44100, 1);
         var stock = new HornVoiceState("air:bus_horn", new[] { 0.3f }, 44100, 1);
         // Full scale is the horn's level plus the shared headroom, so it shows whose level it took.

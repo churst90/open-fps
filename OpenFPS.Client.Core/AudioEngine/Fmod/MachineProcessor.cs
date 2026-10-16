@@ -327,7 +327,7 @@ public sealed class MachineVoiceState : PhysicalVoiceState
     {
         Spec = spec;
         // Its noise is its own too: two of one model given one seed are still two machines.
-        Machine = new SmallMachineSynth(spec, sampleRate, unchecked(seed * 31 + entityId));
+        Machine = new SmallMachineSynth(spec, ModelLibrary.Presets, sampleRate, unchecked(seed * 31 + entityId));
 
         var rng = new Random(entityId * 2654435761u.GetHashCode());
         if (spec.Compressor != null)
@@ -432,7 +432,7 @@ public sealed class AircraftVoiceState : PhysicalVoiceState
     public AircraftVoiceState(AircraftProfile p, float sampleRate, int seed, float lever = 1f)
         : base(p.SourceLevelDb, sampleRate)
     {
-        Aircraft = new AircraftSynth(p, sampleRate, seed);
+        Aircraft = new AircraftSynth(p, ModelLibrary.Presets, sampleRate, seed);
         // Already at this power, not spooling up to it. See AircraftSynth.PlaceAtLever.
         _lever = Math.Clamp(lever, 0f, 1f);
         TargetLever = _lever;
@@ -516,7 +516,7 @@ public sealed class HornVoiceState : PhysicalVoiceState
     private readonly ElectricHorn? _electric;
 
     public HornVoiceState(string horn, float[] pattern, float sampleRate, int seed)
-        : base(Honk.LevelDb(horn), sampleRate)
+        : base(Honk.LevelDb(horn, ModelLibrary.Presets), sampleRate)
     {
         // Each horn is blown once in silence to set its level: 10-25 ms.
         OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A horn's model");

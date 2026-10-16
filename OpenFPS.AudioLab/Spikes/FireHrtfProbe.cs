@@ -67,7 +67,7 @@ public static class FireHrtfProbe
         // standing on the near side with its ears at 1.7 m, facing the middle.
         void Scene(string name, string preset, float distance, float yaw = 0f)
         {
-            var spec = FireSpec.ByName(preset);
+            var spec = ModelLibrary.Presets.Fire(preset);
             var layout = FireSynth.Layout(spec);
             var synth = new FireSynth(spec, Fs, 5, layout.Length) { Spread = 1f };
             var pw = new double[layout.Length];

@@ -603,11 +603,6 @@ public sealed record RunningWaterSpec
             ["washbasin"] = () => Washbasin,
             ["shower"] = () => Shower,
         };
-
-    /// <summary>A preset by name, through the <see cref="ModelLibrary"/> so a map's own wins; or a drainage
-    /// line of the ground, whose key says what it is ("ground/...", GroundChannels).</summary>
-    public static RunningWaterSpec ByName(string key)
-        => GroundChannels.TryParse(key, out var ground) ? ground : ModelLibrary.Flow(key);
 }
 
 /// <summary>

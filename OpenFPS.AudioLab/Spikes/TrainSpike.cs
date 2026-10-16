@@ -54,7 +54,7 @@ public static class TrainSpike
             // Long enough for the whole train plus the approach and the going away.
             float sec = seconds > 0 ? seconds : Math.Clamp(p.LengthMetres / v + 22f, 18f, 150f);
 
-            var train = new TrainSynth(p, Sr, 41) { Speed = v, Notch = notch };
+            var train = new TrainSynth(p, ModelLibrary.Presets, Sr, 41) { Speed = v, Notch = notch };
             Console.WriteLine($"  {key}");
             foreach (var line in train.Describe(v)) Console.WriteLine($"    {line}");
             Console.WriteLine($"    pass: {v:F0} m/s ({v * 3.6f:F0} km/h), listener {offset:F0} m from the track, {sec:F0} s");

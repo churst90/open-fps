@@ -324,7 +324,7 @@ public class RunningWaterRound2Tests
         foreach (var tap in new[] { "kitchen_sink_water", "dripping_sink_water", "washbasin_water", "shower_water" })
         {
             Assert.False(prefabs[tap].GetProperty("SynthRunning").GetBoolean());
-            Assert.NotNull(RunningWaterSpec.ByName(prefabs[tap].GetProperty("SoundId").GetString()![5..]).Tap);
+            Assert.NotNull(ModelLibrary.Presets.Flow(prefabs[tap].GetProperty("SoundId").GetString()![5..]).Tap);
         }
     }
 }

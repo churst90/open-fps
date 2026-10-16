@@ -212,9 +212,6 @@ public sealed record WaterFeatureSpec
         {
             ["park_fountain"] = () => ParkFountain,
         };
-
-    /// <summary>A preset by name, through the <see cref="ModelLibrary"/> so a map's own wins.</summary>
-    public static WaterFeatureSpec ByName(string key) => ModelLibrary.Water(key);
 }
 
 /// <summary>What a plant's leaves are, which decides which of the two sounds of wind in it you hear.</summary>
@@ -316,6 +313,4 @@ public sealed record FoliageSpec
             ["park_tree"] = () => ParkTree,
             ["pine"] = () => Pine,
         };
-
-    public static FoliageSpec ByName(string key) => ModelLibrary.Foliage(key);
 }

@@ -55,7 +55,7 @@ public static class RunningWaterSpike
 
         foreach (var key in presets)
         {
-            var spec = RunningWaterSpec.ByName(key);
+            var spec = ModelLibrary.Presets.Flow(key);
             float q = !float.IsNaN(flow) ? flow : !float.IsNaN(rain) ? spec.FlowFor(rain) : spec.ReferenceFlow;
             // The rain falling on it as it runs: the rain given, or its reference rain if it is rain-fed;
             // dry=1 for the run-off after the rain has stopped.
@@ -126,7 +126,7 @@ public static class RunningWaterSpike
     private static int TapCycle(string[] args)
     {
         string key = args.First(a => !a.StartsWith("--") && !a.Contains('=') && a != "cycle");
-        var spec = RunningWaterSpec.ByName(key);
+        var spec = ModelLibrary.Presets.Flow(key);
         float on = Arg(args, "on=", 10f), off = Arg(args, "off=", 20f);
         float flowOn = Arg(args, "flow=", spec.Tap?.OpenLitresPerSecond ?? spec.ReferenceFlow);
         float flowOff = spec.Tap?.LeakLitresPerSecond ?? 0f;
@@ -427,7 +427,7 @@ public static class RunningWaterSpike
                     facade.Weather.Runoff.Reset();
                     facade.Weather.Runoff.Update(Rainfall.HeavyRate, 0);
                     for (int t = 1; t <= seconds; t++) facade.Weather.Runoff.Update(0f, t);
-                    return facade.Weather.Runoff.Through(RunningWaterSpec.ByName(preset).CatchmentSeconds);
+                    return facade.Weather.Runoff.Through(ModelLibrary.Presets.Flow(preset).CatchmentSeconds);
                 }
                 float gutterAfter = After(600f, "gutter");
                 float pipeAfter = After(180f, "downpipe");
@@ -511,7 +511,7 @@ public static class RunningWaterSpike
                     facade.Weather.Runoff.Update(Rainfall.HeavyRate, 0);
                     for (int t = 1; t <= minutes * 60f; t++) facade.Weather.Runoff.Update(0f, t);
                     facade.Weather.Runoff.Held = true;
-                    var dp = RunningWaterSpec.ByName("downpipe");
+                    var dp = ModelLibrary.Presets.Flow("downpipe");
                     Console.WriteLine($"  {minutes:F0} min after heavy rain: downpipe {dp.FlowNow(facade.Weather) * 1000:F2} mL/s");
                     int a = Add("flow:downpipe", shoe, 50f, 0.6f);
                     Stand(garden, shoe);

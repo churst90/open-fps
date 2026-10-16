@@ -137,7 +137,7 @@ public class RunningWaterTests
     [InlineData("basin_overflow")]
     public void No_water_no_sound(string preset)
     {
-        var x = Render(RunningWaterSpec.ByName(preset), 0f, 2f);
+        var x = Render(ModelLibrary.Presets.Flow(preset), 0f, 2f);
         Assert.Equal(0.0, MeanSquare(x));
     }
 
@@ -149,7 +149,7 @@ public class RunningWaterTests
     [InlineData("basin_overflow")]
     public void It_renders_at_its_declared_level_and_is_finite(string preset)
     {
-        var spec = RunningWaterSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.Flow(preset);
         var x = Render(spec, spec.ReferenceFlow, 20f, seed: 7);
         Assert.All(x, v => Assert.True(float.IsFinite(v)));
         double db = Db(MeanSquare(x));
@@ -163,7 +163,7 @@ public class RunningWaterTests
     [InlineData("drain_grate", 0.1f, 0.36f, 1.8f)]
     public void More_water_is_louder(string preset, float low, float mid, float high)
     {
-        var spec = RunningWaterSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.Flow(preset);
         double a = Db(MeanSquare(Render(spec, low, 15f))), b = Db(MeanSquare(Render(spec, mid, 15f))), c = Db(MeanSquare(Render(spec, high, 15f)));
         _o.WriteLine($"  {preset}: {low} L/s {a:F1} dB, {mid} L/s {b:F1} dB, {high} L/s {c:F1} dB");
         Assert.True(b > a + 1.0 && c > b + 1.0);
@@ -253,8 +253,8 @@ public class RunningWaterTests
         var grate = RunningWaterSynth.Layout(RunningWaterSpec.DrainGrate);
         Assert.All(grate.Skip(1), p => Assert.InRange(p.Length(), 0.24f, 0.26f));
         // And the client finds the same.
-        Assert.Equal(creek.Length, ExtendedSources.Layout("flow:creek")?.Length);
-        Assert.Null(ExtendedSources.Layout("flow:no_such_thing"));
+        Assert.Equal(creek.Length, ExtendedSources.Layout("flow:creek", ModelLibrary.Presets)?.Length);
+        Assert.Null(ExtendedSources.Layout("flow:no_such_thing", ModelLibrary.Presets));
     }
 
     // ── Texture: fitted against recordings ─────────────────────────────────────────────────────
@@ -309,7 +309,7 @@ public class RunningWaterTests
     [InlineData("downpipe", "downpipe")]
     public void A_drain_and_a_downpipe_move_as_recorded_ones_do(string preset, string texture)
     {
-        var spec = RunningWaterSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.Flow(preset);
         var x = Render(spec, spec.ReferenceFlow, 20f, seed: 3);
         HoldInRange(texture, TextureStatistics.Analyse(x).Summary(), Fitted, allowed: 1);
         var (kurtosis, _) = TextureStatistics.Waveform(x);
@@ -355,7 +355,7 @@ public class RunningWaterTests
         foreach (var (prefab, at, turned) in water)
         {
             string sound = prefabs[prefab].GetProperty("SoundId").GetString()!;
-            var spec = RunningWaterSpec.ByName(sound[5..]);
+            var spec = ModelLibrary.Presets.Flow(sound[5..]);
             Assert.True(spec.CatchmentSquareMetres > 0f && spec.BaseFlowLitresPerSecond == 0f, $"{prefab} should be fed by the rain alone");
             var inside = solids.Where(b => MathF.Abs(at.X - b.Centre.X) < b.Half.X && MathF.Abs(at.Y - b.Centre.Y) < b.Half.Y && MathF.Abs(at.Z - b.Centre.Z) < b.Half.Z)
                                .Select(b => b.Name).ToList();
@@ -372,7 +372,7 @@ public class RunningWaterTests
     public void The_fountain_is_unchanged_by_the_hooks_running_water_uses()
     {
         // FlowScale 1 and no placer: the fountain renders sample for sample as it did.
-        var spec = WaterFeatureSpec.ByName("park_fountain");
+        var spec = ModelLibrary.Presets.Water("park_fountain");
         var a = new FallingWaterSynth(spec, Rate, 4);
         var b = new FallingWaterSynth(spec, Rate, 4) { FlowScale = 1f };
         for (int i = 0; i < Rate * 2; i++)

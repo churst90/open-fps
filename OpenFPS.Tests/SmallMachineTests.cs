@@ -19,7 +19,7 @@ public class SmallMachineTests
     {
         foreach (var key in SmallMachineSpec.Presets.Keys)
         {
-            var s = SmallMachineSpec.ByName(key);
+            var s = ModelLibrary.Presets.SmallMachine(key);
             Assert.False(string.IsNullOrWhiteSpace(s.Name));
             Assert.True(s.SourceLevelDb > 30f, $"{key} declares {s.SourceLevelDb} dB");
             // Petrol machinery is governed; the rest are fans and compressors.
@@ -62,7 +62,7 @@ public class SmallMachineTests
     [Fact]
     public void ThickGrassBogsTheMowerAndItRecovers()
     {
-        var synth = new SmallMachineSynth(SmallMachineSpec.PushMower, Sr, 17)
+        var synth = new SmallMachineSynth(SmallMachineSpec.PushMower, ModelLibrary.Presets, Sr, 17)
         { Load = 0.05f, GroundSpeed = 0f };
         Run(synth, 8f);
         float free = MeanRpm(synth, 1f);
@@ -111,7 +111,7 @@ public class SmallMachineTests
         var spec = SmallMachineSpec.PushMower;
         Assert.Equal(1f, spec.BladeGearRatio);
 
-        var synth = new SmallMachineSynth(spec, Sr, 17) { Load = 0.4f, GroundSpeed = 1f };
+        var synth = new SmallMachineSynth(spec, ModelLibrary.Presets, Sr, 17) { Load = 0.4f, GroundSpeed = 1f };
         for (int i = 0; i < (int)(Sr * 8); i++) synth.Step();
         Assert.Equal(synth.Rpm, synth.BladeRpm, 0);
 
@@ -147,7 +147,7 @@ public class SmallMachineTests
     [Fact]
     public void TheFanRunsOnWhenTheCompressorIsSatisfied()
     {
-        var synth = new SmallMachineSynth(SmallMachineSpec.AirConditionerCondenser, Sr, 17);
+        var synth = new SmallMachineSynth(SmallMachineSpec.AirConditionerCondenser, ModelLibrary.Presets, Sr, 17);
         Run(synth, 4f);                 // the compressor takes a moment to come up to speed
         double both = Energy(synth, 3f);
 
@@ -182,7 +182,7 @@ public class SmallMachineTests
     [Fact]
     public void AMowerStandingStillCutsNothing()
     {
-        var synth = new SmallMachineSynth(SmallMachineSpec.PushMower, Sr, 17) { Load = 0.6f, GroundSpeed = 1.2f };
+        var synth = new SmallMachineSynth(SmallMachineSpec.PushMower, ModelLibrary.Presets, Sr, 17) { Load = 0.6f, GroundSpeed = 1.2f };
         for (int i = 0; i < (int)(Sr * 8); i++) synth.Step();
 
         double walking = 0;
@@ -207,8 +207,8 @@ public class SmallMachineTests
     [InlineData("ac_window")]
     public void EachMachineMeasuresWhatItDeclares(string key)
     {
-        var spec = SmallMachineSpec.ByName(key);
-        var synth = new SmallMachineSynth(spec, Sr, 17)
+        var spec = ModelLibrary.Presets.SmallMachine(key);
+        var synth = new SmallMachineSynth(spec, ModelLibrary.Presets, Sr, 17)
         {
             Load = spec.Cutting != null ? 0.5f : 0.6f,
             GroundSpeed = spec.Cutting != null ? 1.1f : 0f,
@@ -233,7 +233,7 @@ public class SmallMachineTests
     {
         foreach (var key in SmallMachineSpec.Presets.Keys)
         {
-            var s = SmallMachineSpec.ByName(key);
+            var s = ModelLibrary.Presets.SmallMachine(key);
             foreach (var (what, material) in new[]
                      { ("deck", s.Deck?.Material), ("casing", s.Casing?.Material) })
             {

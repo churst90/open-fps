@@ -71,7 +71,9 @@ public sealed class AircraftSynth
     private bool _onGround;
     private const int SlowEvery = 64;
 
-    public AircraftSynth(AircraftProfile p, float rate = RenderRate.Default, int seed = 3)
+    /// <summary>An aeroplane's voice. A piston engine's profile is <paramref name="presets"/>' (the catalogue's),
+    /// so an engine changed in the world editor is the one heard.</summary>
+    public AircraftSynth(AircraftProfile p, IPresets presets, float rate = RenderRate.Default, int seed = 3)
     {
         Profile = p;
         _rate = rate;
@@ -118,7 +120,7 @@ public sealed class AircraftSynth
         }
         if (p.Power == AircraftPower.Piston && p.EngineKey != null)
         {
-            _piston = new EngineSynth(EngineProfile.ByName(p.EngineKey), rate, seed + 6);
+            _piston = new EngineSynth(presets.Engine(p.EngineKey), rate, seed + 6);
             _piston.ExternalInertia = p.PropInertiaKgM2;
             _piston.Ignition = true;
         }

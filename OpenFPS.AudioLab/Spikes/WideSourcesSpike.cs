@@ -114,7 +114,7 @@ public static class WideSourcesSpike
         {
             measuredSound = soundId;
             measuredMiddle = middle;
-            var layout = ExtendedSources.Layout(soundId);
+            var layout = ExtendedSources.Layout(soundId, ModelLibrary.Presets);
             measuredPlaces = layout?.Length ?? 1;
             measuredSpread = layout == null ? 0f
                 : float.IsNaN(ExtendedSources.ForceSpread) ? ExtendedSources.SpreadFor(ExtendedSources.Reach(layout), Vector3.Distance(ear, at))

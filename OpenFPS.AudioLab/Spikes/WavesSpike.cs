@@ -68,7 +68,7 @@ public static class WavesSpike
 
         foreach (var key in presets)
         {
-            var spec = ShoreSpec.ByName(key);
+            var spec = ModelLibrary.Presets.Shore(key);
             float u = float.IsNaN(wind) ? spec.ReferenceWind : wind;
             var geo = spec.DefaultGeometry with { FetchMetres = float.IsNaN(fetch) ? spec.FetchMetres : fetch };
             var sw = Stopwatch.StartNew();
@@ -312,7 +312,7 @@ public static class WavesSpike
         // to its +Z (north here), not solid.
         int Add(string preset, Vector3 at, float length = float.NaN, float fetch = float.NaN)
         {
-            var spec = ShoreSpec.ByName(preset);
+            var spec = ModelLibrary.Presets.Shore(preset);
             int id = nextId++;
             var def = new EntityDefinition
             {
@@ -342,7 +342,7 @@ public static class WavesSpike
         void Shore(string preset, string label, float wind, params float[] distances)
         {
             Wind(wind);
-            var spec = ShoreSpec.ByName(preset);
+            var spec = ModelLibrary.Presets.Shore(preset);
             Vector3 edge = new(0f, 0.05f, 0f);
             int id = Add(preset, edge);
             // A surf bore takes a while to come in; a lake's sea is there at once.

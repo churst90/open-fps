@@ -802,7 +802,7 @@ public class VehicleMotionTests : IDisposable
         {
             Assert.True(OpenFPS.Common.Honk.TryParse(h.Sound.SynthKey, out var kind, out var pattern), h.Sound.SynthKey);
             Assert.Equal(horn, kind);
-            Assert.Equal(OpenFPS.Common.Honk.LevelDb(horn), h.Sound.LevelDb);
+            Assert.Equal(OpenFPS.Common.Honk.LevelDb(horn, ModelLibrary.Presets), h.Sound.LevelDb);
             Assert.InRange(h.Sound.DecaySeconds - OpenFPS.Common.Honk.Duration(pattern), -0.01f, 0.01f);   // the key rounds the pattern
             Assert.Equal(SoundCharacter.Ring, h.Sound.Character);
             float r = MathF.Sqrt(h.Sound.Position.X * h.Sound.Position.X + h.Sound.Position.Z * h.Sound.Position.Z);

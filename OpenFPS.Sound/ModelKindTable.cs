@@ -69,7 +69,7 @@ public static class ModelKindTable
         new() { Prefix = "engine", Synth = ModelSynth.Engine, Body = ModelBody.Rolls, LibraryKind = ModelLibrary.Kinds.Vehicle,
                 Knows = id => MachineRegistry.Knows(id[7..]) },
         new() { Prefix = "machine", Synth = ModelSynth.Machine, LibraryKind = ModelLibrary.Kinds.SmallMachine,
-                Level = id => { var s = SmallMachineSpec.ByName(id[8..]); return (s.SourceLevelDb, s.ExtentMetres); } },
+                Level = id => { var s = ModelLibrary.Presets.SmallMachine(id[8..]); return (s.SourceLevelDb, s.ExtentMetres); } },
         new() { Prefix = "aircraft", Synth = ModelSynth.Aircraft, Body = ModelBody.Flies, Level = AircraftLevel },
         new() { Prefix = "rail", Synth = ModelSynth.Rail, Body = ModelBody.Rails, Level = RailLevel, Headroom = RailHeadroom },
         new() { Prefix = "siren", Synth = ModelSynth.Siren, Knows = id => SirenSpec.ByName(id[6..]) != null },
@@ -80,27 +80,27 @@ public static class ModelKindTable
         // A level crossing's gate mechanism, by its motor's level; the case at the mast's foot is half a metre of steel.
         new() { Prefix = "gate", Synth = ModelSynth.Gate, Level = id => (CrossingGateSpec.ByName(id[5..]).SourceLevelDb, 0.5f) },
         new() { Prefix = "water", Synth = ModelSynth.Water, LibraryKind = ModelLibrary.Kinds.Water,
-                Level = WaterLevel, Headroom = WaterHeadroom, Places = ExtendedSources.WaterTapPlacesOf },
+                Level = WaterLevel, Headroom = WaterHeadroom, Places = id => ExtendedSources.WaterTapPlacesOf(id, ModelLibrary.Presets) },
         new() { Prefix = "fire", Synth = ModelSynth.Fire, LibraryKind = ModelLibrary.Kinds.Fire,
-                Level = id => { var f = FireSpec.ByName(id[5..]); return (f.SourceLevelDb, f.ExtentMetres); },
-                Headroom = id => FireSpec.ByName(id[5..]).PeakHeadroomDb, Places = ExtendedSources.FirePlacesOf },
+                Level = id => { var f = ModelLibrary.Presets.Fire(id[5..]); return (f.SourceLevelDb, f.ExtentMetres); },
+                Headroom = id => ModelLibrary.Presets.Fire(id[5..]).PeakHeadroomDb, Places = id => ExtendedSources.FirePlacesOf(id, ModelLibrary.Presets) },
         new() { Prefix = "foliage", Synth = ModelSynth.Foliage, LibraryKind = ModelLibrary.Kinds.Foliage,
-                Level = id => { var t = FoliageSpec.ByName(id[8..]); return (t.SourceLevelDb, t.ExtentMetres); },
-                Headroom = id => FoliageSpec.ByName(id[8..]).PeakHeadroomDb, Places = ExtendedSources.TreePlacesOf },
+                Level = id => { var t = ModelLibrary.Presets.Foliage(id[8..]); return (t.SourceLevelDb, t.ExtentMetres); },
+                Headroom = id => ModelLibrary.Presets.Foliage(id[8..]).PeakHeadroomDb, Places = id => ExtendedSources.TreePlacesOf(id, ModelLibrary.Presets) },
         // A wood heard as one (WoodChorus): one tree's level, since its synth renders its trees, and the wood's size.
         new() { Prefix = "wood", Synth = ModelSynth.Wood, Level = WoodLevel, Headroom = WoodHeadroom, Places = ExtendedSources.WoodPlacesOf },
         // Running water: its size is its length or its opening, its level declared at its base flow or reference rain.
         new() { Prefix = "flow", Synth = ModelSynth.Flow, LibraryKind = ModelLibrary.Kinds.Flow,
-                Level = id => { var f = RunningWaterSpec.ByName(id[5..]); return (f.SourceLevelDb, f.ExtentMetres); },
-                Headroom = id => RunningWaterSpec.ByName(id[5..]).PeakHeadroomDb, Places = ExtendedSources.FlowPlacesOf },
+                Level = id => { var f = ModelLibrary.Presets.Flow(id[5..]); return (f.SourceLevelDb, f.ExtentMetres); },
+                Headroom = id => ModelLibrary.Presets.Flow(id[5..]).PeakHeadroomDb, Places = id => ExtendedSources.FlowPlacesOf(id, ModelLibrary.Presets) },
         // Waves at an edge, declared at the reference wind straight onshore; its size a stretch of the edge.
         new() { Prefix = "shore", Synth = ModelSynth.Shore, LibraryKind = ModelLibrary.Kinds.Shore,
-                Level = id => { var s = ShoreSpec.ByName(id); return (s.SourceLevelDb, s.ExtentMetres); },
-                Headroom = id => ShoreSpec.ByName(id).PeakHeadroomDb, Places = ExtendedSources.ShorePlacesOf },
+                Level = id => { var s = ModelLibrary.Presets.Shore(id); return (s.SourceLevelDb, s.ExtentMetres); },
+                Headroom = id => ModelLibrary.Presets.Shore(id).PeakHeadroomDb, Places = id => ExtendedSources.ShorePlacesOf(id, ModelLibrary.Presets) },
         // A gas hob, declared with every burner on full; its size is the hob.
         new() { Prefix = "stove", Synth = ModelSynth.Stove, LibraryKind = ModelLibrary.Kinds.GasHob,
-                Level = id => { var h = GasHobSpec.ByName(id); return (h.SourceLevelDb, h.ExtentMetres); },
-                Headroom = id => GasHobSpec.ByName(id).PeakHeadroomDb },
+                Level = id => { var h = ModelLibrary.Presets.GasHob(id); return (h.SourceLevelDb, h.ExtentMetres); },
+                Headroom = id => ModelLibrary.Presets.GasHob(id).PeakHeadroomDb },
         new() { Prefix = "horn", Synth = ModelSynth.Horn, Knows = id => Honk.TryParse(id, out _, out _) },
         new() { Prefix = "rain", Synth = ModelSynth.Rain, Knows = _ => true },
     };
@@ -166,7 +166,7 @@ public static class ModelKindTable
     }
 
     /// <summary>The places a model is heard from, unscaled and uncapped (ExtendedSources.Layout caps and
-    /// caches them); null for one heard from one point.</summary>
+    /// caches them, asking here through <see cref="ModelLibrary.Presets"/>); null for one heard from one point.</summary>
     internal static Vector3[]? Places(string soundId)
     {
         if (KindOf(soundId) is not { Places: { } places }) return null;
@@ -198,7 +198,7 @@ public static class ModelKindTable
         }
         return _bodies.GetOrAdd(soundId!, static id =>
         {
-            try { return SmallMachineSpec.ByName(id[8..]).WalkedBehind ? ModelBody.Walks : ModelBody.Fixed; }
+            try { return ModelLibrary.Presets.SmallMachine(id[8..]).WalkedBehind ? ModelBody.Walks : ModelBody.Fixed; }
             catch (Exception ex)
             {
                 Fail(id, ex.Message);
@@ -262,18 +262,13 @@ public static class ModelKindTable
         }
     }
 
-    /// <summary>Logs, once per id, that a model id does not resolve. Never thrown: a voice that cannot be
-    /// made is not made, and the log says which.</summary>
-    public static void Fail(string soundId, string what)
-    {
-        if (_failed.TryAdd(soundId, what))
-            Serilog.Log.Warning("Model table: '{SoundId}' {What}", soundId, what);
-    }
-
-    private static readonly ConcurrentDictionary<string, string> _failed = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Logs, once per id, that a model id does not resolve (<see cref="ModelFailures"/>, which the
+    /// sound models below the table write to as well). Never thrown: a voice that cannot be made is not
+    /// made, and the log says which.</summary>
+    public static void Fail(string soundId, string what) => ModelFailures.Fail(soundId, what);
 
     /// <summary>The ids logged so far, with why.</summary>
-    public static IReadOnlyDictionary<string, string> Failures => _failed;
+    public static IReadOnlyDictionary<string, string> Failures => ModelFailures.All;
 
     // ── The kinds' own keys ─────────────────────────────────────────────────────────────────────
 
@@ -310,7 +305,7 @@ public static class ModelKindTable
     private static (float, float)? RailLevel(string id)
     {
         if (!TryRailSource(id, out string preset, out _, out int index)) return null;
-        var layout = TrainLayout.Sources(TrainProfile.ByName(preset));
+        var layout = TrainLayout.Sources(TrainProfile.ByName(preset), ModelLibrary.Presets);
         return index >= 0 && index < layout.Count ? (layout[index].LevelDb, layout[index].ExtentMetres) : null;
     }
 
@@ -318,7 +313,7 @@ public static class ModelKindTable
     private static float? RailHeadroom(string id)
     {
         if (!TryRailSource(id, out string preset, out _, out int index)) return null;
-        var layout = TrainLayout.Sources(TrainProfile.ByName(preset));
+        var layout = TrainLayout.Sources(TrainProfile.ByName(preset), ModelLibrary.Presets);
         return index >= 0 && index < layout.Count ? layout[index].HeadroomDb : null;
     }
 
@@ -328,26 +323,26 @@ public static class ModelKindTable
     {
         if (TryWaterTap(id, out string preset, out _, out int tap))
         {
-            var feature = WaterFeatureSpec.ByName(preset);
+            var feature = ModelLibrary.Presets.Water(preset);
             return tap < feature.Taps.Length ? (feature.SourceLevelDb, feature.Taps[tap].ExtentMetres) : null;
         }
-        var water = WaterFeatureSpec.ByName(id[6..]);
+        var water = ModelLibrary.Presets.Water(id[6..]);
         return (water.SourceLevelDb, water.ExtentMetres);
     }
 
     private static float? WaterHeadroom(string id)
         => TryWaterTap(id, out string preset, out _, out _)
-            ? WaterFeatureSpec.ByName(preset).PeakHeadroomDb
-            : WaterFeatureSpec.ByName(id[6..]).PeakHeadroomDb;
+            ? ModelLibrary.Presets.Water(preset).PeakHeadroomDb
+            : ModelLibrary.Presets.Water(id[6..]).PeakHeadroomDb;
 
     private static (float, float)? WoodLevel(string id)
     {
         if (!WoodChorus.ParseKey(id, out string preset, out float rx, out float rz)) return null;
-        return (FoliageSpec.ByName(preset).SourceLevelDb, MathF.Max(rx, rz));
+        return (ModelLibrary.Presets.Foliage(preset).SourceLevelDb, MathF.Max(rx, rz));
     }
 
     private static float? WoodHeadroom(string id)
-        => WoodChorus.ParseKey(id, out string preset, out _, out _) ? FoliageSpec.ByName(preset).PeakHeadroomDb : null;
+        => WoodChorus.ParseKey(id, out string preset, out _, out _) ? ModelLibrary.Presets.Foliage(preset).PeakHeadroomDb : null;
 
     // The size is what radiates (the disc or the nozzle), which only has to stop the inverse law running
     // away directly underneath; with more than one engine it is their span (11.5 m on a twin), as a bus's

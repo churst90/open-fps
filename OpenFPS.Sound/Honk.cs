@@ -55,9 +55,10 @@ public static class Honk
         return true;
     }
 
-    /// <summary>A horn's level at one metre while blowing, dB SPL, from its model, so the server's
-    /// earshot and the client's voice agree. A horn with no model is logged once and given 110 dB.</summary>
-    public static float LevelDb(string horn)
+    /// <summary>A horn's level at one metre while blowing, dB SPL, from its model (an air horn's from
+    /// <paramref name="presets"/>, the catalogue's), so the server's earshot and the client's voice agree. A
+    /// horn with no model is logged once and given 110 dB.</summary>
+    public static float LevelDb(string horn, IPresets presets)
     {
         int colon = horn.IndexOf(':');
         string kind = colon > 0 ? horn[..colon] : "";
@@ -66,12 +67,12 @@ public static class Honk
         {
             switch (kind.ToLowerInvariant())
             {
-                case "air": return ModelLibrary.Horn(preset).ReferenceDb;
+                case "air": return presets.Horn(preset).ReferenceDb;
                 case "electric": return ElectricHornSpec.ByName(preset).ReferenceDb;
             }
-            ModelKindTable.Fail(Prefix + horn, "names no kind of horn (air or electric); played at 110 dB");
+            ModelFailures.Fail(Prefix + horn, "names no kind of horn (air or electric); played at 110 dB");
         }
-        catch (ArgumentException ex) { ModelKindTable.Fail(Prefix + horn, ex.Message + "; played at 110 dB"); }
+        catch (ArgumentException ex) { ModelFailures.Fail(Prefix + horn, ex.Message + "; played at 110 dB"); }
         return 110f;
     }
 

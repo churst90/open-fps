@@ -1286,7 +1286,7 @@ public class ClientWorldState
             var key = (cell.X, cell.Z, preset);
             if (!_woodIds.TryGetValue(key, out int id)) _woodIds[key] = id = WoodChorus.FirstId - _woodIds.Count;
             return id;
-        });
+        }, ModelLibrary.Presets);
         var keep = new HashSet<int>();
         foreach (var w in chorus.Woods)
         {

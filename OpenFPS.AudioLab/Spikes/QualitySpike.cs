@@ -370,9 +370,9 @@ public static class QualitySpike
         string kind = key[..key.IndexOf(':')], preset = key[(key.IndexOf(':') + 1)..];
         var (level, extent, headroom) = kind switch
         {
-            "water" => (WaterFeatureSpec.ByName(preset).SourceLevelDb, WaterFeatureSpec.ByName(preset).ExtentMetres, WaterFeatureSpec.ByName(preset).PeakHeadroomDb),
-            "foliage" => (FoliageSpec.ByName(preset).SourceLevelDb, FoliageSpec.ByName(preset).ExtentMetres, FoliageSpec.ByName(preset).PeakHeadroomDb),
-            "fire" => (FireSpec.ByName(preset).SourceLevelDb, FireSpec.ByName(preset).ExtentMetres, FireSpec.ByName(preset).PeakHeadroomDb),
+            "water" => (ModelLibrary.Presets.Water(preset).SourceLevelDb, ModelLibrary.Presets.Water(preset).ExtentMetres, ModelLibrary.Presets.Water(preset).PeakHeadroomDb),
+            "foliage" => (ModelLibrary.Presets.Foliage(preset).SourceLevelDb, ModelLibrary.Presets.Foliage(preset).ExtentMetres, ModelLibrary.Presets.Foliage(preset).PeakHeadroomDb),
+            "fire" => (ModelLibrary.Presets.Fire(preset).SourceLevelDb, ModelLibrary.Presets.Fire(preset).ExtentMetres, ModelLibrary.Presets.Fire(preset).PeakHeadroomDb),
             _ => throw new ArgumentException(key),
         };
         var (gain, reference) = Loudness.Place(level, extent);
@@ -828,10 +828,10 @@ public static class QualitySpike
             string kind = key[..key.IndexOf(':')], preset = key[(key.IndexOf(':') + 1)..];
             PhysicalVoiceState v = kind switch
             {
-                "water" => new WaterVoiceState(WaterFeatureSpec.ByName(preset), sr, 11, Vector3.Zero, new WorldWeather()),
-                "foliage" => new FoliageVoiceState(FoliageSpec.ByName(preset), sr, 11, Vector3.Zero, new WorldWeather()),
-                "fire" => new FireVoiceState(FireSpec.ByName(preset), sr, 11, Vector3.Zero, new WorldWeather()),
-                _ => new MachineVoiceState(SmallMachineSpec.ByName(preset), sr, 5, 11),
+                "water" => new WaterVoiceState(ModelLibrary.Presets.Water(preset), sr, 11, Vector3.Zero, new WorldWeather()),
+                "foliage" => new FoliageVoiceState(ModelLibrary.Presets.Foliage(preset), sr, 11, Vector3.Zero, new WorldWeather()),
+                "fire" => new FireVoiceState(ModelLibrary.Presets.Fire(preset), sr, 11, Vector3.Zero, new WorldWeather()),
+                _ => new MachineVoiceState(ModelLibrary.Presets.SmallMachine(preset), sr, 5, 11),
             };
             var block = new float[1024];
             for (int i = 0; i < 2 * sr / 1024; i++) v.Render(block);

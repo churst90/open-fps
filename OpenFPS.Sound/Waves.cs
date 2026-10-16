@@ -505,14 +505,6 @@ public sealed record ShoreSpec
             ["hull_wood"] = () => HullWood,
             ["hull_aluminium"] = () => HullAluminium,
         };
-
-    /// <summary>A preset by name, through the <see cref="ModelLibrary"/> so a map's own wins. A map's
-    /// key with its geometry ("shore:lake_sand/300/90/20") names its preset.</summary>
-    public static ShoreSpec ByName(string key)
-    {
-        ParseKey(key, out string preset, out _);
-        return ModelLibrary.Shore(preset);
-    }
 }
 
 /// <summary>

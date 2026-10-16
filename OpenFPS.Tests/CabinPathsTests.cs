@@ -25,7 +25,7 @@ public class CabinPathsTests
     public void ACarHasEveryWayInWhereItIs()
     {
         var v = MachineRegistry.VehicleFor("i4_economy");
-        var lay = CabinPaths.Build(v)!;
+        var lay = CabinPaths.Build(v, ModelLibrary.Presets)!;
         Assert.NotNull(lay);
         var g = VehicleCabin.Measure(v)!.Value;
         var kinds = lay.Paths.Select(p => p.Kind).ToArray();
@@ -51,17 +51,17 @@ public class CabinPathsTests
     [Fact]
     public void ABusHasItsDoorOnTheKerbSideAndAMotorcycleHasNoCabin()
     {
-        var bus = CabinPaths.Build(MachineRegistry.VehicleFor("transit_bus"))!;
+        var bus = CabinPaths.Build(MachineRegistry.VehicleFor("transit_bus"), ModelLibrary.Presets)!;
         Assert.True(bus.Door > 0);
         Assert.Equal(CabinPaths.Kind.Door, bus.Paths[bus.Door].Kind);
-        Assert.Null(CabinPaths.Build(MachineRegistry.VehicleFor("sportbike")));
+        Assert.Null(CabinPaths.Build(MachineRegistry.VehicleFor("sportbike"), ModelLibrary.Presets));
     }
 
     [Fact]
     public void EveryPathIsPlayedWhereTheOneVoiceWasOnlyTurned()
     {
         var v = MachineRegistry.VehicleFor("i4_economy");
-        var lay = CabinPaths.Build(v)!;
+        var lay = CabinPaths.Build(v, ModelLibrary.Presets)!;
         var ear = new Vector3(-0.36f, 1.25f, 0.28f);
         for (int p = 0; p < lay.Count; p++)
             Assert.Equal(CabinPaths.PlacedMetres, CabinPaths.Offset(lay, p, ear).Length(), 3);

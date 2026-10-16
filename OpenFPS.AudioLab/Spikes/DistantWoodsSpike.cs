@@ -57,7 +57,7 @@ public static class DistantWoodsSpike
         var spec = FoliageSpec.ParkTree;
         var crowns = Wood(trees);
         int nextId = WoodChorus.FirstId;
-        var chorus = WoodChorus.Build(crowns.Select((c, i) => new WoodChorus.Crown(i + 1, c, "park_tree")).ToList(), (_, _) => nextId--);
+        var chorus = WoodChorus.Build(crowns.Select((c, i) => new WoodChorus.Crown(i + 1, c, "park_tree")).ToList(), (_, _) => nextId--, ModelLibrary.Presets);
         float[] distances = { 300f, 500f, 800f };
         var ears = distances.Select(d => new Vector3(0f, 1.7f, -d)).ToArray();
         var wind = WindWeather.Steady(4.5f, 250f, 0.25f);
@@ -88,7 +88,7 @@ public static class DistantWoodsSpike
         {
             Wood = w,
             Synth = new FoliageSynth(spec, Rate, 7 + j),
-            WindAt = ExtendedSources.Layout(w.Key)![1..],
+            WindAt = ExtendedSources.Layout(w.Key, ModelLibrary.Presets)![1..],
             Gain = new float[ears.Length],
             Delay = new int[ears.Length],
         }).ToArray();

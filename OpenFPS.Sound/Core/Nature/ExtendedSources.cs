@@ -67,20 +67,19 @@ public static class ExtendedSources
     /// The places of a source, by its physical key, as offsets from its middle in the source's own frame
     /// (x east, y up, z north on an unrotated entity): place 0 is the middle itself. Null for anything
     /// that is not an extended source of this kind (a machine, a whole fountain at one point, the rain).
+    /// Which kind it is and its model are <paramref name="presets"/>' (the catalogue's).
     /// </summary>
-    public static Vector3[]? Layout(string? physicalKey)
+    public static Vector3[]? Layout(string? physicalKey, IPresets presets)
     {
         if (!Enabled || string.IsNullOrEmpty(physicalKey)) return null;
-        var layout = _layouts.GetOrAdd(physicalKey, static key => Make(key));
+        var layout = _layouts.GetOrAdd(physicalKey, static (key, presets) => presets.Places(key), presets);
         return layout != null && layout.Length <= MaxPlaces ? layout : null;
     }
 
-    private static Vector3[]? Make(string key) => ModelKindTable.Places(key);
-
     /// <summary>A tree's crown: one place per bough, at the middle of the boughs it stands for.</summary>
-    internal static Vector3[]? TreePlacesOf(string key)
+    internal static Vector3[]? TreePlacesOf(string key, IPresets presets)
     {
-        var spec = FoliageSpec.ByName(key[8..]);
+        var spec = presets.Foliage(key[8..]);
         int n = TreePlaces;
         var places = new Vector3[1 + n];
         for (int j = 0; j < n; j++)
@@ -96,11 +95,11 @@ public static class ExtendedSources
 
     /// <summary>One tap of a water feature ("water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;"): round the place its
     /// water lands, at half its extent. The whole feature at one point ("water:&lt;preset&gt;") is not spread.</summary>
-    internal static Vector3[]? WaterTapPlacesOf(string key)
+    internal static Vector3[]? WaterTapPlacesOf(string key, IPresets presets)
     {
         var parts = key[6..].Split('/');
         if (parts.Length != 3 || !int.TryParse(parts[2], out int tap)) return null;
-        var spec = WaterFeatureSpec.ByName(parts[0]);
+        var spec = presets.Water(parts[0]);
         if (tap < 0 || tap >= spec.Taps.Length) return null;
         float r = 0.5f * spec.Taps[tap].ExtentMetres * LayoutScale;
         var places = new Vector3[1 + WaterTapPlaces];
@@ -113,18 +112,18 @@ public static class ExtendedSources
     }
 
     /// <summary>Running water: along its length, or round where it lands (RunningWaterSynth.Layout).</summary>
-    internal static Vector3[]? FlowPlacesOf(string key)
+    internal static Vector3[]? FlowPlacesOf(string key, IPresets presets)
     {
-        var spec = RunningWaterSpec.ByName(key[5..]);
+        var spec = presets.Flow(key[5..]);
         if (spec.Places <= 1) return null;
         return Scaled(RunningWaterSynth.Layout(spec));
     }
 
     /// <summary>Waves at an edge: along it, and on its break line (ShoreSynth.Layout), its length the map's.</summary>
-    internal static Vector3[]? ShorePlacesOf(string key)
+    internal static Vector3[]? ShorePlacesOf(string key, IPresets presets)
     {
         ShoreSpec.ParseKey(key, out string preset, out var geometry);
-        var spec = ShoreSpec.ByName(preset);
+        var spec = presets.Shore(preset);
         if (spec.TotalPlaces <= 1) return null;
         return Scaled(ShoreSynth.Layout(spec, geometry?.LengthMetres ?? spec.LengthMetres));
     }
@@ -145,9 +144,9 @@ public static class ExtendedSources
     }
 
     /// <summary>A fire's bed, by its own layout (FireSynth.Layout).</summary>
-    internal static Vector3[]? FirePlacesOf(string key)
+    internal static Vector3[]? FirePlacesOf(string key, IPresets presets)
     {
-        var places = FireSynth.Layout(FireSpec.ByName(key[5..]));
+        var places = FireSynth.Layout(presets.Fire(key[5..]));
         return places.Length <= 1 ? null : Scaled(places);
     }
 

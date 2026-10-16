@@ -45,14 +45,14 @@ public class HonkTests
     [Fact]
     public void AHornsLevelIsItsOwnModelsAnchor()
     {
-        Assert.Equal(ChimeHornSpec.ByName("truck_dual").ReferenceDb, Honk.LevelDb("air:truck_dual"));
-        Assert.Equal(ElectricHornSpec.ByName("disc_pair").ReferenceDb, Honk.LevelDb("electric:disc_pair"));
-        Assert.Equal(ElectricHornSpec.ByName("moto_disc").ReferenceDb, Honk.LevelDb("ELECTRIC:moto_disc"));
+        Assert.Equal(ChimeHornSpec.ByName("truck_dual").ReferenceDb, Honk.LevelDb("air:truck_dual", ModelLibrary.Presets));
+        Assert.Equal(ElectricHornSpec.ByName("disc_pair").ReferenceDb, Honk.LevelDb("electric:disc_pair", ModelLibrary.Presets));
+        Assert.Equal(ElectricHornSpec.ByName("moto_disc").ReferenceDb, Honk.LevelDb("ELECTRIC:moto_disc", ModelLibrary.Presets));
         // Nothing it can name: a plausible horn, not silence and not the ceiling.
-        Assert.Equal(110f, Honk.LevelDb("air:no_such_horn"));
-        Assert.Equal(110f, Honk.LevelDb("klaxon:disc_pair"));
-        Assert.Equal(110f, Honk.LevelDb("disc_pair"));
-        Assert.NotEqual(110f, Honk.LevelDb("air:truck_dual"));
+        Assert.Equal(110f, Honk.LevelDb("air:no_such_horn", ModelLibrary.Presets));
+        Assert.Equal(110f, Honk.LevelDb("klaxon:disc_pair", ModelLibrary.Presets));
+        Assert.Equal(110f, Honk.LevelDb("disc_pair", ModelLibrary.Presets));
+        Assert.NotEqual(110f, Honk.LevelDb("air:truck_dual", ModelLibrary.Presets));
     }
 
     [Fact]

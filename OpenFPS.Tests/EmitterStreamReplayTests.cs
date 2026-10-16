@@ -779,7 +779,7 @@ internal sealed class Replay
     private static void TrainBehindWall(Replay r)
     {
         r.Wall(9601, new Vector3(0f, 5f, -8f), new Vector3(60f, 10f, 0.3f), "Brick");
-        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"));
+        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"), ModelLibrary.Presets);
         const string train = "light_rail/t1";
         const float speed = 12f;
         float head = -10f;

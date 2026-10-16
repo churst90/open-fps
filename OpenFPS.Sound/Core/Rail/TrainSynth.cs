@@ -80,9 +80,14 @@ public sealed class TrainSynth
 
     public IReadOnlyList<Source> Sources => _sources;
 
-    public TrainSynth(TrainProfile p, float rate = RenderRate.Default, int seed = 41, double headAt = 0)
+    private readonly IPresets _presets;
+
+    /// <summary>A consist's voices. Its engines, horn, whistle and bell are <paramref name="presets"/>' (the
+    /// catalogue's), so one changed in the world editor is the one heard.</summary>
+    public TrainSynth(TrainProfile p, IPresets presets, float rate = RenderRate.Default, int seed = 41, double headAt = 0)
     {
         Profile = p; _rate = rate; _dt = 1f / rate;
+        _presets = presets;
         HeadMetres = headAt;
         _track = new TrackResponse(p.Track, rate);
         Speed = p.TypicalSpeedMps;
@@ -147,7 +152,7 @@ public sealed class TrainSynth
         {
             case RailTraction.DieselElectric when tr.EngineKey != null:
             {
-                var eng = new EngineSynth(EngineProfile.ByName(tr.EngineKey), _rate, seed++) { Ignition = true };
+                var eng = new EngineSynth(_presets.Engine(tr.EngineKey), _rate, seed++) { Ignition = true };
                 // Already running at its notch: a train is first heard on the move, and from rest the engine
                 // cranks and catches each time a train comes into earshot.
                 if (tr.NotchRpm.Length > 0)
@@ -211,7 +216,7 @@ public sealed class TrainSynth
         string? hornKey = tr.HornKey;
         if (hornKey != null && _horn == null)
         {
-            _horn = new ChimeHorn(ModelLibrary.Horn(hornKey), _rate, seed++);
+            _horn = new ChimeHorn(_presets.Horn(hornKey), _rate, seed++);
             var h = _horn;
             _sources.Add(new Source
             {
@@ -222,7 +227,7 @@ public sealed class TrainSynth
         }
         if (tr.Steam?.WhistleKey is { } wk && _whistle == null)
         {
-            _whistle = new SteamWhistle(ModelLibrary.Whistle(wk), _rate, seed++);
+            _whistle = new SteamWhistle(_presets.Whistle(wk), _rate, seed++);
             var w = _whistle;
             _sources.Add(new Source
             {
@@ -234,7 +239,7 @@ public sealed class TrainSynth
         string? bellKey = tr.BellKey ?? tr.Steam?.BellKey;
         if (bellKey != null && _bell == null)
         {
-            _bell = new StruckBell(ModelLibrary.Bell(bellKey), _rate, seed++);
+            _bell = new StruckBell(_presets.Bell(bellKey), _rate, seed++);
             var bl = _bell;
             _sources.Add(new Source
             {

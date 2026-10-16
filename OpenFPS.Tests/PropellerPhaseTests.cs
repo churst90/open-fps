@@ -36,7 +36,7 @@ public class PropellerPhaseTests
 
     private static double WanderCore(AircraftProfile p)
     {
-        var syn = new AircraftSynth(p, Sr, 3);
+        var syn = new AircraftSynth(p, ModelLibrary.Presets, Sr, 3);
         syn.PlaceAtLever(0.7f); syn.Lever = 0.7f;
         syn.SetListener(new Vector3(60f, -40f, 10f));
         int n = Sr * 8;

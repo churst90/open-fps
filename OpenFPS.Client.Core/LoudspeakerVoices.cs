@@ -33,7 +33,7 @@ internal sealed class LoudspeakerVoices
     {
         Drain();
         render = null!;
-        if (!Loudspeakers.TryGet(speaker, out var spec))
+        if (!ModelLibrary.TryLoudspeaker(speaker, out var spec))
         {
             if (_failed.Add("speaker:" + speaker))
                 Log.Warning("Loudspeaker '{Speaker}' is not a loudspeaker model; {Program} is silent", speaker, program);

@@ -336,6 +336,7 @@ OpenFPS.Sound/GasHob.cs	lib	Sound
 OpenFPS.Sound/Glass.cs	lib	Sound	
 OpenFPS.Sound/GlassDoor.cs	lib	Sound	
 OpenFPS.Sound/GlassFracture.cs	lib	Sound	
+OpenFPS.Sound/GlassKind.cs	lib	Sound	
 OpenFPS.Sound/GroundChannels.cs	lib	Sound	
 OpenFPS.Sound/GroundWater.cs	lib	Sound	
 OpenFPS.Sound/HandOverSounds.cs	lib	Sound	
@@ -347,14 +348,17 @@ OpenFPS.Sound/Hearing/ReferenceVoice.cs	lib	Sound
 OpenFPS.Sound/Hearing/Timbre.cs	lib	Sound	
 OpenFPS.Sound/Hearing/ZwickerLoudness.cs	lib	Sound	
 OpenFPS.Sound/Honk.cs	lib	Sound	
+OpenFPS.Sound/IPresets.cs	lib	Sound	
 OpenFPS.Sound/ImpactAcoustics.cs	lib	Sound	
 OpenFPS.Sound/KnobDoor.cs	lib	Sound	
 OpenFPS.Sound/Lightning.cs	lib	Sound	
 OpenFPS.Sound/LockCylinder.cs	lib	Sound	
 OpenFPS.Sound/Loudness.cs	lib	Sound	
 OpenFPS.Sound/Loudspeakers.cs	lib	Sound	
+OpenFPS.Sound/MachineParts.cs	lib	Sound	
 OpenFPS.Sound/MachinePower.cs	lib	Sound	
 OpenFPS.Sound/Machines.cs	lib	Sound	
+OpenFPS.Sound/ModelFailures.cs	lib	Sound	
 OpenFPS.Sound/ModelKindTable.cs	lib	Sound	
 OpenFPS.Sound/ModelLibrary.cs	lib	Sound	
 OpenFPS.Sound/NatureModels.cs	lib	Sound	

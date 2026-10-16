@@ -115,12 +115,12 @@ public static class CrossingSpike
         // The mast beside the road on the near side, the listener on the footway just short of it.
         var mastAt = new Vector3(MathF.Sqrt(MathF.Max(0.01f, mastDist * mastDist - 4f)) * 0.8f, 3.6f, 1.2f);
 
-        var train = new TrainSynth(profile, Sr, 41) { Speed = speed, Notch = 7f };
+        var train = new TrainSynth(profile, ModelLibrary.Presets, Sr, 41) { Speed = speed, Notch = 7f };
         var gong = new StruckBell(ModelLibrary.Bell("crossing_gong"), Sr, 31);
         var truckAir = new AirSystem(ModelLibrary.Air("tractor_trailer"), Sr, 71) { EngineRpm = 650f };
         var busAir = new AirSystem(ModelLibrary.Air("transit_bus"), Sr, 83) { EngineRpm = 700f };
-        var truckEngine = new EngineSynth(EngineProfile.ByName("diesel_truck"), Sr, 91) { Ignition = true };
-        var busEngine = new EngineSynth(EngineProfile.ByName("diesel_bus"), Sr, 97) { Ignition = true };
+        var truckEngine = new EngineSynth(ModelLibrary.Presets.Engine("diesel_truck"), Sr, 91) { Ignition = true };
+        var busEngine = new EngineSynth(ModelLibrary.Presets.Engine("diesel_bus"), Sr, 97) { Ignition = true };
         var truckHorn = new ChimeHorn(ModelLibrary.Horn("truck_dual"), Sr, 103);
 
         // When everything happens. The train is abeam the crossing half way through.

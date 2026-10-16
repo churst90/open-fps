@@ -275,15 +275,6 @@ public static class Loudspeakers
 
     /// <summary>The sound id of a program played through a loudspeaker: "loudspeaker:pa_horn/ANNOUNCE/x".</summary>
     public static string Key(string speaker, string program) => KeyPrefix + speaker + "/" + program;
-
-    /// <summary>The speaker a placed emitter names, from the model library (an authored one first).</summary>
-    public static bool TryGet(string? id, out LoudspeakerSpec spec)
-    {
-        spec = null!;
-        if (string.IsNullOrEmpty(id) || !ModelLibrary.Knows(ModelLibrary.Kinds.Loudspeaker, id)) return false;
-        spec = ModelLibrary.Loudspeaker(id);
-        return true;
-    }
 }
 
 /// <summary>

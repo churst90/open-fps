@@ -75,7 +75,7 @@ public class TrainSignalTests
     [InlineData("amtrak", "k5la")]
     public void A_horn_source_is_placed_at_its_own_models_level(string preset, string horn)
     {
-        var layout = TrainLayout.Sources(TrainProfile.ByName(preset));
+        var layout = TrainLayout.Sources(TrainProfile.ByName(preset), ModelLibrary.Presets);
         Assert.Equal(ModelLibrary.Horn(horn).ReferenceDb, layout[TrainSignal.WarningSource(layout)].LevelDb);
         var bell = layout[TrainSignal.BellSource(layout)];
         Assert.True(bell.HeadroomDb > VehicleProfile.PeakHeadroomDb, "a bell renders with its own room");

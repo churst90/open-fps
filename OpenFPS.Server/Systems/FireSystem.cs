@@ -25,7 +25,7 @@ public sealed class FireSystem
         public float Waited;
         public Task? Stepping;
         public int Logged;
-        public MapFire(int seed) { Sim = new FireSpread(seed); }
+        public MapFire(int seed) { Sim = new FireSpread(seed, ModelLibrary.Presets.Fire); }
     }
 
     private readonly Dictionary<string, MapFire> _maps = new(StringComparer.OrdinalIgnoreCase);
@@ -100,7 +100,7 @@ public sealed class FireSystem
     public int Light(MapManager maps, string mapId, World world, string preset, Vector3 ground, float yaw)
     {
         var m = Map(maps, mapId, world);
-        var thing = FuelCatalog.ForFire(preset);
+        var thing = FuelCatalog.ForFire(preset, ModelLibrary.Presets.Fire);
         double now = Clock();
         lock (m.Sim)
         {
@@ -186,7 +186,7 @@ public sealed class FireSystem
             string material = world.TryGet<MaterialComponent>(e, out var mat) ? mat.Material ?? "" : "";
             // The ground under a thing is taken as the map's datum: the maps are flat so far (docs/FIRE.md 12.10).
             float bottom = t.Position.Y - 0.5f * c.Size.Y;
-            var fuel = FuelCatalog.ForThing(sound, material, c.Shape.IsRound(), c.Size, bottom);
+            var fuel = FuelCatalog.ForThing(sound, ModelKindTable.IsVehicle(sound), material, c.Shape.IsRound(), c.Size, bottom, ModelLibrary.Presets.Fire);
             if (fuel == null) return;
             float yaw = YawOf(t.Rotation);
             string name = world.TryGet<IdentityComponent>(e, out var id) && id.Name.Length > 0 ? id.Name : fuel.Name;
@@ -226,7 +226,7 @@ public sealed class FireSystem
                 }
                 continue;
             }
-            var spec = FireSpec.ByName(FireSpread.KeyOf(b));
+            var spec = ModelLibrary.Presets.Fire(FireSpread.KeyOf(b, ModelLibrary.Presets.Fire));
             var shape = b.Shape;
             var collider = new ColliderComponent
             {
@@ -234,7 +234,7 @@ public sealed class FireSystem
                 Size = new Vector3(shape.Width, MathF.Max(0.5f, spec.FlameHeightMetres), shape.Depth),
                 IsSolid = false,
             };
-            string sound = FireSpread.KeyOf(b);
+            string sound = FireSpread.KeyOf(b, ModelLibrary.Presets.Fire);
             var part = m.Sim.Objects[b.Object].Fuel.Parts[b.Part];
             e = maps.SpawnEntity(mapId, w => w.Create(
                 new Transform { Position = b.Position, Rotation = Quaternion.CreateFromYawPitchRoll(b.Yaw, 0f, 0f), Scale = Vector3.One, IsDirty = true },

@@ -65,7 +65,7 @@ public class RailRunTests : IDisposable
     public void A_train_sounds_its_own_horn_and_bell_for_a_crossing()
     {
         var f = new Fixture(_dir, topSpeedKmh: 40f, startMetres: 50f, crossingAtMetres: 400f, clearMetres: 30f);
-        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"));
+        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"), ModelLibrary.Presets);
         int horn = TrainSignal.WarningSource(layout), bell = TrainSignal.BellSource(layout);
         Assert.True(horn >= 0 && bell >= 0, "the light rail set has a horn and a bell");
 
@@ -106,7 +106,7 @@ public class RailRunTests : IDisposable
     {
         // The rail climbs one in twenty eastward: fifteen metres between the two sides of the loop.
         var f = new Fixture(_dir, topSpeedKmh: 40f, startMetres: 0f, slope: 0.05f);
-        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"));
+        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"), ModelLibrary.Presets);
 
         for (int s = 0; s < 60; s++)
         {

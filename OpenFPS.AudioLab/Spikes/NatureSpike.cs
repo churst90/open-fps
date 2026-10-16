@@ -175,10 +175,10 @@ public static class NatureSpike
         string kind = key[..key.IndexOf(':')], preset = key[(key.IndexOf(':') + 1)..];
         return kind switch
         {
-            "machine" => (SmallMachineSpec.ByName(preset).SourceLevelDb, SmallMachineSpec.ByName(preset).ExtentMetres, VehicleProfile.PeakHeadroomDb),
-            "water" => (WaterFeatureSpec.ByName(preset).SourceLevelDb, WaterFeatureSpec.ByName(preset).ExtentMetres, WaterFeatureSpec.ByName(preset).PeakHeadroomDb),
-            "fire" => (FireSpec.ByName(preset).SourceLevelDb, FireSpec.ByName(preset).ExtentMetres, FireSpec.ByName(preset).PeakHeadroomDb),
-            "foliage" => (FoliageSpec.ByName(preset).SourceLevelDb, FoliageSpec.ByName(preset).ExtentMetres, FoliageSpec.ByName(preset).PeakHeadroomDb),
+            "machine" => (ModelLibrary.Presets.SmallMachine(preset).SourceLevelDb, ModelLibrary.Presets.SmallMachine(preset).ExtentMetres, VehicleProfile.PeakHeadroomDb),
+            "water" => (ModelLibrary.Presets.Water(preset).SourceLevelDb, ModelLibrary.Presets.Water(preset).ExtentMetres, ModelLibrary.Presets.Water(preset).PeakHeadroomDb),
+            "fire" => (ModelLibrary.Presets.Fire(preset).SourceLevelDb, ModelLibrary.Presets.Fire(preset).ExtentMetres, ModelLibrary.Presets.Fire(preset).PeakHeadroomDb),
+            "foliage" => (ModelLibrary.Presets.Foliage(preset).SourceLevelDb, ModelLibrary.Presets.Foliage(preset).ExtentMetres, ModelLibrary.Presets.Foliage(preset).PeakHeadroomDb),
             _ => throw new ArgumentException(key),
         };
     }
@@ -196,7 +196,7 @@ public static class NatureSpike
         {
             case "water":
             {
-                var spec = WaterFeatureSpec.ByName(preset);
+                var spec = ModelLibrary.Presets.Water(preset);
                 var s = new FallingWaterSynth(spec, Rate, seed);
                 if (Parts != null)
                 {
@@ -223,7 +223,7 @@ public static class NatureSpike
             }
             case "fire":
             {
-                var spec = FireSpec.ByName(preset);
+                var spec = ModelLibrary.Presets.Fire(preset);
                 var s = new FireSynth(spec, Rate, seed);
                 if (Parts != null)
                 {
@@ -243,7 +243,7 @@ public static class NatureSpike
             }
             case "foliage":
             {
-                var spec = FoliageSpec.ByName(preset);
+                var spec = ModelLibrary.Presets.Foliage(preset);
                 var s = new FoliageSynth(spec, Rate, seed);
                 if (Parts != null)
                 {

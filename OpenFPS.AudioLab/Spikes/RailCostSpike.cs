@@ -22,7 +22,7 @@ public static class RailCostSpike
         if (args.Contains("law"))
         {
             // What the mixer plays a train's sources at, by distance, and what the ear model adds.
-            var layout = TrainLayout.Sources(TrainProfile.ByName(args.FirstOrDefault(a => ModelLibrary.Knows(ModelLibrary.Kinds.Train, a)) ?? "freight"));
+            var layout = TrainLayout.Sources(TrainProfile.ByName(args.FirstOrDefault(a => ModelLibrary.Knows(ModelLibrary.Kinds.Train, a)) ?? "freight"), ModelLibrary.Presets);
             foreach (var e in layout.Where(e => e.Index < 12 || e.Index % 40 == 0))
             {
                 float corr = OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb("rail:freight/x/" + e.Index, e.LevelDb);
@@ -42,7 +42,7 @@ public static class RailCostSpike
         foreach (var key in presets)
         {
             var p = ModelLibrary.Train(key);
-            var train = new TrainSynth(p, Rate, 41) { Speed = p.TypicalSpeedMps, Notch = 6f };
+            var train = new TrainSynth(p, ModelLibrary.Presets, Rate, 41) { Speed = p.TypicalSpeedMps, Notch = 6f };
             for (int i = 0; i < Rate; i++) train.Step();
             int n = (int)(sec * Rate);
             var sw = Stopwatch.StartNew();

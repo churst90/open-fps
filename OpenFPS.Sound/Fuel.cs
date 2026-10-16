@@ -179,11 +179,11 @@ public static class FuelCatalog
     /// <summary>
     /// A fire lit as a preset (/spawn fire): one part burning over the preset's own ground, sending up
     /// brands as its fuel does (ESTIMATES, docs/FIRE.md 12.4): foliage and a building's timber many, logs
-    /// some, a car's few.
+    /// some, a car's few. The preset is <paramref name="fires"/>' (the catalogue's).
     /// </summary>
-    public static FuelSpec ForFire(string preset)
+    public static FuelSpec ForFire(string preset, Func<string, FireSpec> fires)
     {
-        var spec = FireSpec.ByName(preset);
+        var spec = fires(preset);
         float brands = spec.Fuel switch
         {
             FireFuel.Trees or FireFuel.Crown => 3f,
@@ -221,18 +221,20 @@ public static class FuelCatalog
     /// size (collider, scaled, and whether it is round). Null for what does not burn here. A tree is its foliage over the ground and
     /// its wood: a Foliage box high off the ground is a crown with litter under it; a Wood box stands as a
     /// trunk, a stump or a pile by its proportions. Thin wood (a floor, a fence board) and buildings burn as
-    /// structures, which are zones: stage 2 (docs/FIRE.md 12.10).
+    /// structures, which are zones: stage 2 (docs/FIRE.md 12.10). Whether its sound names a road vehicle is
+    /// <paramref name="vehicle"/>, and a fire's preset is <paramref name="fires"/>': both the catalogue's.
     /// </summary>
-    public static FuelSpec? ForThing(string soundId, string material, bool round, Vector3 size, float baseAboveGround)
+    public static FuelSpec? ForThing(string soundId, bool vehicle, string material, bool round, Vector3 size, float baseAboveGround,
+                                     Func<string, FireSpec> fires)
     {
         float w = MathF.Max(0f, size.X), h = MathF.Max(0f, size.Y), d = MathF.Max(0f, size.Z);
-        if (ModelKindTable.Is(soundId, ModelSynth.Fire))
+        if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
         {
-            string key = FireSpec.KeyForPlaced(soundId, round, size);
+            string key = FireSpec.KeyForPlaced(soundId, round, size, fires);
             FireSpec.ParseKey(key, out _, out _, out var fs);
-            return Hearth(key, fs ?? FireSpec.ByName(key).Outline);
+            return Hearth(key, fs ?? fires(key).Outline);
         }
-        if (ModelKindTable.IsVehicle(soundId) && w > 0.5f && d > 0.5f)
+        if (vehicle && w > 0.5f && d > 0.5f)
             return Car(MathF.Min(w, d), MathF.Max(w, d));
         if (AcousticRegistry.IsLeaves(material) && baseAboveGround >= 1f && w > 0.5f && d > 0.5f)
             return Tree(MathF.Sqrt(w * d), baseAboveGround, baseAboveGround + h, "tree");

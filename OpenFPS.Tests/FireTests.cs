@@ -66,7 +66,7 @@ public class FireTests : IDisposable
         foreach (var (name, make) in FireSpec.Presets)
         {
             var spec = make();
-            var all = ExtendedSources.Layout("fire:" + name);
+            var all = ExtendedSources.Layout("fire:" + name, ModelLibrary.Presets);
             Assert.NotNull(all);
             int bed = FireSynth.BedPlaces(spec);
             Assert.Equal(bed + Math.Min(FireSynth.FlamePlaces, FireSynth.MaxPlaces - bed), all!.Length);
@@ -94,7 +94,7 @@ public class FireTests : IDisposable
             _o.WriteLine($"{name}: {all.Length} places, {nx * nz} bodies of {d:F1} m");
         }
         // A key with its lighting time has the same places.
-        Assert.Equal(ExtendedSources.Layout("fire:house_fire")!.Length, ExtendedSources.Layout(FireSpec.KeyFor("house_fire", 1234.5))!.Length);
+        Assert.Equal(ExtendedSources.Layout("fire:house_fire", ModelLibrary.Presets)!.Length, ExtendedSources.Layout(FireSpec.KeyFor("house_fire", 1234.5), ModelLibrary.Presets)!.Length);
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class FireTests : IDisposable
         FireSpec.ParseKey("fire:fire_pit", out preset, out lit);
         Assert.Equal("fire_pit", preset);
         Assert.Null(lit);
-        Assert.Equal(FireSpec.BurningCar.Name, FireSpec.ByName("burning_car/lit=12").Name);
+        Assert.Equal(FireSpec.BurningCar.Name, ModelLibrary.Presets.Fire("burning_car/lit=12").Name);
     }
 
     [Fact]
@@ -319,7 +319,7 @@ public class FireTests : IDisposable
     {
         foreach (var name in new[] { "fire_pit", "burning_car", "house_fire", "crown_fire" })
         {
-            var spec = FireSpec.ByName(name);
+            var spec = ModelLibrary.Presets.Fire(name);
             // The fire's own allocations come back in an identical fire; what happens once a process does not.
             // On GitHub's runners such a thing landed in the measure three times in 42 runs, each in another fire.
             var (allocated, compiled) = Burn(spec);

@@ -46,7 +46,7 @@ public static class AircraftSpike
     /// round <paramref name="hz"/>, over 250 ms windows, steady listener.</summary>
     static float Swing(AircraftProfile p, float hz)
     {
-        var syn = new AircraftSynth(p, Sr, 3);
+        var syn = new AircraftSynth(p, ModelLibrary.Presets, Sr, 3);
         syn.PlaceAtLever(0.7f); syn.Lever = 0.7f;
         syn.SetListener(new System.Numerics.Vector3(60f, -40f, 10f));
         int n = Sr * 14, N = 16384;
@@ -68,7 +68,7 @@ public static class AircraftSpike
 
     static float FlangeIndex(AircraftProfile p)
     {
-        var syn = new AircraftSynth(p, Sr, 3);
+        var syn = new AircraftSynth(p, ModelLibrary.Presets, Sr, 3);
         syn.PlaceAtLever(0.7f);
         syn.Lever = 0.7f;
         syn.SetListener(new System.Numerics.Vector3(60f, -40f, 10f));
@@ -151,7 +151,7 @@ public static class AircraftSpike
             float lv = lever >= 0 ? lever : (p.Power == AircraftPower.Turboshaft ? 0.8f : 1f);
             float ds = descend >= 0 ? descend : (p.Power == AircraftPower.Turboshaft ? 0.7f : 0f);
 
-            var synth = new AircraftSynth(p, Sr, 5) { Lever = lv, Descending = ds };
+            var synth = new AircraftSynth(p, ModelLibrary.Presets, Sr, 5) { Lever = lv, Descending = ds };
             Console.WriteLine($"  {key}");
             foreach (var line in synth.Describe()) Console.WriteLine($"    {line}");
             Console.WriteLine($"    pass: {h:F0} m up, {offset:F0} m to the side, {v:F0} m/s ({v * 3.6f:F0} km/h), {seconds:F0} s");
@@ -221,7 +221,7 @@ public static class AircraftSpike
     private static (float Blades, float Jet, float Core, float Total, float Spool, float Bpf, float BpfDb)
         Hold(AircraftProfile p, Vector3 listener, float lever)
     {
-        var s = new AircraftSynth(p, Sr, 5) { Lever = lever };
+        var s = new AircraftSynth(p, ModelLibrary.Presets, Sr, 5) { Lever = lever };
         s.SetListener(listener);
         s.PlaceAtLever(lever);
         // Four seconds: a blade row follows its target on a half-second time constant, and a sliding
@@ -293,7 +293,7 @@ public static class AircraftSpike
             if (p.Gear is not { } gear) { Console.WriteLine($"  {key}: no undercarriage declared.\n"); continue; }
             float vApp = Arg(args, "speed", p.ApproachSpeedMps > 0f ? p.ApproachSpeedMps : p.CruiseSpeedMps * 0.62f);
             Console.WriteLine($"  {key}");
-            foreach (var line in new AircraftSynth(p, Sr, 5).Describe()) Console.WriteLine($"    {line}");
+            foreach (var line in new AircraftSynth(p, ModelLibrary.Presets, Sr, 5).Describe()) Console.WriteLine($"    {line}");
             Console.WriteLine($"    approach {vApp:F0} m/s ({vApp * 1.944f:F0} kt) on 3 degrees, {offset:F0} m to the side; "
                             + $"spin-up {gear.SpinUpSeconds(vApp) * 1000f:F0} ms");
 
@@ -317,7 +317,7 @@ public static class AircraftSpike
         float tTouch = seconds * 0.4f;
         float slope = MathF.Tan(3f * MathF.PI / 180f);
 
-        var synth = new AircraftSynth(p, Sr, 5);
+        var synth = new AircraftSynth(p, ModelLibrary.Presets, Sr, 5);
         synth.SetListener(new Vector3(0f, -vApp * tTouch * slope, -vApp * tTouch));
         // On approach: idle, the air doing the work. Started there rather than spooling down to it.
         synth.Lever = 0.12f;

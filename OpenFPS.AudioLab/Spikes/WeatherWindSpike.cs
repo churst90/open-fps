@@ -184,7 +184,7 @@ public static class WeatherWindSpike
             new Setting("storm_arriving", e => e.PinWind(new Vector3(-3.5f, 0f, -3.5f), 0.4f),
                         e => e.PinScenario(WeatherType.Storm), 10f),
         };
-        var spec = FoliageSpec.ByName("park_tree");
+        var spec = ModelLibrary.Presets.Foliage("park_tree");
         // A tree in Elm Park, a few hundred metres from the origin, where a swinging pattern would race.
         const float x = -375f, z = 195f;
         foreach (var set in settings)

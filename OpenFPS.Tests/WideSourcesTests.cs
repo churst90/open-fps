@@ -67,18 +67,18 @@ public class WideSourcesTests
     [Fact]
     public void TreesFiresAndFountainTapsHavePlacesAndNothingElseDoes()
     {
-        var tree = ExtendedSources.Layout("foliage:park_tree")!;
+        var tree = ExtendedSources.Layout("foliage:park_tree", ModelLibrary.Presets)!;
         Assert.Equal(1 + ExtendedSources.TreePlaces, tree.Length);
         Assert.Equal(Vector3.Zero, tree[0]);
         float reach = ExtendedSources.Reach(tree);
         _o.WriteLine($"tree: {tree.Length} places, reach {reach:F2} m");
         Assert.InRange(reach, 2f, FoliageSpec.ParkTree.CrownRadiusMetres);
         // The bed's places and the flames' above them (docs/FIRE.md 12.2).
-        Assert.Equal(1 + ExtendedSources.FirePlaces + FireSynth.FlamePlaces, ExtendedSources.Layout("fire:fire_pit")!.Length);
-        Assert.Equal(1 + ExtendedSources.WaterTapPlaces, ExtendedSources.Layout("water:park_fountain/elm_park/3")!.Length);
-        Assert.Null(ExtendedSources.Layout("water:park_fountain"));
-        Assert.Null(ExtendedSources.Layout("machine:ac_window"));
-        Assert.Null(ExtendedSources.Layout("rain:0"));
+        Assert.Equal(1 + ExtendedSources.FirePlaces + FireSynth.FlamePlaces, ExtendedSources.Layout("fire:fire_pit", ModelLibrary.Presets)!.Length);
+        Assert.Equal(1 + ExtendedSources.WaterTapPlaces, ExtendedSources.Layout("water:park_fountain/elm_park/3", ModelLibrary.Presets)!.Length);
+        Assert.Null(ExtendedSources.Layout("water:park_fountain", ModelLibrary.Presets));
+        Assert.Null(ExtendedSources.Layout("machine:ac_window", ModelLibrary.Presets));
+        Assert.Null(ExtendedSources.Layout("rain:0", ModelLibrary.Presets));
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public class WideSourcesTests
             ("fire:fire_pit", new Vector3(0f, 0.6f, 0f), FireSpec.GardenFirePit.SourceLevelDb, FireSpec.GardenFirePit.ExtentMetres),
         })
         {
-            var layout = ExtendedSources.Layout(key)!;
+            var layout = ExtendedSources.Layout(key, ModelLibrary.Presets)!;
             var (_, reference) = Loudness.Place(levelDb, extent);
             float range = Loudness.AudibleRange(levelDb);
             var at = layout.Select(o => middle + o).ToArray();
@@ -407,7 +407,7 @@ public class WideSourcesTests
         var voices = new VoiceRegistry();
         foreach (string key in keys)
         {
-            var layout = ExtendedSources.Layout(key);
+            var layout = ExtendedSources.Layout(key, ModelLibrary.Presets);
             if (layout == null) continue;
             widest = Math.Max(widest, layout.Length);
             // Source 41 and its neighbour 42, each with this layout: no id of one is an id of the other.

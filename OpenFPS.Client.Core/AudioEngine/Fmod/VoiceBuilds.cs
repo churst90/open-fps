@@ -36,7 +36,7 @@ public sealed class VoiceBuilds
         string preset = ModelKindTable.KindOf(physicalKey) is { } k ? k.Rest(physicalKey) : physicalKey;
         return kind switch
         {
-            ModelSynth.Machine => new MachineVoiceState(SmallMachineSpec.ByName(preset), rate, seed, seed * 31 + 7) { Clock = clock },
+            ModelSynth.Machine => new MachineVoiceState(ModelLibrary.Presets.SmallMachine(preset), rate, seed, seed * 31 + 7) { Clock = clock },
             ModelSynth.Aircraft => new AircraftVoiceState(AircraftProfile.ByName(preset), rate, seed * 17 + 3, lever: lever),
             // Its own voice: 35 dB over the car's exhaust, the two cannot share one full-scale
             // reference (SirenVoiceState).

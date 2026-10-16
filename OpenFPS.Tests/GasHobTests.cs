@@ -82,7 +82,7 @@ public class GasHobTests
         Assert.True(back.AnyOn);
         Assert.False(HobKey.TryParse("stove:hob4/0000>300@1", out _));
         Assert.False(HobKey.TryParse("stove:hob4/0000>3009@1", out _));
-        Assert.Equal("hob4", GasHobSpec.ByName(k.Format()).Burners.Length == 4 ? "hob4" : "");
+        Assert.Equal("hob4", ModelLibrary.Presets.GasHob(k.Format()).Burners.Length == 4 ? "hob4" : "");
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class GasHobTests
         var lines = new List<string>();
         for (int i = 0; i < 5; i++)
         {
-            lines.Add(HobControls.Press(key, 100 + i, out key));
+            lines.Add(HobControls.Press(key, 100 + i, ModelLibrary.Presets, out key));
             _o.WriteLine($"{lines[^1]}  {key}");
         }
         Assert.Equal("You light the front left burner.", lines[0]);
@@ -102,7 +102,7 @@ public class GasHobTests
         Assert.Equal("3333", last.From);
         Assert.Equal("0000", last.To);
         Assert.Equal(104.0, last.At, 2);
-        Assert.Equal("You light the burner.", HobControls.Press("stove:hob1", 1, out _));
+        Assert.Equal("You light the burner.", HobControls.Press("stove:hob1", 1, ModelLibrary.Presets, out _));
     }
 
     /// <summary>Runs a light of the first burner and returns when it caught and when each spark came, s.</summary>

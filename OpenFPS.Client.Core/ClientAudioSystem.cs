@@ -1075,7 +1075,7 @@ public partial class ClientAudioSystem
         if (!OpenFPS.Common.ModelKindTable.Is(id, OpenFPS.Common.ModelSynth.Fire)) return id;
         var k = (id, def.Collider.Shape, def.Collider.Size);
         if (_voiceKeys.TryGetValue(k, out var key)) return key;
-        key = OpenFPS.Common.FireSpec.KeyForPlaced(id, def.Collider.Shape.IsRound(), def.Collider.Size);
+        key = OpenFPS.Common.FireSpec.KeyForPlaced(id, def.Collider.Shape.IsRound(), def.Collider.Size, ModelLibrary.Presets.Fire);
         if (_voiceKeys.Count > 4096) _voiceKeys.Clear();
         _voiceKeys[k] = key;
         return key;
@@ -1205,7 +1205,7 @@ public partial class ClientAudioSystem
         // Still water: no wind to raise waves, no swell, no current. It makes no sound.
         if (OpenFPS.Common.ModelKindTable.Is(soundId, OpenFPS.Common.ModelSynth.Shore))
         {
-            try { return OpenFPS.Common.ShoreSpec.ByName(soundId).CalmAt(_audio.Weather.MeanSpeed); }
+            try { return OpenFPS.Common.ModelLibrary.Presets.Shore(soundId).CalmAt(_audio.Weather.MeanSpeed); }
             catch (Exception) { return false; }
         }
         // A gas hob with every burner off: heard for as long as its last change can still be heard (the
@@ -1220,7 +1220,7 @@ public partial class ClientAudioSystem
         {
             // Once per sound id: this runs for every sink in every flat, every frame.
             if (!_flowSpecs.TryGetValue(soundId, out var spec))
-                _flowSpecs[soundId] = spec = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
+                _flowSpecs[soundId] = spec = OpenFPS.Common.ModelLibrary.Presets.Flow(soundId[5..]);
             // A tap is heard while on and for as long after as its basin takes to empty. A shut tap nobody
             // opened since you arrived is an empty sink; a leaking one drips.
             if (spec.Tap is { } tap)
@@ -2005,7 +2005,7 @@ public partial class ClientAudioSystem
         foreach (int id in _liveMachines)
         {
             if (!world.Entities.TryGetValue(id, out var snap)) continue;
-            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(VoiceKey(snap.Definition));
+            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(VoiceKey(snap.Definition), ModelLibrary.Presets);
             if (layout == null) continue;
             var at = OpenFPS.Common.AudioEmission.PointFor(snap);
             float d2 = Vector3.DistanceSquared(at, eyePos);
@@ -2241,7 +2241,7 @@ public partial class ClientAudioSystem
     private IReadOnlyList<OpenFPS.Common.TrainLayout.Entry> TrainLayoutOf(string preset)
     {
         if (!_trainLayouts.TryGetValue(preset, out var layout))
-            _trainLayouts[preset] = layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset)).ToArray();
+            _trainLayouts[preset] = layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset), ModelLibrary.Presets).ToArray();
         return layout;
     }
     private readonly Dictionary<string, IReadOnlyList<OpenFPS.Common.TrainLayout.Entry>> _trainLayouts = new(StringComparer.OrdinalIgnoreCase);
@@ -2278,7 +2278,7 @@ public partial class ClientAudioSystem
             int voiceId = HornVoiceId(id);
             // Where the vehicle's model has its horn: behind a car's grille, on a train its horn source.
             Vector3 pos = HornAt(world, snap);
-            float levelDb = OpenFPS.Common.Honk.LevelDb(horn.Key[OpenFPS.Common.Honk.Prefix.Length..horn.Key.LastIndexOf(':')]);
+            float levelDb = OpenFPS.Common.Honk.LevelDb(horn.Key[OpenFPS.Common.Honk.Prefix.Length..horn.Key.LastIndexOf(':')], ModelLibrary.Presets);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
             var e = new SpatialEmitter
             {
@@ -2464,7 +2464,7 @@ public partial class ClientAudioSystem
         // Let go before it ever sounded: nothing to close.
         if (!blowing && !_voices.IsRegistered(voiceId)) return;
         Vector3 pos = HornAt(world, snap);
-        float levelDb = OpenFPS.Common.Honk.LevelDb(horn);
+        float levelDb = OpenFPS.Common.Honk.LevelDb(horn, ModelLibrary.Presets);
         var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
         var e = new SpatialEmitter
         {
@@ -2582,7 +2582,7 @@ public partial class ClientAudioSystem
         if (OpenFPS.Common.ModelKindTable.TryRailSource(sid, out string preset, out string train, out int index))
         {
             int horn = -1;
-            try { horn = OpenFPS.Common.TrainSignal.WarningSource(OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset))); }
+            try { horn = OpenFPS.Common.TrainSignal.WarningSource(OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset), ModelLibrary.Presets)); }
             catch (Exception ex) { OpenFPS.Common.ModelKindTable.Fail(sid, ex.Message); }
             if (horn == index) return OpenFPS.Common.AudioEmission.PointFor(snap);
             if (horn >= 0)
@@ -2788,7 +2788,7 @@ public partial class ClientAudioSystem
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
                 earLevel = levelDb;
-                extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey);
+                extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey, ModelLibrary.Presets);
                 if (physicalSynth == OpenFPS.Common.ModelSynth.Aircraft)
                 {
                     // Its power lever as the server that flies it sends it (MachinePower: from its flight path
@@ -2855,7 +2855,7 @@ public partial class ClientAudioSystem
                     engineMinDistance = 1f;
                     engineExtent = 0f;
                     // With a cabin (CabinPaths) this voice is the bulkhead; every other path gets its own.
-                    cabinLayout = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(profile);
+                    cabinLayout = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(profile, ModelLibrary.Presets);
                     cabinEar = Vector3.Transform(eyePos - snap.Transform.Position, Quaternion.Inverse(snap.Transform.Rotation));
                 }
             }

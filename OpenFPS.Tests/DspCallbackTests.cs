@@ -40,8 +40,8 @@ public class DspCallbackTests
 
     private static PhysicalVoiceState MakePhysical(string kind, WorldWeather weather) => kind switch
     {
-        "window unit" => new MachineVoiceState(SmallMachineSpec.ByName("ac_window"), Rate, entityId: 4242, seed: 11),
-        "mower" => new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, entityId: 77, seed: 3) { TargetGroundSpeed = 0.95f },
+        "window unit" => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("ac_window"), Rate, entityId: 4242, seed: 11),
+        "mower" => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("mower_push"), Rate, entityId: 77, seed: 3) { TargetGroundSpeed = 0.95f },
         "airliner" => new AircraftVoiceState(AircraftProfile.ByName("airliner"), Rate, seed: 5, lever: 1f),
         "siren" => new SirenVoiceState(SirenSpec.Patrol100W, Rate) { TargetMode = (int)SirenMode.Wail },
         "electric horn" => new HornVoiceState("electric:disc_pair", new[] { 2f }, Rate, 3),
@@ -49,10 +49,10 @@ public class DspCallbackTests
         "crossing bell" => new BellVoiceState(ModelLibrary.Bell("crossing_gong"), Rate, 5),
         "rain" => Rain(),
         "light rail" => LightRail(),
-        "fountain" => new WaterVoiceState(WaterFeatureSpec.ByName("park_fountain"), Rate, 3, Somewhere, weather),
-        "fountain tap" => new WaterTapState(new WaterFeatureVoice("park_fountain/test", WaterFeatureSpec.ByName("park_fountain"), Rate, 1), 0, Rate, Somewhere, weather),
-        "fire" => new FireVoiceState(FireSpec.ByName("fire_pit"), Rate, 13, Somewhere, weather),
-        "fire place" => new NaturePlaceState(new PlacedNatureVoice("fire:fire_pit", FireSpec.ByName("fire_pit"), 3, Rate, 13, Somewhere, weather) { TargetSpread = 1f }, 0, Rate, Somewhere),
+        "fountain" => new WaterVoiceState(ModelLibrary.Presets.Water("park_fountain"), Rate, 3, Somewhere, weather),
+        "fountain tap" => new WaterTapState(new WaterFeatureVoice("park_fountain/test", ModelLibrary.Presets.Water("park_fountain"), Rate, 1), 0, Rate, Somewhere, weather),
+        "fire" => new FireVoiceState(ModelLibrary.Presets.Fire("fire_pit"), Rate, 13, Somewhere, weather),
+        "fire place" => new NaturePlaceState(new PlacedNatureVoice("fire:fire_pit", ModelLibrary.Presets.Fire("fire_pit"), 3, Rate, 13, Somewhere, weather) { TargetSpread = 1f }, 0, Rate, Somewhere),
         "tree" => new FoliageVoiceState(FoliageSpec.ParkTree, Rate, 9, Somewhere, weather),
         "tree place" => new NaturePlaceState(new PlacedNatureVoice("foliage:park_tree", FoliageSpec.ParkTree, 1 + FoliageSynth.Boughs, Rate, 9, Somewhere, weather) { TargetSpread = 1f }, 0, Rate, Somewhere),
         "creek" => new NaturePlaceState(new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, 19, Somewhere, weather), 0, Rate, Somewhere),

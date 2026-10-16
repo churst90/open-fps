@@ -200,7 +200,7 @@ public class ClientAudioSelectionTests
         h.StandAt(at);
         h.Player.RidingEntityId = Car;
         var profile = MachineRegistry.VehicleFor(Preset);
-        var layout = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(profile);
+        var layout = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(profile, ModelLibrary.Presets);
         Assert.NotNull(layout);
         Assert.True(layout!.Count > 1, "a saloon has more than one way in");
 
@@ -336,7 +336,7 @@ public class ClientAudioSelectionTests
         }
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Id), 30), $"{soundId} was never voiced");
 
-        string placed = FireSpec.KeyForPlaced(soundId, ColliderShape.Box.IsRound(), new Vector3(4f, 1f, 4f));
+        string placed = FireSpec.KeyForPlaced(soundId, ColliderShape.Box.IsRound(), new Vector3(4f, 1f, 4f), ModelLibrary.Presets.Fire);
         var (level, extent) = Declared(placed);
         var (gain, reference) = Loudness.Place(level, extent);
         var e = h.Mixer.Latest[Id];
@@ -348,7 +348,7 @@ public class ClientAudioSelectionTests
         Assert.Equal(extent, e.ExtentMetres, 4);
         Assert.True(e.Range >= Loudness.AudibleRange(level) - 1e-3f, $"range {e.Range} under the level's audible range");
         Assert.Equal("", e.EngineKey);
-        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(e.PhysicalKey) == null)
+        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(e.PhysicalKey, ModelLibrary.Presets) == null)
             Assert.Equal(gain * PhysicalVoiceState.HeadroomGain(Headroom(soundId)), e.Volume, 5);
         else
             Assert.True(e.Volume > 0f && float.IsFinite(e.Volume));
@@ -365,7 +365,7 @@ public class ClientAudioSelectionTests
     [MemberData(nameof(FirePresets))]
     public void EveryFirePresetOnItsOwnBedIsPlacedAtItsOwnDeclaredLevel(string preset)
     {
-        var spec = FireSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.Fire(preset);
         foreach (float areaRatio in new[] { 1f, 2f })
         {
             var h = new ClientAudioHarness();
@@ -408,7 +408,7 @@ public class ClientAudioSelectionTests
 
         var e = h.Mixer.Latest.Values.Single(v => v.PhysicalKey.StartsWith($"rail:{key}/@", StringComparison.Ordinal));
         Assert.True(TrainVoiceState.ParseSlotKey(e.PhysicalKey, out _, out _, out int slot));
-        var layout = TrainLayout.Sources(TrainProfile.ByName(preset));
+        var layout = TrainLayout.Sources(TrainProfile.ByName(preset), ModelLibrary.Presets);
         float slotLevel = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(layout);
         var (slotGain, slotReference) = Loudness.Place(slotLevel);
         Assert.Equal(slotLevel, e.EarLevelDb, 3);
@@ -435,18 +435,18 @@ public class ClientAudioSelectionTests
         string kind = soundId[..soundId.IndexOf(':')], name = soundId[(soundId.IndexOf(':') + 1)..];
         switch (kind)
         {
-            case "machine": { var s = SmallMachineSpec.ByName(name); return (s.SourceLevelDb, s.ExtentMetres); }
+            case "machine": { var s = ModelLibrary.Presets.SmallMachine(name); return (s.SourceLevelDb, s.ExtentMetres); }
             case "bell": { var b = ModelLibrary.Bell(name); return (b.ReferenceDb, MathF.Max(0.5f, b.DiameterMetres)); }
             case "rail":
             {
-                var layout = TrainLayout.Sources(TrainProfile.ByName(name.Split('/')[0]));
+                var layout = TrainLayout.Sources(TrainProfile.ByName(name.Split('/')[0]), ModelLibrary.Presets);
                 return (layout[0].LevelDb, layout[0].ExtentMetres);
             }
-            case "water": { var w = WaterFeatureSpec.ByName(name); return (w.SourceLevelDb, w.ExtentMetres); }
-            case "fire": { var f = FireSpec.ByName(name); return (f.SourceLevelDb, f.ExtentMetres); }
-            case "foliage": { var t = FoliageSpec.ByName(name); return (t.SourceLevelDb, t.ExtentMetres); }
-            case "flow": { var r = RunningWaterSpec.ByName(name); return (r.SourceLevelDb, r.ExtentMetres); }
-            case "shore": { var s = ShoreSpec.ByName(soundId); return (s.SourceLevelDb, s.ExtentMetres); }
+            case "water": { var w = ModelLibrary.Presets.Water(name); return (w.SourceLevelDb, w.ExtentMetres); }
+            case "fire": { var f = ModelLibrary.Presets.Fire(name); return (f.SourceLevelDb, f.ExtentMetres); }
+            case "foliage": { var t = ModelLibrary.Presets.Foliage(name); return (t.SourceLevelDb, t.ExtentMetres); }
+            case "flow": { var r = ModelLibrary.Presets.Flow(name); return (r.SourceLevelDb, r.ExtentMetres); }
+            case "shore": { var s = ModelLibrary.Presets.Shore(soundId); return (s.SourceLevelDb, s.ExtentMetres); }
             case "aircraft":
             {
                 var p = AircraftProfile.ByName(name);
@@ -461,11 +461,11 @@ public class ClientAudioSelectionTests
     private static float Headroom(string soundId) => soundId.Split(':')[0] switch
     {
         "bell" => ModelLibrary.Bell(soundId[5..]).PeakHeadroomDb,
-        "flow" => RunningWaterSpec.ByName(soundId[5..]).PeakHeadroomDb,
-        "shore" => ShoreSpec.ByName(soundId).PeakHeadroomDb,
-        "water" => WaterFeatureSpec.ByName(soundId[6..]).PeakHeadroomDb,
-        "fire" => FireSpec.ByName(soundId[5..]).PeakHeadroomDb,
-        "foliage" => FoliageSpec.ByName(soundId[8..]).PeakHeadroomDb,
+        "flow" => ModelLibrary.Presets.Flow(soundId[5..]).PeakHeadroomDb,
+        "shore" => ModelLibrary.Presets.Shore(soundId).PeakHeadroomDb,
+        "water" => ModelLibrary.Presets.Water(soundId[6..]).PeakHeadroomDb,
+        "fire" => ModelLibrary.Presets.Fire(soundId[5..]).PeakHeadroomDb,
+        "foliage" => ModelLibrary.Presets.Foliage(soundId[8..]).PeakHeadroomDb,
         _ => VehicleProfile.PeakHeadroomDb,
     };
 

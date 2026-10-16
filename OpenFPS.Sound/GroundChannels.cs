@@ -148,6 +148,10 @@ public static class GroundChannels
     private static readonly float[,] RunnelLevels = { { 47, 46, 46, 48 }, { 51, 51, 54, 56 }, { 56, 58, 63, 65 }, { 55, 59, 71, 75 }, { 20, 61, 80, 86 }, { 20, 60, 88, 94 } };
     private static readonly float[,] CreekLevels = { { 40, 39, 37, 36 }, { 55, 51, 48, 45 }, { 64, 60, 57, 55 }, { 72, 70, 69, 70 }, { 79, 75, 75, 82 }, { 82, 79, 80, 87 } };
 
+    /// <summary>The sound id of a drainage line: running water's ("flow:"), with <see cref="Key"/> after it.</summary>
+    public static string SoundId(GroundChannelKind kind, float widthMetres, float slope, float lengthMetres, float referenceLitresPerSecond, GroundCatchment catchment)
+        => "flow:" + Key(kind, widthMetres, slope, lengthMetres, referenceLitresPerSecond, catchment);
+
     /// <summary>The sound id of a line's voice.</summary>
     public static string Key(GroundChannelKind kind, float widthMetres, float slope, float lengthMetres, float referenceLitresPerSecond, GroundCatchment catchment)
         => string.Create(CultureInfo.InvariantCulture,

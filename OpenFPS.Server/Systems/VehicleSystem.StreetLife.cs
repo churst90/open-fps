@@ -175,7 +175,7 @@ public sealed partial class VehicleSystem
             {
                 Character = SoundCharacter.Ring,
                 Position = at + Vector3.UnitY * 0.6f,
-                LevelDb = OpenFPS.Common.Honk.LevelDb(v.Horn),
+                LevelDb = OpenFPS.Common.Honk.LevelDb(v.Horn, ModelLibrary.Presets),
                 DecaySeconds = OpenFPS.Common.Honk.Duration(pattern),
                 Noisiness = 0f,
                 SynthKey = OpenFPS.Common.Honk.Key(v.Horn, pattern),

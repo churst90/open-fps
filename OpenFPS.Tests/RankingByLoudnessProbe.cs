@@ -137,25 +137,25 @@ public class RankingByLoudnessProbe
     private static PhysicalVoiceState? Voice(string id)
     {
         if (id.StartsWith("machine:", StringComparison.OrdinalIgnoreCase))
-            return new MachineVoiceState(SmallMachineSpec.ByName(id[8..]), Rate, entityId: 4242, seed: 11);
+            return new MachineVoiceState(ModelLibrary.Presets.SmallMachine(id[8..]), Rate, entityId: 4242, seed: 11);
         if (id.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
-            return new FoliageVoiceState(FoliageSpec.ByName(id[8..]), Rate, 9, Somewhere, Breeze);
+            return new FoliageVoiceState(ModelLibrary.Presets.Foliage(id[8..]), Rate, 9, Somewhere, Breeze);
         if (id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
-            return new FireVoiceState(FireSpec.ByName(id[5..]), Rate, 13, Somewhere, Breeze);
+            return new FireVoiceState(ModelLibrary.Presets.Fire(id[5..]), Rate, 13, Somewhere, Breeze);
         if (WaterFeatureVoice.ParseKey(id, out string preset, out string feature, out int tap))
-            return new WaterTapState(new WaterFeatureVoice(preset + "/" + feature, WaterFeatureSpec.ByName(preset), Rate, 1), tap, Rate, Somewhere, Breeze);
+            return new WaterTapState(new WaterFeatureVoice(preset + "/" + feature, ModelLibrary.Presets.Water(preset), Rate, 1), tap, Rate, Somewhere, Breeze);
         if (id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
-            return new NaturePlaceState(new PlacedNatureVoice(id, RunningWaterSpec.ByName(id[5..]), Rate, 19, Somewhere, Breeze), 0, Rate, Somewhere);
+            return new NaturePlaceState(new PlacedNatureVoice(id, ModelLibrary.Presets.Flow(id[5..]), Rate, 19, Somewhere, Breeze), 0, Rate, Somewhere);
         return null;
     }
 
     private static float LevelOf(string id)
     {
-        if (id.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)) return SmallMachineSpec.ByName(id[8..]).SourceLevelDb;
-        if (id.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase)) return FoliageSpec.ByName(id[8..]).SourceLevelDb;
-        if (id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase)) return FireSpec.ByName(id[5..]).SourceLevelDb;
-        if (WaterFeatureVoice.ParseKey(id, out string preset, out _, out _)) return WaterFeatureSpec.ByName(preset).SourceLevelDb;
-        if (id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return RunningWaterSpec.ByName(id[5..]).SourceLevelDb;
+        if (id.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)) return ModelLibrary.Presets.SmallMachine(id[8..]).SourceLevelDb;
+        if (id.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase)) return ModelLibrary.Presets.Foliage(id[8..]).SourceLevelDb;
+        if (id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase)) return ModelLibrary.Presets.Fire(id[5..]).SourceLevelDb;
+        if (WaterFeatureVoice.ParseKey(id, out string preset, out _, out _)) return ModelLibrary.Presets.Water(preset).SourceLevelDb;
+        if (id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return ModelLibrary.Presets.Flow(id[5..]).SourceLevelDb;
         return 0f;
     }
 

@@ -96,7 +96,8 @@ public sealed class SmallMachineSynth
     private int _slowTick;
     private const int SlowEvery = 64;
 
-    public SmallMachineSynth(SmallMachineSpec spec, float rate = RenderRate.Default, int seed = 17)
+    /// <summary>A machine's voice. Its engine's profile is <paramref name="presets"/>' (the catalogue's).</summary>
+    public SmallMachineSynth(SmallMachineSpec spec, IPresets presets, float rate = RenderRate.Default, int seed = 17)
     {
         Spec = spec;
         _rate = rate;
@@ -106,7 +107,7 @@ public sealed class SmallMachineSynth
 
         if (spec.EngineKey != null)
         {
-            _engine = new EngineSynth(EngineProfile.ByName(spec.EngineKey), rate, seed + 1);
+            _engine = new EngineSynth(presets.Engine(spec.EngineKey), rate, seed + 1);
             _engine.ExternalInertia = spec.DrivenInertiaKgM2;
             _engine.Ignition = true;
         }

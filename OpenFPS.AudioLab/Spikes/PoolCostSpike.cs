@@ -177,10 +177,10 @@ public static class PoolCostSpike
     {
         var makers = new (string Name, Func<PhysicalVoiceState> Make)[]
         {
-            ("machine:mower_push", () => new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, 11, 11 * 31 + 7)),
-            ("machine:mower_riding", () => new MachineVoiceState(SmallMachineSpec.ByName("mower_riding"), Rate, 12, 12 * 31 + 7)),
-            ("machine:ac_condenser", () => new MachineVoiceState(SmallMachineSpec.ByName("ac_condenser"), Rate, 13, 13 * 31 + 7)),
-            ("machine:ac_window", () => new MachineVoiceState(SmallMachineSpec.ByName("ac_window"), Rate, 14, 14 * 31 + 7)),
+            ("machine:mower_push", () => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("mower_push"), Rate, 11, 11 * 31 + 7)),
+            ("machine:mower_riding", () => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("mower_riding"), Rate, 12, 12 * 31 + 7)),
+            ("machine:ac_condenser", () => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("ac_condenser"), Rate, 13, 13 * 31 + 7)),
+            ("machine:ac_window", () => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("ac_window"), Rate, 14, 14 * 31 + 7)),
             ("gate:crossing_gate", () => new GateVoiceState(CrossingGateSpec.ByName("crossing_gate"), Rate, closed: true)),
             ("bell:crossing_gong", () => new BellVoiceState(ModelLibrary.Bell("crossing_gong"), Rate, 15 * 13 + 5)),
         };
@@ -320,7 +320,7 @@ public static class PoolCostSpike
             Console.WriteLine($"{key} at {speed} m/s, gear {v.Driveline.Gear}, peak torque {v.Vehicle.Engine.PeakTorqueNm} Nm:");
             foreach (var l in lines.Take(8)) Console.WriteLine("   " + l);
         }
-        var m = new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, 11, 11 * 31 + 7) { TargetGroundSpeed = 0.9f };
+        var m = new MachineVoiceState(ModelLibrary.Presets.SmallMachine("mower_push"), Rate, 11, 11 * 31 + 7) { TargetGroundSpeed = 0.9f };
         var mb = new float[64];
         for (int n = 0; n < Rate * 8 / 64; n++)
         {
@@ -338,7 +338,7 @@ public static class PoolCostSpike
     /// costs a step at each, to tell the engine from the rest of a voice.</summary>
     private static int EnginesAlone(string key)
     {
-        var p = OpenFPS.Common.EngineProfile.ByName(key);
+        var p = OpenFPS.Common.ModelLibrary.Presets.Engine(key);
         foreach (int rate in new[] { 48000, 24000, 48000, 24000 })
         {
             var e = new OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth(p, rate, 5) { Throttle = 0.4f };
@@ -362,7 +362,7 @@ public static class PoolCostSpike
         foreach (var (key, id) in new[] { ("mower_push", 11), ("mower_riding", 12) })
             foreach (float ground in new[] { 0f, key == "mower_push" ? 0.9f : 2f })
             {
-                var v = new MachineVoiceState(SmallMachineSpec.ByName(key), Rate, id, id * 31 + 7 + seedOffset)
+                var v = new MachineVoiceState(ModelLibrary.Presets.SmallMachine(key), Rate, id, id * 31 + 7 + seedOffset)
                 {
                     Detail = _detail,
                     TargetGroundSpeed = ground,
@@ -448,9 +448,9 @@ public static class PoolCostSpike
         }
         var physical = new (string Name, Func<PhysicalVoiceState> Make)[]
         {
-            ("mower_push", () => new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, 11, 11 * 31 + 7 + seedOffset)),
-            ("mower_riding", () => new MachineVoiceState(SmallMachineSpec.ByName("mower_riding"), Rate, 12, 12 * 31 + 7 + seedOffset)),
-            ("ac_condenser", () => new MachineVoiceState(SmallMachineSpec.ByName("ac_condenser"), Rate, 13, 13 * 31 + 7 + seedOffset)),
+            ("mower_push", () => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("mower_push"), Rate, 11, 11 * 31 + 7 + seedOffset)),
+            ("mower_riding", () => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("mower_riding"), Rate, 12, 12 * 31 + 7 + seedOffset)),
+            ("ac_condenser", () => new MachineVoiceState(ModelLibrary.Presets.SmallMachine("ac_condenser"), Rate, 13, 13 * 31 + 7 + seedOffset)),
             ("piston_single", () => new AircraftVoiceState(AircraftProfile.ByName("piston_single"), Rate, 5 + seedOffset)),
         };
         foreach (var (name, make) in physical)

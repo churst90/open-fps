@@ -39,7 +39,7 @@ public class LandingGearTests
     public void A_touchdown_slides_for_as_long_as_the_wheels_take_to_spin_up(string preset, double atLeast, double atMost)
     {
         var p = AircraftProfile.ByName(preset);
-        var s = new OpenFPS.Client.AudioEngine.Core.Aircraft.AircraftSynth(p, 48000f, 5);
+        var s = new OpenFPS.Client.AudioEngine.Core.Aircraft.AircraftSynth(p, ModelLibrary.Presets, 48000f, 5);
         s.SetListener(new System.Numerics.Vector3(-40f, 0f, 0f));
         s.PlaceAtLever(0.12f);
         for (int i = 0; i < 48000; i++) s.Step();
@@ -79,7 +79,7 @@ public class LandingGearTests
     public void A_touchdown_screeches(string preset)
     {
         var p = AircraftProfile.ByName(preset);
-        var s = new OpenFPS.Client.AudioEngine.Core.Aircraft.AircraftSynth(p, 48000f, 5);
+        var s = new OpenFPS.Client.AudioEngine.Core.Aircraft.AircraftSynth(p, ModelLibrary.Presets, 48000f, 5);
         s.SetListener(new System.Numerics.Vector3(-40f, 0f, 0f));
         s.PlaceAtLever(0.12f);
         for (int i = 0; i < 48000; i++) s.Step();

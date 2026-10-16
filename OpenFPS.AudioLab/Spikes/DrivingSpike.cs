@@ -663,7 +663,7 @@ public static class DrivingSpike
             // A garden fire pit as its prefab places it (fire_pit.json): 45 dB of headroom, given back as 29 dB of gain.
             int AddFire(float x, float z)
             {
-                var spec = FireSpec.ByName("fire_pit");
+                var spec = ModelLibrary.Presets.Fire("fire_pit");
                 int fire = nextId++;
                 var fireDef = new EntityDefinition
                 {

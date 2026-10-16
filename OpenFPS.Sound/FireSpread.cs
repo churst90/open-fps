@@ -126,7 +126,11 @@ public sealed class FireSpread
         return v;
     }
 
-    public FireSpread(int seed) { _rng = (uint)seed * 2654435761u | 1u; }
+    /// <summary>A fire's world. <paramref name="fires"/> gives a fire preset by name or by key: the catalogue's,
+    /// a map's own first.</summary>
+    public FireSpread(int seed, Func<string, FireSpec> fires) { _rng = (uint)seed * 2654435761u | 1u; _fires = fires; }
+
+    private readonly Func<string, FireSpec> _fires;
 
     public IReadOnlyList<FireEvent> Events => _events;
     public IReadOnlyList<FuelObject> Objects => _objects;
@@ -164,10 +168,10 @@ public sealed class FireSpread
         return id;
     }
 
-    private static FireSpec SpecOf(FuelPart f)
+    private FireSpec SpecOf(FuelPart f)
     {
-        if (f.Preset.StartsWith("fire:", StringComparison.OrdinalIgnoreCase)) return FireSpec.ByName(f.Preset);
-        return FireSpec.ByName(f.Preset).WithShape(f.Footprint);
+        if (f.Preset.StartsWith("fire:", StringComparison.OrdinalIgnoreCase)) return _fires(f.Preset);
+        return _fires(f.Preset).WithShape(f.Footprint);
     }
 
     // ── Lighting and water ───────────────────────────────────────────────────────────────────────
@@ -691,13 +695,13 @@ public sealed class FireSpread
     }
 
     /// <summary>The sound key of a burning part, its lighting moved onto the clock it is heard by
-    /// (<paramref name="clockOffset"/> = that clock less this one).</summary>
-    public static string KeyOf(in BurningPart b, double clockOffset = 0)
+    /// (<paramref name="clockOffset"/> = that clock less this one). Its preset is <paramref name="fires"/>'.</summary>
+    public static string KeyOf(in BurningPart b, Func<string, FireSpec> fires, double clockOffset = 0)
     {
         if (b.Always || b.Preset.StartsWith("fire:", StringComparison.OrdinalIgnoreCase)) return b.Preset;
         // The preset's own shape is said by the preset.
         bool own;
-        try { own = ModelLibrary.Fire(b.Preset).Outline.SameAs(b.Shape); } catch (Exception) { own = false; }
+        try { own = fires(b.Preset).Outline.SameAs(b.Shape); } catch (Exception) { own = false; }
         return FireSpec.KeyFor(b.Preset, Math.Round(b.LitAt + clockOffset, 1), own ? null : b.Shape);
     }
 

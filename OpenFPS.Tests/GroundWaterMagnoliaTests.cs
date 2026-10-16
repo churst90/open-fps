@@ -70,7 +70,7 @@ public class GroundWaterMagnoliaTests : IDisposable
         {
             if (!s.SoundId.StartsWith("flow:ground/", StringComparison.Ordinal)) return;
             voices++;
-            var spec = RunningWaterSpec.ByName(s.SoundId[5..]);
+            var spec = ModelLibrary.Presets.Flow(s.SoundId[5..]);
             Assert.NotNull(spec.Ground);
             Assert.InRange(spec.SourceLevelDb, 30f, 100f);
         });

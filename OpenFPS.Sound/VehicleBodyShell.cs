@@ -30,15 +30,10 @@ public sealed record VehicleBodyShell(BodyShell Shell, IReadOnlyList<VehicleBody
     /// <summary>The material of a face.</summary>
     public string MaterialOf(BodyFace face) => Materials[(int)face];
 
-    /// <summary>
-    /// The shell of the vehicle <paramref name="id"/> names in the catalogue (<see cref="MachineRegistry"/>),
-    /// at its own body's size, or at <paramref name="size"/> (width, height, length) when its map gives it one.
-    /// </summary>
-    public static VehicleBodyShell For(string id, Vector3? size = null) => For(MachineRegistry.VehicleFor(id), id, size);
-
-    /// <summary>The shell of <paramref name="vehicle"/>, at its own body's size or at <paramref name="size"/>
-    /// (width, height, length).</summary>
-    public static VehicleBodyShell For(VehicleProfile vehicle, string id, Vector3? size = null)
+    /// <summary>The shell of <paramref name="vehicle"/>, from its parts list (<paramref name="parts"/>, which the
+    /// catalogue describes it as: MachineRegistry.Describe), at its own body's size or at <paramref name="size"/>
+    /// (width, height, length). MachineRegistry.Shell makes one by the vehicle's id.</summary>
+    public static VehicleBodyShell For(VehicleProfile vehicle, MachineDefinition parts, Vector3? size = null)
     {
         var body = size is { } given
             ? vehicle with { WidthMetres = given.X, HeightMetres = given.Y, LengthMetres = given.Z }
@@ -47,7 +42,6 @@ public sealed record VehicleBodyShell(BodyShell Shell, IReadOnlyList<VehicleBody
         var scale = new Vector3(body.WidthMetres / vehicle.WidthMetres, body.HeightMetres / vehicle.HeightMetres,
                                 body.LengthMetres / vehicle.LengthMetres);
 
-        var parts = MachineRegistry.Describe(vehicle, id);
         var names = new List<(string Part, int Index)>();
         var at = new List<Vector3>();
         foreach (var part in parts.Parts)

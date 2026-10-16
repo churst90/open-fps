@@ -68,7 +68,7 @@ public class CrossingTests
         object? spec = kind switch
         {
             "bell" => ModelLibrary.Bell(preset),
-            "machine" => SmallMachineSpec.ByName(preset),
+            "machine" => ModelLibrary.Presets.SmallMachine(preset),
             "aircraft" => AircraftProfile.ByName(preset),
             "gate" => CrossingGateSpec.ByName(preset),
             _ => null,

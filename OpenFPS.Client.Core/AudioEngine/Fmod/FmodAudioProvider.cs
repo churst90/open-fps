@@ -2534,20 +2534,20 @@ public partial class FmodAudioProvider : IAudioProvider
             if (shared == null || emitter.Place <= 0 || emitter.Place >= shared.Places) return null;
             return new NaturePlaceState(shared, emitter.Place, rate, emitter.Position);
         }
-        int places = ExtendedSources.Layout(emitter.PhysicalKey)?.Length ?? 1;
+        int places = ExtendedSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1;
         PlacedNatureVoice voice = kind == OpenFPS.Common.ModelSynth.Shore
             ? ShoreVoice(emitter, rate)
             : kind == OpenFPS.Common.ModelSynth.Wood && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
-            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(woodPreset), places, rate,
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Foliage(woodPreset), places, rate,
                                     emitter.Seed * 43 + 17, emitter.Position, Weather)
-              { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey)?[1..], TargetTrees = emitter.Trees }
+              { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?[1..], TargetTrees = emitter.Trees }
             : kind == OpenFPS.Common.ModelSynth.Flow
-            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.RunningWaterSpec.ByName(preset), rate,
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Flow(preset), rate,
                                     emitter.Seed * 47 + 19, emitter.Position, Weather)
             : kind == OpenFPS.Common.ModelSynth.Fire
-            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FireSpec.ByName(preset), places, rate,
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Fire(preset), places, rate,
                                     emitter.Seed * 41 + 13, emitter.Position, Weather)
-            : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(preset), places, rate,
+            : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Foliage(preset), places, rate,
                                     emitter.Seed * 43 + 17, emitter.Position, Weather);
         voice.TargetSpread = emitter.Spread;
         voice.TargetQuench = emitter.Quench;
@@ -2558,7 +2558,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private PlacedNatureVoice ShoreVoice(in SpatialEmitter emitter, int rate)
     {
         OpenFPS.Common.ShoreSpec.ParseKey(emitter.PhysicalKey, out string shorePreset, out var geometry);
-        var spec = OpenFPS.Common.ShoreSpec.ByName(shorePreset);
+        var spec = OpenFPS.Common.ModelLibrary.Presets.Shore(shorePreset);
         return new PlacedNatureVoice(emitter.PhysicalKey, spec, geometry ?? spec.DefaultGeometry, rate,
                                      emitter.Seed * 53 + 23, emitter.Position, Weather);
     }
@@ -2573,7 +2573,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private PhysicalVoiceState? Water(string key, int rate, int seed, System.Numerics.Vector3 position, in SpatialEmitter emitter)
     {
         if (!WaterFeatureVoice.ParseKey(key, out string preset, out string feature, out int tap))
-            return new WaterVoiceState(OpenFPS.Common.WaterFeatureSpec.ByName(key[(key.IndexOf(':') + 1)..]),
+            return new WaterVoiceState(OpenFPS.Common.ModelLibrary.Presets.Water(key[(key.IndexOf(':') + 1)..]),
                                        rate, seed * 37 + 11, position, Weather);
         string shared = preset + "/" + feature;
         if (emitter.PlaceOfEntity != 0)
@@ -2588,9 +2588,9 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             if (!_waterFeatures.TryGetValue(shared, out var w))
             {
-                w = new WaterFeatureVoice(shared, OpenFPS.Common.WaterFeatureSpec.ByName(preset), rate,
+                w = new WaterFeatureVoice(shared, OpenFPS.Common.ModelLibrary.Presets.Water(preset), rate,
                                           (int)((uint)shared.GetHashCode() & 0x7fff),
-                                          ExtendedSources.Layout(emitter.PhysicalKey)?.Length ?? 1);
+                                          ExtendedSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1);
                 _waterFeatures[shared] = w;
                 Log.Information("Water feature '{Feature}' ({Spec}): one synth, {Taps} tap(s)", shared, w.Spec.Name, w.Water.TapCount);
             }
@@ -3023,7 +3023,7 @@ public partial class FmodAudioProvider : IAudioProvider
                         ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23 + rainPart * 7919, rainPart, RainParts(rainSlot), Clock)
                         : null,
                     // A gas hob: its knobs' settings and when they were turned are in the key (HobKey).
-                    OpenFPS.Common.ModelSynth.Stove => new StoveVoiceState(OpenFPS.Common.GasHobSpec.ByName(emitter.PhysicalKey), emitter.PhysicalKey,
+                    OpenFPS.Common.ModelSynth.Stove => new StoveVoiceState(OpenFPS.Common.ModelLibrary.Presets.GasHob(emitter.PhysicalKey), emitter.PhysicalKey,
                                                    mrate, emitter.Seed * 59 + 29, Clock),
                     _ => null,
                 };

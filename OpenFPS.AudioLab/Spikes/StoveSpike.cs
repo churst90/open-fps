@@ -101,7 +101,7 @@ public static class StoveSpike
         ModelLibrary.Add(ModelLibrary.Kinds.GasHob, "hob4_old", Old);
         if (args.Contains("game")) return Game(args);
         string preset = args.FirstOrDefault(a => !a.StartsWith("--") && !a.Contains('=') && a is not ("levels" or "render")) ?? "hob4";
-        var spec = Tuned(GasHobSpec.ByName(preset), args);
+        var spec = Tuned(ModelLibrary.Presets.GasHob(preset), args);
         int seed = (int)Arg(args, "seed=", 7f);
         string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..];
         if (dir != null) Directory.CreateDirectory(dir);
@@ -287,7 +287,7 @@ public static class StoveSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        var spec = GasHobSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.GasHob(preset);
         int n = spec.Burners.Length;
         string off = HobKey.Off(n);
         string One(int setting) => setting + off[1..];

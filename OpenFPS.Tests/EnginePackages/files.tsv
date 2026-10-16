@@ -492,6 +492,7 @@ OpenFPS.Sound/GasHob.cs	Sound
 OpenFPS.Sound/Glass.cs	Sound	
 OpenFPS.Sound/GlassDoor.cs	Sound	
 OpenFPS.Sound/GlassFracture.cs	Sound	
+OpenFPS.Sound/GlassKind.cs	Models	which glass a glazed part is: its prefab's, or a vehicle's by where it sits
 OpenFPS.Sound/GroundChannels.cs	Sound	
 OpenFPS.Sound/GroundWater.cs	Environment	hydrology of the ground
 OpenFPS.Sound/HandOverSounds.cs	Sound	
@@ -503,14 +504,17 @@ OpenFPS.Sound/Hearing/ReferenceVoice.cs	Sound
 OpenFPS.Sound/Hearing/Timbre.cs	Sound	
 OpenFPS.Sound/Hearing/ZwickerLoudness.cs	Sound	
 OpenFPS.Sound/Honk.cs	Sound	
+OpenFPS.Sound/IPresets.cs	Sound	
 OpenFPS.Sound/ImpactAcoustics.cs	Sound	
 OpenFPS.Sound/KnobDoor.cs	Sound	
 OpenFPS.Sound/Lightning.cs	Environment	strikes, their schedule and channel
 OpenFPS.Sound/LockCylinder.cs	Sound	
 OpenFPS.Sound/Loudness.cs	Sound	
 OpenFPS.Sound/Loudspeakers.cs	Sound	
+OpenFPS.Sound/MachineParts.cs	Sound	
 OpenFPS.Sound/MachinePower.cs	Agents	how hard a driver works a machine: a notch, a power lever
 OpenFPS.Sound/Machines.cs	Models	machines as parts lists, the registry
+OpenFPS.Sound/ModelFailures.cs	Sound	
 OpenFPS.Sound/ModelKindTable.cs	Models	the one table of model kinds
 OpenFPS.Sound/ModelLibrary.cs	Models	the models a map can name
 OpenFPS.Sound/NatureModels.cs	Sound	

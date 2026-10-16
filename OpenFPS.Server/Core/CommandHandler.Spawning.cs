@@ -112,7 +112,7 @@ public partial class CommandHandler
             return;
         }
         if (!FireSpec.Presets.ContainsKey(preset)) { Say(reply, $"There is no fire called {preset}. Fires: {list}."); return; }
-        var spec = FireSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.Fire(preset);
         // Its near edge a few metres ahead (a crown fire's front a hundred), its width across your way.
         float ahead = 0.5f * spec.AreaDepth + (spec.Fuel == FireFuel.Crown ? 100f : 3f);
         var ground = feet + forward * ahead;

@@ -62,7 +62,7 @@ public static class FireSpreadSpike
         // A bonfire burning when the rain comes: light rain, then a downpour.
         "rain" => new Scene("rain", s => new List<int>
             {
-                s.Add(new FuelObject("the campfire", new Vector3(0f, 0f, 0f), 0f, FuelCatalog.ForFire("campfire"))),
+                s.Add(new FuelObject("the campfire", new Vector3(0f, 0f, 0f), 0f, FuelCatalog.ForFire("campfire", ModelLibrary.Presets.Fire))),
             }, Air(2f), new Vector3(0f, 0f, -3f), new Vector3(0f, 0f, 0f),
             (s, ids, t) => s.Light(ids[0], t - 1200),
             new[] { (0.0, 25.0), (60.0, 35.0), (130.0, 35.0), (200.0, 100.0) }, 400),
@@ -90,7 +90,7 @@ public static class FireSpreadSpike
     private static string Timeline(Scene sc, string[] args)
     {
         float until = Arg(args, "until=", (float)sc.Until);
-        var s = new FireSpread(7);
+        var s = new FireSpread(7, ModelLibrary.Presets.Fire);
         var ids = sc.Build(s);
         sc.Start(s, ids, 0);
         float trace = Arg(args, "trace=", 0f);
@@ -118,7 +118,7 @@ public static class FireSpreadSpike
     private static int Cost(string[] args)
     {
         int nx = (int)Arg(args, "nx=", 60f), nz = (int)Arg(args, "nz=", 50f);
-        var s = new FireSpread(3);
+        var s = new FireSpread(3, ModelLibrary.Presets.Fire);
         for (int i = 0; i < nx; i++)
             for (int j = 0; j < nz; j++)
                 s.Add(new FuelObject($"tree {i},{j}", new Vector3(6f * i, 0f, 6f * j), 0f, FuelCatalog.Tree(5f, 2f, 12f)));
@@ -220,7 +220,7 @@ public static class FireSpreadSpike
         // A fire emitter as the server makes it (FireSystem.Sync): its key, its shape's collider, its state.
         int Emit(string key, Vector3 at, float yaw, FireShape shape, bool running, float quench, int id = 0)
         {
-            var spec = FireSpec.ByName(key);
+            var spec = ModelLibrary.Presets.Fire(key);
             if (id == 0) id = nextId++;
             var def = new EntityDefinition
             {
@@ -260,7 +260,7 @@ public static class FireSpreadSpike
                 if (name == "pit") { Pits(); continue; }
                 var sc = Get(name);
                 facade.Weather.Wind = sc.Weather.Wind;
-                var s = new FireSpread(7);
+                var s = new FireSpread(7, ModelLibrary.Presets.Fire);
                 var ids = sc.Build(s);
                 sc.Start(s, ids, 0);
                 double simNow = 0;
@@ -280,12 +280,12 @@ public static class FireSpreadSpike
                         {
                             if (e.Running != b.Running || MathF.Abs(e.Quench - b.Quench) > 0.05f)
                             {
-                                Emit(FireSpread.KeyOf(b, offset), b.Position, b.Yaw, b.Shape, b.Running, b.Quench, e.Id);
+                                Emit(FireSpread.KeyOf(b, ModelLibrary.Presets.Fire, offset), b.Position, b.Yaw, b.Shape, b.Running, b.Quench, e.Id);
                                 emitters[k] = (e.Id, b.Running, b.Quench);
                             }
                             continue;
                         }
-                        int id = Emit(FireSpread.KeyOf(b, offset), b.Position, b.Yaw, b.Shape, b.Running, b.Quench);
+                        int id = Emit(FireSpread.KeyOf(b, ModelLibrary.Presets.Fire, offset), b.Position, b.Yaw, b.Shape, b.Running, b.Quench);
                         emitters[k] = (id, b.Running, b.Quench);
                     }
                     var gone = emitters.Where(kv => !live.Contains(kv.Key)).ToList();

@@ -93,7 +93,7 @@ public class WorldEditorPhase2Tests : IDisposable
             var e = EngineProfile.Presets[engine]();
             ModelLibrary.Add(ModelLibrary.Kinds.Engine, engine, e with { CompressionRatio = 12.5f });
             Assert.Equal(12.5f, MachineRegistry.VehicleFor(id).Engine.CompressionRatio);
-            Assert.Equal(12.5f, EngineProfile.ByName(engine).CompressionRatio);
+            Assert.Equal(12.5f, ModelLibrary.Presets.Engine(engine).CompressionRatio);
         }
         finally { ModelLibrary.Clear(); }
         Assert.NotEqual(4321f, MachineRegistry.VehicleFor(id).MassKg);

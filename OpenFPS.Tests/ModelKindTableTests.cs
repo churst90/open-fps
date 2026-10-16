@@ -242,10 +242,10 @@ public class ModelKindTableTests
         {
             var v = VehicleProfile.ByName(name);
             string horn = VehicleProfile.HornFor(v);
-            Honk.LevelDb(horn);
+            Honk.LevelDb(horn, ModelLibrary.Presets);
             if (ModelKindTable.Failures.TryGetValue(Honk.Prefix + horn, out var why)) failed.Add($"{name}: horn {horn} {why}");
             if (string.IsNullOrEmpty(v.AirSystem) || !v.DoorChime) continue;
-            OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(v);
+            OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(v, ModelLibrary.Presets);
             if (ModelKindTable.Failures.TryGetValue(ModelLibrary.Kinds.Air + ":" + v.AirSystem, out why)) failed.Add($"{name}: door {why}");
         }
         foreach (var name in AircraftProfile.Presets.Keys)
@@ -261,8 +261,8 @@ public class ModelKindTableTests
     [Fact]
     public void AHornWithNoModelIsLoggedOnce()
     {
-        Assert.Equal(110f, Honk.LevelDb("klaxon:no_such_horn_for_the_table_test"));
-        Assert.Equal(110f, Honk.LevelDb("air:no_such_horn_for_the_table_test"));
+        Assert.Equal(110f, Honk.LevelDb("klaxon:no_such_horn_for_the_table_test", ModelLibrary.Presets));
+        Assert.Equal(110f, Honk.LevelDb("air:no_such_horn_for_the_table_test", ModelLibrary.Presets));
         Assert.True(ModelKindTable.Failures.ContainsKey("horn:klaxon:no_such_horn_for_the_table_test"));
         Assert.True(ModelKindTable.Failures.ContainsKey("horn:air:no_such_horn_for_the_table_test"));
     }

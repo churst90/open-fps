@@ -424,7 +424,7 @@ public static class GameLevelsSpike
         void TrainCrossing(string preset, float speed, float lateral, double seconds)
         {
             var profile = TrainProfile.ByName(preset);
-            var layout = TrainLayout.Sources(profile);
+            var layout = TrainLayout.Sources(profile, ModelLibrary.Presets);
             const string trainKey = "fault_train";
             const float hornLead = 18f;
             Stand(new Vector3(0f, 0f, -lateral), 0f);               // the track runs along X, the crossing at x = 0
@@ -554,7 +554,7 @@ public static class GameLevelsSpike
         {
             Stand(new Vector3(-60f, 0f, -60f), 0f);
             world.UpdateAtmosphere(new WorldStateUpdate { Temperature = celsius, Humidity = 0.6f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f });
-            var spec = SmallMachineSpec.ByName(preset);
+            var spec = ModelLibrary.Presets.SmallMachine(preset);
             int a = AddEmitter("machine:" + preset, player.Position + new Vector3(-0.9f, 1.7f, 3f), Loudness.AudibleRange(spec.SourceLevelDb), 1.2f);
             int b = AddEmitter("machine:" + preset, player.Position + new Vector3(0.9f, 1.7f, 3f), Loudness.AudibleRange(spec.SourceLevelDb), 1.2f);
             Pump(4.0);
@@ -667,10 +667,10 @@ public static class GameLevelsSpike
                     Remove(busId);
                 }
                 Unidle();
-                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
+                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
                 Stand(new Vector3(-30f, 0f, -30f), 0f);
                 Idle("i4_midsize", new Vector3(-30f + 7f, 0f, -30f - 10f));
-                Steady("mower_push", "machine:mower_push", 35f, 0.4f, 10.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
+                Steady("mower_push", "machine:mower_push", 35f, 0.4f, 10.0, Loudness.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
                 Unidle();
             }
             if (set is "mowers")
@@ -678,7 +678,7 @@ public static class GameLevelsSpike
                 // A push mower standing alone at 5 m; then one 30 m away in a garden while a pickup idles
                 // 4 m from you (the mower runs reduced under it). A second mower of the same kind nearer you
                 // would lend it its voice instead (ChooseLiveEngines), at no cost at all.
-                float range = Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb);
+                float range = Loudness.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb);
                 Steady("mower_push", "machine:mower_push", 5f, 0.4f, 12.0, range);
                 Stand(new Vector3(-30f, 0f, -30f), 0f);
                 Idle("pickup_v8", new Vector3(-30f + 3f, 0f, -30f - 2.5f));
@@ -694,7 +694,7 @@ public static class GameLevelsSpike
                 PassBy("pickup_v8", 50f, 90f, 14.0);
                 PassBy("transit_bus", 40f, 3f, 14.0);
                 IdleCar("transit_bus", new[] { ("rear", 6f) }, 12.0);
-                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(SmallMachineSpec.ByName("mower_push").SourceLevelDb));
+                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
             }
             if (set is "compare")
             {

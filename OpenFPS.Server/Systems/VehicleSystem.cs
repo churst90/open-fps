@@ -212,7 +212,7 @@ public sealed partial class VehicleSystem
                     continue;
                 }
                 var air = isAircraft ? AircraftProfile.ByName(vd.Preset) : null;
-                var machine = isMachine ? SmallMachineSpec.ByName(vd.Preset) : null;
+                var machine = isMachine ? ModelLibrary.Presets.SmallMachine(vd.Preset) : null;
                 var profile = isAircraft || isMachine || isWalker ? null : MachineRegistry.VehicleFor(vd.Preset);
                 string displayKind = isAircraft ? air!.Name : isMachine ? machine!.Name : isWalker ? "someone walking" : profile!.Engine.Name;
                 float sourceLevelDb = isAircraft ? air!.SourceLevelDb : isMachine ? machine!.SourceLevelDb : isWalker ? 0f : profile!.SourceLevelDb;

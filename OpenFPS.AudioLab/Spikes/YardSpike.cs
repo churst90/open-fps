@@ -34,8 +34,8 @@ public static class YardSpike
 
         foreach (var key in presets)
         {
-            var spec = SmallMachineSpec.ByName(key);
-            var synth = new SmallMachineSynth(spec, Sr, 17);
+            var spec = ModelLibrary.Presets.SmallMachine(key);
+            var synth = new SmallMachineSynth(spec, ModelLibrary.Presets, Sr, 17);
             Console.WriteLine($"  {key}");
             foreach (var line in synth.Describe()) Console.WriteLine($"    {line}");
 
@@ -67,7 +67,7 @@ public static class YardSpike
     /// </summary>
     private static void Levels(SmallMachineSpec spec)
     {
-        var synth = new SmallMachineSynth(spec, Sr, 17)
+        var synth = new SmallMachineSynth(spec, ModelLibrary.Presets, Sr, 17)
         {
             Load = spec.Cutting != null ? 0.5f : 0.6f,
             GroundSpeed = spec.Cutting != null ? 1.1f : 0f,
@@ -117,7 +117,7 @@ public static class YardSpike
     /// </summary>
     private static (float[] Pcm, float PeakDb, List<float> RpmTrace) Script(SmallMachineSpec spec, float seconds)
     {
-        var synth = new SmallMachineSynth(spec, Sr, 17);
+        var synth = new SmallMachineSynth(spec, ModelLibrary.Presets, Sr, 17);
         synth.SetListener(new Vector3(0.6f, 1.4f, -1.1f));   // behind and above it, where the operator is
         int n = (int)(seconds * Sr);
         var outBuf = new float[n];
@@ -163,7 +163,7 @@ public static class YardSpike
     {
         const float c = 343f;
         float speed = 1.15f, seconds = 24f;
-        var synth = new SmallMachineSynth(spec, Sr, 17) { Load = 0.5f, GroundSpeed = speed };
+        var synth = new SmallMachineSynth(spec, ModelLibrary.Presets, Sr, 17) { Load = 0.5f, GroundSpeed = speed };
         var ear = new Vector3(0f, 1.6f, 0f);
         int n = (int)(seconds * Sr);
         var outBuf = new float[n + Sr];

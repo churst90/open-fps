@@ -67,12 +67,12 @@ public class FireSpreadTests
 
         // As hard per square metre over a bigger bed: heat and power with the area.
         var pit = FireSpec.GardenFirePit;
-        var big = FireSpec.ByName(FireSpec.KeyFor("fire_pit", null, FireShape.Rectangle(1.8f, 1.8f)));
+        var big = ModelLibrary.Presets.Fire(FireSpec.KeyFor("fire_pit", null, FireShape.Rectangle(1.8f, 1.8f)));
         Assert.Equal(4f * pit.HeatReleaseKw, big.HeatReleaseKw, 1);
         Assert.Equal(pit.SourceLevelDb + 10f * MathF.Log10(4f), big.SourceLevelDb, 2);
         Assert.Equal(1.8f, big.BaseDiameterMetres, 3);
         // A round bed of the pit's width is the pit's square less its corners.
-        var round = FireSpec.ByName(FireSpec.KeyFor("fire_pit", null, FireShape.Circle(0.9f)));
+        var round = ModelLibrary.Presets.Fire(FireSpec.KeyFor("fire_pit", null, FireShape.Circle(0.9f)));
         Assert.Equal(pit.HeatReleaseKw * MathF.PI / 4f, round.HeatReleaseKw, 1);
     }
 
@@ -80,18 +80,18 @@ public class FireSpreadTests
     public void APlacedFirePitTakesItsSize()
     {
         // At the prefab's own size (0.9 m), the preset; scaled, a bigger fire; round, a round bed.
-        Assert.Equal("fire:fire_pit", FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Box.IsRound(), new Vector3(0.9f, 0.6f, 0.9f)));
-        string scaled = FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Box.IsRound(), new Vector3(1.8f, 1.2f, 1.8f));
+        Assert.Equal("fire:fire_pit", FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Box.IsRound(), new Vector3(0.9f, 0.6f, 0.9f), ModelLibrary.Presets.Fire));
+        string scaled = FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Box.IsRound(), new Vector3(1.8f, 1.2f, 1.8f), ModelLibrary.Presets.Fire);
         Assert.Equal("fire:fire_pit/shape=r1.8x1.8", scaled);
-        string round = FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Cylinder.IsRound(), new Vector3(1.2f, 0.6f, 1.2f));
+        string round = FireSpec.KeyForPlaced("fire:fire_pit", ColliderShape.Cylinder.IsRound(), new Vector3(1.2f, 0.6f, 1.2f), ModelLibrary.Presets.Fire);
         Assert.Equal("fire:fire_pit/shape=c1.2", round);
         // A key that says its shape keeps it.
-        Assert.Equal("fire:bonfire/lit=5.0/shape=c2", FireSpec.KeyForPlaced("fire:bonfire/lit=5.0/shape=c2", ColliderShape.Box.IsRound(), new Vector3(9f, 1f, 9f)));
+        Assert.Equal("fire:bonfire/lit=5.0/shape=c2", FireSpec.KeyForPlaced("fire:bonfire/lit=5.0/shape=c2", ColliderShape.Box.IsRound(), new Vector3(9f, 1f, 9f), ModelLibrary.Presets.Fire));
         // Not a fire: untouched.
-        Assert.Equal("foliage:park_tree", FireSpec.KeyForPlaced("foliage:park_tree", ColliderShape.Box.IsRound(), Vector3.One));
+        Assert.Equal("foliage:park_tree", FireSpec.KeyForPlaced("foliage:park_tree", ColliderShape.Box.IsRound(), Vector3.One, ModelLibrary.Presets.Fire));
         // And the places follow the shape: a round bed's ring is narrower than its square's.
-        var square = ExtendedSources.Layout("fire:fire_pit")!;
-        var circle = ExtendedSources.Layout(round)!;
+        var square = ExtendedSources.Layout("fire:fire_pit", ModelLibrary.Presets)!;
+        var circle = ExtendedSources.Layout(round, ModelLibrary.Presets)!;
         Assert.Equal(square.Length, circle.Length);
         Assert.True(circle[1].Length() < 1.2f / 0.9f * square[1].Length());
     }
@@ -113,7 +113,7 @@ public class FireSpreadTests
     {
         foreach (float wind in new[] { 6f, 0.5f })
         {
-            var s = new FireSpread(7);
+            var s = new FireSpread(7, ModelLibrary.Presets.Fire);
             var ids = Enumerable.Range(0, 4).Select(i => s.Add(new FuelObject($"stump {i}", new Vector3(i, 0f, 0f), 0f, FuelCatalog.Stump(0.6f, 0.4f)))).ToList();
             // And one upwind.
             int up = s.Add(new FuelObject("upwind", new Vector3(-1f, 0f, 0f), 0f, FuelCatalog.Stump(0.6f, 0.4f)));
@@ -137,7 +137,7 @@ public class FireSpreadTests
         int across = 0, calm = 0;
         foreach (float wind in new[] { 6f, 0.5f })
         {
-            var s = new FireSpread(11);
+            var s = new FireSpread(11, ModelLibrary.Presets.Fire);
             var row = Enumerable.Range(0, 4).Select(i => s.Add(new FuelObject($"tree {i}", new Vector3(6f * i, 0f, 0f), 0f, FuelCatalog.Tree(5f, 2f, 12f)))).ToList();
             var far = Enumerable.Range(0, 3).Select(i => s.Add(new FuelObject($"far {i}", new Vector3(18f + 30f + 6f * i, 0f, 0f), 0f, FuelCatalog.Tree(5f, 2f, 12f)))).ToList();
             s.Strike(Vector3.Zero, 0, force: true);
@@ -161,7 +161,7 @@ public class FireSpreadTests
         Assert.Equal(476f, FireSpread.VanWagnerIntensity(2f, 1f), 0);
         foreach (float wind in new[] { 6f, 0.5f })
         {
-            var s = new FireSpread(3);
+            var s = new FireSpread(3, ModelLibrary.Presets.Fire);
             int tree = s.Add(new FuelObject("tree", Vector3.Zero, 0f, FuelCatalog.Tree(5f, 2f, 12f)));
             s.Light(tree, 0, "litter");
             Run(s, 300, _ => Air(wind));
@@ -176,7 +176,7 @@ public class FireSpreadTests
     [Fact]
     public void LightningStrikesWhatStandsHighest()
     {
-        var s = new FireSpread(5);
+        var s = new FireSpread(5, ModelLibrary.Presets.Fire);
         int stump = s.Add(new FuelObject("stump", new Vector3(5f, 0f, 0f), 0f, FuelCatalog.Stump(0.6f, 0.4f)));
         int tree = s.Add(new FuelObject("tree", new Vector3(30f, 0f, 0f), 0f, FuelCatalog.Tree(5f, 2f, 12f)));
         Assert.Equal(tree, s.Strike(new Vector3(0f, 0f, 0f), 0, force: true));
@@ -191,7 +191,7 @@ public class FireSpreadTests
     {
         string Once()
         {
-            var s = new FireSpread(42);
+            var s = new FireSpread(42, ModelLibrary.Presets.Fire);
             for (int i = 0; i < 6; i++) s.Add(new FuelObject($"tree {i}", new Vector3(6f * i, 0f, 0f), 0f, FuelCatalog.Tree(5f, 2f, 12f)));
             s.Strike(Vector3.Zero, 0, force: true);
             Run(s, 300, _ => Air(5f));
@@ -212,8 +212,8 @@ public class FireSpreadTests
         // A campfire in light rain burns on; in a cloudburst it goes out.
         foreach (float rain in new[] { 2f, 60f })
         {
-            var s = new FireSpread(1);
-            int fire = s.Add(new FuelObject("campfire", Vector3.Zero, 0f, FuelCatalog.ForFire("campfire")));
+            var s = new FireSpread(1, ModelLibrary.Presets.Fire);
+            int fire = s.Add(new FuelObject("campfire", Vector3.Zero, 0f, FuelCatalog.ForFire("campfire", ModelLibrary.Presets.Fire)));
             s.Light(fire, -1200);
             Run(s, 300, _ => Air(2f, rain));
             Timeline(s);
@@ -223,7 +223,7 @@ public class FireSpreadTests
         }
 
         // After rain the litter under a tree will not take a brand: two hours of 10 mm/h.
-        var w = new FireSpread(2);
+        var w = new FireSpread(2, ModelLibrary.Presets.Fire);
         int tree = w.Add(new FuelObject("tree", Vector3.Zero, 0f, FuelCatalog.Tree(5f, 2f, 12f)));
         Run(w, 7200, _ => Air(2f, 10f));
         var litter = w.State(tree).First(p => p.Part == "litter");
@@ -236,7 +236,7 @@ public class FireSpreadTests
     [Fact]
     public void WaterOnAFireCoolsItButOnOilItFlares()
     {
-        var s = new FireSpread(4);
+        var s = new FireSpread(4, ModelLibrary.Presets.Fire);
         int pile = s.Add(new FuelObject("pile", Vector3.Zero, 0f, FuelCatalog.WoodPile(2f, 1f, 1f)));
         s.Light(pile, -3000);
         Run(s, 10, _ => Air(1f), -10);
@@ -252,8 +252,8 @@ public class FireSpreadTests
         Timeline(s);
         Assert.Contains(s.Events, e => e.Object == pile && e.What == "put out by water");
 
-        var oil = new FuelSpec { Name = "pan", Parts = new[] { FuelCatalog.ForFire("campfire").Parts[0] with { WaterFlares = true } } };
-        var t = new FireSpread(4);
+        var oil = new FuelSpec { Name = "pan", Parts = new[] { FuelCatalog.ForFire("campfire", ModelLibrary.Presets.Fire).Parts[0] with { WaterFlares = true } } };
+        var t = new FireSpread(4, ModelLibrary.Presets.Fire);
         int pan = t.Add(new FuelObject("pan", Vector3.Zero, 0f, oil));
         t.Light(pan, -1200);
         Run(t, 5, _ => Air(1f), -5);
@@ -332,20 +332,20 @@ public class FireSpreadTests
     public void WhatAThingBurnsAsComesFromWhatItIs()
     {
         // A crown of foliage off the ground: a tree, with litter under it.
-        var tree = FuelCatalog.ForThing("", "Foliage", ColliderShape.Box.IsRound(), new Vector3(8f, 8f, 8f), 3f);
+        var tree = FuelCatalog.ForThing("", ModelKindTable.IsVehicle(""), "Foliage", ColliderShape.Box.IsRound(), new Vector3(8f, 8f, 8f), 3f, ModelLibrary.Presets.Fire);
         Assert.NotNull(tree);
         Assert.Equal(new[] { "litter", "crown", "branches" }, tree!.Parts.Select(p => p.Name));
         Assert.Equal(3f, tree.Parts[1].CrownBaseMetres);
         // Wood on the ground by its proportions.
-        Assert.Equal("stump", FuelCatalog.ForThing("", "Wood", ColliderShape.Box.IsRound(), new Vector3(0.6f, 0.4f, 0.6f), 0f)!.Parts[0].Preset);
-        Assert.Equal("wood_pile", FuelCatalog.ForThing("", "Wood", ColliderShape.Box.IsRound(), new Vector3(2f, 1f, 1f), 0f)!.Parts[0].Preset);
-        Assert.Equal("tree_trunk", FuelCatalog.ForThing("", "Wood", ColliderShape.Box.IsRound(), new Vector3(0.5f, 3f, 0.5f), 0f)!.Parts[0].Preset);
+        Assert.Equal("stump", FuelCatalog.ForThing("", ModelKindTable.IsVehicle(""), "Wood", ColliderShape.Box.IsRound(), new Vector3(0.6f, 0.4f, 0.6f), 0f, ModelLibrary.Presets.Fire)!.Parts[0].Preset);
+        Assert.Equal("wood_pile", FuelCatalog.ForThing("", ModelKindTable.IsVehicle(""), "Wood", ColliderShape.Box.IsRound(), new Vector3(2f, 1f, 1f), 0f, ModelLibrary.Presets.Fire)!.Parts[0].Preset);
+        Assert.Equal("tree_trunk", FuelCatalog.ForThing("", ModelKindTable.IsVehicle(""), "Wood", ColliderShape.Box.IsRound(), new Vector3(0.5f, 3f, 0.5f), 0f, ModelLibrary.Presets.Fire)!.Parts[0].Preset);
         // A floor and a fence board are structures, a later stage; brick does not burn.
-        Assert.Null(FuelCatalog.ForThing("", "Wood", ColliderShape.Box.IsRound(), new Vector3(5f, 0.1f, 5f), 0f));
-        Assert.Null(FuelCatalog.ForThing("", "Brick", ColliderShape.Box.IsRound(), new Vector3(1f, 1f, 1f), 0f));
+        Assert.Null(FuelCatalog.ForThing("", ModelKindTable.IsVehicle(""), "Wood", ColliderShape.Box.IsRound(), new Vector3(5f, 0.1f, 5f), 0f, ModelLibrary.Presets.Fire));
+        Assert.Null(FuelCatalog.ForThing("", ModelKindTable.IsVehicle(""), "Brick", ColliderShape.Box.IsRound(), new Vector3(1f, 1f, 1f), 0f, ModelLibrary.Presets.Fire));
         // A vehicle by its engine; a map's fire as itself, burning.
-        Assert.Equal("burning_car", FuelCatalog.ForThing("engine:sedan", "Metal", ColliderShape.Box.IsRound(), new Vector3(1.8f, 1.4f, 4.5f), 0f)!.Parts[0].Preset);
-        var pit = FuelCatalog.ForThing("fire:fire_pit", "None", ColliderShape.Box.IsRound(), new Vector3(0.9f, 0.6f, 0.9f), 0.3f)!;
+        Assert.Equal("burning_car", FuelCatalog.ForThing("engine:sedan", ModelKindTable.IsVehicle("engine:sedan"), "Metal", ColliderShape.Box.IsRound(), new Vector3(1.8f, 1.4f, 4.5f), 0f, ModelLibrary.Presets.Fire)!.Parts[0].Preset);
+        var pit = FuelCatalog.ForThing("fire:fire_pit", ModelKindTable.IsVehicle("fire:fire_pit"), "None", ColliderShape.Box.IsRound(), new Vector3(0.9f, 0.6f, 0.9f), 0.3f, ModelLibrary.Presets.Fire)!;
         Assert.True(pit.AlwaysBurning);
         Assert.Equal("fire:fire_pit", pit.Parts[0].Preset);
         // Land cover's hook.

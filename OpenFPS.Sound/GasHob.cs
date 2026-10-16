@@ -521,12 +521,6 @@ public sealed record GasHobSpec
             ["hob1"] = () => SingleBurner,
         };
 
-    /// <summary>A preset by name or by key, through the <see cref="ModelLibrary"/> so a map's own wins.</summary>
-    public static GasHobSpec ByName(string key)
-    {
-        HobKey.TryParse(key, out var k);
-        return ModelLibrary.GasHob(k.Preset.Length > 0 ? k.Preset : key);
-    }
 }
 
 /// <summary>
@@ -600,12 +594,13 @@ public readonly record struct HobKey(string Preset, string From, string To, doub
 /// </summary>
 public static class HobControls
 {
-    /// <summary>The key after a press of the interact key, and what to tell the player.</summary>
-    public static string Press(string soundId, double now, out string newKey)
+    /// <summary>The key after a press of the interact key, and what to tell the player. The hob is
+    /// <paramref name="presets"/>' (the catalogue's).</summary>
+    public static string Press(string soundId, double now, IPresets presets, out string newKey)
     {
         newKey = soundId;
         if (!HobKey.TryParse(soundId, out var key)) return "";
-        var spec = GasHobSpec.ByName(key.Preset);
+        var spec = presets.GasHob(key.Preset);
         int n = spec.Burners.Length;
         string current = key.To.Length == n ? key.To : HobKey.Off(n);
         int next = current.IndexOf('0');

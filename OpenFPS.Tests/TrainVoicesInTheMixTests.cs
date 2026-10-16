@@ -37,7 +37,7 @@ public class TrainVoicesInTheMixTests
     [InlineData(true)]
     public void A_fifty_wagon_freight_passing_is_a_handful_of_voices_and_none_comes_and_goes(bool curved)
     {
-        var layout = TrainLayout.Sources(TrainProfile.ByName("freight"));
+        var layout = TrainLayout.Sources(TrainProfile.ByName("freight"), ModelLibrary.Presets);
         const string train = "freight_test";
         const float speed = 18f;
         var ear = new Vector3(0f, 0f, 12f);

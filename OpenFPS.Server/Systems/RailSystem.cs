@@ -184,7 +184,7 @@ public sealed class RailSystem
                 try { line = new RaceLine(track.Waypoints, 0f, top, 0.1f, brake, track.BankingDegrees, gravity: data.Gravity); }
                 catch (Exception ex) { Log.Warning("Map {Map}: track '{Track}' — {Err}", mapId, td.Track, ex.Message); continue; }
 
-                var layout = TrainLayout.Sources(profile);
+                var layout = TrainLayout.Sources(profile, ModelLibrary.Presets);
                 string name = td.Name ?? $"{profile.Name} {++n}";
                 string trainKey = name.Replace('/', '-').Replace(' ', '_');
                 var ents = new Entity[layout.Count];

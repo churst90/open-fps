@@ -2112,12 +2112,4 @@ public sealed record EngineProfile
             ["ge_7fdl16"] = () => Ge7Fdl16,
             ["emd_645e3"] = () => Emd645E3,
         };
-
-    /// <summary>An engine by its preset name: as changed in the world editor if it has been (it is a
-    /// library kind, ModelLibrary.Kinds.Engine), otherwise as built. Every vehicle, small machine,
-    /// train and aircraft that names it has the change.</summary>
-    public static EngineProfile ByName(string key)
-        => ModelLibrary.IsAuthored(ModelLibrary.Kinds.Engine, key) ? ModelLibrary.Get<EngineProfile>(ModelLibrary.Kinds.Engine, key)
-         : Presets.TryGetValue(key, out var make) ? make()
-         : throw new ArgumentException($"No engine preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
 }

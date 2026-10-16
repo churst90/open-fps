@@ -27,7 +27,7 @@ public class WoodChorusTests
     {
         int next = WoodChorus.FirstId;
         var ids = new Dictionary<(int, int, string), int>();
-        return WoodChorus.Build(crowns, (cell, preset) => ids.TryGetValue((cell.X, cell.Z, preset), out int id) ? id : ids[(cell.X, cell.Z, preset)] = next--);
+        return WoodChorus.Build(crowns, (cell, preset) => ids.TryGetValue((cell.X, cell.Z, preset), out int id) ? id : ids[(cell.X, cell.Z, preset)] = next--, ModelLibrary.Presets);
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class WoodChorusTests
         Assert.Equal(("park_tree", 60f, 40f), (preset, rx, rz));
         Assert.False(WoodChorus.ParseKey("foliage:park_tree", out _, out _, out _));
         // A wood's places are spread over the wood, not a crown.
-        var layout = ExtendedSources.Layout(key)!;
+        var layout = ExtendedSources.Layout(key, ModelLibrary.Presets)!;
         Assert.Equal(1 + FoliageSynth.Boughs, layout.Length);
         Assert.InRange(ExtendedSources.Reach(layout), 25f, 41f);
     }

@@ -23,7 +23,7 @@ public class TrainVoicingTests
     /// <paramref name="head"/>.</summary>
     private static List<TrainVoicing.Source> Along(string preset, float head)
     {
-        var layout = TrainLayout.Sources(TrainProfile.ByName(preset));
+        var layout = TrainLayout.Sources(TrainProfile.ByName(preset), ModelLibrary.Presets);
         return layout.Where(e => !e.IsSignal)
                      .Select(e => new TrainVoicing.Source(e.Index, e.AlongMetres, new Vector3(head - e.AlongMetres, e.HeightMetres, 0f)))
                      .ToList();
@@ -146,7 +146,7 @@ public class TrainVoicingTests
         // of n times one bogie's, as n separate bogies would be.
         var (_, one) = Voice("freight", e => e.Kind == TrainLayout.Kind.Bogie && e.Label.Contains("#10 bogie 1"), 0.5f);
         var (_, forty) = Voice("freight", e => e.Kind == TrainLayout.Kind.Bogie && e.Label.Contains("wagon") && e.Label.EndsWith("bogie 1") && e.Index < 130, 0.5f);
-        int n = TrainLayout.Sources(TrainProfile.ByName("freight")).Count(e => e.Kind == TrainLayout.Kind.Bogie && e.Label.Contains("wagon") && e.Label.EndsWith("bogie 1") && e.Index < 130);
+        int n = TrainLayout.Sources(TrainProfile.ByName("freight"), ModelLibrary.Presets).Count(e => e.Kind == TrainLayout.Kind.Bogie && e.Label.Contains("wagon") && e.Label.EndsWith("bogie 1") && e.Index < 130);
         double a = RmsDbfs(one, 4f), b = RmsDbfs(forty, 4f);
         double expected = 10 * Math.Log10(n);
         _o.WriteLine($"one bogie {a:F1} dBFS, {n} bogies {b:F1} dBFS: +{b - a:F1} dB, independent sources +{expected:F1} dB");

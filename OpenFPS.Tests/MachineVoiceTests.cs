@@ -21,7 +21,7 @@ public class MachineVoiceTests
     /// measured: RMS and peak in dB SPL.</summary>
     private static (float RmsDb, float PeakDb) Measure(string preset, float seconds = 1.5f)
     {
-        var spec = SmallMachineSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.SmallMachine(preset);
         var voice = new MachineVoiceState(spec, Rate, entityId: 4242, seed: 11);
         // A mower's declared level is the mower being pushed, at the 0.95 m/s its levels were measured at.
         if (spec.Cutting != null) voice.TargetGroundSpeed = 0.95f;
@@ -58,7 +58,7 @@ public class MachineVoiceTests
     [InlineData("ac_window")]
     public void AMachineRendersAtTheLevelItDeclares(string preset)
     {
-        var spec = SmallMachineSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.SmallMachine(preset);
         var (rms, _) = Measure(preset);
         Assert.True(MathF.Abs(rms - spec.SourceLevelDb) < 6f,
             $"{preset} declares {spec.SourceLevelDb:F0} dB at 1 m and rendered {rms:F1}");
@@ -74,7 +74,7 @@ public class MachineVoiceTests
     [InlineData("mower_riding", 1.9f)]
     public void AMowerWorksHarderMovingThanStanding(string preset, float walkingPace)
     {
-        var spec = SmallMachineSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.SmallMachine(preset);
         var voice = new MachineVoiceState(spec, Rate, entityId: 4242, seed: 11);
         var block = new float[(int)(Rate * 0.1f)];
         float MeanThrottle(float speed)
@@ -104,7 +104,7 @@ public class MachineVoiceTests
     [InlineData("ac_window")]
     public void AMachineDoesNotLiveOnTheCeiling(string preset)
     {
-        var spec = SmallMachineSpec.ByName(preset);
+        var spec = ModelLibrary.Presets.SmallMachine(preset);
         var voice = new MachineVoiceState(spec, Rate, entityId: 99, seed: 3);
         var warm = new float[(int)(Rate * 0.5f)];
         voice.Render(warm);
@@ -124,7 +124,7 @@ public class MachineVoiceTests
     {
         static float At(string preset, float metres)
         {
-            var s = SmallMachineSpec.ByName(preset);
+            var s = ModelLibrary.Presets.SmallMachine(preset);
             var (gain, reference) = Loudness.Place(s.SourceLevelDb, s.ExtentMetres);
             return Loudness.RenderedGain(gain, reference, Loudness.AudibleRange(s.SourceLevelDb), metres);
         }
@@ -366,7 +366,7 @@ public class MachineVoiceTests
     [Fact]
     public void TheRingSurvivesProducersAndAConsumerAtOnce()
     {
-        var spec = SmallMachineSpec.ByName("mower_push");
+        var spec = ModelLibrary.Presets.SmallMachine("mower_push");
         var voice = new MachineVoiceState(spec, Rate, entityId: 7, seed: 2);
 
         var faults = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
@@ -433,7 +433,7 @@ public class MachineVoiceTests
     [Fact]
     public void TwoOfTheSameMachineDoNotRunInStep()
     {
-        var spec = SmallMachineSpec.ByName("ac_window");
+        var spec = ModelLibrary.Presets.SmallMachine("ac_window");
         var a = new MachineVoiceState(spec, Rate, entityId: 1001, seed: 5);
         var b = new MachineVoiceState(spec, Rate, entityId: 1002, seed: 5);
         var ba = new float[4096];

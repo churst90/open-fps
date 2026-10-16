@@ -91,7 +91,7 @@ public static class MapDrainage
     /// own x axis (RunningWaterSynth's line), silent while the line is dry.</summary>
     public static Entity SpawnVoice(World world, DrainageNetwork.Voice v)
     {
-        var spec = RunningWaterSpec.ByName(v.SoundId[5..]);
+        var spec = ModelLibrary.Presets.Flow(v.SoundId[5..]);
         string name = spec.Name;
         // The line runs along x: the yaw that turns x onto the line (x east, z north; yaw about y from north).
         var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, v.Yaw - MathF.PI / 2f);

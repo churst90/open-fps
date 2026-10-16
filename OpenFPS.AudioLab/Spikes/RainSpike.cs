@@ -716,9 +716,9 @@ public static class RainSpike
 
         foreach (var (name, key, level, extent, headroom, dist) in new[]
         {
-            ("window air conditioner at 3 m", "machine:ac_window", SmallMachineSpec.ByName("ac_window").SourceLevelDb, SmallMachineSpec.ByName("ac_window").ExtentMetres, VehicleProfile.PeakHeadroomDb, 3f),
-            ("park fountain at 10 m", "water:park_fountain", WaterFeatureSpec.ByName("park_fountain").SourceLevelDb, WaterFeatureSpec.ByName("park_fountain").ExtentMetres, WaterFeatureSpec.ByName("park_fountain").PeakHeadroomDb, 10f),
-            ("park tree in the wind at 8 m", "foliage:park_tree", FoliageSpec.ByName("park_tree").SourceLevelDb, FoliageSpec.ByName("park_tree").ExtentMetres, FoliageSpec.ByName("park_tree").PeakHeadroomDb, 8f),
+            ("window air conditioner at 3 m", "machine:ac_window", ModelLibrary.Presets.SmallMachine("ac_window").SourceLevelDb, ModelLibrary.Presets.SmallMachine("ac_window").ExtentMetres, VehicleProfile.PeakHeadroomDb, 3f),
+            ("park fountain at 10 m", "water:park_fountain", ModelLibrary.Presets.Water("park_fountain").SourceLevelDb, ModelLibrary.Presets.Water("park_fountain").ExtentMetres, ModelLibrary.Presets.Water("park_fountain").PeakHeadroomDb, 10f),
+            ("park tree in the wind at 8 m", "foliage:park_tree", ModelLibrary.Presets.Foliage("park_tree").SourceLevelDb, ModelLibrary.Presets.Foliage("park_tree").ExtentMetres, ModelLibrary.Presets.Foliage("park_tree").PeakHeadroomDb, 8f),
         })
         {
             var (gain, reference) = Loudness.Place(level, extent);

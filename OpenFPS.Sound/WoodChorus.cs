@@ -55,8 +55,9 @@ public sealed class WoodChorus
     private WoodChorus(Crown[] crowns, Wood[] woods) { _crowns = crowns; _woods = woods; }
 
     /// <summary>The woods of these crowns. <paramref name="idFor"/> gives each wood (cell and species) its
-    /// entity id, so a wood keeps its id while its trees come and go.</summary>
-    public static WoodChorus Build(IReadOnlyList<Crown> crowns, Func<(int X, int Z), string, int> idFor)
+    /// entity id, so a wood keeps its id while its trees come and go; each species' crown is
+    /// <paramref name="presets"/>' (the catalogue's).</summary>
+    public static WoodChorus Build(IReadOnlyList<Crown> crowns, Func<(int X, int Z), string, int> idFor, IPresets presets)
     {
         var groups = new Dictionary<((int, int) Cell, string Preset), List<int>>();
         for (int i = 0; i < crowns.Count; i++)
@@ -71,7 +72,7 @@ public sealed class WoodChorus
         foreach (var ((cell, preset), members) in groups)
         {
             FoliageSpec spec;
-            try { spec = FoliageSpec.ByName(preset); } catch (Exception) { continue; }
+            try { spec = presets.Foliage(preset); } catch (Exception) { continue; }
             var centre = Vector3.Zero;
             foreach (int i in members) centre += crowns[i].At;
             centre /= members.Count;

@@ -114,7 +114,7 @@ public static class EarshotSpike
             }
             if (SmallMachineSpec.Presets.ContainsKey(preset))
             {
-                var m = SmallMachineSpec.ByName(preset);
+                var m = ModelLibrary.Presets.SmallMachine(preset);
                 levelDb = m.SourceLevelDb; extent = m.ExtentMetres; return true;
             }
             if (MachineRegistry.Knows(preset))

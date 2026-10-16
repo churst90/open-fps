@@ -161,7 +161,7 @@ public class EngineDetailTests
     {
         double Level(EngineDetail detail, out int replayed)
         {
-            var m = new MachineVoiceState(SmallMachineSpec.ByName("mower_push"), Rate, 11, 11 * 31 + 7) { Detail = detail };
+            var m = new MachineVoiceState(ModelLibrary.Presets.SmallMachine("mower_push"), Rate, 11, 11 * 31 + 7) { Detail = detail };
             m.SetListener(new Vector3(3f, 1.6f, 8f));
             var buf = new float[Block];
             double sum = 0; long n = 0; replayed = 0;

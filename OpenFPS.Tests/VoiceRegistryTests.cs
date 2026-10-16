@@ -45,7 +45,7 @@ public class VoiceRegistryTests
                 (505, new Vector3(150f, 0.5f, 10f), new Vector3(0f, 0f, 12f)),
             };
             foreach (var c in far) r.Car(c.Id, "v8_muscle", c.At, c.V);
-            var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"));
+            var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"), ModelLibrary.Presets);
             for (int i = 0; i < layout.Count; i++)
                 r.RailSource(601 + i, $"rail:light_rail/t1/{i}", layout[i].LevelDb,
                              new Vector3(-10f - layout[i].AlongMetres, layout[i].HeightMetres, -25f), Vector3.Zero);

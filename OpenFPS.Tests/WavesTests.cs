@@ -125,16 +125,16 @@ public class WavesTests
         Assert.True(ShoreSpec.ParseKey(key, out string preset, out var g));
         Assert.Equal("pond_bank", preset);
         Assert.Equal(new ShoreGeometry(140f, 90f, 18f), g);
-        Assert.Equal(ShoreSpec.PondBank.Name, ShoreSpec.ByName(key).Name);
+        Assert.Equal(ShoreSpec.PondBank.Name, ModelLibrary.Presets.Shore(key).Name);
         // The prefab's own key names the preset, with no geometry.
         Assert.True(ShoreSpec.ParseKey("shore:sea_sand", out preset, out g));
         Assert.Equal("sea_sand", preset);
         Assert.Null(g);
         // Its places lie along it, the stretch's own length, and a surf beach has a row on its break line.
-        var layout = ExtendedSources.Layout(key)!;
+        var layout = ExtendedSources.Layout(key, ModelLibrary.Presets)!;
         Assert.Equal(ShoreSpec.PondBank.TotalPlaces, layout.Length);
         Assert.True(layout.Max(p => MathF.Abs(p.X)) <= 9f && layout.All(p => p.Z == 0f));
-        var surf = ExtendedSources.Layout("shore:sea_sand")!;
+        var surf = ExtendedSources.Layout("shore:sea_sand", ModelLibrary.Presets)!;
         Assert.Equal(2 * ShoreSpec.SeaSand.Places, surf.Length);
         Assert.Contains(surf, p => p.Z == ShoreSpec.SeaSand.BreakRowMetres);
     }

@@ -98,7 +98,7 @@ public class VehicleBodyShellTests
             var v = MachineRegistry.VehicleFor(id);
             foreach (var size in Sizes(v))
             {
-                var shell = VehicleBodyShell.For(v, id, size).Shell;
+                var shell = VehicleBodyShell.For(v, MachineRegistry.Describe(v, id), size).Shell;
                 meshes++; triangles += shell.Mesh.TriangleCount;
                 foreach (string fault in Faults(shell).Take(3)) wrong.Add($"{id} at {size?.ToString() ?? "its own size"}: {fault}");
             }
@@ -118,7 +118,7 @@ public class VehicleBodyShellTests
             foreach (var size in Sizes(v))
             {
                 var want = size ?? new Vector3(v.WidthMetres, v.HeightMetres, v.LengthMetres);
-                var m = VehicleBodyShell.For(v, id, size).Shell.Mesh;
+                var m = VehicleBodyShell.For(v, MachineRegistry.Describe(v, id), size).Shell.Mesh;
                 var lo = m.BoundsMin; var hi = m.BoundsMax;
                 bool right = MathF.Abs(hi.X - want.X * 0.5f) < 1e-4f && MathF.Abs(lo.X + want.X * 0.5f) < 1e-4f
                           && MathF.Abs(hi.Z - want.Z * 0.5f) < 1e-4f && MathF.Abs(lo.Z + want.Z * 0.5f) < 1e-4f
@@ -139,7 +139,7 @@ public class VehicleBodyShellTests
             var v = MachineRegistry.VehicleFor(id);
             foreach (var size in Sizes(v))
             {
-                var body = VehicleBodyShell.For(v, id, size);
+                var body = VehicleBodyShell.For(v, MachineRegistry.Describe(v, id), size);
                 var shell = body.Shell;
                 string at = $"{id} at {size?.ToString() ?? "its own size"}";
                 // One exhaust, one intake, and a tyre for every wheel.
@@ -231,7 +231,7 @@ public class VehicleBodyShellTests
             var v = MachineRegistry.VehicleFor(id);
             if (VehicleCabin.Measure(v) is not { } g) continue;
             cabins++;
-            var body = VehicleBodyShell.For(v, id);
+            var body = VehicleBodyShell.For(v, MachineRegistry.Describe(v, id));
             var m = body.Shell.Mesh;
             var high = new Vector3(0f, (g.Belt + v.HeightMetres) * 0.5f, g.Cz);
             var low = new Vector3(0f, (VehicleCabin.ChassisBottom + g.Belt) * 0.5f, g.Cz);
@@ -263,7 +263,7 @@ public class VehicleBodyShellTests
             var v = MachineRegistry.VehicleFor(id);
             if (VehicleCabin.Measure(v) != null) continue;
             found++;
-            var shell = VehicleBodyShell.For(v, id).Shell;
+            var shell = VehicleBodyShell.For(v, MachineRegistry.Describe(v, id)).Shell;
             Assert.Single(shell.Spec.Sections);
             Assert.Equal(12, shell.Mesh.TriangleCount);
             Assert.True(shell.Mesh.Convex);
@@ -279,8 +279,8 @@ public class VehicleBodyShellTests
     {
         foreach (string id in EveryVehicle().Take(8))
         {
-            var a = VehicleBodyShell.For(id);
-            var b = VehicleBodyShell.For(id);
+            var a = MachineRegistry.Shell(id);
+            var b = MachineRegistry.Shell(id);
             Assert.Equal(a.Shell.Mesh.Hash, b.Shell.Mesh.Hash);
             Assert.Equal(a.Sources, b.Sources);
         }

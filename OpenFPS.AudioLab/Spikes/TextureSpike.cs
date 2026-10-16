@@ -105,7 +105,7 @@ public static class TextureSpike
     private static void Render(string dir, string? before, float sec)
     {
         int n = (int)(sec * Rate);
-        var fountain = WaterFeatureSpec.ByName("park_fountain");
+        var fountain = ModelLibrary.Presets.Water("park_fountain");
         var (centre, taps) = FountainOnTheMap();
         Console.WriteLine($"fountain at {centre}, {taps.Count} taps: " + string.Join("; ", taps.Select(t => $"{t - centre}")));
 
@@ -144,7 +144,7 @@ public static class TextureSpike
         }
 
         // A park tree, 5 m off its trunk to the south-west: the crown's middle 7 m up.
-        var treeSpec = FoliageSpec.ByName("park_tree");
+        var treeSpec = ModelLibrary.Presets.Foliage("park_tree");
         var treeAt = new Vector3(3f, treeSpec.CrownHeightMetres, 4f);
         var treeEar = new Vector3(0f, 1.7f, 0f);
         foreach (float wind in new[] { 3f, 6f, 10f })

@@ -474,7 +474,7 @@ public static class GroundWaterSpike
                     EntityId = id, Type = EntityType.StaticObject,
                     Transform = new Transform { Position = new Vector3(v.Position.X - stand.X, v.Position.Y - stand.Y + 0.05f, v.Position.Z - stand.Z), Rotation = turn, Scale = Vector3.One },
                 };
-                var spec = RunningWaterSpec.ByName(v.SoundId[5..]);
+                var spec = ModelLibrary.Presets.Flow(v.SoundId[5..]);
                 def.SoundEmitter = new SoundEmitterComponent
                 {
                     IsSynth = true, SoundId = v.SoundId, Mode = PlaybackMode.LoopOne, Volume = 1f,

@@ -537,15 +537,16 @@ public sealed record FireSpec
     /// The key of a fire a placed thing makes: its own key, with the shape its size gives it (round or not,
     /// <see cref="FireShape.Footprint"/>) unless the
     /// key already says one, and only when that differs from the preset's own. A fire pit placed at its
-    /// prefab's size is the preset; scaled up, it is a bigger fire (docs/FIRE.md 12.2).
+    /// prefab's size is the preset; scaled up, it is a bigger fire (docs/FIRE.md 12.2). The preset is
+    /// <paramref name="fires"/>' (the catalogue's: a map's own first).
     /// </summary>
-    public static string KeyForPlaced(string key, bool round, System.Numerics.Vector3 size)
+    public static string KeyForPlaced(string key, bool round, System.Numerics.Vector3 size, Func<string, FireSpec> fires)
     {
         if (!key.StartsWith("fire:", StringComparison.OrdinalIgnoreCase) || key.Contains("/shape=", StringComparison.OrdinalIgnoreCase)) return key;
         if (!(size.X > 0f) || !(size.Z > 0f)) return key;
         ParseKey(key, out string preset, out _);
         FireSpec own;
-        try { own = ModelLibrary.Fire(preset); } catch (Exception) { return key; }
+        try { own = fires(preset); } catch (Exception) { return key; }
         var shape = FireShape.Footprint(round, size);
         var mine = own.Outline;
         if (shape.SameAs(mine)) return key;
@@ -573,14 +574,5 @@ public sealed record FireSpec
             else if (part.StartsWith("shape=", StringComparison.OrdinalIgnoreCase) && FireShape.TryParse(part[6..], out var sh))
                 shape = sh;
         }
-    }
-
-    /// <summary>A preset by name or by key, through the <see cref="ModelLibrary"/> so a map's own wins,
-    /// burning over the shape the key gives it.</summary>
-    public static FireSpec ByName(string key)
-    {
-        ParseKey(key, out string preset, out _, out var shape);
-        var spec = ModelLibrary.Fire(preset);
-        return shape == null ? spec : spec.WithShape(shape);
     }
 }

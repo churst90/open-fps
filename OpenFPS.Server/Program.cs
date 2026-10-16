@@ -2224,7 +2224,7 @@ public class GameServer
         if (nearest == null) return false;
         ref var hob = ref world.Get<SoundEmitterComponent>(nearest.Value);
         string line;
-        try { line = HobControls.Press(hob.SoundId, Clock.WorldTime, out string key); hob.SoundId = key; }
+        try { line = HobControls.Press(hob.SoundId, Clock.WorldTime, ModelLibrary.Presets, out string key); hob.SoundId = key; }
         catch (ArgumentException) { return false; }
         hob.SynthRunning = HobKey.TryParse(hob.SoundId, out var state) && state.AnyOn;
         SyncAudioComponent(nearest.Value.Id);
@@ -2240,7 +2240,7 @@ public class GameServer
         if (!ModelKindTable.Is(soundId, ModelSynth.Flow)) return false;
         return TapIds.GetOrAdd(soundId!, static id =>
         {
-            try { return OpenFPS.Common.RunningWaterSpec.ByName(ModelKindTable.KindOf(id)!.Rest(id)).Tap != null; }
+            try { return OpenFPS.Common.ModelLibrary.Presets.Flow(ModelKindTable.KindOf(id)!.Rest(id)).Tap != null; }
             catch (Exception ex)
             {
                 ModelKindTable.Fail(id, ex.Message);

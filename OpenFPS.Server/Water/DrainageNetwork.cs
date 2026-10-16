@@ -161,7 +161,7 @@ public sealed class DrainageNetwork
     public sealed record Voice(Vector3 Position, float Yaw, GroundChannelKind Kind, float WidthMetres, float Slope, float LengthMetres,
                                float ReferenceLitresPerSecond, GroundCatchment Catchment, int Cell, float SquareMetres)
     {
-        public string SoundId => ModelKindTable.IdOf(ModelSynth.Flow, GroundChannels.Key(Kind, WidthMetres, Slope, LengthMetres, ReferenceLitresPerSecond, Catchment));
+        public string SoundId => GroundChannels.SoundId(Kind, WidthMetres, Slope, LengthMetres, ReferenceLitresPerSecond, Catchment);
     }
 
     public IReadOnlyList<Pond> Ponds => _ponds;

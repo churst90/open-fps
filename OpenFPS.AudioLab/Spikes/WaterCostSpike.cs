@@ -53,7 +53,7 @@ public static class WaterCostSpike
         if (shores)
             foreach (var key in ShoreSpec.Presets.Keys.Where(Wanted))
             {
-                var spec = ShoreSpec.ByName(key);
+                var spec = ModelLibrary.Presets.Shore(key);
                 float u = float.IsNaN(wind) ? spec.ReferenceWind : wind;
                 var geo = spec.DefaultGeometry;
                 float settle = spec.BreakRowMetres > 0f ? 25f : 5f;
@@ -66,7 +66,7 @@ public static class WaterCostSpike
         if (flows)
             foreach (var key in RunningWaterSpec.Presets.Keys.Where(Wanted))
             {
-                var spec = RunningWaterSpec.ByName(key);
+                var spec = ModelLibrary.Presets.Flow(key);
                 float q = spec.ReferenceFlow;
                 float rain = spec.CatchmentSquareMetres > 0f ? spec.ReferenceRainMmPerHour : 0f;
                 Measure("flow_" + key, $"{q:0.####} L/s", Math.Max(1, spec.Places), 2f, sec, reps, dir, () =>

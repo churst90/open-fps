@@ -442,8 +442,8 @@ public class RailAndSignalTests
     public void ABogieInATrainIsAsLoudAsItIsDeclared()
     {
         var p = TrainProfile.ByName("freight");
-        var layout = TrainLayout.Sources(p);
-        var train = new TrainSynth(p, Sr, 41) { Speed = p.TypicalSpeedMps };
+        var layout = TrainLayout.Sources(p, ModelLibrary.Presets);
+        var train = new TrainSynth(p, ModelLibrary.Presets, Sr, 41) { Speed = p.TypicalSpeedMps };
         int n = Sr / 2;
         var sum = new double[train.Sources.Count];
         for (int i = 0; i < n + Sr / 4; i++)
@@ -658,7 +658,7 @@ public class RailAndSignalTests
         float[] notchRpm = p.Consist[0].Vehicle.Traction!.NotchRpm;
         for (int n = 0; n < notchRpm.Length; n++)
         {
-            var train = new TrainSynth(p, Sr, 41) { Notch = n, Speed = 0f };
+            var train = new TrainSynth(p, ModelLibrary.Presets, Sr, 41) { Notch = n, Speed = 0f };
             int units = train.Diesels.Count;
             var lo = Enumerable.Repeat(float.MaxValue, units).ToArray();
             var hi = new float[units];
@@ -694,7 +694,7 @@ public class RailAndSignalTests
     [Fact]
     public void ATrainIsALineOfSourcesAndNotAThingAtAPlace()
     {
-        var train = new TrainSynth(TrainProfile.AmtrakDiesel, Sr, 41);
+        var train = new TrainSynth(TrainProfile.AmtrakDiesel, ModelLibrary.Presets, Sr, 41);
         var srcs = train.Sources;
         _o.WriteLine($"{TrainProfile.AmtrakDiesel.Name}: {srcs.Count} sources over {TrainProfile.AmtrakDiesel.LengthMetres:F0} m");
         // One per bogie at least, and they must be spread out along the train rather than stacked.
@@ -736,8 +736,8 @@ public class RailAndSignalTests
         foreach (var key in TrainProfile.Presets.Keys)
         {
             var p = TrainProfile.ByName(key);
-            var layout = TrainLayout.Sources(p);
-            var synth = new TrainSynth(p, 44100f, 3);
+            var layout = TrainLayout.Sources(p, ModelLibrary.Presets);
+            var synth = new TrainSynth(p, ModelLibrary.Presets, 44100f, 3);
             Assert.True(layout.Count == synth.Sources.Count,
                 $"{key}: layout lists {layout.Count} sources, the synth builds {synth.Sources.Count}");
             for (int i = 0; i < layout.Count; i++)

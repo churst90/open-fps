@@ -74,7 +74,7 @@ public class RenderFingerprintTests
         // A light-rail set passing at 15 m/s: every source of the train, summed, for three seconds.
         ["train.light_rail.pass"] = () =>
         {
-            var train = new TrainSynth(TrainProfile.ByName("light_rail"), Rate, 41) { Speed = 15f, Notch = 4f };
+            var train = new TrainSynth(TrainProfile.ByName("light_rail"), ModelLibrary.Presets, Rate, 41) { Speed = 15f, Notch = 4f };
             train.Place(-15.0 * 1.5);
             var x = new float[3 * Rate];
             for (int i = 0; i < x.Length; i++)

@@ -711,7 +711,7 @@ public sealed class RainSurvey
         {
             // A tree: its crown is its spec's, round the point the crown is placed at.
             FoliageSpec spec;
-            try { spec = FoliageSpec.ByName(sound[8..]); }
+            try { spec = ModelLibrary.Presets.Foliage(sound[8..]); }
             catch (Exception ex) { ModelKindTable.Fail(sound, ex.Message); return; }
             _things.Add(new Thing
             {

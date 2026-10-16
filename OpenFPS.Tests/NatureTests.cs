@@ -115,7 +115,7 @@ public class NatureTests
     [Fact]
     public void TwoFountainsAreTwoFountains()
     {
-        var spec = WaterFeatureSpec.ByName("park_fountain");
+        var spec = ModelLibrary.Presets.Water("park_fountain");
         var a = new FallingWaterSynth(spec, Rate, 1);
         var b = new FallingWaterSynth(spec, Rate, 2);
         double ab = 0, aa = 0, bb = 0;
@@ -160,13 +160,13 @@ public class NatureTests
     [Fact]
     public void WaterAndFireRenderAtTheLevelTheyDeclare()
     {
-        var water = WaterFeatureSpec.ByName("park_fountain");
+        var water = ModelLibrary.Presets.Water("park_fountain");
         var (wDb, wKnee) = Measure(new WaterVoiceState(water, Rate, 5, Vector3.Zero, Air), 8f);
         _o.WriteLine($"fountain {wDb:F1} dB against {water.SourceLevelDb:F1}, {wKnee:P3} on the knee");
         Assert.InRange(wDb, water.SourceLevelDb - 3f, water.SourceLevelDb + 3f);
         Assert.True(wKnee < 1e-4, $"the fountain sat on the soft ceiling {wKnee:P3} of the time");
 
-        var fire = FireSpec.ByName("fire_pit");
+        var fire = ModelLibrary.Presets.Fire("fire_pit");
         var (fDb, fKnee) = Measure(new FireVoiceState(fire, Rate, 5, Vector3.Zero, Air), 30f);
         _o.WriteLine($"fire {fDb:F1} dB against {fire.SourceLevelDb:F1}, {fKnee:P4} on the knee");
         Assert.InRange(fDb, fire.SourceLevelDb - 3f, fire.SourceLevelDb + 3f);
@@ -180,7 +180,7 @@ public class NatureTests
     {
         Assert.Equal(1f, PhysicalVoiceState.HeadroomGain(VehicleProfile.PeakHeadroomDb), 4);
         Assert.Equal(1f, PhysicalVoiceState.HeadroomGain(10f), 4);
-        float fire = FireSpec.ByName("fire_pit").PeakHeadroomDb;
+        float fire = ModelLibrary.Presets.Fire("fire_pit").PeakHeadroomDb;
         Assert.Equal(MathF.Pow(10f, (fire - VehicleProfile.PeakHeadroomDb) / 20f), PhysicalVoiceState.HeadroomGain(fire), 3);
     }
 
@@ -188,7 +188,7 @@ public class NatureTests
     [Fact]
     public void AFirePuffsAtTheRateItsWidthSets()
     {
-        var spec = FireSpec.ByName("fire_pit");
+        var spec = ModelLibrary.Presets.Fire("fire_pit");
         var fire = new FireSynth(spec, Rate, 3) { CracklePart = 0f, FizzPart = 0f, SteamPart = 0f, SettlePart = 0f };
         int hop = Rate / 50;
         var env = new List<double>();
@@ -221,8 +221,8 @@ public class NatureTests
     [Fact]
     public void WetterWoodCracklesMore()
     {
-        var dry = new FireSynth(FireSpec.ByName("fire_pit") with { Moisture = 0.12f }, Rate, 1);
-        var wet = new FireSynth(FireSpec.ByName("fire_pit") with { Moisture = 0.35f }, Rate, 1);
+        var dry = new FireSynth(ModelLibrary.Presets.Fire("fire_pit") with { Moisture = 0.12f }, Rate, 1);
+        var wet = new FireSynth(ModelLibrary.Presets.Fire("fire_pit") with { Moisture = 0.35f }, Rate, 1);
         Assert.True(wet.CrackleRate > 1.5f * dry.CrackleRate);
     }
 
@@ -236,7 +236,7 @@ public class NatureTests
     {
         float Level(float wind)
         {
-            var tree = new FoliageSynth(FoliageSpec.ByName("park_tree"), Rate, 9) { Wind = wind };
+            var tree = new FoliageSynth(ModelLibrary.Presets.Foliage("park_tree"), Rate, 9) { Wind = wind };
             double sum = 0;
             int n = 0;
             for (int i = 0; i < Rate * 12; i++)
@@ -256,9 +256,9 @@ public class NatureTests
     [Fact]
     public void APineSighsAndDoesNotRustle()
     {
-        var pine = new FoliageSynth(FoliageSpec.ByName("pine"), Rate, 1);
+        var pine = new FoliageSynth(ModelLibrary.Presets.Foliage("pine"), Rate, 1);
         Assert.Equal(0f, pine.StrikesPerSecond(5f));
-        var lime = new FoliageSynth(FoliageSpec.ByName("park_tree"), Rate, 1);
+        var lime = new FoliageSynth(ModelLibrary.Presets.Foliage("park_tree"), Rate, 1);
         Assert.True(lime.StrikesPerSecond(5f) > 1000f);
         Assert.Equal(0f, lime.StrikesPerSecond(0.5f));
     }
@@ -371,7 +371,7 @@ public class NatureTests
     [Fact]
     public void TheFountainMovesAsRecordedFountainsDo()
     {
-        var water = new FallingWaterSynth(WaterFeatureSpec.ByName("park_fountain"), TextureStatistics.Rate, 3);
+        var water = new FallingWaterSynth(ModelLibrary.Presets.Water("park_fountain"), TextureStatistics.Rate, 3);
         var x = new float[TextureStatistics.Rate * 20];
         for (int i = 0; i < x.Length; i++)
         {
@@ -394,7 +394,7 @@ public class NatureTests
     [Fact]
     public void AFountainsTapsAreItsWaterWhereItLands()
     {
-        var spec = WaterFeatureSpec.ByName("park_fountain");
+        var spec = ModelLibrary.Presets.Water("park_fountain");
         Assert.Equal(5, spec.Taps.Length);
         Assert.All(spec.Falls, f => Assert.InRange(f.Tap, 0, spec.Taps.Length - 1));
         Assert.Contains(spec.Falls, f => f.Onto == WaterSurface.Rock);
@@ -490,7 +490,7 @@ public class NatureTests
     [InlineData(4.5f)]
     public void ATreeRustlesAsRecordedLeavesDo(float wind)
     {
-        var tree = new FoliageSynth(FoliageSpec.ByName("park_tree"), TextureStatistics.Rate, 5) { Wind = wind };
+        var tree = new FoliageSynth(ModelLibrary.Presets.Foliage("park_tree"), TextureStatistics.Rate, 5) { Wind = wind };
         var x = new float[TextureStatistics.Rate * 20];
         for (int i = 0; i < x.Length; i++)
         {
@@ -509,7 +509,7 @@ public class NatureTests
     [Fact]
     public void AFireFizzesBetweenItsCracks()
     {
-        var fire = new FireSynth(FireSpec.ByName("fire_pit"), TextureStatistics.Rate, 7);
+        var fire = new FireSynth(ModelLibrary.Presets.Fire("fire_pit"), TextureStatistics.Rate, 7);
         var x = new float[TextureStatistics.Rate * 20];
         for (int i = 0; i < x.Length; i++)
         {
@@ -563,7 +563,7 @@ public class NatureTests
     [Fact]
     public void ATapVoiceRendersAgainstTheWholeFountain()
     {
-        var spec = WaterFeatureSpec.ByName("park_fountain");
+        var spec = ModelLibrary.Presets.Water("park_fountain");
         var shared = new WaterFeatureVoice("park_fountain/test", spec, Rate, 1);
         var tap = new WaterTapState(shared, 2, Rate, Vector3.Zero, Air);
         var whole = new WaterVoiceState(spec, Rate, 1, Vector3.Zero, Air);
@@ -579,7 +579,7 @@ public class NatureTests
     {
         // Over 10 ms windows a fountain stays near a wash within a window (recordings 3.0-3.4 in 2-8 kHz);
         // what moves is the envelope from window to window.
-        var water = new FallingWaterSynth(WaterFeatureSpec.ByName("park_fountain"), Rate, 3) { Wind = 3f };
+        var water = new FallingWaterSynth(ModelLibrary.Presets.Water("park_fountain"), Rate, 3) { Wind = 3f };
         var x = new float[Rate * 20];
         for (int i = 0; i < x.Length; i++)
         {
@@ -606,7 +606,7 @@ public class NatureTests
     [Fact]
     public void TheRustleIsNotAFewLoudPatches()
     {
-        var tree = new FoliageSynth(FoliageSpec.ByName("park_tree"), Rate, 5) { Wind = 4f };
+        var tree = new FoliageSynth(ModelLibrary.Presets.Foliage("park_tree"), Rate, 5) { Wind = 4f };
         var x = new float[Rate * 20];
         for (int i = 0; i < x.Length; i++)
         {
@@ -627,7 +627,7 @@ public class NatureTests
     {
         // The boughs stand round the crown (FoliageSynth.BoughOffset, where they are also heard from);
         // along the wind, the most upwind and the most downwind are most of a crown apart.
-        var spec = FoliageSpec.ByName("park_tree");
+        var spec = ModelLibrary.Presets.Foliage("park_tree");
         var (dx, dz) = Air.Wind.At(0).Downwind;
         float Along(int b) { var o = FoliageSynth.BoughOffset(spec, b); return o.X * dx + o.Z * dz; }
         int up = Enumerable.Range(0, FoliageSynth.Boughs).OrderBy(Along).First();
@@ -706,7 +706,7 @@ public class NatureTests
                           .Select(b => WaterFeatureVoice.ParseKey(prefabs[b.Prefab].GetProperty("SoundId").GetString(), out var p, out var f, out int t)
                                        ? (Preset: p, Feature: f, Tap: t) : throw new Xunit.Sdk.XunitException($"{b.Prefab} is not a water tap"))
                           .ToList();
-        var fountain = WaterFeatureSpec.ByName(taps[0].Preset);
+        var fountain = ModelLibrary.Presets.Water(taps[0].Preset);
         Assert.Equal(Enumerable.Range(0, fountain.Taps.Length), taps.Select(t => t.Tap).OrderBy(t => t));
         Assert.Single(taps.Select(t => (t.Preset, t.Feature)).Distinct());
 
@@ -717,8 +717,8 @@ public class NatureTests
             object model = kind switch
             {
                 "water" => fountain,
-                "fire" => FireSpec.ByName(key),
-                "foliage" => FoliageSpec.ByName(key),
+                "fire" => ModelLibrary.Presets.Fire(key),
+                "foliage" => ModelLibrary.Presets.Foliage(key),
                 _ => throw new Xunit.Sdk.XunitException($"{src.Prefab} names '{sound}', which is no nature model"),
             };
             Assert.NotNull(model);

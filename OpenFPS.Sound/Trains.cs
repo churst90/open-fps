@@ -339,7 +339,9 @@ public static class TrainLayout
          + (v.Wheels.TreadBraked ? 9f : 0f)
          + p.Track.RoughnessDb + p.Track.StructureDb;
 
-    public static IReadOnlyList<Entry> Sources(TrainProfile p)
+    /// <summary>Every source of a consist, in the order the server places them. The signals' levels are their
+    /// models', from <paramref name="presets"/> (the catalogue's).</summary>
+    public static IReadOnlyList<Entry> Sources(TrainProfile p, IPresets presets)
     {
         var list = new List<Entry>();
         float along = 0f;
@@ -380,24 +382,24 @@ public static class TrainLayout
                                                along + v.LengthMetres * 0.18f, 4.6f, 0.8f, tr.Steam.MotionDb + 6f));
                             break;
                     }
-                    // The signals' levels are their own models' (ModelLibrary), so a tram's two-chime
+                    // The signals' levels are their own models' (the catalogue's), so a tram's two-chime
                     // horn is placed as the 124 dB it is and not as a freight horn's 139.
                     if (tr.HornKey != null && !horn)
                     {
                         horn = true;
                         list.Add(new Entry(list.Count, Kind.Horn, $"{v.Name} #{unit + 1} horn", along + 2.5f, 4.8f, 0.6f,
-                                           ModelLibrary.Horn(tr.HornKey).ReferenceDb));
+                                           presets.Horn(tr.HornKey).ReferenceDb));
                     }
                     if (tr.Steam?.WhistleKey is { } wk && !whistle)
                     {
                         whistle = true;
                         list.Add(new Entry(list.Count, Kind.Whistle, $"{v.Name} #{unit + 1} whistle", along + v.LengthMetres * 0.55f, 4.4f, 0.5f,
-                                           ModelLibrary.Whistle(wk).ReferenceDb));
+                                           presets.Whistle(wk).ReferenceDb));
                     }
                     if ((tr.BellKey ?? tr.Steam?.BellKey) is { } bk && !bell)
                     {
                         bell = true;
-                        var bellSpec = ModelLibrary.Bell(bk);
+                        var bellSpec = presets.Bell(bk);
                         list.Add(new Entry(list.Count, Kind.Bell, $"{v.Name} #{unit + 1} bell", along + 1.8f, 3.2f, 0.4f,
                                            bellSpec.ReferenceDb, MathF.Max(VehicleProfile.PeakHeadroomDb, bellSpec.PeakHeadroomDb)));
                     }

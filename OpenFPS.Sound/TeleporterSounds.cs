@@ -52,7 +52,7 @@ public static class TeleporterSounds
     /// <summary>A teleporter sound no level is declared for: logged once by key, and placed as the ready hum.</summary>
     private static float Unknown(string kind)
     {
-        ModelKindTable.Fail(Key(kind), "is a teleporter sound with no level: placed at the ready hum's 56 dB");
+        ModelFailures.Fail(Key(kind), "is a teleporter sound with no level: placed at the ready hum's 56 dB");
         return 56f;
     }
 
