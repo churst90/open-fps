@@ -22,6 +22,9 @@ Recent work, newest first. `git log` has the rest.
   player hears or is told changes: the moved files are as they were, and the spoken-lines replay passes
   unchanged. The wire hash changes, as four of the files left it, so the server and the Windows client go out
   together.
+- Snow, ice, oak, pine and maple have names underfoot (docs/MATTER.md 2.4), as Cody approved: "snow", "ice" and,
+  for the solid timbers, "boardwalk" as plain wood is, where each was "outside". Plywood and MDF are sheets that
+  do not lie open to the weather and have none. No map lays any of them as ground yet, so no walk's lines change.
 - The glass's landings fall through the one air, 1.204 kg/m³, where they kept their own 1.2 (docs/PHYSICS_BOUNDARY.md
   16.6; Cody approved). An annealed pane's landing re-rolls: each of the game's variants moves up to 5.6 dB in an
   octave band, their mean over 64 variants within 0.46 dB; the break, a hole and a tempered landing move 0.03 to

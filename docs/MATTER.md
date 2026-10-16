@@ -291,12 +291,15 @@ Mechanical Engineers (table 3.2.1) is recalled to hold the same metal, glass and
 #### What a material is to a player (2026-10-16)
 
 Five places decided by a material's name; they read a property now, so every material that has it gets the
-behaviour (docs/ENGINE_PACKAGES.md 3.1). Every row answers as its name did, but laminated glass, which is glass.
+behaviour (docs/ENGINE_PACKAGES.md 3.1). Every row answered as its name did, but laminated glass, which is glass;
+snow, ice and solid timber were given ground names after.
 
 - `GroundName`: what open ground of it is called to someone standing on it, where no named place is over them.
-  Concrete "sidewalk", Asphalt "road", Grass "grass", Dirt "dirt", Gravel "gravel", Sand "sand", Wood "boardwalk",
-  Metal "metal grating", Water "water"; the rest have none, and the place is "outside". Set row by row, not by
-  "like": ice is water's face to sound, not water underfoot.
+  Concrete "sidewalk", Asphalt "road", Grass "grass", Dirt "dirt", Gravel "gravel", Sand "sand", Wood, Oak, Pine
+  and Maple "boardwalk", Metal "metal grating", Water "water", Snow "snow", Ice "ice" (snow, ice and the solid
+  timbers since 2026-10-16); the rest have none, and the place is "outside". Plywood and MDF are sheets that do not
+  lie open to the weather, so they are not ground. Set row by row, not by "like": ice is water's face to sound, not
+  water underfoot.
 - `Carriageway`: a road's carriageway is laid in it, so the driving aids take a box of it for a stretch of road.
   Asphalt alone: the generators lay the footways in concrete.
 - `Pales`: a material that is a row of pales, not a slab. Fence: a pale 65 mm by 3 mm between rails a metre apart,

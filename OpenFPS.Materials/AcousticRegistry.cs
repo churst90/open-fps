@@ -629,8 +629,15 @@ public static class AcousticRegistry
         Name("Gravel", "gravel");
         Name("Sand", "sand");
         Name("Wood", "boardwalk");
+        // Solid timber laid outdoors is boards whatever the tree. Plywood and MDF are sheets that do not lie open to the
+        // weather, so they are not ground.
+        Name("Oak", "boardwalk");
+        Name("Pine", "boardwalk");
+        Name("Maple", "boardwalk");
         Name("Metal", "metal grating");
         Name("Water", "water");
+        Name("Snow", "snow");
+        Name("Ice", "ice");
         var asphalt = reg["Asphalt"]; asphalt.Carriageway = true; reg["Asphalt"] = asphalt;
         // A palisade's pale: a pressed steel section about 65 mm wide and 3 mm thick, pinned between rails a metre apart.
         var fence = reg["Fence"]; fence.Pales = new PaleSection(0.065f, 0.003f, 1f); reg["Fence"] = fence;

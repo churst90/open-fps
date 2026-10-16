@@ -30,7 +30,8 @@ public class MaterialNameTests
 
     /// <summary>
     /// Every material in the table, with each of the five properties, answers as its name did: the place's name, a
-    /// road, a canopy, a window, a pale. The one row that differs is the rule doing its work: laminated glass is glass.
+    /// road, a canopy, a window, a pale. The rows that differ are the rule doing its work (laminated glass is glass) and
+    /// the ground names given since (snow, ice, solid timber).
     /// </summary>
     [Fact]
     public void EachMaterialAnswersAsItsNameDid()
@@ -48,7 +49,13 @@ public class MaterialNameTests
             if (AcousticRegistry.IsGlass(name) != OldGlazing(name)) differ.Add($"{name}: glazing {AcousticRegistry.IsGlass(name)}, before {OldGlazing(name)}");
             if ((p.Pales != null) != OldPale(name)) differ.Add($"{name}: pales {p.Pales}, before {OldPale(name)}");
         }
-        Assert.Equal(new[] { "LaminatedGlass: glazing True, before False" }, differ);
+        // The rest are the names the table gave since (Cody, 2026-10-16): snow, ice and solid timber were "outside".
+        Assert.Equal(new[]
+        {
+            "Ice: said 'ice', said 'outside' before", "LaminatedGlass: glazing True, before False",
+            "Maple: said 'boardwalk', said 'outside' before", "Oak: said 'boardwalk', said 'outside' before",
+            "Pine: said 'boardwalk', said 'outside' before", "Snow: said 'snow', said 'outside' before",
+        }, differ.OrderBy(d => d, StringComparer.Ordinal));
     }
 
     /// <summary>A fence struck is the pale it always was: 65 mm by 3 mm, a metre between its rails.</summary>
