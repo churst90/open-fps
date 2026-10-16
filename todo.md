@@ -702,7 +702,8 @@ phrases: in `/edit build column 0.3 by 3 ahead 2` the 2 is read as a size and th
 ### The ground reflection, done properly (discussed 2026-10-06)
 Built 2026-10-16, unheard (docs/CLIENT_NOTES.md, "The ground by its impedance"): Delany-Bazley
 impedance from Nord2000's flow resistivities, the spherical wave's reflection, Clifford and Lataitis'
-coherence; it only takes from the approved copy. Left:
+coherence; it only takes from the approved copy. Asphalt is dense asphalt, Nord2000's H, since 2026-10-16
+(Cody): water in a road's gutter keeps its top. Left:
 - what the law would add (the far top over any ground, water and concrete at a hundred metres, 1 to 4 dB),
   held back as approved (Cody's call);
 - roughness and the scattered share (the 20 dB floor stands in); the ground mixed over the Fresnel zone

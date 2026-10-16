@@ -160,6 +160,23 @@ public class GroundAnswerTests
             }
     }
 
+    /// <summary>
+    /// Water at a road's face (a gutter, a drain's grate, a runnel, 1 to 10 cm up) heard by a standing ear 10 to 200 m
+    /// along the road: the city's roads are dense asphalt (Nord2000's H, Cody 2026-10-16), which takes at most a decibel
+    /// from any band. Class G, "most normal asphalt", took 2 to 10 dB off the top.
+    /// </summary>
+    [Fact]
+    public void ARoadKeepsTheTopOfWaterRunningInIt()
+    {
+        foreach (float hs in new[] { 0.01f, 0.03f, 0.05f, 0.1f })
+            foreach (float d in new[] { 10f, 25f, 50f, 100f, 150f, 200f })
+            {
+                var b = At("Asphalt", hs, d);
+                float least = MathF.Min(Db(b.ExcessLow), MathF.Min(Db(b.ExcessMid), Db(b.ExcessHigh)));
+                Assert.True(least > -1f, $"hs {hs} d {d}: {Db(b.ExcessLow):F2}/{Db(b.ExcessMid):F2}/{Db(b.ExcessHigh):F2} dB");
+            }
+    }
+
     /// <summary>A source 5 cm up over snow, from 300 m to 3 km: sound and ground never fall more than 20 dB under free
     /// field in any band, the copy and what is taken together.</summary>
     [Fact]
@@ -257,7 +274,7 @@ public class GroundAnswerTests
         (string Name, float Kpa)[] grounds =
         {
             ("Grass", 200f), ("Foliage", 31.5f), ("Dirt", 500f), ("Gravel", 500f), ("Sand", 300f), ("Snow", 12.5f),
-            ("Clay", 2000f), ("Asphalt", 20000f), ("Concrete", 200000f),
+            ("Clay", 2000f), ("Asphalt", 200000f), ("Concrete", 200000f),
             ("Water", float.PositiveInfinity), ("Ice", float.PositiveInfinity),
         };
         foreach (var (name, kpa) in grounds) Assert.Equal(kpa, AcousticRegistry.GetProperties(name).FlowResistivityKPa);

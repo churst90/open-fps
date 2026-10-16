@@ -603,8 +603,9 @@ public static class AcousticRegistry
         Flow("Snow", 12.5f);
         // Firm clay: NORD F, compacted dense ground; EPD's hard-packed sandy silt 800-2,500.
         Flow("Clay", 2000f);
-        // NORD G, most normal asphalt.
-        Flow("Asphalt", 20000f);
+        // NORD H, dense asphalt (Cody, 2026-10-16): the city's roads are a dense wearing course, not G's "most normal
+        // asphalt", which took 2-10 dB off the top of a gutter heard 25-200 m along the road it runs in.
+        Flow("Asphalt", 200000f);
         // NORD H, very hard and dense.
         Flow("Concrete", 200000f);
         // Water's characteristic impedance is about 3,500 times air's (1.48e6 against 413 Pa s/m): to a sound in air it

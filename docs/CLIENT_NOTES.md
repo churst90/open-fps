@@ -141,8 +141,16 @@ over and cancels part of the direct sound, which is a large part of why traffic 
 
 - The ground's materials carry a flow resistivity (Nord2000's classes; the sources are on
   `AcousticRegistry.AddGroundImpedance`): lawn 200, forest floor (Foliage) 31.5, dirt and gravel 500, sand 300,
-  snow 12.5, clay 2,000, asphalt 20,000, concrete 200,000 kPa s/m², water and ice rigid. Everything else has
+  snow 12.5, clay 2,000, asphalt 200,000, concrete 200,000 kPa s/m², water and ice rigid. Everything else has
   none and answers by its absorption, as before.
+- Asphalt is dense asphalt, Nord2000's class H (Cody, 2026-10-16); it was G's 20,000, "most normal asphalt".
+  Measured with AudioLab `--ground-answer` on Foundry Street, a standing ear along the road: at G the gutter,
+  the drain's grate and a runnel 1 cm over the road lost 1.6 to 3.1 dB of their top at 25 m, 3.1 to 4.4 at 50,
+  5.4 to 6.3 at 100 and 8.1 to 9.7 at 200 (and 0.4 of the middle at 200); at H they lose nothing at 25 to 100 m
+  and at most 0.2 dB of the top at 200. The survey's last row for the drain, 15 dB of the middle at 200 m, is
+  the dirt verge behind the kerb, where the bounce lands for an ear to the south. A car (i4_midsize at 50 km/h,
+  exhaust 0.3 m up) heard along the road is the same to 0.05 dB at 4.5 to 50 m, and at 100 and 200 m keeps 0.1
+  and 0.4 dB more of its top and 0.2 more of its middle at 200 m than at G.
 - `GroundAnswer` (OpenFPS.Acoustics): Delany and Bazley's impedance; the spherical wave's reflection,
   Q = Rp + (1 - Rp) F(w), with Humlicek's W4 for the Faddeeva function; Clifford and Lataitis' coherence as
   before. Sound and real ground carry 1 + |Qs|² + 2 C Re(Qs e^(ikΔ)) over free field, judged over four
@@ -157,8 +165,9 @@ over and cancels part of the direct sound, which is a large part of why traffic 
   the far top over any ground, and water and concrete in the middle at a hundred metres, stay as they were
   though the law would lift them 1 to 4 dB (turbulence makes the top add as power, and the old law gave
   every surface asphalt's fall with range): a question for Cody.
-- Roads, car parks and hard floors: asphalt within 0.6 dB in every band for a source 0.3 m and more up and a
-  standing ear from 2 to 200 m, concrete and water unchanged (GroundAnswerTests holds 0.75 dB). Tile, marble,
+- Roads, car parks and hard floors: asphalt (now concrete's class) and concrete unchanged for a source 0.3 m and
+  more up and a standing ear from 2 to 200 m, and water too (GroundAnswerTests holds 0.75 dB); water running at a
+  road's face, 1 to 10 cm up, within a decibel from 10 to 200 m (`ARoadKeepsTheTopOfWaterRunningInIt`). Tile, marble,
   wood, brick and carpet have no flow resistivity and are exactly as before.
 - Where it shows: the bounce lands near the lower end of the path, so it is the ground under a low source
   that matters. A car on Alder Street heard from Elm Park bounces on the pavement's concrete: no change.

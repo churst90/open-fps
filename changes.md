@@ -22,6 +22,12 @@ Recent work, newest first. `git log` has the rest.
   player hears or is told changes: the moved files are as they were, and the spoken-lines replay passes
   unchanged. The wire hash changes, as four of the files left it, so the server and the Windows client go out
   together.
+- The city's roads are dense asphalt, Nord2000's class H (200,000 kPa s/m²), where they were G's 20,000, "most
+  normal asphalt" (docs/CLIENT_NOTES.md, "The ground by its impedance"; Cody chose H). A gutter, a drain's grate
+  and a runnel heard along Foundry Street lost 2 to 10 dB of their top at 25 to 200 m to the road; now at most
+  0.2 dB. A car heard along the road is the same to 0.05 dB within 50 m and keeps up to 0.4 dB more of its top at
+  200 m. No stored data changes; the wire hash changes, and the door renders are made again.
+
 - Materials are told by what they are, not by their names (docs/ENGINE_PACKAGES.md, stage 1). Five places decided
   by a material's name: the place's name underfoot, the driving aids' road, the rain's canopy, the editor's windows
   and a shape's glass, and a struck fence's pale. Each reads a property of the material table now, so a material
