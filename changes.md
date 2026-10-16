@@ -4,6 +4,9 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Package stage 7's clean half finished: the listening-level calibration (/listening) is in
+  `OpenFPS.Accessibility`, playing its cues through `IUiCues` as the lists do; Accessibility now references
+  Models and Sound. Nothing a player hears or is told changes, and the wire hash does not.
 - Library stage 5's rest (docs/SOUND_LIBRARY_BOUNDARY.md 18.8). Nothing a player hears changes. The world's air
   (`Atmosphere`), the mixer's rate, how a world is heard (`HearingSettings`: /levels, /ear, /listening), the
   console's levers (`MixSettings`: /tail, /copies, /echoes, /cabin, /valveflow, /enginedetail), the voice chat's

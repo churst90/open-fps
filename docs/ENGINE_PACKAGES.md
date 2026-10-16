@@ -918,6 +918,14 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   - The spoken-lines replay passes unregenerated, line for line, and with `DOTNET_PROCESSOR_COUNT=4`. So do the
     guards, the stage's four checks and the 40 classes that name a moved type (849 tests), and the replays with
     four processors (60).
+  - **`ListeningCalibration` moved after (2026-10-16), eleven of the twelve.** `git mv` to Accessibility with
+    two lines changed: it takes an `IUiCues` where it took `UiSounds`, as the lists do, and the game hands it
+    the same `UiSounds`. It reads `Speech` (Models) and the hearing it sets (`HearingSettings`, `EarModel`,
+    `Loudness`: Sound), both under its layer, so Accessibility now references Models and Sound and nothing
+    needed an interface of its own. No crossing came or went (the packages ratchet's 1,178, the library's 358,
+    the physics survey's 15); the two ratchets' file lists moved the row. The wire hash does not change:
+    Accessibility is not in it. `ListeningCalibrationTests` and the spoken-lines replay pass unchanged.
+    `DrivingCuePlanner` still waits on stages 4 and 5.
 
 ### Stage 8: Editor (1 to 2 sessions)
 

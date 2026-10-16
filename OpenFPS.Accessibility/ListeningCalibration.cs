@@ -23,7 +23,7 @@ public sealed class ListeningCalibration
 
     private readonly HearingSettings _hearing;
     private readonly ISpeechOutput _speech;
-    private readonly UiSounds? _ui;
+    private readonly IUiCues? _ui;
     private readonly Action<string, float> _play;
     private readonly Action _stop;
     private readonly Action _save;
@@ -32,7 +32,7 @@ public sealed class ListeningCalibration
     private double _nextAt;
 
     /// <param name="hearing">The hearing of the world it calibrates (AudioEngineFacade.Hearing).</param>
-    public ListeningCalibration(HearingSettings hearing, ISpeechOutput speech, UiSounds? ui, Action<string, float> play, Action stop,
+    public ListeningCalibration(HearingSettings hearing, ISpeechOutput speech, IUiCues? ui, Action<string, float> play, Action stop,
                                 Action save, Func<(string SoundId, double Seconds)>? line = null)
     {
         _hearing = hearing;

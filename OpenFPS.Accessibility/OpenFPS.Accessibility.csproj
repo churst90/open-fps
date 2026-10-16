@@ -3,19 +3,24 @@
   <!-- How a player who cannot see is told the world (docs/ENGINE_PACKAGES.md, 3.6 and stage 7): the keys the
        game knows, the speech output, the beacons' categories, the coordinates as a player reads them, the
        painted lines from the driver's seat, the turn narration, a zone held before it is said, the
-       driving cues' sounds, the spoken lists, and what each interface sound means (the client plays them
-       through IUiCues). The aids that read the client's world (the tracker, sight, beacons, stairs, wall
-       bumps, the driving aids) join it in stage 9, once they read a scene view.
+       driving cues' sounds, the spoken lists, what each interface sound means (the client plays them through
+       IUiCues), and the listening-level calibration. The aids that read the client's world (the tracker,
+       sight, beacons, stairs, wall bumps, the driving aids) join it in stage 9, once they read a scene view.
 
-       It uses nothing of ours yet; its layer may reference the packages below it, never OpenFPS.Common. The
-       client and the server read it; it is not in the wire hash (decision 11). Namespaces are those the files
-       had, as for the other moves. -->
+       It uses Models (the calibration's reference voice, Speech) and Sound (the hearing it sets); its layer
+       may reference the packages below it, never OpenFPS.Common. The client and the server read it; it is not
+       in the wire hash (decision 11). Namespaces are those the files had, as for the other moves. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
+    <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- SpeechDispatcherOutput logs the backend it found or did not. -->

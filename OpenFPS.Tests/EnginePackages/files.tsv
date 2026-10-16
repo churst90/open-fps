@@ -6,6 +6,7 @@ OpenFPS.Accessibility/Keys/GameKey.cs	Accessibility
 OpenFPS.Accessibility/Keys/KeyModifiers.cs	Accessibility	
 OpenFPS.Accessibility/LaneGuide.cs	Accessibility	
 OpenFPS.Accessibility/ListMenu.cs	Accessibility	
+OpenFPS.Accessibility/ListeningCalibration.cs	Accessibility	
 OpenFPS.Accessibility/PlayerCoordinates.cs	Accessibility	
 OpenFPS.Accessibility/Speech/ISpeechOutput.cs	Accessibility	
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	Accessibility	
@@ -122,7 +123,6 @@ OpenFPS.Client.Core/EditorKeys.cs	Editor
 OpenFPS.Client.Core/EditorValuePrompt.cs	Editor	
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	game	
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	game	
-OpenFPS.Client.Core/ListeningCalibration.cs	Accessibility	
 OpenFPS.Client.Core/LocalPlayerController.cs	game	
 OpenFPS.Client.Core/LocalPlayerState.cs	game	
 OpenFPS.Client.Core/LoudspeakerVoices.cs	Audio	programs rendered through their speakers
