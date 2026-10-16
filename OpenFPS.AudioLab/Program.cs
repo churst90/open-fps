@@ -228,6 +228,7 @@ string[] usage =
     "                                                old box path and triangle world side by side, every difference",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
+    "  --subnormals [sec=30]                         which models ring down into subnormal numbers, and what flushing saves",
     "  --eq-onset [out=FILE]                         THREE_EQ at a voice's start and when its gains change",
     "  --quality resampler|orbit|echo|ceiling|quant|lsb|output|limiter|thunderfile|scene=NAME [out=DIR] [tag=]",
     "                                                what the mixer does to a sound: resampler, binaural steps, limiter (tools/audio_quality.py)",
@@ -340,6 +341,11 @@ if (args.Contains("--speech-lines"))
 if (args.Contains("--eq-onset"))
 {
     Environment.Exit(EqOnsetSpike.Run(args));
+}
+
+if (args.Contains("--subnormals"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.SubnormalSpike.Run(args));
 }
 
 if (args.Contains("--dsp-order"))

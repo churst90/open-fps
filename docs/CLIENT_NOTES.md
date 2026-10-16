@@ -325,6 +325,11 @@ fade is rendered with the rest of the ring, up to 0.7 s ahead; released when it 
 until 2026-10-07, the voice was stopped at full level and the fade never heard. That was the fountain
 and the crossing bell "cutting out" each time the budget gave them up.
 
+The workers treat subnormal numbers as zero (FlushToZero, 2026-10-16), as FMOD's mixer thread already did.
+A bell or a resonator ringing down to silence sits on them, and an Intel processor works on them about a
+hundred times slower; a voice that did would starve the others. Nothing a float sample can hold is that
+small, so no sound changes (docs/AUDIO_QUALITY_2026-10-06.md, row 14).
+
 An engine heard 15 dB or more under the loudest machine runs at reduced detail (EngineDetail, 2026-10-09;
 FmodAudioProvider.ChooseEngineDetail), and goes back to full within 12 dB. Reduced is a twin of the engine
 at half the rate, interpolated back up (EngineSynth.Detail.cs); the voice's tyres, fan and body stay at

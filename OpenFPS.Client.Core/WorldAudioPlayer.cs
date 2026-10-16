@@ -245,6 +245,7 @@ public sealed class WorldAudioPlayer
 
     private void Prewarmer()
     {
+        OpenFPS.Client.Core.Platform.FlushToZero.ThisThread("Door prewarm");
         do
         {
             while (_toPrewarm.TryDequeue(out var key))
@@ -374,7 +375,7 @@ public sealed class WorldAudioPlayer
                 {
                     var toRender = sound;
                     int seed = message.Seed;
-                    System.Threading.Tasks.Task.Run(() => _rendered.Enqueue(AtMixerRate(id, RenderOne(toRender, seed))));
+                    OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a sound's render", () => _rendered.Enqueue(AtMixerRate(id, RenderOne(toRender, seed))));
                 }
                 // It waits for its buffer: dropping every first hearing would silence whatever is rare
                 // (four seed variants, each a first hearing once).
@@ -1486,7 +1487,7 @@ public sealed class WorldAudioPlayer
         {
             var sound = item.Sound;
             int seed = item.Seed;
-            System.Threading.Tasks.Task.Run(() => _rendered.Enqueue(AtMixerRate(id, Diffuse(RenderOne(sound, seed), step / 4f, seed))));
+            OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a sound's render", () => _rendered.Enqueue(AtMixerRate(id, Diffuse(RenderOne(sound, seed), step / 4f, seed))));
         }
         return id;
     }

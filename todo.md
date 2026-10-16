@@ -504,6 +504,11 @@ path trims and other rooms' fields on the thread pool, all 2026-10-12). Left, ea
 - Smaller, and within a frame or two: each new voice's first path (`FirstAnswer`, the hand-rolled tracer,
   1-4 ms, 10-20 cold), and the first frame of a session compiling the audio code (170-190 ms in the train
   lab).
+- Subnormal numbers: the threads that render ahead flush them since 2026-10-16 (`FlushToZero`), as FMOD's
+  mixer thread already did. Left: AudioLab `--subnormals` on an Intel machine, for the plain column the AMD
+  one cannot show, and on Windows, to see that FMOD's mixer thread flushes there too. Thunder and the glass
+  fracture split a render across the thread pool (Parallel.For), and only the thread that started one is
+  flushed; the others are as the pool left them.
 
 ### Acoustics
 - The room answering at once (early tail): clap in a main-street lobby and in flat 01F. Is 20-100 ms

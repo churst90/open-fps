@@ -44,7 +44,7 @@ internal sealed class LoudspeakerVoices
         if (_failed.Contains(key) || !_rendering.Add(key)) return false;
 
         if (RenderInPlace) { _done.Enqueue((key, RenderOne(key, spec, program, loop))); Drain(); }
-        else System.Threading.Tasks.Task.Run(() => _done.Enqueue((key, RenderOne(key, spec, program, loop))));
+        else OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a loudspeaker's render", () => _done.Enqueue((key, RenderOne(key, spec, program, loop))));
         if (_ready.TryGetValue(key, out r)) { render = r; return true; }
         return false;
     }

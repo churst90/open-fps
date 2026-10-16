@@ -40,7 +40,7 @@ changes approved sounds and needs listening rounds.
 | 11 | Steam Audio binaural frame steps. | Orbit at 360°/s: residual -95 dB under a 300 Hz tone; 90°/s: -103 dB; still: -107 dB. | No | None. Steam Audio crossfades. | |
 | 12 | Voices' SoftCeiling. | 0 % of samples bent at cruise for nine engines; fire 0.001 % (-77 dB). | No | None | |
 | 13 | Noise generators. | System.Random (31-bit doubles) and xorshift generators, nothing shared between threads. | No | None | |
-| 14 | Denormals. | No flush-to-zero anywhere; glides toward zero and ringing resonators can sit on subnormals. Measured 2026-10-12 in the door models, on an Intel processor: a 1.9 s render took 431 s. Fixed there (`DoorPhysics.Rest`). The producers that run while playing are not measured. | Indirect (CPU, then starves) | Recommendation: measure | Small |
+| 14 | Denormals. | Glides toward zero and ringing resonators sit on subnormals. Measured 2026-10-12 in the door models, on an Intel processor: a 1.9 s render took 431 s (`DoorPhysics.Rest` since). Measured 2026-10-16 on AMD (AudioLab `--subnormals`): every model named below reaches them ringing down, and FMOD's mixer thread already flushes them. | Indirect (CPU, then starves) | Fixed 2026-10-16: the threads that render ahead flush them too (`FlushToZero`); no stored render changes | Small |
 
 ## 1. The textures are noise, not events
 
@@ -191,13 +191,41 @@ across them. Each place is an independent stream of the one synth, not a copy of
   512-sample control block (at most about 2 % a step). AircraftSynth and SmallMachineSynth apply gains
   from 64-sample slow ticks. VehicleSynth's squeal recomputes coefficients every 64 samples. All are
   small; ramp them if a model is reopened.
-- Denormals: measure the producer threads' time on a voice ringing down to silence. If it rises, add a
-  tiny offset or flush values under 1e-20 in the glides and resonators listed in the survey
-  (GroundReflection, BoundaryProximityProcessor, Modes, the all-passes). The door models' `Modes` are done
+- Denormals: done 2026-10-16, by the threads rather than the models. The door models' `Modes` came first
   (2026-10-12): on an Intel i7-13700HX the glass front door opened with a key took 431 s to render in a
   Release build, 485 s in Debug, and 10 s and 28 s with a floor of 1e-200 under each bank's pushed forces and
-  its states, every sample the same. An AMD processor hardly slows on subnormal numbers, which is why the
-  same test took 14 s on one. The measurement has to be made on an Intel machine.
+  its states, every sample the same; 14 s on AMD. That floor stays, and no other model has one.
+
+  Every thread that renders ahead of the mixer now treats subnormal numbers as zero, results and inputs
+  (flush-to-zero and denormals-are-zero, `FlushToZero` in OpenFPS.Native): the render pool's workers and
+  the door prewarm threads from their start, and on the thread pool a one-off sound's render, a
+  loudspeaker's and a voice's build (`VoiceBuilds`) while each runs, the thread handed back as it was.
+  .NET cannot reach the control register, so it goes through glibc's fegetenv and fesetenv on Linux (fenv_t
+  carries MXCSR by name at byte 28 on x86-64, FPCR first on ARM64) and the C runtime's `_controlfp_s` on
+  Windows; anywhere else it logs once and does nothing. On Linux a thread inherits the setting from the one
+  that starts it.
+
+  FMOD's mixer thread is not touched: it already runs with both on (MXCSR 0x9fe1 in our DSP callbacks,
+  measured with and without a sound device), so `GroundReflection`, `BoundaryProximityProcessor` and the
+  all-passes, which run there, were never slow in the game. Measured with AudioLab `--subnormals`
+  (Release, AMD Ryzen AI 9 HX 370, 20 s ring-downs, MXCSR's sticky flags read around every 64-sample block):
+
+  | Model, ringing down | Blocks on subnormals | Plain | Flushed |
+  |---|---|---|---|
+  | GroundReflection, the voice falls silent | 99.9 % | 33 ms | 11 ms |
+  | GroundReflection, the ground goes | 88 % from 2.4 s | 29 ms | 17 ms |
+  | BoundaryProximityProcessor, the mix falls silent | 100 % | 192 ms | 53 ms |
+  | BoundaryProximityProcessor, the walls go | 94 % from 1.3 s | 52 ms | 21 ms |
+  | EarDecorrelator's all-passes | 99.8 % | 17 ms | 12 ms |
+  | EchoDiffuser's all-passes | 99 % | 12 ms | 5 ms |
+  | The crossing gong's modes, struck once | 100 % | 83 ms | 26 ms |
+  | A bell voice switched off (Produce and Consume) | every render batch | 108 ms | 49 ms |
+  | Eight street engines (Produce and Consume) | every render batch | 12.3 s | 12.2 s |
+
+  Even on AMD a ring-down is two to four times faster flushed; the engines are not, and their output is the
+  same to the bit either way. The seventeen renders of the render fingerprint are the same to the bit made on
+  a flushed thread, the doors included (the knob and glass doors still meet subnormal numbers under their
+  floor, without effect). On an Intel processor the plain column should be far worse.
 - The mixer at 48 kHz: devices and PipeWire run at 48 kHz, the renders are 48 kHz, and the mixer is
   44.1 kHz. Moving it means every hard-coded 44100: Steam Audio's IPLAudioSettings in five places,
   TracedReverbDsp, EarDecorrelator, EarlyCopies, SynthProcessor, GranularProcessor, AmbisonicBedDsp,

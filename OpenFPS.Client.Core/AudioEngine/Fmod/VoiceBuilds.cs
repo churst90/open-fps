@@ -140,7 +140,7 @@ public sealed class VoiceBuilds
         int seed = emitter.Seed;
         _engines[emitter.EntityId] = new EngineBuild
         {
-            Task = System.Threading.Tasks.Task.Run(() => new EngineVoiceState(MachineRegistry.VehicleFor(key), rate, seed)),
+            Task = OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () => new EngineVoiceState(MachineRegistry.VehicleFor(key), rate, seed)),
             AskedAt = now,
         };
         return Taken.Making;
@@ -192,7 +192,7 @@ public sealed class VoiceBuilds
     private Task<PhysicalVoiceState?> Start(Recipe r)
     {
         var clock = _clock;
-        return System.Threading.Tasks.Task.Run(() => Make(r.Kind, r.Key, r.Seed, r.Lever, r.Rate, clock));
+        return OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () => Make(r.Kind, r.Key, r.Seed, r.Lever, r.Rate, clock));
     }
 
     /// <summary>
@@ -202,7 +202,7 @@ public sealed class VoiceBuilds
     public TrainVoiceState? Train(string preset, string train, int rate)
     {
         var clock = _clock;
-        var task = _trains.GetOrAdd(preset + "/" + train, shared => System.Threading.Tasks.Task.Run(() =>
+        var task = _trains.GetOrAdd(preset + "/" + train, shared => OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () =>
         {
             // The seed from the name's characters, not string.GetHashCode (randomised per process): every
             // client and every run hears the same train.

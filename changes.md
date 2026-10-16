@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- The threads that render ahead of the mixer treat subnormal numbers as zero (docs/AUDIO_QUALITY_2026-10-06.md,
+  row 14). A resonator or a glide ringing down to silence sits on numbers too small to be normal, and an
+  Intel processor works on those about a hundred times slower: a door once took seven minutes. The render
+  pool's workers and the door prewarm threads flush them from their start, and a one-off sound's render, a
+  loudspeaker's and a voice's build flush them while they run (`FlushToZero`: glibc's fesetenv on Linux, the
+  C runtime's `_controlfp_s` on Windows). FMOD's mixer thread already did, so the ground reflection, the
+  near-wall copies and the all-passes, which run there, were never slow. Measured on AMD with AudioLab
+  `--subnormals`: a bell ringing down renders two to four times faster flushed, and the engines no faster.
+  No model was touched and no stored render changes: the seventeen fingerprint renders are the same to the
+  bit made flushed, the doors included, whose floor (`DoorPhysics.Rest`) stays. The wire hash does not change.
+
 - A door's jamb is not a wall. The near-wall copies took any surface a probe met within 3 m as a whole
   wall, so standing in a doorway put a copy of everything at each ear off the jambs and the head. Each probe
   now looks again across the surface it met, on its plane, half and a whole first Fresnel zone each way, and

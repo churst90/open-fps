@@ -220,6 +220,7 @@ OpenFPS.Native/FmodNative/fmod_dsp.cs	Native
 OpenFPS.Native/FmodNative/fmod_errors.cs	Native	
 OpenFPS.Native/FmodNative/fmod_studio.cs	Native	
 OpenFPS.Native/Platform/BackgroundPriority.cs	Native	
+OpenFPS.Native/Platform/FlushToZero.cs	Native	
 OpenFPS.Native/Platform/NativeAudioLibraries.cs	Native	
 OpenFPS.Native/SteamAudio/Phonon.cs	Native	
 OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	Native	

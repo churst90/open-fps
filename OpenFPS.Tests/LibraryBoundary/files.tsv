@@ -214,6 +214,7 @@ OpenFPS.Native/FmodNative/fmod_dsp.cs	lib	Native
 OpenFPS.Native/FmodNative/fmod_errors.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_studio.cs	lib	Native	
 OpenFPS.Native/Platform/BackgroundPriority.cs	lib	Native	
+OpenFPS.Native/Platform/FlushToZero.cs	lib	Native	
 OpenFPS.Native/Platform/NativeAudioLibraries.cs	lib	Native	
 OpenFPS.Native/SteamAudio/Phonon.cs	lib	Native	
 OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	lib	Native	
