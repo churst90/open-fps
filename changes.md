@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Materials are told by what they are, not by their names (docs/ENGINE_PACKAGES.md, stage 1). Five places decided
+  by a material's name: the place's name underfoot, the driving aids' road, the rain's canopy, the editor's windows
+  and a shape's glass, and a struck fence's pale. Each reads a property of the material table now, so a material
+  that has the property gets the behaviour whatever it is called. Every material answers as it did but laminated
+  glass, which is glass, and an alias answers as its material ("Steel" underfoot is metal grating). A guard keeps
+  new name tests out. Nothing heard changes; the wire hash changes, and the door renders are made again, the same.
+- Friction and restitution in the material table (docs/MATTER.md 2.4): static and sliding friction and the
+  coefficient of restitution, each the material against itself, with their sources. 22 materials have a friction
+  and glass a restitution; the rest are left empty rather than guessed. Nothing reads them until physics stage 4.
 - The threads that render ahead of the mixer treat subnormal numbers as zero (docs/AUDIO_QUALITY_2026-10-06.md,
   row 14). A resonator or a glide ringing down to silence sits on numbers too small to be normal, and an
   Intel processor works on those about a hundred times slower: a door once took seven minutes. The render

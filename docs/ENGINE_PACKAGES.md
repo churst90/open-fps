@@ -747,8 +747,40 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   - In a second commit, the twelve names: `Sightline.cs`, `WallBumps.cs`, `MapRepository.cs` and
     `PrefabValidator.cs` read the body's step, radius and mass and gravity from `BodyConstants`, where
     they read them by the game's names. The allowance is 1,289.
-  - **Not built yet:** the four name tests of 3.1 made to read properties, and friction and restitution as
-    columns with their sources.
+- **Built 2026-10-16, the name tests and the contact columns** (on Linux, in two commits on main `c8386406`).
+  - **The name tests.** A grep for comparisons with a material's name found five, not four; each reads a
+    property of the table now (docs/MATTER.md 2.4, "What a material is to a player"):
+
+    | What | Where | Reads now |
+    |---|---|---|
+    | A material's spoken name underfoot | `ClientAudioSystem.OutdoorNameFor` | `MaterialProperties.GroundName` |
+    | "Asphalt" means a road | `DrivingAids.NearestRoad`, `TryRoadAt` | `MaterialProperties.Carriageway` (`IsCarriageway`) |
+    | "Foliage" means a canopy | `SurfaceRaster.Of` | `Leaves` (`IsLeaves`) |
+    | "Glass" means a window | `WorldEditor.Glazing` | the glass family (`IsGlass`) |
+    | "Glass" means a glass surface of a shape | `Shapes.SlotSurfaces` (Geometry) | the family, passed in by `SolidSpec.OfShape`'s callers: Geometry holds no table |
+    | "Fence" means a pale | `StruckThings.Describe` (Sound) | `MaterialProperties.Pales`, the pale's section, which moved into the table |
+
+    Every row of the table answers as its name did but laminated glass, which is glass now (no map uses it), and
+    an alias answers as its material ("Steel" underfoot is metal grating). `MaterialNameTests` holds both, row by
+    row, and holds the fence's pale as it was. The lab's three copies (`DrivingSpike`, `BumpSpike`,
+    `GeometryParitySpike`) read the same properties.
+  - **The guard of section 11** (`MaterialNameTests.NoMaterialIsToldByItsName`): no file of the sorted projects
+    but the table compares anything with a material's name or an alias (an `==`, an `Equals`, a switch arm, a
+    `case`, an `is`), beyond four allowed: `SoundMappingService`'s wet footstep sets (a choice of recordings,
+    which stays), the concrete a path is laid in (`WorldEditor.Routes`, two), and the menu a sofa is listed under
+    (`WorldEditor.Menus`, "Audience"). "None" and "Generic", the table's words for no material and an unknown one,
+    are not counted. It reads names as the table spells them; lower-case words are other vocabularies (the
+    weather's "snow", OSM's "brick", a lock's "steel"). One name test is in lower case and so out of its sight:
+    `GroundWater.OfMaterial`, the runoff class by name (grass a lawn, foliage woods, dirt open ground, anything
+    else sealed). It wants a runoff cover in the table, and waits for stage 3, which moves the file.
+  - **Friction and restitution** (`StaticFriction`, `KineticFriction`, `Restitution`), each the material against
+    itself, so decision 2's pair rule gives a measured like-on-like pair back. 22 rows have a friction, one a
+    restitution (glass); the rest are empty, not guessed, and docs/MATTER.md 2.4 lists them with the sources.
+    Nothing reads them yet. `MaterialContactTests` holds every cell.
+  - The wire hash changes (Materials, Geometry, Sound and Common changed), and so does the door models'
+    fingerprint, which hashes `AcousticRegistry.cs`: every door render is made again, the same. Nothing heard
+    changes: the render fingerprint, the emitter streams, the spoken lines and the physics replays are as they were.
+    No crossing came or went (the packages survey still counts 1,289).
 
 ### Stage 2: Models (2 to 3 sessions)
 
@@ -894,7 +926,8 @@ beside physics 3 and 4 where the files allow; stage 9 follows library 6; stage 1
 - **Generators.** `city.json` and the places' maps are generated; a move that changes a generator's output changes
   the maps. Byte identity is the check.
 - **Strings.** Model ids, material names, sound ids and JSON keys are not seen by the reader. The model kind table
-  (audit P2) and the material table's aliases hold most of them; four name tests remain (3.1).
+  (audit P2) and the material table's aliases hold most of them; the name tests of 3.1 read properties since
+  2026-10-16, and `MaterialNameTests` keeps new ones out.
 - **Work in flight.** The audit's P3d step 6 and P4 came back as patches on 2026-10-12; physics stage 2 is next;
   the second half of geometry stage 6 is open. Each stage here is done when no branch is open on its files, and
   says so.

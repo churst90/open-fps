@@ -219,6 +219,90 @@ The estimates worth checking first, because a struck sound leans on them: cast i
 damping capacity), bronze's (0.0003, from bell partials' Q), laminated glass's (0.04, the middle of
 published PVB measurements), MDF's (0.025), and every soft and ground material's hardness.
 
+#### Friction and restitution (2026-10-16)
+
+Three columns physics stage 4 will read for every contact (docs/PHYSICS_BOUNDARY.md, stage 4). Nothing reads
+them yet, so nothing heard changed. Each is the material against itself, clean and dry: decision 2 of
+docs/ENGINE_PACKAGES.md section 13 combines a pair by the geometric mean of the two frictions and the larger of
+the two restitutions, so a like-on-like pair gives back the figure measured for it. Pairs the rule gets wrong
+(rubber on asphalt, a tyre on ice: `RoadSurfaces` holds them now, from Wong) go in a short table of measured pairs
+when stage 4 needs it.
+
+- `StaticFriction` and `KineticFriction`: coefficients of friction on itself. A range in the source is taken at
+  its middle.
+- `Restitution`: the coefficient of restitution on itself at a low speed (a few metres a second), where it does
+  not yet fall with speed.
+- An empty cell is null: no measurement was found, and none was guessed. A reader must not take it as zero.
+
+| Material | static | sliding | restitution | source |
+|---|---|---|---|---|
+| Metal | 0.74 | 0.57 | | RM, mild steel on mild steel |
+| Fence | 0.74 | 0.57 | | as Metal: galvanised mild steel, and every other figure of its row is Metal's |
+| Aluminium | 1.2 | 1.4 | | RM, 1.05 to 1.35 and 1.4: clean aluminium galls, so it slides harder than it starts. RM-E's incline in ordinary air gives 0.57 for the same pair |
+| CastIron | 1.1 | 0.15 | | RM: its graphite lubricates the slide |
+| Copper | 1.0 | | | RM |
+| Lead | 0.90 | | | RM-E |
+| Titanium | 0.36 | 0.30 | | RM, Ti-6Al-4V on itself, flat on flat |
+| Glass | 0.95 | 0.4 | 0.93 | RM, 0.9 to 1.0 and 0.4; TANG, glass beads onto a glass plate, 0.926 |
+| LaminatedGlass | 0.95 | 0.4 | | as Glass: its faces are float glass. Its restitution is the interlayer's as well, and unmeasured |
+| Concrete | | 0.65 | | RM-C, cement on cement blocks |
+| Brick | | 0.68 | | RM-C gives brick on brick twice, 0.7 and 0.65: the mean |
+| Granite | | 0.6 | | RM-C |
+| Wood | 0.38 | | | RM, wood on clean wood 0.25 to 0.5 |
+| Oak | 0.62 | 0.48 | | RM, along the grain (across it 0.54 and 0.32) |
+| Acrylic | 0.8 | | | RM, Plexiglas on Plexiglas |
+| Nylon | 0.2 | | | RM, 0.15 to 0.25 |
+| Rubber | 1.16 | | | ETB, which names no source of its own |
+| Dirt | 0.58 | | | GTD, loam 28 to 32 degrees (Minnesota DOT): tan 30 |
+| Sand | 0.57 | | | GTD, loose sand 29 to 30 degrees (Peck, Hanson and Thornburn): tan 29.5 |
+| Clay | 0.42 | | | GTD, clay 18 to 28 degrees (Minnesota DOT): tan 23. Clay has a cohesion besides, which this does not hold |
+| Gravel | 0.70 | | | GTD, loose sandy gravel 35 degrees (Carter and Bentley): tan 35 |
+| Ice | 0.3 | 0.035 | | ETB, ice on ice at -12 C; the table's ice is near -10 C |
+
+Empty, with no measurement of the material on itself found: StainlessSteel, Brass, Bronze, Marble, Sandstone,
+Tile, Pine, Maple, Plywood, MDF, Plastic, PVC, Polycarbonate, BootRubber, Foam, Leather, Skin, Audience, Carpet,
+Foliage, Fabric, Grass, Asphalt, Snow, Plaster, AcousticTile, GlassWool and Generic; and every restitution but
+glass's. Water is a liquid, and None is no material: they have neither. The soils' figures are a mass of the soil
+sheared on itself (the tangent of its drained friction angle), so they have no separate sliding figure.
+
+Restitution was the harder search. It is not one number for a material: it falls with speed once the contact
+yields (from well under a metre a second for mild steel), and a sphere on a thin plate loses energy to the plate
+(Sondergaard, Chaney and Brennen, J. Appl. Mech. 57 (1990) 694). Published measurements are mostly of a sphere
+on another material (glass on granite, brass or rubber blocks), which the rule cannot use.
+
+Sources, on the lines of `AcousticRegistry.AddContact`:
+
+- RM: R. Beardmore, Roymech, "Coefficient of friction" (archived 2019-02-01), compiled from Machinery's Handbook
+  (18th ed.), Kempe's Engineers Year Book (1980), Davis's Concise Metals Engineering Data Book (ASM) and Gieck's
+  Engineering Formulas (7th ed.); RM-E is its table for elements (an incline in air at room temperature and 50 %
+  humidity), RM-C its table for civil engineering materials (sliding).
+- ETB: The Engineering ToolBox, "Friction and friction coefficients" (2004). It names no source; its two figures
+  used here are the ones to replace first.
+- GTD: Geotechdata.info, "Angle of friction" (2013), a soil's drained friction angle by its USCS class, from Peck,
+  Hanson and Thornburn, Foundation Engineering (1974); Carter and Bentley, Correlations of Soil Properties (1991);
+  and Minnesota DOT, Pavement Design (2007).
+- TANG: Tang, Song, Dong and Song, "Measurement of restitution and friction coefficients for granular particles
+  and discrete element simulation for the tests of glass beads", Materials 12 (2019) 3170, table 3.
+
+The figures checked at those pages; the original handbooks were not opened. Marks' Standard Handbook for
+Mechanical Engineers (table 3.2.1) is recalled to hold the same metal, glass and oak figures, but was not checked.
+
+#### What a material is to a player (2026-10-16)
+
+Five places decided by a material's name; they read a property now, so every material that has it gets the
+behaviour (docs/ENGINE_PACKAGES.md 3.1). Every row answers as its name did, but laminated glass, which is glass.
+
+- `GroundName`: what open ground of it is called to someone standing on it, where no named place is over them.
+  Concrete "sidewalk", Asphalt "road", Grass "grass", Dirt "dirt", Gravel "gravel", Sand "sand", Wood "boardwalk",
+  Metal "metal grating", Water "water"; the rest have none, and the place is "outside". Set row by row, not by
+  "like": ice is water's face to sound, not water underfoot.
+- `Carriageway`: a road's carriageway is laid in it, so the driving aids take a box of it for a stretch of road.
+  Asphalt alone: the generators lay the footways in concrete.
+- `Pales`: a material that is a row of pales, not a slab. Fence: a pale 65 mm by 3 mm between rails a metre apart,
+  which a blow meets (`StruckThings.Describe`).
+- `Leaves` (a canopy, to the rain's surface map) and the glass family (`IsGlass`, the editor's windows and a
+  shape's glass surfaces) were there already.
+
 ## 3. Solids
 
 A solid is geometry (triangles, docs/GEOMETRY.md) plus its material. It has today: collision, footstep and
