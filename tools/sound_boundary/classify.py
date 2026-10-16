@@ -114,6 +114,7 @@ FILE_RULES = [
     (CO + 'Scopes.cs', 'b', '', 'weapon UI'),
     (CO + 'SharedMovementEngine.cs', 'b', '', 'player movement'),
     (CO + 'PhysicsUtils.cs', 'b', '', 'player movement'),
+    (CO + 'PhysicsViews.cs', 'b', '', "player movement: open-fps's world and a client's snapshot as the physics sees them"),
     (CO + 'PhysicsConstants.cs', 'b', '', 'player movement'),
     (CO + 'GroundProbeMemo.cs', 'b', '', 'server movement'),
     (CO + 'EntityGeometry.cs', 'b', '', "open-fps's entities to solids: the adapter the geometry library is fed through"),

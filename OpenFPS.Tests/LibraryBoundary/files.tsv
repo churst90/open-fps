@@ -172,6 +172,7 @@ OpenFPS.Common/Messages.cs	host
 OpenFPS.Common/MoverPoses.cs	host		
 OpenFPS.Common/PhysicsConstants.cs	host		
 OpenFPS.Common/PhysicsUtils.cs	host		
+OpenFPS.Common/PhysicsViews.cs	host		
 OpenFPS.Common/RaceLine.cs	host		
 OpenFPS.Common/RoadMapData.cs	host		
 OpenFPS.Common/Roads.cs	host		
@@ -234,11 +235,15 @@ OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	lib	Native
 OpenFPS.Native/SteamAudio/PhononSim.cs	lib	Native	
 OpenFPS.Physics/BodyConstants.cs	lib	Physics	
 OpenFPS.Physics/Chassis.cs	lib	Physics	
+OpenFPS.Physics/ContactStream.cs	lib	Physics	
 OpenFPS.Physics/Earth.cs	lib	Physics	
 OpenFPS.Physics/EngineMechanics.cs	lib	Physics	
 OpenFPS.Physics/ExternalBallistics.cs	lib	Physics	
 OpenFPS.Physics/Footing.cs	lib	Physics	
 OpenFPS.Physics/Gearbox.cs	lib	Physics	
+OpenFPS.Physics/OnFoot.cs	lib	Physics	
+OpenFPS.Physics/PhysicsState.cs	lib	Physics	
+OpenFPS.Physics/PhysicsWorld.cs	lib	Physics	
 OpenFPS.Physics/RicochetLaw.cs	lib	Physics	
 OpenFPS.Physics/RoadGrip.cs	lib	Physics	
 OpenFPS.Physics/RunningGear.cs	lib	Physics	

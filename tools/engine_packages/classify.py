@@ -117,6 +117,7 @@ FILE_RULES = [
     ('OpenFPS.Common/MoverPoses.cs', 'game', 'a server counter'),
     ('OpenFPS.Common/PhysicsConstants.cs', 'Common', 'the game\'s reach and bounds, the tick, the input limits (the body: BodyConstants)'),
     ('OpenFPS.Common/PhysicsUtils.cs', 'Common', 'entity adapter: the ground probes of a world and of a snapshot (the question: Footing)'),
+    ('OpenFPS.Common/PhysicsViews.cs', 'Common', 'entity adapter: a world and a snapshot as the physics sees them (IPhysicsWorld)'),
     ('OpenFPS.Common/RaceLine.cs', 'Agents', 'speeds along a line'),
     ('OpenFPS.Common/RoadMapData.cs', 'World', 'roads as sent to a driver'),
     ('OpenFPS.Common/Roads.cs', 'World', 'roads as a map declares them'),

@@ -23,6 +23,91 @@ public static class Footing
         where F : IGeometryFilter
         => geo.Ground(pos, PlayerRadius, StepHeight, GeometryLayers.Ground, ref filter, out solid, out _);
 
+    /// <summary>No floor under a point: every probe answers below this.</summary>
+    public const float NoFloor = -1000f;
+
+    /// <summary>
+    /// The floor under a body in a physics world (docs/PHYSICS_BOUNDARY.md stage 3): the triangle world's, the
+    /// boxes' near it (the statics the triangles do not hold and everything that moves), the higher of the two;
+    /// and, when nothing near is under it, every box in the world. The server and every client ask this of the
+    /// world each has, so a body on a parked car stands on its roof on both. Not counting <paramref name="own"/>
+    /// or <paramref name="ignore"/> (a car's own parts and occupants). <paramref name="scratch"/> is the caller's.
+    /// </summary>
+    public static float GroundOn(IPhysicsWorld world, Vector3 pos, int own, IReadOnlyList<int>? ignore,
+                                 List<PhysicsBody> scratch, out string material)
+    {
+        float floor = TriangleGround(world, pos, own, ignore, out string under);
+        return GroundOn(world, pos, own, ignore, floor, under, scratch, out material);
+    }
+
+    /// <summary>
+    /// The triangle world's part of <see cref="GroundOn(IPhysicsWorld, Vector3, int, IReadOnlyList{int}, List{PhysicsBody}, out string)"/>,
+    /// which changes only with the static geometry: a host may remember it for a point (the server's
+    /// <c>GroundProbeMemo</c>). <see cref="NoFloor"/> where there is none or no triangle world.
+    /// </summary>
+    public static float TriangleGround(IPhysicsWorld world, Vector3 pos, int own, IReadOnlyList<int>? ignore, out string material)
+    {
+        material = "Generic";
+        var geo = world.Triangles;
+        if (geo == null) return NoFloor;
+        var filter = new BodyFilter(world, own, ignore);
+        float y = Ground(geo, ref filter, pos, out var solid);
+        if (y > NoFloor)
+        {
+            var raw = geo.SurfaceOf(solid).Material;
+            if (!string.IsNullOrEmpty(raw)) material = raw;
+        }
+        return y;
+    }
+
+    /// <summary>The rest of the ground probe, given the triangle world's floor under the point.</summary>
+    public static float GroundOn(IPhysicsWorld world, Vector3 pos, int own, IReadOnlyList<int>? ignore,
+                                 float triangleFloor, string triangleMaterial, List<PhysicsBody> scratch, out string material)
+    {
+        float y = triangleFloor;
+        material = triangleMaterial;
+        var skip = new BodyFilter { Own = own, Ignore = ignore is { Count: > 0 } ? ignore : null };
+        world.Near(pos, PlayerRadius, scratch);
+        float boxes = BoxFloor(scratch, pos, skip, out string boxMaterial);
+        if (boxes > y) { y = boxes; material = boxMaterial; }
+        // Nothing near (an edge case, a stale grid, a body far out on a vehicle): everything is asked.
+        if (y < -900f)
+        {
+            world.Everything(scratch);
+            y = BoxFloor(scratch, pos, skip, out material);
+        }
+        return y;
+    }
+
+    /// <summary>
+    /// The highest top among <paramref name="boxes"/> under the body's footprint (the centre and four points on
+    /// its radius) no higher than a step above its feet; <see cref="NoFloor"/> and Generic where none is. The
+    /// first in the list wins a tie.
+    /// </summary>
+    public static float BoxFloor(List<PhysicsBody> boxes, Vector3 pos, in BodyFilter skip, out string material)
+    {
+        float best = NoFloor;
+        material = "Generic";
+        Span<Vector3> probes = stackalloc Vector3[5];
+        probes[0] = pos;
+        probes[1] = pos + new Vector3(PlayerRadius, 0, 0);
+        probes[2] = pos + new Vector3(-PlayerRadius, 0, 0);
+        probes[3] = pos + new Vector3(0, 0, PlayerRadius);
+        probes[4] = pos + new Vector3(0, 0, -PlayerRadius);
+        foreach (var b in boxes)
+        {
+            if (skip.Ignores(b.Id)) continue;
+            float top = b.Centre.Y + b.Size.Y / 2f;
+            if (top > pos.Y + StepHeight) continue;
+            bool hit = false;
+            var column = new Vector3(b.Size.X, 40000f, b.Size.Z);
+            foreach (var p in probes)
+                if (GeometryUtils.IsPointInOBB(p, b.Centre, column, b.Rotation)) { hit = true; break; }
+            if (hit && top > best) { best = top; material = b.Material; }
+        }
+        return best;
+    }
+
     /// <summary>
     /// Where a foot goes down, and on what (docs/GEOMETRY.md 3.8). The body stands at the highest floor
     /// under its footprint, so on a flight a foot under its middle was in the air over the lower tread.

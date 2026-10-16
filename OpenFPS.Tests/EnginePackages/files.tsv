@@ -178,6 +178,7 @@ OpenFPS.Common/Messages.cs	Common	wire
 OpenFPS.Common/MoverPoses.cs	game	a server counter
 OpenFPS.Common/PhysicsConstants.cs	Common	the game's reach and bounds, the tick, the input limits (the body: BodyConstants)
 OpenFPS.Common/PhysicsUtils.cs	Common	entity adapter: the ground probes of a world and of a snapshot (the question: Footing)
+OpenFPS.Common/PhysicsViews.cs	Common	entity adapter: a world and a snapshot as the physics sees them (IPhysicsWorld)
 OpenFPS.Common/RaceLine.cs	Agents	speeds along a line
 OpenFPS.Common/RoadMapData.cs	World	roads as sent to a driver
 OpenFPS.Common/Roads.cs	World	roads as a map declares them
@@ -240,11 +241,15 @@ OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	Native
 OpenFPS.Native/SteamAudio/PhononSim.cs	Native	
 OpenFPS.Physics/BodyConstants.cs	Physics	
 OpenFPS.Physics/Chassis.cs	Physics	
+OpenFPS.Physics/ContactStream.cs	Physics	
 OpenFPS.Physics/Earth.cs	Physics	
 OpenFPS.Physics/EngineMechanics.cs	Physics	
 OpenFPS.Physics/ExternalBallistics.cs	Physics	
 OpenFPS.Physics/Footing.cs	Physics	
 OpenFPS.Physics/Gearbox.cs	Physics	
+OpenFPS.Physics/OnFoot.cs	Physics	
+OpenFPS.Physics/PhysicsState.cs	Physics	
+OpenFPS.Physics/PhysicsWorld.cs	Physics	
 OpenFPS.Physics/RicochetLaw.cs	Physics	
 OpenFPS.Physics/RoadGrip.cs	Physics	
 OpenFPS.Physics/RunningGear.cs	Physics	
@@ -373,6 +378,7 @@ OpenFPS.Server/Repositories/UserRepository.cs	game
 OpenFPS.Server/Services/DiscoveryService.cs	game	
 OpenFPS.Server/Services/SocialService.cs	game	
 OpenFPS.Server/Systems/CharacterSystem.cs	game	host: steps Agents
+OpenFPS.Server/Systems/ContactStreams.cs	game	
 OpenFPS.Server/Systems/CrossingSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/CrowdSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/DoorManners.cs	game	host: Agents once it reads a view

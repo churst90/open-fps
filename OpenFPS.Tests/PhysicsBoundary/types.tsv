@@ -1,6 +1,17 @@
 type	group
 OpenFPS.Common.SharedMovementEngine	P
 OpenFPS.Common.Footing	P
+OpenFPS.Common.IPhysicsWorld	P
+OpenFPS.Common.PhysicsBody	V
+OpenFPS.Common.BodyFilter	P
+OpenFPS.Common.OnFoot	P
+OpenFPS.Common.BodyState	V
+OpenFPS.Common.Grounding	V
+OpenFPS.Common.ContactEvent	V
+OpenFPS.Common.ContactPhase	V
+OpenFPS.Common.ContactStream	P
+OpenFPS.Common.VehicleState	V
+OpenFPS.Common.AirSample	V
 OpenFPS.Common.BodyConstants	P
 OpenFPS.Common.Earth	P
 OpenFPS.Common.ChassisSpec	P

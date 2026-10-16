@@ -917,6 +917,9 @@ public class GameServer
                     });
 
                     stage.Dispose();
+                    // This tick's contacts (ContactStream): the bodies and the cars add to it as they move.
+                    var contacts = ContactStreams.Of(world);
+                    contacts.Begin();
                     stage = PerfProbe.Measure("server.movement");
                     MovementSystem.Update(world, entry.Value.data.WalkMin, entry.Value.data.WalkMax, grid, lookup, _sessions, _maps, dt);
                     stage.Dispose();
@@ -1000,6 +1003,7 @@ public class GameServer
                     // tick taken into it (docs/GEOMETRY.md stage 1).
                     _maps.SyncGeometry(entry.Key);
                     _occupancy.Update(world, lookup);
+                    contacts.Close();
                     stage.Dispose();
                 }
                 catch (Exception ex)

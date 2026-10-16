@@ -37,8 +37,12 @@ public sealed class PredictionReconciler
     /// </summary>
     public BodyContact? LastContact { get; private set; }
 
+    /// <summary>Another thing the last fresh step pressed into (<see cref="ClientPhysicsSystem.SecondContact"/>):
+    /// in a corner, the other wall. Null when none, and on a replay.</summary>
+    public BodyContact? LastSecondContact { get; private set; }
+
     /// <summary>Drops the history: on a spawn or a teleport, where replay means nothing.</summary>
-    public void Reset() { _history.Clear(); LastContact = null; }
+    public void Reset() { _history.Clear(); LastContact = null; LastSecondContact = null; }
 
     /// <summary>
     /// The position is a seat's, not the player's. A passenger causes no movement the client could
@@ -56,6 +60,7 @@ public sealed class PredictionReconciler
     {
         _physics.ApplyLook(input, dt);
         LastContact = Riding || Held ? null : _physics.Predict(input, snapshot, dt);
+        LastSecondContact = Riding || Held ? null : _physics.SecondContact;
 
         // Still recorded while riding: the server acknowledges these sequence numbers, and the yaw
         // reconciliation below needs to know which look deltas it has not seen yet.

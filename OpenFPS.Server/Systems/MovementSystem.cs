@@ -4,7 +4,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using System.Numerics;
-using System.Buffers;
 using Serilog;
 using static OpenFPS.Common.PhysicsConstants;
 
@@ -17,11 +16,8 @@ public static class MovementSystem
 {
     private static MapManager _maps = null!;
 
-    // Tick thread only: reused for every player and input so the collision gather allocates nothing.
-    // CollectInRadius yields each obstacle once; a wall spanning four cells was once copied in four times.
-    private static readonly List<Entity> _nearbyScratch = new(64);
-    private static readonly HashSet<Entity> _nearbySeen = new();
-    private static readonly List<OpenFPS.Common.Geometry.SolidRef> _solidScratch = new(32);
+    // Tick thread only: reused for every player and input so the step allocates nothing.
+    private static readonly OnFoot.Scratch _scratch = new();
 
     /// <summary>Faster across the ground than any person moves on foot, m/s: a sprint is about 6.</summary>
     public const float FlingSpeed = 12f;
@@ -75,6 +71,8 @@ public static class MovementSystem
 
         // A margin below the map's floor, so a fall is not cut short by the respawn.
         float voidThreshold = mapMinimumY - 5.0f;
+        // What the bodies press into this tick, for whoever reads the map's contacts.
+        var contacts = ContactStreams.Of(world);
 
         world.Query(new QueryDescription().WithAll<PlayerComponent, Transform, Velocity, MaterialComponent>(), (Entity e, ref PlayerComponent player, ref Transform transform, ref Velocity velocity, ref MaterialComponent material) =>
         {
@@ -158,7 +156,7 @@ public static class MovementSystem
 
                 // Never write the floor's material into the player's: a person on a concrete roof was
                 // concrete to anything that met them. Footsteps probe the ground themselves.
-                float groundY = PhysicsUtils.GetGroundHeight(world, grid, transform.Position, ref session.GroundProbe, out _);
+                float groundY = PhysicsUtils.GetGroundHeight(world, grid, transform.Position, e.Id, ref session.GroundProbe, out _);
 
                 Vector3 inputDir = Vector3.Zero;
                 if (input.MoveDirection != Vector3.Zero)
@@ -170,79 +168,37 @@ public static class MovementSystem
                     inputDir = Vector3.Transform(move, Quaternion.CreateFromYawPitchRoll(player.Yaw, 0, 0));
                 }
 
-                // With a triangle world the static solids come from it (GatherSolids, below) and the grid
-                // is asked only for what moves and the statics the triangles do not hold.
-                var geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
-                if (geometry != null) grid.CollectDynamicInRadius(transform.Position, CollisionSearchRadius, _nearbyScratch, _nearbySeen);
-                else grid.CollectInRadius(transform.Position, CollisionSearchRadius, _nearbyScratch, _nearbySeen);
-                var colliderArray = ArrayPool<SharedMovementEngine.Collider>.Shared.Rent(Math.Max(1, _nearbyScratch.Count));
-                int colliderCount = 0;
-
-                try
+                var ctx = new SharedMovementEngine.MovementContext
                 {
-                    foreach (var obstacle in _nearbyScratch)
-                    {
-                        if (obstacle.Id == e.Id) continue;
-                        if (!world.Has<ColliderComponent>(obstacle)) continue;
-                        
-                        ref var t = ref world.Get<Transform>(obstacle);
-                        ref var c = ref world.Get<ColliderComponent>(obstacle);
-                        if (!c.IsSolid) continue;
+                    Position = transform.Position,
+                    Velocity = velocity.Linear,
+                    InputDirection = inputDir,
+                    DeltaTime = stepDt,
+                    GroundHeight = groundY,
+                    Gravity = mapGravity,
+                    JumpForce = JumpPower,
+                    Speed = FootSpeed(input.Sprint, HandsService.SpeedLimit(world, e, lookup)),
+                    PlayerRadius = PlayerRadius,
+                    PlayerHeight = PlayerHeight,
+                    StepHeight = StepHeight,
+                    IsJumpRequested = input.Jump,
+                    MapMin = mapMin,
+                    MapMax = mapMax,
+                    TileReady = tileReady,
+                    TileMetres = tileMetres,
+                };
 
-                        colliderArray[colliderCount++] = new SharedMovementEngine.Collider {
-                            Position = t.Position,
-                            Size = c.Size,
-                            Rotation = SharedMovementEngine.StandingRotation(c.Shape, t.Rotation),
-                            Material = world.Has<MaterialComponent>(obstacle) ? world.Get<MaterialComponent>(obstacle).Material : "Generic"
-                        };
-                    }
+                // The same step a client predicts with, over the server's view of the world (OnFoot): one
+                // gather, in one order, for both.
+                var step = OnFoot.Step(ServerPhysicsView.Of(world, grid), e.Id, ctx, _scratch);
+                NoteFling(player.Username, transform.Position, step.Position, stepDt, input, groundY, _scratch.Gathered.Count);
 
-                    var collidersSlice = new ReadOnlySpan<SharedMovementEngine.Collider>(colliderArray, 0, colliderCount);
-
-                    var ctx = new SharedMovementEngine.MovementContext
-                    {
-                        Position = transform.Position,
-                        Velocity = velocity.Linear,
-                        InputDirection = inputDir,
-                        DeltaTime = stepDt,
-                        GroundHeight = groundY,
-                        Gravity = mapGravity,
-                        JumpForce = JumpPower,
-                        Speed = FootSpeed(input.Sprint, HandsService.SpeedLimit(world, e, lookup)),
-                        PlayerRadius = PlayerRadius,
-                        PlayerHeight = PlayerHeight,
-                        StepHeight = StepHeight,
-                        IsJumpRequested = input.Jump,
-                        MapMin = mapMin,
-                        MapMax = mapMax,
-                        TileReady = tileReady,
-                        TileMetres = tileMetres,
-                    };
-
-                    var obstacles = new SharedMovementEngine.Obstacles(collidersSlice);
-                    if (geometry != null)
-                    {
-                        var self = new OpenFPS.Common.Geometry.ExceptOwners(e.Id);
-                        // On triangles the body is the capsule, and the ground has a grade (docs/GEOMETRY.md
-                        // stage 2); the box path keeps the cylinder on the level.
-                        ctx.Body = OpenFPS.Common.Geometry.BodyShape.Capsule;
-                        ctx.Grade = SharedMovementEngine.GradeAlong(geometry, ref self, transform.Position, inputDir);
-                        SharedMovementEngine.GatherSolids(ctx, geometry, ref self, _solidScratch);
-                        obstacles = new SharedMovementEngine.Obstacles(collidersSlice, geometry,
-                            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_solidScratch));
-                    }
-                    var result = SharedMovementEngine.Step(ctx, obstacles, out _);
-                    NoteFling(player.Username, transform.Position, result.NewPosition, stepDt, input, groundY, colliderCount);
-
-                    transform.Position = result.NewPosition;
-                    velocity.Linear = result.NewVelocity;
-                    player.IsGrounded = result.IsGrounded;
-                    transform.IsDirty = true;
-                }
-                finally
-                {
-                    ArrayPool<SharedMovementEngine.Collider>.Shared.Return(colliderArray);
-                }
+                transform.Position = step.Position;
+                velocity.Linear = step.Velocity;
+                player.IsGrounded = step.Grounded;
+                transform.IsDirty = true;
+                if (OnFoot.ContactOf(e.Id, material.Material, step) is { } contact) contacts.Add(contact);
+                if (OnFoot.SecondContactOf(e.Id, material.Material, step) is { } second) contacts.Add(second);
             }
         });
     }

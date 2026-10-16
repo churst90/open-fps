@@ -7,24 +7,21 @@ namespace OpenFPS.Common;
 
 /// <summary>
 /// The ground probes, shared so the client and the server agree where the floor is. The question itself is
-/// <see cref="Footing"/>'s, asked of a triangle world; these ask it of the server's world and of a client's
-/// snapshot, each adding the solids its triangle world does not hold.
+/// <see cref="Footing"/>'s, asked of a physics world (docs/PHYSICS_BOUNDARY.md stage 3); these ask it of the
+/// server's world and grid and of a client's snapshot, through the view each fills.
 /// </summary>
 public static class PhysicsUtils
 {
-    // The candidate gather runs on the server tick thread, the client game thread and the acoustic worker
-    // thread. Per-thread scratch keeps it allocation-free without any of them waiting on the others.
-    [ThreadStatic] private static List<Entity>? _entityScratch;
-    [ThreadStatic] private static HashSet<Entity>? _entitySeen;
-    [ThreadStatic] private static List<int>? _idScratch;
-    [ThreadStatic] private static HashSet<int>? _idSeen;
-    [ThreadStatic] private static List<EntitySnapshot>? _snapshotScratch;
+    // The probes run on the server tick thread, the client game thread and the acoustic worker thread.
+    // Per-thread scratch keeps them allocation-free without any of them waiting on the others.
+    [ThreadStatic] private static List<PhysicsBody>? _bodies;
+    [ThreadStatic] private static List<int>? _ignored;
 
-    /// <summary>
-    /// The floor height under a point, on the server. The most-run query on the server (once per
-    /// input), so callers with a <see cref="GroundProbeMemo"/> go through
-    /// <see cref="GetGroundHeight(World, SpatialGrid{Entity}, Vector3, ref GroundProbeMemo, out string)"/>.
-    /// </summary>
+    private static List<PhysicsBody> Bodies => _bodies ??= new List<PhysicsBody>(64);
+
+    /// <summary>The floor height under a point, on the server (<see cref="Footing"/>'s ground probe over
+    /// <see cref="ServerPhysicsView"/>). A player's step goes through
+    /// <see cref="GetGroundHeight(World, SpatialGrid{Entity}, Vector3, int, ref GroundProbeMemo, out string)"/>.</summary>
     public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos, out string material)
         => GetGroundHeight(world, grid, pos, null, out material);
 
@@ -35,203 +32,41 @@ public static class PhysicsUtils
     public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos,
                                         ICollection<Entity>? ignore, out string material)
     {
-        const float stepHeight = PhysicsConstants.StepHeight;
-
-        if (grid.Geometry != null && Geometry.TriangleGeometry.Enabled)
-            return GroundFromGeometry(world, grid, pos, ignore, stepHeight, out material);
-
-        // Each candidate once: a floor spanning many cells is tested against five probe points.
-        var candidates = _entityScratch ??= new List<Entity>(64);
-        var seen = _entitySeen ??= new HashSet<Entity>();
-        grid.CollectInRadius(pos, 50.0f, candidates, seen);
-        if (ignore != null && ignore.Count > 0) candidates.RemoveAll(ignore.Contains);
-
-        float ground = CalculateHeightFromCandidates(world, candidates, pos, stepHeight, out material);
-
-        // The grid missed the floor (an edge case, a stale grid): scan every solid.
-        if (ground < -900f)
+        List<int>? skip = null;
+        if (ignore is { Count: > 0 })
         {
-            var allStatic = new List<Entity>();
-            world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e) => {
-                if (ignore == null || !ignore.Contains(e)) allStatic.Add(e);
-            });
-            ground = CalculateHeightFromCandidates(world, allStatic, pos, stepHeight, out material);
+            skip = _ignored ??= new List<int>(8);
+            skip.Clear();
+            foreach (var e in ignore) skip.Add(e.Id);
         }
-
-        return ground;
-    }
-
-    /// <summary>Counts every solid but those of the entities it was given to ignore.</summary>
-    private readonly struct IgnoreEntities : Geometry.IGeometryFilter
-    {
-        private readonly ICollection<Entity>? _ignore;
-        public IgnoreEntities(ICollection<Entity>? ignore) => _ignore = ignore is { Count: > 0 } ? ignore : null;
-        public bool Accept(int owner, in Geometry.Surface surface)
-        {
-            if (_ignore == null) return true;
-            foreach (var e in _ignore) if (e.Id == owner) return false;
-            return true;
-        }
+        return Footing.GroundOn(ServerPhysicsView.Of(world, grid), pos, int.MinValue, skip, Bodies, out material);
     }
 
     /// <summary>
-    /// The server ground probe on the triangle world (docs/GEOMETRY.md 3.3): the static solids from it, and
-    /// what moves and what it does not hold the old way; the higher of the two. Five points, the highest
-    /// top no higher than a step above the feet, exactly as <see cref="CalculateHeightFromCandidates"/>.
+    /// A body's floor on the server, the triangle world's part remembered (the session's memo): asked
+    /// again only when the point or the static geometry changed. What moves and the statics the triangles do
+    /// not hold are asked every time, so the answer is the one a fresh probe and a client's give.
     /// </summary>
-    private static float GroundFromGeometry(World world, SpatialGrid<Entity> grid, Vector3 pos, ICollection<Entity>? ignore,
-                                            float stepHeight, out string material)
-    {
-        var filter = new IgnoreEntities(ignore);
-        var geo = grid.Geometry!;
-        float ground = Footing.Ground(geo, ref filter, pos, out var solid);
-        material = ground > -1000f ? GroundMaterial(geo.SurfaceOf(solid).Material) : "Generic";
-
-        var candidates = _entityScratch ??= new List<Entity>(64);
-        var seen = _entitySeen ??= new HashSet<Entity>();
-        grid.CollectDynamicInRadius(pos, 50.0f, candidates, seen);
-        if (ignore != null && ignore.Count > 0) candidates.RemoveAll(ignore.Contains);
-        float other = CalculateHeightFromCandidates(world, candidates, pos, stepHeight, out string otherMaterial);
-        if (other > ground) { ground = other; material = otherMaterial; }
-
-        if (ground < -900f)
-        {
-            // As the box path: nothing found near, so everything is asked (a body far out on a vehicle).
-            var allStatic = new List<Entity>();
-            world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e) => {
-                if (ignore == null || !ignore.Contains(e)) allStatic.Add(e);
-            });
-            ground = CalculateHeightFromCandidates(world, allStatic, pos, stepHeight, out material);
-        }
-        return ground;
-    }
-
-    /// <summary>The material a floor reports: the server's box path read the component as it was.</summary>
-    private static string GroundMaterial(string material) => material;
-
-    /// <summary>
-    /// The server ground probe, remembered: recomputed only when the static geometry changed, the point
-    /// moved or the answer aged out (<see cref="GroundProbeMemo"/>).
-    /// </summary>
-    public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos,
+    public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos, int own,
         ref GroundProbeMemo memo, out string material)
     {
-        long nowMs = Environment.TickCount64;
-        if (memo.TryGet(pos, grid.StaticVersion, nowMs, out float cached, out material))
-        {
+        // The view first: handing out the triangle world places its movers, which may move the version.
+        var view = ServerPhysicsView.Of(world, grid);
+        if (memo.TryGet(pos, grid.StaticVersion, out float floor, out string under))
             PerfProbe.Count("server.groundprobe.hit");
-            return cached;
-        }
-
-        using (PerfProbe.Measure("server.groundprobe"))
-        {
-            float ground = GetGroundHeight(world, grid, pos, out material);
-            memo.Store(pos, grid.StaticVersion, nowMs, ground, material);
-            return ground;
-        }
+        else
+            using (PerfProbe.Measure("server.groundprobe"))
+            {
+                floor = Footing.TriangleGround(view, pos, own, null, out under);
+                memo.Store(pos, grid.StaticVersion, floor, under);
+            }
+        return Footing.GroundOn(view, pos, own, null, floor, under, Bodies, out material);
     }
 
-    private static float CalculateHeightFromCandidates(World world, IEnumerable<Entity> candidates, Vector3 pos, float stepHeight, out string material)
-    {
-        float bestY = -1000f;
-        material = "Generic";
-        string bestMat = "Generic";
-
-        // The centre and four points on the body's radius.
-        const float radius = PhysicsConstants.PlayerRadius;
-        Span<Vector3> probes = stackalloc Vector3[5];
-        probes[0] = pos;
-        probes[1] = pos + new Vector3(radius, 0, 0);
-        probes[2] = pos + new Vector3(-radius, 0, 0);
-        probes[3] = pos + new Vector3(0, 0, radius);
-        probes[4] = pos + new Vector3(0, 0, -radius);
-
-        foreach (var e in candidates)
-        {
-            // Gone from the world but still in the grid: asking it anything throws (2026-09-28, 92
-            // "failed to move" errors from the parked cars after something was removed).
-            if (!world.IsAlive(e) || !world.Has<Transform>(e) || !world.Has<ColliderComponent>(e)) continue;
-
-            ref var t = ref world.Get<Transform>(e);
-            ref var c = ref world.Get<ColliderComponent>(e);
-            if (!c.IsSolid) continue;
-
-            float objTop = t.Position.Y + (c.Size.Y / 2f);
-            if (objTop > pos.Y + stepHeight) continue;
-
-            bool hit = false;
-            foreach (var p in probes)
-            {
-                if (GeometryUtils.IsPointInOBB(p, t.Position, new Vector3(c.Size.X, 40000f, c.Size.Z), SharedMovementEngine.StandingRotation(c.Shape, t.Rotation)))
-                {
-                    hit = true;
-                    break;
-                }
-            }
-
-            if (hit && objTop > bestY)
-            {
-                bestY = objTop;
-                bestMat = world.Has<MaterialComponent>(e) ? world.Get<MaterialComponent>(e).Material : "Generic";
-            }
-        }
-
-        material = bestMat;
-        return bestY;
-    }
-
-    /// <summary>The floor height under a point, on the client.</summary>
+    /// <summary>The floor height under a point, on the client: the same question as the server's, of the
+    /// client's snapshot (<see cref="SnapshotPhysicsView"/>), what moves included.</summary>
     public static float GetGroundHeight(WorldSnapshot snapshot, Vector3 pos, int ownEntityId, out string material)
-    {
-        const float stepHeight = PhysicsConstants.StepHeight;
-
-        if (snapshot.Geometry != null && Geometry.TriangleGeometry.Enabled)
-        {
-            // The triangle world for the static solids (docs/GEOMETRY.md 3.3), the old test for the statics
-            // it does not hold; nothing that moves, as the box path counted only the static grid.
-            var filter = new SnapshotGround { Stale = snapshot.GeometryStale, Own = ownEntityId };
-            var geo = snapshot.Geometry;
-            float y = Footing.Ground(geo, ref filter, pos, out var solid);
-            string m = "Generic";
-            if (y > -1000f) { var raw = geo.SurfaceOf(solid).Material; m = string.IsNullOrEmpty(raw) ? "Generic" : raw; }
-            if (snapshot.UnindexedStatics.Count > 0)
-            {
-                var others = _snapshotScratch ??= new List<EntitySnapshot>(64);
-                others.Clear();
-                foreach (int id in snapshot.UnindexedStatics)
-                    if (snapshot.Entities.TryGetValue(id, out var s)) others.Add(s);
-                float o = CalculateHeightFromSnapshots(others, pos, stepHeight, ownEntityId, out string om);
-                if (o > y) { y = o; m = om; }
-            }
-            if (y < -900f && snapshot.Entities.Count > 0)
-                y = CalculateHeightFromSnapshots(snapshot.Entities.Values, pos, stepHeight, ownEntityId, out m);
-            material = m;
-            return y;
-        }
-
-        var candidates = _snapshotScratch ??= new List<EntitySnapshot>(64);
-        candidates.Clear();
-
-        if (snapshot.StaticGrid != null)
-        {
-            var ids = _idScratch ??= new List<int>(64);
-            var seen = _idSeen ??= new HashSet<int>();
-            snapshot.StaticGrid.CollectInRadius(pos, 50.0f, ids, seen);
-            for (int i = 0; i < ids.Count; i++)
-                if (snapshot.Entities.TryGetValue(ids[i], out var snap)) candidates.Add(snap);
-        }
-
-        float ground = candidates.Count > 0
-            ? CalculateHeightFromSnapshots(candidates, pos, stepHeight, ownEntityId, out material)
-            : CalculateHeightFromSnapshots(snapshot.Entities.Values, pos, stepHeight, ownEntityId, out material);
-
-        if (ground < -900f && snapshot.Entities.Count > 0)
-        {
-            ground = CalculateHeightFromSnapshots(snapshot.Entities.Values, pos, stepHeight, ownEntityId, out material);
-        }
-
-        return ground;
-    }
+        => Footing.GroundOn(SnapshotPhysicsView.Of(snapshot), pos, ownEntityId, null, Bodies, out material);
 
     /// <summary>
     /// Where a foot goes down on a client, and on what (<see cref="Footing.FootOnFloor"/>): on the snapshot's
@@ -241,60 +76,9 @@ public static class PhysicsUtils
     public static Vector3 FootOnFloor(WorldSnapshot snapshot, Vector3 foot, Vector3 feet, Vector3 way, int ownEntityId, out string? material)
     {
         material = null;
-        var geo = snapshot.Geometry;
-        if (geo == null || !Geometry.TriangleGeometry.Enabled) return foot;
-        var filter = new SnapshotGround { Stale = snapshot.GeometryStale, Own = ownEntityId };
+        var view = SnapshotPhysicsView.Of(snapshot);
+        if (view.Triangles is not { } geo) return foot;
+        var filter = new BodyFilter(view, ownEntityId);
         return Footing.FootOnFloor(geo, ref filter, foot, feet, way, out material);
-    }
-
-    private struct SnapshotGround : Geometry.IGeometryFilter
-    {
-        public IReadOnlySet<int>? Stale;
-        public int Own;
-        public readonly bool Accept(int owner, in Geometry.Surface surface) => owner != Own && (Stale == null || !Stale.Contains(owner));
-    }
-
-    private static float CalculateHeightFromSnapshots(IEnumerable<EntitySnapshot> candidates, Vector3 pos, float stepHeight, int ownEntityId, out string material)
-    {
-        float bestY = -1000f;
-        material = "Generic";
-        string bestMat = "Generic";
-
-        const float radius = PhysicsConstants.PlayerRadius;
-        Span<Vector3> probes = stackalloc Vector3[5];
-        probes[0] = pos;
-        probes[1] = pos + new Vector3(radius, 0, 0);
-        probes[2] = pos + new Vector3(-radius, 0, 0);
-        probes[3] = pos + new Vector3(0, 0, radius);
-        probes[4] = pos + new Vector3(0, 0, -radius);
-
-        foreach (var entity in candidates)
-        {
-            if (entity.Id == ownEntityId) continue;
-            var def = entity.Definition;
-            if (!def.Collider.IsSolid) continue;
-
-            float objTop = entity.Transform.Position.Y + (def.Collider.Size.Y / 2f);
-            if (objTop > pos.Y + stepHeight) continue;
-
-            bool hit = false;
-            foreach (var p in probes)
-            {
-                if (GeometryUtils.IsPointInOBB(p, entity.Transform.Position, new Vector3(def.Collider.Size.X, 40000f, def.Collider.Size.Z), SharedMovementEngine.StandingRotation(def.Collider.Shape, entity.Transform.Rotation)))
-                {
-                    hit = true;
-                    break;
-                }
-            }
-
-            if (hit && objTop > bestY)
-            {
-                bestY = objTop;
-                bestMat = string.IsNullOrEmpty(def.Material.Material) ? "Generic" : def.Material.Material;
-            }
-        }
-
-        material = bestMat;
-        return bestY;
     }
 }

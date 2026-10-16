@@ -61,13 +61,13 @@ public static class PhysicsReplaySpike
 
         if (what is "walks" or "all")
         {
-            Console.WriteLine(PhysicsReplays.WalkSummaryHeader + "\treproduction_misses\tclock_stalls\tseconds");
+            Console.WriteLine(PhysicsReplays.WalkSummaryHeader + "\treproduction_misses\tseconds");
             foreach (var w in PhysicsReplays.Walks)
             {
                 if (only != null && w.Name != only) continue;
                 var clock = System.Diagnostics.Stopwatch.StartNew();
                 var run = PhysicsReplays.Walk(Map(w.Map), w);
-                Console.WriteLine($"{PhysicsReplays.SummaryLine(run)}\t{run.ReproductionMisses}\t{run.ClockStalls}\t{clock.Elapsed.TotalSeconds:F1}");
+                Console.WriteLine($"{PhysicsReplays.SummaryLine(run)}\t{run.ReproductionMisses}\t{clock.Elapsed.TotalSeconds:F1}");
                 if (run.FirstGatherDifference != null) Console.WriteLine($"  gathers first differ: {run.FirstGatherDifference}");
                 if (track) Console.Write(PhysicsReplays.Track(run));
             }

@@ -65,6 +65,15 @@ public static class SharedMovementEngine
         public float IntoSpeed;
         /// <summary>Stopped at the edge of a tile of the world that is not built yet.</summary>
         public bool Fenced;
+        /// <summary>
+        /// A second thing pressed into this step, another collider than <see cref="ColliderIndex"/>: in a corner,
+        /// the other wall. Of two pressed equally (a diagonal into a square corner), which is the first depends
+        /// on the order the obstacles were given; with both reported, what was met does not.
+        /// </summary>
+        public bool SecondBlocked;
+        public int SecondIndex;
+        public Vector3 SecondNormal;
+        public float SecondIntoSpeed;
     }
 
     public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders)
@@ -413,10 +422,20 @@ public static class SharedMovementEngine
                 pos = nextPos + bestHit.Normal * (bestHit.Penetration + CollisionSkinWidth);
                 remainingMove = Vector3.Zero; // spent: the slide is what survived the push-out
 
-                // Reported, not acted on: the hardest the attempted motion pressed into anything.
+                // Reported, not acted on: the hardest the attempted motion pressed into anything, and the
+                // hardest other thing it pressed into.
                 float into = -(vel.X * bestHit.Normal.X + vel.Z * bestHit.Normal.Z);
                 if (into > contact.IntoSpeed)
+                {
+                    var was = contact;
                     contact = new Contact { Blocked = true, ColliderIndex = bestIndex, Normal = bestHit.Normal, IntoSpeed = into };
+                    if (was.Blocked && was.ColliderIndex != bestIndex)
+                        (contact.SecondBlocked, contact.SecondIndex, contact.SecondNormal, contact.SecondIntoSpeed) = (true, was.ColliderIndex, was.Normal, was.IntoSpeed);
+                    else if (was.SecondBlocked && was.SecondIndex != bestIndex)
+                        (contact.SecondBlocked, contact.SecondIndex, contact.SecondNormal, contact.SecondIntoSpeed) = (true, was.SecondIndex, was.SecondNormal, was.SecondIntoSpeed);
+                }
+                else if (into > 0f && bestIndex != contact.ColliderIndex && (!contact.SecondBlocked || into > contact.SecondIntoSpeed))
+                    (contact.SecondBlocked, contact.SecondIndex, contact.SecondNormal, contact.SecondIntoSpeed) = (true, bestIndex, bestHit.Normal, into);
 
                 float velDot = Vector3.Dot(vel, bestHit.Normal);
                 if (velDot < 0)

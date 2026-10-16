@@ -1235,8 +1235,10 @@ public sealed partial class ClientGameSession : IDisposable
         if (_state.IsRiding) { _bumps.Reset(); return; }
         // Only faces that stand up, and never the ground: a floor's edge, a kerb, a step you could
         // take, a ceiling met on a jump.
-        var contact = WallBumps.Resolve(_reconciler.LastContact, snapshot, _state.EyeHeight, out var struck);
-        if (!_bumps.Update(contact, _state.Position) || contact is not { } hit) return;
+        var first = WallBumps.Resolve(_reconciler.LastContact, snapshot, _state.EyeHeight, out var firstStruck);
+        var second = WallBumps.Resolve(_reconciler.LastSecondContact, snapshot, _state.EyeHeight, out var secondStruck);
+        if (!_bumps.Bump(first, second, _state.Position, out var bumped) || bumped is not { } hit) return;
+        var struck = first is { } f && f.EntityId == hit.EntityId ? firstStruck : secondStruck;
         if (!NavigationAids.WallBumps) return;
 
         string name = Sightline.NameOf(struck);

@@ -24,6 +24,9 @@ namespace OpenFPS.AudioLab;
 /// </summary>
 public static class PhysicsParitySpike
 {
+    /// <summary>How far away the server's ground memo handed back a floor before physics stage 3, metres.</summary>
+    private const float OldMemoToleranceMetres = 0.05f;
+
     /// <summary>One question asked two ways: today's code and the code a stage moves it to.</summary>
     private sealed record Path(string Name, Func<Probe, float[]> Old, Func<Probe, float[]> New);
 
@@ -177,8 +180,9 @@ public static class PhysicsParitySpike
             float gsBare = PhysicsUtils.GetGroundHeight(ecs, map.Grid, at, near, out _);
             if (MathF.Abs(gs - gc) > 0.001f) groundMovers.Add(MathF.Abs(gs - gsBare), () => $"{V(at)}: server {gs:F3} without movers {gsBare:F3}");
 
-            // Risk 2: a remembered floor handed back for a point up to 5 cm away; and the step it would give.
-            float r = (float)rng.NextDouble() * GroundProbeMemo.ToleranceMetres, ra = (float)(rng.NextDouble() * Math.PI * 2);
+            // Risk 2: a remembered floor handed back for a point up to 5 cm away, as the memo did before stage 3
+            // (it hands back only the same point now); and the step it would give.
+            float r = (float)rng.NextDouble() * OldMemoToleranceMetres, ra = (float)(rng.NextDouble() * Math.PI * 2);
             var nudged = at + new Vector3(r * MathF.Cos(ra), 0f, r * MathF.Sin(ra));
             float gn = PhysicsUtils.GetGroundHeight(ecs, map.Grid, nudged, out _);
             memo.Add(MathF.Abs(gn - gs), () => $"{V(nudged)}: fresh {gn:F3}, remembered from {r * 100f:F1} cm away {gs:F3}");

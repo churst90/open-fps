@@ -20,8 +20,9 @@ namespace OpenFPS.Instruments;
 /// <para>A walk is --walk-pair's: one script of keys from one spot, taken by the server's
 /// MovementSystem.Update with a real session and by the client's ClientPhysicsSystem.Predict over the
 /// client's world as a streamed client holds it. Beside the two bodies it measures the three parity risks
-/// the survey read from the code (section 3.7): the moving things in the server's ground probe, the ground
-/// memo's stale answers, and the two ways the obstacles are gathered.</para>
+/// the survey read from the code (section 3.7): the two sides' floors, the ground memo's answers against a
+/// fresh probe, and the two sides' gathers. Stage 3 closed all three (one view of the world both fill,
+/// docs/PHYSICS_BOUNDARY.md 17); the measures stay, to say so on every walk.</para>
 /// </summary>
 public static partial class PhysicsReplays
 {
@@ -132,11 +133,10 @@ public static partial class PhysicsReplays
         new("city_stairs_down", "city", new(-13.05f, 149.4f, 3.4f), 0f, "-15 w60 -10", "down the same flight from its top"),
         new("city_roof_fall", "city", new(-31.4f, 191.884f, 18.25f), 270f, "-15 w60 -60",
             "off Brandt Court's west side at roof height: eighteen metres down (RoofEdgeFallTests' spot)"),
+        // Until physics stage 3 the client's ground probe counted nothing that moves, and this walk parted the two
+        // sides by 39 mm on every tick on the roof (KnownGapMm 40): risk 1, closed by the one view both fill.
         new("city_parked_car", "city", new(70f, 127f, 1.6f), 0f, "-15 w30 -30", "standing on a parked car and walking off its end")
         {
-            KnownGapMm = 40f,
-            KnownWhy = "risk 1: the server's ground probe stands the body on the car's roof; the client's counts nothing that "
-                     + "moves, so from the same state it falls 11 mm a tick toward the road (39 mm on the first)",
             Props = new[] { new Prop("parked car", new Vector3(70f, 0.8f, 128f), new Vector3(1.8f, 1.5f, 4.6f), "Metal") },
         },
         new("city_bus_side", "city", new(70f, 127.2f, 0.05f), 0f, "-15 w30 d30 -10", "into the side of a bus at a stop, then along it")
@@ -150,6 +150,11 @@ public static partial class PhysicsReplays
         new("magnolia_slope_up", "magnolia_tx", new(-66.2f, 218.2f, float.NaN), 0f, "-15 w140 -10",
             "up the steepest smooth ground near the spawn: 2.1 m in 30 m (--physics-replay hills)"),
         new("magnolia_slope_down", "magnolia_tx", new(-66.2f, 248.2f, float.NaN), 180f, "-15 tw10 -10 W60 -10", "down it, in taps and then running"),
+        new("city_bus_roof", "city", new(73f, 131f, 3.3f), 90f, "-15 tw4 -10 w40 -30",
+            "standing on a bus's roof at a stop, four taps along it, then off its east end: three metres down")
+        {
+            Props = new[] { new Prop("bus", new Vector3(76f, 1.65f, 131f), new Vector3(12f, 3.2f, 2.5f), "Metal") },
+        },
         new("city_two_cars", "city", new(68.6f, 125.5f, 0.05f), 20f, "-15 w60 -10",
             "pressed along the sides of two parked cars nose to tail, across the joint between them")
         {
@@ -230,11 +235,12 @@ public static partial class PhysicsReplays
         public float WorstGapMetres;
         public int GapTicks;
         /// <summary>Risk 1: ticks where the server's fresh ground probe and the client's, asked at the same
-        /// point, differ by over 1 mm; of those, the ones where the moving things made the server's answer.</summary>
+        /// point, differ by over 1 mm; of those, the ones where the moving things made the difference.</summary>
         public int GroundDiffers, GroundFromMovers;
         public float WorstGroundDifference;
         /// <summary>Risk 2: ticks where the memo handed back a floor more than 1 mm from a fresh probe, the
-        /// worst, the memo's hits, and how far the server's body went from where it goes with no memo.</summary>
+        /// worst, the memo's hits (the triangle world's floor remembered for the same point), and how far the
+        /// server's body went from where it goes with no memo.</summary>
         public int MemoStale, MemoHits;
         public float WorstMemoError, MemoTrackEffect;
         /// <summary>Risk 3: ticks where the two sides gathered different boxes (or in another order), and
@@ -246,27 +252,19 @@ public static partial class PhysicsReplays
         public int ReproductionMisses;
         /// <summary>The two gathers' entities the first time they differed, for the lab.</summary>
         public string? FirstGatherDifference;
-        public int ClockStalls;
 
         public float Metres => Ticks.Count == 0 ? 0f
             : Vector2.Distance(new Vector2(Start.X, Start.Z), new Vector2(Ticks[^1].Server.X, Ticks[^1].Server.Z));
     }
 
-    /// <summary>Seconds between the server's ticks in play, ms: the memo's age bound counts these.</summary>
-    private const double TickMs = 1000.0 / PhysicsConstants.TickRate;
-
     /// <summary>Takes a walk on a loaded map. The map is left as it was found.</summary>
     public static WalkRun Walk(LoadedMap map, WalkScript script)
     {
-        for (int attempt = 0; ; attempt++)
-        {
-            var run = WalkOnce(map, script, memo: true, measure: true);
-            if (run.ClockStalls > 0 && attempt < 3) continue;   // the machine stalled over 150 ms in a tick
-            var bare = WalkOnce(map, script, memo: false, measure: false);
-            for (int i = 0; i < run.Ticks.Count && i < bare.Ticks.Count; i++)
-                run.MemoTrackEffect = MathF.Max(run.MemoTrackEffect, Vector3.Distance(run.Ticks[i].Server, bare.Ticks[i].Server));
-            return run;
-        }
+        var run = WalkOnce(map, script, memo: true, measure: true);
+        var bare = WalkOnce(map, script, memo: false, measure: false);
+        for (int i = 0; i < run.Ticks.Count && i < bare.Ticks.Count; i++)
+            run.MemoTrackEffect = MathF.Max(run.MemoTrackEffect, Vector3.Distance(run.Ticks[i].Server, bare.Ticks[i].Server));
+        return run;
     }
 
     private static WalkRun WalkOnce(LoadedMap map, WalkScript script, bool memo, bool measure)
@@ -313,9 +311,6 @@ public static partial class PhysicsReplays
 
             float dt = PhysicsConstants.FixedDeltaTime;
             var steps = Expand(script.Script);
-            int lastStore = int.MinValue;
-            Vector3 storedAt = default;
-            int storedVersion = 0;
             for (int tick = 1; tick <= steps.Count; tick++)
             {
                 var step = steps[tick - 1];
@@ -327,26 +322,16 @@ public static partial class PhysicsReplays
                 ecs.Query(new QueryDescription().WithAll<Transform, ColliderComponent>().WithAny<Velocity, PlayerComponent>(),
                     (Entity e, ref Transform t, ref ColliderComponent c) => grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, false));
 
-                // The memo as it ages in play: thirty ticks a second, whatever this machine's speed.
-                bool forced = !memo || (tick - lastStore) * TickMs > GroundProbeMemo.MaxAgeMs;
-                if (forced) session.GroundProbe.Invalidate();
+                // With no memo, the floor is asked afresh every tick.
+                if (!memo) session.GroundProbe.Invalidate();
                 var before = ecs.Get<Transform>(body).Position;
                 var velBefore = ecs.Get<Velocity>(body).Linear;
-                long missesBefore = session.GroundProbe.Misses;
-                bool expectHit = !forced && Vector3.DistanceSquared(before, storedAt) <= GroundProbeMemo.ToleranceMetres * GroundProbeMemo.ToleranceMetres
-                                 && grid.StaticVersion == storedVersion;
+                long hitsBefore = session.GroundProbe.Hits;
 
                 Expected? mine = measure ? Measure(map, session, body, before, velBefore, step, snap, run) : null;
 
                 MovementSystem.Update(ecs, data.WalkMin, data.WalkMax, grid, map.Lookup, sessions, map.Maps, dt);
-                if (session.GroundProbe.Misses > missesBefore)
-                {
-                    if (expectHit) run.ClockStalls++;
-                    lastStore = tick;
-                    storedAt = before;
-                    storedVersion = grid.StaticVersion;
-                }
-                else run.MemoHits++;
+                if (session.GroundProbe.Hits > hitsBefore) run.MemoHits++;
 
                 // Each step from the server's state, as the reconciler replays from it: the gap is what one
                 // step on each side makes of the same body, so a parting is seen on the tick it happens.
@@ -400,7 +385,7 @@ public static partial class PhysicsReplays
 
         // Risk 2: what the memo will hand MovementSystem this tick, against a fresh probe.
         var copy = session.GroundProbe;
-        float remembered = PhysicsUtils.GetGroundHeight(ecs, grid, at, ref copy, out _);
+        float remembered = PhysicsUtils.GetGroundHeight(ecs, grid, at, body.Id, ref copy, out _);
         float stale = MathF.Abs(remembered - serverGround);
         if (stale > 0.001f) run.MemoStale++;
         run.WorstMemoError = MathF.Max(run.WorstMemoError, stale);
@@ -423,7 +408,8 @@ public static partial class PhysicsReplays
         return new Expected(result.NewPosition);
     }
 
-    /// <summary>MovementSystem's context for one input, on the triangle world.</summary>
+    /// <summary>MovementSystem's context for one input, and what OnFoot.Step adds to it on the triangle world
+    /// (the capsule, the grade, the solids gathered).</summary>
     public static SharedMovementEngine.MovementContext ServerContext(LoadedMap map, Entity body, Vector3 at, Vector3 velocity, Step step,
                                                                      float ground, out OpenFPS.Common.Geometry.TriangleWorld? geometry,
                                                                      out List<OpenFPS.Common.Geometry.SolidRef> solids)
@@ -444,10 +430,11 @@ public static partial class PhysicsReplays
             IsJumpRequested = step.Jump, MapMin = map.Data.WalkMin, MapMax = map.Data.WalkMax,
         };
         solids = new List<OpenFPS.Common.Geometry.SolidRef>();
-        geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? map.Grid.Geometry : null;
+        var view = ServerPhysicsView.Of(ecs, map.Grid);
+        geometry = view.Triangles;
         if (geometry != null)
         {
-            var self = new OpenFPS.Common.Geometry.ExceptOwners(body.Id);
+            var self = new BodyFilter(view, body.Id);
             ctx.Body = OpenFPS.Common.Geometry.BodyShape.Capsule;
             ctx.Grade = SharedMovementEngine.GradeAlong(geometry, ref self, at, inputDir);
             SharedMovementEngine.GatherSolids(ctx, geometry, ref self, solids);
@@ -458,52 +445,22 @@ public static partial class PhysicsReplays
     /// <summary>The boxes a step is given, with their entities in the order given.</summary>
     public sealed record Gathered(List<int> Ids, List<SharedMovementEngine.Collider> Boxes);
 
-    /// <summary>MovementSystem's gather: the grid's moving half and the statics the triangles do not hold.</summary>
+    /// <summary>The server's gather (OnFoot.Gather over the server's view): the grid's moving half and the
+    /// statics the triangles do not hold, by id.</summary>
     public static Gathered ServerGather(LoadedMap map, Entity body, Vector3 at)
-    {
-        var ecs = map.World;
-        var near = new List<Entity>();
-        if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled && map.Grid.Geometry != null)
-            map.Grid.CollectDynamicInRadius(at, PhysicsConstants.CollisionSearchRadius, near, new HashSet<Entity>());
-        else map.Grid.CollectInRadius(at, PhysicsConstants.CollisionSearchRadius, near, new HashSet<Entity>());
-        var g = new Gathered(new List<int>(), new List<SharedMovementEngine.Collider>());
-        foreach (var o in near)
-        {
-            if (o.Id == body.Id || !ecs.Has<ColliderComponent>(o)) continue;
-            var t = ecs.Get<Transform>(o);
-            var c = ecs.Get<ColliderComponent>(o);
-            if (!c.IsSolid) continue;
-            g.Ids.Add(o.Id);
-            g.Boxes.Add(new SharedMovementEngine.Collider
-            {
-                Position = t.Position, Size = c.Size, Rotation = SharedMovementEngine.StandingRotation(c.Shape, t.Rotation),
-                Material = ecs.Has<MaterialComponent>(o) ? ecs.Get<MaterialComponent>(o).Material : "Generic",
-            });
-        }
-        return g;
-    }
+        => Gather(ServerPhysicsView.Of(map.World, map.Grid), body.Id, at);
 
-    /// <summary>ClientPhysicsSystem.Predict's gather on the triangle world: the statics the triangles do not
-    /// hold, then every moving solid within reach plus half its size.</summary>
+    /// <summary>A client's gather (OnFoot.Gather over its snapshot's view): the statics the triangles do not
+    /// hold and every moving solid near, by id. Before stage 3 it was a gather of its own, in the snapshot's
+    /// order and by another rule of near.</summary>
     public static Gathered ClientGather(WorldSnapshot snap, Vector3 at, int own)
+        => Gather(SnapshotPhysicsView.Of(snap), own, at);
+
+    private static Gathered Gather(IPhysicsWorld world, int own, Vector3 at)
     {
-        float reach = PhysicsConstants.CollisionSearchRadius;
-        var unindexed = snap.UnindexedStatics.Where(id => snap.Entities.ContainsKey(id)).Select(id => snap.Entities[id]);
-        var moving = snap.DynamicEntities.Where(d => d.Definition.Collider.IsSolid
-            && Vector3.Distance(d.Transform.Position, at) <= reach + d.Definition.Collider.Size.Length() * 0.5f);
-        var g = new Gathered(new List<int>(), new List<SharedMovementEngine.Collider>());
-        foreach (var entity in unindexed.Concat(moving))
-        {
-            if (entity.Id == own || !entity.Definition.Collider.IsSolid) continue;
-            g.Ids.Add(entity.Id);
-            g.Boxes.Add(new SharedMovementEngine.Collider
-            {
-                Position = entity.Transform.Position, Size = entity.Definition.Collider.Size,
-                Rotation = SharedMovementEngine.StandingRotation(entity.Definition.Collider.Shape, entity.Transform.Rotation),
-                Material = entity.Definition.Material.Material,
-            });
-        }
-        return g;
+        var bodies = new List<PhysicsBody>();
+        OnFoot.Gather(world, own, at, bodies);
+        return new Gathered(bodies.Select(b => b.Id).ToList(), bodies.Select(b => b.Collider).ToList());
     }
 
     /// <summary>

@@ -182,23 +182,20 @@ public class HotPathTests
         var memo = new GroundProbeMemo();
         var pos = new Vector3(10, 1, 10);
 
-        Assert.False(memo.TryGet(pos, staticVersion: 1, nowMs: 1000, out _, out _));
-        memo.Store(pos, staticVersion: 1, nowMs: 1000, height: 2.5f, material: "Wood");
+        Assert.False(memo.TryGet(pos, staticVersion: 1, out _, out _));
+        memo.Store(pos, staticVersion: 1, height: 2.5f, material: "Wood");
 
-        // A sub-tick input later: same tick, a centimetre of movement, same geometry.
-        Assert.True(memo.TryGet(pos + new Vector3(0.01f, 0, 0.01f), 1, 1005, out float height, out string material));
+        // Standing still: the same point, the same geometry.
+        Assert.True(memo.TryGet(pos, 1, out float height, out string material));
         Assert.Equal(2.5f, height);
         Assert.Equal("Wood", material);
 
-        // Moved off the memo's footprint.
-        Assert.False(memo.TryGet(pos + new Vector3(0.5f, 0, 0), 1, 1005, out _, out _));
+        // A centimetre away is another point (physics stage 3: until then the memo answered for 5 cm round,
+        // where a kerb's or a tread's edge is another floor, and a client probing afresh read that one).
+        Assert.False(memo.TryGet(pos + new Vector3(0.01f, 0, 0.01f), 1, out _, out _));
 
-        // The map changed under them — a wall spawned, a platform destroyed.
-        Assert.False(memo.TryGet(pos, staticVersion: 2, nowMs: 1005, out _, out _));
-
-        // Aged out. Dynamic colliders are not in the static version, so a remembered floor is only ever
-        // allowed to be this stale.
-        Assert.False(memo.TryGet(pos, 1, 1000 + GroundProbeMemo.MaxAgeMs + 1, out _, out _));
+        // The map changed under them — a wall spawned, a platform destroyed, a door swung.
+        Assert.False(memo.TryGet(pos, staticVersion: 2, out _, out _));
     }
 
     [Fact]
@@ -219,8 +216,8 @@ public class HotPathTests
             float direct = PhysicsUtils.GetGroundHeight(world, grid, standing, out string directMaterial);
 
             var memo = new GroundProbeMemo();
-            float first = PhysicsUtils.GetGroundHeight(world, grid, standing, ref memo, out string firstMaterial);
-            float second = PhysicsUtils.GetGroundHeight(world, grid, standing, ref memo, out string secondMaterial);
+            float first = PhysicsUtils.GetGroundHeight(world, grid, standing, -1, ref memo, out string firstMaterial);
+            float second = PhysicsUtils.GetGroundHeight(world, grid, standing, -1, ref memo, out string secondMaterial);
 
             Assert.Equal(direct, first);
             Assert.Equal(direct, second);

@@ -88,8 +88,11 @@ public class WallBumpAndNarrationTests
                     MoveDirection = direction == Vector3.Zero ? Vector3.Zero : Vector3.Normalize(direction) };
                 _reconciler.Step(input, _world, Dt);
                 var contact = WallBumps.Resolve(_reconciler.LastContact, _world, State.EyeHeight, out var struck);
+                var second = WallBumps.Resolve(_reconciler.LastSecondContact, _world, State.EyeHeight, out var secondStruck);
                 if (contact != null) Contacts++;
-                if (_bumps.Update(contact, State.Position)) Bumps.Add((struck.Id, Sightline.NameOf(struck)));
+                if (_bumps.Bump(contact, second, State.Position, out var bumped))
+                    Bumps.Add(bumped!.Value.EntityId == struck.Id && contact != null
+                        ? (struck.Id, Sightline.NameOf(struck)) : (secondStruck.Id, Sightline.NameOf(secondStruck)));
             }
         }
     }
@@ -159,10 +162,14 @@ public class WallBumpAndNarrationTests
     }
 
     /// <summary>A corner is two walls, and each is met once.</summary>
-    [Fact]
-    public void ACornerIsTwoThings()
+    [Theory]
+    [InlineData(30)]
+    [InlineData(5)]
+    public void ACornerIsTwoThings(int sideId)
     {
-        var side = Box(30, new Vector3(1.56f, 1.5f, 2f), new Vector3(2f, 3f, 0.12f), "Brandt Court, east wall",
+        // Whichever wall comes first by id (physics stage 3 gathers by id on both sides; until then the
+        // client met them in the order it heard of them, and a corner was two things only that one way round).
+        var side = Box(sideId, new Vector3(1.56f, 1.5f, 2f), new Vector3(2f, 3f, 0.12f), "Brandt Court, east wall",
                        rotation: Quaternion.CreateFromYawPitchRoll(MathF.PI / 2f, 0, 0));
         var world = World(new[] { Floor(), side }.Concat(WallAlongX(10, 3f, -3f, 3, "Brandt Court, north wall")).ToArray());
         var w = new Walker(world, new Vector3(0, 0, 1.5f));

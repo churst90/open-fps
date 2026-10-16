@@ -75,7 +75,7 @@ public class PhysicsBoundaryTests
 
     /// <summary>What steps the world. The sound may read the physics' values and presets; it never steps it
     /// (section 9). A stepper added later (a physics world, a vehicle step) goes on this list.</summary>
-    private static readonly string[] Steppers = { "OpenFPS.Common.SharedMovementEngine" };
+    private static readonly string[] Steppers = { "OpenFPS.Common.SharedMovementEngine", "OpenFPS.Common.OnFoot" };
 
     /// <summary>
     /// Nothing in the sound project names a stepper: the server steps the physics, the client predicts the

@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Buffers;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using static OpenFPS.Common.PhysicsConstants;
@@ -29,16 +28,9 @@ public class ClientPhysicsSystem
     /// <summary>The last step was stopped at the edge of a tile not built yet.</summary>
     public bool Fenced { get; private set; }
 
-    private readonly List<OpenFPS.Common.Geometry.SolidRef> _solids = new(32);
-
-    /// <summary>Every solid but the body's own and those the triangle world is rebuilding.</summary>
-    private struct OwnAndStale : OpenFPS.Common.Geometry.IGeometryFilter
-    {
-        public int Own;
-        public IReadOnlySet<int>? Stale;
-        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
-            => owner != Own && (Stale == null || !Stale.Contains(owner));
-    }
+    /// <summary>The snapshot as the physics sees it, and the step's lists: the game thread's alone.</summary>
+    private readonly SnapshotPhysicsView _view = new();
+    private readonly OnFoot.Scratch _scratch = new();
 
     public ClientPhysicsSystem(LocalPlayerState state, SpatialService spatial)
     {
@@ -73,7 +65,10 @@ public class ClientPhysicsSystem
     /// <see cref="PredictionReconciler.LastContact"/>.</returns>
     public BodyContact? Predict(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
     {
-        float groundY = PhysicsUtils.GetGroundHeight(snapshot, _state.Position, OwnEntityId, out string mat);
+        // The server's question of the client's world: the same ground probe and gather (OnFoot), what moves
+        // counted in both, so a body standing on a parked car stands on its roof here too.
+        var world = _view.Over(snapshot);
+        float groundY = Footing.GroundOn(world, _state.Position, OwnEntityId, null, _scratch.Ground, out string mat);
         _state.CurrentMaterial = mat;
 
         Vector3 inputDir = Vector3.Zero;
@@ -82,116 +77,49 @@ public class ClientPhysicsSystem
             inputDir = Vector3.Transform(input.MoveDirection, Quaternion.CreateFromYawPitchRoll(_state.Yaw, 0, 0));
         }
 
-        // Only what is near enough to walk into. An EMPTY grid answer means no static geometry in reach
-        // (the middle of a road); reading it as a failure put the whole map through the solver every
-        // tick, and a city of six thousand boxes locked the client up. Only a MISSING grid (between a
-        // map arriving and its first rebuild) means consider everything. Moving solids are added
-        // separately: the static grid never holds them, and without them the client walked through a
-        // bus and the server pulled it back every tick.
-        IEnumerable<EntitySnapshot> candidates;
-        bool triangles = SpatialService.UsesTriangles(snapshot);
-        var gridResults = triangles ? null : snapshot.StaticGrid?.GetItemsInRadius(_state.Position, CollisionSearchRadius);
-        if (triangles)
+        var ctx = new SharedMovementEngine.MovementContext
         {
-            // The triangle world's solids are gathered below; here only the statics it does not hold.
-            float reach = CollisionSearchRadius;
-            var unindexed = snapshot.UnindexedStatics.Where(id => snapshot.Entities.ContainsKey(id)).Select(id => snapshot.Entities[id]);
-            var moving = snapshot.DynamicEntities.Where(d =>
-                d.Definition.Collider.IsSolid
-                && Vector3.Distance(d.Transform.Position, _state.Position)
-                   <= reach + d.Definition.Collider.Size.Length() * 0.5f);
-            candidates = unindexed.Concat(moving);
-        }
-        else if (gridResults != null)
-        {
-            float reach = CollisionSearchRadius;
-            var moving = snapshot.DynamicEntities.Where(d =>
-                d.Definition.Collider.IsSolid
-                && Vector3.Distance(d.Transform.Position, _state.Position)
-                   <= reach + d.Definition.Collider.Size.Length() * 0.5f);
-            candidates = gridResults.Select(id => snapshot.Entities[id]).Concat(moving);
-        }
-        else
-            candidates = snapshot.Entities.Values;
+            Position = _state.Position,
+            Velocity = _state.Velocity,
+            InputDirection = inputDir,
+            DeltaTime = dt,
+            GroundHeight = groundY,
+            Gravity = Gravity,
+            JumpForce = JumpPower,
+            Speed = PhysicsConstants.FootSpeed(input.Sprint, _state.SpeedLimit),
+            PlayerRadius = PlayerRadius,
+            PlayerHeight = PlayerHeight,
+            StepHeight = StepHeight,
+            IsJumpRequested = input.Jump,
+            MapMin = MapMin,
+            MapMax = MapMax,
+            // Held, and its ground built into the triangles: a foot never comes down on ground the client
+            // cannot stand on yet.
+            TileReady = TileReady is { } held ? key => held(key) && snapshot.Geometry is { } g && g.InstanceOfTile(key) >= 0 : null,
+            TileMetres = TileMetres,
+        };
 
-        int maxCandidates = candidates.Count();
-        var colliderArray = ArrayPool<SharedMovementEngine.Collider>.Shared.Rent(maxCandidates);
-        var idArray = ArrayPool<int>.Shared.Rent(maxCandidates);
-        int colliderCount = 0;
+        var step = OnFoot.Step(world, OwnEntityId, ctx, _scratch);
+        Fenced = step.Contact.Fenced;
 
-        try
-        {
-            foreach (var entity in candidates)
-            {
-                if (entity.Id == OwnEntityId) continue;
-                var def = entity.Definition;
-                if (!def.Collider.IsSolid) continue;
+        _state.Position = step.Position;
+        _state.Velocity = step.Velocity;
+        _state.IsGrounded = step.Grounded;
 
-                idArray[colliderCount] = entity.Id;
-                colliderArray[colliderCount++] = new SharedMovementEngine.Collider {
-                    Position = entity.Transform.Position,
-                    Size = def.Collider.Size,
-                    Rotation = SharedMovementEngine.StandingRotation(def.Collider.Shape, entity.Transform.Rotation),
-                    Material = def.Material.Material
-                };
-            }
-
-            var ctx = new SharedMovementEngine.MovementContext
-            {
-                Position = _state.Position,
-                Velocity = _state.Velocity,
-                InputDirection = inputDir,
-                DeltaTime = dt,
-                GroundHeight = groundY,
-                Gravity = Gravity,
-                JumpForce = JumpPower,
-                Speed = PhysicsConstants.FootSpeed(input.Sprint, _state.SpeedLimit),
-                PlayerRadius = PlayerRadius,
-                PlayerHeight = PlayerHeight,
-                StepHeight = StepHeight,
-                IsJumpRequested = input.Jump,
-                MapMin = MapMin,
-                MapMax = MapMax,
-                // Held, and its ground built into the triangles: a foot never comes down on ground the client
-                // cannot stand on yet.
-                TileReady = TileReady is { } held ? key => held(key) && snapshot.Geometry is { } g && g.InstanceOfTile(key) >= 0 : null,
-                TileMetres = TileMetres,
-            };
-
-            var collidersSlice = new ReadOnlySpan<SharedMovementEngine.Collider>(colliderArray, 0, colliderCount);
-            var obstacles = new SharedMovementEngine.Obstacles(collidersSlice);
-            var solids = _solids;
-            solids.Clear();
-            if (triangles)
-            {
-                var filter = new OwnAndStale { Own = OwnEntityId, Stale = snapshot.GeometryStale };
-                // As the server: the capsule on triangles, and the grade of the floor along the way.
-                ctx.Body = OpenFPS.Common.Geometry.BodyShape.Capsule;
-                ctx.Grade = SharedMovementEngine.GradeAlong(snapshot.Geometry!, ref filter, _state.Position, inputDir);
-                SharedMovementEngine.GatherSolids(ctx, snapshot.Geometry!, ref filter, solids);
-                obstacles = new SharedMovementEngine.Obstacles(collidersSlice, snapshot.Geometry,
-                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(solids));
-            }
-            var result = SharedMovementEngine.Step(ctx, obstacles, out var contact);
-            Fenced = contact.Fenced;
-
-            _state.Position = result.NewPosition;
-            _state.Velocity = result.NewVelocity;
-            _state.IsGrounded = result.IsGrounded;
-
-            if (!contact.Blocked || contact.ColliderIndex < 0) return null;
-            int hitId;
-            if (contact.ColliderIndex < colliderCount) hitId = idArray[contact.ColliderIndex];
-            else if (contact.ColliderIndex - colliderCount < solids.Count) hitId = snapshot.Geometry!.OwnerOf(solids[contact.ColliderIndex - colliderCount]);
-            else return null;
-            return new BodyContact(hitId, contact.Normal, contact.IntoSpeed, ctx.Speed, result.NewPosition);
-        }
-        finally
-        {
-            ArrayPool<SharedMovementEngine.Collider>.Shared.Return(colliderArray);
-            ArrayPool<int>.Shared.Return(idArray);
-        }
+        LastContactEvent = OnFoot.ContactOf(OwnEntityId, PhysicsConstants.PersonMaterial, step);
+        SecondContact = OnFoot.SecondContactOf(OwnEntityId, PhysicsConstants.PersonMaterial, step) is { } also
+            ? new BodyContact(also.Other, also.Normal, also.ClosingSpeed, ctx.Speed, also.Point) : null;
+        if (LastContactEvent is not { } contact) return null;
+        return new BodyContact(contact.Other, contact.Normal, contact.ClosingSpeed, ctx.Speed, contact.Point);
     }
+
+    /// <summary>The last step's contact as the physics states it (<see cref="ContactEvent"/>), or null when
+    /// nothing held the body back. Its phase is always Began: a replayed step cannot tell.</summary>
+    public ContactEvent? LastContactEvent { get; private set; }
+
+    /// <summary>Another thing the last step pressed into besides what <see cref="Predict"/> returned: in a
+    /// corner, the other wall. Null when there was none.</summary>
+    public BodyContact? SecondContact { get; private set; }
 }
 
 /// <summary>
@@ -203,4 +131,24 @@ public class ClientPhysicsSystem
 public readonly record struct BodyContact(int EntityId, Vector3 Normal, float IntoSpeed, float Speed, Vector3 Feet)
 {
     public float Intent => Speed > 1e-4f ? Math.Clamp(IntoSpeed / Speed, 0f, 1f) : 0f;
+}
+
+/// <summary>What a fresh step's contacts are to the wall bumps.</summary>
+public static class BodyContacts
+{
+    /// <summary>
+    /// One fresh movement step's two contacts put to <paramref name="bumps"/>: what the body pressed hardest
+    /// into, and the other thing it pressed into (in a corner, the other wall), each already resolved
+    /// (<see cref="WallBumps.Resolve"/>). Of two walls pressed equally, which the step names first depends on the
+    /// order it met them; asked of both, a corner is two walls whatever that order. True when either is a new
+    /// bump, which <paramref name="bumped"/> says.
+    /// </summary>
+    public static bool Bump(this WallBumps bumps, BodyContact? first, BodyContact? second, Vector3 feet, out BodyContact? bumped)
+    {
+        bumped = null;
+        if (first == null) (first, second) = (second, null);
+        if (bumps.Update(first, feet)) { bumped = first; return true; }
+        if (second != null && bumps.Update(second, feet)) { bumped = second; return true; }
+        return false;
+    }
 }

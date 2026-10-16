@@ -176,7 +176,6 @@ public class MovementReplayTests : IClassFixture<PhysicsStore.Maps>
 
         Assert.True(run.ReproductionMisses == 0,
             $"{run.ReproductionMisses} ticks where the rig's copy of MovementSystem's step disagreed with it: the risks it measures are of another step");
-        Assert.True(run.ClockStalls == 0, "the machine stalled past the ground memo's 150 ms in a tick, three times running");
 
         PhysicsStore.Check(PhysicsStore.PathOf("walks", name + ".tsv"), track, TrackTolerance, OtherMaths, $"walk {name}", log: _o.WriteLine);
         CheckSummary(run);
