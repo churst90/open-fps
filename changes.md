@@ -15,6 +15,14 @@ Recent work, newest first. `git log` has the rest.
   No model was touched and no stored render changes: the seventeen fingerprint renders are the same to the
   bit made flushed, the doors included, whose floor (`DoorPhysics.Rest`) stays. The wire hash does not change.
 
+- The ground by its impedance (todo, "The ground reflection, done properly"; docs/CLIENT_NOTES.md). The ground's
+  materials carry Nord2000's flow resistivities, and a voice's ground is judged as a spherical wave off a
+  Delany-Bazley impedance with its ground wave, in each of the voice's bands. The copy Cody approved is unchanged;
+  where the real ground carries less than sound and copy, the band is brought down to it. A car's exhaust 0.3 m
+  over Elm Park's lawn loses 2.2 dB of its middle at 25 m, 6.8 at 50 and 9.4 at 100; roads within 0.6 dB, concrete
+  and water as before. On the maps: sources at the ground on grass (rain's rills, runnels, downpipes) lose 8 dB of
+  their middle at 25 m; the train beyond Elm Park 3 to 4 dB at 100 to 170 m; garden mowers 7 dB at 100 m; the
+  fountain's low taps 3.6 dB across the lawn. Stored streams: three new fields, all zero.
 - A door's jamb is not a wall. The near-wall copies took any surface a probe met within 3 m as a whole
   wall, so standing in a doorway put a copy of everything at each ear off the jambs and the head. Each probe
   now looks again across the surface it met, on its plane, half and a whole first Fresnel zone each way, and

@@ -109,6 +109,11 @@ conductivity, melting point, water uptake and vapour resistance. The fuel fields
 - Aliases: Steel and MildSteel are Metal, Aluminum is Aluminium, SodaLimeGlass is Glass, Soil is Dirt,
   Porcelain and CeramicTile are Tile, Plasterboard and Gypsum are Plaster, Stainless is StainlessSteel.
   An alias reads its material; lists show only the table's own names.
+- Flow resistivity (2026-10-16, `FlowResistivityKPa`): the ground's, kPa s/m², for the ground by its impedance
+  (docs/CLIENT_NOTES.md, "The ground by its impedance"). Grass 200, Foliage 31.5, Dirt and Gravel 500, Sand 300
+  (an estimate between two classes), Snow 12.5, Clay 2,000, Asphalt 20,000, Concrete 200,000, Water and Ice
+  rigid; none elsewhere. Sources NORD (Nord2000's ground classes, DELTA report AV 1849/00) and EPD (Embleton,
+  Piercy and Daigle, J. Acoust. Soc. Am. 74 (1983) 1239), on `AcousticRegistry.AddGroundImpedance`.
 - GlassWool (2026-10-11, index 58): the glass-fibre batt between a timber wall's studs, its own face like
   Foam's. Softer than the air in it, so between two boards it is a cavity, not a bond
   (`WallTransmission.IsCavity`; docs/GEOMETRY.md 12.6, "Timber walls are framed").

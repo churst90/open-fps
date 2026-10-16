@@ -163,6 +163,10 @@ public struct SpatialEmitter
     public float GroundDelaySeconds;
     public float GroundLowGain;
     public float GroundHighGain;
+    /// <summary>What the ground takes from the voice's own bands besides its copy, dB per band (AcousticBands), zero
+    /// for none: a lawn grazed from far off cancels part of the direct sound, which a copy that only adds cannot do
+    /// (GroundAnswer). Applied only where the voice plays the copy.</summary>
+    public float GroundLowDb, GroundMidDb, GroundHighDb;
     /// <summary>
     /// When non-zero, this voice is the front outlet (intake and block) of that entity's live engine,
     /// at its own point on the machine. The same integration writes both taps, and they sum to exactly

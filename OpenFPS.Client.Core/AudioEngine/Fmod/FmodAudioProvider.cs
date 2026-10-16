@@ -638,6 +638,19 @@ public partial class FmodAudioProvider : IAudioProvider
         
         /// <summary>What the air takes over the path, dB per band (ISO 9613-1).</summary>
         public float AirLowDb, AirMidDb, AirHighDb;
+        /// <summary>What the ground takes from the voice's bands besides its copy, dB (SpatialEmitter.GroundLowDb),
+        /// where it is headed and where it is, glided as the path's bands are.</summary>
+        public float TargetGroundLowDb, TargetGroundMidDb, TargetGroundHighDb, GroundLowDb, GroundMidDb, GroundHighDb;
+
+        /// <summary>The ground's take from <paramref name="e"/>, on a voice that plays its copy; none on one that
+        /// does not. <paramref name="now"/>: start there rather than glide (a sound just begun).</summary>
+        public void TakeGround(in SpatialEmitter e, bool playsCopy, bool now)
+        {
+            TargetGroundLowDb = playsCopy ? e.GroundLowDb : 0f;
+            TargetGroundMidDb = playsCopy ? e.GroundMidDb : 0f;
+            TargetGroundHighDb = playsCopy ? e.GroundHighDb : 0f;
+            if (now) { GroundLowDb = TargetGroundLowDb; GroundMidDb = TargetGroundMidDb; GroundHighDb = TargetGroundHighDb; }
+        }
         public int TargetRegionId = -1; 
         public bool IsReflection; 
         /// <summary>The overloading sound itself: everything else gives way to it, not this.</summary>
@@ -3306,6 +3319,7 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 saState?.Ground?.Set(emitter.GroundDelaySeconds, emitter.GroundLowGain, emitter.GroundHighGain);
                 activeSound.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
+                activeSound.TakeGround(emitter, saState?.Ground != null, now: true);
             }
 
             if (_acousticMap != null && !activeSound.IsReflection && emitter.Type != EmitterType.UI) // a reflection does not feed the reverb
@@ -3527,6 +3541,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.SaState?.Ground?.Set(emitter.GroundDelaySeconds, emitter.GroundLowGain, emitter.GroundHighGain);
                     active.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
                 }
+                active.TakeGround(emitter, ground != null || (!active.IsReflection && active.SaState?.Ground != null), now: false);
                 active.MinDistance = emitter.MinDistance;
                 // No 3D calls on a 2D (binaural) voice: run every frame, this was most of the 113,228
                 // refused calls (see PlaySpatialSound).
@@ -4235,6 +4250,9 @@ public partial class FmodAudioProvider : IAudioProvider
         active.CurrentLow = MathHelper.Lerp(active.CurrentLow, active.TargetLow, lerpFactor);
         active.CurrentMid = MathHelper.Lerp(active.CurrentMid, active.TargetMid, lerpFactor);
         active.CurrentHigh = MathHelper.Lerp(active.CurrentHigh, active.TargetHigh, lerpFactor);
+        active.GroundLowDb = MathHelper.Lerp(active.GroundLowDb, active.TargetGroundLowDb, lerpFactor);
+        active.GroundMidDb = MathHelper.Lerp(active.GroundMidDb, active.TargetGroundMidDb, lerpFactor);
+        active.GroundHighDb = MathHelper.Lerp(active.GroundHighDb, active.TargetGroundHighDb, lerpFactor);
 
         // The path is applied once: the band gains are the whole of what occlusion, transmission and
         // diffraction do, as 20 log10 each in the EQ below, with the air's per-band loss. Applied
@@ -4339,6 +4357,8 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             var (lowDb, midDb, highDb) = PathEqDb(active.CurrentLow, active.CurrentMid, active.CurrentHigh,
                                                   active.AirLowDb, active.AirMidDb, active.AirHighDb);
+            // What the ground takes besides the copy the voice plays of itself (GroundAnswer).
+            lowDb -= active.GroundLowDb; midDb -= active.GroundMidDb; highDb -= active.GroundHighDb;
 
             // Sitting in a car, everything outside it comes through the glass and the doors: not the
             // car's own engine (its voice rendered the body already), not the cues on your head.

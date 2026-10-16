@@ -15,7 +15,8 @@ namespace OpenFPS.Client.AudioEngine.Acoustics;
 /// (EngineEchoState.MinDelayBlocks, about 46 ms), because FMOD's order of DSPs is not fixed, and a ground
 /// path is a hundred times shorter. So the voice's own output goes through a short delay line and the
 /// surface's two bands (from its absorption, split at a kilohertz) and back in. The second arrival's
-/// direction, a few degrees lower, is not rendered.
+/// direction, a few degrees lower, is not rendered. A copy only adds; what soft ground grazed from far off
+/// takes besides rides on the voice's own bands in the mixer (GroundAnswer, SpatialEmitter.GroundLowDb).
 ///
 /// Mixer-thread object: allocated once, no locks; the game thread writes targets and they are glided to.
 /// </remarks>
@@ -57,7 +58,7 @@ public sealed class GroundReflection
     public GroundReflection(float sampleRate)
     {
         _rate = sampleRate;
-        _lpA = 1f - MathF.Exp(-2f * MathF.PI * 1000f / sampleRate);
+        _lpA = 1f - MathF.Exp(-2f * MathF.PI * OpenFPS.Common.GroundAnswer.CopySplitHz / sampleRate);
         // Thirty milliseconds: a delay that steps tears the waveform, one that lags a pass smears it.
         _glide = 1f - MathF.Exp(-1f / (0.03f * sampleRate));
     }

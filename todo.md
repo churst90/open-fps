@@ -543,8 +543,8 @@ path trims and other rooms' fields on the thread pool, all 2026-10-12). Left, ea
 - The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost
   25 MB and twice the convolution (Cody).
 - Below 120 Hz the tail of a room you are not in is identical in both ears.
-- A voice's ground reflection flanges, so voices have none. Next: the ground as it answers (Next,
-  below), and a lab render with head and body movement on both ends.
+- A voice's ground reflection flanges, so voices have none. The ground as it answers is built (below);
+  next, a lab render with head and body movement on both ends.
 - Blocked sources come from one edge at a time. If a siren behind buildings wanders again, blend the
   routes by energy.
 - The traced echoes convolve at 1,024 samples and arrive about 20 ms late.
@@ -699,11 +699,15 @@ phrases: in `/edit build column 0.3 by 3 ahead 2` the 2 is read as a size and th
   stay sharp ticks (no recording to compare).
 
 ### The ground reflection, done properly (discussed 2026-10-06)
-The ground is the strongest reflection outdoors, so it stays, but as the ground really answers:
-filtered by the surface's impedance (Delany-Bazley or Miki), with the coherent share falling with
-frequency, distance, roughness and turbulence (Clifford and Lataitis; Nord2000, Harmonoise), and the
-rest scattered. A perfect mirror copy is what flanged, which is why speech has none today. Moving
-bodies go into the acoustic scene with Bodies and wheels stage 2.
+Built 2026-10-16, unheard (docs/CLIENT_NOTES.md, "The ground by its impedance"): Delany-Bazley
+impedance from Nord2000's flow resistivities, the spherical wave's reflection, Clifford and Lataitis'
+coherence; it only takes from the approved copy. Left:
+- what the law would add (the far top over any ground, water and concrete at a hundred metres, 1 to 4 dB),
+  held back as approved (Cody's call);
+- roughness and the scattered share (the 20 dB floor stands in); the ground mixed over the Fresnel zone
+  instead of one bounce point; μ² from the weather; the tyre share and textures seen by the law;
+- speech could take the ground as band gains with no copy at all, which cannot flange.
+Moving bodies go into the acoustic scene with Bodies and wheels stage 2.
 
 ### Fire, the rest
 Fire at any size is built and approved (docs/FIRE.md). Fire that burns what is there, stage 1, is built

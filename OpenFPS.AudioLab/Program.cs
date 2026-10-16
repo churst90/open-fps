@@ -163,6 +163,7 @@ string[] usage =
     "  --speech-lines                                decodes every shipped voice line as the client does",
     "  --heard-levels [d=1.5] [wav=DIR]              doors, steps, speech: declared vs LAFmax at the ear",
     "  --ground-voice [line.ogg] [--at=3] [--angle=30] [--out=DIR] [--ladder]",
+    "  --ground-answer [map=city] ear=x,y,z src=x,y,z [src=...] [car=preset] [speed=km/h] [out=DIR] [cost] | survey",
     "                                                a talker's ground reflection three ways",
     "  --mic [sec=3] [device=NAME]                   the microphone through FMOD, as voice chat opens it: samples and level; nothing kept",
     "",
@@ -775,6 +776,11 @@ if (args.Contains("--materials"))
 if (args.Contains("--bumps"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.BumpSpike.Run(args));
+}
+
+if (args.Contains("--ground-answer"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GroundAnswerSpike.Run(args));
 }
 
 if (args.Contains("--ground-voice"))

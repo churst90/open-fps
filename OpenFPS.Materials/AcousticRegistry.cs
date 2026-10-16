@@ -107,6 +107,13 @@ public struct MaterialProperties
     /// <see cref="Common.Underfoot.Ground"/>.</summary>
     public Underfoot? Underfoot { get; set; }
 
+    /// <summary>
+    /// For ground: how hard air finds it to flow into the surface, kPa s/m2 (Nord2000's impedance classes; the
+    /// sources are in <c>AddGroundImpedance</c>). With it the ground answers a sound grazing it as its impedance says
+    /// (GroundAnswer, OpenFPS.Acoustics); without it, by its absorption as before. Infinity is rigid (water).
+    /// </summary>
+    public float? FlowResistivityKPa { get; set; }
+
     // ── What it does when struck by a round (BulletImpact, Ricochet) ─────────────────────────────
 
     /// <summary>How a round's strike on it behaves. Every material in the table has one; null only on a
@@ -256,6 +263,7 @@ public static class AcousticRegistry
             AddUnderfoot(reg);
             AddMatter(reg);
             AddStrikesAfterMatter(reg);
+            AddGroundImpedance(reg);
 
             foreach (var kvp in reg)
                 if (kvp.Value.Strike == null)
@@ -529,6 +537,48 @@ public static class AcousticRegistry
         p.LossFactor = lossAt1kHz;
         if (porous is { } isPorous) p.Porous = isPorous;
         reg[name] = p;
+    }
+
+    /// <summary>
+    /// How hard air finds it to flow into each ground (<see cref="MaterialProperties.FlowResistivityKPa"/>), kPa s/m2.
+    /// These are effective flow resistivities: the one figure that, through Delany and Bazley's impedance, fits a
+    /// ground's measured excess attenuation, so they belong with that model and no other. Every other material has
+    /// none and answers by its absorption, as before. Sources:
+    ///   NORD  Nord2000's ground classes, A to H: 12.5 very soft (snow, moss), 31.5 soft forest floor, 80 uncompacted
+    ///         loose ground (turf, loose soil), 200 normal uncompacted ground (pasture), 500 compacted field and gravel
+    ///         (compacted lawns, park area), 2,000 compacted dense ground (gravel road, car park), 20,000 hard surfaces
+    ///         (most normal asphalt), 200,000 very hard and dense surfaces (dense asphalt, concrete, water) (Plovsing,
+    ///         Nord2000 comprehensive outdoor propagation model, DELTA report AV 1849/00, rev. 2006; the same classes
+    ///         in Harmonoise and Imagine).
+    ///   EPD   Embleton, Piercy and Daigle, "Effective flow resistivity of ground surfaces determined by acoustical
+    ///         measurements", J. Acoust. Soc. Am. 74 (1983) 1239: dry snow 10-30, forest floor 20-80, grass 150-300,
+    ///         roadside dirt 300-800, sandy silt packed hard by vehicles 800-2,500.
+    /// </summary>
+    private static void AddGroundImpedance(Dictionary<string, MaterialProperties> reg)
+    {
+        void Flow(string name, float kPa) { var p = reg[name]; p.FlowResistivityKPa = kPa; reg[name] = p; }
+        // A lawn: NORD D, pasture, and the middle of EPD's grass. NORD puts a compacted park lawn in E, 500.
+        Flow("Grass", 200f);
+        // Leaves on the ground, a forest floor: NORD B; EPD 20-80. A hedge's top or a crown met from above is as soft.
+        Flow("Foliage", 31.5f);
+        // Soil, compacted: NORD E; EPD's roadside dirt 300-800.
+        Flow("Dirt", 500f);
+        // NORD E, "compacted field and gravel".
+        Flow("Gravel", 500f);
+        // Loose dry sand, between NORD D and E (EST: uncompacted, coarser than soil).
+        Flow("Sand", 300f);
+        // Settled snow: NORD A; EPD's dry snow 10-30.
+        Flow("Snow", 12.5f);
+        // Firm clay: NORD F, compacted dense ground; EPD's hard-packed sandy silt 800-2,500.
+        Flow("Clay", 2000f);
+        // NORD G, most normal asphalt.
+        Flow("Asphalt", 20000f);
+        // NORD H, very hard and dense.
+        Flow("Concrete", 200000f);
+        // Water's characteristic impedance is about 3,500 times air's (1.48e6 against 413 Pa s/m): to a sound in air it
+        // is rigid. NORD puts it in H; rigid is the limit H stands for. Ice is still water to sound (its face is water's).
+        Flow("Water", float.PositiveInfinity);
+        Flow("Ice", float.PositiveInfinity);
     }
 
     /// <summary>The properties beyond sound for a material already in the table.</summary>

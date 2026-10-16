@@ -132,6 +132,48 @@ real talker on a pavement does not sound like that, so something the ear uses is
 shadow on sound from below, the talker's own vertical radiation, or the small movements that keep a comb
 from standing still. Until one is measured, a voice has none (WorldAudioPlayer.HearsTheGround).
 
+## The ground by its impedance
+
+Built 2026-10-16 (todo, "The ground reflection, done properly"). A voice's ground was only ever a copy of
+itself, the surface's absorption in two bands: over grass it added a little less than over asphalt, and
+never took anything away. Real soft ground grazed from far off sends the middle of the range back turned
+over and cancels part of the direct sound, which is a large part of why traffic fades across fields.
+
+- The ground's materials carry a flow resistivity (Nord2000's classes; the sources are on
+  `AcousticRegistry.AddGroundImpedance`): lawn 200, forest floor (Foliage) 31.5, dirt and gravel 500, sand 300,
+  snow 12.5, clay 2,000, asphalt 20,000, concrete 200,000 kPa s/m², water and ice rigid. Everything else has
+  none and answers by its absorption, as before.
+- `GroundAnswer` (OpenFPS.Acoustics): Delany and Bazley's impedance; the spherical wave's reflection,
+  Q = Rp + (1 - Rp) F(w), with Humlicek's W4 for the Faddeeva function; Clifford and Lataitis' coherence as
+  before. Sound and real ground carry 1 + |Qs|² + 2 C Re(Qs e^(ikΔ)) over free field, judged over four
+  stretches of the voice's bands (50-400, 400-1,000, 1,000-4,000, 4,000-14,000 Hz), each over three thirds
+  of itself with the mean of e^(ikΔ) in closed form, so it moves smoothly as a source does. No band falls
+  more than 20 dB under free field: unevenness and scattering are not modelled, and the floor stands in.
+- The copy Cody approved stays as it was, bit for bit (the stored streams moved only by the three new
+  fields, all zero). The impedance only takes away: in each of the voice's bands, sound and copy (reckoned
+  as GroundReflection plays it, its one-pole split and its delay) are brought down to what sound and the
+  real ground carry where that is less, as a gain on the band (`SpatialEmitter.GroundLowDb` and the rest,
+  glided in the mixer's THREE_EQ with the path). Where the real ground carries more it is left alone. So
+  the far top over any ground, and water and concrete in the middle at a hundred metres, stay as they were
+  though the law would lift them 1 to 4 dB (turbulence makes the top add as power, and the old law gave
+  every surface asphalt's fall with range): a question for Cody.
+- Roads, car parks and hard floors: asphalt within 0.6 dB in every band for a source 0.3 m and more up and a
+  standing ear from 2 to 200 m, concrete and water unchanged (GroundAnswerTests holds 0.75 dB). Tile, marble,
+  wood, brick and carpet have no flow resistivity and are exactly as before.
+- Where it shows: the bounce lands near the lower end of the path, so it is the ground under a low source
+  that matters. A car on Alder Street heard from Elm Park bounces on the pavement's concrete: no change.
+  A car's exhaust 0.3 m over Elm Park's lawn (AudioLab `--ground-answer car=i4_midsize`, the live voice at
+  50 km/h): the middle band 2.2 dB down at 25 m, 6.8 at 50, 9.4 at 100 and 9.1 at 145, the low band 0.4
+  and 0.8 down at 100 and 145, the top as it was. A source at the ground (a rill, a downpipe's splash) over
+  grass loses 3.6 dB of its middle at 10 m and 8.5 at 25, and its top as well.
+- Cost: 3.3 µs a voice on ground with a flow resistivity, 0.12 µs without (AudioLab `--ground-answer cost`),
+  on the placement thread with the rest of ApplyGround; the rays are cached as before.
+- Not seen by the law: a car's tyre share (GroundReflection.NearGroundShare), which makes the copy carry
+  more than reckoned, so the ground takes less from a car than it should; and a texture's ground, reckoned
+  as a comb (a source at the ground has its copy in phase either way).
+  The ground is judged at the one bounce point, so it changes as that point crosses a kerb (Nord2000's
+  Fresnel-zone mixing would blend it). μ² is fixed at 5e-6, not taken from the weather.
+
 ## One-off sounds: why the echoes are as they are
 
 - Render once, play by name. Before WorldAudioPlayer the server's whole vocabulary for sound was "this

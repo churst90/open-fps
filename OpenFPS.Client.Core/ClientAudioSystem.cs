@@ -3790,12 +3790,35 @@ public partial class ClientAudioSystem
     /// <summary>Below this a recorded sound's own bounce is already in the recording, metres.</summary>
     internal const float RecordedGroundMinHeight = 0.15f;
 
+    /// <summary>
+    /// Two rays straight down (ApplyGround's). The first finds the ground under the source, which fixes where the bounce
+    /// lands, between the two in the ratio of their heights (<paramref name="at"/>); the second, from the direct path above
+    /// that point, finds what is there to bounce off: a surface above the ground and below the line (a bonnet, a kerb)
+    /// is what the sound meets. Buffers the caller's, one ray long.
+    /// </summary>
+    internal static bool LookForGround(SpatialService spatial, WorldSnapshot world, Vector3 src, Vector3 ear, Vector3[] down,
+                                       float[] dist, float[] abs, string[] mat, out float height, out string material, out Vector3 at)
+    {
+        const float Reach = 30f;
+        height = 0f; material = "Generic"; at = src;
+        spatial.RaycastAll(world, src + new Vector3(0f, 0.05f, 0f), down, Reach, dist, abs, mat, staticOnly: true);
+        if (!(dist[0] < Reach)) return false;
+        float g0 = src.Y + 0.05f - dist[0];
+        float hs0 = MathF.Max(0.02f, src.Y - g0), hr0 = MathF.Max(0.02f, ear.Y - g0);
+        at = Vector3.Lerp(src, ear, hs0 / (hs0 + hr0));
+        spatial.RaycastAll(world, at + new Vector3(0f, 0.02f, 0f), down, Reach, dist, abs, mat, staticOnly: true);
+        if (!(dist[0] < Reach)) return false;
+        height = at.Y + 0.02f - dist[0];
+        material = mat[0] ?? "Generic";
+        return true;
+    }
+
     private void ApplyGround(ref SpatialEmitter e, WorldSnapshot? world, bool keep, float minHeight)
     {
         e.GroundDelaySeconds = 0f; e.GroundLowGain = 0f; e.GroundHighGain = 0f;
+        e.GroundLowDb = 0f; e.GroundMidDb = 0f; e.GroundHighDb = 0f;
         if (world == null || _state.IsRiding) return;          // from inside a vehicle there is no road to hear
         Vector3 src = e.Position, ear = _groundEar;
-        const float Reach = 30f;
 
         // The rays are the cost: cast again only once the source or the ear has moved a metre, or after
         // a quarter of a second.
@@ -3803,68 +3826,24 @@ public partial class ClientAudioSystem
         if (!_groundCache.TryGetValue(e.EntityId, out var c)
             || Vector3.DistanceSquared(c.Src, src) > 1f || Vector3.DistanceSquared(c.Ear, ear) > 1f || now - c.At > 0.25)
         {
-            c = new GroundCache { Src = src, Ear = ear, At = now, Found = false };
-            _spatial.RaycastAll(world, src + new Vector3(0f, 0.05f, 0f), _groundRay, Reach, _groundDist, _groundAbs, _groundMat, staticOnly: true);
-            if (_groundDist[0] < Reach)
-            {
-                float g0 = src.Y + 0.05f - _groundDist[0];
-                float hs0 = MathF.Max(0.02f, src.Y - g0), hr0 = MathF.Max(0.02f, ear.Y - g0);
-                var above0 = Vector3.Lerp(src, ear, hs0 / (hs0 + hr0));
-                _spatial.RaycastAll(world, above0 + new Vector3(0f, 0.02f, 0f), _groundRay, Reach, _groundDist, _groundAbs, _groundMat, staticOnly: true);
-                if (_groundDist[0] < Reach)
-                {
-                    c.Found = true;
-                    c.Height = above0.Y + 0.02f - _groundDist[0];
-                    c.Material = _groundMat[0] ?? "Generic";
-                }
-            }
+            c = new GroundCache { Src = src, Ear = ear, At = now };
+            c.Found = LookForGround(_spatial, world, src, ear, _groundRay, _groundDist, _groundAbs, _groundMat,
+                                    out c.Height, out c.Material, out _);
             if (keep) _groundCache[e.EntityId] = c;
         }
         if (!c.Found) return;
-        float gb = c.Height;
-        _groundMat[0] = c.Material ?? "Generic";
-        if (gb > MathF.Min(src.Y, ear.Y)) return;                // nothing to bounce off below both
-        if (src.Y - gb < minHeight) return;                      // the recording has it already
+        var m = OpenFPS.Common.AcousticRegistry.GetProperties(c.Material ?? "Generic");
+        if (OpenFPS.Common.GroundAnswer.Reflect(c.Height, m, src, ear, minHeight, AudioPhysics.CurrentSpeedOfSound) is not { } bounce)
+            return;
+        e.GroundHeight = bounce.Height;
+        e.GroundDelaySeconds = bounce.DelaySeconds;
+        e.GroundLowGain = bounce.LowGain;
+        e.GroundHighGain = bounce.HighGain;
+        e.GroundLowDb = Taken(bounce.ExcessLow);
+        e.GroundMidDb = Taken(bounce.ExcessMid);
+        e.GroundHighDb = Taken(bounce.ExcessHigh);
 
-        var image = new Vector3(src.X, 2f * gb - src.Y, src.Z);
-        float direct = MathF.Max(0.1f, Vector3.Distance(src, ear));
-        float mirrored = Vector3.Distance(image, ear);
-        var m = OpenFPS.Common.AcousticRegistry.GetProperties(_groundMat[0] ?? "Generic");
-        float spread = direct / MathF.Max(direct, mirrored);
-        float low = MathF.Sqrt(Math.Clamp(1f - 0.5f * (m.AbsorptionLow + m.AbsorptionMid), 0f, 1f));
-        float high = MathF.Sqrt(Math.Clamp(1f - m.AbsorptionHigh, 0f, 1f));
-        // At grazing incidence even asphalt is not a mirror at the top: its spherical-wave reflection
-        // falls with range (Delany-Bazley, 20,000 kPa s/m2, source 0.3 m: 0.88 at 10 m and 0.64 at
-        // 50 m at 4 kHz). And the air is never still: turbulence decorrelates the two paths, the
-        // Clifford-Lataitis coherence Tc = exp(-sigma2 (1 - Csp)) with a moderate <mu2> of 5e-6 and
-        // an outer scale of 1.1 m (Rietdijk, Chalmers 2017, eqs 2.55-2.58).
-        high *= Math.Clamp(0.94f - 0.0055f * direct, 0.45f, 1f);
-        float rho = 1f / (0.5f * (1f / MathF.Max(0.02f, src.Y - gb) + 1f / MathF.Max(0.02f, ear.Y - gb)));
-        low *= Coherence(250f, direct, rho);
-        high *= Coherence(2500f, direct, rho);
-        e.GroundHeight = gb;
-        e.GroundDelaySeconds = (mirrored - direct) / AudioPhysics.CurrentSpeedOfSound;
-        e.GroundLowGain = low * spread;
-        e.GroundHighGain = high * spread;
-    }
-
-    /// <summary>Turbulent coherence between the direct and ground paths (Clifford-Lataitis).</summary>
-    internal static float Coherence(float hz, float distance, float rho)
-    {
-        const float Mu2 = 5e-6f, OuterScale = 1.1f;
-        float k = 2f * MathF.PI * hz / AudioPhysics.CurrentSpeedOfSound;
-        float sigma2 = MathF.Sqrt(MathF.PI) * Mu2 * k * k * distance * OuterScale;
-        float x = MathF.Max(1e-4f, rho / OuterScale);
-        float csp = MathF.Sqrt(MathF.PI) * 0.5f * Erf(x) / x;
-        return MathF.Exp(-sigma2 * MathF.Max(0f, 1f - csp));
-    }
-
-    private static float Erf(float x)
-    {
-        // Abramowitz and Stegun 7.1.26, good to 1.5e-7.
-        float t = 1f / (1f + 0.3275911f * MathF.Abs(x));
-        float y = 1f - (((((1.061405429f * t - 1.453152027f) * t) + 1.421413741f) * t - 0.284496736f) * t + 0.254829592f) * t * MathF.Exp(-x * x);
-        return x < 0 ? -y : y;
+        static float Taken(float gain) => gain >= 1f ? 0f : -20f * MathF.Log10(MathF.Max(1e-4f, gain));
     }
 
     /// <summary>Probes the space round the listener's head for the mixer, head-relative so the picture

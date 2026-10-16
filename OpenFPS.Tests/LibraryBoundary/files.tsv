@@ -6,6 +6,7 @@ OpenFPS.Acoustics/Constructions.cs	lib	Acoustics
 OpenFPS.Acoustics/Diffraction.cs	lib	Acoustics	
 OpenFPS.Acoustics/EarlyReflections.cs	lib	Acoustics	
 OpenFPS.Acoustics/Enclosure.cs	lib	Acoustics	
+OpenFPS.Acoustics/GroundAnswer.cs	lib	Acoustics	
 OpenFPS.Acoustics/ImageSource.cs	lib	Acoustics	
 OpenFPS.Acoustics/LayeredFaces.cs	lib	Acoustics	
 OpenFPS.Acoustics/Localisation.cs	lib	Acoustics	
