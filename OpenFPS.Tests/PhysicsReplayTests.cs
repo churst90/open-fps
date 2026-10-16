@@ -362,8 +362,10 @@ public class RicochetTableTests
     private readonly ITestOutputHelper _o;
     public RicochetTableTests(ITestOutputHelper o) => _o = o;
 
-    /// <summary>On other maths: a few units in the last place stored of the bounce, a tenth of a millimetre of
-    /// the flight's half second. Whether it skips is compared as text: the dice draw it well clear of a tie.</summary>
+    /// <summary>On other maths: a few units in the last place stored of the bounce, and a tenth of a millimetre
+    /// of where the slug is after its half second (the bounce's last stored place of speed, 0.1 mm/s, carries it
+    /// at most 0.05 mm); a gravity of 9.81 for 9.80665 moves it a quarter of one. Whether it skips is compared
+    /// as text: the dice draw it well clear of a tie.</summary>
     private static readonly CrossMachine OtherMaths = new()
     {
         Seconds = _ => PhysicsReplays.RicochetFlightSeconds,
@@ -372,8 +374,7 @@ public class RicochetTableTests
             5 or 6 or 7 => new(CrossMachine.Kind.Drift, 5e-4), 8 => new(CrossMachine.Kind.Drift, 5e-3),
             9 or 10 or 11 => new(CrossMachine.Kind.Drift, 5e-5), 12 => new(CrossMachine.Kind.Drift, 0.05),
             13 => new(CrossMachine.Kind.Drift, 5e-3), 14 => new(CrossMachine.Kind.Drift, 5e-4), 15 => new(CrossMachine.Kind.Drift, 5e-6),
-            16 or 17 or 18 or 20 => new(CrossMachine.Kind.Drift, 1e-4, CrossMachine.MetresPerSecond),
-            19 => new(CrossMachine.Kind.Drift, 5e-4, CrossMachine.SpeedPerSecond),
+            16 or 17 or 18 or 20 => new(CrossMachine.Kind.Drift, 1e-4), 19 => new(CrossMachine.Kind.Drift, 5e-4),
             _ => null,
         },
     };
