@@ -19,6 +19,12 @@ Recent work, newest first. `git log` has the rest.
   kind of face and half a second of its flight after; stored before the move, it passes unchanged, so
   nothing a player sees or hears changes. The wire hash changes, so the server and the Windows client go out
   together.
+- The spoken-lines replay drives (docs/ENGINE_PACKAGES.md, stage 0). A third scenario, `garage_drive`: in
+  the hatchback parked in the city's garage, out onto Main Street and right at Central Street with the
+  indicator on, then out of the car, with the server's half scripted by hand. Its list holds what the road
+  says and every driving cue by tick, so package stage 7 cannot move the driving aids and change them. A new
+  test also holds that walking into a wall knocks on it, in the wall's own material. Tests only: nothing a
+  player sees or hears changes.
 ## 2026-10-14
 
 - No rush into the tail stepping out of a small room. The late field's answers, and the distance law

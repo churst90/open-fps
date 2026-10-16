@@ -672,7 +672,8 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   - A line is "tick say text" (said after what is being said), "tick say! text" (over it), "tick interrupt",
     "tick ui id" or "tick cue kind sound". Cues are the interface sounds and the voices of the beacons' and
     the aids' kinds. A knock on a wall walked into is a render played when a worker has made it, so its
-    moment is not the same on every run: it is not in the list, and the wall's name said with it is.
+    moment is not the same on every run: it is not in the list, and the wall's name said with it is
+    (`WalkingIntoAWallKnocks` holds the knock; see the drive below).
   - **The session has a clock for it.** Three announcements waited on the wall clock (the arrival line, a
     zone holding before it is said, a stair cue speaking for its landing), and the session's audio system ran
     on a stopwatch with its acoustic worker on a thread. An internal constructor takes a replay's clock: the
@@ -680,8 +681,44 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
     replay has it. The game's constructor is as it was.
   - The same run says the same on the same tick every time (`TheSameRunSaysTheSame`), and the two lists come
     out the same run after run on the machine they were written on.
-  - **Not built:** a drive (the driving cues need the server's states for a vehicle, tick by tick), other
-    people passing, and what the menus, the editor and chat say.
+  - **Not built:** a drive (built 2026-10-16, below), other people passing, and what the menus, the editor
+    and chat say.
+- **Built 2026-10-16, the spoken-lines replay, its drive, and the knock** (on Linux, on main `d0116bb5`).
+  `garage_drive` is a third scenario, about twenty seconds of the game: beside the hatchback parked on level 0
+  of the city's garage, in by E, the engine on by T, out of the garage and right onto Main Street, Z for the
+  road, the right indicator by L, slowing for the junction with Central Street and right through it, west
+  along Central Street, stopping, the engine off by Shift+T and out by E. Its list holds 14 lines said and
+  105 driving cues: the road's name and limit, the junction ahead with its exits, the turn the indicator
+  means, the readout, the guide, the kerb sensor, the kerb's rumble strip, 12 turn clicks, the aligned
+  chime, the brake cue in four bands, and the relay ticking until it cancels after the turn; and the
+  server's lines for getting in, the key and getting out, the arrival, the car's offer to get in, and the
+  zones (the car's cabin once out of the garage, the street on stepping out). The car's beacon sounds while
+  you stand beside it.
+  - **The server's half is scripted** (`DriveServer`, in `SpokenLinesReplayDrive.cs`), as the emitter-stream
+    replay scripts its cars. The car and its parts are the ones the server makes (a city with its parked cars
+    placed, a map manager of the drive's own so the walks are sent nothing new), sent as the broadcast sends
+    them once in reach, then a `ServerStateUpdate` every tick with the car, its parts and, seated, the
+    driver at the seat. E, T and Shift+T are answered in the server's words (OccupancyService.Enter and
+    Exit, DrivingSystem.SetIgnition). The roads are `MapRoadsBuilder`'s, without level crossings (none is
+    near). The car keeps to a line of straights and arcs; W and S only set its speed, so steering and lane
+    assist are sent and not followed. No car door is sent (a render, as the knock is), no wheels (the cues
+    take the road as dry) and no weather.
+  - **Every heading is 0.6 degrees off the road's.** A heading on a multiple of 15 degrees sits on a turn
+    click's mark, where the last bit of an arctangent decides the click: due south clicked twice on a
+    straight in the first run, and another machine's maths could add or drop one.
+  - **The relay is one voice, sounded again.** The test mixer never ends a one-shot, so the relay's tock
+    after its tick was a new sound on a voice still held, where the game starts each afresh. A cue voice
+    given another sound counts as a cue started; the walks' lists did not change for it.
+  - The drive says the same twice (`TheSameDriveSaysTheSame`), and its list is the same with
+    `DOTNET_PROCESSOR_COUNT=4`. Broken on purpose, it failed for each of: the junction line reworded, the
+    relay's period 0.3 s for 1/3 s, the road's lines said over speech instead of after it, and the kerb
+    sensor's range 1.4 m for 1.5 m.
+  - **The knock** (`WalkingIntoAWallKnocks`): up Selby House's stairs into the brick wall, the wall's name
+    is said and a strike starts within three ticks, of brick, with the body among its blows. The replay
+    waits for each render a worker is making before the next tick (`AwaitRenders`), which the stored lists'
+    runs never do. It failed with the knock not handed to the world's sounds, and with the wall's material
+    taken as plaster. Before it, `WallBumpAndNarrationTests` held the bump and the strike's key but not that
+    the session plays it.
 
 ### Stage 1: Materials (1 session)
 
