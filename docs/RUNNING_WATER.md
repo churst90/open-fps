@@ -257,10 +257,11 @@ an impact and, into a puddle, usually a bubble about a fifth of the drop's radiu
 
 ### 5.7 Heard from places along it
 
-A creek or a gutter is heard from places along its length (`ExtendedSources`, the same rules as the
-trees and the fire): each site belongs to the nearest place and its events are heard there with the
-spread, otherwise at the middle. A grate, a downpipe or an overflow is heard from a ring of places
-round where its water lands. Every event goes to one place: no place is a copy of another.
+A creek, a ditch, a rivulet or a gutter is a line, cut at the listener into pieces by the angle each covers
+(`ExtendedSources.Cut`, section 15): small beside you, long far along it. Each site's events are heard from the
+piece it is in, and each piece is as loud as what it holds by the mixer's law. A grate, a downpipe or an overflow
+is heard from a ring of places round where its water lands, with the trees' and the fire's spread. Every event
+goes to one place: no place is a copy of another.
 
 ## 6. Fitting
 
@@ -834,8 +835,8 @@ further gathers more as its upstream tiles load, and its voice's key changes the
 ### 13.5 Voices where it gathers
 
 - **Lines**: cells draining half a hectare or more, from each head down to where they join a bigger line.
-- **A voice every 20 m** of line (`GroundChannels.SegmentMetres`), heard from five places along it, laid along
-  the line (the entity's x axis), its sound id saying everything about it:
+- **A voice every 20 m** of line (`GroundChannels.SegmentMetres`), cut into pieces at the listener (section 15),
+  laid along the line (the entity's x axis), its sound id saying everything about it:
   `flow:ground/KIND/WIDTH_CM/SLOPE_PERMILLE/LENGTH_M/REFERENCE_ML_PER_S/CATCHMENT` (each surface's area and mean
   travel time, the ponds, the ground for base flow). Not where water stands (a pond, a lake) and not within 15 m
   of running or falling water a map placed by hand (its creeks, gutters, drains, fountains, shores): that water

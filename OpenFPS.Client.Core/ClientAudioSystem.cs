@@ -476,6 +476,7 @@ public partial class ClientAudioSystem
             _cabinVoiced = int.MinValue; _cabinVoicedPaths = 0;
         }
         if (_spreading.Remove(entityId, out var spreading) && spreading.Voiced) StopOuter(entityId, spreading, now: true);
+        if (_cutting.Remove(entityId, out var cutting)) StopPieces(entityId, cutting, 1, now: true);
         if (_sirenVoiced.Remove(entityId)) _voices.Stop(SirenVoiceId(entityId));
         if (_heldHorns.Remove(entityId)) _voices.Stop(HeldHornVoiceId(entityId));
         _placed.Remove(entityId);
@@ -1294,8 +1295,11 @@ public partial class ClientAudioSystem
             float d = Vector3.Distance(OpenFPS.Common.EntityEmission.PointFor(snap), eyePos);
             var (gain, reference) = _audio.Hearing.Place(levelDb, extent);
             float range = MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb)));
+            // A line cut into pieces is as loud as the law over its whole length, not its middle alone: stood at
+            // one end of a stretch you are beside it.
+            float line = LineHeard(snap, voiceKey, reference, eyePos, d);
             float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
-                gain * em.Volume * chorus, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(snap, voiceKey), physical: true);
+                gain * em.Volume * chorus * line, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(snap, voiceKey), physical: true);
             _heardInRanking[entityId] = level;
             // Switched off by the server (a crossing's bell between trains) and within earshot: the voice it
             // would start with is made now, off the threads that place sounds, so it starts when switched on.
@@ -2005,9 +2009,20 @@ public partial class ClientAudioSystem
         foreach (int id in _liveMachines)
         {
             if (!world.Entities.TryGetValue(id, out var snap)) continue;
-            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(VoiceKey(snap.Definition), ModelLibrary.Presets);
-            if (layout == null) continue;
+            string key = VoiceKey(snap.Definition);
             var at = OpenFPS.Common.EntityEmission.PointFor(snap);
+            float length = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(key, ModelLibrary.Presets);
+            if (length > 0f)
+            {
+                // A line: as many pieces as the angle it covers here asks for, the rest of it merged.
+                if (!_cutting.TryGetValue(id, out var c)) _cutting[id] = c = new Cutting();
+                c.Wanted = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.WantedPieces(OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(at, AxisOf(snap), length, eyePos), c.Wanted);
+                c.Count = 1;
+                if (c.Wanted > 1) _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, c.Wanted - 1));
+                continue;
+            }
+            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(key, ModelLibrary.Presets);
+            if (layout == null) continue;
             float d2 = Vector3.DistanceSquared(at, eyePos);
             if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
                     OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), MathF.Sqrt(d2)) <= 0f) continue;
@@ -2018,18 +2033,36 @@ public partial class ClientAudioSystem
         int left = _adaptivePlaces;
         foreach (var (_, id, outer) in _placeCandidates)
         {
-            if (outer > left) continue;
-            left -= outer;
-            _placesGranted.Add(id);
+            // A line takes what is left and is cut coarser; a crown or a fire all its places or none.
+            if (_cutting.TryGetValue(id, out var line)) line.Count = 1 + OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Grant(outer, cutsCoarser: true, ref left);
+            else if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Grant(outer, cutsCoarser: false, ref left) > 0) _placesGranted.Add(id);
         }
+    }
+
+    /// <summary>The way a source's own x lies in the world: the way a line of it runs.</summary>
+    private static Vector3 AxisOf(in EntitySnapshot snap) => Vector3.Transform(Vector3.UnitX, snap.Transform.Rotation);
+
+    /// <summary>
+    /// For the ranking: how much louder a line cut into pieces is here than a point at its middle, both by the
+    /// mixer's law (ExtendedSources.MeanLawPower). One for anything else, and further off than twice its length,
+    /// where the two agree within a decibel.
+    /// </summary>
+    private static float LineHeard(in EntitySnapshot snap, string key, float reference, Vector3 eyePos, float distance)
+    {
+        float length = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(key, ModelLibrary.Presets);
+        if (length <= 0f || distance > 2f * length) return 1f;
+        var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(OpenFPS.Common.EntityEmission.PointFor(snap), AxisOf(snap), length, eyePos);
+        float point = MathF.Min(1f, MathF.Max(0.1f, reference) / MathF.Max(1e-3f, distance));
+        return MathF.Sqrt(OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MeanLawPower(view, reference)) / point;
     }
     private readonly List<int> _spreadingGone = new();
     private long _spreadFrame;
 
     /// <summary>
-    /// How much of a tree or a fire its outer places carry from here, slewed, and the one gain that keeps
-    /// the places together as loud as the source from its middle (ExtendedSources.Balance), applied to its
-    /// own voice's emitter before it is submitted.
+    /// How much of a tree or a fire its outer places carry from here, slewed, applied to its own voice's emitter
+    /// before it is submitted. Each place plays its share at the source's own gain from where it is, so together
+    /// they are what the mixer's law makes of each part of it (ExtendedSources.PlaceRule.Pieces); under the old
+    /// rule, one gain held them to the source heard from its middle (ExtendedSources.Balance).
     /// </summary>
     private Spreading SpreadOf(EntitySnapshot snap, Vector3[] layout, ref SpatialEmitter e, Vector3 eyePos, float dt, double now)
     {
@@ -2040,9 +2073,12 @@ public partial class ClientAudioSystem
         float target = !_placesGranted.Contains(snap.Id) ? 0f : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
             OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), Vector3.Distance(eyePos, e.Position));
         sp.Spread = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Slew(sp.Spread, target, MathF.Min(dt, 0.25f));
-        Span<float> shares = stackalloc float[layout.Length];
-        OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Shares(sp.Spread, shares);
-        e.Volume *= OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Balance(eyePos, e.Position, sp.At, shares, e.MinDistance, e.Range);
+        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Rule == OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.PlaceRule.Middle)
+        {
+            Span<float> shares = stackalloc float[layout.Length];
+            OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Shares(sp.Spread, shares);
+            e.Volume *= OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Balance(eyePos, e.Position, sp.At, shares, e.MinDistance, e.Range);
+        }
         e.Spread = sp.Spread;
         if (sp.Spread > 0f) sp.MergedSince = double.NaN;
         else if (double.IsNaN(sp.MergedSince)) sp.MergedSince = now;
@@ -2109,7 +2145,164 @@ public partial class ClientAudioSystem
         {
             if (_spreading.Remove(id, out var sp) && sp.Voiced) StopOuter(id, sp);
         }
+        _spreadingGone.Clear();
+        foreach (var (id, c) in _cutting)
+            if (c.Frame != _spreadFrame) _spreadingGone.Add(id);
+        foreach (int id in _spreadingGone)
+            if (_cutting.Remove(id, out var c)) StopPieces(id, c, 1);
         _spreadFrame++;
+    }
+
+    // ── A line cut into pieces at the ear (ExtendedSources.Cut, 2026-10-16) ─────────────────────────
+
+    private sealed class Cutting
+    {
+        /// <summary>How many pieces the angle it covers asks for (held between the merge and split angles), and
+        /// how many the place budget gave it this frame.</summary>
+        public int Wanted, Count = 1;
+        public OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut? Cut;
+        /// <summary>Where the ear was when it was cut: it is cut again when the ear has moved a quarter of its
+        /// shortest piece, the one beside you.</summary>
+        public Vector3 CutAt;
+        /// <summary>The source's own emitter as built, before its piece moves it, and the way its line runs.</summary>
+        public SpatialEmitter Base;
+        public Vector3 Axis;
+        /// <summary>How many of its places have voices, and since when the cut has had fewer.</summary>
+        public int Voiced = 1;
+        public double FewerSince = double.NaN;
+        public long Frame;
+    }
+    private readonly Dictionary<int, Cutting> _cutting = new();
+
+    /// <summary>
+    /// A line cut at the ear: the pieces it is heard as (the place budget's count, ChoosePlaces), handed to its synth
+    /// when they change, and its own voice moved to the piece that holds its middle, as loud as everything in it.
+    /// A few closed forms a piece (ExtendedSources.Place), so on this thread.
+    /// </summary>
+    private Cutting CutOf(EntitySnapshot snap, float length, ref SpatialEmitter e, Vector3 eyePos)
+    {
+        if (!_cutting.TryGetValue(snap.Id, out var c)) _cutting[snap.Id] = c = new Cutting();
+        c.Frame = _spreadFrame;
+        c.Axis = AxisOf(snap);
+        c.Base = e;
+        var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(e.Position, c.Axis, length, eyePos);
+        int n = Math.Max(1, c.Count);
+        if (c.Cut == null || c.Cut.Count != n || n > 1 && Vector3.Distance(eyePos, c.CutAt) > 0.25f * c.Cut.Shortest)
+        {
+            c.Cut = n == 1 ? OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Whole(length) : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Cut(view, n);
+            c.CutAt = eyePos;
+            _audio.PlanPieces(e.EntityId, c.Cut);
+        }
+        PlacePiece(ref e, c, view, 0);
+        e.Spread = 0f;
+        return c;
+    }
+
+    /// <summary>One place of a cut line: at its piece's centroid, at the gain that makes it as loud as its piece.
+    /// Returns where along the line it is, m from the middle.</summary>
+    private static float PlacePiece(ref SpatialEmitter e, Cutting c, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineView view, int place)
+    {
+        var cut = c.Cut!;
+        int i = cut.PieceOfPlace(place);
+        var p = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Place(view, cut.Edges[i], cut.Edges[i + 1], c.Base.MinDistance);
+        var offset = c.Axis * p.Along;
+        e.Position = c.Base.Position + offset;
+        e.ApparentPosition = c.Base.ApparentPosition + offset;
+        e.Volume = c.Base.Volume * p.Gain;
+        return p.Along;
+    }
+
+    /// <summary>
+    /// The other pieces of a cut line, each a voice at its own point reading its own stream of the one synth: every
+    /// event in the piece it happens in, never a copy. Places the cut no longer has keep their last placing for
+    /// <see cref="MergeHoldSeconds"/>, so what was rendered into them rings out, and are then let go.
+    /// </summary>
+    private void PlacePieces(int sourceId, Cutting c, in SpatialEmitter middle, WorldSnapshot world, Vector3 eyePos, double now)
+    {
+        var cut = c.Cut!;
+        var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(c.Base.Position, c.Axis, cut.Length, eyePos);
+        for (int k = 1; k < cut.Count; k++)
+        {
+            var e = middle;
+            float along = PlacePiece(ref e, c, view, k);
+            e.EntityId = PlaceVoiceId(sourceId, k);
+            e.Seed = VoiceRegistry.SeedOf(VoiceKind.Place, sourceId, k);
+            // The voice whose synth it reads, by that voice's id.
+            e.PlaceOfEntity = middle.EntityId;
+            e.Place = k;
+            e.Spread = 0f;
+            e.StartSoundId = "";
+            e.StopSoundId = "";
+            ApplyGround(ref e, world);
+            _voices.Declare(e.EntityId, sourceId, VoiceKind.Place, new Vector3(along, 0f, 0f), e.EarLevelDb);
+            _voices.Sound(e);
+        }
+        if (cut.Count >= c.Voiced) { c.Voiced = cut.Count; c.FewerSince = double.NaN; return; }
+        if (double.IsNaN(c.FewerSince)) c.FewerSince = now;
+        else if (now - c.FewerSince >= MergeHoldSeconds) StopPieces(sourceId, c, cut.Count);
+    }
+
+    /// <summary>What a walk hears of some sources at one point (the tests and AudioLab --extent-walk).</summary>
+    internal readonly record struct Together(double Power, float BearingDegrees, float WidthDegrees, int Voices);
+
+    /// <summary>
+    /// What the mixer makes at <paramref name="ear"/> of every live voice whose physical key <paramref name="source"/>
+    /// takes: each voice's share of its source (its piece's share of a cut line, or its place's share at its middle's
+    /// spread) times the mixer's law at its own place and gain (Loudness.RenderedGain, its headroom's return taken
+    /// off), with where they come from (the bearing of their power-weighted directions on the flat) and how wide
+    /// (twice the arc cosine of their resultant: two equal sources ±θ either side are 2θ). Paths are left out.
+    /// </summary>
+    internal static Together HeardTogether(IReadOnlyDictionary<int, SpatialEmitter> latest, IEnumerable<int> live,
+                                           IReadOnlyDictionary<int, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut> pieces,
+                                           Func<string, bool> source, Vector3 ear)
+    {
+        double power = 0, x = 0, z = 0;
+        int voices = 0;
+        foreach (int id in live)
+        {
+            if (!latest.TryGetValue(id, out var e) || !source(e.PhysicalKey ?? "")) continue;
+            float g = OpenFPS.Common.Loudness.RenderedGain(OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(e.Volume, e.HeadroomGain),
+                                                          e.MinDistance, e.Range, Vector3.Distance(e.Position, ear));
+            double p = ShareOfVoice(latest, pieces, e) * (double)g * g;
+            voices++;
+            power += p;
+            var to = e.Position - ear;
+            float flat = MathF.Sqrt(to.X * to.X + to.Z * to.Z);
+            if (flat > 1e-4f) { x += p * to.X / flat; z += p * to.Z / flat; }
+        }
+        double r = power > 0 ? Math.Sqrt(x * x + z * z) / power : 1.0;
+        float bearing = (float)(Math.Atan2(x, z) * 180.0 / Math.PI);
+        if (bearing < 0f) bearing += 360f;
+        return new Together(power, bearing, (float)(2.0 * Math.Acos(Math.Clamp(r, 0.0, 1.0)) * 180.0 / Math.PI), voices);
+    }
+
+    /// <summary>A voice's share of its source's power; one for a voice that is a source of its own.</summary>
+    private static float ShareOfVoice(IReadOnlyDictionary<int, SpatialEmitter> latest,
+                                      IReadOnlyDictionary<int, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut> pieces, in SpatialEmitter e)
+    {
+        var middle = e;
+        if (e.PlaceOfEntity != 0 && !latest.TryGetValue(e.PlaceOfEntity, out middle)) return 0f;
+        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(middle.PhysicalKey, ModelLibrary.Presets) > 0f)
+            return pieces.TryGetValue(middle.EntityId, out var cut) ? cut.ShareOfPlace(e.Place) : e.Place == 0 ? 1f : 0f;
+        var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(middle.PhysicalKey, ModelLibrary.Presets);
+        if (layout == null) return 1f;
+        Span<float> shares = stackalloc float[layout.Length];
+        OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Shares(middle.Spread, shares);
+        return e.Place >= 0 && e.Place < shares.Length ? shares[e.Place] : 0f;
+    }
+
+    /// <summary>Lets go of a cut line's places from <paramref name="from"/> up: faded, or at once when the source is gone.</summary>
+    private void StopPieces(int sourceId, Cutting c, int from, bool now = false)
+    {
+        for (int k = Math.Max(1, from); k < c.Voiced; k++)
+        {
+            int id = PlaceVoiceId(sourceId, k);
+            _groundCache.Remove(id);
+            if (now) _voices.Stop(id);
+            else _voices.Retire(id);
+        }
+        c.Voiced = Math.Max(1, Math.Min(c.Voiced, from));
+        c.FewerSince = double.NaN;
     }
 
     /// <summary>The birds: found from the map's foliage and roofs, not placed. See BirdLife.</summary>
@@ -2742,6 +2935,8 @@ public partial class ClientAudioSystem
         float engineExtent = def.SoundEmitter.ExtentMetres;
         // A tree or a fire: the places it is heard from across its extent (ExtendedSources).
         Vector3[]? extentLayout = null;
+        // Running water along a line: cut into pieces at the ear (ExtendedSources.Cut); its length, or none.
+        float lineLength = 0f;
         float chorusTrees = 1f;
         // The declared level, for the ear model; 0 for an authored source with only a volume.
         float earLevel = 0f;
@@ -2789,6 +2984,7 @@ public partial class ClientAudioSystem
                 engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(levelDb));
                 earLevel = levelDb;
                 extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey, ModelLibrary.Presets);
+                lineLength = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(physicalKey, ModelLibrary.Presets);
                 if (physicalSynth == OpenFPS.Common.ModelSynth.Aircraft)
                 {
                     // Its power lever as the server that flies it sends it (MachinePower: from its flight path
@@ -3023,6 +3219,7 @@ public partial class ClientAudioSystem
         // The road under a machine hands its sound back a moment later; see GroundReflection. Engines and
         // physical models only: a sustained recording (a PA's speech) gets none, as speech flanged with
         // one (docs/CLIENT_NOTES.md, "Speech has no ground reflection").
+        Cutting? cutting = lineLength > 0f ? CutOf(snap, lineLength, ref emitter, eyePos) : null;
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
         if (engineKey.Length > 0 || physicalKey.Length > 0) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
@@ -3031,6 +3228,7 @@ public partial class ClientAudioSystem
         _voices.Submit(emitter);
         // ...and its other places, after its middle, so the synth they read already exists.
         if (spreading != null) PlaceOuter(snap.Id, spreading, emitter, world, now);
+        if (cutting != null) PlacePieces(snap.Id, cutting, emitter, world, eyePos, now);
 
         // The front outlet, after the machine's own voice so a just-built engine exists for the tap.
         if (engineKey.Length > 0 && _frontVoiced.Contains(snap.Id))

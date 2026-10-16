@@ -356,6 +356,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.PlanTrainSlot(preset, train, slot, plan);
     }
 
+    /// <summary>See IAudioProvider.PlanPieces.</summary>
+    public void PlanPieces(int voiceId, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut cut)
+    {
+        if (_isInitialized) _provider.PlanPieces(voiceId, cut);
+    }
+
     /// <summary>See IAudioProvider.PrepareTrain.</summary>
     public void PrepareTrain(string preset, string train)
     {

@@ -351,7 +351,9 @@ public class ClientAudioSelectionTests
         Assert.Equal(extent, e.ExtentMetres, 4);
         Assert.True(e.Range >= Law.AudibleRange(level) - 1e-3f, $"range {e.Range} under the level's audible range");
         Assert.Equal("", e.EngineKey);
-        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(e.PhysicalKey, ModelLibrary.Presets) == null)
+        // A line cut into pieces (running water) has its own voice moved to its middle piece at that piece's gain.
+        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(e.PhysicalKey, ModelLibrary.Presets) == null
+            && OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(e.PhysicalKey, ModelLibrary.Presets) == 0f)
             Assert.Equal(gain * PhysicalVoiceState.HeadroomGain(Headroom(soundId)), e.Volume, 5);
         else
             Assert.True(e.Volume > 0f && float.IsFinite(e.Volume));

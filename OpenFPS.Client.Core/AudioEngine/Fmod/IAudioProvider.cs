@@ -79,6 +79,10 @@ public interface IAudioProvider : IDisposable
     /// <summary>What one of a train's voices carries (TrainVoicing, TrainSlotPlan): "preset/train", the
     /// voice, its sources and their weights. Kept until replaced; the voice reads it as it renders.</summary>
     void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Client.AudioEngine.Fmod.TrainSlotPlan plan) { }
+    /// <summary>The pieces a line of running water is cut into at the listener (ExtendedSources.Cut), by its own
+    /// voice's id: its synth writes each event into the place that plays the piece it happens in. Kept until
+    /// replaced or the voice stops.</summary>
+    void PlanPieces(int voiceId, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut cut) { }
     /// <summary>A train ("preset/train") the client has seen: its model is made now, off the threads that
     /// place sounds (VoiceBuilds), so it is there when the train is first heard or first blows.</summary>
     void PrepareTrain(string preset, string train) { }

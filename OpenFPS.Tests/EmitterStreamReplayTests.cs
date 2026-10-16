@@ -1066,6 +1066,7 @@ internal sealed class StreamMixer : IAudioProvider
     public void CancelVoiceFade(int id) => Log("CancelFade", id);
     public void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo) => Log("SignalTrain", train, warning, bellSeconds, secondsAgo);
     public void PlanTrainSlot(string preset, string train, int slot, TrainSlotPlan plan) => Log("PlanTrain", preset + "/" + train, slot, plan.Sources, plan.Weights);
+    public void PlanPieces(int voiceId, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut cut) => Log("PlanPieces", voiceId, cut.Edges, cut.Middle);
     public void StopSound(int id) { Log("Stop", id); _live.Remove(id); _emitterFields.Remove(id); _pathFields.Remove(id); }
     public bool IsPlaying(int id) => _live.Contains(id);
     public Vector3 GetSoundPosition(int id) => _latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;

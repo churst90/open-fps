@@ -168,6 +168,9 @@ internal sealed class RecordingMixer : IAudioProvider
     /// <summary>What each of a train's voices was last told to carry, by "preset/train" and voice.</summary>
     public readonly Dictionary<(string Train, int Slot), TrainSlotPlan> Plans = new();
     public void PlanTrainSlot(string preset, string train, int slot, TrainSlotPlan plan) => Plans[(preset + "/" + train, slot)] = plan;
+    /// <summary>The pieces each line of running water was last cut into, by its own voice's id.</summary>
+    public readonly Dictionary<int, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut> Pieces = new();
+    public void PlanPieces(int voiceId, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut cut) => Pieces[voiceId] = cut;
 
     /// <summary>Every path handed to each voice in its own emitter (SpatialEmitter.CarriesPath), in order:
     /// how the voices of moving things are given theirs (ClientAudioSystem.HandPath).</summary>

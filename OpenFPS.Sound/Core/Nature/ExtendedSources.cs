@@ -21,10 +21,37 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// with no step in level. Merged, the outer places' voices are let go.
 ///
 /// OPENFPS_WIDE_SOURCES=0 plays every one from one point, as before 2026-10-06.
+///
+/// Each place is as loud as what it holds, by the mixer's law from where it is (2026-10-16, Cody: "a sound
+/// source should have its sound be the entire area of the sound source"). A line of running water is cut,
+/// at the listener, into pieces by the angle each covers (<see cref="Cut"/>). OPENFPS_EXTENT_RULE=middle plays
+/// them as before (<see cref="PlaceRule.Middle"/>), for an A/B.
 /// </summary>
 public static class ExtendedSources
 {
     public static bool Enabled = Environment.GetEnvironmentVariable("OPENFPS_WIDE_SOURCES") != "0";
+
+    /// <summary>How the places of a source share its power.</summary>
+    public enum PlaceRule
+    {
+        /// <summary>Before 2026-10-16: a fixed layout, every place paid down so that together they are as
+        /// loud as the source heard from its middle (<see cref="Balance"/>). Beside a chain of 20 m creek
+        /// voices the level rose and fell 10.4 dB every 20 m (docs/RUNNING_WATER.md 15).</summary>
+        Middle,
+        /// <summary>Each place as loud as what it holds, by the mixer's law from where it is, and a line cut
+        /// by angle into pieces (<see cref="Cut"/>).</summary>
+        Pieces,
+    }
+
+    /// <summary>The rule now. Read when a layout or a voice is first made; the lab sets it before either.</summary>
+    internal static PlaceRule Rule = Environment.GetEnvironmentVariable("OPENFPS_EXTENT_RULE") == "middle" ? PlaceRule.Middle : PlaceRule.Pieces;
+
+    /// <summary>For the lab, after it changes <see cref="Rule"/>: the layouts made under the old one forgotten.</summary>
+    internal static void ForgetLayouts()
+    {
+        _layouts.Clear();
+        _lines.Clear();
+    }
 
     /// <summary>Under this half-angle the places are one point to the ear, degrees: the localisation
     /// blur straight ahead is about 1-4° (Blauert 1997, table 2.1), so two sources this far apart are
@@ -111,11 +138,12 @@ public static class ExtendedSources
         return places;
     }
 
-    /// <summary>Running water: along its length, or round where it lands (RunningWaterSynth.Layout).</summary>
+    /// <summary>Running water: round where it lands (RunningWaterSynth.Layout); along its length under the old
+    /// rule, a line cut by angle under the new (<see cref="LineLength"/>).</summary>
     internal static Vector3[]? FlowPlacesOf(string key, IPresets presets)
     {
         var spec = presets.Flow(key[5..]);
-        if (spec.Places <= 1) return null;
+        if (spec.Places <= 1 || LineLength(key, presets) > 0f) return null;
         return Scaled(RunningWaterSynth.Layout(spec));
     }
 
@@ -214,5 +242,226 @@ public static class ExtendedSources
         }
         if (sum <= 1e-20 || centre <= 0f) return 1f;
         return (float)(centre / Math.Sqrt(sum));
+    }
+
+    // ── A line cut into pieces by the angle each covers at the ear (2026-10-16) ───────────────────
+
+    private static readonly ConcurrentDictionary<string, float> _lines = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The length of a source heard as a line cut into pieces, m: running water laid along its own x (a creek,
+    /// a ditch, a rivulet, a gutter), under <see cref="PlaceRule.Pieces"/>. Zero for anything else. Its model is
+    /// <paramref name="presets"/>' (the catalogue's).
+    /// </summary>
+    public static float LineLength(string? physicalKey, IPresets presets)
+    {
+        if (!Enabled || Rule != PlaceRule.Pieces || string.IsNullOrEmpty(physicalKey)
+            || !physicalKey.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return 0f;
+        return _lines.GetOrAdd(physicalKey, static (key, presets) =>
+        {
+            try
+            {
+                var spec = presets.Flow(key[5..]);
+                return spec.Layout == FlowLayout.Line && spec.Places > 1 ? spec.LengthMetres : 0f;
+            }
+            catch (Exception) { return 0f; }
+        }, presets);
+    }
+
+    /// <summary>How many streams a running-water synth renders: one for each piece a line can be cut into, or
+    /// its own places.</summary>
+    public static int FlowPlaces(string? physicalKey, RunningWaterSpec spec, IPresets presets)
+        => LineLength(physicalKey, presets) > 0f ? MaxPlaces : Math.Max(1, spec.Places);
+
+    /// <summary>
+    /// A straight line source as the ear sees it: where along it the ear's foot falls (m from its middle,
+    /// along its own x), how far off the line the ear is (m, height included, never under 5 cm) and half its
+    /// length. Distances along it from the foot are u; from its middle, along.
+    /// </summary>
+    public readonly record struct LineView(float Foot, float Off, float HalfLength)
+    {
+        public float From => -HalfLength - Foot;
+        public float To => HalfLength - Foot;
+        /// <summary>The direction of a point u along from the foot, radians from the perpendicular.</summary>
+        public float AngleOf(float u) => MathF.Atan2(u, Off);
+        /// <summary>The angle the whole line covers at the ear, degrees.</summary>
+        public float SubtendedDegrees => (AngleOf(To) - AngleOf(From)) * (180f / MathF.PI);
+    }
+
+    /// <summary>The line through <paramref name="middle"/> along <paramref name="axis"/> (a unit vector), as
+    /// seen from <paramref name="ear"/>.</summary>
+    public static LineView View(Vector3 middle, Vector3 axis, float length, Vector3 ear)
+    {
+        var d = ear - middle;
+        float foot = Vector3.Dot(d, axis);
+        float off = (d - foot * axis).Length();
+        return new LineView(foot, MathF.Max(0.05f, off), 0.5f * MathF.Max(0f, length));
+    }
+
+    /// <summary>
+    /// How many pieces a line wants from here: enough that none covers more than TrainVoicing's split angle, and
+    /// no more than leave every two neighbours together over its merge angle, as TrainVoicing merges a pair;
+    /// holding <paramref name="previous"/> while it fits between the two (the ear places a source to a few
+    /// degrees, and the band between them keeps a tap of a key from cutting it back and forth); never more than
+    /// <see cref="MaxPlaces"/>.
+    /// </summary>
+    public static int WantedPieces(LineView view, int previous)
+    {
+        float covered = view.SubtendedDegrees;
+        int fewest = Math.Max(1, (int)MathF.Ceiling(covered / OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SplitAboveDegrees - 1e-4f));
+        int most = Math.Max(fewest, (int)MathF.Floor(2f * covered / OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.MergeBelowDegrees));
+        int n = previous <= 0 ? fewest : Math.Clamp(previous, fewest, most);
+        return Math.Min(n, MaxPlaces);
+    }
+
+    /// <summary>
+    /// A line cut into pieces, each heard as one voice: the edges along it (m from its middle, ascending, the
+    /// first and last its ends) and which piece holds its middle, which the source's own voice plays. The
+    /// others are places 1 up, in order along it. Shared by the client, which places the voices, and the synth,
+    /// which writes each event into the piece it happens in.
+    /// </summary>
+    public sealed class LineCut
+    {
+        public readonly float[] Edges;
+        public readonly int Middle;
+
+        public LineCut(float[] edges)
+        {
+            Edges = edges;
+            int m = 0;
+            // As PieceAt finds it: a piece holds its lower edge, not its upper.
+            while (m < edges.Length - 2 && edges[m + 1] <= 0f) m++;
+            Middle = m;
+        }
+
+        public int Count => Edges.Length - 1;
+        public float Length => Edges[^1] - Edges[0];
+
+        /// <summary>The place (the voice: 0 the source's own) that plays piece <paramref name="piece"/>.</summary>
+        public int PlaceOfPiece(int piece) => piece == Middle ? 0 : piece < Middle ? piece + 1 : piece;
+
+        /// <summary>The piece place <paramref name="place"/> plays.</summary>
+        public int PieceOfPlace(int place) => place == 0 ? Middle : place <= Middle ? place - 1 : place;
+
+        /// <summary>The piece a point <paramref name="along"/> m from the middle is in; the ends' own beyond them.</summary>
+        public int PieceAt(float along)
+        {
+            int lo = 0, hi = Count - 1;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) >> 1;
+                if (along < Edges[mid + 1]) hi = mid; else lo = mid + 1;
+            }
+            return lo;
+        }
+
+        /// <summary>The place that hears a point <paramref name="along"/> m from the middle.</summary>
+        public int PlaceAt(float along) => PlaceOfPiece(PieceAt(along));
+
+        /// <summary>The share of the line's length place <paramref name="place"/> plays: of a line doing the same
+        /// all along, its share of the power.</summary>
+        public float ShareOfPlace(int place)
+        {
+            if (place < 0 || place >= Count || Length <= 0f) return 0f;
+            int i = PieceOfPlace(place);
+            return (Edges[i + 1] - Edges[i]) / Length;
+        }
+
+        /// <summary>The shortest piece, m: the one at the ear.</summary>
+        public float Shortest
+        {
+            get
+            {
+                float s = float.MaxValue;
+                for (int i = 0; i < Count; i++) s = MathF.Min(s, Edges[i + 1] - Edges[i]);
+                return s;
+            }
+        }
+    }
+
+    /// <summary>The whole line as one piece.</summary>
+    public static LineCut Whole(float length) => new(new[] { -0.5f * length, 0.5f * length });
+
+    /// <summary>
+    /// The line cut into <paramref name="pieces"/> pieces of equal angle at the ear: small beside it, long far
+    /// along it. When fewer are given than it wants (the place budget), each covers more; the far end is never
+    /// dropped.
+    /// </summary>
+    public static LineCut Cut(LineView view, int pieces)
+    {
+        int n = Math.Clamp(pieces, 1, MaxPlaces);
+        var edges = new float[n + 1];
+        float a0 = view.AngleOf(view.From), a1 = view.AngleOf(view.To);
+        edges[0] = -view.HalfLength;
+        edges[n] = view.HalfLength;
+        for (int i = 1; i < n; i++)
+            edges[i] = Math.Clamp(view.Foot + view.Off * MathF.Tan(a0 + (a1 - a0) * i / n), -view.HalfLength, view.HalfLength);
+        return new LineCut(edges);
+    }
+
+    /// <summary>Where a piece is played from (m along the line from its middle) and the gain its voice takes over
+    /// the source's own, so that played from there it is as loud as everything along it.</summary>
+    public readonly record struct PiecePlace(float Along, float Gain);
+
+    /// <summary>
+    /// A piece of a line from <paramref name="from"/> to <paramref name="to"/> (m along it from its middle), as
+    /// the mixer's law (Loudness.RenderedGain: flat inside <paramref name="reference"/>, then 1/d) would play
+    /// every point of it from where it is: placed where its sound arrives from (the centroid of what each part
+    /// of it brings to the ear) and given the gain that makes the law at that one point equal the law over the
+    /// whole piece. Its voice carries its own events, so with this gain it is as loud as what it holds, and the
+    /// pieces together are the whole line heard from every point of it, flat as you walk beside it however it
+    /// is cut. Closed forms, no sampling: under a microsecond a piece. The edge fade at the end of the range is
+    /// left out, being nearly the same over a piece.
+    /// </summary>
+    public static PiecePlace Place(LineView view, float from, float to, float reference)
+    {
+        double h = view.Off, r = MathF.Max(0.1f, reference);
+        double u0 = from - view.Foot, u1 = to - view.Foot;
+        if (!(u1 - u0 > 1e-4)) return new PiecePlace(0.5f * (from + to), 1f);
+        double i0 = LawIntegral(u1, h, r) - LawIntegral(u0, h, r);
+        double i1 = LawMoment(u1, h, r) - LawMoment(u0, h, r);
+        double uc = i0 > 1e-30 ? Math.Clamp(i1 / i0, u0, u1) : 0.5 * (u0 + u1);
+        double mean = i0 / (u1 - u0);
+        double at = Math.Min(1.0, r / Math.Sqrt(h * h + uc * uc));
+        return new PiecePlace((float)(view.Foot + uc), (float)(Math.Sqrt(Math.Max(0.0, mean)) / at));
+    }
+
+    /// <summary>The mean of the law's power over the whole line (Loudness.RenderedGain squared, without its edge
+    /// fade): how loud the line is here, against one point of it at the same reference.</summary>
+    public static float MeanLawPower(LineView view, float reference)
+    {
+        double h = view.Off, r = MathF.Max(0.1f, reference);
+        double u0 = view.From, u1 = view.To;
+        if (!(u1 - u0 > 1e-4)) return Math.Min(1f, (float)(r * r / (h * h)));
+        return (float)((LawIntegral(u1, h, r) - LawIntegral(u0, h, r)) / (u1 - u0));
+    }
+
+    /// <summary>∫₀ᵘ min(1, r²/(h² + s²)) ds: the law's power along a line h off it, flat inside r.</summary>
+    private static double LawIntegral(double u, double h, double r)
+    {
+        double c = r > h ? Math.Sqrt(r * r - h * h) : 0.0;
+        double a = Math.Abs(u);
+        double v = a <= c ? a : c + r * r / h * (Math.Atan(a / h) - Math.Atan(c / h));
+        return u < 0 ? -v : v;
+    }
+
+    /// <summary>∫₀ᵘ s min(1, r²/(h² + s²)) ds, for the centroid.</summary>
+    private static double LawMoment(double u, double h, double r)
+    {
+        double c = r > h ? Math.Sqrt(r * r - h * h) : 0.0;
+        double a = Math.Abs(u);
+        return a <= c ? 0.5 * a * a : 0.5 * c * c + 0.5 * r * r * Math.Log((h * h + a * a) / (h * h + c * c));
+    }
+
+    /// <summary>
+    /// How many outer places a source is given from what is left of the place budget: a fixed layout all of
+    /// them or none (a crown with a bough missing is lopsided), a line as many as are left (it is cut coarser).
+    /// </summary>
+    public static int Grant(int outerWanted, bool cutsCoarser, ref int left)
+    {
+        if (outerWanted <= 0 || left <= 0) return 0;
+        int given = outerWanted <= left ? outerWanted : cutsCoarser ? left : 0;
+        left -= given;
+        return given;
     }
 }

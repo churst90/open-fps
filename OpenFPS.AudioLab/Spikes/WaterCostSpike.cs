@@ -14,12 +14,13 @@ namespace OpenFPS.AudioLab.Spikes;
 /// more: on one the JIT's tiering thread barely runs and the hot loops stay in their first, unoptimised
 /// code (docs/WAVES_AND_SHORES.md 8.2).
 ///
-///   --water-cost [shore|flow] [preset ...] [sec=20] [reps=3] [wind=] [out=DIR]
+///   --water-cost [shore|flow] [preset ...] [sec=20] [reps=3] [wind=] [out=DIR] [cut]
 ///        each preset settled (25 s for a surf beach, 5 s for another shore, 2 s for running water),
 ///        then sec= seconds timed, reps= times from a fresh synth; the cheapest and the median rep as a
 ///        share of one core, the bytes allocated while timed, and a hash of the places' samples. out=DIR
 ///        writes the first rep's places, interleaved float32, as DIR/shore_KEY.f32 (or flow_KEY.f32),
-///        for a null test.
+///        for a null test. cut: running water along a line as the game plays it beside you, its every place
+///        a piece (ExtendedSources.Cut, as 1.5 m off its middle), each event in its own.
 ///   --water-cost rain out=DIR
 ///        the render fingerprint's three rain renders (RenderFingerprintTests: 2 s at 8 mm/h on asphalt,
 ///        steel and a puddle, seed 9) as DIR/rain_SURFACE.f32, for a null test of a change that moves them.
@@ -69,9 +70,13 @@ public static class WaterCostSpike
                 var spec = ModelLibrary.Presets.Flow(key);
                 float q = spec.ReferenceFlow;
                 float rain = spec.CatchmentSquareMetres > 0f ? spec.ReferenceRainMmPerHour : 0f;
-                Measure("flow_" + key, $"{q:0.####} L/s", Math.Max(1, spec.Places), 2f, sec, reps, dir, () =>
+                bool cut = args.Contains("cut") && spec.Layout == FlowLayout.Line && spec.Places > 1;
+                int places = cut ? ExtendedSources.MaxPlaces : Math.Max(1, spec.Places);
+                Measure("flow_" + key + (cut ? "_cut" : ""), $"{q:0.####} L/s", places, 2f, sec, reps, dir, () =>
                 {
-                    var s = new RunningWaterSynth(spec, Rate, 7) { Flow = q, RainOnWater = rain, Spread = 1f };
+                    var s = new RunningWaterSynth(spec, Rate, 7, places) { Flow = q, RainOnWater = rain, Spread = 1f };
+                    if (cut)
+                        s.Cut = ExtendedSources.Cut(ExtendedSources.View(Vector3.Zero, Vector3.UnitX, spec.LengthMetres, new Vector3(0f, 1.7f, 1.5f)), places);
                     return (s.Control, s.NextPlaces);
                 });
             }

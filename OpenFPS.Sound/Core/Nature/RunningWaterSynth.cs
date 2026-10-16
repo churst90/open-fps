@@ -125,6 +125,12 @@ public sealed partial class RunningWaterSynth
     public float Spread;
     private float _toHome;
 
+    /// <summary>A line cut into pieces at the listener (ExtendedSources.Cut): every event is written into the
+    /// place that plays the piece it happens in, whatever <see cref="Spread"/> says. Null: the places along it,
+    /// shared by the spread.</summary>
+    public ExtendedSources.LineCut? Cut;
+    private ExtendedSources.LineCut? _homedBy;
+
     /// <summary>Each part's share, for the lab to take the sound apart: the breaking sites' bubbles,
     /// their spray, the falls, the drips. One in the game.</summary>
     public float SitePart = 1f, SprayPart = 1f, FallPart = 1f, DripPart = 1f;
@@ -135,7 +141,8 @@ public sealed partial class RunningWaterSynth
     private sealed class Site
     {
         public EventSum Rng = null!;
-        public int Home;
+        public int Home, OwnHome;
+        public float Along;           // m from the middle, along a line
         public float Drop;            // m: how far the water falls into its lee
         public float NoteMm;          // its characteristic bubble radius
         public float Strip;           // m: the width of flow it gathers
@@ -146,11 +153,13 @@ public sealed partial class RunningWaterSynth
         public float MeanVolume, VolumeHinze, VolumeLargest;   // the mean bubble volume, cached for these
     }
 
-    public RunningWaterSynth(RunningWaterSpec spec, float sampleRate, int seed)
+    /// <param name="places">How many streams it renders: its spec's places unless a line cut into pieces wants
+    /// more (ExtendedSources.FlowPlaces).</param>
+    public RunningWaterSynth(RunningWaterSpec spec, float sampleRate, int seed, int places = 0)
     {
         Spec = spec;
         _rate = sampleRate;
-        int places = Math.Max(1, spec.Places);
+        places = places > 0 ? places : Math.Max(1, spec.Places);
         _open = new EventSum[places];
         for (int k = 0; k < places; k++) _open[k] = new EventSum(sampleRate, seed * 7919 + 1 + k * 15485863);
         _rng = _open[0];
@@ -188,11 +197,13 @@ public sealed partial class RunningWaterSynth
                 {
                     Rng = rng,
                     Home = HomeOf(along),
+                    Along = along,
                     Drop = obs.MedianDropMetres * MathF.Exp(obs.DropSpread * Gauss(rng)),
                     Strip = obs.WidthMetres * (0.6f + 0.8f * rng.Uniform()),
                     Weight = real / n,
                 };
                 site.NextBurst = rng.Uniform() * 0.5f;
+                site.OwnHome = site.Home;
                 sites.Add(site);
             }
         }
@@ -200,6 +211,8 @@ public sealed partial class RunningWaterSynth
 
         // The falls, through the fountain's physics, written into these places.
         _fallHome = new int[spec.Falls.Length];
+        _fallOwnHome = new int[spec.Falls.Length];
+        _fallAlong = new float[spec.Falls.Length];
         if (spec.Falls.Length > 0)
         {
             var falls = new WaterFallSpec[spec.Falls.Length];
@@ -210,8 +223,8 @@ public sealed partial class RunningWaterSynth
                 taps[i] = new WaterTapSpec { Name = spec.Falls[i].Name };
                 // A line's falls are spread along it; a ring's land in its middle and are scattered by
                 // the placer below.
-                _fallHome[i] = spec.Layout == FlowLayout.Line && places > 1
-                    ? HomeOf(((i + 0.5f) / falls.Length - 0.5f) * spec.LengthMetres) : -1;
+                _fallAlong[i] = ((i + 0.5f) / falls.Length - 0.5f) * spec.LengthMetres;
+                _fallHome[i] = _fallOwnHome[i] = spec.Layout == FlowLayout.Line && places > 1 ? HomeOf(_fallAlong[i]) : -1;
             }
             var feature = new WaterFeatureSpec { Name = spec.Name, Falls = falls, Taps = taps, SourceLevelDb = spec.SourceLevelDb };
             // Nothing falls until the first control call says how much is running.
@@ -350,6 +363,23 @@ public sealed partial class RunningWaterSynth
     }
 
     private int _nextRingHome;
+    private readonly int[] _fallOwnHome;
+    private readonly float[] _fallAlong;
+
+    /// <summary>Every site and fall of a line to the place playing the piece it is in (or back to its own place
+    /// along the line when there is no cut).</summary>
+    private void HomeBy(ExtendedSources.LineCut? cut)
+    {
+        _homedBy = cut;
+        int places = _open.Length;
+        foreach (var s in _sites) s.Home = cut == null ? s.OwnHome : Math.Min(places - 1, cut.PlaceAt(s.Along));
+        for (int i = 0; i < _fallHome.Length; i++)
+            _fallHome[i] = cut == null || _fallOwnHome[i] < 0 ? _fallOwnHome[i] : Math.Min(places - 1, cut.PlaceAt(_fallAlong[i]));
+    }
+
+    /// <summary>The cut this line is played by now, if any: one with no more pieces than it has places.</summary>
+    private ExtendedSources.LineCut? CutNow
+        => Cut is { } cut && Spec.Layout == FlowLayout.Line && cut.Count <= _open.Length ? cut : null;
 
     /// <summary>Where an event of fall <paramref name="tap"/> is written: its home place with the spread,
     /// otherwise the middle; inside the cavity if it lands there.</summary>
@@ -412,10 +442,21 @@ public sealed partial class RunningWaterSynth
         }
         int n = _open.Length;
         Span<float> shares = stackalloc float[n];
-        ExtendedSources.Shares(n > 1 ? Spread : 0f, shares);
-        // An event whose home is an outer place goes there with probability s: that is what makes each
-        // outer place carry s/n of the power and the middle the rest (ExtendedSources.Shares).
-        _toHome = Math.Clamp(Spread, 0f, 1f);
+        var cut = CutNow;
+        if (!ReferenceEquals(cut, _homedBy)) HomeBy(cut);
+        if (cut != null)
+        {
+            // Cut into pieces: each event in the piece it happens in, and each place its piece's share.
+            for (int k = 0; k < n; k++) shares[k] = cut.ShareOfPlace(k);
+            _toHome = 1f;
+        }
+        else
+        {
+            ExtendedSources.Shares(n > 1 ? Spread : 0f, shares);
+            // An event whose home is an outer place goes there with probability s: that is what makes each
+            // outer place carry s/n of the power and the middle the rest (ExtendedSources.Shares).
+            _toHome = Math.Clamp(Spread, 0f, 1f);
+        }
         if (_rain != null) RainControl(dt, shares);
     }
 
@@ -523,7 +564,9 @@ public sealed partial class RunningWaterSynth
     {
         if (Lab.WaterAsNoise)
         {
-            for (int k = 0; k < _open.Length && k < places.Length; k++) places[k] = 0.1732f * _open[k].Signed();
+            var cut = _homedBy;
+            for (int k = 0; k < _open.Length && k < places.Length; k++)
+                places[k] = 0.1732f * (cut == null ? 1f : MathF.Sqrt(cut.ShareOfPlace(k) * _open.Length)) * _open[k].Signed();
             return;
         }
         Step();
@@ -743,7 +786,8 @@ public sealed partial class RunningWaterSynth
     {
         float r = MathF.Cbrt(3f * volume / (4f * MathF.PI));
         float v = FallingWaterSynth.ArrivalSpeed(r, Spec.DripFallMetres);
-        int home = _open.Length > 1 ? 1 + (int)(_rng.Uniform() * (_open.Length - 1)) % (_open.Length - 1) : 0;
+        int home = _homedBy is { } cut ? Math.Min(_open.Length - 1, cut.PlaceAt((_rng.Uniform() - 0.5f) * Spec.LengthMetres))
+                 : _open.Length > 1 ? 1 + (int)(_rng.Uniform() * (_open.Length - 1)) % (_open.Length - 1) : 0;
         int k = home != 0 && _rng.Uniform() < _toHome ? home : 0;
         var place = Spec.DripsInside && _inside != null ? _inside[k] : _open[k];
         // Under a tap the drip lands on whatever the basin is now: its bare bottom (and a steel one rings

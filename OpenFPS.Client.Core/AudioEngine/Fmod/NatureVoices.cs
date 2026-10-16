@@ -272,6 +272,9 @@ public sealed class PlacedNatureVoice
     private const int ControlBlock = 256;
 
     public volatile float TargetSpread;
+    /// <summary>For running water along a line: the pieces it is cut into at the listener, each place one of
+    /// them (ExtendedSources.Cut), from the client (IAudioProvider.PlanPieces). Null until the first.</summary>
+    public volatile ExtendedSources.LineCut? TargetCut;
     public volatile bool Running = true;
     /// <summary>A fire's share of its heat taken by water now (the server's, SoundEmitterComponent.Quench).</summary>
     public volatile float TargetQuench;
@@ -298,8 +301,8 @@ public sealed class PlacedNatureVoice
     private readonly double? _litAt;
 
     public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position, WorldWeather weather)
-        : this(Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f, weather)
-        => Flow = new RunningWaterSynth(spec, sampleRate, seed);
+        : this(ExtendedSources.FlowPlaces(key, spec, ModelLibrary.Presets), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f, weather)
+        => Flow = new RunningWaterSynth(spec, sampleRate, seed, ExtendedSources.FlowPlaces(key, spec, ModelLibrary.Presets));
 
     /// <summary>Waves at an edge (ShoreSynth); fetch, lie and length come from the map's key
     /// (ShoreSpec.KeyFor).</summary>
@@ -317,8 +320,9 @@ public sealed class PlacedNatureVoice
         HeadroomDb = headroomDb;
         WindHeight = windHeight;
         _rate = sampleRate;
+        // Each ring is made when its place first sounds: a line has a place for every piece it could be cut
+        // into, and far off it is one.
         _rings = new float[Places][];
-        for (int i = 0; i < Places; i++) _rings[i] = new float[RingLength];
         _out = new float[Places];
     }
 
@@ -347,13 +351,23 @@ public sealed class PlacedNatureVoice
                         else if (Flow != null) Flow.NextPlaces(_out);
                         else Shore!.NextPlaces(_out);
                         int idx = (int)(s & Mask);
-                        for (int i = 0; i < _rings.Length; i++) _rings[i][idx] = _out[i];
+                        for (int i = 0; i < _rings.Length; i++)
+                        {
+                            var ring = _rings[i];
+                            if (ring == null)
+                            {
+                                if (_out[i] == 0f) continue;
+                                Volatile.Write(ref _rings[i], ring = new float[RingLength]);
+                            }
+                            ring[idx] = _out[i];
+                        }
                     }
                     Volatile.Write(ref _rendered, upto);
                 }
             }
         }
-        return _rings[Math.Clamp(place, 0, _rings.Length - 1)][(int)(at & Mask)];
+        var heard = Volatile.Read(ref _rings[Math.Clamp(place, 0, _rings.Length - 1)]);
+        return heard == null ? 0f : heard[(int)(at & Mask)];
     }
 
     private void Control(float dt)
@@ -389,6 +403,7 @@ public sealed class PlacedNatureVoice
             // Its water: its own flow, and the rain running off its catchment now (Runoff).
             var spec = Flow.Spec;
             Flow.Spread = spread;
+            Flow.Cut = TargetCut;
             // A tap runs when somebody has turned it on (Running, from the server), and the basin under
             // it goes on draining after; anything else runs with its own flow and the rain.
             Flow.Flow = spec.Tap != null ? spec.FlowNow(Weather, tapOn: Running) : Running ? spec.FlowNow(Weather) : 0f;

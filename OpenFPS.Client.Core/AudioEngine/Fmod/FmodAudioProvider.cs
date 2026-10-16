@@ -2516,6 +2516,21 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>The last cut each line of running water was given, by its own voice's id (PlanPieces): a voice made
+    /// after it, or made again, starts cut.</summary>
+    private readonly Dictionary<int, ExtendedSources.LineCut> _pieces = new();
+
+    /// <summary>See IAudioProvider.PlanPieces.</summary>
+    public void PlanPieces(int voiceId, ExtendedSources.LineCut cut)
+    {
+        if (!_isInitialized) return;
+        lock (_lock)
+        {
+            _pieces[voiceId] = cut;
+            if (FindActive(voiceId)?.MachineState is NaturePlaceState { Place: 0 } middle) middle.Shared.TargetCut = cut;
+        }
+    }
+
     /// <summary>One of a train's voices; <paramref name="making"/> while its model is still being made.</summary>
     private PhysicalVoiceState? RailSlot(string key, int rate, out bool making)
     {
@@ -2557,7 +2572,7 @@ public partial class FmodAudioProvider : IAudioProvider
               { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?[1..], TargetTrees = emitter.Trees }
             : kind == OpenFPS.Common.ModelSynth.Flow
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Flow(preset), rate,
-                                    emitter.Seed * 47 + 19, emitter.Position, Weather)
+                                    emitter.Seed * 47 + 19, emitter.Position, Weather) { TargetCut = PiecesOf(emitter.EntityId) }
             : kind == OpenFPS.Common.ModelSynth.Fire
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Fire(preset), places, rate,
                                     emitter.Seed * 41 + 13, emitter.Position, Weather)
@@ -2568,6 +2583,11 @@ public partial class FmodAudioProvider : IAudioProvider
         if (voice.Fire != null) voice.Fire.Hearing = Hearing;
         if (voice.Flow != null) voice.Flow.Lab = Lab;
         return new NaturePlaceState(voice, 0, rate, emitter.Position);
+    }
+
+    private ExtendedSources.LineCut? PiecesOf(int voiceId)
+    {
+        lock (_lock) return _pieces.GetValueOrDefault(voiceId);
     }
 
     /// <summary>Waves at an edge: its preset and its own geometry from the key (ShoreSpec.KeyFor).</summary>
@@ -5114,6 +5134,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 _activeSounds.Remove(sound);
             }
             _activeById.Remove(entityId);
+            _pieces.Remove(entityId);
         } 
     }
     

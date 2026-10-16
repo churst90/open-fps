@@ -85,17 +85,20 @@ public class WideSourcesTests
     }
 
     /// <summary>
-    /// The places together are as loud as the source from its middle at 1, 5 and 20 m: each place's
-    /// voice rendered by the mixer's own law (Loudness.RenderedGain) from where it is, its share of
-    /// the source, and the one balance gain. Within 0.5 dB is the requirement; it comes out exact.
+    /// Each place is as loud as what it carries, by the mixer's own law (Loudness.RenderedGain) from where it is,
+    /// at its share of the source (2026-10-16: no gain any more holds them to the source heard from its middle,
+    /// which beside a line of creek made the level rise and fall 10 dB a stretch). A tree, the fire pit and a
+    /// fountain's tap are smaller than their extent, so this moves them under half a decibel at 1, 5 and 20 m.
     /// </summary>
     [Fact]
-    public void ThePlacesTogetherAreTheSourceAt1And5And20Metres()
+    public void EachPlaceIsAsLoudAsItsShareAndATreeAFireAndATapMoveUnderHalfADecibel()
     {
+        var tap = ModelLibrary.Presets.Water("park_fountain");
         foreach (var (key, middle, levelDb, extent) in new[]
         {
             ("foliage:park_tree", new Vector3(0f, 7f, 0f), FoliageSpec.ParkTree.SourceLevelDb, FoliageSpec.ParkTree.ExtentMetres),
             ("fire:fire_pit", new Vector3(0f, 0.6f, 0f), FireSpec.GardenFirePit.SourceLevelDb, FireSpec.GardenFirePit.ExtentMetres),
+            ("water:park_fountain/elm_park/1", new Vector3(0f, 0.8f, 0f), tap.SourceLevelDb, tap.Taps[1].ExtentMetres),
         })
         {
             var layout = ExtendedSources.Layout(key, ModelLibrary.Presets)!;
@@ -110,18 +113,16 @@ public class WideSourcesTests
                     var ear = new Vector3(d * 0.6f, MathF.Max(1.7f, middle.Y - d * 0.8f), d * 0.8f);
                     ear = middle + Vector3.Normalize(ear - middle) * d;
                     ExtendedSources.Shares(spread, shares);
-                    float balance = ExtendedSources.Balance(ear, middle, at, shares, reference, range);
                     double power = 0;
                     for (int k = 0; k < at.Length; k++)
                     {
-                        float g = Loudness.RenderedGain(balance, reference, range, Vector3.Distance(ear, at[k]));
+                        float g = Loudness.RenderedGain(1f, reference, range, Vector3.Distance(ear, at[k]));
                         power += shares[k] * (double)g * g;
                     }
                     float one = Loudness.RenderedGain(1f, reference, range, d);
                     double diff = 10 * Math.Log10(power / (one * (double)one));
-                    _o.WriteLine($"{key} at {d} m, spread {spread}: places together {diff:F3} dB against the middle alone (balance {20 * MathF.Log10(balance):F2} dB)");
+                    _o.WriteLine($"{key} at {d} m, spread {spread}: the places together {diff:F3} dB against the middle alone (what the old balance held them to)");
                     Assert.InRange(diff, -0.5, 0.5);
-                    Assert.InRange(diff, -0.01, 0.01);
                 }
         }
     }

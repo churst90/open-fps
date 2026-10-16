@@ -18,8 +18,11 @@ namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --extent-walk [walks=creek,creek-out,gutter,shore,fountain,fountain-out,fire] [render] [out=DIR] [speed=1]
+///               [rule=middle|pieces] [rain=60]
 ///
-/// The walks away from a source face across the way they go, so the source is at one side.
+/// The walks away from a source face across the way they go, so the source is at one side. rule=middle plays the
+/// extended sources as before 2026-10-16 (ExtendedSources.PlaceRule.Middle), for the before and after; rain= is how
+/// many minutes of heavy rain Albany's drainage has had (60: its creeks well up).
 ///
 /// Walks beside, along and away from the extended sources of the real maps at standing height (docs/RUNNING_WATER.md
 /// 15): a creek of Albany's drainage lines, its gutter and fountain and fire pit on the city, a stretch of
@@ -51,7 +54,14 @@ public static class ExtentWalkSpike
         var wanted = (Arg(args, "walks=") ?? "creek,creek-out,gutter,shore,fountain,fountain-out,fire").Split(',');
         bool render = args.Contains("render");
         float speed = ArgF(args, "speed=", render ? 0.5f : 1f);
-        Console.WriteLine($"Extent walk: {(render ? "rendered through the game's mixer" : "the client's placing, summed by the mixer's law")}, {speed:F1} m/s, a row every {Step} m");
+        float rainMinutes = ArgF(args, "rain=", 60f);
+        if (Arg(args, "rule=") is { } rule)
+        {
+            ExtendedSources.Rule = rule == "middle" ? ExtendedSources.PlaceRule.Middle : ExtendedSources.PlaceRule.Pieces;
+            ExtendedSources.ForgetLayouts();
+        }
+        Console.WriteLine($"Extent walk: {(render ? "rendered through the game's mixer" : "the client's placing, summed by the mixer's law")}, {speed:F1} m/s, a row every {Step} m; " +
+                          $"places by the {(ExtendedSources.Rule == ExtendedSources.PlaceRule.Middle ? "old rule (held to the middle)" : "rule of 2026-10-16 (each piece as loud as what it holds)")}");
 
         int failures = 0;
         foreach (var map in new[] { "albany_or", "city" })
@@ -64,9 +74,9 @@ public static class ExtentWalkSpike
             float[]? ground = null;
             if (map == "albany_or")
             {
-                // Ten minutes of heavy rain on the place's drainage, as GroundWaterSpike's scenes: the lines running.
+                // Heavy rain on the place's drainage, as GroundWaterSpike's scenes: the lines running.
                 GroundWaterSystem.Settle(map, 0f);
-                for (int t = 1; t <= 600; t++) GroundWaterSystem.Update(map, Rainfall.HeavyRate, 0.05f, 1f);
+                for (int t = 1; t <= (int)(rainMinutes * 60f); t++) GroundWaterSystem.Update(map, Rainfall.HeavyRate, 0.05f, 1f);
                 ground = GroundWaterSystem.WaterOf(map)!.Save();
             }
             float Floor(Vector3 near)
@@ -294,6 +304,8 @@ public static class ExtentWalkSpike
     {
         public readonly Dictionary<int, SpatialEmitter> Latest = new();
         public readonly HashSet<int> Live = new();
+        public readonly Dictionary<int, ExtendedSources.LineCut> Pieces = new();
+        public void PlanPieces(int voiceId, ExtendedSources.LineCut cut) => Pieces[voiceId] = cut;
         public bool Initialize() => true;
         public void Update() { }
         public void UpdateListener(Vector3 p, Quaternion r, Vector3 v, int region) { }
@@ -326,49 +338,6 @@ public static class ExtentWalkSpike
         public void SetDiagnosticPosition(Vector3 p) { }
         public void StopDiagnosticSound() { }
         public void Dispose() { }
-    }
-
-    /// <summary>One step's sum: the power of the walk's voices by the mixer's law, where it comes from, how wide.</summary>
-    internal readonly record struct Heard(double Power, float BearingDegrees, float WidthDegrees, int Voices);
-
-    /// <summary>
-    /// What the mixer makes of every live voice whose physical key is the walk's, at the ear: each voice's share of
-    /// its source (its places' shares at its middle's spread) times its law squared; their power-weighted
-    /// directions on the flat.
-    /// </summary>
-    internal static Heard Sum(IReadOnlyDictionary<int, SpatialEmitter> latest, IEnumerable<int> live, Func<string, bool> source, Vector3 ear)
-    {
-        double power = 0, x = 0, z = 0;
-        int voices = 0;
-        foreach (int id in live)
-        {
-            if (!latest.TryGetValue(id, out var e) || !source(e.PhysicalKey ?? "")) continue;
-            float share = ShareOf(latest, e);
-            float g = Loudness.RenderedGain(VoiceManager.WithoutHeadroom(e.Volume, e.HeadroomGain), e.MinDistance, e.Range, Vector3.Distance(e.Position, ear));
-            double p = share * (double)g * g;
-            voices++;
-            power += p;
-            var to = e.Position - ear;
-            float flat = MathF.Sqrt(to.X * to.X + to.Z * to.Z);
-            if (flat > 1e-4f) { x += p * to.X / flat; z += p * to.Z / flat; }
-        }
-        double r = power > 0 ? Math.Sqrt(x * x + z * z) / power : 1.0;
-        float bearing = (float)(Math.Atan2(x, z) * 180.0 / Math.PI);
-        if (bearing < 0f) bearing += 360f;
-        return new Heard(power, bearing, (float)(2.0 * Math.Acos(Math.Clamp(r, 0.0, 1.0)) * 180.0 / Math.PI), voices);
-    }
-
-    /// <summary>A voice's share of its source's power: its place's share at the spread its middle carries; one for a
-    /// voice that is a source of its own.</summary>
-    private static float ShareOf(IReadOnlyDictionary<int, SpatialEmitter> latest, in SpatialEmitter e)
-    {
-        var middle = e;
-        if (e.PlaceOfEntity != 0 && !latest.TryGetValue(e.PlaceOfEntity, out middle)) return 0f;
-        var layout = ExtendedSources.Layout(middle.PhysicalKey);
-        if (layout == null) return 1f;
-        Span<float> shares = stackalloc float[layout.Length];
-        ExtendedSources.Shares(middle.Spread, shares);
-        return e.Place >= 0 && e.Place < shares.Length ? shares[e.Place] : 0f;
     }
 
     private sealed class Rig
@@ -412,6 +381,23 @@ public static class ExtentWalkSpike
         });
     }
 
+    /// <summary>For running water: what its lines near the walk carry now, against what their beds were made for.</summary>
+    private static void Flows(Rig rig, Walk walk, List<EntityDefinition> sources)
+    {
+        var flows = new List<(float Now, float Made)>();
+        foreach (var d in sources)
+        {
+            string id = d.SoundEmitter.SoundId!;
+            if (!id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) continue;
+            if (walk.Feet.Min(f => Vector3.Distance(f, d.Transform.Position)) > 30f) continue;
+            var spec = ModelLibrary.Presets.Flow(id[5..]);
+            flows.Add((spec.FlowNow(rig.Facade.Weather), spec.ReferenceFlow));
+        }
+        if (flows.Count > 0)
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"   the water within 30 m of the walk: {flows.Min(f => f.Now):F2} to {flows.Max(f => f.Now):F2} L/s ({flows.Count} voices; their beds made for {flows.Min(f => f.Made):F1} to {flows.Max(f => f.Made):F1} L/s)"));
+    }
+
     private static void Face(LocalPlayerState player, Vector3 heading)
     {
         float yaw = MathF.Atan2(heading.X, heading.Z);
@@ -426,6 +412,7 @@ public static class ExtentWalkSpike
         var rig = MakeRig(mixer, () => now, prewarm: false, sounds: null);
         Wet(rig, ground, walk.WindMetresPerSecond);
         foreach (var d in sources) rig.World.RegisterDefinition(d);
+        Flows(rig, walk, sources);
         Face(rig.Player, walk.Heading);
         int framesPerStep = Math.Max(1, (int)MathF.Round(Step / speed * (float)ClientAudioSystem.UpdateHz));
         var update = new List<double>();
@@ -443,7 +430,7 @@ public static class ExtentWalkSpike
         for (int i = 0; i < 4 * (int)ClientAudioSystem.UpdateHz; i++) Tick();
         update.Clear();
 
-        var rows = new List<(Vector3 Feet, Heard H)>();
+        var rows = new List<(Vector3 Feet, ClientAudioSystem.Together H)>();
         for (int s = 0; s < walk.Feet.Count; s++)
         {
             var from = s == 0 ? walk.Feet[0] : walk.Feet[s - 1];
@@ -453,25 +440,25 @@ public static class ExtentWalkSpike
                 Tick();
             }
             var ear = walk.Feet[s] + new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f);
-            rows.Add((walk.Feet[s], Sum(mixer.Latest, mixer.Live, walk.Source, ear)));
+            rows.Add((walk.Feet[s], ClientAudioSystem.HeardTogether(mixer.Latest, mixer.Live, mixer.Pieces, walk.Source, ear)));
         }
         rig.Facade.Dispose();
 
         double mean = 10 * Math.Log10(rows.Average(r => r.H.Power));
-        var csv = new StringBuilder("metres,east,north,height,level_db,bearing_deg,width_deg,voices\n");
+        var csv = new StringBuilder("metres,east,north,height,level_db,bearing_deg,width_deg,voices,absolute_db\n");
         Console.WriteLine("   metres   level dB   from °   wide °   voices");
         for (int s = 0; s < rows.Count; s++)
         {
             var (feet, h) = rows[s];
             double db = 10 * Math.Log10(Math.Max(1e-30, h.Power)) - mean;
-            csv.Append(CultureInfo.InvariantCulture, $"{s * Step:F1},{feet.X:F2},{feet.Z:F2},{feet.Y:F2},{db:F2},{h.BearingDegrees:F1},{h.WidthDegrees:F1},{h.Voices}\n");
+            csv.Append(CultureInfo.InvariantCulture, $"{s * Step:F1},{feet.X:F2},{feet.Z:F2},{feet.Y:F2},{db:F2},{h.BearingDegrees:F1},{h.WidthDegrees:F1},{h.Voices},{db + mean:F2}\n");
             if (s % 4 == 0 || s == rows.Count - 1)
                 Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"   {s * Step,6:F1}   {db,8:F1}   {h.BearingDegrees,6:F0}   {h.WidthDegrees,6:F0}   {h.Voices,6}"));
         }
         var levels = rows.Select(r => 10 * Math.Log10(Math.Max(1e-30, r.H.Power))).ToList();
         update.Sort();
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-            $"   level: highest {levels.Max() - mean:F1} dB, lowest {levels.Min() - mean:F1} dB, swing {levels.Max() - levels.Min():F1} dB; " +
+            $"   level: mean {mean:F1} dB (the voices' gain squared, for before and after), highest {levels.Max() - mean:F1} dB, lowest {levels.Min() - mean:F1} dB, swing {levels.Max() - levels.Min():F1} dB; " +
             $"voices at most {rows.Max(r => r.H.Voices)}; width {rows.Min(r => r.H.WidthDegrees):F0} to {rows.Max(r => r.H.WidthDegrees):F0}°; " +
             $"ClientAudioSystem.Update median {update[update.Count / 2]:F2} ms, 99th {update[(int)(0.99 * (update.Count - 1))]:F2} ms"));
         File.WriteAllText(Path.Combine(outDir, walk.Name + ".csv"), csv.ToString());
@@ -501,6 +488,7 @@ public static class ExtentWalkSpike
             Material = new MaterialComponent { Material = "Grass" },
         });
         foreach (var d in sources) rig.World.RegisterDefinition(d);
+        Flows(rig, walk, sources);
         Face(rig.Player, walk.Heading);
         int mostVoices = 0, flat = 0, leastFree = int.MaxValue;
         void Pump(double seconds, Func<double, Vector3>? at = null)

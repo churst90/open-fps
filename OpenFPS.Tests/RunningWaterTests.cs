@@ -252,9 +252,13 @@ public class RunningWaterTests
         Assert.Equal(creek.Length, xs.Distinct().Count());
         var grate = RunningWaterSynth.Layout(RunningWaterSpec.DrainGrate);
         Assert.All(grate.Skip(1), p => Assert.InRange(p.Length(), 0.24f, 0.26f));
-        // And the client finds the same.
-        Assert.Equal(creek.Length, ExtendedSources.Layout("flow:creek", ModelLibrary.Presets)?.Length);
+        // And the client: a grate round its middle, a creek cut at the ear along its length (ExtendedSources.Cut).
+        Assert.Equal(grate.Length, ExtendedSources.Layout("flow:drain_grate", ModelLibrary.Presets)?.Length);
+        Assert.Null(ExtendedSources.Layout("flow:creek", ModelLibrary.Presets));
+        Assert.Equal(RunningWaterSpec.Creek.LengthMetres, ExtendedSources.LineLength("flow:creek", ModelLibrary.Presets));
+        Assert.Equal(0f, ExtendedSources.LineLength("flow:drain_grate", ModelLibrary.Presets));
         Assert.Null(ExtendedSources.Layout("flow:no_such_thing", ModelLibrary.Presets));
+        Assert.Equal(0f, ExtendedSources.LineLength("flow:no_such_thing", ModelLibrary.Presets));
     }
 
     // ── Texture: fitted against recordings ─────────────────────────────────────────────────────
