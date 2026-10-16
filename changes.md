@@ -12,6 +12,11 @@ Recent work, newest first. `git log` has the rest.
   the whole mix for a sixth of a second. Each answer now carries the place it was traced for, and is used
   only while the listener is in that place; until the new place is traced, the stand-in. Nothing changes
   while the listener stays in one place.
+- A one-off sound's copies are heard only while the way from where they came off is clear (docs/CLIENT_NOTES.md,
+  one-off sounds). They were found for where the listener stood as the sound began and never again, so a long
+  one, a telephone's ring, was heard in full by its copies from behind a wall or through a door shut on it.
+  Each copy is faded out while something solid stands between its last surface and the ears, looked at again
+  when the ears move 0.25 m or the scene changes. No stored stream changes.
 
 ## 2026-10-12
 

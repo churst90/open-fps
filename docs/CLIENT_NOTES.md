@@ -159,6 +159,10 @@ from standing still. Until one is measured, a voice has none (WorldAudioPlayer.H
   footstep that landed there took over a car's reflection or a distant car's voice, heard as a car going
   quiet or a bike's reflection standing still and repeating. The id was also shared by a sound and its own
   reflection, and under one id the last written won: a grandstand was heard only as its echo.
+- A one-off's copies are found for where the ears are as it begins. Each keeps the last point it came
+  off and is faded out while something solid stands between that point and the ears (`KeepCopiesTrue`):
+  one ray a copy, again when the ears have moved 0.25 m or a door or the tiles have. Without it a ringing
+  telephone was heard in full by its copies through the door shut on it.
 
 ## Rain: a drop's click and its spray
 
