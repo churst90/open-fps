@@ -115,6 +115,21 @@ public struct MaterialProperties
     /// this section between its rails. Null for anything solid.</summary>
     public PaleSection? Pales { get; set; }
 
+    // ── What it does at a contact (docs/MATTER.md 2.4, "Friction and restitution"). Nothing reads these yet: physics
+    // stage 4 will, for every contact. Each is the material against itself, clean and dry, so the pair rule (friction
+    // the geometric mean of the two, restitution the larger) gives a measured like-on-like pair back exactly. Null
+    // where no measurement was found: a reader must not take null as zero.
+
+    /// <summary>Coefficient of static friction against itself, clean and dry; null where none was found.</summary>
+    public float? StaticFriction { get; set; }
+
+    /// <summary>Coefficient of kinetic (sliding) friction against itself, clean and dry; null where none was found.</summary>
+    public float? KineticFriction { get; set; }
+
+    /// <summary>Coefficient of restitution against itself at a low speed (a few metres a second at most, where it does not
+    /// yet fall with speed); null where none was found.</summary>
+    public float? Restitution { get; set; }
+
     /// <summary>What it is underfoot (Footsteps); null where it is a slab bearing on the ground with an ordinary grit,
     /// <see cref="Common.Underfoot.Ground"/>.</summary>
     public Underfoot? Underfoot { get; set; }
@@ -280,6 +295,7 @@ public static class AcousticRegistry
             AddStrikesAfterMatter(reg);
             AddGroundImpedance(reg);
             AddGroundUse(reg);
+            AddContact(reg);
 
             foreach (var kvp in reg)
                 if (kvp.Value.Strike == null)
@@ -617,6 +633,78 @@ public static class AcousticRegistry
         var asphalt = reg["Asphalt"]; asphalt.Carriageway = true; reg["Asphalt"] = asphalt;
         // A palisade's pale: a pressed steel section about 65 mm wide and 3 mm thick, pinned between rails a metre apart.
         var fence = reg["Fence"]; fence.Pales = new PaleSection(0.065f, 0.003f, 1f); reg["Fence"] = fence;
+    }
+
+    /// <summary>
+    /// Friction and restitution, each the material against itself (<see cref="MaterialProperties.StaticFriction"/>). A row
+    /// with no measurement found is left out, not guessed. Ranges printed in a source are taken at their middle. Sources:
+    ///   RM    R. Beardmore, Roymech, "Coefficient of friction" (archived 2019-02-01, web.archive.org/web/20190201171526/
+    ///         http://www.roymech.co.uk/Useful_Tables/Tribology/co_of_frict.htm): the main table, clean and dry, compiled
+    ///         from Machinery's Handbook (18th ed.), Kempe's Engineers Year Book (1980), Davis's Concise Metals
+    ///         Engineering Data Book (ASM) and Gieck's Engineering Formulas (7th ed.); its "elements" table (an incline in
+    ///         air at room temperature and 50 % humidity), RM-E; its "civils" table (sliding), RM-C.
+    ///   ETB   The Engineering ToolBox, "Friction and friction coefficients" (2004), which names no source of its own.
+    ///   GTD   Geotechdata.info, "Angle of friction" (2013): a soil's drained friction angle phi, by USCS class, from Peck,
+    ///         Hanson and Thornburn, Foundation Engineering (1974); Carter and Bentley, Correlations of Soil Properties
+    ///         (1991); and Minnesota DOT, Pavement Design (2007). A soil sheared on itself: mu = tan(phi), static only.
+    ///   TANG  Tang, Song, Dong and Song, "Measurement of restitution and friction coefficients for granular particles...",
+    ///         Materials 12 (2019) 3170, doi:10.3390/ma12193170, table 3: glass beads thrown onto a glass plate, 0.926.
+    /// </summary>
+    private static void AddContact(Dictionary<string, MaterialProperties> reg)
+    {
+        void Set(string name, float? staticMu, float? kineticMu, float? restitution = null)
+        {
+            var p = reg[name];
+            p.StaticFriction = staticMu;
+            p.KineticFriction = kineticMu;
+            p.Restitution = restitution;
+            reg[name] = p;
+        }
+        // Metals. Mild steel on mild steel 0.74, sliding 0.57 (RM).
+        Set("Metal", 0.74f, 0.57f);
+        // A palisade is galvanised mild steel, and every other figure of its row is mild steel's (RM as Metal).
+        Set("Fence", 0.74f, 0.57f);
+        // Aluminium on aluminium 1.05-1.35, sliding 1.4 (RM): clean aluminium galls, so it slides harder than it starts.
+        // RM-E's incline gives 0.57 for the same pair in ordinary air: the spread is real, and the clean figure is kept.
+        Set("Aluminium", 1.2f, 1.4f);
+        // Cast iron on cast iron 1.1, sliding 0.15 (RM): its graphite lubricates the slide.
+        Set("CastIron", 1.1f, 0.15f);
+        // Copper on copper 1.0 (RM); no sliding figure.
+        Set("Copper", 1.0f, null);
+        // Lead on lead 0.90 (RM-E).
+        Set("Lead", 0.90f, null);
+        // Ti-6Al-4V on itself, flat on flat, 0.36, sliding 0.30 (RM).
+        Set("Titanium", 0.36f, 0.30f);
+
+        // Stone, ceramic and glass. Glass on glass 0.9-1.0, sliding 0.4 (RM); glass beads on a glass plate rebound at
+        // 0.926 (TANG). Laminated glass's faces are float glass; its restitution is the interlayer's too, and unmeasured.
+        Set("Glass", 0.95f, 0.4f, 0.93f);
+        Set("LaminatedGlass", 0.95f, 0.4f);
+        // Cement on cement blocks, sliding 0.65 (RM-C).
+        Set("Concrete", null, 0.65f);
+        // Brick on brick, sliding, given twice: 0.7 and 0.65 (RM-C); the mean.
+        Set("Brick", null, 0.68f);
+        // Granite on granite, sliding 0.6 (RM-C).
+        Set("Granite", null, 0.6f);
+
+        // Wood. Wood on clean wood 0.25-0.5 (RM). Oak on oak along the grain 0.62, sliding 0.48 (RM).
+        Set("Wood", 0.38f, null);
+        Set("Oak", 0.62f, 0.48f);
+
+        // Polymers. Plexiglas on Plexiglas 0.8 (RM); nylon on nylon 0.15-0.25 (RM); rubber on rubber 1.16 (ETB).
+        Set("Acrylic", 0.8f, null);
+        Set("Nylon", 0.2f, null);
+        Set("Rubber", 1.16f, null);
+
+        // Ground: a soil sheared on itself, tan of its drained friction angle (GTD). Loam 28-32 degrees (Minnesota DOT),
+        // tan 30 = 0.58; loose sand 29-30 (Peck et al.), tan 29.5 = 0.57; clay 18-28 (Minnesota DOT), tan 23 = 0.42, and
+        // it has a cohesion besides; loose sandy gravel 35 (Carter and Bentley), tan 35 = 0.70.
+        Set("Dirt", 0.58f, null);
+        Set("Sand", 0.57f, null);
+        Set("Clay", 0.42f, null);
+        Set("Gravel", 0.70f, null);
+        // Ice on ice at -12 C 0.3, sliding 0.035 (ETB); the table's ice is near -10 C.
+        Set("Ice", 0.3f, 0.035f);
     }
 
     /// <summary>The properties beyond sound for a material already in the table.</summary>
