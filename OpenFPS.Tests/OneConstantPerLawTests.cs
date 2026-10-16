@@ -70,14 +70,9 @@ public class OneConstantPerLawTests
         new(@"(?<![\w.])1\.2[01]?[fFdD]?\s*\*.*\b(?:343|293)", RegexOptions.Compiled),
     };
 
-    /// <summary>The one copy left, waiting on Cody (docs/PHYSICS_BOUNDARY.md 16.6): the glass's landing renders
-    /// re-roll with the one air.</summary>
-    private const string Waiting = "OpenFPS.Sound/GlassFracture.cs";
-
     internal static List<string> DensityCopies()
         => CodeLines()
             .Where(l => l.File != "OpenFPS.Materials/Air.cs")
-            .Where(l => !(l.File == Waiting && l.Code.StartsWith("private const double Rho0 = 1.2;", StringComparison.Ordinal)))
             // A table of measured statistics is numbers, not a law.
             .Where(l => !l.Code.Contains("\", new[]", StringComparison.Ordinal))
             .Where(l => DensityLiterals.Any(r => r.IsMatch(l.Code)))

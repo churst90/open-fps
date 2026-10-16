@@ -357,7 +357,7 @@ dead reckoning, part of the network, stays there.
 | Gravity | `BodyConstants.cs:31` (movement, glass, breath, ear wind), `Waves.cs:525`, `RunningWater.cs:619`, the door models' own `G` (`KnobDoor.cs:243`, `SlidingDoor.cs:200`, `LockCylinder.cs:125`, `CarWindow.cs:210`, `ElevatorDoor.cs:120`, `GlassFracture.cs:87`), literals in `RaceLine.cs` (4), `VehicleSystem*.cs` (4), `Driveline.cs` (2), `BulletImpact.cs` (4), `FireSynth.cs` (5), and 9 more files | 9.81: 40 times in 26 files. One number since 16.6: `Earth.StandardGravity` |
 | Gravity | `TyreFriction.cs:13` (= `WheelDynamics.G`), `ExternalBallistics.cs:50`, `StruckThings.cs:178`, `Aircraft.cs:432` | 9.80665: 4 times in 4 files. One number since 16.6: `Earth.StandardGravity` |
 | The map's gravity | `ZoneComponent.Gravity`, read by `MovementSystem.cs:64` only | drops, falls, tyres, bullets and water ignore it. Since 16.6 everything on the server that falls, rolls or flies reads it (`PhysicsConstants.GravityOf`) |
-| Air density | `DrivingSystem.cs:71` and `Driveline.cs:57` (1.225); `Precipitation.cs:101`, `WallTransmission.cs:83`, `DoorPhysics.cs:13` (1.21); `BulletImpact.cs:275`, `GlassFracture.cs:87`, `ExhaustNetwork.cs:36`, `IntakeNetwork.cs:27`, `Waveguide.cs:511`, `GasHobSynth.cs:40` (1.2) | the ballistics alone work it out from the world's temperature and pressure (`Air`). One law since 16.6: `Air.Density` (the glass waits on Cody) |
+| Air density | `DrivingSystem.cs:71` and `Driveline.cs:57` (1.225); `Precipitation.cs:101`, `WallTransmission.cs:83`, `DoorPhysics.cs:13` (1.21); `BulletImpact.cs:275`, `GlassFracture.cs:87`, `ExhaustNetwork.cs:36`, `IntakeNetwork.cs:27`, `Waveguide.cs:511`, `GasHobSynth.cs:40` (1.2) | the ballistics alone work it out from the world's temperature and pressure (`Air`). One law since 16.6: `Air.Density` (the glass's too since 2026-10-16) |
 | Step height | `PhysicsConstants.cs:57` and two locals in `PhysicsUtils.cs:34, 182` | 0.4. One number since 16.4: `BodyConstants.StepHeight` |
 | Foot padding | `SharedMovementEngine.cs:329`, `WorldEditor.cs:28` (0.15); `MovementSystem.cs:254`, `OccupancyService.cs:376` (0.4) | two values for one body |
 | Brakes | `DrivingSystem.cs:262` (all the grip) and `Driveline.cs:35` (7.5 m/s²) | one car, two laws |
@@ -1756,12 +1756,18 @@ octave band, most of it by a few hundredths, but where landings re-roll.
   - The server's driven car pushes through its map's air, the weather's temperature and the map's pressure,
     as the bullets fly through it; `Air.Standard` where none is given (the replays, the lab). The sound's car
     (`Driveline`) and the keys sent without a density read `Air.Standard`.
-  - **Held back for Cody: the glass.** `GlassFracture` keeps its own 1.2. With 1.204 every shard's terminal
-    speed, sqrt(2 m g / (rho Cd A)), moves 0.17 % and the pieces of an annealed pane's landing fall together
-    differently: each of eight variants' renders moves up to 4.5 dB in an octave band, while their mean is
-    within 0.44 dB in every band within 60 dB of the loudest, inside the 2 to 5 dB the variants already
-    differ by. A re-roll, not a change of level; the guard names it as waiting. The tempered pane's landing
-    moves 0.05 dB.
+  - **The glass, held back for Cody, then moved (2026-10-16).** `GlassFracture` kept its own 1.2 until Cody
+    approved the one air for it too. With 1.204 every shard's terminal speed, sqrt(2 m g / (rho Cd A)),
+    moves 0.17 % and the pieces of an annealed pane's landing fall together differently: a re-roll, not a
+    change of level. Measured on renders before and after (a 1.2 by 1.6 m, 6 mm house window shot with a
+    9 mm, falling 0.9 m; octave bands 31.5 Hz to 16 kHz, in pascals, as the game places them): the game's
+    four variants on concrete move up to 4.6 dB in a band and on grass up to 5.6; the four on concrete
+    averaged move up to 2.2 dB (at 2 kHz) and the four on grass up to 1.1, the re-roll of so few. Over 32
+    variants on each ground the mean moves within 0.5 dB on concrete and up to 1.3 dB at 2 kHz on grass,
+    where one variant of the 32 gains 15 to 20 dB at 2 to 4 kHz (a piece lands differently); over all 64,
+    within 0.46 dB. The break, a hole in laminated glass and the tempered pane's landing move 0.03 to
+    0.13 dB. No stored render holds a glass landing, so nothing stored changed; the guard's waiting line
+    went.
 - **What moves, heard.** Measured on renders before and after, by octave band from 31.5 Hz to 16 kHz:
 
   | Model | Gravity | Air |
@@ -1772,7 +1778,7 @@ octave band, most of it by a few hundredths, but where landings re-roll.
   | Rain on steel | none | -0.04 to -0.01 |
   | Thunder at 1.5 km | none | within 0.05 |
   | Glass breaking | within 0.10 | +0.03 |
-  | Glass landing, annealed | within 0.12 | held back (above) |
+  | Glass landing, annealed | within 0.12 | a re-roll, moved 2026-10-16 (above) |
   | Glass landing, tempered | within 0.09 | within 0.05 |
   | Bullet strikes | none | full scale +0.03; their shape within 0.13 |
   | Bullet debris | within 0.16, but dirt: 0.69 at 31.5 Hz (47 dB under its loudest band), -0.4 at 63 to 125 Hz | within 0.16 |
@@ -1806,7 +1812,7 @@ octave band, most of it by a few hundredths, but where landings re-roll.
   `DoorModelFingerprint` changes (cfb37eeb081b, d8da086ecd2c after): the door renders cached on disk are made
   again.
 - **Left of stage 2:** `VehicleSpec`'s `VehicleChassisSpec` (16.2); one rolling resistance and drag law and
-  one brake law; `WindModel` folded into `WindField`. Of the constants: the glass's air (above);
+  one brake law; `WindModel` folded into `WindField`. Of the constants:
   `tools/gen_city.py` and `tools/gen_osm.py` still write g as 9.81 into the maps' braking and pulling numbers
   (with 9.80665 two would round differently, 2.58 to 2.57 and 1.79 to 1.78 m/s², so the maps regenerate with
   it); the heard laws' 343 beside the density, which the plan has them take from the same air; the

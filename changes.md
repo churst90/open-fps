@@ -22,6 +22,10 @@ Recent work, newest first. `git log` has the rest.
   player hears or is told changes: the moved files are as they were, and the spoken-lines replay passes
   unchanged. The wire hash changes, as four of the files left it, so the server and the Windows client go out
   together.
+- The glass's landings fall through the one air, 1.204 kg/m³, where they kept their own 1.2 (docs/PHYSICS_BOUNDARY.md
+  16.6; Cody approved). An annealed pane's landing re-rolls: each of the game's variants moves up to 5.6 dB in an
+  octave band, their mean over 64 variants within 0.46 dB; the break, a hole and a tempered landing move 0.03 to
+  0.13 dB. The guard's one waiting line went. The wire hash changes, and the door renders are made again.
 - The city's roads are dense asphalt, Nord2000's class H (200,000 kPa s/m²), where they were G's 20,000, "most
   normal asphalt" (docs/CLIENT_NOTES.md, "The ground by its impedance"; Cody chose H). A gutter, a drain's grate
   and a runnel heard along Foundry Street lost 2 to 10 dB of their top at 25 to 200 m to the road; now at most
