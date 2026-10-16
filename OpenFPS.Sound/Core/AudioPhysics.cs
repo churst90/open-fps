@@ -9,24 +9,6 @@ public static class AudioPhysics
     /// <summary>Default speed of sound in air, m/s (~20 °C).</summary>
     public const float SpeedOfSound = OpenFPS.Common.AcousticConstants.SpeedOfSound;
 
-    /// <summary>The speed of sound in the world's air now, m/s: one figure for Doppler, echo delays, the
-    /// ground reflection and flight time (echoes once ran at 343 while Doppler followed the weather).</summary>
-    public static float CurrentSpeedOfSound
-    {
-        get => System.Threading.Volatile.Read(ref _current);
-        set => System.Threading.Volatile.Write(ref _current, value);
-    }
-    private static float _current = SpeedOfSound;
-
-    /// <summary>The world's air temperature now, °C, from the server's weather: what a vehicle's cooling
-    /// system runs against.</summary>
-    public static float CurrentAirCelsius
-    {
-        get => System.Threading.Volatile.Read(ref _currentCelsius);
-        set => System.Threading.Volatile.Write(ref _currentCelsius, value);
-    }
-    private static float _currentCelsius = 20f;
-
     /// <summary>Speed of sound in dry air, m/s: the air's own law (<see cref="OpenFPS.Common.Air.SpeedOfSound"/>),
     /// so a bullet's crack and the mix's Doppler and delays hear one air (the mix had the linear fit
     /// 331.3 + 0.606·T, 0.2 % fast at 40 °C). About 4 % across −20 to +40 °C, shifting every Doppler
@@ -34,7 +16,7 @@ public static class AudioPhysics
     /// <param name="celsius">Air temperature. Clamped, so a map's temperature in the wrong units cannot
     /// take the mix off the end of the weather.</param>
     public static float SpeedOfSoundAt(float celsius)
-        => new OpenFPS.Common.Air(Math.Clamp(celsius, -60f, 60f), 1013.25f).SpeedOfSound;
+        => new OpenFPS.Common.Air(Math.Clamp(celsius, -60f, 60f), OpenFPS.Common.Air.Reference.PressureMb).SpeedOfSound;
 
     /// <summary>
     /// Doppler pitch multiplier, f' = f · (c − v_listener·û) / (c − v_source·û), û from source to

@@ -428,8 +428,7 @@ internal sealed class Replay
         // The statics the audio system reads, at the game's defaults whatever ran before, and put back after
         // (docs/SOUND_LIBRARY_BOUNDARY.md, 4.1).
         var saved = (Loudness.DynamicRangeCompression, OpenFPS.Common.Hearing.EarModel.Enabled,
-                     OpenFPS.Common.Hearing.EarModel.ListeningLevelDb, AudioPhysics.CurrentSpeedOfSound,
-                     AudioPhysics.CurrentAirCelsius, MixerQuality.MixerRate,
+                     OpenFPS.Common.Hearing.EarModel.ListeningLevelDb, MixerQuality.MixerRate,
                      OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
                      OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
                      OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead,
@@ -442,8 +441,6 @@ internal sealed class Replay
         OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
         OpenFPS.Common.Hearing.EarModel.Enabled = true;
         OpenFPS.Common.Hearing.EarModel.ListeningLevelDb = OpenFPS.Common.Hearing.EarModel.DefaultListeningLevelDb;
-        AudioPhysics.CurrentSpeedOfSound = AudioPhysics.SpeedOfSound;
-        AudioPhysics.CurrentAirCelsius = 20f;
         MixerQuality.MixerRate = MixerQuality.DefaultRate;
         OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled = true;
         OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled = true;
@@ -464,8 +461,7 @@ internal sealed class Replay
         finally
         {
             (Loudness.DynamicRangeCompression, OpenFPS.Common.Hearing.EarModel.Enabled,
-             OpenFPS.Common.Hearing.EarModel.ListeningLevelDb, AudioPhysics.CurrentSpeedOfSound,
-             AudioPhysics.CurrentAirCelsius, MixerQuality.MixerRate,
+             OpenFPS.Common.Hearing.EarModel.ListeningLevelDb, MixerQuality.MixerRate,
              OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
              OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
              OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead,

@@ -423,6 +423,7 @@ OpenFPS.Sound/CarWindow.cs	Sound
 OpenFPS.Sound/Core/AdminGunSynth.cs	Sound	
 OpenFPS.Sound/Core/Aircraft/AircraftSynth.cs	Sound	
 OpenFPS.Sound/Core/At44k.cs	Sound	
+OpenFPS.Sound/Core/Atmosphere.cs	Sound	
 OpenFPS.Sound/Core/AudioPhysics.cs	Sound	
 OpenFPS.Sound/Core/Bending.cs	Sound	
 OpenFPS.Sound/Core/BoundaryModel.cs	Sound	

@@ -112,7 +112,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         _acoustics = acoustics;
         _clock = clock ?? new OpenFPS.Common.StopwatchAudioClock();
-        Traced = traced ?? new TracedReverbSet { Clock = _clock };
+        Traced = traced ?? new TracedReverbSet { Clock = _clock, Atmosphere = acoustics.Atmosphere };
     }
 
     /// <summary>The world's clock. What only waits on real work (a retired scene's five seconds, a build's
@@ -646,7 +646,7 @@ public class AsyncAcousticWorker : IDisposable
                 float barrierDelta = -1f;
                 Vector3 round = Vector3.Zero;
                 if (routes != null)
-                    round = routes.BarrierGains(kv.Value.SourcePos, kv.Value.ListenerPos, AudioPhysics.CurrentSpeedOfSound,
+                    round = routes.BarrierGains(kv.Value.SourcePos, kv.Value.ListenerPos, _acoustics.Atmosphere.SpeedOfSound,
                                                 out barrierDelta, out edgeVerified, out edge, out roundFound);
                 if (_saDebug && edgeVerified)
                     Console.WriteLine($"[ROUTE] {kv.Value.SourcePos} -> {kv.Value.ListenerPos}: {barrierDelta:F2} m round one box, edge {edge}");
@@ -819,8 +819,8 @@ public class AsyncAcousticWorker : IDisposable
         // First order only, for a sound that goes on: at third order a jet's and a bus's hiss became
         // copies of themselves standing in the distance, cutting in and out, and a far siren's image
         // stood in front of you. Copies of copies belong to one-off sounds (WorldAudioPlayer).
-        if (solids != null) EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
-        else EarlyReflections.Find(req.SourcePos, req.ListenerPos, geometry!, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
+        if (solids != null) EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, _acoustics.Atmosphere.SpeedOfSound);
+        else EarlyReflections.Find(req.SourcePos, req.ListenerPos, geometry!, _reflectionScratch, _acoustics.Atmosphere.SpeedOfSound);
 
         _lastReflectionCount = 0;
         for (int i = 0; i < _reflectionScratch.Count; i++)

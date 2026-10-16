@@ -102,6 +102,9 @@ internal sealed class TracedReverb : IDisposable
     /// the dry sound is what the bus path adds. Never set in the game.
     /// </summary>
     public static float LabProbeSeconds;
+    /// <summary>The air of the world traced for, whose speed of sound places the copies (EarlyCopies): its
+    /// set's (TracedReverbSet.Atmosphere). One of its own when made alone, as in the lab.</summary>
+    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; init; } = new();
     /// <summary>The scene's boxes, for the placed copies' share of the early energy (EarlyCopies).</summary>
     private IReadOnlyList<EarlyReflections.Solid> _solids = Array.Empty<EarlyReflections.Solid>();
 
@@ -403,7 +406,7 @@ internal sealed class TracedReverb : IDisposable
                             // first reflection on, less what the placed copies carry (EarlyCopies).
                             long s0 = System.Diagnostics.Stopwatch.GetTimestamp();
                             _smooth ??= new SmoothTail(SampleRate, IrSize, DiffuseBranch.Count);
-                            var copies = _solids.Count > 0 ? EarlyCopies.From(_solids, at, SampleRate) : null;
+                            var copies = _solids.Count > 0 ? EarlyCopies.From(_solids, at, SampleRate, Atmosphere.SpeedOfSound) : null;
                             _smooth.Add(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, _lateCov, at, place, sceneChanged, copies);
                             if (dirs != null)
                             {
@@ -548,6 +551,9 @@ internal sealed class TracedReverbSet
     /// <summary>The clock of the world these places are traced for, which whoever holds the set gives it (the
     /// mixer, or a worker with a set of its own): a late answer's age is told on it.</summary>
     public OpenFPS.Common.IAudioClock Clock { get; set; } = new OpenFPS.Common.StopwatchAudioClock();
+    /// <summary>The air of that world, which whoever holds the set gives it as it gives the clock: the traces
+    /// place their early copies at its speed of sound.</summary>
+    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
     private readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> _rooms = new();
     private readonly HashSet<int> _roomsMaking = new();
     /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
@@ -615,7 +621,7 @@ internal sealed class TracedReverbSet
         TracedReverb? madeListener = null; TracedEchoes? madeEchoes = null; LateField? madeLate = null;
         if (missing)
         {
-            madeListener = new TracedReverb(context) { ExtractLate = true };
+            madeListener = new TracedReverb(context) { ExtractLate = true, Atmosphere = Atmosphere };
             // On the scene without its open ground too: every voice carries its own ground bounce
             // (GroundReflection), and traced again a car at 30 m had it twice, a comb under a millisecond
             // late at about the direct level.
@@ -697,7 +703,7 @@ internal sealed class TracedReverbSet
     {
         Making("A room's trace");
         long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-        var t = new TracedReverb(context, refreshMs: 1000);
+        var t = new TracedReverb(context, refreshMs: 1000) { Atmosphere = Atmosphere };
         if (t.IsValid) { t.SetListener(at); t.SetScene(scene); }
         bool keep;
         SteamAudioScene? newer = null;
@@ -806,7 +812,7 @@ internal sealed class TracedReverbSet
             scene.Build(boxes);
             if (scene.IsBuilt)
             {
-                trace = new TracedReverb(context, refreshMs: 1000) { IsCabin = true };
+                trace = new TracedReverb(context, refreshMs: 1000) { IsCabin = true, Atmosphere = Atmosphere };
                 // Its first trace from the middle of the cabin, until a seat is known.
                 if (trace.IsValid) { trace.SetListener(new Vector3(0f, g.FloorTop + g.Hc * 0.5f, g.Cz)); trace.SetScene(scene); }
                 else { trace.Dispose(); trace = null; }

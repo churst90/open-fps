@@ -365,7 +365,7 @@ public partial class ClientAudioSystem
         _state = state;
         _drivingAids = new DrivingAids(audio);
         _spatial = new SpatialService();
-        _acoustics = new SpatialAcoustics(_spatial) { Clock = audio.Clock };
+        _acoustics = new SpatialAcoustics(_spatial) { Clock = audio.Clock, Atmosphere = audio.Atmosphere };
         // After the acoustics, which it needs: a beacon behind a wall is not blipped.
         _beacons = new BeaconAids(audio, beacons, acoustics: _acoustics);
         // Shares this system's acoustics, so a rendered latch takes exactly the path a recorded one would.
@@ -3047,7 +3047,7 @@ public partial class ClientAudioSystem
         if (engineKey.Length > 0)
         {
             long echoAt = System.Diagnostics.Stopwatch.GetTimestamp();
-            _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.CurrentSpeedOfSound, engineDt, _audio,
+            _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, _audio.Atmosphere.SpeedOfSound, engineDt, _audio,
                                  traced: OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.HasTracedEchoes(snap.Id));
             double echoMs = Ms(echoAt);
             _partMs[0] += echoMs;
@@ -3248,7 +3248,7 @@ public partial class ClientAudioSystem
         _talkerSearchedThisFrame = true;
         room.NextSearch = now + 0.1;
         // Their voice is played without its flight time, so a copy is its EXTRA path behind it.
-        float flight = Vector3.Distance(mouth, ear) / AudioPhysics.CurrentSpeedOfSound;
+        float flight = Vector3.Distance(mouth, ear) / _audio.Atmosphere.SpeedOfSound;
         room.Answering = PlaceVoiceCopies(world, mouth, ear, room.Arrivals, gain, reference, flight,
                                           room.Block, room.On,
                                           OpenFPS.Client.AudioEngine.Fmod.Talkers.CopyKey(id), "voice chat", region, range,
@@ -3542,7 +3542,7 @@ public partial class ClientAudioSystem
         KeepCopies(VoiceKind.OwnVoiceCopy, VoiceRegistry.NoEntity, _voiceCopyOn);
         if (now < _voiceNextSearch) return;
         _voiceNextSearch = now + 0.1;
-        float c = AudioPhysics.CurrentSpeedOfSound;
+        float c = _audio.Atmosphere.SpeedOfSound;
         // Its whole path, less what the microphone has already cost.
         int slot = PlaceVoiceCopies(world, mouth, ear, _voiceArrivals, gain, reference, MicrophoneLatency,
                                     VoiceRegistry.NoEntity, _voiceCopyOn,
@@ -3588,12 +3588,12 @@ public partial class ClientAudioSystem
                                  VoiceKind kind, int ownerId)
     {
         arrivals.Clear();
-        _acoustics.FindReflections(world, mouth, ear, arrivals, AudioPhysics.CurrentSpeedOfSound,
+        _acoustics.FindReflections(world, mouth, ear, arrivals, _audio.Atmosphere.SpeedOfSound,
                                                  maxOrder: 2, keep: OwnVoiceCopies * 2,
-                                                 maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
+                                                 maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * _audio.Atmosphere.SpeedOfSound);
         arrivals.Sort(static (a, b) => (b.GainMid, a.SurfaceId, a.Order, a.PathLength).CompareTo((a.GainMid, b.SurfaceId, b.Order, b.PathLength)));
         float direct = Vector3.Distance(mouth, ear);
-        float c = AudioPhysics.CurrentSpeedOfSound;
+        float c = _audio.Atmosphere.SpeedOfSound;
         int slot = 0, secondOrder = 0;
         foreach (var a in arrivals)
         {
@@ -3681,9 +3681,9 @@ public partial class ClientAudioSystem
     /// each from its own wall with that wall's colour. The floor under the foot is skipped.</summary>
     private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, float stepLevelDb, WorldSnapshot world)
     {
-        _acoustics.FindReflections(world, stepPos, ear, _stepArrivals, AudioPhysics.CurrentSpeedOfSound,
+        _acoustics.FindReflections(world, stepPos, ear, _stepArrivals, _audio.Atmosphere.SpeedOfSound,
                                              maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
-                                             maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
+                                             maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * _audio.Atmosphere.SpeedOfSound);
         _stepArrivals.Sort(static (a, b) => (b.GainMid, a.SurfaceId, a.Order, a.PathLength).CompareTo((a.GainMid, b.SurfaceId, b.Order, b.PathLength)));
         float direct = Vector3.Distance(stepPos, ear);
         int added = 0, secondOrder = 0;
@@ -3827,8 +3827,8 @@ public partial class ClientAudioSystem
         var m = OpenFPS.Common.AcousticRegistry.GetProperties(c.Material ?? "Generic");
         // Sound bent down by the wind or the air's layers comes off the ground as if both ends stood higher (Bending).
         bool water = OpenFPS.Common.AcousticRegistry.IsLiquid(c.Material);
-        var bent = OpenFPS.Common.Bending.Along(_audio.Weather, src, ear, c.Height, water, _audio.Weather.Now, AudioPhysics.CurrentSpeedOfSound);
-        if (OpenFPS.Common.GroundAnswer.Reflect(c.Height, m, src, ear, minHeight, AudioPhysics.CurrentSpeedOfSound,
+        var bent = OpenFPS.Common.Bending.Along(_audio.Weather, src, ear, c.Height, water, _audio.Weather.Now, _audio.Atmosphere.SpeedOfSound);
+        if (OpenFPS.Common.GroundAnswer.Reflect(c.Height, m, src, ear, minHeight, _audio.Atmosphere.SpeedOfSound,
                                                 bent.SourceRaise, bent.EarRaise) is not { } bounce)
             return;
         e.OverWater = water;
@@ -3861,7 +3861,7 @@ public partial class ClientAudioSystem
             return;
         }
 
-        _boundaryProber.Probe(_spatial, world, visualEyePos, head, AudioPhysics.CurrentSpeedOfSound, _boundaryProbes);
+        _boundaryProber.Probe(_spatial, world, visualEyePos, head, _audio.Atmosphere.SpeedOfSound, _boundaryProbes);
         _audio.UpdateBoundaries(_boundaryProbes);
     }
 

@@ -44,7 +44,7 @@ public static class GroundAnswerSpike
         var down = new[] { -Vector3.UnitY };
         float[] dist = new float[1], abs = new float[1];
         string[] mat = new string[1];
-        float c = AudioPhysics.CurrentSpeedOfSound;
+        float c = AudioPhysics.SpeedOfSound;
         if (args.Contains("survey")) return Survey(world, spatial, mapId, c);
         double[] real = new double[3], copy = new double[3];
         Vector3? heading = null;

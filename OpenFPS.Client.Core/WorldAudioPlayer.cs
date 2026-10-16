@@ -1092,7 +1092,7 @@ public sealed class WorldAudioPlayer
     {
         if (ListenerEnclosed(world, listenerPosition)) return;
 
-        _acoustics.FindReflections(world, item.Sound.Position, listenerPosition, _higher, AudioPhysics.CurrentSpeedOfSound,
+        _acoustics.FindReflections(world, item.Sound.Position, listenerPosition, _higher, _audio.Atmosphere.SpeedOfSound,
                               maxOrder: EarlyReflections.MaxOrder, separateFirst: true,
                               // The roll down a street is for an impulse: two dozen copies of a horn
                               // are a cloud, not a flutter.
@@ -1173,9 +1173,9 @@ public sealed class WorldAudioPlayer
     {
         int mirrors = 0;
         Vector3 src = item.Sound.Position;
-        _acoustics.FindReflections(world, src, listenerPosition, _room, AudioPhysics.CurrentSpeedOfSound,
+        _acoustics.FindReflections(world, src, listenerPosition, _room, _audio.Atmosphere.SpeedOfSound,
                               maxOrder: 2, keep: MaxRoomEchoes * 2,
-                              maxExtraPathMetres: RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
+                              maxExtraPathMetres: RoomEchoWindowSeconds * _audio.Atmosphere.SpeedOfSound);
         float direct = Vector3.Distance(src, listenerPosition);
         float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
         PlanRoomEchoes(_room, src, listenerPosition, direct, reference,
@@ -1305,7 +1305,7 @@ public sealed class WorldAudioPlayer
         // Through the echo search, which tests both legs for obstruction: an echo that cannot be blocked
         // is all that is left when the direct sound is ("I only hear the reflections of the clapping").
         int n = reflections.FindReflections(item.Sound.Position, listenerPosition,
-                                            AudioPhysics.CurrentSpeedOfSound, found, diffuse ? DiffuseTaps : 0);
+                                            _audio.Atmosphere.SpeedOfSound, found, diffuse ? DiffuseTaps : 0);
         if (n == 0) return;
 
         float directDist = Vector3.Distance(item.Sound.Position, listenerPosition);

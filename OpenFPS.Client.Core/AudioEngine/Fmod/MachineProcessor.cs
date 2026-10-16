@@ -305,6 +305,10 @@ public sealed class MachineVoiceState : PhysicalVoiceState
     /// its own until then, as in an offline render.</summary>
     public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
 
+    /// <summary>The air its world is in, whose temperature the thermostat answers: its world's, which the mixer
+    /// gives it as it makes it. One of its own until then, at 20 °C.</summary>
+    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
+
     // What the machine is doing, which nothing on the wire says (a mower's grass, a thermostat's
     // call), is driven here from a seed taken from the entity id: two clients hear the same mower
     // the same way, and forty window units on a wall are forty machines, not one forty times.
@@ -316,7 +320,7 @@ public sealed class MachineVoiceState : PhysicalVoiceState
     private readonly float _fanTrim, _wanderHz1, _wanderHz2, _wanderPhase1, _wanderPhase2;
 
     /// <summary>The air round the machine, °C. NaN (the default) takes the world's
-    /// (AudioPhysics.CurrentAirCelsius, from the server's weather); a test sets it outright.</summary>
+    /// (<see cref="Atmosphere"/>, from the server's weather); a test sets it outright.</summary>
     public float AmbientCelsius = float.NaN;
 
     /// <summary>Whether the thermostat is calling for the compressor, after the last render.</summary>
@@ -385,7 +389,7 @@ public sealed class MachineVoiceState : PhysicalVoiceState
         Machine.FanSpeedFraction = _fanTrim;
         if (_thermostat != null)
         {
-            float air = float.IsNaN(AmbientCelsius) ? OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius : AmbientCelsius;
+            float air = float.IsNaN(AmbientCelsius) ? Atmosphere.TemperatureC : AmbientCelsius;
             Machine.CompressorOn = _thermostat.Step(dt, air, Clock.Now);
             float wander = 0.6f * MathF.Sin(_wanderPhase1 + MathF.Tau * _wanderHz1 * seconds)
                          + 0.4f * MathF.Sin(_wanderPhase2 + MathF.Tau * _wanderHz2 * seconds);

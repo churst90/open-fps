@@ -69,6 +69,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         _provider = provider;
         Clock = (provider as FmodAudioProvider)?.Clock ?? clock ?? new StopwatchAudioClock();
         Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather { Clock = Clock };
+        Atmosphere = (provider as FmodAudioProvider)?.Atmosphere ?? new Atmosphere();
     }
 
     /// <summary>The clock this world tells time by, for the host to read wherever it stamps something the mixer
@@ -78,6 +79,11 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>The weather this world hears, for the host to fill: the mixer's when there is one
     /// (FmodAudioProvider.Weather), so its voices read what the host writes.</summary>
     public WorldWeather Weather { get; }
+
+    /// <summary>The air this world is in, for the host's flight times, echoes and reflections: the mixer's when
+    /// there is one (FmodAudioProvider.Atmosphere, set from the weather the host gives it); otherwise one of the
+    /// facade's own, in the air the heard laws are written in until a test sets it.</summary>
+    public Atmosphere Atmosphere { get; }
 
     /// <summary>Brings up the provider, loads the bank and starts the audio thread.</summary>
     public void Initialize()
@@ -407,7 +413,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (emitter.Type != EmitterType.UI)
         {
             float dist = Vector3.Distance(lPos, emitter.Position);
-            emitter.DelayMs += dist / AudioPhysics.CurrentSpeedOfSound * 1000.0f;
+            emitter.DelayMs += dist / Atmosphere.SpeedOfSound * 1000.0f;
         }
 
         _submissionQueue.Enqueue((Next(), emitter));
@@ -434,7 +440,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         {
             Vector3 lPos;
             lock (_stateLock) { lPos = _listenerPos; }
-            emitter.DelayMs += Vector3.Distance(lPos, emitter.Position) / AudioPhysics.CurrentSpeedOfSound * 1000.0f;
+            emitter.DelayMs += Vector3.Distance(lPos, emitter.Position) / Atmosphere.SpeedOfSound * 1000.0f;
         }
         _sustainQueue.Enqueue((Next(), emitter));
     }

@@ -60,7 +60,7 @@ public static class NanWalkSpike
             int runs = tr.Runs;
             var seen = tr.Late;
             for (int t = 0; t < 400 && (tr.Runs < runs + 2 || ReferenceEquals(tr.Late, seen)); t++) Thread.Sleep(25);
-            var copies = EarlyCopies.From(scene.Solids, at, tr.SampleRate);
+            var copies = EarlyCopies.From(scene.Solids, at, tr.SampleRate, tr.Atmosphere.SpeedOfSound);
             string what = Check(tr, copies);
             Console.WriteLine($"  ({at.X:F2}, {at.Y:F2}, {at.Z:F2}) region {place}: start {tr.Smooth?.Start * 1000.0 / tr.SampleRate:F1} ms, "
                             + $"copies {(copies == null ? "none" : $"{copies.Copies.Count}, first {copies.FirstArrival * 1000.0 / tr.SampleRate:F1} ms, {10 * Math.Log10(copies.Total().Sum() + 1e-30):F1} dB")}: {what}");

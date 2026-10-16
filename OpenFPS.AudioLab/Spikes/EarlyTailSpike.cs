@@ -57,7 +57,7 @@ public static class EarlyTailSpike
         float direct = Vector3.Distance(src, ear);
         var img = new double[bins, 4];
         Console.WriteLine($"{room}: {into.Count} images within 120 ms");
-        if (EarlyCopies.From(scene.Solids, ear, Fs) is { } ec)
+        if (EarlyCopies.From(scene.Solids, ear, Fs, tr.Atmosphere.SpeedOfSound) is { } ec)
         {
             var ect = ec.Total();
             Console.WriteLine($"  first reflection {ec.FirstArrival * 1000.0 / Fs:F2} ms (the played response starts {tr.Smooth?.Start * 1000.0 / Fs:F2} ms); "

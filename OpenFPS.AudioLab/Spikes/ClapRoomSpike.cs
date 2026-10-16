@@ -110,7 +110,7 @@ public static class ClapRoomSpike
             var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
             var found = new List<EarlyReflections.Arrival>();
             var plan = new List<OpenFPS.Client.Core.WorldAudioPlayer.RoomEcho>();
-            float c0 = AudioPhysics.CurrentSpeedOfSound;
+            float c0 = provider.Atmosphere.SpeedOfSound;
             EarlyReflections.Find(hands, ear, solids, found, c0, maxOrder: 2, keep: OpenFPS.Client.Core.WorldAudioPlayer.MaxRoomEchoes * 2,
                                   maxExtraPathMetres: OpenFPS.Client.Core.WorldAudioPlayer.RoomEchoWindowSeconds * c0);
             float direct0 = Vector3.Distance(hands, ear);
@@ -162,7 +162,7 @@ public static class ClapRoomSpike
                     EqLow = MathF.Pow(10f, lowDb / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, highDb / 20f), ApertureFactor = 1f,
                     // A copy: never sent to the reverb (LevelDb 0), delayed by its own path as the facade does.
                     IsEvent = true, Essential = true, TargetRegionId = RoomId, LevelDb = 0f,
-                    DelayMs = dist / AudioPhysics.CurrentSpeedOfSound * 1000f,
+                    DelayMs = dist / provider.Atmosphere.SpeedOfSound * 1000f,
                 });
             }
             // The clap's own floor bounce, as ClientAudioSystem.ApplyGround gives a one-off sound.
@@ -172,7 +172,7 @@ public static class ClapRoomSpike
             float groundSpread = direct0 / MathF.Max(direct0, Vector3.Distance(floorImage, ear));
             float groundLow = MathF.Sqrt(Math.Clamp(1f - 0.5f * (carpet.AbsorptionLow + carpet.AbsorptionMid), 0f, 1f)) * groundSpread;
             float groundHigh = MathF.Sqrt(Math.Clamp(1f - carpet.AbsorptionHigh, 0f, 1f)) * Math.Clamp(0.94f - 0.0055f * direct0, 0.45f, 1f) * groundSpread;
-            float groundDelay = (Vector3.Distance(floorImage, ear) - direct0) / AudioPhysics.CurrentSpeedOfSound;
+            float groundDelay = (Vector3.Distance(floorImage, ear) - direct0) / provider.Atmosphere.SpeedOfSound;
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             double next = 3.0;
@@ -199,7 +199,7 @@ public static class ClapRoomSpike
                         EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                         IsEvent = true, Essential = true, TargetRegionId = RoomId,
                         LevelDb = levelDb, EffectiveDistance = Vector3.Distance(ear, hands),
-                        DelayMs = direct0 / AudioPhysics.CurrentSpeedOfSound * 1000f,
+                        DelayMs = direct0 / provider.Atmosphere.SpeedOfSound * 1000f,
                         GroundHeight = floorTop, GroundDelaySeconds = groundDelay, GroundLowGain = groundLow, GroundHighGain = groundHigh,
                     });
                     PlayCopies(played);

@@ -267,6 +267,7 @@ OpenFPS.Sound/CarWindow.cs	lib	Sound
 OpenFPS.Sound/Core/AdminGunSynth.cs	lib	Sound	
 OpenFPS.Sound/Core/Aircraft/AircraftSynth.cs	lib	Sound	
 OpenFPS.Sound/Core/At44k.cs	lib	Sound	
+OpenFPS.Sound/Core/Atmosphere.cs	lib	Sound	
 OpenFPS.Sound/Core/AudioPhysics.cs	lib	Sound	
 OpenFPS.Sound/Core/Bending.cs	lib	Sound	
 OpenFPS.Sound/Core/BoundaryModel.cs	lib	Sound	

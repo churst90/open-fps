@@ -90,6 +90,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// (the strikes are stamped by the game loop on that clock). One of its own until then, as in an offline
     /// render, where nothing is stamped.</summary>
     public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
+
+    /// <summary>The air its world is in: the speed of sound its pipes radiate at and the temperature its cooling
+    /// runs against. Its world's, which the mixer gives it as it makes it; one of its own until then.</summary>
+    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
     /// <summary>Standing at a stop that takes passengers: set the spring brakes, kneel, open the
     /// doors. Anywhere else a stopped vehicle just holds its service brake.</summary>
     public volatile bool ServingStop;
@@ -972,7 +976,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>
     /// The air round the vehicle, °C, for its cooling system (whether the air conditioning is on, and so
     /// whether the fan runs at a standstill). NaN (the default) takes the world's
-    /// (AudioPhysics.CurrentAirCelsius); a test sets it outright.
+    /// (<see cref="Atmosphere"/>); a test sets it outright.
     /// </summary>
     public float AmbientCelsius = float.NaN;
     private float _bayLeak;
@@ -1188,7 +1192,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // Relative to where this voice is placed: the true tailpipe once the ends are split, the
             // compromise point before (VehicleProfile.ExhaustOffset).
             var placedAt = SplitVoices ? Vehicle.ExhaustSlot : Vehicle.ExhaustOffset;
-            float speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentSpeedOfSound;
+            float speedOfSound = Atmosphere.SpeedOfSound;
             _radiation.Aim(heard + placedAt, speedOfSound);
             _bayRadiation.Aim(heard + placedAt, speedOfSound);
         }
@@ -1321,7 +1325,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                     if (_cooling != null)
                     {
                         _cooling.AmbientCelsius = float.IsNaN(AmbientCelsius)
-                            ? OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius : AmbientCelsius;
+                            ? Atmosphere.TemperatureC : AmbientCelsius;
                         _cooling.Step(dt * 64f, Engine.Rpm, Engine.LoadTorque, Driveline.Speed);
                     }
                     float fanRpm = _electricFan

@@ -107,9 +107,9 @@ public static class GroundVoiceSpike
             float direct = Vector3.Distance(mouth, ear), mirrored = Vector3.Distance(image, ear);
             float spread = direct / mirrored;
             float rho = 1f / (0.5f * (1f / mouth.Y + 1f / ear.Y));
-            float low = MathF.Sqrt(1f - 0.5f * (m.AbsorptionLow + m.AbsorptionMid)) * spread * OpenFPS.Common.GroundAnswer.Coherence(250f, direct, rho, AudioPhysics.CurrentSpeedOfSound);
+            float low = MathF.Sqrt(1f - 0.5f * (m.AbsorptionLow + m.AbsorptionMid)) * spread * OpenFPS.Common.GroundAnswer.Coherence(250f, direct, rho, AudioPhysics.SpeedOfSound);
             float high = MathF.Sqrt(1f - m.AbsorptionHigh) * Math.Clamp(0.94f - 0.0055f * direct, 0.45f, 1f)
-                         * spread * OpenFPS.Common.GroundAnswer.Coherence(2500f, direct, rho, AudioPhysics.CurrentSpeedOfSound);
+                         * spread * OpenFPS.Common.GroundAnswer.Coherence(2500f, direct, rho, AudioPhysics.SpeedOfSound);
             g.Set((mirrored - direct) / AudioPhysics.SpeedOfSound, low * scale, high * scale);
             if (first)
             {

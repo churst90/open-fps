@@ -46,10 +46,10 @@ internal sealed class EarlyCopies
     /// where its first reflection lands. Null if nothing answers in the window. Any thread (the search
     /// keeps its scratch per thread).
     /// </summary>
-    public static EarlyCopies? From(IReadOnlyList<EarlyReflections.Solid> solids, Vector3 listener, int sampleRate)
+    public static EarlyCopies? From(IReadOnlyList<EarlyReflections.Solid> solids, Vector3 listener, int sampleRate, float speedOfSound)
     {
         if (solids.Count == 0) return null;
-        float c = AudioPhysics.CurrentSpeedOfSound;
+        float c = speedOfSound;
         // A sound at the listener: the search wants the two a little apart.
         var src = listener + new Vector3(0f, 0f, 0.01f);
         float direct = Vector3.Distance(src, listener);

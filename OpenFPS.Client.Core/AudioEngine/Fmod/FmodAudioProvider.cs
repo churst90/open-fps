@@ -1380,8 +1380,7 @@ public partial class FmodAudioProvider : IAudioProvider
         if (c != _speedOfSound && _system.hasHandle())
             FmodCheck(_system.set3DSettings(FmodDopplerScale(c), 1.0f, 1.0f), "set3DSettings");
         _speedOfSound = c;
-        OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentSpeedOfSound = _speedOfSound;
-        OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius = celsius;
+        Atmosphere.SetTemperature(celsius);
     }
 
     /// <summary>
@@ -1525,6 +1524,11 @@ public partial class FmodAudioProvider : IAudioProvider
     /// the ear wind its wind. The host fills it (AudioEngineFacade.Weather).</summary>
     public WorldWeather Weather { get; } = new();
 
+    /// <summary>The air this mixer's world is in: the speed of sound its Doppler, echoes and flight times read,
+    /// and the temperature its engines' cooling and air conditioners run against. Set with the weather
+    /// (<see cref="SetAirTemperature"/>); the host reads the same one (AudioEngineFacade.Atmosphere).</summary>
+    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; } = new();
+
     /// <summary>The clock this mixer and its voices tell time by: how old a position is, when a horn was
     /// sounded, when a fade ends. One of its own unless its host gives it one; either way the host's game loop
     /// reads this one (AudioEngineFacade.Clock), so a position is stamped on the clock it is aged on.</summary>
@@ -1541,10 +1545,11 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         Weather.Clock = _clock;
         Traced.Clock = _clock;
+        Traced.Atmosphere = Atmosphere;
     }
 
     /// <summary>The models made off the placing threads (VoiceBuilds), on this mixer's clock.</summary>
-    private VoiceBuilds _voiceBuilds => LazyInitializer.EnsureInitialized(ref _builds, () => new VoiceBuilds(Clock));
+    private VoiceBuilds _voiceBuilds => LazyInitializer.EnsureInitialized(ref _builds, () => new VoiceBuilds(Clock, Atmosphere));
     private VoiceBuilds? _builds;
 
     /// <summary>See IAudioProvider.PrepareVoice.</summary>
@@ -3072,6 +3077,7 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             engineState = made!;
             engineState.Clock = Clock;
+            engineState.Atmosphere = Atmosphere;
             engineState.TargetSpeed = emitter.EngineSpeed;
             engineState.Running = emitter.EngineRunning;
             engineState.ServingStop = emitter.ServingStop;

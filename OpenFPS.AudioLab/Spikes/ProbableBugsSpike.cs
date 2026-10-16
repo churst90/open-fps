@@ -516,7 +516,7 @@ public static class ProbableBugsSpike
             var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
             var found = new List<EarlyReflections.Arrival>();
             var plan = new List<WorldAudioPlayer.RoomEcho>();
-            float c0 = AudioPhysics.CurrentSpeedOfSound;
+            float c0 = provider.Atmosphere.SpeedOfSound;
             EarlyReflections.Find(hands, ear, solids, found, c0, maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
                                   maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * c0);
             float direct0 = Vector3.Distance(hands, ear);
@@ -542,7 +542,7 @@ public static class ProbableBugsSpike
                     ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
                     EqLow = MathF.Pow(10f, lowDb / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, highDb / 20f), ApertureFactor = 1f,
                     IsEvent = true, Essential = true, TargetRegionId = RoomId, LevelDb = 0f,
-                    DelayMs = dist / AudioPhysics.CurrentSpeedOfSound * 1000f,
+                    DelayMs = dist / provider.Atmosphere.SpeedOfSound * 1000f,
                 });
             }
             void PlayCopies()
@@ -594,7 +594,7 @@ public static class ProbableBugsSpike
                         EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                         IsEvent = true, Essential = true, TargetRegionId = RoomId,
                         LevelDb = 92f, EffectiveDistance = direct0,
-                        DelayMs = direct0 / AudioPhysics.CurrentSpeedOfSound * 1000f,
+                        DelayMs = direct0 / provider.Atmosphere.SpeedOfSound * 1000f,
                     });
                     PlayCopies();
                 }

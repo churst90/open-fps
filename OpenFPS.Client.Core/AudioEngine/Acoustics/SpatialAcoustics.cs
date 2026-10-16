@@ -34,7 +34,7 @@ public class SpatialAcoustics
         // (AsyncAcousticWorker.AddEarlyReflections), the same every tick for the same geometry. A ray
         // solve seeded from the clock here once moved every wall's reflection from frame to frame.
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        FindReflections(world, sourcePos, listenerPos, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
+        FindReflections(world, sourcePos, listenerPos, _reflectionScratch, Atmosphere.SpeedOfSound);
         for (int i = 0; i < _reflectionScratch.Count; i++)
         {
             var a = _reflectionScratch[i];
@@ -137,6 +137,10 @@ public class SpatialAcoustics
     /// <summary>The clock of the world it answers about, which its host gives it (AudioEngineFacade.Clock): how
     /// often the routes are made again after a door moves is told on it. One of its own until then.</summary>
     public OpenFPS.Common.IAudioClock Clock { get; set; } = new OpenFPS.Common.StopwatchAudioClock();
+
+    /// <summary>The air of the world it answers about (AudioEngineFacade.Atmosphere): the speed of sound its
+    /// reflections and the bends over the ground are timed at. One of its own until it is given one.</summary>
+    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
     private System.Threading.Tasks.Task? _localRoutesBuild;
     private readonly object _localRoutesLock = new();
     /// <summary>Metres: only doors this near the listener count (as AsyncAcousticWorker's).</summary>
@@ -251,7 +255,7 @@ public class SpatialAcoustics
         // The tracer sees boxes only, so a line through a hill passed for nothing. The earth passes nothing:
         // what comes is over the ground's profile and what stands on it, heard from the top it bends over,
         // as the simulator's path has it (OpeningRoutes.OverTheGround).
-        if (routes != null && routes.OverTheGround(sourcePos, listenerPos, AudioPhysics.CurrentSpeedOfSound, out var over, out var top, out bool overFound))
+        if (routes != null && routes.OverTheGround(sourcePos, listenerPos, Atmosphere.SpeedOfSound, out var over, out var top, out bool overFound))
         {
             gainL = over.X; gainM = over.Y; gainH = over.Z;
             directOcclusion = 1f;
