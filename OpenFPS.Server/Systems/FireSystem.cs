@@ -41,8 +41,11 @@ public sealed class FireSystem
     /// <summary>A map's spread, if anything has been lit or struck there.</summary>
     public FireSpread? SpreadOf(string mapId) => _maps.TryGetValue(mapId, out var m) ? m.Sim : null;
 
-    /// <summary>Moves a map's fire on: its weather from the map's own (wind, rain, temperature, humidity).</summary>
-    public void Update(MapManager maps, string mapId, World world, in WorldEnvironmentComponent env, float rainMmPerHour, float dt)
+    /// <summary>Moves a map's fire on: its weather from the map's own (wind, rain, temperature, humidity).
+    /// <paramref name="windTravel"/> is how far the air has carried the eddy pattern (WorldEnvironmentSystem.WindTravel),
+    /// so the spread feels the gusts and swings every client hears at the same place and moment.</summary>
+    public void Update(MapManager maps, string mapId, World world, in WorldEnvironmentComponent env, float rainMmPerHour, float dt,
+                       (double East, double North) windTravel = default)
     {
         if (!_maps.TryGetValue(mapId, out var m)) return;
         m.Waited += dt;
@@ -57,8 +60,7 @@ public sealed class FireSystem
         float step = m.Waited;
         m.Waited = 0f;
         double now = Clock();
-        var weather = new FireWeather(
-            WindWeather.Steady(WindAir.FromBroadcast(env.WindVelocity, env.WindGustiness, now, 0, 0)),
+        var weather = new FireWeather(WindFor(env, now, windTravel),
             MathF.Max(0f, rainMmPerHour), env.Temperature, Math.Clamp(env.Humidity * 100f, 0f, 100f));
         // A forest crowning steps in tens of milliseconds (docs/FIRE.md 12.10): never on the tick.
         if (Background)
@@ -69,6 +71,11 @@ public sealed class FireSystem
             Finish(maps, mapId, world, m);
         }
     }
+
+    /// <summary>The wind the spread reads: the map's mean wind with the pattern carried as far as the server has carried
+    /// it, so a brand at a place is pushed by the same gust and swing the clients hear there.</summary>
+    internal static WindWeather WindFor(in WorldEnvironmentComponent env, double now, (double East, double North) windTravel)
+        => WindWeather.Steady(WindAir.FromBroadcast(env.WindVelocity, env.WindGustiness, now, windTravel.East, windTravel.North));
 
     /// <summary>The shared clock the spread and every client's sound read (WindField.Now); the tests' own.</summary>
     public Func<double> Clock = WindField.Now;

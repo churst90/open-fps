@@ -234,6 +234,56 @@ or on a clear night, sound arcs down and its ground bounce comes in steeper, so 
   yet shadow less under sound bent down; the stir's flicker swings sounds even in still air (the calm stir
   is the thunder's judgement), the treble most.
 
+## Where the wind comes from
+
+Built 2026-10-16, unheard (the Resonance survey, inbox/2026-10-14-resonance-acoustics-beyond-open-fps, section 3,
+approved by Cody that day with his rule: "wind sound should actually follow the wind directions, not random"). The
+wind never changed direction except when a front came, and every front blew from a fixed quarter.
+
+- The direction is the weather's. Each front's wind blows from round the prevailing direction
+  (`WindWeather.PrevailingFromDegrees`, 250, the west-south-west), turned as the northern depression turns it
+  (`WorldEnvironmentSystem.FrontTurnDegrees`): rain, ahead of a warm front, backed 60 to the south; a storm, at a
+  cold front, veered 45 to the west-north-west; snow, in the polar air behind it, veered 60 to the north-west; a fair
+  day not turned. The strengths are as they were (a fair day's still drawn, 0 to 7 m/s). Then the day turns it
+  (`DiurnalTurnDegrees`): ten degrees either way, veered most at 14:00 when the sun mixes the upper wind down, backed
+  most at 02:00. The turns are a judgement of the textbook figures. A wind set by hand (`/weather wind`) is held as
+  said, without the day's turn. Nothing about a direction is drawn: two servers with different luck have the same
+  direction for the same front at the same hour. The server eases toward it as before (a front's veer takes about half
+  a game hour) and sends it; no message changes (the wire hash does, the wind field being in it).
+- The swing is the field's. At a place the eddies push the air across the mean as well as along it
+  (`WindField.Swing`): the same five eddy sizes as the gusts on lattice layers of their own, carried the same way,
+  four fifths of the lengthwise turbulence (Panofsky and Dutton), so the direction swings about 8 degrees either way
+  (one standard deviation) in a steady wind and 13 in the gustiest, more in a lull, over the time the eddies take to
+  pass (seconds to a minute). In still air, or with no turbulence, nothing swings: Resonance's light-air meander
+  (2.5 m/s per unit of turbulence, laid on even with no wind) is left out, since it would blow in still air.
+  `SpeedAt` is now the length of `VelocityAt`.
+- Who reads the vector: the ears (`EarWind.Hear` takes the field's velocity at the head, so the wind moves from ear
+  to ear as it swings), the bending of far sounds (`Bending.Along`, already `VelocityAt`), and the fire's spread
+  (already `VelocityAt`; the server's spread now carries the pattern as far as the server has, so it feels the same
+  gust and swing the clients hear; it read a pattern standing still). The trees, the flames and the fountain's spray
+  read the speed, the vector's length, at each of their own places. The shore reads the mean direction (the waves
+  are raised over the fetch, not by a gust), as does the thunder and the storm cell's drift. Rain does not read the
+  wind in sound at all yet.
+- Hearing it: `/weather` says where the wind comes from now, and while it is going round to another point of the
+  compass (a front arriving) says so: "Wind 7 metres a second from the south west, gusty. Turning to come from the
+  north west."
+- Measured before and after (AudioLab, band changes in dB, 32 Hz to 16 kHz octaves). `--nature levels` at 4.5 m/s
+  (turbulence 0.25): park tree +0.8 Leq (0 to +1.0 by band), fire pit +0.1 (+0.3 in the bass, −0.5 to −0.7 above
+  1 kHz), fountain −0.1. At 1.5 m/s: tree +0.3, fire and fountain unchanged. `--weather-wind` trees through the
+  weather path: calm −0.2, breezy +0.7, stormy 0.0, a storm arriving +0.2. The ears in a calm (1.5 m/s) and a breeze
+  (5 m/s from the north east), standing, walking and sprinting: within 1.5 dB, most within 0.5; in a storm, now from 295 rather than 304, the ears 2 to 3 dB lower and their one-second
+  range 7 dB wider at the bottom. `--refraction`: upwind and downwind unchanged; a way straight across a 4.5 m/s
+  wind now feels the swing: on a sunny afternoon at 600 m it averages 2 to 6 dB less shadow and swings 3.7/9.0/10.8
+  dB (low/middle/high, one standard deviation) where it swung 0.5/2.7/2.7; at night at 300 m, −1.4/−0.3/−3.1 against
+  −1.0/+2.0/−0.4 with a swing of 1.2/4.8/6.2. `Bending.Along` still costs 1.7 µs a voice.
+- Over game hours (`--weather-wind direction`, a reading every ten game minutes in Elm Park): a fair day held from
+  10:00 turns from 254 to 256 in the hour, from 258 at noon to 260 at 14:00 and back to 259 by 16:00; the place's
+  ten-minute direction wanders within about ten degrees of it with the slow eddies. A storm front arriving at 10:00
+  veers it from 255 to 295 inside ten game minutes (the light fair wind gives way at once to the strong one) and the
+  day takes it on to 301 by 11:00. A wind set by hand stays at 270. Rolling on its own from 06:00, the
+  fair morning turned 245 to 250, a snow front at 08:30 took it to 314 within the hour, and the clearing after it
+  backed it to 258 by noon.
+
 ## One-off sounds: why the echoes are as they are
 
 - Render once, play by name. Before WorldAudioPlayer the server's whole vocabulary for sound was "this

@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- The wind's direction comes from the weather (docs/CLIENT_NOTES.md, "Where the wind comes from"; Cody: "wind
+  sound should actually follow the wind directions, not random"). Each front blows from round a prevailing
+  west-south-west, turned as a depression turns it (rain backed 60 degrees, a storm veered 45, snow veered 60, a
+  fair day not at all), and the day turns it ten degrees either way, veered most at 14:00; nothing about a
+  direction is drawn, and the server sends it as before. At a place the wind field's own eddies swing it either
+  side, four fifths of the gusts' strength, carried as the gusts are: the ears hear the wind move from ear to ear,
+  the far sounds' bending feels it, and the server's fire spread now reads the same carried pattern as the clients.
+  Still air does not swing. `/weather` says where the wind is turning to while a front brings it round. Trees
+  +0.8 dB in a 4.5 m/s breeze, fire and fountain within 0.7; a far sound straight across the wind swings
+  several decibels more past 300 m. No message changes, but the wind field is in the wire hash, so the hash
+  changes (the server and the Windows client go out together); the stored streams do not change.
 - Sound bent by the wind and the air's layers (docs/CLIENT_NOTES.md). The air's layers near the ground come
   from the sun, the cloud, the hour and the wind (Monin-Obukhov; Holtslag and van Ulden), and over water from
   the air against the water; the server sends the day of the year. Every voice in the world is bent by the

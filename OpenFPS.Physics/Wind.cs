@@ -11,7 +11,9 @@ namespace OpenFPS.Common;
 /// about half of what a tree's crown does. The turbulence is a pattern of eddies carried by the mean flow
 /// (Taylor's frozen turbulence); its intensity near the ground is about 0.1 in open country on a quiet
 /// day and 0.3 to 0.4 in a gale over buildings and trees, its eddies 180 m down to 5 m with less energy
-/// in the short ones, as a Kolmogorov spectrum has.
+/// in the short ones, as a Kolmogorov spectrum has. The eddies push the air sideways as well as along
+/// (<see cref="Swing"/>), so at a place the wind swings either side of where the weather says it blows
+/// from; the direction itself, and every slower change of it, is the weather's (the server's fronts).
 ///
 /// The server's weather (WorldEnvironmentSystem) is broadcast once a second and <see cref="WindWeather"/>
 /// ramps to each; each audio world holds its own (<see cref="WorldWeather.Wind"/>) and everything here
@@ -112,23 +114,58 @@ public static class WindField
         return sum / MathF.Sqrt(variance * (1f / 3f) * 0.7429f * 0.7429f * 0.7429f);
     }
 
-    /// <summary>The wind speed at a place, m/s: the mean at that height times one plus the
-    /// turbulence, never stopping entirely (a lull in a breeze is still air moving).</summary>
-    public static float SpeedAt(WindWeather weather, float x, float heightMetres, float z, double seconds)
+    /// <summary>The share of the lengthwise turbulence that blows across the mean wind near the ground: the
+    /// sideways standard deviation is about four fifths of the lengthwise over flat land (Panofsky and Dutton,
+    /// Atmospheric Turbulence, 1984: σv ≈ 1.9 u*, σu ≈ 2.4 u*).</summary>
+    public const float CrossShare = 0.8f;
+
+    /// <summary>The eddy pattern's lattice layers the sideways push is drawn from: the gust's own five eddy
+    /// sizes on lattices of their own, so the push is independent of the gust and carried the same way.</summary>
+    private const int SwingLayers = 8;
+
+    /// <summary>
+    /// The sideways push at a place and moment under a weather: zero mean, unit standard deviation, positive to
+    /// the left of the way the air moves. The same eddies as <see cref="Gust"/> (sizes, weights, the carried
+    /// pattern, the slow life of each eddy), on lattice layers of their own: one field, read in the two
+    /// directions an eddy pushes the air.
+    /// </summary>
+    public static float Swing(WindWeather weather, float x, float z, double seconds)
     {
-        var air = weather.At(seconds);
-        float mean = MeanAt(air.Speed, heightMetres);
-        return mean * MathF.Max(0.12f, 1f + air.Turbulence * Gust(weather, x, z, seconds));
+        var (te, tn) = weather.TravelAt(seconds);
+        double px = x - te, pz = z - tn;
+        double slow = seconds / EddyLifetimeSeconds;
+        float sum = 0f;
+        for (int k = 0; k < Eddies.Length; k++)
+        {
+            var (period, weight) = Eddies[k];
+            double size = period * ReferenceSpeed;
+            sum += weight * Noise3(px / size, pz / size, slow + k * 0.37, SwingLayers + k);
+        }
+        return sum * Norm;
     }
 
-    /// <summary>The air's velocity at a place, m/s, east and north: the speed of
-    /// <see cref="SpeedAt(WindWeather, float, float, float, double)"/> along the mean direction.</summary>
+    /// <summary>The wind speed at a place, m/s: the length of <see cref="VelocityAt"/>. What a leaf or a flame
+    /// feels, whichever way the air pushes it.</summary>
+    public static float SpeedAt(WindWeather weather, float x, float heightMetres, float z, double seconds)
+        => VelocityAt(weather, x, heightMetres, z, seconds).Length();
+
+    /// <summary>
+    /// The air's velocity at a place, m/s, east and north. Along the weather's mean direction, the mean at that
+    /// height times one plus the turbulence, never stopping entirely (a lull in a breeze is still air moving);
+    /// across it, the same eddies' sideways push, <see cref="CrossShare"/> of the lengthwise turbulence. The
+    /// across part is what swings the wind's direction at a place: about 8 degrees either way (one standard
+    /// deviation) in a steady wind, 13 in the gustiest, wider in a lull, and none without turbulence or in still air.
+    /// </summary>
     public static Vector2 VelocityAt(WindWeather weather, float x, float heightMetres, float z, double seconds)
     {
         var air = weather.At(seconds);
         var (dx, dz) = air.Downwind;
-        float speed = SpeedAt(weather, x, heightMetres, z, seconds);
-        return new Vector2(dx, dz) * speed;
+        float mean = MeanAt(air.Speed, heightMetres);
+        if (!(mean > 0f)) return Vector2.Zero;
+        float along = mean * MathF.Max(0.12f, 1f + air.Turbulence * Gust(weather, x, z, seconds));
+        float across = air.Turbulence > 0f ? mean * air.Turbulence * CrossShare * Swing(weather, x, z, seconds) : 0f;
+        // Across is to the left of downwind: (−dz, dx) in east and north.
+        return new Vector2(dx * along - dz * across, dz * along + dx * across);
     }
 
     /// <summary>How fast the eddy pattern is carried for a mean wind, east and north, m/s: the wind
@@ -260,10 +297,14 @@ public sealed class WindWeather
         From = from; To = to; RampStart = rampStart; RampSeconds = rampSeconds; IsDefault = isDefault;
     }
 
-    /// <summary>A moderate west-south-westerly, the prevailing wind over most of the temperate world;
-    /// what the lab renders with and what a client has before the server says otherwise.</summary>
-    public static readonly WindWeather Default = new(WindAir.FromCompass(4.5f, 250f, 0.25f),
-                                                     WindAir.FromCompass(4.5f, 250f, 0.25f), 0, 0, true);
+    /// <summary>Where the prevailing wind blows from, degrees clockwise from north: the west-south-west, as over most
+    /// of the temperate northern world. The server's fronts each blow from round it (WorldEnvironmentSystem.FrontWind).</summary>
+    public const float PrevailingFromDegrees = 250f;
+
+    /// <summary>A moderate wind from the prevailing direction; what the lab renders with and what a client has
+    /// before the server says otherwise.</summary>
+    public static readonly WindWeather Default = new(WindAir.FromCompass(4.5f, PrevailingFromDegrees, 0.25f),
+                                                     WindAir.FromCompass(4.5f, PrevailingFromDegrees, 0.25f), 0, 0, true);
 
     /// <summary>A wind that does not change, its pattern carried from the origin at time zero.</summary>
     public static WindWeather Steady(float speed, float fromDegrees, float turbulence)

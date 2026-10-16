@@ -33,8 +33,8 @@ public partial class CommandHandler
             // The sky over your map, and what is falling now as well as the front: a front that has just
             // cleared leaves its rain falling for a minute or two (Cody, 2026-10-08: rain heard under
             // "Clear").
-            var now = env.GetStateForMap(_maps.TryGetMapData(session.CurrentMapId, out var map)
-                ? MapAtmosphere.Of(map) : MapAtmosphere.Default);
+            var atmosphere = _maps.TryGetMapData(session.CurrentMapId, out var map) ? MapAtmosphere.Of(map) : MapAtmosphere.Default;
+            var now = env.GetStateForMap(atmosphere);
             var falling = env.HeldPrecipitation ?? env.PrecipitationFor(now);
             string front = ScenarioWord(env.CurrentScenario);
             if (env.HeldPrecipitation == null)
@@ -44,7 +44,8 @@ public partial class CommandHandler
             }
             string held = env.Pinned ? " Held until /weather auto." : " It changes on its own.";
             if (falling.Falling) held = " " + DescribePrecipitation(falling) + held;
-            Say(reply, $"{front}. {DescribeWind(now.WindVelocity, now.WindGustiness)} " +
+            string turning = atmosphere.HeldWeather == null ? DescribeTurning(now.WindVelocity, env.TargetWind) : "";
+            Say(reply, $"{front}. {DescribeWind(now.WindVelocity, now.WindGustiness)}{turning} " +
                        $"{now.Temperature.ToString("F0", CultureInfo.InvariantCulture)} degrees.{held}");
             return;
         }
@@ -102,6 +103,19 @@ public partial class CommandHandler
                                     : speed.ToString("F1", CultureInfo.InvariantCulture);
         string unit = amount == "1" ? "metre" : "metres";
         return $"Wind {amount} {unit} a second from the {CompassWord(air.FromDegrees)}, {GustWord(gustiness)}.";
+    }
+
+    /// <summary>
+    /// " Turning to come from the west." when the wind is on its way round to a direction more than half a point of
+    /// the compass off where it blows from now (a front arriving, or the day's turn when it has far to go), else
+    /// nothing: the wind changes direction only with the weather, so the weather says where it is going.
+    /// </summary>
+    internal static string DescribeTurning(Vector3 now, Vector3 target)
+    {
+        if (new Vector2(now.X, now.Z).Length() < 0.5f || new Vector2(target.X, target.Z).Length() < 0.5f) return "";
+        float from = new WindAir(now.X, now.Z, 0f, 0, 0, 0).FromDegrees, to = new WindAir(target.X, target.Z, 0f, 0, 0, 0).FromDegrees;
+        float apart = MathF.Abs(((to - from) % 360f + 540f) % 360f - 180f);
+        return apart > 22.5f && CompassWord(to) != CompassWord(from) ? $" Turning to come from the {CompassWord(to)}." : "";
     }
 
     internal static string GustWord(float gustiness) => gustiness < 0.2f ? "steady" : gustiness < 0.5f ? "gusty" : "very gusty";

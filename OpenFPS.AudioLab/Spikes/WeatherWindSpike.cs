@@ -7,9 +7,9 @@ using OpenFPS.Server.Systems;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --weather-wind [out=DIR] [sec=12] [ears|trees] [short] [live]: the weather's wind, measured before
+/// --weather-wind [out=DIR] [sec=12] [ears|trees] [short] [live] [direction]: the weather's wind, measured before
 /// anybody listens. ears leaves out the trees, trees the ears; short is a 30 s tree run; live is
-/// <see cref="Live"/>.
+/// <see cref="Live"/>; direction is <see cref="Direction"/> alone.
 ///
 ///   1. The wind at the ears, at 2, 5, 10 and 15 m/s past the head, facing into it, side-on each way
 ///      and with the back to it: each ear's level as the game places it (dBFS) and as the model says
@@ -44,6 +44,7 @@ public static class WeatherWindSpike
         Console.WriteLine($"Ear law: {EarWind.ReferenceDb} dB at {EarWind.ReferenceSpeed} m/s, {EarWind.DbPerDecade} dB/decade; windward -{EarWind.WindwardDb} dB, lee +{EarWind.LeeDb}, from behind +{EarWind.FromBehindDb}; knee {EarWind.KneeHzPerMetrePerSecond} Hz per m/s.");
 
         if (args.Contains("live")) return Live(Arg(args, "sec=", 8f));
+        if (args.Contains("direction")) { Direction(); return 0; }
         if (!args.Contains("trees")) Ears(dir, sec);
         if (!args.Contains("trees")) Turn(dir);
         if (!args.Contains("trees")) EarsInWeather(dir, Math.Max(sec, 20f));
@@ -333,6 +334,72 @@ public static class WeatherWindSpike
                     WriteStereo(Path.Combine(dir, $"weather_{wname}_{name.Replace(' ', '_')}.wav"), l, r);
             }
     }
+
+    // ── 5. Where the wind comes from, over game hours ───────────────────────────────────────────
+
+    /// <summary>
+    /// Where the wind comes from as the server's weather turns it and a client hears it, a reading every ten game
+    /// minutes (ten seconds at the game's sixty times): the server's mean wind, and at a place in Elm Park the field's
+    /// wind at a crown (7 m) and at the ears (1.7 m, standing facing north): the mean direction over the ten minutes
+    /// and its swing (one standard deviation, degrees), and the ears' left less right. A fair day from ten in the
+    /// morning, the same through the afternoon, a storm front arriving on a fair morning (at a front's own pace),
+    /// a wind set by hand, and the weather rolling on its own for six hours.
+    /// </summary>
+    private static void Direction()
+    {
+        var cases = new (string Name, float Hour, int Hours, Action<WorldEnvironmentSystem> Set, Action<WorldEnvironmentSystem>? Then)[]
+        {
+            ("a fair day from ten in the morning", 10f, 1, e => e.SetScenario(WeatherType.Clear), null),
+            ("a fair day through the afternoon", 12f, 4, e => e.SetScenario(WeatherType.Clear), null),
+            ("a storm front arriving at ten", 10f, 1, e => e.SetScenario(WeatherType.Clear), e => e.SetScenario(WeatherType.Storm)),
+            ("set by hand: 5 m/s from the west, gusty", 10f, 1, e => e.PinWind(new Vector3(5f, 0f, 0f), 0.4f), null),
+            ("rolling on its own", 6f, 6, e => e.FrontProbabilityPerTick = WorldEnvironmentSystem.DefaultFrontProbabilityPerTick, null),
+        };
+        const float x = -375f, z = 195f;
+        foreach (var (name, hour, hours, set, then) in cases)
+        {
+            double start = 5000.0;
+            // The sim runs a game hour before it starts; begin an hour early.
+            var sim = new WeatherSim(e => { e.SetDate(hour - 1f, 172); set(e); }, start);
+            then?.Invoke(sim.Env);
+            Console.WriteLine();
+            Console.WriteLine($"== Where the wind comes from: {name} (degrees clockwise from north, the swing one standard deviation)");
+            Console.WriteLine("   game time  front   mean wind        crown 7 m: from  swing   ears 1.7 m: from  swing  L-R dB");
+            const double step = 0.1;
+            int perWindow = 100; // ten seconds, ten game minutes
+            double t = start;
+            for (int w = 0; w < hours * 6; w++)
+            {
+                double crownSum = 0, crownSq = 0, earSum = 0, earSq = 0, lr = 0;
+                float meanFrom = 0f;
+                for (int i = 0; i < perWindow; i++, t += step)
+                {
+                    sim.Advance(t);
+                    var air = sim.Weather.At(t);
+                    meanFrom = air.FromDegrees;
+                    var crown = WindField.VelocityAt(sim.Weather, x, 7f, z, t);
+                    double dc = Turn(new WindAir(crown.X, crown.Y, 0f, 0, 0, 0).FromDegrees - meanFrom);
+                    crownSum += dc; crownSq += dc * dc;
+                    var ears = EarWind.Hear(sim.Weather, new EarWindListener(new Vector3(x, 1.7f, z), 1.7f, Vector2.Zero, 0f, 1f), t);
+                    double de = Turn(ears.FromDegrees - meanFrom);
+                    earSum += de; earSq += de * de;
+                    lr += ears.LeftDb - ears.RightDb;
+                }
+                var st = sim.Env.GetCurrentState();
+                float speed = new Vector2(st.WindVelocity.X, st.WindVelocity.Z).Length();
+                double cm = crownSum / perWindow, em = earSum / perWindow;
+                double cs = Math.Sqrt(Math.Max(0, crownSq / perWindow - cm * cm)), es = Math.Sqrt(Math.Max(0, earSq / perWindow - em * em));
+                int h = (int)st.GameTime, m = (int)((st.GameTime - h) * 60f);
+                Console.WriteLine($"   {h,2:D2}:{m:D2}      {sim.Env.CurrentScenario,-6}  {speed,5:F1} m/s {meanFrom,5:F0}    {Compass(meanFrom + cm),5:F0}   {cs,5:F1}         {Compass(meanFrom + em),5:F0}   {es,5:F1}   {lr / perWindow,5:F1}");
+            }
+        }
+    }
+
+    /// <summary>A turn folded to −180..180 degrees.</summary>
+    private static double Turn(double degrees) => ((degrees % 360.0) + 540.0) % 360.0 - 180.0;
+
+    /// <summary>A bearing folded to 0..360 degrees.</summary>
+    private static double Compass(double degrees) => ((degrees % 360.0) + 360.0) % 360.0;
 
     /// <summary>
     /// The ear wind through the REAL provider: FmodAudioProvider starts its generator, the listener is

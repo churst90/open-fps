@@ -30,7 +30,7 @@ public class WorldEnvironmentSystem
         Humidity = BaselineHumidity,
         AirPressure = SeaLevelPressureMb,
         AirAbsorptionMultiplier = 1.0f,
-        WindVelocity = new Vector3(2.0f, 0.0f, 1.0f),
+        WindVelocity = FrontWind(WeatherType.Clear, StartingWindSpeed, WindWeather.PrevailingFromDegrees),
         WindGustiness = 0.2f,
         PrecipitationIntensity = 0.0f
     };
@@ -41,7 +41,13 @@ public class WorldEnvironmentSystem
     // ceiling, so two fronts in a row do not compound.
     private float _targetHumidity = BaselineHumidity;
     private float _targetPrecipitation = 0.0f;
-    private Vector3 _targetWind = new Vector3(2.0f, 0.0f, 1.0f);
+    private Vector3 _targetWind = FrontWind(WeatherType.Clear, StartingWindSpeed, WindWeather.PrevailingFromDegrees);
+
+    /// <summary>The wind the world starts with, m/s: a light air, as the start always had (it was 2 east and 1 north).</summary>
+    private static readonly float StartingWindSpeed = MathF.Sqrt(5f);
+
+    /// <summary>Whether the wind was set by hand (/weather wind): held exactly as said, without the day's turn.</summary>
+    private bool _windByHand;
     private float _targetGustiness = 0.2f;
     private float _scenarioTempOffset = 0.0f;
     private float _scenarioTempCeiling = float.MaxValue;
@@ -165,7 +171,9 @@ public class WorldEnvironmentSystem
         // Easing toward a dry sky never reaches it: the last front's rain fell, ever lighter, for good.
         if (_targetPrecipitation <= 0f && Rainfall.RateFromIntensity(_env.PrecipitationIntensity) < StoppedBelowMmPerHour)
             _env.PrecipitationIntensity = 0f;
-        _env.WindVelocity = Vector3.Lerp(_env.WindVelocity, _targetWind, MathF.Min(1f, rate * 0.05f));
+        // Toward the front's wind turned by the hour (TargetWind): a direction that changes only with the weather and
+        // the clock, the same for every client because they all hear it from here.
+        _env.WindVelocity = Vector3.Lerp(_env.WindVelocity, TargetWind, MathF.Min(1f, rate * 0.05f));
         // Gustiness fades too: set straight, a front snapped calm to a gale in one tick.
         _env.WindGustiness = MathHelper.Lerp(_env.WindGustiness, _targetGustiness, MathF.Min(1f, rate * 0.05f));
 
@@ -193,12 +201,14 @@ public class WorldEnvironmentSystem
     public void SetScenario(WeatherType scenario)
     {
         _currentScenario = scenario;
+        _windByHand = false;
         switch (scenario)
         {
             case WeatherType.Clear:
                 _targetHumidity = 0.4f;
                 _targetPrecipitation = 0.0f;
-                _targetWind = new Vector3(_random.NextSingle() * 5f, 0, _random.NextSingle() * 5f);
+                // A fair day's strength, drawn as it always was (0 to 7 m/s); its direction the prevailing wind's.
+                _targetWind = FrontWind(scenario, new Vector2(_random.NextSingle() * 5f, _random.NextSingle() * 5f).Length(), PrevailingFromDegrees);
                 _targetGustiness = 0.1f;
                 _scenarioTempOffset = 0.0f;
                 _scenarioTempCeiling = float.MaxValue;
@@ -206,7 +216,7 @@ public class WorldEnvironmentSystem
             case WeatherType.Rain:
                 _targetHumidity = 0.9f;
                 _targetPrecipitation = 0.6f;
-                _targetWind = new Vector3(5f, 0, 5f);
+                _targetWind = FrontWind(scenario, FrontSpeed(scenario), PrevailingFromDegrees);
                 _targetGustiness = 0.3f;
                 _scenarioTempOffset = -2.0f; // Rain cools the air
                 _scenarioTempCeiling = float.MaxValue;
@@ -214,7 +224,7 @@ public class WorldEnvironmentSystem
             case WeatherType.Storm:
                 _targetHumidity = 1.0f;
                 _targetPrecipitation = 1.0f;
-                _targetWind = new Vector3(15f, 0, -10f); // High wind
+                _targetWind = FrontWind(scenario, FrontSpeed(scenario), PrevailingFromDegrees);
                 _targetGustiness = 0.8f;
                 _scenarioTempOffset = -4.0f;
                 _scenarioTempCeiling = float.MaxValue;
@@ -222,7 +232,7 @@ public class WorldEnvironmentSystem
             case WeatherType.Snow:
                 _targetHumidity = 0.6f;
                 _targetPrecipitation = 0.5f;
-                _targetWind = new Vector3(8f, 0, 2f);
+                _targetWind = FrontWind(scenario, FrontSpeed(scenario), PrevailingFromDegrees);
                 _targetGustiness = 0.4f;
                 _scenarioTempOffset = -5.0f;
                 _scenarioTempCeiling = -1.0f; // Snow does not fall above freezing
@@ -258,6 +268,7 @@ public class WorldEnvironmentSystem
     public void PinWind(Vector3 velocity, float gustiness)
     {
         _targetWind = new Vector3(velocity.X, 0f, velocity.Z);
+        _windByHand = true;
         _targetGustiness = Math.Clamp(gustiness, 0f, 1f);
         FrontProbabilityPerTick = 0;
         _weatherRate = SetByHandRate;
@@ -313,12 +324,74 @@ public class WorldEnvironmentSystem
     public void Unpin()
     {
         _held = null;
+        _windByHand = false;
         FrontProbabilityPerTick = DefaultFrontProbabilityPerTick;
         _weatherRate = 1f;
     }
 
-    /// <summary>Where the wind is heading for, before it gets there.</summary>
-    public Vector3 TargetWind => _targetWind;
+    /// <summary>Where the wind is heading for, before it gets there: the front's wind turned by the hour
+    /// (<see cref="DiurnalTurnDegrees"/>), or the wind set by hand as it was said.</summary>
+    public Vector3 TargetWind => _windByHand ? _targetWind : Veered(_targetWind, DiurnalTurnDegrees(_env.GameTime));
+
+    // ── Where the wind blows from ──────────────────────────────────────────────────────────────
+
+    /// <summary>Where the prevailing wind blows from, degrees clockwise from north (<see cref="WindWeather.PrevailingFromDegrees"/>).
+    /// Each front's wind blows from round it (<see cref="FrontWind"/>). Real weather, where a place has it, would
+    /// give the direction instead (docs/REAL_WEATHER.md).</summary>
+    public float PrevailingFromDegrees { get; set; } = WindWeather.PrevailingFromDegrees;
+
+    /// <summary>
+    /// How far a front's wind is turned from the prevailing wind, degrees, positive veered (clockwise). The
+    /// northern mid-latitude depression as the Norwegian school drew it, with the prevailing wind its warm sector's:
+    /// ahead of a warm front, where the long rain falls, the wind is backed toward the south; at a cold front, where
+    /// the squalls and thunder are, it veers to the west-north-west; the polar air behind it, which brings the snow,
+    /// comes from the north-west; a fair day blows from the prevailing quarter. The turns are a judgement of the
+    /// textbook figures, not measured.
+    /// </summary>
+    public static float FrontTurnDegrees(WeatherType w) => w switch
+    {
+        WeatherType.Rain => -60f,
+        WeatherType.Storm => 45f,
+        WeatherType.Snow => 60f,
+        _ => 0f,
+    };
+
+    /// <summary>A front's own strength, m/s at ten metres, as the fronts always had it (a fair day's is drawn).</summary>
+    public static float FrontSpeed(WeatherType w) => w switch
+    {
+        WeatherType.Rain => MathF.Sqrt(50f),     // it was 5 east and 5 north
+        WeatherType.Storm => MathF.Sqrt(325f),   // 15 east and 10 south
+        WeatherType.Snow => MathF.Sqrt(68f),     // 8 east and 2 north
+        _ => MathF.Sqrt(12.5f),                  // the middle of a fair day's draw, 2.5 east and 2.5 north
+    };
+
+    /// <summary>A front's wind at a strength, from round the prevailing direction: map axes, x east, z north, m/s.</summary>
+    public static Vector3 FrontWind(WeatherType w, float speed, float prevailingFromDegrees)
+    {
+        var air = WindAir.FromCompass(speed, prevailingFromDegrees + FrontTurnDegrees(w), 0f);
+        return new Vector3(air.East, 0f, air.North);
+    }
+
+    /// <summary>How far the wind near the ground turns over the day, degrees either way.</summary>
+    public const float DiurnalTurnAmplitudeDegrees = 10f;
+
+    /// <summary>
+    /// The day's turn of the wind near the ground at an hour, degrees, positive veered. By day the sun stirs the
+    /// lowest kilometre and brings the upper wind down, which blows veered of the ground's (the Ekman spiral); at
+    /// night the ground's air settles and backs. The turn follows the same day as the temperature: veered most at
+    /// two in the afternoon, backed most at two in the morning, by <see cref="DiurnalTurnAmplitudeDegrees"/> (the
+    /// ground's wind turns 20 to 30 degrees from the upper by day and 40 or more on a still night: a judgement of
+    /// the textbook figures).
+    /// </summary>
+    public static float DiurnalTurnDegrees(float gameHour)
+        => DiurnalTurnAmplitudeDegrees * MathF.Sin((gameHour - 8f) / 24f * MathF.PI * 2f);
+
+    /// <summary>A wind turned clockwise (veered) by some degrees: where it blows from moves round that far.</summary>
+    public static Vector3 Veered(Vector3 wind, float degrees)
+    {
+        float a = degrees * MathF.PI / 180f, c = MathF.Cos(a), sn = MathF.Sin(a);
+        return new Vector3(wind.X * c + wind.Z * sn, wind.Y, wind.Z * c - wind.X * sn);
+    }
     public float TargetGustiness => _targetGustiness;
 
     /// <summary>How far the air has carried the eddy pattern, metres east and north.</summary>
@@ -363,7 +436,7 @@ public class WorldEnvironmentSystem
             var (humidity, precipitation, wind, gustiness, offset, ceiling) = HeldFront(held);
             state.Humidity = humidity;
             state.PrecipitationIntensity = precipitation;
-            state.WindVelocity = wind;
+            state.WindVelocity = Veered(FrontWind(held, wind, PrevailingFromDegrees), DiurnalTurnDegrees(state.GameTime));
             state.WindGustiness = gustiness;
             state.Temperature = MathF.Min(state.Temperature + offset, ceiling);
         }
@@ -371,13 +444,14 @@ public class WorldEnvironmentSystem
     }
 
     /// <summary>A front's settled values, as <see cref="SetScenario"/> sets its targets (a clear sky's
-    /// wind is the middle of its random range).</summary>
-    internal static (float Humidity, float Precipitation, Vector3 Wind, float Gustiness, float TempOffset, float TempCeiling) HeldFront(WeatherType w) => w switch
+    /// wind is the middle of its random range). Its wind blows from round the prevailing direction, turned by the
+    /// hour, as a front's does (<see cref="GetStateForMap"/>).</summary>
+    internal static (float Humidity, float Precipitation, float WindSpeed, float Gustiness, float TempOffset, float TempCeiling) HeldFront(WeatherType w) => w switch
     {
-        WeatherType.Rain => (0.9f, 0.6f, new Vector3(5f, 0, 5f), 0.3f, -2f, float.MaxValue),
-        WeatherType.Storm => (1.0f, 1.0f, new Vector3(15f, 0, -10f), 0.8f, -4f, float.MaxValue),
-        WeatherType.Snow => (0.6f, 0.5f, new Vector3(8f, 0, 2f), 0.4f, -5f, -1f),
-        _ => (0.4f, 0f, new Vector3(2.5f, 0, 2.5f), 0.1f, 0f, float.MaxValue),
+        WeatherType.Rain => (0.9f, 0.6f, FrontSpeed(w), 0.3f, -2f, float.MaxValue),
+        WeatherType.Storm => (1.0f, 1.0f, FrontSpeed(w), 0.8f, -4f, float.MaxValue),
+        WeatherType.Snow => (0.6f, 0.5f, FrontSpeed(w), 0.4f, -5f, -1f),
+        _ => (0.4f, 0f, FrontSpeed(w), 0.1f, 0f, float.MaxValue),
     };
 }
 

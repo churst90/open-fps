@@ -290,6 +290,13 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
 here are checked to stand on (docs/LISTENING_SPOTS.md).
+- The wind's direction (2026-10-16, docs/CLIENT_NOTES.md "Where the wind comes from"). In Elm Park among the
+  trees (`/tp -375.0 195.0 0.2`), `/weather wind 5 west gusty`, stand facing north: the wind in the left ear,
+  swinging a little toward the face and the back over tens of seconds, never from the right; turn to face west
+  and it is in both ears. `/weather wind 5 west steady`: the same, with less swing. `/weather wind calm`: nothing
+  at the ears standing still. Then `/weather storm`: `/weather` says it is turning to come from the north west
+  while it comes round, and the ears follow it. By the fountain (`/tp -325.0 219.0 0.2`) and at
+  `/tp -350.0 240.0 0.2`, the trees with `/weather auto`: no change of level you would notice (under 1 dB).
 - No rush stepping out of a doorway (2026-10-14). With traffic on Main Street, inside Marlow Tower's front
   entrance (`/tp -12.0 -103.0 0.1`), the door open, walk east out to the pavement (`/tp -7.0 -103.0 0.2`)
   and back, a few times: the street's reverb comes in as you cross, with no burst of it for a moment at the
@@ -909,6 +916,10 @@ Some may already be fixed; confirm before fixing again.
   layers"). Left: the thunder on the same profile and depth (it moves up to 25 dB, Cody's call); fences and
   buildings shadowing less under sound bent down; the shore (land or water by one point); the still air's
   flicker (the calm stir is the thunder's judgement); a map's own latitude.
+- The wind's direction: built 2026-10-16, unheard (docs/CLIENT_NOTES.md, "Where the wind comes from"). Left:
+  a prevailing direction per world or real place (one for the server now, 250), and real weather's direction
+  where a place has it (docs/REAL_WEATHER.md); the southern hemisphere's turns are the other way; rain does not
+  read the wind in sound yet; the day's turn of the wind's strength (stronger by day) is not modelled.
 
 ## Later
 

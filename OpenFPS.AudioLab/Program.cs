@@ -112,7 +112,7 @@ string[] usage =
     "                                                rain running over a real place's ground: its drainage lines, their flows and voices",
     "  --water-cost [shore|flow] [preset ...] [sec= reps= wind= out=DIR] | rain out=DIR | bubbles | null DIR_A DIR_B",
     "                                                what each water preset costs a core, and a null test between builds",
-    "  --weather-wind [out=DIR] [sec=] [ears|trees] [short] [live]",
+    "  --weather-wind [out=DIR] [sec=] [ears|trees] [short] [live] [direction]",
     "                                                the wind at your ears by speed and heading, a 360 turn, and a tree under /weather",
     "  --thunder [out=DIR] [seed=] [city=x,z] [still] [nowav]",
     "                                                thunder at 0.1-15 km, ground and cloud flashes, open field and a city street",

@@ -363,6 +363,14 @@ place, other liquids.
 Air is the one gas the game simulates: temperature, humidity and wind (the weather's fronts and gusts), the
 air's absorption of sound (ISO 9613-1), the wind in your ears (`EarWind`). Nothing can be released into it.
 
+Where the wind comes from is the weather's, and nothing else's (Cody, 2026-10-16: "wind sound should actually
+follow the wind directions, not random"). Each front blows from round a prevailing direction, turned by the front
+(`WorldEnvironmentSystem.FrontWind`), and the day turns it ten degrees either way; the server sends the result,
+so every client has the same direction at the same moment. At a place the field's own eddies swing it either side
+(`WindField.Swing`, the same eddies as the gusts, carried the same way), and everything the wind moves reads that
+one vector: your ears, the trees, the fires, the fire's spread and the bending of far sounds. docs/CLIENT_NOTES.md,
+"Where the wind comes from".
+
 ### 5.2 How it should work
 
 - Released gases as puffs that the wind carries, that rise if hot or light and sink if heavy, and that thin as

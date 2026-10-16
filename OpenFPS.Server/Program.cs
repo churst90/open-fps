@@ -931,7 +931,7 @@ public class GameServer
                     GroundWaterSystem.Update(entry.Key, _environment.RainRate(roadWeather),
                                              RoadWaterSystem.WaterOf(entry.Key)?.EvaporationMmPerHour ?? 0f, dt);
                     // Fire in the same weather: the rain that wets the roads wets the fuel.
-                    Fires.Update(_maps, entry.Key, world, roadWeather, _environment.RainRate(roadWeather), dt);
+                    Fires.Update(_maps, entry.Key, world, roadWeather, _environment.RainRate(roadWeather), dt, _environment.WindTravel);
                     _vehicles.Update(entry.Key, world, dt);
                     // Before the seats carry anybody: Alex gets on and off the bus here.
                     if (_characters.Count > 0)

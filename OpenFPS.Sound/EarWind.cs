@@ -168,9 +168,10 @@ public static class EarWind
         var air = weather.At(seconds);
         float height = MathF.Max(0.5f, l.HeightMetres);
         var (dx, dz) = air.Downwind;
-        Vector2 dir = new(dx, dz);
-        Vector2 meanAir = dir * WindField.MeanAt(air.Speed, height);
-        Vector2 gustAir = dir * WindField.SpeedAt(weather, l.Head.X, height, l.Head.Z, seconds);
+        Vector2 meanAir = new Vector2(dx, dz) * WindField.MeanAt(air.Speed, height);
+        // The air at the head as the field has it, its swing across the mean included: the ears hear it come
+        // from where it is coming from now.
+        Vector2 gustAir = WindField.VelocityAt(weather, l.Head.X, height, l.Head.Z, seconds);
         Vector2 mean = Relative(meanAir, l), now = Relative(gustAir, l);
         return Ears(mean.Length(), now, l.FacingDegrees, l.Cabin);
     }

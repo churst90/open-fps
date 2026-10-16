@@ -496,6 +496,240 @@ public class WeatherWindTests
         Assert.Equal(update.PrecipitationIntensity, back.PrecipitationIntensity);
     }
 
+    // ── Where the wind blows from ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// At a place the wind swings either side of where the weather says it blows from, by the field's own eddies: the
+    /// sideways push is four fifths of the lengthwise turbulence (Panofsky and Dutton), about the mean, and not the gust.
+    /// </summary>
+    [Fact]
+    public void TheWindSwingsAcrossItsMeanByTheFieldsOwnEddies()
+    {
+        var weather = WindWeather.Steady(5f, 250f, 0.25f);
+        var (dx, dz) = weather.At(0).Downwind;
+        double along = 0, across = 0, across2 = 0, gustAcross = 0, gust2 = 0, east = 0, north = 0;
+        int n = 0;
+        var rng = new Random(3);
+        for (int i = 0; i < 40000; i++)
+        {
+            float x = (float)(rng.NextDouble() * 4000 - 2000), z = (float)(rng.NextDouble() * 4000 - 2000);
+            double t = rng.NextDouble() * 20000;
+            var v = WindField.VelocityAt(weather, x, 10f, z, t);
+            float a = v.X * dx + v.Y * dz, c = -v.X * dz + v.Y * dx;
+            float g = WindField.Gust(weather, x, z, t);
+            along += a; across += c; across2 += c * c; gustAcross += g * c; gust2 += g * g;
+            east += v.X; north += v.Y; n++;
+        }
+        double meanAlong = along / n, meanAcross = across / n, sdAcross = Math.Sqrt(across2 / n - meanAcross * meanAcross);
+        double from = (Math.Atan2(-east, -north) * 180 / Math.PI + 360) % 360;
+        double r = gustAcross / Math.Sqrt(gust2 * across2);
+        _o.WriteLine($"along {meanAlong:F2} m/s, across mean {meanAcross:F3} sd {sdAcross:F3} ({sdAcross / meanAlong:F3} of the mean, " +
+                     $"{Math.Atan(sdAcross / meanAlong) * 180 / Math.PI:F1} degrees); mean from {from:F1}; gust and swing correlate {r:F3}");
+        Assert.InRange(sdAcross / meanAlong, 0.8 * 0.25 * 0.8, 0.8 * 0.25 * 1.2);
+        Assert.InRange(meanAcross / meanAlong, -0.02, 0.02);
+        Assert.InRange(from, 248.5, 251.5);
+        Assert.InRange(r, -0.1, 0.1);
+        // The speed is the vector's: what a leaf feels whichever way it is pushed.
+        Assert.Equal(WindField.VelocityAt(weather, 30f, 7f, -12f, 500.0).Length(), WindField.SpeedAt(weather, 30f, 7f, -12f, 500.0), 5);
+    }
+
+    /// <summary>The swing is carried by the wind as the gust is: a place downwind swings as a place upwind did.</summary>
+    [Fact]
+    public void TheSwingTravelsDownwind()
+    {
+        var weather = WindWeather.Steady(4.5f, 250f, 0.25f);
+        var (dx, dz) = weather.At(0).Downwind;
+        const float metres = 90f;
+        float lag = metres / 4.5f;
+        double carried = 0, aa = 0, cc = 0;
+        for (double t = 0; t < 6000; t += 0.5)
+        {
+            float a = WindField.Swing(weather, 0f, 0f, t);
+            float c = WindField.Swing(weather, dx * metres, dz * metres, t + lag);
+            carried += a * c; aa += a * a; cc += c * c;
+        }
+        double rCarried = carried / Math.Sqrt(aa * cc);
+        _o.WriteLine($"swing 90 m downwind {lag:F0} s later correlates {rCarried:F3}");
+        Assert.True(rCarried > 0.98, $"{rCarried:F3}");
+    }
+
+    /// <summary>
+    /// In still air nothing blows and nothing swings: no light-air meander is laid over the field. Without turbulence
+    /// the wind blows exactly from where the weather says.
+    /// </summary>
+    [Fact]
+    public void StillAirIsStillAndASteadyWindDoesNotSwing()
+    {
+        var still = WindWeather.Steady(0f, 250f, 0.3f);
+        var smooth = WindWeather.Steady(6f, 300f, 0f);
+        for (double t = 100; t < 5000; t += 37.1)
+            foreach (var (x, z) in new[] { (0f, 0f), (-375f, 195f), (1800f, -900f) })
+            {
+                Assert.Equal(Vector2.Zero, WindField.VelocityAt(still, x, 1.7f, z, t));
+                var ears = EarWind.Hear(still, new EarWindListener(new Vector3(x, 1.7f, z), 1.7f, Vector2.Zero, 0f, 1f), t);
+                Assert.True(ears.Speed < EarWind.StillAir, $"still air at the ears blew {ears.Speed} m/s");
+                var v = WindField.VelocityAt(smooth, x, 10f, z, t);
+                Assert.Equal(300f, new WindAir(v.X, v.Y, 0f, 0, 0, 0).FromDegrees, 2);
+                Assert.Equal(6f, v.Length(), 3);
+            }
+    }
+
+    /// <summary>
+    /// The ears hear the wind come from where the field says it comes from at the head now: as it swings, the wind
+    /// moves from ear to ear. Read off the mean direction, it never did.
+    /// </summary>
+    [Fact]
+    public void TheEarsHearTheWindComeFromWhereItIsComingFromNow()
+    {
+        var weather = WindWeather.Steady(8f, 0f, 0.25f);
+        var head = new Vector3(-375f, 1.7f, 195f);
+        var l = new EarWindListener(head, 1.7f, Vector2.Zero, 90f, 1f);
+        double sum = 0, sq = 0; int n = 0;
+        for (double t = 1000; t < 4600; t += 0.5)
+        {
+            var ears = EarWind.Hear(weather, l, t);
+            var v = WindField.VelocityAt(weather, head.X, 1.7f, head.Z, t);
+            float from = (new WindAir(v.X, v.Y, 0f, 0, 0, 0).FromDegrees - 90f + 360f) % 360f;
+            Assert.InRange(MathF.Abs(((from - ears.FromDegrees) % 360f + 540f) % 360f - 180f), 0f, 0.05f);
+            double d = ears.FromDegrees - 270.0;
+            sum += d; sq += d * d; n++;
+        }
+        double sd = Math.Sqrt(sq / n - (sum / n) * (sum / n));
+        _o.WriteLine($"from the left (270 re the face) by {sum / n:F1}, swinging {sd:F1} degrees");
+        Assert.InRange(sum / n, -3, 3);
+        Assert.InRange(sd, 6, 20);
+    }
+
+    /// <summary>
+    /// The way to a far sound feels the same swing: a way straight across the mean wind has the wind blowing along it
+    /// now one way and now the other, so its bending comes and goes about none.
+    /// </summary>
+    [Fact]
+    public void AWayAcrossTheWindIsBentByItsSwing()
+    {
+        var w = new WorldWeather { Wind = WindWeather.Steady(8f, 270f, 0.25f), Layers = AirLayers.Neutral() };
+        // From the west, so a way from south to north lies across it.
+        var source = new Vector3(-375f, 0.5f, 0f);
+        var ear = new Vector3(-375f, 1.7f, 300f);
+        // And the same length of way downwind, west to east.
+        var downwindEar = new Vector3(-75f, 1.7f, 0f);
+        double sum = 0, sq = 0, down = 0; int n = 0;
+        for (double t = 1000; t < 4600; t += 1.0)
+        {
+            var bent = Bending.Along(w, source, ear, 0f, false, t, 343f);
+            sum += bent.Curvature; sq += bent.Curvature * (double)bent.Curvature; n++;
+            down += Bending.Along(w, source, downwindEar, 0f, false, t, 343f).Curvature;
+        }
+        double mean = sum / n, sd = Math.Sqrt(sq / n - mean * mean);
+        _o.WriteLine($"curvature across the wind: mean {mean:E2}, sd {sd:E2} per metre; downwind {down / n:E2}");
+        // A fifth of the downwind bending, either way: the swing is four fifths of a quarter of the wind.
+        Assert.True(sd > 0.1 * Math.Abs(down / n), $"the way across the wind hardly bent ({sd:E2} against {down / n:E2} downwind): the refraction read the mean direction");
+        Assert.True(Math.Abs(mean) < sd * 0.5, $"{mean:E2} against {sd:E2}");
+    }
+
+    /// <summary>
+    /// The server's fire spread and a client's sound read the same wind at the same place and moment, swing and all:
+    /// the spread carries the pattern as far as the server has (it read a pattern standing still at the origin).
+    /// </summary>
+    [Fact]
+    public void TheServerAndEveryClientFeelTheSameWindAtTheSamePlace()
+    {
+        var sim = new Sim(e => e.PinScenario(WeatherType.Storm));
+        WindWeather a = WindWeather.Default, b = WindWeather.Default;
+        for (int s = 0; s < 30; s++)
+        {
+            sim.Run(1);
+            var air = sim.Broadcast();
+            a = a.Following(air, sim.Clock);
+            b = b.Following(air, sim.Clock + 0.4);
+        }
+        double t = sim.Clock + 1.5;
+        var server = FireSystem.WindFor(sim.Env.GetCurrentState(), sim.Clock, sim.Env.WindTravel);
+        foreach (var (x, z) in new[] { (0f, 0f), (-375f, 195f), (1800f, -900f) })
+        {
+            var va = WindField.VelocityAt(a, x, 7f, z, t);
+            Assert.Equal(va, WindField.VelocityAt(b, x, 7f, z, t));
+            var vs = WindField.VelocityAt(server, x, 7f, z, t);
+            Assert.True(Vector2.Distance(va, vs) < 1e-3f, $"at ({x}, {z}) the server's fire felt {vs}, the clients {va}");
+        }
+    }
+
+    /// <summary>
+    /// Each front's wind blows from round the prevailing wind, turned as the front turns it, and turns with the day:
+    /// veered most at two in the afternoon, backed most at two in the morning. Nothing about it is drawn: two worlds with
+    /// different luck have the same direction at the same front and hour.
+    /// </summary>
+    [Theory]
+    [InlineData(WeatherType.Clear, 8f, 250f)]
+    [InlineData(WeatherType.Clear, 14f, 260f)]
+    [InlineData(WeatherType.Clear, 2f, 240f)]
+    [InlineData(WeatherType.Rain, 8f, 190f)]
+    [InlineData(WeatherType.Storm, 8f, 295f)]
+    [InlineData(WeatherType.Storm, 20f, 295f)]
+    [InlineData(WeatherType.Snow, 14f, 320f)]
+    public void AFrontsWindComesFromRoundThePrevailingWindAndTurnsWithTheDay(WeatherType front, float hour, float from)
+    {
+        foreach (int seed in new[] { 1, 2, 77 })
+        {
+            var env = new WorldEnvironmentSystem(new Random(seed)) { FrontProbabilityPerTick = 0 };
+            env.SetDate(hour, 172);
+            env.PinScenario(front);
+            for (int i = 0; i < 60 * 20; i++) env.Update(1f / 60f);
+            var v = env.GetCurrentState().WindVelocity;
+            float now = new WindAir(v.X, v.Z, 0f, 0, 0, 0).FromDegrees;
+            _o.WriteLine($"{front} at {env.GetCurrentState().GameTime:F2} h, seed {seed}: from {now:F1}");
+            // Twenty seconds is twenty game minutes: the day's turn has moved by under a degree since the hour.
+            Assert.InRange(now, from - 1.5f, from + 1.5f);
+        }
+    }
+
+    /// <summary>
+    /// Over a game hour with the weather held, the direction moves only by the day's turn: a few degrees, smoothly, the
+    /// same in every world; and a wind set by hand does not move at all.
+    /// </summary>
+    [Fact]
+    public void OverAnHourTheWindTurnsOnlyAsTheDayTurnsIt()
+    {
+        float[] Hour(int seed, Action<WorldEnvironmentSystem> set)
+        {
+            var env = new WorldEnvironmentSystem(new Random(seed)) { FrontProbabilityPerTick = 0 };
+            env.SetDate(9f, 100);
+            set(env);
+            for (int i = 0; i < 60 * 60; i++) env.Update(1f / 60f);
+            var froms = new List<float>();
+            // A game hour is a minute: a reading every game minute.
+            for (int m = 0; m <= 60; m++)
+            {
+                var v = env.GetCurrentState().WindVelocity;
+                froms.Add(new WindAir(v.X, v.Z, 0f, 0, 0, 0).FromDegrees);
+                for (int i = 0; i < 60; i++) env.Update(1f / 60f);
+            }
+            return froms.ToArray();
+        }
+        var one = Hour(1, e => e.PinScenario(WeatherType.Clear));
+        var other = Hour(5, e => e.PinScenario(WeatherType.Clear));
+        _o.WriteLine($"from {one[0]:F2} to {one[^1]:F2} over the hour from ten");
+        for (int m = 0; m < one.Length; m++) Assert.Equal(one[m], other[m], 2);
+        for (int m = 1; m < one.Length; m++) Assert.InRange(one[m] - one[m - 1], 0f, 0.1f);
+        float turned = one[^1] - one[0];
+        // The day's turn between ten and eleven: 10 (sin(3/24 · 2π) − sin(2/24 · 2π)), about 2.1 degrees.
+        Assert.InRange(turned, 1.5f, 3.5f);
+
+        var byHand = Hour(1, e => e.PinWind(new Vector3(5f, 0f, 0f), 0.4f));
+        foreach (float f in byHand) Assert.Equal(270f, f, 2);
+    }
+
+    [Fact]
+    public void WeatherSaysWhereTheWindIsTurningTo()
+    {
+        var west = new Vector3(5f, 0f, 0f);
+        Assert.Equal("", CommandHandler.DescribeTurning(west, west));
+        Assert.Equal("", CommandHandler.DescribeTurning(west, WorldEnvironmentSystem.Veered(west, 10f)));
+        Assert.Equal(" Turning to come from the north west.", CommandHandler.DescribeTurning(west, WorldEnvironmentSystem.Veered(west, 45f)));
+        Assert.Equal(" Turning to come from the south.", CommandHandler.DescribeTurning(west, WorldEnvironmentSystem.Veered(west, -90f)));
+        Assert.Equal("", CommandHandler.DescribeTurning(Vector3.Zero, west));
+    }
+
     // ── Rigs ────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>A server weather system and a client following it, a second at a time.</summary>
