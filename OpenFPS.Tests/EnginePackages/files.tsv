@@ -163,7 +163,6 @@ OpenFPS.Client.Core/VoiceRegistry.Lifecycle.cs	Audio	the voices' ids and kinds (
 OpenFPS.Client.Core/VoiceRegistry.cs	Audio	the voices' ids and kinds (audit P3)
 OpenFPS.Client.Core/WallBumps.cs	Accessibility	
 OpenFPS.Client.Core/WorldAudioPlayer.cs	game	library stage 7 (host until split)
-OpenFPS.Common/Ammunition.cs	Models	what a round and a fire selector are
 OpenFPS.Common/AudioEmission.cs	Common	entity adapter: where an entity sounds from
 OpenFPS.Common/AudioEvents.cs	Common	wire
 OpenFPS.Common/Components.cs	Common	wire and entity model
@@ -182,8 +181,7 @@ OpenFPS.Common/PhysicsUtils.cs	Common	entity adapter: the ground probes of a wor
 OpenFPS.Common/RaceLine.cs	Agents	speeds along a line
 OpenFPS.Common/RoadMapData.cs	World	roads as sent to a driver
 OpenFPS.Common/Roads.cs	World	roads as a map declares them
-OpenFPS.Common/Scopes.cs	Models	what a scope is (ScopeMath and ScopeSway: game, by type)
-OpenFPS.Common/Speech/Speech.cs	Models	the voices: who exists and what each can say
+OpenFPS.Common/Scopes.cs	game	the scope's maths and sway (what a scope is: OpenFPS.Models)
 OpenFPS.Common/StatePacking.cs	Common	wire
 OpenFPS.Common/Tiles.cs	World	tile detail and streaming radii
 OpenFPS.Common/TrackClearance.cs	World	a map's drive route checked at load
@@ -220,6 +218,15 @@ OpenFPS.Geometry/WallBuild.cs	Geometry
 OpenFPS.Materials/AcousticRegistry.cs	Materials	
 OpenFPS.Materials/Air.cs	Materials	
 OpenFPS.Materials/RoadSurfaces.cs	Materials	
+OpenFPS.Models/Ammunition.cs	Models	
+OpenFPS.Models/Editing/ModelKinds.cs	Models	
+OpenFPS.Models/GlassKind.cs	Models	
+OpenFPS.Models/Machines.cs	Models	
+OpenFPS.Models/ModelKindTable.cs	Models	
+OpenFPS.Models/ModelLibrary.cs	Models	
+OpenFPS.Models/Scopes.cs	Models	
+OpenFPS.Models/Speech/Speech.cs	Models	
+OpenFPS.Models/VehicleSpec.cs	Models	
 OpenFPS.Native/FmodNative/fmod.cs	Native	
 OpenFPS.Native/FmodNative/fmod_dsp.cs	Native	
 OpenFPS.Native/FmodNative/fmod_errors.cs	Native	
@@ -480,7 +487,6 @@ OpenFPS.Sound/DoorKnock.cs	Sound
 OpenFPS.Sound/DoorPhysics.cs	Sound	
 OpenFPS.Sound/Doors.cs	Sound	
 OpenFPS.Sound/EarWind.cs	Sound	
-OpenFPS.Sound/Editing/ModelKinds.cs	Models	each kind's fields for the editor
 OpenFPS.Sound/ElevatorDoor.cs	Sound	
 OpenFPS.Sound/Engines.cs	Sound	
 OpenFPS.Sound/Fire.cs	Environment	what is burning and its shape: the fire's description, which its sound reads
@@ -492,7 +498,6 @@ OpenFPS.Sound/GasHob.cs	Sound
 OpenFPS.Sound/Glass.cs	Sound	
 OpenFPS.Sound/GlassDoor.cs	Sound	
 OpenFPS.Sound/GlassFracture.cs	Sound	
-OpenFPS.Sound/GlassKind.cs	Models	which glass a glazed part is: its prefab's, or a vehicle's by where it sits
 OpenFPS.Sound/GroundChannels.cs	Sound	
 OpenFPS.Sound/GroundWater.cs	Environment	hydrology of the ground
 OpenFPS.Sound/HandOverSounds.cs	Sound	
@@ -513,10 +518,7 @@ OpenFPS.Sound/Loudness.cs	Sound
 OpenFPS.Sound/Loudspeakers.cs	Sound	
 OpenFPS.Sound/MachineParts.cs	Sound	
 OpenFPS.Sound/MachinePower.cs	Agents	how hard a driver works a machine: a notch, a power lever
-OpenFPS.Sound/Machines.cs	Models	machines as parts lists, the registry
 OpenFPS.Sound/ModelFailures.cs	Sound	
-OpenFPS.Sound/ModelKindTable.cs	Models	the one table of model kinds
-OpenFPS.Sound/ModelLibrary.cs	Models	the models a map can name
 OpenFPS.Sound/NatureModels.cs	Sound	
 OpenFPS.Sound/PlaybackMode.cs	Sound	
 OpenFPS.Sound/Pneumatics.cs	Sound	
@@ -545,7 +547,6 @@ OpenFPS.Sound/VehicleBody.cs	Sound
 OpenFPS.Sound/VehicleBodyShell.cs	Sound	
 OpenFPS.Sound/VehicleCabin.cs	Sound	
 OpenFPS.Sound/VehicleSignalBits.cs	Sound	
-OpenFPS.Sound/VehicleSpec.cs	Sound	
 OpenFPS.Sound/Vehicles.cs	Sound	
 OpenFPS.Sound/Waves.cs	Sound	
 OpenFPS.Sound/WeaponHandling.cs	Sound	

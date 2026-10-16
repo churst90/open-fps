@@ -47,6 +47,7 @@ FILE_RULES = [
     ('OpenFPS.Materials/', 'a', 'Materials', 'docs/ENGINE_PACKAGES.md, stage 1'),
     ('OpenFPS.Acoustics/', 'a', 'Acoustics', ''),
     ('OpenFPS.Sound/', 'a', 'Sound', ''),
+    ('OpenFPS.Models/', 'a', 'Models', 'the catalogue: docs/ENGINE_PACKAGES.md, stage 2'),
     ('OpenFPS.Native/', 'a', 'Native', ''),
     ('OpenFPS.Audio/', 'a', 'Audio', ''),
     ('OpenFPS.Schema/', 'a', 'Schema', 'the editor attribute on a model property'),
@@ -157,9 +158,6 @@ TYPE_RULES = {
     'OpenFPS.Common.RoadWater': ('c', 'Sound', 'server-advanced store sent whole; the sound reads depths'),
     'OpenFPS.Common.PuddleField': ('c', 'Sound', ''),
     'OpenFPS.Common.WeaponRegistry': ('c', 'Sound', 'content registry both read'),
-    'OpenFPS.Common.FireSelector': ('b', '', 'game rule'),
-    'OpenFPS.Common.AmmoType': ('b', '', 'game rule'),
-    'OpenFPS.Common.Ammunition': ('b', '', 'game rule'),
     'OpenFPS.Common.MathHelper': ('a', 'Geometry', ''),
     'OpenFPS.Client.Core.RainSurvey': ('a', 'Audio', 'reads entities to find roofs and gutters: becomes a reader of the world input'),
     'OpenFPS.Client.Core.DropBank': ('a', 'Audio', ''),
@@ -171,18 +169,20 @@ TYPE_RULES = {
 
 # The library's layers, lowest first. A project may use only those before it in this list (Native
 # stands apart: only Audio uses it).
-LAYERS = {'Geometry': 0, 'Acoustics': 1, 'Sound': 2, 'Native': 0, 'Audio': 3}
+LAYERS = {'Geometry': 0, 'Acoustics': 1, 'Sound': 2, 'Models': 3, 'Native': 0, 'Audio': 4}
 ALLOWED = {
     'Geometry': {'Geometry'},
     'Acoustics': {'Geometry', 'Acoustics'},
     'Sound': {'Geometry', 'Acoustics', 'Sound'},
+    'Models': {'Geometry', 'Acoustics', 'Sound', 'Models'},
     'Native': {'Native'},
-    'Audio': {'Geometry', 'Acoustics', 'Sound', 'Native', 'Audio'},
+    'Audio': {'Geometry', 'Acoustics', 'Sound', 'Models', 'Native', 'Audio'},
 }
 
 
 # Projects whose files are sorted by the rules above; every other project is host.
 SCANNED = ('OpenFPS.Common', 'OpenFPS.Client.Core', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Acoustics', 'OpenFPS.Sound',
+           'OpenFPS.Models',
            'OpenFPS.Native', 'OpenFPS.Audio', 'OpenFPS.Schema', 'OpenFPS.Physics', 'OpenFPS.Accessibility')
 
 

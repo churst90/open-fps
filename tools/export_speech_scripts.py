@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Exports the scripted phone calls and two-person conversations to OpenFPS.Common/Speech/scripts.json.
+"""Exports the scripted phone calls and two-person conversations to OpenFPS.Models/Speech/scripts.json.
 
     tools/export_speech_scripts.py [lines dir, default ~/npc-lines-2026-09-28]
 
 The turn order lives in the line lists Cody generates from (phone.py CALLS, pairs.py PAIRS); the
-recordings are in the game's catalogue (OpenFPS.Common/Speech/voices.csv). Each turn is matched to a
+recordings are in the game's catalogue (OpenFPS.Models/Speech/voices.csv). Each turn is matched to a
 recording by its words, per voice. A call is kept for every voice that recorded all of its lines; a
 conversation for the voice that recorded its A side and the one that recorded its B side, when every
 spoken turn was recorded. Cues like "[laughs]" become a short pause until they are recorded.
@@ -24,7 +24,7 @@ def norm(t): return re.sub(r"[^a-z0-9]+", " ", t.lower()).strip()
 
 
 takes = {}
-with open(os.path.join(ROOT, "OpenFPS.Common/Speech/voices.csv")) as f:
+with open(os.path.join(ROOT, "OpenFPS.Models/Speech/voices.csv")) as f:
     for r in csv.DictReader(f):
         takes.setdefault((r["category"], r["voice"]), {})[norm(r["text"])] = r["line"]
 
@@ -58,7 +58,7 @@ for name, pair in load("pairs").PAIRS.items():
         turns.append({"who": who, "line": line, **({"cut": True} if len(t) > 2 else {})})
     if ok: out["pairs"].append({"name": name, "a": sides["a"][0], "b": sides["b"][0], "turns": turns})
 
-path = os.path.join(ROOT, "OpenFPS.Common/Speech/scripts.json")
+path = os.path.join(ROOT, "OpenFPS.Models/Speech/scripts.json")
 with open(path, "w") as f: json.dump(out, f, indent=1)
 print(f"{path}: {len(out['calls'])} calls ({sum(len(c['voices']) for c in out['calls'])} voice versions), "
       f"{len(out['pairs'])} conversations between {len({(p['a'], p['b']) for p in out['pairs']})} pairs of voices")

@@ -52,5 +52,4 @@ OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs	Common	4
 OpenFPS.Server/Water/DrainageNetwork.cs	Sound	10
 OpenFPS.Sound/Lightning.cs	Acoustics	4
 OpenFPS.Sound/Precipitation.cs	Sound	2
-OpenFPS.Sound/VehicleSpec.cs	Models	10
 OpenFPS.Sound/WorldWeather.cs	Sound	3

@@ -13,6 +13,7 @@ Groups (the first rule that matches a type):
   G   stays in OpenFPS.Geometry; Physics calls it
   S   stays in Sound (or Acoustics) and reads physical state
   H   stays in the host (server, client, Common's entity model): steps Physics or adapts the world to it
+  M   the catalogue's (OpenFPS.Models, docs/ENGINE_PACKAGES.md stage 2): hands out the presets' halves
 Types no rule names are outside the inventory and are sorted by project only (host, sound, geometry, ...).
 """
 import collections
@@ -69,8 +70,8 @@ RULES = [
     (C + 'VehicleProfile', 'PS', 'a preset: mass, drag, rolling resistance, running gear are mechanics; the rest is sound'),
     (C + 'EngineMechanics', 'P', 'the physics half of an engine preset: idle, redline, peak torque and its rpm'),
     (C + 'EngineProfile', 'PS', 'a preset: torque, inertia, friction, idle and redline are mechanics; the gas path is sound'),
-    (C + 'VehicleSpec', 'PS', 'the editable vehicle kind: chassis to Physics, exhaust and intake to Sound'),
-    (C + 'VehicleChassisSpec', 'P', ''),
+    (C + 'VehicleSpec', 'M', 'the editable vehicle kind, as an edited vehicle is stored: the catalogue\'s (physics stage 2, 16.2)'),
+    (C + 'VehicleChassisSpec', 'M', 'its chassis, with the one number of the sound\'s it carries (SourceLevelDb)'),
     (C + 'VehicleExhaustSpec', 'S', ''),
     (C + 'VehicleIntakeSpec', 'S', ''),
     (C + 'VehicleBody', 'S', 'panel modes and the cabin air: how the engine gets out, not how the car moves'),
@@ -233,7 +234,7 @@ for t, g, _ in RULES:
     if t in TYPES:
         tot[g][0] += 1
         tot[g][1] += int(TYPES[t]['lines'])
-for g in ('P', 'PS', 'V', 'G', 'S', 'H'):
+for g in ('P', 'PS', 'V', 'G', 'S', 'H', 'M'):
     w(f'| {g} | {tot[g][0]} | {tot[g][1]} |')
 w()
 

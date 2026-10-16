@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The catalogue of what things are (docs/ENGINE_PACKAGES.md, 3.3 and stage 2): machines as parts lists and
+       their registry, the models a map can name, the one table of model kinds and each kind's fields for the
+       editor, a vehicle as the world editor stores it, which glass a glazed part is, the voices and what each
+       can say, what a scope and a round are. It sits above the sound and the physics and hands out their
+       presets; nothing below it asks it anything: a sound model that names another preset is handed it
+       (IPresets).
+
+       Namespaces are those the files had (OpenFPS.Common, OpenFPS.Common.Editing), as for the other
+       packages' moves. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
+    <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Schema\OpenFPS.Schema.csproj" />
+    <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A pane that declares no glazing is logged (decision 5 of the library survey: Serilog's static Log stays). -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The voices' lines, under the names they had in OpenFPS.Common: Speech reads them from its own assembly. -->
+    <EmbeddedResource Include="Speech\voices.csv" LogicalName="OpenFPS.Common.Speech.voices.csv" />
+    <EmbeddedResource Include="Speech\scripts.json" LogicalName="OpenFPS.Common.Speech.scripts.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests and the lab reach the registries' hooks, as they do the sound's. -->
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+  </ItemGroup>
+
+</Project>

@@ -20,7 +20,7 @@ public class LibraryBoundaryTests
     {
         "OpenFPS.Common", "OpenFPS.Client.Core",
         "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Schema",
-        "OpenFPS.Physics", "OpenFPS.Accessibility",
+        "OpenFPS.Physics", "OpenFPS.Accessibility", "OpenFPS.Models",
     };
 
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")
@@ -287,8 +287,12 @@ public class LibraryBoundaryTests
         // The sound models and the synthesis. MemoryPack: TransientSound is on the wire.
         new object[] { typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "MemoryPack.Core", "Serilog" } },
-        // The editor's attribute on a model's property: nothing but the runtime.
+        // The editor's attribute on a model's property, and the field it describes: nothing but the runtime.
         new object[] { typeof(OpenFPS.Common.Editing.TunableAttribute).Assembly.GetName().Name!, Array.Empty<string>() },
+        // The catalogue (docs/ENGINE_PACKAGES.md, stage 2): above the sound, which it hands out. Serilog: a pane
+        // that declares no glazing is logged.
+        new object[] { typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name!,
+                       new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "Serilog" } },
     };
 
     [Theory]

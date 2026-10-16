@@ -44,6 +44,9 @@
     <!-- The lab's spikes drive the synths' internals directly (an intake network on its own): that is what
          a spike is. -->
     <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+    <!-- The catalogue's kind table hands each kind's places to the extended sources' layouts
+         (ExtendedSources.TreePlacesOf and the rest), and its registry reads a part's empty settings. -->
+    <InternalsVisibleTo Include="OpenFPS.Models" />
   </ItemGroup>
 
   <!-- ── THE DOOR MODELS' FINGERPRINT ─────────────────────────────────────────────────────────────

@@ -86,7 +86,7 @@ def layers():
 
 
 LAYER = layers()
-NEW = {'Environment', 'Models', 'World', 'Agents', 'Editor'}
+NEW = {'Environment', 'World', 'Agents', 'Editor'}
 PLANNED = {'Audio'}
 
 # ── Files: (glob, package, why) ─────────────────────────────────────────────────────────────────────
@@ -98,11 +98,10 @@ FILE_RULES = [
     # The projects that are packages already map to themselves.
     ('OpenFPS.Words/*', 'Words', ''), ('OpenFPS.Schema/*', 'Schema', ''), ('OpenFPS.Native/*', 'Native', ''),
     ('OpenFPS.Geometry/*', 'Geometry', ''), ('OpenFPS.Materials/*', 'Materials', ''), ('OpenFPS.Astronomy/*', 'Astronomy', ''),
-    ('OpenFPS.Physics/*', 'Physics', ''), ('OpenFPS.Acoustics/*', 'Acoustics', ''),
+    ('OpenFPS.Physics/*', 'Physics', ''), ('OpenFPS.Acoustics/*', 'Acoustics', ''), ('OpenFPS.Models/*', 'Models', ''),
     ('OpenFPS.Accessibility/*', 'Accessibility', ''),
 
     # ── Common ──
-    ('OpenFPS.Common/Ammunition.cs', 'Models', 'what a round and a fire selector are'),
     ('OpenFPS.Common/AudioEmission.cs', 'Common', 'entity adapter: where an entity sounds from'),
     ('OpenFPS.Common/AudioEvents.cs', 'Common', 'wire'),
     ('OpenFPS.Common/Components.cs', 'Common', 'wire and entity model'),
@@ -121,9 +120,8 @@ FILE_RULES = [
     ('OpenFPS.Common/RaceLine.cs', 'Agents', 'speeds along a line'),
     ('OpenFPS.Common/RoadMapData.cs', 'World', 'roads as sent to a driver'),
     ('OpenFPS.Common/Roads.cs', 'World', 'roads as a map declares them'),
-    ('OpenFPS.Common/Scopes.cs', 'Models', 'what a scope is (ScopeMath and ScopeSway: game, by type)'),
+    ('OpenFPS.Common/Scopes.cs', 'game', 'the scope\'s maths and sway (what a scope is: OpenFPS.Models)'),
     ('OpenFPS.Common/StatePacking.cs', 'Common', 'wire'),
-    ('OpenFPS.Common/Speech/*', 'Models', 'the voices: who exists and what each can say'),
     ('OpenFPS.Common/Tiles.cs', 'World', 'tile detail and streaming radii'),
     ('OpenFPS.Common/TrackClearance.cs', 'World', 'a map\'s drive route checked at load'),
     ('OpenFPS.Common/UpdateThrottle.cs', 'Common', 'a fixed-rate gate'),
@@ -144,11 +142,6 @@ FILE_RULES = [
     ('OpenFPS.Sound/WorldWeather.cs', 'Environment', 'one world\'s weather state'),
     ('OpenFPS.Sound/AirLayers.cs', 'Environment', 'the air\'s layers near the ground'),
     # ── Sound: what things are ──
-    ('OpenFPS.Sound/Machines.cs', 'Models', 'machines as parts lists, the registry'),
-    ('OpenFPS.Sound/ModelKindTable.cs', 'Models', 'the one table of model kinds'),
-    ('OpenFPS.Sound/ModelLibrary.cs', 'Models', 'the models a map can name'),
-    ('OpenFPS.Sound/Editing/ModelKinds.cs', 'Models', 'each kind\'s fields for the editor'),
-    ('OpenFPS.Sound/GlassKind.cs', 'Models', 'which glass a glazed part is: its prefab\'s, or a vehicle\'s by where it sits'),
     ('OpenFPS.Sound/MachinePower.cs', 'Agents', 'how hard a driver works a machine: a notch, a power lever'),
     ('OpenFPS.Sound/AircraftGroundRun.cs', 'Agents', 'an aeroplane driven along its runway'),
     ('OpenFPS.Sound/*', 'Sound', ''),
@@ -234,8 +227,6 @@ FILE_RULES = [
 
 # Types that do not go where their file goes.
 TYPE_RULES = {
-    'OpenFPS.Common.ScopeMath': 'game',
-    'OpenFPS.Common.ScopeSway': 'game',
     'OpenFPS.Common.WindWaves': 'Environment',
     'OpenFPS.Common.WaterBody': 'Environment',
     'OpenFPS.Common.GroundChannelKind': 'Environment',
@@ -252,7 +243,8 @@ TYPE_RULES = {
 }
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',
-                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Common', 'OpenFPS.Accessibility',
+                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.Common',
+                   'OpenFPS.Accessibility',
                    'OpenFPS.Client.Core', 'OpenFPS.Server')
 USERS = ('OpenFPS.Server', 'OpenFPS.Client.Core', 'OpenFPS.Client', 'OpenFPS.Client.Gtk', 'OpenFPS.AudioLab',
          'OpenFPS.Tests')
@@ -311,7 +303,8 @@ def from_pkg(e):
 def hashed(path):
     if path.startswith('OpenFPS.Common/'):
         return True
-    for pre in ('OpenFPS.Geometry/', 'OpenFPS.Materials/', 'OpenFPS.Acoustics/', 'OpenFPS.Schema/', 'OpenFPS.Physics/'):
+    for pre in ('OpenFPS.Geometry/', 'OpenFPS.Materials/', 'OpenFPS.Acoustics/', 'OpenFPS.Schema/', 'OpenFPS.Physics/',
+                'OpenFPS.Models/'):
         if path.startswith(pre):
             return True
     return path.startswith('OpenFPS.Sound/') and not path.startswith('OpenFPS.Sound/Core/')

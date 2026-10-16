@@ -45,8 +45,8 @@ OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/AudioBank.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Core/AudioEngineFacade.cs	lib	Audio	
-OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	lib	Audio
-OpenFPS.Client.Core/AudioEngine/Core/PlacementThread.cs	lib	Sound
+OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Core/PlacementThread.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/VoiceManager.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Data/AcousticPathData.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Data/SpatialEmitter.cs	lib	Audio	
@@ -78,9 +78,9 @@ OpenFPS.Client.Core/AudioEngine/Fmod/RainVoices.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/StoveVoiceState.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/SynthProcessor.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/TakeLevels.cs	lib	Audio	
-OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	lib	Audio
-OpenFPS.Client.Core/AudioEngine/Fmod/TracedStages.cs	lib	Audio
-OpenFPS.Client.Core/AudioEngine/Fmod/VoiceBuilds.cs	lib	Audio
+OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/TracedStages.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/VoiceBuilds.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/AcousticGeometry.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbiAxes.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/DiffuseLate.cs	lib	Audio	
@@ -157,7 +157,6 @@ OpenFPS.Client.Core/VoiceRegistry.Lifecycle.cs	host
 OpenFPS.Client.Core/VoiceRegistry.cs	host		
 OpenFPS.Client.Core/WallBumps.cs	host		
 OpenFPS.Client.Core/WorldAudioPlayer.cs	host		
-OpenFPS.Common/Ammunition.cs	host		
 OpenFPS.Common/AudioEmission.cs	lib	Sound	
 OpenFPS.Common/AudioEvents.cs	host		
 OpenFPS.Common/Components.cs	host		
@@ -177,7 +176,6 @@ OpenFPS.Common/RaceLine.cs	host
 OpenFPS.Common/RoadMapData.cs	host		
 OpenFPS.Common/Roads.cs	host		
 OpenFPS.Common/Scopes.cs	host		
-OpenFPS.Common/Speech/Speech.cs	host		
 OpenFPS.Common/StatePacking.cs	host		
 OpenFPS.Common/Tiles.cs	host		
 OpenFPS.Common/TrackClearance.cs	host		
@@ -190,6 +188,7 @@ OpenFPS.Geometry/GeometryUtils.cs	lib	Geometry
 OpenFPS.Geometry/PerfProbe.cs	lib	Geometry	
 OpenFPS.Geometry/SpatialGrid.cs	lib	Geometry	
 OpenFPS.Geometry/TileKey.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/BodyShell.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Bvh.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Facets.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/FloodOpenings.cs	lib	Geometry	
@@ -209,11 +208,19 @@ OpenFPS.Geometry/Triangles/TriangleGeometry.cs	lib	Geometry
 OpenFPS.Geometry/Triangles/TriangleWorld.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/WheelRays.cs	lib	Geometry	
-OpenFPS.Geometry/Triangles/BodyShell.cs	lib	Geometry	
 OpenFPS.Geometry/WallBuild.cs	lib	Geometry	
 OpenFPS.Materials/AcousticRegistry.cs	lib	Materials	
 OpenFPS.Materials/Air.cs	lib	Materials	
 OpenFPS.Materials/RoadSurfaces.cs	lib	Materials	
+OpenFPS.Models/Ammunition.cs	lib	Models	
+OpenFPS.Models/Editing/ModelKinds.cs	lib	Models	
+OpenFPS.Models/GlassKind.cs	lib	Models	
+OpenFPS.Models/Machines.cs	lib	Models	
+OpenFPS.Models/ModelKindTable.cs	lib	Models	
+OpenFPS.Models/ModelLibrary.cs	lib	Models	
+OpenFPS.Models/Scopes.cs	lib	Models	
+OpenFPS.Models/Speech/Speech.cs	lib	Models	
+OpenFPS.Models/VehicleSpec.cs	lib	Models	
 OpenFPS.Native/FmodNative/fmod.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_dsp.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_errors.cs	lib	Native	
@@ -324,7 +331,6 @@ OpenFPS.Sound/DoorKnock.cs	lib	Sound
 OpenFPS.Sound/DoorPhysics.cs	lib	Sound	
 OpenFPS.Sound/Doors.cs	lib	Sound	
 OpenFPS.Sound/EarWind.cs	lib	Sound	
-OpenFPS.Sound/Editing/ModelKinds.cs	lib	Sound	
 OpenFPS.Sound/ElevatorDoor.cs	lib	Sound	
 OpenFPS.Sound/Engines.cs	lib	Sound	
 OpenFPS.Sound/Fire.cs	lib	Sound	
@@ -336,7 +342,6 @@ OpenFPS.Sound/GasHob.cs	lib	Sound
 OpenFPS.Sound/Glass.cs	lib	Sound	
 OpenFPS.Sound/GlassDoor.cs	lib	Sound	
 OpenFPS.Sound/GlassFracture.cs	lib	Sound	
-OpenFPS.Sound/GlassKind.cs	lib	Sound	
 OpenFPS.Sound/GroundChannels.cs	lib	Sound	
 OpenFPS.Sound/GroundWater.cs	lib	Sound	
 OpenFPS.Sound/HandOverSounds.cs	lib	Sound	
@@ -357,10 +362,7 @@ OpenFPS.Sound/Loudness.cs	lib	Sound
 OpenFPS.Sound/Loudspeakers.cs	lib	Sound	
 OpenFPS.Sound/MachineParts.cs	lib	Sound	
 OpenFPS.Sound/MachinePower.cs	lib	Sound	
-OpenFPS.Sound/Machines.cs	lib	Sound	
 OpenFPS.Sound/ModelFailures.cs	lib	Sound	
-OpenFPS.Sound/ModelKindTable.cs	lib	Sound	
-OpenFPS.Sound/ModelLibrary.cs	lib	Sound	
 OpenFPS.Sound/NatureModels.cs	lib	Sound	
 OpenFPS.Sound/PlaybackMode.cs	lib	Sound	
 OpenFPS.Sound/Pneumatics.cs	lib	Sound	
@@ -389,7 +391,6 @@ OpenFPS.Sound/VehicleBody.cs	lib	Sound
 OpenFPS.Sound/VehicleBodyShell.cs	lib	Sound	
 OpenFPS.Sound/VehicleCabin.cs	lib	Sound	
 OpenFPS.Sound/VehicleSignalBits.cs	lib	Sound	
-OpenFPS.Sound/VehicleSpec.cs	lib	Sound	
 OpenFPS.Sound/Vehicles.cs	lib	Sound	
 OpenFPS.Sound/Waves.cs	lib	Sound	
 OpenFPS.Sound/WeaponHandling.cs	lib	Sound	

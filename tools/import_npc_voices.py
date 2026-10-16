@@ -8,7 +8,7 @@ Reads the folder's manifest.csv (voice, kind, category, file, text, seconds, whi
 
 - encodes every line to OpenFPS.Client/ASSETS/SOUNDS/VOICES/<voice>/<name>.ogg (Vorbis, mono, 48 kHz,
   the mixer's rate, so nothing is resampled at play time);
-- writes OpenFPS.Common/Speech/voices.csv, the list the server chooses lines from.
+- writes OpenFPS.Models/Speech/voices.csv, the list the server chooses lines from.
 
 Only voices whose folder is still in the source folder are imported: deleting a voice's folder takes it out
 of the game, and its recordings are removed from ASSETS. A manifest row whose file is gone is skipped.
@@ -30,7 +30,7 @@ too much for a woman. The reference is the long-term average speech spectrum (By
 Each band below 500 Hz is compared with the voice's own 500 Hz - 2 kHz, and only an excess is cut, up
 to 12 dB, smoothed over neighbouring bands. Everything above is left alone: that is the person, and
 how hard they are talking. What was measured and applied is written to
-OpenFPS.Common/Speech/voicing.csv; a voice whose row changes is re-encoded.
+OpenFPS.Models/Speech/voicing.csv; a voice whose row changes is re-encoded.
 
 Levels are not touched here; the client rescales every line to Speech.BufferRmsDbfs when it loads it.
 A line is re-encoded when its .wav is newer than its .ogg, so a regenerated voice replaces the old one.
@@ -48,8 +48,8 @@ from array import array
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "OpenFPS.Client", "ASSETS", "SOUNDS", "VOICES")
-CATALOGUE = os.path.join(ROOT, "OpenFPS.Common", "Speech", "voices.csv")
-VOICING = os.path.join(ROOT, "OpenFPS.Common", "Speech", "voicing.csv")
+CATALOGUE = os.path.join(ROOT, "OpenFPS.Models", "Speech", "voices.csv")
+VOICING = os.path.join(ROOT, "OpenFPS.Models", "Speech", "voicing.csv")
 
 # Byrne et al. 1994, Table II: third-octave levels normalised to 70 dB overall, averaged over languages.
 BANDS = [63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500,

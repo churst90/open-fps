@@ -15,6 +15,8 @@
     <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
     <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
     <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <!-- The catalogue (docs/ENGINE_PACKAGES.md, stage 2): machines, models, kinds, voices, scopes, rounds. -->
+    <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,11 +24,6 @@
     <PackageReference Include="LiteNetLib" Version="1.2.0" />
     <PackageReference Include="MemoryPack" Version="1.21.4" />
     <PackageReference Include="Serilog" Version="4.2.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Speech\voices.csv" LogicalName="OpenFPS.Common.Speech.voices.csv" />
-    <EmbeddedResource Include="Speech\scripts.json" LogicalName="OpenFPS.Common.Speech.scripts.json" />
   </ItemGroup>
 
   <!-- ── THE WIRE CONTRACT ────────────────────────────────────────────────────────────────────────
@@ -43,7 +40,8 @@
        sends of the weather and the vehicles (Sound), and the materials and walls both sides hear through
        (Acoustics). All of Acoustics and Sound came from this project in stage 3 and were in the hash
        already. Not Sound's Core/: the synthesis came from OpenFPS.Client.Core, only the client runs it,
-       and it was never in the hash. -->
+       and it was never in the hash. The catalogue (Models) is: a server and a client must resolve a model
+       id the same way (docs/ENGINE_PACKAGES.md, section 8). -->
   <ItemGroup>
     <WireLibrarySource Include="..\OpenFPS.Geometry\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Materials\**\*.cs" />
@@ -51,6 +49,7 @@
     <WireLibrarySource Include="..\OpenFPS.Sound\**\*.cs" Exclude="..\OpenFPS.Sound\Core\**" />
     <WireLibrarySource Include="..\OpenFPS.Schema\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Physics\**\*.cs" />
+    <WireLibrarySource Include="..\OpenFPS.Models\**\*.cs" />
   </ItemGroup>
   <Import Project="..\tools\build\SourceHash.targets" />
 

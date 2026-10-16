@@ -22,7 +22,7 @@ public class EnginePackagesTests
     internal static readonly string[] SortedProjects =
     {
         "OpenFPS.Words", "OpenFPS.Schema", "OpenFPS.Native", "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Astronomy", "OpenFPS.Physics",
-        "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Common", "OpenFPS.Accessibility", "OpenFPS.Client.Core", "OpenFPS.Server",
+        "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.Common", "OpenFPS.Accessibility", "OpenFPS.Client.Core", "OpenFPS.Server",
     };
 
     /// <summary>open-fps itself: the server, the client's session and heads. It may reference anything.</summary>
@@ -194,6 +194,7 @@ public class EnginePackagesTests
         new object[] { "Acoustics", typeof(OpenFPS.Common.AcousticConstants).Assembly.GetName().Name! },
         new object[] { "Sound", typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name! },
         new object[] { "Accessibility", typeof(OpenFPS.Client.Core.Platform.GameKey).Assembly.GetName().Name! },
+        new object[] { "Models", typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name! },
     };
 
     [Theory]
