@@ -87,12 +87,13 @@ public static class GroundAnswer
     /// What the ground at <paramref name="groundHeight"/>, of <paramref name="ground"/>, sends back of a source at
     /// <paramref name="source"/> heard at <paramref name="ear"/>; null when the surface is above either, or the source
     /// stands within <paramref name="minHeight"/> of it. Allocates nothing: it runs for every voice that hears the ground,
-    /// every frame.
+    /// every frame. Under sound bent down (Refraction.Raise) the bounce comes in as if the source stood
+    /// <paramref name="sourceRaise"/> and the ear <paramref name="earRaise"/> higher over it, metres.
     /// </summary>
     public static Bounce? Reflect(float groundHeight, in MaterialProperties ground, Vector3 source, Vector3 ear,
-                                  float minHeight, float speedOfSound)
+                                  float minHeight, float speedOfSound, float sourceRaise = 0f, float earRaise = 0f)
     {
-        if (!Bounced(groundHeight, ground, source, ear, minHeight, speedOfSound, out var path)) return null;
+        if (!Bounced(groundHeight, ground, source, ear, minHeight, speedOfSound, sourceRaise, earRaise, out var path)) return null;
         if (ground.FlowResistivityKPa is not { } flow || !(flow > 0f))
             return new Bounce(path.Height, path.Delay, path.Low, path.High, 1f, 1f, 1f);
         Span<double> real = stackalloc double[3], copy = stackalloc double[3];
@@ -108,9 +109,9 @@ public static class GroundAnswer
     /// judges them. False where there is no bounce or the ground has no flow resistivity.
     /// </summary>
     public static bool Powers(float groundHeight, in MaterialProperties ground, Vector3 source, Vector3 ear, float speedOfSound,
-                              Span<double> real, Span<double> copy)
+                              Span<double> real, Span<double> copy, float sourceRaise = 0f, float earRaise = 0f)
     {
-        if (!Bounced(groundHeight, ground, source, ear, 0f, speedOfSound, out var path)
+        if (!Bounced(groundHeight, ground, source, ear, 0f, speedOfSound, sourceRaise, earRaise, out var path)
             || ground.FlowResistivityKPa is not { } flow || !(flow > 0f)) return false;
         Judge(flow, path, speedOfSound, real, copy);
         return true;
@@ -122,14 +123,17 @@ public static class GroundAnswer
 
     /// <summary>
     /// The copy Cody approved: the surface's two bands from its absorption, the top falling with range, each scaled by the
-    /// paths' coherence and the longer path's extra spreading. False where there is nothing to bounce off.
+    /// paths' coherence and the longer path's extra spreading. False where there is nothing to bounce off. The raises
+    /// lift the ends over the bounce, as sound bent down sees them; whether there is a bounce is the ends' own heights'.
     /// </summary>
     private static bool Bounced(float gb, in MaterialProperties ground, Vector3 source, Vector3 ear, float minHeight,
-                                float speedOfSound, out Path path)
+                                float speedOfSound, float sourceRaise, float earRaise, out Path path)
     {
         path = default;
         if (gb > MathF.Min(source.Y, ear.Y)) return false;             // nothing to bounce off below both
         if (source.Y - gb < minHeight) return false;                   // a recording that has it already
+        source.Y += sourceRaise;
+        ear.Y += earRaise;
 
         var image = new Vector3(source.X, 2f * gb - source.Y, source.Z);
         float direct = MathF.Max(0.1f, Vector3.Distance(source, ear));

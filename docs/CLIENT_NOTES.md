@@ -174,6 +174,57 @@ over and cancels part of the direct sound, which is a large part of why traffic 
   The ground is judged at the one bounce point, so it changes as that point crosses a kerb (Nord2000's
   Fresnel-zone mixing would blend it). μ² is fixed at 5e-6, not taken from the weather.
 
+## Sound bent by the wind and the air's layers
+
+Built 2026-10-16, unheard (todo, "Refraction past 150 m"; Cody's decision on the Resonance survey,
+inbox/2026-10-14-resonance-acoustics-beyond-open-fps, section 2). Sound goes faster where the air is warmer
+and where the wind carries it, so a ray curves toward the slower air. Upwind, or on a sunny afternoon, the
+lowest ray from a low source lifts off the ground and past some distance the listener is in shadow; downwind,
+or on a clear night, sound arcs down and its ground bounce comes in steeper, so a lawn cancels less.
+
+- The air's layers (`AirLayers`, OpenFPS.Sound, bound for Environment): Monin-Obukhov similarity with
+  Businger's profile functions. Over land the heat the ground gives the air comes from the net radiation
+  (`RoadWaterLaw.NetRadiationWm2`: the hour, the day of the year, a 45° latitude and the cloud) by Holtslag
+  and van Ulden's scheme by day and van Ulden and Holtslag's θ* = 0.09 (1 − 0.5 N²) K at night; over open
+  water from the air against the water (Large and Pond's bulk coefficients), the water following the
+  season's air a month behind. The client works it out at each weather broadcast; the server now sends the
+  day of the year with the hour (`WorldStateUpdate.DayOfYear`, appended).
+- The rule (`Refraction`, OpenFPS.Acoustics): the effective speed of sound along the way is Harmonoise's
+  lin-log profile, the wind's log law along the way plus the temperature's two terms. Harmonoise's two
+  radii (Nota et al., Inter-noise 2004, eqs. 6 and 7) make one curvature per path, the log term read at the
+  height its ray climbs to, or at the higher end. The shadow starts √(2R)(√hs + √hr) off (Fleagle 1949);
+  past it the sound dies as a creeping wave round a rigid curved ground (curved-ground analogy, Almgren 1987;
+  Keller; Berry and Daigle 1988), the treble faster than the bass (as f^1/3), held 20 to 30 dB down by the
+  air's stir (Embleton 1996), 30 in a calm, 10 less for each tenfold stir. Bent down, each end of the
+  ground's bounce is lifted d²/2R (at most 30 m) and `GroundAnswer.Reflect` judges the ground with the ends
+  so raised: the same law, so a lawn's dip fills and nothing is counted twice.
+- The flicker: past 100 m a far sound rises and falls with the stir, the Rytov law
+  χ² = (√π/2) μ² k² L L0 with L0 = 1.1 m, at most 3 dB (one standard deviation), mean power kept. The stir
+  signal is the wind field's two smallest eddy layers at the way's middle (`WindField.Stir`); μ² is the
+  thunder's (`Refraction.StirVariance`, which Thunder.TurbulenceVariance now reads unchanged).
+- Where: the mixer works it out for every voice in the world every 0.1 s (`FmodAudioProvider.Bend`,
+  `Bending.Along`, 1 µs a voice), from where the voice is placed (a sound heard over a roof comes from
+  above it, and is bent less), with the wind where the way's middle is at that moment (gusts move the
+  shadow's edge), over the ground its bounce found or the listener's, and glides it as the path's bands are.
+  Speech, birds and one-offs bend as engines do; the voice's own ground copy, where it has one, takes the
+  raised ends in `ApplyGround` (`SpatialEmitter.OverWater` says whether that ground is water). Not bent: the
+  listener's own sounds, the vehicle you ride, rain and wind, and the thunder, which carries its own.
+- Measured (AudioLab `--refraction car=i4_midsize`, exhaust 0.5 m, ear 1.7 m, across grass, 4.5 m/s, change
+  from before, low/middle/high dB). Afternoon (15:00, clear): upwind 150 m −7.6/−16/−28, 300 m −13/−27/−29,
+  600 m −19/−29/−29, the edge at 75 to 150 m; across 150 m −2/−4/−8, 300 m −5/−11/−21 (the sun's lapse
+  alone); downwind 150 m −1/+3/−0.5 and 300 m −1.4/+0.9/−1.1 (the lawn's dip fills; the bass loses a little
+  because the raised ends take its image out of step too; the treble's −1 is the flicker's mean). Night (03:00, clear): upwind about as the afternoon; downwind and across +1 to +3 in the
+  middle. Still neutral air: no shadow inside 700 m. Within 50 m at most 1.7 dB of treble upwind on a sunny
+  afternoon; at 100 m upwind in that breeze 5/11/20 already (the edge is at 62 m).
+- Thunder: unchanged (`--thunder` measured before and after, every row the same). The shared rule would
+  move it: its still-air edge agrees with the thunder's to under 1 %, but the wind's log law aloft and the
+  creeping wave's depth by band would move far thunder by up to 25 dB (`--refraction thunder`), so the
+  thunder keeps its own profile and its single 25 dB until Cody hears it (a question).
+- Known short of the whole: land or water is the bounce point's (a shore path flips); the log term's height
+  is the higher end's for raised sources, an extension of Harmonoise's relation; fences and buildings do not
+  yet shadow less under sound bent down; the stir's flicker swings sounds even in still air (the calm stir
+  is the thunder's judgement), the treble most.
+
 ## One-off sounds: why the echoes are as they are
 
 - Render once, play by name. Before WorldAudioPlayer the server's whole vocabulary for sound was "this

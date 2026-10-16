@@ -621,6 +621,8 @@ public partial class ClientAudioSystem
         // Now and then, forget the windows of vehicles that have gone.
         if (_frameCount % 600 == 0) _cabins.Forget(world.Entities.ContainsKey);
         _audio.SetListenerEnclosure(encLow, encMid, encHigh);
+        // What the air's bending measures heights from where a voice's own bounce found no ground.
+        _audio.SetListenerGround(visualEyePos.Y - _state.EyeHeight);
         // Temperature reaches the mix as the speed of sound: c = 331.3 + 0.606·T.
         _audio.SetAirTemperature(world.Temperature);
 
@@ -3806,6 +3808,7 @@ public partial class ClientAudioSystem
     {
         e.GroundDelaySeconds = 0f; e.GroundLowGain = 0f; e.GroundHighGain = 0f;
         e.GroundLowDb = 0f; e.GroundMidDb = 0f; e.GroundHighDb = 0f;
+        e.OverWater = false;
         if (world == null || _state.IsRiding) return;          // from inside a vehicle there is no road to hear
         Vector3 src = e.Position, ear = _groundEar;
 
@@ -3822,8 +3825,13 @@ public partial class ClientAudioSystem
         }
         if (!c.Found) return;
         var m = OpenFPS.Common.AcousticRegistry.GetProperties(c.Material ?? "Generic");
-        if (OpenFPS.Common.GroundAnswer.Reflect(c.Height, m, src, ear, minHeight, AudioPhysics.CurrentSpeedOfSound) is not { } bounce)
+        // Sound bent down by the wind or the air's layers comes off the ground as if both ends stood higher (Bending).
+        bool water = OpenFPS.Common.AcousticRegistry.IsLiquid(c.Material);
+        var bent = OpenFPS.Common.Bending.Along(_audio.Weather, src, ear, c.Height, water, _audio.Weather.Now, AudioPhysics.CurrentSpeedOfSound);
+        if (OpenFPS.Common.GroundAnswer.Reflect(c.Height, m, src, ear, minHeight, AudioPhysics.CurrentSpeedOfSound,
+                                                bent.SourceRaise, bent.EarRaise) is not { } bounce)
             return;
+        e.OverWater = water;
         e.GroundHeight = bounce.Height;
         e.GroundDelaySeconds = bounce.DelaySeconds;
         e.GroundLowGain = bounce.LowGain;

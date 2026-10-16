@@ -13,6 +13,7 @@ OpenFPS.Acoustics/Localisation.cs	Acoustics
 OpenFPS.Acoustics/Opening.cs	Acoustics	
 OpenFPS.Acoustics/OpeningRoutes.cs	Acoustics	
 OpenFPS.Acoustics/PanelAcoustics.cs	Acoustics	
+OpenFPS.Acoustics/Refraction.cs	Acoustics	
 OpenFPS.Acoustics/Room.cs	Acoustics	
 OpenFPS.Acoustics/RoomAcoustics.cs	Acoustics	
 OpenFPS.Acoustics/SparseAcousticOctree.cs	Acoustics	
@@ -396,6 +397,7 @@ OpenFPS.Server/Water/DrainageNetwork.cs	Environment	a map's drainage from its ti
 OpenFPS.Server/Water/MapDrainage.cs	game	host: adapts the map to Environment
 OpenFPS.Server/Water/SurfaceRaster.cs	game	host: adapts the map to Environment
 OpenFPS.Sound/AdminGun.cs	Sound	
+OpenFPS.Sound/AirLayers.cs	Environment	the air's layers near the ground
 OpenFPS.Sound/Aircraft.cs	Sound	
 OpenFPS.Sound/AircraftGroundRun.cs	Agents	an aeroplane driven along its runway
 OpenFPS.Sound/Applause.cs	Sound	
@@ -411,6 +413,7 @@ OpenFPS.Sound/Core/AdminGunSynth.cs	Sound
 OpenFPS.Sound/Core/Aircraft/AircraftSynth.cs	Sound	
 OpenFPS.Sound/Core/At44k.cs	Sound	
 OpenFPS.Sound/Core/AudioPhysics.cs	Sound	
+OpenFPS.Sound/Core/Bending.cs	Sound	
 OpenFPS.Sound/Core/BoundaryModel.cs	Sound	
 OpenFPS.Sound/Core/BrakeSqueal.cs	Sound	
 OpenFPS.Sound/Core/EarTimbres.cs	Sound	

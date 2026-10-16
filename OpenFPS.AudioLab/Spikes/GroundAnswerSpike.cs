@@ -217,7 +217,7 @@ public static class GroundAnswerSpike
     }
 
     /// <summary>The power in each of the voice's bands (AcousticBands' ranges).</summary>
-    static double[] Bands(float[] x)
+    internal static double[] Bands(float[] x)
     {
         int n = 1; while (n < x.Length) n <<= 1;
         var a = new Complex[n];
@@ -235,7 +235,7 @@ public static class GroundAnswerSpike
         return p;
     }
 
-    static void Write(string path, float[] x, float gain)
+    internal static void Write(string path, float[] x, float gain)
     {
         using var w = new BinaryWriter(File.Create(path));
         int bytes = x.Length * 2;

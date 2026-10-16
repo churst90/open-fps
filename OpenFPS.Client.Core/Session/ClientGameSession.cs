@@ -1046,6 +1046,10 @@ public sealed partial class ClientGameSession : IDisposable
                 // drainage lines' voices read: this world's weather, as the server sends it.
                 _audioEngine.Weather.Wind = _world.Wind;
                 _audioEngine.Weather.Ground.Load(wsu.GroundWater);
+                // The air's layers near the ground, which bend sound: from the hour, the day, the cloud and the wind.
+                _audioEngine.Weather.Layers = AirLayers.From(wsu.GameTime, wsu.DayOfYear > 0 ? wsu.DayOfYear : AirLayers.EquinoxDay,
+                    RoadDrainageSpec.Default.LatitudeDegrees, wsu.PrecipitationIntensity, wsu.Humidity, wsu.Temperature,
+                    wsu.AirPressure, new Vector2(wsu.WindVelocity.X, wsu.WindVelocity.Z).Length(), wsu.WindGustiness);
                 break;
 
             case HitConfirm confirm:

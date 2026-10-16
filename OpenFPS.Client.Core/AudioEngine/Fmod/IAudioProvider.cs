@@ -18,6 +18,9 @@ public interface IAudioProvider : IDisposable
     /// <summary>What the body of the vehicle the listener sits in takes off everything outside it, dB per
     /// band (negative); zero on foot.</summary>
     void SetListenerEnclosure(float lowDb, float midDb, float highDb) { }
+    /// <summary>The height of the ground under the listener, world metres: what the air's bending measures a voice's
+    /// and the ear's heights from where the voice's own bounce found none.</summary>
+    void SetListenerGround(float groundY) { }
     /// <summary>For the wind at the ears (EarWind); null when nobody is in a world.</summary>
     void SetEarWind(OpenFPS.Common.EarWindListener? listener) { }
     /// <summary>The surfaces right round the listener's head, one probe per direction in head space, each

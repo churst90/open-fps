@@ -651,6 +651,21 @@ public partial class FmodAudioProvider : IAudioProvider
             TargetGroundHighDb = playsCopy ? e.GroundHighDb : 0f;
             if (now) { GroundLowDb = TargetGroundLowDb; GroundMidDb = TargetGroundMidDb; GroundHighDb = TargetGroundHighDb; }
         }
+        /// <summary>What the air's bending takes from the voice's bands (Bending: the shadow less the stir's swing), dB,
+        /// where it is headed and where it is; when it was last worked out (provider clock, s; never: negative
+        /// infinity); the ground under its way as its ground's bounce found it (NaN: none found, the listener's
+        /// ground stands for it); and whether that ground is open water.</summary>
+        public float TargetBentLowDb, TargetBentMidDb, TargetBentHighDb, BentLowDb, BentMidDb, BentHighDb;
+        public double BentAt = double.NegativeInfinity;
+        public float BendGround = float.NaN;
+        public bool OverWater;
+
+        /// <summary>The ground under the way and what it is, from <paramref name="e"/>'s bounce.</summary>
+        public void TakeBendGround(in SpatialEmitter e)
+        {
+            BendGround = HasGround(e) ? e.GroundHeight : float.NaN;
+            OverWater = e.OverWater;
+        }
         public int TargetRegionId = -1; 
         public bool IsReflection; 
         /// <summary>The overloading sound itself: everything else gives way to it, not this.</summary>
@@ -3321,6 +3336,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 activeSound.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
                 activeSound.TakeGround(emitter, saState?.Ground != null, now: true);
             }
+            activeSound.TakeBendGround(emitter);
 
             if (_acousticMap != null && !activeSound.IsReflection && emitter.Type != EmitterType.UI) // a reflection does not feed the reverb
             {
@@ -3542,6 +3558,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
                 }
                 active.TakeGround(emitter, ground != null || (!active.IsReflection && active.SaState?.Ground != null), now: false);
+                active.TakeBendGround(emitter);
                 active.MinDistance = emitter.MinDistance;
                 // No 3D calls on a 2D (binaural) voice: run every frame, this was most of the 113,228
                 // refused calls (see PlaySpatialSound).
@@ -4235,6 +4252,43 @@ public partial class FmodAudioProvider : IAudioProvider
         return (Db(gainLow) - airLowDb, Db(gainMid) - airMidDb, Db(gainHigh) - airHighDb);
     }
 
+    /// <summary>How often a voice's bending is worked out again, s. The wind's smallest eddies pass in a second or
+    /// two, and the result is glided as the path's bands are.</summary>
+    internal const double BendSeconds = 0.1;
+
+    /// <summary>The height of the ground under the listener, world metres (NaN: not told; then 1.7 m under the ear).</summary>
+    private volatile float _listenerGroundY = float.NaN;
+
+    public void SetListenerGround(float groundY) => _listenerGroundY = groundY;
+
+    /// <summary>
+    /// Works out again, every <see cref="BendSeconds"/>, what the air's bending takes from a voice (Bending.Along, read
+    /// with this world's weather): from where it is placed, so a sound heard over a roof's edge comes from above, over
+    /// the ground its bounce found or the listener's. Not for what is part of the listener, inside the vehicle they
+    /// ride, or the air itself (rain, wind), whose sound is all round. A voice just begun starts where it is headed.
+    /// </summary>
+    private void Bend(ActiveSound active, Vector3 ear)
+    {
+        bool bends = !active.FollowsListener && !active.InsideListenersVehicle && active.Type is EmitterType.WorldLocked or EmitterType.EntityAttached
+                     && active.EngineState is not { Interior: true } && active.TapState is not { CabinPath: > 0 };
+        if (!bends)
+        {
+            active.TargetBentLowDb = active.TargetBentMidDb = active.TargetBentHighDb = 0f;
+            return;
+        }
+        double now = Clock.Now;
+        bool first = double.IsNegativeInfinity(active.BentAt);
+        if (now - active.BentAt < BendSeconds) return;
+        active.BentAt = now;
+        float listenerGround = _listenerGroundY;
+        if (float.IsNaN(listenerGround)) listenerGround = ear.Y - 1.7f;
+        float ground = float.IsNaN(active.BendGround) ? listenerGround : active.BendGround;
+        var from = active.CurrentApparentPosition != Vector3.Zero ? active.CurrentApparentPosition : active.Position;
+        var taken = OpenFPS.Common.Bending.Along(Weather, from, ear, ground, active.OverWater, Weather.Now, _speedOfSound).TakenDb;
+        active.TargetBentLowDb = taken.Low; active.TargetBentMidDb = taken.Mid; active.TargetBentHighDb = taken.High;
+        if (first) { active.BentLowDb = taken.Low; active.BentMidDb = taken.Mid; active.BentHighDb = taken.High; }
+    }
+
     // Seconds since the previous attribute pass: the loop's real period, which varies with load.
     private long _attributeTickAt;
     private float _attributeDt;
@@ -4253,6 +4307,10 @@ public partial class FmodAudioProvider : IAudioProvider
         active.GroundLowDb = MathHelper.Lerp(active.GroundLowDb, active.TargetGroundLowDb, lerpFactor);
         active.GroundMidDb = MathHelper.Lerp(active.GroundMidDb, active.TargetGroundMidDb, lerpFactor);
         active.GroundHighDb = MathHelper.Lerp(active.GroundHighDb, active.TargetGroundHighDb, lerpFactor);
+        Bend(active, lPosVec);
+        active.BentLowDb = MathHelper.Lerp(active.BentLowDb, active.TargetBentLowDb, lerpFactor);
+        active.BentMidDb = MathHelper.Lerp(active.BentMidDb, active.TargetBentMidDb, lerpFactor);
+        active.BentHighDb = MathHelper.Lerp(active.BentHighDb, active.TargetBentHighDb, lerpFactor);
 
         // The path is applied once: the band gains are the whole of what occlusion, transmission and
         // diffraction do, as 20 log10 each in the EQ below, with the air's per-band loss. Applied
@@ -4357,8 +4415,11 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             var (lowDb, midDb, highDb) = PathEqDb(active.CurrentLow, active.CurrentMid, active.CurrentHigh,
                                                   active.AirLowDb, active.AirMidDb, active.AirHighDb);
-            // What the ground takes besides the copy the voice plays of itself (GroundAnswer).
-            lowDb -= active.GroundLowDb; midDb -= active.GroundMidDb; highDb -= active.GroundHighDb;
+            // What the ground takes besides the copy the voice plays of itself (GroundAnswer), and what the air's
+            // bending takes, or its stir lends (Bending).
+            lowDb -= active.GroundLowDb + active.BentLowDb;
+            midDb -= active.GroundMidDb + active.BentMidDb;
+            highDb -= active.GroundHighDb + active.BentHighDb;
 
             // Sitting in a car, everything outside it comes through the glass and the doors: not the
             // car's own engine (its voice rendered the body already), not the cues on your head.

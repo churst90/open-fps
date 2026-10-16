@@ -2360,6 +2360,7 @@ public class GameServer
                     HailDiameterMm = falling.HailMm,
                     RoadWater = RoadWaterSystem.WaterOf(session.CurrentMapId)?.Save(),
                     GroundWater = GroundWaterSystem.WaterOf(session.CurrentMapId)?.Save(),
+                    DayOfYear = state.DayOfYear,
                 };
                 perMap[session.CurrentMapId] = update;
             }

@@ -127,24 +127,17 @@ public static class Thunder
     public const float TurbulenceScaleMetres = 10f;
 
     /// <summary>The temperature's fluctuation, K, and the wind's turbulent velocity in still air and
-    /// per m/s of wind, doubled at full gustiness (a storm's 18 m/s gusting gives about 1.2 m/s, the
-    /// order Ostashev and Wilson 2015, ch. 6, give for a windy day). Judgements: the server has one
-    /// wind and a gustiness.</summary>
-    public const float TemperatureSigmaK = 0.5f, CalmVelocitySigma = 0.2f, TurbulenceIntensity = 0.03f;
+    /// per m/s of wind: the air's stir every sound reads (Refraction.StirVariance).</summary>
+    public const float TemperatureSigmaK = Refraction.TemperatureSigmaK, CalmVelocitySigma = Refraction.CalmVelocitySigma,
+                       TurbulenceIntensity = Refraction.TurbulenceIntensity;
 
     /// <summary>The longest a scattered tail is spread, seconds: past this the small-angle law no
     /// longer holds (the scattering saturates), and thunder from 20 km is not a minute long.</summary>
     public const float MaxScatterSeconds = 0.6f;
 
-    /// <summary>The variance of the refractive index, mu^2: the wind's turbulent velocity and the
-    /// temperature's fluctuation, each against the sound speed.</summary>
+    /// <summary>The variance of the refractive index, mu^2, as every sound reads it (Refraction.StirVariance).</summary>
     public static float TurbulenceVariance(Air air, float c)
-    {
-        float wind = new Vector2(air.Wind.X, air.Wind.Z).Length();
-        float sv = CalmVelocitySigma + TurbulenceIntensity * wind * (1f + Math.Clamp(air.Gustiness, 0f, 1f));
-        float st = TemperatureSigmaK / (2f * (air.TemperatureC + 273.15f));
-        return sv * sv / (c * c) + st * st;
-    }
+        => Refraction.StirVariance(new Vector2(air.Wind.X, air.Wind.Z).Length(), air.Gustiness, air.TemperatureC, c);
 
     /// <summary>How fast turbulence takes the coherent wave at <paramref name="f"/> Hz, per metre (intensity).</summary>
     public static float ScatterPerMetre(float f, float mu2, float c)

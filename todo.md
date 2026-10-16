@@ -903,7 +903,10 @@ Some may already be fixed; confirm before fixing again.
 - The client sends interact only within 3 m; the server allows 5 m.
 
 ### Sound synthesis to come
-- Refraction past 150 m; wind and temperature against height; turbulence.
+- Refraction: built 2026-10-16, unheard (docs/CLIENT_NOTES.md, "Sound bent by the wind and the air's
+  layers"). Left: the thunder on the same profile and depth (it moves up to 25 dB, Cody's call); fences and
+  buildings shadowing less under sound bent down; the shore (land or water by one point); the still air's
+  flicker (the calm stir is the thunder's judgement); a map's own latitude.
 
 ## Later
 

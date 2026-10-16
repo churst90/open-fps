@@ -167,6 +167,9 @@ public struct SpatialEmitter
     /// for none: a lawn grazed from far off cancels part of the direct sound, which a copy that only adds cannot do
     /// (GroundAnswer). Applied only where the voice plays the copy.</summary>
     public float GroundLowDb, GroundMidDb, GroundHighDb;
+    /// <summary>The ground's bounce is on open water: the mixer bends the voice by the air's layers over water, not
+    /// land (AirLayers.Water; Bending). False for land, or with no bounce found.</summary>
+    public bool OverWater;
     /// <summary>
     /// When non-zero, this voice is the front outlet (intake and block) of that entity's live engine,
     /// at its own point on the machine. The same integration writes both taps, and they sum to exactly

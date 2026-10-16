@@ -145,6 +145,7 @@ FILE_RULES = [
     ('OpenFPS.Sound/Fuel.cs', 'Environment', 'what a thing burns as'),
     ('OpenFPS.Sound/FireShape.cs', 'Environment', 'a fire\'s burning area'),
     ('OpenFPS.Sound/WorldWeather.cs', 'Environment', 'one world\'s weather state'),
+    ('OpenFPS.Sound/AirLayers.cs', 'Environment', 'the air\'s layers near the ground'),
     # ── Sound: what things are ──
     ('OpenFPS.Sound/Machines.cs', 'Models', 'machines as parts lists, the registry'),
     ('OpenFPS.Sound/ModelKindTable.cs', 'Models', 'the one table of model kinds'),

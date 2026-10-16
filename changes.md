@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Sound bent by the wind and the air's layers (docs/CLIENT_NOTES.md). The air's layers near the ground come
+  from the sun, the cloud, the hour and the wind (Monin-Obukhov; Holtslag and van Ulden), and over water from
+  the air against the water; the server sends the day of the year. Every voice in the world is bent by the
+  wind where its way's middle is, gusts and all: upwind or on a sunny afternoon a far low source goes into
+  shadow, the treble first (Harmonoise's curvature, Fleagle's edge, the creeping wave, held 20 to 30 dB down
+  by the stir); downwind or on a clear night its ground bounce comes in steeper and a lawn cancels less; past
+  100 m it rises and falls with the stir. A car's exhaust 300 m upwind of a 4.5 m/s breeze on a sunny afternoon
+  loses 13/27/29 dB (low/middle/high); downwind it keeps 1 dB more of its middle. Still neutral air bends
+  nothing inside 700 m. Thunder unchanged. Stored streams: one new field, false everywhere. The wire hash changes.
 - Materials are told by what they are, not by their names (docs/ENGINE_PACKAGES.md, stage 1). Five places decided
   by a material's name: the place's name underfoot, the driving aids' road, the rain's canopy, the editor's windows
   and a shape's glass, and a struck fence's pale. Each reads a property of the material table now, so a material

@@ -89,6 +89,29 @@ public static class WindField
         return sum * Norm;
     }
 
+    /// <summary>
+    /// The small eddies alone at a place and moment: zero mean, unit standard deviation. The two shortest layers of the
+    /// gust pattern (12 and 5 m), which pass a point in seconds: eddies of the size of a far sound's Fresnel zone, which
+    /// swing its level (Refraction.Flicker), where the gust is the slow sum of them all.
+    /// </summary>
+    public static float Stir(WindWeather weather, float x, float z, double seconds)
+    {
+        var (te, tn) = weather.TravelAt(seconds);
+        double px = x - te, pz = z - tn;
+        double slow = seconds / EddyLifetimeSeconds;
+        float sum = 0f, variance = 0f;
+        for (int k = Eddies.Length - 2; k < Eddies.Length; k++)
+        {
+            var (period, weight) = Eddies[k];
+            double size = period * ReferenceSpeed;
+            // Off the lattice's own planes: on one (a way's middle on an axis) the noise's variance is a third larger.
+            sum += weight * Noise3(px / size + 0.31, pz / size + 0.73, slow + k * 0.37 + 0.5, k);
+            variance += weight * weight;
+        }
+        // Each layer's value noise has a variance of 1/3 times 0.743 cubed (see the static constructor).
+        return sum / MathF.Sqrt(variance * (1f / 3f) * 0.7429f * 0.7429f * 0.7429f);
+    }
+
     /// <summary>The wind speed at a place, m/s: the mean at that height times one plus the
     /// turbulence, never stopping entirely (a lull in a breeze is still air moving).</summary>
     public static float SpeedAt(WindWeather weather, float x, float heightMetres, float z, double seconds)

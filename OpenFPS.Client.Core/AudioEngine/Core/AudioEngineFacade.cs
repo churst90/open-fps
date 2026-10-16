@@ -332,6 +332,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.SetListenerEnclosure(lowDb, midDb, highDb);
     }
 
+    /// <summary>The ground under the listener (IAudioProvider.SetListenerGround). Thread-safe: one float.</summary>
+    public void SetListenerGround(float groundY)
+    {
+        if (_isInitialized) _provider.SetListenerGround(groundY);
+    }
+
     /// <summary>Where the listener is, for the wind at their ears. Thread-safe: the provider swaps it
     /// in whole.</summary>
     public void SetEarWind(OpenFPS.Common.EarWindListener? listener)

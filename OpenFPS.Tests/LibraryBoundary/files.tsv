@@ -13,6 +13,7 @@ OpenFPS.Acoustics/Localisation.cs	lib	Acoustics
 OpenFPS.Acoustics/Opening.cs	lib	Acoustics	
 OpenFPS.Acoustics/OpeningRoutes.cs	lib	Acoustics	
 OpenFPS.Acoustics/PanelAcoustics.cs	lib	Acoustics	
+OpenFPS.Acoustics/Refraction.cs	lib	Acoustics	
 OpenFPS.Acoustics/Room.cs	lib	Acoustics	
 OpenFPS.Acoustics/RoomAcoustics.cs	lib	Acoustics	
 OpenFPS.Acoustics/SparseAcousticOctree.cs	lib	Acoustics	
@@ -240,6 +241,7 @@ OpenFPS.Physics/Wind.cs	lib	Physics
 OpenFPS.Physics/WindModel.cs	lib	Physics	
 OpenFPS.Schema/Tunable.cs	lib	Schema	
 OpenFPS.Sound/AdminGun.cs	lib	Sound	
+OpenFPS.Sound/AirLayers.cs	lib	Sound	
 OpenFPS.Sound/Aircraft.cs	lib	Sound	
 OpenFPS.Sound/AircraftGroundRun.cs	lib	Sound	
 OpenFPS.Sound/Applause.cs	lib	Sound	
@@ -255,6 +257,7 @@ OpenFPS.Sound/Core/AdminGunSynth.cs	lib	Sound
 OpenFPS.Sound/Core/Aircraft/AircraftSynth.cs	lib	Sound	
 OpenFPS.Sound/Core/At44k.cs	lib	Sound	
 OpenFPS.Sound/Core/AudioPhysics.cs	lib	Sound	
+OpenFPS.Sound/Core/Bending.cs	lib	Sound	
 OpenFPS.Sound/Core/BoundaryModel.cs	lib	Sound	
 OpenFPS.Sound/Core/BrakeSqueal.cs	lib	Sound	
 OpenFPS.Sound/Core/EarTimbres.cs	lib	Sound	

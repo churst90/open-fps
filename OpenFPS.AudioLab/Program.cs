@@ -164,6 +164,8 @@ string[] usage =
     "  --heard-levels [d=1.5] [wav=DIR]              doors, steps, speech: declared vs LAFmax at the ear",
     "  --ground-voice [line.ogg] [--at=3] [--angle=30] [--out=DIR] [--ladder]",
     "  --ground-answer [map=city] ear=x,y,z src=x,y,z [src=...] [car=preset] [speed=km/h] [out=DIR] [cost] | survey",
+    "  --refraction [car=preset] [wind=m/s] [d=150,300,600] [src=m] [ground=Grass] [cost] [thunder]",
+    "                                                sound bent by the wind and the air's layers, before and now, per band",
     "                                                a talker's ground reflection three ways",
     "  --mic [sec=3] [device=NAME]                   the microphone through FMOD, as voice chat opens it: samples and level; nothing kept",
     "",
@@ -781,6 +783,11 @@ if (args.Contains("--bumps"))
 if (args.Contains("--ground-answer"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GroundAnswerSpike.Run(args));
+}
+
+if (args.Contains("--refraction"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RefractionSpike.Run(args));
 }
 
 if (args.Contains("--ground-voice"))

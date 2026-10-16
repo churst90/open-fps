@@ -891,6 +891,9 @@ public partial class WorldStateUpdate : IMessage
     /// of reservoirs, the groundwater, and the ponds overflowing into a drainage line's voice. Null from an
     /// older server or a map without ground of its own.</summary>
     public float[]? GroundWater;
+    /// <summary>The day of the year (1 to 365) with GameTime's hour: the sun's height, which sets the air's layers near
+    /// the ground (AirLayers). Zero from an older server.</summary>
+    public int DayOfYear;
 }
 
 /// <summary>

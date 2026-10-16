@@ -33,6 +33,15 @@ public sealed class WorldWeather
     }
     private WindWeather _wind = WindWeather.Default;
 
+    /// <summary>The air's layers near the ground (AirLayers): what bends sound over land and over water. Swapped whole, as
+    /// the wind is; neutral until the host says otherwise.</summary>
+    public AirLayers Layers
+    {
+        get => Volatile.Read(ref _layers);
+        set => Volatile.Write(ref _layers, value ?? AirLayers.Neutral());
+    }
+    private AirLayers _layers = AirLayers.Neutral();
+
     /// <summary>The rain landing on roofs and streets on its way to a gutter, a drain or a downpipe. The host
     /// advances it once a frame with the rain falling (<see cref="Runoff.Update"/>).</summary>
     public Runoff Runoff { get; } = new();
