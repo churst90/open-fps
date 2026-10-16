@@ -32,6 +32,18 @@ Recent work, newest first. `git log` has the rest.
   the lobby's, now 2.4 under to 2.9 over. Rooms unchanged: 3,820 of 3,837 standing spots and headings.
   Found in Resonance's copy (a shop's open doorway).
 
+- Physics stage 2, one gravity and one air (docs/PHYSICS_BOUNDARY.md 16.6). Gravity is one number,
+  9.80665 m/s² (`Earth.StandardGravity`), where it was written 44 times, 40 of them 9.81; and a map's own
+  gravity is what everything on it falls, rolls and flies by on the server: drops, falls, bullets, slugs,
+  driven cars and traffic, not the walk alone. Air's density is one law, from the air's temperature and
+  pressure (`Air`, moved into the materials): the heard laws take 20 °C's 1.204 kg/m³ where they wrote 1.2
+  and 1.21, thunder its own air's, and a driven car its map's air. The walk falls a hair slower, traffic and
+  trains move by millimetres to a car length where a decision falls a tick later, and every sound moves
+  by no more than 0.16 dB in an octave band, mostly a few hundredths, but where landings re-roll: a spray of
+  sand off a bullet's strike (0.4 to 0.7 dB in its faint low bands, with the gravity) and the glass's
+  landings, which keep their own 1.2 until Cody decides. The wire hash changes, so the server and the Windows client go out
+  together.
+
 - Physics stage 2, the ricochet (docs/PHYSICS_BOUNDARY.md 16.5). Whether a round skips off a face, how it
   leaves and how the tumbling slug flies are the physics' now (`RicochetLaw`); the sound's `Ricochet` keeps
   the whine. A new guard, the ricochet table (`RicochetTableTests`), holds every weapon's round off every

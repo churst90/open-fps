@@ -47,7 +47,8 @@ RULES = [
     (C + 'PhysicsConstants', 'H', 'the game\'s reach and bounds, the tick and input integrity; the body\'s numbers are BodyConstants\' (physics stage 2)'),
     (C + 'GroundProbeMemo', 'H', 'the server\'s per-session cache of the ground probe'),
     # Sound: the body constants, wheels, tyres, chassis, presets
-    (C + 'BodyConstants', 'P', 'the body: size, mass, walk, run, jump, step, turn, and gravity'),
+    (C + 'BodyConstants', 'P', 'the body: size, mass, walk, run, jump, step, turn'),
+    (C + 'Earth', 'P', 'standard gravity, the one number a map\'s own starts from (physics stage 2)'),
     (C + 'ChassisSpec', 'P', 'axles, centre of gravity, roll stiffness, steering lock'),
     (C + 'AxleSpec', 'P', ''),
     (C + 'TyreSize', 'P', ''),

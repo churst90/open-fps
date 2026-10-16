@@ -42,7 +42,7 @@ stages come after the special-cases audit's parts.
 14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
 16. Stage 2 as it is built: the tyre, the vehicle, the engine, the ground probes and the body (2026-10-12), the
-    ricochet (2026-10-16)
+    ricochet, one gravity and one air (2026-10-16)
 
 ---
 
@@ -354,10 +354,10 @@ dead reckoning, part of the network, stays there.
 
 | Law | Where | Values |
 |---|---|---|
-| Gravity | `BodyConstants.cs:31` (movement, glass, breath, ear wind), `Waves.cs:525`, `RunningWater.cs:619`, the door models' own `G` (`KnobDoor.cs:243`, `SlidingDoor.cs:200`, `LockCylinder.cs:125`, `CarWindow.cs:210`, `ElevatorDoor.cs:120`, `GlassFracture.cs:87`), literals in `RaceLine.cs` (4), `VehicleSystem*.cs` (4), `Driveline.cs` (2), `BulletImpact.cs` (4), `FireSynth.cs` (5), and 9 more files | 9.81: 40 times in 26 files |
-| Gravity | `TyreFriction.cs:13` (= `WheelDynamics.G`), `ExternalBallistics.cs:50`, `StruckThings.cs:178`, `Aircraft.cs:432` | 9.80665: 4 times in 4 files |
-| The map's gravity | `ZoneComponent.Gravity`, read by `MovementSystem.cs:64` only | drops, falls, tyres, bullets and water ignore it |
-| Air density | `DrivingSystem.cs:71` and `Driveline.cs:57` (1.225); `Precipitation.cs:101`, `WallTransmission.cs:83`, `DoorPhysics.cs:13` (1.21); `BulletImpact.cs:275`, `GlassFracture.cs:87`, `ExhaustNetwork.cs:36`, `IntakeNetwork.cs:27`, `Waveguide.cs:511`, `GasHobSynth.cs:40` (1.2) | the ballistics alone work it out from the world's temperature and pressure (`Air`) |
+| Gravity | `BodyConstants.cs:31` (movement, glass, breath, ear wind), `Waves.cs:525`, `RunningWater.cs:619`, the door models' own `G` (`KnobDoor.cs:243`, `SlidingDoor.cs:200`, `LockCylinder.cs:125`, `CarWindow.cs:210`, `ElevatorDoor.cs:120`, `GlassFracture.cs:87`), literals in `RaceLine.cs` (4), `VehicleSystem*.cs` (4), `Driveline.cs` (2), `BulletImpact.cs` (4), `FireSynth.cs` (5), and 9 more files | 9.81: 40 times in 26 files. One number since 16.6: `Earth.StandardGravity` |
+| Gravity | `TyreFriction.cs:13` (= `WheelDynamics.G`), `ExternalBallistics.cs:50`, `StruckThings.cs:178`, `Aircraft.cs:432` | 9.80665: 4 times in 4 files. One number since 16.6: `Earth.StandardGravity` |
+| The map's gravity | `ZoneComponent.Gravity`, read by `MovementSystem.cs:64` only | drops, falls, tyres, bullets and water ignore it. Since 16.6 everything on the server that falls, rolls or flies reads it (`PhysicsConstants.GravityOf`) |
+| Air density | `DrivingSystem.cs:71` and `Driveline.cs:57` (1.225); `Precipitation.cs:101`, `WallTransmission.cs:83`, `DoorPhysics.cs:13` (1.21); `BulletImpact.cs:275`, `GlassFracture.cs:87`, `ExhaustNetwork.cs:36`, `IntakeNetwork.cs:27`, `Waveguide.cs:511`, `GasHobSynth.cs:40` (1.2) | the ballistics alone work it out from the world's temperature and pressure (`Air`). One law since 16.6: `Air.Density` (the glass waits on Cody) |
 | Step height | `PhysicsConstants.cs:57` and two locals in `PhysicsUtils.cs:34, 182` | 0.4. One number since 16.4: `BodyConstants.StepHeight` |
 | Foot padding | `SharedMovementEngine.cs:329`, `WorldEditor.cs:28` (0.15); `MovementSystem.cs:254`, `OccupancyService.cs:376` (0.4) | two values for one body |
 | Brakes | `DrivingSystem.cs:262` (all the grip) and `Driveline.cs:35` (7.5 m/s²) | one car, two laws |
@@ -1708,6 +1708,110 @@ guards pass unregenerated.
 - **Left of stage 2:** `VehicleSpec`'s `VehicleChassisSpec` (16.2); one constant for each law (gravity, air
   density, rolling resistance and drag, brakes) and `WindModel` folded into `WindField`, which change
   numbers.
+
+### 16.6 One gravity and one air (2026-10-16)
+
+Made on Linux, on main `bdb1ac53`, in five commits: the one gravity, the map's gravity, the one air, then
+the stored data for each. These change numbers, as the plan said they would (decision 5): the tracks and
+fingerprints are regenerated in commits of their own, and nothing heard moves by more than 0.16 dB in an
+octave band, most of it by a few hundredths, but where landings re-roll.
+
+- **One gravity: `Earth.StandardGravity`** (`OpenFPS.Physics/Earth.cs`), 9.80665 m/s². It was written 44
+  times in the game's code, 40 as 9.81 (the walk, traffic's brakes and race lines, the sound's car, the
+  doors' bolts and latches, glass, water, fire, rain, debris, an aircraft's landing gear) and 4 as 9.80665
+  (the tyres, the bullets, a struck thing's weight, an aircraft's taxi turn), and 6 more times in the lab.
+  Every one reads it. `PhysicsConstants.Gravity`, `WindWaves.Gravity`, `Hydraulics.Gravity` and the door
+  models' `G` are names for it; `BodyConstants.Gravity` went (how fast things fall is not the body's number),
+  and `TyreGrip.G`, `WheelDynamics.G` and `ExternalBallistics.Gravity` with the map's gravity (below).
+- **The map's gravity** (Cody, 2026-10-11: "adjusting the gravity as a property of the world will effect
+  everything on the world"). A map's `Gravity` (its file's, carried in its `ZoneComponent`, standard unless the
+  file says otherwise) was read by the walk alone. `PhysicsConstants.GravityOf(world)` says it, and on the
+  server everything that falls, rolls or flies reads it: a dropped thing and a shot body land at sqrt(2 g h)
+  in it (`HandsService`, `CombatService.BodyFall`); bullets and tumbling slugs fall at it
+  (`ExternalBallistics` and `RicochetLaw` take it, standard by default; `ExternalBallistics.Gravity` went),
+  and so does the aim assist's flight; a driven car's tyres, rolling resistance and wheels stand in it
+  (`WheelDynamics.Gravity` replaced the constant `G`; `TyreGrip.G` went and `TyreGrip.Demand` takes it);
+  traffic carries its map's on every vehicle (hard-brake limits, banked corners, wheels, the cornering its
+  tyres allow), and `RaceLine` works a bend's sqrt(mu g R) at the gravity it is given, for traffic and the
+  trains. Not the map's: the client's driving aids and cue planner, and the sounds' own mechanisms (a bolt
+  falling in a door, a shard's flight, a jet of water), which read the standard as the plan says (stage 2:
+  "the sound's own audio-rate constants read the shared gravity"). Every map is standard, so this moved
+  nothing; `MapGravityTests` tries the Moon's 1.62 m/s².
+- **One air: `Air`, from its temperature and pressure.** Air's density was written 1.225 (the server's car,
+  the sound's car, two key fallbacks), 1.21 (walls, rain, doors), 1.2 (bullet strikes, glass, exhaust,
+  intake, jet noise, the hob, the bell, surf, fire's plume, a cabin's wind) and as rho c, 413 and 415
+  (falling water, surf, a car's panels and windows); the bullets alone worked it out. `Air` moved from
+  `ExternalBallistics.cs` to `OpenFPS.Materials/Air.cs`, unchanged and in the same namespace: the acoustics'
+  `WallTransmission` needs the one law and sits beside the physics, not above it, and air is a material. It
+  has two airs now: `Air.Standard`, the ICAO day (15 °C, 1.225 kg/m³), and `Air.Reference`, 20 °C at sea
+  level (1.204 kg/m³), the air whose speed of sound is the heard laws' 343 m/s
+  (`AcousticConstants.SpeedOfSound`).
+  - The heard laws read `Air.Reference.Density`: wall transmission (and so rain on plates and through
+    walls), hail, every door (`DoorPhysics`, with struck things and their modes), bullet strikes and their
+    debris, the exhaust's and intake's radiation (the intake's own gas law gave 1.2008), jet noise, the gas
+    hob, the struck bell, falling water and surf, the car window and the cabin's panels and wind
+    (`EngineProcessor`), fire's plume. Their speed of sound stays the 343 written beside each. They do not
+    follow the weather: their renders are stored and cached (`DoorRenderCache`).
+  - Thunder reads the density of the air it rolls through, whose speed and absorption it already took.
+  - The server's driven car pushes through its map's air, the weather's temperature and the map's pressure,
+    as the bullets fly through it; `Air.Standard` where none is given (the replays, the lab). The sound's car
+    (`Driveline`) and the keys sent without a density read `Air.Standard`.
+  - **Held back for Cody: the glass.** `GlassFracture` keeps its own 1.2. With 1.204 every shard's terminal
+    speed, sqrt(2 m g / (rho Cd A)), moves 0.17 % and the pieces of an annealed pane's landing fall together
+    differently: each of eight variants' renders moves up to 4.5 dB in an octave band, while their mean is
+    within 0.44 dB in every band within 60 dB of the loudest, inside the 2 to 5 dB the variants already
+    differ by. A re-roll, not a change of level; the guard names it as waiting. The tempered pane's landing
+    moves 0.05 dB.
+- **What moves, heard.** Measured on renders before and after, by octave band from 31.5 Hz to 16 kHz:
+
+  | Model | Gravity | Air |
+  |---|---|---|
+  | Doors (knob, push bar, sliding, glass, elevator, lock) | within 0.003 dB | -0.04 dB; the sliding door's 250 Hz band +0.13, the push bar's 4 kHz -0.10 |
+  | Car window | within 0.015 | -0.04 |
+  | Engine (exhaust, intake, block) | none | within 0.02 |
+  | Rain on steel | none | -0.04 to -0.01 |
+  | Thunder at 1.5 km | none | within 0.05 |
+  | Glass breaking | within 0.10 | +0.03 |
+  | Glass landing, annealed | within 0.12 | held back (above) |
+  | Glass landing, tempered | within 0.09 | within 0.05 |
+  | Bullet strikes | none | full scale +0.03; their shape within 0.13 |
+  | Bullet debris | within 0.16, but dirt: 0.69 at 31.5 Hz (47 dB under its loudest band), -0.4 at 63 to 125 Hz | within 0.16 |
+  | Gas hob, struck bells, wall transmission | none | within 0.015, 0.003, 0.003 |
+
+  The debris's landings are stepped in 2 ms, so a few land a step earlier or later, which moves the sparse
+  low bands of a spray of sand. Jet noise moves +0.03 dB, hail falls 0.25 % faster, and fire's plume rises
+  0.1 % slower. Falling water's and surf's rho c were already 1.204 times 343.
+- **What moves, stored.** The gravity: five walks (a fall off the Brandt Court roof lands 6.2 mm later in
+  height), the trains (42 mm in 90 s), the traffic (1,641 of 11,235 rows; a car at most 2.5 m along its own
+  path, where a give-way or a start was decided a few ticks later) and five door renders (0.01 dB in a
+  block). The air: eleven renders (the seven doors, the window, the engine, rain on steel, thunder; every
+  4096-sample block within 0.05 dB but one of the push bar's, 0.29, and one of the sliding door's, 0.37) and
+  eight emitter streams (a car cabin's wall loss -0.037 dB at low frequencies; a wall's transmission 4e-5 of
+  its value). The four drives, the ballistics and ricochet tables, `walks.tsv` and the spoken lines are
+  unchanged. Each data commit says file by file what moved and why. Same maths line as before.
+- **Guards** (`OneConstantPerLawTests`): gravity written once (9.8, 9.81, 9.807 or 9.80665 anywhere in the
+  code but `Earth.cs`, a 9.8 given to a member in mm or per krpm excepted), and air's density one law (a
+  density named and given 1.15 to 1.29, that times 343, half of it times a speed squared, rho c as 410 to
+  419, 1.225 or 1.204 anywhere, 1.2 times a law with 343 or 293 in it; tables of measured statistics
+  excepted). Each proven by writing a copy back (`Precipitation`'s 9.81 and its 1.21). `MapGravityTests`:
+  the zone says the gravity, a body falls softer, a bullet and a slug drop less, a bend is taken at
+  sqrt(1.62 / 9.807) of the speed and the wheels press with the map's weight; proven by breaking each (the
+  zone ignored, the bullet's gravity a constant, the bend's a constant, the loads at standard gravity).
+- **The ratchet:** `Earth` is on the list of the physics' types (P), and on the survey's rules; `Air` stays
+  a shared value (V), as `RoadSurfaces` is from the materials. The library's and the packages' `files.tsv`
+  have `Earth.cs` and `Air.cs`, as the surveys write them; no crossing came or went (the packages' lists
+  match the survey's exactly).
+- **The wire hash** changes (8ecbf9e9f48c at `bdb1ac53`, 7db225974947 after): the server and the Windows
+  client go out together. A map's gravity is sent in its manifest, 9.80665 now where it was 9.81.
+  `DoorModelFingerprint` changes (cfb37eeb081b, d8da086ecd2c after): the door renders cached on disk are made
+  again.
+- **Left of stage 2:** `VehicleSpec`'s `VehicleChassisSpec` (16.2); one rolling resistance and drag law and
+  one brake law; `WindModel` folded into `WindField`. Of the constants: the glass's air (above);
+  `tools/gen_city.py` and `tools/gen_osm.py` still write g as 9.81 into the maps' braking and pulling numbers
+  (with 9.80665 two would round differently, 2.58 to 2.57 and 1.79 to 1.78 m/s², so the maps regenerate with
+  it); the heard laws' 343 beside the density, which the plan has them take from the same air; the
+  engine's own gas law for its charge (`Gas`, R = 288 for burnt gas and air together); the client's aids
+  reading the map's gravity from the manifest.
 
 ## Decisions (Cody, 2026-10-11)
 
