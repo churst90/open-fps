@@ -224,6 +224,7 @@ OpenFPS.Physics/EngineMechanics.cs	lib	Physics
 OpenFPS.Physics/ExternalBallistics.cs	lib	Physics	
 OpenFPS.Physics/Footing.cs	lib	Physics	
 OpenFPS.Physics/Gearbox.cs	lib	Physics	
+OpenFPS.Physics/RicochetLaw.cs	lib	Physics	
 OpenFPS.Physics/RoadGrip.cs	lib	Physics	
 OpenFPS.Physics/RunningGear.cs	lib	Physics	
 OpenFPS.Physics/SharedMovementEngine.cs	lib	Physics	

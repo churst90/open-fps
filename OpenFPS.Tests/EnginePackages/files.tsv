@@ -230,6 +230,7 @@ OpenFPS.Physics/EngineMechanics.cs	Physics
 OpenFPS.Physics/ExternalBallistics.cs	Physics	
 OpenFPS.Physics/Footing.cs	Physics	
 OpenFPS.Physics/Gearbox.cs	Physics	
+OpenFPS.Physics/RicochetLaw.cs	Physics	
 OpenFPS.Physics/RoadGrip.cs	Physics	
 OpenFPS.Physics/RunningGear.cs	Physics	
 OpenFPS.Physics/SharedMovementEngine.cs	Physics	

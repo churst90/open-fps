@@ -538,7 +538,7 @@ public sealed partial class CombatService
             At = Clock(),
             TargetId = targetId,
             RideId = world.Has<OccupantComponent>(session.Entity) ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1,
-            Slug = Slug.Of(weapon),
+            Slug = weapon.Slug,
             Seed = Scatter.Next(),
             Admin = admin,
         };
@@ -656,7 +656,7 @@ public sealed partial class CombatService
     /// <summary>Flies a round on: a bullet by its ballistic coefficient, a tumbling slug by its own drag.</summary>
     private static void Fly(ref BulletState state, Slug slug, WeaponDefinition weapon, float seconds, Air air, Vector3 wind)
     {
-        if (slug.Tumbling) Ricochet.Advance(ref state, seconds, slug, air, wind);
+        if (slug.Tumbling) RicochetLaw.Advance(ref state, seconds, slug, air, wind);
         else ExternalBallistics.Advance(ref state, seconds, ExternalBallistics.CoefficientOf(weapon.Projectile), air, wind);
     }
 
@@ -673,17 +673,17 @@ public sealed partial class CombatService
 
     /// <summary>
     /// Whether a round meeting <paramref name="hit"/> at <paramref name="at"/> ricochets off it: by the
-    /// face's material and the grazing angle (<see cref="Ricochet.TryBounce"/>), with dice that are the
+    /// face's material and the grazing angle (<see cref="RicochetLaw.TryBounce"/>), with dice that are the
     /// flight's own for this bounce, so the flight flown ahead and the real one bounce alike.
     /// </summary>
     private static bool TryRicochet(int seed, int bounces, Slug slug, World world, OpenFPS.Common.Geometry.TriangleWorld? geometry, Entity hit,
-                                    Vector3 at, Vector3 velocity, out Ricochet.Outcome outcome, out Vector3 normal, out Vector3 face)
+                                    Vector3 at, Vector3 velocity, out RicochetLaw.Outcome outcome, out Vector3 normal, out Vector3 face)
     {
         outcome = default;
         Face(world, hit, at, velocity, out normal, out face, geometry);
         if (bounces >= MaxBounces || IsPerson(world, hit)) return false;
         var dice = new Random((int)(BulletFlyby.Mix((uint)seed, (uint)bounces + 1u) & 0x7fffffff));
-        return Ricochet.TryBounce(MaterialOf(world, hit), velocity, normal, slug, dice, out outcome);
+        return RicochetLaw.TryBounce(MaterialOf(world, hit), velocity, normal, slug, dice, out outcome);
     }
 
     private static string MaterialOf(World world, Entity e)

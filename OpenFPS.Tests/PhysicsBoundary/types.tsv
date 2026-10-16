@@ -28,7 +28,8 @@ OpenFPS.Common.BulletState	V
 OpenFPS.Common.FlightPoint	P
 OpenFPS.Common.Projectile	V
 OpenFPS.Common.Air	V
-OpenFPS.Common.Ricochet	PS
+OpenFPS.Common.RicochetLaw	P
+OpenFPS.Common.Slug	V
 OpenFPS.Common.WindField	P
 OpenFPS.Common.WindAir	V
 OpenFPS.Common.WindWeather	V

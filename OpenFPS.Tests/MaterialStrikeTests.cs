@@ -63,13 +63,13 @@ public class MaterialStrikeTests
     [InlineData("Water", -1f, 1.3f, 0.4f, 1f, 0.05f)]
     public void WhatSkippedBeforeSkipsAsItDid(string material, float critical, float departure, float loss, float kept, float flatten)
     {
-        Assert.True(Ricochet.TryFace(material, out var f));
+        Assert.True(RicochetLaw.TryFace(material, out var f));
         Assert.Equal(new RicochetFace(critical, departure, loss, kept, flatten), f);
     }
 
     [Theory]
     [InlineData("Fence")] [InlineData("Glass")] [InlineData("Wood")] [InlineData("Grass")] [InlineData("Carpet")] [InlineData("Plaster")]
-    public void ARoundGoesIntoWhatNeverSkipped(string material) => Assert.False(Ricochet.TryFace(material, out _));
+    public void ARoundGoesIntoWhatNeverSkipped(string material) => Assert.False(RicochetLaw.TryFace(material, out _));
 
     /// <summary>Every material in the table says what a round does to it.</summary>
     [Fact]
@@ -102,7 +102,7 @@ public class MaterialStrikeTests
         var s = BulletImpact.StuffOf(material);
         Assert.Equal(kind, s.Kind);
         Assert.Equal(MathF.Max(1f, AcousticRegistry.GetProperties(material).DensityKgM3), s.DebrisDensity);
-        Assert.Equal(skips, Ricochet.TryFace(material, out _));
+        Assert.Equal(skips, RicochetLaw.TryFace(material, out _));
         Assert.DoesNotContain(material, AcousticRegistry.UnknownNamesAsked);
     }
 

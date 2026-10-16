@@ -10,8 +10,8 @@ namespace OpenFPS.AudioLab.Spikes;
 ///
 ///   --bullet-round2 [out=DIR]
 ///
-/// Every sound comes from the game's own calls (BulletFlyby.Sounds, Ricochet.TryBounce and
-/// WhineSounds, BulletImpact.Sounds) and is rendered from its key as the client renders it, laid down
+/// Every sound comes from the game's own calls (BulletFlyby.Sounds, RicochetLaw.TryBounce and
+/// Ricochet.WhineSounds, BulletImpact.Sounds) and is rendered from its key as the client renders it, laid down
 /// when it arrives (its delay plus its own distance over the speed of sound) and at the game's own
 /// placement for its declared level (Loudness.Place, then the inverse law). ONE shared gain for every
 /// file, never normalised per file. Dry and mono: the game adds direction, air, reflections, reverb.
@@ -107,10 +107,10 @@ public static class BulletRound2Spike
             // Fly the round from the muzzle to the face, down the line at that angle.
             var leg0 = FlyStraight(w, muzzle, new Vector3(0f, -MathF.Sin(g), MathF.Cos(g)), 0.5f, untilY: 0f);
             var hitSample = leg0[^1];
-            var slug = Slug.Of(w);
-            bool bounced = false; Ricochet.Outcome o = default;
+            var slug = w.Slug;
+            bool bounced = false; RicochetLaw.Outcome o = default;
             for (int seed = 1; seed < 40 && !bounced; seed++)
-                bounced = Ricochet.TryBounce(face, hitSample.Velocity, Vector3.UnitY, slug, new Random(seed), out o);
+                bounced = RicochetLaw.TryBounce(face, hitSample.Velocity, Vector3.UnitY, slug, new Random(seed), out o);
             if (!bounced) { Console.WriteLine($"  {name}: no ricochet at {degrees} degrees"); continue; }
             var leg1 = FlySlug(o.Slug, hitSample.Position + Vector3.UnitY * 0.002f, o.Velocity, hitSample.Seconds, 150f);
             float range = 0f;
@@ -349,7 +349,7 @@ public static class BulletRound2Spike
         var path = new List<FlightSample> { new(seconds, from, velocity) };
         while (s.Seconds < seconds + 2.5f && s.Velocity.Length() > 15f && s.Travelled < maxRange && s.Position.Y > -0.001f)
         {
-            Ricochet.Advance(ref s, 0.01f, slug, Still, Vector3.Zero);
+            RicochetLaw.Advance(ref s, 0.01f, slug, Still, Vector3.Zero);
             path.Add(new FlightSample(s.Seconds, s.Position, s.Velocity));
         }
         return path;

@@ -133,6 +133,20 @@ public sealed record WeaponDefinition
     /// coefficient, its mass and its calibre, and nothing of the gun.</summary>
     public Projectile Projectile => new(MuzzleVelocity, BallisticCoefficientG7, BulletMassKg, BulletDiameterMetres);
 
+    /// <summary>The bullet as a ricochet needs it (<see cref="RicochetLaw"/>): point first and not tumbling,
+    /// a 9 mm 124-grain round's sizes where the weapon gives none.</summary>
+    public Slug Slug
+    {
+        get
+        {
+            var w = this;
+            float d = w.BulletDiameterMetres > 0f ? w.BulletDiameterMetres : 0.009f;
+            float l = w.BulletLengthMetres > 0f ? w.BulletLengthMetres : 0.0156f;
+            float m = w.BulletMassKg > 0f ? w.BulletMassKg : 124f * WeaponRegistry.Grain;
+            return new Slug(m, l, d, d, 0f);
+        }
+    }
+
     // ── In flight ───────────────────────────────────────────────────────────────────────────────
 
     /// <summary>

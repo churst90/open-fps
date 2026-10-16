@@ -73,12 +73,12 @@ public class BulletRicochetTests : IDisposable
     [InlineData("Asphalt", 10f)]
     public void ARoundRicochetsOnlyBelowTheFacesCriticalAngle(string material, float critical)
     {
-        var slug = Slug.Of(WeaponRegistry.Glock);
-        Assert.Equal(critical * MathF.PI / 180f, Ricochet.CriticalRadians(material, slug), 4);
+        var slug = WeaponRegistry.Glock.Slug;
+        Assert.Equal(critical * MathF.PI / 180f, RicochetLaw.CriticalRadians(material, slug), 4);
         for (int seed = 0; seed < 30; seed++)
         {
-            Assert.True(Ricochet.TryBounce(material, Incoming(0.6f * critical, 360f), Vector3.UnitY, slug, new Random(seed), out var o));
-            Assert.False(Ricochet.TryBounce(material, Incoming(1.3f * critical, 360f), Vector3.UnitY, slug, new Random(seed), out _));
+            Assert.True(RicochetLaw.TryBounce(material, Incoming(0.6f * critical, 360f), Vector3.UnitY, slug, new Random(seed), out var o));
+            Assert.False(RicochetLaw.TryBounce(material, Incoming(1.3f * critical, 360f), Vector3.UnitY, slug, new Random(seed), out _));
             // Off a hard face it leaves lower than it came, slower, and tumbling.
             float departure = MathF.Asin(Vector3.Normalize(o.Velocity).Y) * 180f / MathF.PI;
             Assert.InRange(departure, 0.2f, 0.6f * critical);
@@ -93,13 +93,13 @@ public class BulletRicochetTests : IDisposable
     [Fact]
     public void WaterSkipsBelowBirkhoffsAngleAndThrowsItUp()
     {
-        var slug = Slug.Of(WeaponRegistry.ServicePistol);
-        float critical = Ricochet.CriticalRadians("Water", slug) * 180f / MathF.PI;
+        var slug = WeaponRegistry.ServicePistol.Slug;
+        float critical = RicochetLaw.CriticalRadians("Water", slug) * 180f / MathF.PI;
         _o.WriteLine($".45 off water: critical {critical:F1} degrees (slug density {slug.Density:F0} kg/m3)");
         Assert.InRange(critical, 5f, 7f);
-        Assert.True(Ricochet.TryBounce("Water", Incoming(3f, 250f), Vector3.UnitY, slug, new Random(1), out var o));
+        Assert.True(RicochetLaw.TryBounce("Water", Incoming(3f, 250f), Vector3.UnitY, slug, new Random(1), out var o));
         Assert.True(MathF.Asin(Vector3.Normalize(o.Velocity).Y) * 180f / MathF.PI > 3f * 0.9f);
-        Assert.False(Ricochet.TryBounce("Water", Incoming(9f, 250f), Vector3.UnitY, slug, new Random(1), out _));
+        Assert.False(RicochetLaw.TryBounce("Water", Incoming(9f, 250f), Vector3.UnitY, slug, new Random(1), out _));
     }
 
     /// <summary>Grass, wood, plaster, carpet and the like take the round in at any angle.</summary>
@@ -111,10 +111,10 @@ public class BulletRicochetTests : IDisposable
     [InlineData("Foliage")]
     public void SoftStuffNeverThrowsARoundBack(string material)
     {
-        var slug = Slug.Of(WeaponRegistry.Akm);
-        Assert.Equal(0f, Ricochet.CriticalRadians(material, slug));
+        var slug = WeaponRegistry.Akm.Slug;
+        Assert.Equal(0f, RicochetLaw.CriticalRadians(material, slug));
         for (int seed = 0; seed < 20; seed++)
-            Assert.False(Ricochet.TryBounce(material, Incoming(1f, 700f), Vector3.UnitY, slug, new Random(seed), out _));
+            Assert.False(RicochetLaw.TryBounce(material, Incoming(1f, 700f), Vector3.UnitY, slug, new Random(seed), out _));
     }
 
     /// <summary>A tumbling slug slows far faster than the bullet it was: 50 m after skipping off concrete,
@@ -123,10 +123,10 @@ public class BulletRicochetTests : IDisposable
     public void ATumblingSlugSlowsLikeABluffBody()
     {
         var w = WeaponRegistry.ServicePistol;
-        Assert.True(Ricochet.TryBounce("Concrete", Incoming(8f, 250f), Vector3.UnitY, Slug.Of(w), new Random(3), out var o));
+        Assert.True(RicochetLaw.TryBounce("Concrete", Incoming(8f, 250f), Vector3.UnitY, w.Slug, new Random(3), out var o));
         var slug = new BulletState { Velocity = o.Velocity };
         var bullet = new BulletState { Velocity = o.Velocity };
-        while (slug.Travelled < 50f) Ricochet.Advance(ref slug, 0.01f, o.Slug, Still, Vector3.Zero);
+        while (slug.Travelled < 50f) RicochetLaw.Advance(ref slug, 0.01f, o.Slug, Still, Vector3.Zero);
         while (bullet.Travelled < 50f) ExternalBallistics.Advance(ref bullet, 0.01f, ExternalBallistics.CoefficientOf(w.Projectile), Still, Vector3.Zero);
         _o.WriteLine($"after 50 m: slug {slug.Velocity.Length():F0} m/s, bullet {bullet.Velocity.Length():F0} m/s (left at {o.Velocity.Length():F0})");
         Assert.True(slug.Velocity.Length() < 0.8f * bullet.Velocity.Length());
@@ -320,7 +320,7 @@ public class BulletRicochetTests : IDisposable
     public void TheWhineIsATumblingToneThatFalls()
     {
         var w = WeaponRegistry.ServicePistol;
-        Assert.True(Ricochet.TryBounce("Concrete", Incoming(8f, 250f), Vector3.UnitY, Slug.Of(w), new Random(2), out var o));
+        Assert.True(RicochetLaw.TryBounce("Concrete", Incoming(8f, 250f), Vector3.UnitY, w.Slug, new Random(2), out var o));
         var ear = new Vector3(10f, 1.7f, 0f);
         var sounds = Ricochet.WhineSounds(Vector3.Zero, o.Velocity, o.Slug, 100f, 0.1f, ear, Still);
         Assert.NotEmpty(sounds);

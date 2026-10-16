@@ -29,17 +29,17 @@ public static partial class PhysicsReplays
         var sb = new StringBuilder(RicochetHeader).Append('\n');
         // One material for each face the table holds (the metals share steel's, the stones concrete's): the first by name.
         var faces = AcousticRegistry.KnownMaterials().OrderBy(m => m, StringComparer.Ordinal)
-            .Select(m => (Name: m, Has: Ricochet.TryFace(m, out var f), Face: f)).Where(m => m.Has)
+            .Select(m => (Name: m, Has: RicochetLaw.TryFace(m, out var f), Face: f)).Where(m => m.Has)
             .GroupBy(m => m.Face).Select(g => g.First().Name).OrderBy(m => m, StringComparer.Ordinal).ToList();
         var tilt = Quaternion.CreateFromYawPitchRoll(0.3f, 0.12f, -0.07f);
         Vector3 normal = Vector3.Transform(Vector3.UnitY, tilt);
         var wind = new Vector3(2f, 0f, -1f);
         foreach (var w in WeaponRegistry.All.OrderBy(w => w.Id, StringComparer.Ordinal))
         {
-            var slug = Slug.Of(w);
+            var slug = w.Slug;
             foreach (string face in faces)
             {
-                float critical = Ricochet.CriticalRadians(face, slug);
+                float critical = RicochetLaw.CriticalRadians(face, slug);
                 foreach (float share in OfCritical)
                     for (int seed = 1; seed <= 3; seed++)
                     {
@@ -48,13 +48,13 @@ public static partial class PhysicsReplays
                         var local = new Vector3(MathF.Cos(graze) * MathF.Cos(0.52f), -MathF.Sin(graze), MathF.Cos(graze) * MathF.Sin(0.52f));
                         Vector3 velocity = Vector3.Transform(local, tilt) * w.MuzzleVelocity;
                         sb.Append(w.Id).Append('\t').Append(face).Append('\t').Append(F(share, 2)).Append('\t').Append(seed).Append('\t');
-                        if (!Ricochet.TryBounce(face, velocity, normal, slug, new Random(seed), out var o))
+                        if (!RicochetLaw.TryBounce(face, velocity, normal, slug, new Random(seed), out var o))
                         {
                             sb.Append("0\n");
                             continue;
                         }
                         var s = new BulletState { Velocity = o.Velocity };
-                        Ricochet.Advance(ref s, RicochetFlightSeconds, o.Slug, Air.Standard, wind);
+                        RicochetLaw.Advance(ref s, RicochetFlightSeconds, o.Slug, Air.Standard, wind);
                         sb.Append("1\t").Append(F(o.Velocity.X, 4)).Append('\t').Append(F(o.Velocity.Y, 4)).Append('\t').Append(F(o.Velocity.Z, 4)).Append('\t')
                           .Append(F(o.Slug.MassKg * 1e6f, 3)).Append('\t').Append(F(o.Slug.Length * 1e3f, 5)).Append('\t')
                           .Append(F(o.Slug.Width * 1e3f, 5)).Append('\t').Append(F(o.Slug.Thickness * 1e3f, 5)).Append('\t')
