@@ -1,6 +1,4 @@
 type	package
-OpenFPS.Client.Core.Input.KeyModifiers	Accessibility
-OpenFPS.Client.Core.Platform.GameKey	Accessibility
 OpenFPS.Common.Components.EntityType	World
 OpenFPS.Common.GroundChannelKind	Environment
 OpenFPS.Common.Networking.QuaternionConverter	Geometry

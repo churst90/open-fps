@@ -1,4 +1,15 @@
 file	group	projects	library_types
+OpenFPS.Accessibility/Beacons.cs	host		
+OpenFPS.Accessibility/DrivingCueSounds.cs	host		
+OpenFPS.Accessibility/Keys/GameKey.cs	host		
+OpenFPS.Accessibility/Keys/KeyModifiers.cs	host		
+OpenFPS.Accessibility/LaneGuide.cs	host		
+OpenFPS.Accessibility/PlayerCoordinates.cs	host		
+OpenFPS.Accessibility/Speech/ISpeechOutput.cs	host		
+OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	host		
+OpenFPS.Accessibility/Speech/SpeechLog.cs	host		
+OpenFPS.Accessibility/TurnNarration.cs	host		
+OpenFPS.Accessibility/ZoneSettle.cs	host		
 OpenFPS.Acoustics/AcousticConstants.cs	lib	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	lib	Acoustics	
 OpenFPS.Acoustics/Assemblies.cs	lib	Acoustics	
@@ -97,7 +108,6 @@ OpenFPS.Client.Core/ClientSettings.cs	host
 OpenFPS.Client.Core/ClientWorldState.cs	host		
 OpenFPS.Client.Core/DiagnosticSwitches.cs	host		
 OpenFPS.Client.Core/DrivingAids.cs	host		
-OpenFPS.Client.Core/DrivingCueSounds.cs	host		
 OpenFPS.Client.Core/EditorDialog.cs	host		
 OpenFPS.Client.Core/EditorKeys.cs	host		
 OpenFPS.Client.Core/EditorValuePrompt.cs	host		
@@ -115,12 +125,8 @@ OpenFPS.Client.Core/NearDrops.cs	lib	Audio
 OpenFPS.Client.Core/OtherBodies.cs	host		
 OpenFPS.Client.Core/PickUp.cs	host		
 OpenFPS.Client.Core/Platform/FmodMicrophoneCapture.cs	host		
-OpenFPS.Client.Core/Platform/GameKey.cs	host		
 OpenFPS.Client.Core/Platform/IClientShell.cs	host		
 OpenFPS.Client.Core/Platform/IMicrophoneCapture.cs	host		
-OpenFPS.Client.Core/Platform/ISpeechOutput.cs	host		
-OpenFPS.Client.Core/Platform/SpeechDispatcherOutput.cs	host		
-OpenFPS.Client.Core/Platform/SpeechLog.cs	host		
 OpenFPS.Client.Core/Platform/TimerResolution.cs	host		
 OpenFPS.Client.Core/Platform/VoiceCodec.cs	host		
 OpenFPS.Client.Core/PredictionReconciler.cs	host		
@@ -144,33 +150,27 @@ OpenFPS.Client.Core/Sightline.cs	host
 OpenFPS.Client.Core/SpatialService.cs	host		
 OpenFPS.Client.Core/StairCues.cs	host		
 OpenFPS.Client.Core/StrideAccumulator.cs	host		
-OpenFPS.Client.Core/TurnNarration.cs	host		
 OpenFPS.Client.Core/UiSounds.cs	host		
 OpenFPS.Client.Core/VoiceRegistry.Lifecycle.cs	host		
 OpenFPS.Client.Core/VoiceRegistry.cs	host		
 OpenFPS.Client.Core/WallBumps.cs	host		
 OpenFPS.Client.Core/WorldAudioPlayer.cs	host		
-OpenFPS.Client.Core/ZoneSettle.cs	host		
 OpenFPS.Common/Ammunition.cs	host		
 OpenFPS.Common/AudioEmission.cs	lib	Sound	
 OpenFPS.Common/AudioEvents.cs	host		
-OpenFPS.Common/Beacons.cs	host		
 OpenFPS.Common/Components.cs	host		
-OpenFPS.Common/DirectionWords.cs	host		
 OpenFPS.Common/DistantMotion.cs	host		
 OpenFPS.Common/DrivingCuePlanner.cs	host		
 OpenFPS.Common/EntityAcoustics.cs	host		
 OpenFPS.Common/EntityGeometry.cs	host		
 OpenFPS.Common/GroundProbeMemo.cs	host		
 OpenFPS.Common/JsonConverters.cs	host		
-OpenFPS.Common/LaneGuide.cs	host		
 OpenFPS.Common/LaneRoutes.cs	host		
 OpenFPS.Common/LineFollower.cs	host		
 OpenFPS.Common/Messages.cs	host		
 OpenFPS.Common/MoverPoses.cs	host		
 OpenFPS.Common/PhysicsConstants.cs	host		
 OpenFPS.Common/PhysicsUtils.cs	host		
-OpenFPS.Common/PlayerCoordinates.cs	host		
 OpenFPS.Common/RaceLine.cs	host		
 OpenFPS.Common/RoadMapData.cs	host		
 OpenFPS.Common/Roads.cs	host		

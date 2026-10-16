@@ -17,6 +17,8 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
     <ProjectReference Include="..\OpenFPS.Client.Core\OpenFPS.Client.Core.csproj" />
+    <!-- The key map maps Windows' keys to the game's, and NVDA's and SAPI's speech output is Accessibility's. -->
+    <ProjectReference Include="..\OpenFPS.Accessibility\OpenFPS.Accessibility.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -14,12 +14,13 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class LibraryBoundaryTests
 {
-    /// <summary>The projects whose files are sorted: the two the library is leaving, and the library's own.</summary>
+    /// <summary>The projects whose files are sorted: the two the library is leaving, the library's own, and
+    /// OpenFPS.Accessibility, all host, which took files from the first two (docs/ENGINE_PACKAGES.md, stage 7).</summary>
     internal static readonly string[] SortedProjects =
     {
         "OpenFPS.Common", "OpenFPS.Client.Core",
         "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Schema",
-        "OpenFPS.Physics",
+        "OpenFPS.Physics", "OpenFPS.Accessibility",
     };
 
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")

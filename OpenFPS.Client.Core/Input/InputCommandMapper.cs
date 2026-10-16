@@ -13,16 +13,6 @@ public enum InputContext
     UI
 }
 
-/// <summary>Modifier keys held alongside a binding. Shift-F5 is a different binding from F5.</summary>
-[Flags]
-public enum KeyModifiers
-{
-    None = 0,
-    Shift = 1,
-    Control = 2,
-    Alt = 4,
-}
-
 /// <summary>
 /// Key to action, per context, on the neutral <see cref="GameKey"/> so both heads share one table. A
 /// binding that names modifiers is tried first; one that names none runs whatever is held, so a key

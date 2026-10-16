@@ -11,6 +11,8 @@
     <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
     <!-- The compass points: the F key's facing and the driving aids' heading say them. -->
     <ProjectReference Include="..\OpenFPS.Words\OpenFPS.Words.csproj" />
+    <!-- The keys, the speech output and the aids that read no world (docs/ENGINE_PACKAGES.md, stage 7). -->
+    <ProjectReference Include="..\OpenFPS.Accessibility\OpenFPS.Accessibility.csproj" />
     <!-- FMOD's wrapper and the Steam Audio bindings (docs/SOUND_LIBRARY_BOUNDARY.md, stage 1). -->
     <ProjectReference Include="..\OpenFPS.Native\OpenFPS.Native.csproj" />
   </ItemGroup>

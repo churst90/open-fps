@@ -1,4 +1,15 @@
 file	package	why
+OpenFPS.Accessibility/Beacons.cs	Accessibility	
+OpenFPS.Accessibility/DrivingCueSounds.cs	Accessibility	
+OpenFPS.Accessibility/Keys/GameKey.cs	Accessibility	
+OpenFPS.Accessibility/Keys/KeyModifiers.cs	Accessibility	
+OpenFPS.Accessibility/LaneGuide.cs	Accessibility	
+OpenFPS.Accessibility/PlayerCoordinates.cs	Accessibility	
+OpenFPS.Accessibility/Speech/ISpeechOutput.cs	Accessibility	
+OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	Accessibility	
+OpenFPS.Accessibility/Speech/SpeechLog.cs	Accessibility	
+OpenFPS.Accessibility/TurnNarration.cs	Accessibility	
+OpenFPS.Accessibility/ZoneSettle.cs	Accessibility	
 OpenFPS.Acoustics/AcousticConstants.cs	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	Acoustics	
 OpenFPS.Acoustics/Assemblies.cs	Acoustics	
@@ -103,7 +114,6 @@ OpenFPS.Client.Core/ClientSettings.cs	game
 OpenFPS.Client.Core/ClientWorldState.cs	game	
 OpenFPS.Client.Core/DiagnosticSwitches.cs	game	
 OpenFPS.Client.Core/DrivingAids.cs	Accessibility	
-OpenFPS.Client.Core/DrivingCueSounds.cs	Accessibility	
 OpenFPS.Client.Core/EditorDialog.cs	Editor	
 OpenFPS.Client.Core/EditorKeys.cs	Editor	
 OpenFPS.Client.Core/EditorValuePrompt.cs	Editor	
@@ -121,12 +131,8 @@ OpenFPS.Client.Core/NearDrops.cs	Audio	library stage 6
 OpenFPS.Client.Core/OtherBodies.cs	game	
 OpenFPS.Client.Core/PickUp.cs	game	
 OpenFPS.Client.Core/Platform/FmodMicrophoneCapture.cs	game	
-OpenFPS.Client.Core/Platform/GameKey.cs	game	
 OpenFPS.Client.Core/Platform/IClientShell.cs	game	
 OpenFPS.Client.Core/Platform/IMicrophoneCapture.cs	game	
-OpenFPS.Client.Core/Platform/ISpeechOutput.cs	Accessibility	
-OpenFPS.Client.Core/Platform/SpeechDispatcherOutput.cs	Accessibility	
-OpenFPS.Client.Core/Platform/SpeechLog.cs	Accessibility	
 OpenFPS.Client.Core/Platform/TimerResolution.cs	game	
 OpenFPS.Client.Core/Platform/VoiceCodec.cs	game	
 OpenFPS.Client.Core/PredictionReconciler.cs	game	
@@ -150,33 +156,27 @@ OpenFPS.Client.Core/Sightline.cs	Accessibility
 OpenFPS.Client.Core/SpatialService.cs	game	
 OpenFPS.Client.Core/StairCues.cs	Accessibility	
 OpenFPS.Client.Core/StrideAccumulator.cs	game	
-OpenFPS.Client.Core/TurnNarration.cs	Accessibility	
 OpenFPS.Client.Core/UiSounds.cs	Accessibility	
 OpenFPS.Client.Core/VoiceRegistry.Lifecycle.cs	Audio	the voices' ids and kinds (audit P3)
 OpenFPS.Client.Core/VoiceRegistry.cs	Audio	the voices' ids and kinds (audit P3)
 OpenFPS.Client.Core/WallBumps.cs	Accessibility	
 OpenFPS.Client.Core/WorldAudioPlayer.cs	game	library stage 7 (host until split)
-OpenFPS.Client.Core/ZoneSettle.cs	Accessibility	
 OpenFPS.Common/Ammunition.cs	Models	what a round and a fire selector are
 OpenFPS.Common/AudioEmission.cs	Common	entity adapter: where an entity sounds from
 OpenFPS.Common/AudioEvents.cs	Common	wire
-OpenFPS.Common/Beacons.cs	Accessibility	beacon categories and map policy
 OpenFPS.Common/Components.cs	Common	wire and entity model
-OpenFPS.Common/DirectionWords.cs	Words	bearings in words
 OpenFPS.Common/DistantMotion.cs	Common	how sent states are carried between packets
 OpenFPS.Common/DrivingCuePlanner.cs	Accessibility	the driver's cues, planned
 OpenFPS.Common/EntityAcoustics.cs	Common	entity adapter: rooms and openings
 OpenFPS.Common/EntityGeometry.cs	Common	entity adapter: geometry
 OpenFPS.Common/GroundProbeMemo.cs	game	physics survey: a server cache
 OpenFPS.Common/JsonConverters.cs	Common	wire
-OpenFPS.Common/LaneGuide.cs	Accessibility	the painted lines from the driver's seat
 OpenFPS.Common/LaneRoutes.cs	Agents	a vehicle's tour of lanes
 OpenFPS.Common/LineFollower.cs	Agents	a driver steering to a line
 OpenFPS.Common/Messages.cs	Common	wire
 OpenFPS.Common/MoverPoses.cs	game	a server counter
 OpenFPS.Common/PhysicsConstants.cs	Common	the game's reach and bounds, the tick, the input limits (the body: BodyConstants)
 OpenFPS.Common/PhysicsUtils.cs	Common	entity adapter: the ground probes of a world and of a snapshot (the question: Footing)
-OpenFPS.Common/PlayerCoordinates.cs	Accessibility	coordinates as a player reads and types them
 OpenFPS.Common/RaceLine.cs	Agents	speeds along a line
 OpenFPS.Common/RoadMapData.cs	World	roads as sent to a driver
 OpenFPS.Common/Roads.cs	World	roads as a map declares them
@@ -548,3 +548,4 @@ OpenFPS.Sound/WeatherType.cs	Environment	wire
 OpenFPS.Sound/WoodChorus.cs	Sound	
 OpenFPS.Sound/WorldWeather.cs	Environment	one world's weather state
 OpenFPS.Words/CompassWords.cs	Words	
+OpenFPS.Words/DirectionWords.cs	Words	

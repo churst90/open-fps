@@ -4,6 +4,8 @@
     <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
     <!-- The compass points: /wind, /build, the editor and the world's "north east of" say them. -->
     <ProjectReference Include="..\OpenFPS.Words\OpenFPS.Words.csproj" />
+    <!-- The beacons' categories and a map's policy for them; coordinates as a player types them. -->
+    <ProjectReference Include="..\OpenFPS.Accessibility\OpenFPS.Accessibility.csproj" />
   </ItemGroup>
 
   <ItemGroup>

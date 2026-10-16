@@ -86,7 +86,7 @@ def layers():
 
 
 LAYER = layers()
-NEW = {'Environment', 'Models', 'World', 'Agents', 'Accessibility', 'Editor'}
+NEW = {'Environment', 'Models', 'World', 'Agents', 'Editor'}
 PLANNED = {'Audio'}
 
 # ── Files: (glob, package, why) ─────────────────────────────────────────────────────────────────────
@@ -99,28 +99,25 @@ FILE_RULES = [
     ('OpenFPS.Words/*', 'Words', ''), ('OpenFPS.Schema/*', 'Schema', ''), ('OpenFPS.Native/*', 'Native', ''),
     ('OpenFPS.Geometry/*', 'Geometry', ''), ('OpenFPS.Materials/*', 'Materials', ''), ('OpenFPS.Astronomy/*', 'Astronomy', ''),
     ('OpenFPS.Physics/*', 'Physics', ''), ('OpenFPS.Acoustics/*', 'Acoustics', ''),
+    ('OpenFPS.Accessibility/*', 'Accessibility', ''),
 
     # ── Common ──
     ('OpenFPS.Common/Ammunition.cs', 'Models', 'what a round and a fire selector are'),
     ('OpenFPS.Common/AudioEmission.cs', 'Common', 'entity adapter: where an entity sounds from'),
     ('OpenFPS.Common/AudioEvents.cs', 'Common', 'wire'),
-    ('OpenFPS.Common/Beacons.cs', 'Accessibility', 'beacon categories and map policy'),
     ('OpenFPS.Common/Components.cs', 'Common', 'wire and entity model'),
-    ('OpenFPS.Common/DirectionWords.cs', 'Words', 'bearings in words'),
     ('OpenFPS.Common/DistantMotion.cs', 'Common', 'how sent states are carried between packets'),
     ('OpenFPS.Common/DrivingCuePlanner.cs', 'Accessibility', 'the driver\'s cues, planned'),
     ('OpenFPS.Common/EntityAcoustics.cs', 'Common', 'entity adapter: rooms and openings'),
     ('OpenFPS.Common/EntityGeometry.cs', 'Common', 'entity adapter: geometry'),
     ('OpenFPS.Common/GroundProbeMemo.cs', 'game', 'physics survey: a server cache'),
     ('OpenFPS.Common/JsonConverters.cs', 'Common', 'wire'),
-    ('OpenFPS.Common/LaneGuide.cs', 'Accessibility', 'the painted lines from the driver\'s seat'),
     ('OpenFPS.Common/LaneRoutes.cs', 'Agents', 'a vehicle\'s tour of lanes'),
     ('OpenFPS.Common/LineFollower.cs', 'Agents', 'a driver steering to a line'),
     ('OpenFPS.Common/Messages.cs', 'Common', 'wire'),
     ('OpenFPS.Common/MoverPoses.cs', 'game', 'a server counter'),
     ('OpenFPS.Common/PhysicsConstants.cs', 'Common', 'the game\'s reach and bounds, the tick, the input limits (the body: BodyConstants)'),
     ('OpenFPS.Common/PhysicsUtils.cs', 'Common', 'entity adapter: the ground probes of a world and of a snapshot (the question: Footing)'),
-    ('OpenFPS.Common/PlayerCoordinates.cs', 'Accessibility', 'coordinates as a player reads and types them'),
     ('OpenFPS.Common/RaceLine.cs', 'Agents', 'speeds along a line'),
     ('OpenFPS.Common/RoadMapData.cs', 'World', 'roads as sent to a driver'),
     ('OpenFPS.Common/Roads.cs', 'World', 'roads as a map declares them'),
@@ -168,9 +165,7 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/BirdLife.cs', 'game', L7),
     ('OpenFPS.Client.Core/BeaconAids.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/DrivingAids.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/DrivingCueSounds.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/StairCues.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/TurnNarration.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/Sightline.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/SightGrid.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/SightWatch.cs', 'Accessibility', ''),
@@ -178,12 +173,8 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/ListMenu.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/UiSounds.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/WallBumps.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/ZoneSettle.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/MapTracker.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/ListeningCalibration.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/Platform/ISpeechOutput.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/Platform/SpeechDispatcherOutput.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/Platform/SpeechLog.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/EditorDialog.cs', 'Editor', ''),
     ('OpenFPS.Client.Core/EditorKeys.cs', 'Editor', ''),
     ('OpenFPS.Client.Core/EditorValuePrompt.cs', 'Editor', ''),
@@ -258,14 +249,12 @@ TYPE_RULES = {
     'OpenFPS.Common.Components.EntityType': 'World',
     'OpenFPS.Common.Networking.Vector3Converter': 'Geometry',
     'OpenFPS.Common.Networking.QuaternionConverter': 'Geometry',
-    'OpenFPS.Client.Core.Platform.GameKey': 'Accessibility',
-    'OpenFPS.Client.Core.Input.KeyModifiers': 'Accessibility',
     'OpenFPS.Server.Core.SafeText': 'Words',
 }
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',
-                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Common', 'OpenFPS.Client.Core',
-                   'OpenFPS.Server')
+                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Common', 'OpenFPS.Accessibility',
+                   'OpenFPS.Client.Core', 'OpenFPS.Server')
 USERS = ('OpenFPS.Server', 'OpenFPS.Client.Core', 'OpenFPS.Client', 'OpenFPS.Client.Gtk', 'OpenFPS.AudioLab',
          'OpenFPS.Tests')
 SKIP = {'OpenFPS.Tests', 'OpenFPS.AudioLab'}
