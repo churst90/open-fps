@@ -1,0 +1,132 @@
+1 ui ui:progress:1
+1 ui ui:progress:2
+1 ui ui:progress:3
+1 ui ui:progress:4
+1 ui ui:progress:5
+1 ui ui:progress:6
+1 ui ui:progress:7
+1 ui ui:progress:10
+1 ui ui:EnterWorld
+4 cue Beacon SYNTH/beacon_vehicle_hum
+8 say! You're in city, at Parking garage, level 0.
+30 say 1.6 hatchback. A 1.6 hatchback. Press E beside it to get in.
+52 cue Beacon SYNTH/beacon_vehicle_hum
+62 say You are in the driver seat of 1.6 hatchback. The engine is off; T starts it. W and S to drive, A and D to steer, shift T switches it off.
+62 cue Aid SYNTH/drive_guide
+80 cue Aid SYNTH/drive_guide
+98 cue Aid SYNTH/drive_guide
+109 say You turn the key. The engine starts.
+116 cue Aid SYNTH/drive_guide
+134 cue Aid SYNTH/drive_guide
+152 cue Aid SYNTH/drive_guide
+170 cue Aid SYNTH/drive_guide
+188 cue Aid SYNTH/drive_guide
+206 cue Aid SYNTH/drive_guide
+221 say 1.6 hatchback
+224 cue Aid SYNTH/drive_guide
+232 cue Aid SYNTH/drive_turn
+238 cue Aid SYNTH/drive_brake_4
+238 cue Aid SYNTH/drive_turn
+241 cue Aid SYNTH/drive_brake_3
+242 cue Aid SYNTH/drive_guide
+245 say Main Street, heading south, limit 50.
+245 say Junction in 20 metres. You can go left onto Central Street, straight on, right onto Central Street.
+245 cue Aid SYNTH/drive_strip
+246 cue Aid SYNTH/drive_turn
+247 cue Aid SYNTH/drive_brake_3
+252 cue Aid SYNTH/drive_kerb
+252 cue Aid SYNTH/drive_turn
+254 cue Aid SYNTH/drive_brake_3
+255 cue Aid SYNTH/drive_kerb
+259 cue Aid SYNTH/drive_brake_4
+259 cue Aid SYNTH/drive_turn
+260 cue Aid SYNTH/drive_guide
+261 cue Aid SYNTH/drive_kerb
+262 cue Aid SYNTH/drive_brake_3
+264 cue Aid SYNTH/drive_aligned
+269 cue Aid SYNTH/drive_brake_2
+270 cue Aid SYNTH/drive_kerb
+270 cue Aid SYNTH/drive_turn
+275 say! Main Street, heading south, in line with the road, in the right lane of 2, 20 kilometres an hour, limit 50. Junction in 15 metres.
+277 say! Right indicator.
+277 say Turning right onto Central Street.
+277 cue Aid SYNTH/drive_relay_on
+278 cue Aid SYNTH/drive_guide
+279 cue Aid SYNTH/drive_kerb
+287 cue Aid SYNTH/drive_relay_off
+287 cue Aid SYNTH/drive_kerb
+296 cue Aid SYNTH/drive_kerb
+296 cue Aid SYNTH/drive_guide
+297 cue Aid SYNTH/drive_relay_on
+304 cue Aid SYNTH/drive_kerb
+307 cue Aid SYNTH/drive_relay_off
+312 cue Aid SYNTH/drive_kerb
+314 cue Aid SYNTH/drive_guide
+317 cue Aid SYNTH/drive_relay_on
+320 cue Aid SYNTH/drive_kerb
+327 cue Aid SYNTH/drive_relay_off
+328 cue Aid SYNTH/drive_kerb
+332 cue Aid SYNTH/drive_guide
+336 cue Aid SYNTH/drive_kerb
+337 cue Aid SYNTH/drive_relay_on
+344 cue Aid SYNTH/drive_kerb
+347 cue Aid SYNTH/drive_relay_off
+350 cue Aid SYNTH/drive_guide
+352 cue Aid SYNTH/drive_kerb
+357 cue Aid SYNTH/drive_relay_on
+359 cue Aid SYNTH/drive_kerb
+367 cue Aid SYNTH/drive_kerb
+367 cue Aid SYNTH/drive_relay_off
+368 cue Aid SYNTH/drive_guide
+375 cue Aid SYNTH/drive_brake_1
+377 cue Aid SYNTH/drive_relay_on
+382 cue Aid SYNTH/drive_turn
+386 cue Aid SYNTH/drive_guide
+387 cue Aid SYNTH/drive_relay_off
+394 cue Aid SYNTH/drive_turn
+397 cue Aid SYNTH/drive_relay_on
+402 cue Aid SYNTH/drive_brake_2
+404 cue Aid SYNTH/drive_guide
+405 cue Aid SYNTH/drive_turn
+407 cue Aid SYNTH/drive_relay_off
+413 cue Aid SYNTH/drive_turn
+414 cue Aid SYNTH/drive_brake_3
+417 cue Aid SYNTH/drive_relay_on
+421 say Central Street, heading west, limit 50.
+421 cue Aid SYNTH/drive_kerb
+421 cue Aid SYNTH/drive_turn
+422 cue Aid SYNTH/drive_guide
+422 cue Aid SYNTH/drive_brake_3
+426 cue Aid SYNTH/drive_brake_3
+427 cue Aid SYNTH/drive_relay_off
+430 cue Aid SYNTH/drive_kerb
+431 cue Aid SYNTH/drive_brake_2
+432 cue Aid SYNTH/drive_turn
+437 cue Aid SYNTH/drive_relay_on
+440 cue Aid SYNTH/drive_kerb
+440 cue Aid SYNTH/drive_guide
+447 cue Aid SYNTH/drive_relay_off
+449 cue Aid SYNTH/drive_kerb
+458 cue Aid SYNTH/drive_guide
+459 cue Aid SYNTH/drive_kerb
+468 cue Aid SYNTH/drive_kerb
+476 cue Aid SYNTH/drive_guide
+477 cue Aid SYNTH/drive_kerb
+486 cue Aid SYNTH/drive_kerb
+494 cue Aid SYNTH/drive_guide
+495 cue Aid SYNTH/drive_kerb
+504 cue Aid SYNTH/drive_kerb
+512 cue Aid SYNTH/drive_guide
+513 cue Aid SYNTH/drive_kerb
+522 cue Aid SYNTH/drive_kerb
+527 say You switch the engine off.
+530 cue Aid SYNTH/drive_guide
+531 cue Aid SYNTH/drive_kerb
+540 cue Aid SYNTH/drive_kerb
+548 cue Aid SYNTH/drive_guide
+549 cue Aid SYNTH/drive_kerb
+558 cue Aid SYNTH/drive_kerb
+560 say You get out of 1.6 hatchback.
+568 cue Beacon SYNTH/beacon_vehicle_hum
+572 say Central Street, block 7
+616 cue Beacon SYNTH/beacon_vehicle_hum
