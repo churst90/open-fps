@@ -20,9 +20,11 @@ public sealed class RouteAnswers
     private readonly Dictionary<int, Held> _held = new();
     private OpeningRoutes? _current;
 
-    /// <summary>For the lab's before-and-after only (AudioLab --stream-walk keep=old): answers kept as
-    /// before 2026-10-06, about any graph, and a forgotten voice's left behind.</summary>
-    public static bool RetainSuperseded { get; set; }
+    /// <summary>The lab's levers on its worker, whose RetainSupersededRoutes (AudioLab --stream-walk keep=old)
+    /// keeps answers as before 2026-10-06, about any graph, and leaves a forgotten voice's behind.</summary>
+    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab { get; set; } = new();
+
+    private bool RetainSuperseded => Lab.RetainSupersededRoutes;
 
     public int Count => _held.Count;
 

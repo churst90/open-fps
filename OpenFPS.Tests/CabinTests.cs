@@ -11,6 +11,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class CabinTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private const int Rate = 44100;
     private readonly ITestOutputHelper _o;
     public CabinTests(ITestOutputHelper o) { _o = o; AcousticRegistry.Initialize(); }
@@ -102,7 +105,7 @@ public class CabinTests
             return 10f * MathF.Log10((float)(sum / n) / (20e-6f * 20e-6f));
         }
         float trueIdle = Idle(false), heard = Idle(true);
-        float expected = (v.SourceLevelDb - trueIdle) * (1f - Loudness.DynamicRangeCompression);
+        float expected = (v.SourceLevelDb - trueIdle) * (1f - Law.Compression);
         _o.WriteLine($"idle {trueIdle:F1} dB true, {heard:F1} dB live — lifted {heard - trueIdle:F1}, the law says {expected:F1}");
         Assert.InRange(heard - trueIdle, expected - 3f, expected + 3f);
     }

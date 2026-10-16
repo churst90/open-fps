@@ -22,6 +22,13 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class ThunderSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
+    /// <summary>The mix the game's mixer starts with, whose trims this instrument applies as the mixer would.</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.MixSettings GameMix = OpenFPS.Client.AudioEngine.Core.MixSettings.FromEnvironment();
+
     private const int OutRate = 48000;
     private const float ProxyMetres = OpenFPS.Client.Core.WorldAudioPlayer.SkyProxyMetres;
 
@@ -150,9 +157,9 @@ public static class ThunderSpike
               + $"{OpenFPS.Client.Core.WorldAudioPlayer.MaxSkyRoomEchoes} mirrors inside 80 ms and up to two first-order facades after it.");
             var survey = Enclosure.Look(cityEar, boxes.Select(b => new Enclosure.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList());
             var tail = StreetTail(boxes, cityEar);
-            float sendGain = MathF.Pow(ProxyMetres, Math.Clamp(survey.Enclosure, 0f, 1f)) * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailTrim;
+            float sendGain = MathF.Pow(ProxyMetres, Math.Clamp(survey.Enclosure, 0f, 1f)) * GameMix.TailTrim;
             Say($"  the street's late tail: Steam Audio's trace at the listener (the scene without its open ground, as the game builds it), "
-              + $"from 50 ms, fed as the mixer feeds it: enclosure {survey.Enclosure:F2}, send {Db20(sendGain):F1} dB against the direct sound at 40 m (tail trim {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb:F0} dB); "
+              + $"from 50 ms, fed as the mixer feeds it: enclosure {survey.Enclosure:F2}, send {Db20(sendGain):F1} dB against the direct sound at 40 m (tail trim {GameMix.TailDb:F0} dB); "
               + (tail.L.Length > 0 ? $"IR energy {10 * Math.Log10(Math.Max(1e-30, tail.L.Sum(v => (double)v * v) + tail.R.Sum(v => (double)v * v))):F1} dB re a 1 m source" : "no IR (Steam Audio not available)"));
             foreach (float d in new[] { 100f, 1000f, 3000f, 8000f })
             {
@@ -289,8 +296,8 @@ public static class ThunderSpike
     internal static float GameGain(Thunder.Part part)
     {
         float level = WorldAudioPlayerThunderLevel(part.PeakDb);
-        var placed = Loudness.Place(level);
-        return Loudness.RenderedGain(placed.Gain, placed.ReferenceDistance, MathF.Min(3000f, Loudness.AudibleRange(level)), ProxyMetres);
+        var placed = LabHearing.Place(level);
+        return Loudness.RenderedGain(placed.Gain, placed.ReferenceDistance, MathF.Min(3000f, LabHearing.AudibleRange(level)), ProxyMetres);
     }
 
     internal static float WorldAudioPlayerThunderLevel(float peakDbAtEar) => OpenFPS.Client.Core.WorldAudioPlayer.SkyLevelDb(peakDbAtEar);
@@ -300,11 +307,11 @@ public static class ThunderSpike
         var m = Measure(parts);
         string oct = string.Join(" ", m.OctaveDb.Select(v => v < 0 ? "  - " : $"{v,4:F0}"));
         // The same at /levels 100 (no compression), where the ceiling falls to about 89 dB at the ear.
-        float shipped = Loudness.DynamicRangeCompression;
-        Loudness.DynamicRangeCompression = 1f;
+        float shipped = LabHearing.Compression;
+        LabHearing.Compression = 1f;
         float real = 0f;
         foreach (var part in parts) real = MathF.Max(real, GameGain(part));
-        Loudness.DynamicRangeCompression = shipped;
+        LabHearing.Compression = shipped;
         return $"{name,-12} parts {parts.Count}, first {(parts.Count > 0 ? parts.Min(p => p.StartSeconds) : 0f),5:F1} s  "
              + $"{m.PeakPa,8:F3} {Db(m.PeakPa),6:F1} {m.Span20,7:F1}  {m.Centroid,7:F0}  {m.PeakThird,7:F0}  {m.LAeq,6:F1}  {oct}  {m.GameDbfs,6:F1} {20f * MathF.Log10(MathF.Max(1e-9f, real)),6:F1}  {ms,5}";
     }
@@ -376,7 +383,7 @@ public static class ThunderSpike
             // (WorldAudioPlayer.PlanRoomEchoes, at most MaxSkyRoomEchoes, no washes), and up to two
             // first-order facades later than that. Each is placed at its image and the mixer's 1/r
             // beyond the 40 m reference does the rest, as in the game.
-            float trim = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;
+            float trim = GameMix.CopiesTrim;
             EarlyReflections.Find(proxy, ear, solids, into, c, maxOrder: 2, keep: OpenFPS.Client.Core.WorldAudioPlayer.MaxRoomEchoes * 2,
                                   maxExtraPathMetres: OpenFPS.Client.Core.WorldAudioPlayer.RoomEchoWindowSeconds * c);
             var plan = new List<OpenFPS.Client.Core.WorldAudioPlayer.RoomEcho>();

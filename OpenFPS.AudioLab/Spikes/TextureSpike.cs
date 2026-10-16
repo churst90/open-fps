@@ -34,6 +34,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class TextureSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
 
     public static int Run(string[] args)
@@ -175,7 +179,7 @@ public static class TextureSpike
         {
             var to = s.At - ear;
             float dist = MathF.Max(0.5f, to.Length());
-            var (gain, reference) = Loudness.Place(s.LevelDb, s.Extent);
+            var (gain, reference) = LabHearing.Place(s.LevelDb, s.Extent);
             float fullScale = 20e-6f * MathF.Pow(10f, (s.LevelDb + VehicleProfile.PeakHeadroomDb) / 20f);
             float amp = gain * MathF.Min(1f, reference / dist) / fullScale * MathF.Pow(10f, (float)RainSpike.ProviderDb / 20f);
             var x = (float[])s.Pascals.Clone();

@@ -14,6 +14,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class WideSourcesTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public WideSourcesTests(ITestOutputHelper o)
     {
@@ -96,8 +99,8 @@ public class WideSourcesTests
         })
         {
             var layout = ExtendedSources.Layout(key, ModelLibrary.Presets)!;
-            var (_, reference) = Loudness.Place(levelDb, extent);
-            float range = Loudness.AudibleRange(levelDb);
+            var (_, reference) = Law.Place(levelDb, extent);
+            float range = Law.AudibleRange(levelDb);
             var at = layout.Select(o => middle + o).ToArray();
             var shares = new float[layout.Length];
             foreach (float d in new[] { 1f, 5f, 20f })

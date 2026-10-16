@@ -13,7 +13,7 @@ public sealed class UiSounds : IUiCues
 {
     private readonly AudioEngineFacade _audio;
     /// <summary>The rate cues are rendered at: the mixer's, so they play without a resampler.</summary>
-    public static int SampleRate => OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+    public int SampleRate => _audio.MixerRate;
 
     /// <summary>Whether interface sounds play at all. Speech is unaffected.</summary>
     public bool Enabled { get; set; } = true;
@@ -32,7 +32,7 @@ public sealed class UiSounds : IUiCues
     public void Play(UiCue cue)
     {
         if (!Enabled) return;
-        _audio.PlayUiSound("ui:" + cue, () => Render(cue), SampleRate, Volume);
+        _audio.PlayUiSound("ui:" + cue, () => Render(cue, SampleRate), SampleRate, Volume);
     }
 
     /// <summary>
@@ -84,16 +84,16 @@ public sealed class UiSounds : IUiCues
     {
         if (!Enabled) return;
         int step = Math.Clamp(percent * ProgressSteps / 100, 0, ProgressSteps);
-        _audio.PlayUiSound("ui:progress:" + step, () => RenderProgress(step), SampleRate, Volume);
+        _audio.PlayUiSound("ui:progress:" + step, () => RenderProgress(step, SampleRate), SampleRate, Volume);
     }
 
     /// <summary>The loading tone at a step, 0..<see cref="ProgressSteps"/>. Public so a test can measure it.</summary>
-    public static float[] RenderProgress(int step)
-        => Notes(SampleRate, 0.3f, (440f * MathF.Pow(2f, Math.Clamp(step, 0, ProgressSteps) / (float)ProgressSteps), 0f, 0.09f));
+    public static float[] RenderProgress(int step, int rate)
+        => Notes(rate, 0.3f, (440f * MathF.Pow(2f, Math.Clamp(step, 0, ProgressSteps) / (float)ProgressSteps), 0f, 0.09f));
 
-    /// <summary>The waveform of a cue: peak 1.28 times its gain, at most 0.95. Public so a test can
-    /// measure it.</summary>
-    public static float[] Render(UiCue cue) => Render(cue, SampleRate);
+    /// <summary>The waveform of a cue at the default mixer's rate: peak 1.28 times its gain, at most 0.95. Public
+    /// so a test can measure it.</summary>
+    public static float[] Render(UiCue cue) => Render(cue, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate);
 
     /// <summary>A cue at any sample rate, for writing it out to be listened to.</summary>
     public static float[] Render(UiCue cue, int rate) => cue switch

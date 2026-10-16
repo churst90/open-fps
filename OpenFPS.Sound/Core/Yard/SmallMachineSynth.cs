@@ -96,6 +96,13 @@ public sealed class SmallMachineSynth
     private int _slowTick;
     private const int SlowEvery = 64;
 
+    /// <summary>Puts its engine on the live levers of the mixer it plays in (MixSettings.ValveJetNoise): its
+    /// voice's, which the mixer gives it as it makes it.</summary>
+    public void UseMix(MixSettings mix)
+    {
+        if (_engine != null) _engine.Mix = mix;
+    }
+
     /// <summary>A machine's voice. Its engine's profile is <paramref name="presets"/>' (the catalogue's).</summary>
     public SmallMachineSynth(SmallMachineSpec spec, IPresets presets, float rate = RenderRate.Default, int seed = 17)
     {

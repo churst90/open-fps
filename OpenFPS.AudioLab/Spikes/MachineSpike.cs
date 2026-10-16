@@ -15,6 +15,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class MachineSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     public static int Run(string[] args)
     {
         string? exportTo = args.FirstOrDefault(a => a.StartsWith("export=", StringComparison.OrdinalIgnoreCase))?[7..];
@@ -86,7 +90,7 @@ public static class MachineSpike
         Console.WriteLine($"  They subtend {Localisation.SubtendedDegrees(separation, side):F0} degrees at {side:F0} m, "
                         + $"and merge into one source past {Localisation.MergingDistance(separation):F0} m.\n");
 
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
@@ -112,8 +116,8 @@ public static class MachineSpike
         float top = hard ? speed * 3f : speed;
         float from = -130f, to = 130f;
         var level = v.SourceLevelDb;
-        var (gain, reference) = Loudness.Place(level);
-        float range = Loudness.AudibleRange(level);
+        var (gain, reference) = LabHearing.Place(level);
+        float range = LabHearing.AudibleRange(level);
 
         Console.WriteLine((split
             ? "  ── TWO voices: the airbox at the front, the tailpipe at the back."
@@ -204,8 +208,8 @@ public static class MachineSpike
             float extent = Vector3.Distance(
                 v.ExhaustSlot,
                 new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ));
-            var (gain, reference) = Loudness.Place(v.SourceLevelDb, extent);
-            float range = Loudness.AudibleRange(v.SourceLevelDb);
+            var (gain, reference) = LabHearing.Place(v.SourceLevelDb, extent);
+            float range = LabHearing.AudibleRange(v.SourceLevelDb);
             // The cruise against full load is already in the signal; the placement is the same for both.
             float under = cruiseDb - v.SourceLevelDb;
             string At(float d)

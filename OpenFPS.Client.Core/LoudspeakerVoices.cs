@@ -71,7 +71,7 @@ internal sealed class LoudspeakerVoices
                 return null;
             }
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            var r = LoudspeakerChain.Render(key, spec, mono, rate, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate, loop);
+            var r = LoudspeakerChain.Render(key, spec, mono, rate, _audio.MixerRate, loop);
             Log.Information("Loudspeaker {Key}: {Spl:F1} dB SPL at 1 m on the axis (gated speech), peaks {Peak:F1}; "
                           + "declared {Level:F1} dB full scale; clipped {Clip:P1} of samples, diaphragm to {X:F2} of its travel, "
                           + "compressor {Limit:F1} dB at most; room fed {Radiated:F1} dB under the axis; rendered in {Ms} ms",

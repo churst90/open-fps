@@ -22,6 +22,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class WeatherWindTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public WeatherWindTests(ITestOutputHelper o) { _o = o; }
 
@@ -286,19 +289,19 @@ public class WeatherWindTests
     [Fact]
     public void TheLevelIsPlacedByTheLawAndTheEarsKeepTheirDifferenceUnderTheCeiling()
     {
-        float before = Loudness.DynamicRangeCompression;
+        float before = Law.Compression;
         // The law places the declared level, the shared headroom under it like every synthesized voice.
-        float placed = EarWind.PlacedDb(85f);
-        Assert.Equal((85f - Loudness.RenderCeilingDb) * Loudness.DynamicRangeCompression - VehicleProfile.PeakHeadroomDb, placed, 3);
+        float placed = EarWind.PlacedDb(85f, Law);
+        Assert.Equal((85f - Law.RenderCeilingDb) * Law.Compression - VehicleProfile.PeakHeadroomDb, placed, 3);
         // A gale is held under the ceiling...
         var gale = EarWind.Ears(25f, new Vector2(-25f, 0f), 0f);
-        float l = EarWind.RenderedDb(gale.DeclaredDb, gale.LeftDb), r = EarWind.RenderedDb(gale.DeclaredDb, gale.RightDb);
-        Assert.True(EarWind.HeldDb(EarWind.PlacedDb(gale.DeclaredDb)) < EarWind.CeilingDb);
+        float l = EarWind.RenderedDb(gale.DeclaredDb, gale.LeftDb, Law), r = EarWind.RenderedDb(gale.DeclaredDb, gale.RightDb, Law);
+        Assert.True(EarWind.HeldDb(EarWind.PlacedDb(gale.DeclaredDb, Law)) < EarWind.CeilingDb);
         // Side-on its two ears are still 9.5 dB apart.
         Assert.Equal(9.5f, l - r, 2);
         // Below the knee the ceiling does nothing.
         Assert.Equal(-40f, EarWind.HeldDb(-40f), 4);
-        Assert.Equal(before, Loudness.DynamicRangeCompression);
+        Assert.Equal(before, Law.Compression);
     }
 
     [Fact]
@@ -318,9 +321,9 @@ public class WeatherWindTests
         double el = 0, er = 0, lr = 0;
         for (int i = 0; i < n; i++) { el += l[i] * (double)l[i]; er += r[i] * (double)r[i]; lr += l[i] * (double)r[i]; }
         double dl = 10 * Math.Log10(el / n), dr = 10 * Math.Log10(er / n);
-        _o.WriteLine($"left {dl:F2} dBFS (law {EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb):F2}), right {dr:F2} (law {EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb):F2}), correlation {lr / Math.Sqrt(el * er):F3}");
-        Assert.InRange(dl, EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb) - 1.5, EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb) + 1.5);
-        Assert.InRange(dr, EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb) - 1.5, EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb) + 1.5);
+        _o.WriteLine($"left {dl:F2} dBFS (law {EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb, Law):F2}), right {dr:F2} (law {EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb, Law):F2}), correlation {lr / Math.Sqrt(el * er):F3}");
+        Assert.InRange(dl, EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb, Law) - 1.5, EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb, Law) + 1.5);
+        Assert.InRange(dr, EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb, Law) - 1.5, EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb, Law) + 1.5);
         Assert.InRange(lr / Math.Sqrt(el * er), -0.1, 0.1);
         // Still air makes nothing.
         s.Control(EarWind.Ears(0f, Vector2.Zero, 0f));

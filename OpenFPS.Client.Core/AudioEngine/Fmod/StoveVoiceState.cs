@@ -23,7 +23,9 @@ public sealed class StoveVoiceState : PhysicalVoiceState
 
     /// <param name="clock">Its world's clock, which the mixer gives it: a knob's turn is aged on its world
     /// time. None for one of its own (an offline render), which reads the shared world time.</param>
-    public StoveVoiceState(GasHobSpec spec, string key, float sampleRate, int seed, IAudioClock? clock = null)
+    /// <param name="lab">The mixer's lab levers (LabLevers.StoveCreated); null is the game.</param>
+    public StoveVoiceState(GasHobSpec spec, string key, float sampleRate, int seed, IAudioClock? clock = null,
+                           OpenFPS.Client.AudioEngine.Core.LabLevers? lab = null)
         : base(spec.SourceLevelDb, sampleRate, spec.PeakHeadroomDb)
     {
         Hob = new GasHobSynth(spec, sampleRate, seed);
@@ -40,12 +42,9 @@ public sealed class StoveVoiceState : PhysicalVoiceState
             Hob.Begin(off, off, 0f);
             _settings = off;
         }
-        LabCreated?.Invoke(Hob);
+        // For the lab: each hob voice's synth as it is made, to give its hand a script no server sends (a slow light).
+        lab?.StoveCreated?.Invoke(Hob);
     }
-
-    /// <summary>For the lab: called with each hob voice's synth as it is made, to give its hand a script no
-    /// server sends (a slow light). Nothing in the game sets it.</summary>
-    internal static Action<GasHobSynth>? LabCreated;
 
     /// <summary>The emitter's key now. Game thread; the producer takes it up at its next block.</summary>
     public void SetKey(string key)

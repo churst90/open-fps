@@ -39,7 +39,7 @@ public struct SpatialEmitter
 
     /// <summary>
     /// How big the source is, metres; zero is a point. Inside its own size the inverse law does not
-    /// hold, so <see cref="OpenFPS.Common.Loudness.Place(float, float)"/> widens the reference distance
+    /// hold, so <see cref="OpenFPS.Common.Hearing.HearingSettings.Place(float, float)"/> widens the reference distance
     /// and pays the gain down: the far field is unchanged. Widened without paying back, a quiet vehicle
     /// came out up to 8 dB over its own level.
     /// </summary>

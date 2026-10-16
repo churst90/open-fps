@@ -17,6 +17,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class BirdLifeMutationTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     // ── A world, a bank of calls, and the birds ─────────────────────────────────────────────
 
     private sealed class Rig : IDisposable
@@ -325,13 +328,13 @@ public class BirdLifeMutationTests
         {
             var mine = played.Where(e => e.SoundId.StartsWith("BIRDS/" + sp.Folder + "/", StringComparison.Ordinal)).ToList();
             Assert.NotEmpty(mine);
-            var (gain, reference) = Loudness.Place(sp.CallDb);
+            var (gain, reference) = Law.Place(sp.CallDb);
             foreach (var e in mine)
             {
                 Assert.InRange(e.Pitch, 1f - sp.PitchSpread - 1e-4f, 1f + sp.PitchSpread + 1e-4f);
                 Assert.Equal(gain, e.Volume, 5);
                 Assert.Equal(reference, e.MinDistance, 5);
-                Assert.Equal(Loudness.AudibleRange(sp.CallDb), e.Range, 3);
+                Assert.Equal(Law.AudibleRange(sp.CallDb), e.Range, 3);
             }
             Assert.True(mine.Select(e => e.Pitch).Distinct().Count() > 3, $"every {sp.Name} has the same voice");
         }
@@ -417,8 +420,8 @@ public class BirdLifeMutationTests
     [Fact]
     public void ACallTooQuietToHearIsNotMade()
     {
-        var (gain, reference) = Loudness.Place(BirdSpecies.Pigeon.CallDb);
-        float range = Loudness.AudibleRange(BirdSpecies.Pigeon.CallDb);
+        var (gain, reference) = Law.Place(BirdSpecies.Pigeon.CallDb);
+        float range = Law.AudibleRange(BirdSpecies.Pigeon.CallDb);
         Assert.True(Loudness.RenderedGain(gain, reference, range, 125f) < 0.001f && range > 130f,
                     "at this distance a pigeon would be heard, so this proves nothing");
 

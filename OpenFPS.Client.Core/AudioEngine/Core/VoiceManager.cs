@@ -80,6 +80,10 @@ public class VoiceManager
     /// <summary>Voices submitted again since the last pass while a play of them was under way.</summary>
     private readonly HashSet<int> _askedAgain = new();
 
+    /// <summary>The hearing of the world it ranks for: the facade's (AudioEngineFacade.Hearing), the shipped
+    /// hearing when made alone.</summary>
+    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; init; } = new();
+
     public VoiceManager(IVoiceSink audio, AudioBank bank, int maxVoices = 64)
     {
         _audio = audio;
@@ -151,7 +155,7 @@ public class VoiceManager
             }
 
             bool playing = _audio.IsPlaying(id);
-            float score = Audibility(e, dist, playing);
+            float score = Audibility(Hearing, e, dist, playing);
             // An inaudible one-shot is dropped. A continuous voice already playing is held at the floor
             // and left to the budget: dropped there, a car at 300 m passing behind buildings was rebuilt
             // 45 times in nine minutes, heard as distant traffic stuttering.
@@ -366,9 +370,9 @@ public class VoiceManager
     /// own steps and warnings above the physics, which on a racetrack would bury them; and a playing
     /// voice gets 2 dB of hysteresis, so two near-equal sources do not trade the last slot every frame.
     /// </summary>
-    internal static float Audibility(in SpatialEmitter e, float distance, bool playing)
+    internal static float Audibility(OpenFPS.Common.Hearing.HearingSettings hearing, in SpatialEmitter e, float distance, bool playing)
     {
-        float level = HeardLevel(WithoutHeadroom(e.Volume, e.HeadroomGain), e.MinDistance, e.Range, distance, e.Occlusion,
+        float level = HeardLevel(hearing, WithoutHeadroom(e.Volume, e.HeadroomGain), e.MinDistance, e.Range, distance, e.Occlusion,
                                  e.EarLevelDb, RankKey(e), IsPhysical(e));
         if (playing) level *= PlayingHysteresis;
         // Pinned, not weighted: essential voices rank above all others, and among themselves by level.
@@ -383,8 +387,8 @@ public class VoiceManager
     /// which things get a voice (cars, standing machines, their places) asks this with the numbers the voice
     /// would be played with, so nothing is picked on one set of numbers and played at another.
     /// </summary>
-    internal static float HeardLevel(float volume, float reference, float range, float distance, float occlusion,
-                                     float earLevelDb, string key, bool physical)
+    internal static float HeardLevel(OpenFPS.Common.Hearing.HearingSettings hearing, float volume, float reference, float range,
+                                     float distance, float occlusion, float earLevelDb, string key, bool physical)
     {
         float level = OpenFPS.Common.Loudness.RenderedGain(volume, reference, range, distance);
         level *= 1f - Math.Clamp(occlusion, 0f, 1f);
@@ -393,9 +397,9 @@ public class VoiceManager
         // up), and ranking on that gain put the rumble at the top.
         if (earLevelDb > 0f)
         {
-            float db = EarTimbres.CorrectionDb(key, earLevelDb);
+            float db = EarTimbres.CorrectionDb(hearing, key, earLevelDb);
             if (db != 0f) level *= MathF.Pow(10f, db / 20f);
-            level = OpenFPS.Common.Loudness.HeardGain(level, EarTimbres.Find(key), physical);
+            level = hearing.HeardGain(level, EarTimbres.Find(key), physical);
         }
         return level;
     }

@@ -121,7 +121,7 @@ public sealed class SteamAudioSimulator : IDisposable
     public SteamAudioSimulator(IntPtr context, int maxSources = 64, bool enablePathing = false,
         bool enableReflections = false, bool enableDirect = true, int samplingRate = 0, int frameSize = 1024)
     {
-        if (samplingRate <= 0) samplingRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;   // 0: the mixer's
+        if (samplingRate <= 0) samplingRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;   // 0: the default mixer's
         _context = context;
         _maxSources = maxSources;
         _direct = enableDirect;

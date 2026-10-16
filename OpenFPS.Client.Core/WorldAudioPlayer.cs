@@ -419,7 +419,7 @@ public sealed class WorldAudioPlayer
                 var parts = Thunder.Render(strike, listener, air, options);
                 // At the mixer's rate, band-limited, here on the worker: from 24 kHz FMOD's resampler
                 // left the rumble's images across the top octave. About 4 ms a second of thunder.
-                int mix = MixerQuality.MixerRate;
+                int mix = _audio.MixerRate;
                 foreach (var part in parts)
                     if (part.SampleRate != mix)
                     {
@@ -673,12 +673,12 @@ public sealed class WorldAudioPlayer
             // beyond it it falls as a point source of the same power would.
             if (!item.IsReflection && item.SourceEntityId >= 0)
                 AskAbout(item.SourceEntityId, listenerPosition, item.Sound.Position);
-            var placed = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres);
+            var placed = _audio.Hearing.Place(item.Sound.LevelDb, item.Sound.ExtentMetres);
             // A copy keeps its source's placement, scaled by what it kept: placed on its own, the law's
             // compression (0.45 shipped) brought an echo 14 dB down to 6 dB down, 4-8 dB too loud.
             if (item.IsReflection && item.CopyGain > 0f)
             {
-                var source = Loudness.Place(item.SourceLevelDb, item.Sound.ExtentMetres);
+                var source = _audio.Hearing.Place(item.SourceLevelDb, item.Sound.ExtentMetres);
                 placed = (source.Gain * item.CopyGain, source.ReferenceDistance);
             }
 
@@ -704,7 +704,7 @@ public sealed class WorldAudioPlayer
                 // Gain and reference distance come together from Loudness.Place: a quiet source wants a
                 // short reference, a gunshot a long one.
                 Volume = placed.Gain,
-                Range = MathF.Min(MaxRange, Loudness.AudibleRange(item.Sound.LevelDb)),
+                Range = MathF.Min(MaxRange, _audio.Hearing.AudibleRange(item.Sound.LevelDb)),
                 MinDistance = placed.ReferenceDistance,
                 Pitch = 1.0f,
                 Type = EmitterType.WorldLocked,
@@ -1098,7 +1098,7 @@ public sealed class WorldAudioPlayer
                               // are a cloud, not a flutter.
                               flutter: IsImpulse(item.Sound));
         float direct = Vector3.Distance(item.Sound.Position, listenerPosition);
-        float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
+        float reference = _audio.Hearing.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
         int added = 0;
         foreach (var a in _higher)
         {
@@ -1110,7 +1110,7 @@ public sealed class WorldAudioPlayer
             // against what it does to the direct sound, as QueueReflections does.
             float gain = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference);
             if (gain < ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
+            gain *= _audio.Mix.CopiesTrim;   // /copies
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
@@ -1177,9 +1177,9 @@ public sealed class WorldAudioPlayer
                               maxOrder: 2, keep: MaxRoomEchoes * 2,
                               maxExtraPathMetres: RoomEchoWindowSeconds * _audio.Atmosphere.SpeedOfSound);
         float direct = Vector3.Distance(src, listenerPosition);
-        float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
+        float reference = _audio.Hearing.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
         PlanRoomEchoes(_room, src, listenerPosition, direct, reference,
-                       OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim, audible: true, _roomPlan);   // /copies
+                       _audio.Mix.CopiesTrim, audible: true, _roomPlan);   // /copies
         foreach (var e in _roomPlan)
         {
             if (e.InVoice) continue;
@@ -1309,7 +1309,7 @@ public sealed class WorldAudioPlayer
         if (n == 0) return;
 
         float directDist = Vector3.Distance(item.Sound.Position, listenerPosition);
-        float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
+        float reference = _audio.Hearing.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
         for (int i = 0; i < n; i++)
         {
             var r = found[i];
@@ -1323,7 +1323,7 @@ public sealed class WorldAudioPlayer
 
             float gain = EarlyReflections.PlacedCopyGain(r.Gain, r.PathLength, directDist, reference);
             if (gain < ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
+            gain *= _audio.Mix.CopiesTrim;   // /copies
 
             var echo = item.Sound;
             echo.Position = r.ApparentPosition;
@@ -1437,9 +1437,9 @@ public sealed class WorldAudioPlayer
 
     /// <summary>A rendered one-shot (at <see cref="TransientSynth.SampleRate"/>) brought to the mixer's
     /// rate, band-limited, on the worker that rendered it (MixerQuality.Resample).</summary>
-    private static (string Id, float[] Pcm, int Rate) AtMixerRate(string id, float[] pcm)
+    private (string Id, float[] Pcm, int Rate) AtMixerRate(string id, float[] pcm)
     {
-        int rate = MixerQuality.MixerRate;
+        int rate = _audio.MixerRate;
         return (id, MixerQuality.Resample(pcm, TransientSynth.SampleRate, rate), rate);
     }
 

@@ -23,6 +23,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class DistantWoodsSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private static string? Arg(string[] args, string key) => args.FirstOrDefault(x => x.StartsWith(key, StringComparison.Ordinal))?[key.Length..];
 
     /// <summary>The wood: a stand of park trees over 160 by 120 m, crowns at their height, as gen_osm
@@ -57,7 +61,7 @@ public static class DistantWoodsSpike
         var spec = FoliageSpec.ParkTree;
         var crowns = Wood(trees);
         int nextId = WoodChorus.FirstId;
-        var chorus = WoodChorus.Build(crowns.Select((c, i) => new WoodChorus.Crown(i + 1, c, "park_tree")).ToList(), (_, _) => nextId--, ModelLibrary.Presets);
+        var chorus = WoodChorus.Build(crowns.Select((c, i) => new WoodChorus.Crown(i + 1, c, "park_tree")).ToList(), (_, _) => nextId--, ModelLibrary.Presets, LabHearing);
         float[] distances = { 300f, 500f, 800f };
         var ears = distances.Select(d => new Vector3(0f, 1.7f, -d)).ToArray();
         var wind = WindWeather.Steady(4.5f, 250f, 0.25f);
@@ -72,7 +76,7 @@ public static class DistantWoodsSpike
         var wood1 = ears.Select(_ => new float[n]).ToArray();
         int[,] delay = new int[ears.Length, trees];
         float[,] gainT = new float[ears.Length, trees];
-        float refT = Loudness.Place(spec.SourceLevelDb, spec.ExtentMetres).ReferenceDistance;
+        float refT = LabHearing.Place(spec.SourceLevelDb, spec.ExtentMetres).ReferenceDistance;
         for (int e = 0; e < ears.Length; e++)
             for (int i = 0; i < trees; i++)
             {
@@ -220,7 +224,7 @@ public static class DistantWoodsSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(dir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(dir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -236,7 +240,7 @@ public static class DistantWoodsSpike
             var mapping = new SoundMappingService(player);
             mapping.Initialize(sounds);
             // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-            world.Clock = facade.Clock;
+            world.Clock = facade.Clock; world.Hearing = facade.Hearing;
             var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
             world.RegisterDefinition(new EntityDefinition
             {
@@ -247,7 +251,7 @@ public static class DistantWoodsSpike
             });
             int id = 100;
             var crowns = Wood(trees);
-            float refT = Loudness.Place(FoliageSpec.ParkTree.SourceLevelDb, FoliageSpec.ParkTree.ExtentMetres).ReferenceDistance;
+            float refT = LabHearing.Place(FoliageSpec.ParkTree.SourceLevelDb, FoliageSpec.ParkTree.ExtentMetres).ReferenceDistance;
             foreach (var at in crowns)
             {
                 var def = new EntityDefinition

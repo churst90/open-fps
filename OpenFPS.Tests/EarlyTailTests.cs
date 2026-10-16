@@ -91,7 +91,7 @@ public class EarlyTailTests
         // is (1 - 0.1) / 2.04^2 = -6.7 dB of a 1 m impulse; all of them a little more.
         double total = c.Total().Sum();
         Assert.InRange(10 * Math.Log10(total), -7.5, -3.0);
-        Assert.InRange(EarlyCopies.BandShare.Sum(), 0.999, 1.001);
+        Assert.InRange(EarlyCopies.BandShareAt(Rate).Sum(), 0.999, 1.001);
     }
 
     [Fact]

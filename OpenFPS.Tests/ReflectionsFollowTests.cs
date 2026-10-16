@@ -169,7 +169,7 @@ public class ReflectionsFollowTests
     {
         var enc = new VoiceFrameEncoder();
         var frame = new float[VoiceCodec.FrameSamples];
-        var stream = Talkers.For(Sean);
+        var stream = h.Facade.TalkerStreams.For(Sean);
         for (int f = 0; f < 10; f++)
         {
             for (int i = 0; i < frame.Length; i++) frame[i] = 0.3f * MathF.Sin(2f * MathF.PI * 180f * i / VoiceCodec.Rate);
@@ -184,47 +184,42 @@ public class ReflectionsFollowTests
     [Fact]
     public void Somebody_talking_is_answered_by_the_room_they_are_in_and_its_surfaces_follow_them()
     {
-        Talkers.Clear();
         var h = new ClientAudioHarness();
         BuildTwoStoreys(h);
-        try
+        h.Audio.OwnEntityId = 7;
+        h.StandAt(new Vector3(-1.5f, 0f, -2f));
+        AddPlayer(h, Sean, new Vector3(0.6f, 0f, 1.1f));
+        h.Tick();
+        SeanSays(h);
+        int voice = h.Voice(VoiceKind.Talker, Sean);
+        Assert.True(h.TickUntil(() => h.Mixer.Live.Contains(voice) && SeansCopies(h).Count > 0, 120), "Sean's voice and its copies never started");
+
+        // His voice reverberates in the room his mouth is in...
+        Assert.True(h.TickUntil(() => h.Mixer.Latest[voice].TargetRegionId == Floor0Room, 120),
+            $"Sean's voice went to region {h.Mixer.Latest[voice].TargetRegionId}, not the room he is standing in");
+        // ...and its surfaces answer: copies of this talker's voice at their images, each its own path
+        // and never a reverb send of its own.
+        var below = SeansCopies(h);
+        Assert.All(below, c =>
         {
-            h.Audio.OwnEntityId = 7;
-            h.StandAt(new Vector3(-1.5f, 0f, -2f));
-            AddPlayer(h, Sean, new Vector3(0.6f, 0f, 1.1f));
-            h.Tick();
-            SeanSays(h);
-            int voice = h.Voice(VoiceKind.Talker, Sean);
-            Assert.True(h.TickUntil(() => h.Mixer.Live.Contains(voice) && SeansCopies(h).Count > 0, 120), "Sean's voice and its copies never started");
+            Assert.True(c.IsReflection);
+            Assert.True(Talkers.TryParseCopyKey(c.PhysicalKey, out int of) && of == Sean, c.PhysicalKey);
+            Assert.InRange(c.EchoDelaySeconds, 0f, 0.1f);
+        });
+        Assert.Contains(below, c => c.Position.Y > Storey - Slab);   // the ceiling over him answers
 
-            // His voice reverberates in the room his mouth is in...
-            Assert.True(h.TickUntil(() => h.Mixer.Latest[voice].TargetRegionId == Floor0Room, 120),
-                $"Sean's voice went to region {h.Mixer.Latest[voice].TargetRegionId}, not the room he is standing in");
-            // ...and its surfaces answer: copies of this talker's voice at their images, each its own path
-            // and never a reverb send of its own.
-            var below = SeansCopies(h);
-            Assert.All(below, c =>
-            {
-                Assert.True(c.IsReflection);
-                Assert.True(Talkers.TryParseCopyKey(c.PhysicalKey, out int of) && of == Sean, c.PhysicalKey);
-                Assert.InRange(c.EchoDelaySeconds, 0f, 0.1f);
-            });
-            Assert.Contains(below, c => c.Position.Y > Storey - Slab);   // the ceiling over him answers
-
-            // Both of you go up a floor: everything that answered him downstairs answers him there.
-            h.StandAt(new Vector3(-1.5f, Storey, -2f));
-            MovePlayer(h, Sean, new Vector3(0.6f, Storey, 1.1f));
-            System.Threading.Thread.Sleep(150);
-            SeanSays(h);
-            Assert.True(h.TickUntil(() => h.Mixer.Latest[voice].TargetRegionId == Floor1Room, 240),
-                $"Sean's voice stayed in region {h.Mixer.Latest[voice].TargetRegionId} after he went up a floor");
-            System.Threading.Thread.Sleep(150);
-            SeanSays(h);
-            h.Tick(3);
-            AssertSameUpAStorey(below.Select(c => c.Position).ToList(), SeansCopies(h).Select(c => c.Position).ToList(),
-                                "Sean's voice's copies");
-        }
-        finally { Talkers.Clear(); }
+        // Both of you go up a floor: everything that answered him downstairs answers him there.
+        h.StandAt(new Vector3(-1.5f, Storey, -2f));
+        MovePlayer(h, Sean, new Vector3(0.6f, Storey, 1.1f));
+        System.Threading.Thread.Sleep(150);
+        SeanSays(h);
+        Assert.True(h.TickUntil(() => h.Mixer.Latest[voice].TargetRegionId == Floor1Room, 240),
+            $"Sean's voice stayed in region {h.Mixer.Latest[voice].TargetRegionId} after he went up a floor");
+        System.Threading.Thread.Sleep(150);
+        SeanSays(h);
+        h.Tick(3);
+        AssertSameUpAStorey(below.Select(c => c.Position).ToList(), SeansCopies(h).Select(c => c.Position).ToList(),
+                            "Sean's voice's copies");
     }
 
     [Fact]

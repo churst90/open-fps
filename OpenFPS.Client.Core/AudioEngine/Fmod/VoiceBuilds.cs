@@ -32,7 +32,20 @@ public sealed class VoiceBuilds
 
     /// <summary>The model a voice of this kind starts with, made now on the calling thread.</summary>
     internal static PhysicalVoiceState? Make(ModelSynth kind, string physicalKey, int seed, float lever, float rate, IAudioClock clock,
-                                             OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere = null)
+                                             OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere = null,
+                                             OpenFPS.Client.AudioEngine.Core.MixSettings? mix = null)
+    {
+        var made = MakeAlone(kind, physicalKey, seed, lever, rate, clock, atmosphere);
+        if (mix != null)
+        {
+            if (made is MachineVoiceState machine) machine.Machine.UseMix(mix);
+            else if (made is AircraftVoiceState aircraft) aircraft.Aircraft.UseMix(mix);
+        }
+        return made;
+    }
+
+    private static PhysicalVoiceState? MakeAlone(ModelSynth kind, string physicalKey, int seed, float lever, float rate, IAudioClock clock,
+                                                 OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere)
     {
         string preset = ModelKindTable.KindOf(physicalKey) is { } k ? k.Rest(physicalKey) : physicalKey;
         return kind switch
@@ -65,6 +78,7 @@ public sealed class VoiceBuilds
 
     private readonly IAudioClock _clock;
     private readonly OpenFPS.Client.AudioEngine.Core.Atmosphere? _atmosphere;
+    private readonly OpenFPS.Client.AudioEngine.Core.MixSettings? _mix;
     /// <summary>Models being made for a voice, by voice.</summary>
     private readonly ConcurrentDictionary<int, Build> _forVoice = new();
     /// <summary>Models made ahead, by what they are made from.</summary>
@@ -78,10 +92,13 @@ public sealed class VoiceBuilds
 
     /// <param name="clock">The world's clock, which the models it makes tell time by.</param>
     /// <param name="atmosphere">The world's air, which a machine's thermostat reads; null gives each its own.</param>
-    public VoiceBuilds(IAudioClock clock, OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere = null)
+    /// <param name="mix">The mixer's live levers, which the engines it makes read; null gives each its own.</param>
+    public VoiceBuilds(IAudioClock clock, OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere = null,
+                       OpenFPS.Client.AudioEngine.Core.MixSettings? mix = null)
     {
         _clock = clock;
         _atmosphere = atmosphere;
+        _mix = mix;
     }
 
     /// <summary>What <see cref="Take"/> found.</summary>
@@ -203,7 +220,7 @@ public sealed class VoiceBuilds
     private Task<PhysicalVoiceState?> Start(Recipe r)
     {
         var clock = _clock;
-        return OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () => Make(r.Kind, r.Key, r.Seed, r.Lever, r.Rate, clock, _atmosphere));
+        return OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () => Make(r.Kind, r.Key, r.Seed, r.Lever, r.Rate, clock, _atmosphere, _mix));
     }
 
     /// <summary>
@@ -219,7 +236,9 @@ public sealed class VoiceBuilds
             // client and every run hears the same train.
             int seed = 17;
             foreach (char c in train) seed = unchecked(seed * 31 + c);
-            return new TrainVoiceState(shared, TrainProfile.ByName(preset), rate, seed & 0x7fff, clock);
+            var made = new TrainVoiceState(shared, TrainProfile.ByName(preset), rate, seed & 0x7fff, clock);
+            if (_mix != null) made.Train.UseMix(_mix);
+            return made;
         }));
         if (!task.IsCompleted) return null;
         if (task.IsFaulted) throw task.Exception!.InnerException ?? task.Exception;

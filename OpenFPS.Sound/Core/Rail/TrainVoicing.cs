@@ -133,12 +133,13 @@ public static class TrainVoicing
 
     /// <summary>
     /// The mixer's gain for a physical source of this level and size at this distance, as it would play
-    /// it through a voice of its own (Loudness.Place, then the law), before the path and the ear model.
+    /// it through a voice of its own (the world's law, <paramref name="hearing"/>), before the path and the ear
+    /// model.
     /// </summary>
-    public static float LawGain(float levelDb, float extentMetres, float distance)
+    public static float LawGain(OpenFPS.Common.Hearing.HearingSettings hearing, float levelDb, float extentMetres, float distance)
     {
-        var (gain, reference) = Loudness.Place(levelDb, extentMetres);
-        return Loudness.RenderedGain(gain, reference, Loudness.AudibleRange(levelDb), distance);
+        var (gain, reference) = hearing.Place(levelDb, extentMetres);
+        return Loudness.RenderedGain(gain, reference, hearing.AudibleRange(levelDb), distance);
     }
 
     /// <summary>

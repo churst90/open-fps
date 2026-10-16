@@ -211,7 +211,7 @@ public sealed class RailSystem
                             SoundId = soundId,
                             Mode = PlaybackMode.LoopOne,
                             Volume = 1f,
-                            Range = Loudness.AudibleRange(src.LevelDb),
+                            Range = Loudness.AudibleRange(src.LevelDb, Loudness.DefaultCompression),
                             MinDistance = 3f,
                         }));
                 }

@@ -26,6 +26,9 @@ namespace OpenFPS.Tests;
 [Collection(nameof(LevelCompressionSetting))]
 public class RankingByLoudnessProbe
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public RankingByLoudnessProbe(ITestOutputHelper o) => _o = o;
 
@@ -66,10 +69,8 @@ public class RankingByLoudnessProbe
         foreach (var g in defs.GroupBy(d => d.SoundEmitter.SoundId).OrderByDescending(g => g.Count()))
             Say($"  {g.Count(),5}  {g.Key}");
 
-        bool wasOn = EarModel.Enabled;
         try
         {
-            EarModel.Enabled = true;
             EarTimbres.Clear();
             // Each kind's spectrum, as its live voice would measure itself.
             Say("\nmeasured spectra (6 s each, the first second left out), and what the law and the ear make of each:");
@@ -84,10 +85,10 @@ public class RankingByLoudnessProbe
                 if (timbre == null) { Say($"  {id,-36} silent (dry or off): ranked unmeasured"); continue; }
                 EarTimbres.Set(id, timbre);
                 float level = LevelOf(id);
-                float corr = Loudness.TimbreCorrectionDb(level, timbre);
-                var (gain, reference) = Loudness.Place(level);
+                float corr = Law.TimbreCorrectionDb(level, timbre);
+                var (gain, reference) = Law.Place(level);
                 float played = Loudness.RenderedGain(gain * MathF.Pow(10f, corr / 20f), reference, 500f, 10f);
-                float heard = Loudness.HeardGain(played, timbre, physical: true);
+                float heard = Law.HeardGain(played, timbre, physical: true);
                 Say($"  {id,-36} {level,5:F0}  {corr,+10:+0.0;-0.0}  {20 * MathF.Log10(heard / played),+8:+0.0;-0.0} dB");
             }
 
@@ -118,8 +119,6 @@ public class RankingByLoudnessProbe
         }
         finally
         {
-            Loudness.RankOnPlayedGain = false;
-            EarModel.Enabled = wasOn;
             EarTimbres.Clear();
         }
         File.WriteAllText(Path.Combine(outDir, "ranking.txt"), report.ToString());
@@ -170,8 +169,8 @@ public class RankingByLoudnessProbe
     /// (a machine, a fountain's taps), what it ranked at and whether it has a voice.</summary>
     private static Dictionary<string, Ranked> Choose(List<EntityDefinition> defs, Vector3 feet, bool onGain)
     {
-        Loudness.RankOnPlayedGain = onGain;
         var h = new ClientAudioHarness();
+        h.Facade.Hearing.RankOnPlayedGain = onGain;
         foreach (var d in defs) h.World.RegisterDefinition(d);
         h.StandAt(feet);
         h.Tick(12);
@@ -197,7 +196,6 @@ public class RankingByLoudnessProbe
                 Live = members.Any(h.Mixer.Live.Contains),
             };
         }
-        Loudness.RankOnPlayedGain = false;
         return result;
     }
 }

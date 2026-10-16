@@ -82,6 +82,13 @@ public sealed class TrainSynth
 
     private readonly IPresets _presets;
 
+    /// <summary>Puts its engines on the live levers of the mixer it plays in (MixSettings.ValveJetNoise): its
+    /// voice's, which the mixer gives it as it makes it.</summary>
+    public void UseMix(MixSettings mix)
+    {
+        foreach (var d in _diesels) d.Mix = mix;
+    }
+
     /// <summary>A consist's voices. Its engines, horn, whistle and bell are <paramref name="presets"/>' (the
     /// catalogue's), so one changed in the world editor is the one heard.</summary>
     public TrainSynth(TrainProfile p, IPresets presets, float rate = RenderRate.Default, int seed = 41, double headAt = 0)

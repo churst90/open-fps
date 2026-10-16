@@ -34,6 +34,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class GroundWaterSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
 
     public static int Run(string[] args)
@@ -401,7 +405,7 @@ public static class GroundWaterSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -414,7 +418,7 @@ public static class GroundWaterSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         world.RegisterDefinition(new EntityDefinition
         {
@@ -478,7 +482,7 @@ public static class GroundWaterSpike
                 def.SoundEmitter = new SoundEmitterComponent
                 {
                     IsSynth = true, SoundId = v.SoundId, Mode = PlaybackMode.LoopOne, Volume = 1f,
-                    Range = MathF.Max(60f, Loudness.AudibleRange(spec.SourceLevelDb + 6f)), MinDistance = 1f, ExtentMetres = spec.ExtentMetres,
+                    Range = MathF.Max(60f, LabHearing.AudibleRange(spec.SourceLevelDb + 6f)), MinDistance = 1f, ExtentMetres = spec.ExtentMetres,
                 };
                 world.RegisterDefinition(def);
                 ids.Add(id);

@@ -514,15 +514,14 @@ public sealed partial class RunningWaterSynth
         }
     }
 
-    /// <summary>For the lab only (AudioLab --running-water game noise=1): each place plays its own white
-    /// noise, 0.1 Pa rms at a metre, instead of its water, so what the game's path does to a source at
-    /// these places can be told from what the water does.</summary>
-    public static bool LabNoise;
+    /// <summary>The lab's levers on this water (LabLevers.WaterAsNoise): its mixer's, which gives it them as it
+    /// makes the voice, or its instrument's. The game's when made alone.</summary>
+    public LabLevers Lab { get; set; } = new();
 
     /// <summary>The next sample at each place, pascals at a metre from it. Their sum is the source.</summary>
     public void NextPlaces(Span<float> places)
     {
-        if (LabNoise)
+        if (Lab.WaterAsNoise)
         {
             for (int k = 0; k < _open.Length && k < places.Length; k++) places[k] = 0.1732f * _open[k].Signed();
             return;

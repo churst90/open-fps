@@ -86,8 +86,8 @@ public static class PathProbeSpike
         int id = 1;
         bool traced = args.Contains("traced");
         Explain = args.Contains("explain");
+        worker.Lab.TraceProvenance = Explain;
         Constructions.PanelsOnlyForLab = args.Contains("panels");
-        AsyncAcousticWorker.TraceProvenance = Explain;
         void Ask(Vector3 at) => worker.EnqueueRequest(new AcousticRequest { EntityId = 997, ListenerPos = at, SourcePos = at + Vector3.UnitX, SourceRadius = 0.1f });
         Measure(worker, acoustics, world, ear, srcs, ref id);
         if (traced && srcs.Count > 0) TracedBinaural.Report(worker.Traced, ear, srcs[0], Ask);

@@ -22,6 +22,13 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class StruckSpike
 {
+    /// <summary>only=BITS: the parts of a strike <see cref="Report"/> renders (StruckThings.RenderPascals' heard).</summary>
+    private static int Heard = -1;
+
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
     private static readonly CultureInfo Ci = CultureInfo.InvariantCulture;
 
@@ -48,18 +55,16 @@ public static class StruckSpike
         if (Arg(args, "bump=") is { } bump && BumpTargets().FirstOrDefault(b => b.File == bump) is { Thing.Material: not null } target)
             strike = new Strike(target.Thing, StruckThings.BodyBump(Num(args, "speed=", 1.2f), 0.45f, 0.62f, target.LengthIsUp, 0f));
         _ = StruckThings.LevelAnchorDb;   // worked out with every part heard, before any are muted
-        if (Arg(args, "only=") is { } only) StruckThings.Heard = int.Parse(only, Ci);
+        if (Arg(args, "only=") is { } only) Heard = int.Parse(only, Ci);
         Report(strike, Arg(args, "out="), args);
-        StruckThings.Heard = -1;
+        Heard = -1;
         if (args.Contains("parts"))
         {
             // Each part alone: where the energy comes from.
             _ = StruckThings.LevelAnchorDb;
             foreach (var (bit, name) in new[] { (1, "listed modes"), (2, "dense field"), (4, "striker's stop"), (8, "own motion and ground"), (16, "near field"), (32, "loose fit") })
             {
-                StruckThings.Heard = bit;
-                var p = StruckThings.RenderPascals(strike, Rate, out float pk);
-                StruckThings.Heard = -1;
+                var p = StruckThings.RenderPascals(strike, Rate, out float pk, heard: bit);
                 if (pk <= 0) continue;
                 var bands = Octaves(p, 0, Rate * 120 / 1000);
                 Console.WriteLine($"  {name,-22} peak {20 * MathF.Log10(pk / 2e-5f) + StruckThings.LevelAnchorDb,6:F1} dB  sound exposure by band (dB re 20 uPa^2 s): "
@@ -99,7 +104,7 @@ public static class StruckSpike
             Console.WriteLine($"    {md.Hz,9:F1} Hz  T60 {t60,7:F3} s  loss {md.Loss:0.#####}  drive {md.Drive,6:F2}  radiation {md.Radiation,8:F2} Pa/(m/s)");
         }
         var sw = Stopwatch.StartNew();
-        var p = StruckThings.RenderPascals(strike, Rate, out float peak);
+        var p = StruckThings.RenderPascals(strike, Rate, out float peak, Heard);
         long ms = sw.ElapsedMilliseconds;
         Console.WriteLine($"  first blow: in contact {StruckThings.LastContactSeconds * 1000:F2} ms, peak force {StruckThings.LastPeakForce:F0} N");
         float anchored = 20f * MathF.Log10(MathF.Max(peak, 1e-9f) / 2e-5f) + StruckThings.LevelAnchorDb;
@@ -350,7 +355,7 @@ public static class StruckSpike
             Measure(played, out float peakDbfs, out float rmsDbfs, out int clipped, out float zeroMs);
             var bands = Shape(Octaves(pcm, 0, Rate * 12 / 100));
             WriteFloatWav(Path.Combine(dir, it.File), played);
-            lines.Add(string.Join("\t", it.File, it.What, db.ToString("F1", Ci), Loudness.Place(db).Gain.ToString("F4", Ci),
+            lines.Add(string.Join("\t", it.File, it.What, db.ToString("F1", Ci), LabHearing.Place(db).Gain.ToString("F4", Ci),
                                   peakDbfs.ToString("F1", Ci), rmsDbfs.ToString("F1", Ci), (played.Length / (float)Rate).ToString("F2", Ci),
                                   clipped.ToString(Ci), zeroMs.ToString("F1", Ci), Bands(bands), ms.ToString(Ci)));
             Console.WriteLine($"{it.File,-46} {db,6:F1} dB  peak {peakDbfs,6:F1} dBFS  rms {rmsDbfs,6:F1}  {played.Length / (float)Rate,5:F2} s  {ms,5} ms  {Bands(bands)}");
@@ -364,7 +369,7 @@ public static class StruckSpike
             string name = $"old-bump-{file}.wav";
             WriteFloatWav(Path.Combine(dir, name), played);
             var bands = Shape(Octaves(old, 0, Rate * 12 / 100));
-            lines.Add(string.Join("\t", name, $"the old bump into {what}", db.ToString("F1", Ci), Loudness.Place(db).Gain.ToString("F4", Ci),
+            lines.Add(string.Join("\t", name, $"the old bump into {what}", db.ToString("F1", Ci), LabHearing.Place(db).Gain.ToString("F4", Ci),
                                   peakDbfs.ToString("F1", Ci), rmsDbfs.ToString("F1", Ci), (played.Length / (float)Rate).ToString("F2", Ci),
                                   clipped.ToString(Ci), zeroMs.ToString("F1", Ci), Bands(bands), "0"));
             Console.WriteLine($"{name,-46} {db,6:F1} dB  peak {peakDbfs,6:F1} dBFS  rms {rmsDbfs,6:F1}  {Bands(bands)}");
@@ -405,7 +410,7 @@ public static class StruckSpike
     /// distance: the loudness law's gain at the shipped /levels (Loudness.Place). No room, no ear-model tone.</summary>
     internal static float[] GameLevel(float[] pcm, float db)
     {
-        float g = Loudness.Place(db).Gain;
+        float g = LabHearing.Place(db).Gain;
         var y = new float[pcm.Length];
         for (int i = 0; i < y.Length; i++) y[i] = pcm[i] * g;
         return y;

@@ -17,6 +17,10 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class VehicleSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     /// <summary>The listener stands on the pavement, a few metres off the centre line.</summary>
     private static readonly Vector3 Ear = new(4.5f, 1.7f, 0f);
 
@@ -29,7 +33,7 @@ public static class VehicleSpike
         AcousticRegistry.Initialize();
         var v = VehicleProfile.ByName(preset);
         var speeds = speedsKmh is { Length: > 0 } ? speedsKmh : new[] { 30f, 60f, 90f };
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
@@ -43,7 +47,7 @@ public static class VehicleSpike
             float roadHalf = 48f;
             var pos = new Vector3(-roadHalf, 0.6f, 0f);
             float heading = MathF.PI / 2f;                   // driving +x
-            var (gain, reference) = Loudness.Place(116f);
+            var (gain, reference) = LabHearing.Place(116f);
             SpatialEmitter Make(Vector3 p, Vector3 vel, float speed) => new()
             {
                 EntityId = Id, Seed = Id,
@@ -57,7 +61,7 @@ public static class VehicleSpike
                 Position = p + Vector3.Transform(new Vector3(0f, 0.3f, v.ExhaustOffsetZ * 0.6f), Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f)),
                 Velocity = vel,
                 Volume = gain,
-                Range = Loudness.AudibleRange(116f),
+                Range = LabHearing.AudibleRange(116f),
                 MinDistance = MathF.Max(reference, 3f),
                 Pitch = 1f,
                 TargetRegionId = AcousticConstants.GlobalRegionId,
@@ -131,7 +135,7 @@ public static class VehicleSpike
         const float C = 340f;
         var ear = new Vector3(-9f, 1.7f, 0f);                // the pavement, west side, near the wall
 
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
@@ -155,7 +159,7 @@ public static class VehicleSpike
                 const int Id = -91000;
                 const float laneX = 3f;                       // the near lane, driving north (+z)
                 float roadStart = -110f, roadEnd = 130f;
-                var (gain, reference) = Loudness.Place(116f);
+                var (gain, reference) = LabHearing.Place(116f);
                 float heading = 0f;
 
                 SpatialEmitter Engine(Vector3 p, Vector3 vel, float speed) => new()
@@ -164,7 +168,7 @@ public static class VehicleSpike
                     EngineSpeed = speed, EngineRunning = true,
                     Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                     Position = p + Vector3.Transform(new Vector3(0f, 0.3f, v.ExhaustOffsetZ * 0.6f), Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f)),
-                    Velocity = vel, Volume = gain, Range = Loudness.AudibleRange(116f),
+                    Velocity = vel, Volume = gain, Range = LabHearing.AudibleRange(116f),
                     MinDistance = MathF.Max(reference, 3f), Pitch = 1f,
                     TargetRegionId = AcousticConstants.GlobalRegionId,
                 };
@@ -174,7 +178,7 @@ public static class VehicleSpike
                     EchoDelaySeconds = r.DelaySeconds, EchoGain = g,
                     Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                     Position = r.ApparentPosition, Velocity = Vector3.Zero,
-                    Volume = gain, Range = Loudness.AudibleRange(116f),
+                    Volume = gain, Range = LabHearing.AudibleRange(116f),
                     MinDistance = MathF.Max(reference, 3f), Pitch = 1f,
                     TargetRegionId = AcousticConstants.GlobalRegionId,
                 };
@@ -279,7 +283,7 @@ public static class VehicleSpike
         var v = preset != null ? VehicleProfile.ByName(preset) : muscle ? VehicleProfile.V8Muscle : VehicleProfile.V8Sports;
         // The key=value sweep every engine tool takes, so a layer can be bracketed without a rebuild.
         if (knobs != null) v = EngineOrderSpike.Override(v, knobs);
-        EngineSynth.DebugLegacyDiesel = knobs != null && Array.IndexOf(knobs, "legacydiesel") >= 0;
+        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { LegacyDiesel = knobs != null && Array.IndexOf(knobs, "legacydiesel") >= 0 };
         // body=off: the same car without its shell, to play against the other.
         if (!withBody) v = v with { Body = VehicleBody.None };
         // coupling=X: how much of the engine gets into the structure, the body model's one number set by
@@ -310,7 +314,7 @@ public static class VehicleSpike
         var gb = v.Gearbox;
 
         Console.WriteLine($"  {v.Name}\n");
-        var probe = new EngineSynth(e, VehicleSynth.SampleRate);
+        var probe = new EngineSynth(e, VehicleSynth.SampleRate) { Lab = lab };
         foreach (var line in probe.Describe()) Console.WriteLine($"    {line}");
         Console.WriteLine($"    gearbox       {gb.TopGear}-speed manual, shift in {gb.ShiftSeconds * 1000:F0} ms, up at {gb.UpshiftRpm:F0}");
         Console.Write($"    geared for    ");
@@ -337,7 +341,7 @@ public static class VehicleSpike
                 new(DriverAction.ShuttingDown, 1.6f),
             };
             Console.WriteLine("  Stationary: start, four blips up the rev range in neutral, shut off.\n");
-            var r = VehicleSynth.Render(v, revs);
+            var r = VehicleSynth.Render(v, revs, lab: lab);
             foreach (var line in r.Log) Console.WriteLine($"    {line}");
             string sd = OpenFPS.AudioLab.LabPaths.Output("VEHICLES");
             Directory.CreateDirectory(sd);
@@ -361,7 +365,7 @@ public static class VehicleSpike
         };
 
         Console.WriteLine("  Rendering...");
-        var render = VehicleSynth.Render(v, orders);
+        var render = VehicleSynth.Render(v, orders, lab: lab);
         foreach (var line in render.Log) Console.WriteLine($"    {line}");
 
         string dir = OpenFPS.AudioLab.LabPaths.Output("VEHICLES");
@@ -386,7 +390,7 @@ public static class VehicleSpike
     /// </summary>
     private static int PlayStationary(VehicleProfile v, string dir)
     {
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
@@ -408,7 +412,7 @@ public static class VehicleSpike
             {
                 string path = Path.Combine(dir, file);
                 if (!File.Exists(path)) continue;
-                var (gain, reference) = Loudness.Place(db);
+                var (gain, reference) = LabHearing.Place(db);
                 provider.PlaySpatialSound(new SpatialEmitter
                 {
                     EntityId = id--,
@@ -417,7 +421,7 @@ public static class VehicleSpike
                     Mode = PlaybackMode.Single,
                     Position = body + new Vector3(0f, 0f, offset),
                     Volume = gain,
-                    Range = Loudness.AudibleRange(db),
+                    Range = LabHearing.AudibleRange(db),
                     MinDistance = MathF.Max(reference, 3f),
                     Pitch = 1.0f,
                     TargetRegionId = AcousticConstants.GlobalRegionId,
@@ -444,7 +448,7 @@ public static class VehicleSpike
     /// </summary>
     private static int Play(VehicleProfile v, VehicleRender render, string dir)
     {
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
@@ -494,7 +498,7 @@ public static class VehicleSpike
             var ids = new int[parts.Length];
             for (int i = 0; i < parts.Length; i++)
             {
-                var (gain, reference) = Loudness.Place(parts[i].Db);
+                var (gain, reference) = LabHearing.Place(parts[i].Db);
                 ids[i] = id--;
                 provider.PlaySpatialSound(new SpatialEmitter
                 {
@@ -504,7 +508,7 @@ public static class VehicleSpike
                     Mode = PlaybackMode.Single,
                     Position = Body(0) + new Vector3(0f, 0f, parts[i].OffsetZ),
                     Volume = gain,
-                    Range = Loudness.AudibleRange(parts[i].Db),
+                    Range = LabHearing.AudibleRange(parts[i].Db),
                     MinDistance = MathF.Max(reference, 3f),
                     Pitch = 1.0f,
                     TargetRegionId = AcousticConstants.GlobalRegionId,
@@ -533,9 +537,9 @@ public static class VehicleSpike
                         EntityId = ids[i],
                         Position = body + new Vector3(0f, 0f, parts[i].OffsetZ),
                         Velocity = vel,
-                        Volume = Loudness.Place(parts[i].Db).Gain,
-                        Range = Loudness.AudibleRange(parts[i].Db),
-                        MinDistance = MathF.Max(Loudness.Place(parts[i].Db).ReferenceDistance, 3f),
+                        Volume = LabHearing.Place(parts[i].Db).Gain,
+                        Range = LabHearing.AudibleRange(parts[i].Db),
+                        MinDistance = MathF.Max(LabHearing.Place(parts[i].Db).ReferenceDistance, 3f),
                         Pitch = 1.0f,
                         TargetRegionId = AcousticConstants.GlobalRegionId,
                     });

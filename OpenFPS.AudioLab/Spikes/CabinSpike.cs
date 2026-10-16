@@ -27,6 +27,16 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class CabinSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
+    /// <summary>This instrument's mix (cabin= sets its cabin level), shared with the mixer it makes.</summary>
+    private static readonly MixSettings LabMix = MixSettings.FromEnvironment();
+
+    /// <summary>probe=align: the engines this instrument makes carry the alignment click.</summary>
+    private static bool LabAlign;
+
     private const int Rate = 48000;
     /// <summary>How far the rides' 15 m brick facades stand off the crown (a 7 m road, 4.5 m pavements), so
     /// the late field round the car is a city street's, not open ground's.</summary>
@@ -40,9 +50,9 @@ public static class CabinSpike
         // place=one: the paths split, every one played from where the one voice was.
         if (Arg(args, "place=") is "one") CabinPaths.LabOnePlace = true;
         // cabin=DB: the cabin's traced response against its physical level, as /cabin sets it (-80: none).
-        if (Arg(args, "cabin=") is { } cabinDb) FmodAudioProvider.CabinDb = float.Parse(cabinDb, CultureInfo.InvariantCulture);
+        if (Arg(args, "cabin=") is { } cabinDb) LabMix.CabinDb = float.Parse(cabinDb, CultureInfo.InvariantCulture);
         // probe=align: a click in the engine's voice and its negative in the exhaust's tap (EngineVoiceState.LabAlignProbe).
-        if (Arg(args, "probe=") is "align") EngineVoiceState.LabAlignProbe = true;
+        if (Arg(args, "probe=") is "align") LabAlign = true;
         // roof=world: the rain on the ridden vehicle's roof stays in the world rather than riding with the head.
         if (Arg(args, "roof=") is "world") RainField.RoofRidesWithHead = false;
         if (args.Contains("model")) return Model(args);
@@ -101,7 +111,7 @@ public static class CabinSpike
             var v = MachineRegistry.VehicleFor(key);
             float speed = kmh / 3.6f;
             var rig = new Rig(v);
-            var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed, CompensateLevel = false, Interior = true };
+            var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = speed, CompensateLevel = false, Interior = true, LabAlignProbe = LabAlign };
             voice.PlaceAtSpeed(speed);
             voice.Revive();
             voice.Wheels = rig.Wire(speed, 0f, water);
@@ -199,7 +209,7 @@ public static class CabinSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Console.WriteLine($"Cabin paths {(CabinPaths.Enabled ? "on" : "off (one point)")}; ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}; /levels {Loudness.DynamicRangeCompression:F2}");
+        Console.WriteLine($"Cabin paths {(CabinPaths.Enabled ? "on" : "off (one point)")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}; /levels {LabHearing.Compression:F2}");
 
         // Outside, open asphalt; riding, the room is the cabin traced from the vehicle's shell.
         var cs = Phonon.DefaultContextSettings();
@@ -211,7 +221,7 @@ public static class CabinSpike
             new(new Vector3(0f, 7.5f, FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
             new(new Vector3(0f, 7.5f, -FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
         });
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing, Mix = LabMix, Lab = new() { EngineAlignProbe = LabAlign } };
         provider.Traced.Configure(ctx, scene);
 
         var facade = new AudioEngineFacade(provider);
@@ -230,7 +240,7 @@ public static class CabinSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         world.RegisterDefinition(new EntityDefinition
         {
@@ -317,7 +327,7 @@ public static class CabinSpike
             def.SoundEmitter.SoundId = "engine:" + preset;
             def.SoundEmitter.Mode = PlaybackMode.LoopOne;
             def.SoundEmitter.Volume = 1f;
-            def.SoundEmitter.Range = Loudness.AudibleRange(profile.SourceLevelDb);
+            def.SoundEmitter.Range = LabHearing.AudibleRange(profile.SourceLevelDb);
             def.SoundEmitter.MinDistance = 3f;
             world.RegisterDefinition(def);
             return id;

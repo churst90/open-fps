@@ -384,10 +384,10 @@ public sealed class BirdLife
     private void Call(WorldSnapshot world, BirdSpecies sp, string sound, Vector3 at, Vector3 velocity, float pitch, Vector3 listener,
                       Group? group = null)
     {
-        float range = Loudness.AudibleRange(sp.CallDb);
+        float range = _audio.Hearing.AudibleRange(sp.CallDb);
         float d = Vector3.Distance(at, listener);
         if (d > range) return;
-        var (gain, reference) = Loudness.Place(sp.CallDb);
+        var (gain, reference) = _audio.Hearing.Place(sp.CallDb);
         if (Loudness.RenderedGain(gain, reference, range, d) < InaudibleGain) return;
         OnCall?.Invoke(sp.Name, at);
         AcousticPathData? path = PathOf(world, group, at, listener);

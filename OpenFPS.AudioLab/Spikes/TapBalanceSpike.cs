@@ -14,6 +14,10 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// </summary>
 public static class TapBalanceSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     const int Rate = 44100, Block = 1024;
 
     public static int Run(string[] args)
@@ -26,7 +30,7 @@ public static class TapBalanceSpike
             int seed = int.Parse(sd[5..]);
             foreach (var n in names.Where(n => n != "squeal" && !n.StartsWith("seed=")))
             {
-                var q = new EngineVoiceState(VehicleProfile.ByName(n), Rate, seed).Squeal;
+                var q = new EngineVoiceState(VehicleProfile.ByName(n), Rate, seed) { Hearing = LabHearing }.Squeal;
                 Console.WriteLine($"{n} seed {seed}: {(q.Squeals ? $"squeals at {q.Hz:F0} Hz" : "does not squeal")}");
             }
             return 0;
@@ -187,9 +191,7 @@ public static class TapBalanceSpike
             Dump("port", r.Port, 1f);
             Dump("tail", r.Exhaust, r.PascalsPerUnit);
             Console.WriteLine($"{n}: exhaust {r.ExhaustDb:F1} dB");
-            EngineSynth.ValveJetNoise = false;
-            var q = VehicleSynth.Render(v, orders, seed: 5);
-            EngineSynth.ValveJetNoise = true;
+            var q = VehicleSynth.Render(v, orders, seed: 5, mix: new MixSettings { ValveJetNoise = false });
             Dump("port.nojet", q.Port, 1f);
             Dump("tail.nojet", q.Exhaust, q.PascalsPerUnit);
             Console.WriteLine($"{n}: exhaust without the valve jet {q.ExhaustDb:F1} dB");
@@ -204,7 +206,7 @@ public static class TapBalanceSpike
 
     static (float L, float M, float H) BandsOf(VehicleProfile v, Action<EngineVoiceState>? mute, string? tag = null)
     {
-        var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = 12f };
+        var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = 12f };
         mute?.Invoke(voice);
         voice.PlaceAtSpeed(12f);
         voice.Revive();
@@ -247,10 +249,10 @@ public static class TapBalanceSpike
             var v = VehicleProfile.ByName(n);
             int squealing = 0, first = -1;
             for (int seed = 1; seed <= 200; seed++)
-                if (new EngineVoiceState(v, Rate, seed).Squeal.Squeals) { squealing++; if (first < 0) first = seed; }
+                if (new EngineVoiceState(v, Rate, seed) { Hearing = LabHearing }.Squeal.Squeals) { squealing++; if (first < 0) first = seed; }
             Console.Write($"{n,-18} {squealing,3}/200 squeal");
             if (first < 0) { Console.WriteLine(); continue; }
-            float hz = new EngineVoiceState(v, Rate, first).Squeal.Hz;
+            float hz = new EngineVoiceState(v, Rate, first) { Hearing = LabHearing }.Squeal.Hz;
             var with = StopFront(v, first, 1f, 2.92f);
             var without = StopFront(v, first, 0f, 2.92f);
             int win = Rate / 10;
@@ -276,7 +278,7 @@ public static class TapBalanceSpike
         foreach (var n in names)
         {
             var v = VehicleProfile.ByName(n);
-            var voice = new EngineVoiceState(v, Rate, 5961) { TargetSpeed = 40f / 3.6f };
+            var voice = new EngineVoiceState(v, Rate, 5961) { Hearing = LabHearing, TargetSpeed = 40f / 3.6f };
             voice.PlaceAtSpeed(40f / 3.6f);
             voice.Revive();
             var buf = new float[256];
@@ -318,7 +320,7 @@ public static class TapBalanceSpike
         foreach (var n in names)
         {
             var v = VehicleProfile.ByName(n);
-            var voice = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 12f };
+            var voice = new EngineVoiceState(v, Rate, 3) { Hearing = LabHearing, TargetSpeed = 12f };
             voice.PlaceAtSpeed(12f); voice.Revive();
             var buf = new float[Block];
             for (int b = 0; b < Rate / Block; b++) voice.Render(buf);
@@ -327,14 +329,12 @@ public static class TapBalanceSpike
             for (int b = 0; b < blocks; b++) voice.Render(buf);
             double rt = sw.Elapsed.TotalSeconds / (blocks * (double)Block / Rate);
             // The same again with the exhaust valves' flow noise off: what that mechanism costs.
-            EngineSynth.ValveJetNoise = false;
-            var v2 = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 12f };
+            var v2 = new EngineVoiceState(v, Rate, 3) { Hearing = LabHearing, TargetSpeed = 12f, Mix = new MixSettings { ValveJetNoise = false } };
             v2.PlaceAtSpeed(12f); v2.Revive();
             for (int b = 0; b < Rate / Block; b++) v2.Render(buf);
             sw.Restart();
             for (int b = 0; b < blocks; b++) v2.Render(buf);
             double rtOff = sw.Elapsed.TotalSeconds / (blocks * (double)Block / Rate);
-            EngineSynth.ValveJetNoise = true;
             Console.WriteLine($"{n,-22} {rt,6:F3} core-seconds per second ({rtOff:F3} without the valve flow noise)");
         }
         return 0;
@@ -367,7 +367,7 @@ public static class TapBalanceSpike
     static void BandsAt(VehicleProfile v, Action<EngineVoiceState> mute, string tag, float speed)
     {
         string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? "/tmp";
-        var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed };
+        var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = speed };
         mute(voice);
         voice.PlaceAtSpeed(speed);
         voice.Revive();
@@ -383,7 +383,7 @@ public static class TapBalanceSpike
 
     static float[] StopFront(VehicleProfile v, int seed, float squeal, float decel)
     {
-        var voice = new EngineVoiceState(v, Rate, seed) { TargetSpeed = 10f, SplitVoices = true, SquealMix = squeal };
+        var voice = new EngineVoiceState(v, Rate, seed) { Hearing = LabHearing, TargetSpeed = 10f, SplitVoices = true, SquealMix = squeal };
         voice.PlaceAtSpeed(10f);
         voice.Revive();
         var tap = new EngineTapState(voice);
@@ -418,7 +418,7 @@ public static class TapBalanceSpike
             foreach (var (state, sp, from) in new[] { ("idle", 0f, -1f), ("cruise", 12f, -1f), ("floored", 30f, 3f) })
                 foreach (var (tag, prof) in new[] { ("", v), (".noturbo", quiet) })
                 {
-                    var voice = new EngineVoiceState(prof, Rate, 11) { TargetSpeed = sp, SplitVoices = true };
+                    var voice = new EngineVoiceState(prof, Rate, 11) { Hearing = LabHearing, TargetSpeed = sp, SplitVoices = true };
                     voice.PlaceAtSpeed(from >= 0f ? from : sp);
                     voice.Revive();
                     var tap = new EngineTapState(voice);
@@ -463,7 +463,7 @@ public static class TapBalanceSpike
             foreach (var (state, sp) in new[] { ("idle", 0f), ("cruise", 12f) })
                 foreach (var (tag, prof, mute) in parts)
                 {
-                    var voice = new EngineVoiceState(prof, Rate, 11) { TargetSpeed = sp, SplitVoices = true };
+                    var voice = new EngineVoiceState(prof, Rate, 11) { Hearing = LabHearing, TargetSpeed = sp, SplitVoices = true };
                     mute?.Invoke(voice);
                     voice.PlaceAtSpeed(sp);
                     voice.Revive();
@@ -492,7 +492,7 @@ public static class TapBalanceSpike
         foreach (var n in names)
         {
             var v = VehicleProfile.ByName(n);
-            var voice = new EngineVoiceState(v, Rate, 5);
+            var voice = new EngineVoiceState(v, Rate, 5) { Hearing = LabHearing };
             float start = v.Engine.RedlineRpm * 0.5f / 60f * 2f * MathF.PI * v.Gearbox.WheelRadiusMetres
                         / MathF.Max(0.1f, v.Gearbox.Ratios[0] * v.Gearbox.FinalDrive);
             voice.PlaceAtSpeed(start);
@@ -542,7 +542,7 @@ public static class TapBalanceSpike
     /// of distances, before the master makeup and limiter.</summary>
     static int Placed()
     {
-        Console.WriteLine($"ceiling {Loudness.RenderCeilingDb:F1} dB SPL, compression {Loudness.DynamicRangeCompression:F2}");
+        Console.WriteLine($"ceiling {LabHearing.RenderCeilingDb:F1} dB SPL, compression {LabHearing.Compression:F2}");
         var rows = new List<(string, float, float)>
         {
             ("5.56 rifle", Loudness.Rifle556Db, 0f), ("7.62x39 rifle", Loudness.Rifle762Db, 0f),
@@ -556,8 +556,8 @@ public static class TapBalanceSpike
         Console.WriteLine($"{"source",-20} {"dB@1m",6} {"gain",6} {"ref m",6} {"range",6}   dBFS at 1 / 10 / 30 / 100 / 300 m");
         foreach (var (name, db, extent) in rows)
         {
-            var (g, r) = extent > 0f ? Loudness.Place(db, extent) : Loudness.Place(db);
-            float range = Loudness.AudibleRange(db);
+            var (g, r) = extent > 0f ? LabHearing.Place(db, extent) : LabHearing.Place(db);
+            float range = LabHearing.AudibleRange(db);
             string At(float d) => $"{20f * MathF.Log10(MathF.Max(1e-9f, Loudness.RenderedGain(g, r, range, d))),6:F1}";
             Console.WriteLine($"{name,-20} {db,6:F0} {20f * MathF.Log10(g),6:F1} {r,6:F1} {range,6:F0}   {At(1)} {At(10)} {At(30)} {At(100)} {At(300)}");
         }
@@ -566,7 +566,7 @@ public static class TapBalanceSpike
 
     static (float Rear, float Front) Measure(VehicleProfile v, float speed, Action<EngineVoiceState>? mute = null, float from = -1f)
     {
-        var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed, SplitVoices = true };
+        var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = speed, SplitVoices = true };
         mute?.Invoke(voice);
         voice.PlaceAtSpeed(from >= 0f ? from : speed);
         voice.Revive();

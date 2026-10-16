@@ -357,7 +357,7 @@ public class DspCallbackTests
     public void TheWindAtTheEarsIsSilentWithNobodyThereAndFiniteWithSomebody()
     {
         var read = Callback(typeof(EarWindProcessor));
-        var state = new EarWindState(Rate, new WorldWeather { Wind = WindWeather.Steady(8f, 270f, 0f) });
+        var state = new EarWindState(Rate, new WorldWeather { Wind = WindWeather.Steady(8f, 270f, 0f) }, new OpenFPS.Common.Hearing.HearingSettings());
         using var dsp = new FakeDsp(state);
         using var output = new Pinned(Block * 2);
         for (int b = 0; b < 8; b++) Run(read, dsp, IntPtr.Zero, output, Block, 0, 2);

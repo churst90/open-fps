@@ -308,7 +308,7 @@ public sealed partial class VehicleSystem
                             SoundId = soundId,
                             Mode = PlaybackMode.LoopOne,
                             Volume = 1f,
-                            Range = Loudness.AudibleRange(sourceLevelDb),
+                            Range = Loudness.AudibleRange(sourceLevelDb, Loudness.DefaultCompression),
                             MinDistance = 3f,
                         });
                         Log.Information("Map {Map}: {Name} takes passengers — {Seats} seat(s).",
@@ -348,7 +348,7 @@ public sealed partial class VehicleSystem
                         Volume = 1f,
                         // From its loudness, as the client places it: the broadcast radius is sized
                         // from this, and a flat 220 m lost the cars round the back of a one-mile oval.
-                        Range = Loudness.AudibleRange(sourceLevelDb),
+                        Range = Loudness.AudibleRange(sourceLevelDb, Loudness.DefaultCompression),
                         MinDistance = 3f,
                     }));
                 if (e == Entity.Null) continue;

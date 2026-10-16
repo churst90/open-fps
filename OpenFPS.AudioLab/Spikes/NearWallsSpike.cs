@@ -65,7 +65,7 @@ public static class NearWallsSpike
             Span<bool> live = stackalloc bool[probes.Length];
             var set = new BoundaryProbe[probes.Length];
             for (int i = 0; i < probes.Length; i++) set[i] = shared ? probes[i] : probes[i] with { Share = 1f };
-            float trim = FmodAudioProvider.BoundaryTaps(set, c, 48000, taps, live) * FmodAudioProvider.CopiesTrim;
+            float trim = FmodAudioProvider.BoundaryTaps(set, c, 48000, taps, live) * OpenFPS.Client.AudioEngine.Core.MixSettings.FromEnvironment().CopiesTrim;
             double l = 0, r = 0;
             float total = 0f;
             for (int i = 0; i < probes.Length; i++)

@@ -440,6 +440,8 @@ OpenFPS.Sound/Core/Engine/ExhaustNetwork.cs	Sound
 OpenFPS.Sound/Core/Engine/ExhaustRadiation.cs	Sound	
 OpenFPS.Sound/Core/Engine/IntakeNetwork.cs	Sound	
 OpenFPS.Sound/Core/Engine/Waveguide.cs	Sound	
+OpenFPS.Sound/Core/LabLevers.cs	Sound	
+OpenFPS.Sound/Core/MixSettings.cs	Sound	
 OpenFPS.Sound/Core/Nature/EarWindSynth.cs	Sound	
 OpenFPS.Sound/Core/Nature/EventSum.cs	Sound	
 OpenFPS.Sound/Core/Nature/ExtendedSources.cs	Sound	
@@ -506,6 +508,7 @@ OpenFPS.Sound/HandOverSounds.cs	Sound
 OpenFPS.Sound/Hearing/BandAnalyser.cs	Sound	
 OpenFPS.Sound/Hearing/EarModel.cs	Sound	
 OpenFPS.Sound/Hearing/EqualLoudness.cs	Sound	
+OpenFPS.Sound/Hearing/HearingSettings.cs	Sound	
 OpenFPS.Sound/Hearing/LoudnessCompensation.cs	Sound	
 OpenFPS.Sound/Hearing/ReferenceVoice.cs	Sound	
 OpenFPS.Sound/Hearing/Timbre.cs	Sound	

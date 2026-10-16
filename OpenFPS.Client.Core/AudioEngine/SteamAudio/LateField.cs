@@ -63,13 +63,13 @@ internal sealed class LateField : IDisposable
     private readonly OpenFPS.Common.IAudioClock _clock;
 
     /// <summary>A simulator of its own on <paramref name="context"/>, at <paramref name="sampleRate"/>
-    /// (0: MixerQuality.MixerRate).</summary>
+    /// (0: MixerQuality.DefaultRate; the mixer's is TracedReverbSet.MixerRate).</summary>
     /// <param name="clock">The clock its answers are stamped on, the one their reader ages them on
     /// (FmodAudioProvider.Clock). None: one of its own.</param>
     public LateField(IntPtr context, int sampleRate = 0, OpenFPS.Common.IAudioClock? clock = null)
     {
         _clock = clock ?? new OpenFPS.Common.StopwatchAudioClock();
-        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
         Context = context; SampleRate = sampleRate;
         var s = new Phonon.IPLSimulationSettings
         {

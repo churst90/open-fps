@@ -17,6 +17,10 @@ public class ClientWorldState
     /// which is enough for a world nothing is listening to.</summary>
     public OpenFPS.Common.IAudioClock Clock { get; set; } = new OpenFPS.Common.StopwatchAudioClock();
 
+    /// <summary>The hearing of the audio world that listens to this one (AudioEngineFacade.Hearing), whose law
+    /// sizes a wood's reach as the woods are gathered (WoodChorus.Build). The shipped hearing until it is given one.</summary>
+    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; set; } = new();
+
     private readonly ConcurrentDictionary<int, EntityDefinition> _definitions = new();
     private readonly ConcurrentDictionary<int, Transform> _serverTransforms = new();
 
@@ -1286,7 +1290,7 @@ public class ClientWorldState
             var key = (cell.X, cell.Z, preset);
             if (!_woodIds.TryGetValue(key, out int id)) _woodIds[key] = id = WoodChorus.FirstId - _woodIds.Count;
             return id;
-        }, ModelLibrary.Presets);
+        }, ModelLibrary.Presets, Hearing);
         var keep = new HashSet<int>();
         foreach (var w in chorus.Woods)
         {

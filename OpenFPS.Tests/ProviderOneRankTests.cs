@@ -17,6 +17,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class ProviderOneRankTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private const int Rate = 48000;
     private static readonly Vector3 Ear = Vector3.Zero;
     private static readonly float FireHeadroom = PhysicalVoiceState.HeadroomGain(45f);
@@ -68,8 +71,8 @@ public class ProviderOneRankTests
             {
                 var a = new ActiveSound { Position = At(d), MinDistance = e.MinDistance, Range = e.Range, BaseVolume = e.Volume };
                 a.RankAs(e);
-                float provider = FmodAudioProvider.HeardHere(a, Ear);
-                float budget = VoiceManager.Audibility(e, d, playing: false);
+                float provider = FmodAudioProvider.HeardHere(Law, a, Ear);
+                float budget = VoiceManager.Audibility(Law, e, d, playing: false);
                 Assert.True(budget > 0f, $"{e.PhysicalKey}{e.SoundId}: nothing at {d} m");
                 Assert.InRange(provider / budget, 0.9999f, 1.0001f);
             }
@@ -91,7 +94,7 @@ public class ProviderOneRankTests
         var places = Enumerable.Range(1, 4).Select(i => Voice(i, At(3f), 0.002f, FireHeadroom)).ToList();
         foreach (var listed in new[] { places.Concat(new[] { car, twinA, bus, twinB }).ToList(), new[] { twinB, bus, twinA, car }.Concat(places).Reverse().ToList() })
         {
-            FmodAudioProvider.RankVoices(listed, Ear);
+            FmodAudioProvider.RankVoices(Law, listed, Ear);
             var order = new List<FmodAudioProvider.RenderSlot>();
             FmodAudioProvider.RenderAhead(listed, order, new Dictionary<TrainVoiceState, (float, int)>());
             Assert.Equal(new[] { 30, 20, 40, 41, 1, 2, 3, 4 }, order.Select(o => o.Id));
@@ -109,7 +112,7 @@ public class ProviderOneRankTests
         var loud = Voice(51, At(40f), 0.5f, machine: new TrainSlotState(t, 1, level, Rate, startSample: 0));
         var car = Voice(20, At(20f), 0.05f);
         var listed = new List<ActiveSound> { near, car, loud };
-        FmodAudioProvider.RankVoices(listed, Ear);
+        FmodAudioProvider.RankVoices(Law, listed, Ear);
         var order = new List<FmodAudioProvider.RenderSlot>();
         FmodAudioProvider.RenderAhead(listed, order, new Dictionary<TrainVoiceState, (float, int)>());
         Assert.True(t.Lanes.Length > 0);
@@ -132,8 +135,8 @@ public class ProviderOneRankTests
         var far = Voice(21, At(80f), 0.08f, engine: Engine());
         var fire = Voice(1, At(3f), 0.03f, FireHeadroom);
         var listed = new List<ActiveSound> { fire, near, far };
-        FmodAudioProvider.RankVoices(listed, Ear);
-        FmodAudioProvider.ChooseEngineDetail(listed, Ear);
+        FmodAudioProvider.RankVoices(Law, listed, Ear);
+        FmodAudioProvider.ChooseEngineDetail(listed, Ear, reduceFar: true);
         Assert.Equal(EngineDetail.Full, near.EngineState!.Detail);
         Assert.Equal(EngineDetail.Reduced, far.EngineState!.Detail);
     }
@@ -156,7 +159,7 @@ public class ProviderOneRankTests
         elsewhere.SourceReverbConnection = sending;
         elsewhere.TargetRegionId = 8;
         listed.Add(elsewhere);
-        FmodAudioProvider.RankVoices(listed, Ear);
+        FmodAudioProvider.RankVoices(Law, listed, Ear);
         var chosen = new List<ActiveSound>();
         FmodAudioProvider.LateCandidates(listed, 7, chosen);
         Assert.Equal(24, chosen.Count);
@@ -177,7 +180,7 @@ public class ProviderOneRankTests
         // Too near to be traced (the comb of a second set of early reflections close to).
         listed.Add(Voice(999, At(10f), 1f));
         foreach (var a in listed) a.SaDsp = binaural;
-        FmodAudioProvider.RankVoices(listed, Ear);
+        FmodAudioProvider.RankVoices(Law, listed, Ear);
         var keep = new HashSet<ActiveSound>();
         FmodAudioProvider.ChooseEchoSources(listed, Ear, 4, new List<(ActiveSound, float)>(), keep);
         Assert.Equal(new[] { 1000, 1001, 1002, 1003 }, keep.Select(a => a.EntityId).Order());
@@ -192,7 +195,7 @@ public class ProviderOneRankTests
     {
         var machine = Voice(1, At(10f), 0.05f);
         var fire = Voice(2, At(10f), 0.05f, FireHeadroom);
-        FmodAudioProvider.RankVoices(new List<ActiveSound> { machine, fire }, Ear);
+        FmodAudioProvider.RankVoices(Law, new List<ActiveSound> { machine, fire }, Ear);
         Assert.True(FmodAudioProvider.LeanWeight(machine) > 0f);
         Assert.InRange(FmodAudioProvider.LeanWeight(fire) / FmodAudioProvider.LeanWeight(machine), 0.999f, 1.001f);
     }

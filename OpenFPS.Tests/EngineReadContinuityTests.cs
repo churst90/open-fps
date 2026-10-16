@@ -11,7 +11,6 @@ namespace OpenFPS.Tests;
 /// samples), so the play position moves in whole blocks: a reflection a fixed distance behind it skipped
 /// 23 ms per extra call, and the front voice stepped (4-8 discontinuities a second, --quality echo).
 /// </summary>
-[Collection(nameof(ValveFlowSwitch))]
 public class EngineReadContinuityTests
 {
     private readonly ITestOutputHelper _o;
@@ -44,7 +43,7 @@ public class EngineReadContinuityTests
     {
         var profile = VehicleProfile.ByName("i4_midsize");
         float speed = 60f / 3.6f;
-        var source = new EngineVoiceState(profile, Rate, 7) { TargetSpeed = speed, ConsumeRate = pitch };
+        var source = new EngineVoiceState(profile, Rate, 7) { TargetSpeed = speed, ConsumeRate = pitch, Mix = ValveFlowSwitch.Off() };
         source.PlaceAtSpeed(speed);
         var echo = new EngineEchoState(source) { TargetDelaySeconds = 0.03f, TargetGain = 1f, SampleRate = Rate };
         var front = new EngineTapState(source) { ChannelRate = 1f };
@@ -74,7 +73,7 @@ public class EngineReadContinuityTests
     [Fact]
     public void AReflectionAndAFrontVoiceReadAPitchedCarWithoutSkipping()
     {
-        var (source, echo, front) = ValveFlowSwitch.Without(() => Drive(1.05f, 260));
+        var (source, echo, front) = Drive(1.05f, 260);
         int skip = 60 * Block;
         int s = Discontinuities(source, skip), e = Discontinuities(echo, skip), f = Discontinuities(front, skip);
         _o.WriteLine($"discontinuities after warm-up: the car itself {s}, its reflection {e}, its front voice {f}");

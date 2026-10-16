@@ -26,9 +26,6 @@ internal sealed class TracedReverb : IDisposable
 
     public const float DurationSeconds = 2.0f;
 
-    /// <summary>What the simulator produces: HYBRID gives the convolution IR and the reverb times;
-    /// CONVOLUTION the IR alone.</summary>
-    public static int SimulatedType = Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID;
     public const int Order = 2;
     public const int Channels = (Order + 1) * (Order + 1);
     /// <summary>Rays and bounces per trace. Sixty-four bounces, not sixteen: in a twelve-metre room
@@ -91,17 +88,9 @@ internal sealed class TracedReverb : IDisposable
     /// <summary>The trace's tail as energy, averaged over traces (SmoothTail). Made on the first
     /// read-back.</summary>
     private SmoothTail? _smooth;
-    /// <summary>The lab's A/B: play each trace's own samples, as before SmoothTail. Never set in the game.</summary>
-    public static bool RawTail;
-    /// <summary>The lab's A/B: the late part as one channel through the velvet branches, as before
-    /// DiffuseLate. Never set in the game.</summary>
-    public static bool OneChannelLate;
-    /// <summary>
-    /// The lab's latency probe: past zero, every trace publishes instead one click this many seconds
-    /// into the response, from one direction, and nothing else. Where it lands in a capture against
-    /// the dry sound is what the bus path adds. Never set in the game.
-    /// </summary>
-    public static float LabProbeSeconds;
+    /// <summary>The lab's levers on this trace (LabLevers: its simulation, the raw tail, one channel late, the
+    /// latency probe, the tail from 50 ms): its set's, or the game's when made alone.</summary>
+    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab { get; }
     /// <summary>The air of the world traced for, whose speed of sound places the copies (EarlyCopies): its
     /// set's (TracedReverbSet.Atmosphere). One of its own when made alone, as in the lab.</summary>
     public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; init; } = new();
@@ -210,20 +199,23 @@ internal sealed class TracedReverb : IDisposable
     private float[] _extractMono = Array.Empty<float>(), _extractInter = Array.Empty<float>();
 
     /// <param name="context">The Steam Audio context; the tracer makes a simulator of its own.</param>
-    /// <param name="sampleRate">0: the mixer's (MixerQuality.MixerRate).</param>
+    /// <param name="sampleRate">0: MixerQuality.DefaultRate (the mixer's is TracedReverbSet.MixerRate).</param>
     /// <param name="frameSize">The convolution's block (<see cref="TracedFrame"/>).</param>
     /// <param name="refreshMs">How often the trace is redone: a quarter second for the listener,
     /// who walks; a second for a room traced from its middle, which does not move.</param>
-    public TracedReverb(IntPtr context, int sampleRate = 0, int frameSize = TracedFrame, int refreshMs = DefaultRefreshMs)
+    /// <param name="lab">The lab's levers on it; null is the game.</param>
+    public TracedReverb(IntPtr context, int sampleRate = 0, int frameSize = TracedFrame, int refreshMs = DefaultRefreshMs,
+                        OpenFPS.Client.AudioEngine.Core.LabLevers? lab = null)
     {
-        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+        Lab = lab ?? new OpenFPS.Client.AudioEngine.Core.LabLevers();
+        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
         _refreshMs = refreshMs;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
         var s = new Phonon.IPLSimulationSettings
         {
             flags = Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS,
             sceneType = SteamAudioScene.TypeFor(context),
-            reflectionType = SimulatedType,
+            reflectionType = Lab.TracedSimulation ?? Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID,
             maxNumOcclusionSamples = 16, maxNumRays = Rays, numDiffuseSamples = 32,
             maxDuration = DurationSeconds, maxOrder = Order, maxNumSources = MaxReaders, numThreads = 2,
             rayBatchSize = 16, numVisSamples = 4, samplingRate = sampleRate, frameSize = frameSize,
@@ -384,7 +376,7 @@ internal sealed class TracedReverb : IDisposable
                         }
                         bool sceneChanged = _sceneChanged;
                         _sceneChanged = false;
-                        if (RawTail || KeepRaw)
+                        if (Lab.RawTail || KeepRaw)
                         {
                             // Each trace's own samples (the lab's raw tail).
                             SdmTailIr? rawSdm = null;
@@ -398,28 +390,29 @@ internal sealed class TracedReverb : IDisposable
                             }
                             else rawLate = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions);
                             RawLateSdm = rawSdm; RawLate = rawLate;
-                            if (RawTail) { LateSdm = rawSdm; Late = rawLate; DiffuseLate = null; }
+                            if (Lab.RawTail) { LateSdm = rawSdm; Late = rawLate; DiffuseLate = null; }
                         }
-                        if (!RawTail)
+                        if (!Lab.RawTail)
                         {
                             // The tail as energy, averaged, through fixed noise (SmoothTail), from the
                             // first reflection on, less what the placed copies carry (EarlyCopies).
                             long s0 = System.Diagnostics.Stopwatch.GetTimestamp();
                             _smooth ??= new SmoothTail(SampleRate, IrSize, DiffuseBranch.Count);
+                            _smooth.FromFiftyMs = Lab.TailFromFiftyMs;
                             var copies = _solids.Count > 0 ? EarlyCopies.From(_solids, at, SampleRate, Atmosphere.SpeedOfSound) : null;
                             _smooth.Add(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, _lateCov, at, place, sceneChanged, copies);
                             if (dirs != null)
                             {
                                 var sdm = _smooth.BuildDirectional(FrameSize);
                                 FillLateShares(_smooth.Cov, sdm.LateShare);
-                                DiffuseLate = OneChannelLate ? null : _smooth.BuildDiffuseLate(DiffuseLateNoise.Shared(SampleRate, IrSize, DiffuseBranch.Count));
+                                DiffuseLate = Lab.OneChannelLate ? null : _smooth.BuildDiffuseLate(DiffuseLateNoise.Shared(SampleRate, IrSize, DiffuseBranch.Count));
                                 LateSdm = sdm;
                                 Late = _smooth.BuildLate(FrameSize, MaxLatePartitions, afterDirectional: true);
                             }
                             else { Late = _smooth.BuildLate(FrameSize, MaxLatePartitions, afterDirectional: false); DiffuseLate = null; }
                             LastSmoothMs = (System.Diagnostics.Stopwatch.GetTimestamp() - s0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                         }
-                        if (LabProbeSeconds > 0f) PublishProbe(LabProbeSeconds);
+                        if (Lab.ProbeSeconds > 0f) PublishProbe(Lab.ProbeSeconds);
                     }
                     LastExtractMs = (System.Diagnostics.Stopwatch.GetTimestamp() - x0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 }
@@ -554,6 +547,11 @@ internal sealed class TracedReverbSet
     /// <summary>The air of that world, which whoever holds the set gives it as it gives the clock: the traces
     /// place their early copies at its speed of sound.</summary>
     public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
+    /// <summary>The rate of the mixer the traces are played in, Hz, which the mixer gives the set once it is made
+    /// (FmodAudioProvider.MixerRate): every trace is made at it.</summary>
+    public int MixerRate { get; set; } = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+    /// <summary>The lab's levers on that world, which every trace made here is made with (the mixer's).</summary>
+    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab { get; set; } = new();
     private readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> _rooms = new();
     private readonly HashSet<int> _roomsMaking = new();
     /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
@@ -621,13 +619,13 @@ internal sealed class TracedReverbSet
         TracedReverb? madeListener = null; TracedEchoes? madeEchoes = null; LateField? madeLate = null;
         if (missing)
         {
-            madeListener = new TracedReverb(context) { ExtractLate = true, Atmosphere = Atmosphere };
+            madeListener = new TracedReverb(context, MixerRate, lab: Lab) { ExtractLate = true, Atmosphere = Atmosphere };
             // On the scene without its open ground too: every voice carries its own ground bounce
             // (GroundReflection), and traced again a car at 30 m had it twice, a comb under a millisecond
             // late at about the direct level.
-            madeEchoes = new TracedEchoes(context);
+            madeEchoes = new TracedEchoes(context, MixerRate);
             // Each source's own late energy and its direction, on the listener's scene (LateField).
-            madeLate = new LateField(context, clock: Clock);
+            madeLate = new LateField(context, MixerRate, clock: Clock);
         }
         TracedReverb listener; TracedEchoes echoes; LateField late; List<TracedReverb> rooms;
         lock (_gate)
@@ -703,7 +701,7 @@ internal sealed class TracedReverbSet
     {
         Making("A room's trace");
         long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-        var t = new TracedReverb(context, refreshMs: 1000) { Atmosphere = Atmosphere };
+        var t = new TracedReverb(context, MixerRate, refreshMs: 1000, lab: Lab) { Atmosphere = Atmosphere };
         if (t.IsValid) { t.SetListener(at); t.SetScene(scene); }
         bool keep;
         SteamAudioScene? newer = null;
@@ -812,7 +810,7 @@ internal sealed class TracedReverbSet
             scene.Build(boxes);
             if (scene.IsBuilt)
             {
-                trace = new TracedReverb(context, refreshMs: 1000) { IsCabin = true, Atmosphere = Atmosphere };
+                trace = new TracedReverb(context, MixerRate, refreshMs: 1000, lab: Lab) { IsCabin = true, Atmosphere = Atmosphere };
                 // Its first trace from the middle of the cabin, until a seat is known.
                 if (trace.IsValid) { trace.SetListener(new Vector3(0f, g.FloorTop + g.Hc * 0.5f, g.Cz)); trace.SetScene(scene); }
                 else { trace.Dispose(); trace = null; }

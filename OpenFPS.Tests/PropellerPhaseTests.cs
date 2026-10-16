@@ -5,20 +5,13 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// For tests that measure a periodic mechanism (a phase, a period): runs with the exhaust valves' flow noise
-/// off (EngineSynth.ValveJetNoise), since a twelfth-octave band of that noise wanders 2-3 dB frame to frame
-/// on its own. The switch is process-wide, so these run alone and put it back.
+/// For tests that measure a periodic mechanism (a phase, a period): a mix with the exhaust valves' flow noise
+/// off (MixSettings.ValveJetNoise), since a twelfth-octave band of that noise wanders 2-3 dB frame to frame
+/// on its own. Each engine made with it is the only one that hears it, so these run beside anything.
 /// </summary>
-[CollectionDefinition(nameof(ValveFlowSwitch), DisableParallelization = true)]
-public class ValveFlowSwitch
+public static class ValveFlowSwitch
 {
-    public static T Without<T>(Func<T> f)
-    {
-        bool was = OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise;
-        OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = false;
-        try { return f(); }
-        finally { OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = was; }
-    }
+    public static OpenFPS.Client.AudioEngine.Core.MixSettings Off() => new() { ValveJetNoise = false };
 }
 
 /// <summary>
@@ -27,16 +20,14 @@ public class ValveFlowSwitch
 /// prop turned on its own smoothed speed instead of its crank, so blade rate and firing rate slid past each
 /// other. Measured as the spectrum's fine structure wandering frame to frame, the listener still.
 /// </summary>
-[Collection(nameof(ValveFlowSwitch))]
 public class PropellerPhaseTests
 {
     private const int Sr = 44100;
 
-    private static double Wander(AircraftProfile p) => ValveFlowSwitch.Without(() => WanderCore(p));
-
-    private static double WanderCore(AircraftProfile p)
+    private static double Wander(AircraftProfile p)
     {
         var syn = new AircraftSynth(p, ModelLibrary.Presets, Sr, 3);
+        syn.UseMix(ValveFlowSwitch.Off());
         syn.PlaceAtLever(0.7f); syn.Lever = 0.7f;
         syn.SetListener(new Vector3(60f, -40f, 10f));
         int n = Sr * 8;

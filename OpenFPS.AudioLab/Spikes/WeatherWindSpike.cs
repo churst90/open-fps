@@ -28,6 +28,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class WeatherWindSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 44100;
     private const int Block = 1024;
 
@@ -39,8 +43,8 @@ public static class WeatherWindSpike
         string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4);
         float sec = Arg(args, "sec=", 12f);
         if (dir != null) Directory.CreateDirectory(dir);
-        Loudness.DynamicRangeCompression = Loudness.DefaultCompression;
-        Console.WriteLine($"Loudness law: compression {Loudness.DynamicRangeCompression:F2}, ceiling {Loudness.RenderCeilingDb:F1} dB SPL at full scale.");
+        LabHearing.Compression = Loudness.DefaultCompression;
+        Console.WriteLine($"Loudness law: compression {LabHearing.Compression:F2}, ceiling {LabHearing.RenderCeilingDb:F1} dB SPL at full scale.");
         Console.WriteLine($"Ear law: {EarWind.ReferenceDb} dB at {EarWind.ReferenceSpeed} m/s, {EarWind.DbPerDecade} dB/decade; windward -{EarWind.WindwardDb} dB, lee +{EarWind.LeeDb}, from behind +{EarWind.FromBehindDb}; knee {EarWind.KneeHzPerMetrePerSecond} Hz per m/s.");
 
         if (args.Contains("live")) return Live(Arg(args, "sec=", 8f));
@@ -75,9 +79,9 @@ public static class WeatherWindSpike
                 var ears = EarWind.Ears(speed, moving, 0f);
                 var (l, r) = Render(ears, sec);
                 double ml = Db(Rms(l)), mr = Db(Rms(r));
-                double pl = EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb);
-                double pr = EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb);
-                double placed = EarWind.PlacedDb(ears.DeclaredDb);
+                double pl = EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb, LabHearing);
+                double pr = EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb, LabHearing);
+                double placed = EarWind.PlacedDb(ears.DeclaredDb, LabHearing);
                 // What the model claims at the ear, read back off the measured output through the
                 // law it was placed by (only exact under the soft ceiling's knee).
                 double il = ears.DeclaredDb + (ml - placed), ir = ears.DeclaredDb + (mr - placed);
@@ -120,7 +124,7 @@ public static class WeatherWindSpike
     /// <summary>One steady state, rendered through the synth as the game's DSP does, block by block.</summary>
     private static (float[] L, float[] R) Render(EarWindAtEars ears, float sec, int seed = 11)
     {
-        var s = new EarWindSynth(Rate, seed);
+        var s = new EarWindSynth(Rate, seed) { Hearing = LabHearing };
         int n = (int)(sec * Rate);
         var l = new float[n]; var r = new float[n];
         // A second of settling (the gain and knee glide in) that is not kept.
@@ -144,7 +148,7 @@ public static class WeatherWindSpike
             const float seconds = 72f;
             Console.WriteLine();
             Console.WriteLine($"== Turning slowly clockwise through 360 degrees in {seconds:F0} s, {speed:F0} m/s from the north (steady), per ear, dBFS as placed");
-            var s = new EarWindSynth(Rate, 5);
+            var s = new EarWindSynth(Rate, 5) { Hearing = LabHearing };
             int n = (int)(seconds * Rate);
             var l = new float[n]; var r = new float[n];
             var moving = new Vector2(0f, -speed); // from the north
@@ -164,7 +168,7 @@ public static class WeatherWindSpike
                 double dl = Db(Rms(l.AsSpan(a, b - a))), dr = Db(Rms(r.AsSpan(a, b - a)));
                 float from = (360f - deg) % 360f;
                 var law = EarWind.Ears(speed, moving, deg);
-                Console.WriteLine($"   {deg,5}    {from,5:F0}       {dl,6:F1}  {dr,6:F1}   {EarWind.RenderedDb(law.DeclaredDb, law.LeftDb),5:F1}  {EarWind.RenderedDb(law.DeclaredDb, law.RightDb),5:F1}");
+                Console.WriteLine($"   {deg,5}    {from,5:F0}       {dl,6:F1}  {dr,6:F1}   {EarWind.RenderedDb(law.DeclaredDb, law.LeftDb, LabHearing),5:F1}  {EarWind.RenderedDb(law.DeclaredDb, law.RightDb, LabHearing),5:F1}");
             }
             if (dir != null) WriteStereo(Path.Combine(dir, $"turn_360_{speed:F0}ms.wav"), l, r);
         }
@@ -306,7 +310,7 @@ public static class WeatherWindSpike
             {
                 double start = 5000.0;
                 var sim = new WeatherSim(set, start);
-                var synth = new EarWindSynth(Rate, 3);
+                var synth = new EarWindSynth(Rate, 3) { Hearing = LabHearing };
                 int n = (int)(sec * Rate);
                 var l = new float[n]; var r = new float[n];
                 var head = new Vector3(-375f, 1.7f, 195f);
@@ -412,7 +416,7 @@ public static class WeatherWindSpike
         string cap = Path.Combine(Path.GetTempPath(), "openfps-earwind-live.wav");
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
         var weather = WindWeather.Steady(WindAir.FromCompass(10f, 90f, 0f));
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing };
         provider.Weather.Wind = weather;
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
         provider.UpdateListener(new Vector3(0f, 1.7f, 0f), Quaternion.Identity, Vector3.Zero, -1);

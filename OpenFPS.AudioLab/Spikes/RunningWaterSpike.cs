@@ -35,6 +35,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class RunningWaterSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
     private const float PascalsToFull = 0.1f;
 
@@ -214,12 +218,12 @@ public static class RunningWaterSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Console.WriteLine($"Extended sources {(ExtendedSources.Enabled ? "spread" : "one point")}; ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}");
+        Console.WriteLine($"Extended sources {(ExtendedSources.Enabled ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
         // noise=1: every place of every running water source plays its own white noise instead of its
         // water, through the same voices, places, ground and HRTF: what the game's path does on its own.
-        RunningWaterSynth.LabNoise = args.Contains("noise=1");
-        if (RunningWaterSynth.LabNoise) Console.WriteLine("Running water replaced by noise (noise=1)");
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { WaterAsNoise = args.Contains("noise=1") };
+        if (lab.WaterAsNoise) Console.WriteLine("Running water replaced by noise (noise=1)");
+        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing, Lab = lab };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -234,7 +238,7 @@ public static class RunningWaterSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         world.RegisterDefinition(new EntityDefinition
         {

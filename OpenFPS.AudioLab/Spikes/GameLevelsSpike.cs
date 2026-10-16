@@ -33,6 +33,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class GameLevelsSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private sealed record Segment(string Name, double Start, double Seconds);
 
     public static int Run(string[] args)
@@ -49,16 +53,16 @@ public static class GameLevelsSpike
             Calm = WindWeather.Steady(c[0], 250f, c.Length > 1 ? c[1] : 0f);
         }
         // The ear model (docs/EAR_MODEL.md): ear=off is the game before it, for a before/after pair.
-        if (Arg(args, "ear=") is { } ear) OpenFPS.Common.Hearing.EarModel.Enabled = ear is not ("off" or "0");
+        if (Arg(args, "ear=") is { } ear) LabHearing.EarModelOn = ear is not ("off" or "0");
         if (Arg(args, "listening=") is { } listening)
-            OpenFPS.Common.Hearing.EarModel.ListeningLevelDb = float.Parse(listening, CultureInfo.InvariantCulture);
-        Console.WriteLine($"Ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}, listening level "
-                        + $"{OpenFPS.Common.Hearing.EarModel.ListeningLevelDb:F2} dB, /levels {Loudness.DynamicRangeCompression:F2}");
+            LabHearing.ListeningLevelDb = float.Parse(listening, CultureInfo.InvariantCulture);
+        Console.WriteLine($"Ear model {(LabHearing.EarModelOn ? "on" : "off")}, listening level "
+                        + $"{LabHearing.ListeningLevelDb:F2} dB, /levels {LabHearing.Compression:F2}");
         string wav = Path.Combine(outDir, "capture.wav");
         AcousticRegistry.Initialize();
 
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -71,7 +75,7 @@ public static class GameLevelsSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
 
         // The ground: asphalt, as a street is.
@@ -134,7 +138,7 @@ public static class GameLevelsSpike
             def.SoundEmitter.SoundId = "engine:" + preset;
             def.SoundEmitter.Mode = PlaybackMode.LoopOne;
             def.SoundEmitter.Volume = 1f;
-            def.SoundEmitter.Range = Loudness.AudibleRange(profile.SourceLevelDb);
+            def.SoundEmitter.Range = LabHearing.AudibleRange(profile.SourceLevelDb);
             def.SoundEmitter.MinDistance = 3f;
             world.RegisterDefinition(def);
             Move(id, at, rot, velocity);
@@ -400,7 +404,7 @@ public static class GameLevelsSpike
             def.SoundEmitter.SoundId = "aircraft:" + preset;
             def.SoundEmitter.Mode = PlaybackMode.LoopOne;
             def.SoundEmitter.Volume = 1f;
-            def.SoundEmitter.Range = Loudness.AudibleRange(p.SourceLevelDb);
+            def.SoundEmitter.Range = LabHearing.AudibleRange(p.SourceLevelDb);
             def.SoundEmitter.MinDistance = 3f;
             world.RegisterDefinition(def);
             // Down the approach its flight path's lever, a piston's closed throttle in the flare; on its wheels
@@ -450,7 +454,7 @@ public static class GameLevelsSpike
                 def.SoundEmitter.SoundId = $"rail:{preset}/{trainKey}/{src.Index}";
                 def.SoundEmitter.Mode = PlaybackMode.LoopOne;
                 def.SoundEmitter.Volume = 1f;
-                def.SoundEmitter.Range = Loudness.AudibleRange(src.LevelDb);
+                def.SoundEmitter.Range = LabHearing.AudibleRange(src.LevelDb);
                 def.SoundEmitter.MinDistance = 3f;
                 world.RegisterDefinition(def);
                 Move(id, at, rot, vel, MachinePower.TrainHolding);
@@ -555,8 +559,8 @@ public static class GameLevelsSpike
             Stand(new Vector3(-60f, 0f, -60f), 0f);
             world.UpdateAtmosphere(new WorldStateUpdate { Temperature = celsius, Humidity = 0.6f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f });
             var spec = ModelLibrary.Presets.SmallMachine(preset);
-            int a = AddEmitter("machine:" + preset, player.Position + new Vector3(-0.9f, 1.7f, 3f), Loudness.AudibleRange(spec.SourceLevelDb), 1.2f);
-            int b = AddEmitter("machine:" + preset, player.Position + new Vector3(0.9f, 1.7f, 3f), Loudness.AudibleRange(spec.SourceLevelDb), 1.2f);
+            int a = AddEmitter("machine:" + preset, player.Position + new Vector3(-0.9f, 1.7f, 3f), LabHearing.AudibleRange(spec.SourceLevelDb), 1.2f);
+            int b = AddEmitter("machine:" + preset, player.Position + new Vector3(0.9f, 1.7f, 3f), LabHearing.AudibleRange(spec.SourceLevelDb), 1.2f);
             Pump(4.0);
             Record($"two {preset} {celsius:0}C", seconds);
             Remove(a); Remove(b);
@@ -667,10 +671,10 @@ public static class GameLevelsSpike
                     Remove(busId);
                 }
                 Unidle();
-                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
+                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, LabHearing.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
                 Stand(new Vector3(-30f, 0f, -30f), 0f);
                 Idle("i4_midsize", new Vector3(-30f + 7f, 0f, -30f - 10f));
-                Steady("mower_push", "machine:mower_push", 35f, 0.4f, 10.0, Loudness.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
+                Steady("mower_push", "machine:mower_push", 35f, 0.4f, 10.0, LabHearing.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
                 Unidle();
             }
             if (set is "mowers")
@@ -678,7 +682,7 @@ public static class GameLevelsSpike
                 // A push mower standing alone at 5 m; then one 30 m away in a garden while a pickup idles
                 // 4 m from you (the mower runs reduced under it). A second mower of the same kind nearer you
                 // would lend it its voice instead (ChooseLiveEngines), at no cost at all.
-                float range = Loudness.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb);
+                float range = LabHearing.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb);
                 Steady("mower_push", "machine:mower_push", 5f, 0.4f, 12.0, range);
                 Stand(new Vector3(-30f, 0f, -30f), 0f);
                 Idle("pickup_v8", new Vector3(-30f + 3f, 0f, -30f - 2.5f));
@@ -694,7 +698,7 @@ public static class GameLevelsSpike
                 PassBy("pickup_v8", 50f, 90f, 14.0);
                 PassBy("transit_bus", 40f, 3f, 14.0);
                 IdleCar("transit_bus", new[] { ("rear", 6f) }, 12.0);
-                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, Loudness.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
+                Steady("mower_push", "machine:mower_push", 5f, 0.4f, 8.0, LabHearing.AudibleRange(ModelLibrary.Presets.SmallMachine("mower_push").SourceLevelDb));
             }
             if (set is "compare")
             {
@@ -713,7 +717,7 @@ public static class GameLevelsSpike
         var sb = new StringBuilder("name,start,seconds\n");
         foreach (var s in segments) sb.Append(CultureInfo.InvariantCulture, $"{s.Name},{s.Start:F3},{s.Seconds:F3}\n");
         File.WriteAllText(Path.Combine(outDir, "segments.csv"), sb.ToString());
-        Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); compression {Loudness.DynamicRangeCompression:F2}");
+        Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); compression {LabHearing.Compression:F2}");
         return 0;
     }
 
@@ -732,7 +736,7 @@ public static class GameLevelsSpike
         foreach (var n in names)
         {
             var v = MachineRegistry.VehicleFor(n);
-            var voice = new EngineVoiceState(v, rate, 11) { TargetSpeed = 0f, CompensateLevel = false };
+            var voice = new EngineVoiceState(v, rate, 11) { Hearing = LabHearing, TargetSpeed = 0f, CompensateLevel = false };
             voice.PlaceAtSpeed(0f);
             voice.Revive();
             voice.SetListener(new Vector3(7.5f, 1.2f, 0f) - v.ExhaustSlot);

@@ -59,8 +59,7 @@ public static class PopHuntSpike
 
         var world = PathProbeSpike.LoadAsClient(OpenFPS.AudioLab.LabPaths.Server(), mapId);
         var acoustics = new SpatialAcoustics();
-        AsyncAcousticWorker.TraceProvenance = true;
-        using var worker = new AsyncAcousticWorker(acoustics);
+        using var worker = new AsyncAcousticWorker(acoustics) { Lab = new() { TraceProvenance = true } };
         worker.UpdateWorld(world);
         worker.Start();
         var settle = Stopwatch.StartNew();

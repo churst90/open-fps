@@ -10,7 +10,6 @@ namespace OpenFPS.Tests;
 /// the channel's pitch. Driven directly: a source consumed faster than real time, as a channel pitched up
 /// for an approaching car consumes it, and what comes out must be at the synthesized pitch.
 /// </summary>
-[Collection(nameof(ValveFlowSwitch))]
 public class BorrowedVoiceDopplerTests
 {
     private readonly ITestOutputHelper _o;
@@ -35,7 +34,8 @@ public class BorrowedVoiceDopplerTests
         float speed = 200f / 3.6f;
         // The provider tells a voice the rate its channel is pitched at whenever it pitches it
         // (EngineVoiceState.ConsumeRate); a reflection follows that rate rather than Played's blocks.
-        var source = new EngineVoiceState(profile, Rate, 11) { TargetSpeed = speed, ConsumeRate = (float)consumeRate };
+        // The valves' broadband flow noise pulls the autocorrelation about; the cursor is under test, not the noise.
+        var source = new EngineVoiceState(profile, Rate, 11) { TargetSpeed = speed, ConsumeRate = (float)consumeRate, Mix = ValveFlowSwitch.Off() };
         source.PlaceAtSpeed(speed);
         return source;
     }
@@ -97,12 +97,11 @@ public class BorrowedVoiceDopplerTests
         // 25 % faster consumption is what a channel pitched up for a car approaching at 70 m/s does.
         const double approaching = 1.25;
 
-        // The valves' broadband flow noise pulls the autocorrelation about; the cursor is under test, not the noise.
-        var (truth, control, inherited, own) = ValveFlowSwitch.Without(() => (
+        var (truth, control, inherited, own) = (
             Run(ownCursor: true, consumeRate: 1.0, blocks: 24).Output,
             Run(ownCursor: false, consumeRate: 1.0, blocks: 24).Output,
             Run(ownCursor: false, consumeRate: approaching, blocks: 24).Output,
-            Run(ownCursor: true, consumeRate: approaching, blocks: 24).Output));
+            Run(ownCursor: true, consumeRate: approaching, blocks: 24).Output);
 
         // A stock car at 200 km/h fires somewhere around 200-400 Hz; look for a period between.
         int from = (int)(Rate / 600f), to = (int)(Rate / 80f);
@@ -155,10 +154,10 @@ public class BorrowedVoiceDopplerTests
             return all;
         }
 
-        var (reference, consumed, own, following) = ValveFlowSwitch.Without(() => (
+        var (reference, consumed, own, following) = (
             Stream(1.0), Stream(rate),
             Run(ownCursor: true, consumeRate: rate, blocks: 24),
-            Run(ownCursor: false, consumeRate: rate, blocks: 24)));
+            Run(ownCursor: false, consumeRate: rate, blocks: 24));
 
         int differing = 0;
         for (int i = 0; i < Samples; i++) if (consumed[i] != reference[i]) differing++;

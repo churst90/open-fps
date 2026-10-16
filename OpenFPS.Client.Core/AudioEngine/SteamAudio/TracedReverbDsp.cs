@@ -70,8 +70,8 @@ internal sealed class TracedReverbState
 
     /// <summary>One per ear: the tail the trace hands back is the same in both, and a room is not.
     /// Made for the stage's rate (<see cref="SampleRate"/>): their all-passes are times.</summary>
-    public EarDecorrelator Left { get; private set; } = new(0, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
-    public EarDecorrelator Right { get; private set; } = new(1, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
+    public EarDecorrelator Left { get; private set; } = new(0, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate);
+    public EarDecorrelator Right { get; private set; } = new(1, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate);
 
     /// <summary>The rate the stage runs at: the trace's, which is the mixer's.</summary>
     public int SampleRate
@@ -79,7 +79,7 @@ internal sealed class TracedReverbState
         get => _sampleRate;
         init { _sampleRate = value; Left = new EarDecorrelator(0, value); Right = new EarDecorrelator(1, value); }
     }
-    private readonly int _sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+    private readonly int _sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
 
     /// <summary>Running totals of the energy in (mono) and out (per ear), for the lab.</summary>
     public double InEnergy, OutEnergy, ChannelEnergy;
@@ -294,7 +294,7 @@ internal sealed class DiffuseTail
     /// <summary>One block per direction: the late field's signals, filled by DiffuseLateConvolver.</summary>
     public float[][] LateIn = Array.Empty<float[]>();
     /// <summary>The lab's A/B: the ear velvet on the field as well. Never set in the game.</summary>
-    public static bool LateEarVelvet;
+    public bool LateEarVelvet { get; set; }
 
     /// <summary>
     /// The late field (<see cref="LateIn"/>) through the directions' own head responses into
@@ -455,7 +455,7 @@ internal sealed class DiffuseTail
     /// so the tail is the same tail at any rate.</param>
     public DiffuseTail(int sampleRate)
     {
-        SampleRate = sampleRate > 0 ? sampleRate : OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+        SampleRate = sampleRate > 0 ? sampleRate : OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
         _lpA = 1f - MathF.Exp(-2f * MathF.PI * SplitHz / SampleRate);
         _loL1 = Biquad.LowPass(EarSplitHz, SampleRate); _loL2 = Biquad.LowPass(EarSplitHz, SampleRate);
         _hiL1 = Biquad.HighPass(EarSplitHz, SampleRate); _hiL2 = Biquad.HighPass(EarSplitHz, SampleRate);
@@ -548,11 +548,12 @@ internal static class TracedReverbDsp
     // difference.
 
     /// <summary>Where an impulse straight ahead first comes out of a binaural effect of this HRTF and
-    /// frame, samples: the first sample at a tenth of the peak. -1 if Steam Audio will not make one.</summary>
-    public static int BinauralOnset(IntPtr context, IntPtr hrtf, int frame)
+    /// frame at <paramref name="sampleRate"/>, samples: the first sample at a tenth of the peak. -1 if Steam Audio
+    /// will not make one.</summary>
+    public static int BinauralOnset(IntPtr context, IntPtr hrtf, int frame, int sampleRate)
     {
         if (context == IntPtr.Zero || hrtf == IntPtr.Zero || frame <= 0) return -1;
-        var au = new Phonon.IPLAudioSettings { samplingRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate, frameSize = frame };
+        var au = new Phonon.IPLAudioSettings { samplingRate = sampleRate, frameSize = frame };
         var bs = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
         if (Phonon.iplBinauralEffectCreate(context, ref au, ref bs, out IntPtr fx) != Phonon.IPL_STATUS_SUCCESS) return -1;
         var inB = new Phonon.IPLAudioBuffer(); var outB = new Phonon.IPLAudioBuffer();
@@ -585,11 +586,9 @@ internal static class TracedReverbDsp
 
     /// <summary>How long the traced stage's input waits, samples: what the voices' binaural rendering
     /// delays a sound by, less what the stage's own does. Never negative; zero if either is unknown.</summary>
-    public static int StagePreDelay(int voiceOnset, int stageOnset)
-        => LabNoPreDelay || voiceOnset < 0 || stageOnset < 0 ? 0 : Math.Max(0, voiceOnset - stageOnset);
-
-    /// <summary>The lab's A/B: no wait, as before 2026-10-03. Never set in the game.</summary>
-    public static bool LabNoPreDelay;
+    /// <param name="noPreDelay">The lab's A/B (LabLevers.NoPreDelay): no wait, as before 2026-10-03.</param>
+    public static int StagePreDelay(int voiceOnset, int stageOnset, bool noPreDelay = false)
+        => noPreDelay || voiceOnset < 0 || stageOnset < 0 ? 0 : Math.Max(0, voiceOnset - stageOnset);
 
     public static RESULT Create(FMOD.System system, TracedReverbState state, out FMOD.DSP dsp, out GCHandle handle)
     {

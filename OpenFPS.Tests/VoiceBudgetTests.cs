@@ -15,6 +15,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class VoiceBudgetTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public VoiceBudgetTests(ITestOutputHelper o) => _o = o;
 
@@ -279,8 +282,8 @@ public class VoiceBudgetTests
     public void ExtentFlattensTheNearFieldAndLeavesTheFarFieldAlone()
     {
         const float level = 94f;                        // a small hatchback
-        var point = OpenFPS.Common.Loudness.Place(level);
-        var sized = OpenFPS.Common.Loudness.Place(level, 3.2f);
+        var point = Law.Place(level);
+        var sized = Law.Place(level, 3.2f);
 
         float Far(float d, (float Gain, float ReferenceDistance) p)
             => OpenFPS.Common.Loudness.RenderedGain(p.Gain, p.ReferenceDistance, 500f, d);
@@ -323,8 +326,8 @@ public class VoiceBudgetTests
     public void ALoudTransientIsNotFadedOutInsideTheMapItIsOn()
     {
         float level = OpenFPS.Common.Applause.LevelDb(300, 0.7f);
-        float range = MathF.Min(WorldAudioPlayer.MaxRange, OpenFPS.Common.Loudness.AudibleRange(level));
-        float reference = OpenFPS.Common.Loudness.Place(level, OpenFPS.Common.Applause.SpreadRadiusMetres(300)).ReferenceDistance;
+        float range = MathF.Min(WorldAudioPlayer.MaxRange, Law.AudibleRange(level));
+        float reference = Law.Place(level, OpenFPS.Common.Applause.SpreadRadiusMetres(300)).ReferenceDistance;
         float fadeStarts = range - 0.25f * (range - reference);
         _o.WriteLine($"a 300-person crowd at {level:F1} dB: range {range:F0} m, fade starts at {fadeStarts:F0} m");
         Assert.True(fadeStarts > 500f,

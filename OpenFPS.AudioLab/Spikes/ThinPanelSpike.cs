@@ -22,7 +22,6 @@ public static class ThinPanelSpike
         var faceArg = args.FirstOrDefault(a => a.StartsWith("face="))?[5..]?.Split(',');
         float w = faceArg != null ? float.Parse(faceArg[0], System.Globalization.CultureInfo.InvariantCulture) : 1.9f;
         float h = faceArg != null ? float.Parse(faceArg[1], System.Globalization.CultureInfo.InvariantCulture) : 2.1f;
-        AsyncAcousticWorker.TraceProvenance = true;
         static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-6f, g));
         var thickArg = args.FirstOrDefault(a => a.StartsWith("mm="))?[3..]?.Split(',');
         float earMetres = float.Parse(args.FirstOrDefault(a => a.StartsWith("ear="))?[4..] ?? "2", System.Globalization.CultureInfo.InvariantCulture);
@@ -44,7 +43,7 @@ public static class ThinPanelSpike
             def.Transform = new Transform { Position = new Vector3(0, 1.05f, 0), Rotation = Quaternion.Identity, Scale = Vector3.One };
             world.Entities[1] = new EntitySnapshot { Id = 1, Definition = def, Transform = def.Transform };
             var acoustics = new SpatialAcoustics();
-            using var worker = new AsyncAcousticWorker(acoustics);
+            using var worker = new AsyncAcousticWorker(acoustics) { Lab = new() { TraceProvenance = true } };
             worker.UpdateWorld(world);
             worker.Start();
             var ear = new Vector3(0, 1.0f, -earMetres);

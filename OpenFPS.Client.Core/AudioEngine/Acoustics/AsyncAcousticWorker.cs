@@ -158,7 +158,16 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>Lab only (--pop-hunt): fills <see cref="Provenance"/>. Off in the game.</summary>
-    public static bool TraceProvenance;
+    public bool TraceProvenance => Lab.TraceProvenance;
+
+    /// <summary>The lab's levers on this worker (where a path came from, the routes kept, the tile scenes held):
+    /// its world's (AudioEngineFacade.Lab), or the game's.</summary>
+    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab
+    {
+        get => _lab;
+        set { _lab = value; _routeCache.Lab = value; }
+    }
+    private OpenFPS.Client.AudioEngine.Core.LabLevers _lab = new();
     /// <summary>What produced each source's last direct answer, when <see cref="TraceProvenance"/> is on.</summary>
     public readonly ConcurrentDictionary<int, string> Provenance = new();
 
@@ -1012,7 +1021,7 @@ public class AsyncAcousticWorker : IDisposable
             // Pathing off: its probe grid is too coarse on a city (tens of metres) to say where a sound comes
             // from, nothing reads its answer, and the bake cost a core for minutes at every map load. Routes
             // round obstacles come from the barrier search (BarrierPathDifference).
-            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: false);
+            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: false, samplingRate: Traced.MixerRate);
             if (!_saSim.IsValid)
             {
                 _saSim.Dispose(); _saSim = null;
@@ -1324,7 +1333,7 @@ public class AsyncAcousticWorker : IDisposable
             // heard inside Selby House). TileSceneSet's remarks say why; they now answer as the whole-scene
             // build does through any number of swings and tile changes (AudioLab --path-probe door=
             // swings=, --stream-walk stops=).
-            _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
+            _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres) { Lab = _lab };
             _acousticStore = _tileScenes == null ? new AcousticGeometry(world.TileMetres) : null;
             var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, boxes, mapLeaves, terrains);
             _saScene.Dispose();

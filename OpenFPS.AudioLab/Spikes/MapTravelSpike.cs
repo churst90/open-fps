@@ -15,6 +15,10 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// </summary>
 public static class MapTravelSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
@@ -26,7 +30,7 @@ public static class MapTravelSpike
         Console.WriteLine($"  {from}: {first.AcousticMap?.Regions.Count ?? 0} region(s); {to}: {second.AcousticMap?.Regions.Count ?? 0}");
 
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", "/tmp/openfps-map-travel.wav");
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         int mono = 0, placed = 0, silent = 0;
         try
@@ -88,7 +92,7 @@ public static class MapTravelSpike
 
     private static SpatialEmitter Hiss(int id, Vector3 at, int region)
     {
-        var p = Loudness.Place(70f);
+        var p = LabHearing.Place(70f);
         return new SpatialEmitter
         {
             EntityId = id, SoundId = "synth:lab:hiss", Mode = PlaybackMode.Single, Type = EmitterType.WorldLocked,

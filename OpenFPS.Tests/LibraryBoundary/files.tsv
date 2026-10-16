@@ -284,6 +284,8 @@ OpenFPS.Sound/Core/Engine/ExhaustNetwork.cs	lib	Sound
 OpenFPS.Sound/Core/Engine/ExhaustRadiation.cs	lib	Sound	
 OpenFPS.Sound/Core/Engine/IntakeNetwork.cs	lib	Sound	
 OpenFPS.Sound/Core/Engine/Waveguide.cs	lib	Sound	
+OpenFPS.Sound/Core/LabLevers.cs	lib	Sound	
+OpenFPS.Sound/Core/MixSettings.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/EarWindSynth.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/EventSum.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/ExtendedSources.cs	lib	Sound	
@@ -350,6 +352,7 @@ OpenFPS.Sound/HandOverSounds.cs	lib	Sound
 OpenFPS.Sound/Hearing/BandAnalyser.cs	lib	Sound	
 OpenFPS.Sound/Hearing/EarModel.cs	lib	Sound	
 OpenFPS.Sound/Hearing/EqualLoudness.cs	lib	Sound	
+OpenFPS.Sound/Hearing/HearingSettings.cs	lib	Sound	
 OpenFPS.Sound/Hearing/LoudnessCompensation.cs	lib	Sound	
 OpenFPS.Sound/Hearing/ReferenceVoice.cs	lib	Sound	
 OpenFPS.Sound/Hearing/Timbre.cs	lib	Sound	

@@ -20,6 +20,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class BulletRound2Spike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Sr = TransientSynth.SampleRate;
     private static readonly Air Still = Air.Standard;
     private static float C => Still.SpeedOfSound;
@@ -271,7 +275,7 @@ public static class BulletRound2Spike
     /// then the engine's inverse law beyond the reference distance.</summary>
     private static float Placed(float levelDb, float distance)
     {
-        var (gain, reference) = Loudness.Place(levelDb);
+        var (gain, reference) = LabHearing.Place(levelDb);
         return gain * MathF.Min(1f, reference / MathF.Max(0.01f, distance));
     }
 

@@ -12,6 +12,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class VoiceManagerMutationTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     /// <summary>A mixer that remembers everything it was told.</summary>
     private sealed class Mixer : IVoiceSink
     {
@@ -72,10 +75,10 @@ public class VoiceManagerMutationTests
         var open = Engine(1, new Vector3(20, 0, 0));
         var half = open; half.Occlusion = 0.5f;
         var all = open; all.Occlusion = 1f;
-        float clear = VoiceManager.Audibility(open, 20f, false);
+        float clear = VoiceManager.Audibility(Law, open, 20f, false);
         Assert.True(clear > 0f);
-        Assert.Equal(clear * 0.5f, VoiceManager.Audibility(half, 20f, false), 6);
-        Assert.Equal(0f, VoiceManager.Audibility(all, 20f, false), 6);
+        Assert.Equal(clear * 0.5f, VoiceManager.Audibility(Law, half, 20f, false), 6);
+        Assert.Equal(0f, VoiceManager.Audibility(Law, all, 20f, false), 6);
     }
 
     /// <summary>
@@ -86,8 +89,8 @@ public class VoiceManagerMutationTests
     public void APlayingVoiceHoldsItsSlotByAboutTwoDecibels()
     {
         var car = Engine(1, new Vector3(20, 0, 0));
-        float idle = VoiceManager.Audibility(car, 20f, false);
-        float playing = VoiceManager.Audibility(car, 20f, true);
+        float idle = VoiceManager.Audibility(Law, car, 20f, false);
+        float playing = VoiceManager.Audibility(Law, car, 20f, true);
         float db = 20f * MathF.Log10(playing / idle);
         Assert.InRange(db, 1.5f, 2.5f);
     }

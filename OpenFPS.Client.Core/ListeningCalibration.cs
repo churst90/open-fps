@@ -21,6 +21,7 @@ public sealed class ListeningCalibration
     /// <summary>The gap between one saying of the line and the next, seconds.</summary>
     public const double GapSeconds = 1.2;
 
+    private readonly HearingSettings _hearing;
     private readonly ISpeechOutput _speech;
     private readonly UiSounds? _ui;
     private readonly Action<string, float> _play;
@@ -30,9 +31,11 @@ public sealed class ListeningCalibration
     private float _was;
     private double _nextAt;
 
-    public ListeningCalibration(ISpeechOutput speech, UiSounds? ui, Action<string, float> play, Action stop, Action save,
-                                Func<(string SoundId, double Seconds)>? line = null)
+    /// <param name="hearing">The hearing of the world it calibrates (AudioEngineFacade.Hearing).</param>
+    public ListeningCalibration(HearingSettings hearing, ISpeechOutput speech, UiSounds? ui, Action<string, float> play, Action stop,
+                                Action save, Func<(string SoundId, double Seconds)>? line = null)
     {
+        _hearing = hearing;
         _line = line ?? Line;
         _speech = speech;
         _ui = ui;
@@ -67,10 +70,10 @@ public sealed class ListeningCalibration
 
     public void Open(double now)
     {
-        _was = EarModel.ListeningLevelDb;
+        _was = _hearing.ListeningLevelDb;
         IsOpen = true;
         _ui?.Play(UiCue.MenuSelect);
-        _speech.Speak($"Listening level, {Say(EarModel.ListeningLevelDb)}. A person will talk to you from one step in front. "
+        _speech.Speak($"Listening level, {Say(_hearing.ListeningLevelDb)}. A person will talk to you from one step in front. "
                     + "Set your volume, or use Up and Down, until they sound like someone talking to you normally at arm's length. "
                     + "Shift with Up or Down moves five. Space repeats, R resets. Enter saves, Escape cancels.", interrupt: true);
         // After the prompt has had a moment: the line comes in under the end of it otherwise.
@@ -83,7 +86,7 @@ public sealed class ListeningCalibration
         if (!IsOpen || now < _nextAt) return;
         var (id, seconds) = _line();
         if (id.Length == 0) return;
-        _play(id, ReferenceGainDb(EarModel.ListeningLevelDb));
+        _play(id, ReferenceGainDb(_hearing.ListeningLevelDb));
         _nextAt = now + Math.Max(1.0, seconds) + GapSeconds;
     }
 
@@ -104,9 +107,9 @@ public sealed class ListeningCalibration
                 _nextAt = now;
                 return true;
             case GameKey.R:
-                EarModel.ListeningLevelDb = EarModel.DefaultListeningLevelDb;
+                _hearing.ListeningLevelDb = EarModel.DefaultListeningLevelDb;
                 _ui?.Play(UiCue.MenuMove);
-                _speech.Speak($"Default, {Say(EarModel.ListeningLevelDb)}.", interrupt: true);
+                _speech.Speak($"Default, {Say(_hearing.ListeningLevelDb)}.", interrupt: true);
                 _nextAt = now + 0.8;
                 return true;
             case GameKey.Enter:
@@ -114,13 +117,13 @@ public sealed class ListeningCalibration
                 _stop();
                 _save();
                 _ui?.Play(UiCue.MenuSelect);
-                _speech.Speak($"Saved. {Describe(EarModel.ListeningLevelDb)}", interrupt: true);
+                _speech.Speak($"Saved. {Describe(_hearing.ListeningLevelDb)}", interrupt: true);
                 return true;
             case GameKey.Escape:
             case GameKey.Backspace:
                 IsOpen = false;
                 _stop();
-                EarModel.ListeningLevelDb = _was;
+                _hearing.ListeningLevelDb = _was;
                 _ui?.Play(UiCue.MenuBack);
                 _speech.Speak($"Cancelled. Listening level {Say(_was)}.", interrupt: true);
                 return true;
@@ -131,9 +134,9 @@ public sealed class ListeningCalibration
 
     private void Move(float byDb, string word, double now)
     {
-        float before = EarModel.ListeningLevelDb;
-        EarModel.ListeningLevelDb = before + byDb;
-        if (EarModel.ListeningLevelDb == before) { _ui?.Play(UiCue.MenuEdge); _speech.Speak("No further.", interrupt: true); return; }
+        float before = _hearing.ListeningLevelDb;
+        _hearing.ListeningLevelDb = before + byDb;
+        if (_hearing.ListeningLevelDb == before) { _ui?.Play(UiCue.MenuEdge); _speech.Speak("No further.", interrupt: true); return; }
         _ui?.Play(UiCue.MenuMove);
         _speech.Speak(word, interrupt: true);
         // The line again soon, at its new level.
@@ -153,34 +156,34 @@ public sealed class ListeningCalibration
     }
 
     /// <summary>/listening 65 or /listening default. Null with no value: the caller opens the calibration.</summary>
-    public static string? Command(string[] args, Action save)
+    public static string? Command(HearingSettings hearing, string[] args, Action save)
     {
         if (args.Length == 0) return null;
         string a = args[0].Trim();
-        if (a.Equals("default", StringComparison.OrdinalIgnoreCase)) EarModel.ListeningLevelDb = EarModel.DefaultListeningLevelDb;
+        if (a.Equals("default", StringComparison.OrdinalIgnoreCase)) hearing.ListeningLevelDb = EarModel.DefaultListeningLevelDb;
         else if (float.TryParse(a, NumberStyles.Float, CultureInfo.InvariantCulture, out float v))
         {
             if (v < EarModel.MinListeningLevelDb || v > EarModel.MaxListeningLevelDb)
                 return $"Say a listening level from {EarModel.MinListeningLevelDb:F0} to {EarModel.MaxListeningLevelDb:F0} decibels, or default.";
-            EarModel.ListeningLevelDb = v;
+            hearing.ListeningLevelDb = v;
         }
         else return $"{args[0]} is not a level. Say slash listening and a number from {EarModel.MinListeningLevelDb:F0} to {EarModel.MaxListeningLevelDb:F0}, or default, or nothing to calibrate by ear.";
         save();
         string note = EarModel.ListeningFromEnvironment ? " For this run only: the environment sets it." : "";
-        return Describe(EarModel.ListeningLevelDb) + note;
+        return Describe(hearing.ListeningLevelDb) + note;
     }
 
     /// <summary>/ear, /ear on, /ear off: the whole ear model, for listening with and without it.</summary>
-    public static string EarCommand(string[] args)
+    public static string EarCommand(HearingSettings hearing, string[] args)
     {
         if (args.Length > 0)
         {
             string a = args[0].ToLowerInvariant();
-            if (a is "on") EarModel.Enabled = true;
-            else if (a is "off") EarModel.Enabled = false;
+            if (a is "on") hearing.EarModelOn = true;
+            else if (a is "off") hearing.EarModelOn = false;
             else return "Say /ear on or /ear off.";
         }
-        return EarModel.Enabled
+        return hearing.EarModelOn
             ? "Ear model on: sounds are placed by how loud they sound, and keep their tone at the level they play."
             : "Ear model off: sounds are placed by their level alone, as before October 2026.";
     }

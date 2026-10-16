@@ -108,7 +108,7 @@ public static class MapDrainage
                 SoundId = v.SoundId,
                 Mode = PlaybackMode.LoopOne,
                 Volume = 1f,
-                Range = MathF.Max(60f, Loudness.AudibleRange(spec.SourceLevelDb + 6f)),
+                Range = MathF.Max(60f, Loudness.AudibleRange(spec.SourceLevelDb + 6f, Loudness.DefaultCompression)),
                 MinDistance = 1f,
                 ExtentMetres = spec.ExtentMetres,
             });

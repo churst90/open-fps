@@ -84,8 +84,7 @@ public static class EarlyTailSpike
         var played = new Dictionary<bool, double[]>();
         foreach (bool old in new[] { true, false })
         {
-            SmoothTail.FromFiftyMs = old;
-            using var t2 = new TracedReverb(ctx) { ExtractLate = true };
+            using var t2 = new TracedReverb(ctx, lab: new OpenFPS.Client.AudioEngine.Core.LabLevers { TailFromFiftyMs = old }) { ExtractLate = true };
             t2.SetScene(scene);
             t2.SetListener(ear);
             for (int t = 0; t < 300 && (t2.LateSdm == null || t2.Runs < 6); t++) Thread.Sleep(100);
@@ -96,7 +95,6 @@ public static class EarlyTailSpike
             else Add(TailSteadySpike.ToTime(t2.Late));
             played[old] = e10;
         }
-        SmoothTail.FromFiftyMs = false;
         var tr10 = new double[40];
         for (int i = 0; i < w.Length && i / (Fs / 100) < 40; i++) tr10[i / (Fs / 100)] += w[i] * (double)w[i];
         Console.WriteLine("  10 ms   trace   played before   played now (dB re a 1 m impulse)");

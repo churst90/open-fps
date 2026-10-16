@@ -38,7 +38,7 @@ public sealed class ClientSettings
 
     /// <summary>
     /// How much of the real difference in loudness reaches the mix: 1 is real life, lower squeezes loud
-    /// and quiet together (Loudness.DynamicRangeCompression, `/levels`). <see cref="Save"/> records the
+    /// and quiet together (HearingSettings.Compression, `/levels`). <see cref="Save"/> records the
     /// live value.
     /// </summary>
     public float LevelCompression { get; set; } = OpenFPS.Common.Loudness.DefaultCompression;
@@ -51,13 +51,20 @@ public sealed class ClientSettings
     /// </summary>
     public float ListeningLevelDb { get; set; } = OpenFPS.Common.Hearing.EarModel.DefaultListeningLevelDb;
 
-    /// <summary>Puts this file's listening level into play, unless the environment chose one for the
-    /// run. Each head calls it once, after loading.</summary>
-    public void ApplyHearing()
+    /// <summary>Puts this file's levels and listening level into play in <paramref name="hearing"/> (the audio
+    /// world's, AudioEngineFacade.Hearing), each unless the environment chose it for the run, and remembers it:
+    /// <see cref="Save"/> records what is live there. Each head calls it once, after loading.</summary>
+    public void ApplyHearing(OpenFPS.Common.Hearing.HearingSettings hearing)
     {
+        _hearing = hearing;
+        if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
+            hearing.Compression = LevelCompression;
         if (!OpenFPS.Common.Hearing.EarModel.ListeningFromEnvironment)
-            OpenFPS.Common.Hearing.EarModel.ListeningLevelDb = ListeningLevelDb;
+            hearing.ListeningLevelDb = ListeningLevelDb;
     }
+
+    /// <summary>The world's hearing this copy was applied to (<see cref="ApplyHearing"/>).</summary>
+    private OpenFPS.Common.Hearing.HearingSettings? _hearing;
 
     /// <summary>Saying what is in front of you as you turn (N in game). See <see cref="NavigationAids"/>.</summary>
     public bool TurnNarration { get; set; } = true;
@@ -150,16 +157,20 @@ public sealed class ClientSettings
         return new ClientSettings();
     }
 
-    public void Save(string? path = null)
+    /// <param name="path">The file; the player's settings file by default.</param>
+    /// <param name="hearing">The world's hearing whose levels and listening level are live: the one this copy
+    /// was applied to by default. With neither, this copy's own are written.</param>
+    public void Save(string? path = null, OpenFPS.Common.Hearing.HearingSettings? hearing = null)
     {
+        hearing ??= _hearing;
         path ??= DefaultPath;
         // A password is written only for a server that asked to remember it.
         foreach (var s in Servers) if (!s.RememberPassword) s.Password = "";
         // What is playing, unless a run's environment chose it: that is not the player's choice.
-        if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
-            LevelCompression = OpenFPS.Common.Loudness.DynamicRangeCompression;
-        if (!OpenFPS.Common.Hearing.EarModel.ListeningFromEnvironment)
-            ListeningLevelDb = OpenFPS.Common.Hearing.EarModel.ListeningLevelDb;
+        if (hearing != null && !OpenFPS.Common.Loudness.CompressionFromEnvironment)
+            LevelCompression = hearing.Compression;
+        if (hearing != null && !OpenFPS.Common.Hearing.EarModel.ListeningFromEnvironment)
+            ListeningLevelDb = hearing.ListeningLevelDb;
         // ...and the navigation aids as they are now: a key in game turns them, not this copy.
         TurnNarration = NavigationAids.TurnNarration;
         EditorDirectKeys = EditorKeys.Enabled;
@@ -181,9 +192,9 @@ public sealed class ClientSettings
 }
 
 /// <summary>
-/// The live switches for the navigation aids, which a key or a command flips. Static, like
-/// Loudness.DynamicRangeCompression: a head keeps its own copy of <see cref="ClientSettings"/> for the
-/// run, and the live value is what <see cref="ClientSettings.Save"/> must write, whoever saves.
+/// The live switches for the navigation aids, which a key or a command flips. Static: a head
+/// keeps its own copy of <see cref="ClientSettings"/> for the run, and the live value is what
+/// <see cref="ClientSettings.Save"/> must write, whoever saves.
 /// </summary>
 public static class NavigationAids
 {

@@ -394,9 +394,10 @@ public sealed partial class EngineSynth
         lever = _crankRadius * s + _crankRadius * _crankRadius * s * c / root;
     }
 
-    /// <summary>Switch for <see cref="BlowdownJet"/>: the lab's A/B, and /valveflow in game.
-    /// Volatile because the engines render on the pool's threads.</summary>
-    internal static volatile bool ValveJetNoise = true;
+    /// <summary>The live levers of the mixer this engine plays in, whose <see cref="MixSettings.ValveJetNoise"/>
+    /// switches <see cref="BlowdownJet"/> (/valveflow in game, the lab's A/B): its voice's, which the mixer gives
+    /// it. One of its own, the shipped mix, when made alone.</summary>
+    public MixSettings Mix { get; set; } = new();
 
     /// <summary>
     /// The rush of gas through the exhaust valve's gap, as broadband noise in the port: sonic flow
@@ -730,7 +731,9 @@ public sealed partial class EngineSynth
                 // The flow through the valve moves smoothly where the arriving wave may jump (a shock
                 // front), so the guess carries the flow on, not the outgoing wave.
                 float guessE = aE + Z * (2f * cy.ExhaustU1 - cy.ExhaustU2);
-                bE = SolveValve(aE, guessE, Z, area, cy.Pressure, cy.Temp, rhoPipeK, Gas.GammaExhaust, cy.Mass, _dt, 0f, capE, Gas.Atmosphere, out float mdot, ref cy.ExhaustSlope);
+                float mdot;
+                if (_lab.RigidValves) { mdot = 0f; bE = aE; }   // Stryker disable once all : lab switch
+                else bE = SolveValve(aE, guessE, Z, area, cy.Pressure, cy.Temp, rhoPipeK, Gas.GammaExhaust, cy.Mass, _dt, 0f, capE, Gas.Atmosphere, out mdot, ref cy.ExhaustSlope);
                 cy.ExhaustB = bE;
                 cy.ExhaustU2 = cy.ExhaustU1;
                 cy.ExhaustU1 = (bE - aE) / Z;
@@ -756,7 +759,7 @@ public sealed partial class EngineSynth
                     cy.BurntMass += entering;
                 }
                 portPeak = MathF.Max(portPeak, MathF.Abs(aE + bE));
-                if (ValveJetNoise && mdot > 0f) bE += BlowdownJet(ref cy, mdot, area);
+                if (Mix.ValveJetNoise && mdot > 0f) bE += BlowdownJet(ref cy, mdot, area);
             }
             else
             {
@@ -790,7 +793,9 @@ public sealed partial class EngineSynth
                 float Z = _intake.RunnerImpedance(c);
                 float capI = 0.3f * 350f * _runnerArea;
                 float guessI = aI + Z * (2f * cy.IntakeU1 - cy.IntakeU2);
-                bI = SolveValve(aI, guessI, Z, area, cy.Pressure, cy.Temp, intakeK, Gas.GammaAir, cy.Mass, _dt, 0f, capI, _map, out float mdotOut, ref cy.IntakeSlope);
+                float mdotOut;
+                if (_lab.RigidValves) { mdotOut = 0f; bI = aI; }   // Stryker disable once all : lab switch
+                else bI = SolveValve(aI, guessI, Z, area, cy.Pressure, cy.Temp, intakeK, Gas.GammaAir, cy.Mass, _dt, 0f, capI, _map, out mdotOut, ref cy.IntakeSlope);
                 cy.IntakeB = bI;
                 cy.IntakeU2 = cy.IntakeU1;
                 cy.IntakeU1 = (bI - aI) / Z;
@@ -904,7 +909,7 @@ public sealed partial class EngineSynth
         // every knock chirps down by about a third. Held still, the right frequency is heard as a note.
         // Retuned every 32 samples (0.7 ms), 1/32 of the per-sample cost.
         float knockRing;
-        if (DebugLegacyDiesel) { knockRing = knockDrive; goto knockDone; }   // Stryker disable once all : lab A/B switch
+        if (_lab.LegacyDiesel) { knockRing = knockDrive; goto knockDone; }   // Stryker disable once all : lab A/B switch
         if (knockTempWgt > 1e-6f) _knockTemp = knockTempAcc / knockTempWgt;
         else _knockTemp += (1100f - _knockTemp) * _knockRelax;
         if (++_knockRetune >= 32)
@@ -1407,7 +1412,7 @@ public sealed partial class EngineSynth
         float fuelFrac = e.Fuel == FuelType.Diesel ? Math.Clamp(0.04f + 0.96f * _pedal, 0f, 1f) : 1f;
         cy.HeatTotal = fresh * FuelEnergyPerKg * _heatScale * q * fuelFrac;
         cy.BurnDeg = BurnDuration(rpm, dilution, load);
-        if (e.Fuel == FuelType.Diesel && DebugLegacyDiesel)
+        if (e.Fuel == FuelType.Diesel && _lab.LegacyDiesel)
         {
             cy.SparkDeg = SparkAngle(rpm, load);
             cy.Premix = 0.22f;
@@ -1512,7 +1517,6 @@ public sealed partial class EngineSynth
                                     float pipeK, float gamma, float cylMass, float dt, float uMean, float uCap, float pMean,
                                     out float mdot, ref float slope)
     {
-        if (DebugRigidValves) { mdot = 0f; return a; }   // Stryker disable once all : lab switch
         // uMean is kept at zero: subtracting a running mean of the valve flow injected a false ram
         // effect worth a quarter of the charge on a big single. The pipes bleed their own DC.
         // uCap: a pipe passes about Mach 0.3 of quasi-steady flow at most; past it a choked valve into an
@@ -1606,19 +1610,16 @@ public sealed partial class EngineSynth
         }
     }
 
-    /// <summary>Diagnostic: the diesel combustion model without the ignition delay and the chamber
-    /// modes, for an A/B against the full model. Set by the `legacydiesel` knob on any of the
-    /// vehicle render commands.</summary>
-    public static bool DebugLegacyDiesel;
-
-    /// <summary>Diagnostic: treat every valve as shut for the pipes, so the network can be tested
-    /// on its own. Never set in a game.</summary>
-    public static bool DebugRigidValves;
-
-    /// <summary>Diagnostic: hear ONE tailpipe on its own (0-based branch index), scaled up by the
-    /// branch count so the level is comparable. -1 is every pipe. Set by the `pipe=` knob in the lab.
-    /// Never set in a game.</summary>
-    public static int DebugSoloTailpipe = -1;
+    /// <summary>The lab's levers on this engine (LabLevers): the diesel combustion model without the ignition
+    /// delay and the chamber modes (`legacydiesel` on any vehicle render command), every valve shut for the pipes
+    /// so the network can be tested on its own, one tailpipe alone (`pipe=`). Never set in a game; an engine made
+    /// alone has the game's, and its instrument gives it its own.</summary>
+    public LabLevers Lab
+    {
+        get => _lab;
+        set { _lab = value; _exhaust.Lab = value; }
+    }
+    private LabLevers _lab = new();
 
     /// <summary>Where the listener stands, in the machine's frame (x across, y up, z forward, origin
     /// at the exhaust part), so each tailpipe radiates from its own place; untold, the pipes sum at one

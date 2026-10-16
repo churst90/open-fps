@@ -20,6 +20,9 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// </summary>
 internal sealed class ExhaustNetwork
 {
+    /// <summary>Its engine's lab levers (LabLevers.SoloTailpipe).</summary>
+    internal LabLevers Lab { get; set; } = new();
+
     private readonly EngineProfile _e;
     private readonly ExhaustSpec _x;
     private readonly float _rate;
@@ -670,7 +673,7 @@ internal sealed class ExhaustNetwork
                 heard = (a0 + (a1 - a0) * f) * br.Spread;
                 br.PathAt = (br.PathAt + 1) & mask;
             }
-            int solo = EngineSynth.DebugSoloTailpipe;
+            int solo = Lab.SoloTailpipe;
             if (solo >= 0) heard = Array.IndexOf(_branch, br) == solo ? heard * _branch.Length : 0f;
 
             radiated += heard;

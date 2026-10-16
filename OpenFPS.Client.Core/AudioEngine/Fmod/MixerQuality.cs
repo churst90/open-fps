@@ -47,11 +47,6 @@ public static class MixerQuality
     public static int RequestedRate
         => int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MIXER_RATE"), out int r) && r >= 22050 && r <= 192000 ? r : DefaultRate;
 
-    /// <summary>The mixer's rate once one is made, <see cref="DefaultRate"/> until then. Everything that
-    /// renders for the mixer or runs in it reads this: nothing may assume a rate.</summary>
-    public static int MixerRate { get => _mixerRate; set => _mixerRate = value > 0 ? value : DefaultRate; }
-    private static volatile int _mixerRate = DefaultRate;
-
     /// <summary>
     /// Brings a buffer to <paramref name="to"/> with a Kaiser-windowed sinc (64 taps a side, about 90 dB
     /// down in the stop band, flat to 95 % of the lower Nyquist), once, on the thread that rendered it.

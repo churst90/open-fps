@@ -35,6 +35,7 @@ internal sealed class ClientAudioHarness
         Facade.InitializeForTest(soundsPath);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
         World.Clock = Facade.Clock;
+        World.Hearing = Facade.Hearing;
         var sounds = new SoundMappingService(Player);
         if (soundsPath != null) sounds.Initialize(soundsPath);
         // No door prewarm: with the render cache empty (TestConfigIsolation) every harness rendered the
@@ -64,7 +65,7 @@ internal sealed class ClientAudioHarness
         def.SoundEmitter.SoundId = "engine:" + preset;
         def.SoundEmitter.Mode = PlaybackMode.LoopOne;
         def.SoundEmitter.Volume = 1f;
-        def.SoundEmitter.Range = Loudness.AudibleRange(profile.SourceLevelDb);
+        def.SoundEmitter.Range = Facade.Hearing.AudibleRange(profile.SourceLevelDb);
         def.SoundEmitter.MinDistance = 3f;
         World.RegisterDefinition(def);
         World.SyncState(new[] { new EntityState

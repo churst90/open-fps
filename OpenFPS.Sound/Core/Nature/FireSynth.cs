@@ -5,6 +5,66 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
 /// <summary>
+/// The figures a fire is fitted by (docs/FIRE.md section 8): how its heat release swings and flickers, how its
+/// roar's spectrum falls, how many crackles each fuel gives. A new one is the fitted fire; the lab brackets one
+/// figure at a time (--fire swing= and the rest) by handing its own to the synth it makes.
+/// </summary>
+public sealed record FireTuning
+{
+    /// <summary>
+    /// How far a body of fire's heat release swings with its puffing, a share of it: its dQ/dt at a metre
+    /// is (γ − 1) / (4π c²) 2π f_puff PuffSwing Q (docs/FIRE.md 1.2). The spectrum of that peaks at the
+    /// puffing rate (infrasound), falls as f^−1.4 to ten times it (Marcillo et al. 2025) and as f^−α
+    /// (<see cref="RoarTailExponent"/>) above, through everything that is heard. FITTED (section 8).
+    /// </summary>
+    public float PuffSwing { get; init; } = 0.35f;
+
+    /// <summary>α, how fast the roar's spectrum falls above ten times the puffing rate: PSD ∝ f^−α. Measured
+    /// 2.1-3.4 on turbulent flames (Rajaram and Lieuwen 2009), 5/2 from Kolmogorov turbulence (Clavin and
+    /// Siggia 1991), about 2.2-2.9 on vegetation fires (Viegas et al. 2008). FITTED (section 8).</summary>
+    public float RoarTailExponent { get; init; } = 2.5f;
+
+    /// <summary>
+    /// How far a body of fire's burning flickers between its puffs, rms over its mean: the heat release's
+    /// own spectrum runs on from the puffing rate to ten times it (f^−1.4, Marcillo et al. 2025), and the
+    /// roar and the gas let out of the fuel follow it. FITTED to the recordings' 4-16 Hz envelope
+    /// modulation (section 8).
+    /// </summary>
+    public float Flicker { get; init; } = 0.2f;
+
+    /// <summary>Crackles per kW of burning foliage and twigs, over seasoned logs'. FITTED (section 8).</summary>
+    public float TreeCrackle { get; init; } = 0.12f;
+
+    /// <summary>The same for a crown fire's front. FITTED (section 8).</summary>
+    public float CrownCrackle { get; init; } = 0.03f;
+
+    /// <summary>
+    /// How a body of fire's crackles grow with its heat release: as (Q / 80 kW)^β, which leaves the fire
+    /// pit as fitted. FITTED (section 8): heard crackles come from the fuel's outer layer, a smaller
+    /// share of what burns in a big pile or a crown.
+    /// </summary>
+    public float CrackleHeatExponent { get; init; } = 0.5f;
+
+    /// <summary>Crackles per kW of a burning building's timber, over seasoned logs'. FITTED (section 8).</summary>
+    public float StructureCrackle { get; init; } = 2f;
+
+    /// <summary>Crackles (spitting plastics and the car's own timber-free fuel) per kW, over logs'. FITTED.</summary>
+    public float VehicleCrackle { get; init; } = 0.3f;
+
+    /// <summary>A car's fizz over wood's, in power: molten plastics boiling and their gas jetting, where wood
+    /// has its water. FITTED (section 8).</summary>
+    public float VehicleFizz { get; init; } = 10f;
+
+    /// <summary>Crackles per kW of burning grass and litter, over seasoned logs': straw and litter fires carry
+    /// almost no crackle, shrubs a strong 1-10 kHz one (Viegas et al. 2008). ESTIMATE, not yet fitted to
+    /// the prescribed burns (docs/FIRE.md 12.9).</summary>
+    public float LitterCrackle { get; init; } = 0.35f;
+
+    /// <summary>Drops bursting on hot fuel, pops a second per 100 kW the water is taking. ESTIMATE.</summary>
+    public float SizzlePopsPer100Kw { get; init; } = 25f;
+}
+
+/// <summary>
 /// A fire of any size, from what is going on in it (docs/FIRE.md).
 ///
 /// The flames radiate as a monopole, p = (γ − 1) / (4π r c²) dQ/dt (Strahle 1971; Hurle et al. 1968),
@@ -27,27 +87,6 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// </summary>
 public sealed class FireSynth
 {
-    /// <summary>
-    /// How far a body of fire's heat release swings with its puffing, a share of it: its dQ/dt at a metre
-    /// is (γ − 1) / (4π c²) 2π f_puff PuffSwing Q (docs/FIRE.md 1.2). The spectrum of that peaks at the
-    /// puffing rate (infrasound), falls as f^−1.4 to ten times it (Marcillo et al. 2025) and as f^−α
-    /// (<see cref="RoarTailExponent"/>) above, through everything that is heard. FITTED (section 8).
-    /// </summary>
-    public static float PuffSwing = 0.35f;
-
-    /// <summary>α, how fast the roar's spectrum falls above ten times the puffing rate: PSD ∝ f^−α. Measured
-    /// 2.1-3.4 on turbulent flames (Rajaram and Lieuwen 2009), 5/2 from Kolmogorov turbulence (Clavin and
-    /// Siggia 1991), about 2.2-2.9 on vegetation fires (Viegas et al. 2008). FITTED (section 8).</summary>
-    public static float RoarTailExponent = 2.5f;
-
-    /// <summary>
-    /// How far a body of fire's burning flickers between its puffs, rms over its mean: the heat release's
-    /// own spectrum runs on from the puffing rate to ten times it (f^−1.4, Marcillo et al. 2025), and the
-    /// roar and the gas let out of the fuel follow it. FITTED to the recordings' 4-16 Hz envelope
-    /// modulation (section 8).
-    /// </summary>
-    public static float Flicker = 0.2f;
-
     /// <summary>Where the roar's spectrum turns from f^−1.4 to f^−α, over the puffing rate.</summary>
     private const float KneeOverPuff = 10f;
     /// <summary>Under this nothing is rendered, Hz: it is not heard, and a big fire's infrasound would
@@ -166,7 +205,7 @@ public sealed class FireSynth
     private readonly float _roarPsdPerKw2;   // the roar's PSD at 100 Hz per kW² of one cell, Pa²/Hz at a metre
     private readonly float _puffHz;
     /// <summary>How much bigger this fire's pockets are than the fire pit's, in pressure: a body of fire's
-    /// crackle energy goes as what it burns, its count as that to the β (<see cref="CrackleHeatExponent"/>),
+    /// crackle energy goes as what it burns, its count as that to the β (<see cref="FireTuning.CrackleHeatExponent"/>),
     /// so each is (Q / 80 kW)^((1 − β) / 2) louder. Bigger fuel holds its water in fewer, bigger pockets.</summary>
     private readonly float _pocketScale;
     private readonly float _flickA, _flickB, _flickC, _flickNorm;
@@ -227,8 +266,16 @@ public sealed class FireSynth
     private struct Clip { public float[]? Data; public int Pos; public int Place; public float Gain; public int Delay; }
     private readonly Clip[] _clips = new Clip[6];
 
-    public FireSynth(FireSpec spec, float sampleRate, int seed, int places = 1)
+    /// <summary>The hearing of the world it burns in, whose compression places a burst over the fire's own level:
+    /// its mixer's, which sets it as it makes the voice. One of its own, the shipped hearing, when made alone.</summary>
+    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; set; } = new();
+
+    /// <summary>The figures it is fitted by: the fitted fire unless an instrument hands it its own.</summary>
+    public FireTuning Tuning { get; }
+
+    public FireSynth(FireSpec spec, float sampleRate, int seed, int places = 1, FireTuning? tuning = null)
     {
+        Tuning = tuning ?? new FireTuning();
         Spec = spec;
         _rate = sampleRate;
         _sum = new EventSum(sampleRate, seed);
@@ -293,7 +340,7 @@ public sealed class FireSynth
         _fizz = new Resonator[places];
         for (int p = 0; p < places; p++)
         {
-            _roar[p].Tune(RoarTailExponent, RoarFloorHz, sampleRate);
+            _roar[p].Tune(Tuning.RoarTailExponent, RoarFloorHz, sampleRate);
             _fizz[p].Tune(MathF.Min(FizzHz, 0.4f * sampleRate), 0.5f, sampleRate);
         }
         _roarUnit = _roar[0].UnitAtReference;
@@ -324,7 +371,7 @@ public sealed class FireSynth
         _placeOut = new float[places];
 
         _energyLogSize = CrackleEnergies(sampleRate);
-        _pocketScale = MathF.Pow(MathF.Max(1f, spec.HeatReleaseKw / _cells.Length / 80f), 0.5f * (1f - CrackleHeatExponent));
+        _pocketScale = MathF.Pow(MathF.Max(1f, spec.HeatReleaseKw / _cells.Length / 80f), 0.5f * (1f - Tuning.CrackleHeatExponent));
         // The flicker: noise above the puffing rate, flat to three times it and falling as f^−2 from there
         // to ten times it (about the f^−1.4 measured over that decade), sampled every Sub samples.
         {
@@ -435,13 +482,13 @@ public sealed class FireSynth
     /// metre: its dQ/dt's variance (the monopole's, at the puffing rate) spread over the puffing peak, down
     /// f^−1.4 to the knee and f^−α from there.
     /// </summary>
-    public static float RoarPsdPerKw2(float puffHz)
+    public float RoarPsdPerKw2(float puffHz)
     {
-        float perKw = (Gamma - 1f) / (4f * MathF.PI * SoundSpeed * SoundSpeed) * MathF.Tau * puffHz * PuffSwing * 1000f;
+        float perKw = (Gamma - 1f) / (4f * MathF.PI * SoundSpeed * SoundSpeed) * MathF.Tau * puffHz * Tuning.PuffSwing * 1000f;
         float peak = perKw * perKw / puffHz;
         float knee = KneeOverPuff * puffHz;
         float at = PowerLawNoise.ReferenceHz;
-        float shape = at <= knee ? MathF.Pow(at / puffHz, -1.4f) : MathF.Pow(KneeOverPuff, -1.4f) * MathF.Pow(at / knee, -RoarTailExponent);
+        float shape = at <= knee ? MathF.Pow(at / puffHz, -1.4f) : MathF.Pow(KneeOverPuff, -1.4f) * MathF.Pow(at / knee, -Tuning.RoarTailExponent);
         return peak * shape;
     }
 
@@ -532,43 +579,19 @@ public sealed class FireSynth
 
     /// <summary>Crackles a second at this moment for the whole fire, before clustering, for the lab and tests.</summary>
     public float CrackleRate => _crackleNow >= 0f ? _crackleNow
-        : _cells.Length * CracklesPer100Kw * 0.8f * MathF.Pow(Spec.HeatReleaseKw / _cells.Length / 80f, CrackleHeatExponent) * FuelCrackle * _life * _burn;
+        : _cells.Length * CracklesPer100Kw * 0.8f * MathF.Pow(Spec.HeatReleaseKw / _cells.Length / 80f, Tuning.CrackleHeatExponent) * FuelCrackle * _life * _burn;
     private float _crackleNow = -1f;
 
     /// <summary>How a fuel's moisture and resin, and what it is, set its crackles per kW (docs/FIRE.md 4).</summary>
     private float FuelCrackle => (0.4f + 3f * MathF.Min(0.4f, Spec.Moisture)) * (0.6f + 0.8f * Spec.Resin) * Spec.Fuel switch
     {
-        FireFuel.Trees => TreeCrackle,
-        FireFuel.Crown => CrownCrackle,
-        FireFuel.Structure => StructureCrackle,
-        FireFuel.Vehicle => VehicleCrackle,
-        FireFuel.Litter => LitterCrackle,
+        FireFuel.Trees => Tuning.TreeCrackle,
+        FireFuel.Crown => Tuning.CrownCrackle,
+        FireFuel.Structure => Tuning.StructureCrackle,
+        FireFuel.Vehicle => Tuning.VehicleCrackle,
+        FireFuel.Litter => Tuning.LitterCrackle,
         _ => 1f,
     };
-
-    /// <summary>Crackles per kW of burning foliage and twigs, over seasoned logs'. FITTED (section 8).</summary>
-    public static float TreeCrackle = 0.12f;
-    /// <summary>The same for a crown fire's front. FITTED (section 8).</summary>
-    public static float CrownCrackle = 0.03f;
-    /// <summary>
-    /// How a body of fire's crackles grow with its heat release: as (Q / 80 kW)^β, which leaves the fire
-    /// pit as fitted. FITTED (section 8): heard crackles come from the fuel's outer layer, a smaller
-    /// share of what burns in a big pile or a crown.
-    /// </summary>
-    public static float CrackleHeatExponent = 0.5f;
-    /// <summary>Crackles per kW of a burning building's timber, over seasoned logs'. FITTED (section 8).</summary>
-    public static float StructureCrackle = 2f;
-    /// <summary>Crackles (spitting plastics and the car's own timber-free fuel) per kW, over logs'. FITTED.</summary>
-    public static float VehicleCrackle = 0.3f;
-    /// <summary>A car's fizz over wood's, in power: molten plastics boiling and their gas jetting, where wood
-    /// has its water. FITTED (section 8).</summary>
-    public static float VehicleFizz = 10f;
-    /// <summary>Crackles per kW of burning grass and litter, over seasoned logs': straw and litter fires carry
-    /// almost no crackle, shrubs a strong 1-10 kHz one (Viegas et al. 2008). ESTIMATE, not yet fitted to
-    /// the prescribed burns (docs/FIRE.md 12.9).</summary>
-    public static float LitterCrackle = 0.35f;
-    /// <summary>Drops bursting on hot fuel, pops a second per 100 kW the water is taking. ESTIMATE.</summary>
-    public static float SizzlePopsPer100Kw = 25f;
 
     /// <summary>
     /// After it is out, the char cools and checks: ticks, at first a few a second for the coals of
@@ -713,15 +736,15 @@ public sealed class FireSynth
             // The fizz follows how hard the fuel is gassing: what is burning, how wet, and the clusters of
             // pockets reaching temperature together that the crackles come in.
             float fizz = FizzPascals * FizzPascals * (heat / 80f) * MathF.Min(2f, Spec.Moisture / 0.2f) * cell.Cluster
-                       * (Spec.Fuel == FireFuel.Vehicle ? VehicleFizz : 1f);
+                       * (Spec.Fuel == FireFuel.Vehicle ? Tuning.VehicleFizz : 1f);
             // The steam the water makes as it flashes on the hot fuel: a gas jet through the char like the
             // fizz, its power the heat it is taking.
             fizz += FizzPascals * FizzPascals * (taken / 80f) * SizzleOverFizz;
             cell.Fizz = fizz;
-            float crackles = CracklesPer100Kw * 0.8f * MathF.Pow(MathF.Max(0f, heat) / 80f, CrackleHeatExponent) * FuelCrackle * cell.Vigour * cell.Cluster * (1f + 1.5f * _flare)
+            float crackles = CracklesPer100Kw * 0.8f * MathF.Pow(MathF.Max(0f, heat) / 80f, Tuning.CrackleHeatExponent) * FuelCrackle * cell.Vigour * cell.Cluster * (1f + 1.5f * _flare)
                            * (1f + 2f * cell.Torch) * (1f + 0.2f * MathF.Max(0f, cell.Wind - 2f))
                            // Drops bursting into steam on the hot surface pop like small crackles.
-                           + SizzlePopsPer100Kw * taken / 100f;
+                           + Tuning.SizzlePopsPer100Kw * taken / 100f;
             rateTotal += crackles / MathF.Max(1e-3f, cell.Cluster);
             for (int p = 0; p < places; p++)
             {
@@ -967,7 +990,7 @@ public sealed class FireSynth
             cell.FlickX = x;
             cell.FlickLo = (1f - _flickB) * hp + _flickB * cell.FlickLo;
             cell.FlickHi = (1f - _flickC) * cell.FlickLo + _flickC * cell.FlickHi;
-            float flick = Flicker * cell.FlickHi * _flickNorm;
+            float flick = Tuning.Flicker * cell.FlickHi * _flickNorm;
             // A puff swells the roar rather than switching it: the flames never stop burning between them.
             cell.Env = MathF.Max(0.05f, 1f + cell.Depth * MathF.Sin(MathF.Tau * cell.Phase) + flick);
             cell.Flick = MathF.Max(0.05f, 1f + flick);
@@ -1361,7 +1384,7 @@ public sealed class FireSynth
         var sum = _sums[place];
         float levelPa = 2e-5f * MathF.Pow(10f, Spec.SourceLevelDb / 20f);
         float excessDb = 20f * MathF.Log10(MathF.Max(1e-6f, pascals) / MathF.Max(1e-6f, levelPa));
-        float placed = levelPa * MathF.Pow(10f, MathF.Max(0f, excessDb) * Loudness.DynamicRangeCompression / 20f);
+        float placed = levelPa * MathF.Pow(10f, MathF.Max(0f, excessDb) * Hearing.Compression / 20f);
         int at = (int)(_sum.Uniform() * Block);
         sum.Impact(at, 15e-6f, seconds, placed * BurstPart);
         if (hiss) sum.Burst(at + 20, 0.01f, 0.4f + 0.8f * _sum.Uniform(), 0.03f * placed * BurstPart, 1500f, 9000f);
@@ -1398,7 +1421,7 @@ public sealed class FireSynth
 
     /// <summary>For the lab: how many of each kind of event have been and how many cells are going.</summary>
     public string Census()
-        => $"  {Cells} bodies of fire {_cellDiameter:F1} m across, puffing at {_puffHz:F2} Hz, roar f^-{RoarTailExponent:F1} from {KneeOverPuff * _puffHz:F0} Hz; " +
+        => $"  {Cells} bodies of fire {_cellDiameter:F1} m across, puffing at {_puffHz:F2} Hz, roar f^-{Tuning.RoarTailExponent:F1} from {KneeOverPuff * _puffHz:F0} Hz; " +
            $"{Places} places; heat {HeatNowKw / 1000f:F2} MW; crackles {CrackleRate:F0}/s";
 }
 

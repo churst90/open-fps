@@ -19,7 +19,7 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 ///   --car-fronts fan [preset ...]          the cooling fan alone
 ///
 /// level=game (the default) renders what the game plays: the idle lift (CompensateLevel) at the
-/// loudness law in force (Loudness.DynamicRangeCompression), each outlet placed as ClientAudioSystem
+/// loudness law in force (LabHearing.Compression), each outlet placed as ClientAudioSystem
 /// places it (Loudness.Place at the declared level, widened to the distance between the outlets) and
 /// rolled off by Loudness.RenderedGain, then the master's trim and makeup (+9 dB), the WAVs unscaled.
 /// level=physical renders pascals spreading spherically from each outlet, the WAVs at 1 Pa = 0.1 full
@@ -34,6 +34,10 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// </summary>
 public static class CarFrontSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     const int Rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Block = 512;   // the rate the game runs it at
     const float WavScale = 0.1f;
     const float C = 343f;
@@ -55,7 +59,7 @@ public static class CarFrontSpike
         bool wav = !args.Contains("nowav");
         BayOverride = float.TryParse(Arg(args, "bay="), out var bo) ? bo : float.NaN;
         var names = args.Where(x => !x.StartsWith("--") && !x.Contains('=') && x != "nowav").ToArray();
-        Console.WriteLine(Game ? $"Game level: loudness law at {Loudness.DynamicRangeCompression:F2}, idle lift on; numbers are dBFS-referenced (0 dB = full scale)"
+        Console.WriteLine(Game ? $"Game level: loudness law at {LabHearing.Compression:F2}, idle lift on; numbers are dBFS-referenced (0 dB = full scale)"
                                : "Physical level: pascals, dB SPL");
         if (names.Length == 0) names = new[] { "i4_economy", "i4_midsize", "v8_mild", "diesel_i4", "police_interceptor" };
         string raw = Arg(args, "raw=") ?? Path.Combine(outDir, "raw");
@@ -108,7 +112,7 @@ public static class CarFrontSpike
             }
             foreach (var (label, ambient, hot) in new[] { ("mild", 20f, false), ("aircon", 32f, false), ("hot coolant", 20f, true) })
             {
-                var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = 0f, SplitVoices = true, AmbientCelsius = ambient };
+                var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = 0f, SplitVoices = true, AmbientCelsius = ambient };
                 voice.BayLeakage = 0f; voice.TyreMix = 0f;
                 voice.PlaceAtSpeed(0f); voice.Revive();
                 var tap = new EngineTapState(voice);
@@ -239,7 +243,7 @@ public static class CarFrontSpike
 
     static EngineVoiceState Voice(VehicleProfile v, float speed, float ambient)
     {
-        var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed, SplitVoices = true, CompensateLevel = Game };
+        var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = speed, SplitVoices = true, CompensateLevel = Game };
         if (!float.IsNaN(ambient)) typeof(EngineVoiceState).GetField("AmbientCelsius")?.SetValue(voice, ambient);
         if (!float.IsNaN(BayOverride)) voice.BayLeakage = BayOverride;
         voice.PlaceAtSpeed(speed);
@@ -308,8 +312,8 @@ public static class CarFrontSpike
     {
         if (!Game) return 1f / MathF.Max(0.5f, d);
         float extent = Vector3.Distance(v.ExhaustSlot, FrontTap(v));
-        var (gain, reference) = Loudness.Place(v.SourceLevelDb, extent);
-        return Loudness.RenderedGain(gain, reference, Loudness.AudibleRange(v.SourceLevelDb), d) * MasterGain;
+        var (gain, reference) = LabHearing.Place(v.SourceLevelDb, extent);
+        return Loudness.RenderedGain(gain, reference, LabHearing.AudibleRange(v.SourceLevelDb), d) * MasterGain;
     }
 
     /// <summary>The master: FmodAudioProvider's trim and the limiter's makeup, which at these levels

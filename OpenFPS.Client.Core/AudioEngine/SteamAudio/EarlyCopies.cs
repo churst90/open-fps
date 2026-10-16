@@ -98,11 +98,8 @@ internal sealed class EarlyCopies
         return band;
     }
 
-    /// <summary>Each of SmoothTail's bands' share of a flat spectrum's energy at the mixer's rate (they
-    /// sum to one). The top band runs to Nyquist, so the shares depend on the rate.</summary>
-    internal static double[] BandShare => BandShareAt(OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
-
-    /// <summary>As <see cref="BandShare"/>, at <paramref name="rate"/>; worked out once per rate.</summary>
+    /// <summary>Each of SmoothTail's bands' share of a flat spectrum's energy at <paramref name="rate"/> (they
+    /// sum to one), worked out once per rate. The top band runs to Nyquist, so the shares depend on the rate.</summary>
     internal static double[] BandShareAt(int rate)
     {
         var c = Volatile.Read(ref _bandShare);

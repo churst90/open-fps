@@ -17,6 +17,8 @@ public class SynthVoiceState : IGuardedUnit
     public float FilterCutoff; 
     public float FilterResonance; 
     public float PulseWidth = 0.5f;
+    /// <summary>The rate of the mixer it plays in, Hz, which its mixer sets as it makes the voice.</summary>
+    public int MixerRate = MixerQuality.DefaultRate;
 
     public float Phase;
     public float LfoPhase;
@@ -118,7 +120,7 @@ public static class SynthProcessor
 
         if (outchannels == 0) outchannels = 2; 
         int outCh = outchannels;
-        float sampleRate = MixerQuality.MixerRate;
+        float sampleRate = state.MixerRate;
 
         unsafe
         {

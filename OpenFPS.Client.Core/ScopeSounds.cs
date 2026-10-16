@@ -9,9 +9,9 @@ namespace OpenFPS.Client.Core;
 /// </summary>
 public static class ScopeSounds
 {
-    /// <summary>The rate both loops and the breath are rendered at: the mixer's, so they play without a
-    /// resampler.</summary>
-    public static int SampleRate => OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+    /// <summary>The rate both loops and the breath are rendered at unless asked for another: the default mixer's.
+    /// The game asks for its mixer's (AudioEngineFacade.MixerRate), so they play without a resampler.</summary>
+    public const int SampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
 
     /// <summary>The held note, Hz, about E5: thirty cycles in 2000 samples at 44.1 kHz, kept at any rate by
     /// a loop of whole cycles (<see cref="SteadyLoopSamples"/>).</summary>
@@ -31,12 +31,12 @@ public static class ScopeSounds
         => (float)(Math.Sin(phase) + 0.25 * Math.Sin(2 * phase) + 0.08 * Math.Sin(3 * phase)) / 1.2f;
 
     /// <summary>One pulse and its silence: a raised-cosine swell up and down, so nothing in it clicks.</summary>
-    public static float[] RenderPulse()
+    public static float[] RenderPulse(int rate = SampleRate)
     {
-        int n = (int)(PulsePeriodSeconds * SampleRate);
-        int on = (int)(PulseOnSeconds * SampleRate);
+        int n = (int)(PulsePeriodSeconds * rate);
+        int on = (int)(PulseOnSeconds * rate);
         var x = new float[n];
-        double w = 2 * Math.PI * PulseHz / SampleRate;
+        double w = 2 * Math.PI * PulseHz / rate;
         for (int i = 0; i < on; i++)
         {
             float env = 0.5f * (1f - MathF.Cos(2f * MathF.PI * i / on));   // up and down, zero at both ends
@@ -56,11 +56,11 @@ public static class ScopeSounds
     }
 
     /// <summary>The held note: whole cycles, so it loops without a seam.</summary>
-    public static float[] RenderSteady()
+    public static float[] RenderSteady(int rate = SampleRate)
     {
-        int n = SteadyLoopSamples(SampleRate);
+        int n = SteadyLoopSamples(rate);
         var x = new float[n];
-        double w = 2 * Math.PI * SteadyHz / SampleRate;
+        double w = 2 * Math.PI * SteadyHz / rate;
         for (int i = 0; i < n; i++) x[i] = Peak * Reed(w * i);
         return x;
     }
@@ -76,16 +76,16 @@ public static class ScopeSounds
     /// longer) when it ends. Band noise on a raised cosine, so no onset knocks; -26 dBFS peak before the
     /// interface volume, about -35 as played: the shooter's own, only there to be felt.
     /// </summary>
-    public static float[] RenderBreath(bool inhale, int seed = 1)
+    public static float[] RenderBreath(bool inhale, int seed = 1, int rate = SampleRate)
     {
         float seconds = inhale ? 0.55f : 0.8f;
         float hz = inhale ? 1100f : 600f;
-        int n = (int)(seconds * SampleRate);
+        int n = (int)(seconds * rate);
         var x = new float[n];
         var rng = new Random(seed);
-        float lowCut = hz / 3f, highCut = MathF.Min(SampleRate * 0.45f, hz * 6f);
-        float aHigh = 1f - MathF.Exp(-MathF.Tau * highCut / SampleRate);
-        float aLow = 1f - MathF.Exp(-MathF.Tau * lowCut / SampleRate);
+        float lowCut = hz / 3f, highCut = MathF.Min(rate * 0.45f, hz * 6f);
+        float aHigh = 1f - MathF.Exp(-MathF.Tau * highCut / rate);
+        float aLow = 1f - MathF.Exp(-MathF.Tau * lowCut / rate);
         float lp1 = 0f, lp2 = 0f, hp = 0f;
         int rise = (int)(n * (inhale ? 0.45f : 0.3f));
         for (int i = 0; i < n; i++)

@@ -16,6 +16,10 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class SpeedwaySpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const float C = 343f;
 
     private sealed record Car(string Name, string Preset, RaceLine Line, float Start);
@@ -121,7 +125,7 @@ public static class SpeedwaySpike
             Console.WriteLine($"    {c.Name,-16} {c.Preset,-11} {c.Line.MinSpeed * 3.6f,4:F0}-{c.Line.MaxSpeed * 3.6f,3:F0} km/h   lap {c.Line.Length:F0} m");
         Console.WriteLine();
 
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
@@ -134,8 +138,8 @@ public static class SpeedwaySpike
             foreach (var key in cars.Select(c => c.Preset).Distinct())
             {
                 float lvl = VehicleProfile.ByName(key).SourceLevelDb;
-                var (g, r) = Loudness.Place(lvl);
-                place[key] = (g, MathF.Max(r, 3f), Loudness.AudibleRange(lvl));
+                var (g, r) = LabHearing.Place(lvl);
+                place[key] = (g, MathF.Max(r, 3f), LabHearing.AudibleRange(lvl));
             }
 
             var lap = new float[cars.Count];

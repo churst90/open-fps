@@ -310,10 +310,10 @@ public sealed class DropBank
     /// A drop's level is its peak (its sound is normalised to it); a patch's is its Leq, rendered the
     /// fleet's shared headroom (VehicleProfile.PeakHeadroomDb) under full scale, hence the headroom here.
     /// </summary>
-    public static (float Gain, float Reference) Placement(float dropLevelDb, float fieldLevelDb)
+    public static (float Gain, float Reference) Placement(OpenFPS.Common.Hearing.HearingSettings hearing, float dropLevelDb, float fieldLevelDb)
     {
-        if (float.IsNaN(fieldLevelDb) || fieldLevelDb <= 0f) return Loudness.Place(dropLevelDb);
-        var (gain, reference) = Loudness.Place(fieldLevelDb);
+        if (float.IsNaN(fieldLevelDb) || fieldLevelDb <= 0f) return hearing.Place(dropLevelDb);
+        var (gain, reference) = hearing.Place(fieldLevelDb);
         float relative = dropLevelDb - fieldLevelDb - VehicleProfile.PeakHeadroomDb;
         return (MathF.Min(1f, gain * MathF.Pow(10f, relative / 20f)), reference);
     }

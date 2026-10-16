@@ -30,7 +30,8 @@ library that open-fps and Resonance both reference. Step 1 of
 15. Stage 2 as built: OpenFPS.Geometry
 16. Stage 3 as built: OpenFPS.Sound and the first half of OpenFPS.Acoustics
 17. Stage 4 as built: rooms and openings as values
-18. Stage 5 (first slice) as built: the traced places and the weather per world
+18. Stage 5 as built: the traced places and the weather per world (18.1-18.5), the clock (18.6), the world
+    time (18.7), the air, the mixer's rate, the hearing, the mix and the lab (18.8)
 
 ---
 
@@ -833,7 +834,9 @@ levers into `LabLevers`.
   old static still compiles if the static is kept, so each static is deleted when its last reader is
   moved, and the deletion is the check.
 - Bonus: the test assembly can run in parallel again once the world state is per instance.
-- As built, the first slice (the traced places, the wind and the run-off): section 18. `AudioClock` is next.
+- As built: section 18. The traced places, the wind and the run-off (18.1-18.5), `AudioClock` (18.6), the world
+  time (18.7), then the air, the mixer's rate, the hearing, the console's and the lab's levers (18.8). The model
+  catalogue is package stage 2's `Catalogue` (docs/ENGINE_PACKAGES.md). What 18.8 left is listed there.
 
 ### Stage 6: the world input and `OpenFPS.Audio` (3 to 5 sessions)
 
@@ -2261,7 +2264,7 @@ unregenerated (18.5).
 ### 18.3 What is left of stage 5
 
 `AudioClock` behind `IAudioClock` is built (18.6), and the world time and the machine's clocks with it (18.7).
-In the order of section 8, the rest: `AudioPhysics` and
+The rest but the catalogue is built too (18.8, with what it left). In the order of section 8, as it stood: `AudioPhysics` and
 `MixerQuality.MixerRate` into the world's atmosphere and mixer format; `EarModel` and `Loudness` into
 `HearingSettings`; `MachineRegistry` and `ModelLibrary` into a `ModelCatalog` (built 2026-10-16 with
 package stage 2: the instance is `Catalogue`, in `OpenFPS.Models`, behind the two static classes; see
@@ -2436,3 +2439,105 @@ stopwatch and the world time is the shared UTC count, as before.
   side of this refuse each other at login.
 - **Not run here** (no Steam Audio on the Windows machine): the worker's simulated paths, its scene rebuilds
   and retired scenes, the late field and the cabin traces. The patch's README lists them by file and method.
+
+### 18.8 The air, the mixer's rate, the hearing, the mix and the lab (fourth slice, 2026-10-16)
+
+The rest of stage 5 but the model catalogue (package stage 2's `Catalogue`). Each static went with its last
+reader, so nothing compiles that still reads one. Behaviour unchanged: the stored streams, the render
+fingerprints and the spoken lines pass unregenerated, and the door fingerprint is the same (ba2b645a8813).
+
+- **Who holds what.** The mixer, beside `Clock`, `Weather` and `Traced`, and `AudioEngineFacade` reaches the
+  same ones (or ones of its own when the mixer is not FMOD, as in the tests):
+
+  | Was | Now |
+  |---|---|
+  | `AudioPhysics.CurrentSpeedOfSound`, `CurrentAirCelsius` | `Atmosphere` (`OpenFPS.Sound/Core/Atmosphere.cs`): the temperature the weather sets and the speed of sound in it, by `AudioPhysics.SpeedOfSoundAt`, which reads `Air`. `FmodAudioProvider.Atmosphere`. |
+  | `MixerQuality.MixerRate` | `FmodAudioProvider.MixerRate`, what FMOD granted; `AudioEngineFacade.MixerRate`. |
+  | `EarModel.Enabled`, `ListeningLevelDb`, `Loudness.DynamicRangeCompression`, `RankOnPlayedGain` | `HearingSettings` (`OpenFPS.Sound/Hearing/HearingSettings.cs`): `Compression`, `EarModelOn`, `ListeningLevelDb`, `RankOnPlayedGain`. `FmodAudioProvider.Hearing`. |
+  | `FmodAudioProvider.TailDb`, `CopiesDb`, `CabinDb`, `TracedEchoesOn`, `ReducedFarEngines`, `EngineSynth.ValveJetNoise` | `MixSettings` (`OpenFPS.Sound/Core/MixSettings.cs`). `FmodAudioProvider.Mix`. |
+  | `FmodAudioProvider._tracedEchoIds`, `HasTracedEchoes` | instance members; the host asks `AudioEngineFacade.HasTracedEchoes`. |
+  | `Talkers._all`, `OwnVoiceRing.Shared` | `FmodAudioProvider.TalkerStreams` and `OwnVoice`. `Talkers` keeps only the keys. |
+  | `TracedReverb.SimulatedType`, `RawTail`, `OneChannelLate`, `LabProbeSeconds`, `SmoothTail.FromFiftyMs`, `TracedReverbDsp.LabNoPreDelay`, `DiffuseTail.LateEarVelvet`, `AsyncAcousticWorker.TraceProvenance`, `RouteAnswers.RetainSuperseded`, `TileSceneSet.RecycleShare`, `StoveVoiceState.LabCreated`, `EngineVoiceState.LabAlignProbe`, `EngineSynth.DebugLegacyDiesel`, `DebugRigidValves`, `DebugSoloTailpipe`, `RunningWaterSynth.LabNoise` | `LabLevers` (`OpenFPS.Sound/Core/LabLevers.cs`). `FmodAudioProvider.Lab`, which its traced set and stages, its stoves, engines and running water are made with; `AsyncAcousticWorker.Lab` (the host gives it the facade's); an engine, a trace or a tile set an instrument makes itself takes its own. |
+  | `FireSynth.PuffSwing` and the other ten fitted figures | `FireTuning`, handed to the synth as it is made (its constructor reads them); a new one is the fitted fire. |
+  | `StruckThings.Heard` | `RenderPascals`' `heard` argument. |
+
+  The air's, the hearing's and the mix's members are volatile reads and writes, as those statics were: the mixer
+  and the render pool read them while the game thread or the console writes. The lab's are plain, as theirs were.
+- **The host's side.** `ClientAudioSystem`, `WorldAudioPlayer`, `BirdLife`, `BeaconAids`, `RainField` and the
+  rest read their facade's (`_audio.Hearing.Place`, `_audio.Atmosphere.SpeedOfSound`, `_audio.Mix.CopiesTrim`).
+  `ClientWorldState.Hearing` (the session's is the facade's) sizes the woods as they are gathered. The heads put
+  the saved levels and listening level into the facade's hearing (`ClientSettings.ApplyHearing(hearing)`),
+  `/levels`, `/listening` and `/ear` change it, and the console's `/tail`, `/copies`, `/echoes`, `/cabin`,
+  `/valveflow` and `/enginedetail` its mix. A settings file is saved with the hearing it was applied to, or
+  the one `ClientSettings.Save` is handed; the session's other saves keep the file's own levels, which every
+  change to them has already written.
+- **The law takes the hearing.** `Loudness` keeps the law as pure functions of the compression
+  (`PlaceAt`, `RenderCeilingDbAt`, `AudibleRange(level, compression)`, `HeardGainAt`); a world places through its
+  `HearingSettings` (`Place`, `PlacedDb`, `TimbreCorrectionDb`, `HeardGain`, `AudibleRange`, `PlayedAtEarDb`).
+  The library's readers take it: `EarWind.PlacedDb` and `RenderedDb`, `EarTimbres.CorrectionDb`,
+  `TrainVoicing.LawGain`, `WoodChorus.Build`, `VoiceManager.HeardLevel` and `Audibility`, `NearDrops.Placement`,
+  an engine's lift (`EngineVoiceState.LiftDb`). The synths that read it as they render have their world's, given
+  by the mixer as it makes them: an engine (`EngineVoiceState.Hearing`, beside `Clock` and `Atmosphere`), a
+  fire's bursts (`FireSynth.Hearing`), the wind at the ears (`EarWindState`, required). The server, which has no
+  player, sizes its emitters at the shipped compression (`Loudness.AudibleRange(level, Loudness.DefaultCompression)`).
+- **The mixer's rate.** A voice's state carries the rate of the mixer it plays in (`GranularVoiceState.MixerRate`,
+  `SynthVoiceState.MixerRate`), set as the mixer makes it, so its callback reads no static. The traced set is given
+  the rate when FMOD grants it (`TracedReverbSet.MixerRate`) and makes every trace, the late field and the echoes'
+  tracer at it; the worker's simulator reads the set's. Made alone, they take `MixerQuality.DefaultRate`.
+- **Defaults.** The game's mixer starts with `HearingSettings.FromEnvironment()` and `MixSettings.FromEnvironment()`
+  (OPENFPS_LEVEL_COMPRESSION, OPENFPS_EAR_MODEL, OPENFPS_LISTENING_LEVEL, OPENFPS_ECHOES, OPENFPS_TAIL_DB,
+  OPENFPS_COPIES_DB, OPENFPS_ENGINE_DETAIL, as the statics did). A new one is the shipped value, whatever the
+  environment: a facade without FMOD, so a test under one of those variables no longer hears it.
+- **Tests and the lab.** The replay's facade is its own world, so `RunScript` no longer pins the hearing, the air,
+  the rate, the valves' rush or the talkers. A test that wanted the law makes a hearing of its own (`Law`, the
+  shipped one) or reads its harness's (`h.Facade.Hearing`); the valve-flow tests hand their engines a mix without
+  the rush (`ValveFlowSwitch.Off()`), so their collection that ran them alone is gone. Each lab instrument has one
+  hearing (`LabHearing`, from the environment) shared with the mixers it makes (`new FmodAudioProvider { Hearing =
+  LabHearing }`), so a spike that sets the compression hears it in its mixer as it did through the static.
+- **Not moved, and why.**
+  - The door models' levers (`KnobDoor.StemFolder`, `KeeperBendsStrike`, `PinTrace`, the other doors'
+    `StemFolder`): their files are the door fingerprint's sources, and an edit renders every door again. With
+    the next change to a door model.
+  - `DoorRenderCache.Folder` and `ShippedFolder`: paths, for `AudioDataPaths` (7.4) with stage 6.
+  - `CabinPaths.Enabled` and `LabOnePlace`, `ExtendedSources.Enabled`, `LayoutScale` and `ForceSpread`: read in
+    static layout lookups (`CabinPaths.For`, `ExtendedSources.Layout`) the host and the mixer share; they go with
+    the world input of stage 6, which hands those lookups their world.
+  - `Constructions.PanelsOnlyForLab`, `OpeningRoutes.DebugOverTheTop` and `ReverseGridOrderForParity`,
+    `EarlyReflections.FlutterTrace`: the geometric acoustics' traces and A/Bs, read inside static searches;
+    candidates for 4.2's diagnostics, or an acoustics lever object passed with the world in stage 6.
+  - `TriangleGeometry.Enabled` and `Incremental`, `MeshLibrary.Shared`, `PerfProbe.Enabled`: the geometry's and
+    the server's as much as the sound's (docs/GEOMETRY.md), and a diagnostic.
+  - `RainField.RoofRidesWithHead`: the host's.
+- **Statics** (the survey's section 4, `tools/sound_boundary/run.sh`): 387 library statics that can change before,
+  337 after; written from outside their type 63 to 24, reassigned by their own type 57 to 50. The 50 gone are
+  those of the table above and their backing fields; by the survey's kinds, 39 written from outside, 7 reassigned
+  by their own type, 2 never written (the fire's two estimates), a cache and a table. The ones that came in are
+  the host's (the lab's `LabHearing` and a few spikes' own levers, the tests' `Law`, each read only by its own
+  class) and are not counted. No crossing was in any of them, so
+  `allowed.tsv` is unchanged; `files.tsv` gained `Atmosphere.cs`, `MixSettings.cs`, `LabLevers.cs` and
+  `HearingSettings.cs` (library, by the Sound folder rule), and the engine packages' list the same four (Sound).
+  The physics survey's crossings are unchanged.
+- **The wire hash** changes, as `Loudness.cs`, `EarModel.cs`, `HearingSettings.cs`, `EarWind.cs`, `WoodChorus.cs`
+  and others are in `OpenFPS.Sound` outside `Core/` (d93a25bb75da at bbd3f7f8, 4fde7879fd68 after). Nothing sent
+  changed. A client and a server from either side of this refuse each other at login.
+- **Checks.** Every project builds with no warnings: the server, the GTK client, the Windows client
+  (`-p:EnableWindowsTargeting=true`), the lab and the tests. Filtered runs, each on its own:
+  - the guards (LibraryBoundary, EnginePackages, RenderFingerprint, EmitterStreamReplay, SpokenLinesReplay,
+    VoiceIdBand, VoiceRegistry, ModelKindTable, MapScoped, PhysicsBoundary, PhysicsReplay, PhysicsCrossMachine,
+    RicochetTable, OneConstantPerLaw, MaterialName, Refraction): 171 passed;
+  - the hearing's and the rate's readers with the guards (ear model, level compression, listening calibration,
+    the client audio, ear overload, doors, wind at the ears, woods, trains, the budget and the one rank, birds,
+    crowds, loudspeakers, stairs, nature, wide sources, machines, cabins, the mixer's callbacks, the mixer's rate,
+    login, the scope, chat, weapons, early tail, the placing thread, the clock, fire): 837 passed, 3 skipped;
+  - the mix's, the talkers' and the lab's readers (traced echoes and reverb, Steam Audio, reflections following,
+    own voice, talkers, borrowed voices, engine reads, propellers, tile scenes, routes, diffuse late, smooth tail,
+    gas hob, engines, struck things, running water, the provider's rank, callbacks, the worker): 585 passed, 9
+    skipped (the Steam Audio opt-ins);
+  - with `OPENFPS_STEAMAUDIO_TESTS` set, TileSceneSet, DiffuseLate, LayersInContact, TracedPlacement, ThinPanel and
+    LateLawPlace: 34 passed;
+  - on the final tree with `DOTNET_PROCESSOR_COUNT=4`, the boundaries, the stored streams, the spoken lines, the
+    physics replays and the fingerprints, with the tests changed last: 134 passed.
+  None regenerated anything. The three surveys' `run.sh` agree with the lists in the tree.
+- **Not run here:** nothing through FMOD. The mixer's own reads (the voices' rates, `HasTracedEchoes`, the
+  console's levers on a live mix, `/levels` and `/listening` in a session) want a session or the lab's
+  `--clap-room` and `--driving` on this machine.

@@ -70,6 +70,11 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         Clock = (provider as FmodAudioProvider)?.Clock ?? clock ?? new StopwatchAudioClock();
         Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather { Clock = Clock };
         Atmosphere = (provider as FmodAudioProvider)?.Atmosphere ?? new Atmosphere();
+        Hearing = (provider as FmodAudioProvider)?.Hearing ?? new OpenFPS.Common.Hearing.HearingSettings();
+        Mix = (provider as FmodAudioProvider)?.Mix ?? new MixSettings();
+        OwnVoice = (provider as FmodAudioProvider)?.OwnVoice ?? new OwnVoiceRing();
+        TalkerStreams = (provider as FmodAudioProvider)?.TalkerStreams ?? new TalkerStreams();
+        Lab = (provider as FmodAudioProvider)?.Lab ?? new LabLevers();
     }
 
     /// <summary>The clock this world tells time by, for the host to read wherever it stamps something the mixer
@@ -85,6 +90,36 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// facade's own, in the air the heard laws are written in until a test sets it.</summary>
     public Atmosphere Atmosphere { get; }
 
+    /// <summary>How this world is heard (the law's compression, the ear model, the listening level), for the host
+    /// to place by and to set from the player's settings: the mixer's when there is one (FmodAudioProvider.Hearing);
+    /// otherwise one of the facade's own, the shipped hearing, which a test sets as it needs.</summary>
+    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; }
+
+    /// <summary>The mix's live levers, for the host's console and its placed copies: the mixer's when there is
+    /// one (FmodAudioProvider.Mix); otherwise one of the facade's own, the shipped mix.</summary>
+    public MixSettings Mix { get; }
+
+    /// <summary>The ring the player's microphone writes into, which their room's answer reads: the mixer's
+    /// (FmodAudioProvider.OwnVoice), or one of the facade's own.</summary>
+    public OwnVoiceRing OwnVoice { get; }
+
+    /// <summary>Everybody whose voice this world has heard, which the host fills as voices arrive: the mixer's
+    /// (FmodAudioProvider.TalkerStreams), or one of the facade's own.</summary>
+    public TalkerStreams TalkerStreams { get; }
+
+    /// <summary>The lab's levers on this world, which the host hands its acoustic worker: the mixer's
+    /// (FmodAudioProvider.Lab), or one of the facade's own. Nothing in the game sets one.</summary>
+    public LabLevers Lab { get; }
+
+    /// <summary>Whether the mixer traces this entity's echoes now, so the host stops making its mirror images
+    /// (FmodAudioProvider.HasTracedEchoes). Never without an FMOD mixer.</summary>
+    public bool HasTracedEchoes(int entityId)
+        => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.HasTracedEchoes(entityId) ?? false;
+
+    /// <summary>The rate the mixer runs at, Hz, for what the host renders for it to play without a resampler:
+    /// the FMOD mixer's (FmodAudioProvider.MixerRate), or MixerQuality.DefaultRate without one.</summary>
+    public int MixerRate => (_provider as FmodAudioProvider)?.MixerRate ?? MixerQuality.DefaultRate;
+
     /// <summary>Brings up the provider, loads the bank and starts the audio thread.</summary>
     public void Initialize()
     {
@@ -93,7 +128,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             string audioPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS", "SOUNDS");
             _bank.Initialize(audioPath);
             _isInitialized = true;
-            _voiceManager = new VoiceManager(this, _bank, 256);
+            _voiceManager = new VoiceManager(this, _bank, 256) { Hearing = Hearing };
             Serilog.Log.Information("AudioEngine: Initialized with {MaxVoices} voices.", 256);
             _isRunning = true;
             _audioThread = new Thread(AudioLoop) 
@@ -278,7 +313,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (!_provider.Initialize()) return;
         if (soundsPath != null) _bank.Initialize(soundsPath);
         _isInitialized = true;
-        _voiceManager = new VoiceManager(this, _bank, 256);
+        _voiceManager = new VoiceManager(this, _bank, 256) { Hearing = Hearing };
     }
 
     /// <summary>Runs one audio frame synchronously. Pair with <see cref="InitializeForTest"/>.</summary>
@@ -378,7 +413,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>The /echoes readout (FmodAudioProvider.TracedEchoesStatus).</summary>
     public string TracedEchoesStatus()
         => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.TracedEchoesStatus()
-           ?? $"Echoes {(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn ? "on" : "off")}. No tracer yet — the scene is still being built.";
+           ?? $"Echoes {(Mix.TracedEchoesOn ? "on" : "off")}. No tracer yet — the scene is still being built.";
 
     public void SetAcousticMap(AcousticMap map)
     {

@@ -5,6 +5,9 @@ namespace OpenFPS.Tests;
 /// <summary>The physical knob door (<see cref="KnobDoor"/>) as the game uses it.</summary>
 public class KnobDoorTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     [Fact]
     public void AKeyNamesItsDoor()
     {
@@ -58,25 +61,25 @@ public class KnobDoorTests
     {
         // Declared at its LAFmax, a close's crack played 20-29 dB under itself (51 dBA at 1.5 m where the
         // model puts 86). At its own peak, a gentle close at 1.5 m on "real" is within a dB of the model.
-        float saved = Loudness.DynamicRangeCompression;
+        float saved = Law.Compression;
         try
         {
-            Loudness.DynamicRangeCompression = 1f;
+            Law.Compression = 1f;
             string key = KnobDoor.Key(true, KnobDoor.Construction.HollowCore, 2, 0.9f, KnobDoor.Shut.Gentle, 1.4f, 2.1f);
             var buf = KnobDoor.RenderKey(key, 48000, out float own);
             double model = LafMax(buf, 2e-5 * Math.Pow(10, own / 20.0));
-            var (gain, reference) = Loudness.Place(own);
-            double atEar = 20 * Math.Log10(Loudness.RenderedGain(gain, reference, Loudness.AudibleRange(own), 1.5f))
-                         + LafMax(buf, 2e-5) + Loudness.RenderCeilingDb;
+            var (gain, reference) = Law.Place(own);
+            double atEar = 20 * Math.Log10(Loudness.RenderedGain(gain, reference, Law.AudibleRange(own), 1.5f))
+                         + LafMax(buf, 2e-5) + Law.RenderCeilingDb;
             // Unless its peak meets the ceiling ("real" puts full scale near 89 dB at the ear): then the
             // whole sound comes down, which is the setting, not the door.
             double peakAtEar = own - 20 * Math.Log10(1.5);
-            if (peakAtEar <= Loudness.RenderCeilingDb)
+            if (peakAtEar <= Law.RenderCeilingDb)
                 Assert.InRange(atEar, model - 20 * Math.Log10(1.5) - 1, model - 20 * Math.Log10(1.5) + 1);
             else
-                Assert.InRange(atEar, Loudness.RenderCeilingDb - (own - model) - 1, Loudness.RenderCeilingDb - (own - model) + 1);
+                Assert.InRange(atEar, Law.RenderCeilingDb - (own - model) - 1, Law.RenderCeilingDb - (own - model) + 1);
         }
-        finally { Loudness.DynamicRangeCompression = saved; }
+        finally { Law.Compression = saved; }
     }
 
     [Fact]

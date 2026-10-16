@@ -39,6 +39,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class NatureSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
     private static readonly float[] Centres = { 31.5f, 63f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f };
 
@@ -120,12 +124,12 @@ public static class NatureSpike
         {
             string cap = Path.Combine(dir, key.Replace(':', '_') + ".wav");
             Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
-            var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+            var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing };
             provider.Weather.Wind = Air.Wind;
             if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
             provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
             var (level, extent, headroom) = Declared(key);
-            var (gain, reference) = Loudness.Place(level, extent);
+            var (gain, reference) = LabHearing.Place(level, extent);
             var emitter = new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
             {
                 EntityId = 777001, Seed = 777001,
@@ -138,7 +142,7 @@ public static class NatureSpike
                 Volume = gain * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(headroom),
                 MinDistance = reference,
                 ExtentMetres = extent,
-                Range = MathF.Max(60f, Loudness.AudibleRange(level)),
+                Range = MathF.Max(60f, LabHearing.AudibleRange(level)),
                 TargetRegionId = -1,
             };
             var sw = Stopwatch.StartNew();

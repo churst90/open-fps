@@ -51,7 +51,11 @@ internal sealed class TileSceneSet : IDisposable
     /// made afresh. Held tiles cost only memory; making a pair afresh can wait on the other pair's traces.
     /// 0 makes it afresh whenever it holds anything replaced (the lab and the tests).
     /// </summary>
-    internal static double RecycleShare { get; set; } = 1.0;
+    internal double RecycleShare => Lab.TileRecycleShare;
+
+    /// <summary>The lab's levers on its worker (LabLevers.TileRecycleShare): the game's unless a test or the lab
+    /// gives its own.</summary>
+    internal OpenFPS.Client.AudioEngine.Core.LabLevers Lab { get; init; } = new();
 
     /// <summary>One pair of top scenes: the full scene and the listener's.</summary>
     private sealed class Pair

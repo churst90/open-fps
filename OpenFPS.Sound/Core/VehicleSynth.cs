@@ -54,7 +54,10 @@ public static class VehicleSynth
     /// <param name="seed">Seeds the engine and the tyres.</param>
     /// <param name="listener">Where the bench stands, in the machine's frame (x across, y up, z
     /// forward, origin at the exhaust). Null sums every tailpipe at one point, as dead behind the car.</param>
-    public static VehicleRender Render(VehicleProfile v, IReadOnlyList<DriveOrder> orders, int seed = 11, Vector3? listener = null)
+    /// <param name="mix">The levers its engine reads (MixSettings.ValveJetNoise); the shipped mix by default.</param>
+    /// <param name="lab">The lab's levers on its engine (LabLevers); the game's by default.</param>
+    public static VehicleRender Render(VehicleProfile v, IReadOnlyList<DriveOrder> orders, int seed = 11, Vector3? listener = null,
+                                       MixSettings? mix = null, LabLevers? lab = null)
     {
         var rng = new Random(seed);
         var log = new List<string>();
@@ -71,6 +74,8 @@ public static class VehicleSynth
         var rpmTrace = new float[n];
 
         var engine = new EngineSynth(v.Engine, SampleRate, seed);
+        if (mix != null) engine.Mix = mix;
+        if (lab != null) engine.Lab = lab;
         if (listener is { } standing) engine.SetListener(standing);
         var driveline = new Driveline(v);
         var driver = new Driver(driveline, engine);

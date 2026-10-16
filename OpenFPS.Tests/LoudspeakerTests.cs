@@ -21,6 +21,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class LoudspeakerTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public LoudspeakerTests(ITestOutputHelper o) => _o = o;
     private const int Rate = 48000;
@@ -190,7 +193,7 @@ public class LoudspeakerTests
         Assert.InRange(r.LevelDb - r.SplDb, -Speech.BufferRmsDbfs - 0.5f, -Speech.BufferRmsDbfs + 0.5f);
         Assert.True(r.Pcm.All(float.IsFinite) && r.Pcm.Max(MathF.Abs) < 1f);
         // Placed by the law from that level: a reference distance, not the authored 12 m.
-        var (gain, reference) = Loudness.Place(r.LevelDb);
+        var (gain, reference) = Law.Place(r.LevelDb);
         _o.WriteLine($"placed: gain {gain:F2}, reference {reference:F1} m");
         Assert.True(reference is > 5f and < 25f);
     }

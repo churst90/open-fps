@@ -11,13 +11,17 @@ using OpenFPS.Client.AudioEngine.Fmod;
 /// </summary>
 public static class ProviderOrbit
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     /// <summary>
     /// --provider-churn: transient voices (footsteps and reflections) created and stopped fast against
     /// the Steam Audio callbacks. Survives <paramref name="seconds"/> and prints a count, or crashes.
     /// </summary>
     public static int RunChurn(double seconds = 12.0)
     {
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
         provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
 
@@ -60,7 +64,7 @@ public static class ProviderOrbit
     /// </summary>
     public static int RunPhysicalChurn(double seconds = 12.0)
     {
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
         provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
 
@@ -74,7 +78,7 @@ public static class ProviderOrbit
         SpatialEmitter Make(int eid, string key, bool flying)
         {
             float levelDb = flying ? 130f : 70f;
-            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, flying ? 2f : 0.6f);
+            var (gain, reference) = LabHearing.Place(levelDb, flying ? 2f : 0.6f);
             return new SpatialEmitter
             {
                 EntityId = eid, Seed = eid,
@@ -91,7 +95,7 @@ public static class ProviderOrbit
                 Volume = gain,
                 MinDistance = reference,
                 ExtentMetres = flying ? 2f : 0.6f,
-                Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
+                Range = LabHearing.AudibleRange(levelDb),
                 TargetRegionId = -1,
             };
         }
@@ -200,7 +204,7 @@ public static class ProviderOrbit
     /// </summary>
     public static int RunReapChurn(double seconds = 20.0)
     {
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
         provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
 
@@ -265,7 +269,7 @@ public static class ProviderOrbit
                      ?? Path.Combine(Path.GetTempPath(), "openfps-churn-capture.wav");
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
 
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
         Console.WriteLine($"  master tap capturing to {cap}");
 
@@ -298,7 +302,7 @@ public static class ProviderOrbit
             bool engine = key.StartsWith("engine:");
             bool flying = key.StartsWith("aircraft:");
             float levelDb = engine ? 116f : flying ? 130f : 70f;
-            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, engine ? 3.5f : flying ? 2f : 0.6f);
+            var (gain, reference) = LabHearing.Place(levelDb, engine ? 3.5f : flying ? 2f : 0.6f);
             return new SpatialEmitter
             {
                 EntityId = eid, Seed = eid,
@@ -316,7 +320,7 @@ public static class ProviderOrbit
                 Direction = Vector3.UnitZ,
                 Volume = gain, MinDistance = reference,
                 ExtentMetres = engine ? 3.5f : flying ? 2f : 0.6f,
-                Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
+                Range = LabHearing.AudibleRange(levelDb),
                 TargetRegionId = 9000 + region,
             };
         }
@@ -375,7 +379,7 @@ public static class ProviderOrbit
     /// </summary>
     public static int RunSendChurn(double seconds = 30.0, bool flip = true, bool ownRoom = false)
     {
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
 
         const int regions = 12;   // under the bus cap, so every room really gets a bus

@@ -145,7 +145,7 @@ public sealed partial class ClientGameSession : IDisposable
         ModelLibrary.EnsureLoaded();
 
         // One clock for the game loop and the mixer: a position is stamped on the clock it is aged on.
-        _world = new ClientWorldState { Clock = audioEngine.Clock };
+        _world = new ClientWorldState { Clock = audioEngine.Clock, Hearing = audioEngine.Hearing };
         _state = new LocalPlayerState();
         _physics = new ClientPhysicsSystem(_state, new SpatialService());
         _reconciler = new PredictionReconciler(_state, _physics);
@@ -161,9 +161,9 @@ public sealed partial class ClientGameSession : IDisposable
         _chat = new ChatManager(_speech);
         Ui = new UiSounds(audioEngine);
         _menus = new MenuStack(_speech, Ui);
-        _listening = new ListeningCalibration(_speech, Ui,
+        _listening = new ListeningCalibration(audioEngine.Hearing, _speech, Ui,
             (id, gainDb) => _audioSystem.PlayReferenceVoice(id, gainDb), _audioSystem.StopReferenceVoice,
-            () => ClientSettings.Load().Save());
+            SaveHearing);
         // Each kind of chat has its own sound, heard before the words: UiSounds.CueFor says which,
         // and that somebody coming or going has its own, which a setting can turn off.
         _chat.Incoming += Ui.PlayChat;
@@ -195,7 +195,7 @@ public sealed partial class ClientGameSession : IDisposable
         _shell.CommandEntered += HandleCommandEntered;
         _microphone.PacketReady += OnVoicePacketReady;
         // What the microphone hears goes straight to the player's own room, not round the server.
-        _microphone.SamplesCaptured += OpenFPS.Client.AudioEngine.Fmod.OwnVoiceRing.Shared.Write;
+        _microphone.SamplesCaptured += _audioEngine.OwnVoice.Write;
         WireConnection();
 
         RegisterBindings();
@@ -458,16 +458,16 @@ public sealed partial class ClientGameSession : IDisposable
     /// (EngineSynth.BlowdownJet). It changes every engine, the loud V8s most, so it can be switched
     /// live to hear what it does. Plain /valveflow says which.
     /// </summary>
-    internal static string ValveFlowCommand(string[] args)
+    internal static string ValveFlowCommand(OpenFPS.Client.AudioEngine.Core.MixSettings mix, string[] args)
     {
         if (args.Length > 0)
         {
             string a = args[0].ToLowerInvariant();
-            if (a is "on") OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = true;
-            else if (a is "off") OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = false;
+            if (a is "on") mix.ValveJetNoise = true;
+            else if (a is "off") mix.ValveJetNoise = false;
             else return "Say /valveflow on or /valveflow off.";
         }
-        return OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise
+        return mix.ValveJetNoise
             ? "Valve flow on: the exhaust valves rush."
             : "Valve flow off: the exhaust is pulses only, as before.";
     }
@@ -477,16 +477,16 @@ public sealed partial class ClientGameSession : IDisposable
     /// (EngineDetail.Reduced), or every engine in full, to hear what the saving costs. Plain
     /// /enginedetail says which.
     /// </summary>
-    internal static string EngineDetailCommand(string[] args)
+    internal static string EngineDetailCommand(OpenFPS.Client.AudioEngine.Core.MixSettings mix, string[] args)
     {
         if (args.Length > 0)
         {
             string a = args[0].ToLowerInvariant();
-            if (a is "on") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReducedFarEngines = true;
-            else if (a is "off") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReducedFarEngines = false;
+            if (a is "on") mix.ReducedFarEngines = true;
+            else if (a is "off") mix.ReducedFarEngines = false;
             else return "Say /enginedetail on or /enginedetail off.";
         }
-        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReducedFarEngines
+        return mix.ReducedFarEngines
             ? "Engine detail on: engines far under the loudest run at half rate."
             : "Engine detail off: every engine runs in full.";
     }
@@ -496,11 +496,11 @@ public sealed partial class ClientGameSession : IDisposable
     /// the mix. No "real" setting (Cody, 2026-10-05): 100 percent is literal source levels, which on
     /// headphones made a parked car's idle inaudible and footsteps vanish, and the word invited it.
     /// </summary>
-    internal static string LevelsCommand(string[] args, Action? save = null)
+    internal static string LevelsCommand(OpenFPS.Common.Hearing.HearingSettings hearing, string[] args, Action save)
     {
         string Now()
         {
-            float c = OpenFPS.Common.Loudness.DynamicRangeCompression;
+            float c = hearing.Compression;
             string tag = MathF.Abs(c - OpenFPS.Common.Loudness.DefaultCompression) < 0.005f ? ", the default" : "";
             return $"{MathF.Round(c * 100f)} percent{tag}";
         }
@@ -513,8 +513,8 @@ public sealed partial class ClientGameSession : IDisposable
         else if (float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
             value = v > 1f ? v / 100f : v;
         else return $"{args[0]} is not a level. Say a number from {OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, or default.";
-        OpenFPS.Common.Loudness.DynamicRangeCompression = value;
-        (save ?? (() => ClientSettings.Load().Save()))();
+        hearing.Compression = value;
+        save();
         string note = OpenFPS.Common.Loudness.CompressionFromEnvironment ? " For this run only: the environment sets it." : "";
         return $"Levels set to {Now()}.{note}";
     }
@@ -1326,10 +1326,17 @@ public sealed partial class ClientGameSession : IDisposable
         Say(NavigationAids.TurnNarration ? "Turn narration on." : "Turn narration off.");
     }
 
-    /// <summary>Writes the settings file with what is live now (see ClientSettings.Save).</summary>
-    private static void SaveSettings()
+    /// <summary>Writes the settings file with what is live now (see ClientSettings.Save). The levels and the
+    /// listening level are as last saved: each change to them saves with the world's hearing
+    /// (<see cref="SaveHearing"/>).</summary>
+    private static void SaveSettings() => SaveSettings(null);
+
+    /// <summary>Writes the settings file with the world's levels and listening level as they are now.</summary>
+    private void SaveHearing() => SaveSettings(_audioEngine.Hearing);
+
+    private static void SaveSettings(OpenFPS.Common.Hearing.HearingSettings? hearing)
     {
-        try { ClientSettings.Load().Save(); }
+        try { ClientSettings.Load().Save(hearing: hearing); }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
             Serilog.Log.Warning("Settings not saved: {Error}", ex.Message);
@@ -1739,19 +1746,19 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].Equals("echoes", StringComparison.OrdinalIgnoreCase))
             {
                 var a = parts.Skip(1).FirstOrDefault()?.ToLowerInvariant();
-                if (a is "on") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
-                else if (a is "off") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = false;
+                if (a is "on") _audioEngine.Mix.TracedEchoesOn = true;
+                else if (a is "off") _audioEngine.Mix.TracedEchoesOn = false;
                 else if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
                 {
                     // /echoes -12: on, at that level. They are traced, so theirs is the tail level.
-                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb = Math.Clamp(db, -80f, 6f);
-                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
+                    _audioEngine.Mix.TailDb = Math.Clamp(db, -80f, 6f);
+                    _audioEngine.Mix.TracedEchoesOn = true;
                 }
                 else if (a != null) { Say("Say /echoes on or /echoes off; /tail sets the level."); return; }
                 Say(_audioEngine.TracedEchoesStatus());
                 return;
             }
-            // Reflections against the direct sound, in two kinds (FmodAudioProvider.TailDb): /tail for
+            // Reflections against the direct sound, in two kinds (MixSettings.TailDb): /tail for
             // everything traced, /copies for everything placed as a copy, /reflections for both.
             // (Not /room: that is the server's "do the walls round you make a room".)
             if (parts[0].Equals("reflections", StringComparison.OrdinalIgnoreCase)
@@ -1763,31 +1770,31 @@ public sealed partial class ClientGameSession : IDisposable
                 if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
                 {
                     db = Math.Clamp(db, -80f, 6f);
-                    if (which != "copies") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb = db;
-                    if (which != "tail") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesDb = db;
+                    if (which != "copies") _audioEngine.Mix.TailDb = db;
+                    if (which != "tail") _audioEngine.Mix.CopiesDb = db;
                 }
                 else if (a != null) { Say($"Say a level in decibels, such as /{which} -12. Zero is the physical level, -80 is off."); return; }
-                Say($"Tail {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb:F0} dB, the traced rooms and echoes. "
-                  + $"Copies {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesDb:F0} dB, the placed reflections. Both against the direct sound; zero is physical.");
+                Say($"Tail {_audioEngine.Mix.TailDb:F0} dB, the traced rooms and echoes. "
+                  + $"Copies {_audioEngine.Mix.CopiesDb:F0} dB, the placed reflections. Both against the direct sound; zero is physical.");
                 return;
             }
             if (parts[0].Equals("cabin", StringComparison.OrdinalIgnoreCase))
             {
                 var a = parts.Skip(1).FirstOrDefault();
                 if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
-                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CabinDb = Math.Clamp(db, -80f, 6f);
+                    _audioEngine.Mix.CabinDb = Math.Clamp(db, -80f, 6f);
                 else if (a != null) { Say("Say a level in decibels, such as /cabin -12. Zero is the traced level, -80 is off."); return; }
-                Say($"{OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CabinDb:F0} dB against the traced level, on the response of the vehicle you are sitting in.");
+                Say($"{_audioEngine.Mix.CabinDb:F0} dB against the traced level, on the response of the vehicle you are sitting in.");
                 return;
             }
             if (parts[0].Equals("valveflow", StringComparison.OrdinalIgnoreCase))
             {
-                Say(ValveFlowCommand(parts.Skip(1).ToArray()));
+                Say(ValveFlowCommand(_audioEngine.Mix, parts.Skip(1).ToArray()));
                 return;
             }
             if (parts[0].Equals("enginedetail", StringComparison.OrdinalIgnoreCase))
             {
-                Say(EngineDetailCommand(parts.Skip(1).ToArray()));
+                Say(EngineDetailCommand(_audioEngine.Mix, parts.Skip(1).ToArray()));
                 return;
             }
             // The scope is yours: what it sees is worked out here, from the world this client holds.
@@ -1838,20 +1845,20 @@ public sealed partial class ClientGameSession : IDisposable
             // So is how loud the world is: yours, and saved.
             if (parts[0].Equals("levels", StringComparison.OrdinalIgnoreCase))
             {
-                Say(LevelsCommand(parts.Skip(1).ToArray()));
+                Say(LevelsCommand(_audioEngine.Hearing, parts.Skip(1).ToArray(), SaveHearing));
                 return;
             }
             // ...and how loud your headphones are: set by ear, or by a number. Saved.
             if (parts[0].Equals("listening", StringComparison.OrdinalIgnoreCase))
             {
-                if (ListeningCalibration.Command(parts.Skip(1).ToArray(), () => ClientSettings.Load().Save()) is { } said) Say(said);
+                if (ListeningCalibration.Command(_audioEngine.Hearing, parts.Skip(1).ToArray(), SaveHearing) is { } said) Say(said);
                 else _listening.Open(_simTime);
                 return;
             }
             // The ear model, on and off, to hear what it does. Not saved.
             if (parts[0].Equals("ear", StringComparison.OrdinalIgnoreCase))
             {
-                Say(ListeningCalibration.EarCommand(parts.Skip(1).ToArray()));
+                Say(ListeningCalibration.EarCommand(_audioEngine.Hearing, parts.Skip(1).ToArray()));
                 return;
             }
             _network.Send(new TextCommand { Command = parts[0].ToLowerInvariant(), Args = parts.Skip(1).ToArray() });
@@ -1951,7 +1958,7 @@ public sealed partial class ClientGameSession : IDisposable
         if (_network.IsConnected) { _network.Send(new LogoutRequest()); _network.Disconnect(); }
         _shell.CommandEntered -= HandleCommandEntered;
         _microphone.PacketReady -= OnVoicePacketReady;
-        _microphone.SamplesCaptured -= OpenFPS.Client.AudioEngine.Fmod.OwnVoiceRing.Shared.Write;
+        _microphone.SamplesCaptured -= _audioEngine.OwnVoice.Write;
         _microphone.Dispose();
         _audioEngine.Dispose();
     }

@@ -5,7 +5,7 @@ using OpenFPS.Common;
 /// <summary>
 /// --heard-levels [d=1.5] [wav=DIR] | survey [only=TEXT]: the level each everyday world sound reaches the
 /// ear at, against what the server declares. A sound's declared level is its buffer's full scale at a metre
-/// (<see cref="Loudness.Place(float)"/>), so what arrives also depends on where the buffer's loudness sits
+/// (<see cref="LabHearing.Place(float)"/>), so what arrives also depends on where the buffer's loudness sits
 /// under full scale (a peak-normalised crack far further than a loudness-normalised line). Each buffer is
 /// taken as the client gets it and its LAFmax reported at d metres on the direct path, at the shipped
 /// compression and at 1.0 ("real": rendered dBFS plus the ceiling is dB SPL); for door models also their
@@ -13,6 +13,10 @@ using OpenFPS.Common;
 /// </summary>
 public static class HeardLevelsSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private sealed record Source(string Name, float DeclaredDb, float[] Buffer, double? ModelLafDb, double? ModelPeakDb)
     {
         /// <summary>The level it is placed at, where the client puts its own in place of the declared one.</summary>
@@ -150,7 +154,7 @@ public static class HeardLevelsSpike
         sys.release();
 
         // ── The table ────────────────────────────────────────────────────────────────────────────────
-        float saved = Loudness.DynamicRangeCompression;
+        float saved = LabHearing.Compression;
         Console.WriteLine($"At {d:F1} m on the direct path. buf = the buffer's own LAFmax and peak, dBFS. "
                         + "0.45 / 1.0 = rendered LAFmax, dBFS; SPL@1.0 = that plus the ceiling at 1.0 (dB SPL heard).");
         Console.WriteLine($"Ceilings: 0.45 -> {Ceiling(0.45f):F1} dB, 1.0 -> {Ceiling(1f):F1} dB.");
@@ -166,11 +170,11 @@ public static class HeardLevelsSpike
             Console.WriteLine($"{s.Name,-44} {s.DeclaredDb,6:F1} {laf,7:F1} {pk,6:F1} {r045,7:F1} {r1,7:F1} {spl,8:F1} {model}");
             if (s.ModelPeakDb is double p)
                 Console.WriteLine($"{"",-44} placed at its own peak, {p:F1} dB (the server declared {s.DeclaredDb:F1})");
-            Loudness.DynamicRangeCompression = 1f;
+            LabHearing.Compression = 1f;
             float g = (float)Math.Pow(10, Rendered(s.Level, 1f, d) / 20);
             renderedAt1.Add((s.Name, s.Buffer.Select(x => x * g).ToArray()));
         }
-        Loudness.DynamicRangeCompression = saved;
+        LabHearing.Compression = saved;
 
         if (wavDir != null)
         {
@@ -200,21 +204,21 @@ public static class HeardLevelsSpike
 
     private static float Ceiling(float c)
     {
-        float saved = Loudness.DynamicRangeCompression;
-        Loudness.DynamicRangeCompression = c;
-        float r = Loudness.RenderCeilingDb;
-        Loudness.DynamicRangeCompression = saved;
+        float saved = LabHearing.Compression;
+        LabHearing.Compression = c;
+        float r = LabHearing.RenderCeilingDb;
+        LabHearing.Compression = saved;
         return r;
     }
 
     /// <summary>The direct path's gain at <paramref name="d"/>, dB: the placement and the mixer's 1/r.</summary>
     private static double Rendered(float levelDb, float c, float d)
     {
-        float saved = Loudness.DynamicRangeCompression;
-        Loudness.DynamicRangeCompression = c;
-        var (gain, reference) = Loudness.Place(levelDb);
-        float g = Loudness.RenderedGain(gain, reference, Loudness.AudibleRange(levelDb), d);
-        Loudness.DynamicRangeCompression = saved;
+        float saved = LabHearing.Compression;
+        LabHearing.Compression = c;
+        var (gain, reference) = LabHearing.Place(levelDb);
+        float g = Loudness.RenderedGain(gain, reference, LabHearing.AudibleRange(levelDb), d);
+        LabHearing.Compression = saved;
         return 20 * Math.Log10(Math.Max(1e-12, g));
     }
 

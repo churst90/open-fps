@@ -29,6 +29,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class FireSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
     private const float PascalsToFull = 0.1f;
 
@@ -44,15 +48,19 @@ public static class FireSpike
         float heard = Arg(args, "heard=", 0f);
         int seed = (int)Arg(args, "seed=", 7f);
         // For fitting: the roar's swing and tail, and the crackle rates by fuel.
-        FireSynth.PuffSwing = Arg(args, "swing=", FireSynth.PuffSwing);
-        FireSynth.RoarTailExponent = Arg(args, "alpha=", FireSynth.RoarTailExponent);
-        FireSynth.Flicker = Arg(args, "flicker=", FireSynth.Flicker);
-        FireSynth.CrackleHeatExponent = Arg(args, "beta=", FireSynth.CrackleHeatExponent);
-        FireSynth.TreeCrackle = Arg(args, "trees=", FireSynth.TreeCrackle);
-        FireSynth.CrownCrackle = Arg(args, "crown=", FireSynth.CrownCrackle);
-        FireSynth.StructureCrackle = Arg(args, "structure=", FireSynth.StructureCrackle);
-        FireSynth.VehicleCrackle = Arg(args, "vehicle=", FireSynth.VehicleCrackle);
-        FireSynth.VehicleFizz = Arg(args, "vfizz=", FireSynth.VehicleFizz);
+        var fitted = new FireTuning();
+        var tuning = new FireTuning
+        {
+            PuffSwing = Arg(args, "swing=", fitted.PuffSwing),
+            RoarTailExponent = Arg(args, "alpha=", fitted.RoarTailExponent),
+            Flicker = Arg(args, "flicker=", fitted.Flicker),
+            CrackleHeatExponent = Arg(args, "beta=", fitted.CrackleHeatExponent),
+            TreeCrackle = Arg(args, "trees=", fitted.TreeCrackle),
+            CrownCrackle = Arg(args, "crown=", fitted.CrownCrackle),
+            StructureCrackle = Arg(args, "structure=", fitted.StructureCrackle),
+            VehicleCrackle = Arg(args, "vehicle=", fitted.VehicleCrackle),
+            VehicleFizz = Arg(args, "vfizz=", fitted.VehicleFizz),
+        };
         string[]? parts = args.FirstOrDefault(a => a.StartsWith("parts=", StringComparison.Ordinal))?[6..].Split(',');
         string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..];
         if (dir != null) Directory.CreateDirectory(dir);
@@ -63,7 +71,7 @@ public static class FireSpike
         {
             var spec = ModelLibrary.Presets.Fire(key);
             var sw = Stopwatch.StartNew();
-            var (pa, census) = Render(spec, sec, seed, wind, age, heard, parts);
+            var (pa, census) = Render(spec, sec, seed, wind, age, heard, parts, tuning);
             double cost = sw.Elapsed.TotalSeconds / (sec + Settle());
             var (nx, nz, d) = FireSynth.CellGrid(spec);
             Console.WriteLine();
@@ -125,10 +133,11 @@ public static class FireSpike
     public static float[][]? LastPlaces;
 
     /// <summary>A fire at a metre (every place summed), or heard from <paramref name="heard"/> m: pascals.</summary>
-    public static (float[] Pa, string Census) Render(FireSpec spec, float sec, int seed, float wind, float age, float heard, string[]? parts = null)
+    public static (float[] Pa, string Census) Render(FireSpec spec, float sec, int seed, float wind, float age, float heard, string[]? parts = null,
+                                                     FireTuning? tuning = null)
     {
         var layout = FireSynth.Layout(spec);
-        var s = new FireSynth(spec, Rate, seed, layout.Length) { Spread = 1f };
+        var s = new FireSynth(spec, Rate, seed, layout.Length, tuning) { Spread = 1f };
         if (parts != null)
         {
             float On(string name) => parts.Contains(name) ? 1f : 0f;
@@ -223,8 +232,8 @@ public static class FireSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Console.WriteLine($"Extended sources {(ExtendedSources.Enabled ? "spread" : "one point")}; ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}");
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+        Console.WriteLine($"Extended sources {(ExtendedSources.Enabled ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
+        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -239,7 +248,7 @@ public static class FireSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         world.RegisterDefinition(new EntityDefinition
         {

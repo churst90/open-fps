@@ -24,6 +24,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class WideSourcesSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private sealed record Segment(string Name, double Start, double Seconds, double CpuPercent, float MixerLoad, int Voices, double PlacedDb);
 
     // Where the sources stand, relative to their own middle, as on the city map (tools/gen_city.py).
@@ -50,14 +54,14 @@ public static class WideSourcesSpike
         if (Arg(args, "spread=") is { } forced) ExtendedSources.ForceSpread = float.Parse(forced, CultureInfo.InvariantCulture);
         // A steady breeze for the level rows: the tree's level then holds still while it is measured.
         if (Arg(args, "turbulence=") is { } turb) _turbulence = float.Parse(turb, CultureInfo.InvariantCulture);
-        Console.WriteLine($"Extended sources {(wide ? "spread" : "one point")}; ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}");
+        Console.WriteLine($"Extended sources {(wide ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
 
         AcousticRegistry.Initialize();
         Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -72,7 +76,7 @@ public static class WideSourcesSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
 
         world.RegisterDefinition(new EntityDefinition

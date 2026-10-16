@@ -333,6 +333,7 @@ internal sealed class Replay
         // The replay's own clock, read by everything from the start: the same moment on every run.
         Facade = new AudioEngineFacade(Mixer, new SteppedAudioClock(() => Now));
         World.Clock = Facade.Clock;
+        World.Hearing = Facade.Hearing;
         // A still day: the weather's wind is read on the wall clock (WindField.Now). The run-off is this
         // world's own, so it starts empty.
         Facade.Weather.Wind = WindWeather.Steady(0f, 0f, 0f);
@@ -425,26 +426,18 @@ internal sealed class Replay
     internal static Replay RunScript(Action<Replay> script)
     {
         AcousticRegistry.Initialize();
-        // The statics the audio system reads, at the game's defaults whatever ran before, and put back after
-        // (docs/SOUND_LIBRARY_BOUNDARY.md, 4.1).
-        var saved = (Loudness.DynamicRangeCompression, OpenFPS.Common.Hearing.EarModel.Enabled,
-                     OpenFPS.Common.Hearing.EarModel.ListeningLevelDb, MixerQuality.MixerRate,
-                     OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
+        // The statics the audio system still reads, at the game's defaults whatever ran before, and put back after
+        // (docs/SOUND_LIBRARY_BOUNDARY.md, 4.1). The hearing, the air, the mixer's rate, the mix and the talkers
+        // are the replay's facade's own (18.8), so they start as the game's.
+        var saved = (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
                      OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-                     OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead,
+                     RainField.RoofRidesWithHead,
                      (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
                       DrivingCues.BrakeCue, DrivingCues.SpeedWarning));
-        Loudness.DynamicRangeCompression = Loudness.DefaultCompression;
         (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
          DrivingCues.BrakeCue, DrivingCues.SpeedWarning) = (true, true, true, true, true, true);
-        // Voice chat streams are a static the replay's talker scenario fills; none from another test.
-        OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
-        OpenFPS.Common.Hearing.EarModel.Enabled = true;
-        OpenFPS.Common.Hearing.EarModel.ListeningLevelDb = OpenFPS.Common.Hearing.EarModel.DefaultListeningLevelDb;
-        MixerQuality.MixerRate = MixerQuality.DefaultRate;
         OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled = true;
         OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled = true;
-        OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = true;
         RainField.RoofRidesWithHead = true;
         // The talker's voice through Concentus's own C#, not a system libopus: the talker is placed at the
         // level measured off the decoded audio (OwnVoiceRing.SpeechRmsDbfs), and a libopus where there is one
@@ -460,14 +453,11 @@ internal sealed class Replay
         }
         finally
         {
-            (Loudness.DynamicRangeCompression, OpenFPS.Common.Hearing.EarModel.Enabled,
-             OpenFPS.Common.Hearing.EarModel.ListeningLevelDb, MixerQuality.MixerRate,
-             OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
+            (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
              OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-             OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise, RainField.RoofRidesWithHead,
+             RainField.RoofRidesWithHead,
              (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
               DrivingCues.BrakeCue, DrivingCues.SpeedWarning)) = saved;
-            OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
             Concentus.OpusCodecFactory.AttemptToUseNativeLibrary = nativeOpus;
         }
     }
@@ -516,7 +506,7 @@ internal sealed class Replay
         def.SoundEmitter.SoundId = "engine:" + preset;
         def.SoundEmitter.Mode = PlaybackMode.LoopOne;
         def.SoundEmitter.Volume = 1f;
-        def.SoundEmitter.Range = Loudness.AudibleRange(profile.SourceLevelDb);
+        def.SoundEmitter.Range = Facade.Hearing.AudibleRange(profile.SourceLevelDb);
         def.SoundEmitter.MinDistance = 3f;
         World.RegisterDefinition(def);
         Move(id, at, velocity);
@@ -549,7 +539,7 @@ internal sealed class Replay
         def.SoundEmitter.SoundId = soundId;
         def.SoundEmitter.Mode = PlaybackMode.LoopOne;
         def.SoundEmitter.Volume = 1f;
-        def.SoundEmitter.Range = Loudness.AudibleRange(levelDb);
+        def.SoundEmitter.Range = Facade.Hearing.AudibleRange(levelDb);
         def.SoundEmitter.MinDistance = 3f;
         World.RegisterDefinition(def);
         Move(id, at, velocity, lever: lever);

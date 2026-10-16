@@ -52,7 +52,7 @@ public sealed class BoundaryVoiceState
 
     public BoundaryVoiceState(int sampleRate)
     {
-        SampleRate = sampleRate <= 0 ? MixerQuality.MixerRate : sampleRate;
+        SampleRate = sampleRate <= 0 ? MixerQuality.DefaultRate : sampleRate;
         Line = new float[(int)(MaxDelaySeconds * SampleRate) + 4];
         // ~30 ms to travel the full range: under a block it would zipper, over a second it would lag.
         Glide = 1f - MathF.Exp(-1f / (0.030f * SampleRate));

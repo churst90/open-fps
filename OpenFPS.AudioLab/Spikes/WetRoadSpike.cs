@@ -24,6 +24,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class WetRoadSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
     private const float PascalsToFull = 0.05f;
     private static readonly byte Asphalt = RoadSurfaces.IndexOf("Asphalt");
@@ -161,7 +165,7 @@ public static class WetRoadSpike
             {
                 float speed = kmh / 3.6f;
                 var rig = new Rig(v, speed);
-                var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed, CompensateLevel = false };
+                var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = speed, CompensateLevel = false };
                 voice.PlaceAtSpeed(speed);
                 voice.Revive();
                 // The listener 7.5 m off the car's right side, ear height: the pass-by microphone.
@@ -199,8 +203,8 @@ public static class WetRoadSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Console.WriteLine($"Ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}; /levels {Loudness.DynamicRangeCompression:F2}");
-        var provider = new FmodAudioProvider();
+        Console.WriteLine($"Ear model {(LabHearing.EarModelOn ? "on" : "off")}; /levels {LabHearing.Compression:F2}");
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -214,7 +218,7 @@ public static class WetRoadSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         world.RegisterDefinition(new EntityDefinition
         {
@@ -285,7 +289,7 @@ public static class WetRoadSpike
             def.SoundEmitter.SoundId = "engine:" + preset;
             def.SoundEmitter.Mode = PlaybackMode.LoopOne;
             def.SoundEmitter.Volume = 1f;
-            def.SoundEmitter.Range = Loudness.AudibleRange(profile.SourceLevelDb);
+            def.SoundEmitter.Range = LabHearing.AudibleRange(profile.SourceLevelDb);
             def.SoundEmitter.MinDistance = 3f;
             world.RegisterDefinition(def);
             return id;

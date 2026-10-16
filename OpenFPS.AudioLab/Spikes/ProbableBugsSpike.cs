@@ -42,6 +42,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class ProbableBugsSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private sealed record Segment(string Name, double Start, double Seconds);
 
     public static int Run(string[] args)
@@ -55,7 +59,7 @@ public static class ProbableBugsSpike
 
         string wav = Path.Combine(outDir, "capture.wav");
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -68,7 +72,7 @@ public static class ProbableBugsSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
 
@@ -290,7 +294,7 @@ public static class ProbableBugsSpike
                 // measured against each other: the game picks a take at random and its own step hides them.
                 var stepEchoes = typeof(ClientAudioSystem).GetMethod("SubmitRoomStepEchoes",
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-                var (stepGain, stepReference) = Loudness.Place(Loudness.FootstepDb);
+                var (stepGain, stepReference) = LabHearing.Place(Loudness.FootstepDb);
                 Repeat($"step copies alone {material}", () => stepEchoes.Invoke(audio, new object[]
                 {
                     player.Position + new Vector3(0f, 0f, 0.2f), player.Position + new Vector3(0f, player.EyeHeight, 0f),
@@ -314,7 +318,7 @@ public static class ProbableBugsSpike
         var sb = new StringBuilder("name,start,seconds\n");
         foreach (var s in segments) sb.Append(CultureInfo.InvariantCulture, $"{s.Name},{s.Start:F3},{s.Seconds:F3}\n");
         File.WriteAllText(Path.Combine(outDir, "segments.csv"), sb.ToString());
-        Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); /levels {Loudness.DynamicRangeCompression:F2}");
+        Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); /levels {LabHearing.Compression:F2}");
         return 0;
     }
 
@@ -494,14 +498,14 @@ public static class ProbableBugsSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var saScene = new SteamAudioScene(ctx);
         saScene.Build(boxes);
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         provider.Traced.Configure(ctx, saScene);
         provider.Traced.SetListener(ear);
 
         string wav = Path.Combine(outDir, $"capture-{room}{(stereoVoice ? "-stereo" : "")}.wav");
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
-        var placed = Loudness.Place(92f);
+        var placed = LabHearing.Place(92f);
         try
         {
             var map = new AcousticMap(new Vector3(100, 40, 100), new Vector3(-50, 0, -50)) { GlobalEnvironmentId = AcousticConstants.GlobalRegionId };
@@ -520,7 +524,7 @@ public static class ProbableBugsSpike
             EarlyReflections.Find(hands, ear, solids, found, c0, maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
                                   maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * c0);
             float direct0 = Vector3.Distance(hands, ear);
-            WorldAudioPlayer.PlanRoomEchoes(found, hands, ear, direct0, placed.ReferenceDistance, FmodAudioProvider.CopiesTrim, audible: true, plan);
+            WorldAudioPlayer.PlanRoomEchoes(found, hands, ear, direct0, placed.ReferenceDistance, provider.Mix.CopiesTrim, audible: true, plan);
             var washIds = new HashSet<string>();
             foreach (var e in plan)
                 if (!e.InVoice && e.WashGain >= ImageSource.MinGain)
@@ -604,7 +608,7 @@ public static class ProbableBugsSpike
             var meter = provider.TracedMeter(RoomId);
             Console.WriteLine($"  the room's bus carried {meter.Channels} channel(s) into the traced stage");
             Console.WriteLine($"  {region.FriendlyName}: listener trace {(provider.Traced.Listener != null ? "ready" : "MISSING")}, "
-                            + $"tail {FmodAudioProvider.TailDb:F0} dB, copies {FmodAudioProvider.CopiesDb:F0} dB, {plan.Count} planned copies");
+                            + $"tail {provider.Mix.TailDb:F0} dB, copies {provider.Mix.CopiesDb:F0} dB, {plan.Count} planned copies");
         }
         finally { provider.Dispose(); provider.Traced.Release(); saScene.Dispose(); Phonon.iplContextRelease(ref ctx); }
         Console.WriteLine($"Wrote {wav}");

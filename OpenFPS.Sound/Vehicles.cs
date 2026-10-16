@@ -526,7 +526,7 @@ public sealed record VehicleProfile
 
     /// <summary>
     /// What this vehicle measures at one metre at full load, dB SPL: the number the audio chain hangs
-    /// off. It places the emitter in the mix (<see cref="Loudness.Place(float)"/>) and sets what one
+    /// off. It places the emitter in the mix (<see cref="Hearing.HearingSettings.Place(float)"/>) and sets what one
     /// full-scale sample means in the synthesis (<c>EngineVoiceState.PascalsAtFullScale</c>). Too low,
     /// and a race engine past it goes through the voice's tanh as a square wave: the first speedway,
     /// "everything is overloaded, crackling and breaking up", clipped before any volume control.

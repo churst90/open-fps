@@ -21,6 +21,10 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class RoomWalkSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int RoomId = 310;
     private const int MegaphoneId = 320;
     private static readonly Vector3 RoomCentre = new(7f, 2f, 15f);
@@ -57,7 +61,7 @@ public static class RoomWalkSpike
         // The file writer REPLACES the sound card: exact, and silent, so a measurement run makes no noise.
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
 
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         try
         {
@@ -215,8 +219,8 @@ public static class RoomWalkSpike
                         ApparentPosition = eye with { Y = 0.1f },
                         FollowsListener = true,
                         ListenerOffset = new Vector3(0f, 0.1f - 1.6f, 0f),
-                        Volume = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb).Gain, Range = 15f,
-                        MinDistance = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb).ReferenceDistance, Pitch = 1f,
+                        Volume = LabHearing.Place(OpenFPS.Common.Loudness.FootstepDb).Gain, Range = 15f,
+                        MinDistance = LabHearing.Place(OpenFPS.Common.Loudness.FootstepDb).ReferenceDistance, Pitch = 1f,
                         ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
                         EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                         IsEvent = true, Essential = true,
@@ -251,7 +255,7 @@ public static class RoomWalkSpike
     private static int ClockCheck(string outPath)
     {
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         try
         {

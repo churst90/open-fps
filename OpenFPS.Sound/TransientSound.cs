@@ -58,7 +58,7 @@ public partial struct TransientSound
     /// <summary>
     /// How big the thing making it is, metres; zero, a point, for almost everything. A grandstand of
     /// people is not a point: the size changes the near field (four hundred people are not a firework at
-    /// your ear) and must not change the far field (<see cref="Loudness.Place(float, float)"/>).
+    /// your ear) and must not change the far field (<see cref="Hearing.HearingSettings.Place(float, float)"/>).
     /// </summary>
     public float ExtentMetres { get; set; }
 

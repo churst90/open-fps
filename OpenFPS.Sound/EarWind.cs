@@ -202,15 +202,16 @@ public static class EarWind
     /// it; what moves on it (a gust, windward ear against lee) is the sound's own shape and is kept, as a
     /// fire's crackle is. <paramref name="declaredDb"/> is <see cref="EarWindAtEars.DeclaredDb"/>.
     /// </summary>
-    public static float RenderedDb(float declaredDb, float earDb)
+    public static float RenderedDb(float declaredDb, float earDb, Hearing.HearingSettings hearing)
     {
         float shape = Math.Clamp(earDb - declaredDb, -40f, 15f);
-        return HeldDb(PlacedDb(declaredDb)) + shape;
+        return HeldDb(PlacedDb(declaredDb, hearing)) + shape;
     }
 
-    /// <summary>Where the loudness law puts a declared ear level, dBFS RMS, before the ceiling.</summary>
-    public static float PlacedDb(float declaredDb)
-        => (declaredDb - Loudness.RenderCeilingDb) * Loudness.DynamicRangeCompression - VehicleProfile.PeakHeadroomDb;
+    /// <summary>Where the loudness law puts a declared ear level, dBFS RMS, before the ceiling, as this world
+    /// hears it.</summary>
+    public static float PlacedDb(float declaredDb, Hearing.HearingSettings hearing)
+        => (declaredDb - hearing.RenderCeilingDb) * hearing.Compression - VehicleProfile.PeakHeadroomDb;
 
     /// <summary>
     /// The loudest the weather's level is ever placed at, dBFS RMS. Its buffets stand 16 dB over its

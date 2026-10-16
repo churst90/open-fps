@@ -56,8 +56,9 @@ public sealed class WoodChorus
 
     /// <summary>The woods of these crowns. <paramref name="idFor"/> gives each wood (cell and species) its
     /// entity id, so a wood keeps its id while its trees come and go; each species' crown is
-    /// <paramref name="presets"/>' (the catalogue's).</summary>
-    public static WoodChorus Build(IReadOnlyList<Crown> crowns, Func<(int X, int Z), string, int> idFor, IPresets presets)
+    /// <paramref name="presets"/>' (the catalogue's), and its reach is the world's law (<paramref name="hearing"/>).</summary>
+    public static WoodChorus Build(IReadOnlyList<Crown> crowns, Func<(int X, int Z), string, int> idFor, IPresets presets,
+                                   Hearing.HearingSettings hearing)
     {
         var groups = new Dictionary<((int, int) Cell, string Preset), List<int>>();
         for (int i = 0; i < crowns.Count; i++)
@@ -86,7 +87,7 @@ public sealed class WoodChorus
             // wood whose size does not change keeps its voice.
             rx = MathF.Ceiling((rx + spec.CrownRadiusMetres) / 10f) * 10f;
             rz = MathF.Ceiling((rz + spec.CrownRadiusMetres) / 10f) * 10f;
-            var (_, reference) = Loudness.Place(spec.SourceLevelDb, spec.ExtentMetres);
+            var (_, reference) = hearing.Place(spec.SourceLevelDb, spec.ExtentMetres);
             woods.Add(new Wood
             {
                 Id = idFor(cell, preset),
@@ -96,7 +97,7 @@ public sealed class WoodChorus
                 RadiusX = rx,
                 RadiusZ = rz,
                 Key = KeyFor(preset, rx, rz),
-                RangeMetres = Loudness.AudibleRange(spec.SourceLevelDb + 10f * MathF.Log10(members.Count)) + MathF.Max(rx, rz),
+                RangeMetres = hearing.AudibleRange(spec.SourceLevelDb + 10f * MathF.Log10(members.Count)) + MathF.Max(rx, rz),
                 ReferenceMetres = reference,
                 Crowns = members.ToArray(),
             });

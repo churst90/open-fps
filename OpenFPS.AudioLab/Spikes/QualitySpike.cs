@@ -46,6 +46,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class QualitySpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
@@ -111,7 +115,7 @@ public static class QualitySpike
             // the sound server while it is open (pactl list sink-inputs).
             Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
             Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
-            var p = new FmodAudioProvider();
+            var p = new FmodAudioProvider { Hearing = LabHearing };
             if (!p.Initialize()) return 1;
             for (int i = 0; i < 400; i++) { p.Update(); Thread.Sleep(10); }
             p.Dispose();
@@ -140,7 +144,7 @@ public static class QualitySpike
             Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(dir, name + ".post.wav"));
             Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
             Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE", pre ? Path.Combine(dir, name + ".pre.wav") : null);
-            P = new FmodAudioProvider();
+            P = new FmodAudioProvider { Hearing = LabHearing };
             if (!P.Initialize()) throw new InvalidOperationException("provider init failed");
             P.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
             for (int i = 0; i < 20; i++) { P.Update(); Thread.Sleep(5); }
@@ -375,14 +379,14 @@ public static class QualitySpike
             "fire" => (ModelLibrary.Presets.Fire(preset).SourceLevelDb, ModelLibrary.Presets.Fire(preset).ExtentMetres, ModelLibrary.Presets.Fire(preset).PeakHeadroomDb),
             _ => throw new ArgumentException(key),
         };
-        var (gain, reference) = Loudness.Place(level, extent);
+        var (gain, reference) = LabHearing.Place(level, extent);
         return new SpatialEmitter
         {
             EntityId = id, Seed = id, Type = EmitterType.EntityAttached, IsSynth = true, PhysicalKey = key, EngineRunning = true,
             SoundId = key, Mode = PlaybackMode.LoopOne,
             Position = at, ApparentPosition = at, Direction = Vector3.UnitZ,
             Volume = gain * PhysicalVoiceState.HeadroomGain(headroom), MinDistance = reference, ExtentMetres = extent,
-            Range = MathF.Max(60f, Loudness.AudibleRange(level)), TargetRegionId = -1, LevelDb = level,
+            Range = MathF.Max(60f, LabHearing.AudibleRange(level)), TargetRegionId = -1, LevelDb = level,
             EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
         };
     }
@@ -445,13 +449,13 @@ public static class QualitySpike
                 var p = new Vector3(c.Lane, 0.4f, along);
                 var vel = new Vector3(0f, 0f, dir * v);
                 var profile = MachineRegistry.VehicleFor(c.Key);
-                var (gain, reference) = Loudness.Place(profile.SourceLevelDb, c.Extent);
+                var (gain, reference) = LabHearing.Place(profile.SourceLevelDb, c.Extent);
                 s.P.PlaySpatialSound(new SpatialEmitter
                 {
                     EntityId = id, Seed = id, SoundId = "engine:" + c.Key, IsSynth = true, EngineKey = c.Key,
                     EngineSpeed = v, EngineRunning = true, Type = EmitterType.EntityAttached, Mode = PlaybackMode.LoopOne,
                     Position = p, ApparentPosition = p, Velocity = vel, Direction = new Vector3(0f, 0f, dir),
-                    Volume = gain, MinDistance = reference, ExtentMetres = c.Extent, Range = Loudness.AudibleRange(profile.SourceLevelDb),
+                    Volume = gain, MinDistance = reference, ExtentMetres = c.Extent, Range = LabHearing.AudibleRange(profile.SourceLevelDb),
                     Pitch = 1f, TargetRegionId = -1, LevelDb = profile.SourceLevelDb,
                     EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                 });
@@ -466,7 +470,7 @@ public static class QualitySpike
                             EntityId = id - 50, SoundId = "front", IsSynth = true, IntakeOfEntity = id,
                             Type = EmitterType.EntityAttached, Mode = PlaybackMode.LoopOne,
                             Position = front, ApparentPosition = front, Velocity = vel, Volume = gain, MinDistance = reference,
-                            Range = Loudness.AudibleRange(profile.SourceLevelDb), Pitch = 1f, TargetRegionId = -1,
+                            Range = LabHearing.AudibleRange(profile.SourceLevelDb), Pitch = 1f, TargetRegionId = -1,
                             LevelDb = profile.SourceLevelDb, EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                         });
                     else s.P.StopSound(id - 50);
@@ -481,7 +485,7 @@ public static class QualitySpike
                         EchoDelaySeconds = MathF.Max(0f, path - direct) / C, EchoGain = 0.6f, EchoScattering = 0.3f,
                         Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
                         Position = mirror, ApparentPosition = mirror, Volume = gain, MinDistance = reference,
-                        Range = Loudness.AudibleRange(profile.SourceLevelDb), Pitch = 1f, TargetRegionId = -1,
+                        Range = LabHearing.AudibleRange(profile.SourceLevelDb), Pitch = 1f, TargetRegionId = -1,
                         LevelDb = profile.SourceLevelDb - 6f, EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                     });
                 }
@@ -516,16 +520,16 @@ public static class QualitySpike
             string id = $"lab:quality:thunder:{k}";
             // As the client does now (WorldAudioPlayer.HearThunder): at the mixer rate, band-limited.
             int rate = part.SampleRate;
-            if (bandLimit && rate != MixerQuality.MixerRate) { pcm = MixerQuality.Resample(pcm, rate, MixerQuality.MixerRate); rate = MixerQuality.MixerRate; }
+            if (bandLimit && rate != s.P.MixerRate) { pcm = MixerQuality.Resample(pcm, rate, s.P.MixerRate); rate = s.P.MixerRate; }
             if (!s.P.RegisterSynthesisedSoundFloat(id, pcm, rate)) continue;
             float level = WorldAudioPlayer.SkyLevelDb(part.PeakDb);
-            var (gain, reference) = Loudness.Place(level);
+            var (gain, reference) = LabHearing.Place(level);
             var at = ear + part.Direction * WorldAudioPlayer.SkyProxyMetres;
             pending.Add((0.5 + part.StartSeconds - first, new SpatialEmitter
             {
                 EntityId = -800 - k, SoundId = id, Mode = PlaybackMode.Single, Type = EmitterType.WorldLocked,
                 Position = at, ApparentPosition = at, Volume = gain, MinDistance = reference,
-                Range = Loudness.AudibleRange(level), Pitch = 1f, IsEvent = true, LevelDb = level, TargetRegionId = -1,
+                Range = LabHearing.AudibleRange(level), Pitch = 1f, IsEvent = true, LevelDb = level, TargetRegionId = -1,
                 EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
             }));
         }
@@ -563,9 +567,9 @@ public static class QualitySpike
         {
             string id = $"lab:quality:oneshot:{k}";
             bool ok = legacy ? s.P.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(pcm), sr)
-                             : s.P.RegisterSynthesisedSoundFloat(id, MixerQuality.Resample(pcm, sr, MixerQuality.MixerRate), MixerQuality.MixerRate);
+                             : s.P.RegisterSynthesisedSoundFloat(id, MixerQuality.Resample(pcm, sr, s.P.MixerRate), s.P.MixerRate);
             if (!ok) continue;
-            var (gain, reference) = Loudness.Place(80f);
+            var (gain, reference) = LabHearing.Place(80f);
             due.Add((0.4 + 1.6 * k, Plain(-1000 - k, id, at, gain, 1f, PlaybackMode.Single) with { MinDistance = reference }));
             Console.WriteLine($"  {k}: {name} at {0.4 + 1.6 * k:F1} s");
             k++;
@@ -595,16 +599,16 @@ public static class QualitySpike
         {
             if (!WeaponRegistry.TryGet(weapon, out var w)) { Console.WriteLine($"  no weapon '{weapon}'"); return; }
             float level = Loudness.MuzzleBlastDb(w);
-            var (gain, reference) = Loudness.Place(level);
+            var (gain, reference) = LabHearing.Place(level);
             for (int k = 0; k < count; k++)
             {
                 string sid = $"lab:quality:shot:{id}";
-                var pcm = MixerQuality.Resample(WeaponSynth.MuzzleBlast(WeaponProfile.From(w), 100 + id), TransientSynth.SampleRate, MixerQuality.MixerRate);
-                if (!s.P.RegisterSynthesisedSoundFloat(sid, pcm, MixerQuality.MixerRate)) continue;
+                var pcm = MixerQuality.Resample(WeaponSynth.MuzzleBlast(WeaponProfile.From(w), 100 + id), TransientSynth.SampleRate, s.P.MixerRate);
+                if (!s.P.RegisterSynthesisedSoundFloat(sid, pcm, s.P.MixerRate)) continue;
                 var pos = ear + at;
                 due.Add((start + k * every, Plain(-1100 - id, sid, pos, gain, 1f, PlaybackMode.Single) with
                 {
-                    MinDistance = reference, LevelDb = level, Range = Loudness.AudibleRange(level), EffectiveDistance = at.Length(),
+                    MinDistance = reference, LevelDb = level, Range = LabHearing.AudibleRange(level), EffectiveDistance = at.Length(),
                 }));
                 id++;
             }
@@ -635,7 +639,7 @@ public static class QualitySpike
         Environment.SetEnvironmentVariable("OPENFPS_MASTER_DB", "0");
         string name = $"limiter-{tag}";
         using var s = new Session(dir, name, pre: true);
-        int sr = MixerQuality.MixerRate;
+        int sr = s.P.MixerRate;
         float makeup = MathF.Pow(10f, FmodAudioProvider.MasterMakeupDb / 20f);
         // A mono interface sound reaches the master 3 dB down in each channel (the 2D pan law): put back.
         float Amp(float overDb) => MathF.Pow(10f, (-1f + overDb) / 20f) / makeup * MathF.Sqrt(2f);
@@ -728,7 +732,7 @@ public static class QualitySpike
     {
         const string Key = "i4_midsize";
         var profile = MachineRegistry.VehicleFor(Key);
-        var (gain, reference) = Loudness.Place(profile.SourceLevelDb, 3.5f);
+        var (gain, reference) = LabHearing.Place(profile.SourceLevelDb, 3.5f);
         var modes = (Str(args, "modes") ?? "moving,still,borrowed,approach,front,frontstill").Split(',');
         foreach (string mode in modes)
         {
@@ -812,7 +816,7 @@ public static class QualitySpike
         foreach (var (key, kmh) in new[] { ("i4_compact", 45f), ("i4_midsize", 50f), ("transit_bus", 35f), ("i6_street", 40f),
                                            ("v8_muscle", 60f), ("police_interceptor", 80f), ("sportbike", 60f), ("single", 50f), ("diesel_truck", 40f) })
         {
-            var v = new EngineVoiceState(MachineRegistry.VehicleFor(key), sr, 3) { TargetSpeed = kmh / 3.6f };
+            var v = new EngineVoiceState(MachineRegistry.VehicleFor(key), sr, 3) { Hearing = LabHearing, TargetSpeed = kmh / 3.6f };
             v.PlaceAtSpeed(kmh / 3.6f);
             var block = new float[1024];
             int n = (int)(sec * sr) / 1024 * 1024;

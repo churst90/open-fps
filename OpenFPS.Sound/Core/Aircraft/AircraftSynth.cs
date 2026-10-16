@@ -71,6 +71,13 @@ public sealed class AircraftSynth
     private bool _onGround;
     private const int SlowEvery = 64;
 
+    /// <summary>Puts its engine on the live levers of the mixer it plays in (MixSettings.ValveJetNoise): its
+    /// voice's, which the mixer gives it as it makes it.</summary>
+    public void UseMix(MixSettings mix)
+    {
+        if (_piston != null) _piston.Mix = mix;
+    }
+
     /// <summary>An aeroplane's voice. A piston engine's profile is <paramref name="presets"/>' (the catalogue's),
     /// so an engine changed in the world editor is the one heard.</summary>
     public AircraftSynth(AircraftProfile p, IPresets presets, float rate = RenderRate.Default, int seed = 3)

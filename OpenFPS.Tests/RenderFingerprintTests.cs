@@ -157,17 +157,11 @@ public class RenderFingerprintTests
     /// <summary>The lab levers a render reads, held at their game values while it runs.</summary>
     private static float[][] RenderPinned(Func<float[][]> render)
     {
-        bool jet = EngineSynth.ValveJetNoise, diesel = EngineSynth.DebugLegacyDiesel, rigid = EngineSynth.DebugRigidValves;
-        int solo = EngineSynth.DebugSoloTailpipe;
         double keeper = KnobDoor.KeeperBendsStrike;
         var stems = (KnobDoor.StemFolder, PushBarDoor.StemFolder, SlidingDoor.StemFolder, GlassDoor.StemFolder,
                      ElevatorDoor.StemFolder, LockCylinder.StemFolder);
         try
         {
-            EngineSynth.ValveJetNoise = true;
-            EngineSynth.DebugLegacyDiesel = false;
-            EngineSynth.DebugRigidValves = false;
-            EngineSynth.DebugSoloTailpipe = -1;
             KnobDoor.KeeperBendsStrike = 0.3;
             KnobDoor.StemFolder = PushBarDoor.StemFolder = SlidingDoor.StemFolder = GlassDoor.StemFolder
                 = ElevatorDoor.StemFolder = LockCylinder.StemFolder = null;
@@ -175,10 +169,6 @@ public class RenderFingerprintTests
         }
         finally
         {
-            EngineSynth.ValveJetNoise = jet;
-            EngineSynth.DebugLegacyDiesel = diesel;
-            EngineSynth.DebugRigidValves = rigid;
-            EngineSynth.DebugSoloTailpipe = solo;
             KnobDoor.KeeperBendsStrike = keeper;
             (KnobDoor.StemFolder, PushBarDoor.StemFolder, SlidingDoor.StemFolder, GlassDoor.StemFolder,
              ElevatorDoor.StemFolder, LockCylinder.StemFolder) = stems;

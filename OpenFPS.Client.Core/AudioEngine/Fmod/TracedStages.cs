@@ -39,9 +39,19 @@ internal sealed class TracedStages
 
     /// <param name="providerContext">The provider's Steam Audio context (the decode, the ears).</param>
     /// <param name="mixerFrame">The mixer's block, which a stage is handed and the voices render in.</param>
-    public TracedStages(IntPtr providerContext, int mixerFrame)
+    /// <param name="lab">The mixer's lab levers (the stage's wait, the ears' velvet); null is the game.</param>
+    public TracedStages(IntPtr providerContext, int mixerFrame, OpenFPS.Client.AudioEngine.Core.LabLevers? lab = null)
     {
         _providerContext = providerContext; _mixerFrame = mixerFrame;
+        _lab = lab ?? new OpenFPS.Client.AudioEngine.Core.LabLevers();
+    }
+
+    private readonly OpenFPS.Client.AudioEngine.Core.LabLevers _lab;
+
+    private DiffuseTail WithEarVelvet(DiffuseTail tail)
+    {
+        tail.LateEarVelvet = _lab.LateEarVelvet;
+        return tail;
     }
 
     private static IntPtr NewHrtf(IntPtr context, int rate, int frame)
@@ -144,10 +154,10 @@ internal sealed class TracedStages
         if (_preDelay < 0)
         {
             IntPtr voiceHead = NewHrtf(_providerContext, s.SampleRate, _mixerFrame);
-            int voice = TracedReverbDsp.BinauralOnset(_providerContext, voiceHead, _mixerFrame);
+            int voice = TracedReverbDsp.BinauralOnset(_providerContext, voiceHead, _mixerFrame, s.SampleRate);
             if (voiceHead != IntPtr.Zero) Phonon.iplHRTFRelease(ref voiceHead);
-            int stage = TracedReverbDsp.BinauralOnset(_providerContext, _calibrationHrtf, sub);
-            _preDelay = TracedReverbDsp.StagePreDelay(voice, stage);
+            int stage = TracedReverbDsp.BinauralOnset(_providerContext, _calibrationHrtf, sub, s.SampleRate);
+            _preDelay = TracedReverbDsp.StagePreDelay(voice, stage, _lab.NoPreDelay);
             Serilog.Log.Information("Traced reverb: voices render {Voice} samples late, the traced stage {Stage}; its input waits {Wait}.",
                                     voice, stage, _preDelay);
         }
@@ -164,7 +174,8 @@ internal sealed class TracedStages
             SdmConv = new SharedInputConvolver(sub, SdmTailIr.PartitionsFor(s.SampleRate, sub), DiffuseBranch.Count),
             LateOut = new float[sub],
             // The room you are in: its late tail as a field round the head, not one channel.
-            Diffuse = DiffuseTail.Create(_providerContext, sub, TracedReverb.Channels, _hrtf, s.SampleRate, calibrateWith: _calibrationHrtf),
+            Diffuse = DiffuseTail.Create(_providerContext, sub, TracedReverb.Channels, _hrtf, s.SampleRate, calibrateWith: _calibrationHrtf) is { } tail
+                ? WithEarVelvet(tail) : null,
             Delay = _preDelay > 0 ? new PreDelay(_preDelay) : null,
         };
         Phonon.iplAudioBufferAllocate(s.WorkerContext, 1, sub, ref st.Mono);

@@ -26,6 +26,10 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class ClapRoomSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int RoomId = 87;
 
     public static int Run(string[] args)
@@ -33,12 +37,16 @@ public static class ClapRoomSpike
         AcousticRegistry.Initialize();
         string outPath = Arg(args, "out") ?? "/tmp/openfps-clap-room.wav";
         int claps = int.TryParse(Arg(args, "claps"), out int c) ? c : 4;
-        TracedReverb.RawTail = Arg(args, "tail") == "raw";
-        TracedReverb.OneChannelLate = Arg(args, "late") == "velvet";
-        SmoothTail.FromFiftyMs = Arg(args, "early") == "old";
-        TracedReverbDsp.LabNoPreDelay = SmoothTail.FromFiftyMs;
         float probeMs = float.TryParse(Arg(args, "probe"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float pm) ? pm : 0f;
-        TracedReverb.LabProbeSeconds = probeMs / 1000f;
+        bool fromFifty = Arg(args, "early") == "old";
+        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers
+        {
+            RawTail = Arg(args, "tail") == "raw",
+            OneChannelLate = Arg(args, "late") == "velvet",
+            TailFromFiftyMs = fromFifty,
+            NoPreDelay = fromFifty,
+            ProbeSeconds = probeMs / 1000f,
+        };
         bool withCopies = Arg(args, "copies") != "0" && probeMs <= 0f;
 
         // The flat, in its own frame: 8.65 x 17.86 x 2.7 m, carpet on concrete, plaster over, plaster
@@ -62,7 +70,7 @@ public static class ClapRoomSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
         scene.Build(boxes);
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing, Lab = lab };
         provider.Traced.Configure(ctx, scene);
         provider.Traced.SetListener(ear);
 
@@ -75,7 +83,7 @@ public static class ClapRoomSpike
         if (float.TryParse(Arg(args, "dist"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float dist))
             hands = ear + new Vector3(0f, -0.2f, MathF.Max(0.3f, dist));
         bool bed = args.Contains("bed");
-        var placed = Loudness.Place(levelDb);
+        var placed = LabHearing.Place(levelDb);
         var clapTimes = new List<double>();
         float[]? traceW = null;
         double startMs = 0, firstMs = 0;
@@ -89,7 +97,7 @@ public static class ClapRoomSpike
             else pcm = Applause.RenderClap(TransientSynth.SampleRate, 1);
             if (bed)
             {
-                var hum = Loudness.Place(60f);
+                var hum = LabHearing.Place(60f);
                 var bedAt = ear + new Vector3(2f, 0f, 0f);
                 var tone = new float[TransientSynth.SampleRate * 8];
                 for (int i = 0; i < tone.Length; i++) tone[i] = 0.5f * MathF.Sin(MathF.Tau * 150f * i / TransientSynth.SampleRate);
@@ -115,7 +123,7 @@ public static class ClapRoomSpike
                                   maxExtraPathMetres: OpenFPS.Client.Core.WorldAudioPlayer.RoomEchoWindowSeconds * c0);
             float direct0 = Vector3.Distance(hands, ear);
             OpenFPS.Client.Core.WorldAudioPlayer.PlanRoomEchoes(found, hands, ear, direct0, placed.ReferenceDistance,
-                                                               FmodAudioProvider.CopiesTrim, audible: true, plan);
+                                                               provider.Mix.CopiesTrim, audible: true, plan);
             firstMs = plan.Count > 0 ? plan.Min(e => e.Arrival.ExtraDelaySeconds) * 1000.0 : 0.0;
             var washIds = new HashSet<string>();
             foreach (var e in plan)
@@ -128,7 +136,7 @@ public static class ClapRoomSpike
                 }
             if (withCopies)
             {
-                Console.WriteLine($"  placed copies ({FmodAudioProvider.CopiesDb:F0} dB trim):");
+                Console.WriteLine($"  placed copies ({provider.Mix.CopiesDb:F0} dB trim):");
                 foreach (var e in plan.OrderBy(e => e.Arrival.PathLength))
                     Console.WriteLine($"    order {e.Arrival.Order} {e.Arrival.ExtraDelaySeconds * 1000,5:F1} ms after the clap, "
                                     + (e.InVoice ? "the floor, in the voice" : $"copy {20 * MathF.Log10(MathF.Max(1e-6f, e.MirrorGain)),6:F1} dB, wash {(e.WashGain > 0 ? 20 * MathF.Log10(e.WashGain) : -999),6:F1} dB"));
@@ -213,7 +221,7 @@ public static class ClapRoomSpike
             var m = provider.TracedMeter(RoomId);
             Console.WriteLine($"  traced stage: {10 * Math.Log10(m.Out / Math.Max(1e-20, m.In)):F1} dB out per ear against its mono input; "
                             + $"{10 * Math.Log10(m.Out / Math.Max(1e-20, m.PerChannel)):F1} dB against the mean of its {m.Channels} input channels; head blend {m.Blend:F2}");
-            Console.WriteLine($"  reverb: traced, listener trace {(provider.Traced.Listener != null ? "ready" : "MISSING")}, reflections {FmodAudioProvider.TailDb:F0} tail, {FmodAudioProvider.CopiesDb:F0} copies dB, makeup {FmodAudioProvider.MasterMakeupDb:F0} dB");
+            Console.WriteLine($"  reverb: traced, listener trace {(provider.Traced.Listener != null ? "ready" : "MISSING")}, reflections {provider.Mix.TailDb:F0} tail, {provider.Mix.CopiesDb:F0} copies dB, makeup {FmodAudioProvider.MasterMakeupDb:F0} dB");
             if (provider.Traced.Listener is { } lt)
             {
                 traceW = lt.LastReadBack;
@@ -221,7 +229,7 @@ public static class ClapRoomSpike
                 {
                     startMs = sm.Start * 1000.0 / lt.SampleRate;
                     double copiesE = sm.LastCopies.Sum(), took = sm.LastTook.Sum();
-                    Console.WriteLine($"  traced response starts {startMs:F1} ms after the sound{(SmoothTail.FromFiftyMs ? " (early=old: played from 50 ms)" : "")}; "
+                    Console.WriteLine($"  traced response starts {startMs:F1} ms after the sound{(lab.TailFromFiftyMs ? " (early=old: played from 50 ms)" : "")}; "
                                     + $"the copies carry {10 * Math.Log10(copiesE + 1e-30):F1} dB (re a 1 m impulse), of which the trace had and gave up {10 * Math.Log10(took + 1e-30):F1} dB");
                 }
             }

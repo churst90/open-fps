@@ -80,10 +80,10 @@ internal sealed class TracedEchoes : IDisposable
     public double LastRunMs;
 
     /// <summary>A simulator of its own on <paramref name="context"/>, at <paramref name="sampleRate"/>
-    /// (0: MixerQuality.MixerRate) in blocks of <paramref name="frameSize"/>.</summary>
+    /// (0: MixerQuality.DefaultRate; the mixer's is TracedReverbSet.MixerRate) in blocks of <paramref name="frameSize"/>.</summary>
     public TracedEchoes(IntPtr context, int sampleRate = 0, int frameSize = 1024)
     {
-        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
         var s = new Phonon.IPLSimulationSettings
         {
@@ -307,7 +307,7 @@ internal sealed class TracedEchoRig : IGuardedUnit
     public float Blend = -1f;
     /// <summary>Each bank's generation when the rig was given its slot (TracedEchoes.BankGeneration).</summary>
     public readonly int[] AttachGeneration = new int[2];
-    public float SampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+    public float SampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
     public Phonon.IPLCoordinateSpace3 Orientation;
     public FMOD.DSP CaptureDsp, MixDsp;
     public GCHandle Handle;

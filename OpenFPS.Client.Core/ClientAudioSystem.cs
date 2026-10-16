@@ -395,7 +395,7 @@ public partial class ClientAudioSystem
         WorldAudio.Received = message => _birds.Heard(message, _audio.Clock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
-        _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced, audio.Clock) { Manual = manualAcoustics };
+        _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced, audio.Clock) { Manual = manualAcoustics, Lab = audio.Lab };
         WorldAudio.Worker = _acousticWorker;
         // Blips, the perched birds' calls and the loudest surface of each rain patch are heard by the worker's
         // answer, as every sustained voice is (P6).
@@ -505,7 +505,7 @@ public partial class ClientAudioSystem
         // Entity ids belong to the map just left: whoever had one there is nobody here.
         _talkersVoiced.Clear();
         _talkerRooms.Clear();
-        OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
+        _audio.TalkerStreams.Clear();
     }
 
     /// <summary>The water in a wheel path of the roads, mm (WorldSnapshot.RoadWaterMm).</summary>
@@ -1292,9 +1292,9 @@ public partial class ClientAudioSystem
             // under. Not the gain that gives a quieter render its headroom back, which is no louder at the ear.
             string voiceKey = VoiceKey(snap.Definition);
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
-            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
-            float range = MathF.Max(1f, MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb)));
-            float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(
+            var (gain, reference) = _audio.Hearing.Place(levelDb, extent);
+            float range = MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb)));
+            float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
                 gain * em.Volume * chorus, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(snap, voiceKey), physical: true);
             _heardInRanking[entityId] = level;
             // Switched off by the server (a crossing's bell between trains) and within earshot: the voice it
@@ -1577,9 +1577,9 @@ public partial class ClientAudioSystem
             // electric car a metre nearer.
             var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
             float levelDb = DeclaredLevel(preset, profile);
-            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, OutletSeparation(preset));
-            float heard = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(
-                gain * em.Volume, reference, MathF.Max(1f, MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb))),
+            var (gain, reference) = _audio.Hearing.Place(levelDb, OutletSeparation(preset));
+            float heard = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
+                gain * em.Volume, reference, MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb))),
                 Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos), UnaskedOcclusion, levelDb, VoiceKey(snap.Definition), physical: true);
             // Louder sorts first, so negated. The keep bias and the hold stop the set churning as cars trade
             // places (EngineKeepBias).
@@ -2279,7 +2279,7 @@ public partial class ClientAudioSystem
             // Where the vehicle's model has its horn: behind a car's grille, on a train its horn source.
             Vector3 pos = HornAt(world, snap);
             float levelDb = OpenFPS.Common.Honk.LevelDb(horn.Key[OpenFPS.Common.Honk.Prefix.Length..horn.Key.LastIndexOf(':')], ModelLibrary.Presets);
-            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
+            var (gain, reference) = _audio.Hearing.Place(levelDb);
             var e = new SpatialEmitter
             {
                 EntityId = voiceId,
@@ -2296,7 +2296,7 @@ public partial class ClientAudioSystem
                 Volume = gain,
                 EarLevelDb = levelDb,
                 MinDistance = reference,
-                Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
+                Range = _audio.Hearing.AudibleRange(levelDb),
                 Pitch = 1f,
                 EngineRunning = true,
             };
@@ -2465,7 +2465,7 @@ public partial class ClientAudioSystem
         if (!blowing && !_voices.IsRegistered(voiceId)) return;
         Vector3 pos = HornAt(world, snap);
         float levelDb = OpenFPS.Common.Honk.LevelDb(horn, ModelLibrary.Presets);
-        var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
+        var (gain, reference) = _audio.Hearing.Place(levelDb);
         var e = new SpatialEmitter
         {
             EntityId = voiceId,
@@ -2482,7 +2482,7 @@ public partial class ClientAudioSystem
             Volume = gain,
             EarLevelDb = levelDb,
             MinDistance = reference,
-            Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
+            Range = _audio.Hearing.AudibleRange(levelDb),
             Pitch = 1f,
             // The hand on the horn: the voice blows while this is set.
             EngineRunning = blowing,
@@ -2500,7 +2500,7 @@ public partial class ClientAudioSystem
         OpenFPS.Common.SirenSpec spec;
         try { spec = OpenFPS.Common.SirenSpec.ByName(sirenKey); }
         catch { return; }
-        if (Vector3.Distance(SirenMouth(snap), eyePos) > OpenFPS.Common.Loudness.AudibleRange(spec.SourceLevelDb)) return;
+        if (Vector3.Distance(SirenMouth(snap), eyePos) > _audio.Hearing.AudibleRange(spec.SourceLevelDb)) return;
         if (!_sirenKeys.TryGetValue(sirenKey, out string? key)) _sirenKeys[sirenKey] = key = "siren:" + sirenKey;
         _audio.PrepareVoice(key, VoiceRegistry.SeedOf(VoiceKind.Siren, snap.Id));
     }
@@ -2521,7 +2521,7 @@ public partial class ClientAudioSystem
         int voiceId = SirenVoiceId(snap.Id);
 
         Vector3 pos = SirenMouth(snap);
-        var (gain, reference) = OpenFPS.Common.Loudness.Place(spec.SourceLevelDb, spec.HornMouthMetres);
+        var (gain, reference) = _audio.Hearing.Place(spec.SourceLevelDb, spec.HornMouthMetres);
 
         var e = new SpatialEmitter
         {
@@ -2542,7 +2542,7 @@ public partial class ClientAudioSystem
             EarLevelDb = spec.SourceLevelDb,
             MinDistance = reference,
             ExtentMetres = spec.HornMouthMetres,
-            Range = OpenFPS.Common.Loudness.AudibleRange(spec.SourceLevelDb),
+            Range = _audio.Hearing.AudibleRange(spec.SourceLevelDb),
             Pitch = 1f,
             // The mode rides in the lever slot, as a train's notch does.
             PowerLever = (float)(int)mode,
@@ -2675,7 +2675,7 @@ public partial class ClientAudioSystem
         var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
         float level = DeclaredLevel(preset, profile);
         float extent = OutletSeparation(preset);
-        var (gain, reference) = OpenFPS.Common.Loudness.Place(level, extent);
+        var (gain, reference) = _audio.Hearing.Place(level, extent);
         Vector3 pos = OpenFPS.Common.AudioEmission.PointFor(snap);
 
         // A stable, arbitrary offset per car, spread across most of the ring buffer.
@@ -2697,7 +2697,7 @@ public partial class ClientAudioSystem
             Velocity = snap.Velocity,
             PositionSampledAt = world.PositionsSampledAt,
             Volume = gain * def.SoundEmitter.Volume,
-            Range = OpenFPS.Common.Loudness.AudibleRange(level),
+            Range = _audio.Hearing.AudibleRange(level),
             MinDistance = reference,
             ExtentMetres = extent,
             Pitch = 1f,
@@ -2777,7 +2777,7 @@ public partial class ClientAudioSystem
                 // Placed by its declared level and size: inside its extent the level is flat, and the
                 // gain is paid down so the far field is unchanged (Loudness.Widen; widening without
                 // paying once handed every quiet vehicle eight decibels).
-                var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
+                var (gain, reference) = _audio.Hearing.Place(levelDb, extent);
                 // A voice rendered with more headroom than the shared one (a fire's crackles) gets the
                 // difference back, so it is placed by its level and not its peaks.
                 headroomGain = OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
@@ -2786,7 +2786,7 @@ public partial class ClientAudioSystem
                 engineVolume *= ChorusShare(world, snap.Id, out chorusTrees);
                 engineMinDistance = reference;
                 engineExtent = extent;
-                engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
+                engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(levelDb));
                 earLevel = levelDb;
                 extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey, ModelLibrary.Presets);
                 if (physicalSynth == OpenFPS.Common.ModelSynth.Aircraft)
@@ -2822,11 +2822,11 @@ public partial class ClientAudioSystem
                 // metre further from the exhaust. Widened by Loudness.Place, which pays the gain back;
                 // a bare MathF.Max(reference, 3f) handed a quiet vehicle up to 8 dB.
                 float extent = OutletSeparation(engineKey);
-                var (gain, reference) = OpenFPS.Common.Loudness.Place(level, extent);
+                var (gain, reference) = _audio.Hearing.Place(level, extent);
                 engineVolume = gain * def.SoundEmitter.Volume;
                 engineMinDistance = reference;
                 engineExtent = extent;
-                engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(level));
+                engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(level));
                 earLevel = level;
 
                 // Close enough to tell the ends apart: this voice moves to the tailpipe and the front gets
@@ -2838,7 +2838,7 @@ public partial class ClientAudioSystem
                 {
                     emitterPosition = snap.Transform.Position
                                     + Vector3.Transform(ExhaustSlot(profile), snap.Transform.Rotation);
-                    (gain, reference) = OpenFPS.Common.Loudness.Place(level);
+                    (gain, reference) = _audio.Hearing.Place(level);
                     engineVolume = gain * def.SoundEmitter.Volume;
                     engineMinDistance = reference;
                     engineExtent = 0f;
@@ -2850,7 +2850,7 @@ public partial class ClientAudioSystem
                 if (snap.Id == _state.RidingEntityId)
                 {
                     interior = true;
-                    var (g0, r0) = OpenFPS.Common.Loudness.Place(level);
+                    var (g0, r0) = _audio.Hearing.Place(level);
                     engineVolume = MathF.Min(1f, g0 * r0) * def.SoundEmitter.Volume;
                     engineMinDistance = 1f;
                     engineExtent = 0f;
@@ -2877,10 +2877,10 @@ public partial class ClientAudioSystem
                     return;
                 speaker = render;
                 resolvedSoundId = render.Key;
-                var (gain, reference) = OpenFPS.Common.Loudness.Place(render.LevelDb, engineExtent);
+                var (gain, reference) = _audio.Hearing.Place(render.LevelDb, engineExtent);
                 engineVolume = gain * def.SoundEmitter.Volume;
                 engineMinDistance = reference;
-                engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(render.LevelDb));
+                engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(render.LevelDb));
                 earLevel = render.LevelDb;
             }
 
@@ -3048,7 +3048,7 @@ public partial class ClientAudioSystem
         {
             long echoAt = System.Diagnostics.Stopwatch.GetTimestamp();
             _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, _audio.Atmosphere.SpeedOfSound, engineDt, _audio,
-                                 traced: OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.HasTracedEchoes(snap.Id));
+                                 traced: _audio.HasTracedEchoes(snap.Id));
             double echoMs = Ms(echoAt);
             _partMs[0] += echoMs;
             _echoPassMs += echoMs;
@@ -3065,7 +3065,7 @@ public partial class ClientAudioSystem
     /// reads (UpdateTalkers).
     /// </summary>
     public void ReceiveVoice(int senderId, ushort sequence, byte[] opusData)
-        => OpenFPS.Client.AudioEngine.Fmod.Talkers.For(senderId).Receive(sequence, opusData, _audio.Clock.Now);
+        => _audio.TalkerStreams.For(senderId).Receive(sequence, opusData, _audio.Clock.Now);
 
     /// <summary>The voice of somebody talking on voice chat, from their mouth.</summary>
     private int TalkerVoiceId(int playerId) => _voices.IdFor(VoiceKind.Talker, playerId);
@@ -3091,7 +3091,7 @@ public partial class ClientAudioSystem
     {
         _talkersGone.Clear();
         _talkerSearchedThisFrame = false;
-        foreach (var stream in OpenFPS.Client.AudioEngine.Fmod.Talkers.All)
+        foreach (var stream in _audio.TalkerStreams.All)
         {
             stream.Pump(now);
             int id = stream.SenderId;
@@ -3115,7 +3115,7 @@ public partial class ClientAudioSystem
             Vector3 mouth = snap.Transform.Position + new Vector3(0f, mouthHeight, 0f) + facing * 0.1f;
 
             float levelDb = OpenFPS.Common.Speech.NormalDb - stream.Ring.SpeechRmsDbfs;
-            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
+            var (gain, reference) = _audio.Hearing.Place(levelDb);
 
             // Asked under its own probe, as a one-off's source is: under the player's id it shared one answer with
             // anything else of theirs asked about at their feet (S13). Their own body is left out of the rays.
@@ -3145,7 +3145,7 @@ public partial class ClientAudioSystem
                 Volume = gain,
                 EarLevelDb = levelDb,
                 MinDistance = reference,
-                Range = MathF.Max(reference, OpenFPS.Common.Loudness.AudibleRange(levelDb)),
+                Range = MathF.Max(reference, _audio.Hearing.AudibleRange(levelDb)),
                 Pitch = 1f,
                 EngineRunning = true,
                 Occlusion = path.Occlusion,
@@ -3183,13 +3183,13 @@ public partial class ClientAudioSystem
         {
             if (_talkersVoiced.Remove(id)) _voices.Stop(TalkerVoiceId(id));
             StopTalkerRoom(id);
-            OpenFPS.Client.AudioEngine.Fmod.Talkers.Remove(id);
+            _audio.TalkerStreams.Remove(id);
         }
         if (_talkersVoiced.Count > 0 && now >= _talkersNextLog)
         {
             _talkersNextLog = now + 5;
             foreach (int id in _talkersVoiced)
-                if (OpenFPS.Client.AudioEngine.Fmod.Talkers.TryGet(id, out var t))
+                if (_audio.TalkerStreams.TryGet(id, out var t))
                     Log.Information("Voice chat: e{Id} talking at {Db:F0} dBFS, buffer {Margin:F0} ms, " +
                                     "{Received} frames in, {Lost} lost ({Rebuilt} rebuilt), {Late} late, {Corrupt} bad, ran dry {Dry} time(s); " +
                                     "room {Region}, {Copies} surface(s) answering",
@@ -3278,7 +3278,7 @@ public partial class ClientAudioSystem
 
     /// <summary>How far away another body's step can be heard at all, metres: the audible range of a step's
     /// level (S24; it was 15 m, hundreds short of a 68 dB step's).</summary>
-    private static float FootstepRange(float levelDb) => OpenFPS.Common.Loudness.AudibleRange(levelDb);
+    private float FootstepRange(float levelDb) => _audio.Hearing.AudibleRange(levelDb);
 
     /// <summary>Somebody else's step: a sound left where it fell, and only one close enough to hear is
     /// made at all.</summary>
@@ -3384,7 +3384,7 @@ public partial class ClientAudioSystem
         // by 9 dB with it and pumped the mix: "the footsteps are loud", a pop on each. On stairs a toe going
         // up is lighter and a heel going down heavier (StrideAccumulator.SlopeDb).
         float slopeDb = StrideAccumulator.SlopeDb(slope), slopePitch = StrideAccumulator.SlopePitch(slope);
-        var (stepGain, stepReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb);
+        var (stepGain, stepReference) = _audio.Hearing.Place(OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb);
 
         var footstep = new SpatialEmitter
         {
@@ -3505,8 +3505,8 @@ public partial class ClientAudioSystem
         var facing = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(_state.Yaw, 0f, 0f));
         Vector3 mouth = ear + facing * 0.08f - new Vector3(0f, 0.1f, 0f);
         // Full scale sits as far above normal talking as the microphone's talking level sits below it.
-        float levelDb = OpenFPS.Common.Speech.NormalDb - OpenFPS.Client.AudioEngine.Fmod.OwnVoiceRing.Shared.SpeechRmsDbfs;
-        var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
+        float levelDb = OpenFPS.Common.Speech.NormalDb - _audio.OwnVoice.SpeechRmsDbfs;
+        var (gain, reference) = _audio.Hearing.Place(levelDb);
 
         // The room's reverberation; its own sound is silent (FmodAudioProvider._ownVoiceRoomGroup). At its
         // reference distance, where the send to the room is a source of that level's.
@@ -3525,7 +3525,7 @@ public partial class ClientAudioSystem
             ApparentPosition = ear + facing * reference,
             Volume = gain,
             MinDistance = reference,
-            Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
+            Range = _audio.Hearing.AudibleRange(levelDb),
             Pitch = 1f,
             EngineRunning = true,
             CarriesPath = true,
@@ -3547,11 +3547,11 @@ public partial class ClientAudioSystem
         int slot = PlaceVoiceCopies(world, mouth, ear, _voiceArrivals, gain, reference, MicrophoneLatency,
                                     VoiceRegistry.NoEntity, _voiceCopyOn,
                                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.OwnVoiceCopyKey, "own voice",
-                                    _listenerRegion, OpenFPS.Common.Loudness.AudibleRange(levelDb), VoiceKind.OwnVoiceCopy, OwnEntityId);
+                                    _listenerRegion, _audio.Hearing.AudibleRange(levelDb), VoiceKind.OwnVoiceCopy, OwnEntityId);
         if (now >= _voiceNextLog)
         {
             _voiceNextLog = now + 5;
-            var ring = OpenFPS.Client.AudioEngine.Fmod.OwnVoiceRing.Shared;
+            var ring = _audio.OwnVoice;
             Serilog.Log.Information("Own voice: talking at {Db:F0} dBFS on the microphone ({Samples} samples in), room {Region}, " +
                                     "{Copies} surface(s) answering, nearest {Near:F0} ms of path",
                                     ring.SpeechRmsDbfs, ring.Written, _listenerRegion, slot,
@@ -3602,7 +3602,7 @@ public partial class ClientAudioSystem
             if (a.Order >= 2 && ++secondOrder > WorldAudioPlayer.MaxSecondOrderCopies) continue;
             float copyGain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference)
                            * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order)
-                           * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;
+                           * _audio.Mix.CopiesTrim;
             if (copyGain < OpenFPS.Common.ImageSource.MinGain) continue;
             var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
             float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
@@ -3703,11 +3703,11 @@ public partial class ClientAudioSystem
             float wash = a.Order == 1 && OpenFPS.Client.AudioEngine.Fmod.EchoWashState.Applies(s) ? placed * MathF.Sqrt(s) : 0f;
             if (wash >= OpenFPS.Common.ImageSource.MinGain)
                 SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb,
-                               wash * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim, lowDb, highDb, s);
+                               wash * _audio.Mix.CopiesTrim, lowDb, highDb, s);
             // The mirror share (WorldAudioPlayer.MirrorShare), a clean copy.
             float gain = placed * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order);
             if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
+            gain *= _audio.Mix.CopiesTrim;   // /copies
             var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
             SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb, gain, loss.LowDb + lowDb, loss.HighDb + highDb, 0f);
             if (++added >= WorldAudioPlayer.MaxRoomEchoes) break;
@@ -3736,7 +3736,7 @@ public partial class ClientAudioSystem
             MinDistance = stepReference,
             EarLevelDb = stepLevelDb,
             EarCopyDb = 20f * MathF.Log10(MathF.Max(1e-6f, gain)),
-            Range = OpenFPS.Common.Loudness.AudibleRange(stepLevelDb),
+            Range = _audio.Hearing.AudibleRange(stepLevelDb),
             // No DelayMs: the facade delays every submission by its distance, and the image is the
             // whole path away.
             IsReflection = true,
@@ -3963,7 +3963,7 @@ public partial class ClientAudioSystem
         {
             // Placed like a step (SubmitFootstep), at a step's level; the landing takes are recorded 7 to
             // 10 dB over the walk banks' medians, and that difference is kept.
-            var (landGain, landReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb);
+            var (landGain, landReference) = _audio.Hearing.Place(OpenFPS.Common.Loudness.FootstepDb);
             var landKind = follows ? VoiceKind.OwnStep : VoiceKind.Footstep;
             var landEmitter = new SpatialEmitter
             {
@@ -3976,7 +3976,7 @@ public partial class ClientAudioSystem
                 Type = EmitterType.WorldLocked,
                 Volume = landGain,
                 EarLevelDb = OpenFPS.Common.Loudness.FootstepDb,
-                Range = OpenFPS.Common.Loudness.AudibleRange(OpenFPS.Common.Loudness.FootstepDb),
+                Range = _audio.Hearing.AudibleRange(OpenFPS.Common.Loudness.FootstepDb),
                 Essential = true,
                 IsEvent = true,
                 MinDistance = landReference,

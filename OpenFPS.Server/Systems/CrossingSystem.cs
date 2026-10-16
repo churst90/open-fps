@@ -105,7 +105,7 @@ public sealed class CrossingSystem
                         SoundId = ModelKindTable.IdOf(ModelSynth.Bell, cd.Bell ?? "crossing_gong"),
                         Mode = PlaybackMode.LoopOne,
                         Volume = 1f,
-                        Range = Loudness.AudibleRange(86f),
+                        Range = Loudness.AudibleRange(86f, Loudness.DefaultCompression),
                         MinDistance = 3f,
                     }));
 
@@ -176,7 +176,7 @@ public sealed class CrossingSystem
                         SoundId = ModelKindTable.IdOf(ModelSynth.Gate, CrossingGateSpec.Standard.Name),
                         Mode = PlaybackMode.LoopOne,
                         Volume = 1f,
-                        Range = Loudness.AudibleRange(CrossingGateSpec.Standard.ClunkDb),
+                        Range = Loudness.AudibleRange(CrossingGateSpec.Standard.ClunkDb, Loudness.DefaultCompression),
                         MinDistance = 1f,
                         SynthRunning = false,
                     }));

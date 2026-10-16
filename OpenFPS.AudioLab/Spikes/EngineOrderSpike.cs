@@ -99,8 +99,7 @@ public static class EngineOrderSpike
             else if (VehicleProfile.Presets.ContainsKey(arg)) preset = arg;
         }
         var v = Override(VehicleProfile.ByName(preset), args);
-        EngineSynth.DebugRigidValves = args.Contains("rigid");
-        var engine = new EngineSynth(v.Engine, Sr, 7);
+        var engine = new EngineSynth(v.Engine, Sr, 7) { Lab = new() { RigidValves = args.Contains("rigid"), SoloTailpipe = SoloTailpipe } };
         var dl = new Driveline(v);
         var driver = new Driver(dl, engine);
         foreach (var line in engine.Describe()) Console.WriteLine($"    {line}");
@@ -163,7 +162,7 @@ public static class EngineOrderSpike
 
         foreach (int rate in rates)
         {
-            var engine = new EngineSynth(v.Engine, rate, 7);
+            var engine = new EngineSynth(v.Engine, rate, 7) { Lab = new() { SoloTailpipe = SoloTailpipe } };
             var dl = new Driveline(v);
             var driver = new Driver(dl, engine);
             float dt = 1f / rate;
@@ -236,6 +235,10 @@ public static class EngineOrderSpike
         return (float)(2 * Math.Sqrt(sr * sr + si * si) / Math.Max(1, norm));
     }
 
+    /// <summary>pipe=N: the tailpipe the renders after <see cref="ListenerFromArgs"/> hear alone (LabLevers.SoloTailpipe);
+    /// -1 is every one.</summary>
+    internal static int SoloTailpipe = -1;
+
     /// <summary>
     /// Where the bench stands: azimuth=DEG round from dead behind the car (positive toward its +x side),
     /// dist=M from the exhaust (default 10), the ear 1.2 m above the tailpipe; pipe=N solos one tailpipe.
@@ -244,7 +247,7 @@ public static class EngineOrderSpike
     public static Vector3? ListenerFromArgs(string[] args, out string describe)
     {
         float? az = null; float dist = 10f;
-        EngineSynth.DebugSoloTailpipe = -1;
+        SoloTailpipe = -1;
         foreach (var arg in args)
         {
             int eq = arg.IndexOf('=');
@@ -253,9 +256,9 @@ public static class EngineOrderSpike
             if (!float.TryParse(arg[(eq + 1)..], out float n)) continue;
             if (k == "azimuth") az = n;
             else if (k == "dist") dist = MathF.Max(0.5f, n);
-            else if (k == "pipe") EngineSynth.DebugSoloTailpipe = (int)n;
+            else if (k == "pipe") SoloTailpipe = (int)n;
         }
-        string solo = EngineSynth.DebugSoloTailpipe >= 0 ? $", tailpipe {EngineSynth.DebugSoloTailpipe} alone" : "";
+        string solo = SoloTailpipe >= 0 ? $", tailpipe {SoloTailpipe} alone" : "";
         if (az is not { } deg)
         {
             describe = "listener: on the centre line, every tailpipe summed at one point" + solo;
@@ -392,7 +395,7 @@ public static class EngineOrderSpike
                 new(DriverAction.Idling, 1.8f),
                 new(DriverAction.ShuttingDown, 1.5f),
             };
-            var r = VehicleSynth.Render(v, orders, seed: 5, listener: listener);
+            var r = VehicleSynth.Render(v, orders, seed: 5, listener: listener, lab: new() { SoloTailpipe = SoloTailpipe });
             File.WriteAllBytes(Path.Combine(dir, $"{key}_exhaust.wav"), VehicleSynth.ToWav16(r.Exhaust));
             File.WriteAllBytes(Path.Combine(dir, $"{key}_front.wav"), VehicleSynth.ToWav16(r.Intake));
             // A near mix: exhaust with the front of the car 8 dB under it.
@@ -429,7 +432,7 @@ public static class EngineOrderSpike
                 new(DriverAction.Idling, 1.5f),
                 new(DriverAction.Holding, 12f, rpm, throttle < 0f ? 1f : throttle),
             };
-        var r = VehicleSynth.Render(v, orders, seed: 7, listener: listener);
+        var r = VehicleSynth.Render(v, orders, seed: 7, listener: listener, lab: new() { SoloTailpipe = SoloTailpipe });
         int from = r.Exhaust.Length - Sr * 2;
         var x = Window(r.Exhaust, from, r.Exhaust.Length);
         var pa = new float[x.Length];

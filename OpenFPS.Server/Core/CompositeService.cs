@@ -708,7 +708,7 @@ public class CompositeService
             SoundId = ModelKindTable.IdOf(ModelSynth.Engine, preset),
             Mode = PlaybackMode.LoopOne,
             Volume = 1f,
-            Range = Loudness.AudibleRange(profile.SourceLevelDb),
+            Range = Loudness.AudibleRange(profile.SourceLevelDb, Loudness.DefaultCompression),
             MinDistance = 3f,
             // Parked with the engine off; the key (DrivingSystem.SetIgnition) flips this and the client cranks it.
             SynthRunning = false,

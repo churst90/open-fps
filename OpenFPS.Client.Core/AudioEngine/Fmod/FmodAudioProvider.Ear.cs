@@ -19,7 +19,7 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// engine from what it is making now):
 ///
 ///   * the correction: how much more or less the law in loudness units gives it than the unweighted
-///     law it was placed by (Loudness.TimbreCorrectionDb). Engines and their outlets get none here:
+///     law it was placed by (HearingSettings.TimbreCorrectionDb). Engines and their outlets get none here:
 ///     their lift is the law (EngineVoiceState.LiftDb).
 ///   * the compensation: the level it really has at the ear against the level it plays at, as two
 ///     ISO 226:2023 loudness levels, and the shelves between them (LoudnessCompensation).
@@ -136,7 +136,7 @@ public partial class FmodAudioProvider
     private void RecomputeEar(ActiveSound active, EarVoice ear, Vector3 listener, double now)
     {
         ear.NextAt = now + EarRecomputeSeconds;
-        bool on = EarModel.Enabled;
+        bool on = Hearing.EarModelOn;
         var engine = active.EngineState ?? active.TapState?.Source ?? active.EchoState?.Source;
 
         float levelDb, placedDb, correction;
@@ -148,7 +148,7 @@ public partial class FmodAudioProvider
             timbre = engine.RunningTimbre;
             correction = 0f;
             if (levelDb <= 0f) { Settle(ear, 0f, 0f, 0f); return; }
-            placedDb = Loudness.PlacedDb(levelDb, timbre);
+            placedDb = Hearing.PlacedDb(levelDb, timbre);
         }
         else
         {
@@ -165,8 +165,8 @@ public partial class FmodAudioProvider
                 ear.Timbre = EarTimbres.Find(ear.Key) ?? ear.Timbre;
             timbre = ear.Timbre;
             levelDb = ear.LevelDb;
-            correction = on ? Loudness.TimbreCorrectionDb(levelDb, timbre) : 0f;
-            placedDb = Loudness.PlacedDb(levelDb, timbre);
+            correction = on ? Hearing.TimbreCorrectionDb(levelDb, timbre) : 0f;
+            placedDb = Hearing.PlacedDb(levelDb, timbre);
         }
 
         float distance = Vector3.Distance(listener, active.Position);
@@ -177,7 +177,7 @@ public partial class FmodAudioProvider
         float realOffset = timbre?.RealOffsetDb ?? (physical ? 0f : Loudness.ReferenceRmsDbfs);
         float digitalRms = timbre?.DigitalRmsDb ?? (physical ? Loudness.PhysicalRmsDbfs : Loudness.ReferenceRmsDbfs);
         float real = EarModel.RealAtEarDb(levelDb + realOffset + ear.CopyDb, distance, pathDb);
-        float played = EarModel.PlayedAtEarDb(placedDb + ear.CopyDb, digitalRms, active.MinDistance, distance, pathDb);
+        float played = Hearing.PlayedAtEarDb(placedDb + ear.CopyDb, digitalRms, active.MinDistance, distance, pathDb);
         var t = timbre ?? Timbre.Speech;
         float realPhon = t.Phons(real), playedPhon = t.Phons(played);
         var (low, high) = on ? LoudnessCompensation.Shelves(realPhon, playedPhon) : (0f, 0f);
@@ -295,14 +295,14 @@ public partial class FmodAudioProvider
                 _windTimbre = Timbre.FromBandPowers(_windEar.Tap.BandPowers, "ear wind", live: true);
             var ears = _earWind.Synth.Last;
             float declared = ears.DeclaredDb;
-            bool on = EarModel.Enabled;
+            bool on = Hearing.EarModelOn;
             if (declared > 0f && _windTimbre != null)
             {
-                _windCorrectionDb = on ? Loudness.TimbreCorrectionDb(declared, _windTimbre) : 0f;
+                _windCorrectionDb = on ? Hearing.TimbreCorrectionDb(declared, _windTimbre) : 0f;
                 // At the ear there is no distance: what the law places is the level itself.
                 float real = MathF.Max(ears.LeftDb, ears.RightDb);
-                float played = EarModel.PlaybackFullScaleDb + Loudness.PhysicalRmsDbfs
-                             + (declared - Loudness.RenderCeilingDb) * Loudness.DynamicRangeCompression
+                float played = Hearing.PlaybackFullScaleDb + Loudness.PhysicalRmsDbfs
+                             + (declared - Hearing.RenderCeilingDb) * Hearing.Compression
                              + _windCorrectionDb + (real - declared);
                 var (low, high) = on ? LoudnessCompensation.Shelves(_windTimbre.Phons(real), _windTimbre.Phons(played)) : (0f, 0f);
                 if (!_windEarStarted) { _windEar.Snap(low, high); _windGainDb = _windCorrectionDb; _windEarStarted = true; }
@@ -335,7 +335,7 @@ public partial class FmodAudioProvider
         if (top.Count == 0 && _windGainDb == 0f && _windCorrectionDb == 0f) return;
         top.Sort(static (x, y) => y.Played != x.Played ? y.Played.CompareTo(x.Played) : string.CompareOrdinal(x.Line, y.Line));
         Log.Information("[EAR] {State}, listening level {Listening:F0} dB, ear wind gain {Wind:+0.0;-0.0}; {Voices}",
-            EarModel.Enabled ? "on" : "OFF", EarModel.ListeningLevelDb, _windGainDb,
+            Hearing.EarModelOn ? "on" : "OFF", Hearing.ListeningLevelDb, _windGainDb,
             string.Join("; ", top.GetRange(0, Math.Min(5, top.Count)).ConvertAll(t => t.Line)));
     }
 }

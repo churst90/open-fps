@@ -152,10 +152,8 @@ internal static partial class GtkClientProgram
             _loginStatus?.SetText(_loginStatusText);
         });
         _settings = ClientSettings.Load();
-        if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
-            OpenFPS.Common.Loudness.DynamicRangeCompression = _settings.LevelCompression;
         _settings.ApplyNavigationAids();
-        _settings.ApplyHearing();
+        _settings.ApplyHearing(_session.Audio.Hearing);
         _session.BeginAudioInit(ApplyAudioSettings);
 
         var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };

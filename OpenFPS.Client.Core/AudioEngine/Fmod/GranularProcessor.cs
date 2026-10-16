@@ -12,6 +12,9 @@ public class GranularVoiceState : IGuardedUnit
     public float[] PcmData;
     public int Channels;
     public int SampleRate;
+    /// <summary>The rate of the mixer it plays in, Hz: the grains are spaced in its samples. Its mixer sets it
+    /// as it makes the voice.</summary>
+    public int MixerRate = MixerQuality.DefaultRate;
 
     public float Position; // 0..1 through the source
     public float GrainSizeMs; // 10 to 200 ms
@@ -148,7 +151,7 @@ public static class GranularProcessor
                 outBuf[i] = 0.0f;
             }
 
-            float sampleRateOut = MixerQuality.MixerRate;
+            float sampleRateOut = state.MixerRate;
             float samplesPerGrain = (state.GrainSizeMs / 1000f) * state.SampleRate;
             float samplesBetweenGrains = sampleRateOut / Math.Max(0.1f, state.Density);
 

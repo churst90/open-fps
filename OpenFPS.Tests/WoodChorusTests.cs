@@ -14,6 +14,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class WoodChorusTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private static List<WoodChorus.Crown> Grid(int n, Vector3 origin, float spacing, int firstId = 1)
     {
         var crowns = new List<WoodChorus.Crown>();
@@ -27,7 +30,7 @@ public class WoodChorusTests
     {
         int next = WoodChorus.FirstId;
         var ids = new Dictionary<(int, int, string), int>();
-        return WoodChorus.Build(crowns, (cell, preset) => ids.TryGetValue((cell.X, cell.Z, preset), out int id) ? id : ids[(cell.X, cell.Z, preset)] = next--, ModelLibrary.Presets);
+        return WoodChorus.Build(crowns, (cell, preset) => ids.TryGetValue((cell.X, cell.Z, preset), out int id) ? id : ids[(cell.X, cell.Z, preset)] = next--, ModelLibrary.Presets, new OpenFPS.Common.Hearing.HearingSettings());
     }
 
     [Fact]
@@ -57,7 +60,7 @@ public class WoodChorusTests
         Assert.Equal(new Vector3(40f, 7f, 40f), big.Centre);
         Assert.Equal(40f, big.RadiusX);   // 30 m to the outer crowns' middles, 4 m of crown, to the next 10 m
         // Heard further than one tree: 16 trees are 12 dB louder.
-        float single = Loudness.AudibleRange(FoliageSpec.ParkTree.SourceLevelDb);
+        float single = Law.AudibleRange(FoliageSpec.ParkTree.SourceLevelDb);
         Assert.True(big.RangeMetres > single * 1.5f, $"{big.RangeMetres:F0} m against {single:F0} m");
         Assert.All(chorus.Woods, w => Assert.True(w.Id <= WoodChorus.FirstId));
     }

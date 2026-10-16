@@ -199,19 +199,24 @@ public sealed class TalkerStream
     }
 }
 
-/// <summary>Everybody whose voice this client has heard, by entity id.</summary>
+/// <summary>Everybody whose voice one audio world has heard, by entity id: the mixer's
+/// (FmodAudioProvider.TalkerStreams), which the host fills as voices arrive and the mixer plays from.</summary>
+public sealed class TalkerStreams
+{
+    private readonly ConcurrentDictionary<int, TalkerStream> _all = new();
+
+    public TalkerStream For(int senderId) => _all.GetOrAdd(senderId, id => new TalkerStream(id));
+    public bool TryGet(int senderId, out TalkerStream stream) => _all.TryGetValue(senderId, out stream!);
+    public void Remove(int senderId) => _all.TryRemove(senderId, out _);
+    public void Clear() => _all.Clear();
+    public ICollection<TalkerStream> All => _all.Values;
+}
+
+/// <summary>The keys that name a talker's voice and the surfaces answering it.</summary>
 public static class Talkers
 {
     /// <summary>The emitter key that names a talker's voice: <c>talker:42</c>.</summary>
     public const string KeyPrefix = "talker:";
-
-    private static readonly ConcurrentDictionary<int, TalkerStream> _all = new();
-
-    public static TalkerStream For(int senderId) => _all.GetOrAdd(senderId, id => new TalkerStream(id));
-    public static bool TryGet(int senderId, out TalkerStream stream) => _all.TryGetValue(senderId, out stream!);
-    public static void Remove(int senderId) => _all.TryRemove(senderId, out _);
-    public static void Clear() => _all.Clear();
-    public static ICollection<TalkerStream> All => _all.Values;
 
     public static string Key(int senderId) => KeyPrefix + senderId;
 

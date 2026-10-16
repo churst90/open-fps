@@ -52,7 +52,7 @@ public static class RoomChangeSpike
         mapping.Initialize(sounds);
         var beacons = BeaconPreferences.InMemory();
         foreach (var category in Beacons.Categories) beacons.Set(category, false);
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds, beacons: beacons);
 
         double worstFrameMs = 0;

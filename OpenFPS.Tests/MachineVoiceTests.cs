@@ -13,6 +13,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class MachineVoiceTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     public MachineVoiceTests() => AcousticRegistry.Initialize();
 
     private const float Rate = 44100f;
@@ -125,8 +128,8 @@ public class MachineVoiceTests
         static float At(string preset, float metres)
         {
             var s = ModelLibrary.Presets.SmallMachine(preset);
-            var (gain, reference) = Loudness.Place(s.SourceLevelDb, s.ExtentMetres);
-            return Loudness.RenderedGain(gain, reference, Loudness.AudibleRange(s.SourceLevelDb), metres);
+            var (gain, reference) = Law.Place(s.SourceLevelDb, s.ExtentMetres);
+            return Loudness.RenderedGain(gain, reference, Law.AudibleRange(s.SourceLevelDb), metres);
         }
 
         foreach (float d in new[] { 3f, 10f, 30f })

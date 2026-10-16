@@ -7,7 +7,7 @@ namespace OpenFPS.Common;
 /// where it is made, and the engine works out the rest.
 ///
 /// The real range, about 115 dB from a muzzle blast at 165 to a quiet ambience at 48, does not fit in
-/// 16-bit audio or a room, so source levels are compressed (<see cref="DynamicRangeCompression"/>) on
+/// 16-bit audio or a room, so source levels are compressed (<see cref="Hearing.HearingSettings.Compression"/>) on
 /// purpose: order and rough spacing survive, the literal ratio does not. The levels below are published
 /// measurements where they exist (firearms, for hearing protection), a starting point for the ear.
 /// </summary>
@@ -61,28 +61,18 @@ public static class Loudness
     /// mix gave it, held whatever the compression.</summary>
     public static float PivotRenderedDb => (PivotDb - ShippedCeilingDb) * DefaultCompression;
 
-    /// <summary>The level at the ear that plays at full scale, for the compression in force.</summary>
-    public static float RenderCeilingDb => PivotDb - PivotRenderedDb / DynamicRangeCompression;
+    /// <summary>The level at the ear that plays at full scale, for this compression
+    /// (<see cref="Hearing.HearingSettings.Compression"/>).</summary>
+    public static float RenderCeilingDbAt(float compression) => PivotDb - PivotRenderedDb / compression;
 
-    /// <summary>
-    /// How much of the real decibel difference survives into the mix: 1.0 is literal physics; at 0.45
-    /// the 110 dB between a rifle and an ambience bed is about 50 dB rendered. Source levels only:
-    /// distance stays literal (1/r), because it carries the range cues. At 0.45 a hot rod 19 dB louder
-    /// than an economy car is placed 9 dB louder, and the engine's idle lift follows the same number.
-    /// Set by the client (`/levels`, ClientSettings), OPENFPS_LEVEL_COMPRESSION for a run; held to 0.2..1.
-    /// </summary>
-    public static float DynamicRangeCompression
-    {
-        get => System.Threading.Volatile.Read(ref _compression);
-        set => System.Threading.Volatile.Write(ref _compression, Math.Clamp(value, MinCompression, 1f));
-    }
-
-    /// <summary>What the game shipped with, and what a player who has chosen nothing gets.</summary>
+    /// <summary>What the game shipped with, and what a player who has chosen nothing gets
+    /// (<see cref="Hearing.HearingSettings.Compression"/>, `/levels`).</summary>
     public const float DefaultCompression = 0.45f;
     public const float MinCompression = 0.2f;
-    private static float _compression = FromEnvironment();
 
-    private static float FromEnvironment()
+    /// <summary>The compression OPENFPS_LEVEL_COMPRESSION asks for, held to <see cref="MinCompression"/>..1, or
+    /// the default.</summary>
+    internal static float CompressionFromEnvironmentOrDefault()
         => float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_LEVEL_COMPRESSION"),
                           System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v)
            ? Math.Clamp(v, MinCompression, 1f) : DefaultCompression;
@@ -99,32 +89,28 @@ public static class Loudness
     /// floor of 0.5 m had a quiet source six decibels down a metre from it.</summary>
     public const float MinReferenceDistance = 1.2f;
 
-    /// <summary>
-    /// Where the law puts a source of this level, as one number: 20 log10 of gain times reference
-    /// distance. Two levels' difference in it is how far apart the mix places them (the engine's idle lift).
-    /// </summary>
-    public static float PlacedDb(float sourceLevelDb)
-    {
-        var (gain, reference) = Place(sourceLevelDb);
-        return 20f * MathF.Log10(MathF.Max(1e-9f, gain * reference));
-    }
+    /// <summary>One number for a placement: 20 log10 of gain times reference distance. Two levels' difference in
+    /// it is how far apart the mix places them (the engine's idle lift).</summary>
+    public static float PlacedDb((float Gain, float ReferenceDistance) placed)
+        => 20f * MathF.Log10(MathF.Max(1e-9f, placed.Gain * placed.ReferenceDistance));
 
     /// <summary>
-    /// Where to put a sound of a given source level: its gain and the reference distance inside which
-    /// it gets no louder, decided together. The reference is where the source's SPL falls to
-    /// <see cref="RenderCeilingDb"/>: a 159 dB rifle plays at full scale out to about twenty-eight
+    /// Where to put a sound of a given source level under this compression: its gain and the reference
+    /// distance inside which it gets no louder, decided together. The reference is where the source's SPL
+    /// falls to <see cref="RenderCeilingDbAt"/>: a 159 dB rifle plays at full scale out to about twenty-eight
     /// metres (with a fixed 2 m reference it was a fifteenth by thirty), and a footstep clamps to
-    /// <see cref="MinReferenceDistance"/> and takes its quietness from the gain.
+    /// <see cref="MinReferenceDistance"/> and takes its quietness from the gain. A world places through its
+    /// hearing (<see cref="Hearing.HearingSettings.Place(float)"/>), which says the compression.
     /// </summary>
-    public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb)
+    public static (float Gain, float ReferenceDistance) PlaceAt(float sourceLevelDb, float compression)
     {
-        float ceiling = RenderCeilingDb;
+        float ceiling = RenderCeilingDbAt(compression);
         float ideal = MathF.Pow(10f, (sourceLevelDb - ceiling) / 20f);
         float reference = Math.Clamp(ideal, MinReferenceDistance, MaxReferenceDistance);
 
         // What is left after the clamp, compressed: unity for a loud source, all its quietness for a quiet one.
         float atReference = sourceLevelDb - 20f * MathF.Log10(MathF.Max(0.01f, reference));
-        float renderedDb = (atReference - ceiling) * DynamicRangeCompression;
+        float renderedDb = (atReference - ceiling) * compression;
         return (MathF.Min(1f, MathF.Pow(10f, renderedDb / 20f)), reference);
     }
 
@@ -147,7 +133,7 @@ public static class Loudness
     /// <summary>
     /// The designed playback, dB SPL at the ear for 0 dB rendered: where a normal voice at a metre (ANSI
     /// S3.5, 62.35 dB) plays as loud as it is at the shipped /levels, about 100.8. The player's own
-    /// playback (Hearing.EarModel.ListeningLevelDb) moves only the tone correction.
+    /// playback (Hearing.HearingSettings.ListeningLevelDb) moves only the tone correction.
     /// </summary>
     public static readonly float DesignFullScaleDb = DesignFullScale();
 
@@ -160,38 +146,15 @@ public static class Loudness
     }
 
     /// <summary>
-    /// Where the law puts a source of this level and this spectrum: gain and reference distance, as
-    /// <see cref="Place(float)"/>. A null timbre, the reference (speech), or the ear model switched off
-    /// is the unweighted law exactly.
+    /// Where the law puts a source of this level and this spectrum under this compression: gain and reference
+    /// distance, as <see cref="PlaceAt(float, float)"/>. A null timbre, the reference (speech), or the ear
+    /// model switched off (<paramref name="earModel"/> false) is the unweighted law exactly.
     /// </summary>
-    public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb, Hearing.Timbre? timbre)
+    public static (float Gain, float ReferenceDistance) PlaceAt(float sourceLevelDb, Hearing.Timbre? timbre, float compression, bool earModel)
     {
-        if (timbre == null || timbre.IsReference || !Hearing.EarModel.Enabled) return Place(sourceLevelDb);
-        return timbre.Placed(sourceLevelDb, DynamicRangeCompression, PlaceHeard);
+        if (timbre == null || timbre.IsReference || !earModel) return PlaceAt(sourceLevelDb, compression);
+        return timbre.Placed(sourceLevelDb, compression, PlaceHeard);
     }
-
-    /// <summary>The loudness-unit placement, widened for a source with a size (see <see cref="Place(float, float)"/>).</summary>
-    public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb, Hearing.Timbre? timbre, float extentMetres)
-        => Widen(Place(sourceLevelDb, timbre), extentMetres);
-
-    /// <summary><see cref="PlacedDb(float)"/> for a source of this spectrum.</summary>
-    public static float PlacedDb(float sourceLevelDb, Hearing.Timbre? timbre)
-    {
-        var (gain, reference) = Place(sourceLevelDb, timbre);
-        return 20f * MathF.Log10(MathF.Max(1e-9f, gain * reference));
-    }
-
-    /// <summary>
-    /// How much more the law in loudness units gives a source than the unweighted law, dB: the same at
-    /// every distance beyond the reference, so one gain puts an unweighted placement right.
-    /// </summary>
-    public static float TimbreCorrectionDb(float sourceLevelDb, Hearing.Timbre? timbre)
-        => timbre == null || timbre.IsReference || !Hearing.EarModel.Enabled ? 0f
-         : PlacedDb(sourceLevelDb, timbre) - PlacedDb(sourceLevelDb);
-
-    /// <summary>The ranking as it was before 2026-10-07, on the played gain: for an instrument's before and
-    /// after (RankingByLoudnessProbe). Nothing in the game sets it.</summary>
-    public static bool RankOnPlayedGain { get; set; }
 
     /// <summary>
     /// How loud a voice is to the ear, for ranking (docs/EAR_MODEL.md, Ranking): a voice playing at
@@ -200,11 +163,12 @@ public static class Loudness
     /// unmeasured recording ranks at its played gain; an unmeasured physical voice is taken as
     /// speech-shaped. Not the compensated gain: a 65 dB rumble at 25 Hz is played about 21 dB above
     /// speech to be heard at its real loudness, and ranking on that put it 21 dB up the list.
+    /// <paramref name="byEar"/> false (the ear model off) ranks on the played gain.
     /// </summary>
-    public static float HeardGain(float playedGain, Hearing.Timbre? timbre, bool physical)
+    public static float HeardGainAt(float playedGain, Hearing.Timbre? timbre, bool physical, bool byEar)
     {
         if (!(playedGain > 0f)) return 0f;
-        if (!Hearing.EarModel.Enabled || RankOnPlayedGain) return playedGain;
+        if (!byEar) return playedGain;
         // The reference itself: exactly its own gain.
         if (timbre?.IsReference ?? !physical) return playedGain;
         var t = timbre ?? Hearing.Timbre.Speech;
@@ -214,7 +178,7 @@ public static class Loudness
         return MathF.Pow(10f, (speechAtEar - DesignFullScaleDb - ReferenceRmsDbfs) / 20f);
     }
 
-    private static (float Gain, float ReferenceDistance) PlaceHeard(float sourceLevelDb, Hearing.Timbre timbre, float compression)
+    internal static (float Gain, float ReferenceDistance) PlaceHeard(float sourceLevelDb, Hearing.Timbre timbre, float compression)
     {
         var speech = Hearing.Timbre.Speech;
         float ceiling = PivotDb - PivotRenderedDb / compression;           // the old law's ceiling, declared
@@ -240,19 +204,14 @@ public static class Loudness
     }
 
     /// <summary>
-    /// The same placement for a source with a size (a crowd, a waterfall, a motorway): the level is flat
-    /// across it, so the reference distance is its radius. The gain comes down to pay for it: beyond the
-    /// patch a distributed source and a point of the same power are identical, so the product of gain and
-    /// reference distance is held and only the near field changes.
+    /// The widening for a source with a size (a crowd, a waterfall, a motorway): the level is flat across it,
+    /// so the reference distance is its radius. The gain comes down to pay for it: beyond the patch a
+    /// distributed source and a point of the same power are identical, so the product of gain and reference
+    /// distance is held and only the near field changes.
     /// </summary>
-    public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb, float extentMetres)
-        => Widen(Place(sourceLevelDb), extentMetres);
-
-    /// <summary>
-    /// The same widening for a gain and reference distance with no source level (an authored emitter).
+    /// <remarks>Also for a gain and reference distance with no source level (an authored emitter).
     /// Widening without paying the gain down once handed every quiet vehicle up to eight decibels it had
-    /// not earned (a reference widened to three metres).
-    /// </summary>
+    /// not earned (a reference widened to three metres).</remarks>
     public static (float Gain, float ReferenceDistance) Widen((float Gain, float ReferenceDistance) placed, float extentMetres)
         => extentMetres > placed.ReferenceDistance
          ? (placed.Gain * (placed.ReferenceDistance / extentMetres), extentMetres)
@@ -279,9 +238,6 @@ public static class Loudness
         // 2026-10-02: "does the ducking mean the shooter is very close?").
         return MathF.Max(0f, (atEar - ShippedCeilingDb) * DefaultCompression);
     }
-
-    /// <summary>Just the gain, for a caller that is setting the reference distance itself.</summary>
-    public static float GainFor(float sourceLevelDb) => Place(sourceLevelDb).Gain;
 
     /// <summary>
     /// What distance does to a voice, as the mixer applies it: 1/d from the reference distance out, and
@@ -326,12 +282,14 @@ public static class Loudness
     public static System.Collections.Generic.ICollection<string> UnknownCartridges => _unknownCartridges.Keys;
 
     /// <summary>
-    /// The distance at which a source of this level drops to the quietest thing worth rendering: what
-    /// <c>SpatialEmitter.Range</c> should be, from the level rather than by feel.
+    /// The distance at which a source of this level drops to the quietest thing worth rendering under this
+    /// compression: what <c>SpatialEmitter.Range</c> should be, from the level rather than by feel. A world
+    /// asks its hearing (<see cref="Hearing.HearingSettings.AudibleRange"/>); the server, which has no player,
+    /// says <see cref="DefaultCompression"/>.
     /// </summary>
-    public static float AudibleRange(float sourceLevelDb)
+    public static float AudibleRange(float sourceLevelDb, float compression)
     {
-        var (gain, reference) = Place(sourceLevelDb);
+        var (gain, reference) = PlaceAt(sourceLevelDb, compression);
         if (gain <= SilenceGain) return reference;
         return MathF.Min(3000f, reference * gain / SilenceGain);
     }

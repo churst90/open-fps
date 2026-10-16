@@ -27,6 +27,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class FloorRenderSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private sealed record Segment(string Name, double Start, double Seconds);
 
     public static int Run(string[] args)
@@ -52,7 +56,7 @@ public static class FloorRenderSpike
         string floatWav = Path.Combine(outDir, "capture-float.wav");
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", floatWav);
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -66,7 +70,7 @@ public static class FloorRenderSpike
         var beacons = BeaconPreferences.InMemory();
         foreach (var category in Beacons.Categories) beacons.Set(category, false);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds, beacons: beacons);
 
         var segments = new List<Segment>();
@@ -203,7 +207,7 @@ public static class FloorRenderSpike
         var sb = new StringBuilder("name,start,seconds\n");
         foreach (var s in segments) sb.Append(CultureInfo.InvariantCulture, $"{s.Name},{s.Start:F3},{s.Seconds:F3}\n");
         File.WriteAllText(Path.Combine(outDir, "segments.csv"), sb.ToString());
-        Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); compression {Loudness.DynamicRangeCompression:F2}");
+        Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); compression {LabHearing.Compression:F2}");
         return 0;
     }
 }

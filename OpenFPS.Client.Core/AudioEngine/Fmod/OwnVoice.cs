@@ -14,8 +14,6 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 public sealed class OwnVoiceRing
 {
     public const int Rate = 48000;
-    /// <summary>The one microphone a client has.</summary>
-    public static readonly OwnVoiceRing Shared = new();
     private const int Bits = 17;                       // 2.7 s
     private readonly float[] _ring = new float[1 << Bits];
     private long _written;

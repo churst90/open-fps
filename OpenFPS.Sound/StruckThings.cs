@@ -304,8 +304,13 @@ public static class StruckThings
     }
 
     /// <summary>The strike as pressure at a metre, pascals, before the anchor; <paramref name="peak"/> its peak.</summary>
-    public static float[] RenderPascals(Strike strike, int rate, out float peak)
+    /// <param name="heard">For instruments: which parts of a strike are heard, as bits (1 the listed modes, 2 the
+    /// dense field, 4 the strikers' own stop, 8 the thing's own motion and the ground under it, 16 the near field,
+    /// 32 the loose fit's part and frame). All of them unless an instrument says otherwise; nothing in the game
+    /// asks for fewer.</param>
+    public static float[] RenderPascals(Strike strike, int rate, out float peak, int heard = -1)
     {
+        double On(int part) => (heard & part) != 0 ? 1 : 0;
         var thing = strike.Thing;
         var m = AcousticRegistry.GetProperties(thing.Material);
         int seed = strike.Seed;
@@ -675,14 +680,6 @@ public static class StruckThings
         return result;
     }
 
-    /// <summary>
-    /// For instruments: which parts of a strike are heard, as bits (1 the listed modes, 2 the dense field,
-    /// 4 the strikers' own stop, 8 the thing's own motion and the ground under it, 16 the near field, 32 the
-    /// loose fit's part and frame). All of them unless an instrument says otherwise; nothing in the game sets it.
-    /// </summary>
-    public static int Heard { get; set; } = -1;
-
-    private static double On(int part) => (Heard & part) != 0 ? 1 : 0;
 
     /// <summary>For instruments: how long the first blow of the last strike rendered on this thread touched, and
     /// its peak force (N).</summary>

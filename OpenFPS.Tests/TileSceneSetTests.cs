@@ -136,9 +136,7 @@ public class TileSceneSetTests
     {
         IntPtr ctx = SteamAudioForTests.EmbreeContext;
         AcousticRegistry.Initialize();
-        double share = TileSceneSet.RecycleShare;
-        TileSceneSet.RecycleShare = recycleShare;
-        var set = new TileSceneSet(ctx, Tile);
+        var set = new TileSceneSet(ctx, Tile) { Lab = new() { TileRecycleShare = recycleShare } };
         var tiles = new SteamAudioSimulator(ctx, maxSources: 8);
         var tilesListener = new SteamAudioSimulator(ctx, maxSources: 8);
         var whole = new SteamAudioSimulator(ctx, maxSources: 8);
@@ -187,7 +185,6 @@ public class TileSceneSetTests
         }
         finally
         {
-            TileSceneSet.RecycleShare = share;
             // Nothing traces the scenes once the simulators have gone.
             tiles.Dispose(); tilesListener.Dispose(); whole.Dispose(); wholeListener.Dispose();
             set.Dispose();
@@ -196,7 +193,7 @@ public class TileSceneSetTests
     }
 
     [SteamAudioEmbreeFact]
-    public void Tile_scenes_trace_as_the_whole_scene_through_swings_and_tile_changes() => SwingAndStream(TileSceneSet.RecycleShare);
+    public void Tile_scenes_trace_as_the_whole_scene_through_swings_and_tile_changes() => SwingAndStream(new OpenFPS.Client.AudioEngine.Core.LabLevers().TileRecycleShare);
 
     [SteamAudioEmbreeFact]
     public void Tile_scenes_trace_as_the_whole_scene_when_every_pair_is_made_afresh() => SwingAndStream(0);

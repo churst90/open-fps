@@ -1113,7 +1113,7 @@ public sealed class RainField
         float level = RainFeeds.Feed[slot].LevelDb;
         if (float.IsNaN(level)) level = 40f;
         float extent = patch.ReferenceDistance;
-        var (gain, reference) = Loudness.Place(level, extent);
+        var (gain, reference) = _audio.Hearing.Place(level, extent);
         var centre = survey.Centres[slot];
         var (id, seed) = SlotVoice(slot, 0);
         var e = new SpatialEmitter
@@ -1133,7 +1133,7 @@ public sealed class RainField
             EarLevelDb = level,
             MinDistance = reference,
             ExtentMetres = extent,
-            Range = Loudness.AudibleRange(level),
+            Range = _audio.Hearing.AudibleRange(level),
             Pitch = 1f,
             EngineRunning = true,
             CarriesPath = true,
@@ -1207,7 +1207,7 @@ public sealed class RainField
             float level = DropBank.LevelDb(sound, impact, aim);
             // In the loudness frame of the rain on that surface, not on its own (DropBank.Placement).
             float field = impact.Slot >= 0 && impact.Slot < RainFeeds.Slots ? RainFeeds.Feed[impact.Slot].LevelDb : float.NaN;
-            var (gain, reference) = DropBank.Placement(level, field);
+            var (gain, reference) = DropBank.Placement(_audio.Hearing, level, field);
             var (dropId, dropSeed) = DropVoice(_nearVoice++);
             var e = new SpatialEmitter
             {
@@ -1221,7 +1221,7 @@ public sealed class RainField
                 Volume = gain,
                 EarLevelDb = level,
                 MinDistance = reference,
-                Range = Loudness.AudibleRange(level),
+                Range = _audio.Hearing.AudibleRange(level),
                 Pitch = 1f,
                 IsEvent = true,
                 CarriesPath = true,

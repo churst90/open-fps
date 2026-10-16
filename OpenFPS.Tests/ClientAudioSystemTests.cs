@@ -12,6 +12,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class ClientAudioSystemTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public ClientAudioSystemTests(ITestOutputHelper o) => _o = o;
 
@@ -97,7 +100,7 @@ public class ClientAudioSystemTests
         Assert.True(at110 > at45 + 3f, $"110 m ({at110}) should be clearly darker than 45 m ({at45})");
     }
 
-    /// <summary>A car's voice is placed by its own declared level and size, Loudness.Place(SourceLevelDb,
+    /// <summary>A car's voice is placed by its own declared level and size, Law.Place(SourceLevelDb,
     /// outlet separation), live or borrowed; presets 20 dB apart must not come out the same.</summary>
     [Theory]
     [InlineData("v6")]
@@ -119,7 +122,7 @@ public class ClientAudioSystemTests
         Assert.True(profile.SourceLevelDb > 0f, "every preset declares its level");
         float extent = Vector3.Distance(new Vector3(0f, profile.ExhaustHeight, profile.ExhaustOffsetZ),
                                         new Vector3(0f, profile.IntakeHeight, profile.IntakeOffsetZ));
-        var (gain, reference) = Loudness.Place(profile.SourceLevelDb, extent);
+        var (gain, reference) = Law.Place(profile.SourceLevelDb, extent);
 
         var live = h.Mixer.Latest[NearCar];
         _o.WriteLine($"{preset}: {profile.SourceLevelDb} dB, extent {extent:F2} m -> gain {gain:F4}, reference {reference:F2} m; "
@@ -128,7 +131,7 @@ public class ClientAudioSystemTests
         if (live.ExtentMetres == 0f)
         {
             // A voice at each end (a bus at 30 m): the length is where the ends are, not widened as well.
-            var (pointGain, pointReference) = Loudness.Place(profile.SourceLevelDb);
+            var (pointGain, pointReference) = Law.Place(profile.SourceLevelDb);
             Assert.Equal(pointGain, live.Volume, 5);
             Assert.Equal(pointReference, live.MinDistance, 4);
         }
@@ -140,7 +143,7 @@ public class ClientAudioSystemTests
         }
         // Either way the same level beyond the car's length: Widen holds gain times reference.
         Assert.Equal(gain * reference, live.Volume * live.MinDistance, 3);
-        Assert.Equal(Loudness.AudibleRange(profile.SourceLevelDb), live.Range, 2);
+        Assert.Equal(Law.AudibleRange(profile.SourceLevelDb), live.Range, 2);
 
         var far = h.Mixer.Latest[borrowed];
         Assert.Equal(gain, far.Volume, 5);
@@ -148,7 +151,7 @@ public class ClientAudioSystemTests
 
         if (MathF.Abs(profile.SourceLevelDb - ClientAudioSystem.EngineSourceLevelDb) > 3f)
         {
-            var (fallbackGain, fallbackRef) = Loudness.Place(ClientAudioSystem.EngineSourceLevelDb, extent);
+            var (fallbackGain, fallbackRef) = Law.Place(ClientAudioSystem.EngineSourceLevelDb, extent);
             Assert.False(MathF.Abs(fallbackGain * fallbackRef - live.Volume * live.MinDistance) < 1e-4f,
                 "placed at the fallback level, not the preset's own");
         }

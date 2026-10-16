@@ -75,8 +75,8 @@ internal sealed class SmoothTail
     private int _start;
     public int Start => _start;
     /// <summary>The lab's A/B: the response as it was before 2026-10-03, faded in at 50-100 ms with
-    /// nothing taken out for the copies. Never set in the game.</summary>
-    public static bool FromFiftyMs;
+    /// nothing taken out for the copies. Never set in the game (LabLevers.TailFromFiftyMs).</summary>
+    public bool FromFiftyMs { get; set; }
     /// <summary>Where the played response starts, and where it is all the way in.</summary>
     private (int From, int In) EarlyWindow()
         => FromFiftyMs ? ((int)(LateTailIr.FadeInStartSeconds * SampleRate), (int)(LateTailIr.FadeInEndSeconds * SampleRate))

@@ -26,8 +26,10 @@ public class MixerRateTests
         if (Environment.GetEnvironmentVariable("OPENFPS_MIXER_RATE") == null) Assert.Equal(48000, MixerQuality.RequestedRate);
         // Rendered one-shots are made at the mixer's rate, so a stationary one plays with no resampler.
         Assert.Equal(MixerQuality.DefaultRate, TransientSynth.SampleRate);
-        Assert.Equal(MixerQuality.MixerRate, UiSounds.SampleRate);
-        Assert.Equal(MixerQuality.MixerRate, ScopeSounds.SampleRate);
+        // The interface's and the scope's sounds are made at the rate of the mixer they play in: without an FMOD
+        // mixer, the default one's.
+        Assert.Equal(MixerQuality.DefaultRate, new UiSounds(new AudioEngineFacade(new RecordingMixer())).SampleRate);
+        Assert.Equal(MixerQuality.DefaultRate, ScopeSounds.SampleRate);
         Assert.Equal(MixerQuality.DefaultRate, VehicleSynth.SampleRate);
     }
 

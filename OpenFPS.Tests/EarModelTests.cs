@@ -13,12 +13,15 @@ namespace OpenFPS.Tests;
 [Collection(nameof(LevelCompressionSetting))]
 public class EarModelTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private static T With<T>(float compression, Func<T> f)
     {
-        float was = Loudness.DynamicRangeCompression;
-        bool on = EarModel.Enabled;
-        try { Loudness.DynamicRangeCompression = compression; EarModel.Enabled = true; return f(); }
-        finally { Loudness.DynamicRangeCompression = was; EarModel.Enabled = on; }
+        float was = Law.Compression;
+        bool on = Law.EarModelOn;
+        try { Law.Compression = compression; Law.EarModelOn = true; return f(); }
+        finally { Law.Compression = was; Law.EarModelOn = on; }
     }
 
     // ── ISO 532-1 ────────────────────────────────────────────────────────────────────────────
@@ -168,8 +171,8 @@ public class EarModelTests
         {
             foreach (float l in new[] { 30f, 60f, 70f, 94f, 120f, 160f })
             {
-                Assert.Equal(Loudness.Place(l), Loudness.Place(l, Timbre.Speech));
-                Assert.Equal(0f, Loudness.TimbreCorrectionDb(l, Timbre.Speech));
+                Assert.Equal(Law.Place(l), Law.Place(l, Timbre.Speech));
+                Assert.Equal(0f, Law.TimbreCorrectionDb(l, Timbre.Speech));
             }
             return 0;
         });
@@ -187,26 +190,26 @@ public class EarModelTests
     {
         With(compression, () =>
         {
-            float listening = EarModel.ListeningLevelDb;
-            EarModel.ListeningLevelDb = EarModel.DefaultListeningLevelDb;
+            float listening = Law.ListeningLevelDb;
+            Law.ListeningLevelDb = EarModel.DefaultListeningLevelDb;
             try
             {
                 float r = Loudness.MinReferenceDistance, toMetre = 20f * MathF.Log10(r);
-                var (lg, lr) = Loudness.Place(lineAtReference + toMetre, Timbre.Speech);
-                float linePlayed = EarModel.PlayedAtEarDb(20f * MathF.Log10(lg * lr), Loudness.ReferenceRmsDbfs, lr, lr, 0f);
+                var (lg, lr) = Law.Place(lineAtReference + toMetre, Timbre.Speech);
+                float linePlayed = Law.PlayedAtEarDb(20f * MathF.Log10(lg * lr), Loudness.ReferenceRmsDbfs, lr, lr, 0f);
                 float lineLoudness = Timbre.Speech.Phons(linePlayed);
                 // Physical voices (their declared level is their RMS) and a recording 20 dB under its full scale.
                 foreach (var t in new[] { Tone(1000f), BassHeavy(), BassHeavy().WithGatedRms(-20f) })
                 {
                     float realAtReference = t.LevelForPhons(Timbre.Speech.Phons(lineAtReference + Loudness.ReferenceRmsDbfs));
                     float declared = realAtReference - t.RealOffsetDb + toMetre;
-                    var (gain, reference) = Loudness.Place(declared, t);
+                    var (gain, reference) = Law.Place(declared, t);
                     Assert.Equal(r, reference, 2);
-                    float played = EarModel.PlayedAtEarDb(20f * MathF.Log10(gain * reference), t.DigitalRmsDb, reference, reference, 0f);
+                    float played = Law.PlayedAtEarDb(20f * MathF.Log10(gain * reference), t.DigitalRmsDb, reference, reference, 0f);
                     Assert.InRange(t.Phons(played) - lineLoudness, -0.3f, 0.3f);
                 }
             }
-            finally { EarModel.ListeningLevelDb = listening; }
+            finally { Law.ListeningLevelDb = listening; }
             return 0;
         });
     }
@@ -219,8 +222,8 @@ public class EarModelTests
         With(Loudness.DefaultCompression, () =>
         {
             float declared = Speech.LevelDb(Speech.NormalDb);
-            var (g, r) = Loudness.Place(declared);
-            float played = EarModel.PlayedAtEarDb(20f * MathF.Log10(g * r), Loudness.ReferenceRmsDbfs, r, 1f, 0f);
+            var (g, r) = Law.Place(declared);
+            float played = Law.PlayedAtEarDb(20f * MathF.Log10(g * r), Loudness.ReferenceRmsDbfs, r, 1f, 0f);
             Assert.Equal(Speech.NormalDb, played, 1);
             Assert.InRange(Loudness.DesignFullScaleDb, 100f, 101.5f);
             return 0;
@@ -236,18 +239,18 @@ public class EarModelTests
     {
         With(Loudness.DefaultCompression, () =>
         {
-            float capped = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(61.5f, 99.5f);
+            float capped = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, 99.5f);
             Assert.Equal(20f, capped, 2);
             var speechLike = Timbre.FromBandLevels(Timbre.Speech.ShapeDb, "speech-shaped engine");
-            float plain = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(61.5f, speechLike, 99.5f);
+            float plain = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, speechLike, 99.5f);
             Assert.InRange(plain, 20.5f, 23f);
-            float bass = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(61.5f, BassHeavy(), 99.5f);
+            float bass = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, BassHeavy(), 99.5f);
             Assert.True(bass > plain + 3f, $"an idle's bass: {bass:F1} dB against {plain:F1}");
             // Silence has no place in the law: the caller holds the lift.
-            Assert.True(float.IsNaN(OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(-30f, BassHeavy(), 99.5f)));
+            Assert.True(float.IsNaN(OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, -30f, BassHeavy(), 99.5f)));
             // Off is the unweighted lift with its cap, exactly.
-            EarModel.Enabled = false;
-            Assert.Equal(capped, OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(61.5f, BassHeavy(), 99.5f));
+            Law.EarModelOn = false;
+            Assert.Equal(capped, OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, BassHeavy(), 99.5f));
             return 0;
         });
     }
@@ -271,11 +274,11 @@ public class EarModelTests
         With(0.45f, () =>
         {
             var tone = Tone(1000f);
-            Assert.InRange(Loudness.TimbreCorrectionDb(70f, tone), 6f, 11f);
+            Assert.InRange(Law.TimbreCorrectionDb(70f, tone), 6f, 11f);
             float prev = float.NegativeInfinity;
             for (float l = 30f; l <= 120f; l += 5f)
             {
-                float placed = Loudness.PlacedDb(l, tone);
+                float placed = Law.PlacedDb(l, tone);
                 Assert.True(placed > prev, $"{l} dB placed at {placed}, not above {prev}");
                 prev = placed;
             }
@@ -286,14 +289,14 @@ public class EarModelTests
     [Fact]
     public void OffIsTheUnweightedLaw()
     {
-        bool was = EarModel.Enabled;
+        bool was = Law.EarModelOn;
         try
         {
-            EarModel.Enabled = false;
-            Assert.Equal(Loudness.Place(70f), Loudness.Place(70f, Tone(500f)));
-            Assert.Equal(0f, Loudness.TimbreCorrectionDb(70f, BassHeavy()));
+            Law.EarModelOn = false;
+            Assert.Equal(Law.Place(70f), Law.Place(70f, Tone(500f)));
+            Assert.Equal(0f, Law.TimbreCorrectionDb(70f, BassHeavy()));
         }
-        finally { EarModel.Enabled = was; }
+        finally { Law.EarModelOn = was; }
     }
 
     // ── Ranking by loudness ──────────────────────────────────────────────────────────────────
@@ -314,18 +317,18 @@ public class EarModelTests
             {
                 OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("test:rumble", rumble);
                 OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("test:tone", tone);
-                float correction = Loudness.TimbreCorrectionDb(65f, rumble);
-                Assert.True(correction > Loudness.TimbreCorrectionDb(60f, tone) + 5f,
+                float correction = Law.TimbreCorrectionDb(65f, rumble);
+                Assert.True(correction > Law.TimbreCorrectionDb(60f, tone) + 5f,
                     $"the law lifts the rumble more than the tone: {correction:F1} dB");
                 foreach (float d in new[] { 2f, 10f, 40f })
                 {
-                    float r = VoiceManager.Audibility(Voice("test:rumble", 65f, new Vector3(d, 0, 0)), d, false);
-                    float t = VoiceManager.Audibility(Voice("test:tone", 60f, new Vector3(0, 0, d)), d, false);
+                    float r = VoiceManager.Audibility(Law, Voice("test:rumble", 65f, new Vector3(d, 0, 0)), d, false);
+                    float t = VoiceManager.Audibility(Law, Voice("test:tone", 60f, new Vector3(0, 0, d)), d, false);
                     Assert.True(r > 0f && t > 0f);
                     Assert.True(t > r * 4f, $"at {d} m the 60 dB tone ({20 * MathF.Log10(t):F1}) should rank well above the 65 dB rumble ({20 * MathF.Log10(r):F1})");
                     // The played gains are the other way round.
                     float playedR = Loudness.RenderedGain(Voice("test:rumble", 65f, default).Volume, 1f, 500f, d) * MathF.Pow(10f, correction / 20f);
-                    float playedT = Loudness.RenderedGain(Voice("test:tone", 60f, default).Volume, 1f, 500f, d) * MathF.Pow(10f, Loudness.TimbreCorrectionDb(60f, tone) / 20f);
+                    float playedT = Loudness.RenderedGain(Voice("test:tone", 60f, default).Volume, 1f, 500f, d) * MathF.Pow(10f, Law.TimbreCorrectionDb(60f, tone) / 20f);
                     Assert.True(playedR > playedT, "the law should play the rumble at more gain than the tone");
                 }
             }
@@ -343,18 +346,18 @@ public class EarModelTests
         {
             foreach (float g in new[] { 1e-5f, 0.001f, 0.1f, 1f })
             {
-                Assert.Equal(g, Loudness.HeardGain(g, Timbre.Speech, physical: false));
-                Assert.Equal(g, Loudness.HeardGain(g, null, physical: false));
+                Assert.Equal(g, Law.HeardGain(g, Timbre.Speech, physical: false));
+                Assert.Equal(g, Law.HeardGain(g, null, physical: false));
             }
             // A physical voice's RMS sits 12 dB nearer full scale than a speech line's: as loud as a
             // speech line played 12 dB higher.
-            Assert.InRange(20f * MathF.Log10(Loudness.HeardGain(0.01f, null, physical: true) / 0.01f), 11.5f, 12.5f);
+            Assert.InRange(20f * MathF.Log10(Law.HeardGain(0.01f, null, physical: true) / 0.01f), 11.5f, 12.5f);
             foreach (var t in new[] { Tone(25f), Tone(1000f), BassHeavy(), Timbre.Speech })
             {
                 float prev = 0f;
                 for (float db = -140f; db <= 10f; db += 0.5f)
                 {
-                    float h = Loudness.HeardGain(MathF.Pow(10f, db / 20f), t, physical: true);
+                    float h = Law.HeardGain(MathF.Pow(10f, db / 20f), t, physical: true);
                     Assert.True(h > prev, $"{t} at {db} dB: {h} not above {prev}");
                     prev = h;
                 }
@@ -366,18 +369,18 @@ public class EarModelTests
     [Fact]
     public void WithTheEarModelOffTheRankIsThePlayedGain()
     {
-        bool was = EarModel.Enabled;
+        bool was = Law.EarModelOn;
         try
         {
-            EarModel.Enabled = false;
-            Assert.Equal(0.01f, Loudness.HeardGain(0.01f, Tone(25f), physical: true));
+            Law.EarModelOn = false;
+            Assert.Equal(0.01f, Law.HeardGain(0.01f, Tone(25f), physical: true));
         }
-        finally { EarModel.Enabled = was; }
+        finally { Law.EarModelOn = was; }
     }
 
     private static OpenFPS.Client.AudioEngine.Data.SpatialEmitter Voice(string key, float levelDb, Vector3 at)
     {
-        var (gain, reference) = Loudness.Place(levelDb);
+        var (gain, reference) = Law.Place(levelDb);
         return new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
         {
             EntityId = 1, SoundId = key, PhysicalKey = key, IsSynth = true, Position = at,

@@ -20,6 +20,10 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// </summary>
 public static class NanMixSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
@@ -42,7 +46,7 @@ public static class NanMixSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no context"); return 1; }
         var scene = new SteamAudioScene(ctx); scene.Build(boxes);
         var lscene = new SteamAudioScene(ctx); lscene.Build(SteamAudioScene.WithoutOpenGround(boxes));
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         provider.Traced.Configure(ctx, scene, lscene);
         provider.Traced.SetListener(from, acoustics.GetRegionAt(world, from));
 
@@ -68,7 +72,7 @@ public static class NanMixSpike
             for (int k = 0; k < steady.Length; k++)
             {
                 var at = steady[k];
-                var placed = Loudness.Place(k < 3 ? 95f : 60f);
+                var placed = LabHearing.Place(k < 3 ? 95f : 60f);
                 provider.PlaySpatialSound(new SpatialEmitter
                 {
                     EntityId = -60 - k, SoundId = "synth:lab:engine", Mode = PlaybackMode.LoopOne, Type = EmitterType.WorldLocked,
@@ -110,7 +114,7 @@ public static class NanMixSpike
                     // atear: every other one exactly where the ear is, as a beacon on a door face at face
                     // height is when you walk through the doorway.
                     if (args.Contains("atear") && ((int)(t / 0.3) & 1) == 0) hands = ear;
-                    var placed = Loudness.Place(85f);
+                    var placed = LabHearing.Place(85f);
                     provider.PlaySpatialSound(new SpatialEmitter
                     {
                         EntityId = voice--, SoundId = args.Contains("chime") ? "SYNTH/beacon_door_chime" : "synth:clap:lab",

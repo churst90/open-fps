@@ -14,6 +14,10 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class EngineCostSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     /// <summary>
     /// Every machine's offline tailpipe at full load: its level and its peak (--engine-levels). The level
     /// places the emitter (Loudness.Place); the peak sets what full scale means in the DSP, and a wrong one
@@ -76,7 +80,7 @@ public static class EngineCostSpike
         Console.WriteLine("    preset            peak     median step    >0.04/s    >0.08/s    >0.15/s   largest");
         foreach (var key in presets)
         {
-            var voice = new EngineVoiceState(VehicleProfile.ByName(key), sr, 11) { TargetSpeed = kmh / 3.6f };
+            var voice = new EngineVoiceState(VehicleProfile.ByName(key), sr, 11) { Hearing = LabHearing, TargetSpeed = kmh / 3.6f };
             voice.PlaceAtSpeed(kmh / 3.6f);
             var buf = new float[block];
             for (int i = 0; i < sr / block; i++) voice.Render(buf);   // settle
@@ -192,7 +196,7 @@ public static class EngineCostSpike
         {
             var profile = VehicleProfile.ByName(key);
             if (!withBody) profile = profile with { Body = VehicleBody.None };
-            var voice = new EngineVoiceState(profile, sr, 7) { TargetSpeed = kmh / 3.6f };
+            var voice = new EngineVoiceState(profile, sr, 7) { Hearing = LabHearing, TargetSpeed = kmh / 3.6f };
 
             // The first half second: a map load creates thirty voices while the JIT keeps them at tier-0,
             // measured at twice steady cost (docs/AUDIO_LOAD_DROPOUTS.md section 2). Only the first preset
@@ -236,7 +240,7 @@ public static class EngineCostSpike
     /// The game's whole voice at one metre against its declaration (--voice-levels [preset ...] [sweep]
     /// [parts]). <c>--engine-levels</c> measures the offline tailpipe plus a third of the intake, which is
     /// what <see cref="VehicleProfile.SourceLevelDb"/> was set from; the live voice adds the body, tyres,
-    /// bay leak and air system, and <see cref="Loudness.Place(float)"/> knows only the declaration. Each
+    /// bay leak and air system, and <see cref="LabHearing.Place(float)"/> knows only the declaration. Each
     /// layer's worth is the total's fall with it muted: under about a decibel it is not heard as itself.
     /// </summary>
     public static int VoiceLevels(string[] args)
@@ -318,7 +322,7 @@ public static class EngineCostSpike
                             + $"the bench holds {redline * 0.85f:F0} rpm.\n");
             Console.WriteLine("      rpm    fraction   throttle   gear    live dB   exhaust dB   boost bar");
 
-            var voice = new EngineVoiceState(v, sr, 5);
+            var voice = new EngineVoiceState(v, sr, 5) { Hearing = LabHearing };
             float start = redline * 0.35f / 60f * 2f * MathF.PI * v.Gearbox.WheelRadiusMetres
                         / MathF.Max(0.1f, v.Gearbox.Ratios[0] * v.Gearbox.FinalDrive);
             voice.PlaceAtSpeed(start);
@@ -364,7 +368,7 @@ public static class EngineCostSpike
     private static (float Total, float Exhaust, float Intake, float Block)
         Run(VehicleProfile v, int sr, int block, bool bay, bool tyres, bool fan, bool body)
     {
-        var voice = new EngineVoiceState(v, sr, 5);
+        var voice = new EngineVoiceState(v, sr, 5) { Hearing = LabHearing };
         if (!bay) voice.BayLeakage = 0f;
         if (!tyres) voice.TyreMix = 0f;
         if (!fan) voice.FanMix = 0f;
@@ -404,7 +408,7 @@ public static class EngineCostSpike
     private static float Measure(VehicleProfile v, int sr, int block, bool bay, bool tyres, bool fan,
                                  out float atRpm, out int atGear)
     {
-        var voice = new EngineVoiceState(v, sr, 5);
+        var voice = new EngineVoiceState(v, sr, 5) { Hearing = LabHearing };
         if (!bay) voice.BayLeakage = 0f;
         if (!tyres) voice.TyreMix = 0f;
         if (!fan) voice.FanMix = 0f;

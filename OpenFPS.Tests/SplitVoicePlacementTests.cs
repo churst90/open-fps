@@ -12,6 +12,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class SplitVoicePlacementTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     [Fact]
     public void EachEndOfACloseCarIsPlacedAsAPoint()
     {
@@ -25,7 +28,7 @@ public class SplitVoicePlacementTests
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(7) && h.Mixer.Latest.ContainsKey(intake)),
                     "a car 2 m away did not get a voice at each end");
 
-        var point = Loudness.Place(profile.SourceLevelDb);
+        var point = Law.Place(profile.SourceLevelDb);
         foreach (int id in new[] { 7, intake })
         {
             var e = h.Mixer.Latest[id];
@@ -47,12 +50,12 @@ public class SplitVoicePlacementTests
         Assert.Empty(h.Mixer.StartedAs(VoiceKind.Intake));
 
         float extent = Vector3.Distance(profile.ExhaustSlot, new Vector3(0f, profile.FrontTapHeight, profile.FrontTapZ));
-        var wide = Loudness.Place(profile.SourceLevelDb, extent);
+        var wide = Law.Place(profile.SourceLevelDb, extent);
         var e = h.Mixer.Latest[7];
         Assert.Equal(wide.ReferenceDistance, e.MinDistance, 3);
         Assert.Equal(wide.Gain, e.Volume, 4);
         // ...and beyond the extent the two placements are the same thing (Widen holds the product).
-        var point = Loudness.Place(profile.SourceLevelDb);
+        var point = Law.Place(profile.SourceLevelDb);
         Assert.Equal(point.Gain * point.ReferenceDistance, wide.Gain * wide.ReferenceDistance, 4);
     }
 }

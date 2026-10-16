@@ -60,10 +60,10 @@ public static class EarTimbres
     /// <summary>Whether a measurement was asked for (finished or not).</summary>
     public static bool Requested(string soundId) => _pending.ContainsKey(soundId) || Has(soundId);
 
-    /// <summary>The law's correction for this sound's timbre at this level over the unweighted law, dB;
-    /// zero with no declared level or no measurement yet.</summary>
-    public static float CorrectionDb(string? soundId, float levelDb)
-        => levelDb > 0f ? OpenFPS.Common.Loudness.TimbreCorrectionDb(levelDb, Find(soundId)) : 0f;
+    /// <summary>The law's correction for this sound's timbre at this level over the unweighted law, as this
+    /// world hears it, dB; zero with no declared level or no measurement yet.</summary>
+    public static float CorrectionDb(OpenFPS.Common.Hearing.HearingSettings hearing, string? soundId, float levelDb)
+        => levelDb > 0f ? hearing.TimbreCorrectionDb(levelDb, Find(soundId)) : 0f;
 
     private static string Folder(string soundId)
     {

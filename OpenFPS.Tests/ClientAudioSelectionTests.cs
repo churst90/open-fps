@@ -18,6 +18,9 @@ namespace OpenFPS.Tests;
 [Collection(nameof(LevelCompressionSetting))]
 public class ClientAudioSelectionTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public ClientAudioSelectionTests(ITestOutputHelper o) => _o = o;
 
@@ -207,7 +210,7 @@ public class ClientAudioSelectionTests
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Car), 30));
         h.Tick(3);
         var engine = h.Mixer.Latest[Car];
-        var (g0, r0) = Loudness.Place(profile.SourceLevelDb);
+        var (g0, r0) = Law.Place(profile.SourceLevelDb);
         Assert.True(engine.Interior);
         Assert.True(engine.FollowsListener);
         Assert.Equal(MathF.Min(1f, g0 * r0), engine.Volume, 5);
@@ -338,7 +341,7 @@ public class ClientAudioSelectionTests
 
         string placed = FireSpec.KeyForPlaced(soundId, ColliderShape.Box.IsRound(), new Vector3(4f, 1f, 4f), ModelLibrary.Presets.Fire);
         var (level, extent) = Declared(placed);
-        var (gain, reference) = Loudness.Place(level, extent);
+        var (gain, reference) = Law.Place(level, extent);
         var e = h.Mixer.Latest[Id];
         _o.WriteLine($"{soundId}: {level:F1} dB, extent {extent:F2} m -> {gain:F4} at {reference:F2} m; voiced {e.Volume:F4} at {e.MinDistance:F2} m, key {e.PhysicalKey}");
         if (soundId.StartsWith("fire:", StringComparison.Ordinal)) Assert.Equal(placed, e.PhysicalKey);
@@ -346,7 +349,7 @@ public class ClientAudioSelectionTests
         Assert.Equal(level, e.EarLevelDb, 3);
         Assert.Equal(reference, e.MinDistance, 4);
         Assert.Equal(extent, e.ExtentMetres, 4);
-        Assert.True(e.Range >= Loudness.AudibleRange(level) - 1e-3f, $"range {e.Range} under the level's audible range");
+        Assert.True(e.Range >= Law.AudibleRange(level) - 1e-3f, $"range {e.Range} under the level's audible range");
         Assert.Equal("", e.EngineKey);
         if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(e.PhysicalKey, ModelLibrary.Presets) == null)
             Assert.Equal(gain * PhysicalVoiceState.HeadroomGain(Headroom(soundId)), e.Volume, 5);
@@ -379,7 +382,7 @@ public class ClientAudioSelectionTests
             var e = h.Mixer.Latest[Id];
             float level = spec.SourceLevelDb + 10f * MathF.Log10(areaRatio);
             float extent = spec.ExtentMetres * MathF.Sqrt(areaRatio);
-            var (_, reference) = Loudness.Place(level, extent);
+            var (_, reference) = Law.Place(level, extent);
             _o.WriteLine($"{preset} x{areaRatio}: declared {spec.SourceLevelDb:F1} dB; voiced {e.EarLevelDb:F2} dB, extent {e.ExtentMetres:F2} m, key {e.PhysicalKey}");
             // The bigger bed's key carries its size to the centimetre: within 0.05 dB and half a percent.
             if (areaRatio == 1f) Assert.Equal("fire:" + preset, e.PhysicalKey);
@@ -410,19 +413,19 @@ public class ClientAudioSelectionTests
         Assert.True(TrainVoiceState.ParseSlotKey(e.PhysicalKey, out _, out _, out int slot));
         var layout = TrainLayout.Sources(TrainProfile.ByName(preset), ModelLibrary.Presets);
         float slotLevel = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(layout);
-        var (slotGain, slotReference) = Loudness.Place(slotLevel);
+        var (slotGain, slotReference) = Law.Place(slotLevel);
         Assert.Equal(slotLevel, e.EarLevelDb, 3);
         Assert.Equal(slotReference, e.MinDistance, 4);
         Assert.Equal(0f, e.ExtentMetres);
         Assert.Equal(slotGain * PhysicalVoiceState.HeadroomGain(TrainSlotState.HeadroomDb), e.Volume, 5);
-        Assert.True(e.Range >= Loudness.AudibleRange(slotLevel) - 1e-3f, $"range {e.Range} under the voice's audible range");
+        Assert.True(e.Range >= Law.AudibleRange(slotLevel) - 1e-3f, $"range {e.Range} under the voice's audible range");
         Assert.Equal("", e.EngineKey);
 
         Assert.True(h.Mixer.Plans.TryGetValue((key, slot), out var plan), "the voice was never told what it carries");
         int k = Array.IndexOf(plan.Sources, index);
         Assert.True(k >= 0, $"source {index} is not in its voice's plan");
         var (level, extent) = Declared(soundId);
-        var (gain, reference) = Loudness.Place(level, extent);
+        var (gain, reference) = Law.Place(level, extent);
         float own = gain * reference;
         float through = plan.Weights[k] * MathF.Pow(10f, (level - slotLevel) / 20f) * slotGain * slotReference;
         _o.WriteLine($"{soundId}: {level:F1} dB, extent {extent:F2} m, carried by voice {slot} at {slotLevel:F1} dB with weight {plan.Weights[k]:F4}; "
@@ -510,7 +513,6 @@ public class ClientAudioSelectionTests
     public void TheMachineBudgetRanksOnHowLoudTheEarHearsAMachine()
     {
         int budget = ClientAudioSystem.MachineVoiceBudget;
-        bool wasOn = OpenFPS.Common.Hearing.EarModel.Enabled;
         const int Condenser = 200;
         bool CondenserWins()
         {
@@ -528,12 +530,11 @@ public class ClientAudioSelectionTests
         }
         try
         {
-            OpenFPS.Common.Hearing.EarModel.Enabled = true;
             OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
             Assert.True(CondenserWins(), "unmeasured, a 65 dB condenser at 12 m should beat a 59 dB window unit at 10 m");
 
             OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_condenser", Band(0, "rumble"));
-            float correction = OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb("machine:ac_condenser", 65f);
+            float correction = OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(Law, "machine:ac_condenser", 65f);
             _o.WriteLine($"the law's correction for a 65 dB rumble at 25 Hz: {correction:+0.0;-0.0} dB");
             Assert.True(correction > 10f, $"the law plays a 25 Hz rumble well up: {correction:F1} dB");
             Assert.False(CondenserWins(), "a rumble the ear barely hears took a voice from a window unit it hears");
@@ -541,7 +542,6 @@ public class ClientAudioSelectionTests
         finally
         {
             OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
-            OpenFPS.Common.Hearing.EarModel.Enabled = wasOn;
         }
     }
 
@@ -553,7 +553,6 @@ public class ClientAudioSelectionTests
     public void ARumbleLosesTheLastMachineSlotToAQuieterToneAtTheSameDistance()
     {
         int budget = ClientAudioSystem.MachineVoiceBudget;
-        bool wasOn = OpenFPS.Common.Hearing.EarModel.Enabled;
         const int Condenser = 200, Window = 201;
         (bool Condenser, bool Window) Wins()
         {
@@ -573,7 +572,6 @@ public class ClientAudioSelectionTests
         }
         try
         {
-            OpenFPS.Common.Hearing.EarModel.Enabled = true;
             OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
             Assert.Equal((true, false), Wins());
             OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_condenser", Band(0, "rumble"));
@@ -583,7 +581,6 @@ public class ClientAudioSelectionTests
         finally
         {
             OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
-            OpenFPS.Common.Hearing.EarModel.Enabled = wasOn;
         }
     }
 
@@ -839,7 +836,7 @@ public class ClientAudioSelectionTests
                 Assert.True(onGround || onYou, $"a drop landed at {e.Position}, neither on the ground near you nor on you");
                 Assert.True(e.IsEvent);
                 Assert.True(float.IsFinite(e.EarLevelDb) && e.EarLevelDb > 0f);
-                var (gain, reference) = Loudness.Place(e.EarLevelDb);
+                var (gain, reference) = Law.Place(e.EarLevelDb);
                 Assert.Equal(MathF.Min(1f, gain), e.Volume, 5);
                 Assert.Equal(reference, e.MinDistance, 4);
                 Assert.InRange(e.DelayMs, 0f, 600f);
@@ -981,7 +978,7 @@ public class ClientAudioSelectionTests
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(siren), 1200), "the siren never sounded");
         Assert.True(h.Audio.VehiclePathsAsked > 0, "a sounding siren takes its car's path");
         var spec = SirenSpec.ByName(MachineRegistry.VehicleFor("police_interceptor").Siren!);
-        var (gain, reference) = Loudness.Place(spec.SourceLevelDb, spec.HornMouthMetres);
+        var (gain, reference) = Law.Place(spec.SourceLevelDb, spec.HornMouthMetres);
         Assert.Equal(reference, h.Mixer.Latest[siren].MinDistance, 4);
         Assert.Equal(gain, h.Mixer.Latest[siren].Volume, 5);
 

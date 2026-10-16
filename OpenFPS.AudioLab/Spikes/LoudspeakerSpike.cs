@@ -30,6 +30,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class LoudspeakerSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const string PaProgram = "ANNOUNCE/st_louis_welcome";
     private const string MegaphoneProgram = "BEACONS/megaphone";
 
@@ -107,7 +111,7 @@ public static class LoudspeakerSpike
         {
             if (!ReadWav(LabPaths.Sounds(program + ".wav"), out var mono, out int srcRate)) continue;
             float gated = OpenFPS.Common.Hearing.Timbre.GatedRms(mono, srcRate);
-            float fullScale = Loudness.RenderCeilingDb + 20f * MathF.Log10(minDistance);
+            float fullScale = LabHearing.RenderCeilingDb + 20f * MathF.Log10(minDistance);
             Console.WriteLine($"\nbefore: {program} at gain 1, reference {minDistance} m: full scale stood for {fullScale:F1} dB at 1 m, "
                             + $"its speech ({gated:F1} dBFS gated) for {fullScale + gated:F1} dB SPL at 1 m");
         }
@@ -124,7 +128,7 @@ public static class LoudspeakerSpike
         AcousticRegistry.Initialize();
         string wav = Path.Combine(outDir, "capture.wav");
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -137,7 +141,7 @@ public static class LoudspeakerSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         facade.Weather.Wind = WindWeather.Steady(0f, 250f, 0f);
 
@@ -267,7 +271,7 @@ public static class LoudspeakerSpike
         var sb = new StringBuilder("name,start,seconds\n");
         foreach (var s in segments) sb.Append(CultureInfo.InvariantCulture, $"{s.Name},{s.Start:F3},{s.Seconds:F3}\n");
         File.WriteAllText(Path.Combine(outDir, "segments.csv"), sb.ToString());
-        Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); /levels {Loudness.DynamicRangeCompression:F2}");
+        Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); /levels {LabHearing.Compression:F2}");
         return 0;
     }
 

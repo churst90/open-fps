@@ -23,6 +23,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class StairsTests : IClassFixture<StairsTests.City>
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly City _city;
     private readonly ITestOutputHelper _o;
 
@@ -1106,8 +1109,8 @@ public class StairsTests : IClassFixture<StairsTests.City>
             Assert.True(upPitch > downPitch, $"up pitch {upPitch}, down {downPitch}");
         }
         upDb /= n; levelDb /= n; downDb /= n;
-        float Rendered(StepSlope s) => 20f * MathF.Log10(Loudness.Place(Loudness.FootstepDb + StrideAccumulator.SlopeDb(s)).Gain
-                                                         / Loudness.Place(Loudness.FootstepDb).Gain);
+        float Rendered(StepSlope s) => 20f * MathF.Log10(Law.Place(Loudness.FootstepDb + StrideAccumulator.SlopeDb(s)).Gain
+                                                         / Law.Place(Loudness.FootstepDb).Gain);
         _o.WriteLine($"up {upDb - levelDb:F2} dB, down {downDb - levelDb:F2} dB against level "
                    + $"(expected {Rendered(StepSlope.Up):F2}, {Rendered(StepSlope.Down):F2})");
         Assert.Equal(Rendered(StepSlope.Up), upDb - levelDb, 0.6);

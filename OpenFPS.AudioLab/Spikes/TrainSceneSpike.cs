@@ -33,6 +33,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class TrainSceneSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private static string? Arg(string[] args, string key) => args.FirstOrDefault(x => x.StartsWith(key, StringComparison.Ordinal))?[key.Length..];
 
     public static int Run(string[] args)
@@ -92,7 +96,7 @@ public static class TrainSceneSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
         scene.Build(new List<SteamAudioScene.Box> { new(new Vector3(0f, -0.5f, 0f), new Vector3(4000f, 1f, 4000f), Quaternion.Identity, "Asphalt") });
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Hearing = LabHearing };
         provider.Traced.Configure(ctx, scene);
 
         var facade = new AudioEngineFacade(provider);
@@ -108,7 +112,7 @@ public static class TrainSceneSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         world.RegisterDefinition(new EntityDefinition
         {
@@ -168,7 +172,7 @@ public static class TrainSceneSpike
             def.SoundEmitter = new SoundEmitterComponent
             {
                 IsSynth = true, SoundId = "engine:" + carPreset, Mode = PlaybackMode.LoopOne, Volume = 1f,
-                Range = Loudness.AudibleRange(profile.SourceLevelDb), MinDistance = 3f,
+                Range = LabHearing.AudibleRange(profile.SourceLevelDb), MinDistance = 3f,
             };
             world.RegisterDefinition(def);
             carIds.Add((id, i / (float)Math.Max(1, cars)));

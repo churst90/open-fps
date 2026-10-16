@@ -78,7 +78,7 @@ public sealed record MachinePart
     public Vector3 At { get; init; }
 
     /// <summary>How big this source is, metres; zero is a point. The mixer can place an extended source
-    /// (<see cref="Loudness.Place(float, float)"/>).</summary>
+    /// (<see cref="Hearing.HearingSettings.Place(float, float)"/>).</summary>
     // TODO: nothing reads it yet; it should replace ClientAudioSystem's car-sized MathF.Max(reference, 3f), with audibility ranking.
     public float ExtentMetres { get; init; }
 

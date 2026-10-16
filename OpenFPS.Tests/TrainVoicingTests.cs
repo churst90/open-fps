@@ -14,6 +14,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class TrainVoicingTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public TrainVoicingTests(ITestOutputHelper o) => _o = o;
 
@@ -104,9 +107,9 @@ public class TrainVoicingTests
     {
         // Its own voice: declared at its level, played at its gain. Another declared at the train's level,
         // a few metres further, at that one's gain.
-        float own = TrainVoicing.LawGain(level, extent, distance);
+        float own = TrainVoicing.LawGain(Law, level, extent, distance);
         float slotLevel = 112f;
-        float slotGain = TrainVoicing.LawGain(slotLevel, 0f, distance + 4f);
+        float slotGain = TrainVoicing.LawGain(Law, slotLevel, 0f, distance + 4f);
         float w = TrainVoicing.Weight(level, own, slotLevel, slotGain);
         // Every physical voice renders its declared level at one point under full scale; the slot's
         // headroom is given back by the channel. So the played RMS of the source alone is

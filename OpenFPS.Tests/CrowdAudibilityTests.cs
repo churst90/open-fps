@@ -15,6 +15,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class CrowdAudibilityTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public CrowdAudibilityTests(ITestOutputHelper o) => _o = o;
 
@@ -102,19 +105,19 @@ public class CrowdAudibilityTests
         float crowdLevel = Applause.LevelDb(spec.Clappers, spec.Intensity);
         float crowdExtent = Applause.SpreadRadiusMetres(spec.Clappers);
 
-        var crowdPlaced = Loudness.Place(crowdLevel, crowdExtent);
+        var crowdPlaced = Law.Place(crowdLevel, crowdExtent);
         float crowdRendered = Loudness.RenderedGain(crowdPlaced.Gain, crowdPlaced.ReferenceDistance,
-                                                    Loudness.AudibleRange(crowdLevel), crowdDist);
+                                                    Law.AudibleRange(crowdLevel), crowdDist);
 
         // A car placed as ClientAudioSystem places one: its measured level, its size as the reference
         // distance. One at about the stand's level: the mix's compression holds relative levels only
         // between sources of like level (docs/TEST_NOTES.md, "The silent grandstand").
         var bike = VehicleProfile.ByName("v8_bigcam");
         float bikeDist = 60f;
-        var bikePlaced = Loudness.Place(bike.SourceLevelDb);
+        var bikePlaced = Law.Place(bike.SourceLevelDb);
         float bikeRendered = Loudness.RenderedGain(bikePlaced.Gain,
             MathF.Max(bikePlaced.ReferenceDistance, 3f),
-            Loudness.AudibleRange(bike.SourceLevelDb), bikeDist);
+            Law.AudibleRange(bike.SourceLevelDb), bikeDist);
 
         float renderedDelta = 20f * MathF.Log10(crowdRendered / bikeRendered);
         float physicalDelta = Loudness.SplAt(crowdLevel, crowdDist) - Loudness.SplAt(bike.SourceLevelDb, bikeDist);
@@ -138,7 +141,7 @@ public class CrowdAudibilityTests
     public void ACrowdIsNotFadedOutForBeingAcrossTheTrack()
     {
         float level = Applause.LevelDb(300, 0.7f);
-        float range = Loudness.AudibleRange(level);
+        float range = Law.AudibleRange(level);
         float fadeStartsAt = range - 0.25f * (range - Applause.SpreadRadiusMetres(300));
         _o.WriteLine($"a 300-person crowd is {level:F1} dB, carries {range:F0} m, starts fading at {fadeStartsAt:F0} m");
         Assert.True(fadeStartsAt > 500f,

@@ -35,6 +35,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class RainSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
 
     public static int Run(string[] args)
@@ -253,7 +257,7 @@ public static class RainSpike
             float aim = (ear.Y - impact.Position.Y) / dist;
             float level = DropBank.LevelDb(sound, impact, aim);
             float pascalsAtEar = 20e-6f * MathF.Pow(10f, level / 20f) / dist;
-            var (gain, reference) = DropBank.Placement(level, impact.Slot >= 0 && impact.Slot < slotLevel.Length ? slotLevel[impact.Slot] : float.NaN);
+            var (gain, reference) = DropBank.Placement(LabHearing, level, impact.Slot >= 0 && impact.Slot < slotLevel.Length ? slotLevel[impact.Slot] : float.NaN);
             // Through the roof's EQ (a car's headliner), or through the shell of the car the listener sits in.
             bool overhead = impact.FromBelow && impact.Slot == RainSurvey.OverheadSlot;
             var bands = overhead ? survey.OverheadEq : (1f, 1f, 1f);
@@ -442,7 +446,7 @@ public static class RainSpike
     internal static double GameDb(double pascalsAtEar, float referenceDistance)
     {
         double level = 20 * Math.Log10(Math.Max(1e-12, pascalsAtEar * referenceDistance) / 20e-6);
-        var (gain, _) = Loudness.Place((float)level, referenceDistance);
+        var (gain, _) = LabHearing.Place((float)level, referenceDistance);
         return 20 * Math.Log10(Math.Max(1e-9, gain)) - VehicleProfile.PeakHeadroomDb + ProviderDb;
     }
 
@@ -683,7 +687,7 @@ public static class RainSpike
                     if (patch == null) continue;
                     float level = OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Feed[s].LevelDb;
                     if (float.IsNaN(level)) level = 40f;
-                    var (gain, reference) = Loudness.Place(level, patch.ReferenceDistance);
+                    var (gain, reference) = LabHearing.Place(level, patch.ReferenceDistance);
                     predicted += Math.Pow(10, (20 * Math.Log10(Math.Max(1e-9, gain)) - VehicleProfile.PeakHeadroomDb) / 10);
                     provider.PlaySpatialSound(new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
                     {
@@ -699,7 +703,7 @@ public static class RainSpike
                         Volume = gain * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(OpenFPS.Client.AudioEngine.Fmod.RainVoiceState.HeadroomDb),
                         MinDistance = reference,
                         ExtentMetres = patch.ReferenceDistance,
-                        Range = MathF.Max(60f, Loudness.AudibleRange(level)),
+                        Range = MathF.Max(60f, LabHearing.AudibleRange(level)),
                         Pitch = 1f,
                         EngineRunning = true,
                         CarriesPath = true,
@@ -721,7 +725,7 @@ public static class RainSpike
             ("park tree in the wind at 8 m", "foliage:park_tree", ModelLibrary.Presets.Foliage("park_tree").SourceLevelDb, ModelLibrary.Presets.Foliage("park_tree").ExtentMetres, ModelLibrary.Presets.Foliage("park_tree").PeakHeadroomDb, 8f),
         })
         {
-            var (gain, reference) = Loudness.Place(level, extent);
+            var (gain, reference) = LabHearing.Place(level, extent);
             string cap = Path.Combine(dir, key.Replace(':', '_') + ".wav");
             double db = Capture(cap, ear, sec, provider => provider.PlaySpatialSound(new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
             {
@@ -735,7 +739,7 @@ public static class RainSpike
                 Volume = gain * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(headroom),
                 MinDistance = reference,
                 ExtentMetres = extent,
-                Range = MathF.Max(60f, Loudness.AudibleRange(level)),
+                Range = MathF.Max(60f, LabHearing.AudibleRange(level)),
                 TargetRegionId = -1,
             }));
             double predicted = 20 * Math.Log10(Math.Max(1e-9, gain * reference / Math.Max(reference, dist))) - VehicleProfile.PeakHeadroomDb;
@@ -757,7 +761,7 @@ public static class RainSpike
     {
         // The mixer into a file instead of the sound card: exact, and silent.
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", path);
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) throw new InvalidOperationException("provider init failed");
         provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
         var sw = Stopwatch.StartNew();

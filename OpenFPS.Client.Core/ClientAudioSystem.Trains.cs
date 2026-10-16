@@ -142,7 +142,7 @@ public partial class ClientAudioSystem
             var at = AudioEmission.PointFor(snap);
             float d = Vector3.Distance(at, eyePos);
             // As loud as its own voice would play it, the ear model's correction included.
-            float gain = TrainVoicing.LawGain(entry.LevelDb, entry.ExtentMetres, d) * Correction(v, em.SoundId, entry.LevelDb);
+            float gain = TrainVoicing.LawGain(_audio.Hearing, entry.LevelDb, entry.ExtentMetres, d) * Correction(v, em.SoundId, entry.LevelDb);
             _trainSourceAt[index] = (snap, at, gain);
             if (index < leadIndex) { leadIndex = index; lead = id; }
             if (index == warning) { warningEntity = id; continue; }
@@ -226,7 +226,7 @@ public partial class ClientAudioSystem
                     if (d < nearest) { nearest = d; rep = src.Snap; }
                 }
             if (rep.Definition is null) continue;   // no car of the group has a source this frame
-            float slotGain = TrainVoicing.LawGain(v.SlotLevelDb, 0f, Vector3.Distance(centre, eyePos))
+            float slotGain = TrainVoicing.LawGain(_audio.Hearing, v.SlotLevelDb, 0f, Vector3.Distance(centre, eyePos))
                            * Correction(v, rep.Definition.SoundEmitter.SoundId!, v.SlotLevelDb);
             var weights = _trainWeights[slot];
             weights.Clear();
@@ -267,7 +267,7 @@ public partial class ClientAudioSystem
     private float Correction(TrainVoicer v, string soundId, float levelDb)
     {
         if (v.Correction.TryGetValue(levelDb, out float c)) return c;
-        c = MathF.Pow(10f, OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(soundId, levelDb) / 20f);
+        c = MathF.Pow(10f, OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(_audio.Hearing, soundId, levelDb) / 20f);
         v.Correction[levelDb] = c;
         return c;
     }
@@ -278,7 +278,7 @@ public partial class ClientAudioSystem
                                  Vector3 at, float levelDb, float extent, float speed, float lever)
     {
         int voiceId = TrainVoiceId(v, slot);
-        var (gain, reference) = Loudness.Place(levelDb, extent);
+        var (gain, reference) = _audio.Hearing.Place(levelDb, extent);
         var e = new SpatialEmitter
         {
             EntityId = voiceId,
@@ -298,7 +298,7 @@ public partial class ClientAudioSystem
             EarLevelDb = levelDb,
             MinDistance = reference,
             ExtentMetres = extent,
-            Range = Loudness.AudibleRange(levelDb),
+            Range = _audio.Hearing.AudibleRange(levelDb),
             Pitch = 1f,
             EngineRunning = true,
             // The speed in the wake slot and the notch over eight in the lever's, as the server's taps carried them.

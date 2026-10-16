@@ -34,6 +34,9 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class StoveSpike
 {
+    /// <summary>The lab's levers on this instrument's mixer: its hob voices are handed to a script as they are made.</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.LabLevers Lab = new();
+
     private const int Rate = 48000;
     private const float PascalsToFull = 0.1f;   // -20 dBFS is 94 dB SPL
 
@@ -322,7 +325,7 @@ public static class StoveSpike
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
         scene.Build(boxes.Select(b => new SteamAudioScene.Box(b.C, b.S, Quaternion.Identity, b.M)).ToList());
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Lab = Lab };
         provider.Traced.Configure(ctx, scene);
 
         var facade = new AudioEngineFacade(provider);
@@ -338,7 +341,7 @@ public static class StoveSpike
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
-        world.Clock = facade.Clock;
+        world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds);
         int id = 1;
         foreach (var b in boxes)
@@ -439,9 +442,9 @@ public static class StoveSpike
             // 2. A slow light: the knob only part way while the sparks fail, then on to full.
             if (Wanted("slow"))
             {
-                StoveVoiceState.LabCreated = h => SlowLight(h);
+                Lab.StoveCreated = h => SlowLight(h);
                 Record("slow", 12.0, (0.5, () => Key(off, off)));
-                StoveVoiceState.LabCreated = null;
+                Lab.StoveCreated = null;
                 Gone();
             }
             // 3. On low, turned up to medium and to full.

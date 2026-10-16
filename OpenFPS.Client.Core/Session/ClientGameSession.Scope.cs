@@ -148,7 +148,7 @@ public sealed partial class ClientGameSession
             bool inhale = hold;
             if (Ui.Enabled)
                 _audioEngine.PlayUiSound(inhale ? "scope:breath-in" : "scope:breath-out",
-                    () => ScopeSounds.RenderBreath(inhale), ScopeSounds.SampleRate, Ui.Volume * ScopeVolume);
+                    () => ScopeSounds.RenderBreath(inhale, rate: _audioEngine.MixerRate), _audioEngine.MixerRate, Ui.Volume * ScopeVolume);
         }
         float speed = new Vector2(_state.Velocity.X, _state.Velocity.Z).Length();
         _scope.SwayNow = _scope.Sway.Update(dt, _controller.Exertion, speed, hold);
@@ -173,9 +173,9 @@ public sealed partial class ClientGameSession
         float volume = Ui.Volume * ScopeVolume;
         if (!g.Sounding) { _audioEngine.StopUiLoop(GuidanceSlot); return; }
         if (g.OnTarget)
-            _audioEngine.SetUiLoop(GuidanceSlot, "scope:steady", ScopeSounds.RenderSteady, ScopeSounds.SampleRate, volume, 1f);
+            _audioEngine.SetUiLoop(GuidanceSlot, "scope:steady", () => ScopeSounds.RenderSteady(_audioEngine.MixerRate), _audioEngine.MixerRate, volume, 1f);
         else
-            _audioEngine.SetUiLoop(GuidanceSlot, "scope:pulse", ScopeSounds.RenderPulse, ScopeSounds.SampleRate, volume,
+            _audioEngine.SetUiLoop(GuidanceSlot, "scope:pulse", () => ScopeSounds.RenderPulse(_audioEngine.MixerRate), _audioEngine.MixerRate, volume,
                                    ScopeSounds.PulseRate(g.Closeness));
     }
 

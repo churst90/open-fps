@@ -12,6 +12,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class FootstepPoolTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     [Fact]
     public void A_crowd_walking_round_you_does_not_take_your_own_step()
     {
@@ -38,7 +41,7 @@ public class FootstepPoolTests
         var h = new ClientAudioHarness(Sounds());
         h.StandAt(Vector3.Zero);
         h.Tick();
-        float range = Loudness.AudibleRange(Loudness.FootstepDb);
+        float range = Law.AudibleRange(Loudness.FootstepDb);
         Assert.True(range > 60f, $"a step is heard to {range:F0} m");
         h.Audio.OnPlayerFootstep(new Vector3(range + 10f, 0f, 0f), "Concrete", "0");
         h.Tick(3);

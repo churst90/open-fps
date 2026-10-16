@@ -16,6 +16,10 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class EarshotSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     public static int Run(string[] args)
     {
         string mapId = Str(args, "map") ?? "city";
@@ -59,8 +63,8 @@ public static class EarshotSpike
                 d = Vector3.Distance(pos, at);
             }
 
-            var (gain, reference) = Loudness.Place(levelDb, extent);
-            float range = Loudness.AudibleRange(levelDb);
+            var (gain, reference) = LabHearing.Place(levelDb, extent);
+            float range = LabHearing.AudibleRange(levelDb);
             float inv = Loudness.RenderedGain(gain, reference, range, d);
             // FMOD's linear law: full at the reference, silent at the range, straight line between.
             float lin = gain * Math.Clamp((range - d) / MathF.Max(1e-6f, range - reference), 0f, 1f);

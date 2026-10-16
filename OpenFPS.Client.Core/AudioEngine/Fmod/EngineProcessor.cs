@@ -94,6 +94,18 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>The air its world is in: the speed of sound its pipes radiate at and the temperature its cooling
     /// runs against. Its world's, which the mixer gives it as it makes it; one of its own until then.</summary>
     public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
+
+    /// <summary>The hearing of its world, whose law the idle lift follows (the compression, the ear model):
+    /// its world's, which the mixer gives it as it makes it. One of its own, the shipped hearing, until then.</summary>
+    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; set; } = new();
+
+    /// <summary>The live levers of its mixer (MixSettings.ValveJetNoise), which its engine reads: the mixer gives
+    /// it its own as it makes it; the shipped mix until then.</summary>
+    public OpenFPS.Client.AudioEngine.Core.MixSettings Mix
+    {
+        get => Engine.Mix;
+        set => Engine.Mix = value;
+    }
     /// <summary>Standing at a stop that takes passengers: set the spring brakes, kneel, open the
     /// doors. Anywhere else a stopped vehicle just holds its service brake.</summary>
     public volatile bool ServingStop;
@@ -184,7 +196,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// coherent signal had (0.6 at each end, summed in phase: 1.2, so 0.6 x root 2 each). The squeal
     /// is still quoted against this; the rolling noise is anchored through it.</summary>
     private const float PerAxle = 0.6f * 1.41421356f;
-    public float SampleRate = MixerQuality.MixerRate;
+    public float SampleRate = MixerQuality.DefaultRate;
 
     private float _speedSmooth;
 
@@ -771,7 +783,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
     /// <summary>For the lab: replace the cabin with a click in this voice and its negative in the first
     /// path, to measure how the taps line up with the voice.</summary>
-    internal static bool LabAlignProbe;
+    internal bool LabAlignProbe;
 
     /// <summary>
     /// Where this voice's channel's own clock sits on its parent's (parent minus own), once the channel
@@ -875,17 +887,18 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private float _levelGain = 1f;
     private const float LevelSeconds = 0.5f;
     /// <summary>The unweighted lift's cap, which only the ear model switched off still uses (see
-    /// <see cref="LiftDb(float, float)"/>). With the model on there is no cap: see the three-argument form.</summary>
+    /// <see cref="LiftDb(OpenFPS.Common.Hearing.HearingSettings, float, float)"/>). With the model on there is no cap:
+    /// see the form with a timbre.</summary>
     private const float UnweightedMaxLiftDb = 20f;
 
     /// <summary>
     /// The unweighted law applied to the deficit, held to 0..20 dB: what runs with the ear model off
     /// (/ear off, OPENFPS_EAR_MODEL=0).
     /// </summary>
-    internal static float LiftDb(float runningDb, float declaredDb)
+    internal static float LiftDb(OpenFPS.Common.Hearing.HearingSettings hearing, float runningDb, float declaredDb)
     {
         float running = MathF.Min(runningDb, declaredDb);
-        float lift = Loudness.PlacedDb(running) - Loudness.PlacedDb(declaredDb) - (running - declaredDb);
+        float lift = hearing.PlacedDb(running) - hearing.PlacedDb(declaredDb) - (running - declaredDb);
         return Math.Clamp(lift, 0f, UnweightedMaxLiftDb);
     }
 
@@ -897,12 +910,12 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// barely hears. No cap (the 20 dB bounded only the unweighted law). Below the threshold of hearing
     /// it returns NaN and the caller holds the lift where it was.
     /// </summary>
-    internal static float LiftDb(float runningDb, OpenFPS.Common.Hearing.Timbre? running, float declaredDb)
+    internal static float LiftDb(OpenFPS.Common.Hearing.HearingSettings hearing, float runningDb, OpenFPS.Common.Hearing.Timbre? running, float declaredDb)
     {
-        if (!OpenFPS.Common.Hearing.EarModel.Enabled) return LiftDb(runningDb, declaredDb);
+        if (!hearing.EarModelOn) return LiftDb(hearing, runningDb, declaredDb);
         var timbre = running ?? OpenFPS.Common.Hearing.Timbre.Speech;
         if (timbre.Sones(runningDb) <= 0f) return float.NaN;
-        return Loudness.PlacedDb(runningDb, timbre) - Loudness.PlacedDb(declaredDb) - (runningDb - declaredDb);
+        return hearing.PlacedDb(runningDb, timbre) - hearing.PlacedDb(declaredDb) - (runningDb - declaredDb);
     }
 
     // ── What the engine's own sound is made of, for the lift and the compensation ────────────
@@ -1208,12 +1221,12 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // or the level moves: the level is a half-second average anyway.
             if (_bands != null && _bands.Update(0.25f, 1.0f))
                 Volatile.Write(ref _timbre, OpenFPS.Common.Hearing.Timbre.FromBandPowers(_bands.BandPowers, "engine", live: true));
-            bool ear = OpenFPS.Common.Hearing.EarModel.Enabled;
-            float compression = Loudness.DynamicRangeCompression;
+            bool ear = Hearing.EarModelOn;
+            float compression = Hearing.Compression;
             if (!_liftKnown || MathF.Abs(nowDb - _liftAtDb) > 0.25f || !ReferenceEquals(_liftTimbre, _timbre)
                 || ear != _liftEar || compression != _liftCompression)
             {
-                float lift = LiftDb(nowDb, _timbre, Vehicle.SourceLevelDb);
+                float lift = LiftDb(Hearing, nowDb, _timbre, Vehicle.SourceLevelDb);
                 // Silence has no place in the law: hold what the sound had while it could be heard.
                 if (!float.IsNaN(lift)) { _liftDb = lift; _liftKnown = true; }
                 _liftAtDb = nowDb;
@@ -1635,7 +1648,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         float a = 1f - MathF.Exp(-count / (LevelSeconds * SampleRate));
         // From the first block it hears, not from zero: an average that starts at nothing reads a
         // sounding engine as near silence for its first half second, and the lift chased that.
-        if (_levelMs <= 0 && blockMs > 0 && OpenFPS.Common.Hearing.EarModel.Enabled) _levelMs = blockMs;
+        if (_levelMs <= 0 && blockMs > 0 && Hearing.EarModelOn) _levelMs = blockMs;
         else _levelMs += (blockMs - _levelMs) * a;
         if (envTarget <= 0f && _envelope <= 1e-4f)
         {
@@ -1737,7 +1750,7 @@ public sealed class EngineEchoState : IGuardedUnit
     public volatile float TargetGain;
     private double _delay = -1;
     private float _gain;
-    public float SampleRate = MixerQuality.MixerRate;
+    public float SampleRate = MixerQuality.DefaultRate;
     /// <summary>
     /// Floor on the echo's delay, in mixer blocks, not time. FMOD calls the source's and the echo's DSPs
     /// in an order that flips whenever the graph changes (several times a second on a racetrack), and a

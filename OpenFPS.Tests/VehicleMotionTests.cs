@@ -17,6 +17,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class VehicleMotionTests : IDisposable
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private const float Dt = 1f / 30f;
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "openfps-motion-" + Guid.NewGuid().ToString("N"));
 
@@ -390,8 +393,8 @@ public class VehicleMotionTests : IDisposable
             Assert.Equal(3f, em.MinDistance);
             Assert.Equal(OpenFPS.Common.Components.PlaybackMode.LoopOne, em.Mode);
         }
-        Assert.Equal(OpenFPS.Common.Loudness.AudibleRange(profile.SourceLevelDb), w.Get<SoundEmitterComponent>(car).Range);
-        Assert.Equal(OpenFPS.Common.Loudness.AudibleRange(air.SourceLevelDb), w.Get<SoundEmitterComponent>(plane).Range);
+        Assert.Equal(Law.AudibleRange(profile.SourceLevelDb), w.Get<SoundEmitterComponent>(car).Range);
+        Assert.Equal(Law.AudibleRange(air.SourceLevelDb), w.Get<SoundEmitterComponent>(plane).Range);
 
         Assert.Equal(new Vector3(profile.WidthMetres, profile.HeightMetres, profile.LengthMetres), w.Get<ColliderComponent>(car).Size);
         Assert.Equal(new Vector3(air.WingspanMetres, 6f, air.LengthMetres), w.Get<ColliderComponent>(plane).Size);

@@ -58,6 +58,10 @@ public sealed class EarWindSynth
     public float RenderedRightDb { get; private set; } = -120f;
     public EarWindAtEars Last { get; private set; }
 
+    /// <summary>The hearing of the world it plays in, whose law places the wind's level: its mixer's, which
+    /// the voice gives it (EarWindState). One of its own, the shipped hearing, when made alone.</summary>
+    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; set; } = new();
+
     public EarWindSynth(float sampleRate, int seed)
     {
         SampleRate = sampleRate;
@@ -78,8 +82,8 @@ public sealed class EarWindSynth
     public void Control(in EarWindAtEars ears)
     {
         Last = ears;
-        float l = EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb);
-        float r = EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb);
+        float l = EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb, Hearing);
+        float r = EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb, Hearing);
         if (ears.Speed < EarWind.StillAir || !float.IsFinite(l) || !float.IsFinite(r)) { l = -150f; r = -150f; }
         RenderedLeftDb = l; RenderedRightDb = r;
         _targetL = MathF.Pow(10f, l / 20f);

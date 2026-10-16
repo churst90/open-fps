@@ -37,9 +37,10 @@ public sealed class EarWindState : IGuardedUnit
     /// <summary>The weather of the world whose wind this is.</summary>
     private readonly WorldWeather _weather;
 
-    public EarWindState(float sampleRate, WorldWeather weather)
+    /// <param name="hearing">The world's hearing, whose law places the wind's level (the mixer's).</param>
+    public EarWindState(float sampleRate, WorldWeather weather, OpenFPS.Common.Hearing.HearingSettings hearing)
     {
-        Synth = new EarWindSynth(sampleRate, 0x5EED);
+        Synth = new EarWindSynth(sampleRate, 0x5EED) { Hearing = hearing };
         _weather = weather;
     }
 

@@ -17,6 +17,10 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class GlassSpike
 {
+    /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
+    /// the mixers it makes.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+
     private const int Rate = 48000;
 
     public static int Run(string[] args)
@@ -120,8 +124,8 @@ public static class GlassSpike
         AcousticRegistry.Initialize();
         Directory.CreateDirectory(dir);
         Directory.CreateDirectory(Path.Combine(dir, "raw"));
-        float savedCompression = Loudness.DynamicRangeCompression;
-        Loudness.DynamicRangeCompression = Loudness.DefaultCompression;
+        float savedCompression = LabHearing.Compression;
+        LabHearing.Compression = Loudness.DefaultCompression;
 
         var takes = new List<(string Name, float[] Pcm)>();
         var rawTakes = new List<(string Name, float[] Pa)>();
@@ -189,7 +193,7 @@ public static class GlassSpike
             WriteWav(Path.Combine(dir, "raw", name + ".wav"), pa.Select(x => x / 500f).ToArray());
         File.WriteAllLines(Path.Combine(dir, "levels.txt"), notes);
         foreach (var l in notes) Console.WriteLine(l);
-        Loudness.DynamicRangeCompression = savedCompression;
+        LabHearing.Compression = savedCompression;
         return 0;
     }
 
@@ -220,8 +224,8 @@ public static class GlassSpike
             }
             else pcm = TransientSynth.Render(s, 1);
             float d = Vector3.Distance(ear, s.Position);
-            var (gain, reference) = Loudness.Place(s.LevelDb);
-            float g = Loudness.RenderedGain(gain, reference, Loudness.AudibleRange(s.LevelDb), d);
+            var (gain, reference) = LabHearing.Place(s.LevelDb);
+            float g = Loudness.RenderedGain(gain, reference, LabHearing.AudibleRange(s.LevelDb), d);
             double at = lead + s.DelaySeconds + d / 343.0;
             placed.Add(((int)(at * Rate), pcm, g));
             string what = string.IsNullOrEmpty(s.SynthKey) ? $"{s.Character} {s.Hz:F0} Hz" : s.SynthKey;

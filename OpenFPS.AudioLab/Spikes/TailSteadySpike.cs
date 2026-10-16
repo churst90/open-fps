@@ -37,6 +37,8 @@ public static class TailSteadySpike
     private static readonly double[] Octaves = { 125, 250, 500, 1000, 2000, 4000 };
 
     private static bool Velvet;
+    /// <summary>earvelvet=1: the ears' velvet on the late field, as before (DiffuseTail.LateEarVelvet).</summary>
+    private static bool EarVelvet;
 
     private sealed class Trace
     {
@@ -53,8 +55,8 @@ public static class TailSteadySpike
         AcousticRegistry.Initialize();
         string room = Arg(args, "room") ?? "stair";
         Velvet = Arg(args, "late") == "velvet";
-        DiffuseTail.LateEarVelvet = Arg(args, "earvelvet") == "1";
-        SmoothTail.FromFiftyMs = Arg(args, "early") == "old";
+        EarVelvet = Arg(args, "earvelvet") == "1";
+        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { TailFromFiftyMs = Arg(args, "early") == "old" };
         double seconds = double.TryParse(Arg(args, "seconds"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : 10;
         var (boxes, ear) = Scene(room);
 
@@ -67,7 +69,7 @@ public static class TailSteadySpike
         var sw = System.Diagnostics.Stopwatch.StartNew();
         double extractMs = 0, runMs = 0;
         var smoothMs = new List<double>();
-        using (var tr = new TracedReverb(ctx) { ExtractLate = true, KeepRaw = true })
+        using (var tr = new TracedReverb(ctx, lab: lab) { ExtractLate = true, KeepRaw = true })
         {
             tr.SetScene(scene);
             tr.SetListener(ear, 1);
@@ -349,6 +351,7 @@ public static class TailSteadySpike
         var sc = new SharedInputConvolver(Block, SdmTailIr.PartitionsFor(Fs, Block), DiffuseBranch.Count);
         var lf = new DiffuseLateConvolver(Block, DiffuseLateNoise.PartitionsFor(Fs, 2 * Fs), DiffuseBranch.Count, DiffuseLateNoise.StartFor(Fs));
         var df = DiffuseTail.Create(ctx, Block, TracedReverb.Channels, hrtf, Fs) ?? throw new InvalidOperationException("no DiffuseTail");
+        df.LateEarVelvet = EarVelvet;
         var ambi = new float[Block * TracedReverb.Channels];
         var y = new[] { new float[x.Length], new float[x.Length] };
         var tmp = new float[Block];

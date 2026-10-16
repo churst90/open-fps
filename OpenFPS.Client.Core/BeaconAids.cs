@@ -174,7 +174,7 @@ public sealed class BeaconAids
     /// <summary>One blip, unless a wall is in the way of it: then false.</summary>
     private bool Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
     {
-        var (gain, reference) = Loudness.Place(BlipDb + (float)_prefs.LevelDb);
+        var (gain, reference) = _audio.Hearing.Place(BlipDb + (float)_prefs.LevelDb);
         at = BlipPoint(world, sourceId, at, listener, out int region);
         // The path the worker answers for this beacon (the hand-rolled tracer until it has); the door's own
         // leaf does not block its own blip.
@@ -202,7 +202,7 @@ public sealed class BeaconAids
             EarLevelDb = BlipDb + (float)_prefs.LevelDb,
             MinDistance = reference,
             // As far as a blip of its level is heard (S24): which beacons blip is each kind's own reach.
-            Range = Loudness.AudibleRange(BlipDb + (float)_prefs.LevelDb),
+            Range = _audio.Hearing.AudibleRange(BlipDb + (float)_prefs.LevelDb),
             IsEvent = true,
             Type = EmitterType.WorldLocked,
         });

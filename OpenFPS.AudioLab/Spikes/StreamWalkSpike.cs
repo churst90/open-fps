@@ -43,7 +43,7 @@ public static class StreamWalkSpike
         float churn = float.Parse(Arg("churn", "0"), System.Globalization.CultureInfo.InvariantCulture);
         float churnDue = 0f;
         float stopEvery = float.Parse(Arg("stops", "0"), System.Globalization.CultureInfo.InvariantCulture);
-        RouteAnswers.RetainSuperseded = Arg("keep", "") == "old";
+        bool keepOld = Arg("keep", "") == "old";
         var heading = Arg("heading", "east") switch
         {
             "north" => new Vector3(0, 0, 1), "west" => new Vector3(-1, 0, 0), "south" => new Vector3(0, 0, -1), _ => new Vector3(1, 0, 0),
@@ -116,7 +116,7 @@ public static class StreamWalkSpike
         Console.WriteLine($"  join: {client.EntityCount} entities, {client.Tiles.Count} tiles, {joinBytes / 1024.0:F0} KB, {clock.ElapsedMilliseconds} ms to the acoustic map");
 
         var acoustics = new SpatialAcoustics { ListenerBodyId = body.Id };
-        using var worker = new AsyncAcousticWorker(acoustics);
+        using var worker = new AsyncAcousticWorker(acoustics) { Lab = new() { RetainSupersededRoutes = keepOld } };
         worker.UpdateWorld(client.GetSnapshot());
         worker.Start();
 
@@ -220,7 +220,7 @@ public static class StreamWalkSpike
 
         heap.Add((loop.Elapsed.TotalSeconds, HeapMb()));
         Console.WriteLine($"  heap: {heap[0].Mb:F0} MB at the start, {heap[^1].Mb:F0} MB at the end, most {heap.Max(h => h.Mb):F0} MB"
-                          + $" ({(RouteAnswers.RetainSuperseded ? "answers kept as before" : "answers let go with their graph")}, {churn} one-off sources a frame)");
+                          + $" ({(keepOld ? "answers kept as before" : "answers let go with their graph")}, {churn} one-off sources a frame)");
         string Stats(List<double> v) { if (v.Count == 0) return "none"; v.Sort(); return $"median {v[v.Count / 2]:F0} ms, 99th {v[(int)(v.Count * 0.99)]:F0} ms, worst {v[^1]:F0} ms ({v.Count})"; }
         Console.WriteLine($"  walked {(at - spawn).Length():F0} m at {speed} m/s: {(bytes - joinBytes) / 1024.0:F0} KB after the join, " +
                           $"{client.AcousticRefreshes} acoustic refreshes (last {client.LastAcousticRefreshMs:F0} ms), {worker.TileSceneBuilds} scene rebuilds (last {worker.LastTileSceneBuildMs:F0} ms)");

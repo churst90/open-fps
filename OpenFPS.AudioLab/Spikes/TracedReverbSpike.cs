@@ -21,7 +21,8 @@ public static class TracedReverbSpike
     {
         AcousticRegistry.Initialize();
         bool parametric = Environment.GetEnvironmentVariable("SA_PARAMETRIC") == "1";
-        if (parametric) TracedReverb.SimulatedType = Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID;
+        // SA_PARAMETRIC=1 asks for the hybrid simulation, which is what the game traces anyway (LabLevers.TracedSimulation).
+        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { TracedSimulation = Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID };
         var cs = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("context failed"); return 1; }
         var q = Quaternion.Identity;
@@ -93,7 +94,7 @@ public static class TracedReverbSpike
             using var scene = new SteamAudioScene(ctx);
             scene.Build(boxes);
             int trFrame = int.TryParse(Environment.GetEnvironmentVariable("SA_FRAME"), out var tf) ? tf : TracedReverb.TracedFrame;
-            using var tr = new TracedReverb(ctx, 44100, trFrame);
+            using var tr = new TracedReverb(ctx, 44100, trFrame, lab: lab);
             tr.SetScene(scene);
             tr.SetListener(ear);
             var until = DateTime.UtcNow.AddSeconds(20);

@@ -218,7 +218,7 @@ public sealed class EngineReflections
     /// <summary>
     /// Brings one engine's echo voices up to date. They copy <paramref name="direct"/>, the engine's own
     /// emitter, so they attenuate the same way, with only the surface's share in their volume. With
-    /// <paramref name="traced"/> (FmodAudioProvider.HasTracedEchoes) the mirror images fade out: the trace
+    /// <paramref name="traced"/> (AudioEngineFacade.HasTracedEchoes) the mirror images fade out: the trace
     /// has them and every order past them.
     /// </summary>
     public void Update(int entityId, in SpatialEmitter direct, in AcousticPathData directPath,

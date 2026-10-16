@@ -303,7 +303,7 @@ public sealed partial class EngineSynth
 
         private void BeginToTwin()
         {
-            _twin ??= new EngineSynth(_o.Profile, _o._rate * 0.5f, _o._seed);
+            _twin ??= new EngineSynth(_o.Profile, _o._rate * 0.5f, _o._seed) { Mix = _o.Mix, Lab = _o.Lab };
             _twin.FollowFrom(_o);
             _twin._theta = _twin.Wrap(_o._theta + CrankLead);
             Restart(Phase.ToTwin);

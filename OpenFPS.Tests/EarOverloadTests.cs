@@ -10,11 +10,14 @@ namespace OpenFPS.Tests;
 [Collection(nameof(LevelCompressionSetting))]
 public class EarOverloadTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private static float At(float compression, System.Func<float> f)
     {
-        float was = Loudness.DynamicRangeCompression;
-        try { Loudness.DynamicRangeCompression = compression; return f(); }
-        finally { Loudness.DynamicRangeCompression = was; }
+        float was = Law.Compression;
+        try { Law.Compression = compression; return f(); }
+        finally { Law.Compression = was; }
     }
 
     [Fact]

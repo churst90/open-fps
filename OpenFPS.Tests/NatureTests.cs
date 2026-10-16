@@ -19,6 +19,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class NatureTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public NatureTests(ITestOutputHelper o)
     {
@@ -535,15 +538,15 @@ public class NatureTests
         foreach (float field in new[] { 35f, 50f, 65f })
         {
             float drop = field + 10f;                  // a drop's peak, 10 dB over the patch's Leq
-            var (g, _) = DropBank.Placement(drop, field);
-            var (pg, _) = Loudness.Place(field);
+            var (g, _) = DropBank.Placement(Law, drop, field);
+            var (pg, _) = Law.Place(field);
             // The patch's Leq plays the shared headroom under its gain; the drop's peak at its own.
             float patchRms = 20f * MathF.Log10(pg) - VehicleProfile.PeakHeadroomDb;
             float dropPeak = 20f * MathF.Log10(g);
             Assert.Equal(10f, dropPeak - patchRms, 2);
         }
         // With no field measured yet, a drop is placed on its own.
-        Assert.Equal(Loudness.Place(60f).Gain, DropBank.Placement(60f, float.NaN).Gain);
+        Assert.Equal(Law.Place(60f).Gain, DropBank.Placement(Law, 60f, float.NaN).Gain);
     }
 
     /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;" is a tap; a plain "water:&lt;preset&gt;" is the whole.</summary>

@@ -18,6 +18,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class OneRankTests
 {
+    /// <summary>The law as a world with the shipped hearing places by.</summary>
+    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+
     private readonly ITestOutputHelper _o;
     public OneRankTests(ITestOutputHelper o) => _o = o;
 
@@ -60,8 +63,8 @@ public class OneRankTests
         Assert.InRange(20 * MathF.Log10(fire.HeadroomGain), 28.9f, 29.1f);
         foreach (float distance in new[] { 1f, 8f, 60f, 250f })
         {
-            float plain = VoiceManager.Audibility(machine, distance, playing: false);
-            float made = VoiceManager.Audibility(fire, distance, playing: false);
+            float plain = VoiceManager.Audibility(Law, machine, distance, playing: false);
+            float made = VoiceManager.Audibility(Law, fire, distance, playing: false);
             Assert.True(plain > 0f, $"nothing at {distance} m");
             Assert.InRange(made / plain, 0.9999f, 1.0001f);
         }
@@ -90,7 +93,7 @@ public class OneRankTests
         var e = h.Mixer.Latest[Id];
         e.Occlusion = 0f;
         float chosenBy = h.Audio.HeardInRanking(Id);
-        float budgetedBy = VoiceManager.Audibility(e, Vector3.Distance(e.Position, Ear), playing: false);
+        float budgetedBy = VoiceManager.Audibility(Law, e, Vector3.Distance(e.Position, Ear), playing: false);
         _o.WriteLine($"{soundId} ({e.PhysicalKey}): chosen by {20 * MathF.Log10(chosenBy):F2} dB, budgeted by {20 * MathF.Log10(budgetedBy):F2} dB; "
                    + $"headroom's return {(e.HeadroomGain > 0f ? 20 * MathF.Log10(e.HeadroomGain) : 0f):F1} dB");
         Assert.True(chosenBy > 0f && float.IsFinite(chosenBy), $"{soundId} was not ranked");
@@ -155,7 +158,7 @@ public class OneRankTests
         var e = h.Mixer.Latest[5];
         e.Occlusion = 0f;
         float chosenBy = h.Audio.HeardInRanking(5);
-        float budgetedBy = VoiceManager.Audibility(e, Vector3.Distance(e.Position, Ear), playing: false);
+        float budgetedBy = VoiceManager.Audibility(Law, e, Vector3.Distance(e.Position, Ear), playing: false);
         _o.WriteLine($"{preset}: chosen by {20 * MathF.Log10(chosenBy):F2} dB, budgeted by {20 * MathF.Log10(budgetedBy):F2} dB");
         Assert.True(chosenBy > 0f && float.IsFinite(chosenBy), $"{preset} was not ranked");
         Assert.InRange(budgetedBy / chosenBy, 0.999f, 1.001f);
