@@ -331,10 +331,7 @@ public partial class ClientAudioSystem
 
     // Near-field boundary probes: rebuilt each frame from the listener's rotation (ProbeDirections is
     // head space) into buffers owned and reused here, since this runs every audio frame.
-    private readonly Vector3[] _boundaryRays = new Vector3[BoundaryModel.ProbeDirections.Length];
-    private readonly float[] _boundaryDistances = new float[BoundaryModel.ProbeDirections.Length];
-    private readonly float[] _boundaryAbsorptions = new float[BoundaryModel.ProbeDirections.Length];
-    private readonly string[] _boundaryMaterials = new string[BoundaryModel.ProbeDirections.Length];
+    private readonly BoundaryProber _boundaryProber = new();
     private readonly BoundaryProbe[] _boundaryProbes = new BoundaryProbe[BoundaryModel.ProbeDirections.Length];
 
 
@@ -3888,16 +3885,63 @@ public partial class ClientAudioSystem
             return;
         }
 
-        for (int i = 0; i < directions.Length; i++)
-            _boundaryRays[i] = Vector3.Transform(directions[i], head);
-
-        _spatial.RaycastAll(world, visualEyePos, _boundaryRays, BoundaryModel.MaxDistance,
-                            _boundaryDistances, _boundaryAbsorptions, _boundaryMaterials);
-
-        for (int i = 0; i < directions.Length; i++)
-            _boundaryProbes[i] = new BoundaryProbe(directions[i], _boundaryDistances[i], _boundaryMaterials[i]);
-
+        _boundaryProber.Probe(_spatial, world, visualEyePos, head, AudioPhysics.CurrentSpeedOfSound, _boundaryProbes);
         _audio.UpdateBoundaries(_boundaryProbes);
+    }
+
+    /// <summary>
+    /// The six probes round the head and, for each that meets something it can hear (not the floor), how much
+    /// of a wall that something is (<see cref="BoundaryModel.Share"/>): a door's jamb a foot deep met between
+    /// the ears was a whole wall's copy of everything at each ear (Resonance, Sean in a shop's doorway,
+    /// 2026-10-14). Buffers owned and reused: this runs every audio frame, 6 rays and at most 40 more, all in
+    /// one cast so the traffic list is walked twice.
+    /// </summary>
+    internal sealed class BoundaryProber
+    {
+        private static readonly int Probes = BoundaryModel.ProbeDirections.Length;
+        private readonly Vector3[] _rays = new Vector3[Probes];
+        private readonly float[] _distances = new float[Probes];
+        private readonly float[] _absorptions = new float[Probes];
+        private readonly string[] _materials = new string[Probes];
+        private readonly Vector3[] _normals = new Vector3[Probes];
+        private readonly int[] _looked = new int[Probes];
+        private readonly Vector3[] _looks = new Vector3[Probes * BoundaryModel.LooksPerProbe];
+        private readonly float[] _reach = new float[Probes * BoundaryModel.LooksPerProbe];
+        private readonly float[] _lookHits = new float[Probes * BoundaryModel.LooksPerProbe];
+        private readonly float[] _lookAbsorptions = new float[Probes * BoundaryModel.LooksPerProbe];
+        private readonly string[] _lookMaterials = new string[Probes * BoundaryModel.LooksPerProbe];
+
+        public void Probe(SpatialService spatial, WorldSnapshot world, Vector3 ear, Quaternion head, float speedOfSound,
+                          Span<BoundaryProbe> into)
+        {
+            var directions = BoundaryModel.ProbeDirections;
+            for (int i = 0; i < Probes; i++) _rays[i] = Vector3.Transform(directions[i], head);
+            spatial.RaycastAll(world, ear, _rays, BoundaryModel.MaxDistance, _distances, _absorptions, _materials, normals: _normals);
+
+            int looks = 0;
+            float reach = 0f;
+            for (int i = 0; i < Probes; i++)
+            {
+                _looked[i] = -1;
+                if (!(_distances[i] < BoundaryModel.MaxDistance) || BoundaryModel.IsFloor(directions[i])) continue;
+                _looked[i] = looks;
+                BoundaryModel.Looks(ear, _rays[i], _distances[i], _normals[i], speedOfSound,
+                                    _looks.AsSpan(looks, BoundaryModel.LooksPerProbe), _reach.AsSpan(looks, BoundaryModel.LooksPerProbe));
+                for (int k = looks; k < looks + BoundaryModel.LooksPerProbe; k++) reach = MathF.Max(reach, _reach[k]);
+                looks += BoundaryModel.LooksPerProbe;
+            }
+            // Twice the furthest look and a half metre: a look that meets nothing stops well behind its plane.
+            if (looks > 0)
+                spatial.RaycastAll(world, ear, _looks, 2f * reach + 0.5f, _lookHits, _lookAbsorptions, _lookMaterials, count: looks);
+
+            for (int i = 0; i < Probes; i++)
+            {
+                float share = _looked[i] < 0 ? 1f
+                    : BoundaryModel.Share(ear, _rays[i], _distances[i], _normals[i],
+                                          _looks.AsSpan(_looked[i], BoundaryModel.LooksPerProbe), _lookHits.AsSpan(_looked[i], BoundaryModel.LooksPerProbe));
+                into[i] = new BoundaryProbe(directions[i], _distances[i], _materials[i], share);
+            }
+        }
     }
 
     /// <summary>The server reports a new material underfoot (StatsUpdate): it becomes the listener

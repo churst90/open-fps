@@ -4777,6 +4777,27 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
+    /// Each probe's copy, and the trim the set takes. A tight hard space puts a surface in every direction, and
+    /// six summed swamp the direct sound: the set is scaled back together, keeping the ratios between surfaces,
+    /// which are the cue. The budget is what the surfaces would send back as whole walls, and each copy is
+    /// then as much of one as its surface is (BoundaryProbe.Share): a doorway's jambs and head, taken as part
+    /// walls, fell under the budget, the trim let go, and the louder ear's copies came out up to 1.4 dB over
+    /// what the whole walls had made (Marlow Tower flat 00B's door, --near-walls).
+    /// </summary>
+    internal static float BoundaryTaps(ReadOnlySpan<BoundaryProbe> probes, float speedOfSound, int sampleRate,
+                                       Span<BoundaryTap> taps, Span<bool> live)
+    {
+        float whole = 0f;
+        for (int i = 0; i < probes.Length; i++)
+        {
+            live[i] = BoundaryModel.TryBuildTap(probes[i], speedOfSound, sampleRate, out taps[i]);
+            if (BoundaryModel.TryBuildTap(probes[i] with { Share = 1f }, speedOfSound, sampleRate, out var w))
+                whole += Math.Max(Math.Abs(w.GainL), Math.Abs(w.GainR));
+        }
+        return whole > AcousticConstants.MaxBoundaryReflectionSum ? AcousticConstants.MaxBoundaryReflectionSum / whole : 1f;
+    }
+
+    /// <summary>
     /// Hands the mixer the space round the listener's head: one probe per direction, each its own
     /// reflection with its own delay, damping and place between the ears.
     /// </summary>
@@ -4788,22 +4809,9 @@ public partial class FmodAudioProvider : IAudioProvider
         int count = Math.Min(probes.Length, BoundaryVoiceState.MaxTaps);
         Span<BoundaryTap> taps = stackalloc BoundaryTap[BoundaryVoiceState.MaxTaps];
         Span<bool> live = stackalloc bool[BoundaryVoiceState.MaxTaps];
-        float total = 0f;
-
-        for (int i = 0; i < count; i++)
-        {
-            live[i] = BoundaryModel.TryBuildTap(probes[i], _speedOfSound, s.SampleRate, out taps[i]);
-            if (live[i]) total += Math.Max(Math.Abs(taps[i].GainL), Math.Abs(taps[i].GainR));
-        }
-
-        // A tight hard space puts a surface in every direction, and six summed swamp the direct sound:
-        // the set is scaled back together, keeping the ratios between surfaces, which are the cue.
-        float trim = total > AcousticConstants.MaxBoundaryReflectionSum
-            ? AcousticConstants.MaxBoundaryReflectionSum / total
-            : 1f;
         // Copies of the whole mix, on top of QueueEarlyEchoes' walls (in flat 01F, a -9 dB copy of
         // every sound off the ceiling 6 ms late): the copies trim governs them too.
-        trim *= CopiesTrim;
+        float trim = BoundaryTaps(probes[..count], _speedOfSound, s.SampleRate, taps, live) * CopiesTrim;
 
         for (int i = 0; i < BoundaryVoiceState.MaxTaps; i++)
         {

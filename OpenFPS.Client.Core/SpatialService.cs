@@ -415,15 +415,20 @@ public class SpatialService
     /// The first solid along each of <paramref name="directions"/>, into buffers the caller owns (it runs
     /// every audio frame): distance, absorption and material, or maxDist, 1 and "Generic" for a miss.
     /// <paramref name="staticOnly"/> leaves out what moves: a ray from inside a car would find the car.
+    /// <paramref name="normals"/>, when given, takes each hit surface's normal (zero for a miss, or for a
+    /// shape that has none worked out); <paramref name="count"/> casts only the first that many.
     /// </summary>
     public void RaycastAll(WorldSnapshot world, Vector3 start, Vector3[] directions, float maxDist,
-                           float[] distances, float[] absorptions, string[] materials, bool staticOnly = false)
+                           float[] distances, float[] absorptions, string[] materials, bool staticOnly = false,
+                           Vector3[]? normals = null, int count = -1)
     {
-        for (int i = 0; i < directions.Length; i++)
+        int rays = count < 0 ? directions.Length : Math.Min(count, directions.Length);
+        for (int i = 0; i < rays; i++)
         {
             distances[i] = maxDist;
             absorptions[i] = 1.0f;
             materials[i] = "Generic";
+            if (normals != null) normals[i] = Vector3.Zero;
         }
 
         List<EntitySnapshot> entitiesToTest;
@@ -431,12 +436,13 @@ public class SpatialService
         {
             var geo = world.Geometry!;
             var filter = Filter(world);
-            for (int i = 0; i < directions.Length; i++)
+            for (int i = 0; i < rays; i++)
             {
                 if (!geo.Enter(start, directions[i], maxDist, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, out var hit)) continue;
                 if (!(hit.T < distances[i])) continue;
                 ref readonly var surface = ref geo.SurfaceOf(hit);
                 distances[i] = hit.T;
+                if (normals != null) normals[i] = hit.Normal;
                 absorptions[i] = surface.Absorption > 0 ? surface.Absorption : AcousticRegistry.GetProperties(surface.Material).Absorption;
                 materials[i] = string.IsNullOrEmpty(surface.Material) ? "Generic" : surface.Material;
             }
@@ -453,8 +459,10 @@ public class SpatialService
             var registryProps = AcousticRegistry.GetProperties(def.Material.Material);
             float absorption = (def.Acoustics.Absorption > 0) ? def.Acoustics.Absorption : registryProps.Absorption;
             string materialName = string.IsNullOrEmpty(def.Material.Material) ? "Generic" : def.Material.Material;
+            // Nothing of it within reach: on the triangle path the list is the whole map's traffic.
+            if (Vector3.Distance(start, transform.Position) - def.Collider.Size.Length() > maxDist) continue;
 
-            for (int i = 0; i < directions.Length; i++)
+            for (int i = 0; i < rays; i++)
             {
                 bool intersected = false;
                 float dist = maxDist;
@@ -479,6 +487,10 @@ public class SpatialService
                     distances[i] = dist;
                     absorptions[i] = absorption;
                     materials[i] = materialName;
+                    if (normals != null)
+                        normals[i] = def.Collider.Shape == ColliderShape.Box
+                            && RayIntersectsOBBWithNormal(start, directions[i], transform.Position, def.Collider.Size, transform.Rotation, out _, out var n)
+                            ? n : Vector3.Zero;
                 }
             }
         }

@@ -543,6 +543,10 @@ if (args.Contains("--physics-replay"))
 {
     Environment.Exit(OpenFPS.AudioLab.PhysicsReplaySpike.Run(args));
 }
+if (args.Contains("--near-walls"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NearWallsSpike.Run(args));
+}
 if (args.Contains("--walk-pair"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.WalkPairSpike.Run(args));
