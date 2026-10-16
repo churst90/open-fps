@@ -267,8 +267,8 @@ public static class StoveSpike
 
     private static float JetDb(float d, float u)
     {
-        double w = 1e-4 * 1.2 * Math.Pow(u, 8) * d * d / Math.Pow(343, 5);
-        return (float)(10 * Math.Log10(w * 1.2 * 343 / (4 * Math.PI) / 4e-10));
+        double w = 1e-4 * Air.Reference.Density * Math.Pow(u, 8) * d * d / Math.Pow(343, 5);
+        return (float)(10 * Math.Log10(w * Air.Reference.Density * 343 / (4 * Math.PI) / 4e-10));
     }
 
     // ── Through the game ─────────────────────────────────────────────────────────────────────────

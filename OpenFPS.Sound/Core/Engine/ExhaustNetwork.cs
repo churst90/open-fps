@@ -33,7 +33,7 @@ internal sealed class ExhaustNetwork
     private readonly Branch[] _branch;
     private readonly float[] _valveArrived;
     private readonly float[] _scratchA = new float[20], _scratchY = new float[20], _scratchB = new float[20];
-    private readonly float _airDensity = 1.2f;
+    private readonly float _airDensity = Air.Reference.Density;
     private float _flowLossFraction;
     private float _tailK = 293f;
 

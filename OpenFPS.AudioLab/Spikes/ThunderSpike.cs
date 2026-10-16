@@ -53,9 +53,10 @@ public static class ThunderSpike
         Say($"source: {Thunder.SourcePa} Pa at {Thunder.SourceMetres} m for a {Thunder.SourcePeakHz} Hz wave (E = {Thunder.SourceEnergyPerMetre():0} J/m); first strokes here take {LightningPhysics.GroundFlashEnergyMedian:0} J/m");
         Say($"Few's peak frequency at that energy: {LightningPhysics.PeakFrequencyHz(LightningPhysics.GroundFlashEnergyMedian):F0} Hz; N-wave {LightningPhysics.NWaveSeconds(LightningPhysics.GroundFlashEnergyMedian) * 1000:F2} ms");
         float c = AudioPhysics.SpeedOfSoundAt(air.TemperatureC);
+        float rho = new OpenFPS.Common.Air(air.TemperatureC, air.PressureMb).Density;
         float a2 = Thunder.AmplitudeAt2m(LightningPhysics.GroundFlashEnergyMedian, c);
         float t0 = LightningPhysics.NWaveSeconds(LightningPhysics.GroundFlashEnergyMedian, c);
-        Say($"N-wave lengthening (weak shock): x{Thunder.LengthenedSeconds(t0, a2, 1000f, c) / t0:F3} at 1 km, x{Thunder.LengthenedSeconds(t0, a2, 10000f, c) / t0:F3} at 10 km");
+        Say($"N-wave lengthening (weak shock): x{Thunder.LengthenedSeconds(t0, a2, 1000f, c, rho) / t0:F3} at 1 km, x{Thunder.LengthenedSeconds(t0, a2, 10000f, c, rho) / t0:F3} at 10 km");
         Say($"shadow edge, still air: source 1 km up {Thunder.ShadowEdgeMetres(1000f, 15f) / 1000:F1} km, 3 km up {Thunder.ShadowEdgeMetres(3000f, 15f) / 1000:F1} km, 5 km up {Thunder.ShadowEdgeMetres(5000f, 15f) / 1000:F1} km");
         Say("");
 

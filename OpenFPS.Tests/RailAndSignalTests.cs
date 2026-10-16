@@ -579,7 +579,8 @@ public class RailAndSignalTests
 
     private static float JetLevelDb(float d, float u)
     {
-        const float rho0 = 1.2f, c = 343f;
+        float rho0 = Air.Reference.Density;
+        const float c = 343f;
         double w = 1e-4 * rho0 * (293.0 / 700.0) * Math.Pow(u, 8) * d * d / Math.Pow(c, 5);
         double p2 = w * rho0 * c / (4 * Math.PI);
         return (float)(20.0 * Math.Log10(Math.Sqrt(p2) / 2e-5));

@@ -97,8 +97,8 @@ public static class Hydrometeors
 
     // ── Fall ────────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Air density at sea level, kg/m³.</summary>
-    public const float AirDensity = 1.21f;
+    /// <summary>Air density at sea level, kg/m³ (<see cref="Air.Reference"/>).</summary>
+    public static readonly float AirDensity = Air.Reference.Density;
 
     /// <summary>A hailstone's drag coefficient: 0.6, measured on natural stones (Heymsfield et al. 2014),
     /// which with the drag law gives their v ≈ 12 D^0.5 (D in cm).</summary>

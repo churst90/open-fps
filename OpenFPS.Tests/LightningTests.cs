@@ -252,7 +252,7 @@ public class LightningTests
         float c = 340f;
         float t0 = LightningPhysics.NWaveSeconds(LightningPhysics.GroundFlashEnergyMedian, c);
         float a2 = Thunder.AmplitudeAt2m(LightningPhysics.GroundFlashEnergyMedian, c);
-        float t1 = Thunder.LengthenedSeconds(t0, a2, 1000f, c), t10 = Thunder.LengthenedSeconds(t0, a2, 10000f, c);
+        float t1 = Thunder.LengthenedSeconds(t0, a2, 1000f, c, Air.Reference.Density), t10 = Thunder.LengthenedSeconds(t0, a2, 10000f, c, Air.Reference.Density);
         Assert.True(t0 < t1 && t1 < t10);
         Assert.InRange(t10 / t0, 1.02f, 1.2f);
     }

@@ -128,7 +128,7 @@ public class CarWindowTests : IDisposable
         float glass = 2500f * 0.004f, seal = v.Body!.SealLeak * v.Body.SealLeak;
         float Expected(float hz, float s)
         {
-            float t = 415f / (MathF.PI * hz * glass);
+            float t = Air.Reference.Density * AcousticConstants.SpeedOfSound / (MathF.PI * hz * glass);
             return 10f * MathF.Log10(MathF.Min(1f, t * t * (1 - s) + seal + s));
         }
         var shut = CabinWalls.LossDb(v, 0f);

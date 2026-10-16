@@ -350,7 +350,7 @@ public static class BulletFlyby
         public float V => MathF.Min(MathF.Max(1f, Speed), 0.95f * SpeedOfSound);
         public float Diameter => MathF.Max(1e-3f, DiameterTenthMm * 1e-4f);
         public float Length => MathF.Max(1e-3f, LengthTenthMm * 1e-4f);
-        public float Density => DensityGrams > 0 ? DensityGrams / 1000f : 1.225f;
+        public float Density => DensityGrams > 0 ? DensityGrams / 1000f : Air.Standard.Density;
     }
 
     public static string WhizzKey(Whizz w) => string.Create(CultureInfo.InvariantCulture,

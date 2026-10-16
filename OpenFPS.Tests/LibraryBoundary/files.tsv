@@ -209,6 +209,7 @@ OpenFPS.Geometry/Triangles/WheelRays.cs	lib	Geometry
 OpenFPS.Geometry/Triangles/BodyShell.cs	lib	Geometry	
 OpenFPS.Geometry/WallBuild.cs	lib	Geometry	
 OpenFPS.Materials/AcousticRegistry.cs	lib	Materials	
+OpenFPS.Materials/Air.cs	lib	Materials	
 OpenFPS.Materials/RoadSurfaces.cs	lib	Materials	
 OpenFPS.Native/FmodNative/fmod.cs	lib	Native	
 OpenFPS.Native/FmodNative/fmod_dsp.cs	lib	Native	

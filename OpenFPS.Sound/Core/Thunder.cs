@@ -627,7 +627,7 @@ public static class Thunder
     /// cylinder to <see cref="CylinderToSphereMetres"/> and as a sphere beyond, that integrates to
     /// T^3/2 = T0^3/2 + (3/2) K ln(r / r_c), K = beta p_c r_c T0^1/2 / (rho c^3).
     /// </summary>
-    public static float LengthenedSeconds(float t0, float amplitudeAt2m, float distance, float c, float rho = 1.2f)
+    public static float LengthenedSeconds(float t0, float amplitudeAt2m, float distance, float c, float rho)
     {
         float rc = CylinderToSphereMetres;
         if (distance <= rc) return t0;
@@ -691,7 +691,7 @@ public static class Thunder
             public readonly System.Collections.Concurrent.ConcurrentDictionary<int, Kernel> Bins = new();
         }
 
-        private readonly int _fs; private readonly float _c; private readonly Air _air;
+        private readonly int _fs; private readonly float _c, _rho; private readonly Air _air;
         // Read from several cores at once (Render's Parallel.For): made at most a few times over, kept once.
         private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Class> _classes = new();
         private readonly System.Collections.Concurrent.ConcurrentDictionary<int, double[]> _alpha = new();
@@ -710,8 +710,9 @@ public static class Thunder
         public KernelBank(int fs, float c, Air air, float largestEnergy, float mu2)
         {
             _fs = fs; _c = c; _air = air; Mu2 = mu2;
+            _rho = new OpenFPS.Common.Air(air.TemperatureC, air.PressureMb).Density;
             float t0 = LightningPhysics.NWaveSeconds(largestEnergy, c);
-            MaxLength = LengthFor(LengthenedSeconds(t0, AmplitudeAt2m(largestEnergy, c), 60000f, c));
+            MaxLength = LengthFor(LengthenedSeconds(t0, AmplitudeAt2m(largestEnergy, c), 60000f, c, _rho));
         }
 
         public Class ClassFor(float energyPerMetre)
@@ -747,7 +748,7 @@ public static class Thunder
         private Kernel Make(Class cls, float d)
         {
             int pre = Pre;
-            float t = LengthenedSeconds(cls.T0, cls.A2, d, _c);
+            float t = LengthenedSeconds(cls.T0, cls.A2, d, _c, _rho);
             int n = LengthFor(t);
             var alpha = Alpha(n);
             // Energy kept as it lengthens: the peak falls as sqrt(T0 / T).

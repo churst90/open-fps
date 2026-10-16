@@ -250,7 +250,8 @@ public static class BulletImpact
 
     // ── The physics of one strike ───────────────────────────────────────────────────────────────
 
-    private const float RhoAir = 1.2f, C = 343f, RefPa = 20e-6f;
+    private static readonly float RhoAir = Air.Reference.Density;
+    private const float C = 343f, RefPa = 20e-6f;
 
     /// <summary>How long the slug and the face are in contact, seconds.</summary>
     public static float ContactSeconds(Hit h)

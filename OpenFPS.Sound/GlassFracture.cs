@@ -84,7 +84,11 @@ public static class GlassFracture
     private const double SlugMetres = 0.016;
     /// <summary>The share of a tempered die's motion in the sheet that is out of the sheet's plane (estimate).</summary>
     private const double OutOfPlane = 0.2;
-    private const double Rho0 = 1.2, C0 = 343, G = Earth.StandardGravity;
+    /// <summary>Its own air, 1.2 kg/m³, until Cody decides (docs/PHYSICS_BOUNDARY.md 16.6): with the one air's
+    /// 1.204 every shard's terminal speed moves 0.17 % and the pieces of a landing fall together differently,
+    /// each variant's render up to 4.5 dB apart in a band (the eight variants' mean within 0.44 dB).</summary>
+    private const double Rho0 = 1.2;
+    private const double C0 = 343, G = Earth.StandardGravity;
 
     /// <summary>The plate's longitudinal speed, sqrt(E / (rho (1 - nu^2))), about 5500 m/s.</summary>
     private static readonly double PlateSpeed = Math.Sqrt(YoungsPa / (Density * (1 - Poisson * Poisson)));

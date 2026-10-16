@@ -48,7 +48,8 @@ public static class BumpSpike
         new("shoulder", 12.9f, 12_800f, 377f, 0.19f, 0.15f),
     };
 
-    const float Rho0 = 1.2f, C0 = 343f;
+    static readonly float Rho0 = Air.Reference.Density;
+    const float C0 = 343f;
 
     public static int Run(string[] args)
     {

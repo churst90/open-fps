@@ -78,7 +78,7 @@ public sealed class StruckBell
             _hz[i] = f;
 
             float sigma = Math.Clamp(f / fCrit + 0.25f, 0.05f, 1f);
-            float etaRad = 1.2f * 343f * sigma / (MathF.Tau * MathF.Max(20f, f) * rhoH);
+            float etaRad = Air.Reference.Density * 343f * sigma / (MathF.Tau * MathF.Max(20f, f) * rhoH);
             // The mounting grips what moves at the crown and cannot reach what does not.
             float etaMount = spec.MountLossFactor * (m == 0 ? 1f : m == 1 ? 0.45f : 0.05f / (m - 1f));
             float eta = spec.LossFactor + etaRad + etaMount;

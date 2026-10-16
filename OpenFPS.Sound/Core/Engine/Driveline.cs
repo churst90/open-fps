@@ -13,6 +13,10 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// </summary>
 public sealed class Driveline
 {
+    /// <summary>The air the car pushes through, kg/m³: a standard day's (<see cref="Air.Standard"/>), as the
+    /// server's car where its map gives no weather.</summary>
+    internal static readonly float AirDensity = Air.Standard.Density;
+
     public readonly VehicleProfile Vehicle;
     private readonly Gearbox _gb;
 
@@ -54,7 +58,7 @@ public sealed class Driveline
         var v = Vehicle;
         float r = _gb.WheelRadiusMetres;
         float i = Ratio(Gear);
-        float drag = 0.5f * 1.225f * v.DragArea * Speed * Speed;
+        float drag = 0.5f * AirDensity * v.DragArea * Speed * Speed;
         float roll = Speed > 0.05f ? v.RollingResistance * v.MassKg * Earth.StandardGravity : 0f;
         float brake = Brake * MaxBrake * v.MassKg;
         float resist = drag + roll + brake;                 // N, against motion
@@ -428,7 +432,7 @@ public sealed class VirtualDriver
         // integral so a cruise settles.
         float wantAccel = _accelEstimate + err * 0.9f;
         float mass = _dl.Vehicle.MassKg;
-        float need = wantAccel * mass + 0.5f * 1.225f * _dl.Vehicle.DragArea * _dl.Speed * _dl.Speed
+        float need = wantAccel * mass + 0.5f * Driveline.AirDensity * _dl.Vehicle.DragArea * _dl.Speed * _dl.Speed
                    + _dl.Vehicle.RollingResistance * mass * Earth.StandardGravity;
         float available = MathF.Max(50f, e.PeakTorqueNm * 0.85f * _dl.Ratio(_dl.Gear) / _gb.WheelRadiusMetres);
         // The integral only while it can act: locked in gear, and not pushing past a throttle already

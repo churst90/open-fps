@@ -80,7 +80,7 @@ public static class CarWindow
         float leak = body.SealLeak * body.SealLeak + open;
         float Loss(float hz)
         {
-            float t = 415f / (MathF.PI * hz * mass);
+            float t = Air.Reference.Density * AcousticConstants.SpeedOfSound / (MathF.PI * hz * mass);
             return 10f * MathF.Log10(MathF.Min(1f, t * t * (1f - open) + leak));
         }
         return (Loss(150f), Loss(1000f), Loss(4000f));

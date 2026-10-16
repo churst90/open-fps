@@ -89,7 +89,7 @@ public sealed class FallingWaterSynth
     private const float SplashScatter = 0.7f, SplashBandHalfWidth = 1.6f;
 
     /// <summary>ρ c of air, Pa s/m: the impedance a radiated power meets.</summary>
-    private const float RhoC = 413f;
+    private static readonly float RhoC = Air.Reference.Density * AcousticConstants.SpeedOfSound;
 
     // ── Physical constants ───────────────────────────────────────────────────────────────────────
 

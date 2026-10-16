@@ -980,11 +980,14 @@ public class GameServer
                     // heads, so they come last.
                     stage.Dispose();
                     stage = PerfProbe.Measure("server.driving+doors+parents");
+                    // A driven car pushes through its map's air, as a bullet flies through it.
+                    var driveAir = _environment.GetStateForMap(MapAtmosphere.Of(entry.Value.data));
                     DrivingSystem.Update(world, grid, entry.Value.data.WalkMin, entry.Value.data.WalkMax, dt,
                                          (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds), entry.Key,
                                          _maps.TryGetTiles(entry.Key, out var driveTiles) && driveTiles.Dynamic
                                              ? new DrivingSystem.TileFence(driveTiles.IsReady, driveTiles.TileMetres) : null,
-                                         root => TellDriver(world, root, "The road ahead is not built yet. Stopping here until it is."));
+                                         root => TellDriver(world, root, "The road ahead is not built yet. Stopping here until it is."),
+                                         new Air(driveAir.Temperature, driveAir.AirPressure));
                     // The glass in every car's windows, toward wherever it was last sent.
                     WindowSystem.Update(world, dt);
                     // Doors swing before ParentSystem places the parts, or the swing of a door in a

@@ -68,8 +68,6 @@ public static class DrivingSystem
     /// <summary>Below this the car is stopped, not creeping. Stops resistances oscillating about zero.</summary>
     private const float StandstillSpeed = 0.15f;
 
-    private const float AirDensity = 1.225f;
-
     /// <summary>
     /// Each driven car on its wheels, by entity. Kept here rather than on the component: it is a
     /// simulation, not something the wire or a save carries.
@@ -172,17 +170,18 @@ public static class DrivingSystem
     /// hears of a car stopped (or held) for a tile not built yet, once per stop.</summary>
     public static void Update(World world, SpatialGrid<Entity> grid, Vector3 mapMin, Vector3 mapMax, float dt,
                               Action<int, string, IReadOnlyList<TransientSound>>? heard = null, string? mapId = null,
-                              TileFence? fence = null, Action<int>? stopped = null)
+                              TileFence? fence = null, Action<int>? stopped = null, Air? air = null)
     {
         _mapId = mapId;
         float gravity = PhysicsConstants.GravityOf(world);
+        float airDensity = (air ?? Air.Standard).Density;
         var query = new QueryDescription().WithAll<Transform, DriveComponent, Velocity>();
         var driven = new List<Entity>();
         world.Query(in query, (Entity e, ref Transform _, ref DriveComponent __, ref Velocity ___) => driven.Add(e));
 
         foreach (var root in driven)
         {
-            try { Step(world, grid, root, mapMin, mapMax, dt, gravity, heard, fence, stopped); }
+            try { Step(world, grid, root, mapMin, mapMax, dt, gravity, airDensity, heard, fence, stopped); }
             catch (Exception ex) { Log.Error(ex, "DrivingSystem: entity {Id} failed to move.", root.Id); }
         }
 
@@ -205,7 +204,7 @@ public static class DrivingSystem
     }
 
     private static void Step(World world, SpatialGrid<Entity> grid, Entity root, Vector3 mapMin, Vector3 mapMax,
-                             float dt, float gravity, Action<int, string, IReadOnlyList<TransientSound>>? heard,
+                             float dt, float gravity, float airDensity, Action<int, string, IReadOnlyList<TransientSound>>? heard,
                              TileFence? fence = null, Action<int>? stopped = null)
     {
         ref var drive = ref world.Get<DriveComponent>(root);
@@ -270,7 +269,7 @@ public static class DrivingSystem
         }
 
         // ── What is holding it back ─────────────────────────────────────────────────────────────
-        float drag = 0.5f * AirDensity * profile.DragArea * v * v;
+        float drag = 0.5f * airDensity * profile.DragArea * v * v;
         float rolling = profile.RollingResistance * mass * gravity;
         float braking = Math.Clamp(drive.Brake, 0f, 1f) * capacity * mass;
         float engineBraking = (1f - MathF.Abs(drive.Throttle))

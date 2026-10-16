@@ -508,7 +508,8 @@ internal sealed class JetNoise
     /// </summary>
     public static float LighthillPressure(float diameterMetres, float velocity, float gasKelvin)
     {
-        const float rho0 = 1.2f, c = 343f;
+        float rho0 = Air.Reference.Density;
+        const float c = 343f;
         float rhoRatio = 293f / MathF.Max(293f, gasKelvin);
         double u = Math.Min(Math.Abs(velocity), 600.0);
         double w = Lighthill * rho0 * rhoRatio * Math.Pow(u, 8) * diameterMetres * diameterMetres / SoundSpeedToTheFifth;

@@ -188,7 +188,7 @@ public readonly record struct RainPlate
     /// <summary>Poisson's ratio, for the bending stiffness: 0.3 for metals and glass.</summary>
     public const float Poisson = 0.3f;
     /// <summary>ρ0 c0 of air at 20 °C, Pa·s/m.</summary>
-    public const float AirImpedance = WallTransmission.AirDensity * WallTransmission.SoundSpeed;
+    public static readonly float AirImpedance = WallTransmission.AirDensity * WallTransmission.SoundSpeed;
     /// <summary>Water's density, kg/m³.</summary>
     public const float WaterDensity = 1000f;
     /// <summary>The peak force of a drop's blow over ρ v² D² (Gordillo et al. 2018).</summary>

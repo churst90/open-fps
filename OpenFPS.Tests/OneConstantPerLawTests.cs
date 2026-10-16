@@ -54,6 +54,49 @@ public class OneConstantPerLawTests
             .Select(l => $"{l.File}:{l.Line}: {l.Code.Trim()}")
             .ToList();
 
+    /// <summary>How air's density was written beside the laws that use it: a density named and given
+    /// 1.15 to 1.29; that times 343, the speed it goes with; half of it times a speed squared; rho c as
+    /// 410 to 419; the standard day's 1.225 or 20 °C's 1.204 anywhere; 1.2 times a law with 343 or 293 K
+    /// in it.</summary>
+    private static readonly Regex[] DensityLiterals =
+    {
+        new(@"(?i)\b\w*(?:rho|density)\w*\s*=\s*1\.(?:1[5-9]|2)\d*[fFdDmM]?(?![\w.])", RegexOptions.Compiled),
+        new(@"(?<![\w.])1\.(?:1[5-9]|2)\d*[fFdD]?\s*\*\s*343|343[fFdD]?\s*\*\s*1\.(?:1[5-9]|2)\d*[fFdD]?(?![\w.])", RegexOptions.Compiled),
+        new(@"(?<![\w.])0\.5[fFdD]?\s*\*\s*1\.(?:1[5-9]|2)\d*[fFdD]?\s*\*", RegexOptions.Compiled),
+        new(@"(?<![\w.])41[0-9](?:\.\d+)?[fFdD]?\s*[/*]|\*\s*41[0-9](?:\.\d+)?[fFdD]?(?![\w.])", RegexOptions.Compiled),
+        new(@"(?i)\b\w*(?:rhoc|impedance)\w*\s*=\s*4[01]\d", RegexOptions.Compiled),
+        new(@"(?i)(?=.*\bair).*(?<![\w.])1\.2(?:25|0[0-9]+|1)[fFdDmM]?(?![\w.])", RegexOptions.Compiled),
+        new(@"(?<![\w.])1\.2(?:25|04|05)\d*[fFdDmM]?(?![\w.])", RegexOptions.Compiled),
+        new(@"(?<![\w.])1\.2[01]?[fFdD]?\s*\*.*\b(?:343|293)", RegexOptions.Compiled),
+    };
+
+    /// <summary>The one copy left, waiting on Cody (docs/PHYSICS_BOUNDARY.md 16.6): the glass's landing renders
+    /// re-roll with the one air.</summary>
+    private const string Waiting = "OpenFPS.Sound/GlassFracture.cs";
+
+    internal static List<string> DensityCopies()
+        => CodeLines()
+            .Where(l => l.File != "OpenFPS.Materials/Air.cs")
+            .Where(l => !(l.File == Waiting && l.Code.StartsWith("private const double Rho0 = 1.2;", StringComparison.Ordinal)))
+            // A table of measured statistics is numbers, not a law.
+            .Where(l => !l.Code.Contains("\", new[]", StringComparison.Ordinal))
+            .Where(l => DensityLiterals.Any(r => r.IsMatch(l.Code)))
+            .Select(l => $"{l.File}:{l.Line}: {l.Code.Trim()}")
+            .ToList();
+
+    [Fact]
+    public void Air_density_is_one_law()
+    {
+        var copies = DensityCopies();
+        Assert.True(copies.Count == 0,
+            "Air's density is Air.Density, from its temperature and pressure (Air.Reference for the heard laws, Air.Standard "
+            + "or the map's air for drag); these write it again:\n" + string.Join("\n", copies));
+        Assert.Equal(1.225f, Air.Standard.Density, 3);
+        Assert.Equal(1.204f, Air.Reference.Density, 3);
+        // The heard laws' air is the one their speed of sound is: 343 m/s at 20 °C.
+        Assert.Equal(AcousticConstants.SpeedOfSound, Air.Reference.SpeedOfSound, 0);
+    }
+
     [Fact]
     public void Gravity_is_written_once()
     {

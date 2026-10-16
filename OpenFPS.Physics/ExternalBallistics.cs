@@ -3,22 +3,6 @@ using System.Numerics;
 
 namespace OpenFPS.Common;
 
-/// <summary>The air a bullet flies through: what sets its drag (density) and where the drag rises
-/// steeply (the speed of sound).</summary>
-public readonly record struct Air(float TemperatureC, float PressureMb)
-{
-    /// <summary>The ICAO standard day at sea level, 15 °C and 1013.25 mb: what published tables assume
-    /// and what a rifle is zeroed in.</summary>
-    public static readonly Air Standard = new(15f, 1013.25f);
-
-    /// <summary>Dry air, kg/m³. Humidity moves it by under one per cent and is left out.</summary>
-    public float Density => PressureMb * 100f / (287.05f * (TemperatureC + 273.15f));
-
-    /// <summary>m/s, an ideal gas: 331.3 at 0 °C, as the square root of the absolute temperature. The
-    /// one law for the speed of sound (AudioPhysics.SpeedOfSoundAt reads it).</summary>
-    public float SpeedOfSound => 331.3f * MathF.Sqrt(1f + TemperatureC / 273.15f);
-}
-
 /// <summary>A bullet in flight: where it is, how fast it is going, and for how long it has flown.</summary>
 /// <summary>
 /// What flies: a bullet as its flight needs it, with nothing of the gun that fired it. A weapon makes one

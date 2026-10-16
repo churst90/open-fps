@@ -215,6 +215,7 @@ OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	Geometry
 OpenFPS.Geometry/Triangles/WheelRays.cs	Geometry	
 OpenFPS.Geometry/WallBuild.cs	Geometry	
 OpenFPS.Materials/AcousticRegistry.cs	Materials	
+OpenFPS.Materials/Air.cs	Materials	
 OpenFPS.Materials/RoadSurfaces.cs	Materials	
 OpenFPS.Native/FmodNative/fmod.cs	Native	
 OpenFPS.Native/FmodNative/fmod_dsp.cs	Native	

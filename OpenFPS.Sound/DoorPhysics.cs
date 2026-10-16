@@ -10,7 +10,9 @@ namespace OpenFPS.Common;
 /// </summary>
 internal static class DoorPhysics
 {
-    internal const double Rho0 = 1.21, C0 = 343.0;
+    /// <summary>The air a door radiates into, kg/m³ (<see cref="Air.Reference"/>), and its speed of sound, m/s.</summary>
+    internal static readonly double Rho0 = Air.Reference.Density;
+    internal const double C0 = 343.0;
     internal const double Poisson = 0.3;
     /// <summary>LuGre bristle stiffness per newton of load, 1/m: about 50 nm of pre-sliding before a
     /// hardened pin breaks away. Softer than this, a squeak never leaves the pre-slide and comes out a

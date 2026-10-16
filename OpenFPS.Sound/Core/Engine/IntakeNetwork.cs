@@ -24,7 +24,7 @@ internal sealed class IntakeNetwork
     private readonly Pipe _airbox, _snorkel;
     private readonly OpenEnd _end;
     private readonly float _rate, _dt;
-    private float _airDensity = 1.2f;
+    private readonly float _airDensity = Air.Reference.Density;
 
     // The plenum
     private readonly float _plenumVolume;
@@ -142,7 +142,6 @@ internal sealed class IntakeNetwork
         for (int c = 0; c < _n; c++) _runner[c].SetGas(kelvin, Gas.GammaAir, 0.03f);
         _airbox.SetGas(kelvin - 10f, Gas.GammaAir, 0f);
         _snorkel.SetGas(kelvin - 12f, Gas.GammaAir, 0.02f);
-        _airDensity = Gas.Density(Gas.Atmosphere, 293f);
         _end.Configure(_snorkel.Radius, _snorkel.SoundSpeed, _snorkel.Density, _snorkel.Area, 0.02f);
         // A runner mouth is not a perfect pressure release: a little of what arrives is lost to the
         // plenum's walls and turbulence at the bell.

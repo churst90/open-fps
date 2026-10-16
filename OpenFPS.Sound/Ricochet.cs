@@ -84,7 +84,7 @@ public static class Ricochet
     {
         float c = MathF.Max(200f, soundSpeed);
         float tc = (c / 331.3f) * (c / 331.3f) * 273.15f - 273.15f;
-        float rho = densityGrams > 0 ? densityGrams / 1000f : 1.225f;
+        float rho = densityGrams > 0 ? densityGrams / 1000f : Air.Standard.Density;
         return new Air(tc, rho * 287.05f * (tc + 273.15f) / 100f);
     }
 

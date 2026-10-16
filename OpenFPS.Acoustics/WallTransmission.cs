@@ -79,8 +79,8 @@ public static class WallTransmission
 {
     /// <summary>Speed of sound, m/s, at 20 °C.</summary>
     public const float SoundSpeed = AcousticConstants.SpeedOfSound;
-    /// <summary>Density of air, kg/m³, at 20 °C.</summary>
-    public const float AirDensity = 1.21f;
+    /// <summary>Density of air, kg/m³, at 20 °C (<see cref="Air.Reference"/>).</summary>
+    public static readonly float AirDensity = Air.Reference.Density;
 
     /// <summary>The thinnest cavity two leaves are built with: the 6 mm gap of the narrowest sealed
     /// glazing unit (4-6-4, EN 1279). A box thinner than two leaves and this is one solid sheet.</summary>
@@ -274,7 +274,7 @@ public static class WallTransmission
     public static bool Seals(in MaterialProperties p) => !p.Porous && p.DensityKgM3 > 0f;
 
     /// <summary>The air's own stiffness, its adiabatic bulk modulus rho c^2, Pa (about 142 kPa).</summary>
-    public const float AirBulkModulusPa = AirDensity * SoundSpeed * SoundSpeed;
+    public static readonly float AirBulkModulusPa = AirDensity * SoundSpeed * SoundSpeed;
 
     /// <summary>
     /// Whether a layer is a cavity between the layers either side of it rather than a ply bonded to them: it lets

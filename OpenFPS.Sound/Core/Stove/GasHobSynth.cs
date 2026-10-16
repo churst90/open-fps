@@ -37,7 +37,8 @@ public sealed class GasHobSynth
     // ── Lab switches: 1 plays a part, 0 mutes it. ──
     public float SparkPart = 1f, ClickPart = 1f, HissPart = 1f, FlamePart = 1f, LightUpPart = 1f;
 
-    private const float Rho0 = 1.2f, C0 = 343f;
+    private static readonly float Rho0 = Air.Reference.Density;
+    private const float C0 = 343f;
 
     // ── The burners ──────────────────────────────────────────────────────────────────────────────
 

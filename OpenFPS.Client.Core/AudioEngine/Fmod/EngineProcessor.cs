@@ -50,6 +50,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>The road speed at which the axle squeal reached its full level (its rub term saturated
     /// at 12 m/s), so the declared squeal level means what it meant.</summary>
     private const float SquealReferenceSpeed = 12f;
+
+    /// <summary>The air the cabin and the wind on the glass are heard in (<see cref="Air.Reference"/>):
+    /// its density, kg/m³, and its impedance rho c, Pa s/m.</summary>
+    private static readonly float AirDensity = OpenFPS.Common.Air.Reference.Density, AirImpedance = AirDensity * AcousticConstants.SpeedOfSound;
     private float _tyreChirp;
     private float _chirpDecay = 0.99985f;   // a sample at 44.1 kHz: 150 ms
     private int _tyreGear;
@@ -465,7 +469,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                                    sampleRate);
         var steel = AcousticRegistry.GetProperties(shell.PanelMaterial);
         float surfaceMass = MathF.Max(0.5f, steel.DensityKgM3 * shell.PanelThicknessM);   // kg/m^2
-        _panelCorner = 415f / (MathF.PI * surfaceMass);                                   // rho*c / (pi*m)
+        _panelCorner = AirImpedance / (MathF.PI * surfaceMass);                           // rho*c / (pi*m)
         _sealLeak = Math.Clamp(shell.SealLeak, 0f, 1f);
         _starterPath = MathF.Pow(10f, -MathF.Max(0f, shell.StarterPathLossDb) / 20f);
         _windPaAt110 = 20e-6f * MathF.Pow(10f, shell.WindNoiseDbAt110 / 20f);
@@ -479,7 +483,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // pitch, about 500 Hz: the glass's mass law there, plus the seals. Outside the glass the
             // turbulence is that much stronger, and an open window lets it in through the hole instead.
             float glassMass = AcousticRegistry.GetProperties("Glass").DensityKgM3 * CarWindow.GlassThicknessM;
-            float t = 415f / (MathF.PI * 500f * MathF.Max(1f, glassMass));
+            float t = AirImpedance / (MathF.PI * 500f * MathF.Max(1f, glassMass));
             _windOutside = 1f / MathF.Sqrt(t * t + _sealLeak * _sealLeak);
             // Helmholtz: the cabin's air is the spring and the air in each open window the mass, its
             // effective length about 1.7 radii of an opening that size (both ends flanged by the door).
@@ -1494,7 +1498,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                             float r = MathF.Exp(-w0 / (2f * (6f / MathF.Max(1, _windowCount))));
                             float y = n * (1f - r) + 2f * r * MathF.Cos(w0) * _buffetY1 - r * r * _buffetY2;
                             _buffetY2 = _buffetY1; _buffetY1 = y;
-                            float q = 0.5f * 1.2f * speed * speed;
+                            float q = 0.5f * AirDensity * speed * speed;
                             _pathNow[0] += y * locked * BuffetShare * q * _windowsNow;
                         }
                     }
@@ -1559,7 +1563,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                                 float r = MathF.Exp(-w0 / (2f * (6f / MathF.Max(1, _windowCount))));
                                 float y = n * (1f - r) + 2f * r * MathF.Cos(w0) * _buffetY1 - r * r * _buffetY2;
                                 _buffetY2 = _buffetY1; _buffetY1 = y;
-                                float q = 0.5f * 1.2f * speed * speed;
+                                float q = 0.5f * AirDensity * speed * speed;
                                 inCabin += y * locked * BuffetShare * q * _windowsNow;
                             }
                         }

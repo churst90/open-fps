@@ -109,6 +109,9 @@ public sealed class ShoreSynth
     /// across, and breaks into bubbles of about a third of that radius. An estimate.</summary>
     private const float LipNote = 0.3f;
 
+    /// <summary>rho c of the air a spray and a hull radiate into, Pa s/m (<see cref="Air.Reference"/>).</summary>
+    private static readonly float AirImpedance = Air.Reference.Density * AcousticConstants.SpeedOfSound;
+
     /// <summary>The share of a breaker's dissipated energy its bubble cloud radiates as a whole, in its
     /// collective oscillation: 10-300 Hz under breakers (Lamarre and Melville 1994), the low roar that
     /// plunging breakers add and spilling ones barely do (Loewen and Melville 1994). FITTED to the
@@ -904,7 +907,7 @@ public sealed class ShoreSynth
             if (hz < 15f || hz > 0.4f * _rate) continue;
             float decay = MathF.Max(0.03f, 3f / hz), rise = MathF.Min(0.05f, 0.5f * decay);
             float t = rise / 3f + decay / 2f;
-            float pascals = MathF.Sqrt(energy / clouds * 413f / (2f * MathF.PI * t)) * CloudPart;
+            float pascals = MathF.Sqrt(energy / clouds * AirImpedance / (2f * MathF.PI * t)) * CloudPart;
             int delay = at + (int)((MathF.Min(0.5f, period / 6f) + 0.3f * period * _rng.Uniform()) * _rate);
             var sum = Place(place);
             if (delay >= sum.Horizon) delay = sum.Horizon - 1;
@@ -1241,7 +1244,7 @@ public sealed class ShoreSynth
         float mass = StoneDensity * 4f / 3f * MathF.PI * a * a * a;
         float mEff = 0.5f * mass, rEff = 0.5f * a, eEff = StoneModulus / (2f * (1f - 0.25f * 0.25f));
         float tau = 2.87f * MathF.Pow(mEff * mEff / (rEff * eEff * eEff * MathF.Max(0.02f, dv)), 0.2f);
-        float peak = 1.2f * a * a * a * dv / (2f * 343f * tau * tau);
+        float peak = Air.Reference.Density * a * a * a * dv / (2f * 343f * tau * tau);
         float sigma = tau / 4f;
         float count = n * p.Weight;
         if (count > SparseLimit)
@@ -1421,7 +1424,7 @@ public sealed class ShoreSynth
                 float w = MathF.Tau * _hz[i] / rate;
                 _cw[i] = MathF.Cos(w); _sw[i] = MathF.Sin(w);
                 _decay[i] = MathF.Exp(-MathF.PI * _hz[i] * plate.Loss(_hz[i]) / rate);
-                _gain[i] = 413f * MathF.Sqrt(plate.RadiationEfficiency(_hz[i]) * s / (8f * MathF.PI));
+                _gain[i] = AirImpedance * MathF.Sqrt(plate.RadiationEfficiency(_hz[i]) * s / (8f * MathF.PI));
                 _kick[i] = _mass[i] * rate;
             }
             _re = new float[places, MaxModes];
