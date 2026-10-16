@@ -295,7 +295,7 @@ public sealed partial class VehicleSystem
                 // Already stopping for it: as hard as standing no more than a little past its mark takes.
                 float room = stand + StandOverrunMetres;
                 float need = room > 0.05f ? v.Speed * v.Speed / (2f * room) : float.MaxValue;
-                brake = Math.Clamp(need, v.Brake, MathF.Max(v.Brake, HardBrakeGripFraction * v.Grip * Earth.StandardGravity));
+                brake = Math.Clamp(need, v.Brake, MathF.Max(v.Brake, HardBrakeGripFraction * v.Grip * v.Gravity));
             }
             else
             {

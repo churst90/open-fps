@@ -6,14 +6,12 @@ namespace OpenFPS.Common;
 /// </summary>
 public static class TyreGrip
 {
-    /// <summary>Standard gravity, m/s²: a grip in g is a force over the load it presses with.</summary>
-    public const float G = Earth.StandardGravity;
-
     /// <summary>The fraction of available grip in use: 0 coasting straight, 1 the limit, above 1
-    /// sliding. Longitudinal and lateral combine as a vector (the friction circle), not a sum.</summary>
-    public static float Demand(float longitudinalMps2, float lateralMps2, float gripG)
+    /// sliding. Longitudinal and lateral combine as a vector (the friction circle), not a sum. A grip in g is
+    /// a force over the load the tyre presses with, so it is worth the map's <paramref name="gravity"/>.</summary>
+    public static float Demand(float longitudinalMps2, float lateralMps2, float gripG, float gravity = Earth.StandardGravity)
     {
-        float capacity = MathF.Max(0.05f, gripG) * G;
+        float capacity = MathF.Max(0.05f, gripG) * gravity;
         float used = MathF.Sqrt(longitudinalMps2 * longitudinalMps2 + lateralMps2 * lateralMps2);
         return used / capacity;
     }

@@ -35,7 +35,7 @@ public class DrivingCueTests
         return _city = RoadMapData.FromJson(built.ToJson())!;
     }
 
-    private static readonly float Dry = 0.95f * WheelDynamics.G;
+    private static readonly float Dry = 0.95f * Earth.StandardGravity;
     private const float HalfCar = 2.1f;
 
     /// <summary>North up Main Street's kerb lane (x = 4.5), the given distance short of Central Street's line.</summary>

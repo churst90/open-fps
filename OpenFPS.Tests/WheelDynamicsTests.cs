@@ -14,7 +14,7 @@ public class WheelDynamicsTests
     private readonly ITestOutputHelper _o;
     public WheelDynamicsTests(ITestOutputHelper o) => _o = o;
 
-    private const float G = WheelDynamics.G;
+    private const float G = Earth.StandardGravity;
 
     // ── Tyre sizes ────────────────────────────────────────────────────────────────────────────
 

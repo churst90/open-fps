@@ -41,8 +41,21 @@ public static class PhysicsConstants
     /// <summary>Metres per second straight up as a standing jump leaves the ground (<see cref="BodyConstants.JumpPower"/>).</summary>
     public const float JumpPower = BodyConstants.JumpPower;
 
-    /// <summary>The Earth's, m/s² (<see cref="Earth.StandardGravity"/>); a map's own is its zone's.</summary>
+    /// <summary>The Earth's, m/s² (<see cref="Earth.StandardGravity"/>); a map's own is <see cref="GravityOf"/>.</summary>
     public const float Gravity = Earth.StandardGravity;
+
+    /// <summary>A map's gravity, m/s²: its zone's, which is the map file's <c>Gravity</c> (standard unless the
+    /// file says otherwise). What everything on the map that falls, rolls or flies reads (Cody, 2026-10-11:
+    /// "adjusting the gravity as a property of the world will effect everything on the world"). Standard on
+    /// a world with no zone.</summary>
+    public static float GravityOf(Arch.Core.World world)
+    {
+        float g = Gravity;
+        world.Query(in Zones, (ref Components.ZoneComponent zone) => g = zone.Gravity);
+        return g;
+    }
+
+    private static readonly Arch.Core.QueryDescription Zones = new Arch.Core.QueryDescription().WithAll<Components.ZoneComponent>();
     /// <summary>The highest step a body on foot takes without jumping, metres (<see cref="BodyConstants.StepHeight"/>).</summary>
     public const float StepHeight = BodyConstants.StepHeight;
     /// <summary>How fast a body on foot turns, radians per second (<see cref="BodyConstants.RotationSpeed"/>).</summary>

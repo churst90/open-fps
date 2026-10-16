@@ -79,7 +79,7 @@ public class ExternalBallisticsTests
         Assert.InRange(p.Seconds, 0.92f, 1.03f);
         Assert.InRange(mil, 5.2f, 6.0f);
         float angle = ExternalBallistics.ZeroAngle(Rifle.Projectile, 100f, SightHeight);
-        float vacuum = 0.5f * ExternalBallistics.Gravity * p.Seconds * p.Seconds - 600f * angle - SightHeight;
+        float vacuum = 0.5f * Earth.StandardGravity * p.Seconds * p.Seconds - 600f * angle - SightHeight;
         Assert.InRange(-p.Height, 0.7f * vacuum, vacuum);
         var p300 = At(300f, 100f);
         _out.WriteLine($"300 m: {p300.Seconds:F3} s, {p300.Height:F2} m ({-p300.Height / 0.3f:F2} mil)");

@@ -35,6 +35,7 @@ public sealed class RaceLine
     /// a straight was reported on the edge of a slide.</summary>
     private readonly float[] _corner;
     private readonly float[] _heading;         // radians, the way the line points at each node
+    private readonly float _gravity;           // the map's, m/s²: what a grip in g is worth
     /// <summary>Signed curvature at each node, 1/m, positive turning right (the way heading rises):
     /// the heading's change across the neighbouring segments over the distance between their middles.</summary>
     private readonly float[] _curvature;
@@ -61,10 +62,12 @@ public sealed class RaceLine
 
     /// <param name="speedCapAt">An upper limit on the speed at a place, m/s: a road's speed limit, which
     /// changes along a route through a town. Null for none.</param>
+    /// <param name="gravity">The map's gravity, m/s²: what a grip in g is worth.</param>
     public RaceLine(IReadOnlyList<Vector3> centreline, float lateralOffset, float topSpeed,
                     float corneringG, float brake, float bankingDegrees = 0f,
-                    Func<Vector3, float>? speedCapAt = null)
+                    Func<Vector3, float>? speedCapAt = null, float gravity = Earth.StandardGravity)
     {
+        _gravity = gravity;
         if (centreline == null || centreline.Count < 3)
             throw new ArgumentException("A circuit needs at least three waypoints.", nameof(centreline));
         // A non-finite waypoint makes the perimeter infinite and the resampled array the size of the
@@ -104,7 +107,7 @@ public sealed class RaceLine
             int span = Math.Clamp(CurvatureSpan, 1, Math.Max(1, n / 3));
             float radius = Radius(_points[(i - span + n) % n], _points[i], _points[(i + span) % n]);
             _corner[i] = float.IsInfinity(radius) ? float.PositiveInfinity
-                                                  : CorneringSpeed(radius, corneringG, bankingDegrees);
+                                                  : CorneringSpeed(radius, corneringG, bankingDegrees, gravity);
             _limit[i] = MathF.Min(topSpeed, float.IsInfinity(radius) ? topSpeed : _corner[i]);
             if (speedCapAt != null) _limit[i] = MathF.Min(_limit[i], MathF.Max(0.5f, speedCapAt(_points[i])));
         }
@@ -205,7 +208,7 @@ public sealed class RaceLine
         if (s < 0f) s += Length;
         Locate(s, out int i, out _);
         int n = _points.Length;
-        float muG = MathF.Max(0.01f, corneringG) * Earth.StandardGravity;
+        float muG = MathF.Max(0.01f, corneringG) * _gravity;
 
         // The nodes ahead within the span, and how far each is.
         Span<int> nodes = stackalloc int[64];
@@ -236,7 +239,7 @@ public sealed class RaceLine
                 if (comfortG != null)
                 {
                     // (b_x / brake)^2 + (a_y / side)^2 = 1.
-                    float side = MathF.Min(muG, MathF.Max(0.01f, comfortG(v)) * Earth.StandardGravity);
+                    float side = MathF.Min(muG, MathF.Max(0.01f, comfortG(v)) * _gravity);
                     float used = lateral / side;
                     room *= MathF.Sqrt(MathF.Max(0f, 1f - used * used));
                 }
@@ -383,14 +386,14 @@ public sealed class RaceLine
     /// car and only power limits it, like a straight. Without the banking every car lifted 16-23 %
     /// twice a lap at the speedway (docs/AUDIO_LOAD_DROPOUTS.md, session 5, third pass).
     /// </summary>
-    private static float CorneringSpeed(float radius, float corneringG, float bankingDegrees)
+    private static float CorneringSpeed(float radius, float corneringG, float bankingDegrees, float gravity)
     {
         float mu = MathF.Max(0f, corneringG);
-        if (bankingDegrees <= 0f) return MathF.Sqrt(MathF.Max(0f, mu * Earth.StandardGravity * radius));
+        if (bankingDegrees <= 0f) return MathF.Sqrt(MathF.Max(0f, mu * gravity * radius));
         float tan = MathF.Tan(bankingDegrees * MathF.PI / 180f);
         float denom = 1f - mu * tan;
         if (denom <= 1e-3f) return float.PositiveInfinity;   // the bank holds it; power is the only limit
-        return MathF.Sqrt(MathF.Max(0f, radius * Earth.StandardGravity * (mu + tan) / denom));
+        return MathF.Sqrt(MathF.Max(0f, radius * gravity * (mu + tan) / denom));
     }
 
 }

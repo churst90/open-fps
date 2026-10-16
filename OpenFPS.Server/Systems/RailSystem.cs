@@ -181,7 +181,7 @@ public sealed class RailSystem
                 RaceLine line;
                 // A tram leans into nothing and slides on nothing: the cornering figure is the
                 // lateral acceleration passengers stand up through, about 0.1 g.
-                try { line = new RaceLine(track.Waypoints, 0f, top, 0.1f, brake, track.BankingDegrees); }
+                try { line = new RaceLine(track.Waypoints, 0f, top, 0.1f, brake, track.BankingDegrees, gravity: data.Gravity); }
                 catch (Exception ex) { Log.Warning("Map {Map}: track '{Track}' — {Err}", mapId, td.Track, ex.Message); continue; }
 
                 var layout = TrainLayout.Sources(profile);

@@ -419,7 +419,7 @@ public class HandsService
             {
                 // It arrives at sqrt(2gh) from where it was held.
                 float fell = MathF.Max(0.05f, from - ground);
-                float speed = MathF.Sqrt(2f * PhysicsConstants.Gravity * fell);
+                float speed = MathF.Sqrt(2f * PhysicsConstants.GravityOf(world) * fell);
                 float mass = MassOf(world, item);
                 var itemMaterial = AcousticRegistry.GetProperties(
                     world.Has<MaterialComponent>(item) ? world.Get<MaterialComponent>(item).Material ?? "Generic" : "Generic");

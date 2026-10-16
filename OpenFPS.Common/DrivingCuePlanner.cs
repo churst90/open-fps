@@ -218,13 +218,13 @@ public sealed class DrivingCuePlanner
                 plan.Path.Add(p + right * offset);
             }
             // A banked track holds a car up: v^2 = g R (mu + tan b) / (1 - mu tan b).
-            float mu = TrackGripShare * plan.AvailableDecel / WheelDynamics.G;
+            float mu = TrackGripShare * plan.AvailableDecel / Earth.StandardGravity;
             float tb = MathF.Tan(track.Track.BankingDegrees * MathF.PI / 180f);
             float effective = (mu + tb) / MathF.Max(0.2f, 1f - mu * tb);
             for (int i = 0; i < plan.Path.Count; i++)
             {
                 float k = MathF.Abs(line.CurvatureAt(lap + dir * i * Step));
-                if (k > 1e-4f) targets.Add((i * Step, MathF.Sqrt(effective * WheelDynamics.G / k), CueHazard.Bend));
+                if (k > 1e-4f) targets.Add((i * Step, MathF.Sqrt(effective * Earth.StandardGravity / k), CueHazard.Bend));
             }
         }
         else

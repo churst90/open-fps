@@ -101,7 +101,7 @@ public class TrafficTyreDemandTests
             float want = MathF.Min(line.SlowestWithin(at, look),
                                    line.BendSpeedWithin(at, 2f * look, cornering, brake, corner, DriverSteering.ComfortSideFriction));
             float lateral = MathF.Max(body.Vx * body.Vx * MathF.Abs(line.CurvatureAt(at)), MathF.Abs(body.Ay));
-            float used = lateral / (MathF.Min(cornering, DriverSteering.ComfortSideFriction(body.Vx)) * WheelDynamics.G);
+            float used = lateral / (MathF.Min(cornering, DriverSteering.ComfortSideFriction(body.Vx)) * Earth.StandardGravity);
             float up = accel * MathF.Sqrt(MathF.Max(0f, 1f - used * used));
             float target = want > body.Vx ? MathF.Min(want, body.Vx + up * dt) : MathF.Max(want, body.Vx - brake * dt);
             at += driver.Drive(line, at, target, 0f, dt);
@@ -211,7 +211,7 @@ public class TrafficTyreDemandTests
             float next = want > v ? MathF.Min(want, v + 1f * dt) : MathF.Max(want, v - 2.92f * dt);
             float decel = MathF.Max(0f, (v - next) / dt);
             float lateral = next * next * MathF.Abs(line.CurvatureAt(at));
-            float side = DriverSteering.ComfortSideFriction(next) * WheelDynamics.G;
+            float side = DriverSteering.ComfortSideFriction(next) * Earth.StandardGravity;
             float use = MathF.Sqrt((decel / 2.92f) * (decel / 2.92f) + (lateral / side) * (lateral / side));
             if (t > 30 * 5) worst = MathF.Max(worst, use);
             v = next;

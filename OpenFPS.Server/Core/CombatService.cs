@@ -246,7 +246,7 @@ public sealed partial class CombatService
             if (!InPlainView(self, ride, world, grid, from, c.Point, c.E)) continue;
             target = c.E;
             Vector3 vel = world.Has<Velocity>(c.E) ? world.Get<Velocity>(c.E).Linear : Vector3.Zero;
-            aim = Onto(weapon, from, c.Point, vel, AirOn(session.CurrentMapId).Air);
+            aim = Onto(weapon, from, c.Point, vel, AirOn(session.CurrentMapId).Air, PhysicsConstants.GravityOf(world));
             return true;
         }
         return false;
@@ -280,7 +280,8 @@ public sealed partial class CombatService
     /// body walking at <paramref name="velocity"/>: aimed at where they will be when it arrives, and above
     /// it by what it drops on the way. Three passes of flying it and moving the aim by the miss.
     /// </summary>
-    internal static Vector3 Onto(WeaponDefinition weapon, Vector3 from, Vector3 point, Vector3 velocity, Air air)
+    internal static Vector3 Onto(WeaponDefinition weapon, Vector3 from, Vector3 point, Vector3 velocity, Air air,
+                                 float gravity = Earth.StandardGravity)
     {
         float bc = ExternalBallistics.CoefficientOf(weapon.Projectile);
         Vector3 aimAt = point;
@@ -294,7 +295,7 @@ public sealed partial class CombatService
             while (Vector3.Dot(s.Position - from, flat) < range && s.Seconds < MaxFlightSeconds)
             {
                 before = s;
-                ExternalBallistics.Advance(ref s, 0.002f, bc, air, Vector3.Zero);
+                ExternalBallistics.Advance(ref s, 0.002f, bc, air, Vector3.Zero, gravity);
             }
             float da = Vector3.Dot(before.Position - from, flat), db = Vector3.Dot(s.Position - from, flat);
             float u = Math.Clamp((range - da) / MathF.Max(1e-6f, db - da), 0f, 1f);
@@ -610,6 +611,7 @@ public sealed partial class CombatService
     {
         var state = f.State;
         float t0 = state.Seconds;
+        float gravity = PhysicsConstants.GravityOf(world);
         var slug = f.Slug;
         int bounces = f.Bounces;
         var legs = new List<Leg> { new(new List<FlightSample> { new(0f, state.Position, state.Velocity) }, slug, state.Position, state.Velocity, 0f) };
@@ -619,7 +621,7 @@ public sealed partial class CombatService
         while (state.Seconds - t0 < MaxFlightSeconds && state.Position.Y >= PhysicsConstants.MapMinimumY)
         {
             var before = state;
-            Fly(ref state, slug, f.Weapon, SegmentSeconds, air, wind);
+            Fly(ref state, slug, f.Weapon, SegmentSeconds, air, wind, gravity);
             double segStart = now + (before.Seconds - t0);
             if (FirstHit(f, world, grid, before.Position, state.Position, SegmentSeconds, segStart, now, glass,
                          out var hit, out float along, out bool body, out _))
@@ -653,11 +655,12 @@ public sealed partial class CombatService
     /// <summary>A tumbling slug slower than this is followed no further: it is falling, not flying.</summary>
     public const float MinSlugSpeed = 15f;
 
-    /// <summary>Flies a round on: a bullet by its ballistic coefficient, a tumbling slug by its own drag.</summary>
-    private static void Fly(ref BulletState state, Slug slug, WeaponDefinition weapon, float seconds, Air air, Vector3 wind)
+    /// <summary>Flies a round on: a bullet by its ballistic coefficient, a tumbling slug by its own drag, both
+    /// falling at the map's gravity.</summary>
+    private static void Fly(ref BulletState state, Slug slug, WeaponDefinition weapon, float seconds, Air air, Vector3 wind, float gravity)
     {
-        if (slug.Tumbling) RicochetLaw.Advance(ref state, seconds, slug, air, wind);
-        else ExternalBallistics.Advance(ref state, seconds, ExternalBallistics.CoefficientOf(weapon.Projectile), air, wind);
+        if (slug.Tumbling) RicochetLaw.Advance(ref state, seconds, slug, air, wind, gravity);
+        else ExternalBallistics.Advance(ref state, seconds, ExternalBallistics.CoefficientOf(weapon.Projectile), air, wind, gravity);
     }
 
     /// <summary>What one listener hears of a ricochet's slug: its crack while it is still faster than
@@ -800,6 +803,7 @@ public sealed partial class CombatService
         if (!_maps.TryGetMap(mapId, out var world, out _, out var grid, out var lookup)) return;
         double now = Clock();
         var (air, wind) = AirOn(mapId);
+        float gravity = PhysicsConstants.GravityOf(world);
 
         for (int i = _flights.Count - 1; i >= 0; i--)
         {
@@ -810,7 +814,7 @@ public sealed partial class CombatService
             {
                 float dt = (float)Math.Min(SegmentSeconds, now - f.At);
                 var before = f.State;
-                Fly(ref f.State, f.Slug, f.Weapon, dt, air, wind);
+                Fly(ref f.State, f.Slug, f.Weapon, dt, air, wind, gravity);
                 double segStart = f.At;
                 f.At += dt;
                 done = Segment(f, world, grid, lookup, before, f.State, segStart, dt, now);
@@ -1256,10 +1260,11 @@ public sealed partial class CombatService
         var body = AcousticRegistry.GetProperties("Skin");
         var under = AcousticRegistry.GetProperties(string.IsNullOrEmpty(floor) ? "Generic" : floor);
         var sounds = new List<TransientSound>();
-        sounds.AddRange(ImpactAcoustics.Between(body, under, where, MathF.Sqrt(2f * PhysicsConstants.Gravity * legs),
+        float g = PhysicsConstants.GravityOf(world);
+        sounds.AddRange(ImpactAcoustics.Between(body, under, where, MathF.Sqrt(2f * g * legs),
                                                 35f, 5000f, 2f, 2f, 0.2f));
         foreach (var s in ImpactAcoustics.Between(body, under, where + new Vector3(0, 0, 0.6f),
-                                                  MathF.Sqrt(2f * PhysicsConstants.Gravity * trunk), 40f, 5000f, 2f, 2f, 0.2f))
+                                                  MathF.Sqrt(2f * g * trunk), 40f, 5000f, 2f, 2f, 0.2f))
         {
             var later = s;
             later.DelaySeconds += 0.45f;

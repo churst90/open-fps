@@ -655,7 +655,7 @@ public sealed class DrivingAids
     /// </summary>
     private static float AvailableDecel(EntitySnapshot car, VehicleProfile? profile, float speed)
     {
-        float grip = (profile?.Tyres.PeakGripG ?? 0.95f) * WheelDynamics.G;
+        float grip = (profile?.Tyres.PeakGripG ?? 0.95f) * Earth.StandardGravity;
         float factor = 1f;
         if (car.Wheels is { Length: > 0 } wheels && profile != null)
             foreach (var w in wheels)

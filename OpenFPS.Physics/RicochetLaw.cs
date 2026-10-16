@@ -146,24 +146,24 @@ public static class RicochetLaw
         return 1.0f + 0.45f * (mach - 0.8f) / 0.4f;
     }
 
-    public static Vector3 Acceleration(Vector3 velocity, Vector3 wind, Slug slug, Air air)
+    public static Vector3 Acceleration(Vector3 velocity, Vector3 wind, Slug slug, Air air, float gravity = Earth.StandardGravity)
     {
         Vector3 through = velocity - wind;
         float speed = through.Length();
         float k = 0.5f * air.Density * TumblingDrag(speed / air.SpeedOfSound) * slug.MeanArea / MathF.Max(1e-5f, slug.MassKg);
-        return -k * speed * through + new Vector3(0f, -ExternalBallistics.Gravity, 0f);
+        return -k * speed * through + new Vector3(0f, -gravity, 0f);
     }
 
     /// <summary>Flies a tumbling slug on, as <see cref="ExternalBallistics.Advance"/> flies a bullet.</summary>
-    public static void Advance(ref BulletState s, float seconds, Slug slug, Air air, Vector3 wind)
+    public static void Advance(ref BulletState s, float seconds, Slug slug, Air air, Vector3 wind, float gravity = Earth.StandardGravity)
     {
         float left = seconds;
         while (left > 1e-7f)
         {
             float h = MathF.Min(ExternalBallistics.StepSeconds, left);
-            Vector3 a0 = Acceleration(s.Velocity, wind, slug, air);
+            Vector3 a0 = Acceleration(s.Velocity, wind, slug, air, gravity);
             Vector3 v1 = s.Velocity + a0 * h;
-            Vector3 a1 = Acceleration(v1, wind, slug, air);
+            Vector3 a1 = Acceleration(v1, wind, slug, air, gravity);
             Vector3 v = s.Velocity + 0.5f * (a0 + a1) * h;
             Vector3 step = 0.5f * (s.Velocity + v) * h;
             s.Position += step;

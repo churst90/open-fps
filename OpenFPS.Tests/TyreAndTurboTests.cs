@@ -19,7 +19,7 @@ public class TyreAndTurboTests
     public void BrakingAndCorneringShareOneFrictionBudget()
     {
         const float grip = 1.0f;
-        float g = TyreGrip.G;
+        float g = Earth.StandardGravity;
 
         Assert.Equal(1.0f, TyreGrip.Demand(0f, g, grip), 2);        // all of it sideways
         Assert.Equal(1.0f, TyreGrip.Demand(g, 0f, grip), 2);        // all of it braking

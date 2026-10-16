@@ -83,12 +83,13 @@ public class PresetHalvesTests
         Is(TyreProfile.SportBikeRoad, 1.1f, 270f, 3f, 0, 0.45f, 80f, 950f, 14f, 92f);
         Is(TyreProfile.RaceSlick, 3.1f, 160f, 0f, 0, 0.35f, 82f, 620f, 17f, 99f);
         Is(TyreProfile.TruckOnAsphalt, 0.75f, 760f, 12f, 96, 0.72f, 85f, 430f, 9f, 97f);
-        Assert.Equal(Earth.StandardGravity, TyreGrip.G);
         Assert.Equal(0.78f, TyreGrip.PatchSlidesFrom);
         // One number for where the patch begins to slide and where the squeal begins.
         Assert.Equal(TyreGrip.PatchSlidesFrom, TyreFriction.SquealOnset);
         // The friction circle: 3 and 4 make 5.
-        Assert.Equal(5f / (0.95f * TyreGrip.G), TyreGrip.Demand(3f, 4f, 0.95f), 5);
+        Assert.Equal(5f / (0.95f * Earth.StandardGravity), TyreGrip.Demand(3f, 4f, 0.95f), 5);
+        // On a map with a third of the gravity a grip in g is worth a third as much.
+        Assert.Equal(15f / (0.95f * Earth.StandardGravity), TyreGrip.Demand(3f, 4f, 0.95f, Earth.StandardGravity / 3f), 4);
     }
 
     /// <summary>

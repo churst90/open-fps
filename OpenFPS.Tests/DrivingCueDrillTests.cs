@@ -36,7 +36,7 @@ public class DrivingCueDrillTests
     {
         var city = DrivingCueTests.City();
         var planner = new DrivingCuePlanner(city) { Indicator = +1 };
-        float grip = 0.95f * WheelDynamics.G * wetFactor;
+        float grip = 0.95f * Earth.StandardGravity * wetFactor;
         const float half = 2.1f, dt = 0.02f;
         // The line it should take: from the lane through the turn and on into Central Street.
         var ideal = new DrivingCuePlanner(city) { Indicator = +1 }
@@ -55,7 +55,7 @@ public class DrivingCueDrillTests
             {
                 // "Junction in N metres" is said as the junction comes within four seconds (DrivingAids).
                 if (said < 0f && plan.Junction != null && plan.JunctionDistance <= MathF.Max(35f, v * 4f)) said = t;
-                if (said >= 0f && t - said > 1f && v > 25f / 3.6f) decel = 0.2f * WheelDynamics.G;
+                if (said >= 0f && t - said > 1f && v > 25f / 3.6f) decel = 0.2f * Earth.StandardGravity;
             }
             else
             {

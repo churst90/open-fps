@@ -55,7 +55,7 @@ public sealed record DriverSteering
         for (int i = 0; i < 30; i++)
         {
             float mid = 0.5f * (lo + hi);
-            if (mid * mid * k <= ComfortSideFriction(mid) * WheelDynamics.G) lo = mid; else hi = mid;
+            if (mid * mid * k <= ComfortSideFriction(mid) * Earth.StandardGravity) lo = mid; else hi = mid;
         }
         return lo;
     }

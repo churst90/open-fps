@@ -109,7 +109,9 @@ public sealed class MagicCurve
 /// </summary>
 public sealed class WheelDynamics
 {
-    public const float G = TyreGrip.G;
+    /// <summary>The gravity it stands in, m/s²: its map's (<see cref="Earth.StandardGravity"/> unless the map
+    /// says otherwise), what presses the wheels into a flat road.</summary>
+    public float Gravity { get; set; } = Earth.StandardGravity;
 
     /// <summary>Speeds the kinematic model hands over to the dynamic one between, m/s.</summary>
     public const float KinematicBelow = 3f, DynamicAbove = 6f;
@@ -244,7 +246,8 @@ public sealed class WheelDynamics
             if (_axleFront[k]) _frontAxles++; else _rearAxles++;
             _axleWheels[k] = axles[k].Wheels;
         }
-        float weight = Mass * G;
+        // Each axle's share at standard gravity; Loads scales it to the gravity the body stands in.
+        float weight = Mass * Earth.StandardGravity;
         if (_frontAxles > 0 && _rearAxles > 0 && frontMiddle > cog && cog > rearMiddle)
         {
             A = frontMiddle - cog;
@@ -391,14 +394,14 @@ public sealed class WheelDynamics
 
     /// <summary>
     /// Every wheel's load for these accelerations in the body's frame (forward, rightward, and the
-    /// acceleration pressing it into the road: g on the flat).
+    /// acceleration pressing it into the road: <see cref="Gravity"/> on the flat, the default).
     /// </summary>
-    public void Loads(float ax, float ay, float normal = G)
+    public void Loads(float ax, float ay, float? normal = null)
     {
         var axles = Chassis.Axles;
         float h = Chassis.CentreOfGravityHeightMetres;
         float shift = _frontAxles > 0 && _rearAxles > 0 ? Mass * ax * h / (A + B) : 0f;
-        float scale = normal / G;
+        float scale = (normal ?? Gravity) / Earth.StandardGravity;
         int i = 0;
         for (int k = 0; k < axles.Length; k++)
         {
@@ -596,7 +599,7 @@ public sealed class WheelDynamics
     /// </summary>
     public float SteadyLateralLimit(float demand = 1f)
     {
-        float lo = 0f, hi = 3f * G;
+        float lo = 0f, hi = 3f * Gravity;
         for (int k = 0; k < 32; k++)
         {
             float mid = 0.5f * (lo + hi);
@@ -684,7 +687,7 @@ public sealed class WheelDynamics
         for (int it = 0; it < 30; it++)
         {
             var (fy, mz) = SteadyResidual(speed, r, vy, steer);
-            if (MathF.Abs(fy) < 1e-3f * Mass * G && MathF.Abs(mz) < 1e-3f * Mass * G * Wheelbase) break;
+            if (MathF.Abs(fy) < 1e-3f * Mass * Gravity && MathF.Abs(mz) < 1e-3f * Mass * Gravity * Wheelbase) break;
             // Newton on (sideslip, steer) with differences.
             const float dv = 1e-3f, ds = 1e-4f;
             var (fyV, mzV) = SteadyResidual(speed, r, vy + dv, steer);
@@ -698,7 +701,7 @@ public sealed class WheelDynamics
             if (MathF.Abs(steer) > maxSteer + 0.2f) return 2f;
         }
         var (rf, rm) = SteadyResidual(speed, r, vy, steer);
-        if (MathF.Abs(rf) > 0.02f * Mass * G || MathF.Abs(rm) > 0.02f * Mass * G * Wheelbase || MathF.Abs(steer) > maxSteer) return 2f;
+        if (MathF.Abs(rf) > 0.02f * Mass * Gravity || MathF.Abs(rm) > 0.02f * Mass * Gravity * Wheelbase || MathF.Abs(steer) > maxSteer) return 2f;
         return MaxDemand;
     }
 
@@ -809,7 +812,7 @@ public sealed class WheelDynamics
     /// share b / L, rear a / L), shared across each axle by load; the longitudinal force as in
     /// <see cref="Step"/>; and the slip each tyre needs for its force.
     /// </summary>
-    public void Hold(float speed, float ax, float ay, float normal = G)
+    public void Hold(float speed, float ax, float ay, float? normal = null)
     {
         Vx = speed; Vy = 0f; YawRate = 0f;
         Wet();

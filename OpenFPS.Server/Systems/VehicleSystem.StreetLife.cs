@@ -132,7 +132,7 @@ public sealed partial class VehicleSystem
     private static void BrakeHard(DemoVehicle v, float toSpeed)
     {
         v.HardBrakeTo = toSpeed;
-        v.HardBrakeDecel = HardBrakeGripFraction * v.Grip * Earth.StandardGravity;
+        v.HardBrakeDecel = HardBrakeGripFraction * v.Grip * v.Gravity;
         v.HardBrakeLeft = (v.Speed - v.HardBrakeTo) / v.HardBrakeDecel + 0.6f;
     }
 

@@ -338,11 +338,11 @@ public static class DrivingSpike
                 if (!indicated && t - t0 > 0.3) { audio.Driving.ToggleIndicator(+1); indicated = true; }
                 var plan = audio.Driving.Plan;
                 var fwd = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading));
-                float grip = 0.95f * WheelDynamics.G;
+                float grip = 0.95f * Earth.StandardGravity;
                 decel = 0f;
                 if (!brakeCue)
                 {
-                    if (said >= 0 && t - said > 1.0 && speed > 25f / 3.6f) decel = 0.2f * WheelDynamics.G;
+                    if (said >= 0 && t - said > 1.0 && speed > 25f / 3.6f) decel = 0.2f * Earth.StandardGravity;
                 }
                 else if (plan != null)
                 {

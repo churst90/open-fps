@@ -61,8 +61,6 @@ public readonly record struct FlightPoint(float Range, float Height, float Drift
 /// </summary>
 public static class ExternalBallistics
 {
-    public const float Gravity = Earth.StandardGravity;
-
     /// <summary>The integration step, seconds. Half a millisecond moves a rifle bullet 40 cm; the
     /// second-order step below is then accurate to well under a millimetre of drop at 600 m.</summary>
     public const float StepSeconds = 0.0005f;
@@ -113,26 +111,26 @@ public static class ExternalBallistics
     public static float CoefficientOf(Projectile p) => p.CoefficientG7 > 0f ? p.CoefficientG7 : FallbackG7;
 
     /// <summary>Drag and gravity together, m/s², for a bullet at <paramref name="velocity"/> in air
-    /// moving at <paramref name="wind"/>.</summary>
-    public static Vector3 Acceleration(Vector3 velocity, Vector3 wind, float bcG7, Air air)
+    /// moving at <paramref name="wind"/>, on a map whose gravity is <paramref name="gravity"/>.</summary>
+    public static Vector3 Acceleration(Vector3 velocity, Vector3 wind, float bcG7, Air air, float gravity = Earth.StandardGravity)
     {
         Vector3 through = velocity - wind;
         float speed = through.Length();
         float k = MathF.PI / 8f * air.Density * DragCoefficientG7(speed / air.SpeedOfSound) / (bcG7 * PoundsPerSquareInch);
-        return -k * speed * through + new Vector3(0f, -Gravity, 0f);
+        return -k * speed * through + new Vector3(0f, -gravity, 0f);
     }
 
     /// <summary>Flies a bullet on for <paramref name="seconds"/>, in steps of <see cref="StepSeconds"/>
     /// (Heun's method: a step at the start's slope, corrected by the slope where it lands).</summary>
-    public static void Advance(ref BulletState s, float seconds, float bcG7, Air air, Vector3 wind)
+    public static void Advance(ref BulletState s, float seconds, float bcG7, Air air, Vector3 wind, float gravity = Earth.StandardGravity)
     {
         float left = seconds;
         while (left > 1e-7f)
         {
             float h = MathF.Min(StepSeconds, left);
-            Vector3 a0 = Acceleration(s.Velocity, wind, bcG7, air);
+            Vector3 a0 = Acceleration(s.Velocity, wind, bcG7, air, gravity);
             Vector3 v1 = s.Velocity + a0 * h;
-            Vector3 a1 = Acceleration(v1, wind, bcG7, air);
+            Vector3 a1 = Acceleration(v1, wind, bcG7, air, gravity);
             Vector3 v = s.Velocity + 0.5f * (a0 + a1) * h;
             Vector3 step = 0.5f * (s.Velocity + v) * h;
             s.Position += step;

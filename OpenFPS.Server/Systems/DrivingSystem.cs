@@ -175,13 +175,14 @@ public static class DrivingSystem
                               TileFence? fence = null, Action<int>? stopped = null)
     {
         _mapId = mapId;
+        float gravity = PhysicsConstants.GravityOf(world);
         var query = new QueryDescription().WithAll<Transform, DriveComponent, Velocity>();
         var driven = new List<Entity>();
         world.Query(in query, (Entity e, ref Transform _, ref DriveComponent __, ref Velocity ___) => driven.Add(e));
 
         foreach (var root in driven)
         {
-            try { Step(world, grid, root, mapMin, mapMax, dt, heard, fence, stopped); }
+            try { Step(world, grid, root, mapMin, mapMax, dt, gravity, heard, fence, stopped); }
             catch (Exception ex) { Log.Error(ex, "DrivingSystem: entity {Id} failed to move.", root.Id); }
         }
 
@@ -204,7 +205,7 @@ public static class DrivingSystem
     }
 
     private static void Step(World world, SpatialGrid<Entity> grid, Entity root, Vector3 mapMin, Vector3 mapMax,
-                             float dt, Action<int, string, IReadOnlyList<TransientSound>>? heard,
+                             float dt, float gravity, Action<int, string, IReadOnlyList<TransientSound>>? heard,
                              TileFence? fence = null, Action<int>? stopped = null)
     {
         ref var drive = ref world.Get<DriveComponent>(root);
@@ -231,7 +232,7 @@ public static class DrivingSystem
         float speed = MathF.Abs(v);
         float mass = MathF.Max(1f, profile.MassKg);
         float grip = MathF.Max(0.1f, profile.Tyres.PeakGripG);
-        float capacity = grip * TyreGrip.G;          // the most this car can do, any direction
+        float capacity = grip * gravity;             // the most this car can do, any direction
 
         // ── What the engine is pulling ──────────────────────────────────────────────────────────
         var gb = profile.Gearbox;
@@ -270,7 +271,7 @@ public static class DrivingSystem
 
         // ── What is holding it back ─────────────────────────────────────────────────────────────
         float drag = 0.5f * AirDensity * profile.DragArea * v * v;
-        float rolling = profile.RollingResistance * mass * TyreGrip.G;
+        float rolling = profile.RollingResistance * mass * gravity;
         float braking = Math.Clamp(drive.Brake, 0f, 1f) * capacity * mass;
         float engineBraking = (1f - MathF.Abs(drive.Throttle))
                             * profile.Engine.PeakTorqueNm * EngineBrakingFraction
@@ -285,6 +286,7 @@ public static class DrivingSystem
         // ── What the steering is asking for ─────────────────────────────────────────────────────
         var running = RunningFor(world, root, drive.Preset, profile);
         var body = running.Body;
+        body.Gravity = gravity;
         var chassis = body.Chassis;
         float wheelbase = MathF.Max(0.5f, body.Wheelbase);
         float maxSteer = chassis.MaxSteerAngleRad;

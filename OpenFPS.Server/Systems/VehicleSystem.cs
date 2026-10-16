@@ -91,6 +91,9 @@ public sealed partial class VehicleSystem
         /// <summary>Flat-ground grip in g, from the map; the lateral demand comes from the line, which knows the bank.</summary>
         public float Grip = 1f;
 
+        /// <summary>Its map's gravity, m/s²: what a grip in g is worth, and what holds it on a bank.</summary>
+        public float Gravity = Earth.StandardGravity;
+
         /// <summary>The vehicle preset, and the horn that comes with it ("" for none).</summary>
         public string Preset = "";
         public string Horn = "";
@@ -245,7 +248,7 @@ public sealed partial class VehicleSystem
                     // A car may not pull further off the centreline than the surface it is on.
                     float half = MathF.Max(0f, track.WidthMetres * 0.5f - 1.2f);
                     float lane = Math.Clamp(vd.LaneOffsetMetres, -half, half);
-                    try { line = new RaceLine(track.Waypoints, lane, topSpeed, grip, brake, track.BankingDegrees); }
+                    try { line = new RaceLine(track.Waypoints, lane, topSpeed, grip, brake, track.BankingDegrees, gravity: data.Gravity); }
                     catch (Exception ex)
                     {
                         Log.Warning("Map {Map}: track '{Track}' could not be turned into a racing line: {Error}", mapId, vd.Track, ex.Message);
@@ -262,11 +265,11 @@ public sealed partial class VehicleSystem
                     // turn in which the most-worked tyre reaches its squeal onset, from its chassis.
                     if (profile != null)
                     {
-                        var tyres = new WheelDynamics(profile.Mechanics, vd.GripG > 0 ? vd.GripG : grip);
-                        corneringG = MathF.Min(grip, tyres.SteadyLateralLimit(TyreFriction.SquealOnset) / WheelDynamics.G);
+                        var tyres = new WheelDynamics(profile.Mechanics, vd.GripG > 0 ? vd.GripG : grip) { Gravity = data.Gravity };
+                        corneringG = MathF.Min(grip, tyres.SteadyLateralLimit(TyreFriction.SquealOnset) / data.Gravity);
                         grip = corneringG;
                     }
-                    line = new RaceLine(route.Points, 0f, topSpeed, grip, brake, 0f, LaneLimits(route));
+                    line = new RaceLine(route.Points, 0f, topSpeed, grip, brake, 0f, LaneLimits(route), data.Gravity);
                 }
 
                 // No track and no road: a shuttle from a point to the same point, whose direction is
@@ -353,7 +356,7 @@ public sealed partial class VehicleSystem
                 string display = vd.Name ?? displayKind;
                 var v = new DemoVehicle
                 {
-                    Entity = e, MapId = mapId, A = vd.RoadStart, B = vd.RoadEnd,
+                    Entity = e, MapId = mapId, A = vd.RoadStart, B = vd.RoadEnd, Gravity = data.Gravity,
                     SpeedsMetresPerSecond = Array.ConvertAll(speeds, k => k / 3.6f),
                     Accel = accel,
                     Brake = brake,
@@ -413,7 +416,7 @@ public sealed partial class VehicleSystem
                 v.IsWalker = isWalker;
                 if (profile != null)
                 {
-                    v.Wheels = new WheelDynamics(profile.Mechanics, v.Grip) { ForwardOnly = true };
+                    v.Wheels = new WheelDynamics(profile.Mechanics, v.Grip) { ForwardOnly = true, Gravity = v.Gravity };
                     v.WireWheels = new OpenFPS.Common.Networking.WheelState[v.Wheels.Wheels.Length];
                     if (route != null)
                     {
@@ -818,7 +821,7 @@ public sealed partial class VehicleSystem
         if (v.Driver != null)
         {
             float lateral = MathF.Max(v.Speed * v.Speed * MathF.Abs(line.CurvatureAt(v.Lap)), MathF.Abs(v.Wheels!.Ay));
-            float side = MathF.Min(v.CorneringG, DriverSteering.ComfortSideFriction(v.Speed)) * WheelDynamics.G;
+            float side = MathF.Min(v.CorneringG, DriverSteering.ComfortSideFriction(v.Speed)) * v.Gravity;
             float used = lateral / side;
             accel *= MathF.Sqrt(MathF.Max(0f, 1f - used * used));
         }
@@ -855,7 +858,7 @@ public sealed partial class VehicleSystem
         float latFraction = float.IsInfinity(cornerLimit) || cornerLimit < 0.5f
             ? 0f
             : (v.Speed / cornerLimit) * (v.Speed / cornerLimit) * cornerShare;
-        float longFraction = v.Grip > 0.01f ? MathF.Abs(v.Speed - wasSpeed) / MathF.Max(1e-4f, dt) / (v.Grip * Earth.StandardGravity) : 0f;
+        float longFraction = v.Grip > 0.01f ? MathF.Abs(v.Speed - wasSpeed) / MathF.Max(1e-4f, dt) / (v.Grip * v.Gravity) : 0f;
         v.TyreDemand = MathF.Min(2f, MathF.Sqrt(latFraction * latFraction + longFraction * longFraction));
 
         Advance(v, line, v.Speed * dt);
@@ -903,8 +906,8 @@ public sealed partial class VehicleSystem
         float centripetal = v.Speed * v.Speed * MathF.Abs(k);
         // The line banks any curve; the last few metres of curvature on a straight are not a turn.
         float bank = MathF.Abs(k) > 1f / 2000f ? line.BankingDegrees * MathF.PI / 180f : 0f;
-        float inPlane = centripetal * MathF.Cos(bank) - WheelDynamics.G * MathF.Sin(bank);
-        float normal = WheelDynamics.G * MathF.Cos(bank) + centripetal * MathF.Sin(bank);
+        float inPlane = centripetal * MathF.Cos(bank) - v.Gravity * MathF.Sin(bank);
+        float normal = v.Gravity * MathF.Cos(bank) + centripetal * MathF.Sin(bank);
         v.Wheels!.Hold(v.Speed, accel, MathF.Sign(k) * inPlane, normal);
     }
 
