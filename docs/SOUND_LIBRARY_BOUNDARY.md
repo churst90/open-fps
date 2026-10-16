@@ -2263,8 +2263,9 @@ unregenerated (18.5).
 `AudioClock` behind `IAudioClock` is built (18.6), and the world time and the machine's clocks with it (18.7).
 In the order of section 8, the rest: `AudioPhysics` and
 `MixerQuality.MixerRate` into the world's atmosphere and mixer format; `EarModel` and `Loudness` into
-`HearingSettings`; `MachineRegistry` and `ModelLibrary` into a `ModelCatalog`; the console levers into
-`MixSettings`; the lab levers into `LabLevers`. Seen on the way and left for those:
+`HearingSettings`; `MachineRegistry` and `ModelLibrary` into a `ModelCatalog` (built 2026-10-16 with
+package stage 2: the instance is `Catalogue`, in `OpenFPS.Models`, behind the two static classes; see
+docs/ENGINE_PACKAGES.md, stage 2); the console levers into `MixSettings`; the lab levers into `LabLevers`. Seen on the way and left for those:
 `FmodAudioProvider._tracedEchoIds` and `HasTracedEchoes` (static, read by `ClientAudioSystem`), `TracedEchoesOn`,
 `TailDb` and `CopiesDb` (console levers), `TracedReverb.SimulatedType`, `RawTail`, `OneChannelLate` and
 `LabProbeSeconds` (lab levers), `OwnVoiceRing.Shared` and `Talkers._all`.

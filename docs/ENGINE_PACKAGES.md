@@ -11,8 +11,9 @@ models for method and depth are docs/SOUND_LIBRARY_BOUNDARY.md and docs/PHYSICS_
   classifier of its own (`tools/engine_packages/classify.py`). It writes `packages_tables.md`,
   `packages_files.tsv` and `packages_crossings.tsv` into the output folder, and the ratchet's four lists into
   `ratchet` there (stage 0). Run it again after any move.
-- Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy; and Materials since
-  stage 1 was built (2026-10-12), and Accessibility, its clean half, since stage 7 (2026-10-16). Planned with their
+- Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy; Materials since
+  stage 1 was built (2026-10-12), Models since stage 2, and Accessibility, its clean half, since stage 7
+  (2026-10-16). Planned with their
   own documents and not planned again here: `OpenFPS.Audio` and the split of `ClientAudioSystem` (sound library
   stages 6 to 8), and physics stages 2 to 6. This survey says where its packages meet them.
 
@@ -792,6 +793,61 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   facade; Speech's caches built once.
 - Check: render fingerprint, emitter stream, `ModelKindTableTests`, `ModelLibraryTests`, `MachineTests`, the world
   editor's tests, `VehicleBodyShellTests`.
+
+- **Built 2026-10-16, the catalogue** (made on Linux in four commits, begun on main `d0116bb5` and rebased onto
+  `f7701b8b`, which has the ricochet, one gravity and one air, the rest of stage 1, refraction and stage 7's
+  first half). Nothing a player
+  hears changes: every stream and render passes unregenerated, and every model the library exports (174),
+  every vehicle's parts list and its stored spec (45), every kind with its editor fields, every voice take,
+  call and conversation, the scope and the rounds, written out on main and on the branch, are the same byte
+  for byte.
+  - **`FieldDescriptor` to Schema first** (`FieldType`, `FieldDescriptor`), moved whole.
+  - **The turn round.** The 95 references from Sound's files and the 16 from Environment's are gone, but
+    `VehicleSpec.cs`'s 10, which moved with the catalogue. `IPresets` (Sound) is a preset by name or key as
+    the catalogue has it, a map's own first; the catalogue is one. The eight lookups that asked the library
+    (`EngineProfile`, `SmallMachineSpec`, `WaterFeatureSpec`, `FoliageSpec`, `RunningWaterSpec`, `ShoreSpec`,
+    `GasHobSpec` and `FireSpec.ByName`) and `Loudspeakers.TryGet` are the catalogue's, their bodies as they
+    were; the game, the lab and the tests ask `ModelLibrary.Presets`. What names another preset is handed
+    it: the train, aircraft and machine synths, `TrainLayout.Sources`, `Honk.LevelDb`, `CabinPaths.For`,
+    `ExtendedSources.Layout`, `WoodChorus.Build`, `HobControls.Press`. The ids logged once are
+    `ModelFailures` (Sound); `ModelKindTable.Fail` writes there.
+  - **The project.** `OpenFPS.Models`, on Geometry, Materials, Acoustics, Physics, Schema and Sound, holds
+    `Machines.cs`, `ModelKindTable.cs`, `ModelLibrary.cs`, `Editing/ModelKinds.cs`, `Speech/Speech.cs` with its
+    three lists, `Ammunition.cs`, what a scope is (`Scopes.cs`; `ScopeMath` and `ScopeSway` stay in Common's),
+    `VehicleSpec.cs` and `GlassKind.cs`, moved with `git mv`, not a line changed. Common references it. The
+    voices' lines keep their resource names. It is in the wire hash (decision 11).
+  - **Library stage 5's slice.** The registries are one instance, `Catalogue`: its halves sit beside the
+    static classes in `ModelLibrary.cs`, `Machines.cs` and `ModelKindTable.cs`, and hold what was loaded,
+    from where, what was assembled, the generation and a machine's body. `ModelLibrary`, `MachineRegistry`
+    and the kind table are facades over `Catalogue.Shared`. Speech's five tables are built once, under a lock
+    (`Lazy`), where any thread built them without one (the audit's S31).
+  - **Where it went another way than written,** each a question for Cody:
+    - The parts vocabulary (`MachineModels`, `MachinePart`, `MachineDefinition`) stayed in Sound, in
+      `MachineParts.cs`, so the shell could take the parts list as the plan says: `VehicleBodyShell.For` takes a
+      `MachineDefinition`, and `MachineRegistry.Shell(id)` makes one by id.
+    - `GlassKind` and `GlazedPart` moved to the catalogue rather than taking the vehicle as an argument: the
+      argument would have changed `CombatService`, which the Ricochet move holds. Taking them out of
+      `Glass.cs` changes the door models' fingerprint, so the kept door renders are made once again.
+    - `VehicleSpec` moved whole (Cody's decision in docs/PHYSICS_BOUNDARY.md 16.2) rather than taking the
+      parts as an argument. The physics survey sorts it and `VehicleChassisSpec` to a new group, M, the
+      catalogue's; its crossings fall from 43 to 15, the 28 having been `VehicleChassisSpec`'s.
+    - Environment's three files (`Fire.cs`, `FireSpread.cs`, `Fuel.cs`) take a fire by name as a function, not
+      `IPresets`, which is Sound's and above them once stage 3 makes Environment. `FuelCatalog.ForThing` is told
+      whether the thing is a road vehicle; a fire is read from its key's prefix, as `Fire.cs` reads it. The
+      server's drainage lines name their sound by `GroundChannels.SoundId`.
+    - The instance is `Catalogue`, not `ModelCatalog`: the world editor's catalogue of kinds
+      (`OpenFPS.Server.Editor.ModelCatalog`) has that name.
+  - **The ratchet** falls from 1,289 to 1,178. The library's allowance is unchanged; its survey counts nine
+    fewer statics that can change for the last commit. The catalogue's assignable statics are
+    `Catalogue.Shared`, the per-thread list of vehicles being assembled and the built-in engines' names; the
+    rest are tables filled once.
+  - **The wire hash** changes (05c6eeaff638 on `f7701b8b`, 5c7130516f83 after; the hashes in the commits'
+    messages were taken before the rebase): the server and the Windows client go out together. The door
+    models' fingerprint changes once, at the second commit (4cee64a56d02 to cb56e903d42f).
+  - **Left:** the readers are on the static facades, and the kind table's rows, `VehicleSpec.Build` and the
+    `IPresets` places ask `Catalogue.Shared`; a second catalogue is whole only for what its own members do.
+    The folders (`machines/`, `models/`) are still relative to the working directory, not named by the host
+    (library survey 7.4). `WeaponRegistry` joins the catalogue when the presets split.
 
 ### Stage 3: Environment (2 to 3 sessions)
 

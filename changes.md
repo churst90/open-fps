@@ -17,6 +17,16 @@ Recent work, newest first. `git log` has the rest.
   +0.8 dB in a 4.5 m/s breeze, fire and fountain within 0.7; a far sound straight across the wind swings
   several decibels more past 300 m. No message changes, but the wind field is in the wire hash, so the hash
   changes (the server and the Windows client go out together); the stored streams do not change.
+- Package stage 2, Models (docs/ENGINE_PACKAGES.md). The catalogue of what things are (machines and their
+  parts lists, the models a map can name, the one table of kinds and their fields for the editor, the
+  vehicle as the editor stores it, which glass a pane is, the voices, scopes and rounds) is a project of its
+  own, `OpenFPS.Models`, above the sound and the physics. The sound no longer asks it anything: whoever makes
+  a voice that names another preset (a train its horn, a mower its engine) hands it in. The registries are
+  one catalogue instance, with the static classes in front of it as before, and the voices' tables are built
+  once. Nothing a player hears changes, and every model and parts list written out is the same byte for
+  byte. The kept door renders are made again once. The wire hash changes, so the server and the Windows
+  client go out together.
+
 - Sound bent by the wind and the air's layers (docs/CLIENT_NOTES.md). The air's layers near the ground come
   from the sun, the cloud, the hour and the wind (Monin-Obukhov; Holtslag and van Ulden), and over water from
   the air against the water; the server sends the day of the year. Every voice in the world is bent by the
