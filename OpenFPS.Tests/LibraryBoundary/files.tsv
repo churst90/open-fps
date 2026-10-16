@@ -213,6 +213,7 @@ OpenFPS.Materials/AcousticRegistry.cs	lib	Materials
 OpenFPS.Materials/Air.cs	lib	Materials	
 OpenFPS.Materials/RoadSurfaces.cs	lib	Materials	
 OpenFPS.Models/Ammunition.cs	lib	Models	
+OpenFPS.Models/Catalogue.cs	lib	Models	
 OpenFPS.Models/Editing/ModelKinds.cs	lib	Models	
 OpenFPS.Models/GlassKind.cs	lib	Models	
 OpenFPS.Models/Machines.cs	lib	Models	

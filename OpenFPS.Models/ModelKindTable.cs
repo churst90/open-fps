@@ -190,25 +190,8 @@ public static class ModelKindTable
         var kind = KindOf(soundId);
         if (kind == null) return null;
         if (kind.Synth != ModelSynth.Machine) return kind.Body;
-        int generation = ModelLibrary.Generation;
-        if (_bodyGeneration != generation)
-        {
-            _bodies.Clear();
-            _bodyGeneration = generation;
-        }
-        return _bodies.GetOrAdd(soundId!, static id =>
-        {
-            try { return ModelLibrary.Presets.SmallMachine(id[8..]).WalkedBehind ? ModelBody.Walks : ModelBody.Fixed; }
-            catch (Exception ex)
-            {
-                Fail(id, ex.Message);
-                return ModelBody.Fixed;
-            }
-        });
+        return Catalogue.Shared.MachineBody(soundId!);
     }
-
-    private static readonly ConcurrentDictionary<string, ModelBody> _bodies = new(StringComparer.OrdinalIgnoreCase);
-    private static volatile int _bodyGeneration = int.MinValue;
 
     /// <summary>Whether a sound id names a road vehicle, known or not.</summary>
     public static bool IsVehicle(string? soundId) => KindOf(soundId)?.Body == ModelBody.Rolls;
@@ -355,4 +338,32 @@ public static class ModelKindTable
         float span = p.EngineSpanMetres > 0f ? p.EngineSpanMetres : MathF.Max(2f, radiates ?? 2f);
         return (p.SourceLevelDb, span);
     }
+}
+
+/// <summary>A machine's body, as the kind table asks it of the catalogue.</summary>
+public sealed partial class Catalogue
+{
+    /// <summary>How a machine's sound id ("machine:push_mower") moves: it walks if somebody walks behind it.
+    /// Memoised, and forgotten when a model changes.</summary>
+    internal ModelBody MachineBody(string soundId)
+    {
+        int generation = Generation;
+        if (_bodyGeneration != generation)
+        {
+            _bodies.Clear();
+            _bodyGeneration = generation;
+        }
+        return _bodies.GetOrAdd(soundId, static (id, self) =>
+        {
+            try { return self.SmallMachine(id[8..]).WalkedBehind ? ModelBody.Walks : ModelBody.Fixed; }
+            catch (Exception ex)
+            {
+                ModelKindTable.Fail(id, ex.Message);
+                return ModelBody.Fixed;
+            }
+        }, this);
+    }
+
+    private readonly ConcurrentDictionary<string, ModelBody> _bodies = new(StringComparer.OrdinalIgnoreCase);
+    private volatile int _bodyGeneration = int.MinValue;
 }

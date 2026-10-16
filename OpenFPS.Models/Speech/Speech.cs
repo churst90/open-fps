@@ -132,28 +132,28 @@ public static class Speech
     /// <summary>One recorded take.</summary>
     public sealed record Take(string Voice, string Kind, string Category, string Line, string Text, float Seconds);
 
-    private static IReadOnlyList<Take>? _takes;
+    // Each table is built once, the first time it is asked for, by whichever thread asks first; the others
+    // wait for it (Lazy's default). They were built without a lock, by every thread that found one missing.
+    private static readonly Lazy<IReadOnlyList<Take>> _takes = new(Load);
 
     /// <summary>Every take shipped, in catalogue order.</summary>
-    public static IReadOnlyList<Take> Takes => _takes ??= Load();
+    public static IReadOnlyList<Take> Takes => _takes.Value;
 
     /// <summary>Every voice, in catalogue order.</summary>
-    public static IReadOnlyList<string> Voices => _voices ??= Takes.Select(t => t.Voice).Distinct().ToArray();
-    private static IReadOnlyList<string>? _voices;
+    public static IReadOnlyList<string> Voices => _voices.Value;
+    private static readonly Lazy<IReadOnlyList<string>> _voices = new(() => Takes.Select(t => t.Voice).Distinct().ToArray());
 
     /// <summary>The voices that recorded anything in a category ("greet", "yell", "story"), in
     /// catalogue order. A driver's voice is one with yells; a pedestrian's is one with greetings.</summary>
     public static IReadOnlyList<string> VoicesWith(string category)
         => Takes.Where(t => t.Category == category).Select(t => t.Voice).Distinct().ToArray();
 
-    private static Dictionary<(string, string), string[]>? _byVoiceCategory;
+    private static readonly Lazy<Dictionary<(string, string), string[]>> _byVoiceCategory =
+        new(() => Takes.GroupBy(t => (t.Voice, t.Category)).ToDictionary(g => g.Key, g => g.Select(t => t.Line).ToArray()));
 
     /// <summary>A voice's lines in one category.</summary>
     public static IReadOnlyList<string> LinesOf(string voice, string category)
-    {
-        _byVoiceCategory ??= Takes.GroupBy(t => (t.Voice, t.Category)).ToDictionary(g => g.Key, g => g.Select(t => t.Line).ToArray());
-        return _byVoiceCategory.TryGetValue((voice, category), out var l) ? l : Array.Empty<string>();
-    }
+        => _byVoiceCategory.Value.TryGetValue((voice, category), out var l) ? l : Array.Empty<string>();
 
     // ── Scripts: phone calls and two people walking together ────────────────────────────────────
     //
@@ -169,10 +169,10 @@ public static class Speech
     public sealed record Turn(string Who, string? Line, string? Cue, bool Cut);
     public sealed record Conversation(string Name, string A, string B, IReadOnlyList<Turn> Turns);
 
-    private static (IReadOnlyList<Call> Calls, IReadOnlyList<Conversation> Pairs)? _scripts;
+    private static readonly Lazy<(IReadOnlyList<Call> Calls, IReadOnlyList<Conversation> Pairs)> _scripts = new(LoadScripts);
 
-    public static IReadOnlyList<Call> Calls => (_scripts ??= LoadScripts()).Calls;
-    public static IReadOnlyList<Conversation> Conversations => (_scripts ??= LoadScripts()).Pairs;
+    public static IReadOnlyList<Call> Calls => _scripts.Value.Calls;
+    public static IReadOnlyList<Conversation> Conversations => _scripts.Value.Pairs;
 
     /// <summary>The calls this voice recorded every line of.</summary>
     public static IReadOnlyList<IReadOnlyList<CallTurn>> CallsFor(string voice)
@@ -211,14 +211,11 @@ public static class Speech
     }
 
 
-    private static Dictionary<(string, string), Take>? _byVoiceLine;
+    private static readonly Lazy<Dictionary<(string, string), Take>> _byVoiceLine = new(() => Takes.ToDictionary(t => (t.Voice, t.Line)));
 
     /// <summary>A voice's take of a line, or null if that voice never recorded it.</summary>
     public static Take? Find(string voice, string line)
-    {
-        _byVoiceLine ??= Takes.ToDictionary(t => (t.Voice, t.Line));
-        return _byVoiceLine.TryGetValue((voice, line), out var t) ? t : null;
-    }
+        => _byVoiceLine.Value.TryGetValue((voice, line), out var t) ? t : null;
 
     private static IReadOnlyList<Take> Load()
     {

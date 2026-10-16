@@ -14,30 +14,161 @@ namespace OpenFPS.Common;
 /// </summary>
 public static class MachineRegistry
 {
-    private static volatile Dictionary<string, MachineDefinition> _authored =
-        new(StringComparer.OrdinalIgnoreCase);
-    private static readonly object _loadLock = new();
+    // A static facade over the shared catalogue (Catalogue.Shared), until the readers are handed an instance
+    // (docs/SOUND_LIBRARY_BOUNDARY.md, stage 5 and decision 7). What each does is said on the catalogue.
 
-    /// <summary>What has been loaded from data, by id.</summary>
-    public static IReadOnlyDictionary<string, MachineDefinition> Authored => _authored;
+    /// <inheritdoc cref="Catalogue.AuthoredMachines"/>
+    public static IReadOnlyDictionary<string, MachineDefinition> Authored => Catalogue.Shared.AuthoredMachines;
+    /// <inheritdoc cref="Catalogue.LoadMachines"/>
+    public static int Load(string directory) => Catalogue.Shared.LoadMachines(directory);
+    /// <inheritdoc cref="Catalogue.EnsureMachinesLoaded"/>
+    public static void EnsureLoaded(string directory = "machines") => Catalogue.Shared.EnsureMachinesLoaded(directory);
+    /// <inheritdoc cref="Catalogue.ClearMachines"/>
+    public static void Clear() => Catalogue.Shared.ClearMachines();
+    /// <inheritdoc cref="Catalogue.AddMachine"/>
+    public static void Add(MachineDefinition def) => Catalogue.Shared.AddMachine(def);
+    /// <inheritdoc cref="Catalogue.FindMachine"/>
+    public static MachineDefinition? Find(string id) => Catalogue.Shared.FindMachine(id);
+    /// <inheritdoc cref="Catalogue.KnowsMachine"/>
+    public static bool Knows(string id) => Catalogue.Shared.KnowsMachine(id);
+    /// <inheritdoc cref="Catalogue.MachineIds"/>
+    public static IEnumerable<string> Ids => Catalogue.Shared.MachineIds;
+    /// <inheritdoc cref="Catalogue.VehicleFor"/>
+    public static VehicleProfile VehicleFor(string id) => Catalogue.Shared.VehicleFor(id);
+    /// <inheritdoc cref="Catalogue.Shell"/>
+    public static VehicleBodyShell Shell(string id, Vector3? size = null) => Catalogue.Shared.Shell(id, size);
+    /// <inheritdoc cref="Catalogue.Unedited"/>
+    public static VehicleProfile Unedited(string id) => Catalogue.Shared.Unedited(id);
+    /// <inheritdoc cref="Catalogue.EngineFor"/>
+    public static EngineProfile EngineFor(string key) => Catalogue.Shared.EngineFor(key);
+    /// <inheritdoc cref="Catalogue.EngineKeyFor"/>
+    public static string EngineKeyFor(string vehicleId) => Catalogue.Shared.EngineKeyFor(vehicleId);
+    /// <inheritdoc cref="Catalogue.Assemble"/>
+    public static VehicleProfile Assemble(MachineDefinition def) => Catalogue.Shared.Assemble(def);
+    /// <inheritdoc cref="Catalogue.Describe"/>
+    public static MachineDefinition Describe(VehicleProfile v, string id) => Catalogue.Shared.Describe(v, id);
+    /// <inheritdoc cref="Catalogue.EngineKeyOf"/>
+    public static string EngineKeyOf(EngineProfile engine) => Catalogue.Shared.EngineKeyOf(engine);
+
+    // ── Data ────────────────────────────────────────────────────────────────────────────────────
+
+    internal static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    /// <summary>A machine on disk. Nullable throughout: an omitted field means "unchanged".</summary>
+    internal sealed class MachineDto
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? Base { get; set; }
+        public List<PartDto>? Parts { get; set; }
+
+        public MachineDefinition ToDefinition(string id) => new()
+        {
+            Id = id,
+            Name = Name ?? "",
+            Base = Base ?? "",
+            Parts = (Parts ?? new List<PartDto>()).Select(p => p.ToPart()).ToList(),
+        };
+    }
+
+    internal sealed class PartDto
+    {
+        public string? Model { get; set; }
+        public string? Profile { get; set; }
+        public string? Material { get; set; }
+        /// <summary>[x, y, z], metres, in the machine's own frame.</summary>
+        public float[]? At { get; set; }
+        public float? Extent { get; set; }
+        public float? LevelDb { get; set; }
+        public Dictionary<string, float>? Settings { get; set; }
+        public float[]? Series { get; set; }
+
+        public MachinePart ToPart() => new()
+        {
+            Model = Model ?? throw new JsonException("a part with no model"),
+            Profile = Profile ?? "",
+            Material = Material ?? "",
+            At = At is { Length: >= 3 } ? new Vector3(At[0], At[1], At[2]) : Vector3.Zero,
+            ExtentMetres = Extent ?? 0f,
+            LevelDb = LevelDb ?? 0f,
+            Settings = Settings != null
+                ? new Dictionary<string, float>(Settings, StringComparer.OrdinalIgnoreCase)
+                : MachinePart.EmptySettings,
+            Series = Series ?? Array.Empty<float>(),
+        };
+    }
+
+    /// <summary>A definition as it would be written on disk.</summary>
+    public static string ToJson(MachineDefinition def)
+    {
+        var dto = new MachineDto
+        {
+            Id = def.Id,
+            Name = def.Name.Length > 0 ? def.Name : null,
+            Base = def.Base.Length > 0 ? def.Base : null,
+            Parts = def.Parts.Select(p => new PartDto
+            {
+                Model = p.Model,
+                Profile = p.Profile.Length > 0 ? p.Profile : null,
+                Material = p.Material.Length > 0 ? p.Material : null,
+                At = p.At == Vector3.Zero ? null : new[] { p.At.X, p.At.Y, p.At.Z },
+                Extent = p.ExtentMetres > 0f ? p.ExtentMetres : null,
+                LevelDb = p.LevelDb > 0f ? p.LevelDb : null,
+                Settings = p.Settings.Count > 0 ? new Dictionary<string, float>(p.Settings) : null,
+                Series = p.Series.Count > 0 ? p.Series.ToArray() : null,
+            }).ToList(),
+        };
+        return JsonSerializer.Serialize(dto, JsonOptions);
+    }
+
+    /// <summary>Reads one machine from JSON text — the other half of <see cref="ToJson"/>.</summary>
+    public static MachineDefinition FromJson(string json, string fallbackId = "")
+    {
+        var dto = JsonSerializer.Deserialize<MachineDto>(json, JsonOptions)
+                  ?? throw new JsonException("empty machine");
+        return dto.ToDefinition(dto.Id ?? fallbackId);
+    }
+}
+
+/// <summary>
+/// The machines' half of the catalogue: what has been loaded from machines/ and what has been assembled from
+/// it, with the built-in vehicles. <see cref="Describe"/> and <see cref="Assemble"/> are inverses: every
+/// built-in preset survives the round trip unchanged (MachineTests), which proves the parts vocabulary holds
+/// the whole library.
+/// </summary>
+public sealed partial class Catalogue
+{
+    private volatile Dictionary<string, MachineDefinition> _machines =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _machinesLock = new();
+
+    /// <summary>The machines loaded from data, by id.</summary>
+    public IReadOnlyDictionary<string, MachineDefinition> AuthoredMachines => _machines;
 
     /// <summary>
     /// Reads every <c>*.json</c> in a directory as a machine definition. Additive and never fatal: a
     /// file that will not parse is logged past. A fresh dictionary is published whole, so the audio
     /// thread never sees a reload half done.
     /// </summary>
-    public static int Load(string directory)
+    public int LoadMachines(string directory)
     {
         if (!Directory.Exists(directory)) return 0;
-        lock (_loadLock)
+        lock (_machinesLock)
         {
-            var next = new Dictionary<string, MachineDefinition>(_authored, StringComparer.OrdinalIgnoreCase);
+            var next = new Dictionary<string, MachineDefinition>(_machines, StringComparer.OrdinalIgnoreCase);
             int loaded = 0;
             foreach (string file in Directory.EnumerateFiles(directory, "*.json"))
             {
                 try
                 {
-                    var dto = JsonSerializer.Deserialize<MachineDto>(File.ReadAllText(file), JsonOptions);
+                    var dto = JsonSerializer.Deserialize<MachineRegistry.MachineDto>(File.ReadAllText(file), MachineRegistry.JsonOptions);
                     if (dto == null) continue;
                     string id = dto.Id ?? Path.GetFileNameWithoutExtension(file);
                     if (string.IsNullOrWhiteSpace(id)) continue;
@@ -49,7 +180,7 @@ public static class MachineRegistry
                     Console.WriteLine($"[WARN] MachineRegistry: {Path.GetFileName(file)} is not a machine: {ex.Message}");
                 }
             }
-            _authored = next;
+            _machines = next;
             _assembled.Clear();
             return loaded;
         }
@@ -58,100 +189,103 @@ public static class MachineRegistry
     /// <summary>Loads the authored library once, from the folder next to the maps (relative to the
     /// working directory, as prefabs/ is). Server, client and lab all call it: they must agree on what
     /// a machine name means.</summary>
-    public static void EnsureLoaded(string directory = "machines")
+    public void EnsureMachinesLoaded(string directory = "machines")
     {
-        if (_loadedFrom == directory) return;
-        lock (_loadLock) { if (_loadedFrom == directory) return; }
-        Load(directory);
-        _loadedFrom = directory;
+        if (_machinesFrom == directory) return;
+        lock (_machinesLock) { if (_machinesFrom == directory) return; }
+        LoadMachines(directory);
+        _machinesFrom = directory;
     }
 
-    private static volatile string? _loadedFrom;
+    private volatile string? _machinesFrom;
 
-    /// <summary>Forgets everything loaded from data. For tests, and for a map change.</summary>
-    public static void Clear()
+    /// <summary>Forgets every machine loaded from data. For tests, and for a map change.</summary>
+    public void ClearMachines()
     {
-        lock (_loadLock)
+        lock (_machinesLock)
         {
-            _authored = new Dictionary<string, MachineDefinition>(StringComparer.OrdinalIgnoreCase);
+            _machines = new Dictionary<string, MachineDefinition>(StringComparer.OrdinalIgnoreCase);
             _assembled.Clear();
-            _loadedFrom = null;
+            _machinesFrom = null;
         }
     }
 
     /// <summary>Adds a definition directly, as a map or a test would.</summary>
-    public static void Add(MachineDefinition def)
+    public void AddMachine(MachineDefinition def)
     {
-        lock (_loadLock)
+        lock (_machinesLock)
         {
-            var next = new Dictionary<string, MachineDefinition>(_authored, StringComparer.OrdinalIgnoreCase)
+            var next = new Dictionary<string, MachineDefinition>(_machines, StringComparer.OrdinalIgnoreCase)
             { [def.Id] = def };
-            _authored = next;
+            _machines = next;
             _assembled.Clear();
         }
     }
 
     /// <summary>A machine by name: an authored one first (so a map can replace a car in the library),
     /// otherwise the built-in of that name taken apart into its parts.</summary>
-    public static MachineDefinition? Find(string id)
+    public MachineDefinition? FindMachine(string id)
     {
         if (string.IsNullOrEmpty(id)) return null;
         // Changed in the world editor: the vehicle as it is now, taken apart.
-        if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, id)) return Describe(VehicleFor(id), id);
-        if (_authored.TryGetValue(id, out var authored)) return authored;
+        if (IsAuthored(ModelLibrary.Kinds.Vehicle, id)) return Describe(VehicleFor(id), id);
+        if (_machines.TryGetValue(id, out var authored)) return authored;
         if (VehicleProfile.Presets.ContainsKey(id)) return Describe(VehicleProfile.ByName(id), id);
         return null;
     }
 
     /// <summary>Is there a machine of this name at all — authored, or in the built-in library?</summary>
-    public static bool Knows(string id)
-        => !string.IsNullOrEmpty(id) && (_authored.ContainsKey(id) || VehicleProfile.Presets.ContainsKey(id)
-                                         || ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, id));
+    public bool KnowsMachine(string id)
+        => !string.IsNullOrEmpty(id) && (_machines.ContainsKey(id) || VehicleProfile.Presets.ContainsKey(id)
+                                         || IsAuthored(ModelLibrary.Kinds.Vehicle, id));
 
     /// <summary>Every machine there is, built-in and authored, and those made in the world editor.</summary>
-    public static IEnumerable<string> Ids
-        => VehicleProfile.Presets.Keys.Concat(_authored.Keys.Where(k => !VehicleProfile.Presets.ContainsKey(k)))
-               .Concat(ModelLibrary.Ids(ModelLibrary.Kinds.Vehicle)
-                   .Where(k => !VehicleProfile.Presets.ContainsKey(k) && !_authored.ContainsKey(k)));
+    public IEnumerable<string> MachineIds
+        => VehicleProfile.Presets.Keys.Concat(_machines.Keys.Where(k => !VehicleProfile.Presets.ContainsKey(k)))
+               .Concat(Ids(ModelLibrary.Kinds.Vehicle)
+                   .Where(k => !VehicleProfile.Presets.ContainsKey(k) && !_machines.ContainsKey(k)));
 
     /// <summary>The vehicle a machine names, assembled. Memoised, as <see cref="VehicleProfile.ByName"/>
     /// is: the audio path asks per car per frame, and assembling one builds a whole engine.</summary>
-    public static VehicleProfile VehicleFor(string id)
+    public VehicleProfile VehicleFor(string id)
     {
         // A model changed in the world editor (a vehicle, or an engine some vehicle has) makes every
         // assembled vehicle stale: forgotten, and built again as each is next asked for.
-        int generation = ModelLibrary.Generation;
+        int generation = Generation;
         if (generation != _seenGeneration)
         {
             _assembled.Clear();
             _seenGeneration = generation;
         }
-        return _assembled.GetOrAdd(id, static k =>
-        {
-            if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, k))
-            {
-                var spec = ModelLibrary.Get<VehicleSpec>(ModelLibrary.Kinds.Vehicle, k);
-                // Built on itself it starts from the unedited vehicle, which never asks for this one
-                // again; marked as assembling, a parts list's own base check took it for a circle.
-                if (spec.Base.Length == 0 || spec.Base.Equals(k, StringComparison.OrdinalIgnoreCase)) return spec.Build(k);
-                _assembling ??= new List<string>();
-                if (_assembling.Contains(k, StringComparer.OrdinalIgnoreCase))
-                    throw new ArgumentException($"Vehicles are built on each other in a circle: {string.Join(" -> ", _assembling)} -> {k}.");
-                _assembling.Add(k);
-                try { return spec.Build(k); }
-                finally { _assembling.Remove(k); }
-            }
-            return WithEditedEngine(Unedited(k));
-        });
+        return _assembled.GetOrAdd(id, static (k, self) => self.BuildVehicle(k), this);
     }
 
-    private static volatile int _seenGeneration = int.MinValue;
+    // A vehicle assembled, as VehicleFor keeps it.
+    private VehicleProfile BuildVehicle(string k)
+    {
+        if (IsAuthored(ModelLibrary.Kinds.Vehicle, k))
+        {
+            var spec = Get<VehicleSpec>(ModelLibrary.Kinds.Vehicle, k);
+            // Built on itself it starts from the unedited vehicle, which never asks for this one
+            // again; marked as assembling, a parts list's own base check took it for a circle.
+            if (spec.Base.Length == 0 || spec.Base.Equals(k, StringComparison.OrdinalIgnoreCase)) return spec.Build(k);
+            _assembling ??= new List<string>();
+            if (_assembling.Contains(k, StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException($"Vehicles are built on each other in a circle: {string.Join(" -> ", _assembling)} -> {k}.");
+            _assembling.Add(k);
+            try { return spec.Build(k); }
+            finally { _assembling.Remove(k); }
+        }
+        return WithEditedEngine(Unedited(k));
+    }
+
+    private volatile int _seenGeneration = int.MinValue;
 
     /// <summary>
     /// The body shell of the vehicle <paramref name="id"/> names, from its parts list, at its own body's size,
     /// or at <paramref name="size"/> (width, height, length) when its map gives it one.
     /// </summary>
-    public static VehicleBodyShell Shell(string id, Vector3? size = null)
+    public VehicleBodyShell Shell(string id, Vector3? size = null)
     {
         var vehicle = VehicleFor(id);
         return VehicleBodyShell.For(vehicle, Describe(vehicle, id), size);
@@ -159,39 +293,39 @@ public static class MachineRegistry
 
     /// <summary>A vehicle as it is without the world editor (a vehicle model's version 0): an authored
     /// parts list assembled, or the built-in preset.</summary>
-    public static VehicleProfile Unedited(string id)
+    public VehicleProfile Unedited(string id)
     {
-        if (_authored.TryGetValue(id, out var def)) return Assemble(def);
+        if (_machines.TryGetValue(id, out var def)) return Assemble(def);
         if (VehicleProfile.Presets.ContainsKey(id)) return VehicleProfile.ByName(id);
         throw new ArgumentException($"No machine '{id}'.");
     }
 
     /// <summary>An engine by its preset name, as changed in the world editor if it has been.</summary>
-    public static EngineProfile EngineFor(string key)
-        => ModelLibrary.IsAuthored(ModelLibrary.Kinds.Engine, key)
-            ? ModelLibrary.Get<EngineProfile>(ModelLibrary.Kinds.Engine, key)
-            : ModelLibrary.Presets.Engine(key);
+    public EngineProfile EngineFor(string key)
+        => IsAuthored(ModelLibrary.Kinds.Engine, key)
+            ? Get<EngineProfile>(ModelLibrary.Kinds.Engine, key)
+            : ((IPresets)this).Engine(key);
 
     /// <summary>A vehicle with its engine as changed in the world editor, if it has been.</summary>
-    private static VehicleProfile WithEditedEngine(VehicleProfile v)
+    private VehicleProfile WithEditedEngine(VehicleProfile v)
     {
         string key = EngineKeyOf(v.Engine);
-        return key.Length > 0 && ModelLibrary.IsAuthored(ModelLibrary.Kinds.Engine, key) ? v with { Engine = EngineFor(key) } : v;
+        return key.Length > 0 && IsAuthored(ModelLibrary.Kinds.Engine, key) ? v with { Engine = EngineFor(key) } : v;
     }
 
     /// <summary>The engine preset a vehicle (by id) is built on, or "".</summary>
-    public static string EngineKeyFor(string vehicleId)
+    public string EngineKeyFor(string vehicleId)
     {
         try
         {
-            if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, vehicleId))
-                return ModelLibrary.Get<VehicleSpec>(ModelLibrary.Kinds.Vehicle, vehicleId).Engine;
-            return Knows(vehicleId) ? EngineKeyOf(Unedited(vehicleId).Engine) : "";
+            if (IsAuthored(ModelLibrary.Kinds.Vehicle, vehicleId))
+                return Get<VehicleSpec>(ModelLibrary.Kinds.Vehicle, vehicleId).Engine;
+            return KnowsMachine(vehicleId) ? EngineKeyOf(Unedited(vehicleId).Engine) : "";
         }
         catch (ArgumentException) { return ""; }
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, VehicleProfile> _assembled =
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, VehicleProfile> _assembled =
         new(StringComparer.OrdinalIgnoreCase);
 
     // ── Parts → machine ─────────────────────────────────────────────────────────────────────────
@@ -201,7 +335,7 @@ public static class MachineRegistry
     /// overrides only what it names; what has no part (the air system, the siren, the fan, where the
     /// engine is) comes with the base. With no base, the parts must carry an engine.
     /// </summary>
-    public static VehicleProfile Assemble(MachineDefinition def)
+    public VehicleProfile Assemble(MachineDefinition def)
     {
         VehicleProfile? b = ResolveBase(def);
 
@@ -314,7 +448,7 @@ public static class MachineRegistry
     /// name ("v8_sports, but heavier"): read as the authored one it recursed for ever and hung the test
     /// run. A deeper circle (a on b on a) is an authoring error and says so.
     /// </summary>
-    private static VehicleProfile? ResolveBase(MachineDefinition def)
+    private VehicleProfile? ResolveBase(MachineDefinition def)
     {
         if (string.IsNullOrEmpty(def.Base)) return null;
         if (string.Equals(def.Base, def.Id, StringComparison.OrdinalIgnoreCase))
@@ -335,7 +469,7 @@ public static class MachineRegistry
 
     /// <summary>The same vehicle taken apart into parts: how the built-in library is exported to data.
     /// The inverse of <see cref="Assemble"/>.</summary>
-    public static MachineDefinition Describe(VehicleProfile v, string id)
+    public MachineDefinition Describe(VehicleProfile v, string id)
     {
         var parts = new List<MachinePart>
         {
@@ -426,14 +560,14 @@ public static class MachineRegistry
     /// Which engine preset this is, found by the engine's Name, which a test holds unique. A vehicle's
     /// own EngineKey is the vehicle's key, not always the engine's (the school bus runs "diesel_bus").
     /// </summary>
-    public static string EngineKeyOf(EngineProfile engine)
+    public string EngineKeyOf(EngineProfile engine)
     {
         var byName = _engineKeys ??= EngineProfile.Presets.ToDictionary(kv => kv.Value().Name, kv => kv.Key);
         if (byName.TryGetValue(engine.Name, out var key)) return key;
         // An engine changed in the world editor may have been renamed: the edited one, by its name.
-        foreach (var id in ModelLibrary.Ids(ModelLibrary.Kinds.Engine))
-            if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Engine, id)
-                && ModelLibrary.Get<EngineProfile>(ModelLibrary.Kinds.Engine, id).Name == engine.Name) return id;
+        foreach (var id in Ids(ModelLibrary.Kinds.Engine))
+            if (IsAuthored(ModelLibrary.Kinds.Engine, id)
+                && Get<EngineProfile>(ModelLibrary.Kinds.Engine, id).Name == engine.Name) return id;
         return "";
     }
 
@@ -459,91 +593,5 @@ public static class MachineRegistry
                 && b with { PanelSpansM = body.PanelSpansM } == body) return kv.Key;
         }
         return "";
-    }
-
-    // ── Data ────────────────────────────────────────────────────────────────────────────────────
-
-    internal static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
-    /// <summary>A machine on disk. Nullable throughout: an omitted field means "unchanged".</summary>
-    internal sealed class MachineDto
-    {
-        public string? Id { get; set; }
-        public string? Name { get; set; }
-        public string? Base { get; set; }
-        public List<PartDto>? Parts { get; set; }
-
-        public MachineDefinition ToDefinition(string id) => new()
-        {
-            Id = id,
-            Name = Name ?? "",
-            Base = Base ?? "",
-            Parts = (Parts ?? new List<PartDto>()).Select(p => p.ToPart()).ToList(),
-        };
-    }
-
-    internal sealed class PartDto
-    {
-        public string? Model { get; set; }
-        public string? Profile { get; set; }
-        public string? Material { get; set; }
-        /// <summary>[x, y, z], metres, in the machine's own frame.</summary>
-        public float[]? At { get; set; }
-        public float? Extent { get; set; }
-        public float? LevelDb { get; set; }
-        public Dictionary<string, float>? Settings { get; set; }
-        public float[]? Series { get; set; }
-
-        public MachinePart ToPart() => new()
-        {
-            Model = Model ?? throw new JsonException("a part with no model"),
-            Profile = Profile ?? "",
-            Material = Material ?? "",
-            At = At is { Length: >= 3 } ? new Vector3(At[0], At[1], At[2]) : Vector3.Zero,
-            ExtentMetres = Extent ?? 0f,
-            LevelDb = LevelDb ?? 0f,
-            Settings = Settings != null
-                ? new Dictionary<string, float>(Settings, StringComparer.OrdinalIgnoreCase)
-                : MachinePart.EmptySettings,
-            Series = Series ?? Array.Empty<float>(),
-        };
-    }
-
-    /// <summary>A definition as it would be written on disk.</summary>
-    public static string ToJson(MachineDefinition def)
-    {
-        var dto = new MachineDto
-        {
-            Id = def.Id,
-            Name = def.Name.Length > 0 ? def.Name : null,
-            Base = def.Base.Length > 0 ? def.Base : null,
-            Parts = def.Parts.Select(p => new PartDto
-            {
-                Model = p.Model,
-                Profile = p.Profile.Length > 0 ? p.Profile : null,
-                Material = p.Material.Length > 0 ? p.Material : null,
-                At = p.At == Vector3.Zero ? null : new[] { p.At.X, p.At.Y, p.At.Z },
-                Extent = p.ExtentMetres > 0f ? p.ExtentMetres : null,
-                LevelDb = p.LevelDb > 0f ? p.LevelDb : null,
-                Settings = p.Settings.Count > 0 ? new Dictionary<string, float>(p.Settings) : null,
-                Series = p.Series.Count > 0 ? p.Series.ToArray() : null,
-            }).ToList(),
-        };
-        return JsonSerializer.Serialize(dto, JsonOptions);
-    }
-
-    /// <summary>Reads one machine from JSON text — the other half of <see cref="ToJson"/>.</summary>
-    public static MachineDefinition FromJson(string json, string fallbackId = "")
-    {
-        var dto = JsonSerializer.Deserialize<MachineDto>(json, JsonOptions)
-                  ?? throw new JsonException("empty machine");
-        return dto.ToDefinition(dto.Id ?? fallbackId);
     }
 }
