@@ -4,6 +4,8 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Clay and leaves are named underfoot: open clay ground is "clay" and foliage lying on the ground "leaves", where both
+  were "outside" (Cody, 2026-10-16). No map lays either as ground yet.
 - The wind's direction comes from the weather (docs/CLIENT_NOTES.md, "Where the wind comes from"; Cody: "wind
   sound should actually follow the wind directions, not random"). Each front blows from round a prevailing
   west-south-west, turned as a depression turns it (rain backed 60 degrees, a storm veered 45, snow veered 60, a

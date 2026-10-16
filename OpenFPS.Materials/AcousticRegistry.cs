@@ -638,6 +638,9 @@ public static class AcousticRegistry
         Name("Water", "water");
         Name("Snow", "snow");
         Name("Ice", "ice");
+        Name("Clay", "clay");
+        // Leaves lying on the ground: a woodland floor, or the canopy's own material where it is walked on.
+        Name("Foliage", "leaves");
         var asphalt = reg["Asphalt"]; asphalt.Carriageway = true; reg["Asphalt"] = asphalt;
         // A palisade's pale: a pressed steel section about 65 mm wide and 3 mm thick, pinned between rails a metre apart.
         var fence = reg["Fence"]; fence.Pales = new PaleSection(0.065f, 0.003f, 1f); reg["Fence"] = fence;
