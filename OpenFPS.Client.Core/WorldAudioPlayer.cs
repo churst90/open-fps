@@ -39,6 +39,9 @@ public sealed class WorldAudioPlayer
         /// placed AS its source and then scaled by this, never by its own lowered level: see Play.</summary>
         public float CopyGain { get; init; }
         public float SourceLevelDb { get; init; }
+        /// <summary>An echo's last point off a surface on its way to the ears: it is heard only while the way from
+        /// there is clear (<see cref="KeepCopiesTrue"/>).</summary>
+        public Vector3? Bounce { get; init; }
         /// <summary>A part of a strike's thunder. It stands for kilometres of lightning channel in one
         /// direction, so it is placed <see cref="SkyOffset"/> from the listener wherever the listener
         /// is, and gets only a sky sound's copies (see <see cref="MaxSkyRoomEchoes"/>).</summary>
@@ -562,6 +565,7 @@ public sealed class WorldAudioPlayer
         }
 
         FollowSpeakers(world, listenerPosition, now);
+        KeepCopiesTrue(world, listenerPosition, now);
         if (_pending.Count == 0) return;
 
         // Several passes: a sound's reflections are queued while it plays, behind this loop, and a
@@ -733,6 +737,7 @@ public sealed class WorldAudioPlayer
             Voices.DeclareEvent(emitter.EntityId, item.SourceEntityId >= 0 ? item.SourceEntityId : VoiceRegistry.NoEntity,
                                  VoiceKind.Transient, emitter.Position, item.Sound.LevelDb);
             Voices.Submit(emitter);
+            if (item.Bounce is { } bounce) _copies.Add(new HeardCopy { Emitter = emitter, Bounce = bounce, StartedAt = now });
 
             // A part of the thunder stays in its direction while the listener walks on under it.
             if (item.Sky)
@@ -959,6 +964,92 @@ public sealed class WorldAudioPlayer
         }
     }
 
+    /// <summary>A copy of a one-off sound that is playing, and the last point it came off.</summary>
+    private struct HeardCopy
+    {
+        public SpatialEmitter Emitter;
+        public Vector3 Bounce;
+        public double StartedAt;
+        /// <summary>Faded out: something solid stands between <see cref="Bounce"/> and the ears.</summary>
+        public bool Shut;
+    }
+
+    private readonly List<HeardCopy> _copies = new();
+
+    /// <summary>How far the ears move before the copies are looked at again, metres: well under a doorway's
+    /// width, as the worker's routes are asked again (AsyncAcousticWorker.RouteReuseMetres).</summary>
+    internal const float CopiesLookAgainMetres = 0.25f;
+
+    // Where the ears were, and the scene, when the copies were last looked at. The snapshot's triangle world is
+    // made anew when a door leaf moves (ClientGeometry.ForSnapshot), and the version when tiles come and go.
+    private Vector3 _copiesHeardFrom = new(float.NaN);
+    private object? _copiesMap, _copiesGeometry;
+    private long _copiesVersion;
+
+    /// <summary>
+    /// A one-off's copies are found for where the ears were as it began. Once the ears have moved, or a door has,
+    /// each is heard only while the way from where it last came off to the ears is clear, its bands taken to nothing
+    /// and back over the mixer's smoothing: a telephone ringing in the next room is not still heard in full, by its
+    /// copies, by someone who has shut the door on it. One ray a copy, and only when the ears have moved
+    /// <see cref="CopiesLookAgainMetres"/> or the scene has changed.
+    /// </summary>
+    private void KeepCopiesTrue(WorldSnapshot world, Vector3 listenerPosition, double now)
+    {
+        for (int i = _copies.Count - 1; i >= 0; i--)
+            if (now - _copies[i].StartedAt > StartGraceSeconds && !_audio.IsPlaying(_copies[i].Emitter.EntityId))
+                _copies.RemoveAt(i);
+        if (_copies.Count == 0) return;
+        if (ReferenceEquals(world.AcousticMap, _copiesMap) && ReferenceEquals(world.Geometry, _copiesGeometry)
+            && world.GeometryVersion == _copiesVersion
+            && Vector3.DistanceSquared(listenerPosition, _copiesHeardFrom) < CopiesLookAgainMetres * CopiesLookAgainMetres)
+            return;
+        _copiesMap = world.AcousticMap;
+        _copiesGeometry = world.Geometry;
+        _copiesVersion = world.GeometryVersion;
+        _copiesHeardFrom = listenerPosition;
+        for (int i = 0; i < _copies.Count; i++)
+        {
+            var c = _copies[i];
+            bool shut = !Reaches(_acoustics.Spatial, world, c.Bounce, listenerPosition);
+            if (shut == c.Shut) continue;
+            c.Shut = shut;
+            _copies[i] = c;
+            // As it was placed, or with nothing let through; carried, so the mixer slews its bands to it.
+            var e = c.Emitter;
+            if (shut) { e.EqLow = 0f; e.EqMid = 0f; e.EqHigh = 0f; }
+            e.CarriesPath = true;
+            Voices.Refresh(e);
+        }
+    }
+
+    /// <summary>How far off its surface a copy's last leg is taken to begin, metres: clear of the face it came off.</summary>
+    internal const float OffSurfaceMetres = 0.02f;
+
+    /// <summary>
+    /// Whether a copy that last came off a surface at <paramref name="bounce"/> still reaches <paramref name="listener"/>:
+    /// nothing a copy is found among (what stays put, door leaves where they stand now, the ground) is between them.
+    /// One ray.
+    /// </summary>
+    internal static bool Reaches(SpatialService spatial, WorldSnapshot world, Vector3 bounce, Vector3 listener)
+    {
+        Vector3 way = listener - bounce;
+        float length = way.Length();
+        if (length <= 2f * OffSurfaceMetres) return true;
+        Vector3 dir = way / length;
+        return !spatial.RaycastSingle(world, bounce + dir * OffSurfaceMetres, dir, length - OffSurfaceMetres, StopsCopies, out _, out _);
+    }
+
+    /// <summary>What stops a copy, as the reflection scene has it (SteamAudioScene.BoxesFromWorld): a fixed solid box
+    /// that is not itself a sound source, or the ground. People and vehicles do not.</summary>
+    private static readonly Func<EntitySnapshot, bool> StopsCopies = e =>
+    {
+        var def = e.Definition;
+        if (def == null || def.Moves || def.Type != OpenFPS.Common.Components.EntityType.StaticObject) return false;
+        if (def.Collider.Shape == OpenFPS.Common.Components.ColliderShape.Terrain) return true;
+        return def.Collider.IsSolid && def.Collider.Shape == OpenFPS.Common.Components.ColliderShape.Box
+               && string.IsNullOrEmpty(def.SoundEmitter.SoundId);
+    };
+
     /// <summary>
     /// How many of a transient's far reflections may play, the strongest: a voice budget, not an
     /// acoustic one. Each is a voice, a binaural slot of ninety-six and an FMOD channel, and at four one
@@ -1035,6 +1126,7 @@ public sealed class WorldAudioPlayer
                 DueAt = item.DueAt,
                 IsReflection = true,
                 Seed = item.Seed,
+                Bounce = a.HitPoint,
             });
             if (++added >= MaxHigherOrderEchoes) break;
         }
@@ -1115,6 +1207,7 @@ public sealed class WorldAudioPlayer
                 DueAt = item.DueAt,                 // not delayed here (see QueueReflections)
                 IsReflection = true,
                 Seed = item.Seed,
+                Bounce = a.HitPoint,
             });
         }
     }
@@ -1192,6 +1285,7 @@ public sealed class WorldAudioPlayer
             DueAt = item.DueAt,
             IsReflection = true,
             Seed = item.Seed,
+            Bounce = a.HitPoint,
         });
     }
 
@@ -1248,6 +1342,7 @@ public sealed class WorldAudioPlayer
                 // whole path away. Adding the delay here too made a facade's slapback 180 ms, not 90.
                 DueAt = item.DueAt,
                 IsReflection = true,
+                Bounce = r.BouncePoint,
             });
         }
     }
@@ -1420,7 +1515,7 @@ public sealed class WorldAudioPlayer
         // A followed voice left playing stays where it last was: thunder for tens of seconds, a line
         // finishing in the next map from wherever its speaker stood in the last.
         foreach (var f in _following) Voices.Stop(f.Emitter.EntityId);
-        _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); _mapGeneration++;
+        _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); _copies.Clear(); _mapGeneration++;
     }
 
     /// <summary>Sounds still to play: queued, waiting for a render, or followed.</summary>
