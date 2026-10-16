@@ -25,6 +25,14 @@ Recent work, newest first. `git log` has the rest.
   says and every driving cue by tick, so package stage 7 cannot move the driving aids and change them. A new
   test also holds that walking into a wall knocks on it, in the wall's own material. Tests only: nothing a
   player sees or hears changes.
+- `FireTests.NothingAllocatesWhileAFireBurns` no longer fails now and then on GitHub's runners. Three
+  times in 42 runs a fire's four measured seconds counted bytes on the test's thread there, each time a
+  different fire and a different number: the crown fire 5,784, the fire pit 3,480, the burning car 8,128.
+  Every run here gives 0, at 4 cores or 12, Debug or Release, with the whole shard around it. The same
+  fire with the same seed replays the same code at the same samples, so an allocation of its own comes
+  back in a second one; something that happens once in a process does not. A fire that allocated is now
+  burnt again, up to three times, and fails only if every one allocates; the methods the runtime compiled
+  on the thread meanwhile are logged with it. Tests only: nothing a player hears changes.
 ## 2026-10-14
 
 - No rush into the tail stepping out of a small room. The late field's answers, and the distance law

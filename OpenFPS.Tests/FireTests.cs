@@ -320,26 +320,42 @@ public class FireTests : IDisposable
         foreach (var name in new[] { "fire_pit", "burning_car", "house_fire", "crown_fire" })
         {
             var spec = FireSpec.ByName(name);
-            int n = FireSynth.Layout(spec).Length;
-            var f = new FireSynth(spec, Rate, 3, n) { Spread = 1f };
-            for (int i = 0; i < 400 && !f.GlassReady; i++) Thread.Sleep(50);
-            if (!float.IsNaN(spec.GrowthSeconds)) f.Age = spec.GrowthSeconds;
-            var buf = new float[n];
-            void Run(int samples)
+            // The fire's own allocations come back in an identical fire; what happens once a process does not.
+            // On GitHub's runners such a thing landed in the measure three times in 42 runs, each in another fire.
+            var (allocated, compiled) = Burn(spec);
+            for (int again = 0; again < 2 && allocated >= 1024; again++)
             {
-                for (int i = 0; i < samples; i++)
-                {
-                    if (i % 256 == 0) { f.Wind = 3f; f.Age += 256.0 / Rate * 50; f.Control(256f / Rate); }
-                    f.NextPlaces(buf);
-                }
+                _o.WriteLine($"{name}: {allocated} bytes, {compiled} methods compiled on this thread; again");
+                (allocated, compiled) = Burn(spec);
             }
-            Run(Rate);
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            Run(Rate * 4);
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-            _o.WriteLine($"{name}: {allocated} bytes");
-            Assert.True(allocated < 1024, $"{name} allocated {allocated} bytes while burning");
+            _o.WriteLine($"{name}: {allocated} bytes, {compiled} methods compiled on this thread");
+            Assert.True(allocated < 1024, $"{name} allocated {allocated} bytes while burning, in three identical fires");
         }
+    }
+
+    /// <summary>A fire a second into its burning, then four more seconds of it: the bytes this thread allocated
+    /// over those four seconds, and the methods the runtime compiled on it meanwhile.</summary>
+    private static (long Bytes, long Compiled) Burn(FireSpec spec)
+    {
+        int n = FireSynth.Layout(spec).Length;
+        var f = new FireSynth(spec, Rate, 3, n) { Spread = 1f };
+        for (int i = 0; i < 400 && !f.GlassReady; i++) Thread.Sleep(50);
+        if (!float.IsNaN(spec.GrowthSeconds)) f.Age = spec.GrowthSeconds;
+        var buf = new float[n];
+        void Run(int samples)
+        {
+            for (int i = 0; i < samples; i++)
+            {
+                if (i % 256 == 0) { f.Wind = 3f; f.Age += 256.0 / Rate * 50; f.Control(256f / Rate); }
+                f.NextPlaces(buf);
+            }
+        }
+        Run(Rate);
+        long compiled = System.Runtime.JitInfo.GetCompiledMethodCount(currentThread: true);
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        Run(Rate * 4);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        return (allocated, System.Runtime.JitInfo.GetCompiledMethodCount(currentThread: true) - compiled);
     }
 
     /// <summary>Each fire renders at the level it declares, every place summed, fully developed.</summary>
