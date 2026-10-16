@@ -350,3 +350,43 @@ public class BallisticsTableTests
             c => c switch { 2 => 2e-4, 3 => 0.05, 4 or 5 => 2e-4, 6 => 2e-5, 7 => 0.02, _ => 0 }, OtherMaths, "the ballistics table", log: _o.WriteLine);
     }
 }
+
+/// <summary>
+/// The ricochet table: every weapon's round onto every face that skips one, at three shares of its critical
+/// angle with three dice, how it leaves and what it is afterwards, and its tumbling flight half a second on,
+/// compared with ricochet.tsv. Stored before the bounce and the flight moved to OpenFPS.Physics (physics stage
+/// 2, docs/PHYSICS_BOUNDARY.md 16.5), so on the same maths nothing may differ in any digit.
+/// </summary>
+public class RicochetTableTests
+{
+    private readonly ITestOutputHelper _o;
+    public RicochetTableTests(ITestOutputHelper o) => _o = o;
+
+    /// <summary>On other maths: a few units in the last place stored of the bounce, a tenth of a millimetre of
+    /// the flight's half second. Whether it skips is compared as text: the dice draw it well clear of a tie.</summary>
+    private static readonly CrossMachine OtherMaths = new()
+    {
+        Seconds = _ => PhysicsReplays.RicochetFlightSeconds,
+        Rule = c => c switch
+        {
+            5 or 6 or 7 => new(CrossMachine.Kind.Drift, 5e-4), 8 => new(CrossMachine.Kind.Drift, 5e-3),
+            9 or 10 or 11 => new(CrossMachine.Kind.Drift, 5e-5), 12 => new(CrossMachine.Kind.Drift, 0.05),
+            13 => new(CrossMachine.Kind.Drift, 5e-3), 14 => new(CrossMachine.Kind.Drift, 5e-4), 15 => new(CrossMachine.Kind.Drift, 5e-6),
+            16 or 17 or 18 or 20 => new(CrossMachine.Kind.Drift, 1e-4, CrossMachine.MetresPerSecond),
+            19 => new(CrossMachine.Kind.Drift, 5e-4, CrossMachine.SpeedPerSecond),
+            _ => null,
+        },
+    };
+
+    [Fact]
+    public void EveryRoundBouncesAndFliesItsStoredTable()
+    {
+        string table = PhysicsReplays.RicochetTable();
+        Assert.True(table == PhysicsReplays.RicochetTable(), "the same bounces twice ran two ways");
+        var rows = table.TrimEnd('\n').Split('\n').Skip(1).ToList();
+        int bounced = rows.Count(r => r.Split('\t')[4] == "1");
+        _o.WriteLine($"{rows.Count} strikes, {bounced} ricochets");
+        Assert.True(bounced > rows.Count / 3 && bounced < rows.Count, $"{bounced} of {rows.Count} skipped: the table should hold both outcomes");
+        PhysicsStore.Check(PhysicsStore.PathOf("ricochet.tsv"), table, _ => 0, OtherMaths, "the ricochet table", log: _o.WriteLine);
+    }
+}

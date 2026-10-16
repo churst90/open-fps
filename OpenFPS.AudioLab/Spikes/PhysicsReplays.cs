@@ -15,7 +15,7 @@ namespace OpenFPS.Instruments;
 /// <summary>
 /// The physics guards of docs/PHYSICS_BOUNDARY.md stage 0, shared by AudioLab (--physics-replay,
 /// --physics-parity) and OpenFPS.Tests (MovementReplayTests, DrivingReplayTests, RailReplayTests,
-/// BallisticsTableTests), which store what these produce and compare a run with it.
+/// BallisticsTableTests, RicochetTableTests), which store what these produce and compare a run with it.
 ///
 /// <para>A walk is --walk-pair's: one script of keys from one spot, taken by the server's
 /// MovementSystem.Update with a real session and by the client's ClientPhysicsSystem.Predict over the
