@@ -279,12 +279,9 @@ public class LoudspeakerTests
     {
         var (program, rate) = Program("ANNOUNCE", "st_louis_welcome");
         var r = LoudspeakerChain.Render("test", LoudspeakerSpec.PaHorn, program, rate, Rate);
-        var horn = new EntitySnapshot
-        {
-            Id = 7,
-            Definition = new EntityDefinition { SoundEmitter = new SoundEmitterComponent { Direction = Vector3.UnitZ } },
-            Transform = new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity, Scale = Vector3.One },
-        };
+        var horn = new OpenFPS.Client.AudioEngine.Data.AudioSource(7);
+        horn.Set(new OpenFPS.Client.AudioEngine.Data.SourceSpec { Direction = Vector3.UnitZ },
+                 new OpenFPS.Client.AudioEngine.Data.SourceState { Position = Vector3.Zero, Rotation = Quaternion.Identity });
         var listener = new Vector3(0f, 0f, -5f);
         // A wall 10 m ahead: the image is 20 m ahead and the sound left along the axis.
         var ahead = OpenFPS.Client.Core.ClientAudioSystem.CopyBeam(r, horn, new Vector3(0f, 0f, 20f), listener);

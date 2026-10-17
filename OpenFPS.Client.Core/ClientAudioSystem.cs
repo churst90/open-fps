@@ -80,12 +80,10 @@ public partial class ClientAudioSystem
     /// list that misses new kinds. A rendered source is answered by its own path (EngineReflections) or by
     /// nothing.
     /// </summary>
-    private static bool PlaysCopies(WorldSnapshot world, int id)
+    private static bool PlaysCopies(AudioSource src)
     {
-        if (!world.Entities.TryGetValue(id, out var snap)) return false;
-        var emitter = snap.Definition.SoundEmitter;
-        string sound = emitter.SoundId ?? "";
-        return !emitter.IsSynth && !OpenFPS.Common.ModelKindTable.IsVehicle(sound);
+        string sound = src.Spec.SoundId ?? "";
+        return !src.Spec.IsSynth && !OpenFPS.Common.ModelKindTable.IsVehicle(sound);
     }
 
     /// <summary>
@@ -514,9 +512,6 @@ public partial class ClientAudioSystem
         _audio.TalkerStreams.Clear();
     }
 
-    /// <summary>The water in a wheel path of the roads, mm (WorldSnapshot.RoadWaterMm).</summary>
-    private float _roadWaterMm;
-
     /// <summary>
     /// Called every frame from the game loop (throttled to <see cref="UpdateHz"/>). The listener is at the
     /// smoothed VisualPosition, so a server correction is not heard as a jump.
@@ -563,12 +558,12 @@ public partial class ClientAudioSystem
         // A position stamped after now was stamped on another clock: its age, and so where the mixer reckons
         // the thing has got to, is out by the two clocks' difference. Whoever holds the world and this gives the
         // world this one's clock (ClientWorldState.Clock = AudioEngineFacade.Clock). Said once.
-        if (!WorldOnAnotherClock && world.PositionsSampledAt > _audio.Clock.Now + OtherClockSeconds)
+        if (!WorldOnAnotherClock && _sources.SampledAt > _audio.Clock.Now + OtherClockSeconds)
         {
             WorldOnAnotherClock = true;
             Log.Warning("Audio: the world's positions are stamped {Ahead:F2} s after the audio's clock reads: the world "
                       + "state was not given the audio's clock (ClientWorldState.Clock), so moving things are placed late or early.",
-                        world.PositionsSampledAt - _audio.Clock.Now);
+                        _sources.SampledAt - _audio.Clock.Now);
         }
 
         Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
@@ -576,11 +571,11 @@ public partial class ClientAudioSystem
         // The cabin you sit in, for the traced reverb: which vehicle, and your ear in its frame.
         {
             string? preset = null; Vector3 local = default;
-            if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var ride)
-                && OpenFPS.Common.ModelKindTable.VehiclePreset(ride.Definition.SoundEmitter.SoundId) is { } ridePreset)
+            if (_state.IsRiding && _sources.TryGet(_state.RidingEntityId, out var ride)
+                && OpenFPS.Common.ModelKindTable.VehiclePreset(ride.Spec.SoundId) is { } ridePreset)
             {
                 preset = ridePreset;
-                local = Vector3.Transform(visualEyePos - ride.Transform.Position, Quaternion.Inverse(ride.Transform.Rotation));
+                local = Vector3.Transform(visualEyePos - ride.State.Position, Quaternion.Inverse(ride.State.Rotation));
             }
             _acousticWorker.Traced.RideIn(preset, local);
             // The cabin of the nearest vehicle within a few steps, traced before you get in (the order is
@@ -600,18 +595,18 @@ public partial class ClientAudioSystem
         // Sitting in something, you face the way it faces: the session sets your heading from the
         // vehicle every frame (ClientGameSession.FollowRide), so the ears and the compass agree.
         var listenerRotation = _state.Rotation;
-        if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var carrying))
+        if (_state.IsRiding && _sources.TryGet(_state.RidingEntityId, out var carrying))
         {
             // ...and you move at its speed, as the interpolated world has it. Your own velocity is the
             // vehicle's too (OccupancySystem), but as of the last server state, not the frame its voice
             // is placed in; any difference is a Doppler shift on your own bus.
-            listenerVelocity = carrying.Velocity;
+            listenerVelocity = carrying.State.Velocity;
         }
 
         // The mixer reads the wind field itself once a block (EarWindVoice); this is where the head is,
         // which way it faces and what is round it.
         _earSpeed = listenerVelocity.Length();
-        var earListener = EarListener(world, visualEyePos, listenerVelocity, listenerRotation);
+        var earListener = EarListener(visualEyePos, listenerVelocity, listenerRotation);
         _audio.SetEarWind(earListener);
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
@@ -624,14 +619,14 @@ public partial class ClientAudioSystem
         _beacons.Update(world, visualEyePos, _now(), OwnEntityId);
         _drivingAids.Update(world, _state, _now());
         // The rest of the world through the glass, if you sit in anything with a roof.
-        var (encLow, encMid, encHigh) = CabinEnclosure(world);
+        var (encLow, encMid, encHigh) = CabinEnclosure();
         // Now and then, forget the windows of vehicles that have gone.
-        if (_frameCount % 600 == 0) _cabins.Forget(world.Entities.ContainsKey);
+        if (_frameCount % 600 == 0) _cabins.Forget(_sources.Contains);
         _audio.SetListenerEnclosure(encLow, encMid, encHigh);
         // What the air's bending measures heights from where a voice's own bounce found no ground.
         _audio.SetListenerGround(visualEyePos.Y - _state.EyeHeight);
         // Temperature reaches the mix as the speed of sound: c = 331.3 + 0.606·T.
-        _audio.SetAirTemperature(world.Temperature);
+        _audio.SetAirTemperature(((IAcousticWorld)world).Air.Celsius);
 
         // The listener's reverb decay from the Steam Audio reflection sim, when there is one, in place of
         // the Sabine estimate.
@@ -704,14 +699,14 @@ public partial class ClientAudioSystem
             // Asked about things in the world only, never about a voice's own id: a copy, a talker, your own
             // voice, rain and the rest work out their own paths (VoiceRegistry.HeardFromOf), and a copy asked
             // about from its image was traced through its own wall.
-            if (!world.Entities.TryGetValue(id, out var snap)) continue;
+            if (!_sources.TryGet(id, out var src)) continue;
 
             // Asked about the point the sound comes out of, not the entity's origin: for anything that
             // drives the origin is its contact patch, and a probe there was half buried (about half the
             // samples blocked on open road).
-            Vector3 sourcePos = OpenFPS.Common.EntityEmission.PointFor(snap);
-            float sourceRadius = OpenFPS.Common.EntityEmission.OcclusionRadiusFor(snap);
-            float sourceSpeed = snap.Velocity.Length();
+            Vector3 sourcePos = src.Emission;
+            float sourceRadius = src.ProbeRadius;
+            float sourceSpeed = src.State.Velocity.Length();
             
             float dist = Vector3.Distance(visualEyePos, sourcePos);
             int updateRate = 1;
@@ -735,7 +730,7 @@ public partial class ClientAudioSystem
             {
                 Array.Clear(_slotLive);
                 if (_pathSlot.Length < paths.Count) _pathSlot = new int[paths.Count * 2];
-                if (PlaysCopies(world, id))
+                if (PlaysCopies(src))
                 {
                     if (!_reflectionSlots.TryGetValue(id, out var slots))
                         _reflectionSlots[id] = slots = Enumerable.Repeat(-1, EarlyReflections.MaxArrivals).ToArray();
@@ -761,7 +756,7 @@ public partial class ClientAudioSystem
                     // Audio, the hand-rolled tracer's otherwise. The tail does not carry this energy: without
                     // these a room answers from everywhere at once and a doorway is inaudible from outside.
                     int slot = _pathSlot[pi];
-                    if (slot < 0 || !world.Entities.TryGetValue(id, out var originalSnap)) continue;
+                    if (slot < 0) continue;
                     // Everywhere: the listener's traced stage plays the late tail alone, so a sustained
                     // source's first bounces are these, indoors as out.
                     _slotLive[slot] = true;
@@ -771,19 +766,18 @@ public partial class ClientAudioSystem
                     // between two opposite walls.
                     int reflectId = ReflectionVoiceId(id, slot);
                     var placed = _placed.TryGetValue(id, out var p)
-                        ? p : (originalSnap.Definition.SoundEmitter.Volume, originalSnap.Definition.SoundEmitter.MinDistance,
-                               originalSnap.Definition.SoundEmitter.Range);
+                        ? p : (src.Spec.Volume, src.Spec.MinDistance, src.Spec.Range);
                     var echo = LoopEchoLevel(path, placed.Volume, placed.MinDistance, dist);
 
                     // A loudspeaker's copy is its render, thrown toward the wall by its beam: the band
                     // gains the mouth gives the way the sound left it for that wall. None before the
                     // render is in, or it would be the bare recording.
-                    string copySound = _sounds.ResolvePath(originalSnap.Definition.SoundEmitter.SoundId);
-                    if (!string.IsNullOrEmpty(originalSnap.Definition.SoundEmitter.Loudspeaker))
+                    string copySound = _sounds.ResolvePath(src.Spec.SoundId!);
+                    if (!string.IsNullOrEmpty(src.Spec.Loudspeaker))
                     {
                         if (!_speakerOf.TryGetValue(id, out var speakerRender)) continue;
                         copySound = speakerRender.Key;
-                        var (bL, bM, bH) = CopyBeam(speakerRender, originalSnap, path.ApparentPosition, visualEyePos);
+                        var (bL, bM, bH) = CopyBeam(speakerRender, src, path.ApparentPosition, visualEyePos);
                         float mid = MathF.Max(1e-3f, bM);
                         echo = (echo.Volume * bM, echo.MinDistance, echo.EqLow * bL / mid, echo.EqMid, echo.EqHigh * bH / mid);
                     }
@@ -793,7 +787,7 @@ public partial class ClientAudioSystem
                         EntityId = reflectId,
                         Seed = VoiceRegistry.SeedOf(VoiceKind.Reflection, id, slot),
                         SoundId = copySound,
-                        Mode = originalSnap.Definition.SoundEmitter.Mode,
+                        Mode = src.Spec.Mode,
                         Position = path.ApparentPosition,
                         ApparentPosition = path.ApparentPosition,
                         // What the surface and the extra distance left of it, per band (LoopEchoLevel).
@@ -844,8 +838,8 @@ public partial class ClientAudioSystem
         // The rain running off (gutters, drains, downpipes), fed before the machines are ranked so a dry
         // gutter is not given a voice. Snow stays where it falls.
         {
-            var p = world.Precipitation;
-            float wet = p.Falling ? (p.Kind == OpenFPS.Common.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : world.RainRateMmPerHour;
+            var p = _sources.Precipitation;
+            float wet = p.Falling ? (p.Kind == OpenFPS.Common.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : _sources.RainRateMmPerHour;
             _audio.Weather.Runoff.Update(wet, _audio.Clock.Now);
         }
         ChooseLiveMachines(visualEyePos);
@@ -886,7 +880,7 @@ public partial class ClientAudioSystem
         _birds.EarSpeed = _earSpeed;
         _birds.Update(world, visualEyePos, _audio.Clock.Now);
         _rain.EarSpeed = _earSpeed;
-        _rain.Update(world, world.Falling, visualEyePos, _audio.Clock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
+        _rain.Update(world, _sources.Falling, visualEyePos, _audio.Clock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
         _partMs[2] += Ms(partAt);
 
         // Every source has been offered to the reflection system: it sets what next frame's reflections
@@ -949,8 +943,6 @@ public partial class ClientAudioSystem
         _state.Temperature = world.Temperature;
 
         _state.PrecipitationIntensity = world.PrecipitationIntensity * (1.0f - _state.ShelterFactor);
-        // The water on the roads, for the vehicles whose wheels the server does not send.
-        _roadWaterMm = world.RoadWaterMm;
 
         // The place's name, by the boxes: in a doorway (the room on your side of it, for sound) you are
         // told you are in the doorway.
@@ -1126,7 +1118,7 @@ public partial class ClientAudioSystem
     /// half) and zero in a room. A cabin lets in what its open windows do; a vehicle without one (a
     /// motorcycle, a formula car) puts a helmet on the rider.
     /// </summary>
-    private EarWindListener EarListener(WorldSnapshot world, Vector3 head, Vector3 velocity, Quaternion rotation)
+    private EarWindListener EarListener(Vector3 head, Vector3 velocity, Quaternion rotation)
     {
         Vector3 forward = Vector3.Transform(Vector3.UnitZ, rotation);
         float facing = MathF.Atan2(forward.X, forward.Z) * 180f / MathF.PI;
@@ -1136,11 +1128,11 @@ public partial class ClientAudioSystem
         if (_state.IsRiding)
         {
             cover = EarCover.Cabin;
-            if (world.Entities.TryGetValue(_state.RidingEntityId, out var ride)
-                && OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride) is { } vehicle)
+            if (_sources.TryGet(_state.RidingEntityId, out var ride)
+                && OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride.Spec.SoundId) is { } vehicle)
             {
                 if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.HasCabin(vehicle))
-                    windows = _cabins.WindowsOpen(ride, _now());
+                    windows = _cabins.WindowsOpen(ride.Id, ride.Spec.WindowsOpen, _now());
                 else cover = EarCover.Helmet;
             }
         }
@@ -1162,14 +1154,14 @@ public partial class ClientAudioSystem
     /// a hundredth of the power; by 1 kHz the seals dominate and the top sits about 30 dB down. Windows
     /// down, a tenth of the wall is a hole. Nothing on foot or on something with no cabin.
     /// </summary>
-    private (float Low, float Mid, float High) CabinEnclosure(WorldSnapshot world)
+    private (float Low, float Mid, float High) CabinEnclosure()
     {
-        if (!_state.IsRiding || !world.Entities.TryGetValue(_state.RidingEntityId, out var ride)) return (0f, 0f, 0f);
-        if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride) is not { } vehicle) return (0f, 0f, 0f);
+        if (!_state.IsRiding || !_sources.TryGet(_state.RidingEntityId, out var ride)) return (0f, 0f, 0f);
+        if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride.Spec.SoundId) is not { } vehicle) return (0f, 0f, 0f);
         // A bus's open doors: about 2.4 m^2 in a hundred-odd m^2 of wall, the street at a couple of per
         // cent of its power. The voice decides when the doors are open.
         float doorway = _audio.EngineDoorsOpen(_state.RidingEntityId) ? DoorwayPowerFraction : 0f;
-        return OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(vehicle, _cabins.WindowsOpen(ride, _now()), doorway);
+        return OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(vehicle, _cabins.WindowsOpen(ride.Id, ride.Spec.WindowsOpen, _now()), doorway);
     }
 
     /// <summary>
@@ -1784,11 +1776,11 @@ public partial class ClientAudioSystem
     /// listener mirrored back: d - 2 (d·n) n, with n from the speaker to its image.
     /// </summary>
     internal static (float Low, float Mid, float High) CopyBeam(OpenFPS.Client.AudioEngine.Core.Signals.LoudspeakerRender speaker,
-                                                               EntitySnapshot source, Vector3 image, Vector3 listener)
+                                                               AudioSource source, Vector3 image, Vector3 listener)
     {
-        Vector3 at = OpenFPS.Common.EntityEmission.PointFor(source);
-        var local = source.Definition.SoundEmitter.Direction;
-        Vector3 axis = Vector3.Transform(local.LengthSquared() > 0f ? Vector3.Normalize(local) : Vector3.UnitZ, source.Transform.Rotation);
+        Vector3 at = source.Emission;
+        var local = source.Spec.Direction;
+        Vector3 axis = Vector3.Transform(local.LengthSquared() > 0f ? Vector3.Normalize(local) : Vector3.UnitZ, source.State.Rotation);
         Vector3 n = image - at, d = listener - image;
         if (n.LengthSquared() < 1e-6f || d.LengthSquared() < 1e-6f) return (1f, 1f, 1f);
         n = Vector3.Normalize(n); d = Vector3.Normalize(d);
@@ -3182,7 +3174,8 @@ public partial class ClientAudioSystem
             TyreSlip = src.State.TyreDemand,
             Wheels = src.State.Wheels,
             WheelStrikes = engineKey.Length > 0 ? RailStrikes(src, engineKey, _sources.SampledAt) : null,
-            RoadWaterMm = _roadWaterMm,
+            // The water on the roads, for the vehicles whose wheels the server does not send.
+            RoadWaterMm = _sources.RoadWaterMm,
 
             // Synthesis mapping
             IsGranular = spec.IsGranular,
@@ -3315,20 +3308,20 @@ public partial class ClientAudioSystem
             double quiet = now - stream.LastArrival;
             if (quiet > TalkerForgetSeconds) { _talkersGone.Add(id); continue; }
             bool talking = quiet < TalkerHoldSeconds && id != OwnEntityId;
-            if (!talking || !world.Entities.TryGetValue(id, out var snap))
+            if (!talking || !_sources.TryGet(id, out var talker))
             {
                 if (_talkersVoiced.Remove(id)) _voices.Stop(voiceId);
                 StopTalkerRoom(id);
                 continue;
             }
-            var facing = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation);
+            var facing = Vector3.Transform(Vector3.UnitZ, talker.State.Rotation);
             facing.Y = 0f;
             facing = facing.LengthSquared() > 1e-6f ? Vector3.Normalize(facing) : Vector3.UnitZ;
             // Seated in a vehicle: a seated mouth, heard outside through the glass or open windows.
-            bool seated = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.TryFind(world, snap.Transform.Position,
+            bool seated = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.TryFind(world, talker.State.Position,
                                                                                 out var cabin, out var cabinVehicle);
             float mouthHeight = seated ? SeatedMouthHeight : OpenFPS.Common.Speech.MouthHeight;
-            Vector3 mouth = snap.Transform.Position + new Vector3(0f, mouthHeight, 0f) + facing * 0.1f;
+            Vector3 mouth = talker.State.Position + new Vector3(0f, mouthHeight, 0f) + facing * 0.1f;
 
             float levelDb = OpenFPS.Common.Speech.NormalDb - stream.Ring.SpeechRmsDbfs;
             var (gain, reference) = _audio.Hearing.Place(levelDb);
@@ -3340,7 +3333,7 @@ public partial class ClientAudioSystem
             {
                 EntityId = probe, ListenerPos = eyePos, SourcePos = mouth, SourceRadius = 0.15f, LeaveOut = id,
             });
-            if (!_acousticWorker.TryGetDirectFor(probe, mouth, snap.Velocity.Length(), eyePos, _earSpeed, out var path))
+            if (!_acousticWorker.TryGetDirectFor(probe, mouth, talker.State.Velocity.Length(), eyePos, _earSpeed, out var path))
                 path = _acoustics.CalculateAcousticPath(world, id, eyePos, mouth);
 
             var e = new SpatialEmitter
@@ -3355,8 +3348,8 @@ public partial class ClientAudioSystem
                 Type = EmitterType.EntityAttached,
                 Position = mouth,
                 ApparentPosition = path.ApparentPosition,
-                Velocity = snap.Velocity,
-                PositionSampledAt = world.PositionsSampledAt,
+                Velocity = talker.State.Velocity,
+                PositionSampledAt = _sources.SampledAt,
                 Direction = facing,
                 Volume = gain,
                 EarLevelDb = levelDb,
@@ -3387,7 +3380,7 @@ public partial class ClientAudioSystem
                     e.EqHigh *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(high);
                 }
             }
-            _voices.Declare(voiceId, id, VoiceKind.Talker, mouth - snap.Transform.Position, levelDb);
+            _voices.Declare(voiceId, id, VoiceKind.Talker, mouth - talker.State.Position, levelDb);
             _voices.Sound(e);
             _talkersVoiced.Add(id);
 
