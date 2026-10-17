@@ -29,6 +29,7 @@ public class BinauralStagesTests
         private readonly List<(ActiveSound A, double Ends)> _lives = new();
         private readonly List<double> _retiring = new();
         private readonly List<ActiveSound> _leavers = new();
+        private readonly Dictionary<ActiveSound, double> _leftAt = new();
         public float Loudest, Floor;
         public double Now;
         public int Heads, Short, Outranked, Unheard, Given, LetGo, LeastFree = int.MaxValue, HeadsRefused;
@@ -63,7 +64,7 @@ public class BinauralStagesTests
                     Outranked++;
                     // The oracle: none keeping a stage may be quieter than this one by more than the hysteresis.
                     foreach (var a in Sounds)
-                        if (a.SaState != null && !a.StageLeaving && !a.Essential && a.Heard * BinauralStages.Hysteresis < level)
+                        if (a.SaState != null && !a.Leaving && !a.Essential && a.Heard * BinauralStages.Hysteresis < level)
                         { Wrong.Add($"outranked at {Db(level)} while {Db(a.Heard)} keeps a stage"); break; }
                     return answer;
             }
@@ -76,8 +77,9 @@ public class BinauralStagesTests
             return Answer.Given;
         }
 
-        /// <summary>One update: the provider's RankStages, then its pass over the voices (stopped once silent, or at
-        /// the end of a one-shot, the stage back four blocks later), then the clock.</summary>
+        /// <summary>One update: the provider's RankStages, then its pass over the voices (a voice let go is stopped by
+        /// the mixer its fade and two blocks later, a one-shot at its end; the stage back four blocks after), then the
+        /// clock.</summary>
         public void Update()
         {
             for (int i = _retiring.Count - 1; i >= 0; i--)
@@ -85,14 +87,13 @@ public class BinauralStagesTests
             Loudest = BinauralStages.Loudest(Sounds);
             Floor = BinauralStages.Floor(Sounds, Free);
             BinauralStages.ChooseLeavers(Sounds, Free, _leavers);
-            foreach (var a in _leavers) a.StageLeaving = true;
+            foreach (var a in _leavers) { a.Leaving = true; _leftAt[a] = Now; }
             for (int i = _lives.Count - 1; i >= 0; i--)
             {
                 var (a, ends) = _lives[i];
                 bool stop = Now >= ends;
-                if (!stop && BinauralStages.StopsNow(a, Now)) { stop = true; LetGo++; }
-                if (stop) { Sounds.Remove(a); _lives.RemoveAt(i); _retiring.Add(Now); continue; }
-                BinauralStages.Fade(a, (float)Dt, FmodAudioProvider.VoiceFadeSeconds, Now);
+                if (!stop && a.Leaving && Now - _leftAt[a] >= FmodAudioProvider.LeaveSeconds) { stop = true; LetGo++; }
+                if (stop) { Sounds.Remove(a); _lives.RemoveAt(i); _retiring.Add(Now); _leftAt.Remove(a); }
             }
             LeastFree = Math.Min(LeastFree, Free);
             FreeSum += Free; Updates++;
@@ -229,34 +230,6 @@ public class BinauralStagesTests
         Assert.Equal(Answer.Short, BinauralStages.Ask(BinauralStages.HeadReserve, false, false, false, 0.5f, loudest, 0.1f));
         Assert.Equal(Answer.Outranked, BinauralStages.Ask(BinauralStages.HeadReserve, false, false, false, 0.11f, loudest, 0.1f));
         Assert.Equal(Answer.Outranked, BinauralStages.Ask(20, false, false, false, 0.11f, loudest, 0.1f));
-    }
-
-    /// <summary>
-    /// A voice let go of its stage leaves click-free: its gain falls no faster than the budget's 80 ms fade, a budget
-    /// asking for it again (CancelFade) does not bring it back, and it is stopped only once it has been silent for two
-    /// mixer blocks, so the channel's own volume ramp has reached zero.
-    /// </summary>
-    [Fact]
-    public void A_voice_let_go_fades_to_silence_before_it_stops()
-    {
-        var a = new ActiveSound { Heard = 0.01f, SaState = new SteamAudioVoiceState(), FadeTarget = 1f, FadeGain = 1f, StageLeaving = true };
-        float step = (float)Dt / FmodAudioProvider.VoiceFadeSeconds;
-        double now = 0, silentAt = -1;
-        float last = a.FadeGain;
-        for (int i = 0; i < 200 && !BinauralStages.StopsNow(a, now); i++)
-        {
-            Assert.False(BinauralStages.StopsNow(a, now) && a.FadeGain > 0f);
-            BinauralStages.Fade(a, (float)Dt, FmodAudioProvider.VoiceFadeSeconds, now);
-            Assert.True(last - a.FadeGain <= step + 1e-6f, $"fell {last - a.FadeGain} in one update");
-            Assert.True(a.FadeGain <= last + 1e-6f, "came back");
-            last = a.FadeGain;
-            if (a.FadeGain <= 0f && silentAt < 0) silentAt = now;
-            now += Dt;
-        }
-        Assert.True(BinauralStages.StopsNow(a, now), "never stopped");
-        Assert.Equal(0f, a.FadeGain);
-        Assert.True(now - silentAt >= BinauralStages.SilentBeforeStop, $"stopped {1000 * (now - silentAt):F1} ms after silence");
-        Assert.True(now >= FmodAudioProvider.VoiceFadeSeconds, $"stopped at {1000 * now:F0} ms");
     }
 
     /// <summary>A reverb bus keeps its head while it is one of the rooms heard or still above silence, and gives it back

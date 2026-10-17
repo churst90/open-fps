@@ -46,10 +46,6 @@ internal static class BinauralStages
     /// trade the last stage.</summary>
     public const float Hysteresis = 1.26f;
 
-    /// <summary>How long a voice let go stays at silence before it is stopped, seconds: two mixer blocks, so the channel's
-    /// own volume ramp has reached zero and stopping it is not a step.</summary>
-    public const double SilentBeforeStop = 2 * 1024 / 48000.0;
-
     /// <summary>The answer to a voice asking for a stage.</summary>
     public enum Answer : byte
     {
@@ -101,7 +97,7 @@ internal static class BinauralStages
 
     /// <summary>Whether a voice holds a stage the rank may take back: a direct sound that is not your own, not already
     /// on its way out.</summary>
-    public static bool MayLetGo(ActiveSound a) => a.SaState != null && !a.IsReflection && !a.Essential && !a.StageLeaving;
+    public static bool MayLetGo(ActiveSound a) => a.SaState != null && !a.IsReflection && !a.Essential && !a.Leaving;
 
     /// <summary>
     /// The voices to let go so the pool keeps its headroom, quietest first (ties by id), into <paramref name="into"/>:
@@ -112,7 +108,7 @@ internal static class BinauralStages
     {
         into.Clear();
         int leaving = 0;
-        foreach (var a in sounds) if (a.SaState != null && a.StageLeaving) leaving++;
+        foreach (var a in sounds) if (a.SaState != null && a.Leaving) leaving++;
         int want = HeadReserve + ArrivalHeadroom - free - leaving;
         if (want <= 0) return;
         foreach (var a in sounds) if (MayLetGo(a)) into.Add(a);
@@ -120,27 +116,11 @@ internal static class BinauralStages
         if (into.Count > want) into.RemoveRange(want, into.Count - want);
     }
 
-    /// <summary>
-    /// A voice's budget fade, one update of <paramref name="dt"/> seconds over <paramref name="fadeSeconds"/> from full
-    /// to silence: toward its budget's target, or toward silence once let go of its stage, noting when it got there
-    /// (<paramref name="now"/>, provider clock).
-    /// </summary>
-    public static void Fade(ActiveSound a, float dt, float fadeSeconds, double now)
-    {
-        float step = dt / fadeSeconds;
-        float to = a.StageLeaving ? 0f : a.FadeTarget;
-        a.FadeGain += Math.Clamp(to - a.FadeGain, -step, step);
-        if (a.StageLeaving && a.FadeGain <= 0f && a.SilentSince < 0) a.SilentSince = now;
-    }
-
-    /// <summary>Whether a voice let go of its stage is stopped now: once it has been silent <see cref="SilentBeforeStop"/>.</summary>
-    public static bool StopsNow(ActiveSound a, double now) => a.StageLeaving && a.SilentSince >= 0 && now - a.SilentSince >= SilentBeforeStop;
-
     /// <summary>The loudest voice playing at the ear, reflections left out (the one rank, <see cref="ActiveSound.Heard"/>).</summary>
     public static float Loudest(List<ActiveSound> sounds)
     {
         float loudest = 0f;
-        foreach (var a in sounds) if (!a.IsReflection && !a.StageLeaving && a.Type != OpenFPS.Client.AudioEngine.Data.EmitterType.UI) loudest = MathF.Max(loudest, a.Heard);
+        foreach (var a in sounds) if (!a.IsReflection && !a.Leaving && a.Type != OpenFPS.Client.AudioEngine.Data.EmitterType.UI) loudest = MathF.Max(loudest, a.Heard);
         return loudest;
     }
 }

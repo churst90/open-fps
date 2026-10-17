@@ -104,6 +104,8 @@ public interface IAudioProvider : IDisposable
     /// (the voice's own output, its envelope and idle lift, the channel's volume and FMOD's audibility).
     /// Empty when there is no such voice.</summary>
     string EngineVoiceDetail(int entityId) => "";
+    /// <summary>Stops an id's voices: the id is free at once (IsPlaying says no), and a voice sounding fades to silence
+    /// before its channel stops, never cut off mid-signal (FmodAudioProvider.StopSound).</summary>
     void StopSound(int entityId);
     bool IsPlaying(int entityId);
     Vector3 GetSoundPosition(int entityId);

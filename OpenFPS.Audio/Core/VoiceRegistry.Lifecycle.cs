@@ -67,7 +67,8 @@ public sealed partial class VoiceRegistry
         if (Mixer != null && (known || Mixer.IsPlaying(voiceId))) Mixer.StopSound(voiceId);
     }
 
-    /// <summary>A hard cut on the calling thread, for a voice that must be gone before the next starts.</summary>
+    /// <summary>Stops a voice on the calling thread, for one whose id must be free before the next starts: the mixer
+    /// still fades it out (IAudioProvider.StopSound).</summary>
     public void StopNow(int voiceId)
     {
         bool known;

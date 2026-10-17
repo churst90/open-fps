@@ -364,7 +364,8 @@ public static class BusyStreetSpike
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
         AcousticRegistry.Initialize();
-        var provider = new FmodAudioProvider { Hearing = LabHearing };
+        // Its comparison is a voice stopped outright, which StopSound no longer does (LabLevers.HardStops).
+        var provider = new FmodAudioProvider { Hearing = LabHearing, Lab = new LabLevers { HardStops = true } };
         string sounds = LabPaths.Sounds();
         var facade = new AudioEngineFacade(provider, paths: new AudioDataPaths(sounds, null, null));
         var clock = System.Diagnostics.Stopwatch.StartNew();

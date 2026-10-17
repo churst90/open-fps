@@ -322,6 +322,13 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
 here are checked to stand on (docs/LISTENING_SPOTS.md).
+- No voice stops with a click (2026-10-17, docs/CLIENT_NOTES.md "A voice is never cut off"). On Main Street in
+  traffic and rain (`/tp 7.0 121.0 0.2`, `/weather rain heavy`): as cars come and go out of earshot, as walkers'
+  steps are dropped and taken up, and as the rain's patches move round you, no ticks at the ends of sounds. Walk
+  into Selby House's lobby (`/tp 15.2 157.1 0.1`) and out again: no tick as the street's voices change. Then
+  `/join speedway` from the city: the city fades out over half a second rather than stopping. Log out to the menu
+  and quit: no click at the end of either. Each voice now takes 80 ms longer to go; a sound that used to stop at once
+  (a horn let go, a siren switched off) has that much of a tail.
 - The binaural pool by rank (2026-10-17, docs/CLIENT_NOTES.md "The binaural pool"). On Main Street in traffic,
   `/weather rain heavy`, at `/tp 7.0 121.0 0.2`: cars passing close are outside the head, left to right with no
   jump inside or above it; the rain is wide all round; a bus's horn and the drops at your feet always sound; no

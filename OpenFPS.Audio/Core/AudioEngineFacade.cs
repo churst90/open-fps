@@ -313,7 +313,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
         // The budget is what the mixer has, asked every frame (VoiceManager.MaxVoices).
         if (_voiceManager != null)
-            _voiceManager.MaxVoices = Math.Clamp(
+            _voiceManager.MaxVoices = BudgetForLab ?? Math.Clamp(
                 _voiceManager.PlayingCount + _provider.SpatialVoicesFree, MinBudgetVoices, MaxBudgetVoices);
         _voiceManager?.Process(lPos);
 
@@ -336,6 +336,10 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         _isInitialized = true;
         _voiceManager = new VoiceManager(this, _bank, 256) { Hearing = Hearing };
     }
+
+    /// <summary>The lab: the voice budget held at this many voices rather than what the mixer has, so a voice can be
+    /// made to lose its slot (AudioLab --stop-clicks). Null in the game.</summary>
+    internal int? BudgetForLab { get; set; }
 
     /// <summary>Runs one audio frame synchronously. Pair with <see cref="InitializeForTest"/>.</summary>
     internal void PumpForTest() => Tick();
@@ -582,7 +586,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         _stopRequests.Enqueue((Next(), entityId));
     }
 
-    /// <summary>A hard cut, on the calling thread.</summary>
+    /// <summary>Stops a voice on the calling thread: its id is free at once, the voice itself fades out at the mixer
+    /// (IAudioProvider.StopSound).</summary>
     public void StopSoundImmediate(int entityId) => _provider.StopSound(entityId);
 
     /// <summary>See <see cref="IVoiceSink.FadeOut"/>.</summary>

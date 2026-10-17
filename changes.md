@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- No voice stops with a click (docs/CLIENT_NOTES.md "A voice is never cut off"). Every way a voice is let go (the
+  budget dropping a one-shot or giving up a voice, the registry's stops and retires, an owner's stop, a voice
+  replaced, leaving a world, the binaural pool) ended in the mixer stopping the channel outright, a step the size of
+  the voice itself; now the voice is faded from wherever it is to silence over 80 ms by the channel's own fade points,
+  one straight line, and the mixer stops it two blocks after. The budget's fade is that line too (it was drawn a
+  mixer block at a time, with corners 47 dB under the voice). Leaving a world cuts what is left under the world's
+  floor, now 80 dB down; closing the program fades the master first; travelling to another map fades the world out
+  as a logout does. Measured with AudioLab `--stop-clicks` (a tone let go by each of fourteen paths; `old` for before):
+  the step at the end 0 to 58 dB under the tone before, 72 to 80 dB under after. The wire hash does not change.
 - The binaural pool goes by how loud a voice is at the ear, not who asked first (docs/CLIENT_NOTES.md "The binaural
   pool"). On a busy street other people's footsteps 140 to 180 m off held up to 70 of its 160 stages while a horn,
   the raindrops at your feet, birds and nearer steps were refused and never played, the budgets gave up machines

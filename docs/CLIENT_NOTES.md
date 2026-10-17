@@ -618,10 +618,55 @@ Measured with `--busy-street` (Release, 40 s at Cody's spot, rain 10 mm/h): refu
 load 91 % to 71 %; the budgets kept 32 engines, 14 machine voices and 12 borrowed cars where they had been taken
 down to 23, 6 and 4. About 50 steps a second are not started, all more than 40 dB under the loudest voice; the
 nearer ones keep their stages. A voice let go (`--busy-street handover`) falls over 70 ms with no step at its end
-(its second difference 11 dB under the tone's own); the same tone stopped outright is a 46 dB click.
+(its second difference 11 dB under the tone's own); the same tone stopped outright is a 46 dB click. That fade was
+drawn a mixer block at a time, with corners 47 dB under the voice; it is one line now (next section).
 
 The log's "Mixer load" line says, beside the free stages, how many were refused for want of one (should stay 0),
 how many one-shots were not heard against the loudest, how many voices were outranked and how many let go.
+
+## A voice is never cut off
+
+Every way a voice is let go ends at the mixer's StopSound: the budget dropping a one-shot that lost its slot, or giving
+up a continuous voice after its fade; the registry's Stop, StopNow and Retire (engines, machines, borrowed cars, places,
+the pieces of running water); an owner stopping its voice (talkers' and loudspeakers' copies, reflections, the rain,
+sirens and horns); a voice replaced under its id; leaving a world; and the binaural pool letting a voice go. Until
+2026-10-17 StopSound stopped the channel outright, and a voice stopped mid-signal is a step in its waveform. AudioLab
+`--stop-clicks` plays a 440 Hz tone 2 m off, lets it go by each of these, and measures in the master capture the step
+at its end: the largest prediction residual of the tone within 5 ms of its last sample, zero for a steady sine and the
+jump itself at a cut, against the tone's own level. On ten of its fourteen paths the step was 0 to 1 dB under the tone,
+a step the size of the voice itself. The budget's fade and the pool's let-go ended 17 to 58 dB under it, depending on
+where the stop fell against the mixer block, with corners 46 to 48 dB under on the way down; the program closing cut
+the output mid-tone.
+
+Now StopSound frees the voice's id at once (a voice started under it next is a new one, and IsPlaying says no) and
+lets the voice go as the pool does: faded from wherever it is to silence, 80 ms from full, and stopped by the mixer
+itself two blocks after (FmodAudioProvider.Leave). The fade is drawn by the channel's fade points, one straight line
+sample by sample, not by a volume set each update: FMOD moves a channel's volume once a mixer block and joins the steps
+over 64 samples, so an 80 ms fade drawn that way was four corners each 47 dB under the voice, the last a fall from
+-15 dB to nothing in 1.3 ms. The budget's fade for a voice losing its slot is the same line (FadeTo), and so is its
+way back when the voice wins its slot again. What is fed ahead of the channel's fader (its own room's send, the traced
+echoes' input) follows the line once an update, which is why the mixer waits two blocks after silence before it stops
+the channel. Every path now ends 72 to 76 dB under the tone, falling over 72 ms from -1 to -60 dB; `--stop-clicks old`
+stops each outright as before. The line drawn is 60 dB under the voice: the depth the mixer already takes for silence
+(HeadSilentVolume), and for a voice heard at 80 dB a 20 dB click, at the threshold of hearing in a quiet room.
+
+Three stops are not faded, by design:
+
+- A voice making no sound yet (held back for its flight time, or ended) is stopped at once.
+- Leaving a world (a logout, or quitting to the menu) fades the whole world out over half a second
+  (ClientGameSession.Leave), stops what is left and brings the world back up for the menu straight after. A voice
+  still sounding then is stopped by the mixer two blocks on, once the floor the master was just given has been mixed,
+  and the world is not brought back up until it has gone (StopUnderFloor). The floor is 80 dB down (WorldFadeFloor).
+  At 60 dB, stopped at once, the cut fell at the fade's last step, 60 dB under the tone, at the edge of hearing; now it
+  is 80 dB under.
+- Closing the program fades the master the same way over 80 ms before the mixer is taken apart, so closing takes about
+  a tenth of a second more; the capture ends 76 dB under the tone, where the output used to stop mid-tone.
+
+Travelling to another map (`/join`) fades the world out over half a second as a logout does. The old map's rooms (its
+reverb buses and traced stages) are taken apart only when the new map's arrive (GenerateAcoustics, after its load and
+bake), and by then they are at the floor, 80 dB down, rather than cut off ringing. The interface's own loops (the
+guidance tones) already fade over 20 ms by fade points (FadeOutAndStop). The diagnostic burst source (`--audio-test`)
+is noise gated on and off, steps on purpose, and is stopped outright.
 
 ## Why an echo is smeared
 

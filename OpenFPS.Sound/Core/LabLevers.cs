@@ -77,4 +77,8 @@ public sealed class LabLevers
     /// <summary>The binaural pool first come, first served, as before 2026-10-17 (BinauralStages): a voice refused only
     /// when no stage is left, every reverb bus holding a head for its life.</summary>
     public bool FirstComeStages { get; set; }
+
+    /// <summary>Every voice stopped outright, as before 2026-10-17 (FmodAudioProvider.StopSound): a step in its
+    /// waveform where it ended, rather than the budget's fade.</summary>
+    public bool HardStops { get; set; }
 }

@@ -849,6 +849,10 @@ public sealed partial class ClientGameSession : IDisposable
                 if (IsInGame)
                 {
                     _menus.Close();
+                    // The world faded out as it is left, as at a logout: the old map's rooms are taken apart when the new
+                    // map's arrive (GenerateAcoustics, after its load and bake), by when the world is at its floor, 80 dB
+                    // down (FmodAudioProvider.WorldFadeFloor), not cut off ringing. The spawn fades the new map in.
+                    FadeWorld(0f, FadeOutSeconds, null);
                     foreach (int id in _world.GetSnapshot().Entities.Keys.ToList()) _audioSystem.ForgetEntity(id);
                     // The one-offs still queued, rendering or followed (thunder, a line) belong to the old map.
                     _audioSystem.WorldAudio.Clear();

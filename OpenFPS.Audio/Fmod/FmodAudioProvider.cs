@@ -580,20 +580,25 @@ public partial class FmodAudioProvider : IAudioProvider
         /// maximum, reset when read: sampled at the report, a hold between two reports was invisible.</summary>
         public double WorstPositionAge;
 
-        /// <summary>The budget's gain on this voice and its target (1 holding a slot, 0 having lost
-        /// one), slewed in the distance pass so losing or regaining a slot is a fade, for any kind of voice.</summary>
+        /// <summary>The voice's fade (<see cref="FadeTo"/>) where the update last read it, and where it is going: 1 holding
+        /// a slot, 0 having lost one or on its way out. The channel draws it itself, by fade points, so losing or
+        /// regaining a slot, or leaving, is one straight line rather than a step a mixer block; this is for what is fed
+        /// ahead of the channel's fader (its own room's send, the traced echoes' input) and for the meters.</summary>
         public float FadeGain = 1f;
         public float FadeTarget = 1f;
+        /// <summary>The fade's line on the channel's parent clock: from FadeFromGain at FadeFromClock to FadeToGain at
+        /// FadeToClock, and flat either side (<see cref="FadeAt"/>).</summary>
+        public ulong FadeFromClock, FadeToClock;
+        public float FadeFromGain = 1f, FadeToGain = 1f;
 
         /// <summary>Your own steps and speech (SpatialEmitter.Essential): never let go of a binaural stage.</summary>
         public bool Essential;
         /// <summary>A one-shot (SpatialEmitter.IsEvent).</summary>
         public bool OneShot;
-        /// <summary>Let go by the binaural pool's rank (BinauralStages): fading out whatever its budget asks, and stopped
-        /// once silent, so its stage goes to a louder voice. When its fade reached silence, provider clock; negative
-        /// before.</summary>
-        public bool StageLeaving;
-        public double SilentSince = -1;
+        /// <summary>On its way out (<see cref="Leave"/>): stopped by its owner (<see cref="StopSound"/>) or let go of its
+        /// stage by the binaural pool's rank (BinauralStages); stopped, it is no longer its id's voice. Its channel fades
+        /// to silence over the budget's 80 ms whatever its budget asks, and the mixer stops it two blocks after.</summary>
+        public bool Leaving;
 
         public Vector3 Position; 
         public Vector3 ApparentPosition; 
@@ -1710,7 +1715,8 @@ public partial class FmodAudioProvider : IAudioProvider
         _loudestHeard = BinauralStages.Loudest(_activeSounds);
         _stageFloor = BinauralStages.Floor(_activeSounds, free);
         BinauralStages.ChooseLeavers(_activeSounds, free, _leavers);
-        foreach (var a in _leavers) a.StageLeaving = true;
+        foreach (var a in _leavers) Leave(a);
+        _stagesLetGo += _leavers.Count;
         _leavers.Clear();
     }
 
@@ -3522,6 +3528,9 @@ public partial class FmodAudioProvider : IAudioProvider
                 CurrentApparentPosition = (emitter.ApparentPosition != Vector3.Zero) ? emitter.ApparentPosition : emitter.Position, 
                 EffectiveDistance = emitter.EffectiveDistance, Velocity = emitter.Velocity, Direction = emitter.Direction, 
                 Range = emitter.Range, MinDistance = emitter.MinDistance, BaseVolume = emitter.Volume * TakeGain(emitter), Pitch = emitter.Pitch,
+                // The onset ramp below, so a fade begun inside it starts from where it is.
+                FadeFromClock = voiceStartClock, FadeToClock = voiceStartClock + (emitter.IsEvent || emitter.IsReflection ? OnsetRampFrames : 0UL),
+                FadeFromGain = emitter.IsEvent || emitter.IsReflection ? 0f : 1f,
                 TargetOcclusion = emitter.Occlusion, 
                 CurrentOcclusion = emitter.Occlusion,
                 TargetAperture = emitter.ApertureFactor, CurrentAperture = emitter.ApertureFactor,
@@ -3619,14 +3628,15 @@ public partial class FmodAudioProvider : IAudioProvider
         // begins at the voice's scheduled start; fade points multiply with setVolume.
         if ((emitter.IsEvent || emitter.IsReflection) && channel.hasHandle())
         {
-            _system.getSoftwareFormat(out int sr, out _, out _);
-            ulong ramp = (ulong)(sr * 0.006f);
             channel.addFadePoint(voiceStartClock, 0.0f);
-            channel.addFadePoint(voiceStartClock + ramp, 1.0f);
+            channel.addFadePoint(voiceStartClock + OnsetRampFrames, 1.0f);
         }
 
         channel.setPaused(false);
     }
+
+    /// <summary>A one-shot's or a reflection's onset ramp, samples: 6 ms.</summary>
+    private ulong OnsetRampFrames => (ulong)(MixerRate * 0.006f);
 
     public void UpdateSpatialAttributes(SpatialEmitter emitter) 
     { 
@@ -4066,6 +4076,7 @@ public partial class FmodAudioProvider : IAudioProvider
             lock (_lock)
             {
                 _dbgFrame++;
+                if (_raisePending && Clock.Now >= _floorHeldUntil) ApplyWorldFade(_worldFade);
                 UpdateActiveReverbs(lPosVec);
                 UpdateTracedStages();
                 RankVoices(Hearing, _activeSounds, lPosVec);
@@ -4079,13 +4090,6 @@ public partial class FmodAudioProvider : IAudioProvider
                 {
                     var active = _activeSounds[i];
                     active.Channel.isPlaying(out bool isPlaying);
-                    // Let go of its stage, and silent long enough that the channel's ramp is at zero: stopped.
-                    if (isPlaying && BinauralStages.StopsNow(active, Clock.Now))
-                    {
-                        active.Channel.stop();
-                        isPlaying = false;
-                        _stagesLetGo++;
-                    }
                     if (!isPlaying) {
                         // Out of the voices now, its units taken off later (ReleaseRetired).
                         RemoveActiveAt(i);
@@ -4589,14 +4593,14 @@ public partial class FmodAudioProvider : IAudioProvider
             }
         }
 
-        // The budget's fade, here because this pass owns the voice's gain: long enough that no step
-        // survives it, short enough that a voice gone does not linger.
-        BinauralStages.Fade(active, dt, VoiceFadeSeconds, Clock.Now);
-
-        active.LastVolume = active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
-                            * active.FadeGain * (active.OverloadExempt || active.IsReflection ? 1f : _overloadGain)
-                            * EarGain(active, lPosVec, dt);   // the law in loudness units (FmodAudioProvider.Ear.cs)
-        active.Channel.setVolume(active.LastVolume);
+        // The fade is the channel's own (FadeTo): set without it, read here for what is fed ahead of the fader.
+        if (active.FadeGain != active.FadeToGain && active.Channel.getDSPClock(out _, out ulong fadeNow) == RESULT.OK)
+            active.FadeGain = FadeAt(active, fadeNow);
+        float volume = active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
+                       * (active.OverloadExempt || active.IsReflection ? 1f : _overloadGain)
+                       * EarGain(active, lPosVec, dt);   // the law in loudness units (FmodAudioProvider.Ear.cs)
+        active.LastVolume = volume * active.FadeGain;
+        active.Channel.setVolume(volume);
 
         // Doppler by hand on a 2D binaural channel (a 3D fallback voice gets FMOD's), from the real
         // source position carried forward to now (DeadReckon), not the apparent one.
@@ -5246,17 +5250,63 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    /// <summary>How long the budget's fade takes, seconds. See ActiveSound.FadeGain.</summary>
+    /// <summary>How long the budget's fade takes from full to silence, seconds. See ActiveSound.FadeGain.</summary>
     internal const float VoiceFadeSeconds = 0.08f;
+
+    /// <summary>How long a voice on its way out stays at silence before the mixer stops it, seconds: two mixer blocks, so
+    /// nothing fed ahead of its fader (its own room's send, the traced echoes, set once an update) is still sounding.</summary>
+    internal const double SilentBeforeStop = 2 * 1024 / 48000.0;
+
+    /// <summary>From a voice let go (or stopped) at full to its channel stopping, seconds.</summary>
+    internal const double LeaveSeconds = VoiceFadeSeconds + SilentBeforeStop;
+
+    /// <summary>A voice's fade at <paramref name="now"/> (its channel's parent clock): the straight line its fade points
+    /// draw, flat either side.</summary>
+    internal static float FadeAt(ActiveSound a, ulong now)
+        => now >= a.FadeToClock ? a.FadeToGain
+         : now <= a.FadeFromClock ? a.FadeFromGain
+         : a.FadeFromGain + (a.FadeToGain - a.FadeFromGain) * (float)(now - a.FadeFromClock) / (a.FadeToClock - a.FadeFromClock);
+
+    /// <summary>
+    /// Draws a voice's fade from where it is now to <paramref name="target"/> at the budget's rate (the whole way in
+    /// <see cref="VoiceFadeSeconds"/>), by the channel's fade points: one straight line, sample by sample. A volume set
+    /// each update moves once a mixer block, and FMOD joins the steps over 64 samples: an 80 ms fade so drawn was four
+    /// corners each 47 dB under the voice (AudioLab --stop-clicks). False when the channel cannot be scheduled.
+    /// </summary>
+    private bool FadeTo(ActiveSound a, float target)
+    {
+        if (a.Channel.getDSPClock(out _, out ulong now) != RESULT.OK) return false;
+        var (from, end) = Line(a, now, target, MixerRate);
+        if (a.Channel.removeFadePoints(now, ulong.MaxValue) != RESULT.OK
+            || a.Channel.addFadePoint(now, from) != RESULT.OK || a.Channel.addFadePoint(end, target) != RESULT.OK)
+            return false;
+        (a.FadeFromClock, a.FadeFromGain, a.FadeToClock, a.FadeToGain) = (now, from, end, target);
+        a.FadeGain = from;
+        a.FadeTarget = target;
+        return true;
+    }
+
+    /// <summary>A fade's line from <paramref name="now"/>: from where the voice's fade is (so it never jumps) to
+    /// <paramref name="target"/>, at the budget's rate, ending at <c>End</c> (samples at <paramref name="rate"/>).</summary>
+    internal static (float From, ulong End) Line(ActiveSound a, ulong now, float target, int rate)
+    {
+        float from = FadeAt(a, now);
+        return (from, now + (ulong)(MathF.Abs(target - from) * rate * VoiceFadeSeconds));
+    }
+
+    /// <summary>When the mixer stops a voice whose fade to silence ends at <paramref name="silentAt"/>: two blocks
+    /// after (<see cref="SilentBeforeStop"/>).</summary>
+    internal static ulong StopClock(ulong silentAt, int rate) => silentAt + (ulong)(rate * SilentBeforeStop);
 
     public bool FadeOutVoice(int entityId)
     {
         lock (_lock)
         {
             var active = FindActive(entityId);
-            if (active == null) return true;
-            active.FadeTarget = 0f;
-            return active.FadeGain <= 0.01f;
+            if (active == null || active.Leaving) return true;
+            // Not to be scheduled: let it be stopped, which tries again and stops it outright only then.
+            if (active.FadeTarget > 0f && !FadeTo(active, 0f)) return true;
+            return active.Channel.getDSPClock(out _, out ulong now) != RESULT.OK || FadeAt(active, now) <= 0f;
         }
     }
 
@@ -5265,7 +5315,7 @@ public partial class FmodAudioProvider : IAudioProvider
         lock (_lock)
         {
             var active = FindActive(entityId);
-            if (active != null) active.FadeTarget = 1f;
+            if (active != null && !active.Leaving && active.FadeTarget < 1f) FadeTo(active, 1f);
         }
     }
 
@@ -5301,6 +5351,15 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>
+    /// Stops an id's voices. Its id is free at once (a voice started under it next is a new one, and IsPlaying says
+    /// no), but a voice sounding leaves as the pool's let-go does: faded to silence over the budget's 80 ms and stopped
+    /// by the mixer two blocks after (<see cref="Leave"/>). Every way a voice is let go ends here (the budget dropping a
+    /// one-shot or giving up a continuous voice, the registry, an owner, a voice replaced, leaving a world). Stopped
+    /// outright, a voice is a step the size of the voice itself (a 440 Hz tone: 0 to 1 dB under its level, AudioLab
+    /// --stop-clicks); faded, its end is 72 to 76 dB under it. Stopped at once: a voice making no sound yet; with the
+    /// world at its floor, two blocks on, under it (<see cref="StopUnderFloor"/>).
+    /// </summary>
     public void StopSound(int entityId) {
         // A model still being made for it is let go.
         _builds?.Cancel(entityId);
@@ -5308,6 +5367,9 @@ public partial class FmodAudioProvider : IAudioProvider
             if (!_activeById.TryGetValue(entityId, out var voices)) return;
             double now = Clock.Now;
             foreach (var sound in voices) {
+                var way = HowItStops(Sounding(sound), _worldFade, _lab.HardStops);
+                if (way == StopWay.Fade && Leave(sound)) continue;
+                if (way == StopWay.UnderFloor && StopUnderFloor(sound)) continue;
                 sound.Channel.stop();
                 // Its units come off once the mixer is done with it, as for a voice that ends.
                 _retiring.Add((sound, now));
@@ -5316,6 +5378,73 @@ public partial class FmodAudioProvider : IAudioProvider
             _activeById.Remove(entityId);
             _pieces.Remove(entityId);
         } 
+    }
+
+    /// <summary>How a voice is stopped (<see cref="StopSound"/>).</summary>
+    internal enum StopWay : byte
+    {
+        /// <summary>Outright: it is making no sound.</summary>
+        Now,
+        /// <summary>By the mixer two blocks on, once the world's floor has been mixed (<see cref="StopUnderFloor"/>).</summary>
+        UnderFloor,
+        /// <summary>Faded out first (<see cref="Leave"/>).</summary>
+        Fade,
+    }
+
+    /// <summary>How a voice stopped is stopped: outright when it is not sounding, under the floor when the world is
+    /// faded to it (<see cref="SetWorldFade"/>), faded out otherwise. <paramref name="hardStops"/> is the lab's lever for
+    /// every stop outright, as before 2026-10-17.</summary>
+    internal static StopWay HowItStops(bool sounding, float worldFade, bool hardStops)
+        => !sounding || hardStops ? StopWay.Now : worldFade <= WorldFadeFloor ? StopWay.UnderFloor : StopWay.Fade;
+
+    /// <summary>
+    /// A voice stopped with the world faded to its floor (leaving it): not faded, since the world is brought back up as
+    /// soon as it is left (ClientGameSession.Leave) and a fade still running would be heard again, but stopped by the
+    /// mixer two blocks on, so the floor the master was just given has been mixed by then and the cut is 80 dB under the
+    /// voice. Stopped at once, it was cut at the block before, at whatever the fade had reached (60 dB down at best,
+    /// --stop-clicks). The world is not brought up again until it has gone (<see cref="SetWorldFade"/>).
+    /// </summary>
+    private bool StopUnderFloor(ActiveSound sound)
+    {
+        if (sound.Channel.getDSPClock(out _, out ulong now) != RESULT.OK) return false;
+        sound.Channel.getDelay(out ulong start, out _, out _);
+        if (sound.Channel.setDelay(start, StopClock(now, MixerRate), true) != RESULT.OK) return false;
+        sound.Leaving = true;
+        sound.TapState?.HandBack();
+        _floorHeldUntil = Math.Max(_floorHeldUntil, Clock.Now + SilentBeforeStop + 1024.0 / MixerRate);
+        return true;
+    }
+
+    /// <summary>Until when (provider clock) the world is held at its floor for voices stopped under it.</summary>
+    private double _floorHeldUntil;
+    /// <summary>A world fade above the floor asked for while it was held there, applied once it is let go.</summary>
+    private bool _raisePending;
+
+    /// <summary>Whether a voice's channel is playing and has begun: one held back for its flight time has made no sound
+    /// yet.</summary>
+    private static bool Sounding(ActiveSound sound)
+    {
+        if (sound.Channel.isPlaying(out bool playing) != RESULT.OK || !playing) return false;
+        if (sound.Channel.getDelay(out ulong start, out _, out _) != RESULT.OK || start == 0) return true;
+        return sound.Channel.getDSPClock(out _, out ulong now) == RESULT.OK && now >= start;
+    }
+
+    /// <summary>
+    /// A voice on its way out (<see cref="ActiveSound.Leaving"/>): faded from where it is to silence (<see cref="FadeTo"/>,
+    /// 80 ms from full) and stopped by the mixer itself <see cref="SilentBeforeStop"/> after, on its own clock, so no
+    /// update arriving late can stop it early. A tap gives its share back to the voice it came from as its fade begins,
+    /// as FadeOutEngine has it, so the two cross over the same fade. False when the channel cannot be scheduled (it is
+    /// then stopped outright).
+    /// </summary>
+    private bool Leave(ActiveSound sound)
+    {
+        if (sound.Leaving) return true;
+        if (!FadeTo(sound, 0f)) return false;
+        sound.Channel.getDelay(out ulong start, out _, out _);
+        if (sound.Channel.setDelay(start, StopClock(sound.FadeToClock, MixerRate), true) != RESULT.OK) return false;
+        sound.Leaving = true;
+        sound.TapState?.HandBack();
+        return true;
     }
     
     public bool IsPlaying(int entityId) { lock (_lock) return _activeById.ContainsKey(entityId); }
@@ -5359,9 +5488,11 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The master's own level (OPENFPS_MASTER_DB), which a world fade scales.</summary>
     private float _masterTrim = 1f;
 
-    /// <summary>The quietest a fade goes, 60 dB down. Never zero: the interface group is lifted by
-    /// the inverse, and that has to stay finite.</summary>
-    public const float WorldFadeFloor = 1e-3f;
+    /// <summary>The quietest a fade goes, 80 dB down. Never zero: the interface group is lifted by
+    /// the inverse, and that has to stay finite. Every voice still sounding is stopped outright here as the world is
+    /// left (StopSound), so it is cut 80 dB under its own level: at 60 dB (as it was) the cut was at the edge of
+    /// hearing (AudioLab --stop-clicks).</summary>
+    public const float WorldFadeFloor = 1e-4f;
 
     /// <summary>Fades everything heard in the world, not the interface: the fade is the master's level,
     /// and the interface group is lifted by the inverse.</summary>
@@ -5369,10 +5500,35 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         if (!_isInitialized) return;
         float g = Math.Clamp(gain, WorldFadeFloor, 1f);
+        lock (_lock)
+        {
+            _worldFade = g;
+            if (g > WorldFadeFloor)
+            {
+                // Not up again while voices stopped under the floor are still being mixed there (StopUnderFloor).
+                if (Clock.Now < _floorHeldUntil) { _raisePending = true; return; }
+                ApplyWorldFade(g);
+                return;
+            }
+            ApplyWorldFade(g);
+            // A voice still on its way out is cut under the floor too: its fade would be heard again when the world is
+            // brought back up.
+            foreach (var a in _activeSounds)
+                if (a.Leaving && !StopUnderFloor(a)) a.Channel.stop();
+        }
+    }
+
+    /// <summary>The world fade on the master, and its inverse on the interface group.</summary>
+    private void ApplyWorldFade(float g)
+    {
+        _raisePending = false;
         _system.getMasterChannelGroup(out var master);
         master.setVolume(_masterTrim * g);
         if (_uiGroup.hasHandle()) _uiGroup.setVolume(1f / g);
     }
+
+    /// <summary>The world fade last set (<see cref="SetWorldFade"/>): 1, or down to <see cref="WorldFadeFloor"/>.</summary>
+    private float _worldFade = 1f;
 
     /// <summary>The voices reaching the listener loudest, by the volume last applied and the strongest
     /// band the EQ lets through. Diagnostic: "why can I still hear that".</summary>
@@ -5716,6 +5872,26 @@ public partial class FmodAudioProvider : IAudioProvider
         _diagChannel.set3DAttributes(ref fpos, ref fvel);
     }
 
+    /// <summary>
+    /// The master taken to silence before the mixer is taken apart: releasing the voices stops each mid-signal and
+    /// close() stops the output on whatever it last played, a click from a world left any way but its own fade (the
+    /// window closed, the program ended). The same fade a voice leaves by (<see cref="Leave"/>), on the master, so closing
+    /// waits about a tenth of a second; nothing when the world is faded to its floor already (ClientGameSession.Leave).
+    /// </summary>
+    private void FadeOutForClose()
+    {
+        if (!_isInitialized || _worldFade <= WorldFadeFloor || _lab.HardStops) return;
+        if (_system.getMasterChannelGroup(out var master) != RESULT.OK || !master.hasHandle()) return;
+        if (master.getDSPClock(out ulong own, out ulong parent) != RESULT.OK) return;
+        // The master has no parent; its fade points are on its own clock.
+        ulong now = parent != 0 ? parent : own;
+        master.addFadePoint(now, 1f);
+        master.addFadePoint(now + (ulong)(MixerRate * VoiceFadeSeconds), 0f);
+        _system.update();
+        System.Threading.Thread.Sleep(TimeSpan.FromSeconds(LeaveSeconds));
+        _worldFade = WorldFadeFloor;
+    }
+
     public void StopDiagnosticSound()
     {
         if (_diagChannel.hasHandle()) { _diagChannel.stop(); _diagChannel = default; }
@@ -5725,6 +5901,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     public void Dispose() {
         StopRecording();
+        FadeOutForClose();
         lock (_lock) {
             foreach (var active in _activeSounds) {
                 ReleaseActiveSoundResources(active);
