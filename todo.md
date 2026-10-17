@@ -409,7 +409,11 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
   150 to 300 m upwind lose their treble first and go into a shadow; downwind they keep it. Past 100 m a far
   sound rises and falls a little with the gusts. On a calm clear night (`/weather wind calm`): far sounds steady,
   the treble barely flickering (Cody asked to hear this first). Within 50 m nothing changes. The thunder is
-  unchanged.
+  unchanged. On the airport side of the rail's east leg (the train runs north and south at x = 178, dirt
+  between), checked standable: `/tp 330 -100 0.1` (152 m off), `/tp 380 -100 0.1` (202 m, on the runway) and
+  `/tp 470 -100 0.1` (292 m). With `/weather wind 5 east steady` and `/edit map set time 15` the passing train
+  is dull and much quieter at 292 m than at 152 m, swelling as gusts move the shadow's edge; with a west wind
+  or at night it is fuller, the middle carrying. `/edit map set time server` puts the clock back.
 - The wind's direction (2026-10-16, docs/CLIENT_NOTES.md "Where the wind comes from"). In Elm Park among the
   trees (`/tp -375.0 195.0 0.2`), `/weather wind 5 west gusty`, stand facing north: the wind in the left ear,
   swinging a little toward the face and the back over tens of seconds, never from the right; turn to face west
