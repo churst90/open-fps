@@ -99,10 +99,12 @@ public class MachineStateTests
         Assert.Equal(-40, state.SpeedRate);
         Assert.Equal(9, state.TurnY);
 
-        // The last member declared, so nothing after it is renumbered and an entity that says nothing reads as 0.
+        // Appended after the turn, so nothing before it is renumbered and an entity that says nothing reads as 0;
+        // members appended since (Grounding) come after it.
         var fields = typeof(EntityState).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
                                         .OrderBy(f => f.MetadataToken).Select(f => f.Name).ToList();
-        Assert.Equal(nameof(EntityState.Lever), fields[^1]);
+        Assert.Equal(fields.IndexOf(nameof(EntityState.TurnZ)) + 1, fields.IndexOf(nameof(EntityState.Lever)));
+        Assert.True(fields.IndexOf(nameof(EntityState.Lever)) < fields.IndexOf(nameof(EntityState.Grounding)));
         Assert.Equal(0f, new EntityState().LeverFraction);
     }
 
