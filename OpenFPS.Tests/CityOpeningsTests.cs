@@ -78,6 +78,8 @@ public class CityOpeningsTests
         // Where its doors hang in their walls (Resonance's 1.2): gen_city hangs a leaf at its wall's middle.
         var hung = DoorFaceSurvey.Offsets(world, routes);
         _o.WriteLine($"  {hung.Count} doors; leaf within 1 cm of its wall's middle {hung.Count(x => MathF.Abs(x.Off) < 0.01f)}");
+        _o.WriteLine($"  the first-named place along the opening's normal {routes.Openings.Count(o => o.ASide > 0)}, against it "
+                     + $"{routes.Openings.Count(o => o.ASide < 0)} (doors {routes.Openings.Count(o => o.Kind == OpeningRoutes.DoorKind && o.ASide < 0)})");
         foreach (var (o, off) in hung.Where(x => MathF.Abs(x.Off) >= 0.01f).OrderByDescending(x => MathF.Abs(x.Off)))
             _o.WriteLine($"    door {o.Id} '{(world.Entities.TryGetValue(o.Id, out var e) ? e.Definition.Identity.Name : "")}' at ({o.Centre.X:F2}, {o.Centre.Z:F2}): "
                        + $"leaf {off:F3} m off the middle of a wall {2 * o.HalfDepth:F2} m deep");

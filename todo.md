@@ -57,7 +57,8 @@ fingerprint changed too, so the door renders are made again once.
    open, round the corner: -37.4/-40.1/-42.0 dB, as at the middle (was -44.0/-45.3/-58.7). A sound beside a small
    room heard in it through its open door: -10.6/-16.9/-25.1 (was -29.0/-37.6/-65.5, through its wall). No map
    hangs a leaf at a face (gen_city, gen_osm and the editor all hang it mid-wall, measured), so nothing on the maps
-   changes; the stored streams pass unregenerated.
+   changes; the stored streams pass unregenerated. `OpeningRoutes.FieldAt` took the first-named place to lie along
+   the normal and most doors are named the other way: fixed with `ASide` the same day, unheard (changes.md).
 5. Sound library stage 8: DONE 2026-10-17. Tag `library/v0.1.0`, docs/LIBRARY_CHANGES.md. Each later library change
    that a host must act on gets a line there and a new tag. Resonance's side (the submodule, NOTICE.md, swapping
    its copies one subsystem at a time) is Resonance's to do.
@@ -385,6 +386,11 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
   wall's face"). Nothing on the maps should change: every door hangs at its wall's middle. In Selby House, with
   flat 00B's door open, someone talking in the corridor (`/tp 20.3 157.5 0.1`) heard in the flat (`/tp 23.5 157.5
   0.1`) as before. A map or a Resonance scene with a leaf at a face of a thick wall is where it is heard.
+- The street heard indoors is traced from the street again (2026-10-17, docs/CLIENT_NOTES.md "A doorway route leaves
+  from the wall's face"). In Selby House's lobby (`/tp 11.8 157.4 0.1`), with the glass front door shut and then
+  open, in traffic (`/weather rain heavy` helps): the street's reverberant tail through the door is the open
+  street's, coming from outside it, where it was traced from 2 m inside the lobby (the street with the lobby's
+  echoes in it). The same at most doors of the city, Albany and Magnolia; the lobby's own reverb is unchanged.
 - A shut door lets through its gaps (2026-10-17, docs/CLIENT_NOTES.md "A shut door leaks by its gaps"). In
   Selby House, ground floor: stand in flat 00B (`/tp 23.5 157.5 0.1`) with its door shut and have someone talk
   or fire in the corridor (`/tp 20.3 157.5 0.1`): heard through the door, muffled but clear, about 16 dB down

@@ -93,6 +93,11 @@ public sealed class OpeningRoutes
 
         public int Other(int node) => node == NodeA ? NodeB : NodeA;
 
+        /// <summary>Straight out of the opening into <paramref name="node"/>'s side, one of the two it joins: along
+        /// <see cref="Normal"/> or against it as <see cref="ASide"/> says; the first-named place along it where its sides
+        /// were not looked at. A map names a door's places either way round.</summary>
+        internal Vector3 Into(int node) => Normal * ((node == NodeA ? 1 : -1) * (ASide < 0 ? -1 : 1));
+
         /// <summary>A copy to fill in again (a tile build's kept opening): every field, the arrays shared.</summary>
         public Opening Copy() => (Opening)MemberwiseClone();
     }
@@ -900,7 +905,7 @@ public sealed class OpeningRoutes
                 if (outerNode == node) outside = 1.0;
                 else
                 {
-                    Vector3 point = o.Centre + (onA ? -o.Normal : o.Normal) * (o.HalfDepth + 0.3f);
+                    Vector3 point = o.Centre + o.Into(outerNode) * (o.HalfDepth + 0.3f);
                     Vector3 ignored = point, ignoredToo = point;
                     outside = Math.Min(1.0, FieldEnergy(node, point, onA ? o.RegionB : o.RegionA, outerNode, range, ref ignored, ref ignoredToo));
                 }
@@ -913,7 +918,7 @@ public sealed class OpeningRoutes
 
     /// <summary>The direct part of <see cref="FieldAt(int, Vector3, int, float, out Vector3)"/>: each opening of the place radiating its field
     /// at <paramref name="listener"/>, straight or by the routes.</summary>
-    private double FieldEnergy(int node, Vector3 listener, int listenerRegion, int lNode, float range,
+    internal double FieldEnergy(int node, Vector3 listener, int listenerRegion, int lNode, float range,
                                ref Vector3 via, ref Vector3 inField)
     {
         double energy = 0; float best = -1f;
@@ -934,8 +939,8 @@ public sealed class OpeningRoutes
             }
             else
             {
-                // Out of the opening into the place beyond it (its A side is along +Normal), then on.
-                Vector3 start = o.Centre + (onA ? -o.Normal : o.Normal) * (o.HalfDepth + 0.3f);
+                // Out of the opening into the place beyond it, then on.
+                Vector3 start = o.Centre + o.Into(onA ? o.NodeB : o.NodeA) * (o.HalfDepth + 0.3f);
                 int beyond = onA ? o.RegionB : o.RegionA;
                 if (!Route(start, beyond, listener, listenerRegion, out var answer)) continue;
                 float r = MathF.Max(1f, Vector3.Distance(start, listener));
@@ -946,7 +951,7 @@ public sealed class OpeningRoutes
             if (part > best)
             {
                 best = part; via = from;
-                inField = o.Centre + (onA ? o.Normal : -o.Normal) * (o.HalfDepth + 2f);
+                inField = o.Centre + o.Into(node) * (o.HalfDepth + 2f);
             }
         }
         return energy;

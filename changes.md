@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- The street heard indoors is traced from the street again, whichever way a map names a door's places
+  (docs/CLIENT_NOTES.md "A doorway route leaves from the wall's face"). `OpeningRoutes.FieldAt` took an opening's
+  first-named place to lie along its normal; the graph takes either, and most are named the other way (the city's
+  480 of 514 doors, Albany's 4,717 of 6,195 openings, Magnolia's 2,115 of 2,698). For those the outdoors heard from
+  indoors was traced from 2 m inside your own room rather than 2 m outside the door it comes in by, a field routed
+  on through a room left the doorway from the wrong face, and what came into a room from beyond its next opening
+  was measured on the wrong side of it. Each now steps out of the face on its own place's side (`Opening.Into`, from
+  `ASide`). Guard: `OpeningRoutesTests.AFieldIsTheSameWhicheverWayADoorsPlacesAreNamed`, the same doorway named
+  both ways; the place each field is heard from, and the routed part (4.8 dB apart broken), each proven by
+  breaking. The wire hash changes (fb5a761e117d to a4934bb0ca23); the door fingerprint does not (c8fa0894bef3); the
+  stored streams pass unregenerated.
 - The click at the end of the patio door's run in AudioLab `--moving-echoes` was the lab's measure, not a sound
   (docs/CLIENT_NOTES.md "One-off sounds: why the echoes are as they are"). Its 54 dB frame was float dust 200 dB
   under the door against a round of digital zeros, with the copies following and left still alike; the next, 51 dB,

@@ -541,6 +541,18 @@ No map hangs a leaf at a face today: gen_city, gen_osm and the editor's fitted d
 middle (the city's 514 doors, Albany's 1,916 and Magnolia's 1,324 all within 1 cm of it). The stored streams pass
 unchanged. ResonanceMaybesGeometryTests holds both rules.
 
+A place's field heard through its openings (`OpeningRoutes.FieldAt`, the doorway field law) steps out of a doorway
+the same way, into the side of the place it goes into (`Opening.Into`, from `ASide`). Until 2026-10-17 it took the
+first-named of an opening's two places to lie along its normal; a map names them either way round, and most are
+named the other: the city's 480 of 514 doors (636 of its 752 openings), Albany's 4,717 of 6,195 openings,
+Magnolia's 2,115 of 2,698. For those the outdoors heard from indoors was traced from 2 m inside your own room
+instead of 2 m outside the door it comes in by (Selby House's lobby: from the lobby at x 11.9, now the street at
+7.5), which is the street with the lobby's echoes in it; a field routed on through a room left the doorway from the
+wrong face (in the test building the street's field routed down a corridor two openings in was 4.8 dB too loud,
+though most of what reaches the corridor is what came into it, which was right); and what came into a room from
+beyond the next opening was measured on the wrong side of it. OpeningRoutesTests holds it with one doorway named
+both ways.
+
 ## Steam Audio pathing is off (a decision for Cody)
 
 The worker makes its simulator with `enablePathing: false`, so Steam Audio's pathing never runs: no probe

@@ -44,6 +44,12 @@ internal static class DoorFaceSurvey
         var offs = Offsets(world, routes);
         int mid = offs.Count(x => MathF.Abs(x.Off) < 0.01f), near = offs.Count(x => MathF.Abs(x.Off) is >= 0.01f and < 0.05f);
         output.WriteLine($"{id}: {offs.Count} doors; leaf within 1 cm of its wall's middle {mid}, 1 to 5 cm off {near}, 5 cm or more {offs.Count - mid - near}");
+        // Which way round each opening's places are named (OpeningRoutes.FieldAt took the first along the normal until
+        // 2026-10-17).
+        int along = routes.Openings.Count(o => o.ASide > 0), against = routes.Openings.Count(o => o.ASide < 0);
+        output.WriteLine($"{id}: {routes.Openings.Count} openings; the first-named place along the normal {along}, against it {against}, "
+                       + $"sides not as named {routes.Openings.Count - along - against}"
+                       + $" (doors {routes.Openings.Count(o => o.Kind == OpeningRoutes.DoorKind && o.ASide < 0)} against)");
         foreach (var (o, off) in offs.OrderByDescending(x => MathF.Abs(x.Off)).Take(5))
             output.WriteLine($"  door {o.Id} at ({o.Centre.X:F2}, {o.Centre.Z:F2}, floor {o.Centre.Y - o.HalfHeight:F2}): leaf {off:F3} m off the middle of a wall {2 * o.HalfDepth:F2} m deep");
 

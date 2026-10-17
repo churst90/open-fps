@@ -41,7 +41,9 @@ public class OpeningRoutesTests
     private static readonly Quaternion Across = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
     private static readonly Vector3 LeafShut = new(0.15f, 1.05f, 2.9f);
 
-    private static WorldSnapshot Building(bool frontDoorOpen, float doorwayHeight = 2.1f)
+    /// <param name="frontDoorNamedOutsideIn">The front door's places named the other way round (the street first), its
+    /// leaf where it was: the graph takes either.</param>
+    private static WorldSnapshot Building(bool frontDoorOpen, float doorwayHeight = 2.1f, bool frontDoorNamedOutsideIn = false)
     {
         AcousticRegistry.EnsureInitialized();
         var defs = new List<EntityDefinition>();
@@ -77,6 +79,7 @@ public class OpeningRoutesTests
         var leaf = Solid(FrontDoor, leafAt, LeafSize, leafRot, "Metal", new WallBuild(0.0012f, 0f));
         leaf.Portal = new PortalComponent { RegionAId = Stair, RegionBId = AcousticConstants.GlobalRegionId,
                                             OpeningCentre = LeafShut, OpeningRotation = Across };
+        if (frontDoorNamedOutsideIn) (leaf.Portal.RegionAId, leaf.Portal.RegionBId) = (leaf.Portal.RegionBId, leaf.Portal.RegionAId);
         defs.Add(leaf);
 
         // The inner doorway: an authored portal, wider than the gap it was put in.
@@ -419,6 +422,50 @@ public class OpeningRoutesTests
         float o = open.FieldAt(AcousticConstants.GlobalRegionId, at, Stair, 60f, out _);
         float c = shut.FieldAt(AcousticConstants.GlobalRegionId, at, Stair, 60f, out _);
         Assert.True(Db(o) - Db(c) > 15f, $"open {Db(o):F1} dB, shut {Db(c):F1} dB");
+    }
+
+    /// <summary>
+    /// An opening's places may be named either way round: the graph looks at which side each lies on (Opening.ASide)
+    /// and takes both. The fields heard through the front door, and where each place's field is heard from, are the
+    /// same whichever way its places are named.
+    /// </summary>
+    [Fact]
+    public void AFieldIsTheSameWhicheverWayADoorsPlacesAreNamed()
+    {
+        var world = Building(frontDoorOpen: true);
+        var (asBuilt, acoustics) = Graph(world);
+        var (turned, _) = Graph(Building(frontDoorOpen: true, frontDoorNamedOutsideIn: true));
+        var a = asBuilt.Openings.Single(o => o.Id == FrontDoor);
+        var b = turned.Openings.Single(o => o.Id == FrontDoor);
+        Assert.True(Vector3.Distance(a.Normal, b.Normal) < 1e-4f && Vector3.Distance(a.Centre, b.Centre) < 1e-4f, "the same doorway");
+        Assert.True(a.ASide != 0 && b.ASide == -a.ASide, $"its sides: {a.ASide} and {b.ASide}");
+
+        const int Street = AcousticConstants.GlobalRegionId;
+        var inStair = new Vector3(2.5f, 1.6f, 5.0f);
+        foreach (var (place, at, region, what) in new[]
+        {
+            (Street, InCorridor, Corridor, "the street's field down the corridor"),
+            (Street, inStair, Stair, "the street's field in the stairwell"),
+            (Corridor, inStair, Stair, "the corridor's field in the stairwell"),
+            (Corridor, OnStreet, Street, "the corridor's field on the street"),
+        })
+        {
+            float one = asBuilt.FieldAt(place, at, region, 60f, out _, out var heardA);
+            float two = turned.FieldAt(place, at, region, 60f, out _, out var heardB);
+            Assert.True(MathF.Abs(Db(one) - Db(two)) < 0.05f, $"{what}: {Db(one):F2} dB named one way, {Db(two):F2} dB the other");
+            int nodeA = asBuilt.NodeOf(acoustics.GetRegionAt(world, heardA)), nodeB = asBuilt.NodeOf(acoustics.GetRegionAt(world, heardB));
+            Assert.True(nodeA == asBuilt.NodeOf(place) && nodeB == asBuilt.NodeOf(place),
+                        $"{what} is heard from {heardA} (place {nodeA}) named one way and {heardB} (place {nodeB}) the other, not from in place {asBuilt.NodeOf(place)}");
+        }
+
+        // Down the corridor what came in builds the corridor's own field and is most of it; the street's field routed
+        // out of the front door on its own leaves from the stairwell's face of it, whichever way the door is named.
+        Vector3 via = default, heard = default;
+        int street = asBuilt.NodeOf(Street), corridor = asBuilt.NodeOf(Corridor);
+        double routedA = asBuilt.FieldEnergy(street, InCorridor, Corridor, corridor, 60f, ref via, ref heard);
+        double routedB = turned.FieldEnergy(street, InCorridor, Corridor, corridor, 60f, ref via, ref heard);
+        Assert.True(routedA > 0 && Math.Abs(10 * Math.Log10(routedB / routedA)) < 0.05,
+                    $"routed to the corridor: {10 * Math.Log10(routedA):F2} dB named one way, {10 * Math.Log10(routedB):F2} dB the other");
     }
 
     private static float HalfPlaneOnTheBoundary()

@@ -6,6 +6,10 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- `OpeningRoutes.FieldAt` steps out of each doorway on the side `ASide` says, not on the assumption that `NodeA`
+  lies along `Normal`. A host need do nothing; one whose openings name their places against the normal (most of
+  open-fps's) finds the point a field is heard from (`inField`) outside the listener's room now, where it was inside
+  it, and the fields routed on through a room a little changed. Without a `regionAt` (`ASide` 0) nothing changes.
 - A one-off sound that moves as it plays has its echoes found again and moved with it (`OneOffSounds`; Resonance's
   2.6, which Resonance marks `SpatialVoice.Moves`). A host need do nothing new: a one-off moves when it is sent with
   `TransientSound.MovesTo` and `MoveSeconds` (its place at the end of the move, and how long it takes), as open-fps's
