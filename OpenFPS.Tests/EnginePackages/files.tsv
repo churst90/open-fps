@@ -256,6 +256,7 @@ OpenFPS.Physics/RunningGear.cs	Physics
 OpenFPS.Physics/SharedMovementEngine.cs	Physics	
 OpenFPS.Physics/TyreGrip.cs	Physics	
 OpenFPS.Physics/VehicleMechanics.cs	Physics	
+OpenFPS.Physics/VehicleStep.cs	Physics	
 OpenFPS.Physics/WheelDynamics.cs	Physics	
 OpenFPS.Physics/WheelState.cs	Physics	
 OpenFPS.Physics/Wind.cs	Physics	

@@ -128,7 +128,8 @@ RULES = [
     (C + 'SpatialGrid', 'G', 'the entity grid'),
     # Server
     (C.replace('Common', 'Server') + 'Systems.MovementSystem', 'H', 'steps players from their inputs'),
-    ('OpenFPS.Server.Systems.DrivingSystem', 'PS', 'steps a driven car; its engine, resistances and collision are mechanics'),
+    ('OpenFPS.Server.Systems.DrivingSystem', 'H', 'a driven car\'s controls, ignition, tile fences and hearing; its mechanics are VehicleStep\'s (physics stage 3)'),
+    (C + 'VehicleStep', 'P', 'one map\'s driven cars: the engine\'s pull, the resistances, the steering limit, the wheels, the pose, the collision test'),
     ('OpenFPS.Server.Systems.VehicleSystem', 'H', 'traffic on its lines, kinematic'),
     ('OpenFPS.Server.Systems.RailSystem', 'H', 'trains on their tracks, kinematic'),
     ('OpenFPS.Server.Systems.OccupancySystem', 'H', 'seats a body on its vehicle'),

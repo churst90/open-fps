@@ -10,6 +10,7 @@ OpenFPS.Common.Grounding	V
 OpenFPS.Common.ContactEvent	V
 OpenFPS.Common.ContactPhase	V
 OpenFPS.Common.ContactStream	P
+OpenFPS.Common.VehicleStep	P
 OpenFPS.Common.VehicleState	V
 OpenFPS.Common.AirSample	V
 OpenFPS.Common.BodyConstants	P
