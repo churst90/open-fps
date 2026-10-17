@@ -107,11 +107,11 @@ FILE_RULES = [
     ('OpenFPS.Common/Components.cs', 'Common', 'wire and entity model'),
     ('OpenFPS.Common/DistantMotion.cs', 'Common', 'how sent states are carried between packets'),
     ('OpenFPS.Common/DrivingCuePlanner.cs', 'Accessibility', 'the driver\'s cues, planned'),
+    ('OpenFPS.Common/EntityType.cs', 'World', 'what a thing is, in a prefab, a map and a definition: on the wire by number'),
     ('OpenFPS.Common/EntityAcoustics.cs', 'Common', 'entity adapter: rooms, openings and the sound\'s world input'),
     ('OpenFPS.Common/EntityEmission.cs', 'Common', 'entity adapter: where an entity sounds from'),
     ('OpenFPS.Common/EntityGeometry.cs', 'Common', 'entity adapter: geometry'),
     ('OpenFPS.Common/GroundProbeMemo.cs', 'game', 'physics survey: a server cache'),
-    ('OpenFPS.Common/JsonConverters.cs', 'Common', 'wire'),
     ('OpenFPS.Common/LaneRoutes.cs', 'Agents', 'a vehicle\'s tour of lanes'),
     ('OpenFPS.Common/LineFollower.cs', 'Agents', 'a driver steering to a line'),
     ('OpenFPS.Common/Messages.cs', 'Common', 'wire'),
@@ -238,10 +238,6 @@ TYPE_RULES = {
     'OpenFPS.Server.Systems.StreetLines': 'Agents',
     'OpenFPS.Server.Systems.SpeechConditions': 'Agents',
     'OpenFPS.Server.OneWorld.WorldPlace': 'World',
-    'OpenFPS.Common.Components.EntityType': 'World',
-    'OpenFPS.Common.Networking.Vector3Converter': 'Geometry',
-    'OpenFPS.Common.Networking.QuaternionConverter': 'Geometry',
-    'OpenFPS.Server.Core.SafeText': 'Words',
 }
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',

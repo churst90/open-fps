@@ -174,8 +174,8 @@ OpenFPS.Common/DrivingCuePlanner.cs	Accessibility	the driver's cues, planned
 OpenFPS.Common/EntityAcoustics.cs	Common	entity adapter: rooms, openings and the sound's world input
 OpenFPS.Common/EntityEmission.cs	Common	entity adapter: where an entity sounds from
 OpenFPS.Common/EntityGeometry.cs	Common	entity adapter: geometry
+OpenFPS.Common/EntityType.cs	World	what a thing is, in a prefab, a map and a definition: on the wire by number
 OpenFPS.Common/GroundProbeMemo.cs	game	physics survey: a server cache
-OpenFPS.Common/JsonConverters.cs	Common	wire
 OpenFPS.Common/LaneRoutes.cs	Agents	a vehicle's tour of lanes
 OpenFPS.Common/LineFollower.cs	Agents	a driver steering to a line
 OpenFPS.Common/Messages.cs	Common	wire
@@ -196,6 +196,7 @@ OpenFPS.Geometry/BoxColumns.cs	Geometry
 OpenFPS.Geometry/BoxContainment.cs	Geometry	
 OpenFPS.Geometry/ColliderShape.cs	Geometry	
 OpenFPS.Geometry/GeometryUtils.cs	Geometry	
+OpenFPS.Geometry/JsonConverters.cs	Geometry	
 OpenFPS.Geometry/PerfProbe.cs	Geometry	
 OpenFPS.Geometry/SpatialGrid.cs	Geometry	
 OpenFPS.Geometry/TileKey.cs	Geometry	
@@ -219,6 +220,7 @@ OpenFPS.Geometry/Triangles/TriangleGeometry.cs	Geometry
 OpenFPS.Geometry/Triangles/TriangleWorld.cs	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	Geometry	
 OpenFPS.Geometry/Triangles/WheelRays.cs	Geometry	
+OpenFPS.Geometry/Vector3Converter.cs	Geometry	
 OpenFPS.Geometry/WallBuild.cs	Geometry	
 OpenFPS.Materials/AcousticRegistry.cs	Materials	
 OpenFPS.Materials/Air.cs	Materials	
@@ -314,7 +316,6 @@ OpenFPS.Server/Core/PlayerState.cs	game
 OpenFPS.Server/Core/PlayerStore.cs	game	
 OpenFPS.Server/Core/RateLimiter.cs	game	
 OpenFPS.Server/Core/RestingStates.cs	game	
-OpenFPS.Server/Core/SafeText.cs	game	
 OpenFPS.Server/Core/ServerGeometry.cs	game	
 OpenFPS.Server/Core/SessionManager.cs	game	
 OpenFPS.Server/Core/StandingSpots.cs	game	
@@ -558,7 +559,6 @@ OpenFPS.Sound/TrainSignals.cs	Sound
 OpenFPS.Sound/Trains.cs	Sound	
 OpenFPS.Sound/TransientSound.cs	Sound	
 OpenFPS.Sound/TyreFriction.cs	Sound	
-OpenFPS.Sound/Vector3Converter.cs	Sound	
 OpenFPS.Sound/VehicleBody.cs	Sound	
 OpenFPS.Sound/VehicleBodyShell.cs	Sound	
 OpenFPS.Sound/VehicleCabin.cs	Sound	
@@ -572,3 +572,4 @@ OpenFPS.Sound/WoodChorus.cs	Sound
 OpenFPS.Sound/WorldWeather.cs	Environment	one world's weather state
 OpenFPS.Words/CompassWords.cs	Words	
 OpenFPS.Words/DirectionWords.cs	Words	
+OpenFPS.Words/SafeText.cs	Words	

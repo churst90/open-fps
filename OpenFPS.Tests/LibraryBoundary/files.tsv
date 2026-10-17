@@ -168,8 +168,8 @@ OpenFPS.Common/DrivingCuePlanner.cs	host
 OpenFPS.Common/EntityAcoustics.cs	host		
 OpenFPS.Common/EntityEmission.cs	host		
 OpenFPS.Common/EntityGeometry.cs	host		
+OpenFPS.Common/EntityType.cs	host		
 OpenFPS.Common/GroundProbeMemo.cs	host		
-OpenFPS.Common/JsonConverters.cs	host		
 OpenFPS.Common/LaneRoutes.cs	host		
 OpenFPS.Common/LineFollower.cs	host		
 OpenFPS.Common/Messages.cs	host		
@@ -190,6 +190,7 @@ OpenFPS.Geometry/BoxColumns.cs	lib	Geometry
 OpenFPS.Geometry/BoxContainment.cs	lib	Geometry	
 OpenFPS.Geometry/ColliderShape.cs	lib	Geometry	
 OpenFPS.Geometry/GeometryUtils.cs	lib	Geometry	
+OpenFPS.Geometry/JsonConverters.cs	lib	Geometry	
 OpenFPS.Geometry/PerfProbe.cs	lib	Geometry	
 OpenFPS.Geometry/SpatialGrid.cs	lib	Geometry	
 OpenFPS.Geometry/TileKey.cs	lib	Geometry	
@@ -213,6 +214,7 @@ OpenFPS.Geometry/Triangles/TriangleGeometry.cs	lib	Geometry
 OpenFPS.Geometry/Triangles/TriangleWorld.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/WheelRays.cs	lib	Geometry	
+OpenFPS.Geometry/Vector3Converter.cs	lib	Geometry	
 OpenFPS.Geometry/WallBuild.cs	lib	Geometry	
 OpenFPS.Materials/AcousticRegistry.cs	lib	Materials	
 OpenFPS.Materials/Air.cs	lib	Materials	
@@ -401,7 +403,6 @@ OpenFPS.Sound/TrainSignals.cs	lib	Sound
 OpenFPS.Sound/Trains.cs	lib	Sound	
 OpenFPS.Sound/TransientSound.cs	lib	Sound	
 OpenFPS.Sound/TyreFriction.cs	lib	Sound	
-OpenFPS.Sound/Vector3Converter.cs	lib	Sound	
 OpenFPS.Sound/VehicleBody.cs	lib	Sound	
 OpenFPS.Sound/VehicleBodyShell.cs	lib	Sound	
 OpenFPS.Sound/VehicleCabin.cs	lib	Sound	

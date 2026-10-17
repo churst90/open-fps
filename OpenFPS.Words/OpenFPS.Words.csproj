@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Words the game says the same way wherever it says them: the compass points, and where something is
-       from the way you face (DirectionWords, from OpenFPS.Common in package stage 7, its namespace kept). It
-       references no other project and no package, so the server, the client and OpenFPS.Astronomy can all
-       use it. Nothing of it is on the wire. -->
+       from the way you face (DirectionWords, from OpenFPS.Common in package stage 7, its namespace kept);
+       and the rules for a player's text that is filed, passed on or said to others (SafeText, from the
+       server in package stage 4, its namespace kept: a design's name is a file name in the world's
+       composites). It references no other project and no package, so the server, the client, OpenFPS.World
+       and OpenFPS.Astronomy can all use it. Nothing of it is on the wire. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

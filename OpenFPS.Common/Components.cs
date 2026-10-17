@@ -7,7 +7,6 @@ namespace OpenFPS.Common.Components;
 /// <summary>Stored and sent by number: append only. Owner has every permission and cannot be taken
 /// off the server's last owner (docs/SERVER_SECURITY.md).</summary>
 public enum UserRole { Player, Dev, Admin, Moderator, Owner }
-public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
 /// <summary>
 /// A tile of ground (docs/GEOMETRY.md 2.3): <see cref="Posts"/> a side, <see cref="Spacing"/> apart, from
 /// the entity's position less half the tile's size in x and z. Heights are whole centimetres over the
