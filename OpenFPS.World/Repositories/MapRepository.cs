@@ -36,6 +36,14 @@ public class EntityData
     /// <summary>On a door, over its prefab: which face it is pushed open from, +1 or -1 (DoorComponent.PushSide).</summary>
     public float? PushSide { get; set; }
 
+    /// <summary>On a door, over its prefab: the gap round its leaf shut at the jambs and head, metres
+    /// (PortalComponent.GapMetres). A steel door is a fire door with smoke seals in one doorway and a weatherstripped
+    /// outside door in another.</summary>
+    public float? DoorGapMetres { get; set; }
+
+    /// <summary>On a door, over its prefab: the gap under its leaf shut, metres (PortalComponent.UndercutMetres).</summary>
+    public float? DoorUndercutMetres { get; set; }
+
     /// <summary>Per-face materials for an acoustic REGION entity, by MATERIAL NAME, in the order
     /// Floor, Ceiling, North, South, East, West. Exactly six entries. Overrides whatever the prefab set.</summary>
     public string[]? RoomMaterials { get; set; }

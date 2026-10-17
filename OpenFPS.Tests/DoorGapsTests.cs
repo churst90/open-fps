@@ -261,4 +261,38 @@ public class DoorGapsTests
         Assert.Equal(0f, plain.GapMetres);
         Assert.Equal(0f, plain.UndercutMetres);
     }
+
+    /// <summary>
+    /// A map sets a door's gaps where it places it, over its prefab's: the city's stair doors are fire doors with smoke
+    /// seals, 3 mm round and 3 mm under (gen_city's FIRE_DOOR_GAPS), and the same steel door at a roof access, the
+    /// terminal's front entrance and the hangar's back door keeps the default, weatherstripped where it opens to the
+    /// outdoors.
+    /// </summary>
+    [Fact]
+    public void TheCitysStairDoorsAreSealedAgainstSmoke()
+    {
+        AcousticRegistry.Initialize();
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new OpenFPS.Server.Core.MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out var ecs, out _, out _, out _));
+        int stairs = 0, others = 0;
+        ecs.Query(new QueryDescription().WithAll<PortalComponent, DoorComponent, IdentityComponent>(),
+            (ref PortalComponent p, ref DoorComponent _, ref IdentityComponent who) =>
+            {
+                if (who.Name.Contains("stairwell door", StringComparison.Ordinal))
+                {
+                    stairs++;
+                    Assert.True(p.GapMetres == 0.003f && p.UndercutMetres == 0.003f, $"{who.Name}: {p.GapMetres} round, {p.UndercutMetres} under");
+                }
+                else if (who.Name.Contains("roof access door", StringComparison.Ordinal) || who.Name is "Terminal front entrance" or "Hangar back door")
+                {
+                    others++;
+                    Assert.True(p.GapMetres == 0f && p.UndercutMetres == 0f, $"{who.Name}: {p.GapMetres} round, {p.UndercutMetres} under");
+                }
+            });
+        _o.WriteLine($"{stairs} stair doors sealed, {others} other steel doors at the default");
+        Assert.Equal(37, stairs);
+        Assert.Equal(7, others);
+    }
 }

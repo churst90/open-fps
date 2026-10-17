@@ -17,6 +17,14 @@ Recent work, newest first. `git log` has the rest.
   what the sound's first one did, 0.5-2.7 ms; nothing for a sound that stays. Swinging doors are heard from their
   shut leaf and do not move, so nothing changes for them; no vehicle sends a one-off that moves. No render
   changes; the wire hash does not change.
+- The city's stair doors are fire doors sealed against smoke (Cody, 2026-10-17): 3 mm round and 3 mm under, where
+  a room door has 3 mm and a 10 mm undercut. A map sets a door's gaps where it places it now (`DoorGapMetres` and
+  `DoorUndercutMetres` on a map entity, over its prefab's), so the same steel door keeps the default at a roof
+  access, the terminal's front entrance and the hangar's back door; gen_city's `door(..., gaps=FIRE_DOOR_GAPS)`
+  for the 37 stairwell doors, and city.json regenerated (only those doors changed). Selby House's stair door shut
+  passes -13/-19/-16 dB (was -12/-17/-15); the corridor heard in the lobby through it -13.5/-18.6/-16.4 (was
+  -13.5/-16.7/-16.0; the low band is the wall's). The wire hash changes (67aba2280a74 to fb5a761e117d: the map
+  entity's two fields are in OpenFPS.World); the door fingerprint does not.
 - A doorway route leaves from the wall's face (Resonance's 1.2; todo item 4; docs/CLIENT_NOTES.md "A doorway route
   leaves from the wall's face"). A door's opening was centred on its leaf and made half the wall deep either side of
   it, so with the leaf hung at one face of a thick wall the far room's leg started inside the wall and a leg slanting

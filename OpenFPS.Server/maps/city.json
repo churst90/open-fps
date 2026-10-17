@@ -12187,7 +12187,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Marlow Tower stairwell door, floor 0"
+   "Name": "Marlow Tower stairwell door, floor 0",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 1119,
@@ -14276,7 +14278,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Marlow Tower stairwell door, floor 1"
+   "Name": "Marlow Tower stairwell door, floor 1",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 1250,
@@ -16177,7 +16181,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Marlow Tower stairwell door, floor 2"
+   "Name": "Marlow Tower stairwell door, floor 2",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 1369,
@@ -18183,7 +18189,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Marlow Tower stairwell door, floor 3"
+   "Name": "Marlow Tower stairwell door, floor 3",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 1495,
@@ -20084,7 +20092,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Marlow Tower stairwell door, floor 4"
+   "Name": "Marlow Tower stairwell door, floor 4",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 1614,
@@ -22090,7 +22100,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Marlow Tower stairwell door, floor 5"
+   "Name": "Marlow Tower stairwell door, floor 5",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 1740,
@@ -23907,7 +23919,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Marlow Tower stairwell door, floor 6"
+   "Name": "Marlow Tower stairwell door, floor 6",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 1855,
@@ -25829,7 +25843,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Marlow Tower stairwell door, floor 7"
+   "Name": "Marlow Tower stairwell door, floor 7",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 1977,
@@ -27897,7 +27913,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Kestrel House stairwell door, floor 0"
+   "Name": "Kestrel House stairwell door, floor 0",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 2108,
@@ -29986,7 +30004,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Kestrel House stairwell door, floor 1"
+   "Name": "Kestrel House stairwell door, floor 1",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 2239,
@@ -31887,7 +31907,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Kestrel House stairwell door, floor 2"
+   "Name": "Kestrel House stairwell door, floor 2",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 2358,
@@ -33893,7 +33915,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Kestrel House stairwell door, floor 3"
+   "Name": "Kestrel House stairwell door, floor 3",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 2484,
@@ -35794,7 +35818,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Kestrel House stairwell door, floor 4"
+   "Name": "Kestrel House stairwell door, floor 4",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 2603,
@@ -37800,7 +37826,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Kestrel House stairwell door, floor 5"
+   "Name": "Kestrel House stairwell door, floor 5",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 2729,
@@ -39952,7 +39980,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 0"
+   "Name": "Union Building stairwell door, floor 0",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 2864,
@@ -42041,7 +42071,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 1"
+   "Name": "Union Building stairwell door, floor 1",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 2995,
@@ -43942,7 +43974,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 2"
+   "Name": "Union Building stairwell door, floor 2",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 3114,
@@ -45948,7 +45982,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 3"
+   "Name": "Union Building stairwell door, floor 3",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 3240,
@@ -47849,7 +47885,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 4"
+   "Name": "Union Building stairwell door, floor 4",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 3359,
@@ -49855,7 +49893,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 5"
+   "Name": "Union Building stairwell door, floor 5",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 3485,
@@ -51672,7 +51712,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 6"
+   "Name": "Union Building stairwell door, floor 6",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 3600,
@@ -53594,7 +53636,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 7"
+   "Name": "Union Building stairwell door, floor 7",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 3722,
@@ -55411,7 +55455,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 8"
+   "Name": "Union Building stairwell door, floor 8",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 3837,
@@ -57333,7 +57379,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Union Building stairwell door, floor 9"
+   "Name": "Union Building stairwell door, floor 9",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 3959,
@@ -59401,7 +59449,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Brandt Court stairwell door, floor 0"
+   "Name": "Brandt Court stairwell door, floor 0",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 4090,
@@ -61490,7 +61540,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Brandt Court stairwell door, floor 1"
+   "Name": "Brandt Court stairwell door, floor 1",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 4221,
@@ -63391,7 +63443,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Brandt Court stairwell door, floor 2"
+   "Name": "Brandt Court stairwell door, floor 2",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 4340,
@@ -65397,7 +65451,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Brandt Court stairwell door, floor 3"
+   "Name": "Brandt Court stairwell door, floor 3",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 4466,
@@ -67298,7 +67354,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Brandt Court stairwell door, floor 4"
+   "Name": "Brandt Court stairwell door, floor 4",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 4585,
@@ -69304,7 +69362,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Brandt Court stairwell door, floor 5"
+   "Name": "Brandt Court stairwell door, floor 5",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 4711,
@@ -71441,7 +71501,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Selby House stairwell door, floor 0"
+   "Name": "Selby House stairwell door, floor 0",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 4845,
@@ -73410,7 +73472,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Selby House stairwell door, floor 1"
+   "Name": "Selby House stairwell door, floor 1",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 4968,
@@ -75416,7 +75480,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Selby House stairwell door, floor 2"
+   "Name": "Selby House stairwell door, floor 2",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 5094,
@@ -77317,7 +77383,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Selby House stairwell door, floor 3"
+   "Name": "Selby House stairwell door, floor 3",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 5213,
@@ -79323,7 +79391,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Selby House stairwell door, floor 4"
+   "Name": "Selby House stairwell door, floor 4",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 5339,
@@ -81224,7 +81294,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Selby House stairwell door, floor 5"
+   "Name": "Selby House stairwell door, floor 5",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 5458,
@@ -83146,7 +83218,9 @@
     "Y": 1,
     "Z": 1
    },
-   "Name": "Selby House stairwell door, floor 6"
+   "Name": "Selby House stairwell door, floor 6",
+   "DoorGapMetres": 0.003,
+   "DoorUndercutMetres": 0.003
   },
   {
    "EntityId": 5580,

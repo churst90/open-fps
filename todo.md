@@ -379,7 +379,8 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
   In the lobby (`/tp 11.8 157.4 0.1`) with the glass front door shut, the street (`/tp 8.0 157.5 0.2`) is as
   before in its body but has a little more hiss and sparkle (high band -32 dB, was -45). Standing in the lobby by
   the shut steel door to the corridor (`/tp 17.5 157.5 0.1`), the corridor beyond it (`/tp 20.3 157.5 0.1`) is
-  much louder than before (mid -17 dB, was -48): say whether that door should sound sealed.
+  much louder than before (mid -19 dB, was -48; it is a fire door with smoke seals, 3 mm round and under, since
+  2026-10-17): say whether it should sound more sealed than that.
 - Your own room's reverb stays binaural (2026-10-17, the fault Cody found 2026-10-17 00:40). On Main Street in
   traffic, `/weather rain heavy` (`/tp 7.0 121.0 0.2`), then walk into Selby House's lobby (`/tp 15.2 157.1 0.1`)
   and clap (T), and shut a door: the lobby's reflections and tail are wide round you, not the same in both

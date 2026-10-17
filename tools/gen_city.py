@@ -169,7 +169,7 @@ def portal_later(*args):
     openings_later.append(args)
 
 
-def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0, name=None):
+def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0, name=None, gaps=None):
     """A leaf in a doorway, joining two named places.
 
     A door is ALREADY a portal — PrefabRepository attaches one to anything with IsDoor — so a doorway
@@ -181,6 +181,9 @@ def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0, n
 
     `turn` turns the leaf about its own middle, radians: half a turn sends a sliding leaf the other
     way. A swinging leaf is turned by where its rooms are instead, and `turn` is not used for it.
+
+    `gaps` is (round, under), the leaf's gaps shut in metres, when this door's are not its prefab's or the default
+    for where it hangs (a fire door's smoke seals, FIRE_DOOR_GAPS).
 
     WHICH WAY IT SWINGS. A hinged leaf's +Z face is its outside, and its prefab says which face it is
     pushed from (PushSide): a room door is pushed from outside and swings into the room, an exit door
@@ -208,6 +211,8 @@ def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0, n
         e["Scale"] = v3(round((opening + 2 * DOOR_LAP) / bx, 4), 1, 1)
     if name:
         e["Name"] = name
+    if gaps is not None:
+        e["DoorGapMetres"], e["DoorUndercutMetres"] = gaps
     entities.append(e)
 
 
@@ -236,6 +241,10 @@ def bi_parting(x, y0, z, a, b, facing_z=True, prefab="auto_sliding_door", openin
 
 
 DOOR_LAP = 0.05                          # how far a leaf overlaps each jamb, m
+# A fire door's gaps shut, m (round, under): a stair door is a fire door with smoke seals at its jambs and head and
+# a drop seal or a tight threshold under it, about 3 mm each (DoorGaps), where a room door has 3 mm and a 10 mm
+# undercut. Set per door, not on the prefab: the same steel door is weatherstripped where it opens to the outdoors.
+FIRE_DOOR_GAPS = (0.003, 0.003)
 
 
 # ══ Dimensions ════════════════════════════════════════════════════════════════════════════════════
@@ -789,7 +798,7 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         sb = (stair_b[0] + stair_b[1]) / 2
         sx_, _, sz_, _ = place(near_wall + WALL_T / 2, 0, sb, 0)
         door(sx_, floor_top, sz_, corridor_id, stair_id, facing_z=not vertical, prefab="steel_door", opening=DOOR_W,
-             name=f"{label} stairwell door, floor {s}")
+             name=f"{label} stairwell door, floor {s}", gaps=FIRE_DOOR_GAPS)
         # One shaft: the flight from the storey below comes up through the hole in this floor, and the place
         # below ends there, in the slab.
         if s:

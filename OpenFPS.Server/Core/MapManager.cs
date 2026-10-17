@@ -563,6 +563,14 @@ public partial class MapManager
 
             if (entityData.ApertureSize.HasValue) p.ApertureSize = entityData.ApertureSize.Value;
 
+            // A door's gaps shut where this placement says, over its prefab's: the same steel door is sealed against
+            // smoke at a stair and weatherstripped at a way out.
+            if (world.Has<DoorComponent>(entity))
+            {
+                if (entityData.DoorGapMetres.HasValue) p.GapMetres = MathF.Max(0f, entityData.DoorGapMetres.Value);
+                if (entityData.DoorUndercutMetres.HasValue) p.UndercutMetres = MathF.Max(0f, entityData.DoorUndercutMetres.Value);
+            }
+
             // Where the opening is, as authored: a door is loaded shut, so its leaf's pose IS the
             // doorway's. DoorSystem records it again when it first takes hold of the door.
             if (world.Has<DoorComponent>(entity) && world.Has<Transform>(entity))

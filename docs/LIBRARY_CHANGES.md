@@ -30,6 +30,9 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   side of the opening its `NodeA` lies on (+1 along `Normal`, -1 against, 0 unchecked), set when the graph is given
   a `regionAt`. A host need do nothing; one that reads a door opening's `Centre` finds it moved by however far the
   leaf hangs off the wall's middle.
+- A map entity (`OpenFPS.Server.Repositories.EntityData`, in OpenFPS.World) gains `DoorGapMetres` and
+  `DoorUndercutMetres`, a door's gaps where it is placed, over its prefab's. A host need do nothing; one that loads
+  open-fps maps with its own loader may read them into its `DoorLeaf`.
 
 ## library/v0.1.0 (2026-10-17)
 
