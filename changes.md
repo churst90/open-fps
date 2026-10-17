@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Library stage 6's second half (docs/SOUND_LIBRARY_BOUNDARY.md 19.7 to 19.12). Nothing a player hears changes.
+  The sound's runtime is a project of its own, `OpenFPS.Audio`: the FMOD mixer and its voices, Steam Audio, the
+  acoustic worker, the facade, the voice manager, the bank, the door render cache, the placing thread and the rain
+  round the listener, moved unchanged out of the client's core, which is now its host. It references no game
+  project. Where a sound comes out (`AudioEmission`) is the sound models'. The wide sources' switches (including
+  the A/B, OPENFPS_EXTENT_RULE=middle, which still works) and the cabins' paths are one audio world's options
+  (`AudioWorldOptions`), and where the bank and the door renders are is the client's to say (`AudioDataPaths`);
+  the folders are the ones they were. The wire hash changes, so the server and the Windows client go out together.
 - Running water is heard from the whole of its line (Cody: "a sound source should have its sound be the entire
   area of the sound source"; docs/RUNNING_WATER.md 15). A creek, ditch, rivulet or gutter is cut at the listener
   into pieces of equal angle, small beside you and long far along it, at most twelve a voice, out of the 36 place

@@ -132,8 +132,10 @@ since the last deploy" list below.
    `ClientAudioSystem`, `WorldAudioPlayer` and `BirdLife`, versions and Resonance. Stage 6's first half, the world
    input (`IAcousticWorld`, the snapshot filling it; the acoustic queries, the room echoes and the talkers' decoder
    in the library): BUILT 2026-10-16 (docs/SOUND_LIBRARY_BOUNDARY.md 19; no library file names a host type; the
-   wire hash changes). Next: the second half (19.6), `OpenFPS.Audio` and the moves, with `AudioWorldOptions` and
-   `AudioDataPaths` for the statics left (`CabinPaths`, the wide sources' levers, the door render cache).
+   wire hash changes). The second half, `OpenFPS.Audio` (the mixer, Steam Audio, the worker, the rain round the
+   listener; 65 files moved unchanged) with `AudioWorldOptions` (the wide sources' levers, the cabins' paths) and
+   `AudioDataPaths` (the bank, the door render cache): BUILT 2026-10-16 (19.7 to 19.12; the wire hash changes).
+   Next: stage 7, splitting `ClientAudioSystem`; what is left of stage 6 for it is 19.13.
 6. Geometry stage 5, diggable ground with strata: held until it is wanted.
 7. A source heard from the whole of itself (Cody, 2026-10-16: "a river should sound like a flowing river the
    entire width and length of the river"; the survey, inbox/2026-10-16-extended-sources-survey; the rule,

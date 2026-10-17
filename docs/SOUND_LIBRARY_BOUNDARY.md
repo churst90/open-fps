@@ -32,7 +32,7 @@ library that open-fps and Resonance both reference. Step 1 of
 17. Stage 4 as built: rooms and openings as values
 18. Stage 5 as built: the traced places and the weather per world (18.1-18.5), the clock (18.6), the world
     time (18.7), the air, the mixer's rate, the hearing, the mix and the lab (18.8)
-19. Stage 6 as built (first half): the world input
+19. Stage 6 as built: the world input (19.1-19.6), `OpenFPS.Audio` and the world's options and paths (19.7-19.13)
 
 ---
 
@@ -855,7 +855,8 @@ levers into `LabLevers`.
   five Core files, `RainField`, `NearDrops`.
 - Risk: the acoustic worker runs on its own thread and holds the snapshot it was given; an
   `IAcousticWorld` must be an immutable view per request, as the snapshot is, or results drift.
-- As built: section 19, the first half (the world input, 2026-10-16). `OpenFPS.Audio` and the moves are next.
+- As built: section 19, the first half (the world input, 2026-10-16) and the second (`OpenFPS.Audio`, the moves, the
+  world's options and data paths, 2026-10-16, 19.7 to 19.12). What is left before stage 7 is 19.13.
 
 ### Stage 7: split the integration types (4 to 6 sessions)
 
@@ -2548,12 +2549,12 @@ on bbd3f7f8 and rebased onto a5bada00 (package stage 2's catalogue, the wind's d
 
 ---
 
-## 19. Stage 6 as built (first half, 2026-10-16): the world input
+## 19. Stage 6 as built (2026-10-16): the world input, then `OpenFPS.Audio`
 
 The library reads the world through one interface it owns, and no library file names a host type any more: the
 ratchet's allowance went from 358 crossings in 11 files to none (`OpenFPS.Tests/LibraryBoundary/allowed.tsv` is
 empty). Behaviour unchanged: the stored streams, the render fingerprints and the spoken lines pass unregenerated.
-`OpenFPS.Audio` and the moves are the second half (19.6).
+`OpenFPS.Audio`, the moves and the world's options and paths are the second half (19.7 to 19.13).
 
 ### 19.1 The world input
 
@@ -2672,3 +2673,138 @@ breaking it: built into the cached snapshot in place (the view following the wor
   sources' levers when that branch lands) and `AudioDataPaths` (the door render cache first).
 - A client adapter for `IAcousticWorld` that is not the snapshot itself, when stage 7 gives the audio world its own
   source table.
+
+The first two are done in the second half (19.7 to 19.12); the adapter is stage 7's.
+
+### 19.7 The second half (2026-10-16): `OpenFPS.Audio`
+
+The runtime is a project of its own, on Geometry, Materials, Acoustics, Physics, Sound, Models and Native, and its
+host, Client.Core, references it. Nothing a player hears changes: the stored streams, the render fingerprints and
+the spoken lines pass unregenerated, and the door fingerprint is the same (f401bda46391). Made on 13e0f460.
+
+- **What moved**, by `git mv` with not a line changed, namespaces as they were (decision 6), 65 files:
+  Client.Core's `AudioEngine/Fmod` (31), `AudioEngine/SteamAudio` (17), `AudioEngine/Acoustics` (8) and
+  `AudioEngine/Data` (2) to the same folders of `OpenFPS.Audio`; the five runtime files of `AudioEngine/Core`
+  (`AudioBank`, `AudioEngineFacade`, `DoorRenderCache`, `PlacementThread`, `VoiceManager`; `AmbisonicFormat`, the
+  fifth when the plan was written, had gone) to `OpenFPS.Audio/Core`; `RainField.cs` (with `RainSurvey`) and
+  `NearDrops.cs` to the project's root. Client.Core has no `AudioEngine` folder any more.
+- **`AudioEmission`** went to Sound (`OpenFPS.Sound/AudioEmission.cs`). Its one catalogue read, the offset a
+  vehicle's kind implies (`ModelKindTable.KnownVehiclePreset`, `MachineRegistry.VehicleFor`), is Models', which is
+  above Sound, so it went to its only caller, the adapter: `EntityEmission.LocalOffset(authored, synth, soundId)`.
+  What stays is the pose and the probe's size, from values.
+- **References.** `OpenFPS.Audio` references no host project: not Common, not Words, not Client.Core
+  (`LibraryBoundaryTests.LibraryReferencesOnlyLibrary` and `EnginePackagesTests.EachPackageReferencesItsLayer` hold
+  its assembly to its layer). Serilog for its logs (decision 5); `AllowUnsafeBlocks`, as Client.Core had.
+- **Internals.** Native's (`Phonon`) and Sound's (the rail voice's bogies, the blade rows) are given to
+  `OpenFPS.Audio`, and no longer to Client.Core, which reads neither. Audio gives its own to the tests, the lab and,
+  until stage 7 splits the audio system, Client.Core: the worker's manual mode and traced set, the rain's ear speed
+  and survey, the voice manager's heard level and the voices' starve count.
+- **Who names the paths.** `publish-windows.sh` and `run-gtk-client.sh` read the door cache's version from
+  `OpenFPS.Audio/Core/DoorRenderCache.cs`; `FloorsBetweenFlatsTests` reads the mixer's source there.
+
+### 19.8 The native libraries
+
+Nothing moved loads a native library or declares a P/Invoke: FMOD's wrapper and `Phonon` are in Native (stage 1),
+resolved by name from the program's folder, and the executables copy them from `lib/` as before (`OpenFPS.Client`
+its `*.dll`, `OpenFPS.Client.Gtk` and `OpenFPS.AudioLab` its `*.so`). No project file's copy rule changed.
+
+- The lab's `--clap-room`, headless, with `libfmod.so` and `libphonon.so` beside it: FMOD 2.03.14 at 48000 Hz,
+  "Steam Audio HRTF binaural enabled", "0 direct voice(s) without HRTF", the traced flat's response rendered.
+- `publish-windows.sh`, into a test folder (`OPENFPS_PUBLISH_DIR`): the zip holds `OpenFPS.Audio.dll` beside
+  `OpenFPS.Native.dll`, `fmod.dll`, `fmodstudio.dll`, `phonon.dll` and the NVDA bridge, and the 220 door renders the
+  lab made through the new cache (`ASSETS/rendercache/f401bda46391-v2`), build d81f09ee05a8.
+- `publish-server.sh`, the same way: the server's folder has no `OpenFPS.Audio.dll`, no `OpenFPS.Native.dll` and no
+  FMOD or Steam Audio library, as decision 1 has it.
+
+### 19.9 The world's options and data paths
+
+The statics 18.8 and 19.3 left for this half are one world's, as 7.4 and 7.5 proposed:
+
+| Was | Now |
+|---|---|
+| `ExtendedSources.Enabled` (OPENFPS_WIDE_SOURCES), `Rule` (OPENFPS_EXTENT_RULE), `LayoutScale`, `ForceSpread`, and the layouts and line lengths cached under them | `WideSources` (`OpenFPS.Sound/Core/Nature/WideSources.cs`): `Enabled`, `Rule`, `LayoutScale`, `ForceSpread`, with `Layout`, `LineLength`, `FlowPlaces` and `SpreadFor` over its own caches. `AudioWorldOptions.WideSources`. |
+| `CabinPaths.Enabled` (OPENFPS_CABIN_PATHS), `LabOnePlace` | `AudioWorldOptions.CabinPathsOn` and `CabinOnePlace` (`OpenFPS.Audio/Core/AudioWorldOptions.cs`), with `CabinLayout(v, presets)` and `CabinOffset(layout, path, ear)`. |
+| `DoorRenderCache.Folder`, `ShippedFolder` (worked out by the cache from OPENFPS_RENDER_CACHE, the local application data and the program's folder) | `AudioDataPaths` (`OpenFPS.Audio/Core/AudioDataPaths.cs`: `Sounds`, `RenderCache`, `ShippedRenderCache`); a `DoorRenderCache` is an instance over them, `AudioEngineFacade.DoorRenders`. |
+
+- **Who holds them.** The mixer (`FmodAudioProvider.Options`, from the environment as the statics were), and the host
+  reaches the same one through `AudioEngineFacade.Options`; a facade on another mixer takes the one it is given, or the
+  shipped world. The paths are the host's: `ClientAudioPaths.ForPlayer()` (Client.Core) works them out as the cache
+  did, and both heads hand them to their facade (`new AudioEngineFacade(ClientAudioPaths.ForPlayer())`). A facade
+  given none reads what ships beside the program and keeps no renders (`AudioDataPaths.Beside`); the bank is loaded
+  from `Paths.Sounds`.
+- **The laws stay in `ExtendedSources`.** A kind's places (`TreePlacesOf`, `FirePlacesOf` and the rest, which the
+  catalogue's kind table hands out) are unscaled now, and running water's no longer asks the rule: a world's
+  `WideSources.Layout` asks its `LineLength` first and scales what it caches. `SpreadFor` is the law; the world's
+  adds the lab's forced spread. `LineLengthOf` is the line's length whatever the rule.
+- **The readers.** The client's placing (`ClientAudioSystem`: the places, the pieces, the cabin's voices; `LineHeard`
+  is an instance member, and `HeardTogether` takes the world's `WideSources`), the mixer (a tree's, a fire's and a
+  fountain's places, a creek's streams: `PlacedNatureVoice` for running water takes the world's `WideSources`; the
+  rain's parts, `RainFeeds.PartsFor(slot, wide)`), the rain round the listener (`RainField`), and an engine made off
+  the placing thread (`VoiceBuilds` gives `EngineVoiceState` its world's `cabinPaths`). `WorldAudioPlayer.RenderDoorKey`
+  takes the world's cache.
+- **The A/B still works.** OPENFPS_EXTENT_RULE=middle reaches the game's mixer and so its client. `AudioLab
+  --extent-walk walks=creek`: beside the creek the level swings 3.3 dB over 113 to 158°, and with
+  OPENFPS_EXTENT_RULE=middle 10.4 dB over 77 to 167°, docs/RUNNING_WATER.md 15's figures.
+- **What a world gets that it did not.** A lever changed is heard by the next layout asked for: the cache forgets
+  what was made under the old one (`--extent-walk rule=` called `ForgetLayouts`; the fire lab's `set=scale` made its
+  three scales from the first scale's cached layout). The tests and the replays' facades are the shipped world
+  whatever the environment, so the replay no longer pins the two statics.
+- **Not taken from 7.4.** `Machines` and `Models` are the catalogue's (package stage 2 reads them through its own
+  roots), and nothing reads an HRTF file. `FmodAudioProvider.SoundFilePath` still confines a sound id to the
+  program's own ASSETS: a fence for ids a map's owner sets, not a guess at where data is.
+
+### 19.10 The statics
+
+The survey's section 4: 355 library statics that can change at 13e0f460, 344 after; written from outside their type
+24 to 16 (the eight in the table above), caches 40 to 38 (the extended sources' two), reassigned by their own type 43
+to 42 (the door cache's pruned flag). The ones that came in are the host's (the lab's `LabOptions` and the tests'
+`Wide`, each read by its own class) and are not counted.
+
+### 19.11 The ratchets
+
+- Library: crossings 0 before and after. `files.tsv` follows the 65 moved files and `AudioEmission.cs`, and gains
+  `AudioWorldOptions.cs`, `AudioDataPaths.cs` (Audio), `WideSources.cs` (Sound) and `ClientAudioPaths.cs` (host).
+  `PlacementThread.cs`, sorted to Sound by the old folder rule, is Audio's. The reader parses `OpenFPS.Audio` and
+  every project above it references it; `classify.py` sorts it by its folder.
+- Engine packages: crossings 767 to 761 (the worker's, the rain's and `BeaconAids`' references to `AudioEmission`,
+  which was Common's). Audio is a project (`PackageAssemblies`, `SortedProjects`, `classify.py`'s rules; no longer
+  planned). `files.tsv` follows the moves and gains the same four files.
+- Physics: unchanged (its 15 crossings). Its classifier counts `OpenFPS.Audio` as sound.
+- A new guard, `AudioWorldOptionsTests` (6): one world's wide sources and cabins are its own, a lever changed is
+  heard by the next layout, the environment chooses as the statics did, the host reaches the mixer's options, and
+  door renders are kept where the host says. Each was proved by breaking it: with the scale's setter not forgetting,
+  the layout ignoring the cabin switch, the facade ignoring its mixer's options, the cache ignoring the shipped folder
+  and the rule's variable misread, five failed; with the two caches static, the two wide-source tests failed.
+
+### 19.12 The wire hash and the checks
+
+- **The wire hash** changes (57189199a720 at 13e0f460, d81f09ee05a8 after): `AudioEmission.cs` is hashed in Sound
+  and `EntityEmission.cs` changed. Nothing sent changed. A client and a server from either side of this refuse each
+  other at login. The options' commit leaves it (the files it changes in Sound are in `Core/`, which is not hashed).
+- **Checks** (on 13e0f460). Every project builds with no warnings: the server, the GTK client, the Windows client
+  (`-p:EnableWindowsTargeting=true`), the lab and the tests. Filtered runs:
+  - the guards (LibraryBoundary, EnginePackages, RenderFingerprint, EmitterStreamReplay, SpokenLinesReplay,
+    VoiceIdBand, VoiceRegistry, ModelKindTable, MapScoped, PhysicsBoundary, PhysicsReplay, PhysicsCrossMachine,
+    RicochetTable, OneConstantPerLaw, WorldWireBytes, AcousticWorldView, FlushToZero, ExtentWalk, MaterialName,
+    TestConfigIsolation) with the new guard, the door cache's and the cabins': 199 passed, again after the last edit;
+  - with `DOTNET_PROCESSOR_COUNT=4`, the boundaries, the stored streams, the spoken lines, the physics replays, the
+    fingerprints and the extent walk: 95 passed;
+  - every class of the moved areas and their readers (the mixer and its callbacks, the provider's rank, the voices
+    and their budget, the engines and the render pool, the placing thread, the worker, the tracer, Steam Audio's
+    scene, tiles and late field, the reflections and echoes, the rain and its probes, the doors and their cache,
+    the cabins, the wide sources, running water, fire, waves, the woods, the talkers and own voice, the beacons and
+    birds, the client's audio): 910 passed, 9 skipped (the Steam Audio opt-ins);
+  - with `OPENFPS_STEAMAUDIO_TESTS`, TileSceneSet, DiffuseLate, LayersInContact, TracedPlacement, ThinPanel,
+    LateLawPlace, SteamAudioScene, OpeningRoutesTerrain, SteamAudioMapping and StaleAcousticResult: 64 passed.
+  None regenerated anything. The three surveys' `run.sh` agree with the lists in the tree.
+- **Not run here:** a session. The game's own start (the heads hand their paths; the player's door renders read and
+  written where they were) wants a login on this machine, and the Windows zip a start on Windows.
+
+### 19.13 Left before stage 7
+
+- A client adapter for `IAcousticWorld` that is not the snapshot itself (19.6), with stage 7's source table.
+- Client.Core's reach into Audio's internals (19.7), which the split's `AudioWorld` makes its interface.
+- The statics 18.8 left that are not the audio world's: the door models' levers (with the next door model change),
+  the geometric acoustics' traces and A/Bs (`Constructions.PanelsOnlyForLab`, `OpeningRoutes.DebugOverTheTop` and
+  `ReverseGridOrderForParity`, `EarlyReflections.FlutterTrace`), the geometry's switches, and
+  `ExtendedSources.TreePlaces` (OPENFPS_WIDE_TREE_PLACES, read once, a table).
