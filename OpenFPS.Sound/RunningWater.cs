@@ -268,7 +268,7 @@ public sealed record RunningWaterSpec
     /// <summary>A drainage line of the ground (GroundChannels): what drains to it, through the map's own
     /// state (WorldWeather.Ground), instead of the catchment fields above. Null for every placed source.</summary>
     public GroundCatchment? Ground { get; init; }
-    /// <summary>For a drainage line, the flow its level was declared at, L/s (GroundChannels.ReferenceFlow).</summary>
+    /// <summary>For a drainage line, the flow its level was declared at, L/s (GroundChannelBed.ReferenceFlow).</summary>
     public float GroundReferenceLitresPerSecond { get; init; }
 
     /// <summary>Under this a rain-fed source is dry, L/s: a drop every few seconds off a downpipe's shoe.</summary>

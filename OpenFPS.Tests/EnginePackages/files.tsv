@@ -490,6 +490,7 @@ OpenFPS.Sound/GasHob.cs	Sound
 OpenFPS.Sound/Glass.cs	Sound	
 OpenFPS.Sound/GlassDoor.cs	Sound	
 OpenFPS.Sound/GlassFracture.cs	Sound	
+OpenFPS.Sound/GroundChannelBed.cs	Environment	a drainage line's bed: its width, roughness and the flow it is shaped by
 OpenFPS.Sound/GroundChannels.cs	Sound	
 OpenFPS.Sound/GroundWater.cs	Environment	hydrology of the ground
 OpenFPS.Sound/HandOverSounds.cs	Sound	
@@ -544,7 +545,9 @@ OpenFPS.Sound/Waves.cs	Sound
 OpenFPS.Sound/WeaponHandling.cs	Sound	
 OpenFPS.Sound/Weapons.cs	Sound	
 OpenFPS.Sound/WeatherType.cs	Environment	wire
+OpenFPS.Sound/WindWaves.cs	Environment	the waves a wind raises over water
 OpenFPS.Sound/WoodChorus.cs	Sound	
+OpenFPS.Sound/WorldClock.cs	Environment	the one world time a world's weather reads
 OpenFPS.Sound/WorldWeather.cs	Environment	one world's weather state
 OpenFPS.Words/CompassWords.cs	Words	
 OpenFPS.Words/DirectionWords.cs	Words	

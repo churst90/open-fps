@@ -743,7 +743,7 @@ public sealed class WorldMaps
         {
             var owner = TileKey.Of(v.Position, tiles.TileMetres);
             if (!frame.Loaded.ContainsKey(owner)) continue;
-            string key = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{v.SoundId}@{v.Position.X:F1},{v.Position.Z:F1}");
+            string key = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Water.MapDrainage.SoundId(v)}@{v.Position.X:F1},{v.Position.Z:F1}");
             if (!wanted.TryGetValue(owner, out var list)) wanted[owner] = list = new();
             list[key] = v;
         }

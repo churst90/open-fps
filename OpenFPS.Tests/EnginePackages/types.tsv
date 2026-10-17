@@ -1,7 +1,4 @@
 type	package
-OpenFPS.Common.GroundChannelKind	Environment
-OpenFPS.Common.WaterBody	Environment
-OpenFPS.Common.WindWaves	Environment
 OpenFPS.Server.Systems.ParkPhase	Agents
 OpenFPS.Server.Systems.ParkState	Agents
 OpenFPS.Server.Systems.ParkingSpot	Agents

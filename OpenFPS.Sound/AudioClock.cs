@@ -6,18 +6,16 @@ namespace OpenFPS.Common;
 /// The clock of one audio world, which its host gives it (docs/SOUND_LIBRARY_BOUNDARY.md 4.1, stage 5): the
 /// game loop, the audio update and the mixer's 250 Hz attribute loop must share a timebase to say how old a
 /// position is, so every timestamp that will be subtracted from another comes from one of these. It was a
-/// static (AudioClock.Now), one per process whatever the process held.
+/// static (AudioClock.Now), one per process whatever the process held. Its world time
+/// (<see cref="IWorldClock.WorldTime"/>) is the one the server and every client agree on: the gusts, a lit
+/// fire's age, a hob's key. Not a world's state.
 /// </summary>
-public interface IAudioClock
+public interface IAudioClock : IWorldClock
 {
     /// <summary>Seconds on a monotonic clock that is never reset. Never a clock something else may restart: the
     /// dead reckoning once read a stopwatch the mixer-load report restarted every 250 ms, ages came out
     /// negative, and the fix for a close pass stepping in pitch did nothing for most of every quarter second.</summary>
     double Now { get; }
-
-    /// <summary>The one world time the server and every client agree on, s (WindField.Now: UTC seconds since
-    /// 2026-01-01): the gusts, a lit fire's age, a hob's key. Not a world's state.</summary>
-    double WorldTime { get; }
 }
 
 /// <summary>

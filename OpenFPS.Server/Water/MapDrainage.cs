@@ -105,11 +105,16 @@ public static class MapDrainage
         return found;
     }
 
+    /// <summary>The sound id of a drainage line's voice: its running water (GroundChannels), from what the line is.</summary>
+    public static string SoundId(DrainageNetwork.Voice v)
+        => GroundChannels.SoundId(v.Kind, v.WidthMetres, v.Slope, v.LengthMetres, v.ReferenceLitresPerSecond, v.Catchment);
+
     /// <summary>A voice of a drainage line as an entity of the map: the line's running water, along the entity's
     /// own x axis (RunningWaterSynth's line), silent while the line is dry.</summary>
     public static Entity SpawnVoice(World world, DrainageNetwork.Voice v)
     {
-        var spec = ModelLibrary.Presets.Flow(v.SoundId[5..]);
+        string soundId = SoundId(v);
+        var spec = ModelLibrary.Presets.Flow(soundId[5..]);
         string name = spec.Name;
         // The line runs along x: the yaw that turns x onto the line (x east, z north; yaw about y from north).
         var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, v.Yaw - MathF.PI / 2f);
@@ -123,7 +128,7 @@ public static class MapDrainage
             new SoundEmitterComponent
             {
                 IsSynth = true,
-                SoundId = v.SoundId,
+                SoundId = soundId,
                 Mode = PlaybackMode.LoopOne,
                 Volume = 1f,
                 Range = MathF.Max(60f, Loudness.AudibleRange(spec.SourceLevelDb + 6f, Loudness.DefaultCompression)),

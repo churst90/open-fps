@@ -140,6 +140,11 @@ public static class Hydrometeors
 
     // ── Meeting a surface ───────────────────────────────────────────────────────────────────────
 
+    /// <summary>Under this Young's modulus a surface yields under what falls on it rather than stopping it, GPa:
+    /// grass, soil, foam, rubber. A hailstone bounces off anything stiffer; rain's surfaces call the rest soft
+    /// (RainSurfaces).</summary>
+    public const float SoftBelowGPa = 1f;
+
     /// <summary>Ice's Young's modulus and Poisson's ratio: 9 GPa, 0.33 (polycrystalline ice).</summary>
     public const float IceModulusGPa = 9f, IcePoisson = 0.33f;
 
@@ -163,7 +168,7 @@ public static class Hydrometeors
     /// hail falls at (Higa, Arakawa and Maeno 1996, Planet. Space Sci. 44, 917-925: e falls from near
     /// 0.9 at a metre a second to 0.3-0.5 above ten); a tenth off something soft.
     /// </summary>
-    public static float Restitution(float surfaceModulusGPa) => surfaceModulusGPa >= RainSurfaces.SoftBelowGPa ? 0.4f : 0.1f;
+    public static float Restitution(float surfaceModulusGPa) => surfaceModulusGPa >= SoftBelowGPa ? 0.4f : 0.1f;
 
     /// <summary>A snowflake crushes rather than strikes: it stops over its own size, s.</summary>
     public static float FlakeCrushSeconds(float meltedMm, float speed) => meltedMm * FlakeSwell * 1e-3f / MathF.Max(0.1f, speed);

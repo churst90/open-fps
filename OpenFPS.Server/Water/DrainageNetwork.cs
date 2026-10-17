@@ -50,7 +50,7 @@ public sealed class DrainageNetwork
     /// a fountain), m: that water is already there, as the map made it.</summary>
     public float PlacedWaterClearMetres { get; init; } = 15f;
 
-    /// <summary>A line whose reference flow (GroundChannels.ReferenceFlow) is less than this gets no voice,
+    /// <summary>A line whose reference flow (GroundChannelBed.ReferenceFlow) is less than this gets no voice,
     /// L/s.</summary>
     public float VoiceReferenceLitresPerSecond { get; init; } = 0.05f;
 
@@ -157,12 +157,10 @@ public sealed class DrainageNetwork
         public float SquareMetres;
     }
 
-    /// <summary>A stretch of a line that is heard: where its voice stands, which way the line runs, and what it is.</summary>
+    /// <summary>A stretch of a line that is heard: where its voice stands, which way the line runs, and what it is.
+    /// Its sound is the host's to name (MapDrainage.SoundId: the running water's GroundChannels).</summary>
     public sealed record Voice(Vector3 Position, float Yaw, GroundChannelKind Kind, float WidthMetres, float Slope, float LengthMetres,
-                               float ReferenceLitresPerSecond, GroundCatchment Catchment, int Cell, float SquareMetres)
-    {
-        public string SoundId => GroundChannels.SoundId(Kind, WidthMetres, Slope, LengthMetres, ReferenceLitresPerSecond, Catchment);
-    }
+                               float ReferenceLitresPerSecond, GroundCatchment Catchment, int Cell, float SquareMetres);
 
     public IReadOnlyList<Pond> Ponds => _ponds;
     public IReadOnlyList<LineInfo> Lines => _lines;
@@ -455,12 +453,12 @@ public sealed class DrainageNetwork
     }
 
     /// <summary>The speed of water in a channel draining this much ground in the reference rain, m/s: Manning in a
-    /// wide channel, v = q^0.4 S^0.3 / n^0.6 with q = Q / w, its width from hydraulic geometry (GroundChannels).</summary>
+    /// wide channel, v = q^0.4 S^0.3 / n^0.6 with q = Q / w, its width from hydraulic geometry (GroundChannelBed).</summary>
     private static float ChannelSpeed(float squareMetres, float slope)
     {
         float q = squareMetres * 10f / 3.6e6f;   // 10 mm/h running off: the order of a heavy storm's run-off
         float w = Math.Clamp(3f * MathF.Sqrt(q), 0.3f, 8f);
-        float n = GroundChannels.ManningN(GroundChannelKind.Creek);
+        float n = GroundChannelBed.ManningN(GroundChannelKind.Creek);
         float y = MathF.Pow(q / w * n / MathF.Sqrt(slope), 0.6f);
         return MathF.Max(0.05f, q / w / MathF.Max(1e-4f, y));
     }
@@ -531,7 +529,7 @@ public sealed class DrainageNetwork
         var cells = line.Cells;
         var along = new float[cells.Length];
         for (int k = 1; k < cells.Length; k++) along[k] = along[k - 1] + Vector2.Distance(Centre2(cells[k - 1]), Centre2(cells[k]));
-        float seg = GroundChannels.SegmentMetres;
+        float seg = GroundChannelBed.SegmentMetres;
         int pieces = Math.Max(1, (int)MathF.Floor(along[^1] / seg));
         if (along[^1] < 0.5f * seg) return;
         for (int p = 0; p < pieces; p++)
@@ -555,10 +553,10 @@ public sealed class DrainageNetwork
             var total = (float[])areas.Clone();
             foreach (int id in ponds)
                 for (int s = 0; s < total.Length; s++) total[s] += _ponds[id].Total[s];
-            float reference = GroundChannels.ReferenceFlow(new GroundCatchment(total, 0f));
+            float reference = GroundChannelBed.ReferenceFlow(new GroundCatchment(total, 0f));
             if (reference < VoiceReferenceLitresPerSecond) continue;
             var kind = KindOf(cells, k0, k1, _area[mid] * CellArea);
-            float width = GroundChannels.WidthFor(kind, reference);
+            float width = GroundChannelBed.WidthFor(kind, reference);
             var dir = new Vector2(c1.X - c0.X, c1.Z - c0.Z);
             float yaw = dir.LengthSquared() > 1e-6f ? MathF.Atan2(dir.X, dir.Y) : 0f;
             _voices.Add(new Voice(centre + new Vector3(0f, 0.05f, 0f), yaw, kind, width, slope, length, reference, catchment, mid, _area[mid] * CellArea));

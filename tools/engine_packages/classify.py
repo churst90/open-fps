@@ -139,6 +139,9 @@ FILE_RULES = [
     ('OpenFPS.Sound/FireShape.cs', 'Environment', 'a fire\'s burning area'),
     ('OpenFPS.Sound/WorldWeather.cs', 'Environment', 'one world\'s weather state'),
     ('OpenFPS.Sound/AirLayers.cs', 'Environment', 'the air\'s layers near the ground'),
+    ('OpenFPS.Sound/GroundChannelBed.cs', 'Environment', 'a drainage line\'s bed: its width, roughness and the flow it is shaped by'),
+    ('OpenFPS.Sound/WindWaves.cs', 'Environment', 'the waves a wind raises over water'),
+    ('OpenFPS.Sound/WorldClock.cs', 'Environment', 'the one world time a world\'s weather reads'),
     # ── Sound: what things are ──
     ('OpenFPS.Sound/Drainage.cs', 'Environment', 'one tile\'s drainage from its ground: below World, which keeps it with a tile'),
     ('OpenFPS.Sound/MachinePower.cs', 'Agents', 'how hard a driver works a machine: a notch, a power lever'),
@@ -213,9 +216,6 @@ FILE_RULES = [
 
 # Types that do not go where their file goes.
 TYPE_RULES = {
-    'OpenFPS.Common.WindWaves': 'Environment',
-    'OpenFPS.Common.WaterBody': 'Environment',
-    'OpenFPS.Common.GroundChannelKind': 'Environment',
     'OpenFPS.Server.Systems.ParkState': 'Agents',
     'OpenFPS.Server.Systems.ParkPhase': 'Agents',
     'OpenFPS.Server.Systems.ParkingSpot': 'Agents',

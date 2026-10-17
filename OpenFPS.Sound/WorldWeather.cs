@@ -11,16 +11,16 @@ namespace OpenFPS.Common;
 /// The host fills it with the conditions it knows and it fetches nothing itself: open-fps's client gives it
 /// the server's broadcast (the wind ramp, the rain, the ground's water); a lab gives it numbers. Whatever
 /// drives the host's weather, a simulation or observations of a real place, reaches the sound the same way.
-/// The gusts are read on its world's clock (<see cref="IAudioClock.WorldTime"/>), the one time the server and
+/// The gusts are read on its world's clock (<see cref="IWorldClock.WorldTime"/>), the one time the server and
 /// every client agree on.
 /// </summary>
 public sealed class WorldWeather
 {
     /// <summary>The clock of the world this is the weather of, which whoever holds both gives it (the mixer:
     /// FmodAudioProvider.Clock). One of its own until then, which reads the shared world time.</summary>
-    public IAudioClock Clock { get; set; } = new StopwatchAudioClock();
+    public IWorldClock Clock { get; set; } = new SharedWorldClock();
 
-    /// <summary>The world time now, s (<see cref="IAudioClock.WorldTime"/>): the moment the gusts, a lit fire's
+    /// <summary>The world time now, s (<see cref="IWorldClock.WorldTime"/>): the moment the gusts, a lit fire's
     /// age and the rain's swell are read at.</summary>
     public double Now => Clock.WorldTime;
 

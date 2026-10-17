@@ -31,10 +31,6 @@ public static class RainSurfaces
     /// timber board are under it; a slab, a road or a brick wall far over it.</summary>
     public const float PlateMaxSkinMetres = 0.02f;
 
-    /// <summary>Under this Young's modulus a material yields under a drop rather than stopping it, GPa:
-    /// grass, soil, foam, rubber.</summary>
-    public const float SoftBelowGPa = 1f;
-
     /// <summary>The kind of surface a material of this skin thickness is to rain.</summary>
     public static RainSurfaceKind KindOf(string material, float skinMetres)
     {
@@ -42,7 +38,7 @@ public static class RainSurfaces
         if (p.Family == "liquid") return RainSurfaceKind.Pool;
         if (p.Leaves) return RainSurfaceKind.Canopy;
         if (p.DensityKgM3 <= 0f) return RainSurfaceKind.None;
-        if (p.YoungsModulusGPa < SoftBelowGPa) return RainSurfaceKind.Soft;
+        if (p.YoungsModulusGPa < Hydrometeors.SoftBelowGPa) return RainSurfaceKind.Soft;
         if (skinMetres > 0f && skinMetres <= PlateMaxSkinMetres) return RainSurfaceKind.Plate;
         return RainSurfaceKind.Hard;
     }
@@ -84,13 +80,13 @@ public static class RainSurfaces
     /// How many times longer a drop takes to stop on this material than on something rigid. To a drop
     /// (ρ v² a few tens of kPa) even turf is rigid; what changes is what it meets first, a blade that
     /// bends or a crumb that gives, spreading the momentum and taking the top off the click. A quarter of
-    /// a transit time longer per decade softer than <see cref="SoftBelowGPa"/>: grass 1.6, soil 1.3,
+    /// a transit time longer per decade softer than <see cref="Hydrometeors.SoftBelowGPa"/>: grass 1.6, soil 1.3,
     /// gravel 1.1, leaves 1.5. An ASSUMPTION on the size, for the ear to judge against recordings.
     /// </summary>
     public static float ContactStretch(MaterialProperties p)
     {
         float e = MathF.Max(1e-4f, p.YoungsModulusGPa);
-        return e >= SoftBelowGPa ? 1f : 1f + SoftStretchPerDecade * MathF.Log10(SoftBelowGPa / e);
+        return e >= Hydrometeors.SoftBelowGPa ? 1f : 1f + SoftStretchPerDecade * MathF.Log10(Hydrometeors.SoftBelowGPa / e);
     }
 
     /// <summary>See <see cref="ContactStretch"/>.</summary>

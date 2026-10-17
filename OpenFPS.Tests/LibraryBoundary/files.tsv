@@ -358,6 +358,7 @@ OpenFPS.Sound/GasHob.cs	lib	Sound
 OpenFPS.Sound/Glass.cs	lib	Sound	
 OpenFPS.Sound/GlassDoor.cs	lib	Sound	
 OpenFPS.Sound/GlassFracture.cs	lib	Sound	
+OpenFPS.Sound/GroundChannelBed.cs	lib	Sound	
 OpenFPS.Sound/GroundChannels.cs	lib	Sound	
 OpenFPS.Sound/GroundWater.cs	lib	Sound	
 OpenFPS.Sound/HandOverSounds.cs	lib	Sound	
@@ -412,7 +413,9 @@ OpenFPS.Sound/Waves.cs	lib	Sound
 OpenFPS.Sound/WeaponHandling.cs	lib	Sound	
 OpenFPS.Sound/Weapons.cs	lib	Sound	
 OpenFPS.Sound/WeatherType.cs	lib	Sound	
+OpenFPS.Sound/WindWaves.cs	lib	Sound	
 OpenFPS.Sound/WoodChorus.cs	lib	Sound	
+OpenFPS.Sound/WorldClock.cs	lib	Sound	
 OpenFPS.Sound/WorldWeather.cs	lib	Sound	
 OpenFPS.World/EntityType.cs	host		
 OpenFPS.World/MapRoadsBuilder.cs	host		

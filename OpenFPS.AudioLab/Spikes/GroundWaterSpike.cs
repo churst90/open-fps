@@ -356,7 +356,7 @@ public static class GroundWaterSpike
                 table.Append("{ ");
                 foreach (float slope in slopes)
                 {
-                    var spec = GroundChannels.SpecFor(kind, GroundChannels.WidthFor(kind, q), slope, GroundChannels.SegmentMetres, q, catchment);
+                    var spec = GroundChannels.SpecFor(kind, GroundChannelBed.WidthFor(kind, q), slope, GroundChannelBed.SegmentMetres, q, catchment);
                     var pa = RunningWaterSpike.Render(spec, q, sec, 7);
                     double sum = 0; foreach (float v in pa) sum += (double)v * v;
                     double leq = 10 * Math.Log10(Math.Max(1e-24, sum / pa.Length) / (20e-6 * 20e-6));
@@ -478,10 +478,11 @@ public static class GroundWaterSpike
                     EntityId = id, Type = EntityType.StaticObject,
                     Transform = new Transform { Position = new Vector3(v.Position.X - stand.X, v.Position.Y - stand.Y + 0.05f, v.Position.Z - stand.Z), Rotation = turn, Scale = Vector3.One },
                 };
-                var spec = ModelLibrary.Presets.Flow(v.SoundId[5..]);
+                string soundId = MapDrainage.SoundId(v);
+                var spec = ModelLibrary.Presets.Flow(soundId[5..]);
                 def.SoundEmitter = new SoundEmitterComponent
                 {
-                    IsSynth = true, SoundId = v.SoundId, Mode = PlaybackMode.LoopOne, Volume = 1f,
+                    IsSynth = true, SoundId = soundId, Mode = PlaybackMode.LoopOne, Volume = 1f,
                     Range = MathF.Max(60f, LabHearing.AudibleRange(spec.SourceLevelDb + 6f)), MinDistance = 1f, ExtentMetres = spec.ExtentMetres,
                 };
                 world.RegisterDefinition(def);

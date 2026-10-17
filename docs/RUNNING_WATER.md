@@ -835,7 +835,7 @@ further gathers more as its upstream tiles load, and its voice's key changes the
 ### 13.5 Voices where it gathers
 
 - **Lines**: cells draining half a hectare or more, from each head down to where they join a bigger line.
-- **A voice every 20 m** of line (`GroundChannels.SegmentMetres`), cut into pieces at the listener (section 15),
+- **A voice every 20 m** of line (`GroundChannelBed.SegmentMetres`), cut into pieces at the listener (section 15),
   laid along the line (the entity's x axis), its sound id saying everything about it:
   `flow:ground/KIND/WIDTH_CM/SLOPE_PERMILLE/LENGTH_M/REFERENCE_ML_PER_S/CATCHMENT` (each surface's area and mean
   travel time, the ponds, the ground for base flow). Not where water stands (a pond, a lake) and not within 15 m

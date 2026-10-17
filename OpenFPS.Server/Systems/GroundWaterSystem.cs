@@ -485,8 +485,8 @@ public static class GroundWaterSystem
         if (net.IsLine(c))
         {
             var kind = net.SquareMetres(c) >= net.CreekSquareMetres ? GroundChannelKind.Creek : GroundChannelKind.Rill;
-            nMan = GroundChannels.ManningN(kind);
-            width = GroundChannels.WidthFor(kind, GroundChannels.ReferenceFlow(net.CatchmentOf(c)));
+            nMan = GroundChannelBed.ManningN(kind);
+            width = GroundChannelBed.WidthFor(kind, GroundChannelBed.ReferenceFlow(net.CatchmentOf(c)));
         }
         else
         {
