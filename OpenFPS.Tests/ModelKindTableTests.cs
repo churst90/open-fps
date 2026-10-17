@@ -8,6 +8,7 @@ using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
+using OpenFPS.Models;
 
 namespace OpenFPS.Tests;
 
@@ -217,7 +218,7 @@ public class ModelKindTableTests
     [InlineData("stove:hob4", ModelLibrary.Kinds.GasHob, "hob4")]
     public void TheEditorsModelOfASoundReadsTheTable(string soundId, string kind, string id)
     {
-        Assert.True(OpenFPS.Common.Editing.ModelKinds.TryModelOfSound(soundId, out var k, out var i));
+        Assert.True(OpenFPS.Models.Editing.ModelKinds.TryModelOfSound(soundId, out var k, out var i));
         Assert.Equal(kind, k);
         Assert.Equal(id, i);
     }

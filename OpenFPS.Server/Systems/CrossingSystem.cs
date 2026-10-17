@@ -6,6 +6,7 @@ using OpenFPS.Server.Core;
 using Serilog;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
+using OpenFPS.Models;
 
 namespace OpenFPS.Server.Systems;
 

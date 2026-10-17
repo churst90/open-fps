@@ -1,6 +1,6 @@
 using System.Globalization;
 using OpenFPS.Client.Core.Platform;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Hearing;
 

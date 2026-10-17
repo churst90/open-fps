@@ -632,7 +632,7 @@ public partial class StatsUpdate : IMessage
     public string HeldWeaponId = "";
     /// <summary>Rounds in that weapon, or -1 with none.</summary>
     public int HeldRounds = -1;
-    /// <summary>The scope on that weapon (a <see cref="OpenFPS.Common.ScopeRegistry"/> id), or empty.
+    /// <summary>The scope on that weapon (a <see cref="OpenFPS.Models.ScopeRegistry"/> id), or empty.
     /// The client needs it for numpad star: only a scoped gun can be raised to the eye.</summary>
     public string HeldScopeId = "";
     /// <summary>The fastest the player may move on foot, metres per second, or 0 for no limit beyond the

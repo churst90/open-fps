@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Environment;
 
 namespace OpenFPS.Server.Systems;

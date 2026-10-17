@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>
 /// A rifle scope: the magnifications it turns through, how wide it sees at each, and its elevation

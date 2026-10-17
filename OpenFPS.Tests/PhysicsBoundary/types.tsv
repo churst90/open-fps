@@ -33,8 +33,8 @@ OpenFPS.Physics.Gearbox	P
 OpenFPS.Sound.VehicleProfile	PS
 OpenFPS.Physics.EngineMechanics	P
 OpenFPS.Sound.EngineProfile	PS
-OpenFPS.Common.VehicleSpec	M
-OpenFPS.Common.VehicleChassisSpec	M
+OpenFPS.Models.VehicleSpec	M
+OpenFPS.Models.VehicleChassisSpec	M
 OpenFPS.Sound.Core.Engine.Driveline	PS
 OpenFPS.Physics.ExternalBallistics	P
 OpenFPS.Physics.BulletState	V

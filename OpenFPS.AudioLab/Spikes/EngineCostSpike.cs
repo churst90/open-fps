@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;

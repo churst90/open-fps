@@ -4,7 +4,7 @@ using System.Numerics;
 using System.Security.Cryptography;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Materials;
 using OpenFPS.Environment;
 

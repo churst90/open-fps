@@ -17,6 +17,7 @@ using OpenFPS.Server.Services;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Environment;
+using OpenFPS.Models;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Server;
@@ -444,8 +445,8 @@ public class GameServer
     {
         // Machines an author has written, before anything asks what a vehicle name means: a map's
         // cars, a composite made drivable, and /drivable all resolve through the registry.
-        OpenFPS.Common.MachineRegistry.EnsureLoaded();
-        OpenFPS.Common.ModelLibrary.EnsureLoaded();
+        OpenFPS.Models.MachineRegistry.EnsureLoaded();
+        OpenFPS.Models.ModelLibrary.EnsureLoaded();
         var prefabRepo = new PrefabRepository(Roots.Prefabs);
         // The world editor's changed models, over the library and the prefabs, before anything asks what
         // a model is or a map is built from them. Prefabs and groups are kinds of the server's own.
@@ -2265,7 +2266,7 @@ public class GameServer
         if (!ModelKindTable.Is(soundId, ModelSynth.Flow)) return false;
         return TapIds.GetOrAdd(soundId!, static id =>
         {
-            try { return OpenFPS.Common.ModelLibrary.Presets.Flow(ModelKindTable.KindOf(id)!.Rest(id)).Tap != null; }
+            try { return OpenFPS.Models.ModelLibrary.Presets.Flow(ModelKindTable.KindOf(id)!.Rest(id)).Tap != null; }
             catch (Exception ex)
             {
                 ModelKindTable.Fail(id, ex.Message);

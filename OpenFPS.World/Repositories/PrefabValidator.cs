@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Reflection;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;

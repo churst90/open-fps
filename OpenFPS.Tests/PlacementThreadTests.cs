@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Audio.Core;
 using OpenFPS.Audio.Data;
 using OpenFPS.Audio.Fmod;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;

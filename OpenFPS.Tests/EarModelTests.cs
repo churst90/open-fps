@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Hearing;
 using System.Numerics;

@@ -8,6 +8,7 @@ using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
 using OpenFPS.Audio.Core;
 using OpenFPS.Physics;
+using OpenFPS.Models;
 
 namespace OpenFPS.Tests;
 

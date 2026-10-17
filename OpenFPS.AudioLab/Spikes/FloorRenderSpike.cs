@@ -10,6 +10,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
+using OpenFPS.Models;
 
 namespace OpenFPS.AudioLab.Spikes;
 

@@ -1,7 +1,7 @@
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Audio.Acoustics;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;

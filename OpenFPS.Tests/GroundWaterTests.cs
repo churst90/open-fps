@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Server.OneWorld;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Environment;

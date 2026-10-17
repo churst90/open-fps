@@ -3,6 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Sound;
 using OpenFPS.Physics;
+using OpenFPS.Models;
 
 namespace OpenFPS.Client.Core;
 
@@ -39,7 +40,7 @@ public sealed class OtherBodies
     };
 
     /// <summary>Head above feet, metres: where a breath comes from, audible in the elevation.</summary>
-    public const float HeadHeight = OpenFPS.Common.Speech.MouthHeight;
+    public const float HeadHeight = OpenFPS.Models.Speech.MouthHeight;
 
     /// <summary>One body's physical state: where its feet are in its gait, and how hard it is working.</summary>
     private sealed class Body

@@ -8,7 +8,7 @@ using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Sound.Core.Signals;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using Xunit.Abstractions;
 using OpenFPS.Environment;
 

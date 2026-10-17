@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>
 /// People talking: which voices exist, what each can say, and how loud a person says it.
@@ -188,7 +188,7 @@ public static class Speech
 
     private static (IReadOnlyList<Call>, IReadOnlyList<Conversation>) LoadScripts()
     {
-        using var stream = typeof(Speech).Assembly.GetManifestResourceStream("OpenFPS.Common.Speech.scripts.json");
+        using var stream = typeof(Speech).Assembly.GetManifestResourceStream("OpenFPS.Models.Speech.scripts.json");
         if (stream == null) return (Array.Empty<Call>(), Array.Empty<Conversation>());
         using var doc = System.Text.Json.JsonDocument.Parse(stream);
         var calls = new List<Call>();
@@ -219,7 +219,7 @@ public static class Speech
 
     private static IReadOnlyList<Take> Load()
     {
-        using var stream = typeof(Speech).Assembly.GetManifestResourceStream("OpenFPS.Common.Speech.voices.csv");
+        using var stream = typeof(Speech).Assembly.GetManifestResourceStream("OpenFPS.Models.Speech.voices.csv");
         if (stream == null) return Array.Empty<Take>();
         using var reader = new StreamReader(stream);
         return Parse(reader.ReadToEnd());

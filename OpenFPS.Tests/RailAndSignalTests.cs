@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Pneumatics;
 using OpenFPS.Sound.Core.Rail;

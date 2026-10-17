@@ -4,7 +4,7 @@ using System.Text.Json;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Materials;
 using OpenFPS.Environment;
 
@@ -214,7 +214,7 @@ public static class TextureSpike
             // Placed once, its taps laid from its spec round it (MapManager.SpawnTaps).
             if (id == "elm_fountain")
             {
-                var spec = OpenFPS.Common.ModelLibrary.Presets.Water("park_fountain");
+                var spec = OpenFPS.Models.ModelLibrary.Presets.Water("park_fountain");
                 for (int k = 0; k < spec.Taps.Length; k++)
                     taps[k] = at + new Vector3(spec.Taps[k].EastMetres, spec.Taps[k].UpMetres, spec.Taps[k].NorthMetres);
             }

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;

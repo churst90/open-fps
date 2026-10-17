@@ -11,6 +11,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Native.Platform;
 using OpenFPS.Materials;
 using OpenFPS.Environment;
+using OpenFPS.Models;
 
 namespace OpenFPS.Client.Core.Session;
 
@@ -1442,7 +1443,7 @@ public sealed partial class ClientGameSession : IDisposable
         {
             _network.Send(new TextCommand { Command = "fire" });
             // Only a gun that can fire on automatic needs to hear the trigger let go.
-            _triggerDown = OpenFPS.Sound.WeaponRegistry.TryGet(_state.HeldWeaponId, out var w) && OpenFPS.Common.FireSelector.HasAuto(w);
+            _triggerDown = OpenFPS.Sound.WeaponRegistry.TryGet(_state.HeldWeaponId, out var w) && OpenFPS.Models.FireSelector.HasAuto(w);
         }
     }
 

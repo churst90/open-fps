@@ -1,6 +1,6 @@
 using OpenFPS.Audio.Core;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

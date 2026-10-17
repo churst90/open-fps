@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;

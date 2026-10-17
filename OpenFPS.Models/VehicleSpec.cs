@@ -2,7 +2,7 @@ using OpenFPS.Schema;
 using OpenFPS.Sound;
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>
 /// What a vehicle weighs, how it meets the air and the road, and how big it is: the numbers of

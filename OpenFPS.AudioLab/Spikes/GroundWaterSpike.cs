@@ -18,6 +18,7 @@ using OpenFPS.Materials;
 using OpenFPS.Physics;
 using OpenFPS.Environment;
 using OpenFPS.Environment.Water;
+using OpenFPS.Models;
 
 namespace OpenFPS.AudioLab.Spikes;
 

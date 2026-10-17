@@ -4,7 +4,7 @@ using OpenFPS.Audio.Data;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Engine;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using ActiveSound = OpenFPS.Audio.Fmod.FmodAudioProvider.ActiveSound;
 
 namespace OpenFPS.Tests;

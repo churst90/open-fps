@@ -7,8 +7,8 @@
        presets; nothing below it asks it anything: a sound model that names another preset is handed it
        (IPresets).
 
-       Namespaces are those the files had (OpenFPS.Common, OpenFPS.Common.Editing), as for the other
-       packages' moves. -->
+       Namespaces follow the project and its folders: OpenFPS.Models, OpenFPS.Models.Editing; Speech/ is
+       OpenFPS.Models too, since its one type is Speech (docs/SOUND_LIBRARY_BOUNDARY.md 21). -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -33,9 +33,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The voices' lines, under the names they had in OpenFPS.Common: Speech reads them from its own assembly. -->
-    <EmbeddedResource Include="Speech\voices.csv" LogicalName="OpenFPS.Common.Speech.voices.csv" />
-    <EmbeddedResource Include="Speech\scripts.json" LogicalName="OpenFPS.Common.Speech.scripts.json" />
+    <!-- The voices' lines, named in Speech's namespace: Speech reads them from its own assembly by these names. -->
+    <EmbeddedResource Include="Speech\voices.csv" LogicalName="OpenFPS.Models.Speech.voices.csv" />
+    <EmbeddedResource Include="Speech\scripts.json" LogicalName="OpenFPS.Models.Speech.scripts.json" />
   </ItemGroup>
 
   <ItemGroup>

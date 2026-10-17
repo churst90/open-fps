@@ -4,7 +4,7 @@ using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Audio.Fmod;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 using OpenFPS.Physics;

@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 using OpenFPS.Sound;
 using OpenFPS.Environment;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>
 /// The models a map can name (trains, track, horns, bells, machines, water, engines, vehicles...), as

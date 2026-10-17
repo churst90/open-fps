@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Environment;
@@ -188,7 +188,7 @@ public sealed class WaterFeatureVoice
     /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;": one tap of one feature on a map. A plain
     /// "water:&lt;preset&gt;" is the whole feature at one point and is not a tap.</summary>
     public static bool ParseKey(string? soundId, out string preset, out string feature, out int tap)
-        => OpenFPS.Common.ModelKindTable.TryWaterTap(soundId, out preset, out feature, out tap);
+        => OpenFPS.Models.ModelKindTable.TryWaterTap(soundId, out preset, out feature, out tap);
 }
 
 /// <summary>One tap of a water feature, as a voice. See <see cref="WaterFeatureVoice"/>.</summary>

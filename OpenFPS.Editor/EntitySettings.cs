@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Numerics;
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
+using OpenFPS.Models.Editing;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Editing;
 using OpenFPS.Schema;
 using OpenFPS.Materials;
 

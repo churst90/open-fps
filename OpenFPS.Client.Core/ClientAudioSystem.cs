@@ -149,14 +149,14 @@ public sealed class ClientAudioSystem : IAudioHost
         {
             string sound = entity.Definition?.SoundEmitter.SoundId ?? "";
             // A loudspeaker is named beside the recording it plays, not in its sound id.
-            if (kind == OpenFPS.Common.ModelLibrary.Kinds.Loudspeaker
+            if (kind == OpenFPS.Models.ModelLibrary.Kinds.Loudspeaker
                 && id.Equals(entity.Definition?.SoundEmitter.Loudspeaker ?? "", StringComparison.OrdinalIgnoreCase))
             {
                 ForgetEntity(entityId);
                 restarted.Add(entityId);
                 continue;
             }
-            if (!OpenFPS.Common.Editing.ModelKinds.TryModelOfSound(sound, out var k, out var i)) continue;
+            if (!OpenFPS.Models.Editing.ModelKinds.TryModelOfSound(sound, out var k, out var i)) continue;
             if (k != kind || !i.Equals(id, StringComparison.OrdinalIgnoreCase)) continue;
             ForgetEntity(entityId);
             restarted.Add(entityId);

@@ -7,7 +7,6 @@ using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;
 using OpenFPS.Materials;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Editing;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Editor;
 using OpenFPS.Server.Repositories;

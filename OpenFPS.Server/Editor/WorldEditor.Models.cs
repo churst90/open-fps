@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
+using OpenFPS.Models.Editing;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Editing;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Schema;

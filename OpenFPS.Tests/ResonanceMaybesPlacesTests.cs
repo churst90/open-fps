@@ -3,7 +3,7 @@ using OpenFPS.Audio.Core;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;

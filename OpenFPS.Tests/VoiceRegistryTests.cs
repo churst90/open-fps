@@ -3,7 +3,7 @@ using OpenFPS.Audio.Core;
 using OpenFPS.Audio.Data;
 using OpenFPS.Sound;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

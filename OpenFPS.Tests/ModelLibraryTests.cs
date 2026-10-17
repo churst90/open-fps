@@ -4,7 +4,7 @@ using System.Numerics;
 using System.Reflection;
 using System.Text.Json;
 using OpenFPS.Audio.Fmod;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using Xunit.Abstractions;
 using OpenFPS.Sound;
 

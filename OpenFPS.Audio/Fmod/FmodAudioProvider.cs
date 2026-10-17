@@ -6,7 +6,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Audio.Data;
 using OpenFPS.Audio.SteamAudio;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Native.Platform;
 using OpenFPS.Native.SteamAudio;
 
@@ -1592,7 +1592,7 @@ public partial class FmodAudioProvider : IAudioProvider
     public void PrepareVoice(string physicalKey, int seed)
     {
         if (!_isInitialized) return;
-        if (OpenFPS.Common.ModelKindTable.KindOf(physicalKey)?.Synth is not { } kind || !VoiceBuilds.Makes(kind)) return;
+        if (OpenFPS.Models.ModelKindTable.KindOf(physicalKey)?.Synth is not { } kind || !VoiceBuilds.Makes(kind)) return;
         _system.getSoftwareFormat(out int rate, out _, out _);
         _voiceBuilds.Prepare(kind, physicalKey, seed, rate);
     }
@@ -2655,7 +2655,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// places as the source has in this world (WideSources.Layout); an outer place (SpatialEmitter.PlaceOfEntity)
     /// reads the synth of its source's live voice, or is not made.
     /// </summary>
-    private PhysicalVoiceState? NaturePlace(OpenFPS.Common.ModelSynth kind, string preset, in SpatialEmitter emitter, int rate)
+    private PhysicalVoiceState? NaturePlace(OpenFPS.Models.ModelSynth kind, string preset, in SpatialEmitter emitter, int rate)
     {
         if (emitter.PlaceOfEntity != 0)
         {
@@ -2665,19 +2665,19 @@ public partial class FmodAudioProvider : IAudioProvider
             return new NaturePlaceState(shared, emitter.Place, rate, emitter.Position);
         }
         int places = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1;
-        PlacedNatureVoice voice = kind == OpenFPS.Common.ModelSynth.Shore
+        PlacedNatureVoice voice = kind == OpenFPS.Models.ModelSynth.Shore
             ? ShoreVoice(emitter, rate)
-            : kind == OpenFPS.Common.ModelSynth.Wood && OpenFPS.Sound.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
-            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Foliage(woodPreset), places, rate,
+            : kind == OpenFPS.Models.ModelSynth.Wood && OpenFPS.Sound.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Models.ModelLibrary.Presets.Foliage(woodPreset), places, rate,
                                     emitter.Seed * 43 + 17, emitter.Position, Weather)
               { WindPlaces = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?[1..], TargetTrees = emitter.Trees }
-            : kind == OpenFPS.Common.ModelSynth.Flow
-            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Flow(preset), rate,
+            : kind == OpenFPS.Models.ModelSynth.Flow
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Models.ModelLibrary.Presets.Flow(preset), rate,
                                     emitter.Seed * 47 + 19, emitter.Position, Weather, Options.WideSources) { TargetCut = PiecesOf(emitter.EntityId) }
-            : kind == OpenFPS.Common.ModelSynth.Fire
-            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Fire(preset), places, rate,
+            : kind == OpenFPS.Models.ModelSynth.Fire
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Models.ModelLibrary.Presets.Fire(preset), places, rate,
                                     emitter.Seed * 41 + 13, emitter.Position, Weather)
-            : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Foliage(preset), places, rate,
+            : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Models.ModelLibrary.Presets.Foliage(preset), places, rate,
                                     emitter.Seed * 43 + 17, emitter.Position, Weather);
         voice.TargetSpread = emitter.Spread;
         voice.TargetQuench = emitter.Quench;
@@ -2696,11 +2696,11 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         // A whole outline: cut along itself at the ear, every piece a column of its own water (ShoreSynth.Cut).
         if (Options.WideSources.IsOutline(emitter.PhysicalKey))
-            return new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Shore(emitter.PhysicalKey), null, rate,
+            return new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Models.ModelLibrary.Presets.Shore(emitter.PhysicalKey), null, rate,
                                          emitter.Seed * 53 + 23, emitter.Position, Weather, ExtendedSources.MaxPlaces)
                    { TargetCut = PiecesOf(emitter.EntityId) };
         OpenFPS.Sound.ShoreSpec.ParseKey(emitter.PhysicalKey, out string shorePreset, out var geometry);
-        var spec = OpenFPS.Common.ModelLibrary.Presets.Shore(shorePreset);
+        var spec = OpenFPS.Models.ModelLibrary.Presets.Shore(shorePreset);
         return new PlacedNatureVoice(emitter.PhysicalKey, spec, geometry ?? spec.DefaultGeometry, rate,
                                      emitter.Seed * 53 + 23, emitter.Position, Weather);
     }
@@ -2715,7 +2715,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private PhysicalVoiceState? Water(string key, int rate, int seed, System.Numerics.Vector3 position, in SpatialEmitter emitter)
     {
         if (!WaterFeatureVoice.ParseKey(key, out string preset, out string feature, out int tap))
-            return new WaterVoiceState(OpenFPS.Common.ModelLibrary.Presets.Water(key[(key.IndexOf(':') + 1)..]),
+            return new WaterVoiceState(OpenFPS.Models.ModelLibrary.Presets.Water(key[(key.IndexOf(':') + 1)..]),
                                        rate, seed * 37 + 11, position, Weather);
         string shared = preset + "/" + feature;
         if (emitter.PlaceOfEntity != 0)
@@ -2730,7 +2730,7 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             if (!_waterFeatures.TryGetValue(shared, out var w))
             {
-                w = new WaterFeatureVoice(shared, OpenFPS.Common.ModelLibrary.Presets.Water(preset), rate,
+                w = new WaterFeatureVoice(shared, OpenFPS.Models.ModelLibrary.Presets.Water(preset), rate,
                                           (int)((uint)shared.GetHashCode() & 0x7fff),
                                           Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1);
                 _waterFeatures[shared] = w;
@@ -3217,7 +3217,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // (ModelKindTable) becomes its voice.
             if (!_isInitialized) return;
             _system.getSoftwareFormat(out int mrate, out _, out _);
-            var kind = OpenFPS.Common.ModelKindTable.KindOf(emitter.PhysicalKey);
+            var kind = OpenFPS.Models.ModelKindTable.KindOf(emitter.PhysicalKey);
             string preset = kind != null ? kind.Rest(emitter.PhysicalKey) : emitter.PhysicalKey;
             bool making = false;
             try
@@ -3236,22 +3236,22 @@ public partial class FmodAudioProvider : IAudioProvider
                 }
                 else machineState = kind?.Synth switch
                 {
-                    OpenFPS.Common.ModelSynth.Rail => RailSlot(emitter.PhysicalKey, mrate, out making),
+                    OpenFPS.Models.ModelSynth.Rail => RailSlot(emitter.PhysicalKey, mrate, out making),
                     // The arm follows the crossing's closed signal (Running, the server's word).
-                    OpenFPS.Common.ModelSynth.Gate => new GateVoiceState(OpenFPS.Sound.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
+                    OpenFPS.Models.ModelSynth.Gate => new GateVoiceState(OpenFPS.Sound.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
                     // Given their place: they read the wind where they stand (NatureVoiceState).
-                    OpenFPS.Common.ModelSynth.Water => Water(emitter.PhysicalKey, mrate, emitter.Seed, emitter.Position, emitter),
+                    OpenFPS.Models.ModelSynth.Water => Water(emitter.PhysicalKey, mrate, emitter.Seed, emitter.Position, emitter),
                     // Heard from places across it (ExtendedSources), all reading the middle's synth.
-                    OpenFPS.Common.ModelSynth.Fire or OpenFPS.Common.ModelSynth.Foliage or OpenFPS.Common.ModelSynth.Flow
-                        or OpenFPS.Common.ModelSynth.Shore or OpenFPS.Common.ModelSynth.Wood => NaturePlace(kind!.Synth, preset, emitter, mrate),
+                    OpenFPS.Models.ModelSynth.Fire or OpenFPS.Models.ModelSynth.Foliage or OpenFPS.Models.ModelSynth.Flow
+                        or OpenFPS.Models.ModelSynth.Shore or OpenFPS.Models.ModelSynth.Wood => NaturePlace(kind!.Synth, preset, emitter, mrate),
                     // Rain round the listener, fed by the rain survey (RainVoiceState); the roof over
                     // the ear and the near quarters are several parts each (RainFeeds.PartsFor).
-                    OpenFPS.Common.ModelSynth.Rain => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
+                    OpenFPS.Models.ModelSynth.Rain => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
                                 && rainPart < RainParts(rainSlot)
                         ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23 + rainPart * 7919, rainPart, RainParts(rainSlot), Clock)
                         : null,
                     // A gas hob: its knobs' settings and when they were turned are in the key (HobKey).
-                    OpenFPS.Common.ModelSynth.Stove => new StoveVoiceState(OpenFPS.Common.ModelLibrary.Presets.GasHob(emitter.PhysicalKey), emitter.PhysicalKey,
+                    OpenFPS.Models.ModelSynth.Stove => new StoveVoiceState(OpenFPS.Models.ModelLibrary.Presets.GasHob(emitter.PhysicalKey), emitter.PhysicalKey,
                                                    mrate, emitter.Seed * 59 + 29, Clock, Lab),
                     _ => null,
                 };

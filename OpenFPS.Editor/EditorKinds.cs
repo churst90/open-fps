@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using OpenFPS.Common;
-using OpenFPS.Common.Editing;
+using OpenFPS.Models;
+using OpenFPS.Models.Editing;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Schema;
 using OpenFPS.Materials;

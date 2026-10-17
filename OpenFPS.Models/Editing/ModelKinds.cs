@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 using OpenFPS.Schema;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Common.Editing;
+namespace OpenFPS.Models.Editing;
 
 /// <summary>Whether a node of a model's description is a value, a part with values of its own, or a
 /// list of such parts.</summary>

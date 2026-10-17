@@ -6,7 +6,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
 
 namespace OpenFPS.Tests;
 

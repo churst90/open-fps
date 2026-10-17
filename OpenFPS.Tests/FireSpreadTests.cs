@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Geometry;
 using Xunit;
 using Xunit.Abstractions;

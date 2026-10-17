@@ -4,6 +4,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Physics;
+using OpenFPS.Models;
 
 namespace OpenFPS.Client.Core;
 

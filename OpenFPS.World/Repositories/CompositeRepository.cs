@@ -47,7 +47,7 @@ public class CompositeTemplate
     /// <summary>Where people can sit in it. Empty for a thing nobody gets inside, like a barricade.</summary>
     public List<SeatDefinition> Seats { get; set; } = new();
 
-    /// <summary>The vehicle this drives as (a <see cref="OpenFPS.Common.MachineRegistry"/> id, the same
+    /// <summary>The vehicle this drives as (a <see cref="OpenFPS.Models.MachineRegistry"/> id, the same
     /// ones the map's traffic uses), or empty for something that does not drive.</summary>
     public string VehiclePreset { get; set; } = string.Empty;
 }
@@ -107,7 +107,7 @@ public class CompositeRepository
                 if (t.Parts.Exists(p => string.IsNullOrWhiteSpace(p.PrefabId)))
                 { _rejected[t.Id] = "a part names no prefab"; continue; }
                 if (!string.IsNullOrWhiteSpace(t.VehiclePreset)
-                    && !OpenFPS.Common.MachineRegistry.Knows(t.VehiclePreset))
+                    && !OpenFPS.Models.MachineRegistry.Knows(t.VehiclePreset))
                 { _rejected[t.Id] = $"unknown vehicle preset '{t.VehiclePreset}'"; continue; }
                 // Checked here as well as at /drivable: a file can be edited by hand.
                 if (!string.IsNullOrWhiteSpace(t.VehiclePreset) && !t.Seats.Exists(s => s.Controls))

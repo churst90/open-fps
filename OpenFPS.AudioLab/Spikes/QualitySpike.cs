@@ -3,7 +3,7 @@ using System.Numerics;
 using OpenFPS.Audio.Core;
 using OpenFPS.Audio.Data;
 using OpenFPS.Audio.Fmod;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Materials;

@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Audio.Acoustics;
@@ -97,7 +97,7 @@ public partial class AudioWorld
     private static bool PlaysCopies(AudioSource src)
     {
         string sound = src.Spec.SoundId ?? "";
-        return !src.Spec.IsSynth && !OpenFPS.Common.ModelKindTable.IsVehicle(sound);
+        return !src.Spec.IsSynth && !OpenFPS.Models.ModelKindTable.IsVehicle(sound);
     }
 
     /// <summary>
@@ -494,7 +494,7 @@ public partial class AudioWorld
         {
             string? preset = null; Vector3 local = default;
             if (Listener.Riding && _sources.TryGet(Listener.RidingId, out var ride)
-                && OpenFPS.Common.ModelKindTable.VehiclePreset(ride.Spec.SoundId) is { } ridePreset)
+                && OpenFPS.Models.ModelKindTable.VehiclePreset(ride.Spec.SoundId) is { } ridePreset)
             {
                 preset = ridePreset;
                 local = Vector3.Transform(visualEyePos - ride.State.Position, Quaternion.Inverse(ride.State.Rotation));
@@ -870,7 +870,7 @@ public partial class AudioWorld
     private string VoiceKey(in SourceSpec spec)
     {
         // A whole shore's outline (its emitter's line, closed): one source as long as the outline (ShoreSpec.OutlineKey).
-        if (spec.Line is { Length: >= 3 } line && OpenFPS.Common.ModelKindTable.Is(spec.SoundId, OpenFPS.Common.ModelSynth.Shore))
+        if (spec.Line is { Length: >= 3 } line && OpenFPS.Models.ModelKindTable.Is(spec.SoundId, OpenFPS.Models.ModelSynth.Shore))
         {
             if (_outlineKeys.TryGetValue(line, out var known)) return known;
             float perimeter = 0f;
@@ -885,7 +885,7 @@ public partial class AudioWorld
     private string VoiceKey(string? soundId, OpenFPS.Geometry.ColliderShape shape, Vector3 size)
     {
         string id = soundId ?? "";
-        if (!OpenFPS.Common.ModelKindTable.Is(id, OpenFPS.Common.ModelSynth.Fire)) return id;
+        if (!OpenFPS.Models.ModelKindTable.Is(id, OpenFPS.Models.ModelSynth.Fire)) return id;
         var k = (id, shape, size);
         if (_voiceKeys.TryGetValue(k, out var key)) return key;
         key = OpenFPS.Environment.FireSpec.KeyForPlaced(id, shape.IsRound(), size, ModelLibrary.Presets.Fire);
@@ -902,13 +902,13 @@ public partial class AudioWorld
     private float PhysicalHeadroom(string soundId)
     {
         if (_physicalHeadroom.TryGetValue(soundId, out float h)) return h;
-        h = OpenFPS.Common.ModelKindTable.Headroom(soundId);
+        h = OpenFPS.Models.ModelKindTable.Headroom(soundId);
         _physicalHeadroom[soundId] = h;
         return h;
     }
 
     private static (float LevelDb, float Extent)? LookUpPhysicalLevel(string soundId)
-        => OpenFPS.Common.ModelKindTable.TryLevel(soundId, out float level, out float extent) ? (level, extent) : null;
+        => OpenFPS.Models.ModelKindTable.TryLevel(soundId, out float level, out float extent) ? (level, extent) : null;
 
     /// <summary>
     /// A rotor's wake from what the aircraft is doing: it slaps descending into its own downwash, or fast
@@ -999,9 +999,9 @@ public partial class AudioWorld
     /// <summary>The aircraft profile a sound id names, or null if it is not an aeroplane.</summary>
     private static OpenFPS.Sound.AircraftProfile? PhysicalAircraft(string? sid)
     {
-        if (OpenFPS.Common.ModelKindTable.KindOf(sid) is not { Synth: OpenFPS.Common.ModelSynth.Aircraft } kind) return null;
+        if (OpenFPS.Models.ModelKindTable.KindOf(sid) is not { Synth: OpenFPS.Models.ModelSynth.Aircraft } kind) return null;
         try { return OpenFPS.Sound.AircraftProfile.ByName(kind.Rest(sid!)); }
-        catch (Exception ex) { OpenFPS.Common.ModelKindTable.Fail(sid!, ex.Message); return null; }
+        catch (Exception ex) { OpenFPS.Models.ModelKindTable.Fail(sid!, ex.Message); return null; }
     }
 
     private readonly Dictionary<string, OpenFPS.Sound.RunningWaterSpec> _flowSpecs = new(StringComparer.OrdinalIgnoreCase);
@@ -1017,9 +1017,9 @@ public partial class AudioWorld
     private bool Dry(string soundId, int entityId, bool running, double now)
     {
         // Still water: no wind to raise waves, no swell, no current. It makes no sound.
-        if (OpenFPS.Common.ModelKindTable.Is(soundId, OpenFPS.Common.ModelSynth.Shore))
+        if (OpenFPS.Models.ModelKindTable.Is(soundId, OpenFPS.Models.ModelSynth.Shore))
         {
-            try { return OpenFPS.Common.ModelLibrary.Presets.Shore(soundId).CalmAt(_audio.Weather.MeanSpeed); }
+            try { return OpenFPS.Models.ModelLibrary.Presets.Shore(soundId).CalmAt(_audio.Weather.MeanSpeed); }
             catch (Exception) { return false; }
         }
         // A gas hob with every burner off: heard for as long as its last change can still be heard (the
@@ -1029,12 +1029,12 @@ public partial class AudioWorld
             if (!OpenFPS.Sound.HobKey.TryParse(soundId, out var hob) || hob.AnyOn) return false;
             return _audio.Clock.WorldTime - hob.At > OpenFPS.Sound.HobKey.QuietAfterSeconds;
         }
-        if (!OpenFPS.Common.ModelKindTable.Is(soundId, OpenFPS.Common.ModelSynth.Flow)) return false;
+        if (!OpenFPS.Models.ModelKindTable.Is(soundId, OpenFPS.Models.ModelSynth.Flow)) return false;
         try
         {
             // Once per sound id: this runs for every sink in every flat, every frame.
             if (!_flowSpecs.TryGetValue(soundId, out var spec))
-                _flowSpecs[soundId] = spec = OpenFPS.Common.ModelLibrary.Presets.Flow(soundId[5..]);
+                _flowSpecs[soundId] = spec = OpenFPS.Models.ModelLibrary.Presets.Flow(soundId[5..]);
             // A tap is heard while on and for as long after as its basin takes to empty. A shut tap nobody
             // opened since you arrived is an empty sink; a leaking one drips.
             if (spec.Tap is { } tap)
@@ -1118,7 +1118,7 @@ public partial class AudioWorld
             // Switched off by the server (a crossing's bell between trains) and within earshot: the voice it
             // would start with is made now, off the threads that place sounds, so it starts when switched on.
             if (!em.SynthRunning && d < range && !_liveMachines.Contains(entityId)
-                && OpenFPS.Audio.Fmod.VoiceBuilds.Makes(OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth))
+                && OpenFPS.Audio.Fmod.VoiceBuilds.Makes(OpenFPS.Models.ModelKindTable.KindOf(voiceKey)?.Synth))
                 _audio.PrepareVoice(PhysicalKeyOf(src, voiceKey), VoiceRegistry.SeedOf(OwnVoiceKind(em, entityId, true), entityId));
 
             // A water feature's taps are one fountain the same way, and come and go together.
@@ -1264,7 +1264,7 @@ public partial class AudioWorld
         => PhysicalKeyOf(src.Spec.Size, src.State.Rotation, voiceKey);
 
     private static string PhysicalKeyOf(Vector3 size, Quaternion rotation, string voiceKey)
-        => OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth == OpenFPS.Common.ModelSynth.Shore && !OpenFPS.Sound.ShoreSpec.TryOutline(voiceKey, out _, out _)
+        => OpenFPS.Models.ModelKindTable.KindOf(voiceKey)?.Synth == OpenFPS.Models.ModelSynth.Shore && !OpenFPS.Sound.ShoreSpec.TryOutline(voiceKey, out _, out _)
             ? OpenFPS.Sound.ShoreSpec.KeyFor(voiceKey, size, rotation)
             : voiceKey;
 
@@ -1437,7 +1437,7 @@ public partial class AudioWorld
             if (!_sources.TryGet(entityId, out var src)) continue;
             ref readonly var em = ref src.Spec;
             if (!em.IsSynth || em.SoundId == null) continue;
-            if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(em.SoundId) is not { } preset) continue;
+            if (OpenFPS.Models.ModelKindTable.KnownVehiclePreset(em.SoundId) is not { } preset) continue;
             _carPreset[entityId] = preset;
 
             float d2 = Vector3.DistanceSquared(src.State.Position, eyePos);
@@ -1445,7 +1445,7 @@ public partial class AudioWorld
             // engine's emitter plays (ProcessAudioEmitter): its declared level placed over the length it radiates
             // from, its range and its spectrum. By distance alone a 132 dB stock car lost its engine to a quiet
             // electric car a metre nearer.
-            var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
+            var profile = OpenFPS.Models.MachineRegistry.VehicleFor(preset);
             float levelDb = DeclaredLevel(preset, profile);
             var (gain, reference) = _audio.Hearing.Place(levelDb, OutletSeparation(preset));
             float heard = OpenFPS.Audio.Core.VoiceManager.HeardLevel(_audio.Hearing,
@@ -1718,7 +1718,7 @@ public partial class AudioWorld
     /// memoised by MachineRegistry.VehicleFor, which a model edit renews (a cache here never forgot).</summary>
     private static float OutletSeparation(string preset)
     {
-        var v = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
+        var v = OpenFPS.Models.MachineRegistry.VehicleFor(preset);
         return Vector3.Distance(ExhaustSlot(v), IntakeSlot(v));
     }
 
@@ -2227,8 +2227,8 @@ public partial class AudioWorld
         {
             var src = _sources.MovingAt(i);
             string? sid = src.Spec.SoundId;
-            if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(sid) is not { } preset
-                || OpenFPS.Common.MachineRegistry.VehicleFor(preset).Siren is not { } sirenKey) continue;
+            if (OpenFPS.Models.ModelKindTable.KnownVehiclePreset(sid) is not { } preset
+                || OpenFPS.Models.MachineRegistry.VehicleFor(preset).Siren is not { } sirenKey) continue;
             // Asked about only while it sounds: switched off, every patrol car on the map asked the worker
             // every frame and was added to the path pass, and with no engine voice ran the hand-rolled tracer
             // on this thread for nothing.
@@ -2303,7 +2303,7 @@ public partial class AudioWorld
     /// <summary>A train's horn, whistle or bell source, while the train is not sounding it.</summary>
     private bool SilentSignal(string soundId, double now)
     {
-        if (!OpenFPS.Common.ModelKindTable.Is(soundId, OpenFPS.Common.ModelSynth.Rail)) return false;
+        if (!OpenFPS.Models.ModelKindTable.Is(soundId, OpenFPS.Models.ModelSynth.Rail)) return false;
         if (!_signalTrains.TryGetValue(soundId, out string? train))
         {
             train = null;
@@ -2429,7 +2429,7 @@ public partial class AudioWorld
     private (Vector3[] At, float[] Load, float[] Radius) WheelLayout(string preset)
     {
         if (_wheelLayouts.TryGetValue(preset, out var l)) return l;
-        var v = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
+        var v = OpenFPS.Models.MachineRegistry.VehicleFor(preset);
         var body = new WheelDynamics(v.Mechanics);
         float cog = v.Running.CentreOfGravityZ;
         int n = body.Wheels.Length;
@@ -2528,7 +2528,7 @@ public partial class AudioWorld
             if (!OpenFPS.Sound.VehicleSignalBits.IsManual(src.State.Signals)) continue;
             bool held = OpenFPS.Sound.VehicleSignalBits.HornHeld(src.State.Signals);
             if (!held && !_heldHorns.ContainsKey(src.Id)) continue;
-            if (OpenFPS.Common.ModelKindTable.Vehicle(src.Spec.SoundId) is not { } vehicle) continue;
+            if (OpenFPS.Models.ModelKindTable.Vehicle(src.Spec.SoundId) is not { } vehicle) continue;
             string horn = OpenFPS.Sound.VehicleProfile.HornFor(vehicle);
             if (held) _heldHorns[src.Id] = double.NaN;
             else if (double.IsNaN(_heldHorns[src.Id])) _heldHorns[src.Id] = now;
@@ -2647,7 +2647,7 @@ public partial class AudioWorld
     /// in the bumper beside the horn.</summary>
     internal static Vector3 SirenMouth(AudioSource src)
         => src.State.Position + Vector3.Transform(
-            OpenFPS.Common.ModelKindTable.Vehicle(src.Spec.SoundId)?.SirenMount ?? new Vector3(0f, 0.4f, Grille(src)),
+            OpenFPS.Models.ModelKindTable.Vehicle(src.Spec.SoundId)?.SirenMount ?? new Vector3(0f, 0.4f, Grille(src)),
             src.State.Rotation);
 
     /// <summary>
@@ -2658,8 +2658,8 @@ public partial class AudioWorld
     private Vector3 HornAt(AudioSource src)
     {
         string? sid = src.Spec.SoundId;
-        if (OpenFPS.Common.ModelKindTable.BodyOf(sid) == OpenFPS.Common.ModelBody.Rails) return TrainHornAt(src);
-        var mount = OpenFPS.Common.ModelKindTable.Vehicle(sid)?.HornMount ?? new Vector3(0f, 0.6f, Grille(src));
+        if (OpenFPS.Models.ModelKindTable.BodyOf(sid) == OpenFPS.Models.ModelBody.Rails) return TrainHornAt(src);
+        var mount = OpenFPS.Models.ModelKindTable.Vehicle(sid)?.HornMount ?? new Vector3(0f, 0.6f, Grille(src));
         return src.State.Position + Vector3.Transform(mount, src.State.Rotation);
     }
 
@@ -2668,15 +2668,15 @@ public partial class AudioWorld
     private Vector3 TrainHornAt(AudioSource src)
     {
         string sid = src.Spec.SoundId ?? "";
-        if (OpenFPS.Common.ModelKindTable.TryRailSource(sid, out string preset, out string train, out int index))
+        if (OpenFPS.Models.ModelKindTable.TryRailSource(sid, out string preset, out string train, out int index))
         {
             int horn = -1;
             try { horn = OpenFPS.Sound.TrainSignal.WarningSource(OpenFPS.Sound.TrainLayout.Sources(OpenFPS.Sound.TrainProfile.ByName(preset), ModelLibrary.Presets)); }
-            catch (Exception ex) { OpenFPS.Common.ModelKindTable.Fail(sid, ex.Message); }
+            catch (Exception ex) { OpenFPS.Models.ModelKindTable.Fail(sid, ex.Message); }
             if (horn == index) return src.Emission;
             if (horn >= 0)
             {
-                string hornId = OpenFPS.Common.ModelKindTable.RailSource(preset, train, horn);
+                string hornId = OpenFPS.Models.ModelKindTable.RailSource(preset, train, horn);
                 for (int i = 0, n = _sources.MovingCount; i < n; i++)
                 {
                     var other = _sources.MovingAt(i);
@@ -2685,7 +2685,7 @@ public partial class AudioWorld
                 }
             }
         }
-        OpenFPS.Common.ModelKindTable.Fail(sid, "honked, and its train has no horn source on the map: heard from its own point");
+        OpenFPS.Models.ModelKindTable.Fail(sid, "honked, and its train has no horn source on the map: heard from its own point");
         return src.Emission;
     }
 
@@ -2697,14 +2697,14 @@ public partial class AudioWorld
     internal static float Grille(AudioSource src)
     {
         string? sid = src.Spec.SoundId;
-        if (OpenFPS.Common.ModelKindTable.Vehicle(sid) is { } vehicle) return vehicle.GrilleZ;
+        if (OpenFPS.Models.ModelKindTable.Vehicle(sid) is { } vehicle) return vehicle.GrilleZ;
         float length = src.Spec.Size.Z;
         if (length > 0f)
         {
-            OpenFPS.Common.ModelKindTable.Fail(sid ?? "", "names no vehicle: its grille is a quarter of a metre in from its collider's nose");
+            OpenFPS.Models.ModelKindTable.Fail(sid ?? "", "names no vehicle: its grille is a quarter of a metre in from its collider's nose");
             return MathF.Max(0.5f, length * 0.5f - 0.25f);
         }
-        OpenFPS.Common.ModelKindTable.Fail(sid ?? "", "names no vehicle and has no body: its grille is taken as 1.9 m ahead");
+        OpenFPS.Models.ModelKindTable.Fail(sid ?? "", "names no vehicle and has no body: its grille is taken as 1.9 m ahead");
         return 1.9f;
     }
 
@@ -2713,7 +2713,7 @@ public partial class AudioWorld
     private static float DeclaredLevel(string preset, OpenFPS.Sound.VehicleProfile profile)
     {
         if (profile.SourceLevelDb > 0f) return profile.SourceLevelDb;
-        OpenFPS.Common.ModelKindTable.Fail(OpenFPS.Common.ModelKindTable.IdOf(OpenFPS.Common.ModelSynth.Engine, preset),
+        OpenFPS.Models.ModelKindTable.Fail(OpenFPS.Models.ModelKindTable.IdOf(OpenFPS.Models.ModelSynth.Engine, preset),
                                            $"declares no source level: placed at {EngineSourceLevelDb} dB");
         return EngineSourceLevelDb;
     }
@@ -2763,7 +2763,7 @@ public partial class AudioWorld
             _voices.Stop(voiceId);
         _distantBoundTo[src.Id] = sourceId;
 
-        var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
+        var profile = OpenFPS.Models.MachineRegistry.VehicleFor(preset);
         float level = DeclaredLevel(preset, profile);
         float extent = OutletSeparation(preset);
         var (gain, reference) = _audio.Hearing.Place(level, extent);
@@ -2853,7 +2853,7 @@ public partial class AudioWorld
             if (string.IsNullOrEmpty(resolvedSoundId))
             {
                 // A synthesised emitter that names no model: the plain oscillator its fields describe.
-                OpenFPS.Common.ModelKindTable.Fail("SYNTH", "an emitter is synthesised with no sound id: played as the plain oscillator");
+                OpenFPS.Models.ModelKindTable.Fail("SYNTH", "an emitter is synthesised with no sound id: played as the plain oscillator");
                 resolvedSoundId = "SYNTH";
             }
             // The ranking's own lookup, not a second prefix list: with two, the crossing bell won a voice
@@ -2866,7 +2866,7 @@ public partial class AudioWorld
                 // The ranking's memoised numbers, so the two cannot disagree.
                 if (!PhysicalLevel(resolvedSoundId, out float levelDb, out float extent)) return;
                 physicalKey = PhysicalKeyOf(src, resolvedSoundId);
-                var physicalSynth = OpenFPS.Common.ModelKindTable.KindOf(resolvedSoundId)!.Synth;
+                var physicalSynth = OpenFPS.Models.ModelKindTable.KindOf(resolvedSoundId)!.Synth;
                 // Placed by its declared level and size: inside its extent the level is flat, and the
                 // gain is paid down so the far field is unchanged (Loudness.Widen; widening without
                 // paying once handed every quiet vehicle eight decibels).
@@ -2883,7 +2883,7 @@ public partial class AudioWorld
                 earLevel = levelDb;
                 extentLayout = _audio.Options.WideSources.Layout(physicalKey, ModelLibrary.Presets);
                 linePath = LinePathOf(src, physicalKey);
-                if (physicalSynth == OpenFPS.Common.ModelSynth.Aircraft)
+                if (physicalSynth == OpenFPS.Models.ModelSynth.Aircraft)
                 {
                     // Its power lever as the server that flies it sends it (MachinePower: from its flight path
                     // in the air and its ground run on its wheels, a piston's closed throttle in the flare).
@@ -2891,7 +2891,7 @@ public partial class AudioWorld
                     rotorWake = RotorWake(src.State.Velocity);
                     onGround = OnTheWheels(src, world, eyePos, out _);
                 }
-                else if (physicalSynth == OpenFPS.Common.ModelSynth.Rail)
+                else if (physicalSynth == OpenFPS.Models.ModelSynth.Rail)
                 {
                     // The notch its driver has it in, as the server sends it (MachinePower.TrainNotch), carried
                     // in the lever slot; the wake slot carries the speed, for rolling noise.
@@ -2899,7 +2899,7 @@ public partial class AudioWorld
                     rotorWake = src.State.Velocity.Length();
                 }
             }
-            else if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(resolvedSoundId) is { } vehiclePreset)
+            else if (OpenFPS.Models.ModelKindTable.KnownVehiclePreset(resolvedSoundId) is { } vehiclePreset)
             {
                 // A vehicle: its own live engine, or a borrowed voice (DistantEngine).
                 if (!_liveEngines.Contains(src.Id))
@@ -2908,7 +2908,7 @@ public partial class AudioWorld
                     return;
                 }
                 engineKey = vehiclePreset;
-                var profile = OpenFPS.Common.MachineRegistry.VehicleFor(engineKey);
+                var profile = OpenFPS.Models.MachineRegistry.VehicleFor(engineKey);
                 // Its own measured level: a stock car is 14 dB over a road car, a diesel pickup 30 under.
                 float level = DeclaredLevel(engineKey, profile);
                 // Its acoustic size is the distance between the ends it radiates from (a car 3.5 m, a bus
@@ -2953,8 +2953,8 @@ public partial class AudioWorld
                     cabinEar = Vector3.Transform(eyePos - src.State.Position, Quaternion.Inverse(src.State.Rotation));
                 }
             }
-            else if (OpenFPS.Common.ModelKindTable.KindOf(resolvedSoundId) == null)
-                OpenFPS.Common.ModelKindTable.Fail(resolvedSoundId, "is synthesised but names no kind of model");
+            else if (OpenFPS.Models.ModelKindTable.KindOf(resolvedSoundId) == null)
+                OpenFPS.Models.ModelKindTable.Fail(resolvedSoundId, "is synthesised but names no kind of model");
         }
         else
         {
@@ -3131,7 +3131,7 @@ public partial class AudioWorld
 
         // The front outlet, after the machine's own voice so a just-built engine exists for the tap.
         if (engineKey.Length > 0 && _frontVoiced.Contains(src.Id))
-            FrontVoice(world, src, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), eyePos, earLevel,
+            FrontVoice(world, src, OpenFPS.Models.MachineRegistry.VehicleFor(engineKey), eyePos, earLevel,
                        engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), _sources.SampledAt);
 
         if (interior && cabinLayout != null && engineKey.Length > 0)
@@ -3201,10 +3201,10 @@ public partial class AudioWorld
             // Seated in a vehicle: a seated mouth, heard outside through the glass or open windows.
             bool seated = OpenFPS.Audio.Acoustics.CabinWalls.TryFind(world, talker.State.Position,
                                                                                 out var cabin, out var cabinVehicle);
-            float mouthHeight = seated ? SeatedMouthHeight : OpenFPS.Common.Speech.MouthHeight;
+            float mouthHeight = seated ? SeatedMouthHeight : OpenFPS.Models.Speech.MouthHeight;
             Vector3 mouth = talker.State.Position + new Vector3(0f, mouthHeight, 0f) + facing * 0.1f;
 
-            float levelDb = OpenFPS.Common.Speech.NormalDb - stream.Ring.SpeechRmsDbfs;
+            float levelDb = OpenFPS.Models.Speech.NormalDb - stream.Ring.SpeechRmsDbfs;
             var (gain, reference) = _audio.Hearing.Place(levelDb);
 
             // Asked under its own probe, as a one-off's source is: under the player's id it shared one answer with
@@ -3404,7 +3404,7 @@ public partial class AudioWorld
         _referenceVoice = (_referenceVoice + 1) & 1;
         var forward = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(Listener.Yaw, 0f, 0f));
         Vector3 ear = Listener.Feet + new Vector3(0f, Listener.EyeHeight, 0f);
-        Vector3 mouth = ear + forward * 1f - new Vector3(0f, Listener.EyeHeight - OpenFPS.Common.Speech.MouthHeight, 0f);
+        Vector3 mouth = ear + forward * 1f - new Vector3(0f, Listener.EyeHeight - OpenFPS.Models.Speech.MouthHeight, 0f);
         int voiceId = _voices.IdFor(VoiceKind.Reference, VoiceRegistry.NoEntity, _referenceVoice);
         _voices.DeclareEvent(voiceId, VoiceRegistry.NoEntity, VoiceKind.Reference, mouth);
         _voices.Submit(new SpatialEmitter
@@ -3592,7 +3592,7 @@ public partial class AudioWorld
         var facing = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(Listener.Yaw, 0f, 0f));
         Vector3 mouth = ear + facing * 0.08f - new Vector3(0f, 0.1f, 0f);
         // Full scale sits as far above normal talking as the microphone's talking level sits below it.
-        float levelDb = OpenFPS.Common.Speech.NormalDb - _audio.OwnVoice.SpeechRmsDbfs;
+        float levelDb = OpenFPS.Models.Speech.NormalDb - _audio.OwnVoice.SpeechRmsDbfs;
         var (gain, reference) = _audio.Hearing.Place(levelDb);
 
         // The room's reverberation; its own sound is silent (FmodAudioProvider._ownVoiceRoomGroup). At its

@@ -1,6 +1,6 @@
 using System.Numerics;
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;

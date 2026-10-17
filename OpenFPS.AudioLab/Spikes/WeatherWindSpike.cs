@@ -5,6 +5,7 @@ using OpenFPS.Common;
 using OpenFPS.Environment;
 using OpenFPS.Server.Systems;
 using OpenFPS.Physics;
+using OpenFPS.Models;
 
 namespace OpenFPS.AudioLab.Spikes;
 

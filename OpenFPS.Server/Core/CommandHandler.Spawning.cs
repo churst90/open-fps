@@ -8,6 +8,7 @@ using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Environment;
+using OpenFPS.Models;
 
 namespace OpenFPS.Server.Core;
 

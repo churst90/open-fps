@@ -1,6 +1,6 @@
 using OpenFPS.Sound;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>
 /// The fire selector: what its settings are called and how a step moves between them. The settings

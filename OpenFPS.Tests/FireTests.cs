@@ -2,7 +2,7 @@ using System.Numerics;
 using Arch.Core;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server;

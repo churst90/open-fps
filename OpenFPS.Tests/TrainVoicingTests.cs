@@ -3,7 +3,7 @@ using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Audio.Fmod;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

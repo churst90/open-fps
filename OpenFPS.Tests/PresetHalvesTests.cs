@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
-using OpenFPS.Common;
-using OpenFPS.Common.Editing;
+using OpenFPS.Models;
+using OpenFPS.Models.Editing;
 using Xunit.Abstractions;
 using OpenFPS.Sound;
 using OpenFPS.Schema;

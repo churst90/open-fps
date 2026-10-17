@@ -3,7 +3,7 @@ using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
@@ -239,11 +239,11 @@ public class WorldEditorClientTests
     [Fact]
     public void AVehiclesSoundNamesTheVehicleModelAndAShoreItsShore()
     {
-        Assert.True(OpenFPS.Common.Editing.ModelKinds.TryModelOfSound("engine:school_bus", out var kind, out var id));
+        Assert.True(OpenFPS.Models.Editing.ModelKinds.TryModelOfSound("engine:school_bus", out var kind, out var id));
         Assert.Equal((ModelLibrary.Kinds.Vehicle, "school_bus"), (kind, id));
-        Assert.True(OpenFPS.Common.Editing.ModelKinds.TryModelOfSound("shore:lake_rock", out kind, out _));
+        Assert.True(OpenFPS.Models.Editing.ModelKinds.TryModelOfSound("shore:lake_rock", out kind, out _));
         Assert.Equal(ModelLibrary.Kinds.Shore, kind);
-        Assert.Equal("water:pond/elm_park/0", OpenFPS.Common.Editing.ModelKinds.WithModel("water:park_fountain/elm_park/0", "pond"));
+        Assert.Equal("water:pond/elm_park/0", OpenFPS.Models.Editing.ModelKinds.WithModel("water:park_fountain/elm_park/0", "pond"));
     }
 
     private static string Typed(IMessage m)

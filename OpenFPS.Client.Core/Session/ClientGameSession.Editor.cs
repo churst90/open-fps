@@ -1,5 +1,6 @@
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
+using OpenFPS.Models;
 
 namespace OpenFPS.Client.Core.Session;
 
@@ -144,7 +145,7 @@ public partial class ClientGameSession
         var seen = new HashSet<(string, string)>();
         foreach (var (_, entity) in snapshot.Entities)
         {
-            if (!OpenFPS.Common.Editing.ModelKinds.TryModelOfSound(entity.Definition?.SoundEmitter.SoundId, out var kind, out var id)) continue;
+            if (!OpenFPS.Models.Editing.ModelKinds.TryModelOfSound(entity.Definition?.SoundEmitter.SoundId, out var kind, out var id)) continue;
             if (!seen.Add((kind, id))) continue;
             string built = kind == ModelLibrary.Kinds.Vehicle ? MachineRegistry.EngineKeyFor(id)
                          : kind == ModelLibrary.Kinds.SmallMachine ? ModelLibrary.SmallMachine(id).EngineKey ?? ""

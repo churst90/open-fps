@@ -20,6 +20,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
 using OpenFPS.Environment;
+using OpenFPS.Models;
 
 namespace OpenFPS.AudioLab.Spikes;
 

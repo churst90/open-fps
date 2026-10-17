@@ -42,6 +42,7 @@ SO = 'OpenFPS.Sound.'
 MA = 'OpenFPS.Materials.'
 PH = 'OpenFPS.Physics.'
 EV = 'OpenFPS.Environment.'
+MO = 'OpenFPS.Models.'
 
 # ── The inventory: (type, group, note) ─────────────────────────────────────────────────────────────
 RULES = [
@@ -89,10 +90,10 @@ RULES = [
     (SO + 'VehicleProfile', 'PS', 'a preset: mass, drag, rolling resistance, running gear are mechanics; the rest is sound'),
     (PH + 'EngineMechanics', 'P', 'the physics half of an engine preset: idle, redline, peak torque and its rpm'),
     (SO + 'EngineProfile', 'PS', 'a preset: torque, inertia, friction, idle and redline are mechanics; the gas path is sound'),
-    (C + 'VehicleSpec', 'M', 'the editable vehicle kind, as an edited vehicle is stored: the catalogue\'s (physics stage 2, 16.2)'),
-    (C + 'VehicleChassisSpec', 'M', 'its chassis, with the one number of the sound\'s it carries (SourceLevelDb)'),
-    (C + 'VehicleExhaustSpec', 'S', ''),
-    (C + 'VehicleIntakeSpec', 'S', ''),
+    (MO + 'VehicleSpec', 'M', 'the editable vehicle kind, as an edited vehicle is stored: the catalogue\'s (physics stage 2, 16.2)'),
+    (MO + 'VehicleChassisSpec', 'M', 'its chassis, with the one number of the sound\'s it carries (SourceLevelDb)'),
+    (MO + 'VehicleExhaustSpec', 'S', ''),
+    (MO + 'VehicleIntakeSpec', 'S', ''),
     (SO + 'VehicleBody', 'S', 'panel modes and the cabin air: how the engine gets out, not how the car moves'),
     (SO + 'BodyResonator', 'S', ''),
     (SO + 'BodyMode', 'S', ''),
@@ -191,7 +192,7 @@ def allowed_for_physics(t):
 
 
 def short(t):
-    for p in ('OpenFPS.Geometry.', 'OpenFPS.Environment.', 'OpenFPS.Physics.', 'OpenFPS.Materials.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
+    for p in ('OpenFPS.Geometry.', 'OpenFPS.Models.', 'OpenFPS.Environment.', 'OpenFPS.Physics.', 'OpenFPS.Materials.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
               'OpenFPS.Sound.Core.Engine.', 'OpenFPS.Server.Systems.', 'OpenFPS.Server.Core.',
               'OpenFPS.Client.Core.'):
         if t.startswith(p):

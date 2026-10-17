@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Audio.Fmod;
 using Xunit.Abstractions;
 

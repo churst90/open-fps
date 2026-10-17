@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 using OpenFPS.Sound;
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>
 /// Machines by name: the built-in library, plus whatever a map's author has written.

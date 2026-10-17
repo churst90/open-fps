@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Numerics;
 using OpenFPS.Audio.Acoustics;
 using OpenFPS.Sound.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Materials;
 

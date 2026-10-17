@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Text.Json;
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
@@ -380,7 +380,7 @@ public class VehicleMotionTests : IDisposable
         Assert.False(all.ContainsKey("Nowhere"));      // no track and no road: its heading would be NaN
 
         var car = all["Car"]; var plane = all["Plane"]; var mower = all["Mower"]; var person = all["Person"];
-        var profile = OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy");
+        var profile = OpenFPS.Models.MachineRegistry.VehicleFor("i4_economy");
         var air = OpenFPS.Sound.AircraftProfile.ByName("airliner");
 
         Assert.Equal("engine:i4_economy", w.Get<SoundEmitterComponent>(car).SoundId);
@@ -454,7 +454,7 @@ public class VehicleMotionTests : IDisposable
                         more: new() { new() { Name = "Mower", Preset = "mower_push", RoadStart = road, RoadEnd = end } });
         Assert.True(rig.Vehicles.TryInspect("motion", rig.Id, out var car));
         Assert.True(car.OnStreet);
-        Assert.Equal(OpenFPS.Sound.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy")), car.Horn);
+        Assert.Equal(OpenFPS.Sound.VehicleProfile.HornFor(OpenFPS.Models.MachineRegistry.VehicleFor("i4_economy")), car.Horn);
         Assert.True(rig.Vehicles.TryInspect("motion", Spawned()["Mower"].Id, out var mower));
         Assert.False(mower.OnStreet);
         Assert.Equal("", mower.Horn);
@@ -802,7 +802,7 @@ public class VehicleMotionTests : IDisposable
         // 60 expected in five minutes; random, so a band.
         Assert.InRange(horns.Count, 35, 90);
         Assert.True(horns.Select(h => h.Id).Distinct().Count() >= 2, "one car does all the honking");
-        string horn = OpenFPS.Sound.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy"));
+        string horn = OpenFPS.Sound.VehicleProfile.HornFor(OpenFPS.Models.MachineRegistry.VehicleFor("i4_economy"));
         foreach (var h in horns)
         {
             Assert.True(OpenFPS.Sound.Honk.TryParse(h.Sound.SynthKey, out var kind, out var pattern), h.Sound.SynthKey);

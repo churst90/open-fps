@@ -23,7 +23,7 @@ public class LocalPlayerController
     private double _lastUpdateAt = -1;
 
     /// <summary>How far above the player's feet the breath comes from, metres: the mouth, as everybody's.</summary>
-    private const float HeadHeight = OpenFPS.Common.Speech.MouthHeight;
+    private const float HeadHeight = OpenFPS.Models.Speech.MouthHeight;
 
     /// <summary>Forgets where the player was, for a spawn, a teleport, or getting in or out of a seat.</summary>
     public void Teleported()

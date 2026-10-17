@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>
 /// The catalogue as one instance (docs/ENGINE_PACKAGES.md, stage 2; docs/SOUND_LIBRARY_BOUNDARY.md, stage 5):

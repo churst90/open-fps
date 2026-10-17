@@ -1,6 +1,6 @@
 using FMOD;
 using OpenFPS.Audio.Fmod;
-using OpenFPS.Common;
+using OpenFPS.Models;
 
 /// <summary>--speech-lines: decodes every shipped voice line through the same FMOD path the client
 /// uses (GranularBank.TryDecode, on a NOSOUND system) and reports what came back: how many decoded,

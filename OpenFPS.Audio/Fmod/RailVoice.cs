@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Rail;
 
@@ -280,7 +280,7 @@ public sealed class TrainVoiceState
     /// <summary>"rail:&lt;preset&gt;/&lt;train&gt;/&lt;source index&gt;" — what the server writes as the
     /// SoundId of each entity of a consist.</summary>
     public static bool ParseKey(string soundId, out string preset, out string train, out int index)
-        => OpenFPS.Common.ModelKindTable.TryRailSource(soundId, out preset, out train, out index);
+        => OpenFPS.Models.ModelKindTable.TryRailSource(soundId, out preset, out train, out index);
 
     /// <summary>"rail:&lt;preset&gt;/&lt;train&gt;/@&lt;slot&gt;" — one of a train's voices (the client's own
     /// key; nothing on the wire carries it).</summary>

@@ -3,7 +3,7 @@ using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>How a modelled thing moves: what decides whether it has footsteps and whether it is a vehicle.</summary>
 public enum ModelBody : byte

@@ -11,6 +11,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Physics;
 using OpenFPS.Environment;
+using OpenFPS.Models;
 
 namespace OpenFPS.Tests;
 

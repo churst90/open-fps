@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Sound;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Models;
 
 /// <summary>
 /// A glazed part as the map has it: the prefab it was made from and the glazing that prefab declares, and, when it

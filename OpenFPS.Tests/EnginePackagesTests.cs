@@ -195,7 +195,7 @@ public class EnginePackagesTests
         new object[] { "Acoustics", typeof(OpenFPS.Acoustics.AcousticConstants).Assembly.GetName().Name! },
         new object[] { "Sound", typeof(OpenFPS.Sound.Loudness).Assembly.GetName().Name! },
         new object[] { "Accessibility", typeof(OpenFPS.Client.Core.Platform.GameKey).Assembly.GetName().Name! },
-        new object[] { "Models", typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name! },
+        new object[] { "Models", typeof(OpenFPS.Models.ModelLibrary).Assembly.GetName().Name! },
         new object[] { "World", typeof(OpenFPS.Server.OneWorld.WorldStore).Assembly.GetName().Name! },
         new object[] { "Audio", typeof(OpenFPS.Audio.Core.AudioEngineFacade).Assembly.GetName().Name! },
         new object[] { "Environment", typeof(OpenFPS.Environment.WorldWeather).Assembly.GetName().Name! },

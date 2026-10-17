@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Aircraft;
-using OpenFPS.Common;
+using OpenFPS.Models;
 
 namespace OpenFPS.Tests;
 

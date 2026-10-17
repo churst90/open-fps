@@ -6,7 +6,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using Xunit.Abstractions;
 using OpenFPS.Environment;
 

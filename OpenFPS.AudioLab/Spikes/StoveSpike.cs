@@ -9,7 +9,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Stove;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;

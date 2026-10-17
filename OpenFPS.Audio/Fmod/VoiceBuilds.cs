@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using OpenFPS.Audio.Data;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 
 namespace OpenFPS.Audio.Fmod;

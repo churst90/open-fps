@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using Xunit.Abstractions;
 using OpenFPS.Sound;
 using OpenFPS.Materials;

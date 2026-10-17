@@ -846,7 +846,7 @@ public partial struct AmmoComponent
 }
 
 /// <summary>
-/// The ammunition a person carries that is not in a gun, by kind (<see cref="OpenFPS.Common.Ammunition"/>
+/// The ammunition a person carries that is not in a gun, by kind (<see cref="OpenFPS.Models.Ammunition"/>
 /// ids). Kept per kind and not per gun: two rifles in the same calibre draw on the same rounds.
 /// </summary>
 [MemoryPackable]

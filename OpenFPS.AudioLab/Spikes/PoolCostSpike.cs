@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using System.Security.Cryptography;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 
@@ -339,7 +339,7 @@ public static class PoolCostSpike
     /// costs a step at each, to tell the engine from the rest of a voice.</summary>
     private static int EnginesAlone(string key)
     {
-        var p = OpenFPS.Common.ModelLibrary.Presets.Engine(key);
+        var p = OpenFPS.Models.ModelLibrary.Presets.Engine(key);
         foreach (int rate in new[] { 48000, 24000, 48000, 24000 })
         {
             var e = new OpenFPS.Sound.Core.Engine.EngineSynth(p, rate, 5) { Throttle = 0.4f };

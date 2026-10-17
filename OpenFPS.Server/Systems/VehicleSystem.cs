@@ -9,6 +9,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Models;
 
 namespace OpenFPS.Server.Systems;
 

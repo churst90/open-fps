@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Text.Json;
-using OpenFPS.Common;
+using OpenFPS.Models;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Audio;

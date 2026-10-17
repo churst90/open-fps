@@ -136,10 +136,10 @@ public partial class AudioWorld
     private VoiceKind OwnVoiceKind(bool synth, string key, int id, bool physical)
     {
         if (!synth) return VoiceKind.Recording;
-        return OpenFPS.Common.ModelKindTable.KindOf(key) switch
+        return OpenFPS.Models.ModelKindTable.KindOf(key) switch
         {
-            { Body: OpenFPS.Common.ModelBody.Rolls } when OpenFPS.Common.ModelKindTable.KnownVehiclePreset(key) != null => VoiceKind.Engine,
-            { Synth: OpenFPS.Common.ModelSynth.Aircraft } => VoiceKind.Aircraft,
+            { Body: OpenFPS.Models.ModelBody.Rolls } when OpenFPS.Models.ModelKindTable.KnownVehiclePreset(key) != null => VoiceKind.Engine,
+            { Synth: OpenFPS.Models.ModelSynth.Aircraft } => VoiceKind.Aircraft,
             _ when IsWood(id) => VoiceKind.Wood,
             _ => physical ? VoiceKind.Machine : VoiceKind.Recording,
         };

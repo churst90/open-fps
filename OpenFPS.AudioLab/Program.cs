@@ -264,23 +264,23 @@ if (args.Contains("--help"))
 
 // The authored machine library, copied in beside the maps and prefabs, so a spike auditions the same
 // cars the game plays rather than only the built-in ones.
-OpenFPS.Common.MachineRegistry.EnsureLoaded();
-OpenFPS.Common.ModelLibrary.EnsureLoaded();
+OpenFPS.Models.MachineRegistry.EnsureLoaded();
+OpenFPS.Models.ModelLibrary.EnsureLoaded();
 
 if (args.Contains("--models"))
 {
     string? exportTo = args.FirstOrDefault(a => a.StartsWith("export=", StringComparison.Ordinal))?["export=".Length..];
     if (exportTo != null)
     {
-        int n = OpenFPS.Common.ModelLibrary.Export(exportTo);
+        int n = OpenFPS.Models.ModelLibrary.Export(exportTo);
         Console.WriteLine($"  wrote {n} models to {exportTo}");
         Console.WriteLine("  NOT into models/ — an authored file overrides the built-in, so a copy of");
         Console.WriteLine("  the library there would freeze every model at today's numbers for good.");
     }
     else
     {
-        foreach (string kind in OpenFPS.Common.ModelLibrary.AllKinds)
-            Console.WriteLine($"  {kind,-13} {string.Join(", ", OpenFPS.Common.ModelLibrary.Ids(kind))}");
+        foreach (string kind in OpenFPS.Models.ModelLibrary.AllKinds)
+            Console.WriteLine($"  {kind,-13} {string.Join(", ", OpenFPS.Models.ModelLibrary.Ids(kind))}");
         Console.WriteLine("\n  --models export=DIR writes every one as the JSON the loader reads.");
     }
     Log.CloseAndFlush();
