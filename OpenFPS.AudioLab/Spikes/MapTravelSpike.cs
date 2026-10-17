@@ -5,7 +5,7 @@ using OpenFPS.Audio.Data;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --map-travel [from=city] [to=speedway] [voices=40]: Cody's /join of 2026-10-05 through the whole mixer.

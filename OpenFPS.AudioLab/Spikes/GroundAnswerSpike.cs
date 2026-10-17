@@ -9,8 +9,9 @@ using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 using OpenFPS.Models;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --ground-answer [map=city] ear=x,y,z [ear=...] src=x,y,z [src=...] [car=preset] [speed=km/h] [out=DIR] [cost]

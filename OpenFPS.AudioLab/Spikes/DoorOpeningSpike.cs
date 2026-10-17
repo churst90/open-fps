@@ -3,7 +3,7 @@ using OpenFPS.Materials;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Doors opening and shutting at a metre, before and after the leaf answers its latch.

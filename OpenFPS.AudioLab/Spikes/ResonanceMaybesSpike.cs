@@ -200,7 +200,7 @@ public static class ResonanceMaybesSpike
         finally { p.Dispose(); }
 
         // What the engine's own voice put out, the taps muted: its level before and after the swap.
-        var (l, r, sr) = OpenFPS.Client.Core.AudioEngine.Fmod.ClapRoomSpike.ReadStereo(Path.Combine(outDir, "outlet.post.wav"));
+        var (l, r, sr) = OpenFPS.AudioLab.Spikes.ClapRoomSpike.ReadStereo(Path.Combine(outDir, "outlet.post.wav"));
         double captureStart = (l.Length / (double)sr) - clock.Elapsed.TotalSeconds;
         foreach (var (name, from, to) in marks)
         {

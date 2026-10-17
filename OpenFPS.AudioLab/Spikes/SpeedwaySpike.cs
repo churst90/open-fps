@@ -8,7 +8,7 @@ using OpenFPS.Audio.Fmod;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --speedway [map] [seconds=60] [voices=4] [probe] [walk] [noecho]: the shipped map's cars on their racing

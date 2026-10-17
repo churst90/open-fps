@@ -79,7 +79,7 @@ public static class RainSpike
             string mapId = args.FirstOrDefault(a => a.StartsWith("map=", StringComparison.Ordinal))?[4..] ?? "city";
             var ear = P(args.First(a => a.StartsWith("ear=", StringComparison.Ordinal))[4..]);
             string root = args.FirstOrDefault(a => a.StartsWith("root=", StringComparison.Ordinal))?[5..] ?? AppContext.BaseDirectory;
-            Func<(WorldSnapshot, Vector3, string)> load = () => (OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.LoadAsClient(root, mapId), ear, $"{mapId} at {ear}");
+            Func<(WorldSnapshot, Vector3, string)> load = () => (OpenFPS.AudioLab.Spikes.PathProbeSpike.LoadAsClient(root, mapId), ear, $"{mapId} at {ear}");
             scenes.Add(($"{mapId}@{ear.X:F0},{ear.Y:F0},{ear.Z:F0}", load));
         }
         else

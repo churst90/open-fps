@@ -3,7 +3,7 @@ using OpenFPS.Materials;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --traced-echoes: the per-source tracer headless on a street canyon (brick rows 20 m apart on asphalt).

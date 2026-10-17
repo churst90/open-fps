@@ -1,6 +1,6 @@
 using OpenFPS.Sound.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --gun-spec [out=DIR] [refs=DIR]: a gunshot synthesised to the spec measured from the NIJ recordings

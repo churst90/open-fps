@@ -11,8 +11,9 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east|north|west|south]

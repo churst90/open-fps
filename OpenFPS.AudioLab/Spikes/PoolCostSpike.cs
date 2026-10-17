@@ -5,7 +5,7 @@ using OpenFPS.Models;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// What the engine render pool costs with a street's worth of live voices, and whether a change to the

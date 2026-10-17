@@ -45,7 +45,7 @@ public static class FloorRenderSpike
         if (!args.Contains("debug")) Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Warning().CreateLogger();
 
         // The city as the client gets it (PathProbeSpike.LoadAsClient), into the client's own world.
-        var snapshot = OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.LoadAsClient(root, "city");
+        var snapshot = OpenFPS.AudioLab.Spikes.PathProbeSpike.LoadAsClient(root, "city");
         var world = new ClientWorldState();
         world.Clear(new Vector3(4000, 400, 4000));
         foreach (var e in snapshot.Entities.Values) world.RegisterDefinition(e.Definition, deferAcoustics: true);

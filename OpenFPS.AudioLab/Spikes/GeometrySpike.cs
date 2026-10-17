@@ -8,7 +8,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 using PV = OpenFPS.Native.SteamAudio.Phonon.IPLVector3;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Throwaway measurements for docs/GEOMETRY.md: what the world costs as triangles.

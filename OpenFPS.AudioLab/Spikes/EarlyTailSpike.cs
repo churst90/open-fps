@@ -4,7 +4,7 @@ using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --early-tail [room=flat|stair|corridor] [hrtf]: the first 120 ms of the listener's trace, energy per

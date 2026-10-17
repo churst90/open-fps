@@ -8,7 +8,7 @@ using OpenFPS.Materials;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --clap-room [out=path] [claps=4] [sound=click|WEAPON] [dist=0.5] [bed] [tail=raw] [late=velvet]

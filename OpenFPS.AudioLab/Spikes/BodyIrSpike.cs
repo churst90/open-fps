@@ -1,6 +1,6 @@
 using OpenFPS.Sound;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// A vehicle body's impulse response, no engine: written as a WAV to listen to or load elsewhere, and

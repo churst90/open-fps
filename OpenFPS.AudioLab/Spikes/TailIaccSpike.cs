@@ -1,7 +1,7 @@
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// The tail's spatial rendering alone: three seconds of noise as the tail's omnidirectional channel,

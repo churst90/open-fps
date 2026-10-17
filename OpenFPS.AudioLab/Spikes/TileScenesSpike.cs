@@ -8,7 +8,7 @@ using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// The Steam Audio scene a client holds at the spawn of a streamed map, three ways: one mesh on the

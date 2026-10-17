@@ -4,7 +4,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --breath [effort=0..1] [seconds=40] [out=path]: the real <see cref="Breathing"/> model at an effort,

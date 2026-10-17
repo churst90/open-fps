@@ -4,7 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Models;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// What can be heard from a spot on a map, in order, and under which distance law.

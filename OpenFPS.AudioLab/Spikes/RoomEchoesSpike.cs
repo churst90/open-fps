@@ -5,7 +5,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Acoustics;
 using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --room-echoes [map=city] ear=x,y,z src=x,y,z: the placed reflections a one-off sound gets in the

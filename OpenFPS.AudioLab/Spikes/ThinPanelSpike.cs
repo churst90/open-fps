@@ -7,7 +7,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --thin-panel [material=Glass] [face=1.9,2.1] [mm=4,12,30] [ear=2] [src=10]: what Steam Audio's direct stage lets through one panel

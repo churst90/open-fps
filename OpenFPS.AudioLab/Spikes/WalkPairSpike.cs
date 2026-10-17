@@ -9,8 +9,9 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --walk-pair map=magnolia_tx at=E,N,H [heading=DEG] [key=w|a|s|d] [ticks=90] [taps=N gap=10] [sprint] [full] [from=E,N,H] [open=ID,...] [show=all]

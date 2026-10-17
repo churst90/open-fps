@@ -12,7 +12,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [explain] [panels] [emitters] [fields] [overlays=DIR] [root=DIR/]

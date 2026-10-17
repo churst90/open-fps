@@ -4,7 +4,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Sound.Core;
 using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Concrete Row: a straight street 24 m wide with six-storey concrete blocks down both sides and two

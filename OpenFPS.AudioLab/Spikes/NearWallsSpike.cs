@@ -8,8 +8,9 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Systems;
 using OpenFPS.Materials;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --near-walls [map=city] [from=E,N,H] [to=E,N,H] [steps=40] [open=ID,...] [heading=DEG] [at=E,N,H;...]

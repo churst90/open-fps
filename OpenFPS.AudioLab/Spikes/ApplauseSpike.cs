@@ -1,6 +1,6 @@
 using OpenFPS.Sound;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// A crowd, on its own, at whatever size and temper you ask for.

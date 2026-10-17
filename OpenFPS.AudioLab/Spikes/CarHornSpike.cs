@@ -2,7 +2,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Signals;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --car-horn [preset ...] [out=DIR] [air=KEY,KEY] [bend=F] [rise=S] [fall=S] [tag=NAME]: electric car

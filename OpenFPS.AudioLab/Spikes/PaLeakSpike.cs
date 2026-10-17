@@ -8,7 +8,7 @@ using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --pa-leak [out=DIR] [overlays=DIR] [before=L,M,H@x,y,z] [dry]: Cody's public address speaker on Main Street

@@ -5,7 +5,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Aircraft;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Aircraft heard from the ground: flyovers, landings and the spool.

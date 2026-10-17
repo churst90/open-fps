@@ -10,7 +10,7 @@ using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Native.Platform;
 using OpenFPS.Models;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --subnormals [sec=N]: the flush state FMOD's mixer thread runs our DSP callbacks with (any platform), then

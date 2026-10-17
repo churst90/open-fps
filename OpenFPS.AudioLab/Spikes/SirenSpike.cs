@@ -5,7 +5,7 @@ using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Models;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --siren [preset ...] [sec=20] | drive | voice: one WAV per mode per preset, each measured: level

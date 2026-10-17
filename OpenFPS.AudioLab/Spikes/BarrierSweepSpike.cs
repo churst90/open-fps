@@ -7,7 +7,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --barrier-sweep [map=city] [n=4000] [seed=1] [top=12] [range=150] [outdoor|ground] [panels|buried|terrain]

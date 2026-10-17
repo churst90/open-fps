@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// What the traced reverb and the traced echoes the game is using right now give the two ears: the

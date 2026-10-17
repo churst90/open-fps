@@ -8,7 +8,7 @@ using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --airbrake [tractor_trailer|transit_bus|locomotive]: air brakes on their own.

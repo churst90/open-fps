@@ -1,7 +1,7 @@
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Engine;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --intake-ir [preset ...] [thr=1] [sec=0.6] [out=DIR]: the intake tract's own modes. Every valve shut,

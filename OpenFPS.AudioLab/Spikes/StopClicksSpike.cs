@@ -136,7 +136,7 @@ public static class StopClicksSpike
         }
         finally { facade.Dispose(); }
 
-        var (l, r, sr) = OpenFPS.Client.Core.AudioEngine.Fmod.ClapRoomSpike.ReadStereo(wav);
+        var (l, r, sr) = OpenFPS.AudioLab.Spikes.ClapRoomSpike.ReadStereo(wav);
         var tones = Segments(l, r, sr);
         Console.WriteLine($"  every stop {(old ? "outright (old)" : "as the game makes it")}; a step under {ThresholdDb:F0} dB is not heard");
         if (tones.Count != names.Count) Console.WriteLine($"  WARNING: {tones.Count} tones in the capture for {names.Count} paths");

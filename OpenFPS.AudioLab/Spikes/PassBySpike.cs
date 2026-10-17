@@ -1,6 +1,6 @@
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --pass-by [out=DIR]: white noise driven past a listener through Steam Audio's binaural effect with one

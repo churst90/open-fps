@@ -3,7 +3,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Audio.Fmod;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// How loud each end of a machine is: the rear voice (tailpipe, body, rear tyres, brake air) against

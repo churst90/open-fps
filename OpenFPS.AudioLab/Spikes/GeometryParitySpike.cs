@@ -12,8 +12,9 @@ using OpenFPS.Acoustics;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --geometry-parity [map=city] [n=4000] [seed=1] [show=12] [times=1]

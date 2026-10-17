@@ -2,7 +2,6 @@ using System.Numerics;
 using OpenFPS.Audio.Core;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Client.Core;
-using OpenFPS.Client.Core.AudioEngine.Fmod;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -45,7 +44,7 @@ public static class ClapCitySpike
         AcousticRegistry.Initialize();
         if (!args.Contains("debug")) Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Warning().CreateLogger();
 
-        var snapshot = OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.LoadAsClient(root, "city");
+        var snapshot = OpenFPS.AudioLab.Spikes.PathProbeSpike.LoadAsClient(root, "city");
         var world = new ClientWorldState();
         world.Clear(new Vector3(4000, 400, 4000));
         foreach (var e in snapshot.Entities.Values) world.RegisterDefinition(e.Definition, deferAcoustics: true);

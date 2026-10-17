@@ -8,8 +8,9 @@ using OpenFPS.Audio.Fmod;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// The wood room walked with the megaphone on, through the real provider, the mix written to a WAV, so

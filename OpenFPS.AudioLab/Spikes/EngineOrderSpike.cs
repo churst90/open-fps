@@ -3,7 +3,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Engine;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// The engine measured in orders (one event per crank revolution: order 4 at 3000 rpm is 200 Hz), where

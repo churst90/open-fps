@@ -3,7 +3,7 @@ using System.Numerics;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --tail-cost [t60=2] [seconds=20] [ears=two] [others=1]: the late tail's cost per 256-sample piece on

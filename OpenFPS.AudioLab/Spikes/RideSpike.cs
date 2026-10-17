@@ -1,7 +1,7 @@
 using OpenFPS.Sound;
 using OpenFPS.Audio.Fmod;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --ride sportbike [knobs] out=FILE.wav [top=50] [gain=1.5]: the whole vehicle voice

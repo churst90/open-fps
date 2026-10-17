@@ -4,7 +4,7 @@ using System.Text.Json;
 using OpenFPS.Materials;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// What the room round a listener measures, at a place on a real map.

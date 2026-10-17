@@ -5,7 +5,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Engine;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// The game's engine voice (<see cref="EngineVoiceState"/>) on the bench: what one live vehicle costs

@@ -412,7 +412,7 @@ public static class BusyStreetSpike
             Pump(1.0);
         }
         finally { facade.Dispose(); }
-        var (l, r, sr) = OpenFPS.Client.Core.AudioEngine.Fmod.ClapRoomSpike.ReadStereo(wav);
+        var (l, r, sr) = OpenFPS.AudioLab.Spikes.ClapRoomSpike.ReadStereo(wav);
         Console.WriteLine("  end              | fall -1 to -60 dB | largest second difference within 5 ms of the end, dB over the tone's own");
         foreach (var (name, at) in new[] { ("let go (rule)", letGoAt), ("stopped outright", stoppedAt) })
         {

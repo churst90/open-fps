@@ -10,7 +10,7 @@ using OpenFPS.Materials;
 using OpenFPS.Physics;
 using OpenFPS.Environment;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --refraction [car=preset] [speed=km/h] [wind=m/s] [gust=0..1] [d=150,300,600] [src=m] [ground=Grass] [day=N] [temp=C]

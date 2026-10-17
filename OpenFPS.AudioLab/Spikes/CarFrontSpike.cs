@@ -1,11 +1,10 @@
 using System.Numerics;
 using OpenFPS.Models;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Sound;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.Fmod;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// The whole live vehicle voice, both taps as the game plays them, heard from in front of the car

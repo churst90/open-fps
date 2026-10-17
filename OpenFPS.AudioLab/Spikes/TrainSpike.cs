@@ -5,7 +5,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// A train going past somebody standing by the line.

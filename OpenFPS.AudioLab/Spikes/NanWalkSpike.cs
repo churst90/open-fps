@@ -4,7 +4,7 @@ using OpenFPS.Materials;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --nan-walk [map=city] [from=x,y,z] [to=x,y,z] [steps=12] [inside]: the listener's trace over the real

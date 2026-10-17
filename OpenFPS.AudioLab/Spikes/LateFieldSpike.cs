@@ -4,7 +4,7 @@ using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Each source's own late energy and direction, as the game traces them (LateField), in the three

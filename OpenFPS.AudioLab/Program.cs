@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using OpenFPS.Client.Core;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.AudioLab.Spikes;
 using Serilog;
 
 // FMOD's own logging is armed before any mode runs: it does nothing once System::create has run, and
@@ -289,35 +289,35 @@ if (args.Contains("--models"))
 
 if (args.Contains("--airbrake"))
 {
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.CrossingSpike.RunAirBrake(args);
+    int code = OpenFPS.AudioLab.Spikes.CrossingSpike.RunAirBrake(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
 
 if (args.Contains("--crossing"))
 {
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.CrossingSpike.RunCrossing(args);
+    int code = OpenFPS.AudioLab.Spikes.CrossingSpike.RunCrossing(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
 
 if (args.Contains("--train"))
 {
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.TrainSpike.Run(args);
+    int code = OpenFPS.AudioLab.Spikes.TrainSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
 
 if (args.Contains("--signals"))
 {
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.SignalSpike.Run(args);
+    int code = OpenFPS.AudioLab.Spikes.SignalSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
 
 if (args.Contains("--siren-route"))
 {
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.SirenRouteSpike.Run(args);
+    int code = OpenFPS.AudioLab.Spikes.SirenRouteSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
@@ -355,7 +355,7 @@ if (args.Contains("--eq-onset"))
 
 if (args.Contains("--subnormals"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.SubnormalSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.SubnormalSpike.Run(args));
 }
 
 if (args.Contains("--dsp-order"))
@@ -366,14 +366,14 @@ if (args.Contains("--dsp-order"))
 
 if (args.Contains("--traced-echoes"))
 {
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedEchoesSpike.Run();
+    int code = OpenFPS.AudioLab.Spikes.TracedEchoesSpike.Run();
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
 
 if (args.Contains("--traced-reverb"))
 {
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.Run();
+    int code = OpenFPS.AudioLab.Spikes.TracedReverbSpike.Run();
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
@@ -382,7 +382,7 @@ if (args.Contains("--sa-frame"))
 {
     // A wall to the left and a wall ahead: the traced response must say left and ahead, and decode
     // that way round the head.
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.FrameCheck();
+    int code = OpenFPS.AudioLab.Spikes.TracedReverbSpike.FrameCheck();
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
@@ -410,7 +410,7 @@ if (args.Contains("--engine-street"))
     if (keys.Length == 0) keys = new[] { "v8_muscle", "diesel_truck" };
     string? kmhArg = args.FirstOrDefault(a => a.StartsWith("kmh="));
     float[]? kmhs = kmhArg == null ? null : Array.ConvertAll(kmhArg[4..].Split(','), float.Parse);
-    int scode = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.RunStreet(keys, kmhs);
+    int scode = OpenFPS.AudioLab.Spikes.VehicleSpike.RunStreet(keys, kmhs);
     Log.CloseAndFlush();
     Environment.Exit(scode);
 }
@@ -419,7 +419,7 @@ if (args.Contains("--engine-live"))
     string presetKey = args.FirstOrDefault(a => OpenFPS.Sound.VehicleProfile.Presets.ContainsKey(a)) ?? "v8_muscle";
     string? kmh = args.FirstOrDefault(a => a.StartsWith("kmh="));
     float[]? speeds = kmh == null ? null : Array.ConvertAll(kmh[4..].Split(','), float.Parse);
-    int lcode = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.RunLive(presetKey, speeds);
+    int lcode = OpenFPS.AudioLab.Spikes.VehicleSpike.RunLive(presetKey, speeds);
     Log.CloseAndFlush();
     Environment.Exit(lcode);
 }
@@ -427,39 +427,39 @@ if (args.Contains("--wheel-squeal"))
 {
     // axle: the same drives with the axle voices squealing from the overall demand.
     string? outArg = args.FirstOrDefault(a => a.StartsWith("out="));
-    OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.AxleOnly = args.Contains("axle");
-    OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.Binaural = args.Contains("binaural");
-    int wcode = OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.Run(outArg?[4..]);
+    OpenFPS.AudioLab.Spikes.WheelSquealSpike.AxleOnly = args.Contains("axle");
+    OpenFPS.AudioLab.Spikes.WheelSquealSpike.Binaural = args.Contains("binaural");
+    int wcode = OpenFPS.AudioLab.Spikes.WheelSquealSpike.Run(outArg?[4..]);
     Log.CloseAndFlush();
     Environment.Exit(wcode);
 }
 if (args.Contains("--speedway"))
 {
-    int wcode = OpenFPS.Client.Core.AudioEngine.Fmod.SpeedwaySpike.Run(args);
+    int wcode = OpenFPS.AudioLab.Spikes.SpeedwaySpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(wcode);
 }
 if (args.Contains("--engine-jumps"))
 {
-    int jcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Jumps(args);
+    int jcode = OpenFPS.AudioLab.Spikes.EngineCostSpike.Jumps(args);
     Log.CloseAndFlush();
     Environment.Exit(jcode);
 }
 if (args.Contains("--applause"))
 {
-    int acode = OpenFPS.Client.Core.AudioEngine.Fmod.ApplauseSpike.Run(args);
+    int acode = OpenFPS.AudioLab.Spikes.ApplauseSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(acode);
 }
 if (args.Contains("--body-ir"))
 {
-    int bcode = OpenFPS.Client.Core.AudioEngine.Fmod.BodyIrSpike.Run(args);
+    int bcode = OpenFPS.AudioLab.Spikes.BodyIrSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(bcode);
 }
 if (args.Contains("--intake-ir"))
 {
-    int iicode = OpenFPS.Client.Core.AudioEngine.Fmod.IntakeIrSpike.Run(args);
+    int iicode = OpenFPS.AudioLab.Spikes.IntakeIrSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(iicode);
 }
@@ -489,60 +489,60 @@ if (args.Contains("--machines"))
 }
 if (args.Contains("--voice-levels"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.VoiceLevels(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.EngineCostSpike.VoiceLevels(args));
 }
 
 if (args.Contains("--engine-levels"))
 {
-    int lvcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Levels();
+    int lvcode = OpenFPS.AudioLab.Spikes.EngineCostSpike.Levels();
     Log.CloseAndFlush();
     Environment.Exit(lvcode);
 }
 if (args.Contains("--shot-echoes"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.ShotEchoSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ShotEchoSpike.Run(args));
 }
 if (args.Contains("--ride"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.RideSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.RideSpike.Run(args));
 }
 if (args.Contains("--shift-trace"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.ShiftTraceSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ShiftTraceSpike.Run(args));
 }
 if (args.Contains("--pool-cost"))
 {
-    int pcode = OpenFPS.Client.Core.AudioEngine.Fmod.PoolCostSpike.Run(args);
+    int pcode = OpenFPS.AudioLab.Spikes.PoolCostSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(pcode);
 }
 if (args.Contains("--engine-cost"))
 {
-    int ccode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Run(args);
+    int ccode = OpenFPS.AudioLab.Spikes.EngineCostSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(ccode);
 }
 if (args.Contains("--engine-trace"))
 {
-    int tcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Trace(args);
+    int tcode = OpenFPS.AudioLab.Spikes.EngineOrderSpike.Trace(args);
     Log.CloseAndFlush();
     Environment.Exit(tcode);
 }
 if (args.Contains("--engine-gallery"))
 {
-    int gcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Gallery(args);
+    int gcode = OpenFPS.AudioLab.Spikes.EngineOrderSpike.Gallery(args);
     Log.CloseAndFlush();
     Environment.Exit(gcode);
 }
 if (args.Contains("--engine-alias"))
 {
-    int eacode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Alias(args);
+    int eacode = OpenFPS.AudioLab.Spikes.EngineOrderSpike.Alias(args);
     Log.CloseAndFlush();
     Environment.Exit(eacode);
 }
 if (args.Contains("--breath"))
 {
-    int brCode = OpenFPS.Client.Core.AudioEngine.Fmod.BreathSpike.Run(args);
+    int brCode = OpenFPS.AudioLab.Spikes.BreathSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(brCode);
 }
@@ -561,29 +561,29 @@ if (args.Contains("--physics-replay"))
 }
 if (args.Contains("--near-walls"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NearWallsSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.NearWallsSpike.Run(args));
 }
 if (args.Contains("--walk-pair"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.WalkPairSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WalkPairSpike.Run(args));
 }
 if (args.Contains("--walk"))
 {
-    int walkCode = OpenFPS.Client.Core.AudioEngine.Fmod.WalkSpike.Run(args);
+    int walkCode = OpenFPS.AudioLab.Spikes.WalkSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(walkCode);
 }
 
 if (args.Contains("--enclosure"))
 {
-    int encCode = OpenFPS.Client.Core.AudioEngine.Fmod.EnclosureSpike.Run(args);
+    int encCode = OpenFPS.AudioLab.Spikes.EnclosureSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(encCode);
 }
 
 if (args.Contains("--yard"))
 {
-    int yardCode = OpenFPS.Client.Core.AudioEngine.Fmod.YardSpike.Run(args);
+    int yardCode = OpenFPS.AudioLab.Spikes.YardSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(yardCode);
 }
@@ -680,17 +680,17 @@ if (args.Contains("--rain"))
 
 if (args.Contains("--earshot"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarshotSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.EarshotSpike.Run(args));
 }
 
 if (args.Contains("--gun-fit"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.GunFitSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GunFitSpike.Run(args));
 }
 
 if (args.Contains("--gun-spec"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.GunSpecSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GunSpecSpike.Run(args));
 }
 
 if (args.Contains("--knob-renders"))
@@ -769,12 +769,12 @@ if (args.Contains("--wide-sources"))
 
 if (args.Contains("--car-fronts"))
 {
-    Environment.Exit(OpenFPS.Client.AudioEngine.Fmod.CarFrontSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.CarFrontSpike.Run(args));
 }
 
 if (args.Contains("--tap-balance"))
 {
-    Environment.Exit(OpenFPS.Client.AudioEngine.Fmod.TapBalanceSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TapBalanceSpike.Run(args));
 }
 
 if (args.Contains("--struck"))
@@ -794,22 +794,22 @@ if (args.Contains("--bumps"))
 
 if (args.Contains("--ground-answer"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GroundAnswerSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GroundAnswerSpike.Run(args));
 }
 
 if (args.Contains("--refraction"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RefractionSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.RefractionSpike.Run(args));
 }
 
 if (args.Contains("--ground-voice"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GroundVoiceSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GroundVoiceSpike.Run(args));
 }
 
 if (args.Contains("--pass-by"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PassBySpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.PassBySpike.Run(args));
 }
 
 if (args.Contains("--car-door"))
@@ -884,7 +884,7 @@ if (args.Contains("--presence-sounds"))
 
 if (args.Contains("--room-echoes"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.RoomEchoesSpike.Run(args));
 }
 if (args.Contains("--resonance-maybes"))
 {
@@ -908,7 +908,7 @@ if (args.Contains("--floor-render"))
 }
 if (args.Contains("--layers"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.LayersSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.LayersSpike.Run(args));
 }
 if (args.Contains("--wall-tl"))
 {
@@ -916,27 +916,27 @@ if (args.Contains("--wall-tl"))
 }
 if (args.Contains("--pop-hunt"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PopHuntSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.PopHuntSpike.Run(args));
 }
 if (args.Contains("--pa-leak"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PaLeakSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.PaLeakSpike.Run(args));
 }
 if (args.Contains("--thin-panel"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.ThinPanelSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ThinPanelSpike.Run(args));
 }
 if (args.Contains("--barrier-sweep"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.BarrierSweepSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BarrierSweepSpike.Run(args));
 }
 if (args.Contains("--beacon-count"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.BeaconCountSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BeaconCountSpike.Run(args));
 }
 if (args.Contains("--path-probe"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.PathProbeSpike.Run(args));
 }
 if (args.Contains("--distant-woods"))
 {
@@ -944,51 +944,51 @@ if (args.Contains("--distant-woods"))
 }
 if (args.Contains("--tile-scenes"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.TileScenesSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TileScenesSpike.Run(args));
 }
 if (args.Contains("--stream-walk"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StreamWalkSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.StreamWalkSpike.Run(args));
 }
 if (args.Contains("--stair-walk"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StairWalkSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.StairWalkSpike.Run(args));
 }
 if (args.Contains("--geometry-parity"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GeometryParitySpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GeometryParitySpike.Run(args));
 }
 if (args.Contains("--geometry"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GeometrySpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GeometrySpike.Run(args));
 }
 if (args.Contains("--scene-cost"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.SceneCostSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.SceneCostSpike.Run(args));
 }
 if (args.Contains("--tail-bands"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailBandsSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TailBandsSpike.Run(args));
 }
 if (args.Contains("--tail-steady"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailSteadySpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TailSteadySpike.Run(args));
 }
 if (args.Contains("--tail-cost"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailCostSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TailCostSpike.Run(args));
 }
 if (args.Contains("--tail-iacc"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailIaccSpike.Run());
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TailIaccSpike.Run());
 }
 if (args.Contains("--late-field"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.LateFieldSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.LateFieldSpike.Run(args));
 }
 if (args.Contains("--nan-mix"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanMixSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.NanMixSpike.Run(args));
 }
 if (args.Contains("--distant-updates"))
 {
@@ -1005,19 +1005,19 @@ if (args.Contains("--distant-updates"))
 }
 if (args.Contains("--map-travel"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.MapTravelSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.MapTravelSpike.Run(args));
 }
 if (args.Contains("--nan-walk"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanWalkSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.NanWalkSpike.Run(args));
 }
 if (args.Contains("--early-tail"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarlyTailSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.EarlyTailSpike.Run(args));
 }
 if (args.Contains("--clap-room"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.ClapRoomSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ClapRoomSpike.Run(args));
 }
 if (args.Contains("--door-knock"))
 {
@@ -1274,12 +1274,12 @@ if (args.Contains("--car-window"))
 
 if (args.Contains("--door-opening"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.DoorOpeningSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.DoorOpeningSpike.Run(args));
 }
 
 if (args.Contains("--car-horn"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.CarHornSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.CarHornSpike.Run(args));
 }
 
 if (args.Contains("--mic"))
@@ -1308,28 +1308,28 @@ if (args.Contains("--mic"))
 
 if (args.Contains("--siren"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.SirenSpike.Run(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.SirenSpike.Run(args));
 }
 
 if (args.Contains("--landing"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.AircraftSpike.Landing(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.AircraftSpike.Landing(args));
 }
 
 if (args.Contains("--spool"))
 {
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.AircraftSpike.Spool(args));
+    Environment.Exit(OpenFPS.AudioLab.Spikes.AircraftSpike.Spool(args));
 }
 
 if (args.Contains("--aircraft"))
 {
-    int aircode = OpenFPS.Client.Core.AudioEngine.Fmod.AircraftSpike.Run(args);
+    int aircode = OpenFPS.AudioLab.Spikes.AircraftSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(aircode);
 }
 if (args.Contains("--engine-orders"))
 {
-    int orderCode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Run(args);
+    int orderCode = OpenFPS.AudioLab.Spikes.EngineOrderSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(orderCode);
 }
@@ -1342,7 +1342,7 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
     bool muscle = args.Contains("--muscle-rev") || args.Contains("--muscle-rev-live");
     string? preset = args.FirstOrDefault(a => !a.StartsWith("--") && OpenFPS.Sound.VehicleProfile.Presets.ContainsKey(a));
     bool stationary = muscle || args.Contains("--vehicle-rev") || args.Contains("--vehicle-rev-live");
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.Run(
+    int code = OpenFPS.AudioLab.Spikes.VehicleSpike.Run(
         args.Contains("--vehicle-live") || args.Contains("--vehicle-rev-live")
         || args.Contains("--muscle-rev-live"), stationary, muscle, preset,
         withBody: !args.Contains("body=off"),
@@ -1370,7 +1370,7 @@ if (args.Contains("--room-change"))
 if (args.Contains("--room-walk"))
 {
     Console.WriteLine("--- Room walk: the wood room with the megaphone on, walked, the mix captured to a WAV ---");
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.RoomWalkSpike.Run(args);
+    int code = OpenFPS.AudioLab.Spikes.RoomWalkSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }

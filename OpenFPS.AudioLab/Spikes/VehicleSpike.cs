@@ -8,7 +8,7 @@ using OpenFPS.Audio.Data;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --vehicle and friends: a car synthesised from its mechanism, started, driven past, brought back hard,

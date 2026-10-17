@@ -11,7 +11,7 @@ using OpenFPS.Sound;
 using OpenFPS.Materials;
 using OpenFPS.Models;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --siren-route [map=city] [track=downtown] [preset=police_interceptor] [lane=1.8] [at=x,z] [from=metres]

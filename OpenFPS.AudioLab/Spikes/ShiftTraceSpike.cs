@@ -1,7 +1,7 @@
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Engine;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// What the game's driver does with a gearbox in town: a preset driven by <see cref="VirtualDriver"/>

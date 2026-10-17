@@ -4,7 +4,7 @@ using OpenFPS.Materials;
 using OpenFPS.Acoustics;
 using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// What a shot echoes off: every arrival EarlyReflections finds for an impulse on a real map, with the

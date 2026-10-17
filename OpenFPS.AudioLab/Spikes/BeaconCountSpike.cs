@@ -5,8 +5,9 @@ using OpenFPS.Audio.Core;
 using OpenFPS.Audio.Data;
 using OpenFPS.Common;
 using OpenFPS.Materials;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --beacon-count [map=city] tp=E,N,H [tp=...] [list] [root=DIR/]

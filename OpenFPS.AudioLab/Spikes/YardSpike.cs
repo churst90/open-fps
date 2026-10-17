@@ -5,7 +5,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Yard;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// The machinery that stands in a garden and runs: mowers and air conditioners.

@@ -3,11 +3,10 @@ using OpenFPS.Physics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Audio.Fmod;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --wheel-squeal [out=DIR] [axle] [binaural]: each wheel squealing for itself (VehicleSynth.WheelSqueal

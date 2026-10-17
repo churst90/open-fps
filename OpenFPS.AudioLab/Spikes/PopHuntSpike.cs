@@ -6,7 +6,7 @@ using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Materials;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --pop-hunt [map=city] ear=x,y,z [sec=60] [cars=40] [extra=30] [seed=1] [verbose] [lines] [panels]

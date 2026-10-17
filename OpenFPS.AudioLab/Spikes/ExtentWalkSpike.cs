@@ -80,7 +80,7 @@ public static class ExtentWalkSpike
         {
             var names = wanted.Where(w => MapOf(w) == map).ToList();
             if (names.Count == 0) continue;
-            if (!OpenFPS.Client.Core.AudioEngine.SteamAudio.WalkPairSpike.Load(map, out var maps)) return 1;
+            if (!OpenFPS.AudioLab.Spikes.WalkPairSpike.Load(map, out var maps)) return 1;
             maps.TryGetMap(map, out var ecs, out _, out var grid, out _);
             var all = EntityDefinitionFactory.StaticDefinitions(ecs);
             var defs = all.Where(d => d.SoundEmitter.IsSynth && d.SoundEmitter.SoundId != null).ToList();

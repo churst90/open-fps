@@ -9,7 +9,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Materials;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --nan-mix [map=city] [from=x,y,z] [to=x,y,z] [seconds=10] [door=x,y,z] [atear]: Cody's walk of 2026-10-03

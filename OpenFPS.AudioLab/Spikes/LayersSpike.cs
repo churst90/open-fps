@@ -5,8 +5,9 @@ using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Materials;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --layers: layers in contact against walls apart. For each construction of boxes, what Steam Audio's

@@ -7,8 +7,9 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Up a flight of stairs and down again, W held, through the server's own movement on the triangle world

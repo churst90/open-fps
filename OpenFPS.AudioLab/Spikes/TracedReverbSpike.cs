@@ -5,7 +5,7 @@ using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --traced-reverb: the traced outdoor reverb, measured headless. Three places — open ground, a

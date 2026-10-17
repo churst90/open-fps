@@ -3,7 +3,7 @@ using OpenFPS.Materials;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Does the tail hold still while you do? The listener's trace of one place, standing still: each

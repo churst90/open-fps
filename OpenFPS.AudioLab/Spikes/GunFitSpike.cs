@@ -1,7 +1,7 @@
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Every weapon's report against the NIJ recordings of its own gun, read by one ruler.

@@ -7,8 +7,9 @@ using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Client.Core;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// Walks a real map with the REAL movement engine and the REAL ground probe, and reports every

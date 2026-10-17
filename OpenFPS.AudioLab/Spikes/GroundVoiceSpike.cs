@@ -6,7 +6,7 @@ using OpenFPS.Models;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// A person talking on a pavement, through the game's own HRTF, three ways: no ground; the ground's

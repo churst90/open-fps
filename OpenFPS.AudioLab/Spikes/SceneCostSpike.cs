@@ -2,7 +2,7 @@ using OpenFPS.Materials;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --scene-cost [map=city]: what a door costs, the Steam Audio scene and the listener's ground-free
@@ -16,7 +16,7 @@ public static class SceneCostSpike
         AcousticRegistry.Initialize();
         string mapId = args.FirstOrDefault(a => a.StartsWith("map="))?[4..] ?? "city";
         string root = OpenFPS.AudioLab.LabPaths.Server() + System.IO.Path.DirectorySeparatorChar;
-        var (world, _) = OpenFPS.Client.Core.AudioEngine.SteamAudio.SirenRouteSpike.Load(root + "maps/" + mapId + ".json", root + "prefabs", "none", 0f);
+        var (world, _) = OpenFPS.AudioLab.Spikes.SirenRouteSpike.Load(root + "maps/" + mapId + ".json", root + "prefabs", "none", 0f);
         var cs = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no context"); return 1; }
         using var full = new SteamAudioScene(ctx);

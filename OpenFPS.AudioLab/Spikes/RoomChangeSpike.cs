@@ -34,7 +34,7 @@ public static class RoomChangeSpike
         }).ToList();
         AcousticRegistry.Initialize();
 
-        var snapshot = OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.LoadAsClient(AppContext.BaseDirectory, "city");
+        var snapshot = OpenFPS.AudioLab.Spikes.PathProbeSpike.LoadAsClient(AppContext.BaseDirectory, "city");
         var world = new ClientWorldState();
         world.Clear(new Vector3(4000, 400, 4000));
         foreach (var e in snapshot.Entities.Values) world.RegisterDefinition(e.Definition, deferAcoustics: true);

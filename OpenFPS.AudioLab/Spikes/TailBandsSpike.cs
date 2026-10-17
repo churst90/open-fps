@@ -3,7 +3,7 @@ using OpenFPS.Materials;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --tail-bands [bare] [corridor]: is the flat's traced tail boomy, or is it the rendering? Flat 01F's

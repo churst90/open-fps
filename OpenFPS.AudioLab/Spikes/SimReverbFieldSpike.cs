@@ -4,7 +4,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --sim-reverbfield: the reflection simulation's RT60 beside the geometry's enclosure, for places from
