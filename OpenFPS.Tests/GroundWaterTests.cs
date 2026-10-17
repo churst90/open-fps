@@ -376,6 +376,138 @@ public class GroundWaterTests : IDisposable
         Assert.False(GroundChannels.TryParse("creek", out _));
     }
 
+    /// <summary>A key carries the share of its flow at its upstream end when a line gathers water along it, and a kind
+    /// alone (a mapped creek's prefab) is a dry line of that kind.</summary>
+    [Fact]
+    public void A_line_s_key_carries_its_head_share()
+    {
+        var c = new GroundCatchment(new float[] { 1500, 820, 0, 0, 3000, 12000, 0 }, 600f);
+        string key = GroundChannels.Key(GroundChannelKind.Creek, 2.4f, 0.004f, 180f, 120f, c, 0.35f);
+        Assert.EndsWith("/350", key);
+        var spec = ModelLibrary.Presets.Flow(key);
+        Assert.Equal(0.35f, spec.HeadShare, 3);
+        Assert.Equal(BedForm.PoolRiffle, spec.Bed);
+        Assert.Equal(180f, spec.LengthMetres);
+        Assert.Equal(GroundChannels.LevelDb(GroundChannelKind.Creek, 120f, 0.004f) + 10f * MathF.Log10(180f / 20f), spec.SourceLevelDb, 3);
+        Assert.DoesNotContain("/1000", GroundChannels.Key(GroundChannelKind.Creek, 2.4f, 0.004f, 180f, 120f, c));
+        Assert.True(GroundChannels.TryParse("ground/creek", out var bare));
+        var weather = new WorldWeather();
+        weather.Ground.Settle(25f);
+        weather.Ground.Held = true;
+        Assert.True(bare.FlowNow(weather) < bare.DryBelowLitresPerSecond);
+    }
+
+    /// <summary>A valley 400 m long over two tiles, its axis falling east, and the line down its axis.</summary>
+    private static DrainageNetwork TwoTileValley(Func<int, int, byte>? surface = null, IEnumerable<Vector3>? placed = null)
+    {
+        const int per = 100, tiles = 2, n = per * tiles;
+        float H(int i, int j) => 10f + 0.04f * MathF.Abs(j - 50) + 0.004f * (n - i);
+        var whole = new float[n * per];
+        for (int j = 0; j < per; j++) for (int i = 0; i < n; i++) whole[j * n + i] = H(i, j);
+        var inputs = new List<DrainageNetwork.TileInput>();
+        for (int tx = 0; tx < tiles; tx++)
+        {
+            var (flow, fill) = Drainage.Route(whole, n, per, tx * per, 0, per, per, Cell);
+            var hh = new float[per * per];
+            var s = new byte[per * per];
+            for (int j = 0; j < per; j++)
+                for (int i = 0; i < per; i++)
+                {
+                    hh[j * per + i] = whole[j * n + tx * per + i];
+                    s[j * per + i] = surface?.Invoke(tx * per + i, j) ?? (byte)GroundSurface.Open;
+                }
+            inputs.Add(new DrainageNetwork.TileInput(tx, 0, tx * per * Cell, 0f, hh,
+                new TileDrainage { Cells = per, CellMetres = Cell, Flow = flow, FillCm = fill, Surface = s }));
+        }
+        return new DrainageNetwork { LineSquareMetres = 2000f, CreekSquareMetres = 2e4f }.Build(inputs, placed);
+    }
+
+    /// <summary>
+    /// A line is heard as whole runs (docs/RUNNING_WATER.md 15.6), not 20 m chords: down a valley's axis, one voice to
+    /// a tile and a kind, each along its own cells (every point within a cell of the axis, in the tile it is in),
+    /// together as long as the stretches heard, its flow at its downstream end and a share of it at its head.
+    /// </summary>
+    [Fact]
+    public void A_line_is_heard_as_whole_runs_along_its_cells()
+    {
+        var net = TwoTileValley();
+        var axis = net.Voices.Where(v => MathF.Abs(v.Position.Z - 50.5f * Cell) < 3f).ToList();
+        foreach (var v in axis)
+            _o.WriteLine($"{v.Kind} {v.LengthMetres:F0} m from x {v.Line![0].X:F0} to {v.Line[^1].X:F0}, {v.Line.Length} points, reference {v.ReferenceLitresPerSecond:F2} L/s, head {v.HeadShare:F2}");
+        Assert.InRange(axis.Count, 2, 4);
+        int kinds = axis.Select(v => v.Kind).Distinct().Count();
+        Assert.True(axis.Count <= 2 + kinds, $"{axis.Count} voices down one axis of {kinds} kinds over two tiles");
+        foreach (var v in axis)
+        {
+            Assert.NotNull(v.Line);
+            Assert.All(v.Line!, p => Assert.InRange(p.Z, 49.5f * Cell, 51.5f * Cell + 0.1f));
+            // In the tile its stretches' middles are in, its last stretch reaching at most half a stretch over the edge.
+            float x0 = v.Line!.Min(p => p.X), x1 = v.Line.Max(p => p.X), half = 0.5f * GroundChannelBed.SegmentMetres;
+            Assert.True(MathF.Floor((x0 + half) / (100 * Cell)) == MathF.Floor((x1 - half) / (100 * Cell)),
+                        $"a voice from x {x0} to {x1} crosses a tile");
+            Assert.True(v.Line[0].X < v.Line[^1].X, "a voice's line runs downstream");
+            Assert.InRange(v.HeadShare, 0.001f, 1f);
+            if (v.LengthMetres > 50f) Assert.True(v.HeadShare < 0.95f, $"a {v.LengthMetres:F0} m run gathers nothing along it");
+        }
+        Assert.True(axis.Sum(v => v.LengthMetres) > 300f, $"{axis.Sum(v => v.LengthMetres):F0} m heard of a 400 m valley");
+        // The line's middle is a middle: as far along it from either end.
+        var one = axis.MaxBy(v => v.LengthMetres)!;
+        var path = new OpenFPS.Client.AudioEngine.Core.Nature.LinePath(one.Line!);
+        path.Nearest(one.Position, out float along);
+        Assert.True(MathF.Abs(along) < 1f, $"its position stands {along:F1} m from its middle");
+    }
+
+    /// <summary>
+    /// A creek the map draws, laid along a valley's axis as water, voiced from what the ground drains to its water
+    /// cells (MapDrainage.VoiceWaterways): its two parts one waterway taken downstream, the flow growing down it, its
+    /// bed's width saying what comes from upstream off the map; and the ground's own lines kept clear of it.
+    /// </summary>
+    [Fact]
+    public void A_mapped_creek_is_voiced_from_what_drains_to_it()
+    {
+        var world = Arch.Core.World.Create();
+        try
+        {
+            // Drawn upstream, in two parts meeting at the tiles' edge, along the axis at the water's height.
+            float Y(float x) => 10f + 0.004f * (200f - x / Cell) + 0.05f;
+            Arch.Core.Entity Part(float from, float to)
+            {
+                var mid = new Vector3(0.5f * (from + to), Y(0.5f * (from + to)), 50.5f * Cell);
+                return world.Create(new OpenFPS.Common.Components.Transform { Position = mid, Rotation = Quaternion.Identity, Scale = Vector3.One },
+                    new OpenFPS.Common.Components.SoundEmitterComponent
+                    {
+                        IsSynth = true, SoundId = "flow:ground/creek",
+                        Line = new[] { new Vector3(from, Y(from), 50.5f * Cell) - mid, new Vector3(to, Y(to), 50.5f * Cell) - mid },
+                    },
+                    new OpenFPS.Common.Components.IdentityComponent { Name = "Test Creek", PrefabId = "waterway_creek" },
+                    new OpenFPS.Common.Components.ColliderComponent { Shape = OpenFPS.Common.Components.ColliderShape.Box, Size = new Vector3(3f, 0.2f, 0.2f) });
+            }
+            var downstream = Part(390f, 200f);
+            var upstream = Part(200f, 10f);
+            var net = TwoTileValley((i, j) => (byte)(j is >= 49 and <= 51 ? GroundSurface.Water : GroundSurface.Open), MapDrainage.PlacedWater(world));
+            Assert.Equal(2, MapDrainage.VoiceWaterways(world, net));
+            var a = world.Get<OpenFPS.Common.Components.SoundEmitterComponent>(upstream);
+            var b = world.Get<OpenFPS.Common.Components.SoundEmitterComponent>(downstream);
+            Assert.True(GroundChannels.TryParse(a.SoundId![5..], out var up));
+            Assert.True(GroundChannels.TryParse(b.SoundId![5..], out var down));
+            _o.WriteLine($"upstream {a.SoundId}\ndownstream {b.SoundId}");
+            Assert.Equal(3f, down.WidthMetres, 2);
+            Assert.True(up.ReferenceFlow < down.ReferenceFlow, $"{up.ReferenceFlow} L/s upstream, {down.ReferenceFlow} down");
+            // The bed 3 m wide was shaped by 1 m³/s (w = 3 Q^0.5): what the valley does not give it comes from upstream.
+            Assert.InRange(down.ReferenceFlow, 990f, 1010f);
+            Assert.True(up.HeadShare < 1f && down.HeadShare > up.HeadShare);
+            Assert.True(down.Ground!.TotalSquareMetres > 0.8f * up.Ground!.TotalSquareMetres);
+            // Each part's line runs downstream now, east.
+            Assert.True(a.Line![0].X < a.Line[^1].X && b.Line![0].X < b.Line[^1].X);
+            // The valley's own line is on water all along it, and nothing else is heard within 15 m of the creek.
+            Assert.DoesNotContain(net.Voices, v => v.Line!.Any(p => MathF.Abs(p.Z - 50.5f * Cell) < 15f && p.X > 12f && p.X < 388f));
+        }
+        finally
+        {
+            Arch.Core.World.Destroy(world);
+        }
+    }
+
     [Fact]
     public void A_declared_level_is_the_loudest_a_line_does_at_or_under_its_flow()
     {

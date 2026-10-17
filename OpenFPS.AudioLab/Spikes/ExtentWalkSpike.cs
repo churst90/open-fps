@@ -93,7 +93,7 @@ public static class ExtentWalkSpike
             {
                 var walk = Make(name, defs, all, Floor);
                 if (walk == null) { Console.WriteLine($"FAIL: no {name} walk on {map}"); failures++; continue; }
-                var near = defs.Where(d => walk.Source(d.SoundEmitter.SoundId!) && walk.Feet.Any(f => Vector3.DistanceSquared(f, d.Transform.Position) < 150f * 150f)).ToList();
+                var near = defs.Where(d => walk.Source(d.SoundEmitter.SoundId!) && walk.Feet.Any(f => Reach(d, f) < 150f)).ToList();
                 Console.WriteLine();
                 Console.WriteLine($"== {walk.Name}: {walk.About}; {walk.Feet.Count} steps, {near.Count} sources within 150 m");
                 Console.WriteLine($"   from /tp {PlayerCoordinates.Format(walk.Feet[0])} to /tp {PlayerCoordinates.Format(walk.Feet[^1])}");
@@ -116,18 +116,23 @@ public static class ExtentWalkSpike
             case "creek":
             case "creek-out":
             {
-                // The longest run of creek voices end to end, beside it 1.5 m off its line.
-                var chain = LongestChain(defs.Where(d => d.SoundEmitter.SoundId!.StartsWith("flow:ground/creek/", StringComparison.OrdinalIgnoreCase)).ToList(),
-                                         d => GroundChannels.TryParse(d.SoundEmitter.SoundId![5..], out var s) ? s.LengthMetres : 20f);
-                if (chain.Count < 3) return null;
+                // The longest run of the drainage's creek voices end to end (not a mapped creek's), beside it 1.5 m off its
+                // line. Heard as whole lines (2026-10-17), the run that holds the creek the walks of 2026-10-16 measured,
+                // centred where they were.
+                var creeks = defs.Where(d => d.SoundEmitter.SoundId!.StartsWith("flow:ground/creek/", StringComparison.OrdinalIgnoreCase)
+                                             && !(d.Identity.PrefabId ?? "").StartsWith("waterway_", StringComparison.Ordinal)).ToList();
+                float LengthOfPart(EntityDefinition d) => GroundChannels.TryParse(d.SoundEmitter.SoundId![5..], out var s) ? s.LengthMetres : 20f;
+                var chain = creeks.Any(d => PointsOf(d) != null) ? ChainNear(creeks, LengthOfPart, MeasuredCreek) : LongestChain(creeks, LengthOfPart);
+                if (chain.Count < 3 && chain.Sum(d => PointsOf(d) is { } l ? LengthOf(l.ToList()) : 0f) < 60f) return null;
                 var line = Polyline(chain);
+                float centre = PointsOf(chain[0]) != null ? AlongOf(line, MeasuredCreek) : 0.5f * LengthOf(line);
                 if (name == "creek")
                 {
-                    var (feet, heading) = Beside(line, 1.5f, 60f, floor);
+                    var (feet, heading) = Beside(line, 1.5f, 60f, floor, centre);
                     return new Walk(name, "albany_or", $"along a creek of {chain.Count} drainage-line voices ({LengthOf(line):F0} m), 1.5 m off its line",
                                     feet, heading, GroundLine);
                 }
-                var (mid, along) = PointAt(line, 0.5f * LengthOf(line));
+                var (mid, along) = PointAt(line, centre);
                 var side = Vector3.Normalize(Vector3.Cross(along, Vector3.UnitY));
                 var outFeet = new List<Vector3>();
                 for (float d = 0.5f; d <= 60f + 1e-3f; d += Step)
@@ -143,7 +148,7 @@ public static class ExtentWalkSpike
                 // Albany's Oak Creek as the map draws it (the water strips tools/gen_osm.py lays along OpenStreetMap's
                 // line): beside its longest run 1.5 m out from its edge, and out from that run's middle. Every running
                 // water near counts, the drainage's lines beside it too.
-                var strips = all.Where(d => d.Identity.Name == "Oak Creek" && d.Material.Material == "Water" && d.Collider.Size.X > 0.5f).ToList();
+                var strips = all.Where(d => d.Identity.Name == "Oak Creek" && d.Identity.PrefabId == "water_surface" && d.Collider.Size.X > 0.5f).ToList();
                 var chain = LongestChain(strips, d => d.Collider.Size.X);
                 if (chain.Count < 3) return null;
                 var line = Polyline(chain);
@@ -245,6 +250,8 @@ public static class ExtentWalkSpike
     {
         var ends = parts.Select(d =>
         {
+            // A source laid along a line of its own (SoundEmitterComponent.Line): that line's ends.
+            if (PointsOf(d) is { } line) return (Def: d, A: line[0], B: line[^1]);
             var axis = Vector3.Transform(Vector3.UnitX, d.Transform.Rotation);
             float half = 0.5f * lengthOf(d);
             return (Def: d, A: d.Transform.Position - axis * half, B: d.Transform.Position + axis * half);
@@ -279,7 +286,11 @@ public static class ExtentWalkSpike
                     tip = forward ? (flip ? ends[next].A : ends[next].B) : (flip ? ends[next].B : ends[next].A);
                 }
             }
-            if (chain.Count > best.Count) best = chain.Select(i => ends[i].Def).ToList();
+            // Stretches laid straight, the most of them (as before 2026-10-17); lines of their own, the longest.
+            float Long(IEnumerable<EntityDefinition> c) => c.Sum(d => PointsOf(d) is { } l ? LengthOf(l.ToList()) : lengthOf(d));
+            var defs = chain.Select(i => ends[i].Def).ToList();
+            bool lines = defs.Any(d => PointsOf(d) != null);
+            if (best.Count == 0 || (lines ? Long(defs) > Long(best) : defs.Count > best.Count)) best = defs;
         }
         return best;
 
@@ -287,7 +298,59 @@ public static class ExtentWalkSpike
     }
 
     /// <summary>The run's line: through every stretch's middle, in order.</summary>
-    private static List<Vector3> Polyline(List<EntityDefinition> chain) => chain.Select(d => d.Transform.Position).ToList();
+    private static List<Vector3> Polyline(List<EntityDefinition> chain)
+    {
+        // Stretches laid straight: through each one's middle. Lines of their own: their points, each turned to go on
+        // from where the last ended.
+        if (chain.All(d => PointsOf(d) == null)) return chain.Select(d => d.Transform.Position).ToList();
+        var line = new List<Vector3>();
+        foreach (var d in chain)
+        {
+            var points = PointsOf(d) ?? new[] { d.Transform.Position };
+            if (line.Count > 0 && Vector3.Distance(points[^1], line[^1]) < Vector3.Distance(points[0], line[^1])) points = points.Reverse().ToArray();
+            if (line.Count == 0 && chain.Count > 1 && PointsOf(chain[1]) is { } next
+                && MathF.Min(Vector3.Distance(points[0], next[0]), Vector3.Distance(points[0], next[^1])) < MathF.Min(Vector3.Distance(points[^1], next[0]), Vector3.Distance(points[^1], next[^1])))
+                points = points.Reverse().ToArray();
+            line.AddRange(points);
+        }
+        return line;
+    }
+
+    /// <summary>The middle of the creek the extent walks of 2026-10-16 measured on Albany (map metres): the drainage's
+    /// creek beside which the stretches rose and fell 10 dB every 20 m.</summary>
+    private static readonly Vector3 MeasuredCreek = new(901.9f, 0f, -1281.0f);
+
+    /// <summary>The run of parts end to end that passes nearest a point.</summary>
+    private static List<EntityDefinition> ChainNear(List<EntityDefinition> parts, Func<EntityDefinition, float> lengthOf, Vector3 near)
+    {
+        var nearest = parts.MinBy(d => Flat(PointsOf(d) is { } l ? new LinePath(l).Nearest(near with { Y = l[0].Y }, out _) - near : d.Transform.Position - near))!;
+        var rest = new List<EntityDefinition>(parts);
+        // Grow from it: the longest chain that holds it.
+        var chain = LongestChain(rest, lengthOf);
+        while (!chain.Contains(nearest) && rest.Count > 1)
+        {
+            rest.RemoveAll(chain.Contains);
+            chain = LongestChain(rest, lengthOf);
+        }
+        return chain.Contains(nearest) ? chain : new List<EntityDefinition> { nearest };
+
+        static float Flat(Vector3 v) => MathF.Sqrt(v.X * v.X + v.Z * v.Z);
+    }
+
+    /// <summary>How far along a polyline its point nearest <paramref name="p"/> is, m.</summary>
+    private static float AlongOf(List<Vector3> line, Vector3 p)
+    {
+        new LinePath(line.Select(q => q with { Y = 0f }).ToArray()).Nearest(p with { Y = 0f }, out float along);
+        return along + 0.5f * LengthOf(line);
+    }
+
+    /// <summary>A source's own line in the world, or null.</summary>
+    private static Vector3[]? PointsOf(EntityDefinition d)
+        => d.SoundEmitter.Line is { Length: >= 2 } l ? l.Select(p => d.Transform.Position + Vector3.Transform(p, d.Transform.Rotation)).ToArray() : null;
+
+    /// <summary>How near a source comes to a point: its line's nearest point, or its middle.</summary>
+    private static float Reach(EntityDefinition d, Vector3 to)
+        => PointsOf(d) is { } line ? Vector3.Distance(new LinePath(line).Nearest(to, out _), to) : Vector3.Distance(d.Transform.Position, to);
 
     private static float LengthOf(List<Vector3> line)
     {
@@ -315,10 +378,11 @@ public static class ExtentWalkSpike
 
     /// <summary>Feet every step along the middle <paramref name="metres"/> of a line, <paramref name="off"/> m to
     /// its right (negative: left), on the floor there.</summary>
-    private static (List<Vector3> Feet, Vector3 Heading) Beside(List<Vector3> line, float off, float metres, Func<Vector3, float> floor)
+    private static (List<Vector3> Feet, Vector3 Heading) Beside(List<Vector3> line, float off, float metres, Func<Vector3, float> floor,
+                                                                float centre = float.NaN)
     {
         float total = LengthOf(line);
-        float from = MathF.Max(0f, 0.5f * (total - metres));
+        float from = Math.Clamp((float.IsNaN(centre) ? 0.5f * total : centre) - 0.5f * metres, 0f, MathF.Max(0f, total - metres));
         var feet = new List<Vector3>();
         for (float s = from; s <= MathF.Min(total, from + metres) + 1e-3f; s += Step)
         {
@@ -422,7 +486,7 @@ public static class ExtentWalkSpike
         {
             string id = d.SoundEmitter.SoundId!;
             if (!id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) continue;
-            if (walk.Feet.Min(f => Vector3.Distance(f, d.Transform.Position)) > 30f) continue;
+            if (walk.Feet.Min(f => Reach(d, f)) > 30f) continue;
             var spec = ModelLibrary.Presets.Flow(id[5..]);
             flows.Add((spec.FlowNow(rig.Facade.Weather), spec.ReferenceFlow));
         }

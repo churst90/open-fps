@@ -1,0 +1,21 @@
+{
+  "Id": "waterway_ditch",
+  "Name": "Ditch",
+  "Description": "A ditch or drain as the map draws it, heard along its whole line (SoundEmitterComponent.Line, from the map's Line): its running water from what the ground drains to it (MapDrainage.VoiceWaterways). Its box's X is its bed's width. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 1,
+    "Y": 0.2,
+    "Z": 0.2
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:ground/ditch",
+  "Volume": 1.0,
+  "Range": 120,
+  "MinDistance": 1,
+  "Mode": "LoopOne"
+}

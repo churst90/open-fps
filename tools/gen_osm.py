@@ -1494,6 +1494,13 @@ for w in sorted(ways_by_kind["rail"], key=lambda w: w["id"]):
 
 # Water: ponds as rectangles of their outline, streams as strips. Solid underfoot, because the
 # engine has no swimming: walking onto a pond is walking on water, and the name says so.
+def waterway_width(wf):
+    """A waterway's bed, m: what the map says, else a stream's, a ditch's or a drain's 3 m and a river's 12."""
+    if wf.get("width"):
+        return float(wf["width"])
+    return 3.0 if wf["class"] in ("stream", "ditch", "drain") else 12.0
+
+
 for wf in WATER:
     nm = wf["name"] or ("Pond" if wf["kind"] == "area" else "Creek")
     if wf["kind"] == "area":
@@ -1509,7 +1516,7 @@ for wf in WATER:
             CLEAR.add(("box", F) + b, *bbox_of(F, *b))
     else:
         for part in clip_line([P(a, b) for a, b in wf["line"]]):
-            lay_line(part, 3.0 if wf["class"] in ("stream", "ditch", "drain") else 12.0, "water_surface", Y_ROAD + 0.01, nm, "water")
+            lay_line(part, waterway_width(wf), "water_surface", Y_ROAD + 0.01, nm, "water")
 
 
 # ══ Addresses ═════════════════════════════════════════════════════════════════════════════════════
@@ -3796,6 +3803,96 @@ if LEVEL >= 1:
             n_shores += 1
 
 
+# ══ Waterways heard ═══════════════════════════════════════════════════════════════════════════════
+#
+# Every stream, river, canal, ditch and drain heard along its whole line (docs/RUNNING_WATER.md 15.6): the water
+# strips above are what you see and stand on, this is what you hear. Its points lie on the water's surface as the
+# strips are set on the ground (on the lowest of the ground under them), and it is cut where it crosses a tile's
+# edge, so each part is sent with the tile it is in; the server joins the parts into one waterway and gives it the
+# water the ground drains to it (MapDrainage.VoiceWaterways). Its box's X is its bed's width, the strips' own.
+# Laid last of all (lay_waterways, just before the ground) so no other id moves.
+WATERWAY_PREFAB = {"ditch": "waterway_ditch", "drain": "waterway_ditch"}
+WATERWAY_TOL = 0.5                       # the line's points kept within this of where the map draws it, m
+WATERWAY_LEAST = 20.0                    # a part shorter than this goes with the one beside it, over the tile's edge, m
+n_waterways = 0
+
+
+def cut_at_tiles(pts):
+    """A polyline cut where it crosses a tile's edge, each part within one tile, the cut points shared."""
+    dense = [pts[0]]
+    for (ax, az), (bx, bz) in zip(pts, pts[1:]):
+        ts = []
+        for a, b in ((ax, bx), (az, bz)):
+            lo, hi = sorted((a, b))
+            k = math.floor(lo / TILE) + 1
+            while k * TILE < hi:
+                ts.append((k * TILE - a) / (b - a))
+                k += 1
+        for t in sorted(ts):
+            dense.append((ax + t * (bx - ax), az + t * (bz - az)))
+        dense.append((bx, bz))
+    parts, cur, tile = [], [dense[0]], None
+    for a, b in zip(dense, dense[1:]):
+        if math.dist(a, b) < 1e-6:
+            continue
+        here = tile_of((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        if tile is not None and here != tile:
+            parts.append(cur)
+            cur = [a]
+        tile = here
+        cur.append(b)
+    parts.append(cur)
+    parts = [p for p in parts if len(p) >= 2]
+    # A sliver over an edge is no source of its own: it goes with the part beside it, which reaches that far over.
+    merged = []
+    for p in parts:
+        if merged and (plen(p) < WATERWAY_LEAST or plen(merged[-1]) < WATERWAY_LEAST):
+            merged[-1] = merged[-1] + p[1:]
+        else:
+            merged.append(p)
+    return [p for p in merged if plen(p) >= 1.0]
+
+
+def water_y(x, z, nx, nz, width):
+    """The water's surface at a point of a strip `width` across, its sides along (nx, nz): its strip's top over
+    the lowest of the ground there, as ground_all sets a water strip."""
+    lo = min(ground(x, z), ground(x + nx * width / 2, z + nz * width / 2), ground(x - nx * width / 2, z - nz * width / 2))
+    return lo + Y_ROAD + 0.05
+
+
+def lay_waterways():
+    """Each waterway's parts, written after every other entity (just before the ground is laid) so no other id moves."""
+    global n_waterways
+    for wf in WATER:
+        if wf["kind"] == "area":
+            continue
+        lay_waterway(wf)
+
+
+def lay_waterway(wf):
+    global n_waterways
+    nm = wf["name"] or "Creek"
+    width = waterway_width(wf)
+    prefab = WATERWAY_PREFAB.get(wf["class"], "waterway_creek")
+    for part in clip_line([P(a, b) for a, b in wf["line"]]):
+        for piece in cut_at_tiles(simplify(part, WATERWAY_TOL)):
+            pts3 = []
+            for i, (x, z) in enumerate(piece):
+                a, b = piece[max(0, i - 1)], piece[min(len(piece) - 1, i + 1)]
+                L = math.dist(a, b) or 1.0
+                pts3.append((x, water_y(x, z, -(b[1] - a[1]) / L, (b[0] - a[0]) / L, width), z))
+            mx, mz = point_at(piece, plen(piece) / 2)
+            k = min(range(len(piece) - 1), key=lambda i: seg_point(mx, mz, *piece[i], *piece[i + 1])[0])
+            (ax, az), (bx, bz) = piece[k], piece[k + 1]
+            L = math.dist(piece[k], piece[k + 1]) or 1.0
+            my = water_y(mx, mz, -(bz - az) / L, (bx - ax) / L, width)
+            e = {"EntityId": new_id(), "PrefabId": prefab, "Position": v3(mx, my, mz), "Scale": v3(round(width, 2), 1, 1),
+                 "Line": [v3(x - mx, y - my, z - mz) for x, y, z in pts3]}
+            _finish(e, nm, "water")
+            e["_pin"] = 0.0
+            n_waterways += 1
+
+
 # ══ Traffic ═══════════════════════════════════════════════════════════════════════════════════════
 VEHICLES = []
 if LEVEL >= 1:
@@ -4089,6 +4186,7 @@ def clear_surfaces():
 
 
 SURFACES_GONE = clear_surfaces()
+lay_waterways()
 ground_all()
 if HAS_GROUND:
     spawn = (spawn[0], spawn[1] + ground(spawn[0], spawn[2]), spawn[2])
@@ -4183,7 +4281,7 @@ print(f"  area {XMAX - XMIN:.0f} x {ZMAX - ZMIN:.0f} m; {len(ROADS)} roads, {len
       f"({INTERPOLATED} interpolated from Census ranges), {len(LOTS)} lots, {len(BLD)} buildings")
 print("  buildings: " + ", ".join(f"{k} {STATS[k]}" for k in ("house", "mobile_home", "premises", "church", "building", "garage", "workshop", "barn", "outbuilding", "shed")))
 print(f"  {regions} zones and rooms, {by_prefab['named_place']} named places, {STATS['doors']} outside doors, "
-      f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} stretches of shore, {len(VEHICLES)} vehicles")
+      f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} stretches of shore, {n_waterways} waterways heard, {len(VEHICLES)} vehicles")
 print("  by layer: " + ", ".join(f"{k} {v}" for k, v in sorted(COUNT.items())))
 if STATS["kitchens with a corner counter"]:
     print(f"  {STATS['kitchens with a corner counter']} kitchens with no clear stretch of back wall have a short counter in a corner")

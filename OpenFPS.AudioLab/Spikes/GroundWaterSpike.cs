@@ -162,6 +162,22 @@ public static class GroundWaterSpike
             Console.WriteLine($"  {kind} reference flows: " + string.Join(", ", new[] { 0.05f, 0.2f, 0.5f, 1f, 5f, 20f, 100f }
                 .Select(q => $"{refs.Count(r => r >= q)} at {q:0.##} L/s and over")));
         }
+        // The map's own creeks as voiced (MapDrainage.VoiceWaterways), upstream first in each.
+        if (l.Maps.TryGetMap(l.Id, out var mapWorld, out _, out _, out _))
+        {
+            var mapped = EntityDefinitionFactory.StaticDefinitions(mapWorld)
+                .Where(d => (d.Identity.PrefabId ?? "").StartsWith(MapDrainage.WaterwayPrefix, StringComparison.Ordinal)).ToList();
+            Console.WriteLine($"Mapped waterways: {mapped.Count} parts");
+            float openPerSquareMetre = GroundHydrology.RunoffMm(GroundSurface.Open, GroundChannelBed.ReferenceStormMm, l.Maps.GroundWater.SoilGroup) / 7200f;
+            foreach (var d in mapped.OrderBy(d => d.Identity.Name).ThenBy(d => d.Transform.Position.X))
+            {
+                if (!GroundChannels.TryParse(d.SoundEmitter.SoundId![5..], out var w) || w.Ground == null) { Console.WriteLine($"  {d.Identity.Name}: {d.SoundEmitter.SoundId}"); continue; }
+                var start = d.Transform.Position + d.SoundEmitter.Line![0];
+                Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"  {d.Identity.Name,-12} from ({start.X:F0}, {start.Z:F0}) {w.LengthMetres,5:F0} m, {w.WidthMetres:F1} m wide at {w.Slope * 100:F2} %, {w.Bed}; " +
+                    $"bed made for {w.ReferenceFlow:F0} L/s, {w.HeadShare:P0} of it at its head; {w.Ground.TotalSquareMetres / 1e4:F1} ha drain to it"));
+            }
+        }
         int show = (int)(float.TryParse(Arg(args, "lines="), NumberStyles.Float, CultureInfo.InvariantCulture, out float s) ? s : 25f);
         Console.WriteLine();
         Console.WriteLine($"The {show} biggest lines at least 150 m long, each from its head to where it joins a bigger one (map metres: x east, z north; heights over the map's y = 0):");
@@ -473,9 +489,10 @@ public static class GroundWaterSpike
             var ids = new List<int>();
             foreach (var v in l.Net.Voices)
             {
-                if (Vector2.Distance(new Vector2(v.Position.X, v.Position.Z), new Vector2(stand.X, stand.Z)) > 80f) continue;
+                var near = v.Line is { Length: >= 2 } line ? new OpenFPS.Client.AudioEngine.Core.Nature.LinePath(line).Nearest(stand, out _) : v.Position;
+                if (Vector2.Distance(new Vector2(near.X, near.Z), new Vector2(stand.X, stand.Z)) > 80f) continue;
                 int id = nextId++;
-                var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, v.Yaw - MathF.PI / 2f);
+                var turn = v.Line != null ? Quaternion.Identity : Quaternion.CreateFromAxisAngle(Vector3.UnitY, v.Yaw - MathF.PI / 2f);
                 var def = new EntityDefinition
                 {
                     EntityId = id, Type = EntityType.StaticObject,
@@ -486,7 +503,7 @@ public static class GroundWaterSpike
                 def.SoundEmitter = new SoundEmitterComponent
                 {
                     IsSynth = true, SoundId = soundId, Mode = PlaybackMode.LoopOne, Volume = 1f,
-                    Range = MathF.Max(60f, LabHearing.AudibleRange(spec.SourceLevelDb + 6f)), MinDistance = 1f, ExtentMetres = spec.ExtentMetres,
+                    Range = MathF.Max(60f, LabHearing.AudibleRange(spec.SourceLevelDb + 6f)), MinDistance = 1f, ExtentMetres = spec.ExtentMetres, Line = MapDrainage.LineOf(v),
                 };
                 world.RegisterDefinition(def);
                 ids.Add(id);

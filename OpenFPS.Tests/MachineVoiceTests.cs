@@ -197,6 +197,8 @@ public class MachineVoiceTests
                         $"{Path.GetFileName(file)} names foliage '{preset}', which is not a preset");
                     break;
                 case "flow":
+                    // A mapped creek's prefab names its kind of line alone ("ground/creek"), its water the server's.
+                    if (GroundChannels.TryParse(preset, out _)) break;
                     Assert.True(RunningWaterSpec.Presets.ContainsKey(preset),
                         $"{Path.GetFileName(file)} names running water '{preset}', which is not a preset");
                     break;

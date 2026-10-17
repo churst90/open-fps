@@ -136,6 +136,10 @@ public static class GroundChannels
     private static RunningWaterSpec? Parse(string key)
     {
         var parts = key[Prefix.Length..].Split('/');
+        // A kind alone ("ground/creek"): a mapped creek's own until the server has measured what drains to it
+        // (MapDrainage.VoiceWaterways), dry.
+        if (parts.Length == 1 && Enum.TryParse<GroundChannelKind>(parts[0], ignoreCase: true, out var bare))
+            return SpecFor(bare, 1f, 0.01f, GroundChannelBed.SegmentMetres, 0f, new GroundCatchment(new float[GroundHydrology.Surfaces], 0f));
         if (parts.Length is not (6 or 7)) return null;
         int head = 1000;
         if (parts.Length == 7 && !int.TryParse(parts[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out head)) return null;

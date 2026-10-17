@@ -160,10 +160,23 @@ public sealed class DrainageNetwork
         public float SquareMetres;
     }
 
-    /// <summary>A stretch of a line that is heard: where its voice stands, which way the line runs, and what it is.
-    /// Its sound is the host's to name (MapDrainage.SoundId: the running water's GroundChannels).</summary>
+    /// <summary>
+    /// A run of a line that is heard, one source (docs/RUNNING_WATER.md 15.6): its middle and the way the line runs
+    /// there, what it is, its bed at its downstream end, and the line itself, its cells' middles from upstream down
+    /// (in the world, a few centimetres over the ground). Its reference flow and catchment are its downstream end's,
+    /// and <see cref="HeadShare"/> is the share of that flow it has at its upstream end. Its sound is the host's to
+    /// name (MapDrainage.SoundId: the running water's GroundChannels).
+    /// </summary>
     public sealed record Voice(Vector3 Position, float Yaw, GroundChannelKind Kind, float WidthMetres, float Slope, float LengthMetres,
-                               float ReferenceLitresPerSecond, GroundCatchment Catchment, int Cell, float SquareMetres);
+                               float ReferenceLitresPerSecond, GroundCatchment Catchment, int Cell, float SquareMetres,
+                               Vector3[]? Line = null, float HeadShare = 1f);
+
+    /// <summary>
+    /// The longest one voice runs, m. A line is one source from where it is first heard until its kind changes, a
+    /// pond or placed water breaks it, or it leaves a tile (a source is sent with the tile it stands in), and no longer
+    /// than this: its stones are rendered one by one only beside you, the rest stood in for, whatever its length.
+    /// </summary>
+    public float VoiceMostMetres { get; init; } = 400f;
 
     public IReadOnlyList<Pond> Ponds => _ponds;
     public IReadOnlyList<LineInfo> Lines => _lines;
@@ -535,35 +548,115 @@ public sealed class DrainageNetwork
         float seg = GroundChannelBed.SegmentMetres;
         int pieces = Math.Max(1, (int)MathF.Floor(along[^1] / seg));
         if (along[^1] < 0.5f * seg) return;
+        int per = CellsPerTile * CellsPerTile;
+        // Each 20 m stretch as it always was judged (its kind, its flow, whether it is heard at all), then the heard
+        // stretches end to end in one voice while they are of a kind and a tile.
+        var run = new List<Stretch>();
         for (int p = 0; p < pieces; p++)
         {
             float a0 = p * seg, a1 = p == pieces - 1 ? along[^1] : (p + 1) * seg;
             int k0 = Array.FindIndex(along, v => v >= a0), k1 = Array.FindLastIndex(along, v => v <= a1);
-            if (k0 < 0 || k1 <= k0) continue;
-            int mid = cells[(k0 + k1) / 2];
-            // Water standing there already, or a lake: no running water to hear.
-            if (_pondOf[mid] >= 0 || _surface[mid] == (byte)GroundSurface.Water) continue;
-            var c0 = Centre(cells[k0]);
-            var c1 = Centre(cells[k1]);
-            var centre = Centre(mid);
-            if (placed.Any(w => Vector2.Distance(new Vector2(w.X, w.Z), new Vector2(centre.X, centre.Z)) < PlacedWaterClearMetres)) continue;
-            float length = MathF.Max(1f, a1 - a0);
-            float slope = MathF.Max(0.002f, (_height[cells[k0]] - _height[cells[k1]]) / length);
-            var catchment = CatchmentOf(mid);
-            var areas = catchment.AreaSquareMetres;
-            var ponds = catchment.Ponds;
-            // Its bed is shaped by everything that drains through it, the ponds' ground included.
-            var total = (float[])areas.Clone();
-            foreach (int id in ponds)
-                for (int s = 0; s < total.Length; s++) total[s] += _ponds[id].Total[s];
-            float reference = GroundChannelBed.ReferenceFlow(new GroundCatchment(total, 0f), SoilGroup);
-            if (reference < VoiceReferenceLitresPerSecond) continue;
-            var kind = KindOf(cells, k0, k1, _area[mid] * CellArea);
-            float width = GroundChannelBed.WidthFor(kind, reference);
-            var dir = new Vector2(c1.X - c0.X, c1.Z - c0.Z);
-            float yaw = dir.LengthSquared() > 1e-6f ? MathF.Atan2(dir.X, dir.Y) : 0f;
-            _voices.Add(new Voice(centre + new Vector3(0f, 0.05f, 0f), yaw, kind, width, slope, length, reference, catchment, mid, _area[mid] * CellArea));
+            Stretch? here = null;
+            if (k0 >= 0 && k1 > k0)
+            {
+                int mid = cells[(k0 + k1) / 2];
+                var centre = Centre(mid);
+                // Water standing there already, or a lake: no running water to hear.
+                bool heard = _pondOf[mid] < 0 && _surface[mid] != (byte)GroundSurface.Water
+                             && !placed.Any(w => Vector2.Distance(new Vector2(w.X, w.Z), new Vector2(centre.X, centre.Z)) < PlacedWaterClearMetres);
+                if (heard)
+                {
+                    var catchment = CatchmentOf(mid);
+                    // Its bed is shaped by everything that drains through it, the ponds' ground included.
+                    var total = (float[])catchment.AreaSquareMetres.Clone();
+                    foreach (int id in catchment.Ponds)
+                        for (int s = 0; s < total.Length; s++) total[s] += _ponds[id].Total[s];
+                    float reference = GroundChannelBed.ReferenceFlow(new GroundCatchment(total, 0f), SoilGroup);
+                    if (reference >= VoiceReferenceLitresPerSecond)
+                        here = new Stretch(k0, k1, mid, KindOf(cells, k0, k1, _area[mid] * CellArea), reference, catchment, mid / per);
+                }
+            }
+            if (run.Count > 0 && (here is not { } h || h.Kind != run[0].Kind || h.Tile != run[0].Tile || h.K0 > run[^1].K1 + 1
+                                  || along[h.K1] - along[run[0].K0] > VoiceMostMetres))
+            {
+                AddRun(cells, run);
+                run.Clear();
+            }
+            if (here is { } s0) run.Add(s0);
         }
+        if (run.Count > 0) AddRun(cells, run);
+    }
+
+    /// <summary>A 20 m stretch of a line judged heard: its first and last cells' places in the line, its middle cell,
+    /// what it is, its flow and catchment, and its tile.</summary>
+    private readonly record struct Stretch(int K0, int K1, int Mid, GroundChannelKind Kind, float Reference, GroundCatchment Catchment, int Tile);
+
+    /// <summary>One voice for stretches end to end: its line through its cells' middles from upstream down, its bed and
+    /// flow its downstream end's, the share of that flow at its upstream end.</summary>
+    private void AddRun(int[] cells, List<Stretch> run)
+    {
+        var first = run[0];
+        var last = run[^1];
+        var points = new List<Vector3>();
+        for (int k = first.K0; k <= last.K1; k++) points.Add(Centre(cells[k]) + new Vector3(0f, 0.05f, 0f));
+        var line = Simplify(points, CellMetres * 0.5f);
+        float length = 0f;
+        for (int i = 1; i < line.Length; i++) length += Vector3.Distance(line[i - 1], line[i]);
+        length = MathF.Max(1f, length);
+        float slope = MathF.Max(0.002f, (_height[cells[first.K0]] - _height[cells[last.K1]]) / length);
+        // Its middle, by length, and which way it runs there.
+        Vector3 middle = line[0], way = line[^1] - line[0];
+        float half = 0.5f * length, so = 0f;
+        for (int i = 1; i < line.Length; i++)
+        {
+            float l = Vector3.Distance(line[i - 1], line[i]);
+            if (so + l >= half || i == line.Length - 1)
+            {
+                middle = Vector3.Lerp(line[i - 1], line[i], l > 0f ? Math.Clamp((half - so) / l, 0f, 1f) : 0f);
+                way = line[i] - line[i - 1];
+                break;
+            }
+            so += l;
+        }
+        float yaw = way.X * way.X + way.Z * way.Z > 1e-6f ? MathF.Atan2(way.X, way.Z) : 0f;
+        var mid = run[run.Count / 2].Mid;
+        float width = GroundChannelBed.WidthFor(first.Kind, last.Reference);
+        float head = run.Count > 1 ? Math.Clamp(first.Reference / MathF.Max(1e-6f, last.Reference), 0.001f, 1f) : 1f;
+        _voices.Add(new Voice(middle, yaw, first.Kind, width, slope, length, last.Reference, last.Catchment, mid, _area[mid] * CellArea,
+                              line, head));
+    }
+
+    /// <summary>A line's points with every one within <paramref name="tolerance"/> of the straight line past it left
+    /// out (Douglas and Peucker 1973): a line of cells steps from one to the next in eight ways only.</summary>
+    internal static Vector3[] Simplify(List<Vector3> points, float tolerance)
+    {
+        if (points.Count <= 2) return points.ToArray();
+        var keep = new bool[points.Count];
+        keep[0] = keep[^1] = true;
+        var stack = new Stack<(int, int)>();
+        stack.Push((0, points.Count - 1));
+        while (stack.Count > 0)
+        {
+            var (a, b) = stack.Pop();
+            float worst = 0f;
+            int at = -1;
+            var ab = points[b] - points[a];
+            float len2 = ab.LengthSquared();
+            for (int i = a + 1; i < b; i++)
+            {
+                var ap = points[i] - points[a];
+                float t = len2 > 0f ? Math.Clamp(Vector3.Dot(ap, ab) / len2, 0f, 1f) : 0f;
+                float d = (ap - ab * t).Length();
+                if (d > worst) { worst = d; at = i; }
+            }
+            if (at < 0 || worst <= tolerance) continue;
+            keep[at] = true;
+            stack.Push((a, at));
+            stack.Push((at, b));
+        }
+        var kept = new List<Vector3>();
+        for (int i = 0; i < points.Count; i++) if (keep[i]) kept.Add(points[i]);
+        return kept.ToArray();
     }
 
     /// <summary>What a stretch is: a creek where enough drains through it; water running over paving where most

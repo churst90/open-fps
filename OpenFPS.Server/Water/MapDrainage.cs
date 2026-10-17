@@ -99,25 +99,260 @@ public static class MapDrainage
         var q = new QueryDescription().WithAll<Transform, SoundEmitterComponent>();
         world.Query(in q, (ref Transform t, ref SoundEmitterComponent s) =>
         {
-            if (ModelKindTable.KindOf(s.SoundId)?.Synth is ModelSynth.Flow or ModelSynth.Water or ModelSynth.Shore)
-                found.Add(t.Position);
+            if (ModelKindTable.KindOf(s.SoundId)?.Synth is not (ModelSynth.Flow or ModelSynth.Water or ModelSynth.Shore)) return;
+            found.Add(t.Position);
+            // A mapped creek all along it: every few metres of its line.
+            if (s.Line is { Length: >= 2 } line)
+            {
+                var turn = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
+                for (int i = 1; i < line.Length; i++)
+                {
+                    var a = t.Position + Vector3.Transform(line[i - 1], turn);
+                    var b = t.Position + Vector3.Transform(line[i], turn);
+                    int n = Math.Max(1, (int)MathF.Ceiling(Vector3.Distance(a, b) / PlacedLineStepMetres));
+                    for (int k = 0; k <= n; k++) found.Add(Vector3.Lerp(a, b, k / (float)n));
+                }
+            }
         });
         return found;
     }
 
+    /// <summary>The prefabs a map's own creeks and ditches are laid with along their lines (tools/gen_osm.py): their
+    /// box's X is their bed's width, and their sound a kind alone until <see cref="VoiceWaterways"/> measures them.</summary>
+    public const string WaterwayPrefix = "waterway_";
+
+    /// <summary>A mapped part and its line in the world, upstream first once its chain is known.</summary>
+    private sealed class Waterway
+    {
+        public Entity Entity;
+        public Vector3[] Points = Array.Empty<Vector3>();
+        public float Width;
+        public GroundChannelKind Kind;
+        public bool Reversed;
+        public float[] HeadAreas = Array.Empty<float>(), EndAreas = Array.Empty<float>();
+        public float[] EndLags = Array.Empty<float>();
+        public int[] EndPonds = Array.Empty<int>();
+        public float EndBase;
+    }
+
+    /// <summary>
+    /// A map's own creeks heard where it draws them (docs/RUNNING_WATER.md 15.6): every mapped waterway (an entity of
+    /// a <see cref="WaterwayPrefix"/> prefab with a line) given its running water from the ground's drainage. Its
+    /// parts end to end are one waterway, taken downstream by the survey's heights. What drains to it is what the
+    /// map's ground sends its water cells, gathered along it; a creek's bed was shaped by more than the map holds
+    /// when its width says so (w = 3 Q^0.5, GroundChannelBed.WidthFor), and the rest comes from upstream, off the map,
+    /// as open ground of that size. Each part's key is its own: its width, its slope from its line's heights, its
+    /// length, its downstream end's flow and catchment and the share of that flow at its upstream end. How many it
+    /// voiced.
+    /// </summary>
+    public static int VoiceWaterways(World world, DrainageNetwork net, int soilGroup = GroundHydrology.DefaultSoilGroup)
+    {
+        var parts = new List<Waterway>();
+        var q = new QueryDescription().WithAll<Transform, SoundEmitterComponent, IdentityComponent, ColliderComponent>();
+        world.Query(in q, (Entity e, ref Transform t, ref SoundEmitterComponent s, ref IdentityComponent id, ref ColliderComponent c) =>
+        {
+            if (s.Line is not { Length: >= 2 } line || id.PrefabId == null || !id.PrefabId.StartsWith(WaterwayPrefix, StringComparison.Ordinal)) return;
+            var turn = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
+            var pos = t.Position;
+            parts.Add(new Waterway
+            {
+                Entity = e,
+                Points = line.Select(p => pos + Vector3.Transform(p, turn)).ToArray(),
+                Width = MathF.Max(0.3f, c.Size.X),
+                Kind = id.PrefabId.Contains("ditch", StringComparison.Ordinal) ? GroundChannelKind.Ditch : GroundChannelKind.Creek,
+            });
+        });
+        foreach (var chain in Chains(parts)) Gather(chain, net, soilGroup);
+        foreach (var w in parts)
+        {
+            if (w.EndAreas.Length == 0) continue;
+            ref var t = ref world.Get<Transform>(w.Entity);
+            ref var s = ref world.Get<SoundEmitterComponent>(w.Entity);
+            var points = w.Reversed ? w.Points.Reverse().ToArray() : w.Points;
+            float length = 0f;
+            for (int i = 1; i < points.Length; i++) length += Vector3.Distance(points[i - 1], points[i]);
+            length = MathF.Max(1f, length);
+            float slope = MathF.Max(0.001f, (points[0].Y - points[^1].Y) / length);
+            var end = new GroundCatchment(w.EndAreas, w.EndLags, w.EndPonds, w.EndBase);
+            float endFlow = GroundChannelBed.ReferenceFlow(end, soilGroup);
+            float headFlow = GroundChannelBed.ReferenceFlow(new GroundCatchment(w.HeadAreas, 0f), soilGroup);
+            float head = endFlow > 0f ? Math.Clamp(headFlow / endFlow, 0.001f, 1f) : 1f;
+            string soundId = GroundChannels.SoundId(w.Kind, w.Width, slope, length, endFlow, end, head);
+            var spec = ModelLibrary.Presets.Flow(soundId[5..]);
+            var turn = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
+            var unturn = Quaternion.Inverse(turn);
+            var pos = t.Position;
+            s.SoundId = soundId;
+            s.Line = points.Select(p => Vector3.Transform(p - pos, unturn)).ToArray();
+            s.Range = MathF.Max(60f, Loudness.AudibleRange(spec.SourceLevelDb + 6f, Loudness.DefaultCompression));
+            s.MinDistance = 1f;
+            s.ExtentMetres = spec.ExtentMetres;
+        }
+        return parts.Count(w => w.EndAreas.Length > 0);
+    }
+
+    /// <summary>Mapped parts whose ends meet, end to end, each chain upstream first by the survey's heights (a part
+    /// drawn the other way round marked reversed).</summary>
+    private static List<List<Waterway>> Chains(List<Waterway> parts)
+    {
+        const float Join = 0.5f;
+        var chains = new List<List<Waterway>>();
+        var used = new HashSet<Waterway>();
+        Vector3 Start(Waterway w) => w.Reversed ? w.Points[^1] : w.Points[0];
+        Vector3 End(Waterway w) => w.Reversed ? w.Points[0] : w.Points[^1];
+        foreach (var seed in parts)
+        {
+            if (!used.Add(seed)) continue;
+            var chain = new LinkedList<Waterway>();
+            chain.AddFirst(seed);
+            for (bool grown = true; grown;)
+            {
+                grown = false;
+                foreach (var w in parts)
+                {
+                    if (used.Contains(w)) continue;
+                    var head = Start(chain.First!.Value);
+                    var tail = End(chain.Last!.Value);
+                    if (Vector3.Distance(w.Points[0], tail) < Join) { w.Reversed = false; chain.AddLast(w); }
+                    else if (Vector3.Distance(w.Points[^1], tail) < Join) { w.Reversed = true; chain.AddLast(w); }
+                    else if (Vector3.Distance(w.Points[^1], head) < Join) { w.Reversed = false; chain.AddFirst(w); }
+                    else if (Vector3.Distance(w.Points[0], head) < Join) { w.Reversed = true; chain.AddFirst(w); }
+                    else continue;
+                    used.Add(w);
+                    grown = true;
+                }
+            }
+            var list = chain.ToList();
+            // Downstream is down.
+            if (Start(list[0]).Y < End(list[^1]).Y)
+            {
+                list.Reverse();
+                foreach (var w in list) w.Reversed = !w.Reversed;
+            }
+            chains.Add(list);
+        }
+        return chains;
+    }
+
+    /// <summary>What drains to a chain's water cells, gathered from upstream down, at each part's ends: the ground's
+    /// own, and what a creek's width says comes from upstream off the map.</summary>
+    private static void Gather(List<Waterway> chain, DrainageNetwork net, int soilGroup)
+    {
+        int surfaces = GroundHydrology.Surfaces;
+        var areas = new float[surfaces];
+        var lagged = new double[surfaces];
+        var ponds = new SortedSet<int>();
+        float baseArea = 0f;
+        var seen = new HashSet<int>();
+        var heads = new List<float[]>();
+        foreach (var w in chain)
+        {
+            heads.Add((float[])areas.Clone());
+            var points = w.Reversed ? w.Points.Reverse().ToArray() : w.Points;
+            float reach = 0.5f * w.Width + net.CellMetres;
+            for (int i = 1; i < points.Length; i++)
+            {
+                var a = points[i - 1];
+                var b = points[i];
+                var flat = new Vector2(b.X - a.X, b.Z - a.Z);
+                float len = flat.Length();
+                var across = len > 1e-4f ? new Vector2(-flat.Y, flat.X) / len : Vector2.UnitX;
+                int steps = Math.Max(1, (int)MathF.Ceiling(len / (0.5f * net.CellMetres)));
+                for (int k = 0; k <= steps; k++)
+                {
+                    var p = Vector3.Lerp(a, b, k / (float)steps);
+                    for (float o = -reach; o <= reach + 1e-3f; o += 0.5f * net.CellMetres)
+                    {
+                        int c = net.CellAt(p.X + across.X * o, p.Z + across.Y * o);
+                        if (c < 0 || net.SurfaceOf(c) != GroundSurface.Water || !seen.Add(c)) continue;
+                        Add(c);
+                    }
+                }
+            }
+            w.EndAreas = (float[])areas.Clone();
+            w.EndLags = Enumerable.Range(0, surfaces).Select(s => areas[s] > 0f ? (float)(lagged[s] / areas[s]) : 0f).ToArray();
+            w.EndPonds = ponds.ToArray();
+            w.EndBase = baseArea;
+        }
+        for (int i = 0; i < chain.Count; i++) chain[i].HeadAreas = heads[i];
+
+        // A creek's bed was shaped by its reference flow (GroundChannelBed.WidthFor, without its clamps): what the map
+        // does not give it at its downstream end comes from upstream, off the map, as open ground.
+        var last = chain[^1];
+        if (last.Kind != GroundChannelKind.Creek) return;
+        float bed = 1000f * MathF.Pow(last.Width / 3f, 2f);
+        float mapped = GroundChannelBed.ReferenceFlow(new GroundCatchment(last.EndAreas, 0f), soilGroup);
+        float perSquareMetre = GroundHydrology.RunoffMm(GroundSurface.Open, GroundChannelBed.ReferenceStormMm, soilGroup) / (2f * 3600f);
+        if (bed <= mapped || perSquareMetre <= 0f) return;
+        float upstream = (bed - mapped) / perSquareMetre;
+        // Its water arrives as off a catchment of its size: a channel about one and a half times the square root of
+        // its area long, run at a metre a second (a judgement), its lag LagShare of that.
+        float lag = GroundHydrology.LagShare * 1.5f * MathF.Sqrt(upstream);
+        int open = (int)GroundSurface.Open;
+        foreach (var w in chain)
+        {
+            float before = w.EndAreas[open];
+            w.EndLags[open] = (before * w.EndLags[open] + upstream * lag) / MathF.Max(1e-6f, before + upstream);
+            w.EndAreas[open] += upstream;
+            w.HeadAreas[open] += upstream;
+            w.EndBase += upstream;
+        }
+
+        void Add(int c)
+        {
+            var catchment = net.CatchmentOf(c);
+            float total = net.SquareMetres(c);
+            if (net.LineAreas(c) is { } lineAreas)
+            {
+                for (int s = 0; s < surfaces; s++) { areas[s] += lineAreas[s]; lagged[s] += lineAreas[s] * (double)catchment.LagOf(s); }
+                foreach (int p in catchment.Ponds) ponds.Add(p);
+            }
+            else
+            {
+                // Off the lines: the cell's own water and, for what runs onto it, the ground beside it (its own is water).
+                areas[(int)GroundSurface.Water] += net.CellArea;
+                int beside = (int)BesideSurface(net, c);
+                areas[beside] += MathF.Max(0f, total - net.CellArea);
+                lagged[beside] += MathF.Max(0f, total - net.CellArea) * (double)catchment.LagOf((int)GroundSurface.Water);
+            }
+            baseArea += total;
+        }
+    }
+
+    /// <summary>The commonest surface of the ground round a cell that is not water: open ground if there is none.</summary>
+    private static GroundSurface BesideSurface(DrainageNetwork net, int c)
+    {
+        Span<int> count = stackalloc int[GroundHydrology.Surfaces];
+        for (int d = 0; d < 8; d++)
+        {
+            int n = net.Neighbour(c, d);
+            if (n >= 0 && net.SurfaceOf(n) != GroundSurface.Water) count[(int)net.SurfaceOf(n)]++;
+        }
+        int best = (int)GroundSurface.Open;
+        for (int s = 0; s < count.Length; s++) if (count[s] > count[best]) best = s;
+        return (GroundSurface)best;
+    }
+
+    /// <summary>A placed line is kept clear of every this often along it, m: a third of the drainage's clearance.</summary>
+    private const float PlacedLineStepMetres = 5f;
+
     /// <summary>The sound id of a drainage line's voice: its running water (GroundChannels), from what the line is.</summary>
     public static string SoundId(DrainageNetwork.Voice v)
-        => GroundChannels.SoundId(v.Kind, v.WidthMetres, v.Slope, v.LengthMetres, v.ReferenceLitresPerSecond, v.Catchment);
+        => GroundChannels.SoundId(v.Kind, v.WidthMetres, v.Slope, v.LengthMetres, v.ReferenceLitresPerSecond, v.Catchment, v.HeadShare);
 
-    /// <summary>A voice of a drainage line as an entity of the map: the line's running water, along the entity's
-    /// own x axis (RunningWaterSynth's line), silent while the line is dry.</summary>
+    /// <summary>A voice's line in its entity's own frame (unturned, about its position): the line, or null.</summary>
+    public static Vector3[]? LineOf(DrainageNetwork.Voice v) => v.Line?.Select(p => p - v.Position).ToArray();
+
+    /// <summary>A voice of a drainage line as an entity of the map: the line's running water along the line itself
+    /// (SoundEmitterComponent.Line, from its cells), silent while the line is dry.</summary>
     public static Entity SpawnVoice(World world, DrainageNetwork.Voice v)
     {
         string soundId = SoundId(v);
         var spec = ModelLibrary.Presets.Flow(soundId[5..]);
         string name = spec.Name;
-        // The line runs along x: the yaw that turns x onto the line (x east, z north; yaw about y from north).
-        var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, v.Yaw - MathF.PI / 2f);
+        // A line of its own needs no turn; a straight one runs along x: the yaw that turns x onto the line (x east,
+        // z north; yaw about y from north).
+        var turn = v.Line != null ? Quaternion.Identity : Quaternion.CreateFromAxisAngle(Vector3.UnitY, v.Yaw - MathF.PI / 2f);
         return world.Create(
             EntityType.StaticObject,
             new Transform { Position = v.Position, Rotation = turn, Scale = Vector3.One },
@@ -134,6 +369,7 @@ public static class MapDrainage
                 Range = MathF.Max(60f, Loudness.AudibleRange(spec.SourceLevelDb + 6f, Loudness.DefaultCompression)),
                 MinDistance = 1f,
                 ExtentMetres = spec.ExtentMetres,
+                Line = LineOf(v),
             });
     }
 
@@ -148,11 +384,12 @@ public static class MapDrainage
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var net = Build(world, tiles, out _, out _, ground.SoilGroup);
         if (net == null) return made;
+        int mapped = VoiceWaterways(world, net, ground.SoilGroup);
         foreach (var v in net.Voices) made.Add(SpawnVoice(world, v));
         ground.Register(mapId, net);
-        Log.Information("MapManager: '{Id}' drains over {Tiles} tiles: {Lines} drainage lines, {Voices} voices, {Ponds} ponds of {Hollows} hollows ({Culverts} held by a road, through its culvert), {Loops} loops between tiles broken ({Ms} ms).",
-                        mapId, tiles.Count, net.Lines.Count, net.Voices.Count, net.Ponds.Count, net.Hollows, net.Culverts, net.LoopsBroken,
-                        clock.ElapsedMilliseconds);
+        Log.Information("MapManager: '{Id}' drains over {Tiles} tiles: {Lines} drainage lines, {Voices} voices ({Km:F1} km), {Mapped} mapped waterways voiced, {Ponds} ponds of {Hollows} hollows ({Culverts} held by a road, through its culvert), {Loops} loops between tiles broken ({Ms} ms).",
+                        mapId, tiles.Count, net.Lines.Count, net.Voices.Count, net.Voices.Sum(v => v.LengthMetres) / 1000f, mapped, net.Ponds.Count, net.Hollows,
+                        net.Culverts, net.LoopsBroken, clock.ElapsedMilliseconds);
         return made;
     }
 }
