@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- The engine packages under the library follow their projects' namespaces too (docs/SOUND_LIBRARY_BOUNDARY.md
+  21.1): `OpenFPS.Schema` (was `OpenFPS.Common.Editing`), `OpenFPS.Materials`, `OpenFPS.Physics`,
+  `OpenFPS.Environment` with `.Water` (was `OpenFPS.Server.Water` and `.Systems`), and `OpenFPS.Models` with
+  `.Editing`, where they were `OpenFPS.Common`; no file of the library or the packages uses `OpenFPS.Common` now.
+  The lab's 66 spikes that still declared the runtime's old namespaces are in `OpenFPS.AudioLab.Spikes`. Inside
+  `OpenFPS.*` the name `Environment` is the namespace now, so 274 uses of the runtime's class are written
+  `System.Environment`; the voices' embedded lines are named `OpenFPS.Models.Speech.*`. Namespaces, usings and
+  qualifiers only, in six commits, every reference bound to the same type before and after; nothing stored a type
+  name. The wire hash changes (f82572c7167e to 635768b546d4) and the door fingerprint with it (ce77e122e30b to
+  c8fa0894bef3: the door renders are made again once).
 - The sound library's namespaces follow its projects (docs/SOUND_LIBRARY_BOUNDARY.md decision 6, section 21):
   `OpenFPS.Geometry`, `OpenFPS.Acoustics`, `OpenFPS.Sound` (with `.Hearing` and `.Core.*`), `OpenFPS.Native.Platform`
   and `.SteamAudio`, and `OpenFPS.Audio` (with `.Core`, `.Fmod`, `.SteamAudio`, `.Acoustics`, `.Data`), where they

@@ -610,6 +610,15 @@ Rules for every stage, as for the other two: one stage per merge; `git mv` for m
 moving; the guards give the same result before and after, and a stage that changes one is finished only when the
 change is the one intended and its commit says so.
 
+Namespaces: once a package is made, its namespaces follow the project and its folders, as the library's do
+(docs/SOUND_LIBRARY_BOUNDARY.md 21.1, 2026-10-17): `OpenFPS.Schema`, `OpenFPS.Materials`, `OpenFPS.Physics`,
+`OpenFPS.Environment` and `.Environment.Water`, `OpenFPS.Models` and `.Models.Editing` (`Speech` in
+`OpenFPS.Models`, a namespace never named like its one type). The rename is its own commit after the move, made
+by script and proved by binding every reference before and after. World, Agents, Accessibility, Editor and Words
+keep the namespaces their files had (`OpenFPS.Common`, `OpenFPS.Server.*`, `OpenFPS.Client.Core.*`) until they are
+renamed the same way. Inside `OpenFPS.*`, `Environment` is the
+namespace: the runtime's class is written `System.Environment`.
+
 | Stage | What | Sessions | Main risk |
 |---|---|---:|---|
 | 0 | Guards: the packages ratchet and the spoken-lines replay | 1 to 1.5 | the replay depends on timing in the aids |

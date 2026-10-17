@@ -34,7 +34,7 @@ library that open-fps and Resonance both reference. Step 1 of
     time (18.7), the air, the mixer's rate, the hearing, the mix and the lab (18.8)
 19. Stage 6 as built: the world input (19.1-19.6), `OpenFPS.Audio` and the world's options and paths (19.7-19.13)
 20. Stage 7 as built: `ClientAudioSystem` split into `AudioWorld` and its host, the one-off sounds and the birds
-21. The namespace rename as built (decision 6)
+21. The namespace rename as built (decision 6); the engine packages and the lab's spikes (21.1)
 
 ---
 
@@ -3025,12 +3025,10 @@ warnings and passing the guards. The library's namespaces follow their projects 
 
 556 types moved (70, 34, 288, 4, 160). The door models' fingerprint is generated into `OpenFPS.Sound`.
 
-- **What did not move.** The engine packages the library stands on (`OpenFPS.Materials`, `.Physics`,
-  `.Environment`, `.Models`, `.Schema`) keep their namespaces (`OpenFPS.Common`, `OpenFPS.Common.Editing`):
-  decision 6 is the library's, and docs/ENGINE_PACKAGES.md keeps namespaces while moving. A consumer of the
-  library therefore still writes `using OpenFPS.Common;` for the material table, the physics, the weather and the
-  catalogue. The lab's spikes that borrowed the old namespaces to reach the library's internals keep them, with
-  usings.
+- **What did not move in these five.** The engine packages the library stands on (`OpenFPS.Materials`,
+  `.Physics`, `.Environment`, `.Models`, `.Schema`) kept their namespaces (`OpenFPS.Common`,
+  `OpenFPS.Common.Editing`), and the lab's spikes that borrowed the runtime's old namespaces kept them. Both
+  followed the same day (21.1).
 - **How.** By script: Roslyn bound every simple name, qualifier and extension call in every project before the
   rename; each library file's namespace was rewritten, each qualified name of a moved type with it (the shortest
   qualifier that still reaches it), and each file given the usings its references need and relieved of those
@@ -3060,3 +3058,56 @@ warnings and passing the guards. The library's namespaces follow their projects 
   on main (`WorldStreamingTests`, Albany's entities in their tiles, 55,125 where 55,152 are expected). With
   `DOTNET_PROCESSOR_COUNT=4`, the boundaries, streams, spoken lines, fingerprints, physics replays and wire bytes:
   149 passed.
+
+### 21.1 The engine packages and the lab's spikes (2026-10-17)
+
+The packages under the library took the same rule, one commit each in the order they stand (Schema, Materials,
+Physics, Environment, Models), and the lab's spikes one more:
+
+| Project | Was | Is |
+|---|---|---|
+| `OpenFPS.Schema` | `OpenFPS.Common.Editing` | `OpenFPS.Schema` |
+| `OpenFPS.Materials` | `OpenFPS.Common` | `OpenFPS.Materials` |
+| `OpenFPS.Physics` | `OpenFPS.Common`, `OpenFPS.Common.Networking` (`WheelState`) | `OpenFPS.Physics` |
+| `OpenFPS.Environment` | `OpenFPS.Common`, `.Components` (`WeatherType`); `Water/`: `OpenFPS.Server.Water`, `OpenFPS.Server.Systems` (`GroundWaterSystem`) | `OpenFPS.Environment`, `OpenFPS.Environment.Water` |
+| `OpenFPS.Models` | `OpenFPS.Common`, `OpenFPS.Common.Editing` (`ModelKinds`) | `OpenFPS.Models` (`Speech/` included), `OpenFPS.Models.Editing` |
+| `OpenFPS.AudioLab`, 66 spikes | `OpenFPS.Client.Core.AudioEngine.Fmod`, `.SteamAudio`, `OpenFPS.Client.AudioEngine.Fmod` | `OpenFPS.AudioLab.Spikes` |
+
+126 types moved (3, 9, 41, 51, 22), and the 66 spikes. `OpenFPS.Common.Editing` no longer exists; the server's
+water (`MapDrainage`, and World's `SurfaceRaster`) stays in `OpenFPS.Server.Water`. No file of the library or of the
+packages declares or uses `OpenFPS.Common` now: a consumer writes `using OpenFPS.Materials;`, `.Physics`,
+`.Environment`, `.Models` and `.Schema` for what it wrote `using OpenFPS.Common;` for.
+
+- **Speech** stays in `OpenFPS.Models`, not `OpenFPS.Models.Speech` after its folder: its one type is `Speech`,
+  and inside the catalogue a namespace of that name would hide the type.
+- **`System.Environment`.** Inside every `OpenFPS.*` namespace of a project that references the environment,
+  `Environment` is now the namespace `OpenFPS.Environment`: C# finds a namespace's members (and `OpenFPS.Environment`
+  is one of `OpenFPS`'s) before the types a using brings in. 274 uses (`Environment.GetEnvironmentVariable`,
+  `.ProcessorCount` and the rest) are written `System.Environment` now; the 171 left, in top-level programs and
+  projects that do not see the environment, bind to it as before. The reader recorded every use of a type from
+  outside the repository by a name the rename makes a namespace (`Environment`, `Physics`, `Materials`, `Models`,
+  `Schema`, `Water`, `Editing`); `System.Environment` was the only one. `Models` and `Materials` are members in two
+  classes (the server's `Program.Models`), and a simple name finds the member first. A consumer with code inside
+  its own `OpenFPS.*` namespace meets the same as the lab did.
+- **The voices' resources.** The qualified-name pass took the resource name `"OpenFPS.Common.Speech.voices.csv"`
+  for `Speech`'s full name and rewrote the string in `Speech`; the project file's `LogicalName`s follow it
+  (`OpenFPS.Models.Speech.voices.csv`, `.scripts.json`). A missing resource reads as no lines, without an error;
+  `PedestrianSpeechTests` (31 voices, at least 30 calls) hold the names.
+- **Names stored nowhere**, checked again for these packages: the wire's messages carry `WheelState`,
+  `WeatherType`, `Precipitation` and the rest by MemoryPack's layout (`WorldWireBytesTests`,
+  `EnvironmentWireBytesTests` pass unchanged); the model library's files, the presets, the maps and the editor's
+  stores carry no `$type` and no type name; the resource names are the program's own. Old files load as before.
+- **The lists.** The physics survey's rules name the moved types under new constants (`MA`, `PH`, `EV`;
+  `WheelState`'s rule by hand), the sound survey's rules and short names follow, as does the physics ratchet's
+  `types.tsv`; `physics_crossings.tsv` names `Gearbox` and the attribute by their new names. The three surveys'
+  lists match the tree after every step: crossings 0, packages 692, physics 15, statics 346, unchanged.
+- **The wire hash** changes (f82572c7167e to 635768b546d4): the server and the Windows client deploy together.
+  **The door fingerprint** changes (ce77e122e30b to c8fa0894bef3): the door models' sources changed (the material
+  table's namespace, the others' usings), and the kept door renders are made again once. Nothing a player hears changes: the stored streams and the spoken
+  lines pass unregenerated.
+- **Checks.** All five builds and the mesh importer have no warnings after every step. On the last commit the
+  guards (those of 21, with SpokenLinesReplay, OneConstantPerLaw, MaterialName and WorldStreaming): 243 passed.
+  The classes that read saved maps, models, prefabs, presets, the editor's stores and the player store, the
+  machines, the voices, the water, fire and weather, with the hardening tests' lookups by name: 961 passed. With
+  `DOTNET_PROCESSOR_COUNT=4`, the boundaries, streams, spoken lines, fingerprints, physics replays and wire bytes:
+  128 passed.
