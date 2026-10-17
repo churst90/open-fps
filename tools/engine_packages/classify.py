@@ -153,11 +153,13 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/*', 'game', ''),
 
     # ── Server ──
-    ('OpenFPS.Server/Systems/VehicleSystem.Following.cs', 'Agents', 'the gap to the car in front (IDM): extract from the partial class'),
-    ('OpenFPS.Server/Systems/VehicleSystem.Junctions.cs', 'Agents', 'who goes first: extract from the partial class'),
-    ('OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs', 'Agents', 'where a walker crosses a road: extract'),
-    ('OpenFPS.Server/Systems/VehicleSystem.Routes.cs', 'Agents', 'tours of lanes from the road network: extract'),
-    ('OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs', 'Agents', 'the street\'s random events: extract'),
+    # Traffic's laws, out of VehicleSystem's partial files (stage 5), bound for OpenFPS.Agents.
+    ('OpenFPS.Server/Systems/CarFollowing.cs', 'Agents', 'the gap to the car in front (IDM, ACC)'),
+    ('OpenFPS.Server/Systems/JunctionRules.cs', 'Agents', 'who goes first at a junction'),
+    ('OpenFPS.Server/Systems/CrossingRules.cs', 'Agents', 'where a walker crosses a road, and who waits'),
+    ('OpenFPS.Server/Systems/RouteRules.cs', 'Agents', 'tours of lanes from the road network, and their stops'),
+    ('OpenFPS.Server/Systems/StreetEvents.cs', 'Agents', 'the street\'s random events'),
+    ('OpenFPS.Server/Systems/StreetLines.cs', 'Agents', 'which lines fit which moment'),
     # The server's hosts: they step a package or adapt the entities to it, and stay.
     ('OpenFPS.Server/Systems/VehicleSystem*.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/CrowdSystem.cs', 'game', 'host: steps Agents'),
@@ -189,8 +191,6 @@ TYPE_RULES = {
     'OpenFPS.Server.Systems.ParkState': 'Agents',
     'OpenFPS.Server.Systems.ParkPhase': 'Agents',
     'OpenFPS.Server.Systems.ParkingSpot': 'Agents',
-    'OpenFPS.Server.Systems.StreetLines': 'Agents',
-    'OpenFPS.Server.Systems.SpeechConditions': 'Agents',
 }
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',

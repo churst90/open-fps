@@ -379,8 +379,10 @@ OpenFPS.Server/Repositories/TeamRepository.cs	game
 OpenFPS.Server/Repositories/UserRepository.cs	game	
 OpenFPS.Server/Services/DiscoveryService.cs	game	
 OpenFPS.Server/Services/SocialService.cs	game	
+OpenFPS.Server/Systems/CarFollowing.cs	Agents	the gap to the car in front (IDM, ACC)
 OpenFPS.Server/Systems/CharacterSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/ContactStreams.cs	game	
+OpenFPS.Server/Systems/CrossingRules.cs	Agents	where a walker crosses a road, and who waits
 OpenFPS.Server/Systems/CrossingSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/CrowdSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/DoorManners.cs	game	host: Agents once it reads a view
@@ -388,6 +390,7 @@ OpenFPS.Server/Systems/DoorSystem.cs	game
 OpenFPS.Server/Systems/DrivingSystem.cs	game	
 OpenFPS.Server/Systems/FireSystem.cs	game	host: steps Environment
 OpenFPS.Server/Systems/Haunts.cs	game	host: Agents once it reads a view
+OpenFPS.Server/Systems/JunctionRules.cs	Agents	who goes first at a junction
 OpenFPS.Server/Systems/LightningSystem.cs	game	host: steps Environment
 OpenFPS.Server/Systems/MovementSystem.cs	game	
 OpenFPS.Server/Systems/OccupancySystem.cs	game	
@@ -397,16 +400,19 @@ OpenFPS.Server/Systems/PedestrianSpeech.Homeless.cs	game	host: steps Agents (the
 OpenFPS.Server/Systems/PedestrianSpeech.cs	game	host: steps Agents (the lines are Speech)
 OpenFPS.Server/Systems/RailSystem.cs	game	host: steps Agents (physics survey: trains kinematic)
 OpenFPS.Server/Systems/RoadWaterSystem.cs	game	host: steps Environment
+OpenFPS.Server/Systems/RouteRules.cs	Agents	tours of lanes from the road network, and their stops
+OpenFPS.Server/Systems/StreetEvents.cs	Agents	the street's random events
+OpenFPS.Server/Systems/StreetLines.cs	Agents	which lines fit which moment
 OpenFPS.Server/Systems/VehicleSignals.cs	game	
 OpenFPS.Server/Systems/VehicleSystem.AdminGun.cs	game	host: steps Agents
 OpenFPS.Server/Systems/VehicleSystem.Casualties.cs	game	host: steps Agents
-OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs	Agents	where a walker crosses a road: extract
+OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs	game	host: steps Agents
 OpenFPS.Server/Systems/VehicleSystem.Drivers.cs	game	host: steps Agents
-OpenFPS.Server/Systems/VehicleSystem.Following.cs	Agents	the gap to the car in front (IDM): extract from the partial class
-OpenFPS.Server/Systems/VehicleSystem.Junctions.cs	Agents	who goes first: extract from the partial class
+OpenFPS.Server/Systems/VehicleSystem.Following.cs	game	host: steps Agents
+OpenFPS.Server/Systems/VehicleSystem.Junctions.cs	game	host: steps Agents
 OpenFPS.Server/Systems/VehicleSystem.Parking.cs	game	host: steps Agents
-OpenFPS.Server/Systems/VehicleSystem.Routes.cs	Agents	tours of lanes from the road network: extract
-OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs	Agents	the street's random events: extract
+OpenFPS.Server/Systems/VehicleSystem.Routes.cs	game	host: steps Agents
+OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs	game	host: steps Agents
 OpenFPS.Server/Systems/VehicleSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/WindowSystem.cs	game	
 OpenFPS.Server/Systems/WorldEnvironmentSystem.cs	game	host: steps Environment

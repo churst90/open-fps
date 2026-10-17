@@ -287,7 +287,8 @@ w()
 
 # ── The split types: which members the mechanics read and which the sound reads ───────────────────
 MECH_READERS = {t for t, g, _ in RULES if g in ('P', 'PS', 'V')} | {
-    'OpenFPS.Server.Systems.VehicleSystem', 'OpenFPS.Server.Systems.RailSystem', C + 'LineFollower', C + 'RaceLine',
+    'OpenFPS.Server.Systems.VehicleSystem', 'OpenFPS.Server.Systems.CarFollowing', 'OpenFPS.Server.Systems.RailSystem',
+    C + 'LineFollower', C + 'RaceLine',
     'OpenFPS.Server.Core.OccupancyService', 'OpenFPS.Server.Systems.MovementSystem', 'OpenFPS.Server.Core.CombatService',
     'OpenFPS.Server.Core.VehicleShell', 'OpenFPS.Server.Core.CompositeService'}
 

@@ -2,5 +2,3 @@ type	package
 OpenFPS.Server.Systems.ParkPhase	Agents
 OpenFPS.Server.Systems.ParkState	Agents
 OpenFPS.Server.Systems.ParkingSpot	Agents
-OpenFPS.Server.Systems.SpeechConditions	Agents
-OpenFPS.Server.Systems.StreetLines	Agents

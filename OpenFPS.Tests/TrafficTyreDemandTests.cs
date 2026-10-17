@@ -234,7 +234,7 @@ public class TrafficTyreDemandTests
         float s = 1f, v = 1.4f, s0 = 2f;
         float sStar = s0 + v * 1.5f + v * v / (2f * MathF.Sqrt(a * b));
         float idm = a * (1f - (sStar / s) * (sStar / s));
-        float acc = VehicleSystem.Acc(idm, v, 0f, 0f, s, a, b);
+        float acc = CarFollowing.Acc(idm, v, 0f, 0f, s, a, b);
         _o.WriteLine($"creeping: IDM {idm:F1}, ACC {acc:F1} m/s2");
         Assert.True(idm < -2f * b);
         Assert.True(acc > -1.5f * b, $"the ACC model braked at {acc:F1} m/s2 creeping up a queue");
@@ -242,7 +242,7 @@ public class TrafficTyreDemandTests
         s = 10f; v = 12f;
         sStar = s0 + v * 1.5f + v * v / (2f * MathF.Sqrt(a * b));
         idm = a * (1f - (sStar / s) * (sStar / s));
-        acc = VehicleSystem.Acc(idm, v, 0f, 0f, s, a, b);
+        acc = CarFollowing.Acc(idm, v, 0f, 0f, s, a, b);
         _o.WriteLine($"closing: IDM {idm:F1}, ACC {acc:F1} m/s2");
         Assert.True(acc < -v * v / (2f * s), $"closing on a stopped car it braked at only {acc:F1} m/s2");
     }

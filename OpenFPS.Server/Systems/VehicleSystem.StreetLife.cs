@@ -9,8 +9,8 @@ namespace OpenFPS.Server.Systems;
 
 /// <summary>
 /// Street life: honks, hard stops, parking, alarms and gunfire, each a random event with a map-wide
-/// mean interval (<see cref="StreetLifeData"/>) landing on a vehicle picked at random. A honk is sent as
-/// the vehicle's horn and a rhythm; a hard stop is only a deceleration, and the client's tyres squeal.
+/// mean interval (<see cref="StreetLifeData"/>) landing on a vehicle picked at random. The events' laws
+/// are StreetEvents'; this steps them over the map's vehicles and sends what is heard.
 /// </summary>
 public sealed partial class VehicleSystem
 {
@@ -23,14 +23,6 @@ public sealed partial class VehicleSystem
     private readonly List<(string Map, DemoVehicle V, double At, float[] Pattern)> _pendingHonks = new();
     private readonly Dictionary<string, double> _streetClocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<(string Map, DemoVehicle V, double At, WeaponDefinition Gun, float Yaw)> _pendingShots = new();
-
-    /// <summary>Below this a car is not going fast enough for braking hard to be an event.</summary>
-    private const float HardBrakeMinSpeed = 8f;
-    /// <summary>What an emergency stop asks of the tyres: close to all of it. Past the squeal onset
-    /// (TyreFriction.SquealOnset, 0.78), short of locking them.</summary>
-    private const float HardBrakeGripFraction = 0.92f;
-    /// <summary>How likely a driver who just had to do that is to say something about it.</summary>
-    private const double HonkAfterHardBrake = 0.55;
 
     private void UpdateStreetLife(string mapId, World world, float dt)
     {
@@ -48,13 +40,12 @@ public sealed partial class VehicleSystem
 
         if (Chance(life.HardBrakeEverySeconds, dt)
             && Pick(mapId, world, v => v.Line != null && v.Park == null && v.DwellLeft <= 0f && v.HardBrakeLeft <= 0f
-                                       && v.Speed >= HardBrakeMinSpeed) is { } braker)
+                                       && v.Speed >= StreetEvents.HardBrakeMinSpeed) is { } braker)
         {
-            // Down to 20 to 40 per cent of the speed, or 1.5 m/s if that is more.
-            BrakeHard(braker, MathF.Max(1.5f, braker.Speed * (0.2f + 0.2f * (float)_streetRng.NextDouble())));
+            BrakeHard(braker, StreetEvents.HardStopTo(_streetRng, braker.Speed));
             Log.Information("Street: {Name} brakes hard, {From:F0} -> {To:F0} km/h at {Decel:F1} m/s^2.",
                             braker.DisplayName, braker.Speed * 3.6f, braker.HardBrakeTo * 3.6f, braker.HardBrakeDecel);
-            if (braker.Horn.Length > 0 && _streetRng.NextDouble() < HonkAfterHardBrake)
+            if (braker.Horn.Length > 0 && _streetRng.NextDouble() < StreetEvents.HonkAfterHardBrake)
                 _pendingHonks.Add((mapId, braker, clock + 0.4 + 0.5 * _streetRng.NextDouble(),
                                    OpenFPS.Common.Honk.Startled(_streetRng)));
             if (_streetRng.NextDouble() < YellAfterHardBrake)
@@ -76,18 +67,9 @@ public sealed partial class VehicleSystem
         if (Chance(life.GunfireEverySeconds, dt)
             && Pick(mapId, world, v => v.Preset.Equals("walker", StringComparison.OrdinalIgnoreCase), streetOnly: false) is { } shooter)
         {
-            var guns = WeaponRegistry.All.ToList();
-            var gun = guns[_streetRng.Next(guns.Count)];
-            int rounds = 2 + _streetRng.Next(3);
-            float yaw = (float)(_streetRng.NextDouble() * Math.PI * 2);
-            double at = clock;
-            for (int r = 0; r < rounds; r++)
-            {
-                _pendingShots.Add((mapId, shooter, at, gun, yaw));
-                // A self-loader fired as fast as a finger goes, a pump or a pistol a little slower.
-                at += 0.14 + 0.4 * _streetRng.NextDouble();
-            }
-            Log.Information("Street: {Name} fires {Rounds} rounds from a {Gun}.", shooter.DisplayName, rounds, gun.DisplayName);
+            var (gun, yaw, rounds) = StreetEvents.Gunfire(_streetRng, WeaponRegistry.All.ToList(), clock);
+            foreach (double at in rounds) _pendingShots.Add((mapId, shooter, at, gun, yaw));
+            Log.Information("Street: {Name} fires {Rounds} rounds from a {Gun}.", shooter.DisplayName, rounds.Length, gun.DisplayName);
         }
         for (int i = _pendingShots.Count - 1; i >= 0; i--)
         {
@@ -106,34 +88,18 @@ public sealed partial class VehicleSystem
         }
     }
 
-    /// <summary>
-    /// One round, sent as a player's is (CombatService.Fire): the weapon's own synthesis at the muzzle,
-    /// 1.5 m up and 0.5 m out, at the cartridge's blast level.
-    /// </summary>
+    /// <summary>One round (StreetEvents.Shot), from where the one firing stands.</summary>
     private void Shoot(string mapId, World world, DemoVehicle v, WeaponDefinition gun, float yaw)
     {
         if (Heard == null) return;
-        var forward = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
-        var muzzle = world.Get<Transform>(v.Entity).Position + new Vector3(0f, 1.5f, 0f) + forward * 0.5f;
-        Heard(mapId, v.Entity.Id, gun.DisplayName, new[]
-        {
-            new TransientSound
-            {
-                Character = SoundCharacter.Knock,
-                Position = muzzle,
-                LevelDb = Loudness.MuzzleBlastDb(gun),
-                SynthKey = "weapon:" + gun.Id,
-                DecaySeconds = 0.6f,
-            },
-        });
+        Heard(mapId, v.Entity.Id, gun.DisplayName, new[] { StreetEvents.Shot(world.Get<Transform>(v.Entity).Position, gun, yaw) });
     }
 
     /// <summary>An emergency stop down to <paramref name="toSpeed"/>, at what the tyres will give.</summary>
     private static void BrakeHard(DemoVehicle v, float toSpeed)
     {
         v.HardBrakeTo = toSpeed;
-        v.HardBrakeDecel = HardBrakeGripFraction * v.Grip * v.Gravity;
-        v.HardBrakeLeft = (v.Speed - v.HardBrakeTo) / v.HardBrakeDecel + 0.6f;
+        (v.HardBrakeDecel, v.HardBrakeLeft) = StreetEvents.HardStop(v.Speed, toSpeed, v.Grip, v.Gravity);
     }
 
     /// <summary>The same stop, asked for by map and entity, for tests.</summary>
@@ -144,24 +110,15 @@ public sealed partial class VehicleSystem
         return false;
     }
 
-    /// <summary>One draw of an event with this mean interval over this step. Zero or less is off.</summary>
-    private bool Chance(float everySeconds, float dt)
-        => everySeconds > 0f && _streetRng.NextDouble() < dt / everySeconds;
+    /// <summary>One draw of an event with this mean interval over this step (StreetEvents.Chance).</summary>
+    private bool Chance(float everySeconds, float dt) => StreetEvents.Chance(_streetRng, everySeconds, dt);
 
+    /// <summary>One of the map's vehicles, picked at random (StreetEvents.Pick).</summary>
     /// <param name="streetOnly">Only the traffic (the default); false lets the people walking be
     /// chosen, who are not traffic and never honk or park.</param>
     private DemoVehicle? Pick(string mapId, World world, Func<DemoVehicle, bool> eligible, bool streetOnly = true)
-    {
-        int count = 0;
-        DemoVehicle? chosen = null;
-        foreach (var v in _vehicles)
-        {
-            if (v.MapId != mapId || (streetOnly && !v.OnStreet) || !world.IsAlive(v.Entity) || !eligible(v)) continue;
-            // Reservoir sampling: every eligible vehicle equally likely, in one pass.
-            if (_streetRng.Next(++count) == 0) chosen = v;
-        }
-        return chosen;
-    }
+        => StreetEvents.Pick(_streetRng, _vehicles.Where(v => v.MapId == mapId && (!streetOnly || v.OnStreet)
+                                                            && world.IsAlive(v.Entity) && eligible(v)));
 
     private void Honk(string mapId, World world, DemoVehicle v, float[] pattern)
     {
@@ -169,17 +126,6 @@ public sealed partial class VehicleSystem
         var at = world.Get<Transform>(v.Entity).Position;
         Log.Information("Street: {Name} sounds its horn ({Horn}) for {Seconds:F2} s.",
                         v.DisplayName, v.Horn, OpenFPS.Common.Honk.Duration(pattern));
-        Heard(mapId, v.Entity.Id, "horn", new[]
-        {
-            new TransientSound
-            {
-                Character = SoundCharacter.Ring,
-                Position = at + Vector3.UnitY * 0.6f,
-                LevelDb = OpenFPS.Common.Honk.LevelDb(v.Horn, ModelLibrary.Presets),
-                DecaySeconds = OpenFPS.Common.Honk.Duration(pattern),
-                Noisiness = 0f,
-                SynthKey = OpenFPS.Common.Honk.Key(v.Horn, pattern),
-            },
-        });
+        Heard(mapId, v.Entity.Id, "horn", new[] { StreetEvents.Horn(at, v.Horn, pattern) });
     }
 }

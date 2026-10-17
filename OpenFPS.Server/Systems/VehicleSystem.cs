@@ -269,7 +269,7 @@ public sealed partial class VehicleSystem
                         corneringG = MathF.Min(grip, tyres.SteadyLateralLimit(TyreFriction.SquealOnset) / data.Gravity);
                         grip = corneringG;
                     }
-                    line = new RaceLine(route.Points, 0f, topSpeed, grip, brake, 0f, LaneLimits(route), data.Gravity);
+                    line = new RaceLine(route.Points, 0f, topSpeed, grip, brake, 0f, RouteRules.LaneLimits(route), data.Gravity);
                 }
 
                 // No track and no road: a shuttle from a point to the same point, whose direction is
@@ -406,7 +406,7 @@ public sealed partial class VehicleSystem
                 {
                     v.Route = route;
                     v.RouteScale = route.Length / line.Length;
-                    v.Stops = RouteStops(route, line, data, vd.Preset);
+                    v.Stops = RouteRules.Stops(route, line, data, vd.Preset);
                     for (int si = 0; si < v.Stops.Length; si++)
                         if (v.Stops[si].At >= v.Lap) { v.NextStop = si; break; }
                     Log.Information("Map {Map}: {Name} drives {Legs} lanes of the roads, {Length:F0} m round, stopping at {Stops} place(s).",
@@ -459,7 +459,7 @@ public sealed partial class VehicleSystem
     private static bool TakesPassengers(MapData data, VehicleData vd, LaneRoute? route, RaceLine? line)
     {
         if (route != null && line != null)
-            return RouteStops(route, line, data, vd.Preset).Any(sp => string.Equals(sp.Kind, "bus_stop", StringComparison.OrdinalIgnoreCase));
+            return RouteRules.Stops(route, line, data, vd.Preset).Any(sp => string.Equals(sp.Kind, "bus_stop", StringComparison.OrdinalIgnoreCase));
         var track = data.Tracks?.Find(tr => string.Equals(tr.Id, vd.Track, StringComparison.OrdinalIgnoreCase));
         return track?.Stops != null && track.Stops.Any(sp =>
             string.Equals(sp.Kind, "bus_stop", StringComparison.OrdinalIgnoreCase)

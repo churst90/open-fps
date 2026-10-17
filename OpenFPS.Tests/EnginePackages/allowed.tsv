@@ -17,11 +17,4 @@ OpenFPS.Client.Core/UiSounds.cs	Common	30
 OpenFPS.Client.Core/WallBumps.cs	Common	37
 OpenFPS.Client.Core/WallBumps.cs	game	30
 OpenFPS.Common/PhysicsUtils.cs	game	3
-OpenFPS.Server/Systems/PedestrianSpeech.cs	Common	4
-OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs	Common	3
-OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs	game	2
-OpenFPS.Server/Systems/VehicleSystem.Following.cs	Common	3
-OpenFPS.Server/Systems/VehicleSystem.Following.cs	game	2
 OpenFPS.Server/Systems/VehicleSystem.Parking.cs	game	2
-OpenFPS.Server/Systems/VehicleSystem.Routes.cs	game	2
-OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs	Common	4

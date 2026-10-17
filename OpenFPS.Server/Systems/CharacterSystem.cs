@@ -176,7 +176,7 @@ public sealed class CharacterSystem
     public void Update(string mapId, World world, SpatialGrid<Entity> grid, float dt, WorldEnvironmentComponent env, WeatherType weather)
     {
         double now = _clocks[mapId] = _clocks.GetValueOrDefault(mapId) + dt;
-        var cond = SpeechConditions.From(env, weather);
+        var cond = PedestrianSpeech.Conditions(env, weather);
         foreach (var c in _all)
         {
             if (c.MapId != mapId) continue;

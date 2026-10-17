@@ -972,7 +972,7 @@ public class GameServer
                         ? MapAtmosphere.Of(speechMap)
                         : MapAtmosphere.Default);
                     _speech.Update(entry.Key, world, Clock.Now,
-                                   SpeechConditions.From(weather, _environment.CurrentScenario),
+                                   PedestrianSpeech.Conditions(weather, _environment.CurrentScenario),
                                    (id, label, sound) => EmitWorldAudio(entry.Key, id, label, new[] { sound }));
 
                     // ...and the people watching them: a source with a place and a size, no loop.
