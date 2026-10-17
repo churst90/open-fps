@@ -13,6 +13,16 @@ Recent work, newest first. `git log` has the rest.
   streams and the microphone's ring, and the lab's levers (`LabLevers`) are the mixer's, where they were statics
   every world shared; the host reaches them through its facade. 50 of the library's statics are gone (393 to
   343). The wire hash changes, so the server and the Windows client go out together.
+- Physics stage 3 (docs/PHYSICS_BOUNDARY.md 17). The server and a client ask the same question of the world
+  each has (`IPhysicsWorld`): the floor under a body counts what moves on both sides, the server remembers
+  only the floor of the same point, and both gather what a body can walk into in one order. Standing on a
+  parked car or a bus's roof the client no longer falls a centimetre a tick and is pulled back (it was 39 mm
+  the first tick on the parked car's roof, 11 mm each after), and footsteps there are on the car's own
+  surface on both sides; nowhere else did any walk move. A player's standing or falling is sent (two bits of a state, no
+  bytes), so somebody else's jump no longer steps in mid-air at its top. Contacts are a stream each tick; a
+  diagonal into a square corner bumps both walls whichever way round they were built. A driven car's
+  mechanics are the physics' `VehicleStep`; every drive is what it was. The wire hash changes, so the server
+  and the Windows client go out together.
 - Clay and leaves are named underfoot: open clay ground is "clay" and foliage lying on the ground "leaves", where both
   were "outside" (Cody, 2026-10-16). No map lays either as ground yet.
 - The air's stir comes from the air (docs/CLIENT_NOTES.md, "The air's stir from the surface layer"; Cody

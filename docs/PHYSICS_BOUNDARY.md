@@ -43,6 +43,7 @@ stages come after the special-cases audit's parts.
 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
 16. Stage 2 as it is built: the tyre, the vehicle, the engine, the ground probes and the body (2026-10-12), the
     ricochet, one gravity and one air (2026-10-16)
+17. Stage 3 as built (2026-10-16): the state, the world view, the vehicle step
 
 ---
 
@@ -679,7 +680,7 @@ changes one is finished only when the change is the one intended and its commit 
 | 0 | Guards: the ratchet, the movement replay, the driving and traffic replays, the ballistics table, the parity harness; the Jolt trial. **Built 2026-10-11, section 14** | 1.5 to 2 | the driving replay depends on statics (the thread-static map id) |
 | 1 | `OpenFPS.Physics`; move what moves whole; the four crossing fixes; the wire hash covers it. **Built 2026-10-12, section 15** | 1.5 to 2 | the engine render fingerprint moves with `Gearbox` |
 | 2 | Split the presets and the mixed types; one law per law | 2 to 3 | approved sound depends on the sound's half reading the same numbers |
-| 3 | The state types; one world view both sides fill; the parity divergences; contact events; `DrivingSystem`'s mechanics into a vehicle step | 3 to 4 | movement parity |
+| 3 | The state types; one world view both sides fill; the parity divergences; contact events; `DrivingSystem`'s mechanics into a vehicle step. **Built 2026-10-16, section 17** | 3 to 4 | movement parity |
 | 4 | Rigid bodies and contacts, with geometry stage 6 | 5 to 8 | solver cost and stability on the server tick |
 | 5 | Moving air and loose layers | 3 to 5 | the ear wind and foliage were approved on the weather alone |
 | 6 | Vehicles in full: suspension, the server's drivetrain from the engine's own torque, brakes, traffic under the same model | 4 to 6 | the engine sound's tuning against its own driver |
@@ -760,7 +761,7 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
 - Check: render fingerprint, emitter-stream replay, movement and driving replays unchanged, except where a
   constant was made one on purpose, regenerated in that commit with the reason.
 
-### Stage 3: the state, the world view, the vehicle step (3 to 4 sessions)
+### Stage 3: the state, the world view, the vehicle step (3 to 4 sessions; built 2026-10-16, section 17)
 
 - The value types of 4.5 (`BodyState`, `ContactEvent`, `VehicleState`, `AirSample`), copied onto the
   components the wire carries; `IsGrounded` sent so `OtherBodies` stops guessing it from the vertical speed.
@@ -1251,7 +1252,8 @@ The walks, and `--physics-parity` over 4,000 standing points each on the city an
    feared did not occur. The orders differ because the server reads the grid's cells and the client its
    snapshot's list.
 
-Item 1 is the one to close in stage 3 (the one world view both sides fill); 2 and 3 are recorded.
+Item 1 is the one to close in stage 3 (the one world view both sides fill); 2 and 3 are recorded. All three
+were closed in stage 3 (17.3).
 
 ### 14.4 The driving, traffic and train replays: `DrivingReplayTests`, `RailReplayTests`
 
@@ -1818,6 +1820,170 @@ octave band, most of it by a few hundredths, but where landings re-roll.
   it); the heard laws' 343 beside the density, which the plan has them take from the same air; the
   engine's own gas law for its charge (`Gas`, R = 288 for burnt gas and air together); the client's aids
   reading the map's gravity from the manifest.
+
+## 17. Stage 3 as built (2026-10-16): the state, the world view, the vehicle step
+
+Made on Linux, on main `450b0244`, in four commits: the state types and a body's grounding on the wire; one
+view of the world and the three divergences of 3.7 closed; the vehicle step; then the stored data the fixes
+changed. Every walk's server track and every drive, the traffic and the trains are what they were to the
+digit; what changed is the client's side, a player's grounding on the wire, and the memo's count of hits.
+
+### 17.1 The state types
+
+`OpenFPS.Physics/PhysicsState.cs` holds the value types of 4.5, plain structs in the physics:
+
+- **`BodyState`**: id, position, orientation, linear and angular velocity, mass, shape id, grounding,
+  sleeping. A body on foot fills it from its step (`BodyState.OnFoot`); the angular velocity and the shape
+  are stage 4's (the shape id is `NoShape` until geometry stage 6 gives each body a piece).
+- **`Grounding`**: unknown, standing or in the air. **Sent:** `EntityState.Grounding`, appended (the wire is
+  positional), packed in two spare bits of the state's flags, so it costs no byte. The server fills it from a
+  player's `PlayerComponent.IsGrounded`, the resting states resend on a change, the client keeps it
+  (`EntitySnapshot.Grounding`) and `OtherBodies` reads it. Until now every other body was standing while its
+  vertical speed was under 0.15 m/s, so the top of somebody's jump, where that speed passes zero, stepped in
+  mid-air. Nothing else on foot is stepped (walkers are placed on their paths), so their grounding goes as
+  unknown and is read from their motion as before.
+- **`ContactEvent`** with its **`ContactPhase`** (17.4).
+- **`VehicleState`**: speed, heading, yaw rate, the accelerations along and across, the wheel's turn, the
+  pedals, gear, rpm, clutch, the engine's torque, the tyres' demand and the wheels. `VehicleStep` leaves one
+  and `DrivingSystem` copies it onto the components the wire carries (`DriveComponent`, `VehicleComponent.Speed`,
+  the transform, the velocity, the wheels). The gear, rpm, clutch and torque are not sent yet: the sound's
+  engine finds its own gear from the speed until stage 6 sends them.
+- **`AirSample`**: the air at a point and moment, the weather's wind from `WindField` (horizontal; its
+  turbulence; no pressure deviation yet). Nothing reads it yet: the ear's wind, foliage and fire take it in
+  stage 5, with the disturbances of moving bodies.
+
+### 17.2 One view of the world
+
+**`IPhysicsWorld`** (`OpenFPS.Physics/PhysicsWorld.cs`) is the world as the physics sees it: the triangle world
+(door leaves where they stand), the owners it is rebuilding, and every solid it does not answer for (the
+statics it does not hold and everything that moves) as a **`PhysicsBody`**: a box standing as a body meets it
+(a person's cylinder upright whatever way they look), with its material. Near is one rule both sides answer
+exactly, a footprint within reach across the ground (`PhysicsBody.Near`), and every list is by id.
+**`BodyFilter`** says which triangles a body counts (not its own, not those it is told to leave out, not those
+being rebuilt).
+
+The server fills one from its world and grid (**`ServerPhysicsView`**), a client from its snapshot
+(**`SnapshotPhysicsView`**), both in `OpenFPS.Common/PhysicsViews.cs`, one per thread, pointed at a map before
+each use, so a probe allocates nothing. The grid's cells round a point hold every box the rule says is near,
+so the server's list is the client's.
+
+What reads the view:
+
+- **The ground probe** is `Footing`'s (`GroundOn`): the triangle world's floor, the boxes near, the higher of
+  the two, and every box in the world when nothing near is under the body. `PhysicsUtils` keeps its
+  signatures as adapters over the two views, so its 44 callers did not change.
+- **The step of a body on foot** is **`OnFoot.Step`**: the one gather (`OnFoot.Gather`), the capsule on
+  triangles, the grade, the solids gathered and `SharedMovementEngine.Step`, whose arithmetic did not change.
+  `MovementSystem` and `ClientPhysicsSystem.Predict` both call it, each over its own view.
+- **The vehicle step** (17.5): its ground probe, its wheel rays and its collision test.
+
+### 17.3 The three divergences of 3.7, closed
+
+| | Before (stage 0, 14.3) | Now |
+|---|---|---|
+| 1. What moves in the ground probe | the server counted it, the client did not: on the parked car the client fell 39 mm on the first tick on the roof and 11 mm on each of the other 39 | both count it: 0 mm on every tick; the server's track the same to the digit |
+| 2. The ground memo | a whole answer for a point up to 5 cm away and 150 ms old, by the wall clock | the triangle world's floor for the same point while the static geometry is unchanged; what moves asked every time; no wall clock |
+| 3. The gather | the server's grid cells in the order filed, the client's snapshot in the order heard of, by two rules of near: `city_two_cars` met the same boxes in another order on all 85 ticks | one gather, one rule, by id: the same order on both sides |
+
+Both counting what moves, rather than neither, is the choice that keeps the server's answer: a body on a
+parked car stands on its roof, as the server always had it; counting neither would have stood it inside the
+car's box, pushed out of the top each tick and falling again on both sides.
+
+The memo's hits moved, which is what `walks.tsv` stores of them: where a body stands still for longer than
+150 ms they rose (`city_strafe_taps` 163 to 185, `city_roof_fall` 51 to 59), where it creeps less than 5 cm a
+tick they fell (`magnolia_barn` 76 to 33, pressed against a wall). Its stale answers were none over 1 mm before
+and are none now.
+
+`walks.tsv` and the movement replay's 20 walks (`MovementReplayTests`):
+
+- every walk's gap is 0.00 mm on every tick; `city_parked_car`'s `KnownGapMm` (40) is gone;
+- the floors the two sides read differ on no tick of any walk (`city_parked_car` 40 before);
+- the gathers differ on no tick (`city_two_cars` 85 before, all of them order);
+- a new walk, **`city_bus_roof`**: standing on a 12 m bus's roof (3.25 m up) at a stop, four taps along it,
+  then walking off its east end and three metres down to the street; 170 ticks, 0.00 mm.
+
+`--physics-parity` over the city's 4,000 standing points: the two sides' floors differ at none of the 3,991 points (at stage 0 every point on a parked box
+differed, 396 of 396), one step on each side from rest parts at none of the 400 points on parked boxes nor the
+3,591 on the map's floors, and the two gathers hold the same boxes in the same order everywhere (27 points in
+another order before). On Magnolia the same: none of 2,887, none of the 400 on parked boxes (324 of 400 parted
+by up to 3.5 m at stage 0). The harness's second risk still sweeps what a 5 cm memo would have handed back, for
+the record: the memo no longer does.
+
+Where to feel it, on the city (checked on the server's and the client's views of a car parked by the
+command, standing clear with `CheckCollision`): from the spawn, `/tp 60 122 0.12`, face north and
+`/spawn vehicle i4_economy`; the hatchback parks to your right, its middle at 62.4 east, 121.8 north. Then
+`/tp 62.4 121.8 1.6` stands you on its roof (the floor 1.57 m, both sides). Stand still: before this stage the
+client stepped and landed every round trip; now nothing should be heard. Walk north or south off its end (its roof
+runs from 120.6 to 123.0 north) and the fall and landing should be heard once. The roof is the shell's
+headliner slab, which is carpet, so the feet on it sound carpet: the shell's material, not this stage's.
+
+### 17.4 Contact events
+
+- **`ContactStream`**: one map's contacts for a tick. The server's tick begins each map's stream before
+  anybody moves and closes it after the last thing that moves (`ContactStreams`, by world). A pair met last tick
+  and again is continued; one not met again ends when the tick closes. A tick nobody closes keeps at most 4,096.
+- **From the movement:** a body that pressed into something (`OnFoot.ContactOf`): the body, what it met (an
+  entity, or the owner of a solid), where its feet ended, the way out, how fast the attempted move went into it
+  and how fast the body slid along it, both surfaces. No impulse: a body on foot exchanges no momentum (stage 4).
+- **A second contact.** The step reports the hardest other thing it pressed into, too
+  (`SharedMovementEngine.Contact.Second*`, reported and not acted on). In a square corner taken on a diagonal the
+  two walls are pressed equally, and the first was whichever came first in the list: with one gather by id, a
+  corner was two walls one way round and one wall the other. The wall bump asks of both (`BodyContacts.Bump`),
+  so a corner is two walls either way (`ACornerIsTwoThings`, both orders). Keyboard diagonals are exactly 45
+  degrees, so this was a real tie in play.
+- **From the vehicle step:** a car stopped dead against something (17.5): the car, what it struck, the way back
+  out, the momentum it lost (its mass times the closing speed: it stops dead), the closing speed and both
+  surfaces. `DrivingSystem` hears it from the stream through `ImpactAcoustics`, as it did.
+- Read today by `DrivingSystem`'s hearing; the client's wall bump reads its own step's two contacts. Stage 4
+  turns the rest into `ImpactAcoustics` and the scrape and roll sounds.
+
+### 17.5 The vehicle step
+
+**`VehicleStep`** (`OpenFPS.Physics/VehicleStep.cs`), one per map, is what a driven car does with what its driver
+asks for, moved out of `DrivingSystem` line for line: the engine's pull through the gear its speed puts it in
+(`SelectGear`, `TorqueFraction`), the air, the road, the brakes and the engine holding it back, the steering held
+under the angle that uses all the grip, `WheelDynamics`, the pose from the ground probe and the four wheel rays,
+and the test that stops it dead against what it would drive into. It reads the vehicle's physics half
+(`VehicleMechanics`), the map's gravity and air, and the view of the world, and leaves a `VehicleState`.
+
+`DrivingSystem` keeps the controls (keys to throttle, brake and the wheel's turn; a silent driver's controls
+held and faded), the ignition and the starter's second, the tile fences (braked short of a tile not built yet
+before the step, held at its edge by the step's `MayGo`), and the hearing. Each world's cars are one
+`VehicleStep`, by world, as the running cars were (3.4).
+
+The driving replay (the four drives, the city's traffic, the trains) passes unregenerated. One named change,
+in no stored drive: the collision test meets a person upright, as the walk does, where it met their box turned
+with their look.
+
+### 17.6 Guards, lists and the wire
+
+- Tests: `PhysicsStateTests` (the grounding on the wire for nothing, a body steps only where its step says it
+  stands, a landing when it stands again, a contact's phases, the stream's bound, the air sampled),
+  `PhysicsWorldViewTests` (the three divergences on a world built both ways, and a step into a car the same
+  contact on both sides), `PhysicsVehicleStepTests` (a car's strike is a contact the host hears; the state onto
+  the components), `HotPathTests`' memo, `ACornerIsTwoThings` both ways round. Each proven by breaking what it
+  holds: the grounding not packed (fails for standing), `OtherBodies` guessing from the vertical speed again
+  (fails in the air), every contact beginning (fails), the client's view leaving out what moves (fails the roof
+  test and four of the walks with a car or a bus in them), the server's gather in the
+  grid's order (fails), the memo handing back what moves as it was (fails), no second contact (the corner fails
+  with the side wall's id above the others'), a car's strike left out of the stream (fails), the speed not
+  copied onto the vehicle's component (fails).
+- The physics ratchet: the new types sorted (`types.tsv`, `tools/physics_boundary/classify.py`): the views and
+  `ContactStreams` are the host's, `DrivingSystem` the host's now, the rest the physics' own. The allowance
+  stays empty. `OnFoot` and `VehicleStep` join the steppers the sound may not name.
+- The library's and the packages' `files.tsv` have the new files, as the surveys write them; no crossing came
+  or went (the library's allowance 358, the packages' 1,178).
+- **The wire hash** changes (8c80f58fe077 at `450b0244`, a6dd22fb65d0 after): `EntityState.Grounding` and the
+  physics' files. The server and the Windows client go out together. `DoorModelFingerprint` is unchanged.
+
+### 17.7 Left
+
+- The gear, rpm, clutch and torque of `VehicleState` on the wire, and the sound's engine following them: stage 6.
+- `AirSample`'s readers and the air's disturbances: stage 5.
+- The contacts into `ImpactAcoustics` and the scrape and roll sounds, a body's mass and impulse: stage 4.
+- The vehicle's collision test still meets every solid as a box; stage 4 meets the triangles with the car as a
+  mesh. `VehicleShadow` and `CabinWalls` still read vehicles from snapshots (library stage 6 reads `BodyState`).
+- Walkers' grounding (placed on their paths, not stepped) is unknown on the wire and read from their motion.
 
 ## Decisions (Cody, 2026-10-11)
 

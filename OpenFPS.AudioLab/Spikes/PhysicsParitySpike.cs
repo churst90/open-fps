@@ -231,7 +231,7 @@ public static class PhysicsParitySpike
         Console.WriteLine("\n  The cross-side risks (docs/PHYSICS_BOUNDARY.md 3.7):");
         Report("1. server ground against client ground", ground);
         Report("   of those, made by the moving things", groundMovers);
-        Report("2. the floor 0 to 5 cm away against this one (what the memo could hand back)", memo);
+        Report("2. the floor 0 to 5 cm away against this one (what the memo handed back before stage 3; now only the same point)", memo);
         Report("   the step that stale floor gives, against the fresh", memoStep);
         Report("3. one step with the client's gather against the server's", gather);
         Console.WriteLine($"     the two gathers held the same boxes in another order at {gatherOrderOnly:N0} points");
