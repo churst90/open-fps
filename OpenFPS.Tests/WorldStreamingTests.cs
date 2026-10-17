@@ -162,9 +162,12 @@ public class WorldStreamingTests
         // Everything from the file is in a tile, and so is the ground the loader lays from the survey; what is
         // global is the loader's own handful.
         var terrain = lookup.Values.Where(e => world.Has<TerrainTileComponent>(e)).ToList();
-        // And the voices of its drainage lines, worked out from that ground (docs/RUNNING_WATER.md 13).
+        // And the voices of its drainage lines, worked out from that ground (docs/RUNNING_WATER.md 13); not the mapped
+        // waterways, which are the file's own though their water is the drainage's (15.6).
         var runoff = lookup.Values.Where(e => world.Has<SoundEmitterComponent>(e)
-                                              && world.Get<SoundEmitterComponent>(e).SoundId.StartsWith("flow:ground/", StringComparison.Ordinal)).ToList();
+                                              && world.Get<SoundEmitterComponent>(e).SoundId.StartsWith("flow:ground/", StringComparison.Ordinal)
+                                              && !(world.Has<IdentityComponent>(e)
+                                                   && world.Get<IdentityComponent>(e).PrefabId.StartsWith("waterway_", StringComparison.Ordinal))).ToList();
         Assert.Equal(data.Entities.Count + terrain.Count + runoff.Count, tiles.TiledCount);
         Assert.InRange(tiles.Global.Count, 1, 10);
         _o.WriteLine($"{id}: {tiles.Tiles.Count()} tiles, {tiles.TiledCount} tiled ({terrain.Count} of them ground), {tiles.Global.Count} global");
@@ -212,6 +215,36 @@ public class WorldStreamingTests
             Assert.Contains(TileKey.Of(at, tiles.TileMetres), m.Tiles);
         }
         Assert.True(doors > 100 && rooms > 100, $"{doors} doors, {rooms} rooms");
+
+        // A source along a line (a mapped creek, a shore's outline) is in every tile its line crosses, as wide as its
+        // bed: wherever you stand along it, the tile you hold has it.
+        int lines = 0;
+        foreach (var e in lookup.Values)
+        {
+            if (!world.Has<SoundEmitterComponent>(e) || world.Get<SoundEmitterComponent>(e).Line is not { Length: >= 2 } line) continue;
+            Assert.True(tiles.TryGet(e.Id, out var m), $"entity {e.Id} along a line is in no tile");
+            var t = world.Get<Transform>(e);
+            var turn = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
+            float side = world.Has<ColliderComponent>(e) ? world.Get<ColliderComponent>(e).Size.X * 0.5f : 0f;
+            for (int i = 1; i < line.Length; i++)
+            {
+                var a = t.Position + Vector3.Transform(line[i - 1], turn);
+                var b = t.Position + Vector3.Transform(line[i], turn);
+                int steps = Math.Max(1, (int)MathF.Ceiling(Vector3.Distance(a, b)));
+                for (int k = 0; k <= steps; k++)
+                {
+                    var at = Vector3.Lerp(a, b, k / (float)steps);
+                    foreach (var off in new[] { Vector3.Zero, new Vector3(side, 0f, 0f), new Vector3(-side, 0f, 0f), new Vector3(0f, 0f, side), new Vector3(0f, 0f, -side) })
+                    {
+                        var key = TileKey.Of(at + off, tiles.TileMetres);
+                        if (key.X < tiles.Min.X || key.X > tiles.Max.X || key.Z < tiles.Min.Z || key.Z > tiles.Max.Z) continue;
+                        Assert.True(m.Tiles.Contains(key), $"entity {e.Id} along a line is not in tile {key}, which its line crosses at {at + off}");
+                    }
+                }
+            }
+            lines++;
+        }
+        _o.WriteLine($"  {lines} sources along lines, each in every tile its line crosses");
 
         // Rooms that flood together share their tiles too: an archway with no door is no doorway, and a client
         // holding one room of a house but not the other flooded the one into the other's air.

@@ -283,7 +283,21 @@ public sealed class MapTiles
         if (world.Has<RegionComponent>(e)) size = Vector3.Max(size, world.Get<RegionComponent>(e).RoomSize);
         var rot = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
         var half = OpenFPS.Acoustics.Systems.FaceOpenings.AxisAlignedHalfExtents(size * 0.5f, rot);
-        return (t.Position - half, t.Position + half);
+        var lo = t.Position - half;
+        var hi = t.Position + half;
+        // A source laid along a line (a mapped creek) is everywhere along it, as wide as its bed (its box's X):
+        // its box is only its bed's cross-section, so its line's bounds decide which tiles hear it.
+        if (world.Has<SoundEmitterComponent>(e) && world.Get<SoundEmitterComponent>(e).Line is { Length: > 0 } line)
+        {
+            var side = new Vector3(size.X * 0.5f, 0f, size.X * 0.5f);
+            foreach (var p in line)
+            {
+                var at = t.Position + Vector3.Transform(p, rot);
+                lo = Vector3.Min(lo, at - side);
+                hi = Vector3.Max(hi, at + side);
+            }
+        }
+        return (lo, hi);
     }
 
     /// <summary>
