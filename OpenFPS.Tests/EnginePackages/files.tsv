@@ -462,6 +462,7 @@ OpenFPS.Sound/Core/LabLevers.cs	Sound
 OpenFPS.Sound/Core/MixSettings.cs	Sound	
 OpenFPS.Sound/Core/Nature/EarWindSynth.cs	Sound	
 OpenFPS.Sound/Core/Nature/EventSum.cs	Sound	
+OpenFPS.Sound/Core/Nature/ExtendedSources.Area.cs	Sound	
 OpenFPS.Sound/Core/Nature/ExtendedSources.cs	Sound	
 OpenFPS.Sound/Core/Nature/FallingWaterSynth.cs	Sound	
 OpenFPS.Sound/Core/Nature/FireReferences.cs	Sound	
@@ -475,6 +476,7 @@ OpenFPS.Sound/Core/Nature/Resonator.cs	Sound
 OpenFPS.Sound/Core/Nature/RunningWaterSynth.Basin.cs	Sound	
 OpenFPS.Sound/Core/Nature/RunningWaterSynth.cs	Sound	
 OpenFPS.Sound/Core/Nature/ShoreReferences.cs	Sound	
+OpenFPS.Sound/Core/Nature/ShoreSynth.OpenWater.cs	Sound	
 OpenFPS.Sound/Core/Nature/ShoreSynth.cs	Sound	
 OpenFPS.Sound/Core/Nature/StreamBed.cs	Sound	
 OpenFPS.Sound/Core/Nature/TextureStatistics.cs	Sound	
