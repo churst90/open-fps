@@ -12,8 +12,8 @@ models for method and depth are docs/SOUND_LIBRARY_BOUNDARY.md and docs/PHYSICS_
   `packages_files.tsv` and `packages_crossings.tsv` into the output folder, and the ratchet's four lists into
   `ratchet` there (stage 0). Run it again after any move.
 - Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy; Materials since
-  stage 1 was built (2026-10-12), Models since stage 2, Accessibility, its clean half, since stage 7, and
-  World since stage 4 (2026-10-16). Planned with their
+  stage 1 was built (2026-10-12), Models since stage 2, Accessibility, its clean half, since stage 7,
+  World since stage 4 and Environment since stage 3 (2026-10-16). Planned with their
   own documents and not planned again here: `OpenFPS.Audio` and the split of `ClientAudioSystem` (sound library
   stages 6 to 8), and physics stages 2 to 6. This survey says where its packages meet them.
 
@@ -858,6 +858,87 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
 - Check: render fingerprint (rain, thunder), emitter stream (`traffic_rain`), `FireSpreadTests`, `FireTests`,
   `WeatherWindTests`, `WeatherAndConvergenceTests`, `AmbienceAndWeatherTests`, `MapScopedStateTests`; the wire
   hash changes.
+
+- **Built 2026-10-16, Environment** (on Linux, in five commits, begun on main `13e0f460` and rebased onto
+  `afe5e9fb`, which has library stage 6's second half; the counts and hashes in the first four commits'
+  messages were taken before the rebase). `OpenFPS.Environment` holds 20 files on Geometry, Materials, Schema
+  and Physics; Sound, Models, World and Common reference it, and it references none of them. Nothing a player
+  hears changes: the render fingerprints (rain on three surfaces, thunder), the stored streams (`traffic_rain`
+  among them), the spoken lines and the physics replays pass unregenerated.
+  - **First, the bytes.** `EnvironmentWireBytesTests` was written on `13e0f460` before any change: a map's
+    weather as the broadcast fills its `WorldStateUpdate` (a seeded storm on a map with its own air, what falls,
+    the water on the roads, three hours of it over the ground with two ponds overflowing), every `WeatherType`
+    and `PrecipitationKind` by number, and a seeded storm's first four strikes as the sounds they are sent as,
+    each by its SHA-256. It passes after every commit. Broken on purpose, it failed for the soil group B for C,
+    Snow and Storm swapped, and a strike's declared level 175 dB for 176.
+  - **The splits** (Environment's 25 crossings; the plan's 38 less the 16 of the catalogue, turned round by
+    stage 2, and the clock's 3 counted since library stage 5):
+
+    | What | Was | Now |
+    |---|---|---|
+    | A drainage line's bed | in `GroundChannels` (Sound) | `GroundChannelBed`: `GroundChannelKind`, `SegmentMetres`, `ReferenceStormMm`, `ReferenceFlow`, `WidthFor`, `ManningN`, moved as they were; the voice's spec, key and level table stay in `GroundChannels` |
+    | A drainage voice's sound id | `DrainageNetwork.Voice.SoundId` | `MapDrainage.SoundId(voice)`, the host's, from `GroundChannels.SoundId` |
+    | Lightning's default speed of sound | `AcousticConstants.SpeedOfSound` (Acoustics) | `Air.ReferenceSpeedOfSound` (Materials), 343 m/s, which `AcousticConstants.SpeedOfSound` now reads; thunder passes its own speed, so only the lab's and the tests' defaulted calls read it |
+    | What is soft to a hailstone | `RainSurfaces.SoftBelowGPa` (Sound) | `Hydrometeors.SoftBelowGPa`, which `RainSurfaces` reads |
+    | The weather's clock | `IAudioClock` (Sound) | `IWorldClock` (`WorldClock.cs`): the world time alone; `IAudioClock` is one, so the mixer still hands the weather its own clock, and until it does the weather reads `SharedWorldClock` (`WindField.Now`), as the stopwatch clock it replaces did |
+    | `WaterBody`, `WindWaves` | in `Waves.cs` | `WindWaves.cs`, cut whole; the shores' specs stay in Sound |
+
+  - **Per world.** `GroundWaterSystem` is an instance: one world's maps and frames, where every map's water was
+    in two static dictionaries. The map manager holds the server's (`MapManager.GroundWater`): its maps register
+    there as they load, the world's frames build there, the tick steps it, the broadcast sends it, and a road's
+    puddles read its hollows (`RoadWaterSystem.Update` is handed it). A frame waits on real time its host hands
+    it (`RealTime.Milliseconds`), so the library's one-place rule for the machine's clock still holds. The soil:
+    `GroundHydrology.SoilGroup`, assignable and written by nobody, is `DefaultSoilGroup` (B), the laws that read
+    it take a soil group, and a world's ground water has one (`GroundWaterSystem.SoilGroup`), which the networks
+    it builds (`DrainageNetwork.SoilGroup`) and the water it keeps (`GroundWater.SoilGroup`) are on. Every world
+    is on B, as before. `Two_worlds_keep_their_own_water_and_their_own_soil` holds both; it failed with the maps'
+    dictionary static again, the water's excess share on the default soil, and the network's beds on it.
+  - **The move**, each file whole and not a line changed, namespaces as they were: from Sound `WeatherType`,
+    `Precipitation`, `Rain`, `Lightning`, `Runoff`, `GroundWater`, `RoadWater`, `Fire`, `FireShape`,
+    `FireSpread`, `Fuel`, `WorldWeather`, `AirLayers` and the three the splits made; into `Water/`, `Drainage.cs`
+    (left in Sound by stage 4 to wait for this one), `DrainageNetwork.cs` and `GroundWaterSystem.cs` (the
+    server's). The plan's 15 files are 19 with the splits' three and `AirLayers`, which came after it; 20 with
+    the atmosphere. The fire files moved as stage 2 left them: they take a fire by name as a function, which
+    Environment can hold since `FireSpec` is in `Fire.cs`. No crossing came or went with the move.
+  - **One atmosphere.** `OutdoorAir` (Environment): temperature, humidity, pressure, the wind and its gustiness,
+    with its gas, `Air`, by the one law. The three ways of 3.2 are now one value and the law below it:
+    - `Thunder.Air` is gone; thunder takes an `OutdoorAir` (`Thunder.StandardAir` before the weather has said,
+      the same 15 °C, 0.8, 1013.25 mb, still, 0.3 as before; the four tests and the render fingerprint that
+      leaned on the old default gust say 0.3).
+    - `WorldEnvironmentComponent.Outdoors` and `WorldSnapshot.Outdoors` carry it: the fields stay what is sent,
+      one by one (`WorldStateUpdate` is unchanged and its bytes held), and the value is read from them. The
+      client's thunder (`WorldAudioPlayer`), the server's bullets (`CombatService.Weather` is a
+      `Func<string, OutdoorAir>`) and a driven car's drag (`driveAir.Outdoors.Air`) read it.
+    - Physics' laws take its `Air`: Physics is below Environment and reads the materials' gas law, never the
+      value.
+    - The audio world's `Atmosphere` (`OpenFPS.Sound/Core/Atmosphere.cs`, library stage 5) is not a fourth
+      way: it is the mixer's live copy of one number of it, the temperature, with the speed of sound from
+      `Air`'s law, held volatile for the mixer's thread. Its host sets it from the weather's temperature, as
+      before. It stays the audio world's.
+    - The acoustics' `AirState` (library stage 6's world input: temperature, humidity, pressure, absorption)
+      stays as it is: Acoustics sits beside Environment and cannot read it.
+    `TheWorldsAirIsOneValueOfItsFields` holds the component's value field by field; it failed with the gust
+    read from the absorption multiplier.
+  - **The guards followed.** The packages ratchet (Environment a sorted project, its files by one rule, its
+    assembly checked against its layer; the three type rules gone with their types' own files), the library's
+    (Environment is library, as its files were in Sound; its assembly may reference Geometry, Materials,
+    Schema and Physics, and Sound, the catalogue and the runtime may reference it; the type rules for the
+    weather's values on the wire name Environment). The reader parses the new project, and every project above
+    it references it. The physics survey sorts a project it does not know as host; its 15 are unchanged.
+  - **The counts.** The packages ratchet falls from 761 to 736 (main `afe5e9fb`), all 25 Environment's; the
+    library's allowance stays empty and its survey counts one static fewer (`SoilGroup`). Its layering count
+    rises (4,530 to about 6,500): that table knows only the library's own layers, and already counted Sound to
+    Physics; it is not a ratchet.
+  - **The wire hash** changes (d81f09ee05a8 at `afe5e9fb` to 60f35a9236d7): the server and the Windows client
+    go out together.
+  - **Found, not fixed** (the reader's compilations, other stages' lines): Accessibility is given neither Models
+    nor Sound (22 binding errors in `ListeningCalibration.cs`, since stage 7 moved it), Sound's internals are not
+    shown to Models (8 in `Machines.cs`), and World is not given Parquet.Net (8 in `Overture.cs`). Those
+    references go unseen by every survey.
+  - **Left:** `GroundWater.OfMaterial` still tells the runoff class by a material's name (stage 1's note): it
+    wants a runoff cover column in the table. Real weather (docs/REAL_WEATHER.md 8.1) plugs in at
+    `OutdoorAir` and `WorldWeather`; the server's `WorldEnvironmentSystem` still keeps its fields one by one.
+    The ground water's soil is one per world until a soil layer gives each tile its own.
 
 ### Stage 4: World (2 to 3 sessions)
 

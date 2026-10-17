@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Package stage 3, Environment (docs/ENGINE_PACKAGES.md, stage 3 as built). Nothing a player hears changes.
+  The weather, the water on the ground and the roads, and fire are a project of their own, `OpenFPS.Environment`:
+  what falls and its drops, the storm's strikes, the air's layers, the waves a wind raises, the rain running off,
+  the ground's hydrology and drainage, the water on the roads, and what burns and how it spreads. It sits on the
+  physics and the materials and below the sound, which reads it. Each world keeps its own ground water and soil
+  (two worlds in one process shared one before), and the air outdoors is one value (`OutdoorAir`) that thunder,
+  bullets and a driven car read. No byte on the wire moved. The wire hash changes, so the server and the Windows
+  client go out together.
 - Library stage 6's second half (docs/SOUND_LIBRARY_BOUNDARY.md 19.7 to 19.12). Nothing a player hears changes.
   The sound's runtime is a project of its own, `OpenFPS.Audio`: the FMOD mixer and its voices, Steam Audio, the
   acoustic worker, the facade, the voice manager, the bank, the door render cache, the placing thread and the rain
