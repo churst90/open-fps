@@ -85,7 +85,7 @@ public static class EarlyTailSpike
         var played = new Dictionary<bool, double[]>();
         foreach (bool old in new[] { true, false })
         {
-            using var t2 = new TracedReverb(ctx, lab: new OpenFPS.Client.AudioEngine.Core.LabLevers { TailFromFiftyMs = old }) { ExtractLate = true };
+            using var t2 = new TracedReverb(ctx, lab: new OpenFPS.Sound.Core.LabLevers { TailFromFiftyMs = old }) { ExtractLate = true };
             t2.SetScene(scene);
             t2.SetListener(ear);
             for (int t = 0; t < 300 && (t2.LateSdm == null || t2.Runs < 6); t++) Thread.Sleep(100);

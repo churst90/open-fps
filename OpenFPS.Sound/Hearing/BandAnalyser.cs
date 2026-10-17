@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Hearing;
+namespace OpenFPS.Sound.Hearing;
 
 /// <summary>
 /// One-third-octave band powers of a signal, 25 Hz to 12.5 kHz: the input <see cref="ZwickerLoudness"/>

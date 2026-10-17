@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Text;
-using static OpenFPS.Common.DoorPhysics;
+using OpenFPS.Common;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A key unlocking a door, simulated as the objects: the ring brought up to a pin-tumbler cylinder, the key

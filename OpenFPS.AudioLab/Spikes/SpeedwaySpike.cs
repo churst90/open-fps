@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Acoustics;
@@ -19,7 +19,7 @@ public static class SpeedwaySpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const float C = 343f;
 

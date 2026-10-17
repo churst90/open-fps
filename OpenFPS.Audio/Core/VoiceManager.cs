@@ -1,5 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.AudioEngine.Data;
 
 namespace OpenFPS.Client.AudioEngine.Core;
@@ -82,7 +83,7 @@ public class VoiceManager
 
     /// <summary>The hearing of the world it ranks for: the facade's (AudioEngineFacade.Hearing), the shipped
     /// hearing when made alone.</summary>
-    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; init; } = new();
+    public OpenFPS.Sound.Hearing.HearingSettings Hearing { get; init; } = new();
 
     public VoiceManager(IVoiceSink audio, AudioBank bank, int maxVoices = 64)
     {
@@ -159,9 +160,9 @@ public class VoiceManager
             // An inaudible one-shot is dropped. A continuous voice already playing is held at the floor
             // and left to the budget: dropped there, a car at 300 m passing behind buildings was rebuilt
             // 45 times in nine minutes, heard as distant traffic stuttering.
-            if (playing && !e.IsEvent && score < OpenFPS.Common.Loudness.SilenceGain)
-                score = OpenFPS.Common.Loudness.SilenceGain;
-            if (score < OpenFPS.Common.Loudness.SilenceGain && !e.Essential)
+            if (playing && !e.IsEvent && score < OpenFPS.Sound.Loudness.SilenceGain)
+                score = OpenFPS.Sound.Loudness.SilenceGain;
+            if (score < OpenFPS.Sound.Loudness.SilenceGain && !e.Essential)
             {
                 if (e.IsEvent) _keysToRemove.Add(id);
                 continue;
@@ -365,12 +366,12 @@ public class VoiceManager
 
     /// <summary>
     /// What this voice will deliver to the ear, the one quantity the budget ranks on: the mixer's own
-    /// distance law (<see cref="OpenFPS.Common.Loudness.RenderedGain"/>) times what the path lets
+    /// distance law (<see cref="OpenFPS.Sound.Loudness.RenderedGain"/>) times what the path lets
     /// through, as loudness. Two departures: <see cref="SpatialEmitter.Essential"/> pins speech, your
     /// own steps and warnings above the physics, which on a racetrack would bury them; and a playing
     /// voice gets 2 dB of hysteresis, so two near-equal sources do not trade the last slot every frame.
     /// </summary>
-    internal static float Audibility(OpenFPS.Common.Hearing.HearingSettings hearing, in SpatialEmitter e, float distance, bool playing)
+    internal static float Audibility(OpenFPS.Sound.Hearing.HearingSettings hearing, in SpatialEmitter e, float distance, bool playing)
     {
         float level = HeardLevel(hearing, WithoutHeadroom(e.Volume, e.HeadroomGain), e.MinDistance, e.Range, distance, e.Occlusion,
                                  e.EarLevelDb, RankKey(e), IsPhysical(e));
@@ -387,10 +388,10 @@ public class VoiceManager
     /// which things get a voice (cars, standing machines, their places) asks this with the numbers the voice
     /// would be played with, so nothing is picked on one set of numbers and played at another.
     /// </summary>
-    internal static float HeardLevel(OpenFPS.Common.Hearing.HearingSettings hearing, float volume, float reference, float range,
+    internal static float HeardLevel(OpenFPS.Sound.Hearing.HearingSettings hearing, float volume, float reference, float range,
                                      float distance, float occlusion, float earLevelDb, string key, bool physical)
     {
-        float level = OpenFPS.Common.Loudness.RenderedGain(volume, reference, range, distance);
+        float level = OpenFPS.Sound.Loudness.RenderedGain(volume, reference, range, distance);
         level *= 1f - Math.Clamp(occlusion, 0f, 1f);
         // Ranked by loudness at the ear from the measured spectrum (docs/EAR_MODEL.md, Ranking), not by
         // the law's gain: the law plays what the ear hears less of louder (a 25 Hz rumble about 21 dB

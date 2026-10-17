@@ -1,5 +1,6 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core;
@@ -186,7 +187,7 @@ public sealed class NearDrops
     private void Cell(RainSurvey.NearCell c, ParticleSpectrum s, PrecipitationKind kind, float from, Vector3 ear, double t, float dt, List<Impact> into)
     {
         // Clustered as the patches are (RainSynth.Intermittency): the big drops come in the same swells.
-        float mean = s.PerSquareMetreSecond * s.ShareAbove(from) * c.Area * dt * OpenFPS.Client.AudioEngine.Core.Nature.RainSynth.Intermittency(t);
+        float mean = s.PerSquareMetreSecond * s.ShareAbove(from) * c.Area * dt * OpenFPS.Sound.Core.Nature.RainSynth.Intermittency(t);
         int n = Poisson(mean);
         for (int k = 0; k < n; k++)
         {
@@ -310,7 +311,7 @@ public sealed class DropBank
     /// A drop's level is its peak (its sound is normalised to it); a patch's is its Leq, rendered the
     /// fleet's shared headroom (VehicleProfile.PeakHeadroomDb) under full scale, hence the headroom here.
     /// </summary>
-    public static (float Gain, float Reference) Placement(OpenFPS.Common.Hearing.HearingSettings hearing, float dropLevelDb, float fieldLevelDb)
+    public static (float Gain, float Reference) Placement(OpenFPS.Sound.Hearing.HearingSettings hearing, float dropLevelDb, float fieldLevelDb)
     {
         if (float.IsNaN(fieldLevelDb) || fieldLevelDb <= 0f) return hearing.Place(dropLevelDb);
         var (gain, reference) = hearing.Place(fieldLevelDb);

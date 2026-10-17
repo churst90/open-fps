@@ -7,6 +7,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Acoustics;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -321,7 +322,7 @@ public class OpeningRoutesTests
         // that has loaded it, whose answer is its own.
         var world = Building(frontDoorOpen: true);
         var acoustics = new SpatialAcoustics();
-        using var worker = new AsyncAcousticWorker(acoustics) { Lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { WithoutSteamAudio = true } };
+        using var worker = new AsyncAcousticWorker(acoustics) { Lab = new OpenFPS.Sound.Core.LabLevers { WithoutSteamAudio = true } };
         worker.UpdateWorld(world);
         worker.Start();
         List<AcousticPathData>? paths = null;

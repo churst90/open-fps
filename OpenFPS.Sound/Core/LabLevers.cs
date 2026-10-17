@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// The lab's levers on one audio world: A/Bs against what the game did before, and probes that put a click

@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Security.Cryptography;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
@@ -57,8 +58,8 @@ public static class PoolCostSpike
         }
         _only = rest.FirstOrDefault(a => a.StartsWith("only="))?[5..];
         _sceneSeconds = IntArg(rest, "secs", 6);
-        _detail = rest.Contains("detail=reduced") ? OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced
-                                                  : OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
+        _detail = rest.Contains("detail=reduced") ? OpenFPS.Sound.Core.Engine.EngineDetail.Reduced
+                                                  : OpenFPS.Sound.Core.Engine.EngineDetail.Full;
         if (rest.Contains("cpu")) return Cpu(voices, IntArg(rest, "sec", 10));
         if (rest.Contains("offline")) return Offline(voices, IntArg(rest, "sec", 4));
         if (rest.Contains("machines")) return Machines(IntArg(rest, "sec", 4));
@@ -91,7 +92,7 @@ public static class PoolCostSpike
     }
 
     /// <summary>The detail every voice the benches build runs at (detail=reduced).</summary>
-    private static OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail _detail;
+    private static OpenFPS.Sound.Core.Engine.EngineDetail _detail;
 
     /// <summary>One street voice: a speed and a listener 5-60 m off, as the provider makes it.</summary>
     private static EngineVoiceState StreetVoice(int i)
@@ -277,8 +278,8 @@ public static class PoolCostSpike
                 for (int b = 0; b < blocks; b++)
                 {
                     double t = b * Block / (double)Rate;
-                    if (hand) v.Detail = t >= 3.0 && t < 9.0 ? OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced
-                                                             : OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
+                    if (hand) v.Detail = t >= 3.0 && t < 9.0 ? OpenFPS.Sound.Core.Engine.EngineDetail.Reduced
+                                                             : OpenFPS.Sound.Core.Engine.EngineDetail.Full;
                     v.Produce(); v.Consume(buf); buf.CopyTo(all, b * Block);
                 }
                 Write(dir, $"{(hand ? "handover" : "full")}_{i:00}_{StreetMix[i]}", all);
@@ -341,7 +342,7 @@ public static class PoolCostSpike
         var p = OpenFPS.Common.ModelLibrary.Presets.Engine(key);
         foreach (int rate in new[] { 48000, 24000, 48000, 24000 })
         {
-            var e = new OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth(p, rate, 5) { Throttle = 0.4f };
+            var e = new OpenFPS.Sound.Core.Engine.EngineSynth(p, rate, 5) { Throttle = 0.4f };
             e.SpinTo(p.IdleRpm * 2.5f);
             e.LoadTorque = 0.3f * p.PeakTorqueNm;
             e.ExternalInertia = 0.05f;

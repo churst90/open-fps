@@ -4,6 +4,8 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Client.AudioEngine.Core;
 
@@ -82,7 +84,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         Clock = (provider as FmodAudioProvider)?.Clock ?? clock ?? new StopwatchAudioClock();
         Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather { Clock = Clock };
         Atmosphere = (provider as FmodAudioProvider)?.Atmosphere ?? new Atmosphere();
-        Hearing = (provider as FmodAudioProvider)?.Hearing ?? new OpenFPS.Common.Hearing.HearingSettings();
+        Hearing = (provider as FmodAudioProvider)?.Hearing ?? new OpenFPS.Sound.Hearing.HearingSettings();
         Mix = (provider as FmodAudioProvider)?.Mix ?? new MixSettings();
         OwnVoice = (provider as FmodAudioProvider)?.OwnVoice ?? new OwnVoiceRing();
         TalkerStreams = (provider as FmodAudioProvider)?.TalkerStreams ?? new TalkerStreams();
@@ -105,7 +107,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>How this world is heard (the law's compression, the ear model, the listening level), for the host
     /// to place by and to set from the player's settings: the mixer's when there is one (FmodAudioProvider.Hearing);
     /// otherwise one of the facade's own, the shipped hearing, which a test sets as it needs.</summary>
-    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; }
+    public OpenFPS.Sound.Hearing.HearingSettings Hearing { get; }
 
     /// <summary>The mix's live levers, for the host's console and its placed copies: the mixer's when there is
     /// one (FmodAudioProvider.Mix); otherwise one of the facade's own, the shipped mix.</summary>
@@ -383,7 +385,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     }
 
     /// <summary>See IAudioProvider.PlanPieces.</summary>
-    public void PlanPieces(int voiceId, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut cut)
+    public void PlanPieces(int voiceId, OpenFPS.Sound.Core.Nature.ExtendedSources.LineCut cut)
     {
         if (_isInitialized) _provider.PlanPieces(voiceId, cut);
     }
@@ -419,7 +421,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
     /// <summary>Where the listener is, for the wind at their ears. Thread-safe: the provider swaps it
     /// in whole.</summary>
-    public void SetEarWind(OpenFPS.Common.EarWindListener? listener)
+    public void SetEarWind(OpenFPS.Sound.EarWindListener? listener)
     {
         if (_isInitialized) _provider.SetEarWind(listener);
     }

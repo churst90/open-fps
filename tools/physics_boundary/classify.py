@@ -37,7 +37,8 @@ SREFS = rd('static_refs.tsv')
 
 C = 'OpenFPS.Common.'
 G = 'OpenFPS.Geometry.'
-EN = 'OpenFPS.Client.AudioEngine.Core.Engine.'
+EN = 'OpenFPS.Sound.Core.Engine.'
+SO = 'OpenFPS.Sound.'
 
 # ── The inventory: (type, group, note) ─────────────────────────────────────────────────────────────
 RULES = [
@@ -77,23 +78,23 @@ RULES = [
     (C + 'TyreGrip', 'P', 'the friction circle: the demand on a tyre against what it can give'),
     (C + 'TyreMechanics', 'P', 'the physics half of a tyre preset: grip, Magic Formula shape, pressure, tread depth'),
     (C + 'VehicleMechanics', 'P', 'the physics half of a vehicle preset: running gear, tyres, mass'),
-    (C + 'TyreFriction', 'S', 'the squeal onsets and amounts (the friction circle went to TyreGrip, physics stage 2)'),
+    (SO + 'TyreFriction', 'S', 'the squeal onsets and amounts (the friction circle went to TyreGrip, physics stage 2)'),
     (C + 'RunningGear', 'P', 'every preset\'s running gear as data'),
     (C + 'Networking.WheelState', 'V', 'one wheel on the wire'),
     (C + 'Gearbox', 'P', 'ratios, final drive, shift points'),
-    (C + 'TyreProfile', 'S', 'tread and cavity (its mechanics are TyreMechanics, physics stage 2)'),
-    (C + 'VehicleProfile', 'PS', 'a preset: mass, drag, rolling resistance, running gear are mechanics; the rest is sound'),
+    (SO + 'TyreProfile', 'S', 'tread and cavity (its mechanics are TyreMechanics, physics stage 2)'),
+    (SO + 'VehicleProfile', 'PS', 'a preset: mass, drag, rolling resistance, running gear are mechanics; the rest is sound'),
     (C + 'EngineMechanics', 'P', 'the physics half of an engine preset: idle, redline, peak torque and its rpm'),
-    (C + 'EngineProfile', 'PS', 'a preset: torque, inertia, friction, idle and redline are mechanics; the gas path is sound'),
+    (SO + 'EngineProfile', 'PS', 'a preset: torque, inertia, friction, idle and redline are mechanics; the gas path is sound'),
     (C + 'VehicleSpec', 'M', 'the editable vehicle kind, as an edited vehicle is stored: the catalogue\'s (physics stage 2, 16.2)'),
     (C + 'VehicleChassisSpec', 'M', 'its chassis, with the one number of the sound\'s it carries (SourceLevelDb)'),
     (C + 'VehicleExhaustSpec', 'S', ''),
     (C + 'VehicleIntakeSpec', 'S', ''),
-    (C + 'VehicleBody', 'S', 'panel modes and the cabin air: how the engine gets out, not how the car moves'),
-    (C + 'BodyResonator', 'S', ''),
-    (C + 'BodyMode', 'S', ''),
-    (C + 'VehicleCabin', 'S', 'the shell as boxes; geometry stage 6 makes it a mesh both sides read'),
-    (C + 'DoorPhysics', 'S', 'audio-rate structural dynamics of door parts (modes, plates, LuGre)'),
+    (SO + 'VehicleBody', 'S', 'panel modes and the cabin air: how the engine gets out, not how the car moves'),
+    (SO + 'BodyResonator', 'S', ''),
+    (SO + 'BodyMode', 'S', ''),
+    (SO + 'VehicleCabin', 'S', 'the shell as boxes; geometry stage 6 makes it a mesh both sides read'),
+    (SO + 'DoorPhysics', 'S', 'audio-rate structural dynamics of door parts (modes, plates, LuGre)'),
     (EN + 'Driveline', 'PS', 'clutch, gears, mass and resistances at the audio rate: the mechanics belong in Physics at the tick'),
     (EN + 'Driver', 'S', 'a scripted driver for the lab and the bench'),
     (EN + 'VirtualDriver', 'S', 'the sound\'s guess at the driver from the server\'s speed'),
@@ -105,17 +106,17 @@ RULES = [
     (C + 'FlightPoint', 'P', ''),
     (C + 'Projectile', 'V', 'what flies, made by a weapon'),
     (C + 'Air', 'V', 'temperature and pressure: density for drag, and the sound\'s air'),
-    (C + 'Ballistics', 'S', 'the crack and the muzzle blast'),
+    (SO + 'Ballistics', 'S', 'the crack and the muzzle blast'),
     (C + 'RicochetLaw', 'P', 'a round off a face: whether it skips, how it leaves, the tumbling slug\'s flight'),
     (C + 'Slug', 'V', 'what a round is in flight: the bounce makes it, the whine reads it'),
-    (C + 'Ricochet', 'S', 'the whine (the bounce and the tumbling flight went to RicochetLaw, physics stage 2)'),
+    (SO + 'Ricochet', 'S', 'the whine (the bounce and the tumbling flight went to RicochetLaw, physics stage 2)'),
     (C + 'WindField', 'P', 'the moving air: log law, eddies, carry'),
     (C + 'WindAir', 'V', 'the wind the server sends'),
     (C + 'WindWeather', 'V', 'one weather\'s wind ramp'),
     (C + 'WindModel', 'P', 'the bullets\' second wind law; to be one law with WindField'),
     (C + 'WorldWeather', 'S', 'one audio world\'s weather: it holds the wind Physics owns'),
-    (C + 'EarWind', 'S', 'the wind at the ears: reads the air'),
-    (C + 'ImpactAcoustics', 'S', 'the sound of an impact from two masses and a closing speed'),
+    (SO + 'EarWind', 'S', 'the wind at the ears: reads the air'),
+    (SO + 'ImpactAcoustics', 'S', 'the sound of an impact from two masses and a closing speed'),
     # Geometry
     (G + 'SolidContact', 'G', 'cylinder and capsule against a solid'),
     (G + 'BodyShape', 'G', ''),
@@ -188,7 +189,7 @@ def allowed_for_physics(t):
 
 def short(t):
     for p in ('OpenFPS.Geometry.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
-              'OpenFPS.Client.AudioEngine.Core.Engine.', 'OpenFPS.Server.Systems.', 'OpenFPS.Server.Core.',
+              'OpenFPS.Sound.Core.Engine.', 'OpenFPS.Server.Systems.', 'OpenFPS.Server.Core.',
               'OpenFPS.Client.Core.'):
         if t.startswith(p):
             return t[len(p):]
@@ -307,7 +308,7 @@ def side(e):
 
 w('## Members of the split presets by who reads them')
 w()
-for preset in (C + 'VehicleProfile', C + 'EngineProfile', C + 'TyreProfile', C + 'Gearbox', C + 'ChassisSpec'):
+for preset in (SO + 'VehicleProfile', SO + 'EngineProfile', SO + 'TyreProfile', C + 'Gearbox', C + 'ChassisSpec'):
     reads = collections.defaultdict(collections.Counter)
     for e in EDGES:
         if e['to_type'] != preset or e['symbol_kind'] not in ('Property', 'Field', 'Method'):

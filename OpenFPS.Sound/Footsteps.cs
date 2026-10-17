@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Globalization;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// What is on the foot. The sole is a material in the registry, and its stiffness is nearly the whole

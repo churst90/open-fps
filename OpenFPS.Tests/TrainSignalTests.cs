@@ -1,6 +1,7 @@
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using Xunit.Abstractions;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

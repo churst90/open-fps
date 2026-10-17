@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Hearing;
+namespace OpenFPS.Sound.Hearing;
 
 /// <summary>
 /// The normal equal-loudness-level contours, ISO 226:2023: the level a pure tone needs at each

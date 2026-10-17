@@ -1,5 +1,6 @@
 using System.Diagnostics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;

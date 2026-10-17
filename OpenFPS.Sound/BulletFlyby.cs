@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>One moment of a bullet's flight: how long it has flown, where it is and how fast it goes.</summary>
 public readonly record struct FlightSample(float Seconds, Vector3 Position, Vector3 Velocity);

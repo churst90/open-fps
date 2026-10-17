@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>The rate a synthesised source renders at when nobody names one.</summary>
 public static class RenderRate

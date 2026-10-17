@@ -385,10 +385,10 @@ public sealed partial class ClientGameSession : IDisposable
 
     private static bool HoldsGun(LocalPlayerState state)
         => !string.IsNullOrEmpty(state.HeldWeaponId)
-           && (OpenFPS.Common.WeaponRegistry.TryGet(state.HeldWeaponId, out _) || HoldsAdminGun(state));
+           && (OpenFPS.Sound.WeaponRegistry.TryGet(state.HeldWeaponId, out _) || HoldsAdminGun(state));
 
     private static bool HoldsAdminGun(LocalPlayerState state)
-        => string.Equals(state.HeldWeaponId, OpenFPS.Common.AdminGun.WeaponId, StringComparison.OrdinalIgnoreCase);
+        => string.Equals(state.HeldWeaponId, OpenFPS.Sound.AdminGun.WeaponId, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>X and Shift+X: a gun in your hands has its selector moved; anything else is told why not.</summary>
     private void SelectorKey(int direction)
@@ -460,7 +460,7 @@ public sealed partial class ClientGameSession : IDisposable
     /// (EngineSynth.BlowdownJet). It changes every engine, the loud V8s most, so it can be switched
     /// live to hear what it does. Plain /valveflow says which.
     /// </summary>
-    internal static string ValveFlowCommand(OpenFPS.Client.AudioEngine.Core.MixSettings mix, string[] args)
+    internal static string ValveFlowCommand(OpenFPS.Sound.Core.MixSettings mix, string[] args)
     {
         if (args.Length > 0)
         {
@@ -479,7 +479,7 @@ public sealed partial class ClientGameSession : IDisposable
     /// (EngineDetail.Reduced), or every engine in full, to hear what the saving costs. Plain
     /// /enginedetail says which.
     /// </summary>
-    internal static string EngineDetailCommand(OpenFPS.Client.AudioEngine.Core.MixSettings mix, string[] args)
+    internal static string EngineDetailCommand(OpenFPS.Sound.Core.MixSettings mix, string[] args)
     {
         if (args.Length > 0)
         {
@@ -498,26 +498,26 @@ public sealed partial class ClientGameSession : IDisposable
     /// the mix. No "real" setting (Cody, 2026-10-05): 100 percent is literal source levels, which on
     /// headphones made a parked car's idle inaudible and footsteps vanish, and the word invited it.
     /// </summary>
-    internal static string LevelsCommand(OpenFPS.Common.Hearing.HearingSettings hearing, string[] args, Action save)
+    internal static string LevelsCommand(OpenFPS.Sound.Hearing.HearingSettings hearing, string[] args, Action save)
     {
         string Now()
         {
             float c = hearing.Compression;
-            string tag = MathF.Abs(c - OpenFPS.Common.Loudness.DefaultCompression) < 0.005f ? ", the default" : "";
+            string tag = MathF.Abs(c - OpenFPS.Sound.Loudness.DefaultCompression) < 0.005f ? ", the default" : "";
             return $"{MathF.Round(c * 100f)} percent{tag}";
         }
         if (args.Length == 0)
             return $"Levels {Now()}: how much of the real loudness differences you hear. Say slash levels and a number from "
-                 + $"{OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, or default.";
+                 + $"{OpenFPS.Sound.Loudness.MinCompression * 100f:F0} to 100, or default.";
         float value;
         string a = args[0].Trim().TrimEnd('%');
-        if (a.Equals("default", StringComparison.OrdinalIgnoreCase)) value = OpenFPS.Common.Loudness.DefaultCompression;
+        if (a.Equals("default", StringComparison.OrdinalIgnoreCase)) value = OpenFPS.Sound.Loudness.DefaultCompression;
         else if (float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
             value = v > 1f ? v / 100f : v;
-        else return $"{args[0]} is not a level. Say a number from {OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, or default.";
+        else return $"{args[0]} is not a level. Say a number from {OpenFPS.Sound.Loudness.MinCompression * 100f:F0} to 100, or default.";
         hearing.Compression = value;
         save();
-        string note = OpenFPS.Common.Loudness.CompressionFromEnvironment ? " For this run only: the environment sets it." : "";
+        string note = OpenFPS.Sound.Loudness.CompressionFromEnvironment ? " For this run only: the environment sets it." : "";
         return $"Levels set to {Now()}.{note}";
     }
 
@@ -1342,7 +1342,7 @@ public sealed partial class ClientGameSession : IDisposable
     /// <summary>Writes the settings file with the world's levels and listening level as they are now.</summary>
     private void SaveHearing() => SaveSettings(_audioEngine.Hearing);
 
-    private static void SaveSettings(OpenFPS.Common.Hearing.HearingSettings? hearing)
+    private static void SaveSettings(OpenFPS.Sound.Hearing.HearingSettings? hearing)
     {
         try { ClientSettings.Load().Save(hearing: hearing); }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
@@ -1439,7 +1439,7 @@ public sealed partial class ClientGameSession : IDisposable
         {
             _network.Send(new TextCommand { Command = "fire" });
             // Only a gun that can fire on automatic needs to hear the trigger let go.
-            _triggerDown = OpenFPS.Common.WeaponRegistry.TryGet(_state.HeldWeaponId, out var w) && OpenFPS.Common.FireSelector.HasAuto(w);
+            _triggerDown = OpenFPS.Sound.WeaponRegistry.TryGet(_state.HeldWeaponId, out var w) && OpenFPS.Common.FireSelector.HasAuto(w);
         }
     }
 

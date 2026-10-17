@@ -1,9 +1,8 @@
 using System.Numerics;
-using OpenFPS.Common;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// Which way a tailpipe throws its sound, and what the vehicle's own body does to it, so a car is not

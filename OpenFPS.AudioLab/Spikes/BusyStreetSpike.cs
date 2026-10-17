@@ -15,6 +15,8 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -31,7 +33,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class BusyStreetSpike
 {
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private sealed class NoUsers : IUserRepository
     {

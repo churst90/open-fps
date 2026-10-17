@@ -41,7 +41,7 @@ public sealed class ClientSettings
     /// and quiet together (HearingSettings.Compression, `/levels`). <see cref="Save"/> records the
     /// live value.
     /// </summary>
-    public float LevelCompression { get; set; } = OpenFPS.Common.Loudness.DefaultCompression;
+    public float LevelCompression { get; set; } = OpenFPS.Sound.Loudness.DefaultCompression;
 
     /// <summary>
     /// How loud the headphones play: dB SPL at the ears of a normal voice at arm's length as the game
@@ -49,22 +49,22 @@ public sealed class ClientSettings
     /// in the mix, only how much tone the ear model gives back (docs/EAR_MODEL.md). <see cref="Save"/>
     /// records the live value.
     /// </summary>
-    public float ListeningLevelDb { get; set; } = OpenFPS.Common.Hearing.EarModel.DefaultListeningLevelDb;
+    public float ListeningLevelDb { get; set; } = OpenFPS.Sound.Hearing.EarModel.DefaultListeningLevelDb;
 
     /// <summary>Puts this file's levels and listening level into play in <paramref name="hearing"/> (the audio
     /// world's, AudioEngineFacade.Hearing), each unless the environment chose it for the run, and remembers it:
     /// <see cref="Save"/> records what is live there. Each head calls it once, after loading.</summary>
-    public void ApplyHearing(OpenFPS.Common.Hearing.HearingSettings hearing)
+    public void ApplyHearing(OpenFPS.Sound.Hearing.HearingSettings hearing)
     {
         _hearing = hearing;
-        if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
+        if (!OpenFPS.Sound.Loudness.CompressionFromEnvironment)
             hearing.Compression = LevelCompression;
-        if (!OpenFPS.Common.Hearing.EarModel.ListeningFromEnvironment)
+        if (!OpenFPS.Sound.Hearing.EarModel.ListeningFromEnvironment)
             hearing.ListeningLevelDb = ListeningLevelDb;
     }
 
     /// <summary>The world's hearing this copy was applied to (<see cref="ApplyHearing"/>).</summary>
-    private OpenFPS.Common.Hearing.HearingSettings? _hearing;
+    private OpenFPS.Sound.Hearing.HearingSettings? _hearing;
 
     /// <summary>Saying what is in front of you as you turn (N in game). See <see cref="NavigationAids"/>.</summary>
     public bool TurnNarration { get; set; } = true;
@@ -160,16 +160,16 @@ public sealed class ClientSettings
     /// <param name="path">The file; the player's settings file by default.</param>
     /// <param name="hearing">The world's hearing whose levels and listening level are live: the one this copy
     /// was applied to by default. With neither, this copy's own are written.</param>
-    public void Save(string? path = null, OpenFPS.Common.Hearing.HearingSettings? hearing = null)
+    public void Save(string? path = null, OpenFPS.Sound.Hearing.HearingSettings? hearing = null)
     {
         hearing ??= _hearing;
         path ??= DefaultPath;
         // A password is written only for a server that asked to remember it.
         foreach (var s in Servers) if (!s.RememberPassword) s.Password = "";
         // What is playing, unless a run's environment chose it: that is not the player's choice.
-        if (hearing != null && !OpenFPS.Common.Loudness.CompressionFromEnvironment)
+        if (hearing != null && !OpenFPS.Sound.Loudness.CompressionFromEnvironment)
             LevelCompression = hearing.Compression;
-        if (hearing != null && !OpenFPS.Common.Hearing.EarModel.ListeningFromEnvironment)
+        if (hearing != null && !OpenFPS.Sound.Hearing.EarModel.ListeningFromEnvironment)
             ListeningLevelDb = hearing.ListeningLevelDb;
         // ...and the navigation aids as they are now: a key in game turns them, not this copy.
         TurnNarration = NavigationAids.TurnNarration;

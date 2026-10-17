@@ -1,6 +1,7 @@
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using Serilog;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Systems;
 
@@ -9,7 +10,7 @@ public readonly record struct HeldSky(string MapId, WeatherType Weather, WorldEn
 
 /// <summary>
 /// When and where the storm flashes, from the weather alone; the client works out the thunder for each
-/// listener (OpenFPS.Client.AudioEngine.Core.Thunder). The physics is in <see cref="LightningSchedule"/>
+/// listener (OpenFPS.Sound.Core.Thunder). The physics is in <see cref="LightningSchedule"/>
 /// and <see cref="LightningPhysics"/>. The server's sky has one storm for every map that follows it; a
 /// map that holds a weather has a storm of its own, from that weather, or none.
 /// </summary>

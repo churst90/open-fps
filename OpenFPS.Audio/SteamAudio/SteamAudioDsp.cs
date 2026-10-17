@@ -59,8 +59,8 @@ internal sealed class SteamAudioVoiceState
     /// send) that takes this direction's HRTF level at the ears back to the one interior voice's; see
     /// HrtfBands. Swapped in whole from the game thread; its state is the stage's.
     /// </summary>
-    public volatile OpenFPS.Client.AudioEngine.Core.Engine.BandEq? PreEq;
-    public readonly float[] PreEqState = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.State();
+    public volatile OpenFPS.Sound.Core.Engine.BandEq? PreEq;
+    public readonly float[] PreEqState = OpenFPS.Sound.Core.Engine.BandEq.State();
 
     /// <summary>The sound this stage places, for the [NONFINITE] line (NonFinite); set when it is
     /// handed to a sound. Its flags: reported for its output, for its input.</summary>

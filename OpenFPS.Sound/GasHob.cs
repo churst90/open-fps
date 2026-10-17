@@ -1,7 +1,8 @@
 using System.Globalization;
 using OpenFPS.Common.Editing;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // A domestic gas hob (docs/GAS_HOB.md): a knob on a plug valve, an injector and a mixing tube under each
 // burner, a ring of ports under a cap, one spark module for every electrode, and a thermocouple that holds

@@ -3,6 +3,7 @@ using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using Serilog;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Systems;
 
@@ -96,7 +97,7 @@ public sealed partial class VehicleSystem
                     if (ahead < 2f || ahead > reach || MathF.Abs(side) > InTheWayHalfWidth) continue;
                     v.LastInTheWayAt = clock;
                     if (v.HardBrakeLeft <= 0f) BrakeHard(v, MathF.Min(v.Speed, 1.5f));
-                    Honk(mapId, world, v, OpenFPS.Common.Honk.Startled(_streetRng));
+                    Honk(mapId, world, v, OpenFPS.Sound.Honk.Startled(_streetRng));
                     Yell(mapId, world, v, StreetLines.AtSomebodyInTheRoad, 0.5f, clock);
                     break;
                 }

@@ -1,6 +1,7 @@
 using System.Numerics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>What kind of glass it is, which decides almost everything about what happens when you
 /// shoot it: a player can learn to tell a shop front from a car window by ear.</summary>

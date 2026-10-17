@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -6,7 +6,7 @@ namespace OpenFPS.Tests;
 public class KnobDoorTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     [Fact]
     public void AKeyNamesItsDoor()

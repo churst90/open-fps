@@ -1,7 +1,8 @@
 using System.Numerics;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// What the air does to one sound's way to the ear now (Refraction's law, read with this world's weather): the wind

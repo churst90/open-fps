@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 
 namespace OpenFPS.Common;
 

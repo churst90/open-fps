@@ -1,4 +1,4 @@
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>Where a species lives, which is how the map says where the birds are without anybody
 /// placing one: foliage is foliage because of its material, a roof because of its height.</summary>

@@ -1,7 +1,8 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A window shot out, simulated as the glass it is: the pane struck, cracked or diced, every fragment a

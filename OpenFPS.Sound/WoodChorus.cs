@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The wind in a wood, heard further than the wind in one tree. A crown is heard to about 90 m; a wood of

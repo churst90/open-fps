@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 using Xunit;
@@ -14,7 +14,7 @@ namespace OpenFPS.Tests;
 public class FireSpreadTests
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     private readonly ITestOutputHelper _o;
     public FireSpreadTests(ITestOutputHelper o) { _o = o; AcousticRegistry.Initialize(); }

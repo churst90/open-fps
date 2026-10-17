@@ -1,7 +1,7 @@
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.Core.Platform;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;

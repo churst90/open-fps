@@ -1,7 +1,7 @@
 using System.Numerics;
-using static OpenFPS.Common.DesignedSoundKit;
+using static OpenFPS.Sound.DesignedSoundKit;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The teleporter's four sounds, reasoned from what the device would physically do.

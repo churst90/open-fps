@@ -4,7 +4,7 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -32,7 +32,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class ResonanceMaybesSpike
 {
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     public static int Run(string[] args)
     {

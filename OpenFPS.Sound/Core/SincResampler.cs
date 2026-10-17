@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>One buffer from one rate to another, band-limited: what a render is brought to the mixer's rate by.</summary>
 public static class SincResampler

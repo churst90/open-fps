@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
-using OpenFPS.Common.Hearing;
+using OpenFPS.Sound.Hearing;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// Each sound's measured one-third-octave shape (<see cref="Timbre"/>) by the id it plays under, for
@@ -62,7 +62,7 @@ public static class EarTimbres
 
     /// <summary>The law's correction for this sound's timbre at this level over the unweighted law, as this
     /// world hears it, dB; zero with no declared level or no measurement yet.</summary>
-    public static float CorrectionDb(OpenFPS.Common.Hearing.HearingSettings hearing, string? soundId, float levelDb)
+    public static float CorrectionDb(OpenFPS.Sound.Hearing.HearingSettings hearing, string? soundId, float levelDb)
         => levelDb > 0f ? hearing.TimbreCorrectionDb(levelDb, Find(soundId)) : 0f;
 
     private static string Folder(string soundId)

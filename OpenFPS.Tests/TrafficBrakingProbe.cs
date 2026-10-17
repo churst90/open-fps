@@ -3,6 +3,7 @@ using System.Reflection;
 using OpenFPS.Common;
 using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

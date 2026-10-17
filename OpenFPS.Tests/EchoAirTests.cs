@@ -29,7 +29,7 @@ public class EchoAirTests
     {
         // Too close for a rate: the echo off a wall 60 m round takes the standard atmosphere's loss.
         var (_, _, high) = EngineReflections.EchoAir(Direct(0f, 0f, 0f), 0.5f, 60f);
-        var (_, _, expected) = OpenFPS.Client.AudioEngine.Core.AudioPhysics.AirLossDb(60f, 0.5f, 20f, 1013.25f);
+        var (_, _, expected) = OpenFPS.Sound.Core.AudioPhysics.AirLossDb(60f, 0.5f, 20f, 1013.25f);
         Assert.Equal(expected, high, 4);
         Assert.True(high > 5f);
     }

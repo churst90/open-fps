@@ -1,5 +1,5 @@
-using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Signals;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

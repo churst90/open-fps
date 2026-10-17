@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace OpenFPS.Common.Hearing;
+namespace OpenFPS.Sound.Hearing;
 
 /// <summary>
 /// The shape of a sound's spectrum, 28 one-third-octave bands from 25 Hz to 12.5 kHz in dB relative

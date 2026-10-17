@@ -3,7 +3,7 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
 using ActiveSound = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ActiveSound;
 using StopWay = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.StopWay;
 

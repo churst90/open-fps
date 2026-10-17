@@ -1,6 +1,6 @@
 using System.Numerics;
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 using OpenFPS.Common.Components;
 
 namespace OpenFPS.Server.Systems;

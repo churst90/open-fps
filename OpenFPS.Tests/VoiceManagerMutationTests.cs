@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -13,7 +13,7 @@ namespace OpenFPS.Tests;
 public class VoiceManagerMutationTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     /// <summary>A mixer that remembers everything it was told.</summary>
     private sealed class Mixer : IVoiceSink

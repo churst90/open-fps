@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The parts every simulated door is built from (<see cref="KnobDoor"/>, <see cref="PushBarDoor"/>):

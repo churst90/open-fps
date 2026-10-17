@@ -1,9 +1,8 @@
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Engine;
+using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Client.AudioEngine.Core.Signals;
+namespace OpenFPS.Sound.Core.Signals;
 
 /// <summary>
 /// A steam whistle: a cup with a lid, and an annular sheet of steam blown across the gap under it.

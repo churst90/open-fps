@@ -1,5 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Acoustics;
@@ -133,11 +134,11 @@ public class SpatialAcoustics
 
     /// <summary>The clock of the world it answers about, which its host gives it (AudioEngineFacade.Clock): how
     /// often the routes are made again after a door moves is told on it. One of its own until then.</summary>
-    public OpenFPS.Common.IAudioClock Clock { get; set; } = new OpenFPS.Common.StopwatchAudioClock();
+    public OpenFPS.Sound.IAudioClock Clock { get; set; } = new OpenFPS.Sound.StopwatchAudioClock();
 
     /// <summary>The air of the world it answers about (AudioEngineFacade.Atmosphere): the speed of sound its
     /// reflections and the bends over the ground are timed at. One of its own until it is given one.</summary>
-    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
+    public OpenFPS.Sound.Core.Atmosphere Atmosphere { get; set; } = new();
     private System.Threading.Tasks.Task? _localRoutesBuild;
     private readonly object _localRoutesLock = new();
     /// <summary>Metres: only doors this near the listener count (as AsyncAcousticWorker's).</summary>
@@ -167,7 +168,7 @@ public class SpatialAcoustics
                 // the old one answering meanwhile.
                 if (_localRoutesVersion != world.GeometryVersion) { _localRoutesVersion = world.GeometryVersion; _localRoutesDoors = ~doors; }
                 if (_localRoutesDoors == doors || _localRoutesBuild is { IsCompleted: false }) return current;
-                long now = OpenFPS.Common.AudioClockStamps.StampMs(Clock);
+                long now = OpenFPS.Sound.AudioClockStamps.StampMs(Clock);
                 if (now - _localRoutesStartedAt < DoorRebuildSeconds * 1000) return current;
                 _localRoutesStartedAt = now;
                 _localRoutesDoors = doors;

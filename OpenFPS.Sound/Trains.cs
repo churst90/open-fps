@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using OpenFPS.Common.Editing;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // A train as the machine it is (docs/TRAINS.md). Most of it is not the engine: from the lineside a
 // train is steel wheels on steel rail, so the parts list starts with the wheels and the track.

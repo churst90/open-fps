@@ -194,7 +194,7 @@ public class TileSceneSetTests
     }
 
     [SteamAudioEmbreeFact]
-    public void Tile_scenes_trace_as_the_whole_scene_through_swings_and_tile_changes() => SwingAndStream(new OpenFPS.Client.AudioEngine.Core.LabLevers().TileRecycleShare);
+    public void Tile_scenes_trace_as_the_whole_scene_through_swings_and_tile_changes() => SwingAndStream(new OpenFPS.Sound.Core.LabLevers().TileRecycleShare);
 
     [SteamAudioEmbreeFact]
     public void Tile_scenes_trace_as_the_whole_scene_when_every_pair_is_made_afresh() => SwingAndStream(0);

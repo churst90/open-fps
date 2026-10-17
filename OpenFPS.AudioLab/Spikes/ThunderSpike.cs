@@ -1,7 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
@@ -25,10 +26,10 @@ public static class ThunderSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     /// <summary>The mix the game's mixer starts with, whose trims this instrument applies as the mixer would.</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.MixSettings GameMix = OpenFPS.Client.AudioEngine.Core.MixSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Core.MixSettings GameMix = OpenFPS.Sound.Core.MixSettings.FromEnvironment();
 
     private const int OutRate = 48000;
     private const float ProxyMetres = OpenFPS.Client.Core.OneOffSounds.SkyProxyMetres;

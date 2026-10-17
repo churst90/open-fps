@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Systems;
 

@@ -90,7 +90,7 @@ public sealed class OwnVoiceRing
         int mask = _ring.Length - 1;
         foreach (float s in samples) _ring[(int)(w++ & mask)] = float.IsFinite(s) ? s : 0f;
         Volatile.Write(ref _written, w);
-        Volatile.Write(ref _lastWrite, OpenFPS.Common.RealTime.Ticks);
+        Volatile.Write(ref _lastWrite, OpenFPS.Sound.RealTime.Ticks);
     }
 
     /// <summary>The ring at a fractional sample position, linearly between its neighbours.</summary>
@@ -142,8 +142,8 @@ public sealed class OwnVoiceTap : IGuardedUnit
         _maxPull = maxPull;
         _measures = measures;
         _step = (double)OwnVoiceRing.Rate / mixerRate;
-        _starveDecay = OpenFPS.Client.AudioEngine.Core.At44k.Decay(0.995f, mixerRate);
-        _envelopeStep = OpenFPS.Client.AudioEngine.Core.At44k.Step(0.002f, mixerRate);
+        _starveDecay = OpenFPS.Sound.Core.At44k.Decay(0.995f, mixerRate);
+        _envelopeStep = OpenFPS.Sound.Core.At44k.Step(0.002f, mixerRate);
         _blockShare = 1.0 / (2.0 * mixerRate);
     }
 
@@ -155,7 +155,7 @@ public sealed class OwnVoiceTap : IGuardedUnit
         double margin = Ring.MarginSeconds;
         // The microphone stopped (or never started), or the talker did: nothing to play.
         bool live = written > 0
-                 && OpenFPS.Common.RealTime.Ticks - Ring.LastWriteTicks < (long)((margin + 0.15) * TimeSpan.TicksPerSecond);
+                 && OpenFPS.Sound.RealTime.Ticks - Ring.LastWriteTicks < (long)((margin + 0.15) * TimeSpan.TicksPerSecond);
         // Where this block should start: the margin and the delay behind the newest sample, less the block.
         double target = written - (margin + TargetDelay) * OwnVoiceRing.Rate - n * _step;
         int spurt = Ring.Spurt;

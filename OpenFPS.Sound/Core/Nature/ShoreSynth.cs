@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// Waves at the water's edge, as the events they are made of (docs/WAVES_AND_SHORES.md).

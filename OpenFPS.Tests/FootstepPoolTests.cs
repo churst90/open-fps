@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -13,7 +13,7 @@ namespace OpenFPS.Tests;
 public class FootstepPoolTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     [Fact]
     public void A_crowd_walking_round_you_does_not_take_your_own_step()

@@ -13,6 +13,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Server.Water;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -40,7 +41,7 @@ public static class GroundWaterSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const int Rate = 48000;
 
@@ -490,7 +491,7 @@ public static class GroundWaterSpike
             var ids = new List<int>();
             foreach (var v in l.Net.Voices)
             {
-                var near = v.Line is { Length: >= 2 } line ? new OpenFPS.Client.AudioEngine.Core.Nature.LinePath(line).Nearest(stand, out _) : v.Position;
+                var near = v.Line is { Length: >= 2 } line ? new OpenFPS.Sound.Core.Nature.LinePath(line).Nearest(stand, out _) : v.Position;
                 if (Vector2.Distance(new Vector2(near.X, near.Z), new Vector2(stand.X, stand.Z)) > 80f) continue;
                 int id = nextId++;
                 var turn = v.Line != null ? Quaternion.Identity : Quaternion.CreateFromAxisAngle(Vector3.UnitY, v.Yaw - MathF.PI / 2f);
@@ -645,7 +646,7 @@ public static class GroundWaterSpike
     {
         static float Flat(Vector3 v) => MathF.Sqrt(v.X * v.X + v.Z * v.Z);
         if (d.SoundEmitter.Line is not { Length: >= 2 } line) return Flat(d.Transform.Position - to);
-        var path = OpenFPS.Client.AudioEngine.Core.Nature.LinePath.Of(d.Transform.Position, d.Transform.Rotation, line);
+        var path = OpenFPS.Sound.Core.Nature.LinePath.Of(d.Transform.Position, d.Transform.Rotation, line);
         return Flat(path.Nearest(to, out _) - to);
     }
 

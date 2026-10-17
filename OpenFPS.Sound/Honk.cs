@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A horn being sounded: which horn, and the rhythm of the hand on it, as a

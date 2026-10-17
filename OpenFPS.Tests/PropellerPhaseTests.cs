@@ -1,5 +1,6 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core.Aircraft;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Aircraft;
 using OpenFPS.Common;
 
 namespace OpenFPS.Tests;
@@ -11,7 +12,7 @@ namespace OpenFPS.Tests;
 /// </summary>
 public static class ValveFlowSwitch
 {
-    public static OpenFPS.Client.AudioEngine.Core.MixSettings Off() => new() { ValveJetNoise = false };
+    public static OpenFPS.Sound.Core.MixSettings Off() => new() { ValveJetNoise = false };
 }
 
 /// <summary>

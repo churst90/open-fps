@@ -1,5 +1,6 @@
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -51,7 +52,7 @@ public class AirPortPlacementTests
     [Fact]
     public void TheFrontShareIsExactlyTheFrontPorts()
     {
-        var air = new OpenFPS.Client.AudioEngine.Core.Pneumatics.AirSystem(ModelLibrary.Air("transit_bus"));
+        var air = new OpenFPS.Sound.Core.Pneumatics.AirSystem(ModelLibrary.Air("transit_bus"));
         air.PlaceAtFront(p => p.Name == "door", compressorAtFront: false);
         air.EngineRpm = 0f;                 // no compressor: only the ports
         air.Vent("door");

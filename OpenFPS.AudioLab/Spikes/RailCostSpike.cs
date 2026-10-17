@@ -1,5 +1,6 @@
 using System.Diagnostics;
-using OpenFPS.Client.AudioEngine.Core.Rail;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;
@@ -16,7 +17,7 @@ public static class RailCostSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const int Rate = 48000;
 
@@ -29,10 +30,10 @@ public static class RailCostSpike
             var layout = TrainLayout.Sources(TrainProfile.ByName(args.FirstOrDefault(a => ModelLibrary.Knows(ModelLibrary.Kinds.Train, a)) ?? "freight"), ModelLibrary.Presets);
             foreach (var e in layout.Where(e => e.Index < 12 || e.Index % 40 == 0))
             {
-                float corr = OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(LabHearing, "rail:freight/x/" + e.Index, e.LevelDb);
+                float corr = OpenFPS.Sound.Core.EarTimbres.CorrectionDb(LabHearing, "rail:freight/x/" + e.Index, e.LevelDb);
                 var (g, r) = LabHearing.Place(e.LevelDb, e.ExtentMetres);
                 Console.WriteLine($"  {e.Index,3} {e.Kind,-12} {e.LevelDb,6:F1} dB  extent {e.ExtentMetres,4:F1}  place gain {20 * MathF.Log10(g),6:F1} dB ref {r,5:F1} m  ear {corr,+5:F1} dB  "
-                    + string.Join("  ", new[] { 3f, 30f, 100f, 360f }.Select(d => $"{d,4:F0} m {20 * MathF.Log10(MathF.Max(1e-9f, OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.LawGain(LabHearing, e.LevelDb, e.ExtentMetres, d))) + corr - 16f,6:F1} dBFS")));
+                    + string.Join("  ", new[] { 3f, 30f, 100f, 360f }.Select(d => $"{d,4:F0} m {20 * MathF.Log10(MathF.Max(1e-9f, OpenFPS.Sound.Core.Rail.TrainVoicing.LawGain(LabHearing, e.LevelDb, e.ExtentMetres, d))) + corr - 16f,6:F1} dBFS")));
             }
             return 0;
         }

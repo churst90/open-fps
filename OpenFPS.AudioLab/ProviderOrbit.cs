@@ -1,6 +1,6 @@
 using System.Numerics;
 using Thread = System.Threading.Thread;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound.Core;
 using OpenFPS.Acoustics;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
@@ -13,7 +13,7 @@ public static class ProviderOrbit
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     /// <summary>
     /// --provider-churn: transient voices (footsteps and reflections) created and stopped fast against

@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>One probe round the listener's head: what was hit, how far, and its material. The direction
 /// is in head space (+X right, +Y up, +Z forward), not the map's. <see cref="Share"/>: how much of a

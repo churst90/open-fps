@@ -5,7 +5,7 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// <summary>
 /// What an HRTF does to the level at the ears, band by band, for one direction: the two ears' mean
 /// power through Steam Audio's binaural effect, per third of an octave of
-/// <see cref="OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Centres"/>.
+/// <see cref="OpenFPS.Sound.Core.Engine.BandEq.Centres"/>.
 ///
 /// For the cabin's paths (CabinPaths): the interior model works out the pressure at the ear, and the one
 /// interior voice was played from a little ahead and below. Played from where each path comes in, the
@@ -64,8 +64,8 @@ internal static class HrtfBands
             Phonon.iplBinauralEffectRelease(ref effect);
         }
 
-        var centres = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Centres;
-        double half = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.HalfWidth;
+        var centres = OpenFPS.Sound.Core.Engine.BandEq.Centres;
+        double half = OpenFPS.Sound.Core.Engine.BandEq.HalfWidth;
         var db = new float[centres.Length];
         for (int k = 0; k < centres.Length; k++)
         {

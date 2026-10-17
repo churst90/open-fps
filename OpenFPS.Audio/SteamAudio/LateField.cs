@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -61,15 +61,15 @@ internal sealed class LateField : IDisposable
 
     public int Runs;
     public double LastRunMs;
-    private readonly OpenFPS.Common.IAudioClock _clock;
+    private readonly OpenFPS.Sound.IAudioClock _clock;
 
     /// <summary>A simulator of its own on <paramref name="context"/>, at <paramref name="sampleRate"/>
     /// (0: MixerQuality.DefaultRate; the mixer's is TracedReverbSet.MixerRate).</summary>
     /// <param name="clock">The clock its answers are stamped on, the one their reader ages them on
     /// (FmodAudioProvider.Clock). None: one of its own.</param>
-    public LateField(IntPtr context, int sampleRate = 0, OpenFPS.Common.IAudioClock? clock = null)
+    public LateField(IntPtr context, int sampleRate = 0, OpenFPS.Sound.IAudioClock? clock = null)
     {
-        _clock = clock ?? new OpenFPS.Common.StopwatchAudioClock();
+        _clock = clock ?? new OpenFPS.Sound.StopwatchAudioClock();
         if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
         Context = context; SampleRate = sampleRate;
         var s = new Phonon.IPLSimulationSettings
@@ -194,7 +194,7 @@ internal sealed class LateField : IDisposable
         Phonon.iplSimulatorRunReflections(_simulator);
 
         if (!Measure(0, out float eRef, out _, out _) || eRef <= 1e-12f) return;
-        long now = OpenFPS.Common.AudioClockStamps.StampTicks(_clock);
+        long now = OpenFPS.Sound.AudioClockStamps.StampTicks(_clock);
         int written = 0;
         for (int i = 0; i < count; i++)
         {

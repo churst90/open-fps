@@ -1,9 +1,8 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core.Rail;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core;
@@ -267,7 +266,7 @@ public partial class AudioWorld
     private float Correction(TrainVoicer v, string soundId, float levelDb)
     {
         if (v.Correction.TryGetValue(levelDb, out float c)) return c;
-        c = MathF.Pow(10f, OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(_audio.Hearing, soundId, levelDb) / 20f);
+        c = MathF.Pow(10f, OpenFPS.Sound.Core.EarTimbres.CorrectionDb(_audio.Hearing, soundId, levelDb) / 20f);
         v.Correction[levelDb] = c;
         return c;
     }

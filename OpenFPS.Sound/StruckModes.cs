@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using OpenFPS.Acoustics;
-using static OpenFPS.Common.DoorPhysics;
+using OpenFPS.Common;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>The simple shapes a struck thing can be (docs/MATTER.md 7.2). Append only: keys carry the number.</summary>
 public enum StruckShape : byte

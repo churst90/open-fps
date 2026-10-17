@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Numerics;
 using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// The ways a vehicle's own sound gets into its cabin, and where each one comes in.

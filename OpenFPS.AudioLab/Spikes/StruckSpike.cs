@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -27,7 +28,7 @@ public static class StruckSpike
 
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const int Rate = 48000;
     private static readonly CultureInfo Ci = CultureInfo.InvariantCulture;
@@ -396,7 +397,7 @@ public static class StruckSpike
         var sum = new float[len];
         foreach (var s in sounds)
         {
-            var pcm = OpenFPS.Client.AudioEngine.Core.TransientSynth.Render(s, 1);
+            var pcm = OpenFPS.Sound.Core.TransientSynth.Render(s, 1);
             float g = MathF.Pow(10f, (s.LevelDb - db) / 20f);
             int off = (int)(s.DelaySeconds * Rate);
             for (int i = 0; i < pcm.Length && off + i < len; i++) sum[off + i] += g * pcm[i];

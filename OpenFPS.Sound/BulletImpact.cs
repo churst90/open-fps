@@ -2,9 +2,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 using Kind = OpenFPS.Common.StrikeKind;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A round striking something, as its own physical event: what the slug and the struck stuff do in the

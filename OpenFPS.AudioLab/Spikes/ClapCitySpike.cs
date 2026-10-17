@@ -7,6 +7,7 @@ using OpenFPS.Client.Services;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
+using OpenFPS.Sound;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -23,7 +24,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class ClapCitySpike
 {
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private static readonly (float Lo, float Hi)[] Octaves = { (177f, 354f), (354f, 707f), (707f, 1414f), (1414f, 2828f), (2828f, 5657f) };
 

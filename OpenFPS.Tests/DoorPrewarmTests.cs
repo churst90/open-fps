@@ -8,6 +8,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

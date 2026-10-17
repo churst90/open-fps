@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Tests;
 

@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Repositories;
 
@@ -43,7 +44,7 @@ public class PrefabTemplate
 
     /// <summary>What kind of glass it is, by NAME ("Annealed", "Tempered", "Laminated"): how it breaks when shot
     /// (GlassKind). Required on anything of glass; nothing else may say it.</summary>
-    public OpenFPS.Common.GlassType? Glazing { get; set; }
+    public OpenFPS.Sound.GlassType? Glazing { get; set; }
 
     // --- Collider (ColliderComponent) --------------------------------------------------------------
 

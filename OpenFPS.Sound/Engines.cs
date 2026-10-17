@@ -2,8 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using OpenFPS.Common.Editing;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // An engine, described as the machine it is, not as the sound it makes. Every number is a physical
 // quantity with a unit, and the synthesis (EngineSynth, ExhaustNetwork, IntakeNetwork) integrates the

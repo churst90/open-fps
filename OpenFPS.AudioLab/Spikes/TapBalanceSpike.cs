@@ -1,6 +1,6 @@
-using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Engine;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Engine;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -16,7 +16,7 @@ public static class TapBalanceSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     const int Rate = 44100, Block = 1024;
 
@@ -532,7 +532,7 @@ public static class TapBalanceSpike
             float sys = prim + x.CollectorPipeMetres + x.MidPipeMetres + x.TailpipeMetres.Max()
                       + (x.Muffler.Kind == MufflerKind.None ? 0f : x.Muffler.ChamberLengthsMetres.Sum() + x.Muffler.AbsorptiveLengthMetres);
             int groups = e.CollectorGroups.Length;
-            var exit = new OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation(v, Rate).Exit;
+            var exit = new OpenFPS.Sound.Core.Engine.ExhaustRadiation(v, Rate).Exit;
             Console.WriteLine($"{n,-20} {e.Name,-44} {litres,4:F1} {e.Cylinders,3} {e.Induction.ToString()[..5],5} {v.EngineBayLeakage,4:F2} {(v.EngineAtRear ? "yes" : ""),4} {v.IntakeOffsetZ,5:F1} {v.ExhaustOffsetZ,5:F1} {v.ExhaustHeight,4:F1} {v.LengthMetres,4:F1} {exit.Z,6:F2} {x.TailpipeCount(groups),5} {x.TailpipeDiameterMm,6:F0} {x.Muffler.Kind,-11} {sys,5:F2} {v.TyreCount,3} {(v.CoolingFan != null ? "yes" : ""),3} {v.TyreCount,3} {v.SourceLevelDb,5:F1}");
         }
         return 0;

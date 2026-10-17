@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using MemoryPack;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Common.Networking
 {

@@ -2,7 +2,7 @@ using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 // One-dimensional gas acoustics in real units: pascals about the pipe's mean, metres, and a gas with a
 // temperature. Real units let the steepening of a half-bar front into a shock be computed from the

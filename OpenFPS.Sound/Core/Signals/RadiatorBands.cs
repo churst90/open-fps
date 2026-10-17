@@ -1,8 +1,7 @@
-using OpenFPS.Common;
 
 // Namespace unchanged from the FMOD folder it was split out of (docs/SOUND_LIBRARY_BOUNDARY.md, decision 6):
 // it is plain filtering, and the loudspeaker renders use it as well as the radiator DSP.
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Sound.Core.Signals;
 
 /// <summary>
 /// The radiator's six octave bands (Radiator.CrossoverHz) split off one signal by a Linkwitz-Riley tree:

@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using OpenFPS.Common.Editing;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // Water that runs: a creek, a gutter, a drain, a downpipe, a basin's overflow, a sink. The specs say what
 // the water and its channel are; RunningWaterSynth works the sound out through Hydraulics. The one level,

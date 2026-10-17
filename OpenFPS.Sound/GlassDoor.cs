@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Text;
-using static OpenFPS.Common.DoorPhysics;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A glass storefront or entrance door, simulated as the object, as <see cref="KnobDoor"/> and

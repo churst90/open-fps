@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// Water running in a channel and falling out of it, as the events it is made of (docs/RUNNING_WATER.md).

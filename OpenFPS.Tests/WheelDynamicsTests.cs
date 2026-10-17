@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Numerics;
 using OpenFPS.Common;
 using Xunit.Abstractions;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

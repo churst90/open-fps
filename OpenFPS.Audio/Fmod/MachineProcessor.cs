@@ -3,9 +3,10 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Yard;
-using OpenFPS.Client.AudioEngine.Core.Aircraft;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Aircraft;
+using OpenFPS.Sound.Core.Signals;
+using OpenFPS.Sound.Core.Yard;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -307,7 +308,7 @@ public sealed class MachineVoiceState : PhysicalVoiceState
 
     /// <summary>The air its world is in, whose temperature the thermostat answers: its world's, which the mixer
     /// gives it as it makes it. One of its own until then, at 20 °C.</summary>
-    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
+    public OpenFPS.Sound.Core.Atmosphere Atmosphere { get; set; } = new();
 
     // What the machine is doing, which nothing on the wire says (a mower's grass, a thermostat's
     // call), is driven here from a seed taken from the entity id: two clients hear the same mower
@@ -373,7 +374,7 @@ public sealed class MachineVoiceState : PhysicalVoiceState
     /// How much of its engine to integrate, from how loud it is against the loudest machine
     /// (FmodAudioProvider.ChooseEngineDetail); a mower costs as much as a car. Game thread writes.
     /// </summary>
-    public volatile OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail Detail;
+    public volatile OpenFPS.Sound.Core.Engine.EngineDetail Detail;
 
     protected override void Control(float seconds, float dt)
     {

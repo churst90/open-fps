@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
@@ -74,7 +74,7 @@ public static class ApplauseSpike
         int used = 0;
         foreach (string f in files)
         {
-            var x = OpenFPS.Client.AudioEngine.Core.WeaponSynth.ReadWav16Mono(File.ReadAllBytes(f));
+            var x = OpenFPS.Sound.Core.WeaponSynth.ReadWav16Mono(File.ReadAllBytes(f));
             if (x.Length < 512) continue;
             var e = Spectrum.BandEnergy(x, Sr);
             for (int i = 0; i < e.Length; i++) realAcc[i] += e[i];

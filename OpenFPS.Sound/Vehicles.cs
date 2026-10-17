@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common.Editing;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>A fan clutch: when the cooling fan is driven, from the coolant's temperature (the heat
 /// balance is CoolingSystem's).</summary>

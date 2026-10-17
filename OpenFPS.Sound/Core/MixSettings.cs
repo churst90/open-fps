@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Threading;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// One mixer's live levers, which the player's console turns to judge the mix by ear: the reflections' two

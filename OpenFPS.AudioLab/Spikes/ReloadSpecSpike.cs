@@ -4,7 +4,7 @@ namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --reload-spec [refs=DIR] [only=TEXT] measures the handling recordings (inbox/weapons) that
-/// <see cref="OpenFPS.Common.WeaponHandling"/> is fitted to; --reload-sounds [out=DIR] measures its
+/// <see cref="OpenFPS.Sound.WeaponHandling"/> is fitted to; --reload-sounds [out=DIR] measures its
 /// renders the same way. The recordings are a spec only, never played or shipped. Per contact (a release,
 /// a magazine seating, a bolt home): time, level against the loudest, 20 dB fall, octave bands.
 /// </summary>
@@ -37,25 +37,25 @@ public static class ReloadSpecSpike
         Directory.CreateDirectory(dir);
         const int sr = 48000;
         var made = new List<(string Name, float[] Pcm, float Seconds, float LevelDb)>();
-        foreach (var w in OpenFPS.Common.WeaponRegistry.All.OrderBy(w => w.Id, StringComparer.Ordinal))
+        foreach (var w in OpenFPS.Sound.WeaponRegistry.All.OrderBy(w => w.Id, StringComparer.Ordinal))
         {
             var keys = new List<(string Name, string Key)>();
-            if (w.Feed == OpenFPS.Common.WeaponFeed.Tube)
+            if (w.Feed == OpenFPS.Sound.WeaponFeed.Tube)
             {
-                keys.Add(($"reload-{w.Id}-1-shell", OpenFPS.Common.WeaponHandling.ReloadKey(w, 1, fromEmpty: false)));
-                keys.Add(($"reload-{w.Id}-empty", OpenFPS.Common.WeaponHandling.ReloadKey(w, w.MagazineCapacity, fromEmpty: true)));
+                keys.Add(($"reload-{w.Id}-1-shell", OpenFPS.Sound.WeaponHandling.ReloadKey(w, 1, fromEmpty: false)));
+                keys.Add(($"reload-{w.Id}-empty", OpenFPS.Sound.WeaponHandling.ReloadKey(w, w.MagazineCapacity, fromEmpty: true)));
             }
             else
             {
-                keys.Add(($"reload-{w.Id}-partial", OpenFPS.Common.WeaponHandling.ReloadKey(w, w.MagazineCapacity, fromEmpty: false)));
-                keys.Add(($"reload-{w.Id}-empty", OpenFPS.Common.WeaponHandling.ReloadKey(w, w.MagazineCapacity, fromEmpty: true)));
+                keys.Add(($"reload-{w.Id}-partial", OpenFPS.Sound.WeaponHandling.ReloadKey(w, w.MagazineCapacity, fromEmpty: false)));
+                keys.Add(($"reload-{w.Id}-empty", OpenFPS.Sound.WeaponHandling.ReloadKey(w, w.MagazineCapacity, fromEmpty: true)));
             }
-            keys.Add(($"dryfire-{w.Id}", OpenFPS.Common.WeaponHandling.DryFireKey(w)));
+            keys.Add(($"dryfire-{w.Id}", OpenFPS.Sound.WeaponHandling.DryFireKey(w)));
             foreach (var (name, key) in keys)
             {
-                Assert(OpenFPS.Common.WeaponHandling.TryParseKey(key, out var spec), key);
-                var pcm = OpenFPS.Common.WeaponHandling.Render(spec, sr, seed: 7);
-                made.Add((name, pcm, OpenFPS.Common.WeaponHandling.Seconds(spec), OpenFPS.Common.WeaponHandling.LevelDb(spec)));
+                Assert(OpenFPS.Sound.WeaponHandling.TryParseKey(key, out var spec), key);
+                var pcm = OpenFPS.Sound.WeaponHandling.Render(spec, sr, seed: 7);
+                made.Add((name, pcm, OpenFPS.Sound.WeaponHandling.Seconds(spec), OpenFPS.Sound.WeaponHandling.LevelDb(spec)));
             }
         }
         foreach (var (name, pcm, seconds, levelDb) in made)

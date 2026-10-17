@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.Core;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using static OpenFPS.Common.SharedMovementEngine;
 

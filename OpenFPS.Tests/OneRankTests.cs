@@ -8,6 +8,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -20,10 +21,10 @@ namespace OpenFPS.Tests;
 public class OneRankTests
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public OneRankTests(ITestOutputHelper o) => _o = o;

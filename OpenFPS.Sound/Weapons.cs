@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// One weapon, as numbers. The figures are real: the muzzle velocity decides whether a round cracks

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using OpenFPS.Common.Editing;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // Compressed air on its way out. Every sound of a vehicle's air system (brake release, dryer purge,
 // kneeling, parking brake) is one event, a vessel at pressure emptying through a hole; only the

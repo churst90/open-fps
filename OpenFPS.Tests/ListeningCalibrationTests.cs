@@ -1,7 +1,8 @@
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Common;
-using OpenFPS.Common.Hearing;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Hearing;
 
 namespace OpenFPS.Tests;
 

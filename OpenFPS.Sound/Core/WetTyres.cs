@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// What the water on a road does to the sound of a vehicle's tyres: the ejection hiss (power the

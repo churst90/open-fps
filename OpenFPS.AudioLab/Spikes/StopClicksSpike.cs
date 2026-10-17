@@ -4,7 +4,8 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -22,7 +23,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class StopClicksSpike
 {
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const int Rate = 48000;
     private const float ToneHz = 440f;

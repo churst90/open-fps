@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core;
 

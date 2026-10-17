@@ -6,6 +6,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -19,7 +20,7 @@ namespace OpenFPS.Tests;
 public class BirdLifeMutationTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     // ── A world, a bank of calls, and the birds ─────────────────────────────────────────────
 

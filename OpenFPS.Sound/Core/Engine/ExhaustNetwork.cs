@@ -3,7 +3,7 @@ using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// The exhaust system as a network of pipes that meet each other, built from an

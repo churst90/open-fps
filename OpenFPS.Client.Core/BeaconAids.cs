@@ -4,6 +4,8 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using Serilog;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Client.Core;
 
@@ -188,7 +190,7 @@ public sealed class BeaconAids
             EntityId = voiceId,
             Seed = VoiceRegistry.SeedOf(VoiceKind.Beacon, VoiceRegistry.NoEntity, blip),
             SoundId = sound,
-            Mode = OpenFPS.Common.Components.PlaybackMode.Single,
+            Mode = OpenFPS.Sound.PlaybackMode.Single,
             Position = at,
             ApparentPosition = path?.ApparentPosition ?? at,
             EffectiveDistance = path?.EffectiveDistance ?? Vector3.Distance(listener, at),

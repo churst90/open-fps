@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Rail;
+using OpenFPS.Sound;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
@@ -397,7 +397,7 @@ public class VoiceRegistryTests
     {
         var (reg, facade, mixer) = OnAMixer();
         var e = Synth(-9);
-        e.Mode = OpenFPS.Common.Components.PlaybackMode.LoopOne;
+        e.Mode = OpenFPS.Sound.PlaybackMode.LoopOne;
         reg.Declare(-9, 1, VoiceKind.Machine, Vector3.Zero, 60f, frame: 1);
         reg.Submit(e);
         facade.PumpForTest();

@@ -7,6 +7,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

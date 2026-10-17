@@ -6,6 +6,8 @@ using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Client.Core;
 
@@ -701,7 +703,7 @@ public sealed class OneOffSounds
                 Seed = VoiceRegistry.SeedOf(VoiceKind.Transient, VoiceRegistry.NoEntity, heard),
                 SoundId = item.SoundId,
                 // Nothing here loops: a looping latch would be a fire alarm.
-                Mode = OpenFPS.Common.Components.PlaybackMode.Single,
+                Mode = OpenFPS.Sound.PlaybackMode.Single,
                 Position = item.Sound.Position,
                 ApparentPosition = path.ApparentPosition,
                 EffectiveDistance = path.EffectiveDistance,

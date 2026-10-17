@@ -1,8 +1,7 @@
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Engine;
+using OpenFPS.Sound.Core.Engine;
 
-namespace OpenFPS.Client.AudioEngine.Core.Rail;
+namespace OpenFPS.Sound.Core.Rail;
 
 /// <summary>
 /// The traction package of an electric train: a motor, the gears to the axle, and the inverter

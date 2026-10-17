@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core.Rail;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using Xunit.Abstractions;
@@ -15,7 +16,7 @@ namespace OpenFPS.Tests;
 public class TrainVoicingTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public TrainVoicingTests(ITestOutputHelper o) => _o = o;

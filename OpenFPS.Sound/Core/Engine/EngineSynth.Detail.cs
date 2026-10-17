@@ -1,8 +1,7 @@
-using OpenFPS.Common;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// How much of an engine is integrated sample by sample. The voice's owner chooses it from how loud the

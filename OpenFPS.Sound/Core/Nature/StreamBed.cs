@@ -1,6 +1,5 @@
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// Where a stream's stones lie along its bed, and how steep each part of it is (docs/RUNNING_WATER.md 15.6).

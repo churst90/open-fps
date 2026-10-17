@@ -7,6 +7,7 @@ using OpenFPS.Client.Core.Session;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

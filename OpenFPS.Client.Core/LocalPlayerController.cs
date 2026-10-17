@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core;
 
@@ -14,7 +14,7 @@ public class LocalPlayerController
     private readonly StrideAccumulator _stride = new();
 
     /// <summary>The clock the breath and the stride run on: the audio world's, given by the session.</summary>
-    public OpenFPS.Common.IAudioClock Clock
+    public OpenFPS.Sound.IAudioClock Clock
     {
         get => _stride.Clock;
         set => _stride.Clock = value;

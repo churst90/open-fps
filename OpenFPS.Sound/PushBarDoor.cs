@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Text;
-using static OpenFPS.Common.DoorPhysics;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A steel push-bar door with a closer, simulated as the object, as <see cref="KnobDoor"/> is.

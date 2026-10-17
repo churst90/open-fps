@@ -1,12 +1,12 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Engine;
-using OpenFPS.Client.AudioEngine.Core.Aircraft;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound.Core.Aircraft;
+using OpenFPS.Sound.Core.Engine;
+using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Core.Yard;
+namespace OpenFPS.Sound.Core.Yard;
 
 /// <summary>
 /// A machine that stands in one place and runs: a lawn mower, an air-conditioning condenser.
@@ -50,9 +50,9 @@ public sealed class SmallMachineSynth
 
     /// <summary>How much of the engine, if it has one, is integrated (EngineDetail): a mower far under
     /// the loudest machine runs it at half rate, or replays its cycles while it stands steady.</summary>
-    public OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail EngineDetail
+    public OpenFPS.Sound.Core.Engine.EngineDetail EngineDetail
     {
-        get => _engine?.Detail ?? OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
+        get => _engine?.Detail ?? OpenFPS.Sound.Core.Engine.EngineDetail.Full;
         set { if (_engine != null) _engine.Detail = value; }
     }
 

@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 
 using OpenFPS.Common.Editing;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // An aircraft as the machine it is, from three mechanisms (docs/AIRCRAFT.md): blades, whose pulses
 // sharpen with tip Mach toward the listener (a soft thump at 0.5, a buzz past 0.8, the buzz-saw comb

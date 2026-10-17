@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>Audio physics with no FMOD or Steam Audio state: the speed of sound, Doppler, air
 /// absorption.</summary>

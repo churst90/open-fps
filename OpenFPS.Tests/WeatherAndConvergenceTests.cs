@@ -11,6 +11,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Tests;
 

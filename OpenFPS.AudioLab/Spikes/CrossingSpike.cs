@@ -1,10 +1,11 @@
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Engine;
-using OpenFPS.Client.AudioEngine.Core.Pneumatics;
-using OpenFPS.Client.AudioEngine.Core.Rail;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Engine;
+using OpenFPS.Sound.Core.Pneumatics;
+using OpenFPS.Sound.Core.Rail;
+using OpenFPS.Sound.Core.Signals;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

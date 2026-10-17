@@ -1,11 +1,12 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 
@@ -1011,7 +1012,7 @@ public sealed class RainField
                                                          : QuarterPartAt(ear, whole.Position, k, parts);
             _partShares[k] = 1f / parts;
         }
-        float balance = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Balance(
+        float balance = OpenFPS.Sound.Core.Nature.ExtendedSources.Balance(
             ear, whole.Position, _partAt.AsSpan(0, parts), _partShares.AsSpan(0, parts), whole.MinDistance, whole.Range);
         for (int k = 0; k < parts; k++)
         {

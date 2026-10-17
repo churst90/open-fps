@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// The wind in your ears, rendered: one noise per ear, shaped as <see cref="EarWind"/> says.
@@ -60,7 +59,7 @@ public sealed class EarWindSynth
 
     /// <summary>The hearing of the world it plays in, whose law places the wind's level: its mixer's, which
     /// the voice gives it (EarWindState). One of its own, the shipped hearing, when made alone.</summary>
-    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; set; } = new();
+    public OpenFPS.Sound.Hearing.HearingSettings Hearing { get; set; } = new();
 
     public EarWindSynth(float sampleRate, int seed)
     {

@@ -1,4 +1,6 @@
-namespace OpenFPS.Common;
+using OpenFPS.Common;
+
+namespace OpenFPS.Sound;
 
 /// <summary>What a body just did with its lungs, if anything.</summary>
 public readonly record struct Breath(bool Taken, bool IsInhale, float LevelDb, float Hz, float DecaySeconds);

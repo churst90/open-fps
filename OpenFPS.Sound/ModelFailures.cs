@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The model ids that did not resolve, each logged once. Below the catalogue, so a sound model that cannot

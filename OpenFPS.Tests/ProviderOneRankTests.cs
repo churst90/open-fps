@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Engine;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
@@ -18,7 +19,7 @@ namespace OpenFPS.Tests;
 public class ProviderOneRankTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private const int Rate = 48000;
     private static readonly Vector3 Ear = Vector3.Zero;
@@ -107,7 +108,7 @@ public class ProviderOneRankTests
     public void A_trains_lanes_go_just_ahead_of_its_loudest_voice()
     {
         var t = new TrainVoiceState("light_rail/test", TrainProfile.ByName("light_rail"), Rate, 7) { Offline = true };
-        float level = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout);
+        float level = OpenFPS.Sound.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout);
         var near = Voice(50, At(12f), 0.01f, machine: new TrainSlotState(t, 0, level, Rate, startSample: 0));
         var loud = Voice(51, At(40f), 0.5f, machine: new TrainSlotState(t, 1, level, Rate, startSample: 0));
         var car = Voice(20, At(20f), 0.05f);

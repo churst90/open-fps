@@ -1,7 +1,7 @@
 using System.Numerics;
 using MemoryPack;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// What a short sound is physically, not what made it: a latch and a bullet strike are both knocks, a

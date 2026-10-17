@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -11,7 +11,7 @@ namespace OpenFPS.Tests;
 public class EarOverloadTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private static float At(float compression, System.Func<float> f)
     {

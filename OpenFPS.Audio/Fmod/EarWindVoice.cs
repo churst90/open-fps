@@ -1,7 +1,8 @@
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -38,7 +39,7 @@ public sealed class EarWindState : IGuardedUnit
     private readonly WorldWeather _weather;
 
     /// <param name="hearing">The world's hearing, whose law places the wind's level (the mixer's).</param>
-    public EarWindState(float sampleRate, WorldWeather weather, OpenFPS.Common.Hearing.HearingSettings hearing)
+    public EarWindState(float sampleRate, WorldWeather weather, OpenFPS.Sound.Hearing.HearingSettings hearing)
     {
         Synth = new EarWindSynth(sampleRate, 0x5EED) { Hearing = hearing };
         _weather = weather;

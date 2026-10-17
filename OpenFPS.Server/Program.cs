@@ -15,6 +15,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Server.Services;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Server;

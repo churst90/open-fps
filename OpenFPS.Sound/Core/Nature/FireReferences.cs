@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// The recorded fires the fire model is held to (docs/FIRE.md section 8): the texture statistics

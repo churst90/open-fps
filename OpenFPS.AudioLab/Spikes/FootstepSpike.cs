@@ -1,5 +1,6 @@
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -141,7 +142,7 @@ public static class FootstepSpike
         int used = 0;
         foreach (string f in files)
         {
-            var x = OpenFPS.Client.AudioEngine.Core.WeaponSynth.ReadWav16Mono(File.ReadAllBytes(f));
+            var x = OpenFPS.Sound.Core.WeaponSynth.ReadWav16Mono(File.ReadAllBytes(f));
             if (x.Length < 512) continue;
             var e = Spectrum.BandEnergy(x, Footsteps.SampleRate);
             for (int i = 0; i < e.Length; i++) realAcc[i] += e[i];

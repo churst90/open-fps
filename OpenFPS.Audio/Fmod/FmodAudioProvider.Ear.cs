@@ -2,10 +2,10 @@ using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using FMOD;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Hearing;
 using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Common;
-using OpenFPS.Common.Hearing;
 using Serilog;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;

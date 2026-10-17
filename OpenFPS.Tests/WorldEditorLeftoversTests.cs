@@ -4,6 +4,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Editor;
 using OpenFPS.Server.Systems;
+using OpenFPS.Sound;
 using Rig = OpenFPS.Tests.WorldEditorTests.Rig;
 
 namespace OpenFPS.Tests;

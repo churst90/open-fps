@@ -1,7 +1,7 @@
 using System.Numerics;
 using Arch.Core;
 using MemoryPack;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;

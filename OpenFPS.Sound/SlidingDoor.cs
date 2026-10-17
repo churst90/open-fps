@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using static OpenFPS.Common.DoorPhysics;
+using OpenFPS.Common;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// Sliding doors simulated as the objects, as <see cref="KnobDoor"/> and <see cref="PushBarDoor"/> are: a

@@ -1,7 +1,8 @@
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -16,7 +17,7 @@ namespace OpenFPS.Tests;
 public class RunningWaterTests
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     private readonly ITestOutputHelper _o;
     public RunningWaterTests(ITestOutputHelper o)

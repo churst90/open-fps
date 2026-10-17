@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// The wind in a tree, from the tree.

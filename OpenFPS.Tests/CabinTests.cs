@@ -12,7 +12,7 @@ namespace OpenFPS.Tests;
 public class CabinTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private const int Rate = 44100;
     private readonly ITestOutputHelper _o;

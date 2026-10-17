@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -91,10 +92,10 @@ internal sealed class TracedReverb : IDisposable
     private SmoothTail? _smooth;
     /// <summary>The lab's levers on this trace (LabLevers: its simulation, the raw tail, one channel late, the
     /// latency probe, the tail from 50 ms): its set's, or the game's when made alone.</summary>
-    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab { get; }
+    public OpenFPS.Sound.Core.LabLevers Lab { get; }
     /// <summary>The air of the world traced for, whose speed of sound places the copies (EarlyCopies): its
     /// set's (TracedReverbSet.Atmosphere). One of its own when made alone, as in the lab.</summary>
-    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; init; } = new();
+    public OpenFPS.Sound.Core.Atmosphere Atmosphere { get; init; } = new();
     /// <summary>The scene's boxes, for the placed copies' share of the early energy (EarlyCopies).</summary>
     private IReadOnlyList<EarlyReflections.Solid> _solids = Array.Empty<EarlyReflections.Solid>();
 
@@ -206,9 +207,9 @@ internal sealed class TracedReverb : IDisposable
     /// who walks; a second for a room traced from its middle, which does not move.</param>
     /// <param name="lab">The lab's levers on it; null is the game.</param>
     public TracedReverb(IntPtr context, int sampleRate = 0, int frameSize = TracedFrame, int refreshMs = DefaultRefreshMs,
-                        OpenFPS.Client.AudioEngine.Core.LabLevers? lab = null)
+                        OpenFPS.Sound.Core.LabLevers? lab = null)
     {
-        Lab = lab ?? new OpenFPS.Client.AudioEngine.Core.LabLevers();
+        Lab = lab ?? new OpenFPS.Sound.Core.LabLevers();
         if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
         _refreshMs = refreshMs;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
@@ -544,15 +545,15 @@ internal sealed class TracedReverbSet
 
     /// <summary>The clock of the world these places are traced for, which whoever holds the set gives it (the
     /// mixer, or a worker with a set of its own): a late answer's age is told on it.</summary>
-    public OpenFPS.Common.IAudioClock Clock { get; set; } = new OpenFPS.Common.StopwatchAudioClock();
+    public OpenFPS.Sound.IAudioClock Clock { get; set; } = new OpenFPS.Sound.StopwatchAudioClock();
     /// <summary>The air of that world, which whoever holds the set gives it as it gives the clock: the traces
     /// place their early copies at its speed of sound.</summary>
-    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
+    public OpenFPS.Sound.Core.Atmosphere Atmosphere { get; set; } = new();
     /// <summary>The rate of the mixer the traces are played in, Hz, which the mixer gives the set once it is made
     /// (FmodAudioProvider.MixerRate): every trace is made at it.</summary>
     public int MixerRate { get; set; } = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
     /// <summary>The lab's levers on that world, which every trace made here is made with (the mixer's).</summary>
-    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab { get; set; } = new();
+    public OpenFPS.Sound.Core.LabLevers Lab { get; set; } = new();
     private readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> _rooms = new();
     private readonly HashSet<int> _roomsMaking = new();
     /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
@@ -855,7 +856,7 @@ internal sealed class TracedReverbSet
     /// <summary>Retires the cabins used longest ago past the cap, never the one ridden. Under the gate.</summary>
     private void Evict()
     {
-        long now = OpenFPS.Common.RealTime.Ticks;
+        long now = OpenFPS.Sound.RealTime.Ticks;
         for (int i = 0; _cabins.Count > MaxCabins && i < _cabinOrder.Count; )
         {
             string p = _cabinOrder[i];
@@ -877,7 +878,7 @@ internal sealed class TracedReverbSet
     private List<IDisposable>? TakeRetired()
     {
         if (_retired.Count == 0) return null;
-        long cutoff = OpenFPS.Common.RealTime.Ticks - 5 * TimeSpan.TicksPerSecond;
+        long cutoff = OpenFPS.Sound.RealTime.Ticks - 5 * TimeSpan.TicksPerSecond;
         List<IDisposable>? due = null;
         for (int i = _retired.Count - 1; i >= 0; i--)
             if (_retired[i].At < cutoff) { (due ??= new()).Add(_retired[i].Item); _retired.RemoveAt(i); }

@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;
 using Serilog;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Core;
 
@@ -70,9 +71,9 @@ public class OccupancyService
         return new List<TransientSound>
         {
             new() { Character = SoundCharacter.Knock, Position = latch, LevelDb = openDb, Hz = 500f,
-                    DecaySeconds = 0.95f, Noisiness = 1f, SynthKey = OpenFPS.Common.CarDoor.Key(closing: false) },
+                    DecaySeconds = 0.95f, Noisiness = 1f, SynthKey = OpenFPS.Sound.CarDoor.Key(closing: false) },
             new() { Character = SoundCharacter.Knock, Position = latch, LevelDb = closeDb, Hz = 500f,
-                    DecaySeconds = 1.15f, Noisiness = 1f, SynthKey = OpenFPS.Common.CarDoor.Key(closing: true), DelaySeconds = closeAfter },
+                    DecaySeconds = 1.15f, Noisiness = 1f, SynthKey = OpenFPS.Sound.CarDoor.Key(closing: true), DelaySeconds = closeAfter },
         };
     }
 

@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A vehicle's horn and siren as one byte on the wire (EntityState.Signals). Bit 0 the horn is held, bit 1 the siren is switched on, bits 2-4 its tone (a <see cref="SirenMode"/>),

@@ -1,7 +1,8 @@
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

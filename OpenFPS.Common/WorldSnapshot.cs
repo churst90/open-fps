@@ -3,6 +3,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Common;
 
@@ -210,7 +211,7 @@ public struct EntitySnapshot
     public WheelState[]? Wheels;
 
     /// <summary>A vehicle's horn and siren switches as the server last sent them
-    /// (<see cref="OpenFPS.Common.VehicleSignalBits"/>); zero for anything without.</summary>
+    /// (<see cref="OpenFPS.Sound.VehicleSignalBits"/>); zero for anything without.</summary>
     public byte Signals;
 
     /// <summary>How hard a train or an aeroplane is working as the server last sent it, 0..1

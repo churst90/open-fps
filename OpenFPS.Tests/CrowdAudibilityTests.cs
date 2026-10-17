@@ -8,6 +8,7 @@ using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -18,7 +19,7 @@ namespace OpenFPS.Tests;
 public class CrowdAudibilityTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public CrowdAudibilityTests(ITestOutputHelper o) => _o = o;
@@ -219,7 +220,7 @@ public class CrowdReflectionTests
 
         Span<Reflection> echoes = stackalloc Reflection[4];
         int count = ImageSource.FirstOrder(surfaces.ToArray(), crowd, listener,
-                                           OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound, echoes);
+                                           OpenFPS.Sound.Core.AudioPhysics.SpeedOfSound, echoes);
         _o.WriteLine($"crowd at {crowd}, listener on the line at {listener} ({Vector3.Distance(crowd, listener):F0} m)");
         for (int i = 0; i < count; i++)
             _o.WriteLine($"  echo {i}: +{echoes[i].DelaySeconds * 1000f:F0} ms, path {echoes[i].PathLength:F0} m, " +
@@ -236,7 +237,7 @@ public class CrowdReflectionTests
         Vector3 underfoot = listener - new Vector3(0, 1.7f, 0);
         Span<Reflection> steps = stackalloc Reflection[4];
         int stepEchoes = ImageSource.FirstOrder(surfaces.ToArray(), underfoot, listener,
-                                                OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound, steps);
+                                                OpenFPS.Sound.Core.AudioPhysics.SpeedOfSound, steps);
         int audible = 0;
         for (int i = 0; i < stepEchoes; i++)
         {

@@ -69,7 +69,7 @@
       <Output TaskParameter="Hash" PropertyName="DoorModelHash" />
     </HashSources>
     <WriteLinesToFile File="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
-                      Lines="namespace OpenFPS.Common%3B;/// &lt;summary&gt;A hash of the sources a door model render is made from (OpenFPS.Sound.csproj, DoorModelSource).&lt;/summary&gt;;public static class DoorModelFingerprint { public const string Hash = &quot;$(DoorModelHash)&quot;%3B }" />
+                      Lines="namespace OpenFPS.Sound%3B;/// &lt;summary&gt;A hash of the sources a door model render is made from (OpenFPS.Sound.csproj, DoorModelSource).&lt;/summary&gt;;public static class DoorModelFingerprint { public const string Hash = &quot;$(DoorModelHash)&quot;%3B }" />
   </Target>
   <Target Name="IncludeDoorModelFingerprint" BeforeTargets="CoreCompile" AfterTargets="GenerateDoorModelFingerprint">
     <ItemGroup>

@@ -23,7 +23,7 @@ public class DegradationTests
     // The hand-rolled tracer, which must give a real answer, not a clear one. Its workers never start Steam
     // Audio, even in a run that has loaded it (the opt-in Steam Audio tests).
     private static AsyncAcousticWorker Unsimulated()
-        => new(new SpatialAcoustics()) { Lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { WithoutSteamAudio = true } };
+        => new(new SpatialAcoustics()) { Lab = new OpenFPS.Sound.Core.LabLevers { WithoutSteamAudio = true } };
 
     // Two rooms in maps/default.json joined by a portal (PortalPipelineTests' landmarks).
     private static readonly Vector3 RoomACentre = new(-7, 2, 15);

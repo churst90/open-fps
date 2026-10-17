@@ -1,12 +1,14 @@
 using System.Numerics;
 using MemoryPack;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Signals;
+using OpenFPS.Sound.Hearing;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Hearing;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;
@@ -22,7 +24,7 @@ namespace OpenFPS.Tests;
 public class LoudspeakerTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public LoudspeakerTests(ITestOutputHelper o) => _o = o;

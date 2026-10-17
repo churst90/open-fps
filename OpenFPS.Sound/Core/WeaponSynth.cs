@@ -1,6 +1,5 @@
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>What a weapon's report sounds like, as numbers; nothing else in the synthesis is
 /// weapon-specific.</summary>

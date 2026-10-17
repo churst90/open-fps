@@ -1,7 +1,8 @@
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Pneumatics;
-using OpenFPS.Client.AudioEngine.Core.Rail;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Pneumatics;
+using OpenFPS.Sound.Core.Rail;
+using OpenFPS.Sound.Core.Signals;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

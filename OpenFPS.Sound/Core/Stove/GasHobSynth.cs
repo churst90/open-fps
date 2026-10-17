@@ -1,11 +1,11 @@
 using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using OpenFPS.Client.AudioEngine.Core.Engine;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound.Core.Engine;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Stove;
+namespace OpenFPS.Sound.Core.Stove;
 
 /// <summary>
 /// A gas hob (GasHobSpec, docs/GAS_HOB.md), pascals at a metre. A hand works the knobs from a queue of

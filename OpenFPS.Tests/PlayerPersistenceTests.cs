@@ -10,6 +10,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using LiteNetLib;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

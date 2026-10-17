@@ -3,7 +3,8 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
@@ -38,7 +39,7 @@ public static class RunningWaterSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
     /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
@@ -226,7 +227,7 @@ public static class RunningWaterSpike
         Console.WriteLine($"Extended sources {(LabOptions.WideSources.Enabled ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
         // noise=1: every place of every running water source plays its own white noise instead of its
         // water, through the same voices, places, ground and HRTF: what the game's path does on its own.
-        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { WaterAsNoise = args.Contains("noise=1") };
+        var lab = new OpenFPS.Sound.Core.LabLevers { WaterAsNoise = args.Contains("noise=1") };
         if (lab.WaterAsNoise) Console.WriteLine("Running water replaced by noise (noise=1)");
         var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing, Lab = lab, Options = LabOptions };
         var facade = new AudioEngineFacade(provider);

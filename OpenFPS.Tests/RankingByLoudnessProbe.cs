@@ -4,7 +4,9 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
-using OpenFPS.Common.Hearing;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Hearing;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
@@ -27,10 +29,10 @@ namespace OpenFPS.Tests;
 public class RankingByLoudnessProbe
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public RankingByLoudnessProbe(ITestOutputHelper o) => _o = o;

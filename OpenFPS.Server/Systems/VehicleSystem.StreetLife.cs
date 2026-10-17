@@ -1,6 +1,6 @@
 using System.Numerics;
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Repositories;
 using Serilog;
@@ -32,10 +32,10 @@ public sealed partial class VehicleSystem
         if (Chance(life.HornEverySeconds, dt)
             && Pick(mapId, world, v => v.Horn.Length > 0 && v.Park == null) is { } honker)
         {
-            var pattern = OpenFPS.Common.Honk.Everyday(_streetRng);
+            var pattern = OpenFPS.Sound.Honk.Everyday(_streetRng);
             Honk(mapId, world, honker, pattern);
             if (_streetRng.NextDouble() < YellAfterHonk)
-                Yell(mapId, world, honker, StreetLines.Impatient, OpenFPS.Common.Honk.Duration(pattern) + 0.2f, clock);
+                Yell(mapId, world, honker, StreetLines.Impatient, OpenFPS.Sound.Honk.Duration(pattern) + 0.2f, clock);
         }
 
         if (Chance(life.HardBrakeEverySeconds, dt)
@@ -47,7 +47,7 @@ public sealed partial class VehicleSystem
                             braker.DisplayName, braker.Speed * 3.6f, braker.HardBrakeTo * 3.6f, braker.HardBrakeDecel);
             if (braker.Horn.Length > 0 && _streetRng.NextDouble() < StreetEvents.HonkAfterHardBrake)
                 _pendingHonks.Add((mapId, braker, clock + 0.4 + 0.5 * _streetRng.NextDouble(),
-                                   OpenFPS.Common.Honk.Startled(_streetRng)));
+                                   OpenFPS.Sound.Honk.Startled(_streetRng)));
             if (_streetRng.NextDouble() < YellAfterHardBrake)
                 Yell(mapId, world, braker, StreetLines.Startled, 1.0f + 0.6f * (float)_streetRng.NextDouble(), clock);
         }
@@ -59,7 +59,7 @@ public sealed partial class VehicleSystem
             && Pick(mapId, world, v => v.Horn.StartsWith("electric:") && v.Park is { Phase: ParkPhase.Parked, Step: 7 }) is { } alarmed)
         {
             var pattern = AlarmPattern(_streetRng);
-            Log.Information("Street: {Name}'s alarm goes off for {Seconds:F0} s.", alarmed.DisplayName, OpenFPS.Common.Honk.Duration(pattern));
+            Log.Information("Street: {Name}'s alarm goes off for {Seconds:F0} s.", alarmed.DisplayName, OpenFPS.Sound.Honk.Duration(pattern));
             Honk(mapId, world, alarmed, pattern);
         }
 
@@ -125,7 +125,7 @@ public sealed partial class VehicleSystem
         if (Heard == null || v.Horn.Length == 0) return;
         var at = world.Get<Transform>(v.Entity).Position;
         Log.Information("Street: {Name} sounds its horn ({Horn}) for {Seconds:F2} s.",
-                        v.DisplayName, v.Horn, OpenFPS.Common.Honk.Duration(pattern));
+                        v.DisplayName, v.Horn, OpenFPS.Sound.Honk.Duration(pattern));
         Heard(mapId, v.Entity.Id, "horn", new[] { StreetEvents.Horn(at, v.Horn, pattern) });
     }
 }

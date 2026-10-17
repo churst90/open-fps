@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;

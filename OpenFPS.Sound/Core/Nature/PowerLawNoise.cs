@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// White noise shaped to a power spectral density falling as f^−α above a floor frequency: the

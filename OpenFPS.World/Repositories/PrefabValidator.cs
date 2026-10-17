@@ -302,7 +302,7 @@ public static class PrefabValidator
             if (isDoor && t.SwingSeconds is <= 0)
                 r.Errors.Add($"SwingSeconds {t.SwingSeconds} must be positive; a door that opens in no time is a door "
                            + "nobody can hear open.");
-            if (isDoor && t.DoorKind != null && !OpenFPS.Common.DoorEvents.TryParseKind(t.DoorKind, out _))
+            if (isDoor && t.DoorKind != null && !OpenFPS.Sound.DoorEvents.TryParseKind(t.DoorKind, out _))
                 r.Errors.Add($"DoorKind '{t.DoorKind}' is not a door kind. Known: knob, pushbar, glass-pushbar, "
                            + "glass-pull, auto-slide, patio-slide, elevator.");
             if (declaresRegion)

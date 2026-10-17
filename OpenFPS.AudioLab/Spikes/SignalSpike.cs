@@ -1,6 +1,7 @@
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Signals;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

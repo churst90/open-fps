@@ -127,7 +127,7 @@ FILE_RULES = [
 TYPE_RULES = {
     'OpenFPS.Common.Networking.WheelState': ('c', 'Physics', 'a wheel\'s state, on the wire (physics stage 1)'),
     'OpenFPS.Common.Networking.WorldAudioEvent': ('b', '', 'network message carrying a TransientSound'),
-    'OpenFPS.Common.Components.PlaybackMode': ('c', 'Sound', 'an enum the emitter component and the voices share'),
+    'OpenFPS.Sound.PlaybackMode': ('c', 'Sound', 'an enum the emitter component and the voices share'),
     'OpenFPS.Common.Components.WeatherType': ('c', 'Environment', ''),
     'OpenFPS.Geometry.ColliderShape': ('c', 'Geometry', ''),
     'OpenFPS.Geometry.TileKey': ('c', 'Geometry', 'a tile of the world; the tile scenes key on it'),
@@ -136,13 +136,13 @@ TYPE_RULES = {
     'OpenFPS.Common.WindAir': ('c', 'Physics', 'the wind the server sends (physics stage 1)'),
     'OpenFPS.Common.LightningStrike': ('c', 'Environment', 'the flash the server sends'),
     'OpenFPS.Common.FlashKind': ('c', 'Environment', ''),
-    'OpenFPS.Common.DoorKind': ('c', 'Sound', 'stored in DoorComponent'),
-    'OpenFPS.Common.AdminGunMode': ('c', 'Sound', ''),
-    'OpenFPS.Common.CrowdApplause': ('c', 'Sound', ''),
-    'OpenFPS.Common.Breath': ('c', 'Sound', ''),
+    'OpenFPS.Sound.DoorKind': ('c', 'Sound', 'stored in DoorComponent'),
+    'OpenFPS.Sound.AdminGunMode': ('c', 'Sound', ''),
+    'OpenFPS.Sound.CrowdApplause': ('c', 'Sound', ''),
+    'OpenFPS.Sound.Breath': ('c', 'Sound', ''),
     'OpenFPS.Common.RoadWater': ('c', 'Environment', 'server-advanced store sent whole; the sound reads depths'),
     'OpenFPS.Common.PuddleField': ('c', 'Environment', ''),
-    'OpenFPS.Common.WeaponRegistry': ('c', 'Sound', 'content registry both read'),
+    'OpenFPS.Sound.WeaponRegistry': ('c', 'Sound', 'content registry both read'),
     'OpenFPS.Geometry.MathHelper': ('a', 'Geometry', ''),
     'OpenFPS.Client.Core.RainSurvey': ('a', 'Audio', 'reads entities to find roofs and gutters: becomes a reader of the world input'),
     'OpenFPS.Client.Core.DropBank': ('a', 'Audio', ''),
@@ -265,7 +265,9 @@ md = []
 
 def short(t):
     return t.replace('OpenFPS.Client.AudioEngine.', '').replace('OpenFPS.Client.Core.AudioEngine.', '') \
-        .replace('OpenFPS.Client.Core.', '').replace('OpenFPS.Common.', '').replace('OpenFPS.', '')
+        .replace('OpenFPS.Client.Core.', '').replace('OpenFPS.Common.', '') \
+        .replace('OpenFPS.Geometry.', '').replace('OpenFPS.Acoustics.', '').replace('OpenFPS.Sound.', '') \
+        .replace('OpenFPS.Native.', '').replace('OpenFPS.Audio.', '').replace('OpenFPS.', '')
 
 
 def fileshort(f):
@@ -549,7 +551,7 @@ SPLIT_TYPES = ['OpenFPS.Client.Core.ClientAudioSystem', 'OpenFPS.Client.Core.Wor
                'OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph', 'OpenFPS.Client.AudioEngine.Acoustics.CabinWalls',
                'OpenFPS.Client.AudioEngine.Acoustics.VehicleShadow', 'OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider',
                'OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene', 'OpenFPS.Acoustics.Systems.AcousticVolumeGenerator',
-               'OpenFPS.Common.AudioEmission', 'OpenFPS.Acoustics.RoomAcoustics', 'OpenFPS.Acoustics.OpeningRoutes']
+               'OpenFPS.Sound.AudioEmission', 'OpenFPS.Acoustics.RoomAcoustics', 'OpenFPS.Acoustics.OpeningRoutes']
 mem_lines = {}
 for m in MEMBERS:
     mem_lines[(m['type'], m['member'])] = int(m['end']) - int(m['start']) + 1

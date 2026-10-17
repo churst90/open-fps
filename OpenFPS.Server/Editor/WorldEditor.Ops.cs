@@ -904,7 +904,7 @@ public sealed partial class WorldEditor
     {
         refusal = "";
         if (t.Premium) { refusal = $"{t.Name} cannot be placed: it is a premium item."; return false; }
-        if (string.Equals(t.WeaponId, OpenFPS.Common.AdminGun.WeaponId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(t.WeaponId, OpenFPS.Sound.AdminGun.WeaponId, StringComparison.OrdinalIgnoreCase))
         { refusal = $"{t.Name} cannot be placed."; return false; }
         if (t.IsItem && !s.Can("give")) { refusal = $"Placing things to carry, like {t.Name}, needs the give permission."; return false; }
         return true;

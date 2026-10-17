@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;
 using Arch.Core;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Core;
 

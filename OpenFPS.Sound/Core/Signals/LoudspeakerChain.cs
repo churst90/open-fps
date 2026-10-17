@@ -1,7 +1,6 @@
-using OpenFPS.Common;
-using OpenFPS.Common.Hearing;
+using OpenFPS.Sound.Hearing;
 
-namespace OpenFPS.Client.AudioEngine.Core.Signals;
+namespace OpenFPS.Sound.Core.Signals;
 
 /// <summary>A program rendered through a loudspeaker: the buffer, the level it declares, and how it radiates.</summary>
 public sealed class LoudspeakerRender
@@ -142,7 +141,7 @@ public static class LoudspeakerChain
     /// (RadiatorBands).</summary>
     public static float[] BandEnergy(float[] x, int rate)
     {
-        var split = new OpenFPS.Client.AudioEngine.Fmod.RadiatorBands();
+        var split = new OpenFPS.Sound.Core.Signals.RadiatorBands();
         split.Configure(rate);
         var e = new double[Radiator.Bands];
         Span<float> band = stackalloc float[Radiator.Bands];

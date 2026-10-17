@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// What is in a buffer, by frequency band: a band balance a test can hold where a listening test cannot

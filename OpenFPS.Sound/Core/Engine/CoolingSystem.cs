@@ -1,6 +1,5 @@
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// The coolant's temperature, and the fan clutch that answers it (<see cref="VehicleProfile.FanClutch"/>).

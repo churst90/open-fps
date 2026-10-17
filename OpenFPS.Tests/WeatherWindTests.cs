@@ -1,7 +1,9 @@
 using System.Numerics;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -23,7 +25,7 @@ namespace OpenFPS.Tests;
 public class WeatherWindTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public WeatherWindTests(ITestOutputHelper o) { _o = o; }

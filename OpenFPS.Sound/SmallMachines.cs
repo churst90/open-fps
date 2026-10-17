@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using OpenFPS.Common.Editing;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// What holds a small engine at one speed: flyweights against a spring open the throttle as it slows,

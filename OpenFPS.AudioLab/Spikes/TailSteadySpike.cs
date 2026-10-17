@@ -56,7 +56,7 @@ public static class TailSteadySpike
         string room = Arg(args, "room") ?? "stair";
         Velvet = Arg(args, "late") == "velvet";
         EarVelvet = Arg(args, "earvelvet") == "1";
-        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { TailFromFiftyMs = Arg(args, "early") == "old" };
+        var lab = new OpenFPS.Sound.Core.LabLevers { TailFromFiftyMs = Arg(args, "early") == "old" };
         double seconds = double.TryParse(Arg(args, "seconds"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : 10;
         var (boxes, ear) = Scene(room);
 

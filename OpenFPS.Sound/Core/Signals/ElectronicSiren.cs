@@ -1,7 +1,6 @@
-using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Engine;   // OnePole
+using OpenFPS.Sound.Core.Engine;   // OnePole
 
-namespace OpenFPS.Client.AudioEngine.Core.Signals;
+namespace OpenFPS.Sound.Core.Signals;
 
 /// <summary>
 /// A police siren, from the chain that makes one: an oscillator, a compression driver pushed past

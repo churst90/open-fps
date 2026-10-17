@@ -3,8 +3,9 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Common;
-using OpenFPS.Common.Hearing;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
+using OpenFPS.Sound.Hearing;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using Xunit.Abstractions;
@@ -23,7 +24,7 @@ namespace OpenFPS.Tests;
 public class DspCallbackTests
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     private readonly ITestOutputHelper _o;
     public DspCallbackTests(ITestOutputHelper o) => _o = o;
@@ -73,7 +74,7 @@ public class DspCallbackTests
         var t = new TrainVoiceState("light_rail/test", TrainProfile.ByName("light_rail"), Rate, 7) { Offline = true };
         var field = t.Layout.Where(e => !e.IsSignal).Select(e => e.Index).ToArray();
         t.SetPlan(0, new TrainSlotPlan(field, field.Select(_ => 0.5f).ToArray()));
-        return new TrainSlotState(t, 0, OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout), Rate, startSample: 0);
+        return new TrainSlotState(t, 0, OpenFPS.Sound.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout), Rate, startSample: 0);
     }
 
     /// <summary>A steel roof in steady rain, on a clock of its own from zero (every rain voice in the game
@@ -360,7 +361,7 @@ public class DspCallbackTests
     public void TheWindAtTheEarsIsSilentWithNobodyThereAndFiniteWithSomebody()
     {
         var read = Callback(typeof(EarWindProcessor));
-        var state = new EarWindState(Rate, new WorldWeather { Wind = WindWeather.Steady(8f, 270f, 0f) }, new OpenFPS.Common.Hearing.HearingSettings());
+        var state = new EarWindState(Rate, new WorldWeather { Wind = WindWeather.Steady(8f, 270f, 0f) }, new OpenFPS.Sound.Hearing.HearingSettings());
         using var dsp = new FakeDsp(state);
         using var output = new Pinned(Block * 2);
         for (int b = 0; b < 8; b++) Run(read, dsp, IntPtr.Zero, output, Block, 0, 2);

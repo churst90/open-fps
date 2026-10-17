@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Client.AudioEngine.Core.Signals;
+namespace OpenFPS.Sound.Core.Signals;
 
 /// <summary>
 /// One resonance, unit peak gain, so a bank of them is a set of levels.

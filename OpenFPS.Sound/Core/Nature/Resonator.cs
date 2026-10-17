@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// A two-pole band-pass at unit peak gain (the RBJ constant-peak form), for the continuous parts of

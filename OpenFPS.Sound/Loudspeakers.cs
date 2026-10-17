@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using OpenFPS.Common.Editing;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // A loudspeaker is a chain: the program (a recording, which is what a public-address system plays), an
 // amplifier that clips at its rail, a driver with a resonance, a travel it cannot exceed and a voice coil

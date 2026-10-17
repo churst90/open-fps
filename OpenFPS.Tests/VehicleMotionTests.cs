@@ -6,6 +6,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
+using OpenFPS.Sound;
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 
 namespace OpenFPS.Tests;
@@ -18,7 +19,7 @@ namespace OpenFPS.Tests;
 public class VehicleMotionTests : IDisposable
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private const float Dt = 1f / 30f;
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "openfps-motion-" + Guid.NewGuid().ToString("N"));
@@ -379,7 +380,7 @@ public class VehicleMotionTests : IDisposable
 
         var car = all["Car"]; var plane = all["Plane"]; var mower = all["Mower"]; var person = all["Person"];
         var profile = OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy");
-        var air = OpenFPS.Common.AircraftProfile.ByName("airliner");
+        var air = OpenFPS.Sound.AircraftProfile.ByName("airliner");
 
         Assert.Equal("engine:i4_economy", w.Get<SoundEmitterComponent>(car).SoundId);
         Assert.Equal("aircraft:airliner", w.Get<SoundEmitterComponent>(plane).SoundId);
@@ -391,7 +392,7 @@ public class VehicleMotionTests : IDisposable
             var em = w.Get<SoundEmitterComponent>(e);
             Assert.True(em.IsSynth);
             Assert.Equal(3f, em.MinDistance);
-            Assert.Equal(OpenFPS.Common.Components.PlaybackMode.LoopOne, em.Mode);
+            Assert.Equal(OpenFPS.Sound.PlaybackMode.LoopOne, em.Mode);
         }
         Assert.Equal(Law.AudibleRange(profile.SourceLevelDb), w.Get<SoundEmitterComponent>(car).Range);
         Assert.Equal(Law.AudibleRange(air.SourceLevelDb), w.Get<SoundEmitterComponent>(plane).Range);
@@ -452,7 +453,7 @@ public class VehicleMotionTests : IDisposable
                         more: new() { new() { Name = "Mower", Preset = "mower_push", RoadStart = road, RoadEnd = end } });
         Assert.True(rig.Vehicles.TryInspect("motion", rig.Id, out var car));
         Assert.True(car.OnStreet);
-        Assert.Equal(OpenFPS.Common.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy")), car.Horn);
+        Assert.Equal(OpenFPS.Sound.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy")), car.Horn);
         Assert.True(rig.Vehicles.TryInspect("motion", Spawned()["Mower"].Id, out var mower));
         Assert.False(mower.OnStreet);
         Assert.Equal("", mower.Horn);
@@ -784,8 +785,8 @@ public class VehicleMotionTests : IDisposable
         Assert.DoesNotContain(heard, h => h.Label == "horn");
         foreach (var s in shots)
         {
-            var gun = OpenFPS.Common.WeaponRegistry.All.First(w => "weapon:" + w.Id == s.Sound.SynthKey);
-            Assert.Equal(OpenFPS.Common.Loudness.MuzzleBlastDb(gun), s.Sound.LevelDb);
+            var gun = OpenFPS.Sound.WeaponRegistry.All.First(w => "weapon:" + w.Id == s.Sound.SynthKey);
+            Assert.Equal(OpenFPS.Sound.Loudness.MuzzleBlastDb(gun), s.Sound.LevelDb);
         }
     }
 
@@ -800,13 +801,13 @@ public class VehicleMotionTests : IDisposable
         // 60 expected in five minutes; random, so a band.
         Assert.InRange(horns.Count, 35, 90);
         Assert.True(horns.Select(h => h.Id).Distinct().Count() >= 2, "one car does all the honking");
-        string horn = OpenFPS.Common.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy"));
+        string horn = OpenFPS.Sound.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy"));
         foreach (var h in horns)
         {
-            Assert.True(OpenFPS.Common.Honk.TryParse(h.Sound.SynthKey, out var kind, out var pattern), h.Sound.SynthKey);
+            Assert.True(OpenFPS.Sound.Honk.TryParse(h.Sound.SynthKey, out var kind, out var pattern), h.Sound.SynthKey);
             Assert.Equal(horn, kind);
-            Assert.Equal(OpenFPS.Common.Honk.LevelDb(horn, ModelLibrary.Presets), h.Sound.LevelDb);
-            Assert.InRange(h.Sound.DecaySeconds - OpenFPS.Common.Honk.Duration(pattern), -0.01f, 0.01f);   // the key rounds the pattern
+            Assert.Equal(OpenFPS.Sound.Honk.LevelDb(horn, ModelLibrary.Presets), h.Sound.LevelDb);
+            Assert.InRange(h.Sound.DecaySeconds - OpenFPS.Sound.Honk.Duration(pattern), -0.01f, 0.01f);   // the key rounds the pattern
             Assert.Equal(SoundCharacter.Ring, h.Sound.Character);
             float r = MathF.Sqrt(h.Sound.Position.X * h.Sound.Position.X + h.Sound.Position.Z * h.Sound.Position.Z);
             Assert.InRange(r, 55f, 65f);                                    // at a car on the circle
@@ -849,6 +850,6 @@ public class VehicleMotionTests : IDisposable
         Assert.InRange(stops, 60, 240);
         Assert.InRange((float)horns.Count / stops, 0.3f, 0.8f);
         foreach (var h in horns)
-            Assert.True(OpenFPS.Common.Honk.TryParse(h.Sound.SynthKey, out _, out _));
+            Assert.True(OpenFPS.Sound.Honk.TryParse(h.Sound.SynthKey, out _, out _));
     }
 }

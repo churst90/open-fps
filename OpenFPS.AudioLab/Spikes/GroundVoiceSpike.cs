@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound.Core;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;

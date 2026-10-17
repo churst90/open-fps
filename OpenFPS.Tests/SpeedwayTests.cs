@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

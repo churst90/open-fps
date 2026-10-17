@@ -1,6 +1,6 @@
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// How loud a thing is at its source, in decibels, and what that becomes in the mix. Assets are

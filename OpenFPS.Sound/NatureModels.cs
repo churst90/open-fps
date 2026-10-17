@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using OpenFPS.Common.Editing;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // Water, fire and the wind in leaves, as parts lists: what the thing is, and the synthesiser works the
 // sound out from that. No level per mechanism and no equaliser; the one level, SourceLevelDb, is what the

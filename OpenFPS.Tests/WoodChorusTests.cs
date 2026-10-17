@@ -1,5 +1,6 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -15,10 +16,10 @@ namespace OpenFPS.Tests;
 public class WoodChorusTests
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private static List<WoodChorus.Crown> Grid(int n, Vector3 origin, float spacing, int firstId = 1)
     {
@@ -33,7 +34,7 @@ public class WoodChorusTests
     {
         int next = WoodChorus.FirstId;
         var ids = new Dictionary<(int, int, string), int>();
-        return WoodChorus.Build(crowns, (cell, preset) => ids.TryGetValue((cell.X, cell.Z, preset), out int id) ? id : ids[(cell.X, cell.Z, preset)] = next--, ModelLibrary.Presets, new OpenFPS.Common.Hearing.HearingSettings());
+        return WoodChorus.Build(crowns, (cell, preset) => ids.TryGetValue((cell.X, cell.Z, preset), out int id) ? id : ids[(cell.X, cell.Z, preset)] = next--, ModelLibrary.Presets, new OpenFPS.Sound.Hearing.HearingSettings());
     }
 
     [Fact]

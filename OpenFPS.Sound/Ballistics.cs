@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// When the sounds of a shot reach a listener, and in what order.

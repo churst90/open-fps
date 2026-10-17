@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
-using OpenFPS.Common;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Client.AudioEngine.Core;
 

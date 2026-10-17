@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>What one shot measured: the numbers docs/GUNFIRE.md compares.</summary>
 /// <param name="PositivePhaseMs">From the onset to the waveform's first crossing back through zero.</param>

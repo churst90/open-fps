@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// Broadband noise whose power spectrum is set from moment to moment: what turbulent flow past a moving

@@ -38,10 +38,10 @@ public static class MixerQuality
     };
 
     /// <summary>
-    /// The rate the synthesised sources render at by default (<see cref="Core.RenderRate.Default"/>, 48 kHz).
+    /// The rate the synthesised sources render at by default (<see cref="Sound.Core.RenderRate.Default"/>, 48 kHz).
     /// OPENFPS_MIXER_RATE (22050-192000) asks for another, for an A/B.
     /// </summary>
-    public const int DefaultRate = Core.RenderRate.Default;
+    public const int DefaultRate = Sound.Core.RenderRate.Default;
 
     /// <summary>What FmodAudioProvider asks FMOD for (setSoftwareFormat). See <see cref="DefaultRate"/>.</summary>
     public static int RequestedRate
@@ -53,7 +53,7 @@ public static class MixerQuality
     /// FMOD's resampler, even its spline, images the top octave: 48 to 44.1 kHz brought a 15 kHz
     /// component back at 11.1 kHz only 24-28 dB under itself (the lab's --quality resampler).
     /// </summary>
-    public static float[] Resample(float[] x, int from, int to) => Core.SincResampler.Resample(x, from, to);
+    public static float[] Resample(float[] x, int from, int to) => Sound.Core.SincResampler.Resample(x, from, to);
 
     /// <summary>
     /// OPENFPS_FMOD_OUTPUT=pulse|alsa|wasapi: which output FMOD drives, for measuring what reaches the

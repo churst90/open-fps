@@ -55,7 +55,7 @@ internal sealed class TileSceneSet : IDisposable
 
     /// <summary>The lab's levers on its worker (LabLevers.TileRecycleShare): the game's unless a test or the lab
     /// gives its own.</summary>
-    internal OpenFPS.Client.AudioEngine.Core.LabLevers Lab { get; init; } = new();
+    internal OpenFPS.Sound.Core.LabLevers Lab { get; init; } = new();
 
     /// <summary>One pair of top scenes: the full scene and the listener's.</summary>
     private sealed class Pair

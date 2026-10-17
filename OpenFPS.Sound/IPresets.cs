@@ -1,6 +1,7 @@
 using System.Numerics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The presets a sound model names by key, as the catalogue has them: a map's own, or one changed in the

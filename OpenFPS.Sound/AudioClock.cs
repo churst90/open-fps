@@ -1,6 +1,7 @@
 using System.Diagnostics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The clock of one audio world, which its host gives it (docs/SOUND_LIBRARY_BOUNDARY.md 4.1, stage 5): the

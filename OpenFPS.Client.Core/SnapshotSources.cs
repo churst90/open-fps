@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core;
 

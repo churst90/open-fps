@@ -1,7 +1,7 @@
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// Water falling into water, and onto stone, as the events it is made of (docs/RUNNING_WATER.md

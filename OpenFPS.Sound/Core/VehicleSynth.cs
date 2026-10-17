@@ -1,10 +1,10 @@
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Engine;
+using OpenFPS.Sound.Core.Engine;
 using System.Runtime.CompilerServices;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>The rendered result: the three sources and the path the car took.</summary>
 public sealed class VehicleRender

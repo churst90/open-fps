@@ -59,7 +59,7 @@ public static class BinauralInputSpike
             cbsize = Marshal.SizeOf<CREATESOUNDEXINFO>(), length = (uint)bytes.Length, numchannels = 1,
             defaultfrequency = Rate, format = SOUND_FORMAT.PCMFLOAT,
         };
-        sys.createSound(bytes, MODE.OPENMEMORY | MODE.OPENRAW | MODE.CREATESAMPLE | MODE.LOOP_OFF | MODE._2D, ref ex, out Sound sound);
+        sys.createSound(bytes, MODE.OPENMEMORY | MODE.OPENRAW | MODE.CREATESAMPLE | MODE.LOOP_OFF | MODE._2D, ref ex, out FMOD.Sound sound);
 
         Console.WriteLine("  A mono voice through the binaural stage in FMOD, against the HRTF alone (dB, each ear):");
         bool ok = true;
@@ -109,7 +109,7 @@ public static class BinauralInputSpike
     }
 
     /// <summary>Energy in each ear of the sound played on a 2D channel through the game's stage.</summary>
-    private static (double L, double R) ThroughStage(FMOD.System sys, ChannelGroup master, Sound sound, IntPtr ctx, IntPtr hrtf,
+    private static (double L, double R) ThroughStage(FMOD.System sys, ChannelGroup master, FMOD.Sound sound, IntPtr ctx, IntPtr hrtf,
                                                      Phonon.IPLAudioSettings au, float x, float y, float z)
     {
         var es = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };

@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Sound;
 using OpenFPS.Client.AudioEngine.Fmod;
 using Xunit.Abstractions;
 

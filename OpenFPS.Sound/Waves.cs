@@ -4,8 +4,9 @@ using System.Numerics;
 using System.Text.Json.Serialization;
 using OpenFPS.Common.Editing;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // Waves at the water's edge: a lake's beach, sea surf, shingle, a wall, a boat's hull, a river bank. The
 // specs say what the water and its edge are; ShoreSynth works the sound out from the waves the wind raises

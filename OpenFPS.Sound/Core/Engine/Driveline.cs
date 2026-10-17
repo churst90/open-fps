@@ -2,7 +2,7 @@ using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// The car behind the engine: gearbox, clutch, mass, drag, brakes. One degree of freedom when the

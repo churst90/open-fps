@@ -14,7 +14,7 @@ namespace OpenFPS.Tests;
 public class ClientAudioSystemTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public ClientAudioSystemTests(ITestOutputHelper o) => _o = o;

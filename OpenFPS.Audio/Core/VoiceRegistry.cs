@@ -148,10 +148,10 @@ public sealed partial class VoiceRegistry
 
     /// <summary>The first id given out, and every one after counts down from it: under every id an entity
     /// has (the server's are not negative) and over the woods', which are entities of the client's own
-    /// (<see cref="OpenFPS.Common.WoodChorus.FirstId"/>).</summary>
+    /// (<see cref="OpenFPS.Sound.WoodChorus.FirstId"/>).</summary>
     public const int FirstId = -1000;
     /// <summary>The last id there is to give: one over the first wood's.</summary>
-    public const int LastId = OpenFPS.Common.WoodChorus.FirstId + 1;
+    public const int LastId = OpenFPS.Sound.WoodChorus.FirstId + 1;
 
     private struct Given
     {

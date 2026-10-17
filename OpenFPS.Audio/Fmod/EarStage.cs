@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using FMOD;
-using OpenFPS.Common.Hearing;
+using OpenFPS.Sound.Hearing;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 

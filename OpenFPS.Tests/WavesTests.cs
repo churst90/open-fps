@@ -1,7 +1,8 @@
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -13,7 +14,7 @@ namespace OpenFPS.Tests;
 public class WavesTests
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     private readonly ITestOutputHelper _o;
     public WavesTests(ITestOutputHelper o)
@@ -353,7 +354,7 @@ public class WavesTests
             Assert.True(ModelLibrary.Knows(ModelLibrary.Kinds.Shore, sound[6..]), sound);
             Assert.True(Vector3.Distance(line[0], line[^1]) < 0.01f, $"the shore at {at} is not closed");
             Assert.All(line, p => Assert.True(MathF.Abs(p.X - at.X) <= 0.5f * scale.X + 0.01f && MathF.Abs(p.Z - at.Z) <= 0.5f * scale.Z + 0.01f));
-            var path = new OpenFPS.Client.AudioEngine.Core.Nature.LinePath(line);
+            var path = new OpenFPS.Sound.Core.Nature.LinePath(line);
             for (float s = 5f; s < path.Length; s += 10f)
             {
                 var p = path.PointAt(s - path.HalfLength);

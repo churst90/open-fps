@@ -4,6 +4,8 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using Serilog;
 using OpenFPS.Words;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Client.Core;
 
@@ -552,7 +554,7 @@ public sealed class DrivingAids
             EntityId = id,
             Seed = VoiceRegistry.SeedOf(VoiceKind.Aid, (int)aid, n),
             SoundId = sound,
-            Mode = OpenFPS.Common.Components.PlaybackMode.Single,
+            Mode = OpenFPS.Sound.PlaybackMode.Single,
             FollowsListener = true,
             ListenerOffset = offset,
             Position = _ear + offset,
@@ -621,7 +623,7 @@ public sealed class DrivingAids
             EntityId = id,
             Seed = VoiceRegistry.SeedOf(VoiceKind.Aid, (int)aid),
             SoundId = sound,
-            Mode = OpenFPS.Common.Components.PlaybackMode.LoopOne,
+            Mode = OpenFPS.Sound.PlaybackMode.LoopOne,
             FollowsListener = true,
             ListenerOffset = offset,
             Position = _ear + offset,

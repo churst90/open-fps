@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace OpenFPS.Common.Hearing;
+namespace OpenFPS.Sound.Hearing;
 
 /// <summary>
 /// The ear model's fixed parts: the range of the playback calibration and where a sound reaches the ear in

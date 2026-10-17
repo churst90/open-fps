@@ -399,14 +399,14 @@ if (args.Contains("--engine-solver"))
     // The intake valve of the 1.6 at idle, as dumped: runner at 0.6 bar, cylinder at 0.18 bar.
     float mean = 0.6f * 101325f;
     float Z = 397000f, area = 8.8e-4f, pCyl = 18200f, tCyl = 386f, pipeK = 305f, gamma = 1.4f, uMean = -6e-4f, uCap = 0.107f;
-    float b = OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.SolveValve(0f, 1300f, Z, area, pCyl, tCyl, pipeK, gamma, 61.8e-6f, 1f / 44100f, uMean, uCap, mean, out float md);
+    float b = OpenFPS.Sound.Core.Engine.EngineSynth.SolveValve(0f, 1300f, Z, area, pCyl, tCyl, pipeK, gamma, 61.8e-6f, 1f / 44100f, uMean, uCap, mean, out float md);
     Console.WriteLine($"  solver: b={b:F0}  pPort={(mean + b) / 1e5f:F3} bar  mdot={md * 1e3f:F1} g/s");
     Log.CloseAndFlush();
     Environment.Exit(0);
 }
 if (args.Contains("--engine-street"))
 {
-    var keys = args.Where(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)).ToArray();
+    var keys = args.Where(a => OpenFPS.Sound.VehicleProfile.Presets.ContainsKey(a)).ToArray();
     if (keys.Length == 0) keys = new[] { "v8_muscle", "diesel_truck" };
     string? kmhArg = args.FirstOrDefault(a => a.StartsWith("kmh="));
     float[]? kmhs = kmhArg == null ? null : Array.ConvertAll(kmhArg[4..].Split(','), float.Parse);
@@ -416,7 +416,7 @@ if (args.Contains("--engine-street"))
 }
 if (args.Contains("--engine-live"))
 {
-    string presetKey = args.FirstOrDefault(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)) ?? "v8_muscle";
+    string presetKey = args.FirstOrDefault(a => OpenFPS.Sound.VehicleProfile.Presets.ContainsKey(a)) ?? "v8_muscle";
     string? kmh = args.FirstOrDefault(a => a.StartsWith("kmh="));
     float[]? speeds = kmh == null ? null : Array.ConvertAll(kmh[4..].Split(','), float.Parse);
     int lcode = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.RunLive(presetKey, speeds);
@@ -819,7 +819,7 @@ if (args.Contains("--car-door"))
     System.IO.Directory.CreateDirectory(dir);
     foreach (bool closing in new[] { false, true })
     {
-        var pcm = OpenFPS.Common.CarDoor.Render(closing, 48000, seed);
+        var pcm = OpenFPS.Sound.CarDoor.Render(closing, 48000, seed);
         string path = System.IO.Path.Combine(dir, closing ? "car_door_close.wav" : "car_door_open.wav");
         using (var w = new System.IO.BinaryWriter(System.IO.File.Create(path)))
         {
@@ -1025,7 +1025,7 @@ if (args.Contains("--door-knock"))
     int seed = int.TryParse(args.FirstOrDefault(a => a.StartsWith("seed="))?.Substring(5), out int sd) ? sd : 3;
     int knocks = int.TryParse(args.FirstOrDefault(a => a.StartsWith("knocks="))?.Substring(7), out int kn) ? kn : 3;
     System.IO.Directory.CreateDirectory(dir);
-    var pcm = OpenFPS.Common.DoorKnock.Render(knocks, 44100, seed);
+    var pcm = OpenFPS.Sound.DoorKnock.Render(knocks, 44100, seed);
     string path = System.IO.Path.Combine(dir, $"door_knock_{knocks}_seed{seed}.wav");
     using (var w = new System.IO.BinaryWriter(System.IO.File.Create(path)))
     {
@@ -1042,53 +1042,53 @@ if (args.Contains("--knob-door"))
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     int seed = int.TryParse(args.FirstOrDefault(a => a.StartsWith("seed="))?.Substring(5), out int sd) ? sd : 1;
     System.IO.Directory.CreateDirectory(dir);
-    var renders = new List<(string Name, Func<OpenFPS.Common.KnobDoor.Report, float[]> Make)>();
-    OpenFPS.Common.KnobDoor.Door Make(OpenFPS.Common.KnobDoor.Construction c, float[]? wear)
+    var renders = new List<(string Name, Func<OpenFPS.Sound.KnobDoor.Report, float[]> Make)>();
+    OpenFPS.Sound.KnobDoor.Door Make(OpenFPS.Sound.KnobDoor.Construction c, float[]? wear)
         => new() { Leaf = c, HingeWear = wear, Seed = seed };
-    var hollow = OpenFPS.Common.KnobDoor.Construction.HollowCore;
-    var solid = OpenFPS.Common.KnobDoor.Construction.SolidWood;
+    var hollow = OpenFPS.Sound.KnobDoor.Construction.HollowCore;
+    var solid = OpenFPS.Sound.KnobDoor.Construction.SolidWood;
     float[] oiled = { 0f, 0f, 0f }, worn = { 0.5f, 0.3f, 0.6f }, dry = { 0.95f, 0.8f, 1f };
-    renders.Add(("hollow-open-oiled", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(hollow, oiled), 48000, 0.9, r)));
-    renders.Add(("hollow-open-worn", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(hollow, worn), 48000, 0.9, r)));
-    renders.Add(("hollow-open-dry", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(hollow, dry), 48000, 0.9, r)));
-    renders.Add(("hollow-open-dry-slow", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(hollow, dry), 48000, 2.0, r)));
-    foreach (var how in new[] { OpenFPS.Common.KnobDoor.Shut.Gentle, OpenFPS.Common.KnobDoor.Shut.Normal, OpenFPS.Common.KnobDoor.Shut.Hard, OpenFPS.Common.KnobDoor.Shut.Slam })
-        renders.Add(($"hollow-close-{how.ToString().ToLowerInvariant()}", r => OpenFPS.Common.KnobDoor.RenderClose(Make(hollow, worn), how, 48000, r)));
-    renders.Add(("solid-open-worn", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(solid, worn), 48000, 0.9, r)));
-    renders.Add(("solid-close-normal", r => OpenFPS.Common.KnobDoor.RenderClose(Make(solid, worn), OpenFPS.Common.KnobDoor.Shut.Normal, 48000, r)));
-    renders.Add(("solid-close-slam", r => OpenFPS.Common.KnobDoor.RenderClose(Make(solid, worn), OpenFPS.Common.KnobDoor.Shut.Slam, 48000, r)));
-    renders.Add(("game-slam-v0", r => OpenFPS.Common.KnobDoor.RenderClose(
-        new OpenFPS.Common.KnobDoor.Door { HingeWear = OpenFPS.Common.KnobDoor.WearOf(0), Seed = 1 }, OpenFPS.Common.KnobDoor.Shut.Slam, 48000, r)));
+    renders.Add(("hollow-open-oiled", r => OpenFPS.Sound.KnobDoor.RenderOpen(Make(hollow, oiled), 48000, 0.9, r)));
+    renders.Add(("hollow-open-worn", r => OpenFPS.Sound.KnobDoor.RenderOpen(Make(hollow, worn), 48000, 0.9, r)));
+    renders.Add(("hollow-open-dry", r => OpenFPS.Sound.KnobDoor.RenderOpen(Make(hollow, dry), 48000, 0.9, r)));
+    renders.Add(("hollow-open-dry-slow", r => OpenFPS.Sound.KnobDoor.RenderOpen(Make(hollow, dry), 48000, 2.0, r)));
+    foreach (var how in new[] { OpenFPS.Sound.KnobDoor.Shut.Gentle, OpenFPS.Sound.KnobDoor.Shut.Normal, OpenFPS.Sound.KnobDoor.Shut.Hard, OpenFPS.Sound.KnobDoor.Shut.Slam })
+        renders.Add(($"hollow-close-{how.ToString().ToLowerInvariant()}", r => OpenFPS.Sound.KnobDoor.RenderClose(Make(hollow, worn), how, 48000, r)));
+    renders.Add(("solid-open-worn", r => OpenFPS.Sound.KnobDoor.RenderOpen(Make(solid, worn), 48000, 0.9, r)));
+    renders.Add(("solid-close-normal", r => OpenFPS.Sound.KnobDoor.RenderClose(Make(solid, worn), OpenFPS.Sound.KnobDoor.Shut.Normal, 48000, r)));
+    renders.Add(("solid-close-slam", r => OpenFPS.Sound.KnobDoor.RenderClose(Make(solid, worn), OpenFPS.Sound.KnobDoor.Shut.Slam, 48000, r)));
+    renders.Add(("game-slam-v0", r => OpenFPS.Sound.KnobDoor.RenderClose(
+        new OpenFPS.Sound.KnobDoor.Door { HingeWear = OpenFPS.Sound.KnobDoor.WearOf(0), Seed = 1 }, OpenFPS.Sound.KnobDoor.Shut.Slam, 48000, r)));
     // As the game sends them: the prefab door, its 0.9 s swing, each character.
-    for (int v = 0; v < OpenFPS.Common.KnobDoor.Variants; v++)
+    for (int v = 0; v < OpenFPS.Sound.KnobDoor.Variants; v++)
     {
         int vv = v;
-        renders.Add(($"game-open-v{v}", r => OpenFPS.Common.KnobDoor.RenderOpen(
-            new OpenFPS.Common.KnobDoor.Door { HingeWear = OpenFPS.Common.KnobDoor.WearOf(vv), Seed = 1 + vv }, 48000, 0.9, r)));
-        foreach (var how in new[] { OpenFPS.Common.KnobDoor.Shut.Gentle, OpenFPS.Common.KnobDoor.Shut.Normal, OpenFPS.Common.KnobDoor.Shut.Hard })
-            renders.Add(($"game-close-{how.ToString().ToLowerInvariant()}-v{v}", r => OpenFPS.Common.KnobDoor.RenderGameClose(
-                new OpenFPS.Common.KnobDoor.Door { HingeWear = OpenFPS.Common.KnobDoor.WearOf(vv), Seed = 1 + vv }, 48000, how, r)));
+        renders.Add(($"game-open-v{v}", r => OpenFPS.Sound.KnobDoor.RenderOpen(
+            new OpenFPS.Sound.KnobDoor.Door { HingeWear = OpenFPS.Sound.KnobDoor.WearOf(vv), Seed = 1 + vv }, 48000, 0.9, r)));
+        foreach (var how in new[] { OpenFPS.Sound.KnobDoor.Shut.Gentle, OpenFPS.Sound.KnobDoor.Shut.Normal, OpenFPS.Sound.KnobDoor.Shut.Hard })
+            renders.Add(($"game-close-{how.ToString().ToLowerInvariant()}-v{v}", r => OpenFPS.Sound.KnobDoor.RenderGameClose(
+                new OpenFPS.Sound.KnobDoor.Door { HingeWear = OpenFPS.Sound.KnobDoor.WearOf(vv), Seed = 1 + vv }, 48000, how, r)));
     }
     string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
-    OpenFPS.Common.KnobDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
+    OpenFPS.Sound.KnobDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
     if (double.TryParse(args.FirstOrDefault(a => a.StartsWith("latch=", StringComparison.Ordinal))?.Substring(6),
                         System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double share))
-        OpenFPS.Common.KnobDoor.KeeperBendsStrike = share;
-    if (args.Contains("pins")) OpenFPS.Common.KnobDoor.PinTrace = new List<string>();
+        OpenFPS.Sound.KnobDoor.KeeperBendsStrike = share;
+    if (args.Contains("pins")) OpenFPS.Sound.KnobDoor.PinTrace = new List<string>();
     // Every file on one gain, set by the loudest, so a slam and a gentle close keep their difference.
     var made = new List<(string Name, float[] Pcm)>();
     foreach (var (name, make) in renders)
     {
         if (only != null && !name.Contains(only)) continue;
-        var rep = new OpenFPS.Common.KnobDoor.Report();
+        var rep = new OpenFPS.Sound.KnobDoor.Report();
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var pcm = make(rep);
         made.Add((name, pcm));
         Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, rendered in {sw.ElapsedMilliseconds} ms)");
-        if (OpenFPS.Common.KnobDoor.PinTrace != null)
+        if (OpenFPS.Sound.KnobDoor.PinTrace != null)
         {
-            System.IO.File.WriteAllLines(System.IO.Path.Combine(dir, name + ".pin.txt"), OpenFPS.Common.KnobDoor.PinTrace);
-            OpenFPS.Common.KnobDoor.PinTrace.Clear();
+            System.IO.File.WriteAllLines(System.IO.Path.Combine(dir, name + ".pin.txt"), OpenFPS.Sound.KnobDoor.PinTrace);
+            OpenFPS.Sound.KnobDoor.PinTrace.Clear();
         }
         Console.WriteLine(rep);
     }
@@ -1104,7 +1104,7 @@ if (args.Contains("--knob-door"))
         foreach (float v in pcm) w.Write((short)Math.Clamp(v * gain * 32767f, -32768f, 32767f));
     }
     // Full scale in every file is this many pascals at a metre.
-    double fullScalePa = OpenFPS.Common.KnobDoor.PascalsAtFullScale / gain;
+    double fullScalePa = OpenFPS.Sound.KnobDoor.PascalsAtFullScale / gain;
     Console.WriteLine($"full scale = {fullScalePa:F1} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
     Environment.Exit(0);
 }
@@ -1113,19 +1113,19 @@ if (args.Contains("--pushbar-door"))
 {
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
-    OpenFPS.Common.PushBarDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
+    OpenFPS.Sound.PushBarDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
     System.IO.Directory.CreateDirectory(dir);
     var made = new List<(string Name, float[] Pcm)>();
-    for (int v = 0; v < OpenFPS.Common.PushBarDoor.Variants; v++)
+    for (int v = 0; v < OpenFPS.Sound.PushBarDoor.Variants; v++)
         foreach (bool closing in new[] { false, true })
         {
             string name = $"pushbar-{(closing ? "close" : "open")}-v{v}";
             if (only != null && !name.Contains(only)) continue;
-            var door = new OpenFPS.Common.PushBarDoor.Door { Variant = v, Seed = 1 + v };
-            var rep = new OpenFPS.Common.PushBarDoor.Report();
+            var door = new OpenFPS.Sound.PushBarDoor.Door { Variant = v, Seed = 1 + v };
+            var rep = new OpenFPS.Sound.PushBarDoor.Report();
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var pcm = closing ? OpenFPS.Common.PushBarDoor.RenderClose(door, 48000, rep)
-                              : OpenFPS.Common.PushBarDoor.RenderOpen(door, 48000, 1.4, rep);
+            var pcm = closing ? OpenFPS.Sound.PushBarDoor.RenderClose(door, 48000, rep)
+                              : OpenFPS.Sound.PushBarDoor.RenderOpen(door, 48000, 1.4, rep);
             made.Add((name, pcm));
             Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, rendered in {sw.ElapsedMilliseconds} ms)");
             Console.WriteLine(rep);
@@ -1140,7 +1140,7 @@ if (args.Contains("--pushbar-door"))
         w.Write(48000); w.Write(96000); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
         foreach (float x in pcm) w.Write((short)Math.Clamp(x * gain * 32767f, -32768f, 32767f));
     }
-    double fullScalePa = OpenFPS.Common.PushBarDoor.PascalsAtFullScale / gain;
+    double fullScalePa = OpenFPS.Sound.PushBarDoor.PascalsAtFullScale / gain;
     Console.WriteLine($"full scale = {fullScalePa:F1} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
     Environment.Exit(0);
 }
@@ -1149,21 +1149,21 @@ if (args.Contains("--sliding-door"))
 {
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
-    OpenFPS.Common.SlidingDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
+    OpenFPS.Sound.SlidingDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
     System.IO.Directory.CreateDirectory(dir);
     var made = new List<(string Name, float[] Pcm)>();
-    foreach (var kind in new[] { OpenFPS.Common.SlidingDoor.Kind.Patio, OpenFPS.Common.SlidingDoor.Kind.Automatic })
-        for (int v = 0; v < OpenFPS.Common.SlidingDoor.Variants; v++)
+    foreach (var kind in new[] { OpenFPS.Sound.SlidingDoor.Kind.Patio, OpenFPS.Sound.SlidingDoor.Kind.Automatic })
+        for (int v = 0; v < OpenFPS.Sound.SlidingDoor.Variants; v++)
             foreach (bool closing in new[] { false, true })
             {
-                string name = $"{(kind == OpenFPS.Common.SlidingDoor.Kind.Patio ? "patio" : "auto")}-{(closing ? "close" : "open")}-v{v}";
+                string name = $"{(kind == OpenFPS.Sound.SlidingDoor.Kind.Patio ? "patio" : "auto")}-{(closing ? "close" : "open")}-v{v}";
                 if (only != null && !name.Contains(only)) continue;
-                var door = new OpenFPS.Common.SlidingDoor.Door { Kind = kind, Variant = v, Seed = 1 + v,
-                    Width = kind == OpenFPS.Common.SlidingDoor.Kind.Patio ? 0.9f : 1.0f, Height = kind == OpenFPS.Common.SlidingDoor.Kind.Patio ? 2.03f : 2.1f };
-                var rep = new OpenFPS.Common.SlidingDoor.Report();
+                var door = new OpenFPS.Sound.SlidingDoor.Door { Kind = kind, Variant = v, Seed = 1 + v,
+                    Width = kind == OpenFPS.Sound.SlidingDoor.Kind.Patio ? 0.9f : 1.0f, Height = kind == OpenFPS.Sound.SlidingDoor.Kind.Patio ? 2.03f : 2.1f };
+                var rep = new OpenFPS.Sound.SlidingDoor.Report();
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var pcm = closing ? OpenFPS.Common.SlidingDoor.RenderClose(door, 48000, 1.4, rep)
-                                  : OpenFPS.Common.SlidingDoor.RenderOpen(door, 48000, 1.4, rep);
+                var pcm = closing ? OpenFPS.Sound.SlidingDoor.RenderClose(door, 48000, 1.4, rep)
+                                  : OpenFPS.Sound.SlidingDoor.RenderOpen(door, 48000, 1.4, rep);
                 made.Add((name, pcm));
                 Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, rendered in {sw.ElapsedMilliseconds} ms)");
                 Console.WriteLine(rep);
@@ -1178,7 +1178,7 @@ if (args.Contains("--sliding-door"))
         w.Write(48000); w.Write(96000); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
         foreach (float x in pcm) w.Write((short)Math.Clamp(x * gain * 32767f, -32768f, 32767f));
     }
-    double fullScalePa = OpenFPS.Common.SlidingDoor.PascalsAtFullScale / gain;
+    double fullScalePa = OpenFPS.Sound.SlidingDoor.PascalsAtFullScale / gain;
     Console.WriteLine($"full scale = {fullScalePa:F1} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
     Environment.Exit(0);
 }
@@ -1189,21 +1189,21 @@ if (args.Contains("--car-window"))
                  ?? OpenFPS.AudioLab.LabPaths.InRepo("inbox", "car-window-2026-10-03");
     string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
     System.IO.Directory.CreateDirectory(dir);
-    Console.WriteLine($"travel: down {OpenFPS.Common.CarWindow.DownSeconds:F2} s, up {OpenFPS.Common.CarWindow.UpSeconds:F2} s (what the server moves the glass by)");
+    Console.WriteLine($"travel: down {OpenFPS.Sound.CarWindow.DownSeconds:F2} s, up {OpenFPS.Sound.CarWindow.UpSeconds:F2} s (what the server moves the glass by)");
     var made = new List<(string Name, float[] Pcm)>();
     var strokes = new (string Name, float From, float To)[] { ("down", 0f, 1f), ("up", 1f, 0f), ("half-down", 0f, 0.5f), ("half-up", 0.5f, 0f) };
-    for (int v = 0; v < OpenFPS.Common.CarWindow.Variants; v++)
+    for (int v = 0; v < OpenFPS.Sound.CarWindow.Variants; v++)
         foreach (var (stroke, from, to) in strokes)
         {
             string name = $"window-{stroke}-v{v}";
             if (only != null && !name.Contains(only)) continue;
-            var rep = new OpenFPS.Common.CarWindow.Report();
+            var rep = new OpenFPS.Sound.CarWindow.Report();
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var pcm = OpenFPS.Common.CarWindow.Render(v, from, to, 48000, rep);
+            var pcm = OpenFPS.Sound.CarWindow.Render(v, from, to, 48000, rep);
             made.Add((name, pcm));
-            Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, expected {OpenFPS.Common.CarWindow.Seconds(from, to):F2} s, rendered in {sw.ElapsedMilliseconds} ms)");
+            Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, expected {OpenFPS.Sound.CarWindow.Seconds(from, to):F2} s, rendered in {sw.ElapsedMilliseconds} ms)");
             Console.WriteLine(rep);
-            CarWindowRunning(pcm, rep, OpenFPS.Common.CarWindow.PascalsAtFullScale);
+            CarWindowRunning(pcm, rep, OpenFPS.Sound.CarWindow.PascalsAtFullScale);
         }
     float loudest = 1e-9f;
     foreach (var (_, pcm) in made) foreach (float x in pcm) loudest = Math.Max(loudest, Math.Abs(x));
@@ -1215,7 +1215,7 @@ if (args.Contains("--car-window"))
         w.Write(48000); w.Write(96000); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
         foreach (float x in pcm) w.Write((short)Math.Clamp(x * gain * 32767f, -32768f, 32767f));
     }
-    double fullScalePa = OpenFPS.Common.CarWindow.PascalsAtFullScale / gain;
+    double fullScalePa = OpenFPS.Sound.CarWindow.PascalsAtFullScale / gain;
     Console.WriteLine($"wrote {made.Count} to {dir}; full scale = {fullScalePa:F2} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
     foreach (var (name, pcm) in made)
     {
@@ -1227,7 +1227,7 @@ if (args.Contains("--car-window"))
     // While the glass is travelling (from 0.4 s after the switch to 0.2 s before it arrives): its level,
     // its octave bands, how tonal it is (spectral flatness, 100 Hz-8 kHz: 1 is white noise, near 0 a set
     // of lines), and its strongest spectral lines, against the rotor's rate and the commutator's.
-    static void CarWindowRunning(float[] pcm, OpenFPS.Common.CarWindow.Report rep, double fullScalePa)
+    static void CarWindowRunning(float[] pcm, OpenFPS.Sound.CarWindow.Report rep, double fullScalePa)
     {
         int start = (int)((0.03 + 0.4) * 48000), stop = (int)((0.03 + rep.TravelSeconds - 0.2) * 48000);
         if (stop - start < 8192) { Console.WriteLine("    (too short to measure running)"); return; }
@@ -1241,7 +1241,7 @@ if (args.Contains("--car-window"))
         {
             var buf = new System.Numerics.Complex[n];
             for (int i = 0; i < n; i++) buf[i] = run[at + i] * (0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (n - 1)));
-            OpenFPS.Common.Spectrum.Fft(buf);
+            OpenFPS.Sound.Spectrum.Fft(buf);
             for (int k = 0; k < n / 2; k++) power[k] += buf[k].Real * buf[k].Real + buf[k].Imaginary * buf[k].Imaginary;
         }
         double hzPerBin = 48000.0 / n, logSum = 0, linSum = 0; int cnt = 0;
@@ -1256,10 +1256,10 @@ if (args.Contains("--car-window"))
         }
         peaks.Sort((p, q) => q.Db.CompareTo(p.Db));
         double top = peaks.Count > 0 ? peaks[0].Db : 0;
-        var bands = OpenFPS.Common.Spectrum.BandsDb(run, 48000, 16384);
+        var bands = OpenFPS.Sound.Spectrum.BandsDb(run, 48000, 16384);
         double rot = rep.RunningRpm / 60;
         Console.WriteLine($"    running: {20 * Math.Log10(rmsPa / 2e-5):F1} dB SPL RMS at 1 m; rotor {rot:F0} Hz, bars {rot * 10:F0} Hz; flatness {flatness:F3}");
-        Console.WriteLine("    bands (dB re total): " + string.Join("  ", Enumerable.Range(0, bands.Length).Select(i => $"{OpenFPS.Common.Spectrum.BandEdges[i]:F0}:{bands[i]:F0}")));
+        Console.WriteLine("    bands (dB re total): " + string.Join("  ", Enumerable.Range(0, bands.Length).Select(i => $"{OpenFPS.Sound.Spectrum.BandEdges[i]:F0}:{bands[i]:F0}")));
         Console.WriteLine("    lines (Hz, dB re strongest): " + string.Join("  ", peaks.Take(10).Select(p => $"{p.Hz:F0} {p.Db - top:F0}")));
         // The level through the stroke, 100 ms at a time, dB SPL RMS at 1 m: the start, the run, the end.
         var env = new List<string>();
@@ -1340,7 +1340,7 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
 {
     Console.WriteLine("--- V8 sports car with Flowmaster 40s, synthesized from its mechanism ---");
     bool muscle = args.Contains("--muscle-rev") || args.Contains("--muscle-rev-live");
-    string? preset = args.FirstOrDefault(a => !a.StartsWith("--") && OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a));
+    string? preset = args.FirstOrDefault(a => !a.StartsWith("--") && OpenFPS.Sound.VehicleProfile.Presets.ContainsKey(a));
     bool stationary = muscle || args.Contains("--vehicle-rev") || args.Contains("--vehicle-rev-live");
     int code = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.Run(
         args.Contains("--vehicle-live") || args.Contains("--vehicle-rev-live")

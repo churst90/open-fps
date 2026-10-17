@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// The statistics a listener recognises a sound texture by, after McDermott and Simoncelli (2011,

@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// What hardware a door has, which decides how it is opened, how it moves and what it sounds like.

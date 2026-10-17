@@ -6,6 +6,7 @@ using Arch.Core;
 using Serilog;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Repositories;
 
@@ -218,11 +219,11 @@ public class PrefabRepository : PrefabLibrary
 
         if (isDoor)
         {
-            OpenFPS.Common.DoorEvents.TryParseKind(t.DoorKind, out var kind);
+            OpenFPS.Sound.DoorEvents.TryParseKind(t.DoorKind, out var kind);
             components.Add(new DoorComponent
             {
                 Kind = (int)kind,
-                Slides = t.Slides ?? OpenFPS.Common.DoorEvents.SlidesByDefault(kind),
+                Slides = t.Slides ?? OpenFPS.Sound.DoorEvents.SlidesByDefault(kind),
                 Powered = t.Powered ?? false,
                 SensorMetres = MathF.Max(0f, t.SensorMetres ?? 0f),
                 CloseAfterSeconds = MathF.Max(0f, t.CloseAfterSeconds ?? 0f),

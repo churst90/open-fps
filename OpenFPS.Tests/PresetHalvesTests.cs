@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using OpenFPS.Common;
 using OpenFPS.Common.Editing;
 using Xunit.Abstractions;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

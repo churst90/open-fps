@@ -1,8 +1,8 @@
 using System.Numerics;
 using Thread = System.Threading.Thread;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Geometry;
@@ -25,7 +25,7 @@ public static class RoomWalkSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const int RoomId = 310;
     private const int MegaphoneId = 320;
@@ -221,8 +221,8 @@ public static class RoomWalkSpike
                         ApparentPosition = eye with { Y = 0.1f },
                         FollowsListener = true,
                         ListenerOffset = new Vector3(0f, 0.1f - 1.6f, 0f),
-                        Volume = LabHearing.Place(OpenFPS.Common.Loudness.FootstepDb).Gain, Range = 15f,
-                        MinDistance = LabHearing.Place(OpenFPS.Common.Loudness.FootstepDb).ReferenceDistance, Pitch = 1f,
+                        Volume = LabHearing.Place(OpenFPS.Sound.Loudness.FootstepDb).Gain, Range = 15f,
+                        MinDistance = LabHearing.Place(OpenFPS.Sound.Loudness.FootstepDb).ReferenceDistance, Pitch = 1f,
                         ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
                         EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                         IsEvent = true, Essential = true,

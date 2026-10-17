@@ -1,6 +1,5 @@
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// Renders a <see cref="TransientSound"/>: four physical characters and a handful of numbers, no case

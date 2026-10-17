@@ -1,4 +1,4 @@
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
 

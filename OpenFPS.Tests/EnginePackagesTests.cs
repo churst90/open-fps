@@ -193,7 +193,7 @@ public class EnginePackagesTests
         new object[] { "Physics", typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetName().Name! },
         new object[] { "Materials", typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name! },
         new object[] { "Acoustics", typeof(OpenFPS.Acoustics.AcousticConstants).Assembly.GetName().Name! },
-        new object[] { "Sound", typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name! },
+        new object[] { "Sound", typeof(OpenFPS.Sound.Loudness).Assembly.GetName().Name! },
         new object[] { "Accessibility", typeof(OpenFPS.Client.Core.Platform.GameKey).Assembly.GetName().Name! },
         new object[] { "Models", typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name! },
         new object[] { "World", typeof(OpenFPS.Server.OneWorld.WorldStore).Assembly.GetName().Name! },

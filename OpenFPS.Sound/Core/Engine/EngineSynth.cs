@@ -1,9 +1,8 @@
 using System.Numerics;
-using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// An internal combustion engine, integrated sample by sample: every cylinder is a volume of gas

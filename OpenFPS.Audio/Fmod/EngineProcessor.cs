@@ -2,9 +2,10 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Engine;
-using OpenFPS.Client.AudioEngine.Core.Pneumatics;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Engine;
+using OpenFPS.Sound.Core.Pneumatics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Acoustics;
 
@@ -82,7 +83,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     public volatile float RoadWaterMm;
     /// <summary>The water on the road: the tyres' hiss, the spray in the arches, the bow and the splash
     /// (WetTyres). Per wheel, from each wheel's own water.</summary>
-    private readonly OpenFPS.Client.AudioEngine.Core.WetTyres _wet;
+    private readonly OpenFPS.Sound.Core.WetTyres _wet;
     private readonly float[] _wetWater, _wetTexture, _wheelWetSqueal;
     /// <summary>Whether the engine should be running. Game thread writes.</summary>
     public volatile bool Running = true;
@@ -94,15 +95,15 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
     /// <summary>The air its world is in: the speed of sound its pipes radiate at and the temperature its cooling
     /// runs against. Its world's, which the mixer gives it as it makes it; one of its own until then.</summary>
-    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; set; } = new();
+    public OpenFPS.Sound.Core.Atmosphere Atmosphere { get; set; } = new();
 
     /// <summary>The hearing of its world, whose law the idle lift follows (the compression, the ear model):
     /// its world's, which the mixer gives it as it makes it. One of its own, the shipped hearing, until then.</summary>
-    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; set; } = new();
+    public OpenFPS.Sound.Hearing.HearingSettings Hearing { get; set; } = new();
 
     /// <summary>The live levers of its mixer (MixSettings.ValveJetNoise), which its engine reads: the mixer gives
     /// it its own as it makes it; the shipped mix until then.</summary>
-    public OpenFPS.Client.AudioEngine.Core.MixSettings Mix
+    public OpenFPS.Sound.Core.MixSettings Mix
     {
         get => Engine.Mix;
         set => Engine.Mix = value;
@@ -474,7 +475,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         Vehicle = v;
         PascalsAtFullScale = v.PascalsAtFullScale;
         SampleRate = sampleRate;
-        _chirpDecay = OpenFPS.Client.AudioEngine.Core.At44k.Decay(0.99985f, sampleRate);
+        _chirpDecay = OpenFPS.Sound.Core.At44k.Decay(0.99985f, sampleRate);
         Engine = new EngineSynth(v.Engine, sampleRate, seed);
         Driveline = new Driveline(v);
         Driver = new VirtualDriver(Driveline, Engine);
@@ -532,11 +533,11 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _bayLeak = Math.Clamp(v.EngineBayLeakage, 0f, 1f);
         _engineAtRear = v.EngineAtRear;
         _bayIntake = new EchoDiffuser(BayScattering, seed + 71, sampleRate);
-        _radiation = new OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation(v, sampleRate);
-        _bayRadiation = new OpenFPS.Client.AudioEngine.Core.Engine.BayRadiation(v, sampleRate);
+        _radiation = new OpenFPS.Sound.Core.Engine.ExhaustRadiation(v, sampleRate);
+        _bayRadiation = new OpenFPS.Sound.Core.Engine.BayRadiation(v, sampleRate);
         // Drums or discs, as the axle doing most of the stopping has.
         var chassis = v.Running;
-        _squeal = new OpenFPS.Client.AudioEngine.Core.BrakeSqueal(sampleRate, drums: chassis.MainBrake == OpenFPS.Common.BrakeKind.Drum, seed: seed + 97);
+        _squeal = new OpenFPS.Sound.Core.BrakeSqueal(sampleRate, drums: chassis.MainBrake == OpenFPS.Common.BrakeKind.Drum, seed: seed + 97);
         _frontWheels = chassis.Axles.Length > 0 ? chassis.Axles[0].Wheels : 1;
         _frontRadius = chassis.Axles.Length > 0 ? chassis.Axles[0].Tyre.RollingRadiusMetres : 0.337f;
         _rearRadius = chassis.Axles.Length > 0 ? chassis.Axles[^1].Tyre.RollingRadiusMetres : 0.337f;
@@ -551,8 +552,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _wetWater = new float[nw]; _wetTexture = new float[nw]; _wheelWetSqueal = new float[nw];
         var wheelAxle = new int[nw];
         for (int i = 0; i < nw; i++) { wheelAxle[i] = body.Wheels[i].Axle; _wheelWetSqueal[i] = 1f; _wheelGain[i] = 1f; }
-        _wet = new OpenFPS.Client.AudioEngine.Core.WetTyres(v, body.Wheels.Select(w => w.Front).ToArray(), wheelAxle, sampleRate, seed + 131);
-        _strikes = new OpenFPS.Client.AudioEngine.Core.WheelStrikes(body.Wheels.Select(w => w.Radius).ToArray(), sampleRate);
+        _wet = new OpenFPS.Sound.Core.WetTyres(v, body.Wheels.Select(w => w.Front).ToArray(), wheelAxle, sampleRate, seed + 131);
+        _strikes = new OpenFPS.Sound.Core.WheelStrikes(body.Wheels.Select(w => w.Radius).ToArray(), sampleRate);
         _strikeNow = new float[nw];
         float cogZ = chassis.CentreOfGravityZ;
         for (int i = 0; i < nw; i++)
@@ -564,22 +565,22 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _squealSlipVelocity = SquealReferenceSpeed * MathF.Tan(MathF.Max(0.01f, body.SteeredPeakSlip()));
         if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
         {
-            _chime = OpenFPS.Common.DoorChimeSpec.TransitBus;
+            _chime = OpenFPS.Sound.DoorChimeSpec.TransitBus;
             _chimeAmp = 20e-6f * MathF.Pow(10f, _chime.ReferenceDb / 20f);
         }
         if (v.CoolingFan is { } fan)
         {
             // It blows forward through the radiator and out of the grille: the vehicle's axis, and
             // the front tap.
-            _fan = new OpenFPS.Client.AudioEngine.Core.Aircraft.BladeRow(fan, sampleRate, Vector3.UnitZ, seed + 53);
+            _fan = new OpenFPS.Sound.Core.Aircraft.BladeRow(fan, sampleRate, Vector3.UnitZ, seed + 53);
             _fanRatio = v.FanDriveRatio > 0f ? v.FanDriveRatio : 1f;
             _fanMaxRpm = fan.RpmMax;
             if (v.FanClutch is { } clutch)
-                _cooling = new OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem(clutch, v.Engine, seed);
+                _cooling = new OpenFPS.Sound.Core.Engine.CoolingSystem(clutch, v.Engine, seed);
             else if (v.ElectricFan is { } relay)
             {
                 // A car's fan is on a motor: its speed is the relay's, never the crank's.
-                _cooling = new OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem(relay, v.Engine, seed);
+                _cooling = new OpenFPS.Sound.Core.Engine.CoolingSystem(relay, v.Engine, seed);
                 _electricFan = true;
             }
         }
@@ -679,9 +680,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     public float FanMix = 1f;
 
     /// <summary>The coolant and the fan clutch, on a vehicle whose fan has one.</summary>
-    private readonly OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem? _cooling;
+    private readonly OpenFPS.Sound.Core.Engine.CoolingSystem? _cooling;
     /// <summary>For instruments: the cooling system, or null.</summary>
-    public OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem? Cooling => _cooling;
+    public OpenFPS.Sound.Core.Engine.CoolingSystem? Cooling => _cooling;
     private readonly float _rollingFrontPa, _rollingRearPa;
     /// <summary>How many wheels the front axle has, and each end's rolling radius (its tread tone).</summary>
     private readonly int _frontWheels;
@@ -890,7 +891,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private float _levelGain = 1f;
     private const float LevelSeconds = 0.5f;
     /// <summary>The unweighted lift's cap, which only the ear model switched off still uses (see
-    /// <see cref="LiftDb(OpenFPS.Common.Hearing.HearingSettings, float, float)"/>). With the model on there is no cap:
+    /// <see cref="LiftDb(OpenFPS.Sound.Hearing.HearingSettings, float, float)"/>). With the model on there is no cap:
     /// see the form with a timbre.</summary>
     private const float UnweightedMaxLiftDb = 20f;
 
@@ -898,7 +899,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// The unweighted law applied to the deficit, held to 0..20 dB: what runs with the ear model off
     /// (/ear off, OPENFPS_EAR_MODEL=0).
     /// </summary>
-    internal static float LiftDb(OpenFPS.Common.Hearing.HearingSettings hearing, float runningDb, float declaredDb)
+    internal static float LiftDb(OpenFPS.Sound.Hearing.HearingSettings hearing, float runningDb, float declaredDb)
     {
         float running = MathF.Min(runningDb, declaredDb);
         float lift = hearing.PlacedDb(running) - hearing.PlacedDb(declaredDb) - (running - declaredDb);
@@ -913,10 +914,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// barely hears. No cap (the 20 dB bounded only the unweighted law). Below the threshold of hearing
     /// it returns NaN and the caller holds the lift where it was.
     /// </summary>
-    internal static float LiftDb(OpenFPS.Common.Hearing.HearingSettings hearing, float runningDb, OpenFPS.Common.Hearing.Timbre? running, float declaredDb)
+    internal static float LiftDb(OpenFPS.Sound.Hearing.HearingSettings hearing, float runningDb, OpenFPS.Sound.Hearing.Timbre? running, float declaredDb)
     {
         if (!hearing.EarModelOn) return LiftDb(hearing, runningDb, declaredDb);
-        var timbre = running ?? OpenFPS.Common.Hearing.Timbre.Speech;
+        var timbre = running ?? OpenFPS.Sound.Hearing.Timbre.Speech;
         if (timbre.Sones(runningDb) <= 0f) return float.NaN;
         return hearing.PlacedDb(runningDb, timbre) - hearing.PlacedDb(declaredDb) - (runningDb - declaredDb);
     }
@@ -926,15 +927,15 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     // Measured from `engineOnly` (the machine radiating, without the air brakes and the beeper and
     // without the listener's angle to the pipe), on this voice's render thread: the shape of the
     // spectrum, smoothed over about a second, analysed every quarter second.
-    private OpenFPS.Common.Hearing.LiveBands? _bands;
+    private OpenFPS.Sound.Hearing.LiveBands? _bands;
     private readonly float[] _bandScratch = new float[1024];
     private int _bandFill;
-    private OpenFPS.Common.Hearing.Timbre? _timbre, _liftTimbre;
+    private OpenFPS.Sound.Hearing.Timbre? _timbre, _liftTimbre;
     private float _liftDb, _liftAtDb, _liftCompression;
     private bool _liftKnown, _liftEar;
 
     /// <summary>The spectrum the engine is making now (null until it has sounded).</summary>
-    public OpenFPS.Common.Hearing.Timbre? RunningTimbre => Volatile.Read(ref _timbre);
+    public OpenFPS.Sound.Hearing.Timbre? RunningTimbre => Volatile.Read(ref _timbre);
 
     /// <summary>The level the machine is running at, dB SPL at a metre, smoothed over half a second.</summary>
     public float RunningLevelDb => _levelMs > 0 ? 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f) : 0f;
@@ -942,7 +943,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private void FlushBands()
     {
         if (_bandFill == 0) return;
-        _bands ??= new OpenFPS.Common.Hearing.LiveBands((int)SampleRate);
+        _bands ??= new OpenFPS.Sound.Hearing.LiveBands((int)SampleRate);
         _bands.Write(new ReadOnlySpan<float>(_bandScratch, 0, _bandFill));
         _bandFill = 0;
     }
@@ -979,13 +980,13 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
     private readonly AirSystem? _air;
     // The door beeper: a piezo behind a grille over the doorway, sounding while the doors are open.
-    private readonly OpenFPS.Common.DoorChimeSpec? _chime;
+    private readonly OpenFPS.Sound.DoorChimeSpec? _chime;
     private readonly float _chimeAmp;
     private double _chimePhase, _chimeCycle;
     private float _chimeEnv;
     /// <summary>The cooling fan, for a vehicle whose fan is on the engine rather than on a relay.
     /// The same BladeRow a propeller and a mower blade are; see VehicleProfile.CoolingFan.</summary>
-    private readonly OpenFPS.Client.AudioEngine.Core.Aircraft.BladeRow? _fan;
+    private readonly OpenFPS.Sound.Core.Aircraft.BladeRow? _fan;
     private readonly float _fanRatio, _fanMaxRpm;
     /// <summary>The fan runs on its own motor (VehicleProfile.ElectricFan), not off the crank.</summary>
     private readonly bool _electricFan;
@@ -1004,16 +1005,16 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private readonly bool _engineAtRear;
     /// <summary>Which way the tailpipe throws its sound and what the body does to it, for where the
     /// listener is. See ExhaustRadiation.</summary>
-    private readonly OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation _radiation;
+    private readonly OpenFPS.Sound.Core.Engine.ExhaustRadiation _radiation;
     /// <summary>Where the bay's noise leaves the vehicle, grille and open floor, and what the body does
     /// to it on the way to the listener. See BayRadiation.</summary>
-    private readonly OpenFPS.Client.AudioEngine.Core.Engine.BayRadiation _bayRadiation;
+    private readonly OpenFPS.Sound.Core.Engine.BayRadiation _bayRadiation;
     /// <summary>The front brakes singing at the end of a stop, on a vehicle whose brakes do. See
     /// BrakeSqueal.</summary>
-    private readonly OpenFPS.Client.AudioEngine.Core.BrakeSqueal _squeal;
+    private readonly OpenFPS.Sound.Core.BrakeSqueal _squeal;
     private float _squealDecel, _squealLastSpeed;
     /// <summary>Whether this vehicle's brakes squeal, and at what. For tests and instruments.</summary>
-    internal OpenFPS.Client.AudioEngine.Core.BrakeSqueal Squeal => _squeal;
+    internal OpenFPS.Sound.Core.BrakeSqueal Squeal => _squeal;
     /// <summary>The brake squeal's contribution, 0..1; writable so an instrument can take it out and
     /// read what it was.</summary>
     public float SquealMix = 1f;
@@ -1174,9 +1175,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     }
 
     /// <summary>Each wheel struck by a step in the road (a rail): see WheelStrikes. Game thread.</summary>
-    public void QueueStrikes(IReadOnlyList<OpenFPS.Client.AudioEngine.Core.WheelStrike> strikes) => _strikes.Queue(strikes);
+    public void QueueStrikes(IReadOnlyList<OpenFPS.Sound.Core.WheelStrike> strikes) => _strikes.Queue(strikes);
 
-    private readonly OpenFPS.Client.AudioEngine.Core.WheelStrikes _strikes;
+    private readonly OpenFPS.Sound.Core.WheelStrikes _strikes;
     /// <summary>This sample's strike on each wheel, pascals at a metre, for the cabin's paths.</summary>
     private readonly float[] _strikeNow;
     private bool _strikesLeftOver;
@@ -1223,7 +1224,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // running at, level and spectrum (LiftDb). Worked out only when the spectrum is re-measured
             // or the level moves: the level is a half-second average anyway.
             if (_bands != null && _bands.Update(0.25f, 1.0f))
-                Volatile.Write(ref _timbre, OpenFPS.Common.Hearing.Timbre.FromBandPowers(_bands.BandPowers, "engine", live: true));
+                Volatile.Write(ref _timbre, OpenFPS.Sound.Hearing.Timbre.FromBandPowers(_bands.BandPowers, "engine", live: true));
             bool ear = Hearing.EarModelOn;
             float compression = Hearing.Compression;
             if (!_liftKnown || MathF.Abs(nowDb - _liftAtDb) > 0.25f || !ReferenceEquals(_liftTimbre, _timbre)
@@ -1668,7 +1669,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 /// is discontinuous there (0.8 under, 0.664 over): a click twice per backfire. The ceiling is 2 dB over
 /// full scale so the peakiest pulse in the fleet (a 450 single's blowdown, 1.6 dB over at its 99.9th
 /// percentile) is rounded, not squared; a unit sample is still the declared level plus
-/// <see cref="OpenFPS.Common.VehicleProfile.PeakHeadroomDb"/>, and the floating-point mix ends in the
+/// <see cref="OpenFPS.Sound.VehicleProfile.PeakHeadroomDb"/>, and the floating-point mix ends in the
 /// master limiter.
 /// </summary>
 public static class SoftCeiling
@@ -1813,8 +1814,8 @@ public sealed class EngineEchoState : IGuardedUnit
     private void Glides()
     {
         if (_k.Rate == SampleRate) return;
-        _k = (SampleRate, OpenFPS.Client.AudioEngine.Core.At44k.Step(0.0015f, SampleRate),
-              OpenFPS.Client.AudioEngine.Core.At44k.Step(0.002, SampleRate), OpenFPS.Client.AudioEngine.Core.At44k.Step(1e-5, SampleRate));
+        _k = (SampleRate, OpenFPS.Sound.Core.At44k.Step(0.0015f, SampleRate),
+              OpenFPS.Sound.Core.At44k.Step(0.002, SampleRate), OpenFPS.Sound.Core.At44k.Step(1e-5, SampleRate));
     }
 
     public void Render(Span<float> mono)

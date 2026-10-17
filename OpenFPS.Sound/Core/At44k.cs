@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// Per-sample coefficients chosen at 44.1 kHz, carried to a voice's own rate so each keeps its time

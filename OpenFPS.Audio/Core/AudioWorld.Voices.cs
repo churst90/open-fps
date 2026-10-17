@@ -98,7 +98,7 @@ public partial class AudioWorld
             // Inside, the voice has already rendered what gets through the body: a path would count the
             // panels twice, and its room is yours (the cabin), whatever room the car's middle is in.
             e.ApparentPosition = at;
-            e.EffectiveDistance = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.PlacedMetres;
+            e.EffectiveDistance = OpenFPS.Sound.Core.Engine.CabinPaths.PlacedMetres;
             e.Occlusion = 0f;
             e.EqLow = 1f; e.EqMid = 1f; e.EqHigh = 1f;
             e.AirLowDb = 0f; e.AirMidDb = 0f; e.AirHighDb = 0f;
@@ -145,7 +145,7 @@ public partial class AudioWorld
         };
     }
 
-    private OpenFPS.Common.WoodChorus? _woodsOf;
+    private OpenFPS.Sound.WoodChorus? _woodsOf;
     private readonly HashSet<int> _woodIds = new();
 
     /// <summary>Whether an entity is one of the woods the world made of its far trees (WoodChorus), by the

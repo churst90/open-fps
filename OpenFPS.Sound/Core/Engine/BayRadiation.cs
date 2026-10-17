@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// Where the engine bay's noise comes out, and what the vehicle's own body does to it on the way to a

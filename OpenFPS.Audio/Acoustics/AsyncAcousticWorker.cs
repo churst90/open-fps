@@ -1,7 +1,8 @@
 using System.Collections.Concurrent;
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Geometry;
@@ -110,16 +111,16 @@ public class AsyncAcousticWorker : IDisposable
     /// <param name="clock">The clock of the world it answers about (AudioEngineFacade.Clock): how long an answer
     /// is held, how long a route is reused and how often the doors' scene is made again are told on it. None:
     /// one of its own.</param>
-    internal AsyncAcousticWorker(SpatialAcoustics acoustics, TracedReverbSet? traced, OpenFPS.Common.IAudioClock? clock = null)
+    internal AsyncAcousticWorker(SpatialAcoustics acoustics, TracedReverbSet? traced, OpenFPS.Sound.IAudioClock? clock = null)
     {
         _acoustics = acoustics;
-        _clock = clock ?? new OpenFPS.Common.StopwatchAudioClock();
+        _clock = clock ?? new OpenFPS.Sound.StopwatchAudioClock();
         Traced = traced ?? new TracedReverbSet { Clock = _clock, Atmosphere = acoustics.Atmosphere };
     }
 
     /// <summary>The world's clock. What only waits on real work (a retired scene's five seconds, a build's
     /// duration) reads RealTime instead.</summary>
-    private readonly OpenFPS.Common.IAudioClock _clock;
+    private readonly OpenFPS.Sound.IAudioClock _clock;
 
     /// <summary>The traced places on this worker's Steam Audio context. Released with the worker.</summary>
     internal TracedReverbSet Traced { get; }
@@ -164,12 +165,12 @@ public class AsyncAcousticWorker : IDisposable
 
     /// <summary>The lab's levers on this worker (where a path came from, the routes kept, the tile scenes held):
     /// its world's (AudioEngineFacade.Lab), or the game's.</summary>
-    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab
+    public OpenFPS.Sound.Core.LabLevers Lab
     {
         get => _lab;
         set { _lab = value; _routeCache.Lab = value; }
     }
-    private OpenFPS.Client.AudioEngine.Core.LabLevers _lab = new();
+    private OpenFPS.Sound.Core.LabLevers _lab = new();
     /// <summary>What produced each source's last direct answer, when <see cref="TraceProvenance"/> is on.</summary>
     public readonly ConcurrentDictionary<int, string> Provenance = new();
 
@@ -229,7 +230,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         lock (_recentLock)
         {
-            _recent[_recentNext] = (req.ListenerPos, req.SourcePos, OpenFPS.Common.AudioClockStamps.StampMs(_clock), path);
+            _recent[_recentNext] = (req.ListenerPos, req.SourcePos, OpenFPS.Sound.AudioClockStamps.StampMs(_clock), path);
             _recentNext = (_recentNext + 1) % RecentCapacity;
         }
     }
@@ -243,7 +244,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         path = default;
         if (!_saEnabled) return false;
-        long now = OpenFPS.Common.AudioClockStamps.StampMs(_clock);
+        long now = OpenFPS.Sound.AudioClockStamps.StampMs(_clock);
         float tolerance = MathF.Max(1f, 0.1f * Vector3.Distance(listener, source));
         float best = float.MaxValue;
         bool found = false;
@@ -356,7 +357,7 @@ public class AsyncAcousticWorker : IDisposable
                     {
                         var built = BuildSimPath(world, req, r);
                         Store(req, built, PathProvenance.Simulated);
-                        _lastSimPath[req.EntityId] = (built, OpenFPS.Common.AudioClockStamps.StampMs(_clock));
+                        _lastSimPath[req.EntityId] = (built, OpenFPS.Sound.AudioClockStamps.StampMs(_clock));
                     }
                     else if (sim != null && _lastSimPath.ContainsKey(req.EntityId))
                     {
@@ -366,7 +367,7 @@ public class AsyncAcousticWorker : IDisposable
                         // over (2026-10-03, --pop-hunt extra=40).
                         _carried.Add(req);
                         if (_lastSimPath.TryGetValue(req.EntityId, out var held)
-                            && OpenFPS.Common.AudioClockStamps.StampMs(_clock) - held.At < HeldSimPathMs)
+                            && OpenFPS.Sound.AudioClockStamps.StampMs(_clock) - held.At < HeldSimPathMs)
                         {
                             // Moved with the source: a bus at 15 m/s held for a second would be heard 15 m
                             // behind itself.
@@ -396,7 +397,7 @@ public class AsyncAcousticWorker : IDisposable
                 // Transient sounds get a new id each time: drop the held answers nobody can use.
                 if (_lastSimPath.Count > 512)
                 {
-                    long stale = OpenFPS.Common.AudioClockStamps.StampMs(_clock) - HeldSimPathMs;
+                    long stale = OpenFPS.Sound.AudioClockStamps.StampMs(_clock) - HeldSimPathMs;
                     foreach (var id in _lastSimPath.Where(e => e.Value.At < stale).Select(e => e.Key).ToList())
                         _lastSimPath.Remove(id);
                 }
@@ -472,7 +473,7 @@ public class AsyncAcousticWorker : IDisposable
             return;
         }
 
-        long now = OpenFPS.Common.AudioClockStamps.StampMs(_clock);
+        long now = OpenFPS.Sound.AudioClockStamps.StampMs(_clock);
         if (_simDegradedLogged && now - _lastDegradeLogTicks < DegradeLogIntervalMs) return;
 
         _simDegradedLogged = true;
@@ -501,7 +502,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         if (_saSim == null || _saSim.RunCount == 0) return;
 
-        long now = OpenFPS.Common.AudioClockStamps.StampMs(_clock);
+        long now = OpenFPS.Sound.AudioClockStamps.StampMs(_clock);
 
         if (_saSim.MaxRunMs > RayBudgetFrameMs && now - _lastRayBudgetWarnTicks >= DegradeLogIntervalMs)
         {
@@ -525,7 +526,7 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>Why a whole tick produced nothing: logged on a change of cause, then once per interval.</summary>
     private void ReportSimTickFailure(string reason)
     {
-        long now = OpenFPS.Common.AudioClockStamps.StampMs(_clock);
+        long now = OpenFPS.Sound.AudioClockStamps.StampMs(_clock);
         if (reason == _lastSimTickFailure && now - _lastSimTickFailureTicks < DegradeLogIntervalMs) return;
         _lastSimTickFailure = reason;
         _lastSimTickFailureTicks = now;
@@ -582,7 +583,7 @@ public class AsyncAcousticWorker : IDisposable
             if (_saSim.CommitPendingProbes())
                 Console.WriteLine("[AcousticWorker] Pathing probes are live; occluded sources can now be localized to the opening they arrive through.");
 
-            long now = OpenFPS.Common.AudioClockStamps.StampMs(_clock);
+            long now = OpenFPS.Sound.AudioClockStamps.StampMs(_clock);
             Vector3 listener = default;
             bool haveListener = false;
             int blocked = 0, viaEdge = 0, viaProbe = 0, reflections = 0;
@@ -932,7 +933,7 @@ public class AsyncAcousticWorker : IDisposable
 
     private OpeningRoutes.Answer? AskRoutes(OpeningRoutes routes, IAcousticWorld world, int id, Vector3 source, Vector3 listener, int listenerRegion)
     {
-        long now = OpenFPS.Common.AudioClockStamps.StampMs(_clock);
+        long now = OpenFPS.Sound.AudioClockStamps.StampMs(_clock);
         if (_routeCache.TryGet(id, routes, out var held))
         {
             bool still = now - held.At < RouteReuseMs
@@ -1138,7 +1139,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         if (_doorBuild != null || _retiredTileSets.Count == 0) return;
         if (Traced.Reconfiguring) return;
-        long cutoff = OpenFPS.Common.RealTime.Ticks - 5 * TimeSpan.TicksPerSecond;
+        long cutoff = OpenFPS.Sound.RealTime.Ticks - 5 * TimeSpan.TicksPerSecond;
         for (int i = _retiredTileSets.Count - 1; i >= 0; i--)
             if (_retiredTileSets[i].At < cutoff) { _retiredTileSets[i].Set.Dispose(); _retiredTileSets.RemoveAt(i); }
     }
@@ -1220,7 +1221,7 @@ public class AsyncAcousticWorker : IDisposable
             full.Dispose(); listener.Dispose();        // the map changed meanwhile
             return;
         }
-        long now = OpenFPS.Common.RealTime.Ticks;
+        long now = OpenFPS.Sound.RealTime.Ticks;
         if (_saScene != null) _retiredScenes.Add((_saScene, now));
         if (_saListenerScene != null) _retiredScenes.Add((_saListenerScene, now));
         _saScene = full; _saListenerScene = listener;
@@ -1232,11 +1233,11 @@ public class AsyncAcousticWorker : IDisposable
         _lastSceneBoxes = boxes.Count;
         PublishRoutes(routes);
         SceneSwaps++;
-        SceneBuildMsTotal += (OpenFPS.Common.RealTime.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
+        SceneBuildMsTotal += (OpenFPS.Sound.RealTime.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
         if (_buildIsForTiles)
         {
             TileSceneBuilds++;
-            LastTileSceneBuildMs = (OpenFPS.Common.RealTime.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
+            LastTileSceneBuildMs = (OpenFPS.Sound.RealTime.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
             Console.WriteLine($"[AcousticWorker] Tiles changed: the scene now has {boxes.Count} boxes ({LastTileSceneBuildMs:F0} ms, off this thread"
                 + $"; scenes {_lastScenesMs:F0} ms, routes {_lastRoutesMs:F0} ms"
                 + (_tileScenes != null ? $"; {_tileScenes.LastBuilt} tile(s) built, update {_tileScenes.LastUpdateMs:F0} ms, assembled in {_tileScenes.LastAssembleMs:F1} ms)." : ")."));
@@ -1249,7 +1250,7 @@ public class AsyncAcousticWorker : IDisposable
         // Not while the tracers are still being handed the new scenes: until then they trace the old.
         if (Traced.Reconfiguring) return;
         if (_saSim is { Baking: true }) return;                 // nor while the bake reads the old one
-        long cutoff = OpenFPS.Common.RealTime.Ticks - 5 * TimeSpan.TicksPerSecond;
+        long cutoff = OpenFPS.Sound.RealTime.Ticks - 5 * TimeSpan.TicksPerSecond;
         for (int i = _retiredScenes.Count - 1; i >= 0; i--)
             if (_retiredScenes[i].At < cutoff) { _retiredScenes[i].Scene.Dispose(); _retiredScenes.RemoveAt(i); }
     }
@@ -1271,12 +1272,12 @@ public class AsyncAcousticWorker : IDisposable
             bool tiles = world.GeometryVersion != _builtGeometryVersion;
             if (!tiles)
             {
-                if ((OpenFPS.Common.AudioClockStamps.StampTicks(_clock) - _lastDoorRebuildTicks) < DoorRebuildSeconds * TimeSpan.TicksPerSecond) return;
+                if ((OpenFPS.Sound.AudioClockStamps.StampTicks(_clock) - _lastDoorRebuildTicks) < DoorRebuildSeconds * TimeSpan.TicksPerSecond) return;
                 if (!NearDoorMoved(world)) return;
             }
             _builtGeometryVersion = world.GeometryVersion;
-            _lastDoorRebuildTicks = OpenFPS.Common.AudioClockStamps.StampTicks(_clock);
-            _buildStartedTicks = OpenFPS.Common.RealTime.Ticks;
+            _lastDoorRebuildTicks = OpenFPS.Sound.AudioClockStamps.StampTicks(_clock);
+            _buildStartedTicks = OpenFPS.Sound.RealTime.Ticks;
             _buildIsForTiles = tiles;
             RecordDoorPoses(world);
             var doorBoxes = SteamAudioScene.BoxesFromWorld(world);
@@ -1287,9 +1288,9 @@ public class AsyncAcousticWorker : IDisposable
             // them is most of a tile's cost.
             var portals = world.Rooms?.Portals;
             bool routesDue = !tiles || _routes == null || !ReferenceEquals(portals, _routesPortals)
-                             || OpenFPS.Common.AudioClockStamps.StampTicks(_clock) - _routesBuiltTicks > RoutesEverySeconds * TimeSpan.TicksPerSecond;
+                             || OpenFPS.Sound.AudioClockStamps.StampTicks(_clock) - _routesBuiltTicks > RoutesEverySeconds * TimeSpan.TicksPerSecond;
             var keptRoutes = _routes;
-            if (routesDue) { _routesPortals = portals; _routesBuiltTicks = OpenFPS.Common.AudioClockStamps.StampTicks(_clock); }
+            if (routesDue) { _routesPortals = portals; _routesBuiltTicks = OpenFPS.Sound.AudioClockStamps.StampTicks(_clock); }
             var store = _acousticStore;
             var routeCache = _routeTiles;
             Func<(SteamAudioScene, SteamAudioScene, List<SteamAudioScene.Box>, AcousticMap?, OpeningRoutes, OpenFPS.Geometry.TriangleWorld?)> build = () =>
@@ -1310,7 +1311,7 @@ public class AsyncAcousticWorker : IDisposable
             return;
         }
         _builtGeometryVersion = world.GeometryVersion;
-        _lastDoorRebuildTicks = OpenFPS.Common.AudioClockStamps.StampTicks(_clock);
+        _lastDoorRebuildTicks = OpenFPS.Sound.AudioClockStamps.StampTicks(_clock);
         RecordDoorPoses(world);
         var built = System.Diagnostics.Stopwatch.StartNew();
 
@@ -1322,7 +1323,7 @@ public class AsyncAcousticWorker : IDisposable
         // the bake may still run on them, and freeing a native scene under a running trace is a crash.
         if (_saScene.IsBuilt)
         {
-            long now = OpenFPS.Common.RealTime.Ticks;
+            long now = OpenFPS.Sound.RealTime.Ticks;
             _retiredScenes.Add((_saScene, now));
             _saScene = new SteamAudioScene(_saContext);
             if (_saListenerScene != null) { _retiredScenes.Add((_saListenerScene, now)); _saListenerScene = null; }
@@ -1332,7 +1333,7 @@ public class AsyncAcousticWorker : IDisposable
                 Console.WriteLine($"[SABOX] center=({b.Center.X:F1},{b.Center.Y:F1},{b.Center.Z:F1}) size=({b.Size.X:F1},{b.Size.Y:F1},{b.Size.Z:F1}) mat={b.Material}");
         if (_embree)
         {
-            if (_tileScenes != null) _retiredTileSets.Add((_tileScenes, OpenFPS.Common.RealTime.Ticks));
+            if (_tileScenes != null) _retiredTileSets.Add((_tileScenes, OpenFPS.Sound.RealTime.Ticks));
             // On unless OPENFPS_TILE_SCENES=0. Off for a day (2026-10-06): the second pair of scenes, handed
             // over at the first door swing, traced as empty and every wall stopped occluding (Cody: traffic
             // heard inside Selby House). TileSceneSet's remarks say why; they now answer as the whole-scene

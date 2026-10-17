@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using OpenFPS.Common.Editing;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 // Things built to be heard: air horns, steam whistles and struck bells. As in Engines.cs, a part has
 // dimensions, never a note: a horn sounds c/2L, a steam whistle (closed at the top) c/4L and its odd

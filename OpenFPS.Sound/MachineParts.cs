@@ -1,6 +1,7 @@
 using System.Numerics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The kinds of part a machine can be assembled from. Strings, not a type hierarchy, so a map author

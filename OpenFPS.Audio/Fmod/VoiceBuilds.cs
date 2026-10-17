@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -32,8 +33,8 @@ public sealed class VoiceBuilds
 
     /// <summary>The model a voice of this kind starts with, made now on the calling thread.</summary>
     internal static PhysicalVoiceState? Make(ModelSynth kind, string physicalKey, int seed, float lever, float rate, IAudioClock clock,
-                                             OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere = null,
-                                             OpenFPS.Client.AudioEngine.Core.MixSettings? mix = null)
+                                             OpenFPS.Sound.Core.Atmosphere? atmosphere = null,
+                                             OpenFPS.Sound.Core.MixSettings? mix = null)
     {
         var made = MakeAlone(kind, physicalKey, seed, lever, rate, clock, atmosphere);
         if (mix != null)
@@ -45,14 +46,14 @@ public sealed class VoiceBuilds
     }
 
     private static PhysicalVoiceState? MakeAlone(ModelSynth kind, string physicalKey, int seed, float lever, float rate, IAudioClock clock,
-                                                 OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere)
+                                                 OpenFPS.Sound.Core.Atmosphere? atmosphere)
     {
         string preset = ModelKindTable.KindOf(physicalKey) is { } k ? k.Rest(physicalKey) : physicalKey;
         return kind switch
         {
             ModelSynth.Machine => new MachineVoiceState(ModelLibrary.Presets.SmallMachine(preset), rate, seed, seed * 31 + 7)
             {
-                Clock = clock, Atmosphere = atmosphere ?? new OpenFPS.Client.AudioEngine.Core.Atmosphere(),
+                Clock = clock, Atmosphere = atmosphere ?? new OpenFPS.Sound.Core.Atmosphere(),
             },
             ModelSynth.Aircraft => new AircraftVoiceState(AircraftProfile.ByName(preset), rate, seed * 17 + 3, lever: lever),
             // Its own voice: 35 dB over the car's exhaust, the two cannot share one full-scale
@@ -77,8 +78,8 @@ public sealed class VoiceBuilds
     }
 
     private readonly IAudioClock _clock;
-    private readonly OpenFPS.Client.AudioEngine.Core.Atmosphere? _atmosphere;
-    private readonly OpenFPS.Client.AudioEngine.Core.MixSettings? _mix;
+    private readonly OpenFPS.Sound.Core.Atmosphere? _atmosphere;
+    private readonly OpenFPS.Sound.Core.MixSettings? _mix;
     private readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions? _options;
     /// <summary>Models being made for a voice, by voice.</summary>
     private readonly ConcurrentDictionary<int, Build> _forVoice = new();
@@ -95,8 +96,8 @@ public sealed class VoiceBuilds
     /// <param name="atmosphere">The world's air, which a machine's thermostat reads; null gives each its own.</param>
     /// <param name="mix">The mixer's live levers, which the engines it makes read; null gives each its own.</param>
     /// <param name="options">The world's options (whether an engine's cabin is split into paths); null: the shipped.</param>
-    public VoiceBuilds(IAudioClock clock, OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere = null,
-                       OpenFPS.Client.AudioEngine.Core.MixSettings? mix = null,
+    public VoiceBuilds(IAudioClock clock, OpenFPS.Sound.Core.Atmosphere? atmosphere = null,
+                       OpenFPS.Sound.Core.MixSettings? mix = null,
                        OpenFPS.Client.AudioEngine.Core.AudioWorldOptions? options = null)
     {
         _clock = clock;

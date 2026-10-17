@@ -7,7 +7,8 @@ using System.Numerics;
 using System.Text;
 using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
@@ -33,7 +34,7 @@ public static class LoudspeakerSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const string PaProgram = "ANNOUNCE/st_louis_welcome";
     private const string MegaphoneProgram = "BEACONS/megaphone";
@@ -111,7 +112,7 @@ public static class LoudspeakerSpike
         foreach (var (program, minDistance) in new[] { (PaProgram, 12f), (MegaphoneProgram, 3f) })
         {
             if (!ReadWav(LabPaths.Sounds(program + ".wav"), out var mono, out int srcRate)) continue;
-            float gated = OpenFPS.Common.Hearing.Timbre.GatedRms(mono, srcRate);
+            float gated = OpenFPS.Sound.Hearing.Timbre.GatedRms(mono, srcRate);
             float fullScale = LabHearing.RenderCeilingDb + 20f * MathF.Log10(minDistance);
             Console.WriteLine($"\nbefore: {program} at gain 1, reference {minDistance} m: full scale stood for {fullScale:F1} dB at 1 m, "
                             + $"its speech ({gated:F1} dBFS gated) for {fullScale + gated:F1} dB SPL at 1 m");

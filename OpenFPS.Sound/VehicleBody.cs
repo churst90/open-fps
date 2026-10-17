@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using OpenFPS.Common.Editing;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>One resonance of a body: its note, how long it rings, and how strongly it is driven.</summary>
 public readonly record struct BodyMode(float Hz, float DecaySeconds, float Weight);

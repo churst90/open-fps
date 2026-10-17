@@ -127,10 +127,10 @@ public class PrefabSpecTests
         var t = Valid();
         t.Material = "LaminatedGlass";
         Rejects(t, "Glazing is not set");
-        t.Glazing = OpenFPS.Common.GlassType.Laminated;
+        t.Glazing = OpenFPS.Sound.GlassType.Laminated;
         Assert.True(PrefabValidator.Validate(t).IsValid);
         var brick = Valid();
-        brick.Glazing = OpenFPS.Common.GlassType.Annealed;
+        brick.Glazing = OpenFPS.Sound.GlassType.Annealed;
         Rejects(brick, "is not glass");
     }
 

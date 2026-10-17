@@ -1,6 +1,6 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core.Stove;
-using OpenFPS.Common;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Stove;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -25,7 +25,7 @@ public sealed class StoveVoiceState : PhysicalVoiceState
     /// time. None for one of its own (an offline render), which reads the shared world time.</param>
     /// <param name="lab">The mixer's lab levers (LabLevers.StoveCreated); null is the game.</param>
     public StoveVoiceState(GasHobSpec spec, string key, float sampleRate, int seed, IAudioClock? clock = null,
-                           OpenFPS.Client.AudioEngine.Core.LabLevers? lab = null)
+                           OpenFPS.Sound.Core.LabLevers? lab = null)
         : base(spec.SourceLevelDb, sampleRate, spec.PeakHeadroomDb)
     {
         Hob = new GasHobSynth(spec, sampleRate, seed);

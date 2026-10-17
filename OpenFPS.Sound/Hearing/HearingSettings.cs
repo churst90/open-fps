@@ -1,6 +1,6 @@
 using System.Threading;
 
-namespace OpenFPS.Common.Hearing;
+namespace OpenFPS.Sound.Hearing;
 
 /// <summary>
 /// How one audio world is heard: the loudness law's compression (`/levels`), whether the ear model is on

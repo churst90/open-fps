@@ -3,7 +3,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// The figures a fire is fitted by (docs/FIRE.md section 8): how its heat release swings and flickers, how its
@@ -269,7 +269,7 @@ public sealed class FireSynth
 
     /// <summary>The hearing of the world it burns in, whose compression places a burst over the fire's own level:
     /// its mixer's, which sets it as it makes the voice. One of its own, the shipped hearing, when made alone.</summary>
-    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; set; } = new();
+    public OpenFPS.Sound.Hearing.HearingSettings Hearing { get; set; } = new();
 
     /// <summary>The figures it is fitted by: the fitted fire unless an instrument hands it its own.</summary>
     public FireTuning Tuning { get; }

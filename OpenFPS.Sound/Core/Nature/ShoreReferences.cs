@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// The recorded shores the wave models are held to (docs/WAVES_AND_SHORES.md section 8): the texture

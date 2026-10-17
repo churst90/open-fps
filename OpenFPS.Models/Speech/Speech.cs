@@ -18,7 +18,7 @@ public static class Speech
     // effort. These are long-term levels, the speech's own RMS.
 
     /// <summary>Talking to someone beside you: the reference voice the levels are calibrated by.</summary>
-    public const float NormalDb = Hearing.ReferenceVoice.NormalDb;
+    public const float NormalDb = Sound.Hearing.ReferenceVoice.NormalDb;
     /// <summary>Calling to someone a few metres off, or telling someone to watch it.</summary>
     public const float RaisedDb = 68.34f;
     /// <summary>Calling across a street.</summary>
@@ -27,11 +27,11 @@ public static class Speech
     public const float ShoutDb = 82.3f;
 
     /// <summary>
-    /// Where a loaded line sits on average, dBFS RMS (<see cref="Hearing.ReferenceVoice.BufferRmsDbfs"/>):
+    /// Where a loaded line sits on average, dBFS RMS (<see cref="Sound.Hearing.ReferenceVoice.BufferRmsDbfs"/>):
     /// lines are brought to <see cref="BufferLoudnessLufs"/>, which for the shipped set is this within a
     /// decibel or so.
     /// </summary>
-    public const float BufferRmsDbfs = Hearing.ReferenceVoice.BufferRmsDbfs;
+    public const float BufferRmsDbfs = Sound.Hearing.ReferenceVoice.BufferRmsDbfs;
 
     /// <summary>
     /// The loudness a line is brought to, LUFS (ITU-R BS.1770 K-weighted, ungated: a few seconds of
@@ -72,7 +72,7 @@ public static class Speech
     /// scale at one metre, and a line at <see cref="BufferRmsDbfs"/> has its full scale that far above
     /// its speech level.
     /// </summary>
-    public static float LevelDb(float effortDb) => Hearing.ReferenceVoice.LevelDb(effortDb);
+    public static float LevelDb(float effortDb) => Sound.Hearing.ReferenceVoice.LevelDb(effortDb);
 
     /// <summary>The key a world sound carries to name a recorded line: <c>voice:maria/greet_hi</c>.</summary>
     public static string Key(string voice, string line) => $"voice:{voice}/{line}";

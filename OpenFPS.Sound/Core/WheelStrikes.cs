@@ -1,10 +1,10 @@
 using System.Collections.Concurrent;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// One wheel meeting a step in the road — a rail at a level crossing: which wheel, when (seconds on
-/// <see cref="OpenFPS.Common.IAudioClock"/>), how hard (peak pascals at a metre) and how long the tyre's
+/// <see cref="OpenFPS.Sound.IAudioClock"/>), how hard (peak pascals at a metre) and how long the tyre's
 /// contact patch takes to roll onto it (seconds).
 /// </summary>
 public readonly record struct WheelStrike(int Wheel, double At, float Pascals, float ContactSeconds);

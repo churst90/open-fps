@@ -1,4 +1,6 @@
-namespace OpenFPS.Common;
+using OpenFPS.Common;
+
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// How hard a tyre is being asked to work, and what that sounds like. Rolling, the blocks slap the

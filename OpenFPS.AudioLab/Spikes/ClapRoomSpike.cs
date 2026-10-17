@@ -1,10 +1,10 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
@@ -29,7 +29,7 @@ public static class ClapRoomSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const int RoomId = 87;
 
@@ -40,7 +40,7 @@ public static class ClapRoomSpike
         int claps = int.TryParse(Arg(args, "claps"), out int c) ? c : 4;
         float probeMs = float.TryParse(Arg(args, "probe"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float pm) ? pm : 0f;
         bool fromFifty = Arg(args, "early") == "old";
-        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers
+        var lab = new OpenFPS.Sound.Core.LabLevers
         {
             RawTail = Arg(args, "tail") == "raw",
             OneChannelLate = Arg(args, "late") == "velvet",

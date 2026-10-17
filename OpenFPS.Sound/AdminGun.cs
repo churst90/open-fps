@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Numerics;
-using static OpenFPS.Common.DesignedSoundKit;
+using static OpenFPS.Sound.DesignedSoundKit;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>What the admin gun does to what it hits.</summary>
 public enum AdminGunMode

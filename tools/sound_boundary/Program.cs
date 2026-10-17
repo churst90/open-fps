@@ -102,7 +102,7 @@ foreach (var (name, dir, refs, extra) in projects)
             "namespace OpenFPS.Common; public static class WireContract { public const string Hash = \"survey\"; }", parse, "<OpenFPS.Common>/Generated.g.cs"));
     if (name == "OpenFPS.Sound")
         all.Add(CSharpSyntaxTree.ParseText(
-            "namespace OpenFPS.Common; public static class DoorModelFingerprint { public const string Hash = \"survey\"; }", parse, "<OpenFPS.Sound>/Generated.g.cs"));
+            "namespace OpenFPS.Sound; public static class DoorModelFingerprint { public const string Hash = \"survey\"; }", parse, "<OpenFPS.Sound>/Generated.g.cs"));
     // The InternalsVisibleTo items of each project file.
     string[] friends = name switch
     {

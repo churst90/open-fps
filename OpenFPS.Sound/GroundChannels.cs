@@ -1,7 +1,8 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The running water of a drainage line of the ground (docs/RUNNING_WATER.md section 13): the creek, the

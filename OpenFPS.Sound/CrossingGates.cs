@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A level crossing's gate mechanism: the arm, the motor that lifts it and the stop it lands on. By

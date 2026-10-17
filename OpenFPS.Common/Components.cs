@@ -3,6 +3,7 @@ using System.Numerics;
 using System;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Common.Components;
 
@@ -289,7 +290,7 @@ public partial struct SoundEmitterComponent
     /// <summary>
     /// How big the thing making the sound is, metres; zero is a point. Inside a source's own size the
     /// level is flat, and it falls only once the whole of it is in front of you. The gain comes down as
-    /// the reference widens (<see cref="OpenFPS.Common.Loudness.Widen(float, float, float)"/>):
+    /// the reference widens (<see cref="OpenFPS.Sound.Loudness.Widen(float, float, float)"/>):
     /// beyond the patch an extended source and a point of the same power are identical, so setting this
     /// says how big the thing is, not that it is louder.
     /// </summary>
@@ -323,7 +324,7 @@ public partial struct SoundEmitterComponent
 
     /// <summary>
     /// Where a vehicle's side windows are going, 0 shut to 1 fully down; shut by default. The glass gets
-    /// there at its motor's pace (<see cref="OpenFPS.Common.CarWindow.Glide"/>) on the server and every
+    /// there at its motor's pace (<see cref="OpenFPS.Sound.CarWindow.Glide"/>) on the server and every
     /// client from this one number, so it is sent once per press, not every tick.
     /// </summary>
     public float WindowsOpen { get; set; }
@@ -333,7 +334,7 @@ public partial struct SoundEmitterComponent
     /// empty for a recording heard as it is. With one, the client renders the program through the
     /// speaker's amplifier, driver and horn, places it by the level that comes out, and gives it the
     /// mouth's directivity per band in place of the cone and <see cref="MinDistance"/>
-    /// (OpenFPS.Common.LoudspeakerSpec).
+    /// (OpenFPS.Sound.LoudspeakerSpec).
     /// </summary>
     public string Loudspeaker { get; set; } = "";
 
@@ -589,12 +590,12 @@ public partial struct OccupantComponent
 /// <summary>
 /// A composite a person can drive, and what its driver is asking of it now. The controls are held
 /// between packets but decay with <see cref="ControlAge"/>, so a client that dies mid-corner coasts to a
-/// stop. How it moves comes from <see cref="OpenFPS.Common.VehicleProfile"/>, not from here.
+/// stop. How it moves comes from <see cref="OpenFPS.Sound.VehicleProfile"/>, not from here.
 /// </summary>
 [MemoryPackable]
 public partial struct DriveComponent
 {
-    /// <summary>Key into <see cref="OpenFPS.Common.VehicleProfile.Presets"/>.</summary>
+    /// <summary>Key into <see cref="OpenFPS.Sound.VehicleProfile.Presets"/>.</summary>
     public string Preset { get; set; }
     /// <summary>0..1.</summary>
     public float Throttle { get; set; }
@@ -680,7 +681,7 @@ public partial struct DoorComponent
     // ── What kind of door it is, and how it moves (docs/DOOR_TYPES_EVENTS.md). APPEND ONLY:
     // components serialise positionally, so new fields go at the end.
 
-    /// <summary>The hardware: a <see cref="OpenFPS.Common.DoorKind"/> as an int. 0 is a hinged door
+    /// <summary>The hardware: a <see cref="OpenFPS.Sound.DoorKind"/> as an int. 0 is a hinged door
     /// with a knob or lever, which is what every door saved before kinds existed was.</summary>
     public int Kind { get; set; }
 
@@ -767,7 +768,7 @@ public partial struct ItemComponent
     /// decision made in the moment, not a list to scroll.</summary>
     public int Hands { get; set; }
 
-    /// <summary>The weapon this is, or empty: a key into <see cref="OpenFPS.Common.WeaponRegistry"/>.</summary>
+    /// <summary>The weapon this is, or empty: a key into <see cref="OpenFPS.Sound.WeaponRegistry"/>.</summary>
     public string WeaponId { get; set; }
 
     public ItemComponent() { MassKg = 1f; Hands = 1; WeaponId = ""; }

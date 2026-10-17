@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -22,7 +22,7 @@ public interface IAudioProvider : IDisposable
     /// and the ear's heights from where the voice's own bounce found none.</summary>
     void SetListenerGround(float groundY) { }
     /// <summary>For the wind at the ears (EarWind); null when nobody is in a world.</summary>
-    void SetEarWind(OpenFPS.Common.EarWindListener? listener) { }
+    void SetEarWind(OpenFPS.Sound.EarWindListener? listener) { }
     /// <summary>The surfaces right round the listener's head, one probe per direction in head space, each
     /// rendered as its own early reflection.</summary>
     void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes);
@@ -82,7 +82,7 @@ public interface IAudioProvider : IDisposable
     /// <summary>The pieces a line of running water is cut into at the listener (ExtendedSources.Cut), by its own
     /// voice's id: its synth writes each event into the place that plays the piece it happens in. Kept until
     /// replaced or the voice stops.</summary>
-    void PlanPieces(int voiceId, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut cut) { }
+    void PlanPieces(int voiceId, OpenFPS.Sound.Core.Nature.ExtendedSources.LineCut cut) { }
 
     /// <summary>A water feature's tap that, while <paramref name="whole"/>, plays every tap's water (the feature far
     /// enough off to be one voice, docs/RUNNING_WATER.md 15.8); its other taps' voices are let go.</summary>

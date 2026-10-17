@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Hearing;
+namespace OpenFPS.Sound.Hearing;
 
 /// <summary>
 /// The sound every level is calibrated by: a normal voice a metre away, as a recorded line holds it. The

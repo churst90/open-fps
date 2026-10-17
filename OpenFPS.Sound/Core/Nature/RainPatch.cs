@@ -1,6 +1,6 @@
 using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// One kind of surface inside a patch of rain: what it is, how much of it there is, and how far it

@@ -1,6 +1,6 @@
 using System.Globalization;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

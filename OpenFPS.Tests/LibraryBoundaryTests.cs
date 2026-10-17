@@ -289,7 +289,7 @@ public class LibraryBoundaryTests
         new object[] { typeof(OpenFPS.Common.WorldWeather).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Schema", "OpenFPS.Physics" } },
         // The sound models and the synthesis. MemoryPack: TransientSound is on the wire.
-        new object[] { typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name!,
+        new object[] { typeof(OpenFPS.Sound.Loudness).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "MemoryPack.Core", "Serilog" } },
         // The editor's attribute on a model's property, and the field it describes: nothing but the runtime.
         new object[] { typeof(OpenFPS.Common.Editing.TunableAttribute).Assembly.GetName().Name!, Array.Empty<string>() },

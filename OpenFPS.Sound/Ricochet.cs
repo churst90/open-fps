@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A ricochet heard. Whether a round skips, how it leaves, what it is afterwards and how it flies

@@ -1,6 +1,5 @@
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// Water that leaves through a hole, and a tap over a basin (docs/RUNNING_WATER.md section 10).

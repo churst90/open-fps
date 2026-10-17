@@ -1,7 +1,7 @@
 using System.Numerics;
-using static OpenFPS.Common.DesignedSoundKit;
+using static OpenFPS.Sound.DesignedSoundKit;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// What a thing sounds like as it is put into somebody's hands, played at the receiver when they are

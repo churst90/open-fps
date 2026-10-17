@@ -3,7 +3,7 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -16,7 +16,7 @@ namespace OpenFPS.Tests;
 public class VoiceBudgetTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public VoiceBudgetTests(ITestOutputHelper o) => _o = o;
@@ -286,7 +286,7 @@ public class VoiceBudgetTests
         var sized = Law.Place(level, 3.2f);
 
         float Far(float d, (float Gain, float ReferenceDistance) p)
-            => OpenFPS.Common.Loudness.RenderedGain(p.Gain, p.ReferenceDistance, 500f, d);
+            => OpenFPS.Sound.Loudness.RenderedGain(p.Gain, p.ReferenceDistance, 500f, d);
 
         _o.WriteLine($"point: gain {point.Gain:F3} ref {point.ReferenceDistance:F2} m; "
                    + $"3.2 m across: gain {sized.Gain:F3} ref {sized.ReferenceDistance:F2} m");
@@ -298,7 +298,7 @@ public class VoiceBudgetTests
         Assert.True(Far(2f, sized) < Far(2f, point));
 
         // And the old fudge — widen the reference, pay nothing back — was louder everywhere.
-        float fudged = OpenFPS.Common.Loudness.RenderedGain(point.Gain, MathF.Max(point.ReferenceDistance, 3f), 500f, 20f);
+        float fudged = OpenFPS.Sound.Loudness.RenderedGain(point.Gain, MathF.Max(point.ReferenceDistance, 3f), 500f, 20f);
         float honest = Far(20f, sized);
         _o.WriteLine($"at 20 m: honest {20 * MathF.Log10(honest):F1} dBFS, old fudge {20 * MathF.Log10(fudged):F1} dBFS");
         Assert.True(fudged > honest * 1.5f, "the old fudge was not worth several decibels, so this test proves nothing.");
@@ -325,9 +325,9 @@ public class VoiceBudgetTests
     [Fact]
     public void ALoudTransientIsNotFadedOutInsideTheMapItIsOn()
     {
-        float level = OpenFPS.Common.Applause.LevelDb(300, 0.7f);
+        float level = OpenFPS.Sound.Applause.LevelDb(300, 0.7f);
         float range = MathF.Min(OneOffSounds.MaxRange, Law.AudibleRange(level));
-        float reference = Law.Place(level, OpenFPS.Common.Applause.SpreadRadiusMetres(300)).ReferenceDistance;
+        float reference = Law.Place(level, OpenFPS.Sound.Applause.SpreadRadiusMetres(300)).ReferenceDistance;
         float fadeStarts = range - 0.25f * (range - reference);
         _o.WriteLine($"a 300-person crowd at {level:F1} dB: range {range:F0} m, fade starts at {fadeStarts:F0} m");
         Assert.True(fadeStarts > 500f,

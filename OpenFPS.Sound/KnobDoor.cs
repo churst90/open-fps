@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Text;
-using static OpenFPS.Common.DoorPhysics;
+using OpenFPS.Common;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A knob door, simulated as the object, and the sound is whatever the object does: parts with mass,

@@ -1,6 +1,7 @@
 using System.Numerics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// Where the listener is, for the wind at their ears: what the game knows each frame.

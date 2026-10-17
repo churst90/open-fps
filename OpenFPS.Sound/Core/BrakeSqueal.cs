@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// Brake squeal as a friction-excited instability. At low speed on a moderate pedal, friction falling

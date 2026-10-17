@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A car door opening or shutting, built from octave bands of noise: fitted to a recording

@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using System.Text;
 using OpenFPS.Acoustics;
-using static OpenFPS.Common.DoorPhysics;
+using OpenFPS.Common;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A car's power window: the openings it makes in the cabin, and the sound of it going down and up,

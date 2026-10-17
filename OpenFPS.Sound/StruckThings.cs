@@ -2,9 +2,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Acoustics;
-using static OpenFPS.Common.DoorPhysics;
+using OpenFPS.Common;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// What strikes: a mass behind a contact. A Hertz contact (a fingertip, a knuckle, a palm, a shoe's toe, a

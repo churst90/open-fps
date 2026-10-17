@@ -30,12 +30,12 @@ OpenFPS.Common.VehicleMechanics	P
 OpenFPS.Common.RunningGear	P
 OpenFPS.Common.Networking.WheelState	V
 OpenFPS.Common.Gearbox	P
-OpenFPS.Common.VehicleProfile	PS
+OpenFPS.Sound.VehicleProfile	PS
 OpenFPS.Common.EngineMechanics	P
-OpenFPS.Common.EngineProfile	PS
+OpenFPS.Sound.EngineProfile	PS
 OpenFPS.Common.VehicleSpec	M
 OpenFPS.Common.VehicleChassisSpec	M
-OpenFPS.Client.AudioEngine.Core.Engine.Driveline	PS
+OpenFPS.Sound.Core.Engine.Driveline	PS
 OpenFPS.Common.ExternalBallistics	P
 OpenFPS.Common.BulletState	V
 OpenFPS.Common.FlightPoint	P

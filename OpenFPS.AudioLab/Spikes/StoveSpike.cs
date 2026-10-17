@@ -3,7 +3,8 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Stove;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Stove;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -37,7 +38,7 @@ namespace OpenFPS.AudioLab.Spikes;
 public static class StoveSpike
 {
     /// <summary>The lab's levers on this instrument's mixer: its hob voices are handed to a script as they are made.</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.LabLevers Lab = new();
+    private static readonly OpenFPS.Sound.Core.LabLevers Lab = new();
 
     private const int Rate = 48000;
     private const float PascalsToFull = 0.1f;   // -20 dBFS is 94 dB SPL

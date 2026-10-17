@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>What a handling sound is: a reload of so many rounds, from empty or not, a dry fire, a bolt
 /// cycled, the selector moved or the action worked.</summary>

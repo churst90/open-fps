@@ -1,6 +1,7 @@
 using System.Numerics;
 using Arch.Core;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -19,7 +20,7 @@ namespace OpenFPS.Tests;
 public class FireTests : IDisposable
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     private const int Rate = 48000;
     private readonly ITestOutputHelper _o;

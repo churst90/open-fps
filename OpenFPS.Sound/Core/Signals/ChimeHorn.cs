@@ -1,9 +1,8 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Engine;
+using OpenFPS.Sound.Core.Engine;
 
-namespace OpenFPS.Client.AudioEngine.Core.Signals;
+namespace OpenFPS.Sound.Core.Signals;
 
 /// <summary>
 /// An air horn, as the reed-and-column instrument it is.

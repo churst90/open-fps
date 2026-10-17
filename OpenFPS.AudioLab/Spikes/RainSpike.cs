@@ -2,7 +2,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -39,7 +40,7 @@ public static class RainSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const int Rate = 48000;
 
@@ -109,7 +110,7 @@ public static class RainSpike
                 {
                     // In view: the air alone, as the game gives it (RainField.Emitter).
                     var direct = new OpenFPS.Client.AudioEngine.Data.AcousticPathData(0f, survey.Centres[s], survey.Patches[s]!.ReferenceDistance);
-                    (direct.AirLowDb, direct.AirMidDb, direct.AirHighDb) = OpenFPS.Client.AudioEngine.Core.AudioPhysics.AirLossDb(
+                    (direct.AirLowDb, direct.AirMidDb, direct.AirHighDb) = OpenFPS.Sound.Core.AudioPhysics.AirLossDb(
                         survey.Patches[s]!.ReferenceDistance, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
                     paths[s] = direct;
                     continue;

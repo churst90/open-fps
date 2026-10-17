@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -22,7 +23,7 @@ public static class TracedReverbSpike
         AcousticRegistry.Initialize();
         bool parametric = Environment.GetEnvironmentVariable("SA_PARAMETRIC") == "1";
         // SA_PARAMETRIC=1 asks for the hybrid simulation, which is what the game traces anyway (LabLevers.TracedSimulation).
-        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { TracedSimulation = Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID };
+        var lab = new OpenFPS.Sound.Core.LabLevers { TracedSimulation = Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID };
         var cs = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("context failed"); return 1; }
         var q = Quaternion.Identity;

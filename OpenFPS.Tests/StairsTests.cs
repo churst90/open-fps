@@ -13,6 +13,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -25,7 +26,7 @@ namespace OpenFPS.Tests;
 public class StairsTests : IClassFixture<StairsTests.City>
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly City _city;
     private readonly ITestOutputHelper _o;

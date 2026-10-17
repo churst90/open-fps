@@ -80,7 +80,7 @@ public class EarlyTailTests
     public void TheFirstReflectionIsTheNearestSurfaceThereAndBack()
     {
         // In the flat the nearest surface is the ceiling, 1.02 m over the ear: 2.04 m, 5.9 ms.
-        var c = EarlyCopies.From(Flat(), Ear, Rate, OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound)!;
+        var c = EarlyCopies.From(Flat(), Ear, Rate, OpenFPS.Sound.Core.AudioPhysics.SpeedOfSound)!;
         Assert.NotNull(c);
         double ms = c.FirstArrival * 1000.0 / Rate;
         Assert.InRange(ms, 5.7, 6.1);
@@ -100,7 +100,7 @@ public class EarlyTailTests
     {
         // At the flat's own level: its trace has about -8 dB of a 1 m impulse in its first 10 ms, and
         // the copies take most of the first 20 ms of it.
-        var copies = EarlyCopies.From(Flat(), Ear, Rate, OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound)!;
+        var copies = EarlyCopies.From(Flat(), Ear, Rate, OpenFPS.Sound.Core.AudioPhysics.SpeedOfSound)!;
         var s = WithDirections(Trace(3, 0.02f), copies);
         Assert.Equal(copies.FirstArrival, s.Start);
         var e = TwoMs(s, 60);
@@ -122,7 +122,7 @@ public class EarlyTailTests
     {
         // The copies' energy comes out of the trace's frames band by band: what is left plus what was taken is
         // what the trace had, and nothing is taken that the copies do not carry.
-        var copies = EarlyCopies.From(Flat(), Ear, Rate, OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound)!;
+        var copies = EarlyCopies.From(Flat(), Ear, Rate, OpenFPS.Sound.Core.AudioPhysics.SpeedOfSound)!;
         var s = new SmoothTail(Rate, Length, 0);
         int frames = s.Frames;
         foreach (float gain in new[] { 1f, 0.3f, 0.05f })          // the trace well over, near and under the copies
@@ -171,7 +171,7 @@ public class EarlyTailTests
     {
         // From where the copies' reach and the smoothing end, the response is what it was: the late
         // field sample for sample, the directional part sample for sample.
-        var copies = EarlyCopies.From(Flat(), Ear, Rate, OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound)!;
+        var copies = EarlyCopies.From(Flat(), Ear, Rate, OpenFPS.Sound.Core.AudioPhysics.SpeedOfSound)!;
         var t = Trace(11);
         var a = WithDirections(t, null);
         var b = WithDirections(t, copies);
@@ -232,7 +232,7 @@ public class EarlyTailTests
         int place = 1;
         foreach (var at in places)
         {
-            var copies = EarlyCopies.From(flat, at, Rate, OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound);
+            var copies = EarlyCopies.From(flat, at, Rate, OpenFPS.Sound.Core.AudioPhysics.SpeedOfSound);
             if (copies != null) Assert.All(copies.Copies, c => Assert.All(c.Band, v => Assert.True(double.IsFinite(v) && v >= 0, $"copy energy {v} at {at}")));
             foreach (var w in traces)
                 foreach (bool dirs in new[] { false, true })

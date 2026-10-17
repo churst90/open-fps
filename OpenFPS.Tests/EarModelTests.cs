@@ -1,5 +1,6 @@
 using OpenFPS.Common;
-using OpenFPS.Common.Hearing;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Hearing;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 
@@ -14,7 +15,7 @@ namespace OpenFPS.Tests;
 public class EarModelTests
 {
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private static T With<T>(float compression, Func<T> f)
     {
@@ -315,8 +316,8 @@ public class EarModelTests
             var tone = Tone(1000f);
             try
             {
-                OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("test:rumble", rumble);
-                OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("test:tone", tone);
+                OpenFPS.Sound.Core.EarTimbres.Set("test:rumble", rumble);
+                OpenFPS.Sound.Core.EarTimbres.Set("test:tone", tone);
                 float correction = Law.TimbreCorrectionDb(65f, rumble);
                 Assert.True(correction > Law.TimbreCorrectionDb(60f, tone) + 5f,
                     $"the law lifts the rumble more than the tone: {correction:F1} dB");
@@ -332,7 +333,7 @@ public class EarModelTests
                     Assert.True(playedR > playedT, "the law should play the rumble at more gain than the tone");
                 }
             }
-            finally { OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear(); }
+            finally { OpenFPS.Sound.Core.EarTimbres.Clear(); }
             return 0;
         });
     }
@@ -384,7 +385,7 @@ public class EarModelTests
         return new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
         {
             EntityId = 1, SoundId = key, PhysicalKey = key, IsSynth = true, Position = at,
-            Mode = OpenFPS.Common.Components.PlaybackMode.LoopOne, Range = 500f, MinDistance = reference,
+            Mode = OpenFPS.Sound.PlaybackMode.LoopOne, Range = 500f, MinDistance = reference,
             Volume = gain, EarLevelDb = levelDb,
         };
     }

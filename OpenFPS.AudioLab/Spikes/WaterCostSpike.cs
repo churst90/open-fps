@@ -2,7 +2,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Security.Cryptography;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;

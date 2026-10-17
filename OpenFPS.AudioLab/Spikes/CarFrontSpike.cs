@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -36,7 +37,7 @@ public static class CarFrontSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     const int Rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Block = 512;   // the rate the game runs it at
     const float WavScale = 0.1f;
@@ -99,7 +100,7 @@ public static class CarFrontSpike
             if (v.ElectricFan is { } relay)
             {
                 // Left idling on a mild day: when does the coolant bring the fan in, and for how long?
-                var cs = new OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem(relay, v.Engine, 11) { AmbientCelsius = 20f };
+                var cs = new OpenFPS.Sound.Core.Engine.CoolingSystem(relay, v.Engine, 11) { AmbientCelsius = 20f };
                 float on = -1f, off = -1f;
                 for (float t = 0f; t < 3600f; t += 0.1f)
                 {
@@ -158,14 +159,14 @@ public static class CarFrontSpike
             float test = s <= 5000f ? 0.75f * s : s < 7500f ? 3750f : 0.5f * s;
             foreach (var (label, orders) in new[]
             {
-                ("idle", new List<OpenFPS.Client.AudioEngine.Core.Engine.DriveOrder>
-                    { new(OpenFPS.Client.AudioEngine.Core.Engine.DriverAction.Cranking, 0.8f), new(OpenFPS.Client.AudioEngine.Core.Engine.DriverAction.Idling, 6f) }),
-                ($"held {test:F0} rpm", new List<OpenFPS.Client.AudioEngine.Core.Engine.DriveOrder>
-                    { new(OpenFPS.Client.AudioEngine.Core.Engine.DriverAction.Cranking, 0.8f), new(OpenFPS.Client.AudioEngine.Core.Engine.DriverAction.Idling, 1f),
-                      new(OpenFPS.Client.AudioEngine.Core.Engine.DriverAction.Holding, 5f, test, 0.12f) }),
+                ("idle", new List<OpenFPS.Sound.Core.Engine.DriveOrder>
+                    { new(OpenFPS.Sound.Core.Engine.DriverAction.Cranking, 0.8f), new(OpenFPS.Sound.Core.Engine.DriverAction.Idling, 6f) }),
+                ($"held {test:F0} rpm", new List<OpenFPS.Sound.Core.Engine.DriveOrder>
+                    { new(OpenFPS.Sound.Core.Engine.DriverAction.Cranking, 0.8f), new(OpenFPS.Sound.Core.Engine.DriverAction.Idling, 1f),
+                      new(OpenFPS.Sound.Core.Engine.DriverAction.Holding, 5f, test, 0.12f) }),
             })
             {
-                var r = OpenFPS.Client.AudioEngine.Core.VehicleSynth.Render(v, orders, seed: 5);
+                var r = OpenFPS.Sound.Core.VehicleSynth.Render(v, orders, seed: 5);
                 int from = r.Exhaust.Length - 3 * Rate;
                 var x = new float[3 * Rate];
                 for (int i = 0; i < x.Length; i++) x[i] = r.Exhaust[from + i] * r.PascalsPerUnit;

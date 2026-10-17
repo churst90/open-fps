@@ -3,6 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Components;
 using Arch.Core;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Core;
 

@@ -1,9 +1,8 @@
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Engine;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound.Core.Engine;
+using OpenFPS.Sound.Core.Signals;
 
-namespace OpenFPS.Client.AudioEngine.Core.Rail;
+namespace OpenFPS.Sound.Core.Rail;
 
 /// <summary>
 /// What the track does with a force put into it, and how much of that reaches the air.

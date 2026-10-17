@@ -1,6 +1,6 @@
 using System.Threading;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// One audio world's air now: its temperature, from the weather its host gives it, and the speed of sound in

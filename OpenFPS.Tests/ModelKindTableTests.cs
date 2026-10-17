@@ -6,6 +6,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -245,7 +246,7 @@ public class ModelKindTableTests
             Honk.LevelDb(horn, ModelLibrary.Presets);
             if (ModelKindTable.Failures.TryGetValue(Honk.Prefix + horn, out var why)) failed.Add($"{name}: horn {horn} {why}");
             if (string.IsNullOrEmpty(v.AirSystem) || !v.DoorChime) continue;
-            OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(v, ModelLibrary.Presets);
+            OpenFPS.Sound.Core.Engine.CabinPaths.For(v, ModelLibrary.Presets);
             if (ModelKindTable.Failures.TryGetValue(ModelLibrary.Kinds.Air + ":" + v.AirSystem, out why)) failed.Add($"{name}: door {why}");
         }
         foreach (var name in AircraftProfile.Presets.Keys)

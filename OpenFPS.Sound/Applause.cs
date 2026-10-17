@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>How many people, how worked up they are, and for how long.</summary>
 public readonly record struct CrowdApplause(int Clappers, float Intensity, float Seconds);

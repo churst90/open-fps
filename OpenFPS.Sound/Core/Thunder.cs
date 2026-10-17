@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Sound.Core;
 
 /// <summary>
 /// Thunder for one listener from the lightning channel that made it: the tortuous-channel model (Few,

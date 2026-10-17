@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using Serilog;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Server.Water;
 

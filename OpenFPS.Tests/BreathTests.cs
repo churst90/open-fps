@@ -1,5 +1,6 @@
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Tests;
 

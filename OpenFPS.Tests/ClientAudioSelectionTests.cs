@@ -9,6 +9,7 @@ using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -22,10 +23,10 @@ namespace OpenFPS.Tests;
 public class ClientAudioSelectionTests
 {
     /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
 
     /// <summary>The law as a world with the shipped hearing places by.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings Law = new();
 
     private readonly ITestOutputHelper _o;
     public ClientAudioSelectionTests(ITestOutputHelper o) => _o = o;
@@ -209,7 +210,7 @@ public class ClientAudioSelectionTests
         h.StandAt(at);
         h.Player.RidingEntityId = Car;
         var profile = MachineRegistry.VehicleFor(Preset);
-        var layout = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(profile, ModelLibrary.Presets);
+        var layout = OpenFPS.Sound.Core.Engine.CabinPaths.For(profile, ModelLibrary.Presets);
         Assert.NotNull(layout);
         Assert.True(layout!.Count > 1, "a saloon has more than one way in");
 
@@ -225,7 +226,7 @@ public class ClientAudioSelectionTests
         Assert.Equal(0f, engine.Occlusion);
         Assert.Equal((1f, 1f, 1f), (engine.EqLow, engine.EqMid, engine.EqHigh));
         Assert.Equal((0f, 0f, 0f), (engine.AirLowDb, engine.AirMidDb, engine.AirHighDb));
-        Assert.Equal(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.PlacedMetres, engine.EffectiveDistance);
+        Assert.Equal(OpenFPS.Sound.Core.Engine.CabinPaths.PlacedMetres, engine.EffectiveDistance);
         Assert.NotEqual(Vector3.Zero, engine.ListenerOffset);
         // No front voice from inside: both ends come through the body.
         Assert.Empty(h.Mixer.StartedAs(VoiceKind.Intake));
@@ -420,7 +421,7 @@ public class ClientAudioSelectionTests
         var e = h.Mixer.Latest.Values.Single(v => v.PhysicalKey.StartsWith($"rail:{key}/@", StringComparison.Ordinal));
         Assert.True(TrainVoiceState.ParseSlotKey(e.PhysicalKey, out _, out _, out int slot));
         var layout = TrainLayout.Sources(TrainProfile.ByName(preset), ModelLibrary.Presets);
-        float slotLevel = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(layout);
+        float slotLevel = OpenFPS.Sound.Core.Rail.TrainVoicing.SlotLevelDb(layout);
         var (slotGain, slotReference) = Law.Place(slotLevel);
         Assert.Equal(slotLevel, e.EarLevelDb, 3);
         Assert.Equal(slotReference, e.MinDistance, 4);
@@ -538,18 +539,18 @@ public class ClientAudioSelectionTests
         }
         try
         {
-            OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
+            OpenFPS.Sound.Core.EarTimbres.Clear();
             Assert.True(CondenserWins(), "unmeasured, a 65 dB condenser at 12 m should beat a 59 dB window unit at 10 m");
 
-            OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_condenser", Band(0, "rumble"));
-            float correction = OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(Law, "machine:ac_condenser", 65f);
+            OpenFPS.Sound.Core.EarTimbres.Set("machine:ac_condenser", Band(0, "rumble"));
+            float correction = OpenFPS.Sound.Core.EarTimbres.CorrectionDb(Law, "machine:ac_condenser", 65f);
             _o.WriteLine($"the law's correction for a 65 dB rumble at 25 Hz: {correction:+0.0;-0.0} dB");
             Assert.True(correction > 10f, $"the law plays a 25 Hz rumble well up: {correction:F1} dB");
             Assert.False(CondenserWins(), "a rumble the ear barely hears took a voice from a window unit it hears");
         }
         finally
         {
-            OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
+            OpenFPS.Sound.Core.EarTimbres.Clear();
         }
     }
 
@@ -580,24 +581,24 @@ public class ClientAudioSelectionTests
         }
         try
         {
-            OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
+            OpenFPS.Sound.Core.EarTimbres.Clear();
             Assert.Equal((true, false), Wins());
-            OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_condenser", Band(0, "rumble"));
-            OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_window", Band(16, "1 kHz tone"));
+            OpenFPS.Sound.Core.EarTimbres.Set("machine:ac_condenser", Band(0, "rumble"));
+            OpenFPS.Sound.Core.EarTimbres.Set("machine:ac_window", Band(16, "1 kHz tone"));
             Assert.Equal((false, true), Wins());
         }
         finally
         {
-            OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
+            OpenFPS.Sound.Core.EarTimbres.Clear();
         }
     }
 
     /// <summary>A spectrum with everything in one third-octave band (0 is 25 Hz, 16 is 1 kHz).</summary>
-    private static OpenFPS.Common.Hearing.Timbre Band(int band, string name)
+    private static OpenFPS.Sound.Hearing.Timbre Band(int band, string name)
     {
-        var levels = Enumerable.Repeat(-60f, OpenFPS.Common.Hearing.Timbre.Bands).ToArray();
+        var levels = Enumerable.Repeat(-60f, OpenFPS.Sound.Hearing.Timbre.Bands).ToArray();
         levels[band] = 0f;
-        return OpenFPS.Common.Hearing.Timbre.FromBandLevels(levels, name);
+        return OpenFPS.Sound.Hearing.Timbre.FromBandLevels(levels, name);
     }
 
     /// <summary>

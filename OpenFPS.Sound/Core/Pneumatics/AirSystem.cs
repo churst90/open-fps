@@ -1,9 +1,8 @@
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Core.Engine;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound.Core.Engine;
+using OpenFPS.Sound.Core.Signals;
 
-namespace OpenFPS.Client.AudioEngine.Core.Pneumatics;
+namespace OpenFPS.Sound.Core.Pneumatics;
 
 /// <summary>
 /// One port letting air out: the whole of an air brake sound in one object.

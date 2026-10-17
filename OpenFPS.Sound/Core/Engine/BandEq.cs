@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Client.AudioEngine.Core.Engine;
+namespace OpenFPS.Sound.Core.Engine;
 
 /// <summary>
 /// A gain per third of an octave, 50 Hz to 10 kHz: a low shelf, peaking sections a third of an octave

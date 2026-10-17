@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// A vehicle's body as one closed mesh, made from its parts list (docs/GEOMETRY.md, stage 6;

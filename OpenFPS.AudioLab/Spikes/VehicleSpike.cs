@@ -1,9 +1,9 @@
 using System.Numerics;
 using Thread = System.Threading.Thread;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Engine;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Acoustics;
@@ -20,7 +20,7 @@ public static class VehicleSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     /// <summary>The listener stands on the pavement, a few metres off the centre line.</summary>
     private static readonly Vector3 Ear = new(4.5f, 1.7f, 0f);
@@ -284,7 +284,7 @@ public static class VehicleSpike
         var v = preset != null ? VehicleProfile.ByName(preset) : muscle ? VehicleProfile.V8Muscle : VehicleProfile.V8Sports;
         // The key=value sweep every engine tool takes, so a layer can be bracketed without a rebuild.
         if (knobs != null) v = EngineOrderSpike.Override(v, knobs);
-        var lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { LegacyDiesel = knobs != null && Array.IndexOf(knobs, "legacydiesel") >= 0 };
+        var lab = new OpenFPS.Sound.Core.LabLevers { LegacyDiesel = knobs != null && Array.IndexOf(knobs, "legacydiesel") >= 0 };
         // body=off: the same car without its shell, to play against the other.
         if (!withBody) v = v with { Body = VehicleBody.None };
         // coupling=X: how much of the engine gets into the structure, the body model's one number set by

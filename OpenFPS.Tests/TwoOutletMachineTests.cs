@@ -1,5 +1,5 @@
 using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 using OpenFPS.Acoustics;
 
 namespace OpenFPS.Tests;

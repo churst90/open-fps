@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// Where a thing's sound comes out, one answer for every consumer: the voice, the occlusion probe and

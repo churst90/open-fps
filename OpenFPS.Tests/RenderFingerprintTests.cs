@@ -2,11 +2,12 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Engine;
-using OpenFPS.Client.AudioEngine.Core.Nature;
-using OpenFPS.Client.AudioEngine.Core.Rail;
-using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Engine;
+using OpenFPS.Sound.Core.Nature;
+using OpenFPS.Sound.Core.Rail;
+using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Common;
 using Xunit.Abstractions;
 

@@ -1,7 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;

@@ -1,5 +1,5 @@
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Sound;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Repositories;

@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// The few pieces of signal processing the DESIGNED sounds are made of (the admin gun, the teleporter,

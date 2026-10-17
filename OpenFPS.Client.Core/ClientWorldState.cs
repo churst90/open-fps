@@ -5,6 +5,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core;
 
@@ -17,11 +18,11 @@ public class ClientWorldState
     /// <summary>The clock positions are stamped on as they arrive (PositionsSampledAt): the audio world's, which
     /// ages them, given by whoever holds both (the session: AudioEngineFacade.Clock). One of its own until then,
     /// which is enough for a world nothing is listening to.</summary>
-    public OpenFPS.Common.IAudioClock Clock { get; set; } = new OpenFPS.Common.StopwatchAudioClock();
+    public OpenFPS.Sound.IAudioClock Clock { get; set; } = new OpenFPS.Sound.StopwatchAudioClock();
 
     /// <summary>The hearing of the audio world that listens to this one (AudioEngineFacade.Hearing), whose law
     /// sizes a wood's reach as the woods are gathered (WoodChorus.Build). The shipped hearing until it is given one.</summary>
-    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; set; } = new();
+    public OpenFPS.Sound.Hearing.HearingSettings Hearing { get; set; } = new();
 
     private readonly ConcurrentDictionary<int, EntityDefinition> _definitions = new();
     private readonly ConcurrentDictionary<int, Transform> _serverTransforms = new();
@@ -73,7 +74,7 @@ public class ClientWorldState
     private const double MaxDriftBeforeSnap = 0.5;
 
     /// <summary>When the interpolated transforms were last advanced, seconds on
-    /// <see cref="OpenFPS.Common.IAudioClock"/>. Copied into every snapshot built from them.</summary>
+    /// <see cref="OpenFPS.Sound.IAudioClock"/>. Copied into every snapshot built from them.</summary>
     private double _positionsSampledAt;
     private double _clientInterpolationTime = 0;
 

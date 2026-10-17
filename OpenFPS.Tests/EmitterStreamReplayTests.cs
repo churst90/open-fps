@@ -15,6 +15,8 @@ using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.Tests;
 
@@ -611,8 +613,8 @@ internal sealed class Replay
         => typeof(AudioWorld).GetField("_adaptiveBudget", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(Audio.World, engines);
 
     /// <summary>A driver's switches as the wire carries them (EntityState.Signals).</summary>
-    internal static byte Driven(bool horn = false, OpenFPS.Common.SirenMode siren = OpenFPS.Common.SirenMode.Off)
-        => OpenFPS.Common.VehicleSignalBits.Encode(true, horn, siren != OpenFPS.Common.SirenMode.Off, siren);
+    internal static byte Driven(bool horn = false, OpenFPS.Sound.SirenMode siren = OpenFPS.Sound.SirenMode.Off)
+        => OpenFPS.Sound.VehicleSignalBits.Encode(true, horn, siren != OpenFPS.Sound.SirenMode.Off, siren);
 
     // ── The scenarios ───────────────────────────────────────────────────────────────────────────
 
@@ -739,7 +741,7 @@ internal sealed class Replay
         for (int f = 0; f < 120; f++)
         {
             r.Listener(feet, Vector3.Zero, 180f);
-            r.Move(501, patrolAt, patrolV, Driven(siren: OpenFPS.Common.SirenMode.Wail));
+            r.Move(501, patrolAt, patrolV, Driven(siren: OpenFPS.Sound.SirenMode.Wail));
             r.Move(509, hornAt, Vector3.Zero, Driven(horn: f >= 20 && f < 60));
             for (int i = 0; i < cars.Length; i++)
             {
@@ -896,7 +898,7 @@ internal sealed class Replay
         {
             r.Listener(at, east, 90f);
             r.Move(mine, at, east);
-            r.Move(patrol, patrolAt, Vector3.Zero, Driven(siren: OpenFPS.Common.SirenMode.Wail));
+            r.Move(patrol, patrolAt, Vector3.Zero, Driven(siren: OpenFPS.Sound.SirenMode.Wail));
             r.Tick();
             at += east * (float)Dt;
         }
@@ -1063,7 +1065,7 @@ internal sealed class StreamMixer : IAudioProvider
     public void CancelVoiceFade(int id) => Log("CancelFade", id);
     public void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo) => Log("SignalTrain", train, warning, bellSeconds, secondsAgo);
     public void PlanTrainSlot(string preset, string train, int slot, TrainSlotPlan plan) => Log("PlanTrain", preset + "/" + train, slot, plan.Sources, plan.Weights);
-    public void PlanPieces(int voiceId, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut cut) => Log("PlanPieces", voiceId, cut.Edges, cut.Middle);
+    public void PlanPieces(int voiceId, OpenFPS.Sound.Core.Nature.ExtendedSources.LineCut cut) => Log("PlanPieces", voiceId, cut.Edges, cut.Middle);
     public void StopSound(int id) { Log("Stop", id); _live.Remove(id); _emitterFields.Remove(id); _pathFields.Remove(id); }
     public bool IsPlaying(int id) => _live.Contains(id);
     public Vector3 GetSoundPosition(int id) => _latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;

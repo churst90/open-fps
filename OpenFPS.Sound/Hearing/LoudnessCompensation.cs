@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Hearing;
+namespace OpenFPS.Sound.Hearing;
 
 /// <summary>
 /// Keeping a sound's tone when it plays at a level other than its real one.

@@ -80,7 +80,7 @@ public class SharedInputConvolverTests
     {
         string root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Here())!, ".."));
         string file = Path.Combine(root, "OpenFPS.Client", "ASSETS", "SOUNDS", "ANNOUNCE", "st_louis_welcome.wav");
-        var src = OpenFPS.Client.AudioEngine.Core.WeaponSynth.ReadWav16Mono(File.ReadAllBytes(file));
+        var src = OpenFPS.Sound.Core.WeaponSynth.ReadWav16Mono(File.ReadAllBytes(file));
         Assert.NotEmpty(src);
         var x = new float[n];
         for (int i = 0; i < n; i++) x[i] = src[i % src.Length];

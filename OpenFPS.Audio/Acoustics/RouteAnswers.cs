@@ -22,7 +22,7 @@ public sealed class RouteAnswers
 
     /// <summary>The lab's levers on its worker, whose RetainSupersededRoutes (AudioLab --stream-walk keep=old)
     /// keeps answers as before 2026-10-06, about any graph, and leaves a forgotten voice's behind.</summary>
-    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab { get; set; } = new();
+    public OpenFPS.Sound.Core.LabLevers Lab { get; set; } = new();
 
     private bool RetainSuperseded => Lab.RetainSupersededRoutes;
 

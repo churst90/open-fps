@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Geometry;
@@ -435,7 +435,7 @@ public sealed class EngineReflections
     internal static (float Low, float Mid, float High) EchoAir(in AcousticPathData direct, float directDist, float pathLength)
     {
         if (directDist < 1f)
-            return OpenFPS.Client.AudioEngine.Core.AudioPhysics.AirLossDb(pathLength, 0.5f, 20f, 1013.25f);
+            return OpenFPS.Sound.Core.AudioPhysics.AirLossDb(pathLength, 0.5f, 20f, 1013.25f);
         float k = MathF.Max(0f, pathLength) / directDist;
         return (direct.AirLowDb * k, direct.AirMidDb * k, direct.AirHighDb * k);
     }

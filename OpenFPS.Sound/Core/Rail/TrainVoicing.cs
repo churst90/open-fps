@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Rail;
+namespace OpenFPS.Sound.Core.Rail;
 
 /// <summary>
 /// Which of a train's sources share a voice, and at what weight (TrainSlotState, docs/TRAINS.md
@@ -136,7 +135,7 @@ public static class TrainVoicing
     /// it through a voice of its own (the world's law, <paramref name="hearing"/>), before the path and the ear
     /// model.
     /// </summary>
-    public static float LawGain(OpenFPS.Common.Hearing.HearingSettings hearing, float levelDb, float extentMetres, float distance)
+    public static float LawGain(OpenFPS.Sound.Hearing.HearingSettings hearing, float levelDb, float extentMetres, float distance)
     {
         var (gain, reference) = hearing.Place(levelDb, extentMetres);
         return Loudness.RenderedGain(gain, reference, hearing.AudibleRange(levelDb), distance);

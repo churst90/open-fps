@@ -1,8 +1,7 @@
 using System.Collections.Concurrent;
 using System.Numerics;
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// How one world hears its extended sources (<see cref="ExtendedSources"/>): whether it spreads them at all, by

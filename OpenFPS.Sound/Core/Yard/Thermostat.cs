@@ -1,6 +1,5 @@
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Yard;
+namespace OpenFPS.Sound.Core.Yard;
 
 /// <summary>
 /// One house's thermostat calling for its air conditioner's compressor (see <see cref="ThermostatSpec"/>).

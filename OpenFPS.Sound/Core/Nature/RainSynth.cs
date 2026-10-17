@@ -1,7 +1,7 @@
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// Rain on the surfaces of one patch, as the drops it is made of, at the listener.

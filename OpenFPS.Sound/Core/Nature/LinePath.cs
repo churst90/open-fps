@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// A source laid along a line of its own: a creek's bed as the map or the ground draws it, bends and all (2026-10-17,

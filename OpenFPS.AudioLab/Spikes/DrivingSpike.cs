@@ -14,6 +14,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -35,7 +36,7 @@ public static class DrivingSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private sealed record Segment(string Name, double Start, double Seconds, string Note);
 
@@ -651,8 +652,8 @@ public static class DrivingSpike
                     var r = provider.Ranks();
                     var byId = new Dictionary<int, FmodAudioProvider.RankedVoice>();
                     foreach (var v in r.Voices) byId[v.Id] = v;
-                    var full = r.Voices.Where(v => v.Detail == OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full).OrderBy(v => v.Distance).Select(Name);
-                    var reduced = r.Voices.Where(v => v.Detail == OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced).OrderBy(v => v.Distance).Select(Name);
+                    var full = r.Voices.Where(v => v.Detail == OpenFPS.Sound.Core.Engine.EngineDetail.Full).OrderBy(v => v.Distance).Select(Name);
+                    var reduced = r.Voices.Where(v => v.Detail == OpenFPS.Sound.Core.Engine.EngineDetail.Reduced).OrderBy(v => v.Distance).Select(Name);
                     var late = r.Voices.Where(v => v.LateField).OrderBy(v => v.Distance).Select(Name);
                     var echoes = r.Voices.Where(v => v.Echoes).OrderBy(v => v.Distance).Select(Name);
                     var order = r.RenderAhead.Select(id => byId.TryGetValue(id, out var v) ? Name(v) : $"#{id}");

@@ -1,6 +1,6 @@
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
 using Xunit.Abstractions;
 using OpenFPS.Acoustics;
 

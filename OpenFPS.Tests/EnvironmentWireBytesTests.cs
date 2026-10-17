@@ -4,6 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 

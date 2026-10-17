@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Text;
-using static OpenFPS.Common.DoorPhysics;
+using OpenFPS.Common;
+using static OpenFPS.Sound.DoorPhysics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// One leaf of a lift's centre-opening landing doors, simulated as the object, as <see cref="SlidingDoor"/> is.

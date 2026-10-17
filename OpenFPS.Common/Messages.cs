@@ -570,7 +570,7 @@ public partial struct EntityState
     public WheelState[]? Wheels;
 
     /// <summary>
-    /// A vehicle's horn and siren as the driver has them switched (<see cref="OpenFPS.Common.VehicleSignalBits"/>);
+    /// A vehicle's horn and siren as the driver has them switched (<see cref="OpenFPS.Sound.VehicleSignalBits"/>);
     /// zero for anything not a player's vehicle. Nothing a client observes says a hand is on the horn.
     /// </summary>
     public byte Signals;
@@ -626,7 +626,7 @@ public partial class StatsUpdate : IMessage
 
     // APPEND ONLY BELOW THIS LINE — members serialise positionally.
 
-    /// <summary>The weapon in the player's hands (a <see cref="OpenFPS.Common.WeaponRegistry"/> id), or
+    /// <summary>The weapon in the player's hands (a <see cref="OpenFPS.Sound.WeaponRegistry"/> id), or
     /// empty. The client needs it for its keys: Enter fires only a gun, and R reloads one.</summary>
     public string HeldWeaponId = "";
     /// <summary>Rounds in that weapon, or -1 with none.</summary>

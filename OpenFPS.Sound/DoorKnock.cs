@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// Knuckles on a wooden door, made as the car door is: each knock a burst of noise in every octave band

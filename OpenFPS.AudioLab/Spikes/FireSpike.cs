@@ -3,7 +3,9 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
@@ -32,7 +34,7 @@ public static class FireSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
-    private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
     /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>

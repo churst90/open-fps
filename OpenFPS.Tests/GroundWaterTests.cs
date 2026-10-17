@@ -5,6 +5,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Server.Water;
 using Xunit.Abstractions;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;
 
@@ -452,7 +453,7 @@ public class GroundWaterTests : IDisposable
         Assert.True(axis.Sum(v => v.LengthMetres) > 300f, $"{axis.Sum(v => v.LengthMetres):F0} m heard of a 400 m valley");
         // The line's middle is a middle: as far along it from either end.
         var one = axis.MaxBy(v => v.LengthMetres)!;
-        var path = new OpenFPS.Client.AudioEngine.Core.Nature.LinePath(one.Line!);
+        var path = new OpenFPS.Sound.Core.Nature.LinePath(one.Line!);
         path.Nearest(one.Position, out float along);
         Assert.True(MathF.Abs(along) < 1f, $"its position stands {along:F1} m from its middle");
     }

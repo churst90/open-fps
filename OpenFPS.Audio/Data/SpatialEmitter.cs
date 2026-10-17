@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.AudioEngine.Data;
 
@@ -39,7 +39,7 @@ public struct SpatialEmitter
 
     /// <summary>
     /// How big the source is, metres; zero is a point. Inside its own size the inverse law does not
-    /// hold, so <see cref="OpenFPS.Common.Hearing.HearingSettings.Place(float, float)"/> widens the reference distance
+    /// hold, so <see cref="OpenFPS.Sound.Hearing.HearingSettings.Place(float, float)"/> widens the reference distance
     /// and pays the gain down: the far field is unchanged. Widened without paying back, a quiet vehicle
     /// came out up to 8 dB over its own level.
     /// </summary>
@@ -74,7 +74,7 @@ public struct SpatialEmitter
     public int TargetRegionId;
     public Vector3 Velocity;
     /// <summary>
-    /// When <see cref="Position"/> was true, seconds on <see cref="OpenFPS.Common.IAudioClock"/>; zero
+    /// When <see cref="Position"/> was true, seconds on <see cref="OpenFPS.Sound.IAudioClock"/>; zero
     /// is unknown, taken as now. Stamped at sample time, never at submission: stamped on submission,
     /// dead reckoning was reset by every re-submission and a close fast car moved in a 30 Hz staircase
     /// (2.3 semitones and 60 degrees a step at 3 m and 235 km/h), heard as "it stops for a second and
@@ -212,7 +212,7 @@ public struct SpatialEmitter
     public OpenFPS.Common.Networking.WheelState[]? Wheels;
     /// <summary>Wheels about to strike a step in the road (a rail), with when: handed to the vehicle's
     /// voice the once they are carried, and null otherwise. See WheelStrikes.</summary>
-    public OpenFPS.Client.AudioEngine.Core.WheelStrike[]? WheelStrikes;
+    public OpenFPS.Sound.Core.WheelStrike[]? WheelStrikes;
     /// <summary>The road's water under a vehicle whose wheels are not sent, mm (WorldSnapshot.RoadWaterMm).</summary>
     public float RoadWaterMm;
     public SynthWaveType SynthWave;
@@ -242,7 +242,7 @@ public struct SpatialEmitter
     /// <see cref="Direction"/>, in place of the cone, and a room is fed with what it radiates all round
     /// (<see cref="RadiatedGain"/> of the on-axis level). Null for everything else.
     /// </summary>
-    public OpenFPS.Common.Radiator? Radiator;
+    public OpenFPS.Sound.Radiator? Radiator;
     /// <summary>The program's energy per radiator band, which weights the beam where one gain stands for
     /// several bands (a room's send, a copy off a wall).</summary>
     public float[]? RadiatorBandEnergy;

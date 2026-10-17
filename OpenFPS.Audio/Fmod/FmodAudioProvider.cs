@@ -1,20 +1,20 @@
 using System.Numerics;
 using FMOD;
 using Serilog;
-using OpenFPS.Common.Components;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.Platform;
 
-using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// How distance attenuates a voice: <see cref="OpenFPS.Common.Loudness"/>'s <c>RenderedGain</c>, applied
+/// How distance attenuates a voice: <see cref="OpenFPS.Sound.Loudness"/>'s <c>RenderedGain</c>, applied
 /// by hand on every voice, binaural or panned by FMOD, so the balance is the same whichever path a voice
 /// gets. FMOD's inverse mode stays on 3D channels and buses as the closest of its own laws, but a voice's
 /// FMOD distances are set out of reach (<see cref="NoneMin"/>), so FMOD pans and Dopplers it and applies
@@ -543,7 +543,7 @@ public partial class FmodAudioProvider : IAudioProvider
         /// <summary>Ahead of the own-room send: the power it radiates all round, band by band. With it the
         /// beam unit carries the beam over that power.</summary>
         public PooledRadiatorDsp? RadiatorPowerDsp;
-        public OpenFPS.Common.Radiator? Radiator;
+        public OpenFPS.Sound.Radiator? Radiator;
         public float[]? RadiatorBandEnergy;
         public float RadiatedGain = 1f;
         
@@ -572,7 +572,7 @@ public partial class FmodAudioProvider : IAudioProvider
         /// <summary>A voice of the player's own room answering their microphone (OwnVoiceTap).</summary>
         public OwnVoiceTap? OwnVoice;
 
-        /// <summary>When this voice's position was last true, seconds on <see cref="OpenFPS.Common.IAudioClock"/>:
+        /// <summary>When this voice's position was last true, seconds on <see cref="OpenFPS.Sound.IAudioClock"/>:
         /// the emitter's sample time, not when it was handed over. A voice nobody updates keeps playing
         /// where it was while the thing making it drives away.</summary>
         public double LastAttributeAt;
@@ -691,7 +691,7 @@ public partial class FmodAudioProvider : IAudioProvider
         public Vector3 ListenerOffset;
         /// <summary>The last batch of wheel strikes handed to this voice's engine: an emitter is applied
         /// over and over until the next one comes, and a batch must be queued once.</summary>
-        public OpenFPS.Client.AudioEngine.Core.WheelStrike[]? LastStrikes;
+        public OpenFPS.Sound.Core.WheelStrike[]? LastStrikes;
         /// <summary>The direction (Steam Audio's frame) the cabin path's HRTF trim was last worked out for.</summary>
         public Vector3 CabinTrimDir;
 
@@ -884,7 +884,7 @@ public partial class FmodAudioProvider : IAudioProvider
         return new ProviderRanks(voices, _renderAheadIds);
     }
 
-    internal sealed record RankedVoice(int Id, string Sound, float Distance, OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail? Detail,
+    internal sealed record RankedVoice(int Id, string Sound, float Distance, OpenFPS.Sound.Core.Engine.EngineDetail? Detail,
                                        bool LateField, bool Echoes);
     internal sealed record ProviderRanks(IReadOnlyList<RankedVoice> Voices, int[] RenderAhead);
     private readonly Dictionary<TrainVoiceState, (float Level, int Id)> _snapshotTrains = new();
@@ -1188,7 +1188,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>Where the listener is, for the wind at their ears; null when nobody is in a world.</summary>
-    public void SetEarWind(OpenFPS.Common.EarWindListener? listener) => _earWind?.SetListener(listener);
+    public void SetEarWind(OpenFPS.Sound.EarWindListener? listener) => _earWind?.SetListener(listener);
 
     /// <summary>The wind at the ears on or off, for the lab, which measures one source at a time.</summary>
     public bool EarWindEnabled
@@ -1198,7 +1198,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>Diagnostics: what the ears were last placed at, dBFS, and what the wind is there.</summary>
-    public (float LeftDbfs, float RightDbfs, OpenFPS.Common.EarWindAtEars Ears) EarWindLevels
+    public (float LeftDbfs, float RightDbfs, OpenFPS.Sound.EarWindAtEars Ears) EarWindLevels
         => _earWind is { } w ? (w.Synth.RenderedLeftDb, w.Synth.RenderedRightDb, w.Synth.Last) : (-150f, -150f, default);
 
     /// <summary>Steam Audio's HRTF stage and its voice pool. Without it, FMOD pans.</summary>
@@ -1385,7 +1385,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private double _roomAdvancedAt;
 
     // From the world's air temperature; 20 °C until the weather says otherwise.
-    private float _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound;
+    private float _speedOfSound = OpenFPS.Sound.Core.AudioPhysics.SpeedOfSound;
 
     /// <summary>FMOD's Doppler (a voice it pans, with no HRTF voice) runs at 340 m/s times its Doppler
     /// scale: the scale that makes it the world's speed, as the binaural voices' Doppler is.</summary>
@@ -1393,7 +1393,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     public void SetAirTemperature(float celsius)
     {
-        float c = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSoundAt(celsius);
+        float c = OpenFPS.Sound.Core.AudioPhysics.SpeedOfSoundAt(celsius);
         if (c != _speedOfSound && _system.hasHandle())
             FmodCheck(_system.set3DSettings(FmodDopplerScale(c), 1.0f, 1.0f), "set3DSettings");
         _speedOfSound = c;
@@ -1544,13 +1544,13 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The air this mixer's world is in: the speed of sound its Doppler, echoes and flight times read,
     /// and the temperature its engines' cooling and air conditioners run against. Set with the weather
     /// (<see cref="SetAirTemperature"/>); the host reads the same one (AudioEngineFacade.Atmosphere).</summary>
-    public OpenFPS.Client.AudioEngine.Core.Atmosphere Atmosphere { get; } = new();
+    public OpenFPS.Sound.Core.Atmosphere Atmosphere { get; } = new();
 
     /// <summary>How this mixer's world is heard: the law's compression (/levels), the ear model (/ear) and the
     /// player's listening level (/listening). Every voice it places, and the host's audio system through
     /// AudioEngineFacade.Hearing, reads this one. The run's environment chooses it until the host's saved
     /// settings do.</summary>
-    public OpenFPS.Common.Hearing.HearingSettings Hearing { get; init; } = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
+    public OpenFPS.Sound.Hearing.HearingSettings Hearing { get; init; } = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     /// <summary>The rate this mixer runs at, Hz: what FMOD granted (<see cref="MixerQuality.RequestedRate"/> is
     /// what was asked), <see cref="MixerQuality.DefaultRate"/> until it is made. Everything that renders for this
@@ -1681,14 +1681,14 @@ public partial class FmodAudioProvider : IAudioProvider
 
     /// <summary>The detail a voice radiating <paramref name="level"/> here should run at, against the
     /// loudest machine's <paramref name="loudest"/> (both linear), from the detail it has now.</summary>
-    internal static OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail DetailFor(
-        OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail now, float level, float loudest, bool enabled, bool all = false)
+    internal static OpenFPS.Sound.Core.Engine.EngineDetail DetailFor(
+        OpenFPS.Sound.Core.Engine.EngineDetail now, float level, float loudest, bool enabled, bool all = false)
     {
-        if (!enabled || loudest <= 0f) return OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
-        bool reduced = now == OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced;
+        if (!enabled || loudest <= 0f) return OpenFPS.Sound.Core.Engine.EngineDetail.Full;
+        bool reduced = now == OpenFPS.Sound.Core.Engine.EngineDetail.Reduced;
         float limit = loudest * MathF.Pow(10f, -(reduced ? DetailBackDb : DetailUnderDb) / 20f);
-        return all || level < limit ? OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Reduced
-                                    : OpenFPS.Client.AudioEngine.Core.Engine.EngineDetail.Full;
+        return all || level < limit ? OpenFPS.Sound.Core.Engine.EngineDetail.Reduced
+                                    : OpenFPS.Sound.Core.Engine.EngineDetail.Full;
     }
 
     /// <summary>
@@ -1697,7 +1697,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// headroom back (<see cref="ActiveSound.HeadroomGain"/>), which is no louder at the ear. No path: occlusion and
     /// the cone swing as a siren passes behind a building, and ranking the echoes on them flickered the trace.
     /// </summary>
-    internal static float HeardHere(OpenFPS.Common.Hearing.HearingSettings hearing, ActiveSound a, Vector3 listener)
+    internal static float HeardHere(OpenFPS.Sound.Hearing.HearingSettings hearing, ActiveSound a, Vector3 listener)
         => OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(hearing,
                OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(a.BaseVolume, a.HeadroomGain), a.MinDistance, a.Range,
                Vector3.Distance(listener, a.Position), 0f, a.EarLevelDb, a.RankKey, a.Physical);
@@ -1722,7 +1722,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>Every voice's <see cref="ActiveSound.Heard"/>, once an update, before the orderings that read it.</summary>
-    internal static void RankVoices(OpenFPS.Common.Hearing.HearingSettings hearing, List<ActiveSound> sounds, Vector3 listener)
+    internal static void RankVoices(OpenFPS.Sound.Hearing.HearingSettings hearing, List<ActiveSound> sounds, Vector3 listener)
     {
         foreach (var a in sounds) a.Heard = HeardHere(hearing, a, listener);
     }
@@ -1746,12 +1746,12 @@ public partial class FmodAudioProvider : IAudioProvider
 
     /// <summary>The lab's levers on this mixer's world (LabLevers): what it makes is made with them. A new one
     /// is the game; an instrument gives its own.</summary>
-    public OpenFPS.Client.AudioEngine.Core.LabLevers Lab
+    public OpenFPS.Sound.Core.LabLevers Lab
     {
         get => _lab;
         init { _lab = value; Traced.Lab = value; }
     }
-    private readonly OpenFPS.Client.AudioEngine.Core.LabLevers _lab = new();
+    private readonly OpenFPS.Sound.Core.LabLevers _lab = new();
 
     /// <summary>This mixer's live levers (the console's): the reflections' trims, the traced echoes, the cabin's
     /// response, far engines' detail and the valves' rush. The host turns the same one (AudioEngineFacade.Mix).
@@ -2568,13 +2568,13 @@ public partial class FmodAudioProvider : IAudioProvider
         _trains[shared] = t;
         Log.Information("Train '{Train}' ({Profile}): one model, {Sources} source(s) over {Length:F0} m, heard through at most {Voices} voice(s); {Lanes} lane(s) render its engines and signals",
                         shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres,
-                        OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots, t.Lanes.Length);
+                        OpenFPS.Sound.Core.Rail.TrainVoicing.Slots, t.Lanes.Length);
         // Sounding already: the horn came in before the model was made. On the train's own timeline, so the
         // blast is where the signal put it however late the model came.
         if (_trainSignals.TryGetValue(shared, out var sig))
         {
             double ago = Clock.Now - sig.At;
-            if (ago < OpenFPS.Common.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
+            if (ago < OpenFPS.Sound.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
         }
         if (_trainPlans.Remove(shared, out var plans))
             for (int slot = 0; slot < plans.Length; slot++)
@@ -2592,11 +2592,11 @@ public partial class FmodAudioProvider : IAudioProvider
             try
             {
                 if (TrainFor(preset, train, rate) is { } t) t.SetPlan(slot, plan);
-                else if (slot >= 0 && slot < OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots)
+                else if (slot >= 0 && slot < OpenFPS.Sound.Core.Rail.TrainVoicing.Slots)
                 {
                     string shared = preset + "/" + train;
                     if (!_trainPlans.TryGetValue(shared, out var plans))
-                        _trainPlans[shared] = plans = new TrainSlotPlan?[OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots];
+                        _trainPlans[shared] = plans = new TrainSlotPlan?[OpenFPS.Sound.Core.Rail.TrainVoicing.Slots];
                     plans[slot] = plan;
                 }
             }
@@ -2640,9 +2640,9 @@ public partial class FmodAudioProvider : IAudioProvider
             var t = TrainFor(preset, train, rate);
             if (t == null) { making = true; return null; }
             // Declared at the train's loudest field source; a signal's voice at the signal's own level.
-            float level = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout);
-            int signal = slot == OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.WarningSlot ? OpenFPS.Common.TrainSignal.WarningSource(t.Layout)
-                       : slot == OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.BellSlot ? OpenFPS.Common.TrainSignal.BellSource(t.Layout) : -1;
+            float level = OpenFPS.Sound.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout);
+            int signal = slot == OpenFPS.Sound.Core.Rail.TrainVoicing.WarningSlot ? OpenFPS.Sound.TrainSignal.WarningSource(t.Layout)
+                       : slot == OpenFPS.Sound.Core.Rail.TrainVoicing.BellSlot ? OpenFPS.Sound.TrainSignal.BellSource(t.Layout) : -1;
             if (signal >= 0) level = t.Layout[signal].LevelDb;
             return new TrainSlotState(t, slot, level, rate);
         }
@@ -2665,7 +2665,7 @@ public partial class FmodAudioProvider : IAudioProvider
         int places = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1;
         PlacedNatureVoice voice = kind == OpenFPS.Common.ModelSynth.Shore
             ? ShoreVoice(emitter, rate)
-            : kind == OpenFPS.Common.ModelSynth.Wood && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
+            : kind == OpenFPS.Common.ModelSynth.Wood && OpenFPS.Sound.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Foliage(woodPreset), places, rate,
                                     emitter.Seed * 43 + 17, emitter.Position, Weather)
               { WindPlaces = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?[1..], TargetTrees = emitter.Trees }
@@ -2697,7 +2697,7 @@ public partial class FmodAudioProvider : IAudioProvider
             return new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Shore(emitter.PhysicalKey), null, rate,
                                          emitter.Seed * 53 + 23, emitter.Position, Weather, ExtendedSources.MaxPlaces)
                    { TargetCut = PiecesOf(emitter.EntityId) };
-        OpenFPS.Common.ShoreSpec.ParseKey(emitter.PhysicalKey, out string shorePreset, out var geometry);
+        OpenFPS.Sound.ShoreSpec.ParseKey(emitter.PhysicalKey, out string shorePreset, out var geometry);
         var spec = OpenFPS.Common.ModelLibrary.Presets.Shore(shorePreset);
         return new PlacedNatureVoice(emitter.PhysicalKey, spec, geometry ?? spec.DefaultGeometry, rate,
                                      emitter.Seed * 53 + 23, emitter.Position, Weather);
@@ -3236,7 +3236,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 {
                     OpenFPS.Common.ModelSynth.Rail => RailSlot(emitter.PhysicalKey, mrate, out making),
                     // The arm follows the crossing's closed signal (Running, the server's word).
-                    OpenFPS.Common.ModelSynth.Gate => new GateVoiceState(OpenFPS.Common.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
+                    OpenFPS.Common.ModelSynth.Gate => new GateVoiceState(OpenFPS.Sound.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
                     // Given their place: they read the wind where they stand (NatureVoiceState).
                     OpenFPS.Common.ModelSynth.Water => Water(emitter.PhysicalKey, mrate, emitter.Seed, emitter.Position, emitter),
                     // Heard from places across it (ExtendedSources), all reading the middle's synth.
@@ -3435,7 +3435,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 radiatorDsp = GetRadiatorDsp();
                 if (radiatorDsp != null)
                 {
-                    Span<float> aim = stackalloc float[OpenFPS.Common.Radiator.Bands];
+                    Span<float> aim = stackalloc float[OpenFPS.Sound.Radiator.Bands];
                     emitter.Radiator.Gains(OffAxis(emitter.Direction, emitter.Position, _listenerPos), aim);
                     radiatorDsp.State.Start(aim);
                     if (channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, radiatorDsp.Dsp) != RESULT.OK)
@@ -3614,7 +3614,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 var power = GetRadiatorDsp();
                 if (power != null)
                 {
-                    Span<float> share = stackalloc float[OpenFPS.Common.Radiator.Bands];
+                    Span<float> share = stackalloc float[OpenFPS.Sound.Radiator.Bands];
                     activeSound.Radiator.PowerGains(share);
                     power.State.Start(share);
                     if (activeSound.Channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, power.Dsp) == RESULT.OK)
@@ -3918,7 +3918,7 @@ public partial class FmodAudioProvider : IAudioProvider
     public float MixerLoad => _mixerLoad;
     private volatile float _mixerLoad;
     /// <summary>The load sample's interval timer, restarted every quarter second: never a timebase for
-    /// positions (a restart gives a negative age). Timestamps come from <see cref="OpenFPS.Common.IAudioClock"/>.</summary>
+    /// positions (a restart gives a negative age). Timestamps come from <see cref="OpenFPS.Sound.IAudioClock"/>.</summary>
     private readonly System.Diagnostics.Stopwatch _loadSampleClock = System.Diagnostics.Stopwatch.StartNew();
 
     /// <summary>FMOD's own DSP load, per cent of the mixer's deadline, now. The lab's cost figures.</summary>
@@ -4410,7 +4410,7 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             Vector3 rel = active.CurrentApparentPosition - lPosVec;
             float bearing = MathF.Atan2(rel.X, rel.Z) * (180f / MathF.PI);
-            float doppler = OpenFPS.Client.AudioEngine.Core.AudioPhysics.DopplerFactor(
+            float doppler = OpenFPS.Sound.Core.AudioPhysics.DopplerFactor(
                 lPosVec, _listenerVel, DeadReckon(active, active.Position, now), active.Velocity, speedOfSound: _speedOfSound);
             Console.WriteLine($"[ATRACE],{now:F4},{active.EntityId},{active.CurrentApparentPosition.X:F3},"
                             + $"{active.CurrentApparentPosition.Y:F3},{active.CurrentApparentPosition.Z:F3},"
@@ -4525,7 +4525,7 @@ public partial class FmodAudioProvider : IAudioProvider
         if (float.IsNaN(listenerGround)) listenerGround = ear.Y - 1.7f;
         float ground = float.IsNaN(active.BendGround) ? listenerGround : active.BendGround;
         var from = active.CurrentApparentPosition != Vector3.Zero ? active.CurrentApparentPosition : active.Position;
-        var taken = OpenFPS.Common.Bending.Along(Weather, from, ear, ground, active.OverWater, Weather.Now, _speedOfSound).TakenDb;
+        var taken = OpenFPS.Sound.Core.Bending.Along(Weather, from, ear, ground, active.OverWater, Weather.Now, _speedOfSound).TakenDb;
         active.TargetBentLowDb = taken.Low; active.TargetBentMidDb = taken.Mid; active.TargetBentHighDb = taken.High;
         if (first) { active.BentLowDb = taken.Low; active.BentMidDb = taken.Mid; active.BentHighDb = taken.High; }
     }
@@ -4586,7 +4586,7 @@ public partial class FmodAudioProvider : IAudioProvider
             float cos = OffAxis(active.Direction, active.Position, lPosVec);
             if (active.RadiatorDsp != null)
             {
-                Span<float> beam = stackalloc float[OpenFPS.Common.Radiator.Bands];
+                Span<float> beam = stackalloc float[OpenFPS.Sound.Radiator.Bands];
                 if (active.RadiatorPowerDsp != null) active.Radiator.BeamOverPower(cos, beam);
                 else active.Radiator.Gains(cos, beam);
                 active.RadiatorDsp.State.SetTargets(beam);
@@ -4624,7 +4624,7 @@ public partial class FmodAudioProvider : IAudioProvider
         if (active.SaState != null)
         {
             Vector3 sourceNow = DeadReckon(active, active.Position, Clock.Now);
-            float doppler = OpenFPS.Client.AudioEngine.Core.AudioPhysics.DopplerFactor(
+            float doppler = OpenFPS.Sound.Core.AudioPhysics.DopplerFactor(
                 lPosVec, _listenerVel, sourceNow, active.Velocity, speedOfSound: _speedOfSound);
             float basePitch = (active.GranularState != null || active.SynthState != null || active.EngineState != null || active.EchoState != null) ? 1.0f : active.Pitch;
 
@@ -4849,7 +4849,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     /// <summary>The trim for each direction asked about, by direction to a degree or so; null where Steam
     /// Audio would not measure one.</summary>
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(int, int, int), OpenFPS.Client.AudioEngine.Core.Engine.BandEq?> _cabinTrims = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(int, int, int), OpenFPS.Sound.Core.Engine.BandEq?> _cabinTrims = new();
     private readonly System.Collections.Concurrent.ConcurrentQueue<((int, int, int) Key, Vector3 Dir)> _trimsAsked = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(int, int, int), byte> _trimsPending = new();
     private System.Threading.Tasks.Task _trimsMaking = System.Threading.Tasks.Task.CompletedTask;
@@ -4863,7 +4863,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     /// <summary>The trim for a path from <paramref name="dir"/>, if it is made; else false, and it is
     /// started. Asked again every update until made.</summary>
-    private bool CabinTrimFor(Vector3 dir, out OpenFPS.Client.AudioEngine.Core.Engine.BandEq? eq)
+    private bool CabinTrimFor(Vector3 dir, out OpenFPS.Sound.Core.Engine.BandEq? eq)
     {
         var key = ((int)MathF.Round(dir.X * 50f), (int)MathF.Round(dir.Y * 50f), (int)MathF.Round(dir.Z * 50f));
         if (_cabinTrims.TryGetValue(key, out eq)) return true;
@@ -4886,7 +4886,7 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             if (!_hrtfOnePlaceMeasured)
             {
-                var one = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace;
+                var one = OpenFPS.Sound.Core.Engine.CabinPaths.OnePlace;
                 _hrtfOnePlace = HrtfBands.Measure(_saContext, _hrtfMeasureHead, MixerRate, _saFrameSize,
                                                   Vector3.Normalize(new Vector3(one.X, one.Y, -one.Z)));
                 _hrtfOnePlaceMeasured = true;
@@ -4897,12 +4897,12 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 made++;
                 var here = HrtfBands.Measure(_saContext, _hrtfMeasureHead, MixerRate, _saFrameSize, ask.Dir);
-                OpenFPS.Client.AudioEngine.Core.Engine.BandEq? eq = null;
+                OpenFPS.Sound.Core.Engine.BandEq? eq = null;
                 if (_hrtfOnePlace != null && here != null)
                 {
                     var trim = new float[here.Length];
                     for (int k = 0; k < trim.Length; k++) trim[k] = Math.Clamp(_hrtfOnePlace[k] - here[k], -12f, 12f);
-                    eq = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Design(trim, MixerRate);
+                    eq = OpenFPS.Sound.Core.Engine.BandEq.Design(trim, MixerRate);
                 }
                 if (_cabinTrims.Count > 512) _cabinTrims.Clear();
                 _cabinTrims[ask.Key] = eq;

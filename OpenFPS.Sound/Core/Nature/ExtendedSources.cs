@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Core.Nature;
+namespace OpenFPS.Sound.Core.Nature;
 
 /// <summary>
 /// A source that is metres across, heard as metres across: a tree's crown, a fire's bed.
@@ -262,8 +261,8 @@ public static class ExtendedSources
     /// <summary>The same for a line covering <paramref name="covered"/> degrees of the ear's view.</summary>
     private static int WantedPieces(float covered, int previous)
     {
-        int fewest = Math.Max(1, (int)MathF.Ceiling(covered / OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SplitAboveDegrees - 1e-4f));
-        int most = Math.Max(fewest, (int)MathF.Floor(2f * covered / OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.MergeBelowDegrees));
+        int fewest = Math.Max(1, (int)MathF.Ceiling(covered / OpenFPS.Sound.Core.Rail.TrainVoicing.SplitAboveDegrees - 1e-4f));
+        int most = Math.Max(fewest, (int)MathF.Floor(2f * covered / OpenFPS.Sound.Core.Rail.TrainVoicing.MergeBelowDegrees));
         int n = previous <= 0 ? fewest : Math.Clamp(previous, fewest, most);
         return Math.Min(n, MaxPlaces);
     }

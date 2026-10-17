@@ -1,6 +1,6 @@
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Core.Engine;
-using OpenFPS.Common;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
+using OpenFPS.Sound.Core.Engine;
 
 namespace OpenFPS.Tests;
 
@@ -183,7 +183,7 @@ public class GearHuntingTests
     public static TheoryData<string> Keys()
     {
         var d = new TheoryData<string>();
-        foreach (var k in OpenFPS.Common.VehicleProfile.Presets.Keys) d.Add(k);
+        foreach (var k in OpenFPS.Sound.VehicleProfile.Presets.Keys) d.Add(k);
         return d;
     }
 
@@ -191,7 +191,7 @@ public class GearHuntingTests
     [MemberData(nameof(Keys))]
     public void AtASteadyCruiseItSettlesInAGear(string key)
     {
-        var v = OpenFPS.Common.VehicleProfile.ByName(key);
+        var v = OpenFPS.Sound.VehicleProfile.ByName(key);
         foreach (float kmh in new[] { 30f, 45f })
         {
             float speed = kmh / 3.6f;

@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core;
 

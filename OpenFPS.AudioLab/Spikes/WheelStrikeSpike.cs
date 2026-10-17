@@ -1,6 +1,6 @@
 using System.Globalization;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Common;
+using OpenFPS.Sound;
+using OpenFPS.Sound.Core;
 
 namespace OpenFPS.AudioLab.Spikes;
 

@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Hearing;
+namespace OpenFPS.Sound.Hearing;
 
 /// <summary>
 /// Loudness of a steady sound from its one-third-octave band levels: ISO 532-1:2017, the method for

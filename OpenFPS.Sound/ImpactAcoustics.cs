@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Sound;
 
 /// <summary>
 /// Two things meeting, from two materials, a size, a closing speed and two masses, whatever the things
