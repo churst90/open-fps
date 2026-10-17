@@ -494,8 +494,12 @@ over its one-third octaves, as a wall's is.
 
 The gaps are the door's data: `DoorGapMetres` round the jambs and head and `DoorUndercutMetres` under it, on a
 prefab (into `PortalComponent.GapMetres` and `UndercutMetres`, so the client has them). Absent, a door takes the
-default for where it hangs: between two rooms 3 mm round and a 10 mm undercut; with the outdoors on either side
-0.3 mm all round, weatherstripped and swept. The lift door declares 6 mm round and at its sill, the most EN 81-20
+default for where it hangs: between two rooms 3 mm round and a 10 mm undercut; with open air on either side
+0.3 mm all round, weatherstripped and swept. Open air is the outdoors or any place that is not indoors, whatever
+surfaces it has (`OpeningRoutes.IsOpenAir`): a roof is a place of its own with a floor and a parapet, and until
+2026-10-17 its access door took a room door's gaps (-12/-17/-15 dB shut; now -13/-41/-37, the low band its leaf's).
+On the city those five roof access doors are the only ones the rule moved; on Albany and Magnolia no door joins a
+room to a place in the open air that has surfaces. The lift door declares 6 mm round and at its sill, the most EN 81-20
 allows a landing door. A map may set a door's gaps where it places it, over its prefab's (`DoorGapMetres` and
 `DoorUndercutMetres` on the map entity): the city's stair doors are fire doors sealed against smoke, 3 mm round and
 3 mm under, where the same steel door at a roof access or a way out keeps the default. The leaf's thickness is the slit's depth. A leaf swung partly open adds its gaps only for
@@ -511,6 +515,7 @@ Measured with `--path-probe` (its `nogaps` switch is the old rule) in Selby Hous
 | the corridor heard 2 m into flat 00B (door shut) | -17.6/-27.3/-54.7 | -17.6/-16.4/-15.6 |
 | the street heard in the lobby (door shut) | -18.1/-28.0/-44.6 | -18.1/-27.5/-31.7 |
 | the corridor heard in the lobby (stair door shut; its smoke seals since, -13.5/-18.6/-16.4) | -13.5/-48.4/-58.8 | -13.5/-16.7/-16.0 |
+| the roof heard at the stair head 4.5 m away (roof access door shut; weatherstripped since, -13.5/-41.1/-38.0) | -13.5/-48.4/-58.8 | -13.5/-16.7/-16.2 |
 
 Resonance measured the same rule as a telephone heard from a restroom 15 dB down with the door open and 33 shut;
 the flat's door here puts a shut door about 16 dB under an open one, as the measured doors do.

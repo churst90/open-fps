@@ -37,6 +37,36 @@ internal static class DoorFaceSurvey
         return list;
     }
 
+    /// <summary>
+    /// The doors that take the outdoor seal by a place with surfaces that is not indoors (a roof, a terrace) rather than
+    /// by the outdoors (OpeningRoutes.IsOpenAir, 2026-10-17): until then each took the gaps of a door between two rooms.
+    /// Counted by what the open-air place is called, its numbers left out, and by whether the door declares its gaps.
+    /// </summary>
+    public static void OpenAir(ITestOutputHelper output, string id, WorldSnapshot world, OpeningRoutes routes)
+    {
+        var map = world.AcousticMap!;
+        string Name(int node) => map.Regions.TryGetValue(node, out var r) ? r.FriendlyName : node.ToString();
+        string Kind(string name) => new string(name.Where(c => !char.IsDigit(c)).ToArray()).Trim();
+        var doors = routes.Openings.Where(o => o.Kind == OpeningRoutes.DoorKind).ToList();
+        var changed = doors.Where(o => o.NodeA != OpeningRoutes.Outside && o.NodeB != OpeningRoutes.Outside
+                                       && (routes.IsOpenAir(o.NodeA) || routes.IsOpenAir(o.NodeB))).ToList();
+        bool Declared(OpeningRoutes.Opening o)
+            => world.Entities.TryGetValue(o.Id, out var e) && e.Definition.Portal is { } p && p.GapMetres > 0f && p.UndercutMetres > 0f;
+        output.WriteLine($"{id}: {doors.Count} doors; to the outdoors {doors.Count(o => o.NodeA == OpeningRoutes.Outside || o.NodeB == OpeningRoutes.Outside)}, "
+                       + $"to a place in the open air {changed.Count} ({changed.Count(Declared)} declaring their own gaps), "
+                       + $"between two places indoors {doors.Count - changed.Count - doors.Count(o => o.NodeA == OpeningRoutes.Outside || o.NodeB == OpeningRoutes.Outside)}");
+        foreach (var g in changed.GroupBy(o => (Kind(Name(routes.IsOpenAir(o.NodeA) ? o.NodeA : o.NodeB)),
+                                               Kind(Name(routes.IsOpenAir(o.NodeA) ? o.NodeB : o.NodeA)), Declared(o)))
+                                 .OrderByDescending(g => g.Count()))
+        {
+            var o = g.First();
+            string door = world.Entities.TryGetValue(o.Id, out var e) ? e.Definition.Identity.Name : "";
+            output.WriteLine($"  {g.Count()} between '{g.Key.Item2}' and open-air '{g.Key.Item1}'{(g.Key.Item3 ? " (own gaps)" : "")}: "
+                           + $"e.g. door {o.Id} '{door}' at ({o.Centre.X:F2}, {o.Centre.Z:F2}, floor {o.Centre.Y - o.HalfHeight:F2}), "
+                           + $"its gaps {10f * MathF.Log10(MathF.Max(1e-12f, o.Gaps.Y)):F1} dB mid");
+        }
+    }
+
     public static void Say(ITestOutputHelper output, string id, WorldSnapshot world)
     {
         var acoustics = new SpatialAcoustics();
@@ -50,6 +80,7 @@ internal static class DoorFaceSurvey
         output.WriteLine($"{id}: {routes.Openings.Count} openings; the first-named place along the normal {along}, against it {against}, "
                        + $"sides not as named {routes.Openings.Count - along - against}"
                        + $" (doors {routes.Openings.Count(o => o.Kind == OpeningRoutes.DoorKind && o.ASide < 0)} against)");
+        OpenAir(output, id, world, routes);
         foreach (var (o, off) in offs.OrderByDescending(x => MathF.Abs(x.Off)).Take(5))
             output.WriteLine($"  door {o.Id} at ({o.Centre.X:F2}, {o.Centre.Z:F2}, floor {o.Centre.Y - o.HalfHeight:F2}): leaf {off:F3} m off the middle of a wall {2 * o.HalfDepth:F2} m deep");
 

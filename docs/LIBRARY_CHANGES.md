@@ -6,6 +6,11 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- A door with open air on either side takes the outdoor seal (0.3 mm) by default, the open air being the outdoors or
+  any place whose `Room.IsIndoor` is false, whatever surfaces it has (`OpeningRoutes.IsOpenAir`, new). A host that
+  sets `IsIndoor` on its rooms need do nothing. A host that leaves it false on rooms with surfaces (it is false
+  unless set) finds the doors between them sealed as if to the outdoors, 20 to 25 dB tighter in the middle band:
+  set `IsIndoor` true on every room that is indoors, or give its doors their own gaps.
 - `OpeningRoutes.FieldAt` steps out of each doorway on the side `ASide` says, not on the assumption that `NodeA`
   lies along `Normal`. A host need do nothing; one whose openings name their places against the normal (most of
   open-fps's) finds the point a field is heard from (`inField`) outside the listener's room now, where it was inside

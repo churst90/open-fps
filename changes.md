@@ -4,6 +4,18 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- A door with open air on either side is weatherstripped by rule, whatever the open air is called
+  (docs/CLIENT_NOTES.md "A shut door leaks by its gaps"). A door's default gaps (`OpeningRoutes.GapsRound`) were
+  the outdoor door's 0.3 mm only where the graph's outdoors node was on one side; a roof is a place with surfaces
+  (`IsIndoor` false), a node of its own, so the city's five roof access doors took a room door's 3 mm and 10 mm
+  undercut and passed -12/-17/-15 dB shut. A place that is not indoors is open air now (`OpeningRoutes.IsOpenAir`),
+  and a door to it takes the outdoor seal; a door's own gaps still win. Selby House's roof access door, measured
+  with `--path-probe` from the stair head to the roof 4.5 m out: -13.5/-16.7/-16.2 dB, now -13.5/-41.1/-38.0 (the
+  low band is the wall's); its gaps -18/-17/-15, now -47/-42/-37. Surveyed: the city's five roof access doors
+  change and no other door on the city, Albany or Magnolia (no other door joins a room to a place in the open air
+  that has surfaces). Guards: `DoorGapsTests.AShutDoorToAPlaceInTheOpenAirIsWeatherstripped` and
+  `ADoorsOwnGapsWinOverTheOpenAir`, a room and a roof terrace, each proven by breaking. The wire hash changes
+  (a4934bb0ca23 to 526af64590ed); the door fingerprint does not (c8fa0894bef3); the stored streams pass unregenerated.
 - The street heard indoors is traced from the street again, whichever way a map names a door's places
   (docs/CLIENT_NOTES.md "A doorway route leaves from the wall's face"). `OpeningRoutes.FieldAt` took an opening's
   first-named place to lie along its normal; the graph takes either, and most are named the other way (the city's

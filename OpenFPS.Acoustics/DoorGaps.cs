@@ -20,14 +20,15 @@ public readonly record struct DoorGaps(float RoundMetres, float UnderMetres)
     /// <summary>The gap under a door hung between two rooms, metres: undercut to let the rooms' air through.</summary>
     public const float InteriorUnderMetres = 0.010f;
 
-    /// <summary>What is left open round a door to the outdoors, metres, at its jambs, head and threshold alike:
-    /// weatherstripped and swept shut against the weather.</summary>
+    /// <summary>What is left open round a door to the open air (the outdoors, a roof), metres, at its jambs, head and
+    /// threshold alike: weatherstripped and swept shut against the weather.</summary>
     public const float OutdoorMetres = 0.0003f;
 
     /// <summary>
     /// A door's gaps as its data gives them (<paramref name="round"/>, <paramref name="under"/>), each zero or less
-    /// taking the default for where it hangs: <see cref="OutdoorMetres"/> round a door with the outdoors on either
-    /// side, <see cref="InteriorRoundMetres"/> and <see cref="InteriorUnderMetres"/> round one between two rooms.
+    /// taking the default for where it hangs: <see cref="OutdoorMetres"/> round a door with open air on either side
+    /// (<paramref name="toOutdoors"/>: the outdoors, or a place that is not indoors such as a roof, whatever surfaces it
+    /// has), <see cref="InteriorRoundMetres"/> and <see cref="InteriorUnderMetres"/> round one between two rooms.
     /// </summary>
     public static DoorGaps For(float round, float under, bool toOutdoors)
         => new(round > 0f ? round : toOutdoors ? OutdoorMetres : InteriorRoundMetres,

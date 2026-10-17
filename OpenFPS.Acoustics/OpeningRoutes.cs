@@ -120,6 +120,8 @@ public sealed class OpeningRoutes
     private readonly Dictionary<int, List<int>> _byNode = new();
     private readonly Dictionary<int, Vector3> _absorption = new();   // node -> Sabine absorption area per band, m²
     private readonly Dictionary<int, int> _nodeOf = new();          // region id -> node
+    /// <summary>The places with surfaces that are open air all the same (a roof, a terrace, a yard): not indoors.</summary>
+    private readonly HashSet<int> _openAir = new();
     /// <summary>The door leaves standing in an opening (in its <see cref="Opening.Contents"/>), by box.</summary>
     private bool[] _leafInOpening = Array.Empty<bool>();
     /// <summary>The scene's terrain, which is no box: it buries every edge at or under its surface.</summary>
@@ -142,6 +144,10 @@ public sealed class OpeningRoutes
 
     /// <summary>Which graph node a region belongs to.</summary>
     public int NodeOf(int regionId) => _nodeOf.TryGetValue(regionId, out int n) ? n : Outside;
+
+    /// <summary>Whether a graph node is open air: the outdoors, or a place with surfaces that is not indoors (a roof, a
+    /// terrace, a yard). A door with open air on either side is hung against the weather (<see cref="GapsRound"/>).</summary>
+    public bool IsOpenAir(int node) => node == Outside || _openAir.Contains(node);
 
     private OpeningRoutes(Solid[] solids, ISolidIndex grid, List<Opening> openings, List<string> problems)
     {
@@ -469,6 +475,7 @@ public sealed class OpeningRoutes
                 if (id == AcousticConstants.GlobalRegionId || id == map.GlobalEnvironmentId) continue;
                 if (region.RoomSize.X <= 0f || RoomAcoustics.OpenFaceCount(region) == 6) continue;
                 model._nodeOf[id] = id;
+                if (!region.IsIndoor) model._openAir.Add(id);
                 // Its flood's lining where it flooded, else its box's faces; an open face absorbs all its area.
                 faceAbsorption[id] = RoomAcoustics.AbsorptionArea(region);
             }
@@ -487,7 +494,7 @@ public sealed class OpeningRoutes
             t0 = clock.Elapsed.TotalMilliseconds;
             if (regionAt != null) model.CheckSides(o, regionAt);
             sidesMs += clock.Elapsed.TotalMilliseconds - t0;
-            GapsRound(o, d);
+            model.GapsRound(o, d);
             if (o.Problem != null) problems.Add($"{o.Kind} {o.Id} at ({o.Centre.X:F1}, {o.Centre.Y:F1}, {o.Centre.Z:F1}): {o.Problem}");
             openings.Add(o);
         }
@@ -699,14 +706,15 @@ public sealed class OpeningRoutes
     /// <summary>
     /// A door's leaf shut leaves its gaps open (<see cref="DoorGaps"/>): what they pass is added to what the leaf lets
     /// through, as much of it as the leaf covers. The gaps are the door's own, or the defaults for where it hangs,
-    /// which its two places say: round a door with the outdoors on either side, weatherstripped; between two rooms,
-    /// a swing's clearance and an undercut. The leaf's thickness is the slit's depth.
+    /// which its two places say: round a door with open air on either side (<see cref="IsOpenAir"/>), the outdoors or
+    /// a place that is not indoors such as a roof, weatherstripped; between two rooms, a swing's clearance and an
+    /// undercut. The leaf's thickness is the slit's depth.
     /// </summary>
-    private static void GapsRound(Opening o, in Declared d)
+    private void GapsRound(Opening o, in Declared d)
     {
         o.Gaps = Vector3.Zero;
         if (o.Kind != DoorKind || o.LeafCover <= 0f || NoDoorGapsForLab) return;
-        var gaps = DoorGaps.For(d.GapMetres, d.UndercutMetres, o.NodeA == Outside || o.NodeB == Outside);
+        var gaps = DoorGaps.For(d.GapMetres, d.UndercutMetres, IsOpenAir(o.NodeA) || IsOpenAir(o.NodeB));
         float leaf = d.Size.X > 0f && d.Size.Z > 0f ? MathF.Min(d.Size.X, d.Size.Z) : 2f * o.HalfDepth;
         o.Gaps = gaps.Leak(2f * o.HalfWidth, 2f * o.HalfHeight, leaf) * o.LeafCover;
         o.Tau = Vector3.Min(Vector3.One, o.Tau + o.Gaps);

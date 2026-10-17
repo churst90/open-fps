@@ -41,7 +41,8 @@ fingerprint changed too, so the door renders are made again once.
    round and a 10 mm undercut between rooms, 0.3 mm to the outdoors, or the door's own (`DoorGapMetres`,
    `DoorUndercutMetres`). Selby House's flat doors pass -14/-16/-16 dB (were -18/-27/-55), its stair doors
    -12/-17/-15 (were -13/-48/-59). docs/CLIENT_NOTES.md "A shut door leaks by its gaps". Listen: "Listen in the
-   game" below.
+   game" below. A door to a place in the open air that has surfaces (a roof) is weatherstripped too since
+   2026-10-17 (`OpeningRoutes.IsOpenAir`): the city's five roof access doors, -13/-41/-37 shut (were -12/-17/-15).
 3. One-off sounds that move while they play have their echoes found and moved (Resonance's 2.6): DONE 2026-10-17,
    unheard (changes.md). A one-off sent moving (`MovesTo`: the sliding and lift doors' runs) and a part of the
    thunder have their copies found again as they go (`OneOffSounds.FollowCopies`) and glided there; a copy no longer
@@ -399,7 +400,11 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
   before in its body but has a little more hiss and sparkle (high band -32 dB, was -45). Standing in the lobby by
   the shut steel door to the corridor (`/tp 17.5 157.5 0.1`), the corridor beyond it (`/tp 20.3 157.5 0.1`) is
   much louder than before (mid -19 dB, was -48; it is a fire door with smoke seals, 3 mm round and under, since
-  2026-10-17): say whether it should sound more sealed than that.
+  2026-10-17): say whether it should sound more sealed than that. Then the roof: at the stair head of Selby
+  House's roof access (`/tp 10.6 155.5 21.3`), in `/weather rain heavy`, with the roof access door shut, the rain
+  on the roof outside (`/tp 10.6 159.5 21.3`) is a dull distant patter, its hiss gone (mid -41 dB, was -17; the
+  door is weatherstripped like a street door since 2026-10-17); open the door and the roof is suddenly there, 25 dB
+  louder in the middle.
 - Your own room's reverb stays binaural (2026-10-17, the fault Cody found 2026-10-17 00:40). On Main Street in
   traffic, `/weather rain heavy` (`/tp 7.0 121.0 0.2`), then walk into Selby House's lobby (`/tp 15.2 157.1 0.1`)
   and clap (T), and shut a door: the lobby's reflections and tail are wide round you, not the same in both

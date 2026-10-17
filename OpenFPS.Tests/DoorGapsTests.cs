@@ -113,9 +113,10 @@ public class DoorGapsTests
 
     /// <summary>Two rooms, A (x &lt; 0) and B (x &gt; 0.11), either side of a brick wall with a 0.9 m doorway at z 2.05
     /// to 2.95 and a hollow-core leaf in it, shut or swung into A; or room A and the outdoors (<paramref name="outdoors"/>,
-    /// no room B and no roof over where it was). <paramref name="gap"/> and <paramref name="under"/> are the door's
-    /// own, zero for the default.</summary>
-    private static WorldSnapshot Rooms(bool open, bool outdoors = false, float gap = 0f, float under = 0f)
+    /// no room B and no roof over where it was); or room A and a roof terrace (<paramref name="terrace"/>: B walled
+    /// round but open to the sky, a place with surfaces that is not indoors). <paramref name="gap"/> and
+    /// <paramref name="under"/> are the door's own, zero for the default.</summary>
+    private static WorldSnapshot Rooms(bool open, bool outdoors = false, float gap = 0f, float under = 0f, bool terrace = false)
     {
         AcousticRegistry.EnsureInitialized();
         const float t = 0.11f;
@@ -126,7 +127,7 @@ public class DoorGapsTests
                               new Vector3(x1 - x0, y1 - y0, z1 - z0), Quaternion.Identity, material, WallBuild.Solid));
         float xb = outdoors ? t : t + 4f;
         Box(-30, 30, -0.2f, 0, -30, 30, "Concrete");                 // the ground
-        Box(-4.3f, xb, 2.7f, 2.9f, -0.3f, 6.3f, "Concrete");          // the roof
+        Box(-4.3f, terrace ? t : xb, 2.7f, 2.9f, -0.3f, 6.3f, "Concrete");   // the roof, over room A alone by a terrace
         Box(-4.3f, -4f, 0, 2.7f, -0.3f, 6.3f, "Brick");               // the outer walls
         Box(-4.3f, xb, 0, 2.7f, -0.3f, 0, "Brick");
         Box(-4.3f, xb, 0, 2.7f, 6f, 6.3f, "Brick");
@@ -155,7 +156,8 @@ public class DoorGapsTests
         int brick = AcousticRegistry.GetProperties("Brick").ResonanceIndex, concrete = AcousticRegistry.GetProperties("Concrete").ResonanceIndex;
         defs.Add(Region(RoomA, new Vector3(-2f, 1.35f, 3f), new Vector3(4f, 2.7f, 6f), new[] { concrete, concrete, brick, brick, brick, brick }));
         if (!outdoors)
-            defs.Add(Region(RoomB, new Vector3(t + 2f, 1.35f, 3f), new Vector3(4f, 2.7f, 6f), new[] { concrete, concrete, brick, brick, brick, brick }));
+            defs.Add(Region(RoomB, new Vector3(t + 2f, 1.35f, 3f), new Vector3(4f, 2.7f, 6f),
+                            new[] { concrete, terrace ? RoomAcoustics.OpenFaceMaterial : concrete, brick, brick, brick, brick }, indoor: !terrace));
 
         var world = new WorldSnapshot();
         foreach (var d in defs)
@@ -174,11 +176,11 @@ public class DoorGapsTests
         Acoustics = new AcousticComponent { LeafMetres = build.LeafMetres, StudSpacingMetres = build.StudSpacingMetres },
     };
 
-    private static EntityDefinition Region(int id, Vector3 at, Vector3 size, int[] materials) => new()
+    private static EntityDefinition Region(int id, Vector3 at, Vector3 size, int[] materials, bool indoor = true) => new()
     {
         EntityId = id,
         Transform = new Transform { Position = at, Rotation = Quaternion.Identity },
-        Region = new RegionComponent { FriendlyName = $"r{id}", RoomSize = size, Materials = materials, IsIndoor = true },
+        Region = new RegionComponent { FriendlyName = $"r{id}", RoomSize = size, Materials = materials, IsIndoor = indoor },
     };
 
     private static OpeningRoutes.Opening DoorOf(WorldSnapshot world, out OpeningRoutes model, out SpatialAcoustics acoustics)
@@ -224,6 +226,38 @@ public class DoorGapsTests
         Assert.True(DbE(door.Gaps.X) < -30f && DbE(door.Gaps.Y) < -30f && DbE(door.Gaps.Z) < -30f, Bands(door.Gaps));
     }
 
+    /// <summary>
+    /// A door from a room to a place in the open air that has surfaces of its own (a roof terrace, the city's roofs: a
+    /// node of the graph, not the outdoors) is hung against the weather all the same: weatherstripped, its gaps the
+    /// outdoor door's to within a decibel and under -30 dB. Until 2026-10-17 such a door took a room door's 3 mm and
+    /// 10 mm undercut (-17 dB in the middle band through the city's roof access doors).
+    /// </summary>
+    [Fact]
+    public void AShutDoorToAPlaceInTheOpenAirIsWeatherstripped()
+    {
+        var door = DoorOf(Rooms(open: false, terrace: true), out var model, out _);
+        var outdoors = DoorOf(Rooms(open: false, outdoors: true), out _, out _);
+        _o.WriteLine($"to a terrace: passes {Bands(door.Tau)} dB, its gaps {Bands(door.Gaps)}; to the outdoors, its gaps {Bands(outdoors.Gaps)}");
+        Assert.True(door.NodeA != OpeningRoutes.Outside && door.NodeB != OpeningRoutes.Outside, "the terrace is a place of its own");
+        Assert.True(model.IsOpenAir(RoomB) && !model.IsOpenAir(RoomA), "the terrace is open air, the room is not");
+        Assert.True(door.Gaps.Y > 0f, "no gaps round the terrace door");
+        Assert.True(DbE(door.Gaps.X) < -30f && DbE(door.Gaps.Y) < -30f && DbE(door.Gaps.Z) < -30f, Bands(door.Gaps));
+        Assert.InRange(DbE(door.Gaps.Y) - DbE(outdoors.Gaps.Y), -1f, 1f);
+    }
+
+    /// <summary>A door's own gaps win over the open air's default: the terrace door declared 3 mm round and under
+    /// leaks by those, as the city's stair doors do.</summary>
+    [Fact]
+    public void ADoorsOwnGapsWinOverTheOpenAir()
+    {
+        var declared = DoorOf(Rooms(open: false, terrace: true, gap: 0.003f, under: 0.003f), out _, out _);
+        var byDefault = DoorOf(Rooms(open: false, terrace: true), out _, out _);
+        var expected = new DoorGaps(0.003f, 0.003f).Leak(2f * declared.HalfWidth, 2f * declared.HalfHeight, LeafSize.Z) * declared.LeafCover;
+        _o.WriteLine($"terrace door: declared 3 mm {Bands(declared.Gaps)}, by default {Bands(byDefault.Gaps)}, 3 mm reckoned on its own {Bands(expected)} dB");
+        Assert.True(DbE(declared.Gaps.Y) > DbE(byDefault.Gaps.Y) + 10f, $"declared {Bands(declared.Gaps)} against {Bands(byDefault.Gaps)}");
+        Assert.InRange(DbE(declared.Gaps.Y) - DbE(expected.Y), -0.1f, 0.1f);
+    }
+
     /// <summary>A door swung open has no gaps to add: its doorway is open.</summary>
     [Fact]
     public void AnOpenDoorAddsNoGaps()
@@ -266,7 +300,7 @@ public class DoorGapsTests
     /// A map sets a door's gaps where it places it, over its prefab's: the city's stair doors are fire doors with smoke
     /// seals, 3 mm round and 3 mm under (gen_city's FIRE_DOOR_GAPS), and the same steel door at a roof access, the
     /// terminal's front entrance and the hangar's back door keeps the default, weatherstripped where it opens to the
-    /// outdoors.
+    /// open air (the outdoors, or a roof).
     /// </summary>
     [Fact]
     public void TheCitysStairDoorsAreSealedAgainstSmoke()
