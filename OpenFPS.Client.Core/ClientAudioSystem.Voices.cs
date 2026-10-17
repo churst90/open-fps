@@ -130,9 +130,6 @@ public partial class ClientAudioSystem
 
     /// <summary>What an entity's own voice is: a moving thing's engine or aeroplane, a wood, a standing
     /// physical model, or a recording (anything authored, a loudspeaker's render).</summary>
-    private VoiceKind OwnVoiceKind(WorldSnapshot world, EntityDefinition def, bool physical)
-        => OwnVoiceKind(def.SoundEmitter.IsSynth, VoiceKey(def), def.EntityId, physical);
-
     private VoiceKind OwnVoiceKind(in SourceSpec spec, int id, bool physical)
         => OwnVoiceKind(spec.IsSynth, VoiceKey(spec), id, physical);
 

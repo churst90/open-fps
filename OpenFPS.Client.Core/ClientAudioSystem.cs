@@ -840,7 +840,7 @@ public partial class ClientAudioSystem
         Stage(1, ref stageTicks);     // 5: the acoustic paths of every active voice
 
         // Once, outside the per-entity pass: who gets a voice is a decision about the set.
-        ChooseLiveEngines(world, visualEyePos);
+        ChooseLiveEngines(visualEyePos);
         // The rain running off (gutters, drains, downpipes), fed before the machines are ranked so a dry
         // gutter is not given a voice. Snow stays where it falls.
         {
@@ -848,8 +848,8 @@ public partial class ClientAudioSystem
             float wet = p.Falling ? (p.Kind == OpenFPS.Common.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : world.RainRateMmPerHour;
             _audio.Weather.Runoff.Update(wet, _audio.Clock.Now);
         }
-        ChooseLiveMachines(world, visualEyePos);
-        ChoosePlaces(world, visualEyePos);
+        ChooseLiveMachines(visualEyePos);
+        ChoosePlaces(visualEyePos);
         _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
         _engineEchoes.SyncGeometry(world, _acoustics.ReflectionWorldFor(world));
         float engineDt = (float)Math.Max(1e-3, _now() - _lastEngineTime);
@@ -1076,9 +1076,6 @@ public partial class ClientAudioSystem
     /// shape its collider gives it (FireSpec.KeyForPlaced), so a fire pit scaled up is a bigger fire.
     /// Memoised: asked several times a frame per source.
     /// </summary>
-    private string VoiceKey(OpenFPS.Common.Networking.EntityDefinition def)
-        => VoiceKey(def.SoundEmitter.SoundId, def.Collider.Shape, def.Collider.Size);
-
     private string VoiceKey(in SourceSpec spec) => VoiceKey(spec.SoundId, spec.Shape, spec.Size);
 
     private string VoiceKey(string? soundId, OpenFPS.Common.Components.ColliderShape shape, Vector3 size)
@@ -1252,7 +1249,7 @@ public partial class ClientAudioSystem
 
     /// <summary>A tree's or a wood's share this frame: the amplitude its voice is played at (0: no voice
     /// of its own), and for a wood how many trees its synth stands for. Everything else: 1, 1.</summary>
-    private float ChorusShare(WorldSnapshot world, int entityId, out float trees)
+    private float ChorusShare(int entityId, out float trees)
     {
         trees = 1f;
         if (IsWood(entityId))
@@ -1271,51 +1268,51 @@ public partial class ClientAudioSystem
     /// and the same airliner idling far off (does not). As for engines: a held slot keeps a bias, a new
     /// one is held a couple of seconds, and a lost one fades, since a running synth has no zero to stop at.
     /// </summary>
-    private void ChooseLiveMachines(WorldSnapshot world, Vector3 eyePos)
+    private void ChooseLiveMachines(Vector3 eyePos)
     {
         double now = _now();
         _machineOrder.Clear();
         _machineGroups.Clear();
         // Trees the budget left without a voice last frame are heard in their wood (WoodChorus.Weigh).
-        if (world.Woods != null) world.Woods.Weigh(eyePos, _woodWeights, _isLiveMachine ??= id => _liveMachines.Contains(id));
+        if (_sources.Woods is { } woods) woods.Weigh(eyePos, _woodWeights, _isLiveMachine ??= id => _liveMachines.Contains(id));
         else { _woodWeights.Individual.Clear(); _woodWeights.Woods.Clear(); }
 
         // A train is one machine: up to nine taps on one synth, ranked by its loudest and admitted
         // together. Ranked tap by tap, its taps dropped and came back all along it as it passed.
-        foreach (int entityId in world.AudioEntityIds)
+        foreach (int entityId in _sources.Audible)
         {
             if (entityId == OwnEntityId) continue;
-            if (!world.Entities.TryGetValue(entityId, out var snap)) continue;
-            var em = snap.Definition.SoundEmitter;
+            if (!_sources.TryGet(entityId, out var src)) continue;
+            ref readonly var em = ref src.Spec;
             if (!em.IsSynth || em.SoundId == null) continue;
-            if (!PhysicalLevel(VoiceKey(snap.Definition), out float levelDb, out float extent)) continue;
+            if (!PhysicalLevel(VoiceKey(em), out float levelDb, out float extent)) continue;
             if (Dry(em.SoundId, entityId, em.SynthRunning, now)) continue;
             // A train's horn or bell that nobody is sounding.
             if (SilentSignal(em.SoundId, now)) continue;
             // A tree past the hand-over is heard in its wood, an empty wood not at all; ranked by what each
             // plays (a wood's trees add in power, so its amplitude by their root).
-            float chorus = ChorusShare(world, entityId, out float chorusTrees);
+            float chorus = ChorusShare(entityId, out float chorusTrees);
             if (chorus <= 0f || chorusTrees <= 1e-3f) continue;
             chorus *= MathF.Sqrt(chorusTrees);
 
             // Ranked by how loud it is at the ear (VoiceManager.HeardLevel, the one rank), with the numbers its
             // emitter plays (ProcessAudioEmitter): its placed gain, its range and the key its spectrum is measured
             // under. Not the gain that gives a quieter render its headroom back, which is no louder at the ear.
-            string voiceKey = VoiceKey(snap.Definition);
-            float d = Vector3.Distance(OpenFPS.Common.EntityEmission.PointFor(snap), eyePos);
+            string voiceKey = VoiceKey(em);
+            float d = Vector3.Distance(src.Emission, eyePos);
             var (gain, reference) = _audio.Hearing.Place(levelDb, extent);
             float range = MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb)));
             // A line cut into pieces is as loud as the law over its whole length, not its middle alone: stood at
             // one end of a stretch you are beside it.
-            float line = LineHeard(snap, voiceKey, reference, eyePos, d);
+            float line = LineHeard(src, voiceKey, reference, eyePos, d);
             float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
-                gain * em.Volume * chorus * line, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(snap, voiceKey), physical: true);
+                gain * em.Volume * chorus * line, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(src, voiceKey), physical: true);
             _heardInRanking[entityId] = level;
             // Switched off by the server (a crossing's bell between trains) and within earshot: the voice it
             // would start with is made now, off the threads that place sounds, so it starts when switched on.
             if (!em.SynthRunning && d < range && !_liveMachines.Contains(entityId)
                 && OpenFPS.Client.AudioEngine.Fmod.VoiceBuilds.Makes(OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth))
-                _audio.PrepareVoice(PhysicalKeyOf(snap, voiceKey), VoiceRegistry.SeedOf(OwnVoiceKind(world, snap.Definition, true), entityId));
+                _audio.PrepareVoice(PhysicalKeyOf(src, voiceKey), VoiceRegistry.SeedOf(OwnVoiceKind(em, entityId, true), entityId));
 
             // A water feature's taps are one fountain the same way, and come and go together.
             bool rail = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _);
@@ -1383,10 +1380,10 @@ public partial class ClientAudioSystem
         {
             if (_wantedMachines.Contains(id)) continue;
             _machineStarted.Remove(id);
-            if (MachineVoiceId(world, id, out int voice)) _voices.Retire(voice);
+            if (MachineVoiceId(id, out int voice)) _voices.Retire(voice);
         }
         foreach (int id in _wantedMachines)
-            if (MachineVoiceId(world, id, out int voice)) _voices.Unretire(voice);
+            if (MachineVoiceId(id, out int voice)) _voices.Unretire(voice);
 
         int admittedGroups = 0;
         _liveMachines.Clear();
@@ -1428,7 +1425,7 @@ public partial class ClientAudioSystem
 
     /// <summary>The id a machine's own voice is under, by its entity: the entity's, or for a wood the id its
     /// voice was given. False for a wood whose voice has none (asking for an id gives one out).</summary>
-    private bool MachineVoiceId(WorldSnapshot world, int entityId, out int voiceId)
+    private bool MachineVoiceId(int entityId, out int voiceId)
     {
         if (_voices.TryIdOf(VoiceKind.Wood, entityId, 0, out voiceId)) return true;
         voiceId = entityId;
@@ -1446,9 +1443,6 @@ public partial class ClientAudioSystem
     /// <summary>The key a standing model's voice is built and measured under: its voice key, and for a stretch
     /// of shore its geometry with it (fetch, which way its water lies), which it carries in its box
     /// (tools/gen_osm.py) and its voice reads from the key.</summary>
-    private static string PhysicalKeyOf(in EntitySnapshot snap, string voiceKey)
-        => PhysicalKeyOf(snap.Definition.Collider.Size, snap.Transform.Rotation, voiceKey);
-
     private static string PhysicalKeyOf(AudioSource src, string voiceKey)
         => PhysicalKeyOf(src.Spec.Size, src.State.Rotation, voiceKey);
 
@@ -1496,7 +1490,7 @@ public partial class ClientAudioSystem
     /// earshot can have one; the budget is a safety net for the placement (HRTF and filters per voice),
     /// giving up reflections, then borrowed voices, then engines, never the cars first.
     /// </summary>
-    private void ChooseLiveEngines(WorldSnapshot world, Vector3 eyePos)
+    private void ChooseLiveEngines(Vector3 eyePos)
     {
         double now = _now();
         _echoMsSmoothed += (_echoPassMs - _echoMsSmoothed) * 0.1;
@@ -1581,16 +1575,16 @@ public partial class ClientAudioSystem
         _engineOrder.Clear();
         _carPreset.Clear();
         _heardInRanking.Clear();
-        foreach (var entityId in world.AudioEntityIds)
+        foreach (var entityId in _sources.Audible)
         {
             if (entityId == OwnEntityId) continue;
-            if (!world.Entities.TryGetValue(entityId, out var snap)) continue;
-            var em = snap.Definition.SoundEmitter;
+            if (!_sources.TryGet(entityId, out var src)) continue;
+            ref readonly var em = ref src.Spec;
             if (!em.IsSynth || em.SoundId == null) continue;
             if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(em.SoundId) is not { } preset) continue;
             _carPreset[entityId] = preset;
 
-            float d2 = Vector3.DistanceSquared(snap.Transform.Position, eyePos);
+            float d2 = Vector3.DistanceSquared(src.State.Position, eyePos);
             // Ranked by how loud it is at the ear (VoiceManager.HeardLevel, the one rank), with the numbers its
             // engine's emitter plays (ProcessAudioEmitter): its declared level placed over the length it radiates
             // from, its range and its spectrum. By distance alone a 132 dB stock car lost its engine to a quiet
@@ -1600,7 +1594,7 @@ public partial class ClientAudioSystem
             var (gain, reference) = _audio.Hearing.Place(levelDb, OutletSeparation(preset));
             float heard = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
                 gain * em.Volume, reference, MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb))),
-                Vector3.Distance(OpenFPS.Common.EntityEmission.PointFor(snap), eyePos), UnaskedOcclusion, levelDb, VoiceKey(snap.Definition), physical: true);
+                Vector3.Distance(src.Emission, eyePos), UnaskedOcclusion, levelDb, VoiceKey(em), physical: true);
             // Louder sorts first, so negated. The keep bias and the hold stop the set churning as cars trade
             // places (EngineKeepBias).
             _heardInRanking[entityId] = heard;
@@ -2018,21 +2012,21 @@ public partial class ClientAudioSystem
     /// <summary>Which live extended sources may spread this frame: the loudest at the ear first (the level the
     /// machines were ranked by, VoiceManager.HeardLevel), while their outer places fit in
     /// <see cref="_adaptivePlaces"/>. One that wants none (too far to be heard as wide) asks for nothing.</summary>
-    private void ChoosePlaces(WorldSnapshot world, Vector3 eyePos)
+    private void ChoosePlaces(Vector3 eyePos)
     {
         _placesGranted.Clear();
         _placeCandidates.Clear();
         foreach (int id in _liveMachines)
         {
-            if (!world.Entities.TryGetValue(id, out var snap)) continue;
-            string key = VoiceKey(snap.Definition);
-            var at = OpenFPS.Common.EntityEmission.PointFor(snap);
+            if (!_sources.TryGet(id, out var src)) continue;
+            string key = VoiceKey(src.Spec);
+            var at = src.Emission;
             float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
             if (length > 0f)
             {
                 // A line: as many pieces as the angle it covers here asks for, the rest of it merged.
                 if (!_cutting.TryGetValue(id, out var c)) _cutting[id] = c = new Cutting();
-                c.Wanted = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.WantedPieces(OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(at, AxisOf(snap), length, eyePos), c.Wanted);
+                c.Wanted = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.WantedPieces(OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(at, AxisOf(src), length, eyePos), c.Wanted);
                 c.Count = 1;
                 if (c.Wanted > 1) _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, c.Wanted - 1));
                 continue;
@@ -2056,7 +2050,6 @@ public partial class ClientAudioSystem
     }
 
     /// <summary>The way a source's own x lies in the world: the way a line of it runs.</summary>
-    private static Vector3 AxisOf(in EntitySnapshot snap) => AxisOf(snap.Transform.Rotation);
     private static Vector3 AxisOf(AudioSource src) => AxisOf(src.State.Rotation);
     private static Vector3 AxisOf(Quaternion rotation) => Vector3.Transform(Vector3.UnitX, rotation);
 
@@ -2065,11 +2058,11 @@ public partial class ClientAudioSystem
     /// mixer's law (ExtendedSources.MeanLawPower). One for anything else, and further off than twice its length,
     /// where the two agree within a decibel.
     /// </summary>
-    private float LineHeard(in EntitySnapshot snap, string key, float reference, Vector3 eyePos, float distance)
+    private float LineHeard(AudioSource src, string key, float reference, Vector3 eyePos, float distance)
     {
         float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
         if (length <= 0f || distance > 2f * length) return 1f;
-        var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(OpenFPS.Common.EntityEmission.PointFor(snap), AxisOf(snap), length, eyePos);
+        var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(src.Emission, AxisOf(src), length, eyePos);
         float point = MathF.Min(1f, MathF.Max(0.1f, reference) / MathF.Max(1e-3f, distance));
         return MathF.Sqrt(OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MeanLawPower(view, reference)) / point;
     }
@@ -3003,7 +2996,7 @@ public partial class ClientAudioSystem
                 headroomGain = OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
                 engineVolume = gain * spec.Volume * headroomGain;
                 // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus).
-                engineVolume *= ChorusShare(world, src.Id, out chorusTrees);
+                engineVolume *= ChorusShare(src.Id, out chorusTrees);
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(levelDb));
