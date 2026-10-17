@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 

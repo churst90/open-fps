@@ -5,6 +5,7 @@ using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

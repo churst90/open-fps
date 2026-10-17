@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 using PV = OpenFPS.Native.SteamAudio.Phonon.IPLVector3;

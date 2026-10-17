@@ -11,6 +11,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

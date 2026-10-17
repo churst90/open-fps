@@ -8,6 +8,7 @@ using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
+using OpenFPS.Materials;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -64,7 +65,7 @@ public static class ThunderSpike
         Say($"source: {Thunder.SourcePa} Pa at {Thunder.SourceMetres} m for a {Thunder.SourcePeakHz} Hz wave (E = {Thunder.SourceEnergyPerMetre():0} J/m); first strokes here take {LightningPhysics.GroundFlashEnergyMedian:0} J/m");
         Say($"Few's peak frequency at that energy: {LightningPhysics.PeakFrequencyHz(LightningPhysics.GroundFlashEnergyMedian):F0} Hz; N-wave {LightningPhysics.NWaveSeconds(LightningPhysics.GroundFlashEnergyMedian) * 1000:F2} ms");
         float c = AudioPhysics.SpeedOfSoundAt(air.TemperatureC);
-        float rho = new OpenFPS.Common.Air(air.TemperatureC, air.PressureMb).Density;
+        float rho = new OpenFPS.Materials.Air(air.TemperatureC, air.PressureMb).Density;
         float a2 = Thunder.AmplitudeAt2m(LightningPhysics.GroundFlashEnergyMedian, c);
         float t0 = LightningPhysics.NWaveSeconds(LightningPhysics.GroundFlashEnergyMedian, c);
         Say($"N-wave lengthening (weak shock): x{Thunder.LengthenedSeconds(t0, a2, 1000f, c, rho) / t0:F3} at 1 km, x{Thunder.LengthenedSeconds(t0, a2, 10000f, c, rho) / t0:F3} at 10 km");

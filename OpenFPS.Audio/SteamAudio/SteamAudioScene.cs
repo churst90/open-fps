@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;

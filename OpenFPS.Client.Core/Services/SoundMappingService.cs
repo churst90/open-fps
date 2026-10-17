@@ -28,7 +28,7 @@ public class SoundMappingService : OpenFPS.Audio.Core.IRecordings
     }
 
     /// <summary>
-    /// The folder under FOOTSTEPS/ a material in <see cref="OpenFPS.Common.AcousticRegistry"/> borrows
+    /// The folder under FOOTSTEPS/ a material in <see cref="OpenFPS.Materials.AcousticRegistry"/> borrows
     /// when it has no recordings of its own. A short list somebody chose by ear, not a guess; anything
     /// else keeps its own name and the fallback chain.
     /// </summary>
@@ -72,7 +72,7 @@ public class SoundMappingService : OpenFPS.Audio.Core.IRecordings
         string action = (force > LandingForce) ? "LANDING" : "FOOTSTEPS";
         
         // The table's own name: "Steel" walks on Metal's recordings.
-        material = OpenFPS.Common.AcousticRegistry.Canonical(material);
+        material = OpenFPS.Materials.AcousticRegistry.Canonical(material);
         string materialName = string.IsNullOrEmpty(material) || material == "None" || material == "Generic" ? "Generic" : material;
         
         // The folders are capitalised: "marble" is Marble.

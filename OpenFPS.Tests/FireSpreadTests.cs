@@ -4,6 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Geometry;
 using Xunit;
 using Xunit.Abstractions;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

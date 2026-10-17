@@ -9,14 +9,14 @@ public static class AudioPhysics
     /// <summary>Default speed of sound in air, m/s (~20 °C).</summary>
     public const float SpeedOfSound = OpenFPS.Acoustics.AcousticConstants.SpeedOfSound;
 
-    /// <summary>Speed of sound in dry air, m/s: the air's own law (<see cref="OpenFPS.Common.Air.SpeedOfSound"/>),
+    /// <summary>Speed of sound in dry air, m/s: the air's own law (<see cref="OpenFPS.Materials.Air.SpeedOfSound"/>),
     /// so a bullet's crack and the mix's Doppler and delays hear one air (the mix had the linear fit
     /// 331.3 + 0.606·T, 0.2 % fast at 40 °C). About 4 % across −20 to +40 °C, shifting every Doppler
     /// factor the same way.</summary>
     /// <param name="celsius">Air temperature. Clamped, so a map's temperature in the wrong units cannot
     /// take the mix off the end of the weather.</param>
     public static float SpeedOfSoundAt(float celsius)
-        => new OpenFPS.Common.Air(Math.Clamp(celsius, -60f, 60f), OpenFPS.Common.Air.Reference.PressureMb).SpeedOfSound;
+        => new OpenFPS.Materials.Air(Math.Clamp(celsius, -60f, 60f), OpenFPS.Materials.Air.Reference.PressureMb).SpeedOfSound;
 
     /// <summary>
     /// Doppler pitch multiplier, f' = f · (c − v_listener·û) / (c − v_source·û), û from source to

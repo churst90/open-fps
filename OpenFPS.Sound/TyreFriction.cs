@@ -1,4 +1,5 @@
 using OpenFPS.Common;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Sound;
 

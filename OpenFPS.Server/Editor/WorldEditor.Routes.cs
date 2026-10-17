@@ -8,6 +8,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Sound;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Server.Editor;
 

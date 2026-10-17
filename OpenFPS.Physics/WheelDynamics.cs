@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Common;
 

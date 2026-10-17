@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Materials;
 
 public struct MaterialProperties
 {
@@ -131,7 +131,7 @@ public struct MaterialProperties
     public float? Restitution { get; set; }
 
     /// <summary>What it is underfoot (Footsteps); null where it is a slab bearing on the ground with an ordinary grit,
-    /// <see cref="Common.Underfoot.Ground"/>.</summary>
+    /// <see cref="Materials.Underfoot.Ground"/>.</summary>
     public Underfoot? Underfoot { get; set; }
 
     /// <summary>

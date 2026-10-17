@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Geometry;
 
 namespace OpenFPS.Audio.SteamAudio;

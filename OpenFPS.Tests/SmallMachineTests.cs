@@ -1,6 +1,7 @@
 using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Yard;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

@@ -126,7 +126,7 @@ public static class TailCostSpike
         // the head (TracedReverbDsp, not TailOnly). A concrete room, traced.
         if (Arg(args, "others") == "1")
         {
-            OpenFPS.Common.AcousticRegistry.Initialize();
+            OpenFPS.Materials.AcousticRegistry.Initialize();
             var q = Quaternion.Identity;
             var room = new List<SteamAudioScene.Box>
             {

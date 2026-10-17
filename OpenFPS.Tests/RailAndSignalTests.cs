@@ -4,6 +4,7 @@ using OpenFPS.Sound.Core.Pneumatics;
 using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Sound.Core.Signals;
 using Xunit.Abstractions;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Server.Water;
 

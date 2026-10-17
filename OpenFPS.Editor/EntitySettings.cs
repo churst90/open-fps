@@ -5,6 +5,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Editing;
 using OpenFPS.Schema;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Server.Editor;
 

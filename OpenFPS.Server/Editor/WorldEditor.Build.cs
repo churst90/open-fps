@@ -13,6 +13,7 @@ using OpenFPS.Words;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Server.Editor;
 

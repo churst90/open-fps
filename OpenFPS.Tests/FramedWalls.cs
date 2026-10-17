@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Geometry;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Acoustics;

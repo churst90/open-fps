@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using OpenFPS.Acoustics;
 using OpenFPS.Common;
+using OpenFPS.Materials;
 using static OpenFPS.Sound.DoorPhysics;
 
 namespace OpenFPS.Sound;

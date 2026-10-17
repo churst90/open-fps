@@ -1,4 +1,5 @@
 using System.Numerics;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Common;
 
@@ -8,7 +9,7 @@ namespace OpenFPS.Common;
 /// carries it (WorldEnvironmentComponent.Outdoors, which the broadcast sends field by field); the laws read
 /// what they need of it: a bullet's and a car's drag the gas (its Air), thunder all of it.
 ///
-/// The gas law itself is the materials' <see cref="OpenFPS.Common.Air"/> (density, speed of sound), below the
+/// The gas law itself is the materials' <see cref="OpenFPS.Materials.Air"/> (density, speed of sound), below the
 /// physics; an audio world's live temperature and speed of sound are its Atmosphere, which its host sets from
 /// this one's temperature.
 /// </summary>

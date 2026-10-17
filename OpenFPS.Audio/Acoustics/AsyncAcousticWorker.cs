@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Audio.Data;

@@ -6,6 +6,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Acoustics;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

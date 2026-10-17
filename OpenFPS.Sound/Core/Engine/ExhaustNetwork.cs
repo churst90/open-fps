@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using System.Runtime.CompilerServices;
 using OpenFPS.Geometry;
 

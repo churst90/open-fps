@@ -3,6 +3,7 @@ using System.Reflection;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Server.Repositories;
 

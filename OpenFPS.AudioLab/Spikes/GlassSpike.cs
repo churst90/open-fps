@@ -5,6 +5,7 @@ using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
+using OpenFPS.Materials;
 
 namespace OpenFPS.AudioLab.Spikes;
 

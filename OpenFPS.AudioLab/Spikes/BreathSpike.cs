@@ -2,6 +2,7 @@ using System.Globalization;
 using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

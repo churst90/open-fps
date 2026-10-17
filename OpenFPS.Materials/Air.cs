@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Materials;
 
 /// <summary>
 /// The air, from its temperature and pressure: its density (what a bullet's and a car's drag push through,

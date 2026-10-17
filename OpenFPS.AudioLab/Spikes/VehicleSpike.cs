@@ -1,6 +1,6 @@
 using System.Numerics;
 using Thread = System.Threading.Thread;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Engine;

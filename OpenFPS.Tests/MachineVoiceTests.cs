@@ -3,6 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Sound;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

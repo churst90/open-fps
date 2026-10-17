@@ -1,5 +1,5 @@
 using OpenFPS.Geometry;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Acoustics;
 

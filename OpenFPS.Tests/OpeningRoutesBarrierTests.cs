@@ -6,6 +6,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Acoustics;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
+using OpenFPS.Materials;
 using Heightfield = OpenFPS.Geometry.Heightfield;
 using SolidSpec = OpenFPS.Geometry.SolidSpec;
 using TriangleWorldBuilder = OpenFPS.Geometry.TriangleWorldBuilder;

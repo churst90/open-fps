@@ -9,6 +9,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Server.Water;
 using Xunit.Abstractions;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

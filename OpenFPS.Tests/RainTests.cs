@@ -11,6 +11,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

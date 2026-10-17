@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Materials;
 
 /// <summary>
 /// The road surfaces a wheel can stand on, as a byte for the wire, and each one's grip against dry

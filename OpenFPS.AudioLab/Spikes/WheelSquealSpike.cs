@@ -6,6 +6,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Native.SteamAudio;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

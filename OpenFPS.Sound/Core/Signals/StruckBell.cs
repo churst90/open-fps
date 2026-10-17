@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Sound.Core.Engine;
 
 namespace OpenFPS.Sound.Core.Signals;

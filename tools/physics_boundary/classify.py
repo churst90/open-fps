@@ -39,6 +39,7 @@ C = 'OpenFPS.Common.'
 G = 'OpenFPS.Geometry.'
 EN = 'OpenFPS.Sound.Core.Engine.'
 SO = 'OpenFPS.Sound.'
+MA = 'OpenFPS.Materials.'
 
 # ── The inventory: (type, group, note) ─────────────────────────────────────────────────────────────
 RULES = [
@@ -70,7 +71,7 @@ RULES = [
     (C + 'AxleSpec', 'P', ''),
     (C + 'TyreSize', 'P', ''),
     (C + 'BrakeKind', 'V', 'mechanics, and the brake squeal reads it'),
-    (C + 'RoadSurfaces', 'V', 'surface grip (Physics) and the surface index the tyres sound by; in OpenFPS.Materials since package stage 1'),
+    (MA + 'RoadSurfaces', 'V', 'surface grip (Physics) and the surface index the tyres sound by; in OpenFPS.Materials since package stage 1'),
     (C + 'RoadGripLaw', 'P', 'a tyre on a wet road: the film, aquaplaning, the grip left'),
     (C + 'RoadTexture', 'V', 'a surface as the wet grip and the water read it'),
     (C + 'MagicCurve', 'P', 'the Magic Formula'),
@@ -105,7 +106,7 @@ RULES = [
     (C + 'BulletState', 'V', ''),
     (C + 'FlightPoint', 'P', ''),
     (C + 'Projectile', 'V', 'what flies, made by a weapon'),
-    (C + 'Air', 'V', 'temperature and pressure: density for drag, and the sound\'s air'),
+    (MA + 'Air', 'V', 'temperature and pressure: density for drag, and the sound\'s air'),
     (SO + 'Ballistics', 'S', 'the crack and the muzzle blast'),
     (C + 'RicochetLaw', 'P', 'a round off a face: whether it skips, how it leaves, the tumbling slug\'s flight'),
     (C + 'Slug', 'V', 'what a round is in flight: the bounce makes it, the whine reads it'),
@@ -188,7 +189,7 @@ def allowed_for_physics(t):
 
 
 def short(t):
-    for p in ('OpenFPS.Geometry.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
+    for p in ('OpenFPS.Geometry.', 'OpenFPS.Materials.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
               'OpenFPS.Sound.Core.Engine.', 'OpenFPS.Server.Systems.', 'OpenFPS.Server.Core.',
               'OpenFPS.Client.Core.'):
         if t.startswith(p):

@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Text;
 using OpenFPS.Common;
 using OpenFPS.Sound;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Instruments;
 

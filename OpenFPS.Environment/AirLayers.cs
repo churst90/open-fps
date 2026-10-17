@@ -1,3 +1,5 @@
+using OpenFPS.Materials;
+
 namespace OpenFPS.Common;
 
 /// <summary>

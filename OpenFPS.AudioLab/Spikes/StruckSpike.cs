@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Sound;
 
 namespace OpenFPS.AudioLab.Spikes;

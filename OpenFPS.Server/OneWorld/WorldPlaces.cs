@@ -7,6 +7,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 using Serilog;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Server.OneWorld;
 

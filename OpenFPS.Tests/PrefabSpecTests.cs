@@ -2,7 +2,7 @@ using System.Numerics;
 using System.Reflection;
 using System.Text.Json;
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;

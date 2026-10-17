@@ -20,7 +20,7 @@ OpenFPS.Common.AxleSpec	P
 OpenFPS.Common.TyreSize	P
 OpenFPS.Common.BrakeKind	V
 OpenFPS.Common.RoadGripLaw	P
-OpenFPS.Common.RoadSurfaces	V
+OpenFPS.Materials.RoadSurfaces	V
 OpenFPS.Common.RoadTexture	V
 OpenFPS.Common.MagicCurve	P
 OpenFPS.Common.WheelDynamics	P
@@ -40,7 +40,7 @@ OpenFPS.Common.ExternalBallistics	P
 OpenFPS.Common.BulletState	V
 OpenFPS.Common.FlightPoint	P
 OpenFPS.Common.Projectile	V
-OpenFPS.Common.Air	V
+OpenFPS.Materials.Air	V
 OpenFPS.Common.RicochetLaw	P
 OpenFPS.Common.Slug	V
 OpenFPS.Common.WindField	P

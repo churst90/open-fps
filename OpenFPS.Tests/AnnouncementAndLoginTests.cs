@@ -10,6 +10,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

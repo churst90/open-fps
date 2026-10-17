@@ -7,6 +7,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

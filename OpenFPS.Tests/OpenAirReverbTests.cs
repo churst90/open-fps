@@ -6,6 +6,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Acoustics;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

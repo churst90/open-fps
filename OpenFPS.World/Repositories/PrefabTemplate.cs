@@ -37,7 +37,7 @@ public class PrefabTemplate
     /// <summary>EntityType by NAME ("StaticObject", "Beacon", "Item", "NPC", ...). Defaults to StaticObject.</summary>
     public EntityType Type { get; set; } = EntityType.StaticObject;
 
-    /// <summary>Surface material by name — one of <see cref="OpenFPS.Common.AcousticRegistry"/>'s materials.
+    /// <summary>Surface material by name — one of <see cref="OpenFPS.Materials.AcousticRegistry"/>'s materials.
     /// Drives footstep sounds and the per-band acoustic properties of this surface. "None" for something
     /// that is not a surface (an emitter, a region, a portal).</summary>
     public string Material { get; set; } = "None";

@@ -1,5 +1,5 @@
 using System.Globalization;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 
 namespace OpenFPS.AudioLab.Spikes;
 

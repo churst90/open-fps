@@ -9,6 +9,7 @@ using OpenFPS.Client.Services;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.Platform;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Client.Core.Session;
 

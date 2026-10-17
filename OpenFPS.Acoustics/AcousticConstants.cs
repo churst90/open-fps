@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Acoustics;
 

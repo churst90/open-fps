@@ -3,7 +3,8 @@ using System.Globalization;
 using System.Numerics;
 using OpenFPS.Acoustics;
 using OpenFPS.Common;
-using Kind = OpenFPS.Common.StrikeKind;
+using OpenFPS.Materials;
+using Kind = OpenFPS.Materials.StrikeKind;
 
 namespace OpenFPS.Sound;
 

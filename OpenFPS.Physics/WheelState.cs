@@ -13,7 +13,7 @@ public struct WheelState
     public sbyte SlipRatio;
     /// <summary>Slip angle, -0.5..0.5 rad in 1/254ths of a radian.</summary>
     public sbyte SlipAngle;
-    /// <summary>The surface under it, an index into <see cref="OpenFPS.Common.RoadSurfaces"/>.</summary>
+    /// <summary>The surface under it, an index into <see cref="OpenFPS.Materials.RoadSurfaces"/>.</summary>
     public byte Surface;
     /// <summary>Its share of its grip in use, 0..2 with 1 the limit, in steps of 1/127.5 (<see cref="EncodeDemand"/>).</summary>
     public byte Demand;

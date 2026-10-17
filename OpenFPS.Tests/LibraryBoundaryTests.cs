@@ -281,7 +281,7 @@ public class LibraryBoundaryTests
         // FMOD's wrapper and the Steam Audio bindings. Serilog: BackgroundPriority logs (decision 5).
         new object[] { typeof(FMOD.System).Assembly.GetName().Name!, new[] { "Serilog" } },
         // The material table and the road surfaces: nothing of ours. Serilog: an unknown material is logged.
-        new object[] { typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name!, new[] { "Serilog" } },
+        new object[] { typeof(OpenFPS.Materials.AcousticRegistry).Assembly.GetName().Name!, new[] { "Serilog" } },
         // Walls, diffraction, reflections, the octree, the rooms.
         new object[] { typeof(OpenFPS.Acoustics.AcousticConstants).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials" } },

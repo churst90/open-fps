@@ -22,8 +22,8 @@ namespace OpenFPS.Sound.Core;
 public static class Thunder
 {
     /// <summary>The air thunder is heard through before the weather has said: the standard day
-    /// (<see cref="OpenFPS.Common.Air.Standard"/>), damp, still, and as gusty as a breezy day (0.3).</summary>
-    public static OutdoorAir StandardAir => new(OpenFPS.Common.Air.Standard.TemperatureC, 0.8f, OpenFPS.Common.Air.Standard.PressureMb, Vector3.Zero, 0.3f);
+    /// (<see cref="OpenFPS.Materials.Air.Standard"/>), damp, still, and as gusty as a breezy day (0.3).</summary>
+    public static OutdoorAir StandardAir => new(OpenFPS.Materials.Air.Standard.TemperatureC, 0.8f, OpenFPS.Materials.Air.Standard.PressureMb, Vector3.Zero, 0.3f);
 
     /// <summary>One part of the thunder, from one direction: its pressure at the ear, pascals, from
     /// <see cref="StartSeconds"/> after the flash.</summary>
@@ -702,7 +702,7 @@ public static class Thunder
         public KernelBank(int fs, float c, OutdoorAir air, float largestEnergy, float mu2)
         {
             _fs = fs; _c = c; _air = air; Mu2 = mu2;
-            _rho = new OpenFPS.Common.Air(air.TemperatureC, air.PressureMb).Density;
+            _rho = new OpenFPS.Materials.Air(air.TemperatureC, air.PressureMb).Density;
             float t0 = LightningPhysics.NWaveSeconds(largestEnergy, c);
             MaxLength = LengthFor(LengthenedSeconds(t0, AmplitudeAt2m(largestEnergy, c), 60000f, c, _rho));
         }

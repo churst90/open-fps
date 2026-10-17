@@ -6,6 +6,7 @@ using OpenFPS.Audio.Core;
 using OpenFPS.Audio.Data;
 using Serilog;
 using OpenFPS.Acoustics;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Client.Core;
 

@@ -4,7 +4,7 @@ using OpenFPS.Audio.Acoustics;
 using OpenFPS.Client.Core;
 using OpenFPS.Native.Platform;
 using OpenFPS.Native.SteamAudio;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;

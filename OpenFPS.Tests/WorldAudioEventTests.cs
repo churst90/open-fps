@@ -2,7 +2,7 @@ using System.Numerics;
 using MemoryPack;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Tests;

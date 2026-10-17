@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Common.Components;
 using Arch.Core;
 using Serilog;

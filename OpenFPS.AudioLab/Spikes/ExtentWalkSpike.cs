@@ -17,6 +17,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Materials;
 
 namespace OpenFPS.AudioLab.Spikes;
 

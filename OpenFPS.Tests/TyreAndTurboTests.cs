@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Sound;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

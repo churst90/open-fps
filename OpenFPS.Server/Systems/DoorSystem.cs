@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using Serilog;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Server.Systems;
 

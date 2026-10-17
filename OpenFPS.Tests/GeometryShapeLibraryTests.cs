@@ -4,6 +4,7 @@ using OpenFPS.Geometry;
 using Xunit.Abstractions;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using Xunit.Abstractions;
 using OpenFPS.Sound;
 

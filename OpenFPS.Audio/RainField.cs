@@ -9,6 +9,7 @@ using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Audio;
 

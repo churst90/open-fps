@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;

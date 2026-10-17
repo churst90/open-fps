@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Sound.Core;
 using OpenFPS.Acoustics;
 using OpenFPS.Audio.SteamAudio;

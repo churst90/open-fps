@@ -4,6 +4,7 @@ using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

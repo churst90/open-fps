@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using OpenFPS.Schema;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Common.Editing;
 

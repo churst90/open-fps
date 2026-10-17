@@ -1,5 +1,6 @@
 using OpenFPS.Common;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Server.Systems;
 

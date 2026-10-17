@@ -4,6 +4,7 @@ using OpenFPS.Audio.Acoustics;
 using OpenFPS.Sound.Core;
 using OpenFPS.Common;
 using OpenFPS.Native.SteamAudio;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

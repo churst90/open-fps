@@ -5,6 +5,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

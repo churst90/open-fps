@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Sound.Core.Aircraft;
 using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Sound.Core.Signals;

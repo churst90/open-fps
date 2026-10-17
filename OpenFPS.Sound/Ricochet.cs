@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Sound;
 

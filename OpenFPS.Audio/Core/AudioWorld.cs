@@ -7,6 +7,7 @@ using OpenFPS.Audio.Data;
 using Serilog;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Audio.Core;
 
@@ -3908,9 +3909,9 @@ public partial class AudioWorld
             if (keep) _groundCache[e.EntityId] = c;
         }
         if (!c.Found) return;
-        var m = OpenFPS.Common.AcousticRegistry.GetProperties(c.Material ?? "Generic");
+        var m = OpenFPS.Materials.AcousticRegistry.GetProperties(c.Material ?? "Generic");
         // Sound bent down by the wind or the air's layers comes off the ground as if both ends stood higher (Bending).
-        bool water = OpenFPS.Common.AcousticRegistry.IsLiquid(c.Material);
+        bool water = OpenFPS.Materials.AcousticRegistry.IsLiquid(c.Material);
         var bent = OpenFPS.Sound.Core.Bending.Along(_audio.Weather, src, ear, c.Height, water, _audio.Weather.Now, _audio.Atmosphere.SpeedOfSound);
         if (OpenFPS.Acoustics.GroundAnswer.Reflect(c.Height, m, src, ear, minHeight, _audio.Atmosphere.SpeedOfSound,
                                                 bent.SourceRaise, bent.EarRaise) is not { } bounce)

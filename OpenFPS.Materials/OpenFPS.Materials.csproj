@@ -5,7 +5,7 @@
        round skips off it) and the road surfaces a wheel stands on. The physics, the acoustics, the sound
        and the game read it. It uses nothing of ours: it is the lowest layer.
 
-       Namespaces are those the files had (OpenFPS.Common), as for the other library projects' moves. -->
+       Namespace OpenFPS.Materials, the project's (docs/SOUND_LIBRARY_BOUNDARY.md 21). -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

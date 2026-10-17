@@ -13,6 +13,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Editor;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
+using OpenFPS.Materials;
 using Rig = OpenFPS.Tests.WorldEditorTests.Rig;
 
 namespace OpenFPS.Tests;

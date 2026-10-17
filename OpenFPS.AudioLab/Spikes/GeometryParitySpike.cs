@@ -10,6 +10,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Acoustics;
 using OpenFPS.Audio.SteamAudio;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

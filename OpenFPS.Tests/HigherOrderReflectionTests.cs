@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;

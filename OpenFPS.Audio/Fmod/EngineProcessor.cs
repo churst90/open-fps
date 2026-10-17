@@ -8,6 +8,7 @@ using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Sound.Core.Pneumatics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Acoustics;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Audio.Fmod;
 
@@ -55,7 +56,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
     /// <summary>The air the cabin and the wind on the glass are heard in (<see cref="Air.Reference"/>):
     /// its density, kg/m³, and its impedance rho c, Pa s/m.</summary>
-    private static readonly float AirDensity = OpenFPS.Common.Air.Reference.Density, AirImpedance = AirDensity * AcousticConstants.SpeedOfSound;
+    private static readonly float AirDensity = OpenFPS.Materials.Air.Reference.Density, AirImpedance = AirDensity * AcousticConstants.SpeedOfSound;
     private float _tyreChirp;
     private float _chirpDecay = 0.99985f;   // a sample at 44.1 kHz: 150 ms
     private int _tyreGear;
@@ -643,7 +644,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // Water in the contact lubricates the stick-snap the squeal is made of (RoadWaterLaw.SquealFactor).
             float wetSqueal = OpenFPS.Common.RoadWaterLaw.SquealFactor(w.Surface, w.WaterMm);
             _wheelWetSqueal[i] = wetSqueal;
-            _wheelStickSlip[i] = OpenFPS.Common.RoadSurfaces.StickSlipOf(w.Surface) * wetSqueal;
+            _wheelStickSlip[i] = OpenFPS.Materials.RoadSurfaces.StickSlipOf(w.Surface) * wetSqueal;
             _wheelSlipVelocity[i] = u * MathF.Sqrt(kappa * kappa + tanAlpha * tanAlpha);
             _wheelLoad[i] = w.LoadNewtons / _wheelStatic[i];
             if (placed)
@@ -1250,7 +1251,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         for (int k = 0; k < _wetWater.Length; k++)
         {
             bool sent = perWheel && wheels != null;
-            byte surface = sent ? wheels![k].Surface : OpenFPS.Common.RoadSurfaces.IndexOf(OpenFPS.Common.RoadSurfaces.Default);
+            byte surface = sent ? wheels![k].Surface : OpenFPS.Materials.RoadSurfaces.IndexOf(OpenFPS.Materials.RoadSurfaces.Default);
             _wetWater[k] = sent ? wheels![k].WaterMm : fallbackWater;
             _wetTexture[k] = OpenFPS.Common.RoadGripLaw.HoldsMm(surface);
             if (!sent) _wheelGain[k] = 1f;

@@ -7,6 +7,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
 using OpenFPS.Sound;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Tests;
 

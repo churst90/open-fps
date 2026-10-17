@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Geometry;
-using OpenFPS.Common;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Acoustics;
 

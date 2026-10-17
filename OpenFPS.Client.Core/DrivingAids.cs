@@ -6,6 +6,7 @@ using Serilog;
 using OpenFPS.Words;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
+using OpenFPS.Materials;
 
 namespace OpenFPS.Client.Core;
 
