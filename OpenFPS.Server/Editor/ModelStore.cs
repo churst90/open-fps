@@ -35,7 +35,7 @@ public sealed class ModelHistory
 /// <summary>
 /// The models as the world editor changes them: every version kept, one file per model in
 /// model_versions/ (docs/WORLD_EDITOR.md sections 5 and 11). At start each model's current version is put
-/// in use through its kind (<see cref="ModelCatalog"/>): into ModelLibrary for the library's kinds, into
+/// in use through its kind (<see cref="EditorKinds"/>): into ModelLibrary for the library's kinds, into
 /// the PrefabRepository for prefabs. A null folder keeps everything in memory (a test rig).
 /// </summary>
 public sealed class ModelStore
@@ -45,14 +45,14 @@ public sealed class ModelStore
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
 
-    public ModelStore(string? directory, ModelCatalog? catalog = null)
+    public ModelStore(string? directory, EditorKinds? catalog = null)
     {
         _directory = directory == null ? null : Path.GetFullPath(directory);
-        Catalog = catalog ?? new ModelCatalog();
+        Catalog = catalog ?? new EditorKinds();
     }
 
     /// <summary>The kinds this store keeps versions of.</summary>
-    public ModelCatalog Catalog { get; }
+    public EditorKinds Catalog { get; }
 
     private static string Key(string kind, string id) => kind + ":" + id;
 

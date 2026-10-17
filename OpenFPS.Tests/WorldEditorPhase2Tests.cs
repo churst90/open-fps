@@ -39,7 +39,7 @@ public class WorldEditorPhase2Tests : IDisposable
     [Fact]
     public void EveryKindHasPhysicalFieldsThatMayBeChanged()
     {
-        var catalog = new ModelCatalog();
+        var catalog = new EditorKinds();
         foreach (var kind in catalog.All)
         {
             int editable = 0;

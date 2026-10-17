@@ -19,7 +19,7 @@ public sealed partial class WorldEditor
     public const string ModelsRefusal = "Changing a model changes it on every map, so it needs edit-models: developers and administrators.";
 
     /// <summary>Every kind of model the editor has: the library's, and the prefabs once the server has them.</summary>
-    public ModelCatalog Catalog
+    public EditorKinds Catalog
     {
         get
         {

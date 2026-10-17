@@ -520,12 +520,12 @@ here has been tried in the game client yet, only by tests and through the MUD ga
   (VehicleSpec, OpenFPS.Sound/VehicleSpec.cs); MachineRegistry.VehicleFor builds an edited one on its
   base and forgets what it assembled whenever the library changes. A client restarts the voices of the
   vehicles and machines on an engine that changed.
-- Prefabs are kind `prefab` (ModelCatalog.cs, PrefabKind): fields from prefab-schema.json (vectors are
+- Prefabs are kind `prefab` (EditorKinds.cs, PrefabKind): fields from prefab-schema.json (vectors are
   groups of X, Y and Z; its lists are editable since section 13), checked by PrefabValidator. Id,
   Type, IsItem, Premium, WeaponId and Hands are shown, not changed. A version is the server's alone and
   makes every thing made from the prefab again where it stands (Remake), keeping its name, settings, a
   doorway's rooms, a door's sides and a room's materials, and joining doorways to a room made again.
-- The editor knows kinds through ModelCatalog (EditorKind: fields, ids, JSON, check, apply). ModelStore
+- The editor knows kinds through EditorKinds (EditorKind: fields, ids, JSON, check, apply). ModelStore
   keeps every kind's versions, puts them in use through the kind, and keeps made and retired models.
 
 ### Pins and versions

@@ -165,7 +165,7 @@ FILE_RULES = [
     ('OpenFPS.Server/Editor/LiveState.cs', 'Editor', ''),
     ('OpenFPS.Server/Editor/MapOverlay.cs', 'Editor', ''),
     ('OpenFPS.Server/Editor/MapVersions.cs', 'Editor', ''),
-    ('OpenFPS.Server/Editor/ModelCatalog.cs', 'Editor', 'the kinds the editor edits'),
+    ('OpenFPS.Server/Editor/EditorKinds.cs', 'Editor', 'the kinds the editor edits'),
     ('OpenFPS.Server/Editor/ModelStore.cs', 'Editor', ''),
     ('OpenFPS.Server/Editor/OverlayRoute.cs', 'Editor', ''),
     ('OpenFPS.Server/Core/BuildSession.cs', 'Editor', ''),

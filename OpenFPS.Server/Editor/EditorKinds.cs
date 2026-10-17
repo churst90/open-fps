@@ -121,11 +121,11 @@ public sealed class PrefabKind : EditorKind
 }
 
 /// <summary>Every kind the editor has: the library's, and those the server adds (prefabs).</summary>
-public sealed class ModelCatalog
+public sealed class EditorKinds
 {
     private readonly Dictionary<string, EditorKind> _kinds = new(StringComparer.OrdinalIgnoreCase);
 
-    public ModelCatalog()
+    public EditorKinds()
     {
         foreach (var kind in ModelLibrary.AllKinds) _kinds[kind] = new LibraryKind(kind);
     }
