@@ -162,7 +162,7 @@ public static class RestingStates
                                               (tick - last.ToldAt) * PhysicsConstants.FixedDeltaTime);
         var now = state.Transform.ToTransform();
         changed = state.Signals != last.ToldSignals || state.Grounding != last.ToldGrounding
-               || MathF.Abs(state.LeverFraction - MachinePower.Decode(last.ToldLever)) > DistantMotion.LeverTolerance
+               || MathF.Abs(state.LeverFraction - StatePacking.DecodeLever(last.ToldLever)) > DistantMotion.LeverTolerance
                || MathF.Abs(state.TyreDemandFraction - last.ToldDemand / 127.5f) > DistantMotion.DemandTolerance
                || state.Wheels != null && WheelsStrayed(last.ToldWheels, state.Wheels)
                || DistantMotion.Strayed(predicted, now.Position, velocity, now.Rotation, distance);

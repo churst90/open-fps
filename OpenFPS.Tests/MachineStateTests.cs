@@ -81,16 +81,16 @@ public class MachineStateTests
     {
         foreach (float lever in new[] { 0f, MachinePower.PistonIdle, MachinePower.GroundStanding, MachinePower.GroundTaxi,
                                         MachinePower.GroundReversing, MachinePower.TrainPulling, 1f })
-            Assert.Equal(lever, MachinePower.Decode(MachinePower.Encode(lever)));
-        Assert.InRange(MachinePower.Decode(MachinePower.Encode(0.777f)), 0.774f, 0.78f);
-        Assert.Equal(1f, MachinePower.Decode(MachinePower.Encode(3f)));
-        Assert.Equal(0f, MachinePower.Decode(MachinePower.Encode(-1f)));
-        Assert.Equal(1f, MachinePower.Decode(255));
+            Assert.Equal(lever, StatePacking.DecodeLever(StatePacking.EncodeLever(lever)));
+        Assert.InRange(StatePacking.DecodeLever(StatePacking.EncodeLever(0.777f)), 0.774f, 0.78f);
+        Assert.Equal(1f, StatePacking.DecodeLever(StatePacking.EncodeLever(3f)));
+        Assert.Equal(0f, StatePacking.DecodeLever(StatePacking.EncodeLever(-1f)));
+        Assert.Equal(1f, StatePacking.DecodeLever(255));
 
         var update = new ServerStateUpdate
         {
             States = new List<EntityState> { new EntityState { EntityId = 7, LinearVelocity = new Vector3(1f, 2f, 3f), Signals = 6,
-                                                 SpeedRate = -40, TurnY = 9, Lever = MachinePower.Encode(MachinePower.TrainPulling) } },
+                                                 SpeedRate = -40, TurnY = 9, Lever = StatePacking.EncodeLever(MachinePower.TrainPulling) } },
         };
         var back = (ServerStateUpdate)MemoryPackSerializer.Deserialize<IMessage>(MemoryPackSerializer.Serialize<IMessage>(update))!;
         var state = Assert.Single(back.States);
@@ -114,7 +114,7 @@ public class MachineStateTests
     {
         var world = new ClientWorldState();
         world.RegisterDefinition(new EntityDefinition { EntityId = 5, Type = EntityType.NPC, Moves = true });
-        world.SyncState(new[] { new EntityState { EntityId = 5, Lever = MachinePower.Encode(MachinePower.GroundReversing) } });
+        world.SyncState(new[] { new EntityState { EntityId = 5, Lever = StatePacking.EncodeLever(MachinePower.GroundReversing) } });
         Assert.Equal(MachinePower.GroundReversing, world.GetSnapshot().Entities[5].Lever);
         world.SyncState(new[] { new EntityState { EntityId = 5 } });
         Assert.Equal(0f, world.GetSnapshot().Entities[5].Lever);
@@ -194,7 +194,7 @@ public class MachineStateTests
         h.World.SyncState(new[] { new EntityState
         {
             EntityId = id, Transform = QuantizedTransform.FromTransform(def.Transform), LinearVelocity = velocity,
-            Lever = MachinePower.Encode(lever),
+            Lever = StatePacking.EncodeLever(lever),
         } });
     }
 
@@ -280,7 +280,7 @@ public class MachineStateTests
                 EntityId = id,
                 Transform = QuantizedTransform.FromTransform(new Transform { Position = new Vector3(0f, 50f, speed * tick * dt), Rotation = Quaternion.Identity }),
                 LinearVelocity = new Vector3(0f, 0f, speed),
-                Lever = MachinePower.Encode(tick < 40 ? MachinePower.TrainPulling : MachinePower.PistonIdle),
+                Lever = StatePacking.EncodeLever(tick < 40 ? MachinePower.TrainPulling : MachinePower.PistonIdle),
             };
             if (RestingStates.ShouldSend(sent, ref s, tick, force: false, distance)) ticks.Add(tick);
         }
@@ -399,14 +399,14 @@ public class MachineStateTests
                 if (rail.Contains(s.EntityId))
                 {
                     Assert.True(server.Rail.TryGetLever("city", s.EntityId, out float notch));
-                    Assert.Equal(MachinePower.Encode(notch), s.Lever);
+                    Assert.Equal(StatePacking.EncodeLever(notch), s.Lever);
                     notches++;
                     if (notch == MachinePower.TrainPulling) pulling++;
                 }
                 else if (s.EntityId == aeroplane.Id)
                 {
                     Assert.True(server.Vehicles.TryGetLever("city", s.EntityId, out float lever));
-                    Assert.Equal(MachinePower.Encode(lever), s.Lever);
+                    Assert.Equal(StatePacking.EncodeLever(lever), s.Lever);
                     levers++;
                     if (lever == 1f) fullPower++;
                     if (lever == MachinePower.PistonIdle) idle++;

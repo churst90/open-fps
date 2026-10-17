@@ -5,7 +5,7 @@ namespace OpenFPS.Common;
 /// <summary>
 /// How hard a driven machine is working, from what its driver is making it do: a train's notch and an
 /// aeroplane's power lever (docs/SPECIAL_CASES_AUDIT.md, S16 and P7). The server drives both, so the server works
-/// these out and sends them (EntityState.Lever). The client guessed them from motion: a notch from a speed
+/// these out and sends them (EntityState.Lever, as StatePacking.EncodeLever writes it). The client guessed them from motion: a notch from a speed
 /// differenced between two network states, so a train braking down a grade read as coasting; a lever from the
 /// climb angle and an acceleration, so the roll-out's reversers were a threshold on noise.
 /// </summary>
@@ -88,11 +88,4 @@ public static class MachinePower
             return PistonIdle;
         return FlightLever(velocity);
     }
-
-    /// <summary>A lever as the wire carries it (EntityState.Lever): steps of a two-hundredth, so the laws'
-    /// own values (0.06, 0.25, 0.3, 0.55, 0.9, 1) cross it exactly.</summary>
-    public static byte Encode(float lever) => (byte)MathF.Round(Math.Clamp(lever, 0f, 1f) * 200f);
-
-    /// <summary>The lever a wire byte says.</summary>
-    public static float Decode(byte wire) => MathF.Min(wire, (byte)200) / 200f;
 }

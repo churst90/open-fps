@@ -513,7 +513,7 @@ internal sealed class Replay
             Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = Facing(velocity) }),
             LinearVelocity = velocity,
             Signals = signals,
-            Lever = MachinePower.Encode(lever),
+            Lever = StatePacking.EncodeLever(lever),
         } });
 
     /// <summary>One source of a train as the server places it (RailSystem): an NPC entity whose SoundId

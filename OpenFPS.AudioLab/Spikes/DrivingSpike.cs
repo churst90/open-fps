@@ -588,7 +588,7 @@ public static class DrivingSpike
                 var rot = Quaternion.CreateFromYawPitchRoll(hdg, 0f, 0f);
                 if (phase == "ground") onWheels = run;
                 float lever = liftedOff ? 1f : MachinePower.AircraftLever(air, onWheels, phase == "approach", pos.Y - touchdown.Y, vel);
-                world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = pos, Rotation = rot }), LinearVelocity = vel, Lever = MachinePower.Encode(lever) } });
+                world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = pos, Rotation = rot }), LinearVelocity = vel, Lever = StatePacking.EncodeLever(lever) } });
                 log.Append(CultureInfo.InvariantCulture, $"{t - t0:F2},{phase}{(run != null ? "/" + run.State : "")},{pos.X:F1},{pos.Y:F1},{pos.Z:F1},{vel.Length():F1}\n");
             };
             RecordUntil(label, () => done, 200, $"{air.Name}: a 3-degree approach from 700 m, touchdown, landing roll, the turn round, a 4 s hold, the take-off roll and the climb-out; "

@@ -1851,7 +1851,7 @@ public class GameServer
                             state.Signals = VehicleSignalBits.Encode(manual: false, horn: false, sirenOn: true, sirenMode);
                         // How hard a train or an aeroplane is working, which the server knows from driving it.
                         if (_rail.TryGetLever(mapEntry.Key, e.Id, out float lever) || _vehicles.TryGetLever(mapEntry.Key, e.Id, out lever))
-                            state.Lever = MachinePower.Encode(lever);
+                            state.Lever = StatePacking.EncodeLever(lever);
 
                         // A dynamic entity is corrected by the next tick, so unreliable; a moved static is
                         // never resent, so reliable, or a dropped packet leaves a wall where none is. A

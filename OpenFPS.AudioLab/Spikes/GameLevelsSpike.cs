@@ -146,7 +146,7 @@ public static class GameLevelsSpike
         }
         // lever: a train's notch or an aeroplane's power lever, as the server that drives it sends it (MachinePower).
         void Move(int id, Vector3 at, Quaternion rot, Vector3 velocity, float lever = 0f)
-            => world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = rot }), LinearVelocity = velocity, Lever = MachinePower.Encode(lever) } });
+            => world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = rot }), LinearVelocity = velocity, Lever = StatePacking.EncodeLever(lever) } });
         int AddEmitter(string soundId, Vector3 at, float range, float minDistance)
         {
             int id = nextId++;

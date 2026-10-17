@@ -45,6 +45,13 @@ public static class StatePacking
     /// demand, signals, rates and a count. Wheels are on top of this.</summary>
     private const int MaxFixedBytes = 5 + 1 + 12 + 6 + 12 + 1 + 1 + 8 + 1;
 
+    /// <summary>A machine's lever as the wire carries it (EntityState.Lever; the laws are MachinePower's): steps
+    /// of a two-hundredth, so the laws' own values (0.06, 0.25, 0.3, 0.55, 0.9, 1) cross it exactly.</summary>
+    public static byte EncodeLever(float lever) => (byte)MathF.Round(Math.Clamp(lever, 0f, 1f) * 200f);
+
+    /// <summary>The lever a wire byte says.</summary>
+    public static float DecodeLever(byte wire) => MathF.Min(wire, (byte)200) / 200f;
+
     /// <summary>
     /// The velocity the client will be given, so the server compares what it sends with what it last
     /// sent as the client would. Rounded to the millimetre a second below <see cref="MillimetreRange"/>.
