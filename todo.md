@@ -50,13 +50,13 @@ fingerprint changed too, so the door renders are made again once.
    search, none for a still sound. A swinging door is heard from its shut leaf and does not move, so its copies
    stay; whether a swing should be heard moving is Cody's to say (Cody).
    Listen: "Listen in the game" below.
-4. A doorway route leaves from the wall's face (Resonance's 1.2, reproduced 2026-10-17). Small, now.
-   - What: when a leaf hangs at one face of a thick wall, the route's leg into the room starts inside the wall.
-     A 0.3 m wall with its door open, heard round the corner: -44.0/-45.3/-58.7 dB against -37.4/-40.1/-42.0
-     with the leaf at mid-wall (up to 17 dB in the high band). Fix in `OpeningRoutes.Derive` and `Face`: a leg
-     leaves the doorway from the wall's face on the side of the room it runs into.
-   - Why: no city map hangs a leaf at a face, but OSM maps and the editor's do.
-   - Size: half a session, after or with item 2.
+4. A doorway route leaves from the wall's face (Resonance's 1.2): DONE 2026-10-17 (changes.md). A door's opening
+   is measured from its jambs' faces, in the middle of the wall and as deep as it, wherever the leaf hangs; a leg
+   leaves it from the face on its own room's side (`Opening.ASide`), straight out. The leaf at a face of a 0.3 m wall,
+   open, round the corner: -37.4/-40.1/-42.0 dB, as at the middle (was -44.0/-45.3/-58.7). A sound beside a small
+   room heard in it through its open door: -10.6/-16.9/-25.1 (was -29.0/-37.6/-65.5, through its wall). No map
+   hangs a leaf at a face (gen_city, gen_osm and the editor all hang it mid-wall, measured), so nothing on the maps
+   changes; the stored streams pass unregenerated.
 5. Sound library stage 8: DONE 2026-10-17. Tag `library/v0.1.0`, docs/LIBRARY_CHANGES.md. Each later library change
    that a host must act on gets a line there and a new tag. Resonance's side (the submodule, NOTICE.md, swapping
    its copies one subsystem at a time) is Resonance's to do.
@@ -368,6 +368,10 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
   into a parked car, out, and into another: the cabin sounds the same each time, with nothing of the first car left.
   By the fire at 58 Alder Street (`/tp -325.0 141.0 0.2`): the fire as before, and when it goes out all of it goes
   out. Lab: AudioLab `--resonance-maybes outlet`.
+- A doorway route leaves from the wall's face (2026-10-17, docs/CLIENT_NOTES.md "A doorway route leaves from the
+  wall's face"). Nothing on the maps should change: every door hangs at its wall's middle. In Selby House, with
+  flat 00B's door open, someone talking in the corridor (`/tp 20.3 157.5 0.1`) heard in the flat (`/tp 23.5 157.5
+  0.1`) as before. A map or a Resonance scene with a leaf at a face of a thick wall is where it is heard.
 - A shut door lets through its gaps (2026-10-17, docs/CLIENT_NOTES.md "A shut door leaks by its gaps"). In
   Selby House, ground floor: stand in flat 00B (`/tp 23.5 157.5 0.1`) with its door shut and have someone talk
   or fire in the corridor (`/tp 20.3 157.5 0.1`): heard through the door, muffled but clear, about 16 dB down

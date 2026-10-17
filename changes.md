@@ -17,6 +17,21 @@ Recent work, newest first. `git log` has the rest.
   what the sound's first one did, 0.5-2.7 ms; nothing for a sound that stays. Swinging doors are heard from their
   shut leaf and do not move, so nothing changes for them; no vehicle sends a one-off that moves. No render
   changes; the wire hash does not change.
+- A doorway route leaves from the wall's face (Resonance's 1.2; todo item 4; docs/CLIENT_NOTES.md "A doorway route
+  leaves from the wall's face"). A door's opening was centred on its leaf and made half the wall deep either side of
+  it, so with the leaf hung at one face of a thick wall the far room's leg started inside the wall and a leg slanting
+  round the corner paid the jamb: a 0.3 m brick wall with its door open, heard round the corner, -44.0/-45.3/-58.7
+  dB against -37.4/-40.1/-42.0 with the leaf at the middle. The opening is measured from the jambs' own faces now:
+  in the middle of the wall, as deep as the wall, what stands in it measured through the whole depth
+  (`OpeningRoutes.Derive`, `MeasureContents`). The leaf at a face is heard as at the middle (-37.4/-40.1/-42.0 at
+  that spot, open; shut, within 1 dB at four spots in a 0.11 and a 0.3 m wall), and a shut leaf at a face is still
+  charged its leaf and its gaps. A leg leaves the doorway from the face on the side of the room it runs through
+  (`Opening.ASide`, from the sides the graph checks), not the side its far end lies on, and steps straight out of
+  that face: a sound beside a small room, heard in it through its open door, came through the small room's wall,
+  -29.0/-37.6/-65.5 dB, and comes in at the door now, -10.6/-16.9/-25.1. No map hangs a leaf at a face today (the
+  city's 514 doors, Albany's 1,916 and Magnolia's 1,324 are all within 1 cm of their walls' middles), and the
+  stored streams pass unregenerated. The wire hash changes (039f03ff964f to 67aba2280a74); the door fingerprint does
+  not (c8fa0894bef3).
 - A machine's front outlet or cabin path stopped and started again under its id no longer leaves the engine's own
   voice carrying its share beside the new one (Resonance's 3.2; todo item 1; docs/CLIENT_NOTES.md "A voice that
   reads another's"). The old tap gave its share back when it was let go and again when it was released, up to

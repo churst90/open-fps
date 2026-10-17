@@ -67,8 +67,14 @@ public sealed class OpeningRoutes
         public int RegionA, RegionB;
         /// <summary>The two places it joins as graph nodes: a region id, or <see cref="Outside"/>.</summary>
         public int NodeA, NodeB;
+        /// <summary>The middle of the aperture, in the middle of the wall it is cut through, wherever in the wall a
+        /// door's leaf hangs.</summary>
         public Vector3 Centre, Normal, Across, Up;
+        /// <summary>Half the aperture's width and height, and half the depth of the wall it is cut through.</summary>
         public float HalfWidth, HalfHeight, HalfDepth;
+        /// <summary>Which side of the opening <see cref="NodeA"/> lies on: +1 along <see cref="Normal"/>, -1 against it,
+        /// 0 when its sides were not looked at.</summary>
+        public int ASide;
         public float Area => 4f * HalfWidth * HalfHeight;
         /// <summary>The energy fraction what stands in it lets through, per band: 1 for a clear doorway,
         /// the leaf's transmission and its gaps' (<see cref="Gaps"/>) for a shut door, the fraction left
@@ -592,14 +598,21 @@ public sealed class OpeningRoutes
         o.HalfHeight = MathF.Max(0.05f, (top + bottom) * 0.5f);
         // As deep as the wall it is cut through, not a box running through it (a tunnel's side wall):
         // counted, the tunnel's openings were fifty metres deep and their checks reached two sections
-        // away (2026-10-02).
+        // away (2026-10-02). From the jambs' own faces: a leaf hung at one face of its wall stands off the wall's
+        // middle, and a leg leaving the doorway from half the wall's depth either side of the leaf began inside the
+        // wall and paid the jamb's brick (Resonance's 1.2, 2026-10-17).
+        float front = o.HalfDepth, back = -o.HalfDepth;
         foreach (int j in new[] { jambR, jambL, lintel })
         {
             if (j < 0) continue;
             float through = HalfExtentAlong(_solids[j], o.Normal);
             if (through > MathF.Min(HalfExtentAlong(_solids[j], o.Across), HalfExtentAlong(_solids[j], o.Up))) continue;
-            o.HalfDepth = MathF.Max(o.HalfDepth, through);
+            float middle = Vector3.Dot(_solids[j].Center - o.Centre, o.Normal);
+            front = MathF.Max(front, middle + through);
+            back = MathF.Min(back, middle - through);
         }
+        o.Centre += o.Normal * ((front + back) * 0.5f);
+        o.HalfDepth = (front - back) * 0.5f;
         if (jambR < 0 && jambL < 0 && lintel < 0 && d.Kind != FaceKind)
             o.Problem ??= "no wall found round it: an opening in nothing";
 
@@ -745,8 +758,8 @@ public sealed class OpeningRoutes
         float step = o.HalfDepth + 0.3f;
         int a = NodeOf(regionAt(o.Centre + o.Normal * step));
         int b = NodeOf(regionAt(o.Centre - o.Normal * step));
-        bool ok = (a == o.NodeA && b == o.NodeB) || (a == o.NodeB && b == o.NodeA);
-        if (!ok) o.Problem ??= $"its sides are in {Name(a)} and {Name(b)}, not {Name(o.NodeA)} and {Name(o.NodeB)}";
+        o.ASide = a == o.NodeA && b == o.NodeB ? 1 : a == o.NodeB && b == o.NodeA ? -1 : 0;
+        if (o.ASide == 0) o.Problem ??= $"its sides are in {Name(a)} and {Name(b)}, not {Name(o.NodeA)} and {Name(o.NodeB)}";
         static string Name(int n) => n == Outside ? "the outdoors" : $"region {n}";
     }
 
@@ -1066,18 +1079,23 @@ public sealed class OpeningRoutes
             int[] ignoreB = k < n ? _openings[chain[k].Opening].Contents : Array.Empty<int>();
             // Inside the edges, not on them: the bend is the aperture's to charge, and a leg ending at the
             // jamb ends in the corner with an open leaf hinged on it, with no way round the leaf.
-            Vector3 from = k > 0 ? Face(_openings[chain[k - 1].Opening], Inset(_openings[chain[k - 1].Opening], x[k]), x[k + 1]) : x[k];
-            Vector3 to = k < n ? Face(_openings[chain[k].Opening], Inset(_openings[chain[k].Opening], x[k + 1]), x[k]) : x[k + 1];
+            // From the face on the side of the place the leg runs through: the one the opening before it leads
+            // into, or the one the next is entered from.
+            int place = k > 0 ? chain[k - 1].IntoNode : _openings[chain[0].Opening].Other(chain[0].IntoNode);
+            Vector3 offFrom = Vector3.Zero, offTo = Vector3.Zero;
+            Vector3 from = k > 0 ? Face(_openings[chain[k - 1].Opening], Inset(_openings[chain[k - 1].Opening], x[k]), x[k + 1], place, out offFrom) : x[k];
+            Vector3 to = k < n ? Face(_openings[chain[k].Opening], Inset(_openings[chain[k].Opening], x[k + 1]), x[k], place, out offTo) : x[k + 1];
             // Off the face: a leg ending on it touched the wall, the padded clearance refused every way
             // round the open leaf, and the leaf was charged as solid steel ("sound struggles through the
-            // door only when loud things pass").
+            // door only when loud things pass"). Straight out of the face, so a leg that comes along the wall
+            // to the doorway is not taken back into the wall.
             Vector3 along = to - from;
             float span = along.Length();
             if (span > 4f * FaceClearance)
             {
                 along /= span;
-                if (k > 0) from += along * FaceClearance;
-                if (k < n) to -= along * FaceClearance;
+                if (k > 0) from += (offFrom == Vector3.Zero ? along : offFrom) * FaceClearance;
+                if (k < n) to += (offTo == Vector3.Zero ? -along : offTo) * FaceClearance;
             }
             legs.Add(Leg(k > 0 ? chain[k - 1].Opening : -1, from, k < n ? chain[k].Opening : -1, to, ignoreA, ignoreB));
         }
@@ -1118,14 +1136,22 @@ public sealed class OpeningRoutes
         return geo + atEar / free;
     }
 
-    /// <summary>Where a route crossing an opening at <paramref name="crossing"/> leaves its wall on the side
-    /// facing <paramref name="toward"/>; the crossing itself when that point is inside the wall.</summary>
-    private static Vector3 Face(Opening o, Vector3 crossing, Vector3 toward)
+    /// <summary>
+    /// Where a route crossing an opening at <paramref name="crossing"/> leaves its wall's face on the side of
+    /// <paramref name="place"/>, the leg's other end <paramref name="toward"/>; the crossing itself when that end is
+    /// inside the wall. The side is the place's, not the end's: a sound beside a small room, reached round its corner
+    /// and in at its door, lies beyond the doorway's plane on the small room's side.
+    /// <paramref name="outward"/> is straight out of that face, zero when the end is inside the wall.
+    /// </summary>
+    private static Vector3 Face(Opening o, Vector3 crossing, Vector3 toward, int place, out Vector3 outward)
     {
+        outward = Vector3.Zero;
         float side = Vector3.Dot(toward - crossing, o.Normal);
         float depth = o.HalfDepth + FrameSkinMetres;
         if (MathF.Abs(side) <= depth) return crossing;
-        return crossing + o.Normal * (side > 0f ? depth : -depth);
+        float sign = o.ASide == 0 ? (side > 0f ? 1f : -1f) : place == o.NodeA ? o.ASide : -o.ASide;
+        outward = o.Normal * sign;
+        return crossing + outward * depth;
     }
 
     /// <summary>The point of an opening's rectangle the route from <paramref name="prev"/> to

@@ -24,6 +24,12 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   rooms, 0.3 mm to the outdoors). A host whose doors are sealed, or looser, fills them per door. A host that
   measured levels through shut doors will find them 10 to 40 dB louder, most in the high band. `Air` gains
   `Viscosity`, `Prandtl` and `HeatCapacityRatio`.
+- A doorway route leaves from the wall's face on its own room's side (Resonance's 1.2). A door's
+  `OpeningRoutes.Opening.Centre` is the middle of the wall now, not of the leaf, and `HalfDepth` half the wall from
+  face to face; a leaf hung at one face of its wall is no longer heard through the jamb. `Opening` gains `ASide`, the
+  side of the opening its `NodeA` lies on (+1 along `Normal`, -1 against, 0 unchecked), set when the graph is given
+  a `regionAt`. A host need do nothing; one that reads a door opening's `Centre` finds it moved by however far the
+  leaf hangs off the wall's middle.
 
 ## library/v0.1.0 (2026-10-17)
 

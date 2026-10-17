@@ -75,6 +75,12 @@ public class CityOpeningsTests
                 string Name(int r) => world.AcousticMap.Regions.TryGetValue(r, out var g) ? g.FriendlyName : r.ToString();
                 _o.WriteLine($"  {o.Id}: {Name(o.RegionA)} -> {Name(o.RegionB)} at {o.Centre} normal {o.Normal} {2 * o.HalfWidth:F2} x {2 * o.HalfHeight:F2}, depth {2 * o.HalfDepth:F2}");
             }
+        // Where its doors hang in their walls (Resonance's 1.2): gen_city hangs a leaf at its wall's middle.
+        var hung = DoorFaceSurvey.Offsets(world, routes);
+        _o.WriteLine($"  {hung.Count} doors; leaf within 1 cm of its wall's middle {hung.Count(x => MathF.Abs(x.Off) < 0.01f)}");
+        foreach (var (o, off) in hung.Where(x => MathF.Abs(x.Off) >= 0.01f).OrderByDescending(x => MathF.Abs(x.Off)))
+            _o.WriteLine($"    door {o.Id} '{(world.Entities.TryGetValue(o.Id, out var e) ? e.Definition.Identity.Name : "")}' at ({o.Centre.X:F2}, {o.Centre.Z:F2}): "
+                       + $"leaf {off:F3} m off the middle of a wall {2 * o.HalfDepth:F2} m deep");
         // Every opening found in a face agrees with the geometry it was found in; on the city, so do the
         // doors and doorways since the three that did not were refitted (2026-10-02).
         Assert.Empty(routes.Openings.Where(o => o.Kind == OpeningRoutes.FaceKind && o.Problem != null).Select(o => o.Problem));

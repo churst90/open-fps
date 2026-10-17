@@ -507,6 +507,32 @@ Measured with `--path-probe` (its `nogaps` switch is the old rule) in Selby Hous
 Resonance measured the same rule as a telephone heard from a restroom 15 dB down with the door open and 33 shut;
 the flat's door here puts a shut door about 16 dB under an open one, as the measured doors do.
 
+## A doorway route leaves from the wall's face
+
+A route through a doorway is three pieces: a leg in the room it comes from, the crossing of the opening, and a leg
+in the room it goes into. Each leg starts at the wall's face on its own room's side, a hand's breadth straight out of
+it, so the wall beside the doorway is not taken for something in the way (`OpeningRoutes.Face`, `Evaluate`).
+
+Until 2026-10-17 a door's opening was centred on its leaf, shut, and made as deep as the jambs, half the wall either
+side of the leaf. A leaf hung at one face of a thick wall then left the far face's leg starting inside the wall, and
+a leg slanting off round the corner paid the jamb's brick (Resonance's 1.2). A 0.3 m brick wall, a 1.0 m doorway,
+its door open, the source 2 m into one room and the ear 0.3 m past the wall and 3 m along it: -44.0/-45.3/-58.7 dB
+with the leaf at a face, -37.4/-40.1/-42.0 with it at the middle. Shut, the face cost up to 5 dB more in the low
+and middle bands and 17 in the high. Now the opening is measured from the jambs' own faces (`OpeningRoutes.Derive`):
+it sits in the middle of the wall and is as deep as the wall, wherever in it the leaf hangs, and what stands in it
+(the leaf, and its gaps shut) is measured through the whole depth. The leaf at a face and at the middle are heard
+alike, within 0.1 dB at the spot above.
+
+The face a leg leaves from is the one on the side of the room the leg runs through, from the opening's two sides as
+the graph checks them (`Opening.ASide`), not the side its far end lies on. A sound beside a small room, reached
+round its corner and in at its open door, lies beyond the doorway's plane on the small room's side; taken by its
+end, the leg started on the small room's side and ran through its wall (-29.0/-37.6/-65.5 dB into the small room;
+by the room's side, -10.6/-16.9/-25.1). Resonance found it as a telephone in an office heard from its restroom.
+
+No map hangs a leaf at a face today: gen_city, gen_osm and the editor's fitted doors all hang it at the wall's
+middle (the city's 514 doors, Albany's 1,916 and Magnolia's 1,324 all within 1 cm of it). The stored streams pass
+unchanged. ResonanceMaybesGeometryTests holds both rules.
+
 ## Steam Audio pathing is off (a decision for Cody)
 
 The worker makes its simulator with `enablePathing: false`, so Steam Audio's pathing never runs: no probe

@@ -182,4 +182,144 @@ public class ResonanceMaybesGeometryTests
         if (found)
             Assert.True(Db(g.Z) <= Db(best1.Z) + 0.5f || Db(g.Z) <= Db(h) + 0.5f, $"high round {Db(g.Z):F1} against the whole wall's {Db(best1.Z):F1}");
     }
+
+    // ── A doorway route leaves from the wall's face (Resonance's 1.2) ───────────────────────────
+
+    /// <summary>Where a route is heard round the doorway's corners: a source in A off to one side and the ear in B
+    /// off to the other, both ways round and at both jambs. The first two are beyond the hinge of a leaf swung open
+    /// into A, the last two behind it.</summary>
+    private static (Vector3 Source, Vector3 Listener)[] Slanting(float t) => new[]
+    {
+        (new Vector3(-2f, 1.5f, 4.5f), new Vector3(t + 0.3f, 1.5f, 5.5f)),
+        (new Vector3(-0.6f, 1.5f, 5.5f), new Vector3(t + 2f, 1.5f, 4.5f)),
+        (new Vector3(-2f, 1.5f, 0.5f), new Vector3(t + 0.6f, 1.5f, 0.4f)),
+        (new Vector3(-1.5f, 1.5f, 1.2f), new Vector3(t + 1.5f, 1.5f, 4.2f)),
+    };
+
+    private static Vector3 RouteDb(WorldSnapshot world, OpeningRoutes model, SpatialAcoustics acoustics, Vector3 src, Vector3 lis)
+    {
+        Assert.True(model.Route(src, acoustics.GetRegionAt(world, src), lis, acoustics.GetRegionAt(world, lis), out var a), $"no route {src} to {lis}");
+        return new Vector3(Db(a.Low), Db(a.Mid), Db(a.High));
+    }
+
+    private static string Bands(Vector3 db) => $"{db.X:F1}/{db.Y:F1}/{db.Z:F1}";
+
+    /// <summary>
+    /// A leaf hung at either face of a 0.11 m and a 0.3 m wall, shut, and at A's face swung open into A: what the route
+    /// delivers round the doorway's corners is what it delivers with the leaf at the wall's middle, within a decibel
+    /// (open, beyond its hinge: behind it the open leaf itself stands in the way, a little further out). The opening is
+    /// the wall's depth from face to face, so a leg into either room leaves from that room's face of the wall. It ran
+    /// from the leaf's plane as deep as half the wall, ended inside the wall short of the far face and paid the jamb's
+    /// brick (0.3 m, open: -44.0/-45.3/-58.7 dB with the leaf at a face against -37.4/-40.1/-42.0 at the middle).
+    /// </summary>
+    [Theory]
+    [InlineData(0.11f, true)]
+    [InlineData(0.11f, false)]
+    [InlineData(0.3f, true)]
+    [InlineData(0.3f, false)]
+    public void ALeafHungAtAFaceIsHeardAsOneAtTheWallsMiddle(float t, bool open)
+    {
+        var mid = Rooms(t, t / 2, open);
+        var (midModel, midAcoustics) = Graph(mid);
+        foreach (float leafX in open ? new[] { 0.02f } : new[] { 0.02f, t - 0.02f })
+        {
+            var face = Rooms(t, leafX, open);
+            var (faceModel, faceAcoustics) = Graph(face);
+            foreach (var (src, lis) in open ? Slanting(t).Take(2) : Slanting(t))
+            {
+                var m = RouteDb(mid, midModel, midAcoustics, src, lis);
+                var f = RouteDb(face, faceModel, faceAcoustics, src, lis);
+                _o.WriteLine($"t {t} {(open ? "open" : "shut")} leaf x {leafX:F2}: {src} to {lis}: at the face {Bands(f)}, at the middle {Bands(m)}");
+                Assert.True(MathF.Abs(f.X - m.X) <= 1f && MathF.Abs(f.Y - m.Y) <= 1f && MathF.Abs(f.Z - m.Z) <= 1f,
+                            $"leaf at x {leafX:F2} in a {t} m wall, {(open ? "open" : "shut")}: {Bands(f)} at the face against {Bands(m)} at the middle");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A sound beside a small room, reached round its corner and in at its open door, comes in at the door and not
+    /// through the small room's wall: the way leaves the doorway from the face on the big room's side, though the sound
+    /// lies beyond the doorway's plane on the small room's. Resonance's case (its 11f9886b): a telephone in a car lot's
+    /// office heard from its restroom at -43 dB through the open door, the leaf hung flush with the wall's inner face.
+    /// </summary>
+    [Fact]
+    public void ASoundBesideASmallRoomComesInAtItsDoorNotThroughItsWall()
+    {
+        AcousticRegistry.EnsureInitialized();
+        const float H = 2.7f, T = 0.3f, W = 0.114f, half = W / 2f;
+        var defs = new List<EntityDefinition>();
+        int id = 1;
+        void Box(float x0, float x1, float y0, float y1, float z0, float z1, string material)
+            => defs.Add(Solid(id++, new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+                              new Vector3(x1 - x0, y1 - y0, z1 - z0), Quaternion.Identity, material, WallBuild.Solid));
+        Box(-T, 6f + T, -T, 0f, -T, 5f + T, "Concrete");
+        Box(-T, 6f + T, H, H + T, -T, 5f + T, "Concrete");
+        Box(-T, 0f, 0f, H, -T, 5f + T, "Brick");
+        Box(6f, 6f + T, 0f, H, -T, 5f + T, "Brick");
+        Box(0f, 6f, 0f, H, -T, 0f, "Brick");
+        Box(0f, 6f, 0f, H, 5f, 5f + T, "Brick");
+        // The small room in the big one's north-east corner, its door in its south wall at x 3.5 to 4.4.
+        Box(3f - half, 3f + half, 0f, H, 2f - half, 5f, "Plaster");
+        Box(3f + half, 3.5f, 0f, H, 2f - half, 2f + half, "Plaster");
+        Box(4.4f, 6f, 0f, H, 2f - half, 2f + half, "Plaster");
+        Box(3.5f, 4.4f, 2.1f, H, 2f - half, 2f + half, "Plaster");
+        // The leaf hung flush with the wall's north face, swung open into the small room.
+        var size = new Vector3(1.0f, 2.1f, 0.036f);
+        var shut = new Vector3(3.95f, 1.05f, 2f + half - 0.018f);
+        var rot = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
+        var at = shut + new Vector3(size.X / 2, 0, 0) + Vector3.Transform(new Vector3(-size.X / 2, 0, 0), rot);
+        var leaf = Solid(Door, at, size, rot, "Wood", new WallBuild(0.036f, 0f));
+        leaf.Portal = new PortalComponent { RegionAId = RoomA, RegionBId = RoomB, OpeningCentre = shut, OpeningRotation = Quaternion.Identity };
+        defs.Add(leaf);
+        int brick = Index("Brick"), concrete = Index("Concrete"), plaster = Index("Plaster");
+        defs.Add(Region(RoomA, new Vector3(3f, H / 2f, 2.5f), new Vector3(6f, H, 5f), new[] { concrete, concrete, brick, brick, brick, brick }));
+        defs.Add(Region(RoomB, new Vector3(4.5f + half / 2f, H / 2f, 3.5f + half / 2f), new Vector3(3f - half, H, 3f - half),
+                        new[] { concrete, concrete, brick, plaster, brick, plaster }));
+        var world = new WorldSnapshot();
+        foreach (var d in defs)
+            world.Entities[d.EntityId] = new EntitySnapshot { Id = d.EntityId, Definition = d, Transform = d.Transform };
+        world.AcousticMap = EntityAcoustics.GenerateRegions(defs, new Vector3(100, 20, 100), new Vector3(-50, -5, -50));
+
+        var (model, acoustics) = Graph(world);
+        var source = new Vector3(2f, 1.2f, 3.5f);
+        var listener = new Vector3(4f, 1.6f, 2.5f);
+        Assert.Equal(RoomA, acoustics.GetRegionAt(world, source));
+        Assert.Equal(RoomB, acoustics.GetRegionAt(world, listener));
+        var a = RouteDb(world, model, acoustics, source, listener);
+        var back = RouteDb(world, model, acoustics, listener, source);
+        _o.WriteLine($"beside the small room to inside it: {Bands(a)} dB, the other way {Bands(back)}");
+        Assert.True(a.Y > -20f && back.Y > -20f, $"mid {a.Y:F1} and {back.Y:F1} dB: through the small room's wall");
+    }
+
+    /// <summary>
+    /// A shut leaf at a face is still charged: the opening is measured through the wall from face to face, so the leaf
+    /// stands in it wherever in the wall it hangs, and what the route delivers round the corners shut is what it delivers open less the leaf and its gaps
+    /// (the opening's Tau), within three decibels. Only where the open leaf, swung into A, is not in the way: from beyond
+    /// its hinge.
+    /// </summary>
+    [Theory]
+    [InlineData(0.11f)]
+    [InlineData(0.3f)]
+    public void AShutLeafAtAFaceIsChargedItsLeafAndGaps(float t)
+    {
+        foreach (float leafX in new[] { 0.02f, t / 2, t - 0.02f })
+        {
+            var shut = Rooms(t, leafX, open: false);
+            var opened = Rooms(t, leafX, open: true);
+            var (shutModel, shutAcoustics) = Graph(shut);
+            var (openModel, openAcoustics) = Graph(opened);
+            var door = shutModel.Openings.Single(x => x.Id == Door);
+            Assert.True(door.LeafCover > 0.9f && door.Gaps.Y > 0f, $"leaf cover {door.LeafCover}, gaps {door.Gaps}");
+            var tau = new Vector3(DbE(door.Tau.X), DbE(door.Tau.Y), DbE(door.Tau.Z));
+            foreach (var (src, lis) in Slanting(t).Take(2))
+            {
+                var s = RouteDb(shut, shutModel, shutAcoustics, src, lis);
+                var o = RouteDb(opened, openModel, openAcoustics, src, lis);
+                var less = s - o;
+                _o.WriteLine($"t {t} leaf x {leafX:F2}: {src} to {lis}: shut {Bands(s)}, open {Bands(o)}, shut less open {Bands(less)}, leaf and gaps {Bands(tau)}");
+                Assert.True(MathF.Abs(less.X - tau.X) <= 3f && MathF.Abs(less.Y - tau.Y) <= 3f && MathF.Abs(less.Z - tau.Z) <= 3f,
+                            $"shut less open {Bands(less)} against the leaf and gaps' {Bands(tau)}");
+            }
+        }
+    }
 }
