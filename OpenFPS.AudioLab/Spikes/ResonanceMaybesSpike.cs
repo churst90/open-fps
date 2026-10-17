@@ -21,11 +21,12 @@ namespace OpenFPS.AudioLab.Spikes;
 /// The recordings are read from ASSETS/SOUNDS beside the lab's binary (a link to the checkout's will do).
 ///
 /// Measured 2026-10-17 on main 54d5dcdd:
-/// - outlet: REPRODUCES. A front outlet or cabin path restarted under its id up to 200 ms after its stop (80 ms with
+/// - outlet: REPRODUCES. A front outlet or cabin path restarted under its id up to 200-250 ms after its stop (80 ms with
 ///   the outright stop before 0893c9b8) is undone when the old voice is released: EngineTapState.HandBack is a flag, not
 ///   a count, so the engine's own voice carries the share again beside the new tap, 4.3 dB louder at 20 m/s with the
-///   taps muted. A fire's middle restarted in one tick leaves its outer places on the old synth, which burns on when the
-///   fire is put out.
+///   taps muted. The engine's own voice restarted in one tick leaves the front tap reading the released engine, whose
+///   play position has stopped. A fire's middle restarted in one tick leaves its outer places on the old synth, which
+///   burns on when the fire is put out.
 /// - overdue: does not reproduce: 1,470 one-offs in 120 s, every one playing, none held past its latest end.
 /// - close: does not reproduce: 40 devices closed with 3,120 sounds still opening, no crash.
 /// </summary>
@@ -94,12 +95,14 @@ public static class ResonanceMaybesSpike
         var profile = MachineRegistry.VehicleFor(Key);
         var (gain, reference) = LabHearing.Place(profile.SourceLevelDb, 3.5f);
         var at = new Vector3(4f, 0.4f, 10f);
+        // Off: the taps muted and the engine's own voice heard. On: the other way round.
+        bool loud = false;
         SpatialEmitter Engine() => new()
         {
             EntityId = Car, Seed = Car, SoundId = "engine:" + Key, IsSynth = true, EngineKey = Key,
             EngineSpeed = Speed, EngineRunning = true, Type = EmitterType.EntityAttached, Mode = PlaybackMode.LoopOne,
             Position = at, ApparentPosition = at, Velocity = Vector3.Zero, Direction = Vector3.UnitZ,
-            Volume = gain, MinDistance = reference, ExtentMetres = 3.5f, Range = 500f, Pitch = 1f, TargetRegionId = -1,
+            Volume = loud ? gain * 1e-4f : gain, MinDistance = reference, ExtentMetres = 3.5f, Range = 500f, Pitch = 1f, TargetRegionId = -1,
             LevelDb = profile.SourceLevelDb, EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
         };
         // The front outlet, as AudioWorld.FrontVoice makes it; muted, so the capture hears only what the engine's own
@@ -109,10 +112,10 @@ public static class ResonanceMaybesSpike
             EntityId = Front, SoundId = "engine-intake", IsSynth = true, IntakeOfEntity = Car, EngineKey = "",
             Type = EmitterType.EntityAttached, Mode = PlaybackMode.LoopOne,
             Position = at + new Vector3(0f, 0f, 2f), ApparentPosition = at + new Vector3(0f, 0f, 2f),
-            Volume = gain * 1e-4f, MinDistance = reference, Range = 500f, Pitch = 1f, TargetRegionId = -1,
+            Volume = loud ? gain : gain * 1e-4f, MinDistance = reference, Range = 500f, Pitch = 1f, TargetRegionId = -1,
             LevelDb = profile.SourceLevelDb, EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
         };
-        SpatialEmitter CabinTap() => FrontTap() with { EntityId = Cabin, SoundId = "cabin", IntakeOfEntity = 0, CabinOfEntity = Car, CabinPath = 1 };
+        SpatialEmitter CabinTap() => FrontTap() with { EntityId = Cabin, SoundId = "cabin", IntakeOfEntity = 0, CabinOfEntity = Car, CabinPath = 1, Volume = gain * 1e-4f };
 
         var p = Provider(outDir, "outlet");
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -175,6 +178,21 @@ public static class ResonanceMaybesSpike
                 Console.WriteLine(line.ToString());
             }
             p.Lab.HardStops = false;
+
+            // The other way round: the engine's own voice swapped in one tick under the taps. Now the engine is muted and
+            // the front outlet heard, so the capture is what the tap reads.
+            loud = true;
+            Pump(p, clock, 2.0, Each);
+            double t3 = clock.Elapsed.TotalSeconds;
+            marks.Add(("front tap, engine live", t3 - 1.0, t3));
+            p.StopSound(Car); p.PlaySpatialSound(Engine());
+            Pump(p, clock, 0.5, Each);
+            double t4 = clock.Elapsed.TotalSeconds;
+            Pump(p, clock, 1.0, Each);
+            marks.Add(("front tap, engine swapped", t4, t4 + 1.0));
+            Console.WriteLine($"  the engine's voice swapped in one tick: the front tap reads the live engine {ReferenceEquals(Active(p, Front)?.TapState?.Source, Active(p, Car)?.EngineState)}, "
+                            + $"the old engine's play position frozen at {engine.Played} (the live one's {Active(p, Car)?.EngineState?.Played})");
+            loud = false;
 
             // A wood's outer place reads the synth of its middle's live voice; the middle swapped in one tick.
             NaturePlaces(p, clock);
