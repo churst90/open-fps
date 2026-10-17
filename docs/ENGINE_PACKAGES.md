@@ -125,7 +125,7 @@ Packages:
 | Environment | new | 15 | 46 | 5,688 |
 | Sound | exists | 130 | 276 | 52,016 |
 | Models | new | 7 | 18 | 2,195 |
-| Audio | planned (library stage 6) | 68 | 142 | 27,416 |
+| Audio | exists since library stage 6 (2026-10-16) | 68 | 142 | 27,416 |
 | World | new | 26 | 71 | 7,872 |
 | Common | exists, slimmed | 11 | 94 | 2,737 |
 | Agents | new | 10 | 11 | 2,493 |
