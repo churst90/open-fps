@@ -3,6 +3,7 @@ using System.Numerics;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.AudioEngine.Core;
 
@@ -432,7 +433,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     }
 
     /// <summary>The routes through openings, for the reverberant fields of the places beyond them.</summary>
-    public Func<OpenFPS.Common.OpeningRoutes?>? RoutesSource
+    public Func<OpenFPS.Acoustics.OpeningRoutes?>? RoutesSource
     {
         set { if (_provider is OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider fmod) fmod.RoutesSource = value; }
     }

@@ -1,6 +1,7 @@
 using OpenFPS.Geometry;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// Walls built of several stuffs in one box: a timber-framed house wall is cladding, sheathing, a stud cavity

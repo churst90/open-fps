@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Text.Json.Serialization;
 using OpenFPS.Common.Editing;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Common;
 

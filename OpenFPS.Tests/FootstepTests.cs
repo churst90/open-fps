@@ -1,5 +1,6 @@
 using OpenFPS.Common;
 using Xunit.Abstractions;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Tests;
 

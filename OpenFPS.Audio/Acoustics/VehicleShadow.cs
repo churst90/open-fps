@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Common;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.AudioEngine.Acoustics;
 

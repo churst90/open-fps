@@ -1,7 +1,8 @@
 using System.Numerics;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
-using OpenFPS.Common.Systems;
+using OpenFPS.Acoustics;
+using OpenFPS.Acoustics.Systems;
 using OpenFPS.Geometry;
 
 namespace OpenFPS.Common;

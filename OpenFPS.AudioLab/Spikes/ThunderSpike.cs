@@ -4,6 +4,7 @@ using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.AudioLab.Spikes;
 

@@ -1,4 +1,6 @@
-namespace OpenFPS.Common;
+using OpenFPS.Common;
+
+namespace OpenFPS.Acoustics;
 
 /// <summary>Tuning for the acoustics, shared so the client and the server agree.</summary>
 public static class AcousticConstants

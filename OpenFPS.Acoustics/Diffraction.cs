@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// What a barrier does to a sound, by Maekawa's curve on the path difference round it against the

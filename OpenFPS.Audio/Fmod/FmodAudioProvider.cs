@@ -9,6 +9,7 @@ using OpenFPS.Common;
 using OpenFPS.Client.Core.Platform;
 
 using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -306,8 +307,8 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_threeEqPool.TryPop(out var dsp)) { dsp.reset(); dsp.setBypass(false); return dsp; }
         _system.createDSPByType(DSP_TYPE.THREE_EQ, out dsp);
         // The bands every path gain is computed for, set rather than left to FMOD's defaults.
-        dsp.setParameterFloat((int)DSP_THREE_EQ.LOWCROSSOVER, OpenFPS.Common.AcousticBands.LowCrossoverHz);
-        dsp.setParameterFloat((int)DSP_THREE_EQ.HIGHCROSSOVER, OpenFPS.Common.AcousticBands.HighCrossoverHz);
+        dsp.setParameterFloat((int)DSP_THREE_EQ.LOWCROSSOVER, OpenFPS.Acoustics.AcousticBands.LowCrossoverHz);
+        dsp.setParameterFloat((int)DSP_THREE_EQ.HIGHCROSSOVER, OpenFPS.Acoustics.AcousticBands.HighCrossoverHz);
         return dsp;
     }
 
@@ -1376,7 +1377,7 @@ public partial class FmodAudioProvider : IAudioProvider
     public float SimulatedReverbDecayMs => _simReverbDecayMs;
 
     /// <summary>How enclosed the listener's surroundings are, 0..1: the value in use, slewed toward
-    /// <see cref="_enclosureTarget"/> by <see cref="AdvanceListenerRoom"/>. See OpenFPS.Common.Enclosure.</summary>
+    /// <see cref="_enclosureTarget"/> by <see cref="AdvanceListenerRoom"/>. See OpenFPS.Acoustics.Enclosure.</summary>
     private float _listenerEnclosure = -1f;
 
     /// <summary>The last measured enclosure, which <see cref="_listenerEnclosure"/> walks toward.</summary>
@@ -4950,8 +4951,8 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>The routes through openings, from whoever builds them (the acoustic worker).</summary>
-    private Func<OpenFPS.Common.OpeningRoutes?>? _routesSource;
-    public Func<OpenFPS.Common.OpeningRoutes?>? RoutesSource { set => _routesSource = value; }
+    private Func<OpenFPS.Acoustics.OpeningRoutes?>? _routesSource;
+    public Func<OpenFPS.Acoustics.OpeningRoutes?>? RoutesSource { set => _routesSource = value; }
 
     /// <summary>Beyond this an opening's share of a room's field is under -45 dB and not asked about.</summary>
     private const float FieldLeakRange = 60f;
@@ -4960,7 +4961,7 @@ public partial class FmodAudioProvider : IAudioProvider
     // Each room's field where you stand is worked out on the thread pool: the first time from a new room it
     // routes through every opening in range, and on the audio thread that held every source still for
     // 200 ms as you walked through Marlow Tower's front door (AudioLab --room-change, 2026-10-12).
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(OpenFPS.Common.OpeningRoutes Routes, int Region, Vector3 Listener, int ListenerRegion, double At)> _fieldsAsked = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(OpenFPS.Acoustics.OpeningRoutes Routes, int Region, Vector3 Listener, int ListenerRegion, double At)> _fieldsAsked = new();
     private readonly System.Collections.Concurrent.ConcurrentQueue<(int Region, (double At, Vector3 Where, int Region, float Gain, Vector3 Via, Vector3 InField) Field)> _fieldsMade = new();
     private readonly HashSet<int> _fieldsPending = new();
     private System.Threading.Tasks.Task _fieldsMaking = System.Threading.Tasks.Task.CompletedTask;
@@ -4969,7 +4970,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// asked again every quarter second or half metre; the last answer stands while the next is made.
     /// Null while none is known from the room the listener is in: the bus is held where it is until one
     /// is, then moves by its own slew.</summary>
-    private bool? FieldHere(OpenFPS.Common.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion,
+    private bool? FieldHere(OpenFPS.Acoustics.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion,
                             out float gain, out Vector3 via)
     {
         double now = Clock.Now;
@@ -4985,7 +4986,7 @@ public partial class FmodAudioProvider : IAudioProvider
         return null;
     }
 
-    private void AskField(OpenFPS.Common.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion, double now)
+    private void AskField(OpenFPS.Acoustics.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion, double now)
     {
         if (_fieldsPending.Add(regionId)) _fieldsAsked.Enqueue((routes, regionId, listener, listenerRegion, now));
         if (_fieldsMaking.IsCompleted && !_fieldsAsked.IsEmpty) _fieldsMaking = System.Threading.Tasks.Task.Run(MakeFields);

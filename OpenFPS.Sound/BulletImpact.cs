@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using OpenFPS.Acoustics;
 using Kind = OpenFPS.Common.StrikeKind;
 
 namespace OpenFPS.Common;

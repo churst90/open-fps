@@ -3,7 +3,7 @@ using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
-using OpenFPS.Common.Systems;
+using OpenFPS.Acoustics;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
 using Heightfield = OpenFPS.Geometry.Heightfield;

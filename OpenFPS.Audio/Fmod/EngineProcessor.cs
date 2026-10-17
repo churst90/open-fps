@@ -6,6 +6,7 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Engine;
 using OpenFPS.Client.AudioEngine.Core.Pneumatics;
 using System.Runtime.CompilerServices;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 

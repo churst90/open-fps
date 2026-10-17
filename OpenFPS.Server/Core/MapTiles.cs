@@ -282,7 +282,7 @@ public sealed class MapTiles
         if (world.Has<ColliderComponent>(e)) size = Vector3.Max(size, world.Get<ColliderComponent>(e).Size);
         if (world.Has<RegionComponent>(e)) size = Vector3.Max(size, world.Get<RegionComponent>(e).RoomSize);
         var rot = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
-        var half = OpenFPS.Common.Systems.FaceOpenings.AxisAlignedHalfExtents(size * 0.5f, rot);
+        var half = OpenFPS.Acoustics.Systems.FaceOpenings.AxisAlignedHalfExtents(size * 0.5f, rot);
         return (t.Position - half, t.Position + half);
     }
 

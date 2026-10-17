@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// What a slab of material does when struck (a door leaf, a pane, a car's wing), by one law:

@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -107,7 +108,7 @@ public static class LayersSpike
         var world = PathProbeSpike.LoadAsClient(root, mapId);
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         var plan = SteamAudioScene.PlanOf(boxes);
-        int sheets = boxes.Count(b => OpenFPS.Common.Constructions.IsSheet(b.Size));
+        int sheets = boxes.Count(b => OpenFPS.Acoustics.Constructions.IsSheet(b.Size));
         Console.WriteLine($"  {mapId}: {boxes.Count} boxes, {sheets} sheets; {plan.Constructions} constructions of {plan.Members.Count} layers, "
                         + $"{plan.Faces} faces shown ({plan.Milliseconds:F0} ms)");
         Console.WriteLine($"  triangles: {boxes.Count * 12} as boxes, {boxes.Count * 12 - plan.Members.Count * 4 + plan.Faces * 2} with the constructions' faces");

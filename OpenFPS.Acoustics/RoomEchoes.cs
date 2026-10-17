@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 // A one-off sound in a room is not one copy (the traced tail took 0.85-0.95 of its energy in a capture). What
 // places a room round you is its first reflections, so a one-off sound's early reflections are voices of their

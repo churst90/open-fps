@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OpenFPS.Acoustics;
 using static OpenFPS.Common.DoorPhysics;
 
 namespace OpenFPS.Common;

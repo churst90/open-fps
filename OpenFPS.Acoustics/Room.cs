@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>A named box and what its six faces are made of; the host fills it (open-fps: from RegionComponent,
 /// in EntityAcoustics). Material "None" is no face at all: see <see cref="RoomAcoustics"/>. A room flooded from

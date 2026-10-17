@@ -1,7 +1,8 @@
 using System.Numerics;
 using OpenFPS.Geometry;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// The sound's questions of the world's solids (docs/SOUND_LIBRARY_BOUNDARY.md 7.6): what every wall between two

@@ -1,4 +1,5 @@
 using OpenFPS.Common;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 

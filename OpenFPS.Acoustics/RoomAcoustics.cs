@@ -1,6 +1,7 @@
 using System.Numerics;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// What a region's boundary does to the sound inside it, and whether there is one. A region is a named

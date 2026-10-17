@@ -4,6 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
 using OpenFPS.Client.AudioEngine.Core.Aircraft;
 using OpenFPS.Client.AudioEngine.Core.Signals;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.AudioEngine.Core.Yard;
 

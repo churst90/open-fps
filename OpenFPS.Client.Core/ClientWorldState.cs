@@ -4,6 +4,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core;
 

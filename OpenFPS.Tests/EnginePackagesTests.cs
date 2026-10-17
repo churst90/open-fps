@@ -192,7 +192,7 @@ public class EnginePackagesTests
         new object[] { "Astronomy", typeof(OpenFPS.Astronomy.Moon).Assembly.GetName().Name! },
         new object[] { "Physics", typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetName().Name! },
         new object[] { "Materials", typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name! },
-        new object[] { "Acoustics", typeof(OpenFPS.Common.AcousticConstants).Assembly.GetName().Name! },
+        new object[] { "Acoustics", typeof(OpenFPS.Acoustics.AcousticConstants).Assembly.GetName().Name! },
         new object[] { "Sound", typeof(OpenFPS.Common.Loudness).Assembly.GetName().Name! },
         new object[] { "Accessibility", typeof(OpenFPS.Client.Core.Platform.GameKey).Assembly.GetName().Name! },
         new object[] { "Models", typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name! },

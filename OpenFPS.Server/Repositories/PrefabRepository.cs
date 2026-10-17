@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using Arch.Core;
 using Serilog;
 using OpenFPS.Geometry;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Server.Repositories;
 

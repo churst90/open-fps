@@ -548,8 +548,8 @@ SPLIT_TYPES = ['OpenFPS.Client.Core.ClientAudioSystem', 'OpenFPS.Client.Core.Wor
                'OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker', 'OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics',
                'OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph', 'OpenFPS.Client.AudioEngine.Acoustics.CabinWalls',
                'OpenFPS.Client.AudioEngine.Acoustics.VehicleShadow', 'OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider',
-               'OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene', 'OpenFPS.Common.Systems.AcousticVolumeGenerator',
-               'OpenFPS.Common.AudioEmission', 'OpenFPS.Common.RoomAcoustics', 'OpenFPS.Common.OpeningRoutes']
+               'OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene', 'OpenFPS.Acoustics.Systems.AcousticVolumeGenerator',
+               'OpenFPS.Common.AudioEmission', 'OpenFPS.Acoustics.RoomAcoustics', 'OpenFPS.Acoustics.OpeningRoutes']
 mem_lines = {}
 for m in MEMBERS:
     mem_lines[(m['type'], m['member'])] = int(m['end']) - int(m['start']) + 1

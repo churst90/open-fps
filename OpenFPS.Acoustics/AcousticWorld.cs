@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// The world as the sound reads it (docs/SOUND_LIBRARY_BOUNDARY.md 7.3): the solids as triangles, the rooms and

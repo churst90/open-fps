@@ -63,7 +63,7 @@ public sealed class SteamAudioSimulator : IDisposable
     /// Reflection result for a source: per-band RT60, seconds, and only that. The reflections output's
     /// <c>eq</c> triple comes back zero in every band on the parametric path (Steam Audio fills it only
     /// for the hybrid effect), so how much reverberant field there is comes from the geometry
-    /// (OpenFPS.Common.Enclosure).
+    /// (OpenFPS.Acoustics.Enclosure).
     /// </summary>
     public readonly record struct ReverbResult(float Rt60Low, float Rt60Mid, float Rt60High)
     {

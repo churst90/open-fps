@@ -5,7 +5,7 @@ using Arch.Core;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Systems;
+using OpenFPS.Acoustics;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;

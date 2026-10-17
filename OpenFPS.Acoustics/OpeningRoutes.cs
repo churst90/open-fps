@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Geometry;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// How sound gets from one place to another through the openings between them (doorways, open faces,

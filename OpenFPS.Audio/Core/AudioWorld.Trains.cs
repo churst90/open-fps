@@ -4,6 +4,7 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core;
 

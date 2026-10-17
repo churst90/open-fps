@@ -1,7 +1,7 @@
 using System.Numerics;
 using Thread = System.Threading.Thread;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Common;
+using OpenFPS.Acoustics;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 
@@ -275,7 +275,7 @@ public static class ProviderOrbit
 
         // A map with rooms in it, so sends make buses the way walking a city does.
         const int regions = 120;
-        var map = new OpenFPS.Common.AcousticMap(new Vector3(2000, 200, 2000), new Vector3(-1000, 0, -1000), 1f);
+        var map = new OpenFPS.Acoustics.AcousticMap(new Vector3(2000, 200, 2000), new Vector3(-1000, 0, -1000), 1f);
         for (int i = 0; i < regions; i++)
         {
             map.Regions[9000 + i] = new Room
@@ -383,7 +383,7 @@ public static class ProviderOrbit
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
 
         const int regions = 12;   // under the bus cap, so every room really gets a bus
-        var map = new OpenFPS.Common.AcousticMap(new Vector3(400, 50, 400), new Vector3(-200, 0, -200), 1f);
+        var map = new OpenFPS.Acoustics.AcousticMap(new Vector3(400, 50, 400), new Vector3(-200, 0, -200), 1f);
         for (int i = 0; i < regions; i++)
         {
             map.Regions[9000 + i] = new Room

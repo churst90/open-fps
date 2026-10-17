@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>One flat reflecting face: a rectangle in space, with a material.</summary>
 /// <param name="HalfU">An in-plane axis scaled to half the face's extent along it, so the containment

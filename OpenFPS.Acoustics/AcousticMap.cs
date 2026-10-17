@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>A map's acoustic regions, portals and voxel grid, built on load by each side; never sent.
 /// Region and portal ids are the host's (open-fps: the server's entity ids; generated openings are negative).</summary>

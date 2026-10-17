@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Tests;
 

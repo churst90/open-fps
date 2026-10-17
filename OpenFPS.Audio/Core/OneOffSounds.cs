@@ -5,6 +5,7 @@ using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core;
 

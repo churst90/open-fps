@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
-using OpenFPS.Common.Systems;
+using OpenFPS.Acoustics;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;

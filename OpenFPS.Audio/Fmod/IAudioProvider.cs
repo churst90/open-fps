@@ -27,7 +27,7 @@ public interface IAudioProvider : IDisposable
     /// rendered as its own early reflection.</summary>
     void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes);
 
-    void SetAcousticMap(OpenFPS.Common.AcousticMap map);
+    void SetAcousticMap(OpenFPS.Acoustics.AcousticMap map);
     void PlaySpatialSound(SpatialEmitter emitter);
     void UpdateSpatialAttributes(SpatialEmitter emitter);
     void SetAcousticPath(int entityId, AcousticPathData path);
@@ -36,7 +36,7 @@ public interface IAudioProvider : IDisposable
     /// The listener's surveyed reverb decay, ms (0: keep the Sabine estimate), with
     /// <paramref name="enclosure"/>, 0 (open field) to 1 (sealed box). They arrive together: the decay
     /// says how long a tail would last and the enclosure whether there is one, and a long decay where
-    /// nothing comes back put a cathedral over an open racetrack (OpenFPS.Common.Enclosure). The
+    /// nothing comes back put a cathedral over an open racetrack (OpenFPS.Acoustics.Enclosure). The
     /// FMOD provider does not read <paramref name="hfDecayRatio"/> or <paramref name="lfDecayRatio"/>.
     /// </summary>
     void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio);

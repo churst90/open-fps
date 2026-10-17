@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Acoustics;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 namespace OpenFPS.Client.AudioEngine.Acoustics;
@@ -72,7 +72,7 @@ public static class OpeningGraph
             if (leaves.Contains(id)) continue;
             // The gaps in rooms' faces (AcousticVolumeGenerator: open sides, tunnel mouths, doorways with
             // no door) carry their own rectangle; an authored portal is as wide as its author said.
-            bool face = id <= OpenFPS.Common.Systems.AcousticVolumeGenerator.FirstFaceOpeningId;
+            bool face = id <= OpenFPS.Acoustics.Systems.AcousticVolumeGenerator.FirstFaceOpeningId;
             // An authored opening with no leaf carries the frame its rooms' floods met (AcousticVolumeGenerator.ApplyFloodOpenings).
             if (map.OpeningFrames.TryGetValue(id, out var frame))
             {

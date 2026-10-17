@@ -6,6 +6,7 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using Serilog;
 using OpenFPS.Geometry;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core;
 
@@ -1689,7 +1690,7 @@ public partial class AudioWorld
             if (!_carPreset.TryGetValue(id, out string? preset)) continue;
             float separation = OutletSeparation(preset);
             if (separation <= 0f) continue;
-            if (!OpenFPS.Common.Localisation.Resolvable(separation, MathF.Sqrt(d2))) continue;
+            if (!OpenFPS.Acoustics.Localisation.Resolvable(separation, MathF.Sqrt(d2))) continue;
             _frontCandidates.Add((id, d2));
         }
         _frontCandidates.Sort(static (a, b) => (a.D2, a.Id).CompareTo((b.D2, b.Id)));
@@ -3302,7 +3303,7 @@ public partial class AudioWorld
         public int Answering;
         public int Region = AcousticConstants.GlobalRegionId;
         public readonly bool[] On = new bool[OwnVoiceCopies];
-        public readonly List<OpenFPS.Common.EarlyReflections.Arrival> Arrivals = new();
+        public readonly List<OpenFPS.Acoustics.EarlyReflections.Arrival> Arrivals = new();
     }
     private readonly Dictionary<int, TalkerRoom> _talkerRooms = new();
     private bool _talkerSearchedThisFrame;
@@ -3542,7 +3543,7 @@ public partial class AudioWorld
                 path.ApertureFactor, path.ApparentPosition.X, path.ApparentPosition.Y, path.ApparentPosition.Z, path.RegionId, _audio.Clock.Now);
     }
 
-    private readonly List<OpenFPS.Common.EarlyReflections.Arrival> _stepArrivals = new();
+    private readonly List<OpenFPS.Acoustics.EarlyReflections.Arrival> _stepArrivals = new();
     /// <summary>
     /// The surfaces answering your own footfalls so far, each a voice of its own kind (VoiceKind.StepEcho), so a
     /// copy never takes its step's. Each carries its whole path from its image, and nothing asks about it
@@ -3567,7 +3568,7 @@ public partial class AudioWorld
     /// myself in the room I'm actually in").
     /// </summary>
     private const float MicrophoneLatency = 0.06f;
-    private readonly List<OpenFPS.Common.EarlyReflections.Arrival> _voiceArrivals = new();
+    private readonly List<OpenFPS.Acoustics.EarlyReflections.Arrival> _voiceArrivals = new();
     private readonly bool[] _voiceCopyOn = new bool[OwnVoiceCopies];
     private bool _voiceRoomOn;
     private double _voiceNextSearch, _voiceNextLog;
@@ -3665,7 +3666,7 @@ public partial class AudioWorld
     /// <param name="regionId">The room the copies reverberate in.</param>
     /// <param name="range">How far the copies are heard.</param>
     private int PlaceVoiceCopies(IAcousticWorld world, Vector3 mouth, Vector3 ear,
-                                 List<OpenFPS.Common.EarlyReflections.Arrival> arrivals,
+                                 List<OpenFPS.Acoustics.EarlyReflections.Arrival> arrivals,
                                  float gain, float reference, float alreadyLateSeconds,
                                  int copiesOf, bool[] on, string key, string soundId, int regionId, float range,
                                  VoiceKind kind, int ownerId)
@@ -3683,11 +3684,11 @@ public partial class AudioWorld
             if (slot >= OwnVoiceCopies) break;
             if (a.ExtraDelaySeconds > RoomEchoes.WindowSeconds) continue;
             if (a.Order >= 2 && ++secondOrder > RoomEchoes.MaxSecondOrderCopies) continue;
-            float copyGain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference)
+            float copyGain = OpenFPS.Acoustics.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference)
                            * RoomEchoes.MirrorShare(a.Scattering, a.Order)
                            * _audio.Mix.CopiesTrim;
-            if (copyGain < OpenFPS.Common.ImageSource.MinGain) continue;
-            var loss = OpenFPS.Common.ImageSource.SpecularBandLossDb(a.Scattering, a.Order);
+            if (copyGain < OpenFPS.Acoustics.ImageSource.MinGain) continue;
+            var loss = OpenFPS.Acoustics.ImageSource.SpecularBandLossDb(a.Scattering, a.Order);
             float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
             float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
             int id = _voices.IdFor(kind, copiesOf, slot);
@@ -3776,7 +3777,7 @@ public partial class AudioWorld
             // The floor the foot is on: the step is made of it already.
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(stepPos.Y, ear.Y) - 0.2f) continue;
             if (a.Order >= 2 && ++secondOrder > RoomEchoes.MaxSecondOrderCopies) continue;
-            float placed = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference);
+            float placed = OpenFPS.Acoustics.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference);
             float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
             float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
             // A first-order wall's scattered share, √s of the pressure, as its wash: the step smeared by the
@@ -3784,14 +3785,14 @@ public partial class AudioWorld
             // wash, WorldAudioPlayer.QueueWash). Nothing off a smooth wall.
             float s = Math.Clamp(a.Scattering, 0f, 1f);
             float wash = a.Order == 1 && OpenFPS.Client.AudioEngine.Fmod.EchoWashState.Applies(s) ? placed * MathF.Sqrt(s) : 0f;
-            if (wash >= OpenFPS.Common.ImageSource.MinGain)
+            if (wash >= OpenFPS.Acoustics.ImageSource.MinGain)
                 SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb,
                                wash * _audio.Mix.CopiesTrim, lowDb, highDb, s);
             // The mirror share (RoomEchoes.MirrorShare), a clean copy.
             float gain = placed * RoomEchoes.MirrorShare(a.Scattering, a.Order);
-            if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
+            if (gain < OpenFPS.Acoustics.ImageSource.MinGain) continue;
             gain *= _audio.Mix.CopiesTrim;   // /copies
-            var loss = OpenFPS.Common.ImageSource.SpecularBandLossDb(a.Scattering, a.Order);
+            var loss = OpenFPS.Acoustics.ImageSource.SpecularBandLossDb(a.Scattering, a.Order);
             SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb, gain, loss.LowDb + lowDb, loss.HighDb + highDb, 0f);
             if (++added >= RoomEchoes.MaxEchoes) break;
         }
@@ -3799,7 +3800,7 @@ public partial class AudioWorld
 
     /// <summary>One copy of your step at a wall's image: the mirror (<paramref name="smear"/> 0) or the
     /// wall's wash, smeared by its roughness in the mixer (EchoWashState).</summary>
-    private void SubmitStepCopy(in OpenFPS.Common.EarlyReflections.Arrival a, string soundId, float stepGain, float stepReference,
+    private void SubmitStepCopy(in OpenFPS.Acoustics.EarlyReflections.Arrival a, string soundId, float stepGain, float stepReference,
                                 float stepLevelDb, float gain, float eqLowDb, float eqHighDb, float smear)
     {
         int echo = _stepEchoIndex++;
@@ -3911,7 +3912,7 @@ public partial class AudioWorld
         // Sound bent down by the wind or the air's layers comes off the ground as if both ends stood higher (Bending).
         bool water = OpenFPS.Common.AcousticRegistry.IsLiquid(c.Material);
         var bent = OpenFPS.Common.Bending.Along(_audio.Weather, src, ear, c.Height, water, _audio.Weather.Now, _audio.Atmosphere.SpeedOfSound);
-        if (OpenFPS.Common.GroundAnswer.Reflect(c.Height, m, src, ear, minHeight, _audio.Atmosphere.SpeedOfSound,
+        if (OpenFPS.Acoustics.GroundAnswer.Reflect(c.Height, m, src, ear, minHeight, _audio.Atmosphere.SpeedOfSound,
                                                 bent.SourceRaise, bent.EarRaise) is not { } bounce)
             return;
         e.OverWater = water;

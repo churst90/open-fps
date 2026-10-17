@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Acoustics;
 using Complex = System.Numerics.Complex;
 
 namespace OpenFPS.Tests;

@@ -88,8 +88,8 @@ public class GroundReflectionTests
     [Fact]
     public void TheAirDecorrelatesTheTopAtRange()
     {
-        float nearLow = OpenFPS.Common.GroundAnswer.Coherence(250f, 10f, 0.5f, 343f);
-        float farHigh = OpenFPS.Common.GroundAnswer.Coherence(2500f, 100f, 0.5f, 343f);
+        float nearLow = OpenFPS.Acoustics.GroundAnswer.Coherence(250f, 10f, 0.5f, 343f);
+        float farHigh = OpenFPS.Acoustics.GroundAnswer.Coherence(2500f, 100f, 0.5f, 343f);
         Assert.True(nearLow > 0.99f);
         Assert.True(farHigh < nearLow && farHigh > 0.5f);
     }

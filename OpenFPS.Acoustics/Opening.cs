@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>A way through between two rooms (equal ids: not linked yet); the host fills it (open-fps: from
 /// PortalComponent, in EntityAcoustics).</summary>

@@ -2,6 +2,7 @@ using MemoryPack;
 using System.Numerics;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Editing;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Common.Networking;
 

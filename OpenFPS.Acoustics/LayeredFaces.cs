@@ -1,7 +1,8 @@
 using System.Numerics;
 using OpenFPS.Geometry;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// The faces a scene of boxes shows a ray tracer that only multiplies what each face it meets lets through

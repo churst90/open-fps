@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// When two sources stop being two: a machine's intake and exhaust are worth separate voices only while

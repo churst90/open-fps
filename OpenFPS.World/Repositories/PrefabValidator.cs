@@ -132,9 +132,9 @@ public static class PrefabValidator
             r.Errors.Add($"StudSpacingMetres {t.StudSpacingMetres} cannot be negative.");
         if (t.Assembly != null)
         {
-            if (OpenFPS.Common.Assemblies.Named(t.Assembly) == null)
+            if (OpenFPS.Acoustics.Assemblies.Named(t.Assembly) == null)
                 r.Errors.Add($"Assembly '{t.Assembly}' is not in the table (Assemblies): "
-                             + string.Join(", ", OpenFPS.Common.Assemblies.All.Select(a => a.Name)) + ".");
+                             + string.Join(", ", OpenFPS.Acoustics.Assemblies.All.Select(a => a.Name)) + ".");
             if (t.LeafMetres.HasValue || t.StudSpacingMetres.HasValue)
                 r.Errors.Add("Assembly and LeafMetres or StudSpacingMetres both set: an assembly's plies say how it is built. Keep one.");
         }

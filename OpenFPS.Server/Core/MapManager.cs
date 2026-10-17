@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Repositories;
 using Serilog;
 using OpenFPS.Geometry;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Server.Core;
 
@@ -103,7 +104,7 @@ public partial class MapManager
             float top = t.Position.Y + c.Size.Y / 2f;
             if (top < -1f || top > 0.5f) return;
             var rot = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
-            var half = OpenFPS.Common.Systems.FaceOpenings.AxisAlignedHalfExtents(c.Size * 0.5f, rot);
+            var half = OpenFPS.Acoustics.Systems.FaceOpenings.AxisAlignedHalfExtents(c.Size * 0.5f, rot);
             floors.Add((t.Position, new Vector2(c.Size.X / 2f, c.Size.Z / 2f), Quaternion.Inverse(rot),
                         new Vector2(t.Position.X - half.X, t.Position.Z - half.Z), new Vector2(t.Position.X + half.X, t.Position.Z + half.Z)));
         });
@@ -818,9 +819,9 @@ public partial class MapManager
     private static bool IsUpright(Quaternion q) => q.IsIdentity || q == default;
 
     /// <summary>How far outside a region's box a wall may stand and still be its wall, metres: a region is
-    /// drawn to the inside of a room. The same reach the client's <see cref="OpenFPS.Common.Systems.FaceOpenings"/>
+    /// drawn to the inside of a room. The same reach the client's <see cref="OpenFPS.Acoustics.Systems.FaceOpenings"/>
     /// uses, so faces and the gaps in them are measured from the same walls.</summary>
-    private const float WallReach = OpenFPS.Common.Systems.FaceOpenings.WallReachMetres;
+    private const float WallReach = OpenFPS.Acoustics.Systems.FaceOpenings.WallReachMetres;
 
     /// <summary>
     /// A map entity's per-face room materials onto its RegionComponent: by name (RoomMaterials) or as raw

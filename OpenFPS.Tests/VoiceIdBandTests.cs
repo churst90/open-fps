@@ -2,6 +2,7 @@ using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using Xunit.Abstractions;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Tests;
 

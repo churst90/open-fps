@@ -193,7 +193,7 @@ public static class ScopeView
     private static bool Indoors(WorldSnapshot snap, SpatialService spatial, Vector3 at)
     {
         int region = spatial.GetRegionAt(snap, at);
-        return region != OpenFPS.Common.AcousticConstants.GlobalRegionId
+        return region != OpenFPS.Acoustics.AcousticConstants.GlobalRegionId
                && snap.Entities.TryGetValue(region, out var r) && r.Definition.Region.IsIndoor;
     }
 }

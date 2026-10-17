@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 using Xunit.Abstractions;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Tests;
 

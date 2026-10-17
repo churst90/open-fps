@@ -283,7 +283,7 @@ public class LibraryBoundaryTests
         // The material table and the road surfaces: nothing of ours. Serilog: an unknown material is logged.
         new object[] { typeof(OpenFPS.Common.AcousticRegistry).Assembly.GetName().Name!, new[] { "Serilog" } },
         // Walls, diffraction, reflections, the octree, the rooms.
-        new object[] { typeof(OpenFPS.Common.AcousticConstants).Assembly.GetName().Name!,
+        new object[] { typeof(OpenFPS.Acoustics.AcousticConstants).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials" } },
         // The weather, the water and fire (docs/ENGINE_PACKAGES.md, stage 3): on the physics, below the sound.
         new object[] { typeof(OpenFPS.Common.WorldWeather).Assembly.GetName().Name!,

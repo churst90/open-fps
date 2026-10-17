@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Geometry;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// How much of the sound leaving a place comes back to it: whether there is a reverberant field here

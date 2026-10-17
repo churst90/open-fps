@@ -1,7 +1,8 @@
 using System.Numerics;
 using OpenFPS.Geometry;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// Solids in contact are one construction: a floor is a slab, the ceiling under it and the carpet on it,

@@ -31,7 +31,7 @@ internal static class OldVoiceIds
         return kind switch
         {
             VoiceKind.Engine or VoiceKind.Aircraft or VoiceKind.Machine or VoiceKind.Wood or VoiceKind.Recording => owner,
-            VoiceKind.Reflection => -30_000 - owner * (OpenFPS.Common.EarlyReflections.MaxArrivals + 1) - part,
+            VoiceKind.Reflection => -30_000 - owner * (OpenFPS.Acoustics.EarlyReflections.MaxArrivals + 1) - part,
             VoiceKind.Transient => -100_000 - part,
             VoiceKind.EngineEcho => -600_000 - part,
             VoiceKind.Borrowed => -700_000 - Math.Abs(owner),

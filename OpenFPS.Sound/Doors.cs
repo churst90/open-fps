@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Common;
 

@@ -1,3 +1,5 @@
+using OpenFPS.Acoustics;
+
 namespace OpenFPS.Common;
 
 /// <summary>What a drop does when it lands on something: the five kinds of surface rain sounds

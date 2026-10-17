@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>A sparse voxel octree of acoustic region ids: a uniform volume is one node.</summary>
 public partial class SparseAcousticOctree

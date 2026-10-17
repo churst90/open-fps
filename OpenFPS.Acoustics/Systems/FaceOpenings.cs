@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace OpenFPS.Common.Systems;
+namespace OpenFPS.Acoustics.Systems;
 
 /// <summary>
 /// The gaps in a room's walls: every part of its five faces above the floor that nothing closes in, as

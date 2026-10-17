@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
+using OpenFPS.Acoustics;
 using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;

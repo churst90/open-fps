@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using Serilog;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core;
 
@@ -255,7 +256,7 @@ public sealed class ClientAudioSystem : IAudioHost
                         if (Vector3.Distance(snap.Transform.Position, oldSnap.Transform.Position) > 0.1f ||
                             Math.Abs(Quaternion.Dot(snap.Transform.Rotation, oldSnap.Transform.Rotation)) < 0.999f)
                         {
-                            OpenFPS.Common.Systems.AcousticVolumeGenerator.UpdateRegion(world.AcousticMap, snap.Id, snap.Transform.Position, snap.Transform.Rotation, snap.Definition.Region.ToRoom());
+                            OpenFPS.Acoustics.Systems.AcousticVolumeGenerator.UpdateRegion(world.AcousticMap, snap.Id, snap.Transform.Position, snap.Transform.Rotation, snap.Definition.Region.ToRoom());
                         }
                     }
                 }

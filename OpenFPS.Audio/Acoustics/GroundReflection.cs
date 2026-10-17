@@ -58,7 +58,7 @@ public sealed class GroundReflection
     public GroundReflection(float sampleRate)
     {
         _rate = sampleRate;
-        _lpA = 1f - MathF.Exp(-2f * MathF.PI * OpenFPS.Common.GroundAnswer.CopySplitHz / sampleRate);
+        _lpA = 1f - MathF.Exp(-2f * MathF.PI * OpenFPS.Acoustics.GroundAnswer.CopySplitHz / sampleRate);
         // Thirty milliseconds: a delay that steps tears the waveform, one that lags a pass smears it.
         _glide = 1f - MathF.Exp(-1f / (0.03f * sampleRate));
     }

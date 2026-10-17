@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

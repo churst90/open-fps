@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
-using OpenFPS.Common.Systems;
+using OpenFPS.Acoustics;
 
 namespace OpenFPS.Tests;
 

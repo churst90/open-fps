@@ -3,7 +3,7 @@ using System;
 using System.Linq;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Common.Systems;
+namespace OpenFPS.Acoustics.Systems;
 
 /// <summary>Builds an AcousticMap from the world's rooms, openings and solids, voxelising only the regions'
 /// own volumes. The host lists them (open-fps: EntityAcoustics, from the entities, in entity order); the order

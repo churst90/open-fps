@@ -1,7 +1,8 @@
 using System.Numerics;
 using OpenFPS.Geometry;
+using OpenFPS.Common;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// The three bands a path's gains are applied in: FMOD's THREE_EQ, split at <see cref="LowCrossoverHz"/>

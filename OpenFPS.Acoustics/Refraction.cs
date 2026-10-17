@@ -1,4 +1,6 @@
-namespace OpenFPS.Common;
+using OpenFPS.Common;
+
+namespace OpenFPS.Acoustics;
 
 /// <summary>
 /// Sound bent by the air: the wind and the temperature change with height, so the speed of sound does, and a ray

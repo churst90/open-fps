@@ -7,7 +7,7 @@ namespace OpenFPS.Client.AudioEngine.Core;
 public static class AudioPhysics
 {
     /// <summary>Default speed of sound in air, m/s (~20 °C).</summary>
-    public const float SpeedOfSound = OpenFPS.Common.AcousticConstants.SpeedOfSound;
+    public const float SpeedOfSound = OpenFPS.Acoustics.AcousticConstants.SpeedOfSound;
 
     /// <summary>Speed of sound in dry air, m/s: the air's own law (<see cref="OpenFPS.Common.Air.SpeedOfSound"/>),
     /// so a bullet's crack and the mix's Doppler and delays hear one air (the mix had the linear fit
@@ -87,7 +87,7 @@ public static class AudioPhysics
 
     /// <summary>
     /// What the air takes off a sound over <paramref name="distance"/> metres, dB (positive), in the
-    /// diffraction model's three bands (<see cref="OpenFPS.Common.Diffraction.LowBandHz"/> and its
+    /// diffraction model's three bands (<see cref="OpenFPS.Acoustics.Diffraction.LowBandHz"/> and its
     /// siblings), so the pipeline agrees on what "the high band" is.
     /// </summary>
     /// <param name="distance">Metres.</param>
@@ -102,8 +102,8 @@ public static class AudioPhysics
         float d = MathF.Max(0f, distance);
         float m = multiplier > 0.01f ? multiplier : 1.0f;
         float p = airPressureMillibars > 1f ? airPressureMillibars : 1013.25f;
-        return (AirAttenuationDbPerMetre(OpenFPS.Common.Diffraction.LowBandHz, temperatureC, humidity, p) * d * m,
-                AirAttenuationDbPerMetre(OpenFPS.Common.Diffraction.MidBandHz, temperatureC, humidity, p) * d * m,
-                AirAttenuationDbPerMetre(OpenFPS.Common.Diffraction.HighBandHz, temperatureC, humidity, p) * d * m);
+        return (AirAttenuationDbPerMetre(OpenFPS.Acoustics.Diffraction.LowBandHz, temperatureC, humidity, p) * d * m,
+                AirAttenuationDbPerMetre(OpenFPS.Acoustics.Diffraction.MidBandHz, temperatureC, humidity, p) * d * m,
+                AirAttenuationDbPerMetre(OpenFPS.Acoustics.Diffraction.HighBandHz, temperatureC, humidity, p) * d * m);
     }
 }
