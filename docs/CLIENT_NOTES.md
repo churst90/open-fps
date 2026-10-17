@@ -383,6 +383,29 @@ wind never changed direction except when a front came, and every front blew from
   off and is faded out while something solid stands between that point and the ears (`KeepCopiesTrue`):
   one ray a copy, again when the ears have moved 0.25 m or a door or the tiles have. Without it a ringing
   telephone was heard in full by its copies through the door shut on it.
+- A one-off that moves as it plays has its copies found again from where it is (`FollowCopies`; Resonance's
+  2.6), as an engine's echoes are every frame. Two kinds move: a sound sent with `MovesTo` (a sliding door's or a
+  lift door's run, its handle carried across the doorway) and a part of the thunder, kept in its direction while
+  the listener walks. A talker's line and a sound in a cabin follow their bodies too, but have no copies. Before,
+  the copies stayed at the images of where the sound began, and the sound seemed to stay with them.
+- Each copy keeps which it is: the search that placed it, the surface or chain of surfaces, the order, a rough
+  face's tap. Searched again by the same searches (only those that placed a copy still playing), a copy still
+  answered is moved to its new image, level and colour, carried, so the mixer glides it there; one no longer
+  answered fades out and plays on silent, and comes back if it is answered again. A face shared by two solids (a
+  storey's band of a facade) is one plane, so a first-order copy answered by the other solid is the same copy: on
+  Selby House's south wall the id changed for one search in twenty, and the copy dropped out for it.
+- A copy is never started partway through: a surface that begins to answer late gets none. A moved copy keeps the
+  delay it began with, since the mixer delays a voice once, as it starts; over a door's run its path changes by
+  about 2 ms.
+- Searched again when the sound has moved 0.1 m or the ears 0.25 m, at most twenty times a second, and one moving
+  sound per update; never for a sound that stays where it began. A search costs what the sound's first one did:
+  0.5-0.7 ms in a house's living room, 0.3-1 ms on a street, and 1.7-2.5 ms more where a copy of copies came down
+  it. Measured with AudioLab `--moving-echoes` (2026-10-17): 1 Elm Street's patio door run, heard from the
+  living room, its west wall's copy turned 249.9 to 248.8 degrees and faded at 0.9 s as the handle's way to that
+  wall passed behind the jamb, the front wall's 356.8 to 353.3; before, both stood still. A ring carried 12 m at
+  8 m/s, 4 m off Selby House's south wall: the wall's copy went from 337 to 23 degrees with it; before it stayed
+  at 337 the whole way. No clicks: the capture's top octaves while it moves, in 2 ms frames against the 50 ms
+  round them, no worse than with the copies left still (1.1 and 7.7 dB, against 1.5 and 9.1).
 
 ## Rain: a drop's click and its spray
 

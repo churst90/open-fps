@@ -42,11 +42,14 @@ fingerprint changed too, so the door renders are made again once.
    `DoorUndercutMetres`). Selby House's flat doors pass -14/-16/-16 dB (were -18/-27/-55), its stair doors
    -12/-17/-15 (were -13/-48/-59). docs/CLIENT_NOTES.md "A shut door leaks by its gaps". Listen: "Listen in the
    game" below.
-3. One-off sounds that move while they play have their echoes found and moved (Resonance's 2.6). Now.
-   - What: a one-off that moves while it plays (a door swinging, a thrown thing) keeps its wall echoes where it
-     began, so it seems to stay with them. Find and move its echoes as a loop's are.
-   - Built on the copies kept true (`OneOffSounds`, KeepCopiesTrue, 2026-10-16). Size: one session. Different
-     files from items 1, 2 and 4, so it can run beside them.
+3. One-off sounds that move while they play have their echoes found and moved (Resonance's 2.6): DONE 2026-10-17,
+   unheard (changes.md). A one-off sent moving (`MovesTo`: the sliding and lift doors' runs) and a part of the
+   thunder have their copies found again as they go (`OneOffSounds.FollowCopies`) and glided there; a copy no longer
+   answered fades. AudioLab `--moving-echoes`: the patio door's west wall copy turns with the run and fades behind
+   the jamb, a ring carried past Selby House's south wall takes its copy 46 degrees with it; no clicks; 0.5-2.7 ms a
+   search, none for a still sound. A swinging door is heard from its shut leaf and does not move, so its copies
+   stay; whether a swing should be heard moving is Cody's to say (Cody).
+   Listen: "Listen in the game" below.
 4. A doorway route leaves from the wall's face (Resonance's 1.2, reproduced 2026-10-17). Small, now.
    - What: when a leaf hangs at one face of a thick wall, the route's leg into the room starts inside the wall.
      A 0.3 m wall with its door open, heard round the corner: -44.0/-45.3/-58.7 dB against -37.4/-40.1/-42.0
@@ -351,6 +354,14 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
 here are checked to stand on (docs/LISTENING_SPOTS.md).
+- A moving one-off's echoes move with it (2026-10-17, docs/CLIENT_NOTES.md "One-off sounds: why the echoes are as
+  they are"). In 1 Elm Street's living room (`/tp -414.2 -108.0 0.2`), slide the patio door (the back door, 2.9 m
+  south-west) open and shut a few times, facing north: its answer off the west wall, on your left, should go with
+  the panel and thin out as the panel reaches the jamb, not stay where the run began; the front wall's, ahead of
+  you, goes with it too. Small: the panel moves a metre and the walls are 4 and 6 m from you. Then on Main Street
+  (`/tp 7.0 121.0 0.2`), `/weather storm`, walk along the street while thunder rolls: the facades' answers to it
+  keep their direction as you walk instead of staying where you first heard them. Lab: AudioLab
+  `--moving-echoes door` and `pass`, each with `before`.
 - A restarted outlet no longer doubles its engine (2026-10-17, docs/CLIENT_NOTES.md "A voice that reads another's").
   On Main Street in traffic (`/tp 7.0 121.0 0.2`): as cars pass close and their fronts split off and merge again, no
   quarter-second swell or brightening of a car's engine as it does. In the parking garage (`/tp -66.0 62.0 0.3`), get

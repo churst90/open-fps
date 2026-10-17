@@ -6,6 +6,11 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- A one-off sound that moves as it plays has its echoes found again and moved with it (`OneOffSounds`; Resonance's
+  2.6, which Resonance marks `SpatialVoice.Moves`). A host need do nothing new: a one-off moves when it is sent with
+  `TransientSound.MovesTo` and `MoveSeconds` (its place at the end of the move, and how long it takes), as open-fps's
+  sliding and lift doors are. A host that marks its own moving sounds sends them so, and their copies follow; a sound
+  that stays costs nothing more.
 - A machine's front outlet or cabin path restarted under its id no longer leaves the engine carrying its share
   beside the new one, and a voice reading another's synth follows the live voice of its id (Resonance's 3.2;
   changes.md, 2026-10-17). A host that drives `EngineVoiceState` itself: `SetCabinTapLive` is gone, and setting

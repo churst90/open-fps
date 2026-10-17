@@ -4,6 +4,19 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- A one-off sound that moves as it plays has its echoes found and moved with it (Resonance's 2.6; todo item 3;
+  docs/CLIENT_NOTES.md "One-off sounds: why the echoes are as they are"). A sliding or lift door's run is sent
+  moving (`MovesTo`) and a part of the thunder is kept in its direction while you walk, but their copies off the
+  walls stayed at the images of where they began, so the sound seemed to stay with them. Each copy now knows which
+  it is, and while its sound moves the searches that placed it are made again from where it is (0.1 m on, at most
+  twenty times a second, one moving sound per update): a copy still answered glides to its new image, level and
+  colour; one no longer answered fades and plays on silent. AudioLab `--moving-echoes`: 1 Elm Street's patio door
+  heard from its living room, the west wall's copy turns 1.1 degrees with the run and fades as the handle passes
+  behind the jamb (it stood still); a ring carried 12 m past Selby House's south wall, the wall's copy sweeps 46
+  degrees with it (it stood at its start). No clicks in the capture's top octaves while it moves. A search costs
+  what the sound's first one did, 0.5-2.7 ms; nothing for a sound that stays. Swinging doors are heard from their
+  shut leaf and do not move, so nothing changes for them; no vehicle sends a one-off that moves. No render
+  changes; the wire hash does not change.
 - A machine's front outlet or cabin path stopped and started again under its id no longer leaves the engine's own
   voice carrying its share beside the new one (Resonance's 3.2; todo item 1; docs/CLIENT_NOTES.md "A voice that
   reads another's"). The old tap gave its share back when it was let go and again when it was released, up to

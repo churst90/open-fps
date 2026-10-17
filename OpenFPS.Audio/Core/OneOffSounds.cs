@@ -50,7 +50,24 @@ public sealed class OneOffSounds
         /// is, and gets only a sky sound's copies (see <see cref="MaxSkyRoomEchoes"/>).</summary>
         public bool Sky { get; init; }
         public Vector3 SkyOffset { get; init; }
+        /// <summary>The one-off that moves as it plays which this sound is, or is a copy of (<see cref="FollowCopies"/>);
+        /// zero for one that stays where it began.</summary>
+        public int Group { get; init; }
+        /// <summary>Which of its source's copies an echo is, the same each time they are found, and where its source
+        /// was when it was found.</summary>
+        public CopyKey Key { get; init; }
+        public Vector3 SourceAt { get; init; }
     }
+
+    /// <summary>
+    /// Which copy of a one-off an echo is, found again from wherever its source has moved to: the finder that placed it
+    /// (<see cref="CopyFinder"/>), the surface or chain of surfaces it came off and how many, and which of a rough
+    /// surface's scattered taps.
+    /// </summary>
+    internal readonly record struct CopyKey(CopyFinder Finder, int Surface, int Order, int Tap);
+
+    /// <summary>What placed a copy: the room's mirrors and their washes, a facade further out, a copy of copies.</summary>
+    internal enum CopyFinder : byte { None, RoomMirror, RoomWash, Facade, FacadeTap, Flutter }
 
     private readonly AudioEngineFacade _audio;
     private readonly SpatialAcoustics _acoustics;
@@ -578,6 +595,7 @@ public sealed class OneOffSounds
         }
 
         FollowSpeakers(world, listenerPosition, now);
+        FollowCopies(world, listenerPosition, now, reflections);
         KeepCopiesTrue(world, listenerPosition, now);
         if (_pending.Count == 0) return;
 
@@ -632,6 +650,10 @@ public sealed class OneOffSounds
             // out of the window.
             bool inCabin = InCabin(world, item.SourceEntityId, item.Sound.Position, out var cabinCar, out var cabinVehicle)
                            && !item.IsReflection && !spoken;
+            // A one-off that moves as it plays (a sliding door's run, a part of the thunder over a listener walking):
+            // its copies are found again as it goes (FollowCopies), each knowing which it is.
+            if (!item.IsReflection && !spoken && !inCabin && (item.Sky || item.Sound.MoveSeconds > 0f))
+                item = item with { Group = ++_nextGroup };
             if (item.Sky)
             {
                 QueueEarlyEchoes(item, world, listenerPosition, MaxSkyRoomEchoes, washes: false);
@@ -750,7 +772,11 @@ public sealed class OneOffSounds
             Voices.DeclareEvent(emitter.EntityId, item.SourceEntityId >= 0 ? item.SourceEntityId : VoiceRegistry.NoEntity,
                                  VoiceKind.Transient, emitter.Position, item.Sound.LevelDb);
             Voices.Submit(emitter);
-            if (item.Bounce is { } bounce) _copies.Add(new HeardCopy { Emitter = emitter, Bounce = bounce, StartedAt = now });
+            if (item.Bounce is { } bounce)
+                _copies.Add(new HeardCopy
+                {
+                    Emitter = emitter, Bounce = bounce, StartedAt = now, Group = item.Group, Key = item.Key, SourceAt = item.SourceAt,
+                });
 
             // A part of the thunder stays in its direction while the listener walks on under it.
             if (item.Sky)
@@ -762,7 +788,7 @@ public sealed class OneOffSounds
                     Offset = item.SkyOffset,
                     Until = now + Math.Max(0f, item.Sound.DecaySeconds - 0.1f),
                     StartedAt = now,
-                });
+                }.Finding(item, world, listenerPosition));
 
             // A sound in a cabin rides with it, turning as it turns: a window's motor is in its door.
             if (inCabin)
@@ -790,7 +816,7 @@ public sealed class OneOffSounds
                     Face = item.Sound.FaceNormal,
                     Until = now + Math.Max(0f, item.Sound.DecaySeconds - 0.1f),
                     StartedAt = now,
-                });
+                }.Finding(item, world, listenerPosition));
 
             // A talker carries the voice with them: a two-second line left where it started is three
             // metres behind by its end. A line placed on the body (a mouth, a driver's window) stays
@@ -887,6 +913,34 @@ public sealed class OneOffSounds
         public bool Sky;
         public Vector3 From, To, Face;
         public float MoveSeconds;
+        /// <summary>Where it was placed at its last update.</summary>
+        public Vector3 At;
+
+        // A one-off whose copies follow it (Pending.Group): the sound as it began, and the source, the ears and the
+        // scene its copies were last found for.
+        public int Group;
+        public Pending Source;
+        public Vector3 FoundFrom, HeardFrom;
+        public object? FoundMap, FoundGeometry;
+        public long FoundVersion;
+        public double FoundAt;
+
+        /// <summary>The same, its copies found for <paramref name="item"/> where it began.</summary>
+        public Following Finding(in Pending item, IAcousticWorld world, Vector3 listener)
+        {
+            var f = this;
+            f.At = item.Sound.Position;
+            if (item.Group == 0) return f;
+            f.Group = item.Group;
+            f.Source = item;
+            f.FoundFrom = item.Sound.Position;
+            f.HeardFrom = listener;
+            f.FoundMap = world.Rooms;
+            f.FoundGeometry = world.Geometry;
+            f.FoundVersion = world.GeometryVersion;
+            f.FoundAt = f.StartedAt;
+            return f;
+        }
     }
 
     /// <summary>Every vehicle's windows as this client has them. Without it a cabin's windows are taken
@@ -946,6 +1000,8 @@ public sealed class OneOffSounds
             if (f.SourceEntityId >= 0) AskAbout(f.SourceEntityId, listenerPosition, at);
             if (f.SourceEntityId < 0 || !TryAsked(f.SourceEntityId, at, listenerPosition, out var path))
                 path = _acoustics.CalculateAcousticPath(world, f.SourceEntityId, listenerPosition, at);
+            f.At = at;
+            _following[i] = f;
             var e = f.Emitter;
             e.Position = at;
             e.Velocity = f.Sky ? Vector3.Zero
@@ -985,6 +1041,13 @@ public sealed class OneOffSounds
         public double StartedAt;
         /// <summary>Faded out: something solid stands between <see cref="Bounce"/> and the ears.</summary>
         public bool Shut;
+        /// <summary>The one-off that moves which it is a copy of, which of its copies (<see cref="FollowCopies"/>), and
+        /// where that one-off was when the copy was placed where it is.</summary>
+        public int Group;
+        public CopyKey Key;
+        public Vector3 SourceAt;
+        /// <summary>Faded out: its surface no longer answers its source where the source has moved to.</summary>
+        public bool Lost;
     }
 
     private readonly List<HeardCopy> _copies = new();
@@ -1023,6 +1086,8 @@ public sealed class OneOffSounds
         for (int i = 0; i < _copies.Count; i++)
         {
             var c = _copies[i];
+            // Found again with its source (FollowCopies), or lost by it.
+            if (c.Lost || (c.Group != 0 && _liveGroups.Contains(c.Group))) continue;
             bool shut = !Reaches(world, c.Bounce, listenerPosition, _stopBodies);
             if (shut == c.Shut) continue;
             c.Shut = shut;
@@ -1033,6 +1098,223 @@ public sealed class OneOffSounds
             e.CarriesPath = true;
             Voices.Refresh(e);
         }
+    }
+
+    /// <summary>How far a one-off that moves goes before its copies are found again, metres: a copy 2 m off turns
+    /// by about three degrees, and the mixer's smoothing glides it there.</summary>
+    internal const float CopiesFollowMetres = 0.1f;
+
+    /// <summary>How soon a moving one-off's copies are found again at the soonest, seconds: twenty times a second, so
+    /// a sound carried at 8 m/s is found every 0.4 m (a copy 6 m off turns about four degrees between) and a sliding
+    /// door's run every 0.1 m.</summary>
+    internal const double CopiesFollowSeconds = 0.05;
+
+    /// <summary>How many moving one-offs have their copies found again in one update; the rest in the next. Each is
+    /// the searches its copies were first found by, as costly as those a one-off makes as it starts: 0.3-0.5 ms in a
+    /// house's living room, 0.3-1.2 ms on a street, and 1.7-2.5 ms more where a copy of copies came down it
+    /// (MovingEchoesSpike, 2026-10-17).</summary>
+    internal const int MaxCopyFindsPerUpdate = 1;
+
+    /// <summary>Whether a moving one-off's copies follow it (the lab's before, with false).</summary>
+    internal bool CopiesFollow { get; set; } = true;
+
+    /// <summary>Moving one-offs whose copies were found again since the client started, and the time it took, in
+    /// Stopwatch ticks (the lab, the tests).</summary>
+    internal int CopyFinds { get; private set; }
+    internal long CopyFindTicks { get; private set; }
+
+    /// <summary>The copies of moving one-offs playing now: their voice, where each is, whether its surface still
+    /// answers, its volume (the lab).</summary>
+    internal IEnumerable<(int Voice, int Group, Vector3 Position, bool Lost, float Volume)> MovingCopies()
+    {
+        foreach (var c in _copies)
+            if (c.Group != 0) yield return (c.Emitter.EntityId, c.Group, c.Emitter.Position, c.Lost, c.Emitter.Volume);
+    }
+
+    private int _nextGroup, _copyFindTurn;
+    private readonly HashSet<int> _liveGroups = new();
+    private readonly List<Pending> _refound = new();
+    private readonly List<(int Copy, int Refound)> _matched = new();
+    private readonly HashSet<int> _refoundTaken = new();
+
+    /// <summary>How far a copy's image may be from where its plane puts the source now and still be the same copy,
+    /// metres: rounding, and a face found a hair off another.</summary>
+    internal const float SameImageMetres = 0.05f;
+
+    /// <summary>The image of <paramref name="source"/> in the plane that made <paramref name="image"/> the image of
+    /// <paramref name="was"/>: the plane half way between them, square to the line joining them.</summary>
+    internal static Vector3 SamePlane(Vector3 source, Vector3 was, Vector3 image)
+    {
+        var axis = image - was;
+        float length = axis.Length();
+        if (length < 1e-4f) return source;
+        var normal = axis / length;
+        var middle = (image + was) * 0.5f;
+        return source - 2f * Vector3.Dot(source - middle, normal) * normal;
+    }
+    /// <summary>While set, a copy found is put here instead of being queued to play (<see cref="QueueEcho"/>).</summary>
+    private bool _refinding;
+
+    /// <summary>
+    /// A one-off that moves as it plays (a sliding door's handle crossing its doorway, a part of the thunder kept in
+    /// its direction while the listener walks) has its copies found again from where it is now, by the searches that
+    /// first placed them, as an engine's echoes are every frame (EngineReflections.Update): each copy still answered
+    /// by its surface is moved to its new image, level and colour, carried so the mixer glides it there; one no longer
+    /// answered fades out over the mixer's smoothing and plays on silent, to come back if it is answered again. A copy
+    /// is never started late: a surface that begins to answer partway through gets none. Found again when the source
+    /// has moved <see cref="CopiesFollowMetres"/> or the ears <see cref="CopiesLookAgainMetres"/>, at most every
+    /// <see cref="CopiesFollowSeconds"/>, or the scene has changed; only by the searches that placed a copy still
+    /// playing, and nothing at all for a one-off that stays where it began.
+    /// </summary>
+    private void FollowCopies(IAcousticWorld world, Vector3 listenerPosition, double now, EngineReflections? reflections)
+    {
+        _liveGroups.Clear();
+        if (!CopiesFollow || _copies.Count == 0) return;
+        int count = _following.Count, finds = 0;
+        for (int k = 0; k < count; k++)
+        {
+            int i = (k + _copyFindTurn) % count;
+            var f = _following[i];
+            if (f.Group == 0) continue;
+            _liveGroups.Add(f.Group);
+            bool sameScene = ReferenceEquals(world.Rooms, f.FoundMap) && ReferenceEquals(world.Geometry, f.FoundGeometry)
+                             && world.GeometryVersion == f.FoundVersion;
+            if (sameScene && Vector3.DistanceSquared(f.At, f.FoundFrom) < CopiesFollowMetres * CopiesFollowMetres
+                && Vector3.DistanceSquared(listenerPosition, f.HeardFrom) < CopiesLookAgainMetres * CopiesLookAgainMetres)
+                continue;
+            if (sameScene && now - f.FoundAt < CopiesFollowSeconds) continue;
+            if (finds >= MaxCopyFindsPerUpdate) continue;
+            finds++;
+            f.FoundFrom = f.At;
+            f.HeardFrom = listenerPosition;
+            f.FoundMap = world.Rooms;
+            f.FoundGeometry = world.Geometry;
+            f.FoundVersion = world.GeometryVersion;
+            f.FoundAt = now;
+            _following[i] = f;
+            FindCopiesAgain(f, world, listenerPosition, now, reflections);
+        }
+        _copyFindTurn++;
+    }
+
+    /// <summary>The copies of one moving one-off, found from where it is now and moved there.</summary>
+    private void FindCopiesAgain(in Following f, IAcousticWorld world, Vector3 listenerPosition, double now, EngineReflections? reflections)
+    {
+        // Only the searches that placed a copy still playing: a copy is never started late, so a search that placed
+        // none has nothing to move.
+        bool room = false, facades = false, flutter = false;
+        foreach (var c in _copies)
+        {
+            if (c.Group != f.Group) continue;
+            room |= c.Key.Finder is CopyFinder.RoomMirror or CopyFinder.RoomWash;
+            facades |= c.Key.Finder is CopyFinder.Facade or CopyFinder.FacadeTap;
+            flutter |= c.Key.Finder == CopyFinder.Flutter;
+        }
+        if (!room && !facades && !flutter) return;
+        CopyFinds++;
+        long began = System.Diagnostics.Stopwatch.GetTimestamp();
+        var sound = f.Source.Sound;
+        sound.Position = f.At;
+        var source = f.Source with { Sound = sound };
+        _refound.Clear();
+        _refinding = true;
+        try
+        {
+            // As it was first heard (the play loop): a part of the thunder answered by the facades it shines on.
+            if (source.Sky)
+            {
+                if (room) QueueEarlyEchoes(source, world, listenerPosition, MaxSkyRoomEchoes, washes: false);
+                if (facades) QueueReflections(source, reflections, listenerPosition, now, diffuse: false);
+            }
+            else
+            {
+                if (room) QueueEarlyEchoes(source, world, listenerPosition);
+                if (facades) QueueReflections(source, reflections, listenerPosition, now);
+                if (flutter) QueueHigherOrderEchoes(source, world, listenerPosition);
+            }
+        }
+        finally { _refinding = false; }
+
+        // Each copy to the arrival off the same surfaces; failing that, a first-order copy to the same kind off the
+        // same plane, whose image is where the plane puts the source now. A face shared by two solids (a storey's
+        // band of a facade, a wall in two lengths) is answered by either: on Selby House's south wall the id changed
+        // for one search in twenty, and the copy dropped out for it.
+        _matched.Clear();
+        _refoundTaken.Clear();
+        for (int j = 0; j < _copies.Count; j++)
+        {
+            var c = _copies[j];
+            if (c.Group != f.Group) continue;
+            int found = -1;
+            for (int n = 0; n < _refound.Count; n++)
+                if (_refound[n].Key == c.Key && _refound[n].Bounce.HasValue && !_refoundTaken.Contains(n)) { found = n; break; }
+            if (found >= 0) _refoundTaken.Add(found);
+            _matched.Add((j, found));
+        }
+        for (int m = 0; m < _matched.Count; m++)
+        {
+            if (_matched[m].Refound >= 0) continue;
+            var c = _copies[_matched[m].Copy];
+            if (c.Key.Order != 1 || c.Key.Finder is not (CopyFinder.RoomMirror or CopyFinder.RoomWash or CopyFinder.Facade)) continue;
+            var image = SamePlane(f.At, c.SourceAt, c.Emitter.Position);
+            int found = -1;
+            float best = SameImageMetres * SameImageMetres;
+            for (int n = 0; n < _refound.Count; n++)
+            {
+                var p = _refound[n];
+                if (_refoundTaken.Contains(n) || !p.Bounce.HasValue || p.Key.Finder != c.Key.Finder || p.Key.Order != 1) continue;
+                float d2 = Vector3.DistanceSquared(p.Sound.Position, image);
+                if (d2 <= best) { best = d2; found = n; }
+            }
+            if (found >= 0) { _refoundTaken.Add(found); _matched[m] = (_matched[m].Copy, found); }
+        }
+
+        var weather = world.Air;
+        foreach (var (j, found) in _matched)
+        {
+            var c = _copies[j];
+            var e = c.Emitter;
+            if (found < 0)
+            {
+                // No longer answered from here: faded out, and played on silent.
+                if (c.Lost) continue;
+                c.Lost = true;
+                c.Shut = true;
+                _copies[j] = c;
+                e.EqLow = 0f; e.EqMid = 0f; e.EqHigh = 0f;
+                e.CarriesPath = true;
+                Voices.Refresh(e);
+                continue;
+            }
+            // Placed as the play loop places a copy, at its new image.
+            var p = _refound[found];
+            float dist = Vector3.Distance(listenerPosition, p.Sound.Position);
+            var placed = _audio.Hearing.Place(p.SourceLevelDb, p.Sound.ExtentMetres);
+            e.Position = p.Sound.Position;
+            e.ApparentPosition = p.Sound.Position;
+            e.EffectiveDistance = dist;
+            (e.AirLowDb, e.AirMidDb, e.AirHighDb) = AudioPhysics.AirLossDb(dist, weather.Humidity, weather.Celsius,
+                                                                           weather.PressureMillibars, weather.AbsorptionMultiplier);
+            e.EqLow = MathF.Pow(10f, p.EchoLowDb / 20f);
+            e.EqMid = 1f;
+            e.EqHigh = MathF.Pow(10f, p.EchoHighDb / 20f);
+            e.Volume = placed.Gain * p.CopyGain;
+            e.EarCopyDb = 20f * MathF.Log10(p.CopyGain);
+            e.CarriesPath = true;
+            c.Emitter = e;
+            c.Bounce = p.Bounce!.Value;
+            c.Key = p.Key;
+            c.SourceAt = p.SourceAt;
+            c.Lost = false;
+            c.Shut = false;
+            _copies[j] = c;
+            Voices.DeclareEvent(e.EntityId, p.SourceEntityId >= 0 ? p.SourceEntityId : VoiceRegistry.NoEntity,
+                                 VoiceKind.Transient, e.Position, p.Sound.LevelDb);
+            Voices.Refresh(e);
+        }
+        _refound.Clear();
+        _matched.Clear();
+        CopyFindTicks += System.Diagnostics.Stopwatch.GetTimestamp() - began;
     }
 
     /// <summary>How far off its surface a copy's last leg is taken to begin, metres: clear of the face it came off.</summary>
@@ -1195,6 +1477,7 @@ public sealed class OneOffSounds
                 IsReflection = true,
                 Seed = item.Seed,
                 Bounce = a.HitPoint,
+                Group = item.Group, Key = new CopyKey(CopyFinder.Flutter, a.SurfaceId, a.Order, 0), SourceAt = item.Sound.Position,
             });
             if (++added >= MaxHigherOrderEchoes) break;
         }
@@ -1252,6 +1535,7 @@ public sealed class OneOffSounds
                 IsReflection = true,
                 Seed = item.Seed,
                 Bounce = a.HitPoint,
+                Group = item.Group, Key = new CopyKey(CopyFinder.RoomMirror, a.SurfaceId, a.Order, 0), SourceAt = item.Sound.Position,
             });
         }
     }
@@ -1277,6 +1561,7 @@ public sealed class OneOffSounds
             IsReflection = true,
             Seed = item.Seed,
             Bounce = a.HitPoint,
+            Group = item.Group, Key = new CopyKey(CopyFinder.RoomWash, a.SurfaceId, a.Order, 0), SourceAt = item.Sound.Position,
         });
     }
 
@@ -1334,8 +1619,22 @@ public sealed class OneOffSounds
                 DueAt = item.DueAt,
                 IsReflection = true,
                 Bounce = r.BouncePoint,
+                Group = item.Group,
+                Key = new CopyKey(r.IsDiffuse ? CopyFinder.FacadeTap : CopyFinder.Facade, r.SurfaceId, 1, TapOf(found, i)),
+                SourceAt = item.Sound.Position,
             });
         }
+    }
+
+    /// <summary>Which of its surface's scattered taps a facade's arrival is, counted in the order found; zero for a
+    /// mirror.</summary>
+    private static int TapOf(ReadOnlySpan<Reflection> found, int i)
+    {
+        if (!found[i].IsDiffuse) return 0;
+        int tap = 0;
+        for (int k = 0; k < i; k++)
+            if (found[k].IsDiffuse && found[k].SurfaceId == found[i].SurfaceId) tap++;
+        return tap;
     }
 
     /// <summary>
@@ -1473,7 +1772,8 @@ public sealed class OneOffSounds
     {
         int step = (int)MathF.Round(Math.Clamp(scattering, 0f, 1f) * 4f);
         string id = $"{item.SoundId}~wash{step}";
-        if (!_registered.Contains(id) && _rendering.Add(id))
+        // Found again for a moving one-off, a copy already playing has its wash.
+        if (!_refinding && !_registered.Contains(id) && _rendering.Add(id))
         {
             var sound = item.Sound;
             int seed = item.Seed;
@@ -1485,6 +1785,7 @@ public sealed class OneOffSounds
     /// <summary>An echo joins the queue if its washed copy exists, or waits for it like a first hearing.</summary>
     private void QueueEcho(Pending echo)
     {
+        if (_refinding) { _refound.Add(echo); return; }
         if (_registered.Contains(echo.SoundId)) _pending.Add(echo);
         else _awaitingRender.Add(echo);
     }
