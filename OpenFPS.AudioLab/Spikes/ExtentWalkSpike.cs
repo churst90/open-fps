@@ -434,7 +434,7 @@ public static class ExtentWalkSpike
         for (int i = 0; i < 4 * (int)ClientAudioSystem.UpdateHz; i++) Tick();
         update.Clear();
 
-        var rows = new List<(Vector3 Feet, ClientAudioSystem.Together H)>();
+        var rows = new List<(Vector3 Feet, AudioWorld.Together H)>();
         for (int s = 0; s < walk.Feet.Count; s++)
         {
             var from = s == 0 ? walk.Feet[0] : walk.Feet[s - 1];
@@ -444,7 +444,7 @@ public static class ExtentWalkSpike
                 Tick();
             }
             var ear = walk.Feet[s] + new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f);
-            rows.Add((walk.Feet[s], ClientAudioSystem.HeardTogether(mixer.Latest, mixer.Live, mixer.Pieces, walk.Source, ear, LabOptions.WideSources)));
+            rows.Add((walk.Feet[s], AudioWorld.HeardTogether(mixer.Latest, mixer.Live, mixer.Pieces, walk.Source, ear, LabOptions.WideSources)));
         }
         rig.Facade.Dispose();
 

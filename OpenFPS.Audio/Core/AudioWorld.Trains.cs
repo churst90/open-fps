@@ -1,7 +1,6 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core.Rail;
 using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.Services;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -15,7 +14,7 @@ namespace OpenFPS.Client.Core;
 /// from where the listener stands, each group is given one of the train's voices, placed where its
 /// sound comes from, and told which sources it carries at what weight.
 /// </summary>
-public partial class ClientAudioSystem
+public partial class AudioWorld
 {
     /// <summary>How often a train's sources are regrouped, seconds. The weights follow every frame.</summary>
     private const double TrainRegroupSeconds = 0.5;
@@ -71,7 +70,7 @@ public partial class ClientAudioSystem
     /// Places every admitted train's voices and tells each what it carries; lets go of the voices of
     /// trains no longer admitted, a fade first. Once a frame, after ChooseLiveMachines.
     /// </summary>
-    private void UpdateTrains(WorldSnapshot world, Vector3 eyePos, float dt)
+    private void UpdateTrains(IAcousticWorld world, Vector3 eyePos, float dt)
     {
         double now = _now();
         foreach (string train in _liveTrains)
@@ -125,7 +124,7 @@ public partial class ClientAudioSystem
         return v.Playing[slot];
     }
 
-    private void VoiceTrain(WorldSnapshot world, Vector3 eyePos, TrainVoicer v, int[] members, double now, float dt)
+    private void VoiceTrain(IAcousticWorld world, Vector3 eyePos, TrainVoicer v, int[] members, double now, float dt)
     {
         for (int slot = 0; slot < TrainVoicing.Slots; slot++) StillVoiced(v, slot);
         _trainSources.Clear();
@@ -244,7 +243,7 @@ public partial class ClientAudioSystem
         TrainSignalVoice(world, eyePos, v, TrainVoicing.BellSlot, bell, bellEntity, speed, lever);
     }
 
-    private void TrainSignalVoice(WorldSnapshot world, Vector3 eyePos, TrainVoicer v, int slot, int index, int entity,
+    private void TrainSignalVoice(IAcousticWorld world, Vector3 eyePos, TrainVoicer v, int slot, int index, int entity,
                                   float speed, float lever)
     {
         bool sounding = index >= 0 && entity >= 0 && _trainSignals.TryGetValue(v.Key, out double until) && _now() <= until;
@@ -274,7 +273,7 @@ public partial class ClientAudioSystem
 
     /// <summary>One of a train's voices, placed at <paramref name="at"/> and heard through the path of the
     /// source nearest there.</summary>
-    private void PlaceTrainVoice(WorldSnapshot world, Vector3 eyePos, TrainVoicer v, int slot, VoiceKind kind, AudioSource rep,
+    private void PlaceTrainVoice(IAcousticWorld world, Vector3 eyePos, TrainVoicer v, int slot, VoiceKind kind, AudioSource rep,
                                  Vector3 at, float levelDb, float extent, float speed, float lever)
     {
         int voiceId = TrainVoiceId(v, slot);

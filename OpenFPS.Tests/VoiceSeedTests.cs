@@ -117,10 +117,10 @@ public class VoiceSeedTests
         var ownKinds = new Dictionary<int, VoiceKind>();
         var run = Replay.RunScript(r =>
         {
-            r.Audio.Voices.OnGiven = (id, key) => r.Mixer.Lines.Add(string.Create(CultureInfo.InvariantCulture, $"{Mark}{id} {(int)key.Kind} {key.Owner} {key.Part}"));
+            r.Audio.World.Voices.OnGiven = (id, key) => r.Mixer.Lines.Add(string.Create(CultureInfo.InvariantCulture, $"{Mark}{id} {(int)key.Kind} {key.Owner} {key.Part}"));
             r.AfterTick = x =>
             {
-                foreach (var e in x.Audio.Voices.Entries)
+                foreach (var e in x.Audio.World.Voices.Entries)
                     if (VoiceRegistry.IsOwnVoice(e.Kind)) ownKinds[e.VoiceId] = e.Kind;
             };
             Replay.Scenarios[scenario](r);

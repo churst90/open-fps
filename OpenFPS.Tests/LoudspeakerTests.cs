@@ -284,9 +284,9 @@ public class LoudspeakerTests
                  new OpenFPS.Client.AudioEngine.Data.SourceState { Position = Vector3.Zero, Rotation = Quaternion.Identity });
         var listener = new Vector3(0f, 0f, -5f);
         // A wall 10 m ahead: the image is 20 m ahead and the sound left along the axis.
-        var ahead = OpenFPS.Client.Core.ClientAudioSystem.CopyBeam(r, horn, new Vector3(0f, 0f, 20f), listener);
+        var ahead = OpenFPS.Client.Core.AudioWorld.CopyBeam(r, horn, new Vector3(0f, 0f, 20f), listener);
         // A wall 5 m behind the listener: the image is behind too, and the sound left backwards.
-        var behind = OpenFPS.Client.Core.ClientAudioSystem.CopyBeam(r, horn, new Vector3(0f, 0f, -20f), listener);
+        var behind = OpenFPS.Client.Core.AudioWorld.CopyBeam(r, horn, new Vector3(0f, 0f, -20f), listener);
         _o.WriteLine($"wall ahead {Db(ahead.Low):F1}/{Db(ahead.Mid):F1}/{Db(ahead.High):F1} dB, behind {Db(behind.Low):F1}/{Db(behind.Mid):F1}/{Db(behind.High):F1}");
         Assert.True(ahead.High > 0.9f && ahead.Mid > 0.9f);
         Assert.True(Db(behind.High) < -20 && behind.Low > 0.7f);

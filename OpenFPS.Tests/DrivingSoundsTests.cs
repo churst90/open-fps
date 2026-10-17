@@ -100,7 +100,7 @@ public class DrivingSoundsTests
             {
                 Position = pos, Rotation = Quaternion.Identity, Velocity = new Vector3(0f, 0f, v),
             });
-            if (h.Audio.RailStrikes(car, preset, now) is { } batch) strikes.AddRange(batch);
+            if (h.Audio.World.RailStrikes(car, preset, now) is { } batch) strikes.AddRange(batch);
         }
         foreach (var s in strikes.OrderBy(s => s.At))
             _o.WriteLine($"wheel {s.Wheel} at {s.At - t0:F3} s, {20 * Math.Log10(s.Pascals / 20e-6):F1} dB peak, contact {s.ContactSeconds * 1000:F1} ms");

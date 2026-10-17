@@ -47,14 +47,14 @@ public class RainProbeTests
     private static List<int> BehindWalls(Replay r)
     {
         var slots = new List<int>();
-        if (r.Audio.Rain.LastSurvey is not { } survey) return slots;
+        if (r.Audio.World.Rain.LastSurvey is not { } survey) return slots;
         for (int s = 0; s < RainFeeds.Slots; s++)
             if (s != RainSurvey.OverheadSlot && survey.Patches[s] != null && !survey.Direct[s]) slots.Add(s);
         return slots;
     }
 
     private static int Probe(Replay r, int slot)
-        => r.Audio.Voices.TryIdOf(VoiceKind.Probe, VoiceRegistry.NoEntity, VoiceRegistry.RainProbe(slot), out int id) ? id : 0;
+        => r.Audio.World.Voices.TryIdOf(VoiceKind.Probe, VoiceRegistry.NoEntity, VoiceRegistry.RainProbe(slot), out int id) ? id : 0;
 
     /// <summary>
     /// Each patch behind the walls has a probe of its own from the frame it is surveyed, no voice sounds under
@@ -73,7 +73,7 @@ public class RainProbeTests
             for (int f = 0; f < 90; f++)
             {
                 r.Listener(Feet, Vector3.Zero, 0f);
-                int before = r.Audio.Rain.AnsweredByWorker;
+                int before = r.Audio.World.Rain.AnsweredByWorker;
                 var asked = BehindWalls(r);          // surveyed before this frame: asked in it
                 r.Tick();
                 if (asked.Count == 0) continue;
@@ -88,10 +88,10 @@ public class RainProbeTests
                     if (r.Mixer.IsPlaying(probe)) problems.Add($"frame {r.Frame}: a voice sounds under {RainSurvey.SlotName(s)}'s probe {probe}");
                 }
                 // Asked in one frame, answered at its end (the replay's worker), taken in the next.
-                if (surveyedFrames > 1 && r.Audio.Rain.AnsweredByWorker - before != asked.Count)
-                    problems.Add($"frame {r.Frame}: {r.Audio.Rain.AnsweredByWorker - before} of {asked.Count} patches took the worker's answer");
+                if (surveyedFrames > 1 && r.Audio.World.Rain.AnsweredByWorker - before != asked.Count)
+                    problems.Add($"frame {r.Frame}: {r.Audio.World.Rain.AnsweredByWorker - before} of {asked.Count} patches took the worker's answer");
             }
-            answered = r.Audio.Rain.AnsweredByWorker;
+            answered = r.Audio.World.Rain.AnsweredByWorker;
         });
         _o.WriteLine($"{seen.Count} patches behind the walls ({string.Join(", ", seen.Select(RainSurvey.SlotName))}), {probes.Count} probes; "
                    + $"{answered} answers taken over {slotFrames} patch-frames in {surveyedFrames} frames");
@@ -114,12 +114,12 @@ public class RainProbeTests
         {
             r.AfterTick = x =>
             {
-                if (x.Audio.Rain.LastSurvey is not { } survey) return;
+                if (x.Audio.World.Rain.LastSurvey is not { } survey) return;
                 patchFrames += survey.Patches.Count(p => p != null);
                 behind += BehindWalls(x).Count;
             };
             Replay.Scenarios["traffic_rain"](r);
-            answered = r.Audio.Rain.AnsweredByWorker;
+            answered = r.Audio.World.Rain.AnsweredByWorker;
             for (int s = 0; s < RainFeeds.Slots; s++) Assert.Equal(0, Probe(r, s));
         });
         _o.WriteLine($"traffic_rain: {patchFrames} patch-frames, {behind} behind walls, {answered} answers taken");
@@ -142,14 +142,14 @@ public class RainProbeTests
             var run = Replay.RunScript(r =>
             {
                 ARoomInTheRain(r);
-                if (!worker) r.Audio.Rain.Worker = null;
+                if (!worker) r.Audio.World.Rain.Worker = null;
                 for (int f = 0; f < 60; f++)
                 {
                     r.Listener(Feet, Vector3.Zero, 0f);
                     r.Tick();
                 }
-                foreach (int s in BehindWalls(r)) voices[s] = r.Audio.Voices.IdFor(VoiceKind.Rain, s, 0);
-                Assert.Equal(worker, r.Audio.Rain.AnsweredByWorker > 0);
+                foreach (int s in BehindWalls(r)) voices[s] = r.Audio.World.Voices.IdFor(VoiceKind.Rain, s, 0);
+                Assert.Equal(worker, r.Audio.World.Rain.AnsweredByWorker > 0);
             });
             var expanded = EmitterStreamReplayTests.Expand(run.Mixer.Lines);
             var heard = new Dictionary<int, float>();

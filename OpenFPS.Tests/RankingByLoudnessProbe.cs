@@ -177,9 +177,9 @@ public class RankingByLoudnessProbe
         foreach (var d in defs) h.World.RegisterDefinition(d);
         h.StandAt(feet);
         h.Tick(12);
-        var groups = (System.Collections.IDictionary)typeof(ClientAudioSystem)
+        var groups = (System.Collections.IDictionary)typeof(AudioWorld)
             .GetField("_machineGroups", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-            .GetValue(h.Audio)!;
+            .GetValue(h.Audio.World)!;
         var byId = defs.ToDictionary(d => d.EntityId);
         var result = new Dictionary<string, Ranked>();
         var ear = feet + new Vector3(0f, 1.6f, 0f);

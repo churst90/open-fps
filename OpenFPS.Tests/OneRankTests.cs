@@ -95,7 +95,7 @@ public class OneRankTests
         h.Tick(2);
         var e = h.Mixer.Latest[Id];
         e.Occlusion = 0f;
-        float chosenBy = h.Audio.HeardInRanking(Id);
+        float chosenBy = h.Audio.World.HeardInRanking(Id);
         float budgetedBy = VoiceManager.Audibility(Law, e, Vector3.Distance(e.Position, Ear), playing: false);
         _o.WriteLine($"{soundId} ({e.PhysicalKey}): chosen by {20 * MathF.Log10(chosenBy):F2} dB, budgeted by {20 * MathF.Log10(budgetedBy):F2} dB; "
                    + $"headroom's return {(e.HeadroomGain > 0f ? 20 * MathF.Log10(e.HeadroomGain) : 0f):F1} dB");
@@ -110,7 +110,7 @@ public class OneRankTests
     }
 
     private static void ShedEnginesTo(ClientAudioHarness h, int engines)
-        => typeof(ClientAudioSystem).GetField("_adaptiveBudget", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(h.Audio, engines);
+        => typeof(AudioWorld).GetField("_adaptiveBudget", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(h.Audio.World, engines);
 
     private const string Quiet = "i4_economy", Loud = "v8_muscle";
 
@@ -133,8 +133,8 @@ public class OneRankTests
         h.AddCar(2, Quiet, new Vector3(0f, 0f, 36f));
         h.AddCar(3, Loud, new Vector3(0f, 0f, 80f));
         h.Tick(12);
-        _o.WriteLine($"ranked at {string.Join(", ", new[] { 1, 2, 3 }.Select(id => $"{id}: {20 * MathF.Log10(h.Audio.HeardInRanking(id)):F1} dB"))}");
-        Assert.True(h.Audio.HeardInRanking(3) > h.Audio.HeardInRanking(1) && h.Audio.HeardInRanking(1) > h.Audio.HeardInRanking(2));
+        _o.WriteLine($"ranked at {string.Join(", ", new[] { 1, 2, 3 }.Select(id => $"{id}: {20 * MathF.Log10(h.Audio.World.HeardInRanking(id)):F1} dB"))}");
+        Assert.True(h.Audio.World.HeardInRanking(3) > h.Audio.World.HeardInRanking(1) && h.Audio.World.HeardInRanking(1) > h.Audio.World.HeardInRanking(2));
         Assert.Contains(3, h.Mixer.Live);
         Assert.Contains(1, h.Mixer.Live);
         Assert.DoesNotContain(2, h.Mixer.Live);
@@ -160,7 +160,7 @@ public class OneRankTests
         h.Tick(2);
         var e = h.Mixer.Latest[5];
         e.Occlusion = 0f;
-        float chosenBy = h.Audio.HeardInRanking(5);
+        float chosenBy = h.Audio.World.HeardInRanking(5);
         float budgetedBy = VoiceManager.Audibility(Law, e, Vector3.Distance(e.Position, Ear), playing: false);
         _o.WriteLine($"{preset}: chosen by {20 * MathF.Log10(chosenBy):F2} dB, budgeted by {20 * MathF.Log10(budgetedBy):F2} dB");
         Assert.True(chosenBy > 0f && float.IsFinite(chosenBy), $"{preset} was not ranked");
@@ -185,7 +185,7 @@ public class OneRankTests
         h.Wait(3.0);
         h.AddCar(2, Loud, new Vector3(0f, 0f, 48f));
         h.Tick(6);
-        _o.WriteLine($"the newcomer is {20 * MathF.Log10(h.Audio.HeardInRanking(2) / h.Audio.HeardInRanking(1)):F1} dB louder");
+        _o.WriteLine($"the newcomer is {20 * MathF.Log10(h.Audio.World.HeardInRanking(2) / h.Audio.World.HeardInRanking(1)):F1} dB louder");
         Assert.Contains(1, h.Mixer.Live);
         Assert.DoesNotContain(2, h.Mixer.Live);
         // A third, 6 dB louder (at half the distance), takes it.
@@ -252,11 +252,11 @@ public class OneRankTests
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Tree) && h.Mixer.Latest.ContainsKey(Fire), 60), "the two were never voiced");
         int treePlaces = Wide.Layout(h.Mixer.Latest[Tree].PhysicalKey, ModelLibrary.Presets)!.Length - 1;
         int firePlaces = Wide.Layout(h.Mixer.Latest[Fire].PhysicalKey, ModelLibrary.Presets)!.Length - 1;
-        _o.WriteLine($"the tree: {treePlaces} places, {20 * MathF.Log10(h.Audio.HeardInRanking(Tree)):F1} dB at 9 m; the fire: {firePlaces} places, {20 * MathF.Log10(h.Audio.HeardInRanking(Fire)):F1} dB at 14 m");
-        Assert.True(h.Audio.HeardInRanking(Fire) > h.Audio.HeardInRanking(Tree), "the fire is not the louder from here");
+        _o.WriteLine($"the tree: {treePlaces} places, {20 * MathF.Log10(h.Audio.World.HeardInRanking(Tree)):F1} dB at 9 m; the fire: {firePlaces} places, {20 * MathF.Log10(h.Audio.World.HeardInRanking(Fire)):F1} dB at 14 m");
+        Assert.True(h.Audio.World.HeardInRanking(Fire) > h.Audio.World.HeardInRanking(Tree), "the fire is not the louder from here");
         Assert.True(treePlaces > 0 && firePlaces > 0);
         // Places for the fire's, and so not for both: given to the tree first, too few are left for the fire.
-        typeof(ClientAudioSystem).GetField("_adaptivePlaces", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(h.Audio, firePlaces);
+        typeof(AudioWorld).GetField("_adaptivePlaces", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(h.Audio.World, firePlaces);
         // Ten seconds: the one that lost its places draws in to its middle, holds them two seconds and fades them.
         for (int i = 0; i < 40; i++) { h.Wait(0.25); h.Tick(2); }
         Assert.True(h.Mixer.Live.Contains(h.Voice(VoiceKind.Place, Fire, 1)), "the louder source has no places");

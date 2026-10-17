@@ -202,7 +202,7 @@ public class ExtentWalkTests
     /// </summary>
     private static double Heard(ClientAudioHarness h, Vector3 ear, out float widthDegrees, out int voices)
     {
-        var heard = ClientAudioSystem.HeardTogether(h.Mixer.Latest, h.Mixer.Live, h.Mixer.Pieces, id => id.StartsWith("flow:"), ear, h.Facade.Options.WideSources);
+        var heard = AudioWorld.HeardTogether(h.Mixer.Latest, h.Mixer.Live, h.Mixer.Pieces, id => id.StartsWith("flow:"), ear, h.Facade.Options.WideSources);
         widthDegrees = heard.WidthDegrees;
         voices = heard.Voices;
         return heard.Power;

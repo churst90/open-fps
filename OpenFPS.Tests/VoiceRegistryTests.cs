@@ -62,7 +62,7 @@ public class VoiceRegistryTests
                 }
                 r.Tick();
                 patrolAt += patrolV / (float)ClientAudioSystem.UpdateHz;
-                foreach (var e in r.Audio.Voices.Entries) seen[e.VoiceId] = e.Kind;
+                foreach (var e in r.Audio.World.Voices.Entries) seen[e.VoiceId] = e.Kind;
             }
         });
         return (run, seen);
@@ -128,7 +128,7 @@ public class VoiceRegistryTests
                 }
                 foreach (var (id, line) in written)
                 {
-                    if (x.Audio.Voices.TryGet(id, out var e)) kinds[e.Kind] = kinds.GetValueOrDefault(e.Kind) + 1;
+                    if (x.Audio.World.Voices.TryGet(id, out var e)) kinds[e.Kind] = kinds.GetValueOrDefault(e.Kind) + 1;
                     else unregistered.Add(line);
                 }
             };
@@ -146,7 +146,7 @@ public class VoiceRegistryTests
     public void A_borrowed_car_behind_a_building_is_occluded_and_at_its_distance()
     {
         var (run, seen) = EveryKind();
-        int voice = run.Audio.Voices.IdFor(VoiceKind.Borrowed, 504);
+        int voice = run.Audio.World.Voices.IdFor(VoiceKind.Borrowed, 504);
         Assert.Equal(VoiceKind.Borrowed, seen[voice]);
         var expanded = EmitterStreamReplayTests.Expand(run.Mixer.Lines);
         string last = expanded.Last(l => l.Contains($" Place {voice} "));
@@ -174,13 +174,13 @@ public class VoiceRegistryTests
         {
             SourcePosition = car,
         };
-        var heard = ClientAudioSystem.SirenApparent(blocked, car, ear);
+        var heard = AudioWorld.SirenApparent(blocked, car, ear);
         Assert.Equal(Vector3.Distance(ear, car), Vector3.Distance(ear, heard), 3);
         Assert.Equal(0f, Vector3.Normalize(heard - ear).X, 3);
         // In the open, or with no answer yet: from the car.
         var open = new OpenFPS.Client.AudioEngine.Data.AcousticPathData(0f, car, 12f) { SourcePosition = car };
-        Assert.Equal(car, ClientAudioSystem.SirenApparent(open, car, ear));
-        Assert.Equal(car, ClientAudioSystem.SirenApparent(default, car, ear));
+        Assert.Equal(car, AudioWorld.SirenApparent(open, car, ear));
+        Assert.Equal(car, AudioWorld.SirenApparent(default, car, ear));
     }
 
     private static float Field(string line, string name)

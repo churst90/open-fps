@@ -45,7 +45,7 @@ internal sealed class ClientAudioHarness
         // No door prewarm: with the render cache empty (TestConfigIsolation) every harness rendered the
         // whole city's doors and starved the tests' own threads.
         Audio = new ClientAudioSystem(Facade, sounds, Player, () => Now, prewarm: false);
-        Mixer.KindOf = id => Audio.Voices.TryGet(id, out var e) ? e.Kind : null;
+        Mixer.KindOf = id => Audio.World.Voices.TryGet(id, out var e) ? e.Kind : null;
     }
 
     /// <summary>Stands the listener here, feet on the ground (the ear is EyeHeight above).</summary>
@@ -139,7 +139,7 @@ internal sealed class ClientAudioHarness
 
     /// <summary>The id a voice plays under: <paramref name="kind"/> of <paramref name="owner"/>, the
     /// <paramref name="part"/>th, kept for it for the test (VoiceRegistry.Hold).</summary>
-    public int Voice(VoiceKind kind, int owner, int part = 0) => Audio.Voices.Hold(kind, owner, part);
+    public int Voice(VoiceKind kind, int owner, int part = 0) => Audio.World.Voices.Hold(kind, owner, part);
     /// <summary>The id a car's borrowed voice plays under.</summary>
     public int DistantVoice(int carId) => Voice(VoiceKind.Borrowed, carId);
     /// <summary>A patrol car in traffic on a call, as the server sends it: nobody's switch, the siren wailing.</summary>

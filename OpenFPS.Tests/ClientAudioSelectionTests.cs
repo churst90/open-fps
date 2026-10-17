@@ -687,7 +687,7 @@ public class ClientAudioSelectionTests
         Assert.True(borrowedDown > machinesDown, "borrowed voices were given up before the machines");
         Assert.True(enginesDown > borrowedDown, "cars were given up before the borrowed voices");
         var end = seen[^1];
-        Assert.Equal(ClientAudioSystem.MinMachineVoices, end.Machines);
+        Assert.Equal(AudioWorld.MinMachineVoices, end.Machines);
         Assert.Equal(4, end.Borrowed);
         Assert.Equal(2, end.Engines);
 
@@ -982,7 +982,7 @@ public class ClientAudioSelectionTests
         h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f), new Vector3(17f, 0f, 0f), ClientAudioHarness.OnACall);
         int siren = h.Voice(VoiceKind.Siren, car);
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(siren), 1200), "the siren never sounded");
-        Assert.True(h.Audio.VehiclePathsAsked > 0, "a sounding siren takes its car's path");
+        Assert.True(h.Audio.World.VehiclePathsAsked > 0, "a sounding siren takes its car's path");
         var spec = SirenSpec.ByName(MachineRegistry.VehicleFor("police_interceptor").Siren!);
         var (gain, reference) = Law.Place(spec.SourceLevelDb, spec.HornMouthMetres);
         Assert.Equal(reference, h.Mixer.Latest[siren].MinDistance, 4);
@@ -1005,6 +1005,6 @@ public class ClientAudioSelectionTests
         h.AddCar(car, "police_interceptor", new Vector3(0f, 0f, 30f));   // parked: the server sends no siren
         h.Tick(120);
         Assert.Empty(h.Mixer.StartedAs(VoiceKind.Siren));
-        Assert.Equal(0, h.Audio.VehiclePathsAsked);
+        Assert.Equal(0, h.Audio.World.VehiclePathsAsked);
     }
 }

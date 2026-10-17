@@ -52,7 +52,7 @@ public static class NearWallsSpike
                                                   : MathF.Atan2(-walk.X, -walk.Z);
         var head = Quaternion.CreateFromAxisAngle(Vector3.UnitY, yaw);
         var spatial = new SpatialService();
-        var prober = new ClientAudioSystem.BoundaryProber();
+        var prober = new AudioWorld.BoundaryProber();
         var probes = new BoundaryProbe[BoundaryModel.ProbeDirections.Length];
         float c = AudioPhysics.SpeedOfSound;
         string[] names = { "right", "left", "up", "down", "ahead", "behind" };

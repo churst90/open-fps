@@ -230,7 +230,7 @@ public static class ProbableBugsSpike
                     int playing = 0;
                     for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
                     {
-                        int voice = audio.Voices.IdFor(VoiceKind.Reflection, id, slot);
+                        int voice = audio.World.Voices.IdFor(VoiceKind.Reflection, id, slot);
                         if (!facade.IsPlaying(voice)) { lastAt.Remove(voice); continue; }
                         playing++;
                         var p = provider.GetSoundPosition(voice);
@@ -292,10 +292,10 @@ public static class ProbableBugsSpike
                        8, 0.52, 5.0);
                 // The wall's answers to one fixed take of a step and nothing else, so before and after can be
                 // measured against each other: the game picks a take at random and its own step hides them.
-                var stepEchoes = typeof(ClientAudioSystem).GetMethod("SubmitRoomStepEchoes",
+                var stepEchoes = typeof(AudioWorld).GetMethod("SubmitRoomStepEchoes",
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
                 var (stepGain, stepReference) = LabHearing.Place(Loudness.FootstepDb);
-                Repeat($"step copies alone {material}", () => stepEchoes.Invoke(audio, new object[]
+                Repeat($"step copies alone {material}", () => stepEchoes.Invoke(audio.World, new object[]
                 {
                     player.Position + new Vector3(0f, 0f, 0.2f), player.Position + new Vector3(0f, player.EyeHeight, 0f),
                     "FOOTSTEPS/Concrete/concrete_shoes_walk_57", stepGain, stepReference, Loudness.FootstepDb, world.GetSnapshot(),

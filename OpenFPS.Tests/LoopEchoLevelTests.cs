@@ -25,7 +25,7 @@ public class LoopEchoLevelTests
             IsReflection = true, EffectiveDistance = pathLength,
             EqLow = relative * 0.9f, EqMid = relative, EqHigh = relative * 0.8f,
         };
-        var echo = ClientAudioSystem.LoopEchoLevel(path, volume, minDistance, direct);
+        var echo = AudioWorld.LoopEchoLevel(path, volume, minDistance, direct);
         float heard = echo.Volume * Loudness.RenderedGain(1f, echo.MinDistance, range * 0.8f, pathLength) * echo.EqMid;
         float loop = volume * Loudness.RenderedGain(1f, minDistance, range, direct);
         Assert.Equal(relative, heard / loop, 3);

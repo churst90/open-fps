@@ -74,7 +74,7 @@ public class AudioClockTests
                 Assert.Equal(r.Now, r.Facade.Clock.Now);
                 Assert.Equal(r.Now, r.World.GetSnapshot().PositionsSampledAt);
                 r.Tick();
-                Assert.False(r.Audio.WorldOnAnotherClock);
+                Assert.False(r.Audio.World.WorldOnAnotherClock);
             }
         });
     }
@@ -91,13 +91,13 @@ public class AudioClockTests
         h.StandAt(Vector3.Zero);
         h.AddCar(1, "v8_muscle", new Vector3(0f, 0f, 20f));
         h.Tick(3);
-        Assert.False(h.Audio.WorldOnAnotherClock);
+        Assert.False(h.Audio.World.WorldOnAnotherClock);
 
         // The mistake: a world made on its own, a while before the mixer.
         h.World.Clock = new SteppedAudioClock { Now = h.Facade.Clock.Now + 30.0 };
         h.AddCar(2, "v8_muscle", new Vector3(0f, 0f, 40f));
         h.Tick(2);
-        Assert.True(h.Audio.WorldOnAnotherClock);
+        Assert.True(h.Audio.World.WorldOnAnotherClock);
     }
 
     /// <summary>

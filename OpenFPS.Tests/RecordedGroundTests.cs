@@ -37,7 +37,7 @@ public class RecordedGroundTests
         var h = OnAsphalt();
         var mouth = new Vector3(3f, Speech.MouthHeight, 0f);
         var e = new SpatialEmitter { EntityId = -5_000_001, Position = mouth };
-        h.Audio.ApplyRecordedGround(ref e, h.World.GetSnapshot());
+        h.Audio.World.ApplyRecordedGround(ref e, h.World.GetSnapshot());
 
         var ear = new Vector3(0f, 1.7f, 0f);
         var image = new Vector3(mouth.X, -mouth.Y, mouth.Z);
@@ -53,7 +53,7 @@ public class RecordedGroundTests
     {
         var h = OnAsphalt();
         var e = new SpatialEmitter { EntityId = -5_000_002, Position = new Vector3(2f, 0.05f, 1f) };
-        h.Audio.ApplyRecordedGround(ref e, h.World.GetSnapshot());
+        h.Audio.World.ApplyRecordedGround(ref e, h.World.GetSnapshot());
         Assert.Equal(0f, e.GroundLowGain);
         Assert.Equal(0f, e.GroundHighGain);
     }

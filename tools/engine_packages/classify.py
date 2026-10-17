@@ -128,10 +128,8 @@ FILE_RULES = [
     ('OpenFPS.Sound/*', 'Sound', ''),
 
     # ── Client.Core ──
-    ('OpenFPS.Client.Core/VoiceRegistry*.cs', 'Audio', 'the voices\' ids and kinds (audit P3)'),
-    ('OpenFPS.Client.Core/LoudspeakerVoices.cs', 'Audio', 'programs rendered through their speakers'),
     ('OpenFPS.Client.Core/Services/SoundMappingService.cs', 'Audio', 'which bank file a footstep plays'),
-    ('OpenFPS.Client.Core/ClientAudioSystem*.cs', 'game', L7),
+    ('OpenFPS.Client.Core/ClientAudioSystem.cs', 'game', 'the audio world\'s host: sources from the snapshot, the game\'s sound features, the place\'s name'),
     ('OpenFPS.Client.Core/WorldAudioPlayer.cs', 'game', L7),
     ('OpenFPS.Client.Core/BirdLife.cs', 'game', L7),
     ('OpenFPS.Client.Core/BeaconAids.cs', 'Accessibility', ''),

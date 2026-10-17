@@ -150,9 +150,9 @@ public class ClientAudioSystemTests
         Assert.Equal(gain, far.Volume, 5);
         Assert.Equal(reference, far.MinDistance, 4);
 
-        if (MathF.Abs(profile.SourceLevelDb - ClientAudioSystem.EngineSourceLevelDb) > 3f)
+        if (MathF.Abs(profile.SourceLevelDb - AudioWorld.EngineSourceLevelDb) > 3f)
         {
-            var (fallbackGain, fallbackRef) = Law.Place(ClientAudioSystem.EngineSourceLevelDb, extent);
+            var (fallbackGain, fallbackRef) = Law.Place(AudioWorld.EngineSourceLevelDb, extent);
             Assert.False(MathF.Abs(fallbackGain * fallbackRef - live.Volume * live.MinDistance) < 1e-4f,
                 "placed at the fallback level, not the preset's own");
         }

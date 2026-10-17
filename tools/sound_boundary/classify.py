@@ -62,7 +62,7 @@ FILE_RULES = [
     # Synthesis: managed, no FMOD (in OpenFPS.Sound/Core since stage 3; the runtime's five went to OpenFPS.Audio/Core)
     (CC + 'AudioEngine/Core/', 'a', 'Sound', 'synthesis'),
     # Integration files: what of them is library and what is open-fps's adapter
-    (CC + 'ClientAudioSystem.cs', 'b', '', 'SPLIT: the host-neutral audio world goes to Audio, the snapshot adapter stays'),
+    (CC + 'ClientAudioSystem.cs', 'b', '', "open-fps's host of the audio world (AudioWorld, stage 7): sources from the snapshot, the game's sound features, the place's name"),
     (CC + 'WorldAudioPlayer.cs', 'b', '', 'SPLIT: one-off sounds and echoes go to Audio, WorldAudioEvent decoding stays'),
     (CC + 'SpatialService.cs', 'b', '', 'the game\'s rays and entity lookups; its acoustic queries are the library\'s (AcousticRays, stage 6)'),
     (CC + 'ClientGeometry.cs', 'b', '', "open-fps's geometry adapter (entities to TriangleWorld)"),

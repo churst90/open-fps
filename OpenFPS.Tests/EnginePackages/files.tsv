@@ -68,10 +68,16 @@ OpenFPS.Audio/Core/AudioBank.cs	Audio
 OpenFPS.Audio/Core/AudioDataPaths.cs	Audio	
 OpenFPS.Audio/Core/AudioEngineFacade.cs	Audio	
 OpenFPS.Audio/Core/AudioHost.cs	Audio	
+OpenFPS.Audio/Core/AudioWorld.Trains.cs	Audio	
+OpenFPS.Audio/Core/AudioWorld.Voices.cs	Audio	
+OpenFPS.Audio/Core/AudioWorld.cs	Audio	
 OpenFPS.Audio/Core/AudioWorldOptions.cs	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	Audio	
+OpenFPS.Audio/Core/LoudspeakerVoices.cs	Audio	
 OpenFPS.Audio/Core/PlacementThread.cs	Audio	
 OpenFPS.Audio/Core/VoiceManager.cs	Audio	
+OpenFPS.Audio/Core/VoiceRegistry.Lifecycle.cs	Audio	
+OpenFPS.Audio/Core/VoiceRegistry.cs	Audio	
 OpenFPS.Audio/Data/AcousticPathData.cs	Audio	
 OpenFPS.Audio/Data/AudioSources.cs	Audio	
 OpenFPS.Audio/Data/SpatialEmitter.cs	Audio	
@@ -129,9 +135,7 @@ OpenFPS.Client.Core/AudioDiagnostics.cs	game
 OpenFPS.Client.Core/BeaconAids.cs	Accessibility	
 OpenFPS.Client.Core/BirdLife.cs	game	library stage 7 (host until split)
 OpenFPS.Client.Core/ClientAudioPaths.cs	game	
-OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	game	library stage 7 (host until split)
-OpenFPS.Client.Core/ClientAudioSystem.Voices.cs	game	library stage 7 (host until split)
-OpenFPS.Client.Core/ClientAudioSystem.cs	game	library stage 7 (host until split)
+OpenFPS.Client.Core/ClientAudioSystem.cs	game	the audio world's host: sources from the snapshot, the game's sound features, the place's name
 OpenFPS.Client.Core/ClientGeometry.cs	game	
 OpenFPS.Client.Core/ClientNetworkService.cs	game	
 OpenFPS.Client.Core/ClientPhysicsSystem.cs	game	
@@ -143,7 +147,6 @@ OpenFPS.Client.Core/Input/InputCommandMapper.cs	game
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	game	
 OpenFPS.Client.Core/LocalPlayerController.cs	game	
 OpenFPS.Client.Core/LocalPlayerState.cs	game	
-OpenFPS.Client.Core/LoudspeakerVoices.cs	Audio	programs rendered through their speakers
 OpenFPS.Client.Core/MapTracker.cs	Accessibility	
 OpenFPS.Client.Core/MeshAssetFetcher.cs	game	
 OpenFPS.Client.Core/NamedPlaces.cs	Accessibility	
@@ -176,8 +179,6 @@ OpenFPS.Client.Core/SpatialService.cs	game
 OpenFPS.Client.Core/StairCues.cs	Accessibility	
 OpenFPS.Client.Core/StrideAccumulator.cs	game	
 OpenFPS.Client.Core/UiSounds.cs	Accessibility	
-OpenFPS.Client.Core/VoiceRegistry.Lifecycle.cs	Audio	the voices' ids and kinds (audit P3)
-OpenFPS.Client.Core/VoiceRegistry.cs	Audio	the voices' ids and kinds (audit P3)
 OpenFPS.Client.Core/WallBumps.cs	Accessibility	
 OpenFPS.Client.Core/WorldAudioPlayer.cs	game	library stage 7 (host until split)
 OpenFPS.Common/AudioEvents.cs	Common	wire

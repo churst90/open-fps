@@ -4,7 +4,7 @@ using OpenFPS.Client.AudioEngine.Data;
 namespace OpenFPS.Client.Core;
 
 /// <summary>How a voice is taken down when its owner lets it go (<see cref="VoiceRegistry.Retire"/>).</summary>
-internal enum VoiceFade : byte
+public enum VoiceFade : byte
 {
     /// <summary>A running synth: its envelope to silence (the provider's FadeOutEngine), brought back by
     /// ReviveEngine. Cut, a synth's waveform steps.</summary>
@@ -21,7 +21,7 @@ internal enum VoiceFade : byte
 /// <see cref="Stop"/>. Whether a voice is started or only placed is the mixer's to decide when it comes to it, never
 /// an owner's from a sounding test a frame old; and a voice fading out is an entry until its fade has ended.
 /// </summary>
-internal sealed partial class VoiceRegistry
+public sealed partial class VoiceRegistry
 {
     /// <summary>The mixer voices are started on. Null: a registry that only keeps ids and entries (a test).</summary>
     public AudioEngineFacade? Mixer { get; set; }

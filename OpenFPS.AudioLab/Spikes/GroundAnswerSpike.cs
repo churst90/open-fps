@@ -53,7 +53,7 @@ public static class GroundAnswerSpike
             if (heading != ear)
                 Console.WriteLine($"  {mapId}: ear ({ear.X:F1}, {ear.Y:F2}, {ear.Z:F1}); bands low/middle/high, dB over free field");
             heading = ear;
-            if (!ClientAudioSystem.LookForGround(world, src, ear, down, dist, abs, mat, out float gb, out string material, out var at))
+            if (!AudioWorld.LookForGround(world, src, ear, down, dist, abs, mat, out float gb, out string material, out var at))
             {
                 Console.WriteLine($"  src ({src.X:F1}, {src.Y:F2}, {src.Z:F1}): no ground within reach");
                 continue;
@@ -82,7 +82,7 @@ public static class GroundAnswerSpike
         var ear0 = ears[0];
 
         if (args.Contains("cost") && srcs.Count > 0
-            && ClientAudioSystem.LookForGround(world, srcs[0], ear0, down, dist, abs, mat, out float h0, out string m0, out _))
+            && AudioWorld.LookForGround(world, srcs[0], ear0, down, dist, abs, mat, out float h0, out string m0, out _))
         {
             var props = AcousticRegistry.GetProperties(m0);
             var plain = props;
@@ -131,7 +131,7 @@ public static class GroundAnswerSpike
                     spatial.RaycastAll(world, flat + new Vector3(0f, ground + 3f, 0f), down, 30f, dist, abs, mat, staticOnly: true);
                     if (!(dist[0] < 30f)) continue;
                     var ear = flat + new Vector3(0f, ground + 3f - dist[0] + 1.7f, 0f);
-                    if (!ClientAudioSystem.LookForGround(world, src, ear, down, dist, abs, mat, out float gb, out string m, out _)) continue;
+                    if (!AudioWorld.LookForGround(world, src, ear, down, dist, abs, mat, out float gb, out string m, out _)) continue;
                     if (GroundAnswer.Reflect(gb, AcousticRegistry.GetProperties(m), src, ear, 0f, c) is not { } b) continue;
                     worst[r * 3] = MathF.Min(worst[r * 3], Db(b.ExcessLow));
                     worst[r * 3 + 1] = MathF.Min(worst[r * 3 + 1], Db(b.ExcessMid));

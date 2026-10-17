@@ -31,6 +31,9 @@ public sealed class SnapshotSources : IAudioSources
     /// <summary>The snapshot the table reads this frame.</summary>
     public WorldSnapshot World => _world;
 
+    /// <summary>Whether a frame's snapshot has been read yet.</summary>
+    public bool Filled => _frame > 0;
+
     /// <summary>A new frame's table, read from <paramref name="world"/>. What was read of the last one is
     /// forgotten; an entity that has left is let go now and then.</summary>
     public void Refill(WorldSnapshot world)

@@ -2,7 +2,6 @@ using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
-using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Client.Core;
 
@@ -13,7 +12,7 @@ namespace OpenFPS.Client.Core;
 /// path here, from its owner's one answer this frame, so no voice has a second writer and none keeps the path
 /// it started with.
 /// </summary>
-public partial class ClientAudioSystem
+public partial class AudioWorld
 {
     /// <summary>Every voice and the ids they are under; a question's id kept as long as the worker keeps a
     /// source nobody asks about.</summary>
@@ -22,8 +21,8 @@ public partial class ClientAudioSystem
         ProbeHoldFrames = (int)Math.Ceiling(AsyncAcousticWorker.SaSourceTtlMs / 1000.0 * UpdateHz),
     };
 
-    /// <summary>The voices of moving things, for a test.</summary>
-    internal VoiceRegistry Voices => _voices;
+    /// <summary>Every voice of this world and the ids they are under: the host's features place theirs through it.</summary>
+    public VoiceRegistry Voices => _voices;
 
     /// <summary>An owner's path this frame: the worker's answer under the one freshness rule
     /// (<see cref="AcousticPathData.Answers"/>), with the vehicles in the way put back
@@ -45,7 +44,7 @@ public partial class ClientAudioSystem
     private readonly Dictionary<int, OwnerPath> _ownerPaths = new();
 
     /// <summary>The owner's path this frame, worked out once.</summary>
-    private OwnerPath PathOf(WorldSnapshot world, AudioSource owner, Vector3 ear)
+    private OwnerPath PathOf(IAcousticWorld world, AudioSource owner, Vector3 ear)
     {
         if (_ownerPaths.TryGetValue(owner.Id, out var known)) return known;
         var at = owner.Emission;
@@ -73,7 +72,7 @@ public partial class ClientAudioSystem
     private const float UnaskedOcclusion = 0f;
 
     /// <summary>An answer with the vehicles between the source and the ear put back as barriers.</summary>
-    private OwnerPath Shadowed(WorldSnapshot world, int ownerId, in AcousticPathData direct, Vector3 at, Vector3 ear)
+    private OwnerPath Shadowed(IAcousticWorld world, int ownerId, in AcousticPathData direct, Vector3 at, Vector3 ear)
     {
         var heard = direct;
         VehicleShadow.Apply(ref heard, world, ownerId, at, ear, Listener.RidingId);
@@ -85,7 +84,7 @@ public partial class ClientAudioSystem
     /// (<see cref="VoiceRegistry.HeardFromOf"/>), and everything the path does to it, in the one emitter
     /// that places it. The caller starts or re-places it as it always has.
     /// </summary>
-    private void HandPath(ref SpatialEmitter e, VoiceKind kind, WorldSnapshot world, AudioSource owner,
+    private void HandPath(ref SpatialEmitter e, VoiceKind kind, IAcousticWorld world, AudioSource owner,
                           Vector3 at, float levelDb, Vector3 ear, bool inside = false)
     {
         _voices.Declare(e.EntityId, owner.Id, kind,

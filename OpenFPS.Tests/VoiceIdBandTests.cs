@@ -32,12 +32,12 @@ public class VoiceIdBandTests
         int given = 0, checkedVoices = 0;
         Replay.RunScript(r =>
         {
-            r.Audio.Voices.OnGiven = (id, key) =>
+            r.Audio.World.Voices.OnGiven = (id, key) =>
             {
                 given++;
                 if (id > VoiceRegistry.FirstId || id < VoiceRegistry.LastId) problems.Add($"{id} for {key} is outside the ids given");
                 if (key.Kind != VoiceKind.Probe && r.Mixer.IsPlaying(id)) problems.Add($"frame {r.Frame}: {id} given for {key} while a voice sounds under it");
-                if (r.Audio.Voices.IsRegistered(id)) problems.Add($"frame {r.Frame}: {id} given for {key} while it is an entry");
+                if (r.Audio.World.Voices.IsRegistered(id)) problems.Add($"frame {r.Frame}: {id} given for {key} while it is an entry");
             };
             r.AfterTick = x =>
             {
@@ -45,15 +45,15 @@ public class VoiceIdBandTests
                 {
                     checkedVoices++;
                     if (id >= 0) continue;                                       // an entity's own voice
-                    if (!x.Audio.Voices.TryKeyOf(id, out _)) problems.Add($"frame {x.Frame}: {id} sounds and no id is held for it");
+                    if (!x.Audio.World.Voices.TryKeyOf(id, out _)) problems.Add($"frame {x.Frame}: {id} sounds and no id is held for it");
                 }
-                foreach (var e in x.Audio.Voices.Entries)
+                foreach (var e in x.Audio.World.Voices.Entries)
                 {
                     if (VoiceRegistry.IsOwnVoice(e.Kind))
                     {
                         if (e.VoiceId != e.OwnerId) problems.Add($"frame {x.Frame}: {e.Kind} of {e.OwnerId} is under {e.VoiceId}");
                     }
-                    else if (!x.Audio.Voices.TryKeyOf(e.VoiceId, out _)) problems.Add($"frame {x.Frame}: entry {e.VoiceId} ({e.Kind}) has no id held");
+                    else if (!x.Audio.World.Voices.TryKeyOf(e.VoiceId, out _)) problems.Add($"frame {x.Frame}: entry {e.VoiceId} ({e.Kind}) has no id held");
                 }
             };
             Replay.Scenarios[scenario](r);

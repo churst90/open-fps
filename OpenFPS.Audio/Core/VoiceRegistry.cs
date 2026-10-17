@@ -3,7 +3,7 @@ using System.Numerics;
 namespace OpenFPS.Client.Core;
 
 /// <summary>What a registered voice is: which part of which thing it is the sound of.</summary>
-internal enum VoiceKind : byte
+public enum VoiceKind : byte
 {
     /// <summary>A vehicle's own engine, under the vehicle's entity id, through the voice budget.</summary>
     Engine,
@@ -73,15 +73,15 @@ internal enum VoiceKind : byte
 
 /// <summary>What an id was given for: <see cref="Kind"/> of <see cref="Owner"/>, the <see cref="Part"/>th of
 /// them (<see cref="VoiceRegistry.IdFor"/>).</summary>
-internal readonly record struct VoiceKey(VoiceKind Kind, int Owner, int Part);
+public readonly record struct VoiceKey(VoiceKind Kind, int Owner, int Part);
 
 /// <summary>Where a registered voice is heard from, and so whose path it takes.</summary>
-internal enum HeardFrom : byte
+public enum HeardFrom : byte
 {
     /// <summary>Its own point on the owner, now, wherever the owner's path arrives from.</summary>
     Point,
     /// <summary>Its point while the way is clear; when it is blocked, turned toward the edge the owner's path
-    /// arrives round, at its own distance (<see cref="ClientAudioSystem.SirenApparent"/>): a blocked source comes
+    /// arrives round, at its own distance (<see cref="AudioWorld.SirenApparent"/>): a blocked source comes
     /// from the edge it bent over.</summary>
     TowardEdge,
     /// <summary>Where the owner's path says it arrives from, at that point: a recording heard round a corner.</summary>
@@ -98,7 +98,7 @@ internal enum HeardFrom : byte
 }
 
 /// <summary>One voice, as the registry knows it.</summary>
-internal struct VoiceEntry
+public struct VoiceEntry
 {
     public int VoiceId;
     /// <summary>The entity it is the sound of, or <see cref="VoiceRegistry.NoEntity"/>.</summary>
@@ -125,7 +125,7 @@ internal struct VoiceEntry
 /// Every voice in the world (docs/SPECIAL_CASES_AUDIT.md, P3a and P3b): whose it is, which part, where on its
 /// owner it sounds from and how loud it is declared. A sustained voice is declared each frame it sounds and is
 /// no longer an entry after a frame without; a one-off is declared once and is one until it has stopped. One
-/// pass hands every voice heard by its owner's path that path (<see cref="ClientAudioSystem"/>, Voices); a
+/// pass hands every voice heard by its owner's path that path (<see cref="AudioWorld"/>, Voices); a
 /// voice that works out its own carries it, and nothing else writes either.
 ///
 /// It gives out the ids (<see cref="IdFor"/>): an entity's own voice is under its entity id, and every other
@@ -133,7 +133,7 @@ internal struct VoiceEntry
 /// entry or still sounding (a voice fading out keeps its id until its fade has ended) and then free for the
 /// next. So no two voices sound under one id, however many entities a map has or however long it runs.
 /// </summary>
-internal sealed partial class VoiceRegistry
+public sealed partial class VoiceRegistry
 {
     /// <summary>The owner of a voice that is no entity's: rain, a bird, the aids round your head.</summary>
     public const int NoEntity = int.MinValue;

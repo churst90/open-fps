@@ -18,7 +18,7 @@ public class AdaptiveBudgetTests
     public AdaptiveBudgetTests(ITestOutputHelper o) => _o = o;
 
     private static int Field(ClientAudioSystem audio, string name)
-        => (int)typeof(ClientAudioSystem).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(audio)!;
+        => (int)typeof(AudioWorld).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(audio.World)!;
 
     private static void Run(Replay r, float load, double seconds)
     {

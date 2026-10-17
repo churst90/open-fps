@@ -243,7 +243,7 @@ internal sealed class SpokenReplay
         // Built where they are asked for, not on a worker: the same world on every tick of every run.
         Session.World.Geometry.Runner = work => work();
         Session.World.RefreshRunner = work => work();
-        Session.AudioSystemForTest.Voices.OnGiven = (id, key) => _kinds[id] = key.Kind;
+        Session.AudioSystemForTest.World.Voices.OnGiven = (id, key) => _kinds[id] = key.Kind;
     }
 
     /// <summary>A script run with the aids' switches at the game's defaults whatever ran before, and put back
@@ -404,7 +404,7 @@ internal sealed class SpokenReplay
         {
             Now += Dt / FramesPerTick;
             Session.ContinuousUpdate();
-            Session.AudioSystemForTest.AcousticWorker.StepForTest();
+            Session.AudioSystemForTest.World.AcousticWorker.StepForTest();
             _facade.PumpForTest();
             _facade.PumpForTest();
         }

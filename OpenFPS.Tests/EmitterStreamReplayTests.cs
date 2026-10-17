@@ -378,7 +378,7 @@ internal sealed class Replay
         int given = 0;
         var r = RunScript(x =>
         {
-            x.Audio.Voices.OnGiven = (id, key) =>
+            x.Audio.World.Voices.OnGiven = (id, key) =>
             {
                 if (key.Kind == VoiceKind.Probe) return;
                 given++;
@@ -462,7 +462,7 @@ internal sealed class Replay
         Now += Dt;
         Mixer.Frame = Frame;
         Audio.Update(World.GetSnapshot());
-        Audio.AcousticWorker.StepForTest();
+        Audio.World.AcousticWorker.StepForTest();
         Facade.PumpForTest();
         Facade.PumpForTest();
         AfterTick?.Invoke(this);
@@ -606,7 +606,7 @@ internal sealed class Replay
     /// replay's mixer reports no load, so nothing gives it back.
     /// </summary>
     internal void ShedEnginesTo(int engines)
-        => typeof(ClientAudioSystem).GetField("_adaptiveBudget", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(Audio, engines);
+        => typeof(AudioWorld).GetField("_adaptiveBudget", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(Audio.World, engines);
 
     /// <summary>A driver's switches as the wire carries them (EntityState.Signals).</summary>
     internal static byte Driven(bool horn = false, OpenFPS.Common.SirenMode siren = OpenFPS.Common.SirenMode.Off)
