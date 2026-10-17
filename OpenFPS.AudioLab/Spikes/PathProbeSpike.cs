@@ -97,7 +97,7 @@ public static class PathProbeSpike
         if (openArg != null || doorArgs.Count > 0)
         {
             float r = openArg != null ? float.Parse(openArg[5..], CultureInfo.InvariantCulture) : -1f;
-            var leaves = world.Entities.Values.Where(e => OpeningGraph.IsDoorLeaf(e.Definition)).ToList();
+            var leaves = world.Entities.Values.Where(e => EntityAcoustics.IsDoorLeaf(e.Definition)).ToList();
             var chosen = new HashSet<int>();
             if (r > 0f) foreach (var e in leaves) if (Vector3.Distance(e.Transform.Position, ear) <= r) chosen.Add(e.Id);
             foreach (var at in doorArgs)
@@ -190,9 +190,9 @@ public static class PathProbeSpike
                 var def = e.Definition;
                 if (string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
                 if (Vector3.Distance(e.Transform.Position, src) > 3f) continue;
-                var at = AudioEmission.PointFor(e);
+                var at = EntityEmission.PointFor(e);
                 Console.WriteLine($"  emitter {e.Id} '{def.Identity.Name}' {def.Type} {def.SoundEmitter.SoundId}: sounds from ({at.X:F2}, {at.Y:F2}, {at.Z:F2}), "
-                                + $"probe radius {AudioEmission.OcclusionRadiusFor(e):F2} m, in {RegionName(world, acoustics, at)}; "
+                                + $"probe radius {EntityEmission.OcclusionRadiusFor(e):F2} m, in {RegionName(world, acoustics, at)}; "
                                 + $"solid {def.Collider.IsSolid}, moves {def.Moves}, in the Steam Audio scene {inScene.Contains(e.Id)}; "
                                 + $"range {def.SoundEmitter.Range}, min distance {def.SoundEmitter.MinDistance}, volume {def.SoundEmitter.Volume}, "
                                 + $"cone {def.SoundEmitter.ConeInsideAngle}/{def.SoundEmitter.ConeOutsideAngle} x{def.SoundEmitter.ConeOutsideVolume}, "

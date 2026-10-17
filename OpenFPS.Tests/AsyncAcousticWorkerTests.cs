@@ -172,10 +172,8 @@ public class AsyncAcousticWorkerTests
         float occlusion = ResultOf(worker, 7).First(p => !p.IsReflection).Occlusion;
         Assert.True(occlusion > 0f);
 
-        // A world the tracer cannot read: an entity with no definition throws inside it.
-        var broken = new WorldSnapshot();
-        broken.Entities[123] = new EntitySnapshot { Id = 123, Definition = null!, Transform = new Transform() };
-        worker.UpdateWorld(broken);
+        // A world the tracer cannot read: every question of it throws inside the tracer.
+        worker.UpdateWorld(new UnreadableWorld());
 
         var moved = Behind + new Vector3(1f, 0f, 0f);
         var fresh = new Vector3(20f, 1f, -5f);
@@ -254,4 +252,25 @@ public class AsyncAcousticWorkerTests
 
     private static object Field(object o, string name)
         => o.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(o)!;
+
+    /// <summary>A world input whose every answer throws: what the tracer meets in a world it cannot read.</summary>
+    private sealed class UnreadableWorld : IAcousticWorld
+    {
+        private static T No<T>() => throw new InvalidOperationException("an unreadable world");
+        public OpenFPS.Common.Geometry.TriangleWorld? Geometry => No<OpenFPS.Common.Geometry.TriangleWorld?>();
+        public IReadOnlySet<int>? GeometryStale => No<IReadOnlySet<int>?>();
+        public long GeometryVersion => No<long>();
+        public float TileMetres => No<float>();
+        public AcousticMap? Rooms => No<AcousticMap?>();
+        public AirState Air => No<AirState>();
+        public int BodyCount => No<int>();
+        public bool TryGetBody(int id, out AcousticBody body) { body = default; return No<bool>(); }
+        public void AllBodies(List<AcousticBody> into) => No<bool>();
+        public int MovingCount => No<int>();
+        public AcousticBody MovingAt(int index) => No<AcousticBody>();
+        public bool Near(Vector3 centre, float radius, bool staticOnly, List<AcousticBody> into) => No<bool>();
+        public void Unindexed(bool staticOnly, List<AcousticBody> into) => No<bool>();
+        public void DoorLeaves(List<DoorLeaf> into) => No<bool>();
+        public List<OpenFPS.Common.Geometry.SolidSpec> TerrainSolids() => No<List<OpenFPS.Common.Geometry.SolidSpec>>();
+    }
 }

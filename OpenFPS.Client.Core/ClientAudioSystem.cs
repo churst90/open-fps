@@ -365,7 +365,7 @@ public partial class ClientAudioSystem
         _state = state;
         _drivingAids = new DrivingAids(audio);
         _spatial = new SpatialService();
-        _acoustics = new SpatialAcoustics(_spatial) { Clock = audio.Clock, Atmosphere = audio.Atmosphere };
+        _acoustics = new SpatialAcoustics { Clock = audio.Clock, Atmosphere = audio.Atmosphere };
         // After the acoustics, which it needs: a beacon behind a wall is not blipped.
         _beacons = new BeaconAids(audio, beacons, acoustics: _acoustics);
         // Shares this system's acoustics, so a rendered latch takes exactly the path a recorded one would.
@@ -702,8 +702,8 @@ public partial class ClientAudioSystem
             // Asked about the point the sound comes out of, not the entity's origin: for anything that
             // drives the origin is its contact patch, and a probe there was half buried (about half the
             // samples blocked on open road).
-            Vector3 sourcePos = OpenFPS.Common.AudioEmission.PointFor(snap);
-            float sourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap);
+            Vector3 sourcePos = OpenFPS.Common.EntityEmission.PointFor(snap);
+            float sourceRadius = OpenFPS.Common.EntityEmission.OcclusionRadiusFor(snap);
             float sourceSpeed = snap.Velocity.Length();
             
             float dist = Vector3.Distance(visualEyePos, sourcePos);
@@ -879,7 +879,7 @@ public partial class ClientAudioSystem
         _birds.EarSpeed = _earSpeed;
         _birds.Update(world, visualEyePos, _audio.Clock.Now);
         _rain.EarSpeed = _earSpeed;
-        _rain.Update(world, visualEyePos, _audio.Clock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
+        _rain.Update(world, world.Falling, visualEyePos, _audio.Clock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
         _partMs[2] += Ms(partAt);
 
         // Every source has been offered to the reflection system: it sets what next frame's reflections
@@ -1291,7 +1291,7 @@ public partial class ClientAudioSystem
             // emitter plays (ProcessAudioEmitter): its placed gain, its range and the key its spectrum is measured
             // under. Not the gain that gives a quieter render its headroom back, which is no louder at the ear.
             string voiceKey = VoiceKey(snap.Definition);
-            float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
+            float d = Vector3.Distance(OpenFPS.Common.EntityEmission.PointFor(snap), eyePos);
             var (gain, reference) = _audio.Hearing.Place(levelDb, extent);
             float range = MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb)));
             float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
@@ -1580,7 +1580,7 @@ public partial class ClientAudioSystem
             var (gain, reference) = _audio.Hearing.Place(levelDb, OutletSeparation(preset));
             float heard = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
                 gain * em.Volume, reference, MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb))),
-                Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos), UnaskedOcclusion, levelDb, VoiceKey(snap.Definition), physical: true);
+                Vector3.Distance(OpenFPS.Common.EntityEmission.PointFor(snap), eyePos), UnaskedOcclusion, levelDb, VoiceKey(snap.Definition), physical: true);
             // Louder sorts first, so negated. The keep bias and the hold stop the set churning as cars trade
             // places (EngineKeepBias).
             _heardInRanking[entityId] = heard;
@@ -1772,7 +1772,7 @@ public partial class ClientAudioSystem
     internal static (float Low, float Mid, float High) CopyBeam(OpenFPS.Client.AudioEngine.Core.Signals.LoudspeakerRender speaker,
                                                                EntitySnapshot source, Vector3 image, Vector3 listener)
     {
-        Vector3 at = OpenFPS.Common.AudioEmission.PointFor(source);
+        Vector3 at = OpenFPS.Common.EntityEmission.PointFor(source);
         var local = source.Definition.SoundEmitter.Direction;
         Vector3 axis = Vector3.Transform(local.LengthSquared() > 0f ? Vector3.Normalize(local) : Vector3.UnitZ, source.Transform.Rotation);
         Vector3 n = image - at, d = listener - image;
@@ -2007,7 +2007,7 @@ public partial class ClientAudioSystem
             if (!world.Entities.TryGetValue(id, out var snap)) continue;
             var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(VoiceKey(snap.Definition), ModelLibrary.Presets);
             if (layout == null) continue;
-            var at = OpenFPS.Common.AudioEmission.PointFor(snap);
+            var at = OpenFPS.Common.EntityEmission.PointFor(snap);
             float d2 = Vector3.DistanceSquared(at, eyePos);
             if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
                     OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), MathF.Sqrt(d2)) <= 0f) continue;
@@ -2173,11 +2173,11 @@ public partial class ClientAudioSystem
     /// </summary>
     private AcousticPathData FirstAnswer(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos)
     {
-        var at = OpenFPS.Common.AudioEmission.PointFor(snap);
+        var at = OpenFPS.Common.EntityEmission.PointFor(snap);
         _acousticWorker.EnqueueRequest(new AcousticRequest
         {
             EntityId = snap.Id, ListenerPos = eyePos, SourcePos = at,
-            SourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap),
+            SourceRadius = OpenFPS.Common.EntityEmission.OcclusionRadiusFor(snap),
         });
         var path = _acoustics.CalculateAcousticPath(world, snap.Id, eyePos, at);
         if (_acousticWorker.TryGetNearby(eyePos, at, out var near))
@@ -2584,17 +2584,17 @@ public partial class ClientAudioSystem
             int horn = -1;
             try { horn = OpenFPS.Common.TrainSignal.WarningSource(OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset), ModelLibrary.Presets)); }
             catch (Exception ex) { OpenFPS.Common.ModelKindTable.Fail(sid, ex.Message); }
-            if (horn == index) return OpenFPS.Common.AudioEmission.PointFor(snap);
+            if (horn == index) return OpenFPS.Common.EntityEmission.PointFor(snap);
             if (horn >= 0)
             {
                 string hornId = OpenFPS.Common.ModelKindTable.RailSource(preset, train, horn);
                 foreach (var other in world.DynamicEntities)
                     if (string.Equals(other.Definition.SoundEmitter.SoundId, hornId, StringComparison.OrdinalIgnoreCase))
-                        return OpenFPS.Common.AudioEmission.PointFor(other);
+                        return OpenFPS.Common.EntityEmission.PointFor(other);
             }
         }
         OpenFPS.Common.ModelKindTable.Fail(sid, "honked, and its train has no horn source on the map: heard from its own point");
-        return OpenFPS.Common.AudioEmission.PointFor(snap);
+        return OpenFPS.Common.EntityEmission.PointFor(snap);
     }
 
     /// <summary>
@@ -2676,7 +2676,7 @@ public partial class ClientAudioSystem
         float level = DeclaredLevel(preset, profile);
         float extent = OutletSeparation(preset);
         var (gain, reference) = _audio.Hearing.Place(level, extent);
-        Vector3 pos = OpenFPS.Common.AudioEmission.PointFor(snap);
+        Vector3 pos = OpenFPS.Common.EntityEmission.PointFor(snap);
 
         // A stable, arbitrary offset per car, spread across most of the ring buffer.
         float offset = 0.08f + (Math.Abs(snap.Id) % 17) * 0.045f;
@@ -2735,7 +2735,7 @@ public partial class ClientAudioSystem
         float powerLever = 1f, rotorWake = 0f;
         bool onGround = false;
         // Where the sound comes out: the same point the occlusion probe in Update asks about.
-        Vector3 emitterPosition = OpenFPS.Common.AudioEmission.PointFor(snap);
+        Vector3 emitterPosition = OpenFPS.Common.EntityEmission.PointFor(snap);
         float engineVolume = def.SoundEmitter.Volume;
         float engineMinDistance = def.SoundEmitter.MinDistance;
         float engineRange = def.SoundEmitter.Range;
@@ -3065,7 +3065,7 @@ public partial class ClientAudioSystem
     /// reads (UpdateTalkers).
     /// </summary>
     public void ReceiveVoice(int senderId, ushort sequence, byte[] opusData)
-        => _audio.TalkerStreams.For(senderId).Receive(sequence, opusData, _audio.Clock.Now);
+        => _audio.TalkerStreams.For(senderId, OpenFPS.Client.Core.Platform.OpusVoiceDecoder.Create).Receive(sequence, opusData, _audio.Clock.Now);
 
     /// <summary>The voice of somebody talking on voice chat, from their mouth.</summary>
     private int TalkerVoiceId(int playerId) => _voices.IdFor(VoiceKind.Talker, playerId);
@@ -3590,7 +3590,7 @@ public partial class ClientAudioSystem
         arrivals.Clear();
         _acoustics.FindReflections(world, mouth, ear, arrivals, _audio.Atmosphere.SpeedOfSound,
                                                  maxOrder: 2, keep: OwnVoiceCopies * 2,
-                                                 maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * _audio.Atmosphere.SpeedOfSound);
+                                                 maxExtraPathMetres: RoomEchoes.WindowSeconds * _audio.Atmosphere.SpeedOfSound);
         arrivals.Sort(static (a, b) => (b.GainMid, a.SurfaceId, a.Order, a.PathLength).CompareTo((a.GainMid, b.SurfaceId, b.Order, b.PathLength)));
         float direct = Vector3.Distance(mouth, ear);
         float c = _audio.Atmosphere.SpeedOfSound;
@@ -3598,10 +3598,10 @@ public partial class ClientAudioSystem
         foreach (var a in arrivals)
         {
             if (slot >= OwnVoiceCopies) break;
-            if (a.ExtraDelaySeconds > WorldAudioPlayer.RoomEchoWindowSeconds) continue;
-            if (a.Order >= 2 && ++secondOrder > WorldAudioPlayer.MaxSecondOrderCopies) continue;
+            if (a.ExtraDelaySeconds > RoomEchoes.WindowSeconds) continue;
+            if (a.Order >= 2 && ++secondOrder > RoomEchoes.MaxSecondOrderCopies) continue;
             float copyGain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference)
-                           * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order)
+                           * RoomEchoes.MirrorShare(a.Scattering, a.Order)
                            * _audio.Mix.CopiesTrim;
             if (copyGain < OpenFPS.Common.ImageSource.MinGain) continue;
             var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
@@ -3682,17 +3682,17 @@ public partial class ClientAudioSystem
     private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, float stepLevelDb, WorldSnapshot world)
     {
         _acoustics.FindReflections(world, stepPos, ear, _stepArrivals, _audio.Atmosphere.SpeedOfSound,
-                                             maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
-                                             maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * _audio.Atmosphere.SpeedOfSound);
+                                             maxOrder: 2, keep: RoomEchoes.MaxEchoes * 2,
+                                             maxExtraPathMetres: RoomEchoes.WindowSeconds * _audio.Atmosphere.SpeedOfSound);
         _stepArrivals.Sort(static (a, b) => (b.GainMid, a.SurfaceId, a.Order, a.PathLength).CompareTo((a.GainMid, b.SurfaceId, b.Order, b.PathLength)));
         float direct = Vector3.Distance(stepPos, ear);
         int added = 0, secondOrder = 0;
         foreach (var a in _stepArrivals)
         {
-            if (a.ExtraDelaySeconds > WorldAudioPlayer.RoomEchoWindowSeconds) continue;
+            if (a.ExtraDelaySeconds > RoomEchoes.WindowSeconds) continue;
             // The floor the foot is on: the step is made of it already.
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(stepPos.Y, ear.Y) - 0.2f) continue;
-            if (a.Order >= 2 && ++secondOrder > WorldAudioPlayer.MaxSecondOrderCopies) continue;
+            if (a.Order >= 2 && ++secondOrder > RoomEchoes.MaxSecondOrderCopies) continue;
             float placed = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference);
             float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
             float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
@@ -3704,13 +3704,13 @@ public partial class ClientAudioSystem
             if (wash >= OpenFPS.Common.ImageSource.MinGain)
                 SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb,
                                wash * _audio.Mix.CopiesTrim, lowDb, highDb, s);
-            // The mirror share (WorldAudioPlayer.MirrorShare), a clean copy.
-            float gain = placed * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order);
+            // The mirror share (RoomEchoes.MirrorShare), a clean copy.
+            float gain = placed * RoomEchoes.MirrorShare(a.Scattering, a.Order);
             if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
             gain *= _audio.Mix.CopiesTrim;   // /copies
             var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
             SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb, gain, loss.LowDb + lowDb, loss.HighDb + highDb, 0f);
-            if (++added >= WorldAudioPlayer.MaxRoomEchoes) break;
+            if (++added >= RoomEchoes.MaxEchoes) break;
         }
     }
 

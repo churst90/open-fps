@@ -276,10 +276,10 @@ public class ModelKindTableTests
     {
         string id = "s26_" + Guid.NewGuid().ToString("N")[..6];
         var def = new OpenFPS.Common.Networking.EntityDefinition { SoundEmitter = new SoundEmitterComponent { IsSynth = true, SoundId = ModelKindTable.IdOf(ModelSynth.Engine, id) } };
-        Assert.Equal(System.Numerics.Vector3.Zero, AudioEmission.LocalOffset(def));
+        Assert.Equal(System.Numerics.Vector3.Zero, EntityEmission.LocalOffset(def));
         Assert.True(ModelKindTable.Failures.ContainsKey(def.SoundEmitter.SoundId));
         MachineRegistry.Add(new MachineDefinition { Id = id, Name = "S26", Base = "v8_muscle", Parts = Array.Empty<MachinePart>() });
-        var offset = AudioEmission.LocalOffset(def);
+        var offset = EntityEmission.LocalOffset(def);
         Assert.NotEqual(System.Numerics.Vector3.Zero, offset);
         Assert.Equal(MachineRegistry.VehicleFor(id).ExhaustOffset, offset);
     }

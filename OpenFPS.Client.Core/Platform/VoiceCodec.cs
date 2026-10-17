@@ -38,6 +38,23 @@ public static class VoiceCodec
     public static IOpusDecoder CreateDecoder() => OpusCodecFactory.CreateDecoder(Rate, 1);
 }
 
+/// <summary>A talker's frames through Opus (<see cref="VoiceCodec"/>), as the sound library's talker streams take
+/// them (TalkerStream).</summary>
+public sealed class OpusVoiceDecoder : OpenFPS.Client.AudioEngine.Fmod.IVoiceDecoder
+{
+    private readonly IOpusDecoder _decoder = VoiceCodec.CreateDecoder();
+
+    /// <summary>A new decoder each: for TalkerStreams.For.</summary>
+    public static readonly Func<OpenFPS.Client.AudioEngine.Fmod.IVoiceDecoder> Create = static () => new OpusVoiceDecoder();
+
+    public int Rate => VoiceCodec.Rate;
+    public int FrameSamples => VoiceCodec.FrameSamples;
+    public int MaxFrameSamples => VoiceCodec.MaxFrameSamples;
+
+    public int Decode(ReadOnlySpan<byte> packet, Span<float> pcm, int frameSize, bool fec)
+        => _decoder.Decode(packet, pcm, frameSize, fec);
+}
+
 /// <summary>
 /// Gathers 48 kHz samples into 20 ms frames and encodes each one. Not thread-safe: one capture thread.
 /// </summary>

@@ -118,7 +118,7 @@ public class BeaconTests
             if (def.Identity.BeaconCategory == Beacons.Door) doors.Add(def);
         }
         var snap = client.GetSnapshot();
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
         var aids = new BeaconAids(new AudioEngineFacade(new VoiceLifecycleTests.RecordingProvider()),
                                   BeaconPreferences.InMemory(), acoustics);
         int tried = 0, halfBlocked = 0, silent = 0;
@@ -135,7 +135,7 @@ public class BeaconTests
                 {
                     // Really in view: clear from the face to the ear, and from the ear to a point straight out.
                     var dir = ear - face; float len = dir.Length();
-                    if (acoustics.Spatial.RaycastSingle(snap, face, dir / len, len, out _, out _)) continue;
+                    if (new SpatialService().RaycastSingle(snap, face, dir / len, len, out _, out _)) continue;
                     tried++;
                     if (acoustics.CalculateAcousticPath(snap, d.EntityId, ear, p).Occlusion > 0.5f) halfBlocked++;
                     if (!aids.Reaches(snap, d.EntityId, ear, p, out _)) silent++;
@@ -167,7 +167,7 @@ public class BeaconTests
         facade.InitializeForTest();
         var ear = new Vector3(-340.8f, 1.6f, -13.45f);
         facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
         var aids = new BeaconAids(facade, BeaconPreferences.InMemory(), acoustics);
         for (int i = 0; i < 6; i++)
         {
@@ -221,7 +221,7 @@ public class BeaconTests
             var facade = new AudioEngineFacade(provider);
             facade.InitializeForTest();
             facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
-            var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+            var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
             using var worker = new OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker(acoustics) { Manual = true };
             var aids = new BeaconAids(facade, BeaconPreferences.InMemory(), acoustics) { Worker = worker };
             var snap = client.GetSnapshot();
@@ -299,7 +299,7 @@ public class BeaconTests
     public void AParkedCarBlipsFromWhereverYouStand()
     {
         var (snap, cars) = CityWithParkedCars();
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
         int tried = 0, silent = 0;
         foreach (var c in cars)
         {
@@ -339,7 +339,7 @@ public class BeaconTests
     public void TheNearestParkedCarsBlipButNotTheOneYouAreIn()
     {
         var (snap, cars) = CityWithParkedCars();
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
         var first = cars.OrderBy(c => c.Transform.Position.Z).First();
         var right = Vector3.Transform(Vector3.UnitX, first.Transform.Rotation);
 

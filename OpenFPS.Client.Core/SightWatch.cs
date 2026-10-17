@@ -406,20 +406,18 @@ public sealed class SightIndex
         _builtCount = world.Entities.Count;
         _builtAt = now;
         var marks = new List<Mark>();
-        foreach (var snap in world.Entities.Values)
+        // Each door's doorway, as the sound's world input has it (its pose shut, IAcousticWorld.DoorLeaves).
+        var leaves = new List<DoorLeaf>();
+        ((IAcousticWorld)world).DoorLeaves(leaves);
+        foreach (var leaf in leaves)
         {
-            var def = snap.Definition;
-            if (!OpeningGraph.IsDoorLeaf(def)) continue;
-            Vector3 centre; Quaternion rotation;
-            if (def.Portal.OpeningRotation != default) { centre = def.Portal.OpeningCentre; rotation = def.Portal.OpeningRotation; }
-            else if (def.Transform.Rotation != default) { centre = def.Transform.Position; rotation = def.Transform.Rotation; }
-            else { centre = snap.Transform.Position; rotation = snap.Transform.Rotation; }
-            var across = Vector3.Transform(Vector3.UnitX, rotation);
+            var centre = leaf.DoorwayCentre;
+            var across = Vector3.Transform(Vector3.UnitX, leaf.DoorwayRotation);
             across.Y = 0f;
             if (across.LengthSquared() < 1e-6f) continue;
             across = Vector3.Normalize(across);
-            var size = def.Collider.Size;
-            marks.Add(new Mark(snap.Id, Sightline.NameOf(snap), centre, across, size.X * 0.5f,
+            var size = leaf.Size;
+            marks.Add(new Mark(leaf.Id, Sightline.NameOf(world.Entities[leaf.Id]), centre, across, size.X * 0.5f,
                                centre.Y - size.Y * 0.5f, centre.Y + size.Y * 0.5f, false));
         }
         foreach (int id in world.MarkerEntityIds)
@@ -576,7 +574,7 @@ public static class SightCone
         bool stairs = m.Stairs;
         if (!index.Grid.Cast(world, eye, dir, length,
                 s => s.Id != id && Sightline.Stops(s, ownEntityId) && !Sightline.IsOnTheMove(s)
-                     && (stairs || !OpeningGraph.IsDoorLeaf(s.Definition) || Sightline.NameOf(s) != name),
+                     && (stairs || !EntityAcoustics.IsDoorLeaf(s.Definition) || Sightline.NameOf(s) != name),
                 out var hit, out float d))
             return true;
         if (d >= length - 0.25f) return true;

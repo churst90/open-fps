@@ -48,7 +48,7 @@ public partial class ClientAudioSystem
     private OwnerPath PathOf(WorldSnapshot world, in EntitySnapshot owner, Vector3 ear)
     {
         if (_ownerPaths.TryGetValue(owner.Id, out var known)) return known;
-        var at = OpenFPS.Common.AudioEmission.PointFor(owner);
+        var at = OpenFPS.Common.EntityEmission.PointFor(owner);
         OwnerPath p;
         if (_acousticWorker.TryGetDirectFor(owner.Id, at, owner.Velocity.Length(), ear, _earSpeed, out var direct))
             p = Shadowed(world, owner.Id, direct, at, ear);

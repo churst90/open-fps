@@ -117,12 +117,12 @@ public static class ClapRoomSpike
             // The copies and washes the game places round a clap (WorldAudioPlayer.QueueEarlyEchoes).
             var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
             var found = new List<EarlyReflections.Arrival>();
-            var plan = new List<OpenFPS.Client.Core.WorldAudioPlayer.RoomEcho>();
+            var plan = new List<RoomEcho>();
             float c0 = provider.Atmosphere.SpeedOfSound;
-            EarlyReflections.Find(hands, ear, solids, found, c0, maxOrder: 2, keep: OpenFPS.Client.Core.WorldAudioPlayer.MaxRoomEchoes * 2,
-                                  maxExtraPathMetres: OpenFPS.Client.Core.WorldAudioPlayer.RoomEchoWindowSeconds * c0);
+            EarlyReflections.Find(hands, ear, solids, found, c0, maxOrder: 2, keep: RoomEchoes.MaxEchoes * 2,
+                                  maxExtraPathMetres: RoomEchoes.WindowSeconds * c0);
             float direct0 = Vector3.Distance(hands, ear);
-            OpenFPS.Client.Core.WorldAudioPlayer.PlanRoomEchoes(found, hands, ear, direct0, placed.ReferenceDistance,
+            RoomEchoes.Plan(found, hands, ear, direct0, placed.ReferenceDistance,
                                                                provider.Mix.CopiesTrim, audible: true, plan);
             firstMs = plan.Count > 0 ? plan.Min(e => e.Arrival.ExtraDelaySeconds) * 1000.0 : 0.0;
             var washIds = new HashSet<string>();

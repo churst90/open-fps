@@ -199,7 +199,7 @@ public class BirdLifeMutationTests
     [Fact]
     public void ARoofNeedsSkyOverMostOfIt()
     {
-        var acoustics = new SpatialAcoustics(new SpatialService());
+        var acoustics = new SpatialAcoustics();
         // Where the survey asks, along each axis: -7.5, -2.5, 2.5, 7.5 m from the middle of a 20 m slab.
         float[] at = { -7.5f, -2.5f, 2.5f, 7.5f };
         int Pigeons(Func<int, int, bool> covered)
@@ -365,7 +365,7 @@ public class BirdLifeMutationTests
     [Fact]
     public void ACallBehindAWallIsHeardThroughIt()
     {
-        var acoustics = new SpatialAcoustics(new SpatialService());
+        var acoustics = new SpatialAcoustics();
         var wall = Box(1, new Vector3(0f, 5f, 5f), new Vector3(200f, 10f, 0.3f), "Concrete");
         var hedges = Grid(2, 100, 6f, 1f, (i, at) => Box(i, at, Hedge, "Foliage"), new Vector3(0f, 0f, 40f));
         var world = World(hedges.Append(wall));
@@ -397,7 +397,7 @@ public class BirdLifeMutationTests
     [Fact]
     public void A_perched_groups_calls_are_heard_by_the_workers_answer()
     {
-        var acoustics = new SpatialAcoustics(new SpatialService());
+        var acoustics = new SpatialAcoustics();
         var wall = Box(1, new Vector3(0f, 5f, 5f), new Vector3(200f, 10f, 0.3f), "Concrete");
         var hedges = Grid(2, 100, 6f, 1f, (i, at) => Box(i, at, Hedge, "Foliage"), new Vector3(0f, 0f, 40f));
         var world = World(hedges.Append(wall));

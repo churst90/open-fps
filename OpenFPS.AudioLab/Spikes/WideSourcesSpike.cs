@@ -309,7 +309,7 @@ public static class WideSourcesSpike
                 while (clock.Elapsed.TotalSeconds < until)
                 {
                     facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
-                    field.Update(w, ear, clock.Elapsed.TotalSeconds, -1, -1, riding);
+                    field.Update(w, w.Falling, ear, clock.Elapsed.TotalSeconds, -1, -1, riding);
                     facade.PumpForTest();
                     loadSum += facade.MixerLoad; loadCount++;
                     Thread.Sleep(4);

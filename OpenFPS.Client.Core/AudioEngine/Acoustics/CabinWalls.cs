@@ -11,7 +11,7 @@ namespace OpenFPS.Client.AudioEngine.Acoustics;
 /// </summary>
 public sealed class CabinWalls
 {
-    /// <summary>Each vehicle's windows as this client has them, and when: the glass follows the server's
+    /// <summary>Each vehicle's windows as this client has them, and when: the glass follows the host's
     /// target at the motor's pace (<see cref="CarWindow.Glide"/>).</summary>
     private readonly Dictionary<int, (float Open, double At)> _windows = new();
 
@@ -19,9 +19,9 @@ public sealed class CabinWalls
     /// 0 shut to 1 fully down. A vehicle seen for the first time has its windows where they were going: a
     /// car that drove up with them down did not just roll them down.
     /// </summary>
-    public float WindowsOpen(EntitySnapshot car, double now)
+    public float WindowsOpen(AcousticBody car, double now)
     {
-        float target = Math.Clamp(car.Definition?.SoundEmitter.WindowsOpen ?? 0f, 0f, 1f);
+        float target = Math.Clamp(car.WindowsOpen, 0f, 1f);
         if (!_windows.TryGetValue(car.Id, out var w))
         {
             _windows[car.Id] = (target, now);
@@ -41,8 +41,8 @@ public sealed class CabinWalls
         if (gone != null) foreach (int id in gone) _windows.Remove(id);
     }
 
-    /// <summary>The vehicle profile an entity is voiced as, or null for anything that is not a vehicle.</summary>
-    public static VehicleProfile? Vehicle(EntitySnapshot snap) => ModelKindTable.Vehicle(snap.Definition?.SoundEmitter.SoundId);
+    /// <summary>The vehicle profile a thing is voiced as, or null for anything that is not a vehicle.</summary>
+    public static VehicleProfile? Vehicle(AcousticBody body) => ModelKindTable.Vehicle(body.SoundId);
 
     /// <summary>Whether a vehicle has a closed cabin at all: a motorcycle and a formula car do not.</summary>
     public static bool HasCabin(VehicleProfile v)
@@ -52,10 +52,10 @@ public sealed class CabinWalls
     /// Whether <paramref name="point"/> is inside the cabin now; a few centimetres of grace all round,
     /// since a seated person's feet are on its floor.
     /// </summary>
-    public static bool Contains(EntitySnapshot car, VehicleProfile v, Vector3 point, float grace = 0.05f)
+    public static bool Contains(AcousticBody car, VehicleProfile v, Vector3 point, float grace = 0.05f)
     {
         if (VehicleCabin.Measure(v) is not { } g) return false;
-        var local = Vector3.Transform(point - car.Transform.Position, Quaternion.Inverse(car.Transform.Rotation));
+        var local = Vector3.Transform(point - car.Position, Quaternion.Inverse(car.Rotation));
         return MathF.Abs(local.X) <= g.Wc * 0.5f + grace
             && local.Y >= g.FloorTop - grace && local.Y <= g.RoofUnder + grace
             && MathF.Abs(local.Z - g.Cz) <= g.Lc * 0.5f + grace;
@@ -63,13 +63,14 @@ public sealed class CabinWalls
 
     /// <summary>The vehicle whose cabin <paramref name="point"/> is in, if any: a handful of box tests over
     /// the moving things voiced as vehicles.</summary>
-    public static bool TryFind(WorldSnapshot world, Vector3 point, out EntitySnapshot car, out VehicleProfile profile)
+    public static bool TryFind(IAcousticWorld world, Vector3 point, out AcousticBody car, out VehicleProfile profile)
     {
-        foreach (var snap in world.DynamicEntities)
+        for (int i = 0, n = world.MovingCount; i < n; i++)
         {
-            if (Vehicle(snap) is not { } v || !HasCabin(v)) continue;
-            if (!Contains(snap, v, point)) continue;
-            car = snap; profile = v;
+            var body = world.MovingAt(i);
+            if (Vehicle(body) is not { } v || !HasCabin(v)) continue;
+            if (!Contains(body, v, point)) continue;
+            car = body; profile = v;
             return true;
         }
         car = default; profile = null!;

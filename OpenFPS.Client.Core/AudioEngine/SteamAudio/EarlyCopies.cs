@@ -14,7 +14,7 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// gate, so the copies come out as energy: each copy's, band by band, the same share of every frame
 /// within <see cref="ReachSeconds"/> of its bin's start, never more than the trace has there (the
 /// hybrid room models' split, done after the fact). What a copy carries is what
-/// WorldAudioPlayer.PlanRoomEchoes places for a sound at the listener. Nothing arrives before the
+/// RoomEchoes.Plan places for a sound at the listener. Nothing arrives before the
 /// nearest surface's reflection: the trace's energy before it is moved to it.
 /// </summary>
 internal sealed class EarlyCopies
@@ -54,13 +54,13 @@ internal sealed class EarlyCopies
         var src = listener + new Vector3(0f, 0f, 0.01f);
         float direct = Vector3.Distance(src, listener);
         var found = new List<EarlyReflections.Arrival>();
-        EarlyReflections.Find(src, listener, solids, found, c, maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
-                              maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * c);
+        EarlyReflections.Find(src, listener, solids, found, c, maxOrder: 2, keep: RoomEchoes.MaxEchoes * 2,
+                              maxExtraPathMetres: RoomEchoes.WindowSeconds * c);
         if (found.Count == 0) return null;
         float nearest = float.MaxValue;
         foreach (var a in found) if (a.Order == 1) nearest = MathF.Min(nearest, a.PathLength);
-        var plan = new List<WorldAudioPlayer.RoomEcho>();
-        WorldAudioPlayer.PlanRoomEchoes(found, src, listener, direct, 1f, 1f, audible: false, plan);
+        var plan = new List<RoomEcho>();
+        RoomEchoes.Plan(found, src, listener, direct, 1f, 1f, audible: false, plan);
         var copies = new EarlyCopies(nearest < float.MaxValue ? (int)(nearest / c * sampleRate) : 0);
         foreach (var e in plan) copies.Copies.Add(((int)(e.Arrival.PathLength / c * sampleRate), Energy(e, direct, sampleRate)));
         copies.Copies.Sort(static (x, y) => x.Sample.CompareTo(y.Sample));
@@ -70,7 +70,7 @@ internal sealed class EarlyCopies
     /// <summary>One placed copy's energy per band, a sound at the listener: what the surfaces keep
     /// over the path's spreading, its mirror share and the mirror's loss at the top, plus a first
     /// order's wash.</summary>
-    internal static double[] Energy(in WorldAudioPlayer.RoomEcho e, float direct, int sampleRate)
+    internal static double[] Energy(in RoomEcho e, float direct, int sampleRate)
     {
         var shareOf = BandShareAt(sampleRate);
         var a = e.Arrival;
@@ -89,7 +89,7 @@ internal sealed class EarlyCopies
             if (e.InVoice) share = 1.0;                                        // the voice's ground: all of it
             else
             {
-                double mirror = WorldAudioPlayer.MirrorShare(s, a.Order) * Math.Pow(10, AcousticRegistry.AtFrequency(loss.LowDb, 0f, loss.HighDb, hz) / 20);
+                double mirror = RoomEchoes.MirrorShare(s, a.Order) * Math.Pow(10, AcousticRegistry.AtFrequency(loss.LowDb, 0f, loss.HighDb, hz) / 20);
                 double wash = a.Order == 1 && s > 0.05f ? Math.Sqrt(s) : 0.0;
                 share = mirror * mirror + wash * wash;
             }

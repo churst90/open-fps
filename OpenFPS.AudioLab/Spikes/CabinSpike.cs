@@ -36,6 +36,8 @@ public static class CabinSpike
 
     /// <summary>probe=align: the engines this instrument makes carry the alignment click.</summary>
     private static bool LabAlign;
+    /// <summary>roof=world: the rain on the ridden vehicle's roof left in the world (LabLevers.RainRoofInTheWorld).</summary>
+    private static bool LabRoofInTheWorld;
 
     private const int Rate = 48000;
     /// <summary>How far the rides' 15 m brick facades stand off the crown (a 7 m road, 4.5 m pavements), so
@@ -54,7 +56,7 @@ public static class CabinSpike
         // probe=align: a click in the engine's voice and its negative in the exhaust's tap (EngineVoiceState.LabAlignProbe).
         if (Arg(args, "probe=") is "align") LabAlign = true;
         // roof=world: the rain on the ridden vehicle's roof stays in the world rather than riding with the head.
-        if (Arg(args, "roof=") is "world") RainField.RoofRidesWithHead = false;
+        if (Arg(args, "roof=") is "world") LabRoofInTheWorld = true;
         if (args.Contains("model")) return Model(args);
         if (args.Contains("hrtf")) return Hrtf(args);
         return Game(args);
@@ -221,7 +223,7 @@ public static class CabinSpike
             new(new Vector3(0f, 7.5f, FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
             new(new Vector3(0f, 7.5f, -FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
         });
-        var provider = new FmodAudioProvider { Hearing = LabHearing, Mix = LabMix, Lab = new() { EngineAlignProbe = LabAlign } };
+        var provider = new FmodAudioProvider { Hearing = LabHearing, Mix = LabMix, Lab = new() { EngineAlignProbe = LabAlign, RainRoofInTheWorld = LabRoofInTheWorld } };
         provider.Traced.Configure(ctx, scene);
 
         var facade = new AudioEngineFacade(provider);

@@ -12,7 +12,7 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 public sealed class EchoWashState
 {
     /// <summary>A surface this smooth or smoother returns a mirror and nothing to smear (glass, marble,
-    /// still water), as WorldAudioPlayer.RoomEcho.WashGain has it for one-off sounds.</summary>
+    /// still water), as RoomEcho.WashGain has it for one-off sounds.</summary>
     public const float SmoothScattering = 0.05f;
 
     /// <summary>Recordings are mono or stereo; a channel past these passes through clean.</summary>

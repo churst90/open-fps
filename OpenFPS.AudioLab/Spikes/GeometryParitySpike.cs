@@ -662,7 +662,7 @@ public static class GeometryParitySpike
             var kinds = new (string Name, int Order, bool Flutter, bool Separate, float Extra)[]
             {
                 ("first order (a sustained sound, the worker)", 1, false, false, EarlyReflections.RangeMetres),
-                ("to second order in the room window (a footfall, a word)", 2, false, false, WorldAudioPlayer.RoomEchoWindowSeconds * 343f),
+                ("to second order in the room window (a footfall, a word)", 2, false, false, RoomEchoes.WindowSeconds * 343f),
                 ("to third order with the flutter (a one-off sound outdoors)", EarlyReflections.MaxOrder, true, true, EarlyReflections.RangeMetres),
             };
             var a0 = new List<EarlyReflections.Arrival>(); var a1 = new List<EarlyReflections.Arrival>();
@@ -723,7 +723,7 @@ public static class GeometryParitySpike
                         }
                         var worldOnlyFirst = unmatched.Where(x => x.Order == 1).ToList();
                         bool explained = worldOnlyFirst.Count > 0 && worldOnlyFirst.All(x => LegsClearTrimmed(x))
-                                         && (missing == 0 || a0.Count >= (kind.Flutter ? EarlyReflections.MaxFlutterArrivals : kind.Order == 1 ? EarlyReflections.MaxArrivals : WorldAudioPlayer.MaxRoomEchoes * 2) - 1 || missing <= unmatched.Count);
+                                         && (missing == 0 || a0.Count >= (kind.Flutter ? EarlyReflections.MaxFlutterArrivals : kind.Order == 1 ? EarlyReflections.MaxArrivals : RoomEchoes.MaxEchoes * 2) - 1 || missing <= unmatched.Count);
                         if (explained)
                         {
                             t.Ties++; t.Same++;

@@ -32,18 +32,18 @@ public static class VehicleShadow
     /// the path's three bands; <paramref name="sourceId"/> and <paramref name="ridingId"/> are never a
     /// barrier. Returns the high band's loss, dB, for diagnostics.
     /// </summary>
-    public static float Apply(ref AcousticPathData path, WorldSnapshot world, int sourceId,
+    public static float Apply(ref AcousticPathData path, IAcousticWorld world, int sourceId,
                               Vector3 source, Vector3 listener, int ridingId)
     {
         float low = 0f, mid = 0f, high = 0f;
-        foreach (var body in world.DynamicEntities)
+        for (int i = 0, n = world.MovingCount; i < n; i++)
         {
+            var body = world.MovingAt(i);
             if (body.Id == sourceId || body.Id == ridingId) continue;
-            var def = body.Definition;
-            if (!def.Collider.IsSolid) continue;
-            var size = def.Collider.Size;
+            if (!body.Solid) continue;
+            var size = body.Size;
             if (size.X * size.Y * size.Z < MinVolumeCubicMetres) continue;
-            float detour = Detour(body.Transform.Position, body.Transform.Rotation, size, listener, source);
+            float detour = Detour(body.Position, body.Rotation, size, listener, source);
             if (detour <= 0f) continue;
             // Barriers do not add in the field, but a second one in a line of traffic takes something
             // more: the worst plus a little of the rest.

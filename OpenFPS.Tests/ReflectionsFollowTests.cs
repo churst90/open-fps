@@ -169,7 +169,7 @@ public class ReflectionsFollowTests
     {
         var enc = new VoiceFrameEncoder();
         var frame = new float[VoiceCodec.FrameSamples];
-        var stream = h.Facade.TalkerStreams.For(Sean);
+        var stream = h.Facade.TalkerStreams.For(Sean, OpenFPS.Client.Core.Platform.OpusVoiceDecoder.Create);
         for (int f = 0; f < 10; f++)
         {
             for (int i = 0; i < frame.Length; i++) frame[i] = 0.3f * MathF.Sin(2f * MathF.PI * 180f * i / VoiceCodec.Rate);

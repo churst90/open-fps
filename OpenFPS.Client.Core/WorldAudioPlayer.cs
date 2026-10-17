@@ -51,6 +51,9 @@ public sealed class WorldAudioPlayer
 
     private readonly AudioEngineFacade _audio;
     private readonly SpatialAcoustics _acoustics;
+    /// <summary>The game's rays over the snapshot, for what stops a copy on its way to the ear (<see cref="Reaches"/>):
+    /// a test of entities, not one of the acoustics' questions.</summary>
+    private readonly SpatialService _rays = new();
     private readonly List<Pending> _pending = new();
     private readonly HashSet<string> _registered = new();
 
@@ -1011,7 +1014,7 @@ public sealed class WorldAudioPlayer
         for (int i = 0; i < _copies.Count; i++)
         {
             var c = _copies[i];
-            bool shut = !Reaches(_acoustics.Spatial, world, c.Bounce, listenerPosition);
+            bool shut = !Reaches(_rays, world, c.Bounce, listenerPosition);
             if (shut == c.Shut) continue;
             c.Shut = shut;
             _copies[i] = c;
@@ -1103,7 +1106,7 @@ public sealed class WorldAudioPlayer
         foreach (var a in _higher)
         {
             if (a.Order < 2 || !EarlyReflections.IsSeparateEvent(a)) continue;
-            if (a.ExtraDelaySeconds <= RoomEchoWindowSeconds) continue;   // placed by QueueEarlyEchoes
+            if (a.ExtraDelaySeconds <= RoomEchoes.WindowSeconds) continue;   // placed by QueueEarlyEchoes
             // Loud enough against the sound it is a copy of to be heard as a second event at all.
             if (a.GainMid < ImageSource.EchoAudibleRatio) continue;
             // Placed at the image, which is the path length away: undo what the engine will do there
@@ -1137,33 +1140,9 @@ public sealed class WorldAudioPlayer
     //
     // The traced room response is almost all omnidirectional (Marlow flat 01F: the directional
     // channels 20 dB under the omni), heard in the middle of the head (interaural correlation
-    // 0.85-0.95 in a capture). What places a room round you is its first reflections, so a one-off
-    // sound's early reflections are voices of their own at their images, through the HRTF, and the
-    // traced stage plays only the late tail (TracedReverbDsp, LateTailIr). The floor under the source is
-    // left out: the voice carries its own ground reflection.
-
-    /// <summary>How long the placed reflections run before the tail takes over, seconds. The traced
-    /// tail fades in from 50 to 100 ms after the sound (LateTailIr); the two overlap a little.</summary>
-    internal const float RoomEchoWindowSeconds = 0.08f;
-
-    /// <summary>At most this many placed reflections per sound: the first order of a box room is six
-    /// and the loudest second orders follow.</summary>
-    internal const int MaxRoomEchoes = 12;
-
-    /// <summary>
-    /// Second-order clean copies per sound, beyond its first order; the rest are the traced tail. Twelve
-    /// clean copies of a dry clap were twelve separate clicks: the ear hears copies of an impulse as
-    /// echoes from a few milliseconds on, where real reflections fuse.
-    /// </summary>
-    internal const int MaxSecondOrderCopies = 4;
-
-    /// <summary>
-    /// What a surface returns as a clean copy, of what it returns at all: the mirror share,
-    /// sqrt(1 - s) of the pressure per bounce. The scattered sqrt(s) is not a copy; it is the wash
-    /// (<see cref="EchoId"/>), and for a first-order wall it is placed beside the mirror.
-    /// </summary>
-    internal static float MirrorShare(float scattering, int order)
-        => MathF.Pow(MathF.Sqrt(1f - Math.Clamp(scattering, 0f, 1f)), Math.Max(1, order));
+    // 0.85-0.95 in a capture). What places a room round you is its first reflections, which the
+    // library plans (RoomEchoes.Plan); this queues them as voices of their own, with each first-order
+    // wall's scattered share as its wash (EchoId).
 
     private readonly List<EarlyReflections.Arrival> _room = new();
     private readonly List<RoomEcho> _roomPlan = new();
@@ -1174,11 +1153,11 @@ public sealed class WorldAudioPlayer
         int mirrors = 0;
         Vector3 src = item.Sound.Position;
         _acoustics.FindReflections(world, src, listenerPosition, _room, _audio.Atmosphere.SpeedOfSound,
-                              maxOrder: 2, keep: MaxRoomEchoes * 2,
-                              maxExtraPathMetres: RoomEchoWindowSeconds * _audio.Atmosphere.SpeedOfSound);
+                              maxOrder: 2, keep: RoomEchoes.MaxEchoes * 2,
+                              maxExtraPathMetres: RoomEchoes.WindowSeconds * _audio.Atmosphere.SpeedOfSound);
         float direct = Vector3.Distance(src, listenerPosition);
         float reference = _audio.Hearing.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
-        PlanRoomEchoes(_room, src, listenerPosition, direct, reference,
+        RoomEchoes.Plan(_room, src, listenerPosition, direct, reference,
                        _audio.Mix.CopiesTrim, audible: true, _roomPlan);   // /copies
         foreach (var e in _roomPlan)
         {
@@ -1210,59 +1189,6 @@ public sealed class WorldAudioPlayer
                 Seed = item.Seed,
                 Bounce = a.HitPoint,
             });
-        }
-    }
-
-    /// <summary>
-    /// One placed reflection of a one-off sound in a room: the arrival, and what it returns with the
-    /// trim (EarlyReflections.PlacedCopyGain times /copies). <paramref name="InVoice"/>: the floor
-    /// under the source, which the voice carries itself (GroundReflection) and nothing places.
-    /// </summary>
-    internal readonly record struct RoomEcho(EarlyReflections.Arrival Arrival, float Returned, bool InVoice)
-    {
-        public float Scattering => Math.Clamp(Arrival.Scattering, 0f, 1f);
-        /// <summary>The clean copy: the mirror share of what the surfaces return.</summary>
-        public float MirrorGain => Returned * MirrorShare(Scattering, Arrival.Order);
-        /// <summary>A first-order wall's scattered share, placed beside the copy as its wash: zero for
-        /// a wall that scatters next to nothing, and for higher orders (their scatter is the tail).</summary>
-        public float WashGain => Arrival.Order == 1 && Scattering > 0.05f ? Returned * MathF.Sqrt(Scattering) : 0f;
-    }
-
-    /// <summary>
-    /// Which of <paramref name="found"/> (a search from <paramref name="src"/> to <paramref name="listener"/>
-    /// out to <see cref="RoomEchoWindowSeconds"/>) a room places, loudest first: every first-order
-    /// surface in the window, at most <see cref="MaxSecondOrderCopies"/> second orders, at most
-    /// <see cref="MaxRoomEchoes"/> copies in all, and the floor under the source marked as the voice's.
-    ///
-    /// One rule for the copies a sound gets (QueueEarlyEchoes, <paramref name="audible"/>: a copy under
-    /// ImageSource.MinGain is not placed and does not count against the cap) and for the early energy
-    /// the listener's trace leaves to them (EarlyCopies, not audible: the trace stands for a sound at
-    /// the listener, and every surface in the window counts). <paramref name="found"/> is sorted.
-    /// </summary>
-    internal static void PlanRoomEchoes(List<EarlyReflections.Arrival> found, Vector3 src, Vector3 listener,
-                                        float direct, float reference, float trim, bool audible, List<RoomEcho> into)
-    {
-        into.Clear();
-        // Loudest first: in surface order, with more in the window than voices (twenty-two in flat
-        // 01F, twelve voices), which walls answered depended on their order in the map.
-        found.Sort(static (a, b) => (b.GainMid, a.SurfaceId, a.Order, a.PathLength).CompareTo((a.GainMid, b.SurfaceId, b.Order, b.PathLength)));
-        int added = 0, secondOrder = 0;
-        foreach (var a in found)
-        {
-            if (a.ExtraDelaySeconds > RoomEchoWindowSeconds) continue;
-            // The ground under the source: already inside the voice (GroundReflection).
-            if (a.Order == 1 && a.HitPoint.Y < MathF.Min(src.Y, listener.Y) - 0.2f)
-            {
-                into.Add(new RoomEcho(a, 0f, InVoice: true));
-                continue;
-            }
-            if (a.Order >= 2 && ++secondOrder > MaxSecondOrderCopies) continue;
-            float returned = audible ? EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference) * trim : trim;
-            var echo = new RoomEcho(a, returned, InVoice: false);
-            into.Add(echo);
-            // A copy too quiet to place is not one of the twelve (its wash may still play).
-            if (audible && echo.MirrorGain < ImageSource.MinGain) continue;
-            if (++added >= MaxRoomEchoes) break;
         }
     }
 
@@ -1317,7 +1243,7 @@ public sealed class WorldAudioPlayer
             if (!diffuse && r.IsDiffuse) continue;
             // Inside the window the surface is already placed by QueueEarlyEchoes; this is the facade
             // up the street, a separate event.
-            if (r.DelaySeconds <= RoomEchoWindowSeconds) continue;
+            if (r.DelaySeconds <= RoomEchoes.WindowSeconds) continue;
             // Loud enough, against the sound it is a copy of, to be heard as a second event at all.
             if (r.Gain < ImageSource.EchoAudibleRatio) continue;
 

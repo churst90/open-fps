@@ -181,7 +181,7 @@ public sealed class BirdLife
                 var at = e.Transform.Position + Vector3.Transform(local, e.Transform.Rotation);
                 var from = new Vector3(at.X, top + 0.3f, at.Z);
                 asked++;
-                if (!_acoustics.Spatial.RaycastMaterial(world, from, Vector3.UnitY, 40f, out _, out _, out _, e.Id)) open++;
+                if (!_acoustics.RaycastMaterial(world, from, Vector3.UnitY, 40f, out _, out _, out _, e.Id)) open++;
             }
         return open >= asked * 0.6f;
     }

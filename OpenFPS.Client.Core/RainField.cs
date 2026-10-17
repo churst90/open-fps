@@ -140,9 +140,8 @@ public sealed class RainSurvey
     }
 
     private readonly List<Thing> _things = new();
-    private readonly List<int> _ids = new();
-    private readonly HashSet<int> _seen = new();
-    private readonly List<EntitySnapshot> _foliage = new();
+    private readonly List<AcousticBody> _gathered = new();
+    private readonly List<AcousticBody> _foliage = new();
     private object? _foliageFor;
     private int _foliageCount = -1;
     private readonly Dictionary<string, RainLayer>[] _layers = MakeLayerMaps();
@@ -170,7 +169,7 @@ public sealed class RainSurvey
     /// <summary>Surveys the rain round <paramref name="ear"/>. <paramref name="ownEntityId"/> is never a
     /// roof (it is the listener's own body). <paramref name="ridingEntityId"/> is not read: the vehicle
     /// you sit in is a roof like any other thing.</summary>
-    public Result Run(WorldSnapshot world, Vector3 ear, int ownEntityId, int ridingEntityId)
+    public Result Run(IAcousticWorld world, Vector3 ear, int ownEntityId, int ridingEntityId)
     {
         long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
         var result = new Result();
@@ -635,63 +634,61 @@ public sealed class RainSurvey
 
     // ── What there is to meet ───────────────────────────────────────────────────────────────────
 
-    private void Gather(WorldSnapshot world, Vector3 ear, float radius, int ownEntityId)
+    private void Gather(IAcousticWorld world, Vector3 ear, float radius, int ownEntityId)
     {
         _things.Clear();
-        if (world.StaticGrid != null)
+        // The fixed solids filed round the ear; before the host has them filed, every fixed solid near enough.
+        if (world.Near(ear, radius, staticOnly: true, _gathered))
         {
-            _ids.Clear(); _seen.Clear();
-            world.StaticGrid.CollectInRadius(ear, radius, _ids, _seen);
-            foreach (int id in _ids)
-                if (world.Entities.TryGetValue(id, out var e)) AddStatic(e);
+            foreach (var e in _gathered) AddStatic(e);
         }
         else
         {
-            foreach (var e in world.Entities.Values)
-                if (e.Definition.Type == EntityType.StaticObject && e.Definition.Collider.IsSolid
-                    && Vector3.DistanceSquared(e.Transform.Position, ear) < (radius + 50f) * (radius + 50f))
+            foreach (var e in _gathered)
+                if (e.Fixed && e.Solid
+                    && Vector3.DistanceSquared(e.Position, ear) < (radius + 50f) * (radius + 50f))
                     AddStatic(e);
         }
-        // Leaves are not solid, so not in the grid: kept in a list of their own, found once a map.
-        if (!ReferenceEquals(_foliageFor, world.AcousticMap) || _foliageCount != world.Entities.Count)
+        // Leaves are not solid, so not filed: kept in a list of their own, found once a map.
+        if (!ReferenceEquals(_foliageFor, world.Rooms) || _foliageCount != world.BodyCount)
         {
-            _foliageFor = world.AcousticMap;
-            _foliageCount = world.Entities.Count;
+            _foliageFor = world.Rooms;
+            _foliageCount = world.BodyCount;
             _foliage.Clear();
-            foreach (var e in world.Entities.Values)
-                if (e.Definition.Type == EntityType.StaticObject && !e.Definition.Collider.IsSolid
-                    && AcousticRegistry.IsLeaves(e.Definition.Material.Material))
+            world.AllBodies(_gathered);
+            foreach (var e in _gathered)
+                if (e.Fixed && !e.Solid && AcousticRegistry.IsLeaves(e.Material))
                     _foliage.Add(e);
         }
         foreach (var e in _foliage)
-            if (Vector3.DistanceSquared(e.Transform.Position, ear) < (radius + 15f) * (radius + 15f)) AddFoliage(e);
+            if (Vector3.DistanceSquared(e.Position, ear) < (radius + 15f) * (radius + 15f)) AddFoliage(e);
         // Vehicles, parked or driving, the one you ride in included.
-        foreach (var e in world.DynamicEntities)
+        for (int i = 0, n = world.MovingCount; i < n; i++)
         {
+            var e = world.MovingAt(i);
             if (e.Id == ownEntityId) continue;
-            if (ModelKindTable.VehiclePreset(e.Definition.SoundEmitter.SoundId) is not { } preset) continue;
-            if (Vector3.DistanceSquared(e.Transform.Position, ear) > (radius + 10f) * (radius + 10f)) continue;
+            if (ModelKindTable.VehiclePreset(e.SoundId) is not { } preset) continue;
+            if (Vector3.DistanceSquared(e.Position, ear) > (radius + 10f) * (radius + 10f)) continue;
             AddVehicle(e, preset);
         }
     }
 
-    private void AddStatic(EntitySnapshot e)
+    private void AddStatic(in AcousticBody e)
     {
-        var def = e.Definition;
-        if (!def.Collider.IsSolid || def.Collider.Shape != ColliderShape.Box) return;
-        var size = def.Collider.Size;
+        if (!e.Solid || e.Shape != ColliderShape.Box) return;
+        var size = e.Size;
         if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) return;
-        string material = def.Material.Material ?? "Generic";
+        string material = e.Material ?? "Generic";
         float thickness = MathF.Min(size.X, MathF.Min(size.Y, size.Z));
-        float skin = def.Acoustics.LeafMetres > 0f ? def.Acoustics.LeafMetres : thickness;
+        float skin = e.Build.LeafMetres > 0f ? e.Build.LeafMetres : thickness;
         float mid = size.X + size.Y + size.Z - thickness - MathF.Max(size.X, MathF.Max(size.Y, size.Z));
         float big = MathF.Max(size.X, MathF.Max(size.Y, size.Z));
         _things.Add(new Thing
         {
             Id = e.Id,
-            Centre = e.Transform.Position,
+            Centre = e.Position,
             Half = size * 0.5f,
-            ToLocal = Quaternion.Inverse(e.Transform.Rotation),
+            ToLocal = Quaternion.Inverse(e.Rotation),
             Material = material,
             Kind = RainSurfaces.KindOf(material, skin),
             Skin = skin,
@@ -699,14 +696,13 @@ public sealed class RainSurvey
             BayB = MathF.Min(RainSurfaces.BuiltBayMetres, mid),
             Solid = true,
             Size = size,
-            Build = def.Acoustics.Build,
+            Build = e.Build,
         });
     }
 
-    private void AddFoliage(EntitySnapshot e)
+    private void AddFoliage(in AcousticBody e)
     {
-        var def = e.Definition;
-        string sound = def.SoundEmitter.SoundId ?? "";
+        string sound = e.SoundId ?? "";
         if (ModelKindTable.Is(sound, ModelSynth.Foliage))
         {
             // A tree: its crown is its spec's, round the point the crown is placed at.
@@ -715,32 +711,32 @@ public sealed class RainSurvey
             catch (Exception ex) { ModelKindTable.Fail(sound, ex.Message); return; }
             _things.Add(new Thing
             {
-                Id = e.Id, Centre = e.Transform.Position, Sphere = true, Radius = spec.CrownRadiusMetres,
+                Id = e.Id, Centre = e.Position, Sphere = true, Radius = spec.CrownRadiusMetres,
                 Material = "Foliage", Kind = RainSurfaceKind.Canopy, LeafAreaIndex = spec.LeafAreaIndex,
                 ToLocal = Quaternion.Identity,
             });
             return;
         }
-        var size = def.Collider.Size;
+        var size = e.Size;
         if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) return;
         _things.Add(new Thing
         {
-            Id = e.Id, Centre = e.Transform.Position, Half = size * 0.5f,
-            ToLocal = Quaternion.Inverse(e.Transform.Rotation),
+            Id = e.Id, Centre = e.Position, Half = size * 0.5f,
+            ToLocal = Quaternion.Inverse(e.Rotation),
             Material = "Foliage", Kind = RainSurfaceKind.Canopy, LeafAreaIndex = RainSurfaces.DefaultLeafAreaIndex,
             Size = size,
         });
     }
 
-    private void AddVehicle(EntitySnapshot e, string key)
+    private void AddVehicle(in AcousticBody e, string key)
     {
-        var size = e.Definition.Collider.Size;
+        var size = e.Size;
         if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) return;
         VehicleBody body;
         try { body = MachineRegistry.VehicleFor(key).Body; } catch { return; }
-        var rot = e.Transform.Rotation;
+        var rot = e.Rotation;
         // A vehicle rests on the ground: its box stands up from where it is.
-        var centre = e.Transform.Position + Vector3.Transform(new Vector3(0f, size.Y * 0.5f, 0f), rot);
+        var centre = e.Position + Vector3.Transform(new Vector3(0f, size.Y * 0.5f, 0f), rot);
         _things.Add(new Thing
         {
             Id = e.Id, Centre = centre, Half = size * 0.5f, ToLocal = Quaternion.Inverse(rot),
@@ -835,13 +831,14 @@ public sealed class RainField
 
     private float _humidity = 0.5f, _temperature = 20f, _pressure = 1013.25f, _airMultiplier = 1f;
 
-    public void Update(WorldSnapshot world, Vector3 ear, double now, int listenerRegion, int ownEntityId, int ridingEntityId)
+    /// <summary>The rain round <paramref name="ear"/> this frame: <paramref name="falling"/> is what the host's
+    /// weather says comes down (open-fps: WorldSnapshot.Falling).</summary>
+    public void Update(IAcousticWorld world, Precipitation falling, Vector3 ear, double now, int listenerRegion, int ownEntityId, int ridingEntityId)
     {
-        (_humidity, _temperature, _pressure, _airMultiplier) = (world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
-        _rideVelocity = ridingEntityId >= 0 && world.Entities.TryGetValue(ridingEntityId, out var ride) ? ride.Velocity : (Vector3?)null;
+        var air = world.Air;
+        (_humidity, _temperature, _pressure, _airMultiplier) = (air.Humidity, air.Celsius, air.PressureMillibars, air.AbsorptionMultiplier);
+        _rideVelocity = ridingEntityId >= 0 && world.TryGetBody(ridingEntityId, out var ride) ? ride.Velocity : (Vector3?)null;
         _ear = ear;
-        var falling = world.Precipitation.Falling ? world.Precipitation
-                    : new Precipitation(PrecipitationKind.Rain, world.RainRateMmPerHour);
         float rate = falling.RateMmPerHour;
         for (int s = 0; s < RainFeeds.Slots; s++) RainFeeds.Feed[s].Falling = falling;
         _falling = falling;
@@ -1039,9 +1036,6 @@ public sealed class RainField
     /// <summary>Where the ear was when the survey in use was asked for.</summary>
     private Vector3 _lastAt;
 
-    /// <summary>For the lab: false leaves the roof in the world, to tell what riding with the head does.</summary>
-    internal static bool RoofRidesWithHead = true;
-
     /// <summary>
     /// The roof of the vehicle you ride in rides with your head: each part is kept where it was against
     /// the head at the survey, and moves with the vehicle. Left in the world, at 100 km/h the roof fell a
@@ -1050,7 +1044,7 @@ public sealed class RainField
     /// </summary>
     private void OnYourRoof(ref SpatialEmitter e, Vector3 at)
     {
-        if (!OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled || !RoofRidesWithHead
+        if (!OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled || _audio.Lab.RainRoofInTheWorld
             || _rideVelocity is not { } v || !e.InsideListenersVehicle) return;
         var offset = at - _lastAt;
         e.FollowsListener = true;

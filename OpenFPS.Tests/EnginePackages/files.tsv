@@ -16,6 +16,8 @@ OpenFPS.Accessibility/UiCue.cs	Accessibility
 OpenFPS.Accessibility/ZoneSettle.cs	Accessibility	
 OpenFPS.Acoustics/AcousticConstants.cs	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	Acoustics	
+OpenFPS.Acoustics/AcousticRays.cs	Acoustics	
+OpenFPS.Acoustics/AcousticWorld.cs	Acoustics	
 OpenFPS.Acoustics/Assemblies.cs	Acoustics	
 OpenFPS.Acoustics/Constructions.cs	Acoustics	
 OpenFPS.Acoustics/Diffraction.cs	Acoustics	
@@ -31,6 +33,7 @@ OpenFPS.Acoustics/PanelAcoustics.cs	Acoustics
 OpenFPS.Acoustics/Refraction.cs	Acoustics	
 OpenFPS.Acoustics/Room.cs	Acoustics	
 OpenFPS.Acoustics/RoomAcoustics.cs	Acoustics	
+OpenFPS.Acoustics/RoomEchoes.cs	Acoustics	
 OpenFPS.Acoustics/SparseAcousticOctree.cs	Acoustics	
 OpenFPS.Acoustics/Systems/AcousticVolumeGenerator.cs	Acoustics	
 OpenFPS.Acoustics/Systems/FaceOpenings.cs	Acoustics	
@@ -163,12 +166,13 @@ OpenFPS.Client.Core/VoiceRegistry.Lifecycle.cs	Audio	the voices' ids and kinds (
 OpenFPS.Client.Core/VoiceRegistry.cs	Audio	the voices' ids and kinds (audit P3)
 OpenFPS.Client.Core/WallBumps.cs	Accessibility	
 OpenFPS.Client.Core/WorldAudioPlayer.cs	game	library stage 7 (host until split)
-OpenFPS.Common/AudioEmission.cs	Common	entity adapter: where an entity sounds from
+OpenFPS.Common/AudioEmission.cs	Common	where a thing sounds from, from values (library stage 6); moves with the second half
 OpenFPS.Common/AudioEvents.cs	Common	wire
 OpenFPS.Common/Components.cs	Common	wire and entity model
 OpenFPS.Common/DistantMotion.cs	Common	how sent states are carried between packets
 OpenFPS.Common/DrivingCuePlanner.cs	Accessibility	the driver's cues, planned
-OpenFPS.Common/EntityAcoustics.cs	Common	entity adapter: rooms and openings
+OpenFPS.Common/EntityAcoustics.cs	Common	entity adapter: rooms, openings and the sound's world input
+OpenFPS.Common/EntityEmission.cs	Common	entity adapter: where an entity sounds from
 OpenFPS.Common/EntityGeometry.cs	Common	entity adapter: geometry
 OpenFPS.Common/GroundProbeMemo.cs	game	physics survey: a server cache
 OpenFPS.Common/JsonConverters.cs	Common	wire

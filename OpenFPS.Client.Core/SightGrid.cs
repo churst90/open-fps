@@ -49,10 +49,13 @@ public sealed class SightGrid
     /// <summary>Whether a thing is one a look can find among the fixed things: fixed, a solid or an
     /// announced thing, and not a door leaf.</summary>
     private static bool Seen(in EntitySnapshot e)
-        => e.Definition.Type == OpenFPS.Common.Components.EntityType.StaticObject && !e.Definition.Moves
-           && (e.Definition.Collider.IsSolid || e.Definition.Identity.Announce)
-           && e.Definition.Collider.Size.X > 0f
-           && !OpeningGraph.IsDoorLeaf(e.Definition);
+    {
+        var def = e.Definition;
+        return def.Type == OpenFPS.Common.Components.EntityType.StaticObject && !def.Moves
+               && (def.Collider.IsSolid || def.Identity.Announce)
+               && def.Collider.Size.X > 0f
+               && !EntityAcoustics.IsDoorLeaf(def);
+    }
 
     /// <summary>Whether the triangle world holds a thing (EntityGeometry), so a look asks its tree for it.</summary>
     private static bool InTriangles(in EntitySnapshot e)

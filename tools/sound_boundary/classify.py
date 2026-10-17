@@ -68,7 +68,7 @@ FILE_RULES = [
     # Integration files: what of them is library and what is open-fps's adapter
     (CC + 'ClientAudioSystem.cs', 'b', '', 'SPLIT: the host-neutral audio world goes to Audio, the snapshot adapter stays'),
     (CC + 'WorldAudioPlayer.cs', 'b', '', 'SPLIT: one-off sounds and echoes go to Audio, WorldAudioEvent decoding stays'),
-    (CC + 'SpatialService.cs', 'b', '', 'SPLIT: ray and occlusion queries go to Acoustics over the geometry input; entity lookups stay'),
+    (CC + 'SpatialService.cs', 'b', '', 'the game\'s rays and entity lookups; its acoustic queries are the library\'s (AcousticRays, stage 6)'),
     (CC + 'ClientGeometry.cs', 'b', '', "open-fps's geometry adapter (entities to TriangleWorld)"),
     (CC + 'BirdLife.cs', 'b', '', 'SPLIT: species choice and calling go to Sound/Audio; the habitat survey reads entities'),
     (CC + 'NearDrops.cs', 'a', 'Audio', ''),
@@ -103,9 +103,10 @@ FILE_RULES = [
     (CO + 'Spectrum.cs', 'a', 'Sound', ''),
     (CO + 'ShapedNoise.cs', 'a', 'Sound', ''),
     (CO + 'AudioClock.cs', 'a', 'Sound', 'becomes an instance the host passes in'),
-    # Where a source's sound comes out: it reads the vehicle and machine presets, so Sound, not Acoustics. It
-    # reads entity snapshots too, so it stays in Common until the world input (stage 6).
-    (CO + 'AudioEmission.cs', 'a', 'Sound', 'stays in Common until stage 6: reads entity snapshots'),
+    # Where a source's sound comes out: it reads the vehicle and machine presets, so Sound, not Acoustics. It takes
+    # values since the world input (stage 6), and moves with the second half; EntityEmission is its adapter.
+    (CO + 'AudioEmission.cs', 'a', 'Sound', 'in Common until the second half of stage 6 moves it'),
+    (CO + 'EntityEmission.cs', 'b', '', "open-fps's entities to where they sound from: AudioEmission's adapter"),
     (CO + 'Speech/', 'b', '', "open-fps's recorded lines; Loudness reads its levels"),
     (CO + 'LaneRoutes.cs', 'b', '', 'traffic'),
     (CO + 'LineFollower.cs', 'b', '', 'traffic driver (Resonance keeps its own in Runtime)'),

@@ -431,14 +431,12 @@ internal sealed class Replay
         // are the replay's facade's own (18.8), so they start as the game's.
         var saved = (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
                      OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-                     RainField.RoofRidesWithHead,
                      (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
                       DrivingCues.BrakeCue, DrivingCues.SpeedWarning));
         (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
          DrivingCues.BrakeCue, DrivingCues.SpeedWarning) = (true, true, true, true, true, true);
         OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled = true;
         OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled = true;
-        RainField.RoofRidesWithHead = true;
         // The talker's voice through Concentus's own C#, not a system libopus: the talker is placed at the
         // level measured off the decoded audio (OwnVoiceRing.SpeechRmsDbfs), and a libopus where there is one
         // (Linux with it installed) decodes a little differently from the managed codec where there is not
@@ -455,7 +453,6 @@ internal sealed class Replay
         {
             (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
              OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-             RainField.RoofRidesWithHead,
              (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
               DrivingCues.BrakeCue, DrivingCues.SpeedWarning)) = saved;
             Concentus.OpusCodecFactory.AttemptToUseNativeLibrary = nativeOpus;

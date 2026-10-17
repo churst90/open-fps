@@ -35,7 +35,7 @@ public class AsyncAcousticWorker : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private Thread? _workerThread;
 
-    private WorldSnapshot? _latestWorld;
+    private IAcousticWorld? _latestWorld;
     private readonly object _worldLock = new();
 
     // ── Steam Audio ─────────────────────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ public class AsyncAcousticWorker : IDisposable
         _workerThread.Start();
     }
 
-    public void UpdateWorld(WorldSnapshot world)
+    public void UpdateWorld(IAcousticWorld world)
     {
         lock (_worldLock)
         {
@@ -292,7 +292,7 @@ public class AsyncAcousticWorker : IDisposable
         _results.TryRemove(entityId, out _);
     }
 
-    public WorldSnapshot? GetLastWorld()
+    public IAcousticWorld? GetLastWorld()
     {
         lock (_worldLock) { return _latestWorld; }
     }
@@ -335,7 +335,7 @@ public class AsyncAcousticWorker : IDisposable
                     _pending[id] = _pending[id] with { ListenerPos = newest.ListenerPos };
             }
 
-            WorldSnapshot? world;
+            IAcousticWorld? world;
             lock (_worldLock) { world = _latestWorld; }
             if (world == null) { _pending.Clear(); if (once) return; continue; }
 
@@ -421,7 +421,7 @@ public class AsyncAcousticWorker : IDisposable
     /// than "clear". If it throws, the source keeps its last result (null); only one that never had any gets
     /// a clear path, and that is logged.
     /// </summary>
-    private List<AcousticPathData>? HandRolledPath(WorldSnapshot world, AcousticRequest req)
+    private List<AcousticPathData>? HandRolledPath(IAcousticWorld world, AcousticRequest req)
     {
         try
         {
@@ -562,7 +562,7 @@ public class AsyncAcousticWorker : IDisposable
     private const float PathRedirectVisibility = 0.5f;
 
     /// <summary>The direct and pathing stages for every pending source, or null with no simulator.</summary>
-    private Dictionary<int, SaResult>? RunSteamAudio(WorldSnapshot world)
+    private Dictionary<int, SaResult>? RunSteamAudio(IAcousticWorld world)
     {
         if (!_saEnabled || _saSim == null) return null;
         try
@@ -718,7 +718,7 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>One source's paths from the simulator's answer: Steam Audio's visibility turned into the
     /// engine's "fraction blocked" and band gains, the better of the routes over an edge and by the openings,
     /// air, and the early reflections (<see cref="AddEarlyReflections"/>).</summary>
-    private List<AcousticPathData> BuildSimPath(WorldSnapshot world, AcousticRequest req, SaResult sr)
+    private List<AcousticPathData> BuildSimPath(IAcousticWorld world, AcousticRequest req, SaResult sr)
     {
         var ap = SteamAudioSimulator.ToAcousticParams(sr.Direct);
         string? trace = TraceProvenance
@@ -778,7 +778,7 @@ public class AsyncAcousticWorker : IDisposable
         }
 
         int region = -1;
-        if (world.AcousticMap != null)
+        if (world.Rooms != null)
         {
             try { region = _acoustics.GetRegionAt(world, req.SourcePos); }
             catch { region = -1; }
@@ -801,8 +801,9 @@ public class AsyncAcousticWorker : IDisposable
         };
         // The air, per band (ISO 9613-1). Once zero here, and a shot two streets away arrived quiet but
         // bright, which reads as small and near.
+        var air = world.Air;
         (path.AirLowDb, path.AirMidDb, path.AirHighDb) = AudioPhysics.AirLossDb(
-            dist, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
+            dist, air.Humidity, air.Celsius, air.PressureMillibars, air.AbsorptionMultiplier);
 
         if (trace != null && _lentFrom.TryGetValue(req.EntityId, out int lender)) trace += $"; on e{lender}'s source";
         if (trace != null) Provenance[req.EntityId] = trace;
@@ -817,7 +818,7 @@ public class AsyncAcousticWorker : IDisposable
     /// and no directions, a blanket in which a doorway cannot be heard from outside. The copies of copies
     /// are the reverb's, its level from how enclosed the place is (Enclosure).
     /// </summary>
-    private void AddEarlyReflections(List<AcousticPathData> into, WorldSnapshot world,
+    private void AddEarlyReflections(List<AcousticPathData> into, IAcousticWorld world,
                                      AcousticRequest req, int region)
     {
         var geometry = _enclosureWorld;
@@ -832,6 +833,7 @@ public class AsyncAcousticWorker : IDisposable
         else EarlyReflections.Find(req.SourcePos, req.ListenerPos, geometry!, _reflectionScratch, _acoustics.Atmosphere.SpeedOfSound);
 
         _lastReflectionCount = 0;
+        var air = world.Air;
         for (int i = 0; i < _reflectionScratch.Count; i++)
         {
             var a = _reflectionScratch[i];
@@ -864,7 +866,7 @@ public class AsyncAcousticWorker : IDisposable
                 RegionId = region,
             };
             (reflected.AirLowDb, reflected.AirMidDb, reflected.AirHighDb) = AudioPhysics.AirLossDb(
-                a.PathLength, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
+                a.PathLength, air.Humidity, air.Celsius, air.PressureMillibars, air.AbsorptionMultiplier);
             into.Add(reflected);
             _lastReflectionCount++;
         }
@@ -926,7 +928,7 @@ public class AsyncAcousticWorker : IDisposable
 
     private static float Db(float gain) => 20f * MathF.Log10(MathF.Max(1e-5f, gain));
 
-    private OpeningRoutes.Answer? AskRoutes(OpeningRoutes routes, WorldSnapshot world, int id, Vector3 source, Vector3 listener, int listenerRegion)
+    private OpeningRoutes.Answer? AskRoutes(OpeningRoutes routes, IAcousticWorld world, int id, Vector3 source, Vector3 listener, int listenerRegion)
     {
         long now = OpenFPS.Common.AudioClockStamps.StampMs(_clock);
         if (_routeCache.TryGet(id, routes, out var held))
@@ -970,7 +972,7 @@ public class AsyncAcousticWorker : IDisposable
     /// check only ever wrote the report. <paramref name="terrains"/> are the world's tiles of ground, for the
     /// box list (the triangle store has its own).
     /// </summary>
-    private OpeningRoutes BuildRoutes(WorldSnapshot world, List<SteamAudioScene.Box> boxes, List<OpenFPS.Common.Geometry.SolidSpec> terrains,
+    private OpeningRoutes BuildRoutes(IAcousticWorld world, List<SteamAudioScene.Box> boxes, List<OpenFPS.Common.Geometry.SolidSpec> terrains,
                                       OpenFPS.Common.Geometry.TriangleWorld? geometry, OpeningRoutes.TileCache? cache, bool report)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -1059,14 +1061,14 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>Where each door leaf stood when the scene in use was built, by entity.</summary>
     private readonly Dictionary<int, long> _builtDoorPoses = new();
 
-    /// <summary>See <see cref="OpeningGraph.IsDoorLeaf"/>; telling a door by its sides differing missed
-    /// every door on the city.</summary>
-    private static bool IsDoorLeaf(OpenFPS.Common.Networking.EntityDefinition? def) => OpeningGraph.IsDoorLeaf(def);
+    /// <summary>The world's door leaves (IAcousticWorld.DoorLeaves: a solid that is also a doorway; telling a
+    /// door by its sides differing missed every door on the city). The worker's thread only.</summary>
+    private readonly List<DoorLeaf> _leaves = new();
 
     /// <summary>A leaf's pose to the centimetre and the degree, folded into one number.</summary>
-    private static long DoorPose(in EntitySnapshot snap)
+    private static long DoorPose(in DoorLeaf leaf)
     {
-        var p = snap.Transform.Position; var q = snap.Transform.Rotation;
+        var p = leaf.Position; var q = leaf.Rotation;
         long h = 17;
         h = h * 31 + (long)MathF.Round(p.X * 100f); h = h * 31 + (long)MathF.Round(p.Y * 100f); h = h * 31 + (long)MathF.Round(p.Z * 100f);
         h = h * 31 + (long)MathF.Round(q.Y * 100f); h = h * 31 + (long)MathF.Round(q.W * 100f);
@@ -1076,23 +1078,23 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>A leaf near the listener stands somewhere other than the scene in use has it. Only a leaf
     /// that moved: a hash of the doors within 50 m changed whenever one crossed the radius as you walked.
     /// A far leaf that moved waits until you come near.</summary>
-    private bool NearDoorMoved(WorldSnapshot world)
+    private bool NearDoorMoved(IAcousticWorld world)
     {
-        foreach (var snap in world.Entities.Values)
+        world.DoorLeaves(_leaves);
+        foreach (var leaf in _leaves)
         {
-            if (!IsDoorLeaf(snap.Definition)) continue;
-            if (_haveLastListener && Vector3.DistanceSquared(snap.Transform.Position, _lastListenerPos) > DoorNearMetres * DoorNearMetres) continue;
-            if (!_builtDoorPoses.TryGetValue(snap.Id, out long was) || was != DoorPose(snap)) return true;
+            if (_haveLastListener && Vector3.DistanceSquared(leaf.Position, _lastListenerPos) > DoorNearMetres * DoorNearMetres) continue;
+            if (!_builtDoorPoses.TryGetValue(leaf.Id, out long was) || was != DoorPose(leaf)) return true;
         }
         return false;
     }
 
     /// <summary>Records where every leaf is, for the scene about to be built from this world.</summary>
-    private void RecordDoorPoses(WorldSnapshot world)
+    private void RecordDoorPoses(IAcousticWorld world)
     {
         _builtDoorPoses.Clear();
-        foreach (var snap in world.Entities.Values)
-            if (IsDoorLeaf(snap.Definition)) _builtDoorPoses[snap.Id] = DoorPose(snap);
+        world.DoorLeaves(_leaves);
+        foreach (var leaf in _leaves) _builtDoorPoses[leaf.Id] = DoorPose(leaf);
     }
 
     // A door's rebuild is made off this thread and swapped in when ready: the city's two scenes take
@@ -1250,13 +1252,13 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>A new scene for a new map at once; for a door or tiles, a background build.</summary>
-    private void RebuildSceneIfNeeded(WorldSnapshot world)
+    private void RebuildSceneIfNeeded(IAcousticWorld world)
     {
         if (_saScene == null || _saSim == null) return;
         SwapInDoorBuild();
         ReleaseRetiredScenes();
         ReleaseRetiredTileSets();
-        bool mapChanged = !_saScene.IsBuilt || !ReferenceEquals(world.AcousticMap, _saSceneMap);
+        bool mapChanged = !_saScene.IsBuilt || !ReferenceEquals(world.Rooms, _saSceneMap);
         if (!mapChanged)
         {
             if (_doorBuild != null) return;
@@ -1280,7 +1282,7 @@ public class AsyncAcousticWorker : IDisposable
             // The routes are made again when the openings changed, otherwise at most every few seconds: the
             // coarse ring moving as you drive changes their far barriers, not their doorways, and making
             // them is most of a tile's cost.
-            var portals = world.AcousticMap?.Portals;
+            var portals = world.Rooms?.Portals;
             bool routesDue = !tiles || _routes == null || !ReferenceEquals(portals, _routesPortals)
                              || OpenFPS.Common.AudioClockStamps.StampTicks(_clock) - _routesBuiltTicks > RoutesEverySeconds * TimeSpan.TicksPerSecond;
             var keptRoutes = _routes;
@@ -1354,9 +1356,9 @@ public class AsyncAcousticWorker : IDisposable
             _saScene.Build(boxes, terrains);
         }
         _enclosureWorld = GeometryFor(_tileScenes, _acousticStore, boxes, mapLeaves, terrains);
-        _acoustics.PublishReflectionWorld(_enclosureWorld, world.AcousticMap);
+        _acoustics.PublishReflectionWorld(_enclosureWorld, world.Rooms);
         _routeTiles = new OpeningRoutes.TileCache();
-        _saSceneMap = world.AcousticMap;
+        _saSceneMap = world.Rooms;
         if (_saScene.IsBuilt)
         {
             _saSim.SetScene(_saScene);

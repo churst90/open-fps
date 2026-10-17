@@ -85,8 +85,8 @@ public class EarlyTailTests
         Assert.InRange(ms, 5.7, 6.1);
         // The copies are the room plan's for a sound at the ear: the six surfaces and the second orders,
         // nothing past the placed window.
-        Assert.InRange(c.Copies.Count, 6, OpenFPS.Client.Core.WorldAudioPlayer.MaxRoomEchoes + 1);
-        Assert.All(c.Copies, k => Assert.True(k.Sample <= (OpenFPS.Client.Core.WorldAudioPlayer.RoomEchoWindowSeconds + 0.002) * Rate));
+        Assert.InRange(c.Copies.Count, 6, RoomEchoes.MaxEchoes + 1);
+        Assert.All(c.Copies, k => Assert.True(k.Sample <= (RoomEchoes.WindowSeconds + 0.002) * Rate));
         // Their energy sums to about what the image sources say: the ceiling alone (plaster, 2.04 m)
         // is (1 - 0.1) / 2.04^2 = -6.7 dB of a 1 m impulse; all of them a little more.
         double total = c.Total().Sum();

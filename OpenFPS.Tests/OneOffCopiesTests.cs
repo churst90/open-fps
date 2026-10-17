@@ -62,7 +62,7 @@ public class OneOffCopiesTests
             World = world;
             Facade = new AudioEngineFacade(Mixer);
             Facade.InitializeForTest();
-            Player = new WorldAudioPlayer(Facade, new SpatialAcoustics(new SpatialService()), prewarm: false);
+            Player = new WorldAudioPlayer(Facade, new SpatialAcoustics(), prewarm: false);
         }
 
         /// <summary>One update with the ears at <paramref name="ears"/>, then the audio thread's turn.</summary>

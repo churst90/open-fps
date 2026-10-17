@@ -183,8 +183,9 @@ public class CarWindowTests : IDisposable
         Assert.True(shut.High < -25f && shut.Mid < -20f, $"a closed car took only {shut.Mid:F1}/{shut.High:F1} dB");
         Assert.True(shut.Low > shut.High, "the glass passes the bottom of a voice more than its top");
 
-        // Windows down, and the client follows the glass at the motor's pace.
+        // Windows down, and the client follows the glass at the motor's pace: the car as the next world has it.
         car.Definition.SoundEmitter = car.Definition.SoundEmitter with { WindowsOpen = 1f };
+        Assert.True(CabinWalls.TryFind(world, seat, out found, out _));
         float halfway = cabins.WindowsOpen(found, CarWindow.DownSeconds * 0.5);
         Assert.InRange(halfway, 0.45f, 0.55f);
         float down = cabins.WindowsOpen(found, CarWindow.DownSeconds + 0.1);

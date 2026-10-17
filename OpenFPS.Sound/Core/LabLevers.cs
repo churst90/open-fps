@@ -64,4 +64,8 @@ public sealed class LabLevers
     /// <summary>How much replaced geometry a tile scene pair may hold, as a share of the triangles it traces, before
     /// it is made afresh (TileSceneSet); 0 makes it afresh whenever it holds anything replaced.</summary>
     public double TileRecycleShare { get; set; } = 1.0;
+
+    /// <summary>The rain on the roof of the vehicle you ride in left in the world rather than riding with your head,
+    /// to tell what riding with it does (RainField).</summary>
+    public bool RainRoofInTheWorld { get; set; }
 }

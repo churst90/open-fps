@@ -386,7 +386,7 @@ public class BeaconAidsMutationTests
         // A wall 3 cm past where the sight line would end at the ear.
         things.Add(Thing(40, P(new Vector3(4.53f, 1.5f, 1f)), P(new Vector3(1f, 3f, 4f))));
         var world = Fixed(things.ToArray());
-        var acoustics = new SpatialAcoustics(new SpatialService());
+        var acoustics = new SpatialAcoustics();
         var aids = new BeaconAids(new AudioEngineFacade(new EmitterRecordingProvider()), BeaconPreferences.InMemory(), acoustics);
 
         var door = P(new Vector3(0f, 1f, 0f));
@@ -408,7 +408,7 @@ public class BeaconAidsMutationTests
         var wall = Thing(1, new Vector3(0f, 5f, 5f), new Vector3(200f, 10f, 0.3f));
         var door = Thing(10, new Vector3(0f, 1f, 10f), DoorSize, Beacons.Door, "Wood");
         var open = Thing(11, new Vector3(3f, 1f, -4f), DoorSize, Beacons.Door, "Wood");
-        var acoustics = new SpatialAcoustics(new SpatialService());
+        var acoustics = new SpatialAcoustics();
         var ear = new Vector3(0f, 1.6f, 0f);
         var world = Fixed(wall, door, open);
         var mixer = new EmitterRecordingProvider();
@@ -430,7 +430,7 @@ public class BeaconAidsMutationTests
     {
         var wall = Thing(1, new Vector3(0f, 5f, 5f), new Vector3(200f, 10f, 0.3f));
         var door = Thing(10, new Vector3(0f, 1f, 10f), DoorSize, Beacons.Door, "Wood");
-        var acoustics = new SpatialAcoustics(new SpatialService());
+        var acoustics = new SpatialAcoustics();
         var ear = new Vector3(0f, 1.6f, 0f);
 
         var world = Fixed(wall, door);
@@ -456,7 +456,7 @@ public class BeaconAidsMutationTests
             Thing(10, new Vector3(0f, 1f, 0f), DoorSize, Beacons.Door, "Wood"),
         };
         var world = Fixed(things);
-        var acoustics = new SpatialAcoustics(new SpatialService());
+        var acoustics = new SpatialAcoustics();
         var ear = new Vector3(3f, 1.6f, 3f);
         Assert.True(BeaconAids.TryDoorFace(world, 10, ear, out var face, out var inRoom));
         var expected = acoustics.CalculateAcousticPath(world, 10, ear, face);

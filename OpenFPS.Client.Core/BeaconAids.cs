@@ -291,7 +291,7 @@ public sealed class BeaconAids
         {
             var ray = listener - at;
             float len = ray.Length();
-            return len < 0.05f || !_acoustics.Spatial.RaycastMaterial(world, at, ray / len, len - 0.05f,
+            return len < 0.05f || !_acoustics.RaycastMaterial(world, at, ray / len, len - 0.05f,
                                                                      out _, out _, out _, ignoreEntityId: sourceId);
         }
         var size = e.Definition.Collider.Size;
@@ -304,7 +304,7 @@ public sealed class BeaconAids
         var toEar = listener - face;
         float dist = toEar.Length();
         if (dist < 0.05f) return true;
-        return !_acoustics.Spatial.RaycastMaterial(world, face, toEar / dist, dist - 0.05f,
+        return !_acoustics.RaycastMaterial(world, face, toEar / dist, dist - 0.05f,
                                                    out _, out _, out _, ignoreEntityId: sourceId);
     }
 

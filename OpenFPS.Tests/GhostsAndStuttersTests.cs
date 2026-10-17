@@ -99,10 +99,10 @@ public class GhostsAndStuttersTests
     {
         var snap = Car(new Vector3(120f, 0f, -40f));
 
-        Vector3 point = AudioEmission.PointFor(snap);
+        Vector3 point = EntityEmission.PointFor(snap);
         Assert.True(point.Y > 0.05f, $"the emission point is on the road surface at y={point.Y:F2}");
 
-        float radius = AudioEmission.OcclusionRadiusFor(snap);
+        float radius = EntityEmission.OcclusionRadiusFor(snap);
         Assert.True(point.Y - radius >= -1e-4f,
             $"the probe sphere reaches {point.Y - radius:F2} m, which is below the surface the car rests on");
         Assert.InRange(radius, AudioEmission.MinOcclusionRadius, AudioEmission.DefaultOcclusionRadius);
@@ -122,8 +122,8 @@ public class GhostsAndStuttersTests
             Definition = new EntityDefinition { SoundEmitter = new SoundEmitterComponent { SoundId = "BEEP" } },
             Transform = new Transform { Position = new Vector3(3f, 2f, 1f), Rotation = Quaternion.Identity },
         };
-        Assert.Equal(snap.Transform.Position, AudioEmission.PointFor(snap));
-        Assert.Equal(AudioEmission.MinOcclusionRadius, AudioEmission.OcclusionRadiusFor(snap), 3);
+        Assert.Equal(snap.Transform.Position, EntityEmission.PointFor(snap));
+        Assert.Equal(AudioEmission.MinOcclusionRadius, EntityEmission.OcclusionRadiusFor(snap), 3);
     }
 
     // ── Rule 6: the map is validated against the things that drive on it ────────────────────────

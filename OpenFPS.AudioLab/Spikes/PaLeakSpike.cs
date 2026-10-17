@@ -46,7 +46,7 @@ public static class PaLeakSpike
                                                            && Vector3.Distance(e.Transform.Position, new Vector3(-1.1f, 0.45f, 158.1f)) < 1f);
         if (pa.Definition == null) { Console.WriteLine("  FAIL: no PA at Main Street (-1.1, 0.45, 158.1); give overlays=DIR"); return 1; }
         var def = pa.Definition;
-        Vector3 mouth = AudioEmission.PointFor(pa);
+        Vector3 mouth = EntityEmission.PointFor(pa);
         Vector3 aim = Vector3.Transform(def.SoundEmitter.Direction.LengthSquared() > 0f ? Vector3.Normalize(def.SoundEmitter.Direction) : Vector3.UnitZ,
                                         pa.Transform.Rotation);
         int paRegion = acoustics.GetRegionAt(world, mouth);
@@ -67,7 +67,7 @@ public static class PaLeakSpike
                 var until = DateTime.UtcNow.AddSeconds(120);
                 while (DateTime.UtcNow < until)
                 {
-                    worker.EnqueueRequest(new AcousticRequest { EntityId = id, ListenerPos = ear, SourcePos = mouth, SourceRadius = AudioEmission.OcclusionRadiusFor(pa) });
+                    worker.EnqueueRequest(new AcousticRequest { EntityId = id, ListenerPos = ear, SourcePos = mouth, SourceRadius = EntityEmission.OcclusionRadiusFor(pa) });
                     Thread.Sleep(50);
                     if (worker.TryGetResult(id, out var paths) && paths.Count > 0 && paths[0].SourcePosition == mouth)
                     { shut[name] = paths.First(p => !p.IsReflection); break; }
@@ -128,7 +128,7 @@ public static class PaLeakSpike
                 // The lobby as the client's log measured it; the street as open air.
                 if (inside) provider.SetSimulatedReverbDecay(1595f, 0.86f, 0.8f, 1.2f);
                 else provider.SetSimulatedReverbDecay(AcousticConstants.MinReverbDecayMs, 0f, 1f, 1f);
-                void Ask() => worker.EnqueueRequest(new AcousticRequest { EntityId = 50, ListenerPos = ear, SourcePos = mouth, SourceRadius = AudioEmission.OcclusionRadiusFor(pa) });
+                void Ask() => worker.EnqueueRequest(new AcousticRequest { EntityId = 50, ListenerPos = ear, SourcePos = mouth, SourceRadius = EntityEmission.OcclusionRadiusFor(pa) });
                 Run(1.5, () => { Ask(); provider.UpdateListener(ear, facing, Vector3.Zero, region); });
                 var e = new SpatialEmitter
                 {

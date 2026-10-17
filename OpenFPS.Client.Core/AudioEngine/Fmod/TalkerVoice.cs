@@ -1,8 +1,25 @@
 using System.Collections.Concurrent;
-using Concentus;
-using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
+
+/// <summary>
+/// A talker's codec, as the host has it (open-fps: Opus at 48 kHz in 20 ms frames, VoiceCodec): one frame of
+/// samples per packet, a lost one concealed (an empty packet) or rebuilt from the next frame's forward error
+/// correction.
+/// </summary>
+public interface IVoiceDecoder
+{
+    /// <summary>Samples a second.</summary>
+    int Rate { get; }
+    /// <summary>Samples in one frame the sender sends.</summary>
+    int FrameSamples { get; }
+    /// <summary>The longest frame a packet can hold.</summary>
+    int MaxFrameSamples { get; }
+    /// <summary>One packet into <paramref name="pcm"/>, at most <paramref name="frameSize"/> samples; how many came out.
+    /// <paramref name="fec"/>: the frame before this one, from its forward error correction. Throws on a packet it
+    /// will not take.</summary>
+    int Decode(ReadOnlySpan<byte> packet, Span<float> pcm, int frameSize, bool fec);
+}
 
 /// <summary>
 /// Another player's voice off the network, decoded in order into a ring that one voice in the world
@@ -37,13 +54,13 @@ public sealed class TalkerStream
     /// grows by the reader waiting (a pause, not a pitch change).
     /// </summary>
     public const double MaxPull = 0.002;
-    private const double FrameSeconds = (double)VoiceCodec.FrameSamples / VoiceCodec.Rate;
+    private readonly double FrameSeconds;
 
     public readonly int SenderId;
     public readonly OwnVoiceRing Ring = new() { MarginSeconds = MinMarginSeconds };
     private readonly object _lock = new();
-    private readonly IOpusDecoder _decoder = VoiceCodec.CreateDecoder();
-    private readonly float[] _pcm = new float[VoiceCodec.MaxFrameSamples];
+    private readonly IVoiceDecoder _decoder;
+    private readonly float[] _pcm;
     private readonly Queue<(double At, double Offset)> _offsets = new();
     /// <summary>Frames waiting for the ones before them, by their place in this run of talking.</summary>
     private readonly SortedDictionary<long, (byte[] Data, double At)> _held = new();
@@ -62,7 +79,16 @@ public sealed class TalkerStream
     /// <summary>When the last packet came, seconds on the clock <see cref="Receive"/> was given.</summary>
     public double LastArrival { get { lock (_lock) return _lastArrival; } }
 
-    public TalkerStream(int senderId) => SenderId = senderId;
+    /// <param name="senderId">Whose voice it is.</param>
+    /// <param name="decoder">The host's decoder for their frames (open-fps: Opus, OpusVoiceDecoder), one per stream:
+    /// a decoder carries the state that conceals a lost frame.</param>
+    public TalkerStream(int senderId, IVoiceDecoder decoder)
+    {
+        SenderId = senderId;
+        _decoder = decoder;
+        _pcm = new float[decoder.MaxFrameSamples];
+        FrameSeconds = (double)decoder.FrameSamples / decoder.Rate;
+    }
 
     /// <param name="sequence">The sender's frame number; zero for a sender that does not number them.</param>
     /// <param name="packet">One Opus frame.</param>
@@ -88,7 +114,7 @@ public sealed class TalkerStream
                 Flush(now, force: true);
                 _numbered = false;
                 Decode(packet);
-                offset = now - (double)_media / VoiceCodec.Rate;
+                offset = now - (double)_media / _decoder.Rate;
             }
             else
             {
@@ -156,8 +182,8 @@ public sealed class TalkerStream
                     try
                     {
                         for (long k = 0; k < missing - 1; k++)
-                            Write(_decoder.Decode(ReadOnlySpan<byte>.Empty, _pcm, VoiceCodec.FrameSamples, false));
-                        Write(_decoder.Decode(data, _pcm, VoiceCodec.FrameSamples, true));
+                            Write(_decoder.Decode(ReadOnlySpan<byte>.Empty, _pcm, _decoder.FrameSamples, false));
+                        Write(_decoder.Decode(data, _pcm, _decoder.FrameSamples, true));
                         Rebuilt++;
                     }
                     catch (Exception ex) when (ex is not OutOfMemoryException) { Corrupt++; }
@@ -177,7 +203,7 @@ public sealed class TalkerStream
 
     private void Decode(byte[] packet)
     {
-        try { Write(_decoder.Decode(packet, _pcm, VoiceCodec.MaxFrameSamples, false)); }
+        try { Write(_decoder.Decode(packet, _pcm, _decoder.MaxFrameSamples, false)); }
         // A packet the decoder will not take. Somebody else's bytes must not stop this voice.
         catch (Exception ex) when (ex is not OutOfMemoryException) { Corrupt++; }
     }
@@ -205,7 +231,9 @@ public sealed class TalkerStreams
 {
     private readonly ConcurrentDictionary<int, TalkerStream> _all = new();
 
-    public TalkerStream For(int senderId) => _all.GetOrAdd(senderId, id => new TalkerStream(id));
+    /// <summary>A talker's stream, made on their first frame with a decoder of the host's.</summary>
+    public TalkerStream For(int senderId, Func<IVoiceDecoder> newDecoder)
+        => _all.GetOrAdd(senderId, static (id, make) => new TalkerStream(id, make()), newDecoder);
     public bool TryGet(int senderId, out TalkerStream stream) => _all.TryGetValue(senderId, out stream!);
     public void Remove(int senderId) => _all.TryRemove(senderId, out _);
     public void Clear() => _all.Clear();

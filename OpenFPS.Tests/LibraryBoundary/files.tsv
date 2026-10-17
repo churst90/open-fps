@@ -16,6 +16,8 @@ OpenFPS.Accessibility/UiCue.cs	host
 OpenFPS.Accessibility/ZoneSettle.cs	host		
 OpenFPS.Acoustics/AcousticConstants.cs	lib	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	lib	Acoustics	
+OpenFPS.Acoustics/AcousticRays.cs	lib	Acoustics	
+OpenFPS.Acoustics/AcousticWorld.cs	lib	Acoustics	
 OpenFPS.Acoustics/Assemblies.cs	lib	Acoustics	
 OpenFPS.Acoustics/Constructions.cs	lib	Acoustics	
 OpenFPS.Acoustics/Diffraction.cs	lib	Acoustics	
@@ -31,6 +33,7 @@ OpenFPS.Acoustics/PanelAcoustics.cs	lib	Acoustics
 OpenFPS.Acoustics/Refraction.cs	lib	Acoustics	
 OpenFPS.Acoustics/Room.cs	lib	Acoustics	
 OpenFPS.Acoustics/RoomAcoustics.cs	lib	Acoustics	
+OpenFPS.Acoustics/RoomEchoes.cs	lib	Acoustics	
 OpenFPS.Acoustics/SparseAcousticOctree.cs	lib	Acoustics	
 OpenFPS.Acoustics/Systems/AcousticVolumeGenerator.cs	lib	Acoustics	
 OpenFPS.Acoustics/Systems/FaceOpenings.cs	lib	Acoustics	
@@ -163,6 +166,7 @@ OpenFPS.Common/Components.cs	host
 OpenFPS.Common/DistantMotion.cs	host		
 OpenFPS.Common/DrivingCuePlanner.cs	host		
 OpenFPS.Common/EntityAcoustics.cs	host		
+OpenFPS.Common/EntityEmission.cs	host		
 OpenFPS.Common/EntityGeometry.cs	host		
 OpenFPS.Common/GroundProbeMemo.cs	host		
 OpenFPS.Common/JsonConverters.cs	host		

@@ -40,7 +40,7 @@ public class VoiceChatTests
     private static (float[] Heard, TalkerStream Stream) Carry(List<(ushort Seq, byte[] Data)> packets,
         Func<int, double> sendAt, Func<int, double?> delay, double seconds)
     {
-        var stream = new TalkerStream(7);
+        var stream = new TalkerStream(7, new OpusVoiceDecoder());
         var tap = new OwnVoiceTap(stream.Ring, 0f, Rate, TalkerStream.MaxPull);
         var arrivals = packets.Select((p, k) => (p, at: delay(k) is double d ? sendAt(k) + d : double.NaN))
                               .Where(a => !double.IsNaN(a.at)).OrderBy(a => a.at).ToList();

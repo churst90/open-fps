@@ -107,29 +107,28 @@ public sealed class SteamAudioScene : IDisposable
     public SteamAudioScene(IntPtr context) => _context = context;
 
     /// <summary>
-    /// The solid box colliders of a <see cref="WorldSnapshot"/> as scene geometry, one <see cref="Box"/>
-    /// each at its live transform with its <c>MaterialComponent</c>'s material; non-box solids are
-    /// skipped. The one definition of what counts as audio geometry, for the worker and the lab.
+    /// The solid box colliders of a world as scene geometry, one <see cref="Box"/> each where it stands
+    /// with its material; non-box solids are skipped. The one definition of what counts as audio geometry,
+    /// for the worker and the lab.
     /// </summary>
-    public static List<Box> BoxesFromWorld(WorldSnapshot world)
+    public static List<Box> BoxesFromWorld(IAcousticWorld world)
     {
         var boxes = new List<Box>();
         if (world == null) return boxes;
-        foreach (var snap in world.Entities.Values)
+        var all = new List<AcousticBody>(world.BodyCount);
+        world.AllBodies(all);
+        foreach (var body in all)
         {
-            var def = snap.Definition;
-            if (def == null || !def.Collider.IsSolid || def.Collider.Shape != ColliderShape.Box) continue;
+            if (!body.Solid || body.Shape != ColliderShape.Box) continue;
             // A sound source is not occluding geometry: its own collider sits at its emission point and
             // occludes itself (a solid beacon went permanently silent). They are small next to walls.
-            if (!string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
+            if (!string.IsNullOrEmpty(body.SoundId)) continue;
             // Nor anything that moves: the scene is built once, and a car's panels would stay in the bay
             // after it drove away.
-            if (def.Moves) continue;
-            var size = def.Collider.Size;
+            if (body.Moves) continue;
+            var size = body.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
-            boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material,
-                              def.Acoustics.Build, snap.Id, def.Collider.Form,
-                              OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.IsDoorLeaf(def)));
+            boxes.Add(new Box(body.Position, size, body.Rotation, body.Material, body.Build, body.Id, body.Form, body.DoorLeaf));
         }
         // In id order, not the order the world listed them in (a ConcurrentDictionary's, which follows the
         // processor count): a box's place in the list is its surfaces' ids (EarlyReflections.SurfaceId),

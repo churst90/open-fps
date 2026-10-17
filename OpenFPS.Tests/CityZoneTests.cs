@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Systems;
 using OpenFPS.Server.Core;
@@ -141,7 +142,7 @@ public class CityZoneTests
     public void AnOpenFrontDoorLetsTheStreetInFromBothSides()
     {
         var world = City();
-        var leaf = world.Entities.Values.Where(e => OpeningGraph.IsDoorLeaf(e.Definition))
+        var leaf = world.Entities.Values.Where(e => EntityAcoustics.IsDoorLeaf(e.Definition))
                         .OrderBy(e => Vector3.Distance(e.Transform.Position, new Vector3(-9.68f, 1.1f, 157.08f))).First();
         var def = leaf.Definition;
         var rot = leaf.Transform.Rotation;

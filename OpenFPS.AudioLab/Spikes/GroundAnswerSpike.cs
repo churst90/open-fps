@@ -116,7 +116,7 @@ public static class GroundAnswerSpike
         {
             var def = e.Definition;
             if (def?.SoundEmitter == null || string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
-            var src = AudioEmission.PointFor(e);
+            var src = EntityEmission.PointFor(e);
             sources++;
             spatial.RaycastAll(world, src + new Vector3(0f, 0.05f, 0f), down, 30f, dist, abs, mat, staticOnly: true);
             string under = dist[0] < 30f ? mat[0] ?? "Generic" : "nothing";

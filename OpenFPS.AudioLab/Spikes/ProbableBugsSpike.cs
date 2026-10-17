@@ -519,12 +519,12 @@ public static class ProbableBugsSpike
             // The copies the game places round a clap, as --clap-room places them.
             var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
             var found = new List<EarlyReflections.Arrival>();
-            var plan = new List<WorldAudioPlayer.RoomEcho>();
+            var plan = new List<RoomEcho>();
             float c0 = provider.Atmosphere.SpeedOfSound;
-            EarlyReflections.Find(hands, ear, solids, found, c0, maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
-                                  maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * c0);
+            EarlyReflections.Find(hands, ear, solids, found, c0, maxOrder: 2, keep: RoomEchoes.MaxEchoes * 2,
+                                  maxExtraPathMetres: RoomEchoes.WindowSeconds * c0);
             float direct0 = Vector3.Distance(hands, ear);
-            WorldAudioPlayer.PlanRoomEchoes(found, hands, ear, direct0, placed.ReferenceDistance, provider.Mix.CopiesTrim, audible: true, plan);
+            RoomEchoes.Plan(found, hands, ear, direct0, placed.ReferenceDistance, provider.Mix.CopiesTrim, audible: true, plan);
             var washIds = new HashSet<string>();
             foreach (var e in plan)
                 if (!e.InVoice && e.WashGain >= ImageSource.MinGain)

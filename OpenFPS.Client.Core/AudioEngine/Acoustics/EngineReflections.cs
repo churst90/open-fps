@@ -99,18 +99,18 @@ public sealed class EngineReflections
     /// Rebuilds the reflecting surfaces if the static geometry changed, judged by the entity count and then
     /// the number of solid boxes: right while no map has walls that move without changing the count.
     /// </summary>
-    public void SyncGeometry(WorldSnapshot world) => SyncGeometry(world, null);
+    public void SyncGeometry(IAcousticWorld world) => SyncGeometry(world, null);
 
     /// <summary>
     /// With the scene's acoustic triangle world when there is one (SpatialAcoustics.ReflectionWorldFor): a
     /// leg of a mirrored path is then asked of its tree instead of every solid box.
     /// </summary>
-    public void SyncGeometry(WorldSnapshot world, OpenFPS.Common.Geometry.TriangleWorld? acoustic)
+    public void SyncGeometry(IAcousticWorld world, OpenFPS.Common.Geometry.TriangleWorld? acoustic)
     {
         _world = acoustic;
         // The cheap test first: BoxesFromWorld walks every entity and allocates, sixty times a second.
-        if (world.Entities.Count == _lastEntityCount) return;
-        _lastEntityCount = world.Entities.Count;
+        if (world.BodyCount == _lastEntityCount) return;
+        _lastEntityCount = world.BodyCount;
 
         var boxes = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
         if (boxes.Count == _builtFrom) return;

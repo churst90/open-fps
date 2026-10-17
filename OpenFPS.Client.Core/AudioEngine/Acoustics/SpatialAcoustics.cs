@@ -1,31 +1,27 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Common.Components;
-using OpenFPS.Client.Core;
 using OpenFPS.Client.AudioEngine.Data;
 
 namespace OpenFPS.Client.AudioEngine.Acoustics;
 
 /// <summary>
 /// The acoustic paths a voice takes without the Steam Audio simulator: through the walls, by the
-/// openings, and off the surfaces, from SpatialService's geometry.
+/// openings, and off the surfaces, from the world input's geometry (<see cref="AcousticRays"/>).
 /// </summary>
 public class SpatialAcoustics
 {
-    private readonly SpatialService _spatial;
-    /// <summary>For a caller that needs one plain ray.</summary>
-    public SpatialService Spatial => _spatial;
-
-    public SpatialAcoustics() : this(new SpatialService()) { }
-
-    public SpatialAcoustics(SpatialService spatial)
-    {
-        _spatial = spatial;
-    }
+    /// <summary>
+    /// The first solid along a ray and its material (<see cref="AcousticRays.FirstMaterial"/>), for a caller that
+    /// needs one plain ray: neither <paramref name="ignoreEntityId"/> nor the listener's own body (<see cref="ListenerBodyId"/>)
+    /// counts.
+    /// </summary>
+    public bool RaycastMaterial(IAcousticWorld world, Vector3 start, Vector3 dir, float maxDist, out float distance, out Vector3 normal,
+                                out string material, int ignoreEntityId = -1)
+        => AcousticRays.FirstMaterial(world, start, dir, maxDist, out distance, out normal, out material, ignoreEntityId, ListenerBodyId);
 
     /// <summary>The main path and the separate early reflections.</summary>
-    public List<AcousticPathData> CalculateAcousticPaths(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
+    public List<AcousticPathData> CalculateAcousticPaths(IAcousticWorld world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
     {
         var rawResults = new List<AcousticPathData>();
         rawResults.Add(CalculateMainPath(world, entityId, listenerPos, sourcePos, ListenerBody));
@@ -80,17 +76,17 @@ public class SpatialAcoustics
         => _reflectionWorld = world == null ? null : new ReflectionScene(world, map);
 
     /// <summary>The acoustic triangle world for this snapshot's map, if the worker has one built.</summary>
-    public OpenFPS.Common.Geometry.TriangleWorld? ReflectionWorldFor(WorldSnapshot world)
+    public OpenFPS.Common.Geometry.TriangleWorld? ReflectionWorldFor(IAcousticWorld world)
     {
         var r = _reflectionWorld;
-        return r != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled && ReferenceEquals(r.Map, world.AcousticMap) ? r.World : null;
+        return r != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled && ReferenceEquals(r.Map, world.Rooms) ? r.World : null;
     }
 
     /// <summary>
     /// The copies of a sound off the surfaces (EarlyReflections.Find): asked of the worker's acoustic
     /// triangle world when it has one for this map, of the list of boxes otherwise.
     /// </summary>
-    public void FindReflections(WorldSnapshot world, Vector3 source, Vector3 listener, List<EarlyReflections.Arrival> into,
+    public void FindReflections(IAcousticWorld world, Vector3 source, Vector3 listener, List<EarlyReflections.Arrival> into,
                                 float speedOfSound, int maxOrder = 1, bool separateFirst = false, bool flutter = false, int keep = 0,
                                 float maxExtraPathMetres = EarlyReflections.RangeMetres)
     {
@@ -106,17 +102,17 @@ public class SpatialAcoustics
 
     /// <summary>The world's solid boxes for the reflection model, rebuilt when the map or its geometry
     /// changes: the simulator scene's own boxes, so the two paths agree about what a wall is.</summary>
-    public IReadOnlyList<EarlyReflections.Solid> ReflectionSolids(WorldSnapshot world)
+    public IReadOnlyList<EarlyReflections.Solid> ReflectionSolids(IAcousticWorld world)
     {
         // The version too: tiles of a streamed map arrive and leave under the same map object.
-        if (ReferenceEquals(_reflectionSolidsFor, world.AcousticMap) && _reflectionSolidsVersion == world.GeometryVersion
+        if (ReferenceEquals(_reflectionSolidsFor, world.Rooms) && _reflectionSolidsVersion == world.GeometryVersion
             && _reflectionSolids.Count > 0)
             return _reflectionSolids;
         var boxes = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
         var solids = new List<EarlyReflections.Solid>(boxes.Count);
         foreach (var b in boxes) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
         _reflectionSolids = solids;
-        _reflectionSolidsFor = world.AcousticMap;
+        _reflectionSolidsFor = world.Rooms;
         _reflectionSolidsVersion = world.GeometryVersion;
         return solids;
     }
@@ -153,11 +149,11 @@ public class SpatialAcoustics
 
     /// <summary>The graph to ask: the worker's, or one built from this world, with the door leaves near
     /// <paramref name="listener"/> (all of them when not given) where they stand.</summary>
-    public OpeningRoutes? RoutesFor(WorldSnapshot world, Vector3? listener = null)
+    public OpeningRoutes? RoutesFor(IAcousticWorld world, Vector3? listener = null)
     {
         var shared = _routes;
         if (shared != null) return shared;
-        var map = world.AcousticMap;
+        var map = world.Rooms;
         if (map == null) return null;
         long doors = DoorPoses(world, listener);
         System.Threading.Tasks.Task first;
@@ -215,7 +211,7 @@ public class SpatialAcoustics
     private object? _firstRoutesMap;
     private System.Threading.Tasks.Task? _firstRoutes;
 
-    private OpeningRoutes BuildLocalRoutes(WorldSnapshot world)
+    private OpeningRoutes BuildLocalRoutes(IAcousticWorld world)
     {
         PlacementThread.Heavy("A map's routes through its openings");
         return OpeningGraph.Build(world, OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world),
@@ -223,31 +219,35 @@ public class SpatialAcoustics
     }
 
     /// <summary>Where the door leaves near the listener stand, folded into one number.</summary>
-    private static long DoorPoses(WorldSnapshot world, Vector3? listener)
+    private static long DoorPoses(IAcousticWorld world, Vector3? listener)
     {
         long doors = 17;
-        foreach (var snap in world.Entities.Values)
+        var leaves = _leaves ??= new List<DoorLeaf>();
+        world.DoorLeaves(leaves);
+        foreach (var leaf in leaves)
         {
-            if (!OpeningGraph.IsDoorLeaf(snap.Definition)) continue;
-            var p = snap.Transform.Position; var q = snap.Transform.Rotation;
+            var p = leaf.Position; var q = leaf.Rotation;
             if (listener is { } l && Vector3.DistanceSquared(p, l) > DoorNearMetres * DoorNearMetres) continue;
-            doors = doors * 31 + snap.Id;
+            doors = doors * 31 + leaf.Id;
             doors = doors * 31 + (long)MathF.Round(p.X * 100f); doors = doors * 31 + (long)MathF.Round(p.Z * 100f);
             doors = doors * 31 + (long)MathF.Round(q.Y * 100f); doors = doors * 31 + (long)MathF.Round(q.W * 100f);
         }
         return doors;
     }
 
-    private AcousticPathData CalculateMainPath(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos, int localPlayerId)
+    /// <summary>Per thread: routes are asked for from the game thread and the worker at once.</summary>
+    [ThreadStatic] private static List<DoorLeaf>? _leaves;
+
+    private AcousticPathData CalculateMainPath(IAcousticWorld world, int entityId, Vector3 listenerPos, Vector3 sourcePos, int localPlayerId)
     {
         // The emitter and the local player are both left out of every ray, so occlusion is symmetric.
         int ignoreA = entityId != AcousticConstants.GlobalRegionId ? entityId : -1;
         int ignoreB = localPlayerId != AcousticConstants.GlobalRegionId ? localPlayerId : -1;
-        _spatial.GetMultiPointOcclusionData(world, listenerPos, sourcePos, out float directOcclusion, out float directBleed, out float eqL, out float eqM, out float eqH, ignoreA, ignoreB);
+        AcousticRays.MultiPointOcclusion(world, listenerPos, sourcePos, out float directOcclusion, out float directBleed, out float eqL, out float eqM, out float eqH, ignoreA, ignoreB);
 
         float directDist = Vector3.Distance(listenerPos, sourcePos);
         Vector3 apparentPos = sourcePos;
-        // Through the walls: the band gains themselves (SpatialService, WallTransmission).
+        // Through the walls: the band gains themselves (AcousticRays, WallTransmission).
         float gainL = eqL, gainM = eqM, gainH = eqH;
         int listenerRegionId = GetRegionAt(world, listenerPos);
         var routes = RoutesFor(world, listenerPos);
@@ -278,14 +278,15 @@ public class SpatialAcoustics
         }
 
         // What the air took, per band (ISO 9613-1): the same law the Steam Audio path uses.
-        var air = AudioPhysics.AirLossDb(directDist, world.Humidity, world.Temperature,
-                                         world.AirPressure, world.AirAbsorptionMultiplier);
+        var weather = world.Air;
+        var air = AudioPhysics.AirLossDb(directDist, weather.Humidity, weather.Celsius,
+                                         weather.PressureMillibars, weather.AbsorptionMultiplier);
 
         int regionId = GetRegionAt(world, sourcePos + new Vector3(0, 0.5f, 0));
         float roomGain = 1.0f;
         // The small-room lift is pressure building up between surfaces: no surfaces, no lift (an
         // infield-sized region read as a room took 6 dB off every car on the map).
-        if (world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(regionId, out var region)
+        if (world.Rooms != null && world.Rooms.Regions.TryGetValue(regionId, out var region)
             && RoomAcoustics.IsEnclosure(region))
         {
             float volume = RoomAcoustics.Volume(region);   // its flood's air where it flooded
@@ -309,12 +310,12 @@ public class SpatialAcoustics
     /// rooms, the room on its side (OpeningRoutes.RoomInOpening), never the outdoors. Uses the graph
     /// already built, never builds one: the build asks this, about points outside every opening.
     /// </summary>
-    public int GetRegionAt(WorldSnapshot world, Vector3 position)
+    public int GetRegionAt(IAcousticWorld world, Vector3 position)
     {
-        int region = _spatial.GetRegionAt(world, position);
+        int region = AcousticRays.RegionAt(world, position);
         if (region != AcousticConstants.GlobalRegionId) return region;
         var routes = _routes ?? _localRoutes;
-        return routes != null && RoomInOpening(routes, position, p => _spatial.GetRegionAt(world, p), out int room) ? room : region;
+        return routes != null && RoomInOpening(routes, position, p => AcousticRays.RegionAt(world, p), out int room) ? room : region;
     }
 
     /// <summary>
@@ -354,17 +355,11 @@ public class SpatialAcoustics
     /// rarely meet to the centimetre.</summary>
     private const float InOpeningSlack = 0.15f;
 
-    /// <summary>The place a point is in by the boxes alone (a doorway is in none), for naming where the
-    /// listener stands, not for sound. A named part of a room (a flight of stairs, a landing) answers
-    /// here; it is not a room, so <see cref="GetRegionAt"/> never does.</summary>
-    public int GetZoneAt(WorldSnapshot world, Vector3 position)
-        => NamedPlaces.At(world, position) ?? GetRoomAt(world, position);
-
     /// <summary>The region a point is in by the boxes alone, leaving out named places: the room you are
     /// in, as a crossing between rooms is counted. A doorway is in none.</summary>
-    public int GetRoomAt(WorldSnapshot world, Vector3 position) => _spatial.GetRegionAt(world, position);
+    public int GetRoomAt(IAcousticWorld world, Vector3 position) => AcousticRays.RegionAt(world, position);
 
-    public AcousticPathData CalculateAcousticPath(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
+    public AcousticPathData CalculateAcousticPath(IAcousticWorld world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
         => CalculateMainPath(world, entityId, listenerPos, sourcePos, ListenerBody);
 
     /// <summary>The listener's own body, left out of every ray: the one the client says is theirs

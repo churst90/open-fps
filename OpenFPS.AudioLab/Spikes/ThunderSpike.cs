@@ -380,14 +380,14 @@ public static class ThunderSpike
             string elev = $"{MathF.Asin(p.Direction.Y) * 180f / MathF.PI:F0} deg up";
             string note = worst > 0f ? $"part {elev} blocked, {worst:F1} m over the edge (bands {Db20(lo):F0}/{Db20(mid):F0}/{Db20(hi):F0} dB)" : $"part {elev} in plain view";
             // The copies the client gives a sky sound: the strongest mirrors inside the room window
-            // (WorldAudioPlayer.PlanRoomEchoes, at most MaxSkyRoomEchoes, no washes), and up to two
+            // (RoomEchoes.Plan, at most MaxSkyRoomEchoes, no washes), and up to two
             // first-order facades later than that. Each is placed at its image and the mixer's 1/r
             // beyond the 40 m reference does the rest, as in the game.
             float trim = GameMix.CopiesTrim;
-            EarlyReflections.Find(proxy, ear, solids, into, c, maxOrder: 2, keep: OpenFPS.Client.Core.WorldAudioPlayer.MaxRoomEchoes * 2,
-                                  maxExtraPathMetres: OpenFPS.Client.Core.WorldAudioPlayer.RoomEchoWindowSeconds * c);
-            var plan = new List<OpenFPS.Client.Core.WorldAudioPlayer.RoomEcho>();
-            OpenFPS.Client.Core.WorldAudioPlayer.PlanRoomEchoes(into, proxy, ear, ProxyMetres, ProxyMetres, trim, audible: true, plan);
+            EarlyReflections.Find(proxy, ear, solids, into, c, maxOrder: 2, keep: RoomEchoes.MaxEchoes * 2,
+                                  maxExtraPathMetres: RoomEchoes.WindowSeconds * c);
+            var plan = new List<RoomEcho>();
+            RoomEchoes.Plan(into, proxy, ear, ProxyMetres, ProxyMetres, trim, audible: true, plan);
             var echoes = new List<(EarlyReflections.Arrival A, float Rel)>();
             foreach (var e in plan)
             {
@@ -399,7 +399,7 @@ public static class ThunderSpike
             int late = 0;
             foreach (var a in into.OrderByDescending(a => a.GainMid))
             {
-                if (a.ExtraDelaySeconds <= OpenFPS.Client.Core.WorldAudioPlayer.RoomEchoWindowSeconds || a.GainMid < ImageSource.EchoAudibleRatio) continue;
+                if (a.ExtraDelaySeconds <= RoomEchoes.WindowSeconds || a.GainMid < ImageSource.EchoAudibleRatio) continue;
                 float placed = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, ProxyMetres, ProxyMetres) * trim;
                 if (placed < ImageSource.MinGain) continue;
                 echoes.Add((a, placed * ProxyMetres / MathF.Max(ProxyMetres, a.PathLength)));

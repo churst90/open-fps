@@ -137,4 +137,56 @@ public static class EntityAcoustics
     /// entities' solids (<see cref="AcousticVolumeGenerator.AddFaceOpenings"/>).</summary>
     public static int AddFaceOpenings(AcousticMap map, IEnumerable<EntityDefinition> entities, IReadOnlyCollection<int>? rooms = null)
         => AcousticVolumeGenerator.AddFaceOpenings(map, Solids(entities), rooms);
+
+    // ── The world input (docs/SOUND_LIBRARY_BOUNDARY.md 7.3, stage 6) ─────────────────────────────
+
+    /// <summary>A door leaf: a solid box that is also a portal. The server gives every door a portal
+    /// (PrefabRepository), both sides the outside when the map names no rooms, so a door is told by having
+    /// one, not by its sides differing. Movers are not in the scene at all.</summary>
+    public static bool IsDoorLeaf(EntityDefinition? def)
+        => def != null && def.Collider.IsSolid && !def.Moves
+           && (def.Portal.RegionAId != 0 || def.Portal.RegionBId != 0);
+
+    /// <summary>An entity as the sound meets it. A snapshot with no definition is a thing with no box.</summary>
+    public static AcousticBody BodyOf(in EntitySnapshot snap)
+    {
+        var def = snap.Definition;
+        if (def == null)
+            return new AcousticBody { Id = snap.Id, Position = snap.Transform.Position, Rotation = snap.Transform.Rotation, Velocity = snap.Velocity };
+        return new AcousticBody
+        {
+            Id = snap.Id,
+            Position = snap.Transform.Position,
+            Rotation = snap.Transform.Rotation,
+            Velocity = snap.Velocity,
+            Shape = def.Collider.Shape,
+            Size = def.Collider.Size,
+            Solid = def.Collider.IsSolid,
+            Form = def.Collider.Form,
+            Fixed = def.Type == EntityType.StaticObject,
+            Moves = def.Moves,
+            DoorLeaf = IsDoorLeaf(def),
+            Material = def.Material.Material,
+            Absorption = def.Acoustics.Absorption,
+            Hollow = def.Acoustics.IsHollow,
+            ShellThickness = def.Acoustics.ShellThickness,
+            Build = def.Acoustics.Build,
+            RoomSize = def.Region.RoomSize,
+            SoundId = def.SoundEmitter.SoundId,
+            WindowsOpen = def.SoundEmitter.WindowsOpen,
+        };
+    }
+
+    /// <summary>A door leaf where it stands, with its doorway: the pose the server recorded for it shut; an older
+    /// definition carries the pose it was defined in, which is shut at load.</summary>
+    public static DoorLeaf LeafOf(in EntitySnapshot snap)
+    {
+        var def = snap.Definition;
+        Vector3 centre; Quaternion rotation;
+        if (def.Portal.OpeningRotation != default) { centre = def.Portal.OpeningCentre; rotation = def.Portal.OpeningRotation; }
+        else if (def.Transform.Rotation != default) { centre = def.Transform.Position; rotation = def.Transform.Rotation; }
+        else { centre = snap.Transform.Position; rotation = snap.Transform.Rotation; }
+        return new DoorLeaf(snap.Id, snap.Transform.Position, snap.Transform.Rotation, def.Collider.Size, centre, rotation,
+                            def.Portal.RegionAId, def.Portal.RegionBId);
+    }
 }

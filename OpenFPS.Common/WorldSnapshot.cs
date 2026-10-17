@@ -4,8 +4,9 @@ using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Common;
 
-/// <summary>The client's world for one frame or audio tick, shared between systems.</summary>
-public class WorldSnapshot
+/// <summary>The client's world for one frame or audio tick, shared between systems. Never changed once built,
+/// which makes it the sound's world input as it is (<see cref="IAcousticWorld"/>): one immutable view per request.</summary>
+public class WorldSnapshot : IAcousticWorld
 {
     public readonly Dictionary<int, EntitySnapshot> Entities = new();
     public readonly List<EntitySnapshot> DynamicEntities = new();
@@ -89,6 +90,102 @@ public class WorldSnapshot
     /// <summary>The water in a wheel path of an asphalt road, mm (RoadWater): for a vehicle whose wheels
     /// the server does not send. Wheels that are sent carry their own (WheelState.Water).</summary>
     public float RoadWaterMm = 0.0f;
+
+    /// <summary>What is coming down: <see cref="Precipitation"/>, or rain at <see cref="RainRateMmPerHour"/> from a
+    /// server that sends only the rate.</summary>
+    public Precipitation Falling => Precipitation.Falling ? Precipitation
+                                  : new Precipitation(PrecipitationKind.Rain, RainRateMmPerHour);
+
+    // ── The world input (docs/SOUND_LIBRARY_BOUNDARY.md 7.3) ─────────────────────────────────────
+    //
+    // Each answer is read off the snapshot as it is asked, so the view is exactly as immutable as the
+    // snapshot: nothing here is cached against a later change to it.
+
+    OpenFPS.Common.Geometry.TriangleWorld? IAcousticWorld.Geometry => Geometry;
+    IReadOnlySet<int>? IAcousticWorld.GeometryStale => GeometryStale;
+    long IAcousticWorld.GeometryVersion => GeometryVersion;
+    float IAcousticWorld.TileMetres => TileMetres;
+    AcousticMap? IAcousticWorld.Rooms => AcousticMap;
+    AirState IAcousticWorld.Air => new(Temperature, Humidity, AirPressure, AirAbsorptionMultiplier);
+    int IAcousticWorld.BodyCount => Entities.Count;
+
+    bool IAcousticWorld.TryGetBody(int id, out AcousticBody body)
+    {
+        if (Entities.TryGetValue(id, out var snap)) { body = EntityAcoustics.BodyOf(snap); return true; }
+        body = default;
+        return false;
+    }
+
+    void IAcousticWorld.AllBodies(List<AcousticBody> into)
+    {
+        into.Clear();
+        foreach (var snap in Entities.Values) into.Add(EntityAcoustics.BodyOf(snap));
+    }
+
+    int IAcousticWorld.MovingCount => DynamicEntities.Count;
+    AcousticBody IAcousticWorld.MovingAt(int index) => EntityAcoustics.BodyOf(DynamicEntities[index]);
+
+    [ThreadStatic] private static List<EntitySnapshot>? _near;
+
+    bool IAcousticWorld.Near(Vector3 centre, float radius, bool staticOnly, List<AcousticBody> into)
+    {
+        var near = _near ??= new List<EntitySnapshot>(64);
+        bool indexed = EntitiesNear(centre, radius, staticOnly, near);
+        into.Clear();
+        foreach (var snap in near) into.Add(EntityAcoustics.BodyOf(snap));
+        return indexed;
+    }
+
+    void IAcousticWorld.Unindexed(bool staticOnly, List<AcousticBody> into)
+    {
+        into.Clear();
+        foreach (int id in UnindexedStatics)
+            if (Entities.TryGetValue(id, out var s)) into.Add(EntityAcoustics.BodyOf(s));
+        if (!staticOnly) foreach (var s in DynamicEntities) into.Add(EntityAcoustics.BodyOf(s));
+    }
+
+    void IAcousticWorld.DoorLeaves(List<DoorLeaf> into)
+    {
+        into.Clear();
+        foreach (var snap in Entities.Values)
+            if (EntityAcoustics.IsDoorLeaf(snap.Definition)) into.Add(EntityAcoustics.LeafOf(snap));
+    }
+
+    [ThreadStatic] private static List<int>? _nearIds;
+    [ThreadStatic] private static HashSet<int>? _nearSeen;
+
+    /// <summary>
+    /// The entities a query at <paramref name="centre"/> could possibly hit, each once (a wall spanning cells is
+    /// filed in each of them): the fixed solids the static grid files round it, then everything that moves unless
+    /// <paramref name="staticOnly"/>. With no grid yet (until the first rebuild, seconds after a map arrives) only
+    /// the whole world is the honest answer, and false says so. Cleared first.
+    /// </summary>
+    public bool EntitiesNear(Vector3 centre, float radius, bool staticOnly, List<EntitySnapshot> into)
+    {
+        into.Clear();
+        if (StaticGrid != null)
+        {
+            var ids = _nearIds ??= new List<int>(64);
+            var seen = _nearSeen ??= new HashSet<int>();
+            StaticGrid.CollectInRadius(centre, radius, ids, seen);
+
+            for (int i = 0; i < ids.Count; i++)
+                if (Entities.TryGetValue(ids[i], out var snap)) into.Add(snap);
+
+            // Dynamic entities are not in the static grid, so they are always in play.
+            if (!staticOnly)
+                for (int i = 0; i < DynamicEntities.Count; i++)
+                    if (seen.Add(DynamicEntities[i].Id)) into.Add(DynamicEntities[i]);
+
+            // An empty answer from the grid is an answer (the middle of a road). Falling through to every
+            // entity in the world froze a city of six thousand boxes, outdoors, where a listener spends
+            // their time.
+            return true;
+        }
+
+        foreach (var snap in Entities.Values) into.Add(snap);
+        return false;
+    }
 }
 
 /// <summary>One entity in a <see cref="WorldSnapshot"/>.</summary>
@@ -118,4 +215,7 @@ public struct EntitySnapshot
     /// <summary>Whether a body on foot stands on something, as the server's step left it
     /// (EntityState.Grounding); Unknown for anything no step stands.</summary>
     public Grounding Grounding;
+
+    /// <summary>An entity is a body to the sound (<see cref="EntityAcoustics.BodyOf"/>).</summary>
+    public static implicit operator AcousticBody(EntitySnapshot snap) => EntityAcoustics.BodyOf(snap);
 }

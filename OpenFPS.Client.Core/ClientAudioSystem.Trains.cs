@@ -139,7 +139,7 @@ public partial class ClientAudioSystem
             if (em.SoundId == null || !TrainVoiceState.ParseKey(em.SoundId, out _, out _, out int index)) continue;
             if (index < 0 || index >= v.Layout.Count) continue;
             var entry = v.Layout[index];
-            var at = AudioEmission.PointFor(snap);
+            var at = EntityEmission.PointFor(snap);
             float d = Vector3.Distance(at, eyePos);
             // As loud as its own voice would play it, the ear model's correction included.
             float gain = TrainVoicing.LawGain(_audio.Hearing, entry.LevelDb, entry.ExtentMetres, d) * Correction(v, em.SoundId, entry.LevelDb);
