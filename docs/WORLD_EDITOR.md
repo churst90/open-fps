@@ -660,7 +660,7 @@ that failed before it. Unheard: tried by tests only.
 ### A thing made again keeps what it is doing
 
 - `WorldEditor.Remake` (a prefab's new version, a thing's new model) carries the running state of the
-  thing across (`LiveState`, OpenFPS.Server/Editor/LiveState.cs). What the model says comes from the new
+  thing across (`LiveState`, OpenFPS.Editor/LiveState.cs). What the model says comes from the new
   version; what the thing is doing comes from the old one.
 - A door: its openness, where it is swinging to, its closer's and motor's clock, which hand has it, the
   key being turned and whether a key was used. Its locked side and push side were already settings. An

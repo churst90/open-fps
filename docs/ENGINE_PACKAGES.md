@@ -13,7 +13,7 @@ models for method and depth are docs/SOUND_LIBRARY_BOUNDARY.md and docs/PHYSICS_
   `ratchet` there (stage 0). Run it again after any move.
 - Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy; Materials since
   stage 1 was built (2026-10-12), Models since stage 2, Accessibility, its clean half, since stage 7,
-  World since stage 4 and Environment since stage 3 (2026-10-16). Planned with their
+  World since stage 4, Environment since stage 3 and Editor since stage 8 (2026-10-16). Planned with their
   own documents and not planned again here: `OpenFPS.Audio` and the split of `ClientAudioSystem` (sound library
   stages 6 to 8), and physics stages 2 to 6. This survey says where its packages meet them.
 
@@ -1073,6 +1073,47 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   catalogue reads World's prefab loading; the overlay takes the map's data.
 - Check: `WorldEditorTests` and its phase and leftovers tests, `EditorDialogTests`, `EditorFormTests`,
   `WorldEditorClientTests`.
+
+- **Built 2026-10-16, Editor** (on Linux, in three commits on main `7d45f7f1`). `OpenFPS.Editor` holds 13 files
+  on Words, Schema, Geometry, Materials, Environment, Models, World, Common and Accessibility; the server,
+  Client.Core and both heads reference it. Nothing a player hears, sees or is told changes, the editor's spoken
+  menus and dialogs included.
+  - **The rename first.** The editor's catalogue of kinds, `OpenFPS.Server.Editor.ModelCatalog`, is `EditorKinds`
+    (in `EditorKinds.cs`): it holds the kinds the editor edits (`EditorKind`), and stage 2's `Catalogue` no
+    longer reads like it. The properties holding one keep their name, `Catalog`.
+  - **The splits** (the editor's 22 crossings; the plan's 33 less the 11 that stage 4's `PrefabLibrary` took):
+
+    | What | Was | Now |
+    |---|---|---|
+    | The prefab kind's files | `PrefabKind` on the server's `PrefabRepository` | on World's `PrefabLibrary` (read, checked, put in use); the repository extends it, so its callers hand it the same object |
+    | `Pose` | in `WorldEditor.Ops.cs` | `Pose.cs`, cut whole, beside `LiveState` |
+    | A door made again | `LiveState.OnTo` called `DoorSystem.Settle` | it is handed the settle law; the host hands it `DoorSystem.Settle` |
+    | The things' settings after load | `ApplyAfter(MapManager, id)` asked the map manager for the world and its things | `ApplyAfter(id, world, authored)`: the map's data handed in |
+    | What laying an overlay needs of the host | `MapSettings.Apply`, `WorldEditor.LayRoutes` and `WorldEditor.IsVehicleId`, called from the overlay | `OverlayLaying` (which ids are parked vehicles, how a setting is laid, how the routes become the map's data), handed to `ApplyBefore` and `Lay`; the server's is `WorldEditor.Laying`. `OverlayAddition.IsVehicle` is `WorldEditor.IsParked` |
+
+    Each is held by a test that failed when it was broken: a parked vehicle laid as a thing
+    (`WorldEditorPlacedTests`), the map's settings not laid (`WorldEditorPhase2Tests`, `WorldEditorPhase3Tests`'
+    baking, `MapSizeTests`), the routes not laid (`WorldEditorPhase3Tests`' road), a door not settled after a new
+    version (two of `WorldEditorLeftoversTests`), and the settings not put on the things after load
+    (`WorldEditorTests`, the baking).
+  - **The move**, each file whole and its history kept, namespaces as they were: from the server's `Editor/`
+    `EditorKinds.cs`, `EntitySettings.cs`, `LiveState.cs`, `MapOverlay.cs`, `MapVersions.cs`, `ModelStore.cs`,
+    `OverlayRoute.cs` and `Pose.cs`, from its `Core/` `BuildSession.cs`, and from Client.Core `EditorDialog.cs`,
+    `EditorKeys.cs`, `EditorValuePrompt.cs` and `BuildForm.cs`. Three members the server's commands use went from
+    internal to public: `LiveState`, `MapOverlayStore.Lay` and `Find`. The tests and the lab see its internals.
+    No crossing came or went with the move.
+  - **The guards followed.** The packages ratchet (Editor a sorted project, its files by one rule, its assembly
+    checked against its layer), the library's (Editor sorted, all host). The reader parses the new project with
+    no binding error and every project above it references it; the physics survey sorts it as host, its 15
+    unchanged.
+  - **The counts.** The packages ratchet falls from 736 to 714, all 22 the editor's: no file of its model reaches
+    the game. The library's allowance stays empty.
+  - **The wire hash** does not change (60f35a9236d7): none of the files was hashed, and Editor is not
+    (decision 11).
+  - **Left:** `EditorKeys.Enabled` is still a static written from four places (section 6: an option the session
+    holds). The folders of the overlays, the map versions and the model versions are still handed in by the
+    server one by one, not as one options value. The two allowed name tests (`WorldEditor.Routes`' concrete,
+    `WorldEditor.Menus`' "Audience") stay in the host, untouched.
 
 ### Stage 9: Accessibility on the scene view (2 to 3 sessions)
 

@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Package stage 8, Editor (docs/ENGINE_PACKAGES.md, stage 8 as built). Nothing a player hears, sees or is told
+  changes. The world editor's model is a project of its own, `OpenFPS.Editor`: the kinds it edits, the model
+  and map versions, a map's edits laid over its data, a placed thing's settings and running state, and the
+  dialogs and forms a head draws. The editor's catalogue of kinds is `EditorKinds` now, not `ModelCatalog`. Its
+  prefab kind reads World's prefab files, and the overlay is handed the map's data and how the editor lays a
+  setting, a route and a parked vehicle. The wire hash does not change.
 - Package stage 3, Environment (docs/ENGINE_PACKAGES.md, stage 3 as built). Nothing a player hears changes.
   The weather, the water on the ground and the roads, and fire are a project of their own, `OpenFPS.Environment`:
   what falls and its drops, the storm's strikes, the air's layers, the waves a wind raises, the rain running off,
