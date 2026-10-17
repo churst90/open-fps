@@ -84,7 +84,7 @@ public static class NearWallsSpike
         {
             var ear = feet + new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f);
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-            prober.Probe(spatial, snap, ear, head, c, probes);
+            prober.Probe(snap, ear, head, c, probes);
             ticks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; casts++;
             var now = Copies(shared: true);
             var was = Copies(shared: false);
@@ -116,7 +116,7 @@ public static class NearWallsSpike
                 var ear = spot + new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f);
                 for (int turn = 0; turn < 8; turn++)
                 {
-                    prober.Probe(spatial, snap, ear, Quaternion.CreateFromAxisAngle(Vector3.UnitY, turn * MathF.PI / 4f), c, probes);
+                    prober.Probe(snap, ear, Quaternion.CreateFromAxisAngle(Vector3.UnitY, turn * MathF.PI / 4f), c, probes);
                     var now = Copies(shared: true);
                     var was = Copies(shared: false);
                     float loud = MathF.Max(now.L, now.R), before = MathF.Max(was.L, was.R);
@@ -138,7 +138,7 @@ public static class NearWallsSpike
             {
                 var ear = Vector3.Lerp(from, to, k / (float)steps) + new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f);
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                prober.Probe(spatial, snap, ear, head, c, probes);
+                prober.Probe(snap, ear, head, c, probes);
                 ticks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; casts++;
             }
         Console.WriteLine($"  the probes and their looks: {ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / casts:F3} ms a frame on average over {casts}");

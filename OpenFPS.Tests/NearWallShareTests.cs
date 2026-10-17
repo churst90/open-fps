@@ -55,7 +55,7 @@ public class NearWallShareTests
     {
         var probes = new BoundaryProbe[BoundaryModel.ProbeDirections.Length];
         var head = Quaternion.CreateFromAxisAngle(Vector3.UnitY, yawDegrees * MathF.PI / 180f);
-        new ClientAudioSystem.BoundaryProber().Probe(new SpatialService(), world, Ear, head, AudioPhysics.SpeedOfSound, probes);
+        new ClientAudioSystem.BoundaryProber().Probe(world, Ear, head, AudioPhysics.SpeedOfSound, probes);
         return probes;
     }
 

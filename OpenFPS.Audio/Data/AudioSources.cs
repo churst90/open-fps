@@ -153,3 +153,30 @@ public interface IAudioSources
     /// <summary>The water in a wheel path of the roads, mm, for vehicles whose wheels are not sent.</summary>
     float RoadWaterMm { get; }
 }
+
+/// <summary>
+/// The listener as the host has them (docs/SOUND_LIBRARY_BOUNDARY.md 7.2): where the feet are as the listener is
+/// heard (smoothed, so a correction from the host's authority is not heard as a jump) and where the body is as the
+/// host's physics has it, how high the ears are above the feet, which way the head faces, how fast it moves, what it
+/// rides in, how sheltered it is and whether it is indoors.
+/// </summary>
+public readonly record struct ListenerState
+{
+    public Vector3 Feet { get; init; }
+    public Vector3 Body { get; init; }
+    public float EyeHeight { get; init; }
+    public Quaternion Rotation { get; init; }
+    /// <summary>The head's turn about the vertical, radians: what the mouth faces.</summary>
+    public float Yaw { get; init; }
+    public Vector3 Velocity { get; init; }
+    /// <summary>The id of what the listener rides in, or -1.</summary>
+    public int RidingId { get; init; }
+    public float Shelter { get; init; }
+    public bool Indoor { get; init; }
+
+    public bool Riding => RidingId >= 0;
+}
+
+/// <summary>A level crossing's rails as a voiced wheel meets them: the crossing's middle, the way the rails run, how
+/// far either side of the middle they are crossed, and a point on each rail.</summary>
+public readonly record struct RailCrossing(Vector3 Centre, Vector3 Along, float HalfLengthMetres, Vector3 Left, Vector3 Right);

@@ -67,6 +67,7 @@ OpenFPS.Audio/Acoustics/VehicleShadow.cs	Audio
 OpenFPS.Audio/Core/AudioBank.cs	Audio	
 OpenFPS.Audio/Core/AudioDataPaths.cs	Audio	
 OpenFPS.Audio/Core/AudioEngineFacade.cs	Audio	
+OpenFPS.Audio/Core/AudioHost.cs	Audio	
 OpenFPS.Audio/Core/AudioWorldOptions.cs	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	Audio	
 OpenFPS.Audio/Core/PlacementThread.cs	Audio	

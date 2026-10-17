@@ -7,7 +7,7 @@ namespace OpenFPS.Client.Services;
 /// Which file in the audio bank a footstep on a material, or a named sound category, plays. It never
 /// plays anything: <see cref="ClientAudioSystem"/> builds the emitters.
 /// </summary>
-public class SoundMappingService
+public class SoundMappingService : OpenFPS.Client.AudioEngine.Core.IRecordings
 {
     private readonly LocalPlayerState _state;
     private readonly AudioBank _bank = new();

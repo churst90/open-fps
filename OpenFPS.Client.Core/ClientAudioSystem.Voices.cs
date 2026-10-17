@@ -76,7 +76,7 @@ public partial class ClientAudioSystem
     private OwnerPath Shadowed(WorldSnapshot world, int ownerId, in AcousticPathData direct, Vector3 at, Vector3 ear)
     {
         var heard = direct;
-        VehicleShadow.Apply(ref heard, world, ownerId, at, ear, _state.RidingEntityId);
+        VehicleShadow.Apply(ref heard, world, ownerId, at, ear, Listener.RidingId);
         return new OwnerPath(direct, heard, fresh: true);
     }
 
