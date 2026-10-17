@@ -130518,10 +130518,10 @@
   },
   {
    "EntityId": 8546,
-   "PrefabId": "elm_fountain_water_0",
+   "PrefabId": "elm_fountain",
    "Position": {
     "X": -325.0,
-    "Y": 1.9,
+    "Y": 0.35,
     "Z": 227.0
    },
    "Scale": {
@@ -130530,66 +130530,6 @@
     "Z": 1
    },
    "Name": "Elm Park fountain"
-  },
-  {
-   "EntityId": 8547,
-   "PrefabId": "elm_fountain_water_1",
-   "Position": {
-    "X": -325.0,
-    "Y": 0.8,
-    "Z": 229.3
-   },
-   "Scale": {
-    "X": 1,
-    "Y": 1,
-    "Z": 1
-   },
-   "Name": "Elm Park fountain, north side"
-  },
-  {
-   "EntityId": 8548,
-   "PrefabId": "elm_fountain_water_2",
-   "Position": {
-    "X": -322.7,
-    "Y": 0.8,
-    "Z": 227.0
-   },
-   "Scale": {
-    "X": 1,
-    "Y": 1,
-    "Z": 1
-   },
-   "Name": "Elm Park fountain, east side"
-  },
-  {
-   "EntityId": 8549,
-   "PrefabId": "elm_fountain_water_3",
-   "Position": {
-    "X": -325.0,
-    "Y": 0.8,
-    "Z": 224.7
-   },
-   "Scale": {
-    "X": 1,
-    "Y": 1,
-    "Z": 1
-   },
-   "Name": "Elm Park fountain, south side"
-  },
-  {
-   "EntityId": 8550,
-   "PrefabId": "elm_fountain_water_4",
-   "Position": {
-    "X": -327.3,
-    "Y": 0.8,
-    "Z": 227.0
-   },
-   "Scale": {
-    "X": 1,
-    "Y": 1,
-    "Z": 1
-   },
-   "Name": "Elm Park fountain, west side"
   },
   {
    "EntityId": 8551,
