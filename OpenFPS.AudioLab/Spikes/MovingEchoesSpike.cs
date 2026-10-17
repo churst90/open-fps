@@ -178,9 +178,10 @@ public static class MovingEchoesSpike
     }
 
     /// <summary>
-    /// The capture's top octaves (two first differences, about 6 kHz up) in 2 ms frames, from the run's onset for
-    /// <paramref name="seconds"/>: each frame against the median of the 50 ms round it. The ring's own top is steady, so
-    /// a copy moved with a step would stand out of its neighbours; the worst frames and when.
+    /// The capture's top octaves from the run's onset for <paramref name="seconds"/> (<see cref="TopOctaveSteps"/>): each
+    /// 2 ms frame against the 50 ms round it, a round never quieter than 60 dB under the run. The ring's own top is
+    /// steady, so a copy moved with a step would stand out of its neighbours; the worst frames, when, and how far under
+    /// the run's loudest frame each is.
     /// </summary>
     private static int Clicks(string path, double received, double seconds, double moving)
     {
@@ -193,33 +194,17 @@ public static class MovingEchoesSpike
         for (int i = search; i < searchEnd; i++) if (Math.Abs(l[i]) + Math.Abs(r[i]) >= 0.1 * peak) { onset = i; break; }
         if (peak < 1e-5 || onset < 0) { Console.WriteLine("  FAIL: the run is not in the capture"); return 1; }
         int from = onset + sr / 50, to = Math.Min(l.Length, onset + (int)(seconds * sr));
-        int frame = sr / 500;
-        var e = new List<double>();
-        for (int i = from; i + frame <= to; i += frame)
-        {
-            double s = 0;
-            for (int k = i; k < i + frame; k++)
-            {
-                double hl = l[k] - 2 * l[k - 1] + l[k - 2], hr = r[k] - 2 * r[k - 1] + r[k - 2];
-                s += hl * hl + hr * hr;
-            }
-            e.Add(s / frame + 1e-30);
-        }
-        const int Round = 12;
-        var worst = new List<(double Db, double At)>();
-        for (int i = Round; i < e.Count - Round; i++)
-        {
-            var near = e.GetRange(i - Round, 2 * Round + 1).OrderBy(x => x).ToList();
-            worst.Add((10 * Math.Log10(e[i] / near[Round]), (from - onset + i * frame) / (double)sr));
-        }
-        Console.WriteLine($"  top octaves, onset {onset / (double)sr - received:F3} s after it was received; 2 ms frames over the 50 ms round them:");
+        double lead = (from - onset) / (double)sr;
+        var worst = TopOctaveSteps.Measure(l, r, sr, from, to).Select(f => f with { Seconds = f.Seconds + lead }).ToList();
+        Console.WriteLine($"  top octaves, onset {onset / (double)sr - received:F3} s after it was received; 2 ms frames over the 50 ms round them"
+                        + $" (a round no quieter than {-TopOctaveSteps.SilenceDb:F0} dB under the run), and under the run's loudest:");
         foreach (var (name, a, b) in new[] { ("while it moves", 0.05, moving + 0.2), ("after", moving + 0.2, seconds) })
         {
-            var part = worst.Where(w => w.At >= a && w.At < b).ToList();
+            var part = worst.Where(w => w.Seconds >= a && w.Seconds < b).ToList();
             if (part.Count == 0) continue;
-            var top = part.OrderByDescending(w => w.Db).Take(3);
-            Console.WriteLine($"    {name,-15} worst " + string.Join(", ", top.Select(w => $"{w.Db:F1} dB at {w.At:F2} s"))
-                            + $"; {part.Count(w => w.Db > 10)} of {part.Count} over 10 dB");
+            var top = part.OrderByDescending(w => w.OverRoundDb).Take(3);
+            Console.WriteLine($"    {name,-15} worst " + string.Join(", ", top.Select(w => $"{w.OverRoundDb:F1} dB at {w.Seconds:F2} s ({w.UnderLoudestDb:F0})"))
+                            + $"; {part.Count(w => w.OverRoundDb > 10)} of {part.Count} over 10 dB");
         }
         return 0;
     }

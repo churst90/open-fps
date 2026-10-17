@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- The click at the end of the patio door's run in AudioLab `--moving-echoes` was the lab's measure, not a sound
+  (docs/CLIENT_NOTES.md "One-off sounds: why the echoes are as they are"). Its 54 dB frame was float dust 200 dB
+  under the door against a round of digital zeros, with the copies following and left still alike; the next, 51 dB,
+  was the render's own end, 87.5 dB under its peak. The measure (`TopOctaveSteps`, AudioLab, linked into the tests)
+  takes no round as quieter than 60 dB under the run: after the run nothing stands 10 dB out, before or after the
+  moving copies, and a ring cut while it can be heard still does. No sound changes. Found on the way and not
+  changed, the models being approved: the knob, glass and push bar doors' renders stop while they still ring, a
+  knob door's close up to 26 dB under its peak (todo, "Door renders that end while they ring").
 - A one-off sound that moves as it plays has its echoes found and moved with it (Resonance's 2.6; todo item 3;
   docs/CLIENT_NOTES.md "One-off sounds: why the echoes are as they are"). A sliding or lift door's run is sent
   moving (`MovesTo`) and a part of the thunder is kept in its direction while you walk, but their copies off the

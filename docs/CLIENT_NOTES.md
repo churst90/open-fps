@@ -406,6 +406,12 @@ wind never changed direction except when a front came, and every front blew from
   8 m/s, 4 m off Selby House's south wall: the wall's copy went from 337 to 23 degrees with it; before it stayed
   at 337 the whole way. No clicks: the capture's top octaves while it moves, in 2 ms frames against the 50 ms
   round them, no worse than with the copies left still (1.1 and 7.7 dB, against 1.5 and 9.1).
+- After the patio door's run the same measure showed a frame 54 dB over its round, with the copies following and
+  left still alike. It was the measure: a frame of float dust 200 dB under the door, 0.65 s after its render
+  ended, against a round of digital zeros. The next, 51 dB, was the render's own end, which stops on an offset
+  87.5 dB under its peak, under hearing. The round is never taken as quieter than 60 dB under the run now
+  (AudioLab `TopOctaveSteps`), the depth the mixer takes for silence; after the run nothing stands 10 dB over its
+  round, and a sound cut while it can still be heard still does.
 
 ## Rain: a drop's click and its spray
 

@@ -49,7 +49,8 @@ fingerprint changed too, so the door renders are made again once.
    the jamb, a ring carried past Selby House's south wall takes its copy 46 degrees with it; no clicks; 0.5-2.7 ms a
    search, none for a still sound. A swinging door is heard from its shut leaf and does not move, so its copies
    stay; whether a swing should be heard moving is Cody's to say (Cody).
-   Listen: "Listen in the game" below.
+   Listen: "Listen in the game" below. The "click at the ring's end" the lab found, with and without the change,
+   was its own measure against digital silence, not a sound (changes.md, 2026-10-17); the measure is fixed.
 4. A doorway route leaves from the wall's face (Resonance's 1.2): DONE 2026-10-17 (changes.md). A door's opening
    is measured from its jambs' faces, in the middle of the wall and as deep as it, wherever the leaf hangs; a leg
    leaves it from the face on its own room's side (`Opening.ASide`), straight out. The leaf at a face of a 0.3 m wall,
@@ -310,6 +311,18 @@ old PA in --loudspeaker game).
 - Everything of 2026-10-14 to 17 is unheard. It is listed with its /tp spots at the top of "Listen in the game"
   (Now, below): doorways, the ground, the wind and the air, running water, the binaural pool, stops without a
   click, your own room's reverb, a car's roof.
+- Door renders that end while they ring (Cody, a decision; found 2026-10-17). A door model's render stops at a
+  fixed time after its last event, not when its sound has died away, and the voice ends with the buffer, so the
+  step is in the render. Measured on the 228 renders in the door cache and checked against the current code:
+  122 of the 130 knob door keys end above 60 dB under their peak, the worst a close whose last 5 ms are a 33 Hz
+  ring 26 dB under its peak, 81 dB SPL at a metre, cut mid-cycle (KnobDoor's hand close stops 1.0 s after the
+  first blow, its open 0.6 s after the swing); 10 of the 28 glass door keys (the worst a pull door's close, a
+  knock starting 40 ms before the render ends and cut 31 dB under its peak); 3 of 6 push bar closes, 56 dB under.
+  The patio, automatic, lock and car window renders end 87 dB or more under their peaks (the lift door's were not
+  measured). The models were approved by ear, so nothing was changed. The fix by the rule would let each model run
+  on until its sound is 60 dB under its peak (the mixer's silence) and keep every sample it makes now: the approved
+  part unchanged, a longer tail, every door render made again once. Not a fade: the knob door's tail is well above
+  hearing.
 
 Approved 2026-10-09 to 11, so off this list: the hull's blows in time; the cheaper reverb tail; the
 shut glass door leak fix (inbox/pa-leak-2026-10-09); the loudspeaker (inbox/loudspeaker-2026-10-10); the
