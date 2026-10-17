@@ -466,6 +466,7 @@ OpenFPS.Sound/Core/Nature/FallingWaterSynth.cs	Sound
 OpenFPS.Sound/Core/Nature/FireReferences.cs	Sound	
 OpenFPS.Sound/Core/Nature/FireSynth.cs	Sound	
 OpenFPS.Sound/Core/Nature/FoliageSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/LinePath.cs	Sound	
 OpenFPS.Sound/Core/Nature/PowerLawNoise.cs	Sound	
 OpenFPS.Sound/Core/Nature/RainPatch.cs	Sound	
 OpenFPS.Sound/Core/Nature/RainSynth.cs	Sound	

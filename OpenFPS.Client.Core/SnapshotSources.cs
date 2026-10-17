@@ -122,6 +122,7 @@ public sealed class SnapshotSources : IAudioSources
             WindowsOpen = em.WindowsOpen,
             Loudspeaker = em.Loudspeaker,
             Quench = em.Quench,
+            Line = em.Line,
             Shape = def.Collider.Shape,
             Size = def.Collider.Size,
         };

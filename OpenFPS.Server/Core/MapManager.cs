@@ -385,6 +385,7 @@ public partial class MapManager
         }
 
         ApplyRoomMaterials(world, entity, entityData, mapId);
+        ApplyLine(world, entity, entityData);
         ApplyForm(world, entity, entityData, mapId);
 
         // Which side of this door is locked and which way it is pushed depend on where it is put,
@@ -408,6 +409,13 @@ public partial class MapManager
         return entity;
     }
 
+    /// <summary>A source the map lays along a line of its own (a mapped creek): the line, on its emitter.</summary>
+    private static void ApplyLine(World world, Entity entity, Repositories.EntityData entityData)
+    {
+        if (entityData.Line is { Length: >= 2 } line && world.Has<SoundEmitterComponent>(entity))
+            world.Get<SoundEmitterComponent>(entity).Line = line;
+    }
+
     /// <summary>
     /// What a map entry says over its prefab besides its place and form, laid on a thing made again
     /// from it after load (the world editor's undo and "put it back as the map has it"): a room's
@@ -417,6 +425,7 @@ public partial class MapManager
     public static void ApplyEntryExtras(World world, Entity entity, Repositories.EntityData entityData, string mapId)
     {
         ApplyRoomMaterials(world, entity, entityData, mapId);
+        ApplyLine(world, entity, entityData);
         if (world.Has<DoorComponent>(entity) && (entityData.KeyedSide.HasValue || entityData.PushSide.HasValue))
         {
             ref var door = ref world.Get<DoorComponent>(entity);

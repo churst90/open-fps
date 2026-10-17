@@ -138,6 +138,246 @@ public class ExtentWalkTests
         Assert.Equal(0, flickers);
     }
 
+    // ── A line along a path of its own (2026-10-17) ─────────────────────────────────────────────
+
+    /// <summary>An arc of <paramref name="radius"/> m through <paramref name="degrees"/>, its middle at the origin, bending
+    /// round toward +z, as a polyline of <paramref name="points"/> points.</summary>
+    private static Vector3[] Arc(float radius, float degrees, int points)
+    {
+        var p = new Vector3[points];
+        float span = degrees * MathF.PI / 180f;
+        for (int i = 0; i < points; i++)
+        {
+            float a = -0.5f * span + span * i / (points - 1);
+            p[i] = new Vector3(radius * MathF.Sin(a), 0f, radius - radius * MathF.Cos(a));
+        }
+        return p;
+    }
+
+    private static IEnumerable<LinePath> Paths()
+    {
+        yield return LinePath.Straight(Vector3.Zero, Vector3.UnitX, 20f);
+        yield return new LinePath(Arc(20f, 120f, 25));
+        yield return new LinePath(Arc(20f, 120f, 25), width: 6f);
+        // A dog-leg with a climb in it, as a drainage line's cells run.
+        yield return new LinePath(new[] { new Vector3(-30f, 1f, 0f), new Vector3(-5f, 0.5f, 0f), new Vector3(0f, 0.4f, 6f), new Vector3(25f, 0f, 8f) }, width: 2f);
+    }
+
+    /// <summary>A straight path is cut and placed as the straight line always was (ExtendedSources.View), to a
+    /// millimetre and a hundredth of a decibel.</summary>
+    [Fact]
+    public void AStraightPathIsCutAndPlacedAsTheStraightLine()
+    {
+        const float L = 20f, Reference = 2f;
+        var path = LinePath.Straight(Vector3.Zero, Vector3.UnitX, L);
+        foreach (var ear in Ears())
+        {
+            var view = ExtendedSources.View(Vector3.Zero, Vector3.UnitX, L, ear);
+            int n = ExtendedSources.WantedPieces(view, 0);
+            Assert.Equal(n, ExtendedSources.WantedPieces(path, ear, 0));
+            var a = ExtendedSources.Cut(view, n);
+            var b = ExtendedSources.Cut(path, ear, n);
+            for (int i = 0; i <= n; i++) Assert.True(MathF.Abs(a.Edges[i] - b.Edges[i]) < 1e-3f, $"edge {i} at {ear}: {a.Edges[i]} against {b.Edges[i]}");
+            for (int i = 0; i < n; i++)
+            {
+                var pa = ExtendedSources.Place(view, a.Edges[i], a.Edges[i + 1], Reference);
+                var pb = ExtendedSources.Place(path, ear, a.Edges[i], a.Edges[i + 1], Reference);
+                Assert.True(MathF.Abs(pa.Along - pb.Along) < 1e-3f, $"piece {i} at {ear} along {pa.Along} against {pb.Along}");
+                Assert.True(MathF.Abs(pa.Along - pb.At.X) < 1e-3f, $"piece {i} at {ear} placed at {pb.At}");
+                Assert.True(Math.Abs(20 * Math.Log10(pa.Gain / pb.Gain)) < 0.01, $"piece {i} at {ear}: {pa.Gain} against {pb.Gain}");
+            }
+            Assert.Equal(ExtendedSources.MeanLawPower(view, Reference), ExtendedSources.MeanLawPower(path, ear, Reference), 4);
+        }
+    }
+
+    /// <summary>
+    /// A bent path, a wide bed, a dog-leg that climbs: at any ear the pieces cover it once end to end, none covers more
+    /// than the split angle unless the cap binds, and together they are the whole path heard from every point of it
+    /// (wide beds across themselves), within a hundredth of a decibel, however it is cut.
+    /// </summary>
+    [Fact]
+    public void APathsPiecesCoverItOnceAndTogetherAreTheWholePath()
+    {
+        const float Reference = 2f;
+        foreach (var path in Paths())
+            foreach (var flat in Ears())
+            {
+                var ear = flat + new Vector3(0f, 0f, 3f);
+                double whole = ExtendedSources.MeanLawPower(path, ear, Reference);
+                int wanted = ExtendedSources.WantedPieces(path, ear, 0);
+                foreach (int n in new[] { 1, 3, wanted, ExtendedSources.MaxPlaces })
+                {
+                    var cut = ExtendedSources.Cut(path, ear, n);
+                    Assert.Equal(-path.HalfLength, cut.Edges[0]);
+                    Assert.Equal(path.HalfLength, cut.Edges[^1]);
+                    double sum = 0, share = 0;
+                    for (int i = 0; i < cut.Count; i++)
+                    {
+                        Assert.True(cut.Edges[i + 1] >= cut.Edges[i], $"edges out of order at {ear}");
+                        float covers = Covered(path, ear, cut.Edges[i], cut.Edges[i + 1]);
+                        if (n == wanted && wanted < ExtendedSources.MaxPlaces)
+                            Assert.True(covers <= TrainVoicing.SplitAboveDegrees + 0.05f, $"a piece covers {covers:F2}° at {ear}");
+                        var p = ExtendedSources.Place(path, ear, cut.Edges[i], cut.Edges[i + 1], Reference);
+                        float g = p.Gain * MathF.Min(1f, Reference / Vector3.Distance(ear, p.At));
+                        int place = cut.PlaceOfPiece(i);
+                        sum += cut.ShareOfPlace(place) * (double)g * g;
+                        share += cut.ShareOfPlace(place);
+                    }
+                    Assert.Equal(1.0, share, 4);
+                    Assert.True(Math.Abs(10 * Math.Log10(sum / whole)) < 0.01, $"{n} pieces of a {path.Length:F0} m path at {ear}: {10 * Math.Log10(sum / whole):F3} dB off");
+                }
+            }
+    }
+
+    /// <summary>The angle a stretch of a path covers at the ear, degrees, by fine steps along it.</summary>
+    private static float Covered(LinePath path, Vector3 ear, float from, float to)
+    {
+        double sum = 0;
+        var last = path.PointAt(from) - ear;
+        for (int s = 1; s <= 400; s++)
+        {
+            var next = path.PointAt(from + (to - from) * s / 400f) - ear;
+            sum += Math.Atan2(Vector3.Cross(last, next).Length(), Vector3.Dot(last, next));
+            last = next;
+        }
+        return (float)(sum * 180.0 / Math.PI);
+    }
+
+    /// <summary>Tapping back and forth round a bent path never cuts it into a different number of pieces and back.</summary>
+    [Fact]
+    public void ATapNeverCutsABentPathBackAndForth()
+    {
+        var path = new LinePath(Arc(20f, 120f, 25));
+        int flickers = 0, changed = 0;
+        foreach (float r in new[] { 15f, 18.5f, 21.5f, 26f, 40f })
+            for (float a = -80f; a <= 80f; a += 0.4f)
+            {
+                float rad = a * MathF.PI / 180f;
+                var at = new Vector3(r * MathF.Sin(rad), 1.7f, 20f - r * MathF.Cos(rad));
+                var step = new Vector3(MathF.Cos(rad), 0f, MathF.Sin(rad)) * 0.15f;
+                int first = ExtendedSources.WantedPieces(path, at, 0);
+                int n = ExtendedSources.WantedPieces(path, at + step, first);
+                if (n != first) changed++;
+                for (int tap = 0; tap < 6; tap++)
+                {
+                    int next = ExtendedSources.WantedPieces(path, at + (tap % 2 == 0 ? Vector3.Zero : step), n);
+                    if (next != n) flickers++;
+                    n = next;
+                }
+            }
+        _o.WriteLine($"round a bend: the first tap changed the count {changed} times, a tap back and forth {flickers}");
+        Assert.True(changed > 0, "no tap ever changed the count: the test asked nothing");
+        Assert.Equal(0, flickers);
+    }
+
+    /// <summary>A creek laid along a bent line of its own, one source, as the server lays a drainage line or a mapped
+    /// creek (SoundEmitterComponent.Line).</summary>
+    private static ClientAudioHarness OnePathCreek(Vector3[] line, Vector3 position)
+    {
+        var h = new ClientAudioHarness();
+        var def = new EntityDefinition
+        {
+            EntityId = 700,
+            Type = EntityType.StaticObject,
+            Transform = new Transform { Position = position, Rotation = Quaternion.Identity, Scale = Vector3.One },
+        };
+        def.SoundEmitter.IsSynth = true;
+        def.SoundEmitter.SoundId = "flow:creek";
+        def.SoundEmitter.Mode = PlaybackMode.LoopOne;
+        def.SoundEmitter.Volume = 1f;
+        def.SoundEmitter.MinDistance = 1f;
+        def.SoundEmitter.Range = 60f;
+        def.SoundEmitter.Line = line.Select(p => p - position).ToArray();
+        h.World.RegisterDefinition(def);
+        return h;
+    }
+
+    /// <summary>
+    /// Walking round the inside of a bend 1.5 m off a creek laid along it, one source, the level stays within ±1.5 dB of
+    /// its mean and it comes from beside you all the way round: the cut follows the bend, not a chord across it.
+    /// </summary>
+    [Fact]
+    public void RoundABendTheLevelIsFlatAndComesFromBeside()
+    {
+        const float R = 40f;
+        var line = Arc(R, 100f, 41).Select(p => p + new Vector3(0f, 0.05f, 0f)).ToArray();
+        var h = OnePathCreek(line, line[20]);
+        float eye = LocalPlayerState.StandingEyeHeight;
+        Vector3 Feet(float degrees)
+        {
+            float a = degrees * MathF.PI / 180f;
+            return new Vector3((R - 1.5f) * MathF.Sin(a), 0f, R - (R - 1.5f) * MathF.Cos(a));
+        }
+        h.StandAt(Feet(-30f));
+        h.Tick(240);
+        var levels = new List<double>();
+        int frames = (int)(0.5 * ClientAudioSystem.UpdateHz);
+        float worstOff = 0f;
+        for (float a = -30f; a <= 30f; a += 0.5f / R * 180f / MathF.PI)
+        {
+            for (int f = 1; f <= frames; f++) { h.StandAt(Feet(a)); h.Tick(); }
+            var ear = Feet(a) + new Vector3(0f, eye, 0f);
+            var heard = AudioWorld.HeardTogether(h.Mixer.Latest, h.Mixer.Live, h.Mixer.Pieces, id => id.StartsWith("flow:"), ear, h.Facade.Options.WideSources);
+            levels.Add(10 * Math.Log10(heard.Power));
+            // The water is outward of the walk, toward the bend's outside.
+            float rad = a * MathF.PI / 180f;
+            var outward = new Vector3(MathF.Sin(rad), 0f, -MathF.Cos(rad));
+            float toward = MathF.Atan2(outward.X, outward.Z) * 180f / MathF.PI;
+            float off = MathF.Abs(((heard.BearingDegrees - toward) % 360f + 540f) % 360f - 180f);
+            worstOff = MathF.Max(worstOff, off);
+        }
+        double mean = 10 * Math.Log10(levels.Average(l => Math.Pow(10, l / 10)));
+        _o.WriteLine($"round a {R:F0} m bend 1.5 m inside it: {levels.Min() - mean:F2} to {levels.Max() - mean:F2} dB about the mean; heard at most {worstOff:F0}° off beside");
+        Assert.InRange(levels.Max() - mean, 0, 1.5);
+        Assert.InRange(levels.Min() - mean, -1.5, 0);
+        Assert.True(worstOff < 20f, $"heard {worstOff:F0}° off the water beside you");
+    }
+
+    /// <summary>
+    /// A long line is heard from its part near you, not its middle: stood 2 m off one end of a 300 m creek, its middle
+    /// 150 m away and past its 60 m range, it still wins a voice and is cut into pieces, and it is as loud as the law over
+    /// the whole line says (ExtendedSources.MeanLawPower).
+    /// </summary>
+    [Fact]
+    public void ALongLineIsHeardFromItsNearPart()
+    {
+        var line = new[] { new Vector3(-150f, 0.05f, 0f), new Vector3(150f, 0.05f, 0f) };
+        var h = OnePathCreek(line, new Vector3(0f, 0.05f, 0f));
+        var feet = new Vector3(140f, 0f, 2f);
+        h.StandAt(feet);
+        h.Tick(240);
+        var ear = feet + new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f);
+        var heard = AudioWorld.HeardTogether(h.Mixer.Latest, h.Mixer.Live, h.Mixer.Pieces, id => id.StartsWith("flow:"), ear, h.Facade.Options.WideSources);
+        float atEnd = h.Audio.World.HeardInRanking(700);
+        _o.WriteLine($"2 m off a 300 m creek, 10 m from its end: {heard.Voices} voices, {10 * Math.Log10(Math.Max(1e-30, heard.Power)):F1} dB; ranked at {atEnd:G3}");
+        Assert.True(heard.Voices > 1, "the creek was not heard, or not cut");
+        Assert.True(h.Mixer.Pieces.TryGetValue(700, out var cut) && cut.Count > 1);
+        // Ranked as what is beside you: within the 3 dB a line's far side adds, as loud as stood beside its middle.
+        h.StandAt(new Vector3(0f, 0f, 2f));
+        h.Tick(60);
+        float atMiddle = h.Audio.World.HeardInRanking(700);
+        _o.WriteLine($"  ranked at {atMiddle:G3} beside its middle: {20 * Math.Log10(atEnd / atMiddle):F1} dB");
+        Assert.True(atEnd > 0f && Math.Abs(20 * Math.Log10(atEnd / atMiddle)) < 4.0, $"ranked {atEnd:G3} by its end, {atMiddle:G3} by its middle");
+    }
+
+    /// <summary>
+    /// A long line's path is asked about from its point nearest the ear: stood beside one end of a 300 m creek with a
+    /// brick wall between you and its middle, 120 m off, the creek beside you is not heard through the wall.
+    /// </summary>
+    [Fact]
+    public void ALongLineIsAskedAboutFromItsNearPart()
+    {
+        var line = new[] { new Vector3(-150f, 0.05f, 0f), new Vector3(150f, 0.05f, 0f) };
+        var h = OnePathCreek(line, new Vector3(0f, 0.05f, 0f));
+        h.AddWall(800, new Vector3(120f, 2.5f, 1f), new Vector3(0.5f, 5f, 30f));
+        h.StandAt(new Vector3(140f, 0f, 2f));
+        bool answered = h.TickUntil(() => false, 240, TimeSpan.FromSeconds(2));
+        Assert.False(answered);
+        Assert.True(h.Mixer.Latest.TryGetValue(700, out var e), "the creek has no voice");
+        _o.WriteLine($"beside its end, a wall toward its middle: occlusion {e.Occlusion:F2}, high band {e.EqHigh:F2}");
+        Assert.True(e.Occlusion < 0.2f && e.EqHigh > 0.5f, $"heard through the wall: occlusion {e.Occlusion:F2}, high band {e.EqHigh:F2}");
+    }
+
     // ── The synth: each event in its own piece ──────────────────────────────────────────────────
 
     /// <summary>

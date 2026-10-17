@@ -341,6 +341,14 @@ public partial struct SoundEmitterComponent
     /// to steam on the fuel; out, <see cref="SynthRunning"/> goes false (docs/FIRE.md 12.7).
     /// </summary>
     public float Quench { get; set; }
+
+    /// <summary>
+    /// A source laid along a line of its own (a creek's bed as the map or the ground draws it), its points from one
+    /// end to the other in the entity's own frame (metres; x right, y up, z forward); null for a point or a source
+    /// whose places are its model's. The client cuts it at the ear by the angle each piece covers and hears each
+    /// piece from where it is (docs/RUNNING_WATER.md 15.6). One per source: a bend is a bend, not a seam.
+    /// </summary>
+    public Vector3[]? Line { get; set; }
 }
 
 [MemoryPackable]

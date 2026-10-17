@@ -380,6 +380,7 @@ public partial class AudioWorld
     public void ForgetEntity(int entityId)
     {
         _groundCache.Remove(entityId);
+        _linePaths.Remove(entityId);
         _voices.Stop(entityId);
         // A wood's voice is under an id of its own.
         if (_voices.TryIdOf(VoiceKind.Wood, entityId, 0, out int wood))
@@ -599,9 +600,10 @@ public partial class AudioWorld
             // Asked about the point the sound comes out of, not the entity's origin: for anything that
             // drives the origin is its contact patch, and a probe there was half buried (about half the
             // samples blocked on open road).
-            Vector3 sourcePos = src.Emission;
+            Vector3 sourcePos = HeardPoint(src, visualEyePos, out bool alongLine);
             float sourceRadius = src.ProbeRadius;
-            float sourceSpeed = src.State.Velocity.Length();
+            // A line's nearest point moves as the ear does.
+            float sourceSpeed = alongLine ? MathF.Max(src.State.Velocity.Length(), _earSpeed) : src.State.Velocity.Length();
             
             float dist = Vector3.Distance(visualEyePos, sourcePos);
             int updateRate = 1;
@@ -1085,7 +1087,8 @@ public partial class AudioWorld
             // emitter plays (ProcessAudioEmitter): its placed gain, its range and the key its spectrum is measured
             // under. Not the gain that gives a quieter render its headroom back, which is no louder at the ear.
             string voiceKey = VoiceKey(em);
-            float d = Vector3.Distance(src.Emission, eyePos);
+            // A line from its point nearest the ear: stood beside its near part, it is that far.
+            float d = Vector3.Distance(HeardPoint(src, eyePos, out _), eyePos);
             var (gain, reference) = _audio.Hearing.Place(levelDb, extent);
             float range = MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb)));
             // A line cut into pieces is as loud as the law over its whole length, not its middle alone: stood at
@@ -1808,11 +1811,11 @@ public partial class AudioWorld
             string key = VoiceKey(src.Spec);
             var at = src.Emission;
             float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
-            if (length > 0f)
+            if (length > 0f && LinePathOf(src, key) is { } path)
             {
                 // A line: as many pieces as the angle it covers here asks for, the rest of it merged.
                 if (!_cutting.TryGetValue(id, out var c)) _cutting[id] = c = new Cutting();
-                c.Wanted = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.WantedPieces(OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(at, AxisOf(src), length, eyePos), c.Wanted);
+                c.Wanted = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.WantedPieces(path, eyePos, c.Wanted);
                 c.Count = 1;
                 if (c.Wanted > 1) _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, c.Wanted - 1));
                 continue;
@@ -1835,22 +1838,49 @@ public partial class AudioWorld
         }
     }
 
-    /// <summary>The way a source's own x lies in the world: the way a line of it runs.</summary>
-    private static Vector3 AxisOf(AudioSource src) => AxisOf(src.State.Rotation);
-    private static Vector3 AxisOf(Quaternion rotation) => Vector3.Transform(Vector3.UnitX, rotation);
-
     /// <summary>
-    /// For the ranking: how much louder a line cut into pieces is here than a point at its middle, both by the
-    /// mixer's law (ExtendedSources.MeanLawPower). One for anything else, and further off than twice its length,
-    /// where the two agree within a decibel.
+    /// For the ranking: how much louder a line cut into pieces is here than a point at <paramref name="distance"/>,
+    /// both by the mixer's law (ExtendedSources.MeanLawPower). One for anything else, and further off than twice its
+    /// length, where the two agree within a decibel.
     /// </summary>
     private float LineHeard(AudioSource src, string key, float reference, Vector3 eyePos, float distance)
     {
-        float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
-        if (length <= 0f || distance > 2f * length) return 1f;
-        var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(src.Emission, AxisOf(src), length, eyePos);
+        if (LinePathOf(src, key) is not { } path || distance > 2f * path.Length) return 1f;
         float point = MathF.Min(1f, MathF.Max(0.1f, reference) / MathF.Max(1e-3f, distance));
-        return MathF.Sqrt(OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MeanLawPower(view, reference)) / point;
+        return MathF.Sqrt(OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MeanLawPower(path, eyePos, reference)) / point;
+    }
+
+    // ── A line's own path (SoundEmitterComponent.Line, 2026-10-17) ───────────────────────────────
+
+    private sealed record LinePathEntry(Vector3 Position, Quaternion Rotation, Vector3[]? Line, float Length,
+                                        OpenFPS.Client.AudioEngine.Core.Nature.LinePath Path);
+    private readonly Dictionary<int, LinePathEntry> _linePaths = new();
+
+    /// <summary>The path a line source is heard along (its spec's own line, or straight along its x), kept while it
+    /// stands where it stood; null for anything that is not a line this world cuts.</summary>
+    private OpenFPS.Client.AudioEngine.Core.Nature.LinePath? LinePathOf(AudioSource src, string key)
+    {
+        float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
+        if (length <= 0f) return null;
+        var line = src.Spec.Line;
+        var at = src.Emission;
+        var turn = src.State.Rotation;
+        if (_linePaths.TryGetValue(src.Id, out var known) && known.Position == at && known.Rotation == turn
+            && ReferenceEquals(known.Line, line) && known.Length == length)
+            return known.Path;
+        var path = OpenFPS.Client.AudioEngine.Core.Nature.WideSources.PathOf(at, turn, line, length,
+                                                                             _audio.Options.WideSources.LineWidth(key, ModelLibrary.Presets));
+        _linePaths[src.Id] = new LinePathEntry(at, turn, line, length, path);
+        return path;
+    }
+
+    /// <summary>Where a source is heard from first, for its path and its distance: a line's point nearest the ear (stood
+    /// beside its near part, whatever its middle is behind), anything else its emission point.</summary>
+    private Vector3 HeardPoint(AudioSource src, Vector3 ear, out bool alongLine)
+    {
+        var path = src.Spec.IsSynth ? LinePathOf(src, VoiceKey(src.Spec)) : null;
+        alongLine = path != null;
+        return path != null ? path.Nearest(ear, out _) : src.Emission;
     }
     private readonly List<int> _spreadingGone = new();
     private long _spreadFrame;
@@ -1961,9 +1991,9 @@ public partial class AudioWorld
         /// <summary>Where the ear was when it was cut: it is cut again when the ear has moved a quarter of its
         /// shortest piece, the one beside you.</summary>
         public Vector3 CutAt;
-        /// <summary>The source's own emitter as built, before its piece moves it, and the way its line runs.</summary>
+        /// <summary>The source's own emitter as built, before its piece moves it, and the path its line runs along.</summary>
         public SpatialEmitter Base;
-        public Vector3 Axis;
+        public OpenFPS.Client.AudioEngine.Core.Nature.LinePath? Path;
         /// <summary>How many of its places have voices, and since when the cut has had fewer.</summary>
         public int Voiced = 1;
         public double FewerSince = double.NaN;
@@ -1976,34 +2006,34 @@ public partial class AudioWorld
     /// when they change, and its own voice moved to the piece that holds its middle, as loud as everything in it.
     /// A few closed forms a piece (ExtendedSources.Place), so on this thread.
     /// </summary>
-    private Cutting CutOf(AudioSource src, float length, ref SpatialEmitter e, Vector3 eyePos)
+    private Cutting CutOf(AudioSource src, OpenFPS.Client.AudioEngine.Core.Nature.LinePath path, ref SpatialEmitter e, Vector3 eyePos)
     {
         if (!_cutting.TryGetValue(src.Id, out var c)) _cutting[src.Id] = c = new Cutting();
         c.Frame = _spreadFrame;
-        c.Axis = AxisOf(src);
         c.Base = e;
-        var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(e.Position, c.Axis, length, eyePos);
         int n = Math.Max(1, c.Count);
-        if (c.Cut == null || c.Cut.Count != n || n > 1 && Vector3.Distance(eyePos, c.CutAt) > 0.25f * c.Cut.Shortest)
+        if (c.Cut == null || c.Cut.Count != n || !ReferenceEquals(c.Path, path)
+            || n > 1 && Vector3.Distance(eyePos, c.CutAt) > 0.25f * c.Cut.Shortest)
         {
-            c.Cut = n == 1 ? OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Whole(length) : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Cut(view, n);
+            c.Cut = n == 1 ? OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Whole(path.Length) : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Cut(path, eyePos, n);
             c.CutAt = eyePos;
             _audio.PlanPieces(e.EntityId, c.Cut);
         }
-        PlacePiece(ref e, c, view, 0);
+        c.Path = path;
+        PlacePiece(ref e, c, eyePos, 0);
         e.Spread = 0f;
         return c;
     }
 
     /// <summary>One place of a cut line: at its piece's centroid, at the gain that makes it as loud as its piece.
     /// Returns where along the line it is, m from the middle.</summary>
-    private static float PlacePiece(ref SpatialEmitter e, Cutting c, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineView view, int place)
+    private static float PlacePiece(ref SpatialEmitter e, Cutting c, Vector3 eyePos, int place)
     {
         var cut = c.Cut!;
         int i = cut.PieceOfPlace(place);
-        var p = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Place(view, cut.Edges[i], cut.Edges[i + 1], c.Base.MinDistance);
-        var offset = c.Axis * p.Along;
-        e.Position = c.Base.Position + offset;
+        var p = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Place(c.Path!, eyePos, cut.Edges[i], cut.Edges[i + 1], c.Base.MinDistance);
+        var offset = p.At - c.Base.Position;
+        e.Position = p.At;
         e.ApparentPosition = c.Base.ApparentPosition + offset;
         e.Volume = c.Base.Volume * p.Gain;
         return p.Along;
@@ -2017,11 +2047,10 @@ public partial class AudioWorld
     private void PlacePieces(int sourceId, Cutting c, in SpatialEmitter middle, IAcousticWorld world, Vector3 eyePos, double now)
     {
         var cut = c.Cut!;
-        var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(c.Base.Position, c.Axis, cut.Length, eyePos);
         for (int k = 1; k < cut.Count; k++)
         {
             var e = middle;
-            float along = PlacePiece(ref e, c, view, k);
+            float along = PlacePiece(ref e, c, eyePos, k);
             e.EntityId = PlaceVoiceId(sourceId, k);
             e.Seed = VoiceRegistry.SeedOf(VoiceKind.Place, sourceId, k);
             // The voice whose synth it reads, by that voice's id.
@@ -2164,7 +2193,7 @@ public partial class AudioWorld
     /// </summary>
     private AcousticPathData FirstAnswer(IAcousticWorld world, AudioSource src, Vector3 eyePos)
     {
-        var at = src.Emission;
+        var at = HeardPoint(src, eyePos, out _);
         _acousticWorker.EnqueueRequest(new AcousticRequest
         {
             EntityId = src.Id, ListenerPos = eyePos, SourcePos = at,
@@ -2736,8 +2765,8 @@ public partial class AudioWorld
         float engineExtent = spec.ExtentMetres;
         // A tree or a fire: the places it is heard from across its extent (ExtendedSources).
         Vector3[]? extentLayout = null;
-        // Running water along a line: cut into pieces at the ear (ExtendedSources.Cut); its length, or none.
-        float lineLength = 0f;
+        // Running water along a line: cut into pieces at the ear (ExtendedSources.Cut); the path it runs along, or none.
+        OpenFPS.Client.AudioEngine.Core.Nature.LinePath? linePath = null;
         float chorusTrees = 1f;
         // The declared level, for the ear model; 0 for an authored source with only a volume.
         float earLevel = 0f;
@@ -2785,7 +2814,7 @@ public partial class AudioWorld
                 engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(levelDb));
                 earLevel = levelDb;
                 extentLayout = _audio.Options.WideSources.Layout(physicalKey, ModelLibrary.Presets);
-                lineLength = _audio.Options.WideSources.LineLength(physicalKey, ModelLibrary.Presets);
+                linePath = LinePathOf(src, physicalKey);
                 if (physicalSynth == OpenFPS.Common.ModelSynth.Aircraft)
                 {
                     // Its power lever as the server that flies it sends it (MachinePower: from its flight path
@@ -3021,7 +3050,7 @@ public partial class AudioWorld
         // The road under a machine hands its sound back a moment later; see GroundReflection. Engines and
         // physical models only: a sustained recording (a PA's speech) gets none, as speech flanged with
         // one (docs/CLIENT_NOTES.md, "Speech has no ground reflection").
-        Cutting? cutting = lineLength > 0f ? CutOf(src, lineLength, ref emitter, eyePos) : null;
+        Cutting? cutting = linePath != null ? CutOf(src, linePath, ref emitter, eyePos) : null;
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
         if (engineKey.Length > 0 || physicalKey.Length > 0) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);

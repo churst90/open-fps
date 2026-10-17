@@ -621,11 +621,14 @@ public static class GroundWaterSpike
         return 0;
     }
 
-    /// <summary>How far a water source reaches toward a point on the flat, m: from its middle.</summary>
+    /// <summary>How far a water source reaches toward a point on the flat, m: from its middle, or the nearest point of
+    /// the line it is laid along.</summary>
     private static float WaterReach(EntityDefinition d, Vector3 to)
     {
-        var v = d.Transform.Position - to;
-        return MathF.Sqrt(v.X * v.X + v.Z * v.Z);
+        static float Flat(Vector3 v) => MathF.Sqrt(v.X * v.X + v.Z * v.Z);
+        if (d.SoundEmitter.Line is not { Length: >= 2 } line) return Flat(d.Transform.Position - to);
+        var path = OpenFPS.Client.AudioEngine.Core.Nature.LinePath.Of(d.Transform.Position, d.Transform.Rotation, line);
+        return Flat(path.Nearest(to, out _) - to);
     }
 
     private static string? Arg(string[] args, string prefix) => args.FirstOrDefault(a => a.StartsWith(prefix, StringComparison.Ordinal))?[prefix.Length..];

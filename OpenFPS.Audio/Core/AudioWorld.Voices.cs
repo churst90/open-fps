@@ -47,9 +47,10 @@ public partial class AudioWorld
     private OwnerPath PathOf(IAcousticWorld world, AudioSource owner, Vector3 ear)
     {
         if (_ownerPaths.TryGetValue(owner.Id, out var known)) return known;
-        var at = owner.Emission;
+        // A line is asked about from its point nearest the ear (HeardPoint), which moves as the ear does.
+        var at = HeardPoint(owner, ear, out bool alongLine);
         OwnerPath p;
-        if (_acousticWorker.TryGetDirectFor(owner.Id, at, owner.State.Velocity.Length(), ear, _earSpeed, out var direct))
+        if (_acousticWorker.TryGetDirectFor(owner.Id, at, alongLine ? MathF.Max(owner.State.Velocity.Length(), _earSpeed) : owner.State.Velocity.Length(), ear, _earSpeed, out var direct))
             p = Shadowed(world, owner.Id, direct, at, ear);
         else
         {

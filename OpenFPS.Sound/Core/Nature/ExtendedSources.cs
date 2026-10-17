@@ -255,9 +255,11 @@ public static class ExtendedSources
     /// degrees, and the band between them keeps a tap of a key from cutting it back and forth); never more than
     /// <see cref="MaxPlaces"/>.
     /// </summary>
-    public static int WantedPieces(LineView view, int previous)
+    public static int WantedPieces(LineView view, int previous) => WantedPieces(view.SubtendedDegrees, previous);
+
+    /// <summary>The same for a line covering <paramref name="covered"/> degrees of the ear's view.</summary>
+    private static int WantedPieces(float covered, int previous)
     {
-        float covered = view.SubtendedDegrees;
         int fewest = Math.Max(1, (int)MathF.Ceiling(covered / OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SplitAboveDegrees - 1e-4f));
         int most = Math.Max(fewest, (int)MathF.Floor(2f * covered / OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.MergeBelowDegrees));
         int n = previous <= 0 ? fewest : Math.Clamp(previous, fewest, most);
@@ -384,6 +386,128 @@ public static class ExtendedSources
         double u0 = view.From, u1 = view.To;
         if (!(u1 - u0 > 1e-4)) return Math.Min(1f, (float)(r * r / (h * h)));
         return (float)((LawIntegral(u1, h, r) - LawIntegral(u0, h, r)) / (u1 - u0));
+    }
+
+    // ── A line along a path of its own (2026-10-17) ────────────────────────────────────────────────
+
+    /// <summary>How much of the ear's view a path covers, degrees: each segment's angle at the ear, added along it.</summary>
+    public static float SubtendedDegrees(LinePath path, Vector3 ear)
+    {
+        double sum = 0;
+        for (int k = 0; k < path.Segments; k++) sum += SegmentAngle(path, k, ear);
+        return (float)(sum * 180.0 / Math.PI);
+    }
+
+    /// <summary>The angle segment <paramref name="k"/> covers at the ear, radians, as a straight line's (View).</summary>
+    private static double SegmentAngle(LinePath path, int k, Vector3 ear)
+    {
+        var (_, _, foot, off) = path.ViewOf(k, ear);
+        double len = path.StartOf(k + 1) - path.StartOf(k);
+        return Math.Atan2(len - foot, off) - Math.Atan2(-foot, off);
+    }
+
+    /// <summary>How many pieces a path wants from here (<see cref="WantedPieces(LineView, int)"/>, by the angle it covers).</summary>
+    public static int WantedPieces(LinePath path, Vector3 ear, int previous) => WantedPieces(SubtendedDegrees(path, ear), previous);
+
+    /// <summary>
+    /// A path cut into <paramref name="pieces"/> pieces of equal angle at the ear, as <see cref="Cut(LineView, int)"/>
+    /// cuts a straight line: the angle each segment covers added along it, and each edge found in its segment by the
+    /// straight line's own law. Small beside the ear, long far along it or where it runs away from the ear.
+    /// </summary>
+    public static LineCut Cut(LinePath path, Vector3 ear, int pieces)
+    {
+        int n = Math.Clamp(pieces, 1, MaxPlaces);
+        float half = path.HalfLength;
+        var edges = new float[n + 1];
+        edges[0] = -half;
+        edges[n] = half;
+        if (n == 1) return new LineCut(edges);
+        int segs = path.Segments;
+        Span<double> angle = segs <= 512 ? stackalloc double[segs] : new double[segs];
+        double total = 0;
+        for (int k = 0; k < segs; k++) total += angle[k] = SegmentAngle(path, k, ear);
+        int seg = 0;
+        double before = 0;
+        for (int i = 1; i < n; i++)
+        {
+            double target = total * i / n;
+            while (seg < segs - 1 && before + angle[seg] < target) { before += angle[seg]; seg++; }
+            var (_, _, foot, off) = path.ViewOf(seg, ear);
+            double a = Math.Clamp(Math.Atan2(-foot, off) + (target - before), -0.5 * Math.PI + 1e-6, 0.5 * Math.PI - 1e-6);
+            double len = path.StartOf(seg + 1) - path.StartOf(seg);
+            double t = Math.Clamp(foot + off * Math.Tan(a), 0.0, len);
+            edges[i] = Math.Clamp((float)(path.StartOf(seg) + t) - half, edges[i - 1], half);
+        }
+        return new LineCut(edges);
+    }
+
+    /// <summary>Where a piece of a path is played from (in the world, and m along the path from its middle) and the
+    /// gain its voice takes over the source's own.</summary>
+    public readonly record struct PathPlace(Vector3 At, float Along, float Gain);
+
+    /// <summary>
+    /// A piece of a path from <paramref name="from"/> to <paramref name="to"/> (m along it from its middle) placed by
+    /// the mixer's law as <see cref="Place(LineView, float, float, float)"/> places a piece of a straight line, segment by
+    /// segment: at the centroid of what each part of it brings to the ear, with the gain that makes the law there equal
+    /// the law's mean over the whole piece. A wide bed (<see cref="LinePath.WideBedMetres"/>) is three lines across it,
+    /// each a third of it, so its near side brings more than its far. Closed forms, a few a segment.
+    /// </summary>
+    public static PathPlace Place(LinePath path, Vector3 ear, float from, float to, float reference)
+    {
+        double r = MathF.Max(0.1f, reference);
+        float half = path.HalfLength;
+        double s0 = from + half, s1 = to + half;
+        if (!(s1 - s0 > 1e-4)) return new PathPlace(path.PointAt(0.5f * (from + to)), 0.5f * (from + to), 1f);
+        bool wide = path.Width >= LinePath.WideBedMetres;
+        int lines = wide ? 3 : 1;
+        double power = 0, along = 0, cx = 0, cy = 0, cz = 0;
+        for (int k = 0; k < path.Segments; k++)
+        {
+            double a = path.StartOf(k), b = path.StartOf(k + 1);
+            if (b <= s0 || a >= s1) continue;
+            double t0 = Math.Max(s0, a) - a, t1 = Math.Min(s1, b) - a;
+            var across = wide ? path.AcrossOf(k) : Vector3.Zero;
+            for (int j = 0; j < lines; j++)
+            {
+                var shift = across * ((j - 1) * path.Width / 3f);
+                var (start, way, foot, off) = path.ViewOf(k, ear - shift);
+                double u0 = t0 - foot, u1 = t1 - foot;
+                double i0 = LawIntegral(u1, off, r) - LawIntegral(u0, off, r);
+                if (!(i0 > 0)) continue;
+                double uc = Math.Clamp((LawMoment(u1, off, r) - LawMoment(u0, off, r)) / i0, u0, u1);
+                var at = start + shift + way * (float)(foot + uc);
+                double w = i0 / lines;
+                power += w;
+                along += w * (a + foot + uc);
+                cx += w * at.X; cy += w * at.Y; cz += w * at.Z;
+            }
+        }
+        if (!(power > 1e-30)) return new PathPlace(path.PointAt(0.5f * (from + to)), 0.5f * (from + to), 1f);
+        var c = new Vector3((float)(cx / power), (float)(cy / power), (float)(cz / power));
+        double mean = power / (s1 - s0);
+        double law = Math.Min(1.0, r / Math.Max(1e-6, Vector3.Distance(c, ear)));
+        return new PathPlace(c, (float)(along / power) - half, (float)(Math.Sqrt(Math.Max(0.0, mean)) / law));
+    }
+
+    /// <summary>The mean of the law's power over a whole path (<see cref="MeanLawPower(LineView, float)"/>), a wide bed
+    /// taken across itself as <see cref="Place(LinePath, Vector3, float, float, float)"/> takes it.</summary>
+    public static float MeanLawPower(LinePath path, Vector3 ear, float reference)
+    {
+        double r = MathF.Max(0.1f, reference);
+        bool wide = path.Width >= LinePath.WideBedMetres;
+        int lines = wide ? 3 : 1;
+        double power = 0;
+        for (int k = 0; k < path.Segments; k++)
+        {
+            double len = path.StartOf(k + 1) - path.StartOf(k);
+            var across = wide ? path.AcrossOf(k) : Vector3.Zero;
+            for (int j = 0; j < lines; j++)
+            {
+                var (_, _, foot, off) = path.ViewOf(k, ear - across * ((j - 1) * path.Width / 3f));
+                power += (LawIntegral(len - foot, off, r) - LawIntegral(-foot, off, r)) / lines;
+            }
+        }
+        return path.Length > 1e-4f ? (float)(power / path.Length) : 0f;
     }
 
     /// <summary>∫₀ᵘ min(1, r²/(h² + s²)) ds: the law's power along a line h off it, flat inside r.</summary>

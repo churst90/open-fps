@@ -54,6 +54,10 @@ public class EntityData
     /// <summary>Over its prefab: a solid form from the shape library filling the collider's box
     /// (PrefabTemplate.Form): a ramp, a flight of stairs, an arch.</summary>
     public OpenFPS.Common.Geometry.ShapeSpec? Form { get; set; }
+
+    /// <summary>Over its prefab: the line a source is laid along, its points in the entity's own frame
+    /// (SoundEmitterComponent.Line): a mapped creek's bed, written by tools/gen_osm.py.</summary>
+    public Vector3[]? Line { get; set; }
 }
 
 /// <summary>Where a map puts a player who arrives: a point, and the way they face. The map format's own, so a

@@ -71,7 +71,9 @@ public class WorldWireBytesTests
 
     private static class Expected
     {
-        public const string Definition = "08b37dc08e4b4c24e5f921cada4afcfe7d34a3fa323137327d0d869408fb2426";
+        // 2026-10-17: SoundEmitterComponent.Line appended (a source laid along a line of its own, docs/RUNNING_WATER.md
+        // 15.6): the emitter has one member more, null here.
+        public const string Definition = "609bf72268049b37a129dd728211f705e2577b1aacba6d3176a86be726f841b2";
         public const string TileStream = "e40761c663bb9337d817ce3814e979f91896f28cf198bc06672be7f637419f69";
         public const string CityRoads = "1794c6f218491f38537875c63a3837ffb35756886a78541cc2ee98a730042a65";
     }

@@ -63,6 +63,7 @@ public sealed class WideSources
     {
         _layouts.Clear();
         _lines.Clear();
+        _widths.Clear();
     }
 
     /// <summary>
@@ -98,6 +99,34 @@ public sealed class WideSources
             || !physicalKey.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return 0f;
         return _lines.GetOrAdd(physicalKey, static (key, presets) => ExtendedSources.LineLengthOf(key, presets), presets);
     }
+
+    /// <summary>
+    /// How wide a line's bed is, m: a stream's, which a wide one is heard across (LinePath.WideBedMetres). Zero for a
+    /// gutter (its water hugs the kerb) and for anything that is not a line this world cuts.
+    /// </summary>
+    public float LineWidth(string? physicalKey, IPresets presets)
+    {
+        if (LineLength(physicalKey, presets) <= 0f) return 0f;
+        return _widths.GetOrAdd(physicalKey!, static (key, presets) =>
+        {
+            try
+            {
+                var spec = presets.Flow(key[5..]);
+                return spec.Channel == FlowChannel.Stream ? spec.WidthMetres : 0f;
+            }
+            catch (Exception) { return 0f; }
+        }, presets);
+    }
+    private readonly ConcurrentDictionary<string, float> _widths = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The path a line source is heard along: the line its emitter carries (SoundEmitterComponent.Line, in its own
+    /// frame), or a straight line of <paramref name="length"/> along its own x through <paramref name="position"/>.
+    /// </summary>
+    public static LinePath PathOf(Vector3 position, Quaternion rotation, Vector3[]? line, float length, float width)
+        => line is { Length: >= 2 }
+            ? LinePath.Of(position, rotation, line, width)
+            : LinePath.Straight(position, Vector3.Transform(Vector3.UnitX, rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : rotation), length, width);
 
     /// <summary>How many streams a running-water synth renders: one for each piece a line can be cut into, or
     /// its own places.</summary>
