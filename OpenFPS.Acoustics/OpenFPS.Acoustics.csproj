@@ -7,7 +7,8 @@
        AcousticVolumeGenerator), which the host fills from its own entities. It uses only the geometry and the
        materials (OpenFPS.Materials, where the material table went: docs/ENGINE_PACKAGES.md, stage 1).
 
-       Namespaces are those the files had in OpenFPS.Common (decision 6). -->
+       Namespaces follow the project and its folders: OpenFPS.Acoustics, OpenFPS.Acoustics.Systems (decision 6,
+       docs/SOUND_LIBRARY_BOUNDARY.md 21). -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

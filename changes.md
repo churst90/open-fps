@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- The sound library's namespaces follow its projects (docs/SOUND_LIBRARY_BOUNDARY.md decision 6, section 21):
+  `OpenFPS.Geometry`, `OpenFPS.Acoustics`, `OpenFPS.Sound` (with `.Hearing` and `.Core.*`), `OpenFPS.Native.Platform`
+  and `.SteamAudio`, and `OpenFPS.Audio` (with `.Core`, `.Fmod`, `.SteamAudio`, `.Acoustics`, `.Data`), where they
+  were `OpenFPS.Common`, `OpenFPS.Client.AudioEngine.*` and `OpenFPS.Client.Core`. FMOD's wrapper keeps `FMOD`; the
+  engine packages keep theirs. Namespaces and usings only, in five commits, every reference bound to the same type
+  before and after; nothing stored a type name, so every saved file loads as before. The wire hash changes
+  (4f5934038d29 to f82572c7167e) and the door fingerprint with it (f401bda46391 to ce77e122e30b: the door renders are made
+  again once).
 - Running water heard from the whole of itself, steps 2 to 4 (docs/RUNNING_WATER.md 15.6 to 15.8; the wire hash
   changes: a source can carry a line, `SoundEmitterComponent.Line`). The mapped creeks are voiced where the map
   draws them: Oak Creek on Albany was silent (-105 dBFS on its bank, the nearest water 57 m off) and is -56 dBFS

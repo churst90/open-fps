@@ -8,9 +8,8 @@
        through IAcousticWorld and IAudioSources and names nothing of the game: Client.Core is its host
        (ClientAudioSystem).
 
-       Namespaces are those the files had in Client.Core (decision 6): OpenFPS.Client.AudioEngine.* and
-       OpenFPS.Client.Core.AudioEngine.SteamAudio, and OpenFPS.Client.Core for the rain, the audio world
-       (ClientAudioSystem's body) and the voice registry. -->
+       Namespaces follow the project and its folders: OpenFPS.Audio, OpenFPS.Audio.Core, .Fmod, .SteamAudio,
+       .Acoustics and .Data (decision 6, docs/SOUND_LIBRARY_BOUNDARY.md 21). -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

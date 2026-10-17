@@ -34,6 +34,7 @@ library that open-fps and Resonance both reference. Step 1 of
     time (18.7), the air, the mixer's rate, the hearing, the mix and the lab (18.8)
 19. Stage 6 as built: the world input (19.1-19.6), `OpenFPS.Audio` and the world's options and paths (19.7-19.13)
 20. Stage 7 as built: `ClientAudioSystem` split into `AudioWorld` and its host, the one-off sounds and the birds
+21. The namespace rename as built (decision 6)
 
 ---
 
@@ -489,9 +490,9 @@ OpenFPS.Geometry   <- OpenFPS.Acoustics <- OpenFPS.Sound <- OpenFPS.Audio -> Ope
 - Client.Core references Audio and keeps the session, the snapshot adapter, `SpatialService`'s
   entity half and everything else of the game.
 - Resonance references Audio (and through it the rest), and none of open-fps's game.
-- Namespaces stay as they are while files move (`OpenFPS.Common`, `OpenFPS.Client.AudioEngine.*`),
-  so every move is a file move and a project edit, not an edit of every `using`. A rename can come
-  later as one commit, or never (decision 6).
+- Namespaces stayed as they were while files moved (`OpenFPS.Common`, `OpenFPS.Client.AudioEngine.*`),
+  so every move was a file move and a project edit, not an edit of every `using`. After stage 7 they were
+  renamed to follow the projects (decision 6, section 21).
 
 Why five and not four: putting the mixer in Sound would make the server reference the FMOD
 bindings. The P/Invoke declarations would not load anything until called, so it would work, but the
@@ -974,7 +975,8 @@ to `Geometry/` and to `SharedMovementEngine`.
 5. **Logging.** Keep Serilog's static `Log` (recommended for now: no behaviour change), or put a
    small log sink on the world options.
 6. **Namespaces.** Keep them while moving (recommended), and decide later whether to rename to
-   `OpenFPS.Sound.*` in one commit.
+   `OpenFPS.Sound.*` in one commit. Done 2026-10-17 after stage 7: the library's namespaces follow its
+   projects and folders (section 21).
 7. **Statics.** World state becomes per-instance (clock, weather, runoff, air, traced reverb,
    talkers); settings and catalogues go behind one options object the host creates, with static
    facades kept until their last reader moves (recommended). The stricter version (no facades at
@@ -2987,8 +2989,8 @@ source table. The tests and the lab keep theirs.
   beacons and the driving aids (Accessibility's, at their hooks), the place's name, the rooms that moved (the host's
   regions), and the decoders (the wire's events, voice chat).
 - `SpatialService`'s acoustic queries are the library's already (19.2); what it keeps is the game's.
-- Namespaces: `AudioWorld`, `VoiceRegistry`, `OneOffSounds` and `BirdLife` keep Client.Core's (decision 6) until the one
-  rename commit.
+- Namespaces: `AudioWorld`, `VoiceRegistry`, `OneOffSounds` and `BirdLife` kept Client.Core's (decision 6) until the
+  rename (section 21); they are `OpenFPS.Audio.Core`'s now.
 - Stage 8 (versions and how Resonance takes it) is next.
 
 ### 20.11 To hear (the second check)
@@ -3005,3 +3007,56 @@ On the city (`./run-server.sh city`, restart it first), each spot checked standa
 | Parking garage, level 0 | `/tp -66.0 62.0 0.3` | Get into a parked car: the engine from inside through its body, the street through the glass, windows down louder |
 
 Voice chat with a second player, and the listening-level calibration's voice, go through the same world.
+
+---
+
+## 21. The namespace rename as built (2026-10-17)
+
+Decision 6 left the rename for one commit after the moves; it is five, one per project, each building with no
+warnings and passing the guards. The library's namespaces follow their projects and folders:
+
+| Project | Was | Is |
+|---|---|---|
+| `OpenFPS.Geometry` | `OpenFPS.Common`, `OpenFPS.Common.Geometry` (`Triangles/`), `.Components` (`ColliderShape`), `.Networking` (the JSON converters) | `OpenFPS.Geometry`, the triangle world included: it was the `Geometry` namespace already, and `Geometry.X` still names it |
+| `OpenFPS.Acoustics` | `OpenFPS.Common`, `OpenFPS.Common.Systems` | `OpenFPS.Acoustics`, `OpenFPS.Acoustics.Systems` |
+| `OpenFPS.Sound` | `OpenFPS.Common`, `.Components` (`PlaybackMode`), `.Hearing`; `OpenFPS.Client.AudioEngine.Core` and its folders | `OpenFPS.Sound`, `OpenFPS.Sound.Hearing`, `OpenFPS.Sound.Core` and `.Core.Engine`, `.Nature`, `.Signals`, `.Rail`, `.Aircraft`, `.Pneumatics`, `.Yard`, `.Stove` |
+| `OpenFPS.Native` | `OpenFPS.Client.Core.Platform`, `OpenFPS.Client.Core.AudioEngine.SteamAudio`; FMOD's wrapper `FMOD`, `FMOD.Studio` | `OpenFPS.Native.Platform`, `OpenFPS.Native.SteamAudio`; FMOD's wrapper keeps FMOD's own (its code, its examples) |
+| `OpenFPS.Audio` | `OpenFPS.Client.Core`, `OpenFPS.Client.AudioEngine.Core`, `.Fmod`, `.Acoustics`, `.Data`, `OpenFPS.Client.Core.AudioEngine.Fmod`, `.SteamAudio` | `OpenFPS.Audio`, `OpenFPS.Audio.Core`, `.Fmod`, `.SteamAudio`, `.Acoustics`, `.Data` |
+
+556 types moved (70, 34, 288, 4, 160). The door models' fingerprint is generated into `OpenFPS.Sound`.
+
+- **What did not move.** The engine packages the library stands on (`OpenFPS.Materials`, `.Physics`,
+  `.Environment`, `.Models`, `.Schema`) keep their namespaces (`OpenFPS.Common`, `OpenFPS.Common.Editing`):
+  decision 6 is the library's, and docs/ENGINE_PACKAGES.md keeps namespaces while moving. A consumer of the
+  library therefore still writes `using OpenFPS.Common;` for the material table, the physics, the weather and the
+  catalogue. The lab's spikes that borrowed the old namespaces to reach the library's internals keep them, with
+  usings.
+- **How.** By script: Roslyn bound every simple name, qualifier and extension call in every project before the
+  rename; each library file's namespace was rewritten, each qualified name of a moved type with it (the shortest
+  qualifier that still reaches it), and each file given the usings its references need and relieved of those
+  nothing in it uses any more. Bound again after each step, every reference reaches the same type as before. One
+  lab spike names FMOD's `Sound` as `FMOD.Sound`: inside `OpenFPS.*` the bare name is the namespace now, ahead of a
+  file's `using FMOD;`. A consumer with `using FMOD;` inside its own `OpenFPS.*` namespace meets the same (and
+  `FMOD.Geometry` the same way).
+- **Names stored nowhere.** MemoryPack writes layouts and union tags, never type names (`WorldWireBytesTests`,
+  `EnvironmentWireBytesTests` pass unchanged); the JSON files (maps, models, presets, the editor's store) carry no
+  `$type` and no type name; the one lookup by name (`LoginHardeningTests`, the wire's messages) asks for
+  `OpenFPS.Common.Networking`, which stays. So no binder or alias is needed: old files load as before.
+- **The lists.** The surveys' classifiers name the moved types by their new names (`tools/sound_boundary`,
+  `tools/physics_boundary`, its short names too), as does the physics ratchet's `types.tsv`; the survey reader's
+  stand-in for the fingerprint is in `OpenFPS.Sound`. The three surveys' lists match the tree after every step:
+  crossings 0, packages 692, physics 15, statics 346, unchanged.
+- **The wire hash** changes (4f5934038d29 to f82572c7167e; every hashed project's sources changed): the server and
+  the Windows client deploy together. **The door fingerprint** changes (f401bda46391 to ce77e122e30b): the door
+  models' sources changed by their namespaces, and the kept door renders are made again once. Nothing a player
+  hears changes: the stored streams and the spoken lines pass unregenerated.
+- **Checks.** All five builds have no warnings after every step (the server, the GTK client, the Windows client with
+  `-p:EnableWindowsTargeting=true`, the lab, the tests; the mesh importer too). On the last commit the guards
+  (LibraryBoundary, EnginePackages, RenderFingerprint, EmitterStreamReplay, SpokenLinesReplay, VoiceIdBand,
+  VoiceRegistry, ModelKindTable, MapScoped, PhysicsBoundary, PhysicsReplay, PhysicsCrossMachine, RicochetTable,
+  the two wire-bytes tests, ModelLibrary, WorldEditor, PresetHalves, DrivingReplay, RailReplay, MovementReplay,
+  ResonanceMaybes): 313 passed. The classes that read saved maps, models, prefabs, the editor's stores and the
+  player store, with the hardening tests' lookups by name: 711 passed, 2 skipped, 1 failed, and it fails the same
+  on main (`WorldStreamingTests`, Albany's entities in their tiles, 55,125 where 55,152 are expected). With
+  `DOTNET_PROCESSOR_COUNT=4`, the boundaries, streams, spoken lines, fingerprints, physics replays and wire bytes:
+  149 passed.

@@ -671,8 +671,8 @@ stage 6; item 20's one wind joins stage 2. Items 1 to 4 are why stage 4 goes bef
 ## 7. The stages
 
 Rules for every stage, as for the sound library: one stage per merge; `git mv` for moves; namespaces
-unchanged while moving (the physics types are in `OpenFPS.Common` and `OpenFPS.Common.Geometry` across
-projects already); before and after each stage the guards (section 9) give the same result, and a stage that
+unchanged while moving (the physics types are in `OpenFPS.Common` across projects already, and the geometry's
+in `OpenFPS.Geometry` since the sound library's rename, SOUND_LIBRARY_BOUNDARY.md 21); before and after each stage the guards (section 9) give the same result, and a stage that
 changes one is finished only when the change is the one intended and its commit says so.
 
 | Stage | What | Sessions | Main risk |

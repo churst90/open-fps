@@ -6,7 +6,7 @@
        references no other project and knows nothing of entities: open-fps's entities become solids in
        OpenFPS.Common (EntityGeometry), on the host's side.
 
-       Namespaces are those the files had in OpenFPS.Common (decision 6). -->
+       Namespace OpenFPS.Geometry, Triangles/ included (decision 6, docs/SOUND_LIBRARY_BOUNDARY.md 21). -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

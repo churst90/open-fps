@@ -141,7 +141,9 @@ since the last deploy" list below.
    Stage 7: BUILT 2026-10-17 (20; `ClientAudioSystem`'s body is `AudioWorld` in `OpenFPS.Audio`, ticked with the
    world input and a source table the client fills once a frame, its host `ClientAudioSystem`; the one-off sounds
    (`OneOffSounds`, `WorldAudioPlayer` the wire's decoder) and the birds the world's; streams unregenerated; the wire
-   hash does not change). Unheard: the spots in 20.11. Next: stage 8, versions and how Resonance takes it.
+   hash does not change). Unheard: the spots in 20.11. The namespace rename (decision 6): BUILT 2026-10-17 (21; the
+   library's namespaces follow its projects, `OpenFPS.Geometry`, `.Acoustics`, `.Sound.*`, `.Native.*`, `.Audio.*`, in
+   five commits; the wire hash and the door fingerprint change). Next: stage 8, versions and how Resonance takes it.
 6. Geometry stage 5, diggable ground with strata: held until it is wanted.
 7. A source heard from the whole of itself (Cody, 2026-10-16: "a river should sound like a flowing river the
    entire width and length of the river"; the survey, inbox/2026-10-16-extended-sources-survey; the rule,
