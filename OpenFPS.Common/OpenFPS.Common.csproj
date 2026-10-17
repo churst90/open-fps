@@ -23,9 +23,6 @@
     <!-- Maps and the one world (docs/ENGINE_PACKAGES.md, stage 4): the roads message and the tiles' states are
          its values on the wire, and EntityType, which a definition carries. -->
     <ProjectReference Include="..\OpenFPS.World\OpenFPS.World.csproj" />
-    <!-- Only while DrivingCuePlanner is here: it plans on the racing line (Agents) and goes to Accessibility
-         next (docs/ENGINE_PACKAGES.md, stage 5). -->
-    <ProjectReference Include="..\OpenFPS.Agents\OpenFPS.Agents.csproj" />
   </ItemGroup>
 
   <ItemGroup>

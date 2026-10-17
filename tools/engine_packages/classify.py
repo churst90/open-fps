@@ -110,7 +110,6 @@ FILE_RULES = [
     ('OpenFPS.Common/AudioEvents.cs', 'Common', 'wire'),
     ('OpenFPS.Common/Components.cs', 'Common', 'wire and entity model'),
     ('OpenFPS.Common/DistantMotion.cs', 'Common', 'how sent states are carried between packets'),
-    ('OpenFPS.Common/DrivingCuePlanner.cs', 'Accessibility', 'the driver\'s cues, planned'),
     ('OpenFPS.Common/EntityAcoustics.cs', 'Common', 'entity adapter: rooms, openings and the sound\'s world input'),
     ('OpenFPS.Common/EntityEmission.cs', 'Common', 'entity adapter: where an entity sounds from'),
     ('OpenFPS.Common/EntityGeometry.cs', 'Common', 'entity adapter: geometry'),

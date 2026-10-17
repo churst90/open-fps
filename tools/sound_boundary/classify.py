@@ -110,7 +110,6 @@ FILE_RULES = [
     (CO + 'EntityGeometry.cs', 'b', '', "open-fps's entities to solids: the adapter the geometry library is fed through"),
     (CO + 'EntityAcoustics.cs', 'b', '', "open-fps's entities to rooms, openings and solids: the adapter the acoustics are fed through"),
     (CO + 'MoverPoses.cs', 'b', '', "the server's count of door leaves moved"),
-    (CO + 'DrivingCuePlanner.cs', 'b', '', 'driving aid over the road network'),
     (CO + 'UpdateThrottle.cs', 'b', '', 'client loop'),
     (CO + 'Messages.cs', 'b', '', 'network'),
     (CO + 'StatePacking.cs', 'b', '', 'network'),

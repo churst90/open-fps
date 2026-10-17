@@ -1,5 +1,6 @@
 file	group	projects	library_types
 OpenFPS.Accessibility/Beacons.cs	host		
+OpenFPS.Accessibility/DrivingCuePlanner.cs	host		
 OpenFPS.Accessibility/DrivingCueSounds.cs	host		
 OpenFPS.Accessibility/IUiCues.cs	host		
 OpenFPS.Accessibility/Keys/GameKey.cs	host		
@@ -173,7 +174,6 @@ OpenFPS.Client.Core/WorldAudioPlayer.cs	host
 OpenFPS.Common/AudioEvents.cs	host		
 OpenFPS.Common/Components.cs	host		
 OpenFPS.Common/DistantMotion.cs	host		
-OpenFPS.Common/DrivingCuePlanner.cs	host		
 OpenFPS.Common/EntityAcoustics.cs	host		
 OpenFPS.Common/EntityEmission.cs	host		
 OpenFPS.Common/EntityGeometry.cs	host		
