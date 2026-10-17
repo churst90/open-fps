@@ -159,7 +159,7 @@ DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
 # (DoorRenderCache.Name: a hash of the door model sources, OpenFPS.Sound.csproj DoorModelSource, and
 # the cache file version), so it survives every change that does not touch a door model.
 DOORHASH=$(grep -ho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Sound/"$LOWER"/DoorModelFingerprint.g.cs 2>/dev/null | head -1 | tr -d '"')
-DOORVER=$(grep -o 'const int Version = [0-9]*' "$REPO/OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs" | grep -o '[0-9]*$')
+DOORVER=$(grep -o 'const int Version = [0-9]*' "$REPO/OpenFPS.Audio/Core/DoorRenderCache.cs" | grep -o '[0-9]*$')
 DOORS="$DOORHASH-v$DOORVER"
 if [ "${OPENFPS_RENDER_CACHE:-}" != "off" ] && [ -n "$DOORHASH" ] && [ -n "$DOORVER" ]; then
   RCACHE="${OPENFPS_RENDER_CACHE:-${XDG_DATA_HOME:-$HOME/.local/share}/OpenFPS/rendercache/$DOORS}"

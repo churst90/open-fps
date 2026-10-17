@@ -99,7 +99,7 @@ public class FloorsBetweenFlatsTests
         // FMOD needs a sound card to construct, so the order is read off the source: the first attribute
         // pass runs before the channel is unpaused, or the first block plays at the emitter's bare volume
         // through whatever EQ gains the pooled unit kept.
-        string source = File.ReadAllText(Source(new[] { "OpenFPS.Client.Core", "AudioEngine", "Fmod", "FmodAudioProvider.cs" }));
+        string source = File.ReadAllText(Source(new[] { "OpenFPS.Audio", "Fmod", "FmodAudioProvider.cs" }));
         int play = source.IndexOf("public void PlaySpatialSound(", StringComparison.Ordinal);
         Assert.True(play > 0);
         int start = source.IndexOf("StartOnPath(activeSound)", play, StringComparison.Ordinal);
@@ -121,7 +121,7 @@ public class FloorsBetweenFlatsTests
     {
         // FMOD needs a sound card to construct, so this is read off the source: the reaper and StopSound
         // hand a voice to the retiring list; only ReleaseRetired (and Dispose) take its units off.
-        string source = File.ReadAllText(Source(new[] { "OpenFPS.Client.Core", "AudioEngine", "Fmod", "FmodAudioProvider.cs" }));
+        string source = File.ReadAllText(Source(new[] { "OpenFPS.Audio", "Fmod", "FmodAudioProvider.cs" }));
         int reap = source.IndexOf("if (!isPlaying) {", StringComparison.Ordinal);
         Assert.True(reap > 0);
         string branch = source.Substring(reap, source.IndexOf('}', reap) - reap);

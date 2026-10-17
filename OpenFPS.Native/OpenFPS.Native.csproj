@@ -21,7 +21,8 @@
 
   <ItemGroup>
     <!-- Phonon is internal: nothing outside the audio engine should call Steam Audio directly. The engine
-         (Client.Core today, OpenFPS.Audio from stage 6), the tests and the lab's spikes do. -->
+         (OpenFPS.Audio, since stage 6), its host Client.Core, the tests and the lab's spikes do. -->
+    <InternalsVisibleTo Include="OpenFPS.Audio" />
     <InternalsVisibleTo Include="OpenFPS.Client.Core" />
     <InternalsVisibleTo Include="OpenFPS.Tests" />
     <InternalsVisibleTo Include="OpenFPS.AudioLab" />

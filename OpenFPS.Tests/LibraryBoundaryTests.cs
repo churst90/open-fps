@@ -293,6 +293,11 @@ public class LibraryBoundaryTests
         // that declares no glazing is logged.
         new object[] { typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "Serilog" } },
+        // The runtime (stage 6): the mixer, Steam Audio, the acoustic worker, over the catalogue's presets and the
+        // native bindings. Serilog: the mixer and the worker log (decision 5).
+        new object[] { typeof(OpenFPS.Client.AudioEngine.Core.AudioEngineFacade).Assembly.GetName().Name!,
+                       new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound",
+                               "OpenFPS.Models", "OpenFPS.Native", "Serilog" } },
     };
 
     [Theory]

@@ -87,7 +87,7 @@ def layers():
 
 LAYER = layers()
 NEW = {'Environment', 'World', 'Agents', 'Editor'}
-PLANNED = {'Audio'}
+PLANNED = set()
 
 # ── Files: (glob, package, why) ─────────────────────────────────────────────────────────────────────
 # The first match wins. "by" says whose plan puts it there: this survey, the physics or the library survey.
@@ -101,9 +101,9 @@ FILE_RULES = [
     ('OpenFPS.Physics/*', 'Physics', ''), ('OpenFPS.Acoustics/*', 'Acoustics', ''), ('OpenFPS.Models/*', 'Models', ''),
     ('OpenFPS.Accessibility/*', 'Accessibility', ''),
     ('OpenFPS.World/*', 'World', ''),
+    ('OpenFPS.Audio/*', 'Audio', ''),
 
     # ── Common ──
-    ('OpenFPS.Common/AudioEmission.cs', 'Common', 'where a thing sounds from, from values (library stage 6); moves with the second half'),
     ('OpenFPS.Common/AudioEvents.cs', 'Common', 'wire'),
     ('OpenFPS.Common/Components.cs', 'Common', 'wire and entity model'),
     ('OpenFPS.Common/DistantMotion.cs', 'Common', 'how sent states are carried between packets'),
@@ -146,9 +146,6 @@ FILE_RULES = [
     ('OpenFPS.Sound/*', 'Sound', ''),
 
     # ── Client.Core ──
-    ('OpenFPS.Client.Core/AudioEngine/*', 'Audio', L6),
-    ('OpenFPS.Client.Core/NearDrops.cs', 'Audio', L6),
-    ('OpenFPS.Client.Core/RainField.cs', 'Audio', L6),
     ('OpenFPS.Client.Core/VoiceRegistry*.cs', 'Audio', 'the voices\' ids and kinds (audit P3)'),
     ('OpenFPS.Client.Core/LoudspeakerVoices.cs', 'Audio', 'programs rendered through their speakers'),
     ('OpenFPS.Client.Core/Services/SoundMappingService.cs', 'Audio', 'which bank file a footstep plays'),
@@ -227,7 +224,7 @@ TYPE_RULES = {
 }
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',
-                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.World', 'OpenFPS.Common',
+                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.Audio', 'OpenFPS.World', 'OpenFPS.Common',
                    'OpenFPS.Accessibility',
                    'OpenFPS.Client.Core', 'OpenFPS.Server')
 USERS = ('OpenFPS.Server', 'OpenFPS.Client.Core', 'OpenFPS.Client', 'OpenFPS.Client.Gtk', 'OpenFPS.AudioLab',

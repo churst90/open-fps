@@ -162,7 +162,7 @@ def project_class(t):
         return 'geometry'
     if p == 'OpenFPS.Materials':
         return 'materials'
-    if p in ('OpenFPS.Sound', 'OpenFPS.Acoustics', 'OpenFPS.Native'):
+    if p in ('OpenFPS.Sound', 'OpenFPS.Acoustics', 'OpenFPS.Native', 'OpenFPS.Audio'):
         return 'sound' if p != 'OpenFPS.Acoustics' else 'acoustics'
     if p in SKIP_PROJECTS:
         return 'lab/tests'
@@ -298,7 +298,7 @@ def side(e):
         return 'lab'
     if ft in MECH_READERS and group(ft) != 'PS' or ft in ('OpenFPS.Server.Systems.DrivingSystem', EN + 'Driveline', C + 'WheelDynamics'):
         return 'mechanics'
-    if e['from_project'] in ('OpenFPS.Sound', 'OpenFPS.Acoustics') or e['file'].startswith('OpenFPS.Client.Core/AudioEngine') \
+    if e['from_project'] in ('OpenFPS.Sound', 'OpenFPS.Acoustics', 'OpenFPS.Audio') \
             or 'ClientAudioSystem' in e['file'] or group(ft) == 'S':
         return 'sound'
     return 'other host'
@@ -346,7 +346,7 @@ w()
 # Sound's reads of physical state, by type.
 w('### Sound and the client audio reading the mechanics (P, PS, V)')
 w()
-w('| Mechanics type | Refs from Sound | Refs from Client.Core audio | Files |')
+w('| Mechanics type | Refs from Sound | Refs from Audio and the client\'s audio system | Files |')
 w('|---|---:|---:|---:|')
 sr = collections.defaultdict(lambda: [0, 0, set()])
 for e in EDGES:
@@ -355,7 +355,7 @@ for e in EDGES:
     if e['from_project'] == 'OpenFPS.Sound':
         sr[e['to_type']][0] += 1
         sr[e['to_type']][2].add(e['file'])
-    elif e['file'].startswith('OpenFPS.Client.Core/AudioEngine') or 'ClientAudioSystem' in e['file']:
+    elif e['from_project'] == 'OpenFPS.Audio' or 'ClientAudioSystem' in e['file']:
         sr[e['to_type']][1] += 1
         sr[e['to_type']][2].add(e['file'])
 for t, (a, b, fs) in sorted(sr.items(), key=lambda kv: -(kv[1][0] + kv[1][1])):

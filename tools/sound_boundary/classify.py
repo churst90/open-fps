@@ -49,22 +49,14 @@ FILE_RULES = [
     ('OpenFPS.Sound/', 'a', 'Sound', ''),
     ('OpenFPS.Models/', 'a', 'Models', 'the catalogue: docs/ENGINE_PACKAGES.md, stage 2'),
     ('OpenFPS.Native/', 'a', 'Native', ''),
-    ('OpenFPS.Audio/', 'a', 'Audio', ''),
+    ('OpenFPS.Audio/Data/', 'c', 'Audio', 'the source description the host fills'),
+    ('OpenFPS.Audio/', 'a', 'Audio', 'the runtime: FMOD DSPs, voices, Steam Audio, the acoustic worker (stage 6)'),
     ('OpenFPS.Schema/', 'a', 'Schema', 'the editor attribute on a model property'),
     ('OpenFPS.Physics/', 'a', 'Physics', 'docs/PHYSICS_BOUNDARY.md'),
     # Not the library's: how a player who cannot see is told the world (docs/ENGINE_PACKAGES.md, stage 7).
     ('OpenFPS.Accessibility/', 'b', '', 'docs/ENGINE_PACKAGES.md, stage 7'),
     ('OpenFPS.World/', 'b', '', 'maps and the one world: docs/ENGINE_PACKAGES.md, stage 4'),
-    # The real-time runtime: FMOD DSPs, voices, Steam Audio, the acoustic worker
-    (CC + 'AudioEngine/Data/', 'c', 'Audio', 'the source description the host fills'),
-    (CC + 'AudioEngine/Fmod/', 'a', 'Audio', ''),
-    (CC + 'AudioEngine/SteamAudio/', 'a', 'Audio', ''),
-    (CC + 'AudioEngine/Acoustics/', 'a', 'Audio', ''),
-    (CC + 'AudioEngine/Core/AudioEngineFacade.cs', 'a', 'Audio', ''),
-    (CC + 'AudioEngine/Core/VoiceManager.cs', 'a', 'Audio', ''),
-    (CC + 'AudioEngine/Core/AudioBank.cs', 'a', 'Audio', ''),
-    (CC + 'AudioEngine/Core/DoorRenderCache.cs', 'a', 'Audio', 'disk cache of door renders'),
-    # Synthesis: managed, no FMOD
+    # Synthesis: managed, no FMOD (in OpenFPS.Sound/Core since stage 3; the runtime's five went to OpenFPS.Audio/Core)
     (CC + 'AudioEngine/Core/', 'a', 'Sound', 'synthesis'),
     # Integration files: what of them is library and what is open-fps's adapter
     (CC + 'ClientAudioSystem.cs', 'b', '', 'SPLIT: the host-neutral audio world goes to Audio, the snapshot adapter stays'),
@@ -72,8 +64,6 @@ FILE_RULES = [
     (CC + 'SpatialService.cs', 'b', '', 'the game\'s rays and entity lookups; its acoustic queries are the library\'s (AcousticRays, stage 6)'),
     (CC + 'ClientGeometry.cs', 'b', '', "open-fps's geometry adapter (entities to TriangleWorld)"),
     (CC + 'BirdLife.cs', 'b', '', 'SPLIT: species choice and calling go to Sound/Audio; the habitat survey reads entities'),
-    (CC + 'NearDrops.cs', 'a', 'Audio', ''),
-    (CC + 'RainField.cs', 'a', 'Audio', ''),
     (CC + 'ListeningCalibration.cs', 'b', '', 'a UI flow; uses Loudness'),
     (CC + 'AudioDiagnostics.cs', 'b', '', 'a console test'),
     (CC + 'Platform/', 'b', '', ''),
@@ -104,9 +94,8 @@ FILE_RULES = [
     (CO + 'Spectrum.cs', 'a', 'Sound', ''),
     (CO + 'ShapedNoise.cs', 'a', 'Sound', ''),
     (CO + 'AudioClock.cs', 'a', 'Sound', 'becomes an instance the host passes in'),
-    # Where a source's sound comes out: it reads the vehicle and machine presets, so Sound, not Acoustics. It takes
-    # values since the world input (stage 6), and moves with the second half; EntityEmission is its adapter.
-    (CO + 'AudioEmission.cs', 'a', 'Sound', 'in Common until the second half of stage 6 moves it'),
+    # Where a source's sound comes out is AudioEmission (OpenFPS.Sound since stage 6's second half); this is its
+    # adapter, with the offset a thing's kind implies, which is the catalogue's.
     (CO + 'EntityEmission.cs', 'b', '', "open-fps's entities to where they sound from: AudioEmission's adapter"),
     (CO + 'Speech/', 'b', '', "open-fps's recorded lines; Loudness reads its levels"),
     (CO + 'LaneRoutes.cs', 'b', '', 'traffic'),

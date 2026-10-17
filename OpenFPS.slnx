@@ -2,6 +2,7 @@
   <Project Path="OpenFPS.Accessibility/OpenFPS.Accessibility.csproj" />
   <Project Path="OpenFPS.Acoustics/OpenFPS.Acoustics.csproj" />
   <Project Path="OpenFPS.Astronomy/OpenFPS.Astronomy.csproj" />
+  <Project Path="OpenFPS.Audio/OpenFPS.Audio.csproj" />
   <Project Path="OpenFPS.AudioLab/OpenFPS.AudioLab.csproj" />
   <Project Path="OpenFPS.Client/OpenFPS.Client.csproj" />
   <Project Path="OpenFPS.Client.Core/OpenFPS.Client.Core.csproj" />

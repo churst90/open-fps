@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The sound library's runtime (docs/SOUND_LIBRARY_BOUNDARY.md, stage 6): the FMOD mixer and its voices
+       (Fmod/), Steam Audio's scenes, tracing and binaural stages (SteamAudio/), the acoustic worker and the
+       paths it answers (Acoustics/), the source description the host fills (Data/), the facade, the voice
+       manager, the bank, the door render cache and the placing thread (Core/), and the rain heard round the
+       listener (RainField, NearDrops). It reads the world through IAcousticWorld and names nothing of the game:
+       Client.Core is its host.
+
+       Namespaces are those the files had in Client.Core (decision 6): OpenFPS.Client.AudioEngine.* and
+       OpenFPS.Client.Core.AudioEngine.SteamAudio, and OpenFPS.Client.Core for the rain. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
+    <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
+    <!-- The catalogue: the presets a voice is made from (ModelLibrary.Presets, MachineRegistry). -->
+    <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />
+    <!-- FMOD's wrapper and the Steam Audio bindings (stage 1). The native libraries themselves are copied from
+         lib/ by the executables (OpenFPS.Client, OpenFPS.Client.Gtk, OpenFPS.AudioLab), not by this project. -->
+    <ProjectReference Include="..\OpenFPS.Native\OpenFPS.Native.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The mixer and the worker log (decision 5: Serilog's static Log stays). -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The host drives the mixer's internal hooks; the tests and the lab's spikes reach its internals directly:
+         that is what a spike is. -->
+    <InternalsVisibleTo Include="OpenFPS.Client.Core" />
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+  </ItemGroup>
+
+</Project>

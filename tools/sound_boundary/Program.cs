@@ -66,14 +66,15 @@ var projects = new (string Name, string Dir, string[] Refs, string[] Extra)[]
     ("OpenFPS.Acoustics", "OpenFPS.Acoustics", new[] { "OpenFPS.Geometry", "OpenFPS.Materials" }, Array.Empty<string>()),
     ("OpenFPS.Sound", "OpenFPS.Sound", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics" }, Array.Empty<string>()),
     ("OpenFPS.Models", "OpenFPS.Models", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound" }, Array.Empty<string>()),
+    ("OpenFPS.Audio", "OpenFPS.Audio", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.Native" }, Array.Empty<string>()),
     ("OpenFPS.World", "OpenFPS.World", new[] { "OpenFPS.Words", "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models" }, Array.Empty<string>()),
     ("OpenFPS.Common", "OpenFPS.Common", new[] { "OpenFPS.Words", "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World" }, Array.Empty<string>()),
-    ("OpenFPS.Client.Core", "OpenFPS.Client.Core", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Words", "OpenFPS.Accessibility" }, Array.Empty<string>()),
+    ("OpenFPS.Client.Core", "OpenFPS.Client.Core", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Words", "OpenFPS.Accessibility" }, Array.Empty<string>()),
     ("OpenFPS.Server", "OpenFPS.Server", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Words", "OpenFPS.Accessibility" }, Array.Empty<string>()),
-    ("OpenFPS.Client", "OpenFPS.Client", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Words", "OpenFPS.Accessibility", "OpenFPS.Client.Core" }, Array.Empty<string>()),
-    ("OpenFPS.Client.Gtk", "OpenFPS.Client.Gtk", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Words", "OpenFPS.Accessibility", "OpenFPS.Client.Core" }, Array.Empty<string>()),
-    ("OpenFPS.AudioLab", "OpenFPS.AudioLab", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Words", "OpenFPS.Accessibility", "OpenFPS.Astronomy", "OpenFPS.Client.Core", "OpenFPS.Server" }, Array.Empty<string>()),
-    ("OpenFPS.Tests", "OpenFPS.Tests", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Words", "OpenFPS.Accessibility", "OpenFPS.Astronomy", "OpenFPS.Client.Core", "OpenFPS.Server" },
+    ("OpenFPS.Client", "OpenFPS.Client", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Words", "OpenFPS.Accessibility", "OpenFPS.Client.Core" }, Array.Empty<string>()),
+    ("OpenFPS.Client.Gtk", "OpenFPS.Client.Gtk", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Words", "OpenFPS.Accessibility", "OpenFPS.Client.Core" }, Array.Empty<string>()),
+    ("OpenFPS.AudioLab", "OpenFPS.AudioLab", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Words", "OpenFPS.Accessibility", "OpenFPS.Astronomy", "OpenFPS.Client.Core", "OpenFPS.Server" }, Array.Empty<string>()),
+    ("OpenFPS.Tests", "OpenFPS.Tests", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Words", "OpenFPS.Accessibility", "OpenFPS.Astronomy", "OpenFPS.Client.Core", "OpenFPS.Server" },
         new[] { "OpenFPS.Client.Gtk/Game/GtkKeyMap.cs" }),
 };
 
@@ -102,9 +103,10 @@ foreach (var (name, dir, refs, extra) in projects)
     // The InternalsVisibleTo items of each project file.
     string[] friends = name switch
     {
-        "OpenFPS.Native" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
+        "OpenFPS.Native" => new[] { "OpenFPS.Audio", "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Acoustics" => new[] { "OpenFPS.Tests" },
-        "OpenFPS.Sound" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
+        "OpenFPS.Sound" => new[] { "OpenFPS.Audio", "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
+        "OpenFPS.Audio" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Client.Core" or "OpenFPS.Server" or "OpenFPS.World" => new[] { "OpenFPS.Tests", "OpenFPS.AudioLab" },
         _ => Array.Empty<string>(),
     };

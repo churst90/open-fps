@@ -50,7 +50,7 @@ DOORHASH=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Sound/*/DoorModelFing
 LAB_DOORHASH=$(grep -rho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Sound/*/DoorModelFingerprint.g.cs | head -1 | tr -d '"')
 [ -n "$DOORHASH" ] || { echo "!! no DoorModelFingerprint.g.cs under $ART/obj/OpenFPS.Sound." >&2; exit 1; }
 [ "$LAB_DOORHASH" = "$DOORHASH" ] || { echo "!! the lab's door models are $LAB_DOORHASH, the client's $DOORHASH: renders would not be used." >&2; exit 1; }
-DOORVER=$(grep -o 'const int Version = [0-9]*' "$REPO/OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs" | grep -o '[0-9]*$')
+DOORVER=$(grep -o 'const int Version = [0-9]*' "$REPO/OpenFPS.Audio/Core/DoorRenderCache.cs" | grep -o '[0-9]*$')
 DOORS="$DOORHASH-v$DOORVER"
 CACHES="${OPENFPS_PUBLISH_DIR:-$HOME/.cache/openfps-publish}/rendercache"
 find "$CACHES" -mindepth 1 -maxdepth 1 -type d ! -name "$DOORS" -exec rm -rf {} + 2>/dev/null || true

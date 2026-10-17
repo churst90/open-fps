@@ -44,70 +44,72 @@ OpenFPS.Astronomy/Moon.cs	Astronomy
 OpenFPS.Astronomy/Sky.cs	Astronomy	
 OpenFPS.Astronomy/SkyWords.cs	Astronomy	
 OpenFPS.Astronomy/Sun.cs	Astronomy	
+OpenFPS.Audio/Acoustics/AsyncAcousticWorker.cs	Audio	
+OpenFPS.Audio/Acoustics/CabinWalls.cs	Audio	
+OpenFPS.Audio/Acoustics/EngineReflections.cs	Audio	
+OpenFPS.Audio/Acoustics/GroundReflection.cs	Audio	
+OpenFPS.Audio/Acoustics/OpeningGraph.cs	Audio	
+OpenFPS.Audio/Acoustics/RouteAnswers.cs	Audio	
+OpenFPS.Audio/Acoustics/SpatialAcoustics.cs	Audio	
+OpenFPS.Audio/Acoustics/VehicleShadow.cs	Audio	
+OpenFPS.Audio/Core/AudioBank.cs	Audio	
+OpenFPS.Audio/Core/AudioEngineFacade.cs	Audio	
+OpenFPS.Audio/Core/DoorRenderCache.cs	Audio	
+OpenFPS.Audio/Core/PlacementThread.cs	Audio	
+OpenFPS.Audio/Core/VoiceManager.cs	Audio	
+OpenFPS.Audio/Data/AcousticPathData.cs	Audio	
+OpenFPS.Audio/Data/SpatialEmitter.cs	Audio	
+OpenFPS.Audio/Fmod/BoundaryProximityProcessor.cs	Audio	
+OpenFPS.Audio/Fmod/DspFault.cs	Audio	
+OpenFPS.Audio/Fmod/EarStage.cs	Audio	
+OpenFPS.Audio/Fmod/EarWindVoice.cs	Audio	
+OpenFPS.Audio/Fmod/EchoWashProcessor.cs	Audio	
+OpenFPS.Audio/Fmod/EngineProcessor.cs	Audio	
+OpenFPS.Audio/Fmod/EngineRenderPool.cs	Audio	
+OpenFPS.Audio/Fmod/FmodAudioProvider.Ear.cs	Audio	
+OpenFPS.Audio/Fmod/FmodAudioProvider.cs	Audio	
+OpenFPS.Audio/Fmod/FmodDebugLog.cs	Audio	
+OpenFPS.Audio/Fmod/GranularBank.cs	Audio	
+OpenFPS.Audio/Fmod/GranularProcessor.cs	Audio	
+OpenFPS.Audio/Fmod/IAudioProvider.cs	Audio	
+OpenFPS.Audio/Fmod/MachineProcessor.cs	Audio	
+OpenFPS.Audio/Fmod/MasterDither.cs	Audio	
+OpenFPS.Audio/Fmod/MasterLimiter.cs	Audio	
+OpenFPS.Audio/Fmod/MasterTap.cs	Audio	
+OpenFPS.Audio/Fmod/MixerProfile.cs	Audio	
+OpenFPS.Audio/Fmod/MixerQuality.cs	Audio	
+OpenFPS.Audio/Fmod/NatureVoices.cs	Audio	
+OpenFPS.Audio/Fmod/NonFinite.cs	Audio	
+OpenFPS.Audio/Fmod/OwnVoice.cs	Audio	
+OpenFPS.Audio/Fmod/RadiatorProcessor.cs	Audio	
+OpenFPS.Audio/Fmod/RailVoice.cs	Audio	
+OpenFPS.Audio/Fmod/RainVoices.cs	Audio	
+OpenFPS.Audio/Fmod/StoveVoiceState.cs	Audio	
+OpenFPS.Audio/Fmod/SynthProcessor.cs	Audio	
+OpenFPS.Audio/Fmod/TakeLevels.cs	Audio	
+OpenFPS.Audio/Fmod/TalkerVoice.cs	Audio	
+OpenFPS.Audio/Fmod/TracedStages.cs	Audio	
+OpenFPS.Audio/Fmod/VoiceBuilds.cs	Audio	
+OpenFPS.Audio/NearDrops.cs	Audio	
+OpenFPS.Audio/RainField.cs	Audio	
+OpenFPS.Audio/SteamAudio/AcousticGeometry.cs	Audio	
+OpenFPS.Audio/SteamAudio/AmbiAxes.cs	Audio	
+OpenFPS.Audio/SteamAudio/DiffuseLate.cs	Audio	
+OpenFPS.Audio/SteamAudio/EarDecorrelator.cs	Audio	
+OpenFPS.Audio/SteamAudio/EarlyCopies.cs	Audio	
+OpenFPS.Audio/SteamAudio/HrtfBands.cs	Audio	
+OpenFPS.Audio/SteamAudio/LateField.cs	Audio	
+OpenFPS.Audio/SteamAudio/LateTail.cs	Audio	
+OpenFPS.Audio/SteamAudio/SceneTerrain.cs	Audio	
+OpenFPS.Audio/SteamAudio/SmoothTail.cs	Audio	
+OpenFPS.Audio/SteamAudio/SteamAudioDsp.cs	Audio	
+OpenFPS.Audio/SteamAudio/SteamAudioScene.cs	Audio	
+OpenFPS.Audio/SteamAudio/SteamAudioSimulator.cs	Audio	
+OpenFPS.Audio/SteamAudio/TileSceneSet.cs	Audio	
+OpenFPS.Audio/SteamAudio/TracedEchoes.cs	Audio	
+OpenFPS.Audio/SteamAudio/TracedReverb.cs	Audio	
+OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	Audio	
 OpenFPS.Client.Core/AudioDiagnostics.cs	game	
-OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Acoustics/CabinWalls.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Acoustics/EngineReflections.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Acoustics/GroundReflection.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Acoustics/OpeningGraph.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Acoustics/RouteAnswers.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Core/AudioBank.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Core/AudioEngineFacade.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Core/PlacementThread.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Core/VoiceManager.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Data/AcousticPathData.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Data/SpatialEmitter.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/BoundaryProximityProcessor.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/DspFault.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/EarStage.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/EarWindVoice.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/EchoWashProcessor.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/EngineProcessor.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/EngineRenderPool.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.Ear.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/FmodDebugLog.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/GranularBank.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/GranularProcessor.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/IAudioProvider.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/MachineProcessor.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/MasterDither.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/MasterLimiter.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/MasterTap.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/MixerProfile.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/MixerQuality.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/NatureVoices.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/NonFinite.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/OwnVoice.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/RadiatorProcessor.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/RailVoice.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/RainVoices.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/StoveVoiceState.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/SynthProcessor.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/TakeLevels.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/TracedStages.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/Fmod/VoiceBuilds.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/AcousticGeometry.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbiAxes.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/DiffuseLate.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/EarDecorrelator.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/EarlyCopies.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/HrtfBands.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/LateField.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/LateTail.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/SceneTerrain.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/SmoothTail.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioDsp.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioScene.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioSimulator.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/TileSceneSet.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedEchoes.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverb.cs	Audio	library stage 6
-OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverbDsp.cs	Audio	library stage 6
 OpenFPS.Client.Core/BeaconAids.cs	Accessibility	
 OpenFPS.Client.Core/BirdLife.cs	game	library stage 7 (host until split)
 OpenFPS.Client.Core/BuildForm.cs	Editor	
@@ -132,7 +134,6 @@ OpenFPS.Client.Core/LoudspeakerVoices.cs	Audio	programs rendered through their s
 OpenFPS.Client.Core/MapTracker.cs	Accessibility	
 OpenFPS.Client.Core/MeshAssetFetcher.cs	game	
 OpenFPS.Client.Core/NamedPlaces.cs	Accessibility	
-OpenFPS.Client.Core/NearDrops.cs	Audio	library stage 6
 OpenFPS.Client.Core/OtherBodies.cs	game	
 OpenFPS.Client.Core/PickUp.cs	game	
 OpenFPS.Client.Core/Platform/FmodMicrophoneCapture.cs	game	
@@ -142,7 +143,6 @@ OpenFPS.Client.Core/Platform/TimerResolution.cs	game
 OpenFPS.Client.Core/Platform/VoiceCodec.cs	game	
 OpenFPS.Client.Core/PredictionReconciler.cs	game	
 OpenFPS.Client.Core/ProcessLifeLog.cs	game	
-OpenFPS.Client.Core/RainField.cs	Audio	library stage 6
 OpenFPS.Client.Core/Scope.cs	game	
 OpenFPS.Client.Core/ScopeSounds.cs	game	
 OpenFPS.Client.Core/Services/ChatManager.cs	game	
@@ -166,7 +166,6 @@ OpenFPS.Client.Core/VoiceRegistry.Lifecycle.cs	Audio	the voices' ids and kinds (
 OpenFPS.Client.Core/VoiceRegistry.cs	Audio	the voices' ids and kinds (audit P3)
 OpenFPS.Client.Core/WallBumps.cs	Accessibility	
 OpenFPS.Client.Core/WorldAudioPlayer.cs	game	library stage 7 (host until split)
-OpenFPS.Common/AudioEmission.cs	Common	where a thing sounds from, from values (library stage 6); moves with the second half
 OpenFPS.Common/AudioEvents.cs	Common	wire
 OpenFPS.Common/Components.cs	Common	wire and entity model
 OpenFPS.Common/DistantMotion.cs	Common	how sent states are carried between packets
@@ -396,6 +395,7 @@ OpenFPS.Sound/Aircraft.cs	Sound
 OpenFPS.Sound/AircraftGroundRun.cs	Agents	an aeroplane driven along its runway
 OpenFPS.Sound/Applause.cs	Sound	
 OpenFPS.Sound/AudioClock.cs	Sound	
+OpenFPS.Sound/AudioEmission.cs	Sound	
 OpenFPS.Sound/Ballistics.cs	Sound	
 OpenFPS.Sound/Birds.cs	Sound	
 OpenFPS.Sound/Breathing.cs	Sound	

@@ -79,7 +79,7 @@ public class TestConfigIsolationTests
             // Moved by OPENFPS_SETTINGS_DIR.
             "OpenFPS.Client.Core/SettingsFolder.cs: SpecialFolder.ApplicationData",
             // Moved by OPENFPS_RENDER_CACHE and OPENFPS_MESH_CACHE.
-            "OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs: SpecialFolder.LocalApplicationData",
+            "OpenFPS.Audio/Core/DoorRenderCache.cs: SpecialFolder.LocalApplicationData",
             "OpenFPS.Client.Core/MeshAssetFetcher.cs: SpecialFolder.LocalApplicationData",
             // The two programs' own start-up (a log folder, a crash folder): no test runs a program's Main.
             "OpenFPS.Client/Program.cs: SpecialFolder.LocalApplicationData",

@@ -1,13 +1,11 @@
 file	to_package	count
-OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	Common	2
-OpenFPS.Client.Core/BeaconAids.cs	Common	90
+OpenFPS.Client.Core/BeaconAids.cs	Common	88
 OpenFPS.Client.Core/BeaconAids.cs	game	6
 OpenFPS.Client.Core/DrivingAids.cs	Common	74
 OpenFPS.Client.Core/DrivingAids.cs	game	30
 OpenFPS.Client.Core/MapTracker.cs	Common	103
 OpenFPS.Client.Core/MapTracker.cs	game	30
 OpenFPS.Client.Core/NamedPlaces.cs	Common	29
-OpenFPS.Client.Core/RainField.cs	Common	2
 OpenFPS.Client.Core/Services/SoundMappingService.cs	game	8
 OpenFPS.Client.Core/SightGrid.cs	Common	94
 OpenFPS.Client.Core/SightGrid.cs	game	2
