@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Running water is heard from the whole of its line (Cody: "a sound source should have its sound be the entire
+  area of the sound source"; docs/RUNNING_WATER.md 15). A creek, ditch, rivulet or gutter is cut at the listener
+  into pieces of equal angle, small beside you and long far along it, at most twelve a voice, out of the 36 place
+  voices; each piece plays only the events that happen in it and is as loud as what it holds by the mixer's law.
+  The gain that held every 20 m stretch to the power of its middle is gone: walking 1.5 m beside a creek on
+  Albany the level swung 10.4 dB every 20 m and now drifts 3.3 dB as its stretches' water does; a shore 2 m back
+  swung 4.2 dB and now 0.7; the city's gutter is flat along its length (3.5 dB quieter opposite its middle,
+  3.5 louder at its ends). Trees, the fire pit and the fountain's taps move under 0.4 dB. A new instrument,
+  `AudioLab --extent-walk`, walks the real maps (with `rule=middle` for the old rule, or `OPENFPS_EXTENT_RULE=middle`
+  in the game), and a new guard, `ExtentWalkTests`. The wire hash does not change; one stored stream
+  (places_and_woods) does.
 - Package stage 7's clean half finished: the listening-level calibration (/listening) is in
   `OpenFPS.Accessibility`, playing its cues through `IUiCues` as the lists do; Accessibility now references
   Models and Sound. Nothing a player hears or is told changes, and the wire hash does not.

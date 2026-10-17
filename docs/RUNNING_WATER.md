@@ -968,3 +968,150 @@ has two volumes), the mains pressure, the room's surfaces (a tiled bathroom answ
 lid is on. Already in the engine to build on: bubbles at Minnaert's note and falling water (section 12), a
 valve's hiss as an orifice jet, struck rings for the lever and the porcelain.
 
+
+## 15. A line heard from the whole of it, 2026-10-16
+
+Cody, 2026-10-16: "a sound source should have its sound be the entire area of the sound source. I.E., a river
+should sound like a flowing river the entire width and length of the river". The survey of every extended source
+(`inbox/2026-10-16-extended-sources-survey`) proposed one rule for all of them and an order to build it in; this
+section is its steps 0 and 1, on running water. Cody approved the same day: the balance gain gives way to each
+part being as loud as what it holds, and the approved creek, gutter, waves, fountain and fire get a re-listen,
+not a re-fit (each event's own sound is unchanged).
+
+### 15.1 The instrument
+
+`AudioLab --extent-walk [walks=] [render] [rule=middle|pieces] [rain=60]` walks at standing height, a row every
+0.5 m, through the client's own placing (`ClientAudioSystem` over a mixer that only records):
+
+- **creek**: 60 m along the longest run of creek voices of Albany's drainage lines (five 20 m voices, 86 m),
+  1.5 m off its line; **creek-out**: straight out from its middle to 60 m, facing along it;
+- **shore**: 60 m along 22 stretches of a pond's shore on Albany, 2 m back from the edge;
+- **gutter**: along the city's Foundry Street gutter (15 m) in heavy rain, 2 m off it, from 7.5 m before it to
+  7.5 m past it;
+- **fountain**: round Elm Park's fountain, 7 m from its middle; **fountain-out**: away south from 6 to 40 m;
+- **fire**: away west from the 58 Alder Street fire pit, 1.5 to 30 m.
+
+Headless, each row is the power of every voice of the walk's sources by the mixer's own law
+(`Loudness.RenderedGain`, each voice at its share of its source: `ClientAudioSystem.HeardTogether`), where it
+comes from, and how wide it is: twice the arc cosine of the power-weighted directions' resultant, so two equal
+sources θ either side are 2θ wide. With `render` the same walks go through FMOD and Steam Audio at 0.5 m/s, and
+each row has the level in each octave from 125 Hz to 8 kHz, the ears' coherence (IACC) in each, and the
+interaural delay as a bearing. `rule=middle` plays everything as before (below), so a before and an after come
+from one build; it reproduces the old build's numbers to the hundredth of a decibel.
+
+### 15.2 Before: every stretch held to its middle
+
+Until now a line was a fixed layout of five places along each voice, and one gain
+(`ExtendedSources.Balance`) held the five together to the power of a point at the voice's middle. The extent is
+2 m where a drainage voice is 20 m long, so walking beside a chain of them the level rose at each middle and fell
+at each seam. Measured with `--extent-walk` at dea7eb3f (headless; after ten minutes of heavy rain, and again
+after an hour, the same to 0.2 dB):
+
+| Walk | Swing along it | What it does |
+|---|---:|---|
+| creek, 1.5 m off | 10.4 dB | peaks at 10, 33 and 51 m along: every stretch's middle |
+| shore, 2 m back | 4.2 dB | a peak every 20 m |
+| gutter, 2 m off | 6.6 dB inside its 15 m | as loud as its middle only opposite it |
+| fountain, round at 7 m | 0.2 dB | its taps are smaller than their extent |
+| fire pit, out | 23.9 dB from 1.5 to 30 m | a point that widens near |
+
+Rendered (FMOD and Steam Audio; one-second windows, so the water's own unevenness is in them too): creek
+16.2 dB, shore 6.1 dB, gutter 17.3 dB over the walk. Every voice had HRTF; at most 68 voices played, with 92
+binaural voices still free.
+
+### 15.3 The rule, for running water
+
+**A line is cut at the listener into pieces by the angle each covers** (`ExtendedSources.Cut`). The cut is of equal
+angle: as many pieces as keep each under TrainVoicing's split angle (7°), held while every two neighbours
+together stay over its merge angle (4°), so a tap of a movement key never cuts it back and forth
+(`WantedPieces`); at most twelve a voice (`MaxPlaces`). Beside a 16 m creek 1.5 m off its line the piece at your
+feet is half a metre long and the far ones several metres; past a few hundred metres the whole voice is one. The
+pieces come out of the 36 place voices, loudest first; a line takes what is left and is cut coarser, and its far
+end is never dropped. It is cut again when the ear has moved a quarter of its shortest piece.
+
+**Each piece plays what happens in it.** The synth writes every breaking site's events, and every fall's, into
+the place that plays the piece the site is in (`RunningWaterSynth.Cut`, handed over by `IAudioProvider.PlanPieces`),
+so a piece over a stretch of stones is louder than one over smooth water, and no two pieces are copies (the
+largest correlation between two pieces of the creek is 0.015). A gutter's rain on its own water is shared by length.
+
+**Each piece is as loud as what it holds, by the mixer's law** (`ExtendedSources.Place`). Its voice stands where
+its sound arrives from (the centroid of what each part of it brings to the ear) at the gain that makes the law
+there equal the law over the whole piece, in closed form. So the pieces together are the line heard from every
+point of it, however it is cut: one piece or twelve, beside it or past its end, they sum to within 0.01 dB of the
+whole line (`ExtentWalkTests`). There is no gain holding it to its middle. The ranking hears a line the same way,
+by the law over its length.
+
+**The rest keep their places**, without the balance gain: a tree, the fire pit and a fountain's tap are smaller
+than their extent and move under 0.4 dB at 1, 5 and 20 m (`WideSourcesTests`); a shore's places, 4 m apart with
+a 4 m extent, now add up along it.
+
+### 15.4 After
+
+Headless, the same walks after an hour of heavy rain (the creek's lines carry 0.2 to 6.5 L/s):
+
+| Walk | Before | After |
+|---|---:|---:|
+| creek, 1.5 m off: swing along 60 m | 10.4 dB, every 20 m | 3.3 dB, slowly: its five voices carry different water |
+| creek: mean level | | +0.1 dB |
+| creek-out, 0.5 to 60 m | 16.6 dB | 16.0 dB; 3 dB a halving near it |
+| shore, 2 m back | 4.2 dB | 0.7 dB |
+| gutter, inside its 15 m | 6.6 dB | 0.7 dB in its middle 10 m, 3 dB down at its ends, as a line's are |
+| gutter, 2 m off: opposite its middle, at its ends | | 3.5 dB quieter, 3.5 dB louder |
+| fountain round, fountain-out, fire | 0.2, 17.0, 23.9 dB | 0.3, 17.1, 24.1 dB |
+
+How wide: beside the creek the sound now spans 113 to 158° (it was 77 to 167°, swinging with the stretches); out
+from it, it narrows steadily from 136° at its bank. In the test's straight 192 m of creek it is 112° wide at
+1.5 m and 77° at 40 m, and the level grows 3.1 dB for each halving of the distance.
+
+Voices: beside the creek at most 61 (machines and places together), as before; the gutter takes 12 where it
+took 5. Placing costs nothing to speak of: `ClientAudioSystem.Update` takes a median 0.20 ms with Albany's
+creek network round you (0.15 before) and 0.39 ms at the 99th percentile; the cut is a few closed forms a piece
+on the placing thread, under a microsecond each, so nothing goes to a worker. Rendering: a creek voice's synth
+renders twelve streams where it rendered five, 9.2 to 13.3 % of a core in `--water-cost` (`cut`) on this machine
+under load; a gutter 4.4 to 9.9 %, as each piece has its own rain on the water.
+
+Rendered through FMOD and Steam Audio after an hour of rain, both rules in one build (one-second windows, which
+hold the water's own unevenness; levels smoothed over 4.5 m):
+
+| Walk | Before | After |
+|---|---|---|
+| creek, smoothed swing | 19.0 dB | 8.1 dB |
+| creek, IACC at 1 and 2 kHz | 0.66, 0.57 | 0.61, 0.48: wider |
+| gutter, inside its 15 m | 11 dB, a hump at its middle | 5 dB, down at its ends |
+| shore, smoothed swing | 2.4 dB | 1.9 dB |
+| fountain round, its octaves | | within 0.4 dB of before |
+| creek, mean level | -46.0 dBFS | -45.5 dBFS |
+
+Every voice had HRTF in both. On this machine (the lab niced and pinned to half the cores, with other work on
+them) Albany's creek walks starved the render pool under both rules alike (up to 1,800 starves a second) and the
+budget gave up machine voices down to six, so their rendered levels carry those drops as well; the headless sums
+above are the measure of the rule, and the creek renders want repeating on a quiet machine.
+
+Where to listen (each checked standable with `--walk-pair ears=`): beside the creek on Albany, /tp 931.4 -1274.8 1.7
+and walk west along it to /tp 871.9 -1284.5 1.5 (1.5 m off its line, 60 m), and out from it at /tp 912.4 -1339.0 2.3;
+the city's gutter in rain, /tp 44.5 122.2 0.2 east to /tp 74.0 122.2 0.2, its middle at /tp 59.0 122.2 0.2.
+
+### 15.5 What the rest of the rule needs
+
+The order is the survey's; todo.md carries it.
+
+2. **Voice the mapped streams.** OSM waterways are laid only as water surfaces (`tools/gen_osm.py`), and the
+   drainage network places no voice on water cells, so Oak Creek's 3.3 km in Albany is silent where the map
+   draws it. Needed: the waterway's polyline with its width in the map's data (an appended component field, so
+   the wire hash changes), its slope from the DEM, and one line source along it, cut as above. The bed's local
+   state is what a piece plays: riffles and pools every five to seven widths from slope and width (obstacles
+   concentrated in the riffles, smooth water in the pools), and a wide bed heard from its banks. Today a voice
+   carries one kind, width, slope and flow for its 20 m, and its sites are spread evenly along it; there is no
+   riffle or pool in the data. A river's edge would also take the `river_bank` shore with current.
+3. Shores as whole outlines, with whitecaps over the open water.
+4. The fountain from its spec: each tap's offset and measured level in `WaterFeatureSpec`, one entity, the calm
+   basin silent.
+5. Fire and woods on the same cut (FIRE.md 12.8's aggregation), the wood's ring of six replaced by pieces of its crowns.
+6. Crowds: the seat blocks as geometry, per-piece decorrelated applause.
+7. Far traffic along the roads.
+8. A path per near piece: today every piece is heard through its source's middle's path, so half a stretch
+   behind a wall is all heard or all hidden.
+
+Two things the cut leaves for those steps: a drainage voice is still a 20 m chord (one source per whole line
+needs the line's path on the wire, step 2), and a far piece is still events, not a texture (a kilometre of line
+is never voiced at once today, as only the voices in the machine budget play).

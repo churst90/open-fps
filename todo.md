@@ -134,7 +134,22 @@ since the last deploy" list below.
    wire hash changes). Next: the second half (19.6), `OpenFPS.Audio` and the moves, with `AudioWorldOptions` and
    `AudioDataPaths` for the statics left (`CabinPaths`, the wide sources' levers, the door render cache).
 6. Geometry stage 5, diggable ground with strata: held until it is wanted.
-7. Then detail, in this order:
+7. A source heard from the whole of itself (Cody, 2026-10-16: "a river should sound like a flowing river the
+   entire width and length of the river"; the survey, inbox/2026-10-16-extended-sources-survey; the rule,
+   docs/RUNNING_WATER.md 15). Step 0, the walk (`--extent-walk`, `ExtentWalkTests`): DONE 2026-10-16. Step 1,
+   running water cut at the ear into pieces each as loud as what it holds, without the balance gain: DONE
+   2026-10-16, unheard (re-listen, below). Then, in order:
+   - 2: voice the mapped streams (OSM waterways are silent where the map draws them; Oak Creek is 3.3 km): the
+     waterway's line and width in the map's data (the wire hash changes), its slope from the DEM, one line
+     source along it, its bed's riffles and pools every five to seven widths and a wide bed heard from its
+     banks; a river's edge with the `river_bank` shore;
+   - 3: shores as whole outlines, with whitecaps over the open water;
+   - 4: the fountain from its spec (each tap's offset and measured level, one entity, the basin silent);
+   - 5: fire and woods on the same cut (FIRE.md 12.8), the wood's ring replaced by pieces of its crowns;
+   - 6: crowds, the seat blocks as geometry with decorrelated applause per piece;
+   - 7: far traffic along the roads;
+   - 8: a path per near piece (today every piece is heard through its source's middle's path).
+8. Then detail, in this order:
    - weather as a system and wind acting on things (docs/MATTER.md 5.3 and its order of work, steps 5
      and 6; CODY_ASKS item 12), with real weather for the real places (docs/REAL_WEATHER.md);
    - footsteps through the structure ("Walls", below);
@@ -250,6 +265,10 @@ the provider after the budget has let it go, and its placement goes stale for th
 old PA in --loudspeaker game).
 
 ## Waiting on Cody's ear
+
+- Running water heard from the whole of its line (2026-10-16, docs/RUNNING_WATER.md 15): a re-listen of the
+  approved creek, gutter, waves, fountain and fire, not a re-fit. Beside a drainage-line creek on Albany the
+  level no longer swells every 20 m; the gutter is flat along its length; the shores' 4 dB swing is gone.
 
 Approved 2026-10-09 to 11, so off this list: the hull's blows in time; the cheaper reverb tail; the
 shut glass door leak fix (inbox/pa-leak-2026-10-09); the loudspeaker (inbox/loudspeaker-2026-10-10); the
@@ -936,7 +955,8 @@ Some may already be fixed; confirm before fixing again.
 ### Acoustics
 - Synthetic footsteps (parked 2026-09-28 after three failures by ear). If tried again: fit only the
   dry first 30-60 ms, give the heel the body's weight, and give each loose surface its own mechanism.
-- Aggregation for traffic and crowds: many distant sources heard as one extended source (woods done).
+- Aggregation for traffic and crowds: many distant sources heard as one extended source (woods done; the rule
+  is "Next, in order" item 7, steps 6 and 7).
 - Fused early reflections (inside 50 ms) by convolution or delay taps.
 - One acoustic path per machine: a wall between you and one end of a bus is not modelled; machines
   with several radiators are still one point.

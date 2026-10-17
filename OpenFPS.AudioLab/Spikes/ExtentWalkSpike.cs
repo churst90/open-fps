@@ -48,7 +48,8 @@ public static class ExtentWalkSpike
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
-        Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Warning().CreateLogger();
+        // log: the game's own log lines too (its budgets giving voices up and taking them back).
+        if (!args.Contains("log")) Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Warning().CreateLogger();
         string outDir = Arg(args, "out=") ?? Path.Combine(Path.GetTempPath(), "openfps-extent-walk");
         Directory.CreateDirectory(outDir);
         var wanted = (Arg(args, "walks=") ?? "creek,creek-out,gutter,shore,fountain,fountain-out,fire").Split(',');
@@ -491,6 +492,7 @@ public static class ExtentWalkSpike
         Flows(rig, walk, sources);
         Face(rig.Player, walk.Heading);
         int mostVoices = 0, flat = 0, leastFree = int.MaxValue;
+        var playing = new List<(double At, int Voices)>();
         void Pump(double seconds, Func<double, Vector3>? at = null)
         {
             double start = clock.Elapsed.TotalSeconds;
@@ -500,9 +502,10 @@ public static class ExtentWalkSpike
                 if (at != null) rig.Player.Position = at(clock.Elapsed.TotalSeconds - start);
                 rig.Audio.Update(rig.World.GetSnapshot());
                 rig.Facade.PumpForTest();
-                if (at != null && ++frame % 25 == 0)
+                if (at != null && ++frame % 10 == 0)
                 {
                     var census = provider.VoiceCensus();
+                    playing.Add((clock.Elapsed.TotalSeconds, census.Active));
                     mostVoices = Math.Max(mostVoices, census.Active);
                     flat = Math.Max(flat, census.NoHrtf);
                     leastFree = Math.Min(leastFree, census.BinauralFree);
@@ -524,10 +527,12 @@ public static class ExtentWalkSpike
         Console.WriteLine($"   mixer: at most {mostVoices} voices playing, {flat} direct voice(s) without HRTF at most, {provider.VoiceCensus().Refused} refused for want of a binaural voice, {leastFree} binaural voices free at least");
         rig.Facade.Dispose();
 
+        // The mixer's voices at a moment of the walk: the census taken nearest it.
+        int Playing(double at) => playing.Count == 0 ? 0 : playing.MinBy(p => Math.Abs(p.At - at)).Voices;
         var (l, r, rate) = ReadStereo(capture);
         int Sample(double seconds) => Math.Clamp((int)(seconds * rate), 0, l.Length);
         double[] octaves = { 125, 250, 500, 1000, 2000, 4000, 8000 };
-        var csv = new StringBuilder("metres,level_db," + string.Join(",", octaves.Select(f => $"db_{f:F0}")) + "," + string.Join(",", octaves.Select(f => $"iacc_{f:F0}")) + ",side_deg,ild_db\n");
+        var csv = new StringBuilder("metres,level_db," + string.Join(",", octaves.Select(f => $"db_{f:F0}")) + "," + string.Join(",", octaves.Select(f => $"iacc_{f:F0}")) + ",side_deg,ild_db,voices_playing\n");
         Console.WriteLine("   metres   level dB   " + string.Join(" ", octaves.Select(f => $"{(f < 1000 ? f.ToString("F0") : (f / 1000).ToString("F0") + "k"),5}")) + "   IACC 500 1k 2k   side °");
         var levels = new List<double>();
         var rows = new List<string>();
@@ -548,7 +553,7 @@ public static class ExtentWalkSpike
             }
             var (side, ild) = Side(wl, wr, rate);
             levels.Add(total);
-            csv.Append(CultureInfo.InvariantCulture, $"{s * Step:F1},{total:F2},{string.Join(",", bandDb.Select(v => v.ToString("F2", CultureInfo.InvariantCulture)))},{string.Join(",", iacc.Select(v => v.ToString("F3", CultureInfo.InvariantCulture)))},{side:F1},{ild:F2}\n");
+            csv.Append(CultureInfo.InvariantCulture, $"{s * Step:F1},{total:F2},{string.Join(",", bandDb.Select(v => v.ToString("F2", CultureInfo.InvariantCulture)))},{string.Join(",", iacc.Select(v => v.ToString("F3", CultureInfo.InvariantCulture)))},{side:F1},{ild:F2},{Playing(walkStart + s * stepSeconds)}\n");
             if (s % 4 == 0 || s == walk.Feet.Count - 1)
                 Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
                     $"   {s * Step,6:F1}   {total,8:F1}   {string.Join(" ", bandDb.Select(v => v.ToString("F0", CultureInfo.InvariantCulture).PadLeft(5)))}   {iacc[2],4:F2} {iacc[3],4:F2} {iacc[4],4:F2}   {side,6:F0}"));
