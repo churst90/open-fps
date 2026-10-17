@@ -32,7 +32,7 @@ public static class PrerenderDoorsSpike
                 Console.WriteLine($"  {id}: {mine.Length} door renders");
                 keys.AddRange(mine);
             }
-        keys.AddRange(WorldAudioPlayer.CarWindowKeys());
+        keys.AddRange(OneOffSounds.CarWindowKeys());
         keys = keys.Distinct().ToList();
         var levels = new ConcurrentDictionary<string, float>();
         int done = 0, failed = 0;
@@ -42,7 +42,7 @@ public static class PrerenderDoorsSpike
         {
             try
             {
-                var pcm = WorldAudioPlayer.RenderDoorKey(key, levels, cache);
+                var pcm = OneOffSounds.RenderDoorKey(key, levels, cache);
                 if (pcm.Length <= 16 || pcm.Any(v => !float.IsFinite(v))) { Interlocked.Increment(ref failed); Console.Error.WriteLine($"!! {key}: empty or not finite"); }
             }
             catch (Exception ex) { Interlocked.Increment(ref failed); Console.Error.WriteLine($"!! {key}: {ex.Message}"); }

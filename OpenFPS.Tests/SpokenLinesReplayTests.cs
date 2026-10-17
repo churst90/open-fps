@@ -412,13 +412,13 @@ internal sealed class SpokenReplay
         if (AwaitRenders) WaitForRenders();
     }
 
-    private static readonly System.Reflection.FieldInfo RenderedField = typeof(WorldAudioPlayer)
+    private static readonly System.Reflection.FieldInfo RenderedField = typeof(OneOffSounds)
         .GetField("_rendered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
 
     /// <summary>Until every render the world's sounds asked a worker for is back, or a minute has gone.</summary>
     private void WaitForRenders()
     {
-        var player = Session.AudioSystemForTest.WorldAudio;
+        var player = Session.AudioSystemForTest.WorldAudio.Sounds;
         var rendered = (System.Collections.ICollection)RenderedField.GetValue(player)!;
         var waited = System.Diagnostics.Stopwatch.StartNew();
         while (rendered.Count < player.RendersOutstanding && waited.Elapsed < TimeSpan.FromMinutes(1))

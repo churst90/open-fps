@@ -54,7 +54,7 @@ public class OneOffCopiesTests
     {
         public readonly RecordingMixer Mixer = new();
         public readonly AudioEngineFacade Facade;
-        public readonly WorldAudioPlayer Player;
+        public readonly OneOffSounds Player;
         public readonly ClientWorldState World;
 
         public Rig(ClientWorldState world)
@@ -62,14 +62,15 @@ public class OneOffCopiesTests
             World = world;
             Facade = new AudioEngineFacade(Mixer);
             Facade.InitializeForTest();
-            Player = new WorldAudioPlayer(Facade, new SpatialAcoustics(), prewarm: false);
+            Player = new OneOffSounds(Facade, new SpatialAcoustics(), prewarm: false);
         }
 
         /// <summary>One update with the ears at <paramref name="ears"/>, then the audio thread's turn.</summary>
         public void Hear(Vector3 ears, double now)
         {
             Facade.UpdateListener(ears, Quaternion.Identity, Vector3.Zero, -1);
-            Player.Update(World.GetSnapshot(), ears, now);
+            var snap = World.GetSnapshot();
+            Player.Update(snap, ears, now, air: snap.Outdoors);
             // Twice: a submission is queued as a direct play, which the next pump hands to the mixer.
             Facade.PumpForTest();
             Facade.PumpForTest();
@@ -85,7 +86,7 @@ public class OneOffCopiesTests
             {
                 Character = SoundCharacter.Ring, Hz = 900f, LevelDb = 80f, DecaySeconds = 4f, Noisiness = 0.2f, Position = at,
             };
-            Player.Receive(new WorldAudioEvent { SourceEntityId = -1, Label = "ring", Sounds = new() { ring }, Seed = 1 }, 0.0);
+            new WorldAudioPlayer(Player).Receive(new WorldAudioEvent { SourceEntityId = -1, Label = "ring", Sounds = new() { ring }, Seed = 1 }, 0.0);
             var clock = Stopwatch.StartNew();
             while (!Mixer.Started.Exists(e => Vector3.Distance(e.Position, at) < 0.01f) && clock.Elapsed < TimeSpan.FromSeconds(60))
             {
@@ -112,12 +113,11 @@ public class OneOffCopiesTests
         var world = Room().GetSnapshot();
         if (!triangles) world.Geometry = null;
         else Assert.NotNull(world.Geometry);
-        var spatial = new SpatialService();
         var bounce = new Vector3(4f, 1.6f, 1.5f);
-        Assert.True(WorldAudioPlayer.Reaches(spatial, world, bounce, Ears));
-        Assert.False(WorldAudioPlayer.Reaches(spatial, world, bounce, Behind));
-        Assert.False(WorldAudioPlayer.Reaches(spatial, world, bounce, new Vector3(8f, 1.6f, 1.5f)));
-        Assert.True(WorldAudioPlayer.Reaches(spatial, world, bounce, bounce));
+        Assert.True(OneOffSounds.Reaches(world, bounce, Ears));
+        Assert.False(OneOffSounds.Reaches(world, bounce, Behind));
+        Assert.False(OneOffSounds.Reaches(world, bounce, new Vector3(8f, 1.6f, 1.5f)));
+        Assert.True(OneOffSounds.Reaches(world, bounce, bounce));
     }
 
     [Fact]

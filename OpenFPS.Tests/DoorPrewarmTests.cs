@@ -65,7 +65,7 @@ public class DoorPrewarmTests
         });
         Assert.True(doors > atLeast, $"{doors} doors");
         Assert.True(missing.Count == 0, "not rendered as the map arrives: " + string.Join(", ", missing.Take(12)));
-        Assert.All(prewarmed, k => Assert.True(WorldAudioPlayer.IsDoorModelKey(k), k));
+        Assert.All(prewarmed, k => Assert.True(OneOffSounds.IsDoorModelKey(k), k));
     }
 
     [Fact]
@@ -84,16 +84,16 @@ public class DoorPrewarmTests
     [Fact]
     public void EachDoorModelIsOneRowAndNothingElseIsADoor()
     {
-        var prefixes = WorldAudioPlayer.DoorModels.Select(m => m.Prefix).ToList();
+        var prefixes = OneOffSounds.DoorModels.Select(m => m.Prefix).ToList();
         Assert.Equal(prefixes.Count, prefixes.Distinct().Count());
         foreach (var a in prefixes)
             Assert.DoesNotContain(prefixes, b => b != a && b.StartsWith(a, StringComparison.Ordinal));
         foreach (var p in new[] { KnobDoor.KeyPrefix, PushBarDoor.KeyPrefix, SlidingDoor.KeyPrefix, GlassDoor.KeyPrefix,
                                   LockCylinder.KeyPrefix, ElevatorDoor.KeyPrefix, CarWindow.KeyPrefix, GlassFracture.KeyPrefix })
             Assert.Contains(p, prefixes);
-        Assert.False(WorldAudioPlayer.IsDoorModelKey("revolvingdoor:open:0"));
-        Assert.Throws<ArgumentException>(() => WorldAudioPlayer.RenderDoorKey("revolvingdoor:open:0", new(), null));
-        Assert.Equal(WorldAudioPlayer.GlassRenderLateness, WorldAudioPlayer.DoorModelOf(GlassFracture.KeyPrefix + "break:x")!.Value.Lateness);
+        Assert.False(OneOffSounds.IsDoorModelKey("revolvingdoor:open:0"));
+        Assert.Throws<ArgumentException>(() => OneOffSounds.RenderDoorKey("revolvingdoor:open:0", new(), null));
+        Assert.Equal(OneOffSounds.GlassRenderLateness, OneOffSounds.DoorModelOf(GlassFracture.KeyPrefix + "break:x")!.Value.Lateness);
     }
 
     [Fact]
@@ -136,14 +136,14 @@ public class DoorPrewarmTests
     {
         var session = new ClientGameSession(new ClientNetworkService(), new Silent(), new NoShell(), new AudioEngineFacade(),
             microphone: new NullMicrophoneCapture("none"), enableAudio: false);
-        Assert.Equal(0, session.AudioSystemForTest.WorldAudio.RendersOutstanding);
+        Assert.Equal(0, session.AudioSystemForTest.WorldAudio.Sounds.RendersOutstanding);
         // Nor when a map arrives with its doors.
         session.HandleMessage(new OpenFPS.Common.Networking.MapManifest
         {
             MapName = "test", WorldSize = new System.Numerics.Vector3(100, 20, 100),
             DoorRenderKeys = new[] { KnobDoor.Key(false, KnobDoor.Construction.HollowCore, 1, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f) },
         });
-        Assert.Equal(0, session.AudioSystemForTest.WorldAudio.RendersOutstanding);
+        Assert.Equal(0, session.AudioSystemForTest.WorldAudio.Sounds.RendersOutstanding);
     }
 
     private sealed class Silent : ISpeechOutput

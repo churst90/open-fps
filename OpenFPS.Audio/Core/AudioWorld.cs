@@ -22,8 +22,16 @@ public partial class AudioWorld
     private readonly SpatialAcoustics _acoustics;
 
     /// <summary>The acoustics this world's paths come from, for the host's features that place sounds on the
-    /// same terms (one-off sounds, beacons, birds).</summary>
+    /// same terms (beacons, birds).</summary>
     public SpatialAcoustics Acoustics => _acoustics;
+
+    /// <summary>
+    /// The short sounds the world reports: a door shutting, glass landing, a round striking a wall, thunder.
+    /// The world's own rather than beside the host's network code because a transient takes the same
+    /// occlusion, reverb and placement as everything else.
+    /// </summary>
+    public OneOffSounds OneOffs => _oneOffs;
+    private readonly OneOffSounds _oneOffs;
     private readonly AsyncAcousticWorker _acousticWorker;
     private readonly HashSet<string> _preloadedSounds = new();
 
@@ -50,8 +58,7 @@ public partial class AudioWorld
     /// <summary>The walls answering the live engines. See EngineReflections.</summary>
     private readonly EngineReflections _engineEchoes = new();
 
-    /// <summary>The walls answering the live engines, which the host's one-off sounds are answered through too.</summary>
-    public EngineReflections EngineEchoes => _engineEchoes;
+
 
     /// <summary>The voice id of one image-source reflection slot of a source. A slot keeps its wall
     /// (<see cref="AssignReflectionSlots"/>).</summary>
@@ -296,8 +303,10 @@ public partial class AudioWorld
     /// renders start in the background. For the emitter-stream replay, which must come out the same on every run.</param>
     /// <param name="seed">Seeds what the world leaves to chance (near rain drops, a footstep's jitter). Null:
     /// unseeded, as in the game.</param>
+    /// <param name="prewarm">Render the city's doors and a strike of thunder in the background (OneOffSounds): the
+    /// game. A test that plays no door has no use for minutes of a core.</param>
     public AudioWorld(AudioEngineFacade audio, IRecordings recordings, IAudioHost host, Func<double> clock,
-                      bool manualAcoustics = false, int? seed = null)
+                      bool manualAcoustics = false, int? seed = null, bool prewarm = false)
     {
         _now = clock;
         _audio = audio;
@@ -310,8 +319,14 @@ public partial class AudioWorld
         _sounds = recordings;
         _host = host;
         _acoustics = new SpatialAcoustics { Clock = audio.Clock, Atmosphere = audio.Atmosphere };
+        // Shares this world's acoustics, so a rendered latch takes exactly the path a recorded one would.
+        _oneOffs = new OneOffSounds(audio, _acoustics, prewarm: prewarm && !manualAcoustics);
+        _oneOffs.HornReceived = StartHorn;
+        _oneOffs.TrainSignalReceived = StartTrainSignal;
+        _oneOffs.Ground = ApplyRecordedGround;
         // Every world voice is started, placed and stopped through the registry, on this mixer.
         _voices.Mixer = audio;
+        _oneOffs.Voices = _voices;
         _rain = new RainField(audio, _acoustics, seed) { SurveyInPlace = manualAcoustics };
         // What the library's sources voice, declared as theirs: each carries its own path.
         _rain.Voiced = (id, drop) =>
@@ -328,6 +343,7 @@ public partial class AudioWorld
         _audio.RoutesSource = () => _acoustics.Routes;
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
         _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced, audio.Clock) { Manual = manualAcoustics, Lab = audio.Lab };
+        _oneOffs.Worker = _acousticWorker;
         // The loudest surface of each rain patch is heard by the worker's answer, as every sustained voice is (P6).
         _rain.Worker = _acousticWorker;
         _rain.SlotProbe = slot => _voices.IdFor(VoiceKind.Probe, VoiceRegistry.NoEntity, VoiceRegistry.RainProbe(slot));
@@ -399,8 +415,7 @@ public partial class AudioWorld
         ForgetTrains();
         _voices.LeaveWorld();
         _ownerPaths.Clear();
-        // The host's one-off sounds go with the world.
-        _host.WorldLeft();
+        _oneOffs.Clear();
         _rain.Stop();
         _audio.StopAllWorldSounds();
         // Nobody is standing anywhere: no wind at the ears until the next map.
@@ -504,7 +519,12 @@ public partial class AudioWorld
         _audio.SetEarWind(earListener);
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(Listener.Shelter);
-        // The host's: the one-off sounds, the beacons and the driving aids, placed from here.
+        _oneOffs.ListenerVehicleId = Listener.RidingId;
+        _oneOffs.ListenerSpeed = _earSpeed;
+        _oneOffs.Cabins = _cabins;
+        _oneOffs.SelfId = OwnEntityId;
+        _oneOffs.Self ??= () => (Listener.Body, Listener.Rotation);
+        // The host's: the beacons and the driving aids, placed from here.
         _host.ListenerPlaced(visualEyePos, _earSpeed);
         // The rest of the world through the glass, if you sit in anything with a roof.
         var (encLow, encMid, encHigh) = CabinEnclosure();
@@ -532,8 +552,11 @@ public partial class AudioWorld
             _audio.SetAcousticMap(rooms!);
             _lastAcousticMap = rooms;
         }
-        // The host's: the rooms that moved, the place's name, the one-off sounds.
+        // The host's: the rooms that moved, the place's name.
         _host.RoomsSet(visualEyePos, listenerRegionId, newRooms);
+        // Through the echo system: the grandstand that answers a car answers the people on it too, on the
+        // same terms (obstruction-tested).
+        _oneOffs.Update(world, visualEyePos, _audio.Clock.Now, _engineEchoes, sources.Outdoors);
 
         // Six rays out of the head, turned by its rotation, so the answer is "concrete half a metre to my
         // left"; each becomes its own early reflection (BoundaryModel, BoundaryProximityProcessor). This is
@@ -909,8 +932,7 @@ public partial class AudioWorld
     /// sound crossing them.</summary>
     private readonly OpenFPS.Client.AudioEngine.Acoustics.CabinWalls _cabins = new();
 
-    /// <summary>Every vehicle's windows as this world has them, for the host's one-off sounds.</summary>
-    public OpenFPS.Client.AudioEngine.Acoustics.CabinWalls Cabins => _cabins;
+
 
     /// <summary>
     /// What the body of the vehicle you sit in takes off everything outside it, dB per band: the interior
@@ -1472,7 +1494,7 @@ public partial class AudioWorld
             Log.Information("  {Voices} reflection voice(s) of a {Budget} budget, floor {Floor:G3}; "
                           + "{Pending} submission(s) queued, {Transients} transient(s) waiting to be heard.",
                             _engineEchoes.VoiceCount, _engineEchoes.MaxReflectionVoices, _engineEchoes.AudibilityFloor,
-                            _audio.PendingSubmissions, _host.OneOffsPending);
+                            _audio.PendingSubmissions, _oneOffs.Pending_Count);
 
             // The longest every source stood still. Target one 60 Hz period, 17 ms; over about 100 ms a
             // car passing in front of you is heard to stop dead and carry on.
@@ -3263,7 +3285,7 @@ public partial class AudioWorld
 
     /// <summary>OPENFPS_AUDIO_DEBUG=1 logs what your own feet did and when: a landing is heavier than a
     /// step, so this answers "periodic bangs" outright.</summary>
-    private bool _footTrace => _audio.Options.TraceFeet;
+    private bool _footTrace => _audio.Options.Trace;
 
     // ── The listening-level calibration's voice (ListeningCalibration) ────────────────────────
     //
@@ -3967,4 +3989,5 @@ file sealed class NoSources : IAudioSources
     public float RainRateMmPerHour => 0f;
     public Precipitation Falling => Precipitation.None;
     public float RoadWaterMm => 0f;
+    public OutdoorAir Outdoors => Thunder.StandardAir;
 }

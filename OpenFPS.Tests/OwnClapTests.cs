@@ -21,7 +21,7 @@ public class OwnClapTests
         var provider = new SteelDoorSoundTests.CapturingProvider();
         var facade = new AudioEngineFacade(provider);
         facade.InitializeForTest();
-        var player = new WorldAudioPlayer(facade, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(), prewarm: false);
+        var player = new OneOffSounds(facade, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(), prewarm: false);
         // The client has you 1.4 m further along than the server did, facing east (+x).
         var feet = new Vector3(11.4f, 0f, 5f);
         var east = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
@@ -40,12 +40,13 @@ public class OwnClapTests
         var client = new ClientWorldState();
         client.Clear(new Vector3(100, 20, 100));
         var clock = Stopwatch.StartNew();
-        player.Receive(new WorldAudioEvent { SourceEntityId = 7, Label = "clap", Sounds = new() { clap }, Seed = 1 }, clock.Elapsed.TotalSeconds);
+        new WorldAudioPlayer(player).Receive(new WorldAudioEvent { SourceEntityId = 7, Label = "clap", Sounds = new() { clap }, Seed = 1 }, clock.Elapsed.TotalSeconds);
         // Rendered off the game thread: ten seconds, since a busy full run took longer than one.
         double until = clock.Elapsed.TotalSeconds + 10.0;
         while (clock.Elapsed.TotalSeconds < until && provider.Emitters.Count == 0)
         {
-            player.Update(client.GetSnapshot(), ear, clock.Elapsed.TotalSeconds);
+            var snap = client.GetSnapshot();
+            player.Update(snap, ear, clock.Elapsed.TotalSeconds, air: snap.Outdoors);
             facade.PumpForTest();
             System.Threading.Thread.Sleep(5);
         }

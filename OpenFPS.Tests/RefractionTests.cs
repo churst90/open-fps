@@ -307,12 +307,12 @@ public class RefractionTests
 
     /// <summary>
     /// The thunder carries its own bending (Thunder.ShadowGain) and its parts are placed 40 m off in their directions
-    /// (WorldAudioPlayer.SkyProxyMetres): there the mixer's rule takes nothing, however the air lies.
+    /// (OneOffSounds.SkyProxyMetres): there the mixer's rule takes nothing, however the air lies.
     /// </summary>
     [Fact]
     public void TheThundersPlacedPartsAreNotBentAgain()
     {
-        float proxy = OpenFPS.Client.Core.WorldAudioPlayer.SkyProxyMetres;
+        float proxy = OpenFPS.Client.Core.OneOffSounds.SkyProxyMetres;
         Assert.True(proxy < Refraction.FlickerFromMetres);
         foreach (var layers in new[] { AirLayers.From(15f, 172, 45f, 0f, 0.4f, 30f, 1013.25f, 18f, 0.8f), AirLayers.Neutral() })
             foreach (float elevation in new[] { 5f, 20f, 60f })

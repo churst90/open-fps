@@ -36,7 +36,7 @@ public class DiffusedEchoTests
     public void AWashKeepsTheEnergyAndLosesThePeak()
     {
         var click = Click();
-        var brick = WorldAudioPlayer.Diffuse(click, 0.5f, 3);
+        var brick = OneOffSounds.Diffuse(click, 0.5f, 3);
         double energyDb = 10 * Math.Log10(Energy(brick) / Energy(click));
         double peakDb = 20 * Math.Log10(Peak(brick) / Peak(click));
         _o.WriteLine($"brick: energy {energyDb:+0.0;-0.0} dB, peak {peakDb:+0.0;-0.0} dB");
@@ -48,9 +48,9 @@ public class DiffusedEchoTests
     public void ARougherSurfaceSmearsItLonger()
     {
         var click = Click();
-        int glass = Spread(WorldAudioPlayer.Diffuse(click, 0f, 3));
-        int brick = Spread(WorldAudioPlayer.Diffuse(click, 0.5f, 3));
-        int rough = Spread(WorldAudioPlayer.Diffuse(click, 1f, 3));
+        int glass = Spread(OneOffSounds.Diffuse(click, 0f, 3));
+        int brick = Spread(OneOffSounds.Diffuse(click, 0.5f, 3));
+        int rough = Spread(OneOffSounds.Diffuse(click, 1f, 3));
         _o.WriteLine($"90% of the energy by sample: glass {glass}, brick {brick}, rough {rough}");
         Assert.True(glass < brick && brick < rough);
         // A mirror stays nearly a mirror: glass delivers it within about 3 ms at 44.1 kHz.
@@ -61,7 +61,7 @@ public class DiffusedEchoTests
     public void TheWashHasRoomToRingOut()
     {
         var click = Click();
-        var rough = WorldAudioPlayer.Diffuse(click, 1f, 3);
+        var rough = OneOffSounds.Diffuse(click, 1f, 3);
         Assert.True(rough.Length > click.Length);
         // The last few milliseconds are near silence, so the buffer does not end on a step.
         float tailPeak = rough.Skip(rough.Length - 100).Max(MathF.Abs);

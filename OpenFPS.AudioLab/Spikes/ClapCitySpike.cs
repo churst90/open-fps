@@ -68,8 +68,8 @@ public static class ClapCitySpike
         world.Clock = facade.Clock; world.Hearing = facade.Hearing;
         var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Elapsed.TotalSeconds, beacons: beacons);
         const int Self = 990_002;
-        audio.WorldAudio.SelfId = Self;
-        audio.WorldAudio.Self = () => (player.Position, player.Rotation);
+        audio.WorldAudio.Sounds.SelfId = Self;
+        audio.WorldAudio.Sounds.Self = () => (player.Position, player.Rotation);
 
         player.Position = feet;
         player.Yaw = yawDeg * MathF.PI / 180f;

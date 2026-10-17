@@ -30,7 +30,7 @@ public static class ThunderSpike
     private static readonly OpenFPS.Client.AudioEngine.Core.MixSettings GameMix = OpenFPS.Client.AudioEngine.Core.MixSettings.FromEnvironment();
 
     private const int OutRate = 48000;
-    private const float ProxyMetres = OpenFPS.Client.Core.WorldAudioPlayer.SkyProxyMetres;
+    private const float ProxyMetres = OpenFPS.Client.Core.OneOffSounds.SkyProxyMetres;
 
     public static int Run(string[] args)
     {
@@ -154,7 +154,7 @@ public static class ThunderSpike
             var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
             Say($"city street at ({xz[0]}, {xz[1]}) (Main Street canyon), {solids.Count} solids: each part placed {ProxyMetres:F0} m out in its direction, as the client places it;");
             Say("  blocked parts take the diffraction over the edge (Maekawa bands); copies as the client gives a sky sound: the strongest "
-              + $"{OpenFPS.Client.Core.WorldAudioPlayer.MaxSkyRoomEchoes} mirrors inside 80 ms and up to two first-order facades after it.");
+              + $"{OpenFPS.Client.Core.OneOffSounds.MaxSkyRoomEchoes} mirrors inside 80 ms and up to two first-order facades after it.");
             var survey = Enclosure.Look(cityEar, boxes.Select(b => new Enclosure.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList());
             var tail = StreetTail(boxes, cityEar);
             float sendGain = MathF.Pow(ProxyMetres, Math.Clamp(survey.Enclosure, 0f, 1f)) * GameMix.TailTrim;
@@ -300,7 +300,7 @@ public static class ThunderSpike
         return Loudness.RenderedGain(placed.Gain, placed.ReferenceDistance, MathF.Min(3000f, LabHearing.AudibleRange(level)), ProxyMetres);
     }
 
-    internal static float WorldAudioPlayerThunderLevel(float peakDbAtEar) => OpenFPS.Client.Core.WorldAudioPlayer.SkyLevelDb(peakDbAtEar);
+    internal static float WorldAudioPlayerThunderLevel(float peakDbAtEar) => OpenFPS.Client.Core.OneOffSounds.SkyLevelDb(peakDbAtEar);
 
     private static string Row(string name, List<Thunder.Part> parts, long ms)
     {
@@ -327,7 +327,7 @@ public static class ThunderSpike
 
     /// <summary>The old linear interpolation, kept to show what it did (--quality thunderfile).</summary>
     internal static float[] To48kLinear(Thunder.Part p)
-        => p.SampleRate == OutRate ? p.Pressure : OpenFPS.Client.Core.WorldAudioPlayer.ResampleLinear(p.Pressure, p.SampleRate, OutRate);
+        => p.SampleRate == OutRate ? p.Pressure : OpenFPS.Client.Core.OneOffSounds.ResampleLinear(p.Pressure, p.SampleRate, OutRate);
 
     /// <summary>Every part through the HRTF from its own direction, listener facing north.</summary>
     private static (float[] L, float[] R) Binaural(List<Thunder.Part> parts, bool gameLevel)
@@ -393,7 +393,7 @@ public static class ThunderSpike
             {
                 if (e.InVoice || e.MirrorGain < ImageSource.MinGain) continue;
                 echoes.Add((e.Arrival, e.MirrorGain * ProxyMetres / MathF.Max(ProxyMetres, e.Arrival.PathLength)));
-                if (echoes.Count >= OpenFPS.Client.Core.WorldAudioPlayer.MaxSkyRoomEchoes) break;
+                if (echoes.Count >= OpenFPS.Client.Core.OneOffSounds.MaxSkyRoomEchoes) break;
             }
             EarlyReflections.Find(proxy, ear, solids, into, c, maxOrder: 1, separateFirst: true);
             int late = 0;

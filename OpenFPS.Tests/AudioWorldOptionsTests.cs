@@ -94,8 +94,8 @@ public class AudioWorldOptionsTests
         // Echoes no more than an engine has; no engines at all is not a budget, no machines is.
         Assert.Equal((5, EngineReflections.MaxEchoesPerEngine, 0, 12, 0),
                      (set.Budgets.Engines, set.Budgets.Echoes, set.Budgets.Front, set.Budgets.Places, set.Budgets.Machines));
-        Assert.True(set.TraceFeet);
-        Assert.False(AudioWorldOptions.From(_ => null).TraceFeet);
+        Assert.True(set.Trace);
+        Assert.False(AudioWorldOptions.From(_ => null).Trace);
         Assert.Equal(32, AudioWorldOptions.From(new Dictionary<string, string> { ["OPENFPS_ENGINE_VOICES"] = "0" }.GetValueOrDefault).Budgets.Engines);
     }
 

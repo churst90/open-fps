@@ -64,6 +64,7 @@ public sealed class SnapshotSources : IAudioSources
     public float RainRateMmPerHour => _world.RainRateMmPerHour;
     public Precipitation Falling => _world.Falling;
     public float RoadWaterMm => _world.RoadWaterMm;
+    public OutdoorAir Outdoors => _world.Outdoors;
 
     private AudioSource Read(in EntitySnapshot snap)
     {

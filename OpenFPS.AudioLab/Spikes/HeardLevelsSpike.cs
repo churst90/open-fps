@@ -129,7 +129,7 @@ public static class HeardLevelsSpike
             {
                 if (!bank.TryDecode(f, out var pcm, out int ch, out int rate) || pcm.Length == 0) continue;
                 pcm = Mono(pcm, ch);
-                if (rate != Rate) pcm = OpenFPS.Client.Core.WorldAudioPlayer.Resample(pcm, rate, Rate);
+                if (rate != Rate) pcm = OpenFPS.Client.Core.OneOffSounds.Resample(pcm, rate, Rate);
                 float g = TakeLevels.GainFor(f);
                 for (int i = 0; i < pcm.Length; i++) pcm[i] *= g;
                 takes.Add((LafMaxDbfs(pcm), pcm));
@@ -145,7 +145,7 @@ public static class HeardLevelsSpike
             string id = OpenFPS.AudioLab.LabPaths.Sounds("VOICES", take.Voice, take.Line + ".ogg");
             if (!bank.TryDecode(id, out var pcm, out int ch, out int rate) || pcm.Length == 0) continue;
             pcm = Mono(pcm, ch);
-            if (rate != Rate) pcm = OpenFPS.Client.Core.WorldAudioPlayer.Resample(pcm, rate, Rate);
+            if (rate != Rate) pcm = OpenFPS.Client.Core.OneOffSounds.Resample(pcm, rate, Rate);
             double lufs = Speech.LoudnessLufs(pcm);
             float gain = (float)Math.Pow(10.0, (Speech.BufferLoudnessLufs - lufs) / 20.0);
             for (int i = 0; i < pcm.Length; i++) pcm[i] = Math.Clamp(pcm[i] * gain, -1f, 1f);
@@ -191,14 +191,14 @@ public static class HeardLevelsSpike
         return 0;
     }
 
-    /// <summary>A door model's key as the client plays it: its render through WorldAudioPlayer.RenderDoorKey,
-    /// placed at the level WorldAudioPlayer.AtOwnLevel gives it (the render's own peak), the server's figure
+    /// <summary>A door model's key as the client plays it: its render through OneOffSounds.RenderDoorKey,
+    /// placed at the level OneOffSounds.AtOwnLevel gives it (the render's own peak), the server's figure
     /// shown beside it. The model's LAFmax at a metre is the buffer's LAFmax over its full scale.</summary>
     private static void AddModel(List<Source> list, string name, float declared, string key)
     {
         var own = new System.Collections.Concurrent.ConcurrentDictionary<string, float>();
-        float[] buf = OpenFPS.Client.Core.WorldAudioPlayer.RenderDoorKey(key, own, new OpenFPS.Client.AudioEngine.Core.DoorRenderCache(OpenFPS.Client.Core.ClientAudioPaths.ForPlayer()));
-        float placed = OpenFPS.Client.Core.WorldAudioPlayer.AtOwnLevel(new TransientSound { SynthKey = key, LevelDb = declared }, own).LevelDb;
+        float[] buf = OpenFPS.Client.Core.OneOffSounds.RenderDoorKey(key, own, new OpenFPS.Client.AudioEngine.Core.DoorRenderCache(OpenFPS.Client.Core.ClientAudioPaths.ForPlayer()));
+        float placed = OpenFPS.Client.Core.OneOffSounds.AtOwnLevel(new TransientSound { SynthKey = key, LevelDb = declared }, own).LevelDb;
         list.Add(new Source(name, declared, buf, LafMaxDbfs(buf) + placed, placed) { PlacedDb = placed });
     }
 

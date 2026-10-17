@@ -68,6 +68,7 @@ OpenFPS.Audio/Core/AudioWorld.cs	lib	Audio
 OpenFPS.Audio/Core/AudioWorldOptions.cs	lib	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	lib	Audio	
 OpenFPS.Audio/Core/LoudspeakerVoices.cs	lib	Audio	
+OpenFPS.Audio/Core/OneOffSounds.cs	lib	Audio	
 OpenFPS.Audio/Core/PlacementThread.cs	lib	Audio	
 OpenFPS.Audio/Core/VoiceManager.cs	lib	Audio	
 OpenFPS.Audio/Core/VoiceRegistry.Lifecycle.cs	lib	Audio	

@@ -63,7 +63,7 @@ FILE_RULES = [
     (CC + 'AudioEngine/Core/', 'a', 'Sound', 'synthesis'),
     # Integration files: what of them is library and what is open-fps's adapter
     (CC + 'ClientAudioSystem.cs', 'b', '', "open-fps's host of the audio world (AudioWorld, stage 7): sources from the snapshot, the game's sound features, the place's name"),
-    (CC + 'WorldAudioPlayer.cs', 'b', '', 'SPLIT: one-off sounds and echoes go to Audio, WorldAudioEvent decoding stays'),
+    (CC + 'WorldAudioPlayer.cs', 'b', '', "the WorldAudioEvent decoding (stage 7); the one-off sounds and their echoes are Audio's OneOffSounds"),
     (CC + 'SpatialService.cs', 'b', '', 'the game\'s rays and entity lookups; its acoustic queries are the library\'s (AcousticRays, stage 6)'),
     (CC + 'ClientGeometry.cs', 'b', '', "open-fps's geometry adapter (entities to TriangleWorld)"),
     (CC + 'BirdLife.cs', 'b', '', 'SPLIT: species choice and calling go to Sound/Audio; the habitat survey reads entities'),

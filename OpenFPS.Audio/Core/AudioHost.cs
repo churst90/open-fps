@@ -31,20 +31,15 @@ public interface IAudioHost
     /// <paramref name="leaveOut"/> (an aeroplane on its wheels).</summary>
     float GroundUnder(System.Numerics.Vector3 at, int leaveOut);
 
-    /// <summary>One-off sounds the host has waiting to be heard, for the census.</summary>
-    int OneOffsPending { get; }
-
-    /// <summary>The listener is placed: the host's features that follow the ears (open-fps: the one-off sounds,
-    /// the beacons, the driving aids).</summary>
+    /// <summary>The listener is placed: the host's features that follow the ears (open-fps: the beacons, the
+    /// driving aids).</summary>
     void ListenerPlaced(System.Numerics.Vector3 ear, float earSpeed);
 
     /// <summary>The rooms are set (<paramref name="newRooms"/>: a new map of them this frame): rooms that moved, the
-    /// place's name, the one-off sounds.</summary>
+    /// place's name. The world's one-off sounds are placed after it.</summary>
     void RoomsSet(System.Numerics.Vector3 ear, int listenerRegion, bool newRooms);
 
     /// <summary>The world's sources are placed: what the host places after them (open-fps: the birds).</summary>
     void SourcesPlaced(System.Numerics.Vector3 ear, float earSpeed);
 
-    /// <summary>The world is being left: whatever the host still has to be heard in it goes.</summary>
-    void WorldLeft();
 }

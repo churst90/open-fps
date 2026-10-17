@@ -43,7 +43,7 @@ public class ProbableBugsTests
         session.HandleMessage(new PlayerSpawned { EntityId = 5 });
         Assert.True(session.IsInGame);
 
-        var world = session.AudioSystemForTest.WorldAudio;
+        var world = session.AudioSystemForTest.WorldAudio.Sounds;
         session.HandleMessage(LateKnock());
         Assert.True(world.Outstanding > 0, "the sound was never queued");
         int generation = world.MapGeneration;
@@ -61,11 +61,11 @@ public class ProbableBugsTests
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
         h.Audio.WorldAudio.Receive(LateKnock(), h.Facade.Clock.Now);
-        Assert.True(h.Audio.WorldAudio.Outstanding > 0);
+        Assert.True(h.Audio.WorldAudio.Sounds.Outstanding > 0);
 
         h.Audio.LeaveWorld(Array.Empty<int>());
 
-        Assert.Equal(0, h.Audio.WorldAudio.Outstanding);
+        Assert.Equal(0, h.Audio.WorldAudio.Sounds.Outstanding);
     }
 
     // ── 6. The engine's per-sample loop skips tier 0 ─────────────────────────────────────────────

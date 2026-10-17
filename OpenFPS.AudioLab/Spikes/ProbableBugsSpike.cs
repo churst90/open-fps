@@ -532,7 +532,7 @@ public static class ProbableBugsSpike
                     int step = (int)MathF.Round(e.Scattering * 4f);
                     string id = $"synth:clap:lab~wash{step}";
                     if (washIds.Add(id))
-                        provider.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(WorldAudioPlayer.Diffuse(pcm, step / 4f, 1)), TransientSynth.SampleRate);
+                        provider.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(OneOffSounds.Diffuse(pcm, step / 4f, 1)), TransientSynth.SampleRate);
                 }
             int voice = -1000;
             void Copy(string id, Vector3 at, float gain, float lowDb, float highDb)
@@ -557,7 +557,7 @@ public static class ProbableBugsSpike
                     var a = e.Arrival;
                     float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
                     float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
-                    var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
+                    var loss = OneOffSounds.SpecularLoss(a.Scattering, a.Order);
                     if (e.WashGain >= ImageSource.MinGain)
                         Copy($"synth:clap:lab~wash{(int)MathF.Round(e.Scattering * 4f)}", a.ImagePosition, e.WashGain, lowDb, highDb);
                     if (e.MirrorGain >= ImageSource.MinGain)

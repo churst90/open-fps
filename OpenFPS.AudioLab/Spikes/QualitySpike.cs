@@ -522,9 +522,9 @@ public static class QualitySpike
             int rate = part.SampleRate;
             if (bandLimit && rate != s.P.MixerRate) { pcm = MixerQuality.Resample(pcm, rate, s.P.MixerRate); rate = s.P.MixerRate; }
             if (!s.P.RegisterSynthesisedSoundFloat(id, pcm, rate)) continue;
-            float level = WorldAudioPlayer.SkyLevelDb(part.PeakDb);
+            float level = OneOffSounds.SkyLevelDb(part.PeakDb);
             var (gain, reference) = LabHearing.Place(level);
-            var at = ear + part.Direction * WorldAudioPlayer.SkyProxyMetres;
+            var at = ear + part.Direction * OneOffSounds.SkyProxyMetres;
             pending.Add((0.5 + part.StartSeconds - first, new SpatialEmitter
             {
                 EntityId = -800 - k, SoundId = id, Mode = PlaybackMode.Single, Type = EmitterType.WorldLocked,
@@ -554,8 +554,8 @@ public static class QualitySpike
         var full = new System.Collections.Concurrent.ConcurrentDictionary<string, float>();
         var renders = new List<(string Name, float[] Pcm)>
         {
-            ("knob door opening", WorldAudioPlayer.RenderDoorKey(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full, doors)),
-            ("knob door shutting", WorldAudioPlayer.RenderDoorKey(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full, doors)),
+            ("knob door opening", OneOffSounds.RenderDoorKey(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full, doors)),
+            ("knob door shutting", OneOffSounds.RenderDoorKey(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full, doors)),
             ("car door shutting", CarDoor.Render(true, sr, 3)),
             ("clap", Applause.RenderClap(sr, 2)),
             ("struck ring", TransientSynth.Render(new TransientSound { Character = SoundCharacter.Ring, Hz = 1400f, DecaySeconds = 1.2f, Noisiness = 0.2f }, 5)),

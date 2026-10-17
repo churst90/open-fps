@@ -152,6 +152,9 @@ public interface IAudioSources
 
     /// <summary>The water in a wheel path of the roads, mm, for vehicles whose wheels are not sent.</summary>
     float RoadWaterMm { get; }
+
+    /// <summary>The air outdoors as the host's weather has it (for thunder rendered for where the listener stands).</summary>
+    OutdoorAir Outdoors { get; }
 }
 
 /// <summary>

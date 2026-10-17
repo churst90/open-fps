@@ -34,9 +34,9 @@ public sealed class AudioWorldOptions
     /// the mixer's load then gives up and takes back within.</summary>
     public VoiceBudgets Budgets { get; init; } = new();
 
-    /// <summary>Trace lines for the listener's own feet and the paths other people's steps start on
-    /// (OPENFPS_AUDIO_DEBUG=1).</summary>
-    public bool TraceFeet { get; init; }
+    /// <summary>Trace lines (OPENFPS_AUDIO_DEBUG=1): the listener's own feet, the paths other people's steps start
+    /// on, and every one-off sound received and played.</summary>
+    public bool Trace { get; init; }
 
     /// <summary>The shipped world, unless OPENFPS_WIDE_SOURCES, OPENFPS_EXTENT_RULE or OPENFPS_CABIN_PATHS says
     /// otherwise.</summary>
@@ -48,7 +48,7 @@ public sealed class AudioWorldOptions
         WideSources = WideSources.From(variable),
         CabinPathsOn = variable("OPENFPS_CABIN_PATHS") != "0",
         Budgets = VoiceBudgets.From(variable),
-        TraceFeet = variable("OPENFPS_AUDIO_DEBUG") == "1",
+        Trace = variable("OPENFPS_AUDIO_DEBUG") == "1",
     };
 
     /// <summary>The paths into this vehicle's cabin in this world, or null if it has none or this world plays the

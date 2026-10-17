@@ -326,7 +326,7 @@ public class VoiceBudgetTests
     public void ALoudTransientIsNotFadedOutInsideTheMapItIsOn()
     {
         float level = OpenFPS.Common.Applause.LevelDb(300, 0.7f);
-        float range = MathF.Min(WorldAudioPlayer.MaxRange, Law.AudibleRange(level));
+        float range = MathF.Min(OneOffSounds.MaxRange, Law.AudibleRange(level));
         float reference = Law.Place(level, OpenFPS.Common.Applause.SpreadRadiusMetres(300)).ReferenceDistance;
         float fadeStarts = range - 0.25f * (range - reference);
         _o.WriteLine($"a 300-person crowd at {level:F1} dB: range {range:F0} m, fade starts at {fadeStarts:F0} m");

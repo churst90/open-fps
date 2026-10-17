@@ -276,8 +276,8 @@ public class LightningTests
     public void APartIsPlacedAtItsPeakAtTheEar()
     {
         // Placed 40 m out, declared at its peak carried out there: the law gives back that peak at the ear.
-        Assert.Equal(40f, OpenFPS.Client.Core.WorldAudioPlayer.SkyProxyMetres);
-        Assert.Equal(100f + 20f * MathF.Log10(40f), OpenFPS.Client.Core.WorldAudioPlayer.SkyLevelDb(100f), 3);
+        Assert.Equal(40f, OpenFPS.Client.Core.OneOffSounds.SkyProxyMetres);
+        Assert.Equal(100f + 20f * MathF.Log10(40f), OpenFPS.Client.Core.OneOffSounds.SkyLevelDb(100f), 3);
     }
 
     // ── Round 2: the rumble does not break up ────────────────────────────────────────────────

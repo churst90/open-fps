@@ -74,6 +74,7 @@ OpenFPS.Audio/Core/AudioWorld.cs	Audio
 OpenFPS.Audio/Core/AudioWorldOptions.cs	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	Audio	
 OpenFPS.Audio/Core/LoudspeakerVoices.cs	Audio	
+OpenFPS.Audio/Core/OneOffSounds.cs	Audio	
 OpenFPS.Audio/Core/PlacementThread.cs	Audio	
 OpenFPS.Audio/Core/VoiceManager.cs	Audio	
 OpenFPS.Audio/Core/VoiceRegistry.Lifecycle.cs	Audio	
@@ -180,7 +181,7 @@ OpenFPS.Client.Core/StairCues.cs	Accessibility
 OpenFPS.Client.Core/StrideAccumulator.cs	game	
 OpenFPS.Client.Core/UiSounds.cs	Accessibility	
 OpenFPS.Client.Core/WallBumps.cs	Accessibility	
-OpenFPS.Client.Core/WorldAudioPlayer.cs	game	library stage 7 (host until split)
+OpenFPS.Client.Core/WorldAudioPlayer.cs	game	the wire's one-off sounds decoded for the audio world's OneOffSounds
 OpenFPS.Common/AudioEvents.cs	Common	wire
 OpenFPS.Common/Components.cs	Common	wire and entity model
 OpenFPS.Common/DistantMotion.cs	Common	how sent states are carried between packets

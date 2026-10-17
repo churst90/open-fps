@@ -30,11 +30,7 @@ public sealed class ClientAudioSystem : IAudioHost
     /// <summary>The audio world this system is the host of.</summary>
     public AudioWorld World => _world;
 
-    /// <summary>
-    /// The short sounds the world reports: a door shutting, glass landing, a round striking a wall.
-    /// Here rather than beside the network code because a transient takes the same occlusion, reverb
-    /// and placement as everything else.
-    /// </summary>
+    /// <summary>The short sounds the server reports (WorldAudioEvent), decoded into the world's one-off sounds.</summary>
     public WorldAudioPlayer WorldAudio { get; }
 
     /// <summary>This frame's sources, from the snapshot: what the audio world reads of the entities.</summary>
@@ -98,22 +94,15 @@ public sealed class ClientAudioSystem : IAudioHost
         _now = clock;
         _audio = audio;
         _state = state;
-        _world = new AudioWorld(audio, sounds, this, clock, manualAcoustics, seed);
+        _world = new AudioWorld(audio, sounds, this, clock, manualAcoustics, seed, prewarm);
         // The game's features place their voices through the world's registry, heard by its worker's answers.
         _drivingAids = new DrivingAids(audio) { Voices = _world.Voices };
         // A beacon behind a wall is not blipped: the world's acoustics.
         _beacons = new BeaconAids(audio, beacons, acoustics: _world.Acoustics) { Voices = _world.Voices, Worker = _world.AcousticWorker };
         // A placed beacon whose category is off has no voice.
         _sources.Silenced = def => def.Type == EntityType.Beacon && !_beacons.IsOn(def.Identity.BeaconCategory);
-        // Shares the world's acoustics, so a rendered latch takes exactly the path a recorded one would.
-        WorldAudio = new WorldAudioPlayer(_audio, _world.Acoustics, prewarm: prewarm && !manualAcoustics)
-        {
-            HornReceived = _world.StartHorn,
-            TrainSignalReceived = _world.StartTrainSignal,
-            Ground = _world.ApplyRecordedGround,
-            Voices = _world.Voices,
-            Worker = _world.AcousticWorker,
-        };
+        // The wire's events, decoded into the world's one-off sounds.
+        WorldAudio = new WorldAudioPlayer(_world.OneOffs);
         _birds = new BirdLife(audio, _world.Acoustics, seed) { Voices = _world.Voices, Worker = _world.AcousticWorker };
         WorldAudio.Received = message => _birds.Heard(message, _audio.Clock.Now);
     }
@@ -206,7 +195,7 @@ public sealed class ClientAudioSystem : IAudioHost
     /// <summary>Your own step, which rides with you at a fixed offset from your head (AudioWorld.OwnFootstep).</summary>
     public void OnOwnFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
     {
-        if (_audio.Options.TraceFeet) Log.Information("[FOOT] step {Slope} on {Mat} at {Pos}", slope, mat, pos);
+        if (_audio.Options.Trace) Log.Information("[FOOT] step {Slope} on {Mat} at {Pos}", slope, mat, pos);
         _world.OwnFootstep(pos, mat, StrideAccumulator.SlopeDb(slope), StrideAccumulator.SlopePitch(slope));
     }
 
@@ -245,27 +234,16 @@ public sealed class ClientAudioSystem : IAudioHost
     float IAudioHost.GroundUnder(Vector3 at, int leaveOut)
         => PhysicsUtils.GetGroundHeight(_sources.World, at, leaveOut, out _);
 
-    /// <summary>One-off sounds waiting to be heard, for the census.</summary>
-    int IAudioHost.OneOffsPending => WorldAudio.Pending_Count;
-
-    /// <summary>Once the listener is placed: the one-off sounds told where the ears are, the beacons and the
-    /// driving aids.</summary>
+    /// <summary>Once the listener is placed: the beacons and the driving aids.</summary>
     void IAudioHost.ListenerPlaced(Vector3 ear, float earSpeed)
     {
         var world = _sources.World;
-        WorldAudio.ListenerVehicleId = _state.RidingEntityId;
-        WorldAudio.ListenerSpeed = earSpeed;
-        WorldAudio.Cabins = _world.Cabins;
-        WorldAudio.SelfId = OwnEntityId;
-        WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
         _beacons.EarSpeed = earSpeed;
         _beacons.Update(world, ear, _now(), OwnEntityId);
         _drivingAids.Update(world, _state, _now());
     }
 
-    /// <summary>Once the rooms are set: the rooms that moved (unless the map is new), the place's name, and the
-    /// one-off sounds through the echo system (the grandstand that answers a car answers the people on it too, on
-    /// the same terms).</summary>
+    /// <summary>Once the rooms are set: the rooms that moved (unless the map is new) and the place's name.</summary>
     void IAudioHost.RoomsSet(Vector3 ear, int listenerRegion, bool newRooms)
     {
         var world = _sources.World;
@@ -289,7 +267,6 @@ public sealed class ClientAudioSystem : IAudioHost
             }
         }
         UpdateAcousticState(world, ear, listenerRegion);
-        WorldAudio.Update(world, ear, _audio.Clock.Now, _world.EngineEchoes);
     }
 
     /// <summary>Once the voices are placed: the birds.</summary>
@@ -299,8 +276,6 @@ public sealed class ClientAudioSystem : IAudioHost
         _birds.Update(_sources.World, ear, _audio.Clock.Now);
     }
 
-    /// <summary>Leaving the world: the one-off sounds still to be heard go with it.</summary>
-    void IAudioHost.WorldLeft() => WorldAudio.Clear();
 
     // ── The place's name ────────────────────────────────────────────────────────────────────────
 
