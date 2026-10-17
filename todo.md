@@ -99,7 +99,8 @@ fingerprint changed too, so the door renders are made again once.
       time. Size: one to two sessions.
 11. Smaller, when a session is free:
     - Stored traffic and rail tracks list movers by ordinal, not entity id, so a map edit does not churn them
-      (the fountain's taps moved every id by 5 on 2026-10-17). Half a session; the tracks are written again once.
+      (the fountain's taps moved every id by 5 on 2026-10-17): DONE 2026-10-17 (changes.md). The tracks were
+      written again once, every row the same apart from its key.
     - A real place with a river. No map has one yet, so the `river_bank` shore is untested in the game.
     - Mapped waterways in the one world's tiles keep a dry placeholder: `VoiceWaterways` runs only at a map's load,
       and the world builds its drainage per frame. One session.

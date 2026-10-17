@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- The stored traffic and train tracks name each mover by its ordinal among the movers, not its entity id
+  (docs/PHYSICS_BOUNDARY.md 14.4). An entity id counts every entity made before it, so Elm Park's fountain taps
+  moved every car's and train's id by five and rewrote both stores with nothing else changed (8e3bc00e). A mover
+  is numbered from 1 by the second it was first sampled, then by the order the world made it in; that order is
+  the movers' own spawn order whatever stands ahead of them. Written again on Linux: every row of
+  `traffic.tsv.gz` (11,232, 188 movers) and `rail.tsv.gz` (2,160, 24 movers) is the same apart from its key, each
+  ordinal the old id's rank, and the maths line unchanged. Guards:
+  `DrivingReplayTests.ThingsAddedAheadOfTheTrafficLeaveItsTrackAlone` and
+  `RailReplayTests.ThingsAddedAheadOfTheTrainsLeaveTheirTrackAlone`, five unrelated entities made before the
+  movers spawn; with the id key both fail at the first row (8875 for 8870). The wire hash does not change.
 - A door with open air on either side is weatherstripped by rule, whatever the open air is called
   (docs/CLIENT_NOTES.md "A shut door leaks by its gaps"). A door's default gaps (`OpeningRoutes.GapsRound`) were
   the outdoor door's 0.3 mm only where the graph's outdoors node was on one side; a roof is a place with surfaces

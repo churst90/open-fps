@@ -39,19 +39,19 @@ public class PhysicsCrossMachineTests
     }
 
     /// <summary>The fastest wheeled mover at second 30 that runs to the end, and its rows by line.</summary>
-    private static (string[] Lines, int Id, Dictionary<int, int> RowOf) Car()
+    private static (string[] Lines, int Mover, Dictionary<int, int> RowOf) Car()
     {
         var lines = StoredTraffic().TrimEnd('\n').Split('\n');
         var rows = lines.Skip(1).Select(l => l.Split('\t')).ToList();
-        int id = rows.Where(c => c[0] == "30" && c[8] != "-" && double.Parse(c[7], Inv) > 8)
+        int mover = rows.Where(c => c[0] == "30" && c[8] != "-" && double.Parse(c[7], Inv) > 8)
             .Select(c => int.Parse(c[1], Inv)).Where(i => rows.Any(c => c[0] == "60" && c[1] == i.ToString(Inv))).Min();
         var rowOf = new Dictionary<int, int>();
         for (int i = 1; i < lines.Length; i++)
         {
             var c = lines[i].Split('\t');
-            if (c[1] == id.ToString(Inv)) rowOf[int.Parse(c[0], Inv)] = i;
+            if (c[1] == mover.ToString(Inv)) rowOf[int.Parse(c[0], Inv)] = i;
         }
-        return (lines, id, rowOf);
+        return (lines, mover, rowOf);
     }
 
     private static string Edit(string line, Action<string[]> change)

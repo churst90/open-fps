@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Numerics;
 using System.Text;
 using OpenFPS.Common;
+using OpenFPS.Common.Components;
 using OpenFPS.Instruments;
 using Xunit.Abstractions;
 
@@ -299,6 +300,35 @@ public class DrivingReplayTests : IClassFixture<PhysicsStore.Maps>
         Assert.True(text == PhysicsReplays.Traffic(PhysicsReplays.Load("city", PhysicsStore.Folders)), "the same minute of traffic twice ran two ways");
         PhysicsStore.Check(PhysicsStore.PathOf("traffic.tsv.gz"), text, MoverTolerance, MoverOtherMaths, "the city's traffic", c => c == 6, _o.WriteLine);
     }
+
+    /// <summary>Things the map gains ahead of the movers move every entity id and nothing else, so the stored
+    /// traffic, which names its movers by ordinal, still matches.</summary>
+    [Fact]
+    public void ThingsAddedAheadOfTheTrafficLeaveItsTrackAlone()
+    {
+        if (PhysicsStore.Writing) return;
+        string text = PhysicsReplays.Traffic(Unrelated.AheadOfTheMovers(PhysicsReplays.Load("city", PhysicsStore.Folders)));
+        PhysicsStore.Check(PhysicsStore.PathOf("traffic.tsv.gz"), text, MoverTolerance, MoverOtherMaths,
+            $"the city's traffic after {Unrelated.Count} things added ahead of it", c => c == 6, _o.WriteLine);
+    }
+}
+
+/// <summary>
+/// Entities unrelated to the movers, made on a loaded map before its movers spawn: five, as Elm Park's fountain
+/// taps were on 2026-10-17, when they moved every car's and train's id by five and rewrote both stored tracks.
+/// Nothing steps or collides with them; they only take ids.
+/// </summary>
+internal static class Unrelated
+{
+    public const int Count = 5;
+
+    public static PhysicsReplays.LoadedMap AheadOfTheMovers(PhysicsReplays.LoadedMap map)
+    {
+        for (int i = 0; i < Count; i++)
+            map.World.Create(new Transform { Position = new Vector3(0f, -100f, 0f), Rotation = Quaternion.Identity, Scale = Vector3.One },
+                             new NameComponent { Name = $"unrelated {i}" });
+        return map;
+    }
 }
 
 /// <summary>The city's trains through RailSystem for a minute and a half, compared with rail.tsv.gz.</summary>
@@ -315,6 +345,16 @@ public class RailReplayTests
         Assert.True(text == PhysicsReplays.Rail(PhysicsReplays.Load("city", PhysicsStore.Folders)), "the same trains twice ran two ways");
         PhysicsStore.Check(PhysicsStore.PathOf("rail.tsv.gz"), text, c => c is 3 or 4 or 5 or 6 or 7 ? 2e-3 : c >= 8 ? 1 : 0,
             DrivingReplayTests.MoverOtherMaths, "the city's trains", c => c == 6, _o.WriteLine);
+    }
+
+    /// <summary>The trains' stored track still matches with things added to the map ahead of them.</summary>
+    [Fact]
+    public void ThingsAddedAheadOfTheTrainsLeaveTheirTrackAlone()
+    {
+        if (PhysicsStore.Writing) return;
+        string text = PhysicsReplays.Rail(Unrelated.AheadOfTheMovers(PhysicsReplays.Load("city", PhysicsStore.Folders)));
+        PhysicsStore.Check(PhysicsStore.PathOf("rail.tsv.gz"), text, c => c is 3 or 4 or 5 or 6 or 7 ? 2e-3 : c >= 8 ? 1 : 0,
+            DrivingReplayTests.MoverOtherMaths, $"the city's trains after {Unrelated.Count} things added ahead of them", c => c == 6, _o.WriteLine);
     }
 }
 

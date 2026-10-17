@@ -107,7 +107,7 @@ public static partial class PhysicsReplays
         return sb.ToString();
     }
 
-    public const string MoverHeader = "second\tid\tname\tx\ty\tz\tyaw\tspeed\tthen per wheel: load_daN angular slip_ratio slip_angle surface demand water";
+    public const string MoverHeader = "second\tmover\tname\tx\ty\tz\tyaw\tspeed\tthen per wheel: load_daN angular slip_ratio slip_angle surface demand water";
 
     /// <summary>
     /// The city's traffic for <paramref name="seconds"/> on a freshly loaded map, through VehicleSystem as
@@ -129,13 +129,20 @@ public static partial class PhysicsReplays
         return Movers(map, seconds, dt => rail.Update(map.Id, map.World, dt), _ => null, null);
     }
 
+    /// <summary>
+    /// The movers' rows, each mover named by its ordinal among the movers (1 up): by the second it was first
+    /// sampled, then by the order the world made it in. Not by its entity id, which counts every entity made
+    /// before it: a map edit that adds things ahead of the movers (Elm Park's fountain taps, 2026-10-17) moved
+    /// every id and rewrote the stored tracks with nothing else changed.
+    /// </summary>
     private static string Movers(LoadedMap map, double seconds, Action<float> step, Func<int, WheelState[]?> wheels, Func<int, float>? stepOf)
     {
         var ecs = map.World;
         float dt = PhysicsConstants.FixedDeltaTime;
-        var rows = new List<(int Second, int Id, string Line)>();
-        var first = new Dictionary<int, Vector3>();
-        var moved = new HashSet<int>();
+        var rows = new List<(int Second, (int Id, int Version) Who, string Line)>();
+        // Keyed by id and version: a mover made mid-run (a driver out of a parked car) may be given a freed id.
+        var first = new Dictionary<(int, int), (int Second, Vector3 At)>();
+        var moved = new HashSet<(int, int)>();
         int ticks = (int)Math.Round(seconds * PhysicsConstants.TickRate);
         for (int tick = 1; tick <= ticks; tick++)
         {
@@ -144,15 +151,21 @@ public static partial class PhysicsReplays
             int second = tick / PhysicsConstants.TickRate;
             ecs.Query(new QueryDescription().WithAll<Transform, Velocity>().WithNone<PlayerComponent>(), (Entity e, ref Transform t, ref Velocity v) =>
             {
-                if (!first.TryAdd(e.Id, t.Position) && Vector3.DistanceSquared(first[e.Id], t.Position) > 1e-6f) moved.Add(e.Id);
+                var who = (e.Id, e.Version);
+                if (!first.TryAdd(who, (second, t.Position)) && Vector3.DistanceSquared(first[who].At, t.Position) > 1e-6f) moved.Add(who);
                 string name = ecs.Has<NameComponent>(e) ? ecs.Get<NameComponent>(e).Name : ecs.Has<IdentityComponent>(e) ? ecs.Get<IdentityComponent>(e).Name : "";
                 var f = Vector3.Transform(Vector3.UnitZ, t.Rotation);
                 float yaw = MathF.Atan2(f.X, f.Z);
-                rows.Add((second, e.Id, $"{second}\t{e.Id}\t{name}\t{F(t.Position.X, 3)}\t{F(t.Position.Y, 3)}\t{F(t.Position.Z, 3)}\t{F(yaw, 4)}\t{F(v.Linear.Length(), 3)}\t{Wheels(wheels(e.Id))}"));
+                rows.Add((second, who, $"\t{name}\t{F(t.Position.X, 3)}\t{F(t.Position.Y, 3)}\t{F(t.Position.Z, 3)}\t{F(yaw, 4)}\t{F(v.Linear.Length(), 3)}\t{Wheels(wheels(e.Id))}"));
             });
         }
+        // The world hands out ids in the order it makes things, so among the movers first seen together the
+        // id's order is their spawn order, and anything made ahead of them all moves every id alike.
+        var ordinal = moved.OrderBy(w => first[w].Second).ThenBy(w => w.Item1).ThenBy(w => w.Item2)
+            .Select((w, i) => (Who: w, Ordinal: i + 1)).ToDictionary(p => p.Who, p => p.Ordinal);
         var sb = new StringBuilder(MoverHeader).Append('\n');
-        foreach (var r in rows.Where(r => moved.Contains(r.Id)).OrderBy(r => r.Second).ThenBy(r => r.Id)) sb.Append(r.Line).Append('\n');
+        foreach (var r in rows.Where(r => moved.Contains(r.Who)).OrderBy(r => r.Second).ThenBy(r => ordinal[r.Who]))
+            sb.Append(r.Second).Append('\t').Append(ordinal[r.Who]).Append(r.Line).Append('\n');
         return sb.ToString();
     }
 }

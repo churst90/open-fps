@@ -1272,6 +1272,12 @@ were closed in stage 3 (17.3).
   `rail.tsv.gz`, 2,160 rows.
 - Each runs twice and must agree with itself before it is compared. Positions to 0.5 mm (drives) and 2 mm
   (movers), angles and speeds to 1e-3, the wheels' bytes to one step of their encoding.
+- A mover is named by its ordinal among the movers (the `mover` column, from 1): by the second it was first
+  sampled, then by the order the world made it in, which is the movers' spawn order. Until 2026-10-17 it was
+  the entity id, which counts every entity made before it: Elm Park's fountain taps moved every id by five and
+  rewrote both stores with nothing else changed (8e3bc00e). `ThingsAddedAheadOfTheTrafficLeaveItsTrackAlone` and
+  `ThingsAddedAheadOfTheTrainsLeaveTheirTrackAlone` make five unrelated entities before the movers spawn and
+  compare with the same stores.
 - Traffic and trains load the city twice each, a second a load.
 
 ### 14.5 The ballistics table: `BallisticsTableTests`
