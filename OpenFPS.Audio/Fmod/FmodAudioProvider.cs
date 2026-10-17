@@ -7,7 +7,8 @@ using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
-using OpenFPS.Client.Core.Platform;
+using OpenFPS.Native.Platform;
+using OpenFPS.Native.SteamAudio;
 
 using OpenFPS.Acoustics;
 

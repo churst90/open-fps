@@ -306,29 +306,29 @@ public static class BusyStreetSpike
         int stages = int.Parse(Arg(args, "stages") ?? "160", CultureInfo.InvariantCulture);
         int blocks = int.Parse(Arg(args, "blocks") ?? "2000", CultureInfo.InvariantCulture);
         const int Frame = 1024, Rate = 48000;
-        var cs = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.DefaultContextSettings();
-        if (OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.iplContextCreate(ref cs, out IntPtr ctx) != 0) { Console.WriteLine("FAIL: no Steam Audio"); return 1; }
-        var au = new OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLAudioSettings { samplingRate = Rate, frameSize = Frame };
-        var hs = new OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLHRTFSettings { type = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPL_HRTFNORMTYPE_NONE };
-        OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf);
-        var es = new OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
+        var cs = OpenFPS.Native.SteamAudio.Phonon.DefaultContextSettings();
+        if (OpenFPS.Native.SteamAudio.Phonon.iplContextCreate(ref cs, out IntPtr ctx) != 0) { Console.WriteLine("FAIL: no Steam Audio"); return 1; }
+        var au = new OpenFPS.Native.SteamAudio.Phonon.IPLAudioSettings { samplingRate = Rate, frameSize = Frame };
+        var hs = new OpenFPS.Native.SteamAudio.Phonon.IPLHRTFSettings { type = OpenFPS.Native.SteamAudio.Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = OpenFPS.Native.SteamAudio.Phonon.IPL_HRTFNORMTYPE_NONE };
+        OpenFPS.Native.SteamAudio.Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf);
+        var es = new OpenFPS.Native.SteamAudio.Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
         var effects = new IntPtr[stages * 2];
-        for (int i = 0; i < effects.Length; i++) OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.iplBinauralEffectCreate(ctx, ref au, ref es, out effects[i]);
-        var inB = new OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLAudioBuffer(); var outB = new OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLAudioBuffer();
-        OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.iplAudioBufferAllocate(ctx, 1, Frame, ref inB);
-        OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.iplAudioBufferAllocate(ctx, 2, Frame, ref outB);
+        for (int i = 0; i < effects.Length; i++) OpenFPS.Native.SteamAudio.Phonon.iplBinauralEffectCreate(ctx, ref au, ref es, out effects[i]);
+        var inB = new OpenFPS.Native.SteamAudio.Phonon.IPLAudioBuffer(); var outB = new OpenFPS.Native.SteamAudio.Phonon.IPLAudioBuffer();
+        OpenFPS.Native.SteamAudio.Phonon.iplAudioBufferAllocate(ctx, 1, Frame, ref inB);
+        OpenFPS.Native.SteamAudio.Phonon.iplAudioBufferAllocate(ctx, 2, Frame, ref outB);
         var mono = new float[Frame]; var rng = new Random(1);
         for (int i = 0; i < Frame; i++) mono[i] = (float)(rng.NextDouble() * 2 - 1) * 0.1f;
-        OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.iplAudioBufferDeinterleave(ctx, mono, ref inB);
+        OpenFPS.Native.SteamAudio.Phonon.iplAudioBufferDeinterleave(ctx, mono, ref inB);
         var watch = new System.Diagnostics.Stopwatch();
         void Apply(IntPtr effect, float angle)
         {
-            var prm = new OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLBinauralEffectParams
+            var prm = new OpenFPS.Native.SteamAudio.Phonon.IPLBinauralEffectParams
             {
-                direction = new OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3 { x = MathF.Sin(angle), y = -0.1f, z = -MathF.Cos(angle) },
-                interpolation = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPL_HRTFINTERPOLATION_BILINEAR, spatialBlend = 1f, hrtf = hrtf, peakDelays = IntPtr.Zero,
+                direction = new OpenFPS.Native.SteamAudio.Phonon.IPLVector3 { x = MathF.Sin(angle), y = -0.1f, z = -MathF.Cos(angle) },
+                interpolation = OpenFPS.Native.SteamAudio.Phonon.IPL_HRTFINTERPOLATION_BILINEAR, spatialBlend = 1f, hrtf = hrtf, peakDelays = IntPtr.Zero,
             };
-            OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.iplBinauralEffectApply(effect, ref prm, ref inB, ref outB);
+            OpenFPS.Native.SteamAudio.Phonon.iplBinauralEffectApply(effect, ref prm, ref inB, ref outB);
         }
         for (int b = 0; b < 50; b++) for (int i = 0; i < effects.Length; i++) Apply(effects[i], b * 0.01f + i);
         foreach (bool ground in new[] { false, true })

@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Native.SteamAudio;
 
 /// <summary>
 /// P/Invoke bindings for the Steam Audio (phonon) C API: context, HRTF, binaural effect and audio

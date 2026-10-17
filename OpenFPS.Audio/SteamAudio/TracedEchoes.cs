@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Thread = System.Threading.Thread;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
+using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -163,7 +164,7 @@ internal sealed class TracedEchoes : IDisposable
     private void Loop()
     {
         // Priority = BelowNormal is a placebo on Linux; nice the thread so tracing loses to the mixer.
-        OpenFPS.Client.Core.Platform.BackgroundPriority.LowerThisThread("TracedEchoes");
+        OpenFPS.Native.Platform.BackgroundPriority.LowerThisThread("TracedEchoes");
         while (_running)
         {
             try

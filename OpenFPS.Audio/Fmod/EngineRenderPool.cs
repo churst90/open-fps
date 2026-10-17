@@ -92,7 +92,7 @@ public sealed class EngineRenderPool : IDisposable
     {
         // A voice ringing down to silence reaches subnormal numbers, a hundred times slower on an Intel
         // processor; flushed, it cannot starve the others (docs/AUDIO_QUALITY_2026-10-06.md, row 14).
-        OpenFPS.Client.Core.Platform.FlushToZero.ThisThread($"EngineRender{id}");
+        OpenFPS.Native.Platform.FlushToZero.ThisThread($"EngineRender{id}");
         while (_running)
         {
             var voices = _voices;

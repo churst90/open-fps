@@ -7,6 +7,7 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.AudioEngine.Acoustics;
 
@@ -1044,7 +1045,7 @@ public class AsyncAcousticWorker : IDisposable
         }
         catch (DllNotFoundException)
         {
-            Console.WriteLine($"[AcousticWorker] DEGRADED: {OpenFPS.Client.Core.Platform.NativeAudioLibraries.PhononFileName} not found; using the hand-rolled ray-tracer for occlusion, portals and reverb.");
+            Console.WriteLine($"[AcousticWorker] DEGRADED: {OpenFPS.Native.Platform.NativeAudioLibraries.PhononFileName} not found; using the hand-rolled ray-tracer for occlusion, portals and reverb.");
         }
         catch (Exception ex) { Console.WriteLine($"[AcousticWorker] DEGRADED: Steam Audio sim init failed; using the hand-rolled ray-tracer: {ex.Message}"); }
     }
@@ -1202,7 +1203,7 @@ public class AsyncAcousticWorker : IDisposable
     private static System.Threading.Tasks.Task<T> RunLowered<T>(string name, Func<T> work)
     {
         var done = new System.Threading.Tasks.TaskCompletionSource<T>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
-        OpenFPS.Client.Core.Platform.BackgroundPriority.RunLowered(name, () =>
+        OpenFPS.Native.Platform.BackgroundPriority.RunLowered(name, () =>
         {
             try { done.SetResult(work()); }
             catch (Exception ex) { done.SetException(ex); }

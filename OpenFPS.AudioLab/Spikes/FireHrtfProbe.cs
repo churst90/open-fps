@@ -1,5 +1,5 @@
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Native.SteamAudio;
 using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;

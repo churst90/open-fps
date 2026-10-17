@@ -14,6 +14,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.AudioLab.Spikes;
 

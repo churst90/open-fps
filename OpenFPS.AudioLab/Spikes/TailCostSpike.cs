@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

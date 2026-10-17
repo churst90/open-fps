@@ -37,7 +37,7 @@ public sealed class ClientGeometry
     private TriangleWorld? _posed;
 
     /// <summary>Runs a build off the calling thread. The game uses a niced thread; a test runs it in place.</summary>
-    public Action<Action> Runner { get; set; } = work => Platform.BackgroundPriority.RunLowered("Geometry", work);
+    public Action<Action> Runner { get; set; } = work => Native.Platform.BackgroundPriority.RunLowered("Geometry", work);
 
     /// <summary>Called when a build has been published, so the next snapshot picks it up.</summary>
     public Action? Published { get; set; }

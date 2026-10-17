@@ -174,7 +174,7 @@ public sealed class VoiceBuilds
         bool cabinPaths = _options?.CabinPathsOn ?? true;
         _engines[emitter.EntityId] = new EngineBuild
         {
-            Task = OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () => new EngineVoiceState(MachineRegistry.VehicleFor(key), rate, seed, cabinPaths)),
+            Task = OpenFPS.Native.Platform.FlushToZero.Ahead("a voice's build", () => new EngineVoiceState(MachineRegistry.VehicleFor(key), rate, seed, cabinPaths)),
             AskedAt = now,
         };
         return Taken.Making;
@@ -226,7 +226,7 @@ public sealed class VoiceBuilds
     private Task<PhysicalVoiceState?> Start(Recipe r)
     {
         var clock = _clock;
-        return OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () => Make(r.Kind, r.Key, r.Seed, r.Lever, r.Rate, clock, _atmosphere, _mix));
+        return OpenFPS.Native.Platform.FlushToZero.Ahead("a voice's build", () => Make(r.Kind, r.Key, r.Seed, r.Lever, r.Rate, clock, _atmosphere, _mix));
     }
 
     /// <summary>
@@ -236,7 +236,7 @@ public sealed class VoiceBuilds
     public TrainVoiceState? Train(string preset, string train, int rate)
     {
         var clock = _clock;
-        var task = _trains.GetOrAdd(preset + "/" + train, shared => OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () =>
+        var task = _trains.GetOrAdd(preset + "/" + train, shared => OpenFPS.Native.Platform.FlushToZero.Ahead("a voice's build", () =>
         {
             // The seed from the name's characters, not string.GetHashCode (randomised per process): every
             // client and every run hears the same train.

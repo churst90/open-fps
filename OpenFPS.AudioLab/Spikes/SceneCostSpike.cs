@@ -1,4 +1,5 @@
 using OpenFPS.Common;
+using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

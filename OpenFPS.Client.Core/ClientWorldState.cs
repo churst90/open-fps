@@ -1010,7 +1010,7 @@ public class ClientWorldState
     /// <summary>Runs a refresh off the calling thread. The game uses a niced thread of its own
     /// (BackgroundPriority); a test can run it in place.</summary>
     public Action<Action> RefreshRunner { get; set; } =
-        work => OpenFPS.Client.Core.Platform.BackgroundPriority.RunLowered("TileAcoustics", work);
+        work => OpenFPS.Native.Platform.BackgroundPriority.RunLowered("TileAcoustics", work);
 
     /// <summary>What the acoustic map of this map is built with: from the manifest.</summary>
     public void ConfigureAcoustics(Vector3 acousticMin, float voxelResolution, float occlusionFloor, float tileMetres)

@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Native.SteamAudio;
 
 /// <summary>
 /// Ambisonics bindings for the Steam Audio (phonon) C API: encode, and the decode effect that turns a

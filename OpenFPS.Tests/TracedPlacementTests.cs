@@ -3,6 +3,7 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using Xunit.Abstractions;
+using OpenFPS.Native.SteamAudio;
 using Box = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box;
 
 namespace OpenFPS.Tests;

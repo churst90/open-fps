@@ -459,8 +459,8 @@ public class GeometryTerrainTests
         // The acoustic scene takes the skirt too; the full ground's triangles are as many as ever.
         int SceneTriangles(SolidSpec spec)
         {
-            var verts = new List<Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3>();
-            var tris = new List<Client.Core.AudioEngine.SteamAudio.Phonon.IPLTriangle>();
+            var verts = new List<Native.SteamAudio.Phonon.IPLVector3>();
+            var tris = new List<Native.SteamAudio.Phonon.IPLTriangle>();
             var mats = new List<int>();
             Client.Core.AudioEngine.SteamAudio.SceneTerrain.Append(spec, Vector3.Zero, verts, tris, mats, (_, _) => 0);
             Assert.Equal(tris.Count, mats.Count);

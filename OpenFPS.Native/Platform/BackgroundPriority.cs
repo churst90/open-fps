@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using Serilog;
 
-namespace OpenFPS.Client.Core.Platform;
+namespace OpenFPS.Native.Platform;
 
 /// <summary>
 /// Puts a loader thread below everything that has to meet a deadline: on Linux, the only scheduling

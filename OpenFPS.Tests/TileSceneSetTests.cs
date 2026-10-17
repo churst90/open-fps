@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
+using OpenFPS.Native.SteamAudio;
 using Box = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box;
 
 namespace OpenFPS.Tests;
@@ -41,7 +42,7 @@ internal static class SteamAudioForTests
     /// <summary>The library: in the directory given, or in the nearest lib/ above the tests.</summary>
     private static string? Find(string asked)
     {
-        string name = OpenFPS.Client.Core.Platform.NativeAudioLibraries.PhononFileName;
+        string name = OpenFPS.Native.Platform.NativeAudioLibraries.PhononFileName;
         if (asked != "1") return File.Exists(Path.Combine(asked, name)) ? Path.Combine(asked, name) : null;
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
         {

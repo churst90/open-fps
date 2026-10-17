@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
+using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -327,7 +328,7 @@ internal sealed class TracedReverb : IDisposable
     private void Loop()
     {
         // Priority = BelowNormal is a placebo on Linux; nice the thread so tracing loses to the mixer.
-        OpenFPS.Client.Core.Platform.BackgroundPriority.LowerThisThread("TracedReverb");
+        OpenFPS.Native.Platform.BackgroundPriority.LowerThisThread("TracedReverb");
         while (_running)
         {
             try

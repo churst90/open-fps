@@ -254,7 +254,7 @@ public sealed class OneOffSounds
 
     private void Prewarmer()
     {
-        OpenFPS.Client.Core.Platform.FlushToZero.ThisThread("Door prewarm");
+        OpenFPS.Native.Platform.FlushToZero.ThisThread("Door prewarm");
         do
         {
             while (_toPrewarm.TryDequeue(out var key))
@@ -386,7 +386,7 @@ public sealed class OneOffSounds
                 {
                     var toRender = sound;
                     int renderSeed = seed;
-                    OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a sound's render", () => _rendered.Enqueue(AtMixerRate(id, RenderOne(toRender, renderSeed))));
+                    OpenFPS.Native.Platform.FlushToZero.Ahead("a sound's render", () => _rendered.Enqueue(AtMixerRate(id, RenderOne(toRender, renderSeed))));
                 }
                 // It waits for its buffer: dropping every first hearing would silence whatever is rare
                 // (four seed variants, each a first hearing once).
@@ -1477,7 +1477,7 @@ public sealed class OneOffSounds
         {
             var sound = item.Sound;
             int seed = item.Seed;
-            OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a sound's render", () => _rendered.Enqueue(AtMixerRate(id, Diffuse(RenderOne(sound, seed), step / 4f, seed))));
+            OpenFPS.Native.Platform.FlushToZero.Ahead("a sound's render", () => _rendered.Enqueue(AtMixerRate(id, Diffuse(RenderOne(sound, seed), step / 4f, seed))));
         }
         return id;
     }

@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core.Platform;
+using OpenFPS.Native.Platform;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

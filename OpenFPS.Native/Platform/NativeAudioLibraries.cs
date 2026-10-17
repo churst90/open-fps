@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace OpenFPS.Client.Core.Platform;
+namespace OpenFPS.Native.Platform;
 
 /// <summary>
 /// The native libraries the audio stack resolves at runtime, and what is lost when one is absent, said

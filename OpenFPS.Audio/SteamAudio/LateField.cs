@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Sound;
+using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -146,7 +147,7 @@ internal sealed class LateField : IDisposable
     private void Loop()
     {
         // Priority = BelowNormal is a placebo on Linux; nice the thread so tracing loses to the mixer.
-        OpenFPS.Client.Core.Platform.BackgroundPriority.LowerThisThread("LateField");
+        OpenFPS.Native.Platform.BackgroundPriority.LowerThisThread("LateField");
         var ids = new int[MaxSources];
         var at = new Vector3[MaxSources];
         while (_running)

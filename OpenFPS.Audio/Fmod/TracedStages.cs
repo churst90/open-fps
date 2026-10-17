@@ -1,5 +1,6 @@
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -86,7 +87,7 @@ internal sealed class TracedStages
                 // A thread of its own, niced: a stage is a few hundred milliseconds of work that must lose to the mixer.
                 var done = new System.Threading.Tasks.TaskCompletionSource();
                 _making = done.Task;
-                OpenFPS.Client.Core.Platform.BackgroundPriority.RunLowered("TracedStages", () =>
+                OpenFPS.Native.Platform.BackgroundPriority.RunLowered("TracedStages", () =>
                 {
                     try { Fill(); } finally { done.SetResult(); }
                 });

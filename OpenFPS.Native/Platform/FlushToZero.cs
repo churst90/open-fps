@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using Serilog;
 
-namespace OpenFPS.Client.Core.Platform;
+namespace OpenFPS.Native.Platform;
 
 /// <summary>
 /// Makes the calling thread treat subnormal numbers as zero: flush-to-zero for results and
