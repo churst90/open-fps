@@ -934,7 +934,9 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   - **Found, not fixed** (the reader's compilations, other stages' lines): Accessibility is given neither Models
     nor Sound (22 binding errors in `ListeningCalibration.cs`, since stage 7 moved it), Sound's internals are not
     shown to Models (8 in `Machines.cs`), and World is not given Parquet.Net (8 in `Overture.cs`). Those
-    references go unseen by every survey.
+    references went unseen by every survey. Fixed in the reader before stage 5: it now sees 64 references more
+    (62 from `ListeningCalibration.cs`, 18 to Models and 44 to Sound, both under Accessibility's layer; one
+    more in `Overture.cs` and a test that reads it). None is a crossing: every ratchet list came out as checked in.
   - **Left:** `GroundWater.OfMaterial` still tells the runoff class by a material's name (stage 1's note): it
     wants a runoff cover column in the table. Real weather (docs/REAL_WEATHER.md 8.1) plugs in at
     `OutdoorAir` and `WorldWeather`; the server's `WorldEnvironmentSystem` still keeps its fields one by one.

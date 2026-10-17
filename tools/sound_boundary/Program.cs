@@ -40,7 +40,7 @@ string[] packages =
     "microsoft.entityframeworkcore", "microsoft.entityframeworkcore.abstractions",
     "microsoft.entityframeworkcore.relational", "microsoft.entityframeworkcore.sqlite.core",
     "xunit.assert", "xunit.core", "xunit.abstractions", "xunit.extensibility.core", "xunit.extensibility.execution",
-    "system.speech", "gircore.gtk-4.0", "gircore.gobject-2.0", "gircore.glib-2.0", "gircore.gio-2.0", "gircore.gdk-4.0",
+    "system.speech", "parquet.net", "gircore.gtk-4.0", "gircore.gobject-2.0", "gircore.glib-2.0", "gircore.gio-2.0", "gircore.gdk-4.0",
 };
 foreach (var p in packages)
     foreach (var dll in PackageDlls(p))
@@ -61,12 +61,12 @@ var projects = new (string Name, string Dir, string[] Refs, string[] Extra)[]
     ("OpenFPS.Schema", "OpenFPS.Schema", Array.Empty<string>(), Array.Empty<string>()),
     ("OpenFPS.Words", "OpenFPS.Words", Array.Empty<string>(), Array.Empty<string>()),
     ("OpenFPS.Astronomy", "OpenFPS.Astronomy", new[] { "OpenFPS.Words" }, Array.Empty<string>()),
-    ("OpenFPS.Accessibility", "OpenFPS.Accessibility", Array.Empty<string>(), Array.Empty<string>()),
     ("OpenFPS.Physics", "OpenFPS.Physics", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Schema" }, Array.Empty<string>()),
     ("OpenFPS.Acoustics", "OpenFPS.Acoustics", new[] { "OpenFPS.Geometry", "OpenFPS.Materials" }, Array.Empty<string>()),
     ("OpenFPS.Environment", "OpenFPS.Environment", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Schema", "OpenFPS.Physics" }, Array.Empty<string>()),
     ("OpenFPS.Sound", "OpenFPS.Sound", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment" }, Array.Empty<string>()),
     ("OpenFPS.Models", "OpenFPS.Models", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "OpenFPS.Sound" }, Array.Empty<string>()),
+    ("OpenFPS.Accessibility", "OpenFPS.Accessibility", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "OpenFPS.Sound", "OpenFPS.Models" }, Array.Empty<string>()),
     ("OpenFPS.Audio", "OpenFPS.Audio", new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.Native" }, Array.Empty<string>()),
     ("OpenFPS.World", "OpenFPS.World", new[] { "OpenFPS.Words", "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "OpenFPS.Sound", "OpenFPS.Models" }, Array.Empty<string>()),
     ("OpenFPS.Common", "OpenFPS.Common", new[] { "OpenFPS.Words", "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.World" }, Array.Empty<string>()),
@@ -107,7 +107,7 @@ foreach (var (name, dir, refs, extra) in projects)
     {
         "OpenFPS.Native" => new[] { "OpenFPS.Audio", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Acoustics" => new[] { "OpenFPS.Tests" },
-        "OpenFPS.Sound" => new[] { "OpenFPS.Audio", "OpenFPS.Tests", "OpenFPS.AudioLab" },
+        "OpenFPS.Sound" => new[] { "OpenFPS.Audio", "OpenFPS.Models", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Audio" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Client.Core" or "OpenFPS.Server" or "OpenFPS.World" or "OpenFPS.Environment" or "OpenFPS.Editor" => new[] { "OpenFPS.Tests", "OpenFPS.AudioLab" },
         _ => Array.Empty<string>(),
