@@ -275,9 +275,10 @@ public partial class MapManager
         foreach (var m in _mapRepo.LoadAll())
         {
             Access?.ApplyTo(m);
-            Overlays?.ApplyBefore(m);
+            Overlays?.ApplyBefore(m, Editor.WorldEditor.Laying);
             CreateMapInstance(m);
-            Overlays?.ApplyAfter(this, m.Id);
+            if (Overlays != null && TryGetMap(m.Id, out var world, out _, out _, out _))
+                Overlays.ApplyAfter(m.Id, world, AuthoredEntities(m.Id));
         }
 
         // After loading: a map that does not exist is refused by name, not given as an empty world.

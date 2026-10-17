@@ -9,8 +9,8 @@ namespace OpenFPS.Server.Editor;
 /// <summary>
 /// One kind of model as the world editor sees it (docs/WORLD_EDITOR.md sections 4 and 11.1): what its
 /// fields are, which models there are, each one as JSON, and how a new version is checked and put in
-/// use. The library's kinds are one class (<see cref="LibraryKind"/>); prefabs, which live in the
-/// server's PrefabRepository and are described by prefab-schema.json, are another (<see cref="PrefabKind"/>).
+/// use. The library's kinds are one class (<see cref="LibraryKind"/>); prefabs, which the world's prefab
+/// files hold (PrefabLibrary) and prefab-schema.json describes, are another (<see cref="PrefabKind"/>).
 /// The editor knows nothing about any one kind beyond this.
 /// </summary>
 public abstract class EditorKind
@@ -75,7 +75,7 @@ public sealed class LibraryKind : EditorKind
 }
 
 /// <summary>
-/// Prefabs as a kind: the server's PrefabRepository, described from prefab-schema.json (its types,
+/// Prefabs as a kind: the world's prefab files (PrefabLibrary), described from prefab-schema.json (its types,
 /// enums, minimum and maximum, and its descriptions as the help). A version is checked by
 /// PrefabValidator, as a file is at load. Clients never hold prefabs: they are sent the things made from
 /// them, so a new version is heard by making those things again (WorldEditor.RemakeAll).
@@ -83,15 +83,15 @@ public sealed class LibraryKind : EditorKind
 public sealed class PrefabKind : EditorKind
 {
     public const string KindId = "prefab";
-    private readonly PrefabRepository _prefabs;
+    private readonly PrefabLibrary _prefabs;
     private readonly Dictionary<string, string> _asLoaded = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<FieldNode>? _fields;
 
-    public PrefabKind(PrefabRepository prefabs)
+    public PrefabKind(PrefabLibrary prefabs)
     {
         _prefabs = prefabs;
         // Version 0 of each: the file, as it was read at start.
-        foreach (var (id, t) in prefabs.Prefabs) _asLoaded[id] = PrefabRepository.ToJson(t);
+        foreach (var (id, t) in prefabs.Prefabs) _asLoaded[id] = PrefabLibrary.ToJson(t);
     }
 
     public override string Kind => KindId;
@@ -100,17 +100,17 @@ public sealed class PrefabKind : EditorKind
     public override IReadOnlyList<FieldNode> Fields => _fields ??= PrefabSchema.Describe(Path.Combine(_prefabs.Folder, "prefab-schema.json"));
     public override IEnumerable<string> Ids => _prefabs.Prefabs.Values.Select(t => t.Id);
     public override bool Knows(string id) => _prefabs.Prefabs.ContainsKey(id.ToLowerInvariant());
-    public override string CurrentJson(string id) => PrefabRepository.ToJson(_prefabs.Prefabs[id.ToLowerInvariant()]);
+    public override string CurrentJson(string id) => PrefabLibrary.ToJson(_prefabs.Prefabs[id.ToLowerInvariant()]);
     public override string? BuiltInJson(string id) => _asLoaded.TryGetValue(id, out var j) ? j : null;
 
     public override string Check(string id, string json)
     {
-        var t = PrefabRepository.FromJson(json);
+        var t = PrefabLibrary.FromJson(json);
         if (!t.Id.Equals(id, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException($"The prefab's id is {t.Id}, not {id}.");
-        return PrefabRepository.ToJson(t);
+        return PrefabLibrary.ToJson(t);
     }
 
-    public override void Apply(string id, string json) => _prefabs.Put(PrefabRepository.FromJson(json));
+    public override void Apply(string id, string json) => _prefabs.Put(PrefabLibrary.FromJson(json));
 
     public override string Renamed(string json, string newId)
     {

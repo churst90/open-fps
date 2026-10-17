@@ -452,7 +452,7 @@ public class WorldEditorPhase2Tests : IDisposable
 
         // Kept: a new store over the same overlay folder lays them on the map as it loads.
         var copy = MapTemplates.Flat("mine", "tester");
-        new MapOverlayStore(Path.Combine(rig.MapDir, "overlays")).ApplyBefore(copy);
+        new MapOverlayStore(Path.Combine(rig.MapDir, "overlays")).ApplyBefore(copy, WorldEditor.Laying);
         Assert.Equal(("rain", 14.5f), (copy.HeldWeather, copy.HeldHour));
     }
 

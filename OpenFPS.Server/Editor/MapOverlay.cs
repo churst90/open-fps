@@ -1,8 +1,8 @@
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Arch.Core;
 using OpenFPS.Common.Components;
-using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Serilog;
 
@@ -60,11 +60,16 @@ public sealed class OverlayAddition
     /// <summary>Who placed it, and when (UTC). Null on entries kept before 2026-10-09: "placed earlier".</summary>
     public string? PlacedBy { get; set; }
     public DateTime? PlacedAt { get; set; }
-
-    /// <summary>A parked vehicle ("vehicle:PRESET" as its prefab): made by the editor after the map's
-    /// composites, never laid into the map's entities.</summary>
-    [JsonIgnore] public bool IsVehicle => WorldEditor.IsVehicleId(Entity.PrefabId, out _);
 }
+
+/// <summary>
+/// What laying an overlay over a map's data takes from the editor's host, which knows them: whether a thing
+/// placed is a parked vehicle ("vehicle:PRESET" as its prefab), made by the host after the map's composites and
+/// never laid into the map's entities; a stored map setting laid on the map's data (MapSettings.Apply); and the
+/// roads, paths and railways laid with the editor made the map's own data (WorldEditor.LayRoutes).
+/// </summary>
+public sealed record OverlayLaying(Func<string, bool> IsVehicle, Action<MapData, string, string?> Setting,
+                                   Action<MapData, MapOverlay> Routes);
 
 /// <summary>
 /// The world editor's edits to one map, as state: what each thing it changed is now, what it removed and
@@ -225,21 +230,21 @@ public sealed class MapOverlayStore
     /// numbered after the highest, in file order, in memory only), then the spawn, the removals, the
     /// changes and the additions laid over the data.
     /// </summary>
-    public void ApplyBefore(MapData map)
+    public void ApplyBefore(MapData map, OverlayLaying laying)
     {
         AssignMissingIds(map);
-        Lay(map, Get(map.Id));
+        Lay(map, Get(map.Id), laying);
     }
 
     /// <summary>An overlay laid over a map's data: what loading does, and what baking writes into a file.</summary>
-    internal static void Lay(MapData map, MapOverlay o)
+    internal static void Lay(MapData map, MapOverlay o, OverlayLaying laying)
     {
         if (o.IsEmpty) return;
 
         if (o.Spawn != null)
             map.SpawnPoint = new MapPose { Position = o.Spawn.Position, Rotation = o.Spawn.Rotation };
         if (o.Settings != null)
-            foreach (var (path, value) in o.Settings) MapSettings.Apply(map, path, value);
+            foreach (var (path, value) in o.Settings) laying.Setting(map, path, value);
 
         var byId = new Dictionary<int, EntityData>();
         foreach (var e in map.Entities) byId.TryAdd(e.EntityId, e);
@@ -265,14 +270,14 @@ public sealed class MapOverlayStore
         foreach (var a in o.Added)
         {
             if (a.Entity.EntityId >= o.NextId) o.NextId = a.Entity.EntityId + 1;
-            if (a.IsVehicle) continue;   // parked by WorldEditor.ParkKeptVehicles, after the composites
+            if (laying.IsVehicle(a.Entity.PrefabId)) continue;   // parked by WorldEditor.ParkKeptVehicles, after the composites
             if (byId.ContainsKey(a.Entity.EntityId)) continue;   // already in the file (/savemap'd)
             var copy = Clone(a.Entity);
             map.Entities.Add(copy);
             byId[copy.EntityId] = copy;
         }
         // Roads and railways as the map's own data, so traffic and trains find them as they always do.
-        WorldEditor.LayRoutes(map, o);
+        laying.Routes(map, o);
         // People put on with the editor, beside the map's own, each once.
         foreach (var p in o.People ?? new List<CharacterData>())
             if (!(map.Characters ?? new List<CharacterData>()).Any(c => c.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase)))
@@ -285,13 +290,12 @@ public sealed class MapOverlayStore
             skipped > 0 ? $", {skipped} not found" : "");
     }
 
-    /// <summary>After the map is built: each thing's own settings, onto its components.</summary>
-    public void ApplyAfter(MapManager maps, string mapId)
+    /// <summary>After the map is built: each thing's own settings, onto its components. <paramref name="authored"/>
+    /// is the map's things by the ids its data gives them.</summary>
+    public void ApplyAfter(string mapId, World world, IReadOnlyDictionary<int, Entity> authored)
     {
         var o = Get(mapId);
         if (o.IsEmpty) return;
-        if (!maps.TryGetMap(mapId, out var world, out _, out _, out _)) return;
-        var authored = maps.AuthoredEntities(mapId);
         void Apply(int id, Dictionary<string, string>? settings)
         {
             if (settings == null || settings.Count == 0) return;

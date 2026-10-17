@@ -40,6 +40,10 @@ public sealed partial class WorldEditor
     }
 
     public MapOverlayStore Overlays => _maps.Overlays ??= new MapOverlayStore(null);
+
+    /// <summary>What laying an overlay takes from the editor: its parked vehicles, its map settings and its routes.</summary>
+    public static readonly OverlayLaying Laying = new(id => IsVehicleId(id, out _), MapSettings.Apply, LayRoutes);
+
     public ModelStore Models => _server.Models;
     /// <summary>What parks a vehicle (the composites of /spawn vehicle); null on a rig without them.</summary>
     public CompositeService? Composites { get; init; }

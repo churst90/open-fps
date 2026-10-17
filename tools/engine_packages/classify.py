@@ -168,6 +168,7 @@ FILE_RULES = [
     ('OpenFPS.Server/Editor/EditorKinds.cs', 'Editor', 'the kinds the editor edits'),
     ('OpenFPS.Server/Editor/ModelStore.cs', 'Editor', ''),
     ('OpenFPS.Server/Editor/OverlayRoute.cs', 'Editor', ''),
+    ('OpenFPS.Server/Editor/Pose.cs', 'Editor', 'where a placed thing is: LiveState and the undo stack read it'),
     ('OpenFPS.Server/Core/BuildSession.cs', 'Editor', ''),
     # The server's hosts: they step a package or adapt the entities to it, and stay.
     ('OpenFPS.Server/Systems/VehicleSystem*.cs', 'game', 'host: steps Agents'),

@@ -30,6 +30,10 @@ public sealed partial class WorldEditor
         return preset.Length > 0;
     }
 
+    /// <summary>Whether a thing the editor placed is a parked vehicle: made after the map's composites, never
+    /// laid into the map's entities.</summary>
+    internal static bool IsParked(OverlayAddition? a) => a != null && IsVehicleId(a.Entity.PrefabId, out _);
+
     private static bool IsAircraft(string preset) => AircraftProfile.Presets.ContainsKey(preset);
 
     /// <summary>Whether /spawn vehicle would park this preset.</summary>
@@ -173,7 +177,7 @@ public sealed partial class WorldEditor
         foreach (string mapId in _maps.LoadedMapIds.ToList())
         {
             var o = Overlays.Get(mapId);
-            foreach (var a in o.Added.Where(a => a.IsVehicle).ToList())
+            foreach (var a in o.Added.Where(IsParked).ToList())
             {
                 IsVehicleId(a.Entity.PrefabId, out string preset);
                 var root = Park(mapId, preset, a.Entity.Position, a.Entity.Rotation, out string why);

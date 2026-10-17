@@ -13,15 +13,6 @@ using EntityData = OpenFPS.Server.Repositories.EntityData;
 
 namespace OpenFPS.Server.Editor;
 
-/// <summary>Where a thing is, which way it is turned, and how big: everything a move changes.</summary>
-public readonly record struct Pose(Vector3 Position, Quaternion Rotation, Vector3 Scale)
-{
-    public bool Near(Pose o)
-        => Vector3.Distance(Position, o.Position) < 1e-3f
-           && MathF.Abs(Quaternion.Dot(Rotation, o.Rotation)) > 1f - 1e-5f
-           && Vector3.Distance(Scale, o.Scale) < 1e-4f;
-}
-
 /// <summary>Everything about a placed thing that is needed to put it back exactly. <see cref="PlacedBy"/>
 /// null means new: whoever is editing now placed it, now. "" means kept from before anybody was recorded.</summary>
 public sealed record Snapshot(int Id, EntityData Data, Dictionary<string, string>? Settings, bool Added,
@@ -449,7 +440,7 @@ public sealed partial class WorldEditor
         }
         if (settings != null)
             foreach (var (path, value) in settings) EntitySettings.TrySet(world, made, path, value, out _);
-        live.OnTo(world, made);
+        live.OnTo(world, made, Systems.DoorSystem.Settle);
         authored[id] = made;
         Restream(mapId, world, made, old);
         return made;
@@ -597,7 +588,7 @@ public sealed partial class WorldEditor
     {
         var o = Overlays.Get(mapId);
         var data = DataOf(mapId);
-        if (o.AdditionFor(id) is { IsVehicle: true } parked)
+        if (o.AdditionFor(id) is { } parked && IsParked(parked))
         {
             o.Added.Remove(parked);
             data.Remove(id);

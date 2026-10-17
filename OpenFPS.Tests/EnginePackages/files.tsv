@@ -348,6 +348,7 @@ OpenFPS.Server/Editor/MapOverlay.cs	Editor
 OpenFPS.Server/Editor/MapVersions.cs	Editor	
 OpenFPS.Server/Editor/ModelStore.cs	Editor	
 OpenFPS.Server/Editor/OverlayRoute.cs	Editor	
+OpenFPS.Server/Editor/Pose.cs	Editor	where a placed thing is: LiveState and the undo stack read it
 OpenFPS.Server/Editor/WorldEditor.Build.cs	game	host: the editor's commands over sessions and maps
 OpenFPS.Server/Editor/WorldEditor.Changed.cs	game	host: the editor's commands over sessions and maps
 OpenFPS.Server/Editor/WorldEditor.Dialog.cs	game	host: the editor's commands over sessions and maps

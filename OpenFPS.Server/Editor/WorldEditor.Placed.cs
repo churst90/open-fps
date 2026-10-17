@@ -208,7 +208,7 @@ public sealed partial class WorldEditor
         var found = new List<(int Id, Entity E, string Name, string Where)>();
         foreach (int id in ids)
         {
-            if (!authored.TryGetValue(id, out var e) || !world.IsAlive(e) || !(Editable(world, e) || o.AdditionFor(id) is { IsVehicle: true }))
+            if (!authored.TryGetValue(id, out var e) || !world.IsAlive(e) || !(Editable(world, e) || IsParked(o.AdditionFor(id))))
             { Say(reply, $"Nothing removed: there is nothing numbered {id} on this map the editor can take away."); return; }
             string name = NameOf(world, e);
             if (Aboard(world, e) is { } rider) { Say(reply, $"Nothing removed: {rider} is in {name}."); return; }

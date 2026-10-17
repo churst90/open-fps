@@ -374,7 +374,7 @@ public sealed partial class WorldEditor
 
         // What loading does, onto the file's data, then each thing's settings the file can hold.
         var laid = MapVersionStore.Copy(o);
-        MapOverlayStore.Lay(file, laid);
+        MapOverlayStore.Lay(file, laid, Laying);
         var authored = _maps.AuthoredEntities(mapId);
         var byId = file.Entities.GroupBy(e => e.EntityId).ToDictionary(g => g.Key, g => g.First());
         var residual = new MapOverlay { MapId = mapId, NextId = o.NextId, Pins = new Dictionary<string, int>(o.Pins) };
@@ -390,8 +390,8 @@ public sealed partial class WorldEditor
             });
         }
         foreach (var c in laid.Changed) Keep(c.Id, c.Settings);
-        foreach (var a in laid.Added.Where(a => !a.IsVehicle)) Keep(a.Entity.EntityId, a.Settings);
-        residual.Added.AddRange(o.Added.Where(a => a.IsVehicle));
+        foreach (var a in laid.Added.Where(a => !IsParked(a))) Keep(a.Entity.EntityId, a.Settings);
+        residual.Added.AddRange(o.Added.Where(IsParked));
         // The map's settings a file holds are laid by Lay (weather, hour, ground, beacons, size); the rest stay.
         if (o.Settings != null)
             foreach (var (key, value) in o.Settings.Where(kv => !FileHolds(kv.Key)))

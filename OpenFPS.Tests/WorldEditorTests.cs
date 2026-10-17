@@ -420,7 +420,7 @@ public class WorldEditorTests : IDisposable
         o.Added.AddRange(overlay.Added);
 
         var map = Generated();
-        store.ApplyBefore(map);
+        store.ApplyBefore(map, WorldEditor.Laying);
         Assert.Equal(new Vector3(5, 1.5f, 0), map.Entities.Single(e => e.EntityId == 2).Position);   // the glass is left alone
         Assert.Equal(new Vector3(11, 1.5f, 0), map.Entities.Single(e => e.EntityId == 3).Position);  // the wall moved
         Assert.DoesNotContain(map.Entities, e => e.PrefabId == "brick_wall");
@@ -428,7 +428,7 @@ public class WorldEditorTests : IDisposable
         Assert.Equal(3, o.Changed[0].Id);   // and the entry now names it by its new number
 
         // Laid twice (a map /savemap'd with its edits in it): the same.
-        store.ApplyBefore(map);
+        store.ApplyBefore(map, WorldEditor.Laying);
         Assert.Single(map.Entities, e => e.PrefabId == "fire_pit");
         Assert.Equal(new Vector3(11, 1.5f, 0), map.Entities.Single(e => e.EntityId == 3).Position);
     }

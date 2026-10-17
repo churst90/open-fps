@@ -18,9 +18,6 @@ OpenFPS.Client.Core/WallBumps.cs	Common	37
 OpenFPS.Client.Core/WallBumps.cs	game	30
 OpenFPS.Common/Messages.cs	Agents	2
 OpenFPS.Common/PhysicsUtils.cs	game	3
-OpenFPS.Server/Editor/EditorKinds.cs	game	7
-OpenFPS.Server/Editor/LiveState.cs	game	6
-OpenFPS.Server/Editor/MapOverlay.cs	game	9
 OpenFPS.Server/Systems/PedestrianSpeech.cs	Common	4
 OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs	Common	3
 OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs	game	2

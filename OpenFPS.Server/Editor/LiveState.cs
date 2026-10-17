@@ -3,7 +3,6 @@ using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Editing;
-using OpenFPS.Server.Systems;
 
 namespace OpenFPS.Server.Editor;
 
@@ -27,8 +26,9 @@ internal readonly record struct LiveState(DoorComponent? Door, bool Parented, So
             ? now with { Position = d.ShutPosition, Rotation = Quaternion.CreateFromYawPitchRoll(d.ShutYaw, 0f, 0f) }
             : now;
 
-    /// <summary>Puts the running state on the thing made again, where it has the same part.</summary>
-    public void OnTo(World world, Entity made)
+    /// <summary>Puts the running state on the thing made again, where it has the same part. A door free of a
+    /// parent is settled where its openness puts it by <paramref name="settleDoor"/>, the host's door law.</summary>
+    public void OnTo(World world, Entity made, Action<World, Entity> settleDoor)
     {
         if (Door is { } d && world.Has<DoorComponent>(made))
         {
@@ -42,7 +42,7 @@ internal readonly record struct LiveState(DoorComponent? Door, bool Parented, So
             nd.OpenedFrom = d.OpenedFrom;
             nd.HandId = d.HandId;
             nd.KeySeconds = d.KeySeconds;
-            if (!Parented) DoorSystem.Settle(world, made);
+            if (!Parented) settleDoor(world, made);
         }
         if (Emitter is { } em && world.Has<SoundEmitterComponent>(made))
         {
