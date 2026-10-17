@@ -168,7 +168,6 @@ OpenFPS.Common/DrivingCuePlanner.cs	host
 OpenFPS.Common/EntityAcoustics.cs	host		
 OpenFPS.Common/EntityEmission.cs	host		
 OpenFPS.Common/EntityGeometry.cs	host		
-OpenFPS.Common/EntityType.cs	host		
 OpenFPS.Common/GroundProbeMemo.cs	host		
 OpenFPS.Common/LaneRoutes.cs	host		
 OpenFPS.Common/LineFollower.cs	host		
@@ -178,12 +177,8 @@ OpenFPS.Common/PhysicsConstants.cs	host
 OpenFPS.Common/PhysicsUtils.cs	host		
 OpenFPS.Common/PhysicsViews.cs	host		
 OpenFPS.Common/RaceLine.cs	host		
-OpenFPS.Common/RoadMapData.cs	host		
-OpenFPS.Common/Roads.cs	host		
 OpenFPS.Common/Scopes.cs	host		
 OpenFPS.Common/StatePacking.cs	host		
-OpenFPS.Common/Tiles.cs	host		
-OpenFPS.Common/TrackClearance.cs	host		
 OpenFPS.Common/UpdateThrottle.cs	host		
 OpenFPS.Common/WorldSnapshot.cs	host		
 OpenFPS.Geometry/BoxColumns.cs	lib	Geometry	
@@ -415,3 +410,33 @@ OpenFPS.Sound/Weapons.cs	lib	Sound
 OpenFPS.Sound/WeatherType.cs	lib	Sound	
 OpenFPS.Sound/WoodChorus.cs	lib	Sound	
 OpenFPS.Sound/WorldWeather.cs	lib	Sound	
+OpenFPS.World/EntityType.cs	host		
+OpenFPS.World/MapRoadsBuilder.cs	host		
+OpenFPS.World/OneWorld/Elevation.cs	host		
+OpenFPS.World/OneWorld/Geocoder.cs	host		
+OpenFPS.World/OneWorld/LandCover.cs	host		
+OpenFPS.World/OneWorld/Osm.cs	host		
+OpenFPS.World/OneWorld/Overture.cs	host		
+OpenFPS.World/OneWorld/Utm.cs	host		
+OpenFPS.World/OneWorld/WorldBuildings.cs	host		
+OpenFPS.World/OneWorld/WorldFeatures.Buildings.cs	host		
+OpenFPS.World/OneWorld/WorldFeatures.Clear.cs	host		
+OpenFPS.World/OneWorld/WorldFeatures.cs	host		
+OpenFPS.World/OneWorld/WorldPlace.cs	host		
+OpenFPS.World/OneWorld/WorldSettings.cs	host		
+OpenFPS.World/OneWorld/WorldStore.cs	host		
+OpenFPS.World/OneWorld/WorldTile.cs	host		
+OpenFPS.World/OneWorld/WorldTileKey.cs	host		
+OpenFPS.World/OneWorld/WorldTileService.cs	host		
+OpenFPS.World/Repositories/CompositeRepository.cs	host		
+OpenFPS.World/Repositories/MapElevation.cs	host		
+OpenFPS.World/Repositories/MapRepository.cs	host		
+OpenFPS.World/Repositories/PrefabLibrary.cs	host		
+OpenFPS.World/Repositories/PrefabTemplate.cs	host		
+OpenFPS.World/Repositories/PrefabValidator.cs	host		
+OpenFPS.World/RoadMapData.cs	host		
+OpenFPS.World/Roads.cs	host		
+OpenFPS.World/SurfaceRaster.cs	host		
+OpenFPS.World/TerrainBuilder.cs	host		
+OpenFPS.World/Tiles.cs	host		
+OpenFPS.World/TrackClearance.cs	host		

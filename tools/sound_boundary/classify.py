@@ -54,6 +54,7 @@ FILE_RULES = [
     ('OpenFPS.Physics/', 'a', 'Physics', 'docs/PHYSICS_BOUNDARY.md'),
     # Not the library's: how a player who cannot see is told the world (docs/ENGINE_PACKAGES.md, stage 7).
     ('OpenFPS.Accessibility/', 'b', '', 'docs/ENGINE_PACKAGES.md, stage 7'),
+    ('OpenFPS.World/', 'b', '', 'maps and the one world: docs/ENGINE_PACKAGES.md, stage 4'),
     # The real-time runtime: FMOD DSPs, voices, Steam Audio, the acoustic worker
     (CC + 'AudioEngine/Data/', 'c', 'Audio', 'the source description the host fills'),
     (CC + 'AudioEngine/Fmod/', 'a', 'Audio', ''),
@@ -111,7 +112,6 @@ FILE_RULES = [
     (CO + 'LaneRoutes.cs', 'b', '', 'traffic'),
     (CO + 'LineFollower.cs', 'b', '', 'traffic driver (Resonance keeps its own in Runtime)'),
     (CO + 'RaceLine.cs', 'b', '', 'traffic'),
-    (CO + 'Roads.cs', 'b', '', 'map data'),
     (CO + 'Scopes.cs', 'b', '', 'weapon UI'),
     (CO + 'SharedMovementEngine.cs', 'b', '', 'player movement'),
     (CO + 'PhysicsUtils.cs', 'b', '', 'player movement'),
@@ -122,16 +122,12 @@ FILE_RULES = [
     (CO + 'EntityAcoustics.cs', 'b', '', "open-fps's entities to rooms, openings and solids: the adapter the acoustics are fed through"),
     (CO + 'MoverPoses.cs', 'b', '', "the server's count of door leaves moved"),
     (CO + 'DrivingCuePlanner.cs', 'b', '', 'driving aid over the road network'),
-    (CO + 'RoadMapData.cs', 'b', '', 'map data (the MapRoads message)'),
     (CO + 'UpdateThrottle.cs', 'b', '', 'client loop'),
-    (CO + 'TrackClearance.cs', 'b', '', 'server map validation'),
     (CO + 'Messages.cs', 'b', '', 'network'),
     (CO + 'StatePacking.cs', 'b', '', 'network'),
     (CO + 'DistantMotion.cs', 'b', '', 'network: how a far thing is carried between states'),
     (CO + 'Components.cs', 'b', '', 'entity model'),
-    (CO + 'EntityType.cs', 'b', '', 'entity model: what a thing is'),
     (CO + 'WorldSnapshot.cs', 'b', '', 'snapshots'),
-    (CO + 'Tiles.cs', 'b', '', 'streaming interest'),
     (CO + 'AudioEvents.cs', 'b', '', 'network: the message carrying TransientSounds'),
     (CO + 'TransientSound.cs', 'c', 'Sound', 'a short sound by its physics; on the wire in WorldAudioEvent'),
     (CO + 'Weapons.cs', 'c', 'Sound', 'weapon numbers the sound reads'),
@@ -185,7 +181,8 @@ ALLOWED = {
 # Projects whose files are sorted by the rules above; every other project is host.
 SCANNED = ('OpenFPS.Common', 'OpenFPS.Client.Core', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Acoustics', 'OpenFPS.Sound',
            'OpenFPS.Models',
-           'OpenFPS.Native', 'OpenFPS.Audio', 'OpenFPS.Schema', 'OpenFPS.Physics', 'OpenFPS.Accessibility')
+           'OpenFPS.Native', 'OpenFPS.Audio', 'OpenFPS.Schema', 'OpenFPS.Physics', 'OpenFPS.Accessibility',
+           'OpenFPS.World')
 
 
 def classify(t):

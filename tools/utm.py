@@ -1,5 +1,5 @@
 """
-The Universal Transverse Mercator grid on WGS84, as OpenFPS.Server/OneWorld/Utm.cs has it (USGS
+The Universal Transverse Mercator grid on WGS84, as OpenFPS.World/OneWorld/Utm.cs has it (USGS
 Professional Paper 1395's series, no Norway or Svalbard exceptions): the world's tiles are 250 m squares
 of it, and the maps of real places are laid on it (tools/gen_osm.py), so a map is the world's tiles moved,
 never turned. Keep the two in step.

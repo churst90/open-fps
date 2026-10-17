@@ -17,4 +17,5 @@
   <Project Path="OpenFPS.Sound/OpenFPS.Sound.csproj" />
   <Project Path="OpenFPS.Tests/OpenFPS.Tests.csproj" />
   <Project Path="OpenFPS.Words/OpenFPS.Words.csproj" />
+  <Project Path="OpenFPS.World/OpenFPS.World.csproj" />
 </Solution>

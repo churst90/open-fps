@@ -408,7 +408,7 @@ def carriageway(x0, x1, z0, z1, name=None):
 
 # ── Roads as data ─────────────────────────────────────────────────────────────────────────────────
 #
-# Every road is also a record: its centreline, its lanes and its type (OpenFPS.Common/Roads.cs). The
+# Every road is also a record: its centreline, its lanes and its type (OpenFPS.World/Roads.cs). The
 # record is written by the same call that lays the asphalt, so the two cannot disagree. The server
 # works out the lanes between junctions and where each can go next; the junctions are found here,
 # wherever two centrelines meet.

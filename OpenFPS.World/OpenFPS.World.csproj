@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Maps and the one world (docs/ENGINE_PACKAGES.md, 3.4 and stage 4): the map file format and the prefab and
+       composite formats with their checks, a map's ground heights and its roads (as declared and as sent to a
+       driver), the tiles and their streaming radii, laying and grading the terrain, what covers the ground as
+       the rain sees it, and the world's tiles: the real-world sources (OpenStreetMap, Overture, USGS 3DEP, ESA
+       WorldCover, the Census geocoder, UTM), a tile's buildings and features, the store and the on-demand
+       tile service. It sits above the sound and the catalogue (a prefab names a door's events, a glass and a
+       playback mode) and below Common, whose messages carry its roads and tiles' states. It knows nothing of
+       entities: the server makes its maps, prefabs and tiles into entities (MapManager, PrefabRepository,
+       TerrainTiles, WorldMaps, WorldPlaces), and names the folders it reads (WorldRoots).
+
+       Namespaces are those the files had (OpenFPS.Common, OpenFPS.Common.Components, OpenFPS.Server.Core,
+       OpenFPS.Server.OneWorld, OpenFPS.Server.Repositories, OpenFPS.Server.Water), as for the other packages'
+       moves. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Words\OpenFPS.Words.csproj" />
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
+    <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
+    <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A tile's state is on the wire (TileStreamUpdate). -->
+    <PackageReference Include="MemoryPack" Version="1.21.4" />
+    <!-- Overture's buildings are GeoParquet, read by byte range (OneWorld/Overture.cs). MIT, fully managed. -->
+    <PackageReference Include="Parquet.Net" Version="6.1.0" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests and the lab reach the formats' and the tile service's hooks, as they did in the server. -->
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+  </ItemGroup>
+
+</Project>

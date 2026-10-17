@@ -938,11 +938,11 @@ def slug(name):
 
 # ══ Roads ═════════════════════════════════════════════════════════════════════════════════════════
 #
-# Roads as data (OpenFPS.Common/Roads.cs): a centreline, a type and lanes, with junctions wherever two
+# Roads as data (OpenFPS.World/Roads.cs): a centreline, a type and lanes, with junctions wherever two
 # roads share a node in OpenStreetMap. Ways of the same name and class that meet end to end are one
 # road, so a street the mapper happened to split in three is still one street; a road that comes back
 # on itself (a loop, a lollipop cul-de-sac) is cut where it does, because a junction joins two roads.
-# The world's tiles lay roads with a C# port of this (OpenFPS.Server/OneWorld/WorldFeatures.cs: ROAD_CLASS,
+# The world's tiles lay roads with a C# port of this (OpenFPS.World/OneWorld/WorldFeatures.cs: ROAD_CLASS,
 # SURFACE, way_width, lay_line with road_y, ground_all's pitch, the zones and junctions): change both, and
 # WorldFeaturesTests.Magnolia_s_roads_are_laid_as_gen_osm_laid_them holds them together.
 ROAD_CLASS = {
@@ -2616,7 +2616,7 @@ FOOTPRINTS = SpatialHash(40.0)  # every building's wall ring as built, for the s
 
 
 # What build() decided for each building, written by --decisions=FILE for the test that holds the world's port of
-# build() (OpenFPS.Server/OneWorld/WorldBuildings.cs, WorldBuildingsTests) to this one: what to build is decided here
+# build() (OpenFPS.World/OneWorld/WorldBuildings.cs, WorldBuildingsTests) to this one: what to build is decided here
 # from addresses and lots, the world decides it from the footprint and the roads, and the shell is the same code.
 # KEEP THE TWO THE SAME: a change to build() at medium detail is a change to WorldBuildings.Build.
 DECIDED = {}

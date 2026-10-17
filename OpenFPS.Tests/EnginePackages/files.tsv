@@ -174,7 +174,6 @@ OpenFPS.Common/DrivingCuePlanner.cs	Accessibility	the driver's cues, planned
 OpenFPS.Common/EntityAcoustics.cs	Common	entity adapter: rooms, openings and the sound's world input
 OpenFPS.Common/EntityEmission.cs	Common	entity adapter: where an entity sounds from
 OpenFPS.Common/EntityGeometry.cs	Common	entity adapter: geometry
-OpenFPS.Common/EntityType.cs	World	what a thing is, in a prefab, a map and a definition: on the wire by number
 OpenFPS.Common/GroundProbeMemo.cs	game	physics survey: a server cache
 OpenFPS.Common/LaneRoutes.cs	Agents	a vehicle's tour of lanes
 OpenFPS.Common/LineFollower.cs	Agents	a driver steering to a line
@@ -184,12 +183,8 @@ OpenFPS.Common/PhysicsConstants.cs	Common	the game's reach and bounds, the tick,
 OpenFPS.Common/PhysicsUtils.cs	Common	entity adapter: the ground probes of a world and of a snapshot (the question: Footing)
 OpenFPS.Common/PhysicsViews.cs	Common	entity adapter: a world and a snapshot as the physics sees them (IPhysicsWorld)
 OpenFPS.Common/RaceLine.cs	Agents	speeds along a line
-OpenFPS.Common/RoadMapData.cs	World	roads as sent to a driver
-OpenFPS.Common/Roads.cs	World	roads as a map declares them
 OpenFPS.Common/Scopes.cs	game	the scope's maths and sway (what a scope is: OpenFPS.Models)
 OpenFPS.Common/StatePacking.cs	Common	wire
-OpenFPS.Common/Tiles.cs	World	tile detail and streaming radii
-OpenFPS.Common/TrackClearance.cs	World	a map's drive route checked at load
 OpenFPS.Common/UpdateThrottle.cs	Common	a fixed-rate gate
 OpenFPS.Common/WorldSnapshot.cs	Common	the client's world for one frame
 OpenFPS.Geometry/BoxColumns.cs	Geometry	
@@ -303,7 +298,6 @@ OpenFPS.Server/Core/HandsService.cs	game
 OpenFPS.Server/Core/IMessageDispatcher.cs	game	
 OpenFPS.Server/Core/MapManager.Rooms.cs	game	
 OpenFPS.Server/Core/MapManager.cs	game	
-OpenFPS.Server/Core/MapRoadsBuilder.cs	World	
 OpenFPS.Server/Core/MapTemplates.cs	game	host
 OpenFPS.Server/Core/MapTiles.cs	game	host: adapts entities to World's tiles
 OpenFPS.Server/Core/MessageDispatcher.cs	game	
@@ -320,7 +314,6 @@ OpenFPS.Server/Core/ServerGeometry.cs	game
 OpenFPS.Server/Core/SessionManager.cs	game	
 OpenFPS.Server/Core/StandingSpots.cs	game	
 OpenFPS.Server/Core/Teleporter.cs	game	
-OpenFPS.Server/Core/TerrainBuilder.cs	World	grading the survey; its entity making is the host's
 OpenFPS.Server/Core/TerrainTiles.cs	game	host: World's terrain as entities
 OpenFPS.Server/Core/TileStreamer.cs	game	host: World's tiles to each session
 OpenFPS.Server/Core/UserSession.cs	game	
@@ -349,36 +342,14 @@ OpenFPS.Server/Editor/WorldEditor.Shapes.cs	game	host: the editor's commands ove
 OpenFPS.Server/Editor/WorldEditor.Vehicles.cs	game	host: the editor's commands over sessions and maps
 OpenFPS.Server/Editor/WorldEditor.Versions.cs	game	host: the editor's commands over sessions and maps
 OpenFPS.Server/Editor/WorldEditor.cs	game	host: the editor's commands over sessions and maps
-OpenFPS.Server/OneWorld/Elevation.cs	World	
-OpenFPS.Server/OneWorld/Geocoder.cs	World	
-OpenFPS.Server/OneWorld/LandCover.cs	World	
-OpenFPS.Server/OneWorld/Osm.cs	World	
-OpenFPS.Server/OneWorld/Overture.cs	World	
-OpenFPS.Server/OneWorld/Utm.cs	World	
-OpenFPS.Server/OneWorld/WorldBuildings.cs	World	
-OpenFPS.Server/OneWorld/WorldFeatures.Buildings.cs	World	
-OpenFPS.Server/OneWorld/WorldFeatures.Clear.cs	World	
-OpenFPS.Server/OneWorld/WorldFeatures.cs	World	
 OpenFPS.Server/OneWorld/WorldMaps.cs	game	host: sessions arriving in World's places
-OpenFPS.Server/OneWorld/WorldPlace.cs	World	
 OpenFPS.Server/OneWorld/WorldPlaces.cs	game	host: places laid on World's tiles as entities
-OpenFPS.Server/OneWorld/WorldSettings.cs	World	
-OpenFPS.Server/OneWorld/WorldStore.cs	World	
-OpenFPS.Server/OneWorld/WorldTile.cs	World	
-OpenFPS.Server/OneWorld/WorldTileKey.cs	World	
-OpenFPS.Server/OneWorld/WorldTileService.cs	World	
 OpenFPS.Server/Program.cs	game	
 OpenFPS.Server/Repositories/AppDbContext.cs	game	
-OpenFPS.Server/Repositories/CompositeRepository.cs	World	composite templates and placements: map data
 OpenFPS.Server/Repositories/FriendRepository.cs	game	
 OpenFPS.Server/Repositories/IUserRepository.cs	game	
 OpenFPS.Server/Repositories/MapAccessRepository.cs	game	
-OpenFPS.Server/Repositories/MapElevation.cs	World	
-OpenFPS.Server/Repositories/MapRepository.cs	World	the map file format
-OpenFPS.Server/Repositories/PrefabLibrary.cs	World	the prefab files, loaded and checked
 OpenFPS.Server/Repositories/PrefabRepository.cs	game	host: World's prefabs made into entities
-OpenFPS.Server/Repositories/PrefabTemplate.cs	World	the prefab format
-OpenFPS.Server/Repositories/PrefabValidator.cs	World	
 OpenFPS.Server/Repositories/RoleRepository.cs	game	
 OpenFPS.Server/Repositories/SqliteUserRepository.cs	game	
 OpenFPS.Server/Repositories/TeamRepository.cs	game	
@@ -419,7 +390,6 @@ OpenFPS.Server/Systems/WindowSystem.cs	game
 OpenFPS.Server/Systems/WorldEnvironmentSystem.cs	game	host: steps Environment
 OpenFPS.Server/Water/DrainageNetwork.cs	Environment	a map's drainage from its tiles'
 OpenFPS.Server/Water/MapDrainage.cs	game	host: adapts the map to Environment
-OpenFPS.Server/Water/SurfaceRaster.cs	World	what covers the ground, as the rain sees it, from boxes
 OpenFPS.Sound/AdminGun.cs	Sound	
 OpenFPS.Sound/AirLayers.cs	Environment	the air's layers near the ground
 OpenFPS.Sound/Aircraft.cs	Sound	
@@ -575,3 +545,33 @@ OpenFPS.Sound/WorldWeather.cs	Environment	one world's weather state
 OpenFPS.Words/CompassWords.cs	Words	
 OpenFPS.Words/DirectionWords.cs	Words	
 OpenFPS.Words/SafeText.cs	Words	
+OpenFPS.World/EntityType.cs	World	
+OpenFPS.World/MapRoadsBuilder.cs	World	
+OpenFPS.World/OneWorld/Elevation.cs	World	
+OpenFPS.World/OneWorld/Geocoder.cs	World	
+OpenFPS.World/OneWorld/LandCover.cs	World	
+OpenFPS.World/OneWorld/Osm.cs	World	
+OpenFPS.World/OneWorld/Overture.cs	World	
+OpenFPS.World/OneWorld/Utm.cs	World	
+OpenFPS.World/OneWorld/WorldBuildings.cs	World	
+OpenFPS.World/OneWorld/WorldFeatures.Buildings.cs	World	
+OpenFPS.World/OneWorld/WorldFeatures.Clear.cs	World	
+OpenFPS.World/OneWorld/WorldFeatures.cs	World	
+OpenFPS.World/OneWorld/WorldPlace.cs	World	
+OpenFPS.World/OneWorld/WorldSettings.cs	World	
+OpenFPS.World/OneWorld/WorldStore.cs	World	
+OpenFPS.World/OneWorld/WorldTile.cs	World	
+OpenFPS.World/OneWorld/WorldTileKey.cs	World	
+OpenFPS.World/OneWorld/WorldTileService.cs	World	
+OpenFPS.World/Repositories/CompositeRepository.cs	World	
+OpenFPS.World/Repositories/MapElevation.cs	World	
+OpenFPS.World/Repositories/MapRepository.cs	World	
+OpenFPS.World/Repositories/PrefabLibrary.cs	World	
+OpenFPS.World/Repositories/PrefabTemplate.cs	World	
+OpenFPS.World/Repositories/PrefabValidator.cs	World	
+OpenFPS.World/RoadMapData.cs	World	
+OpenFPS.World/Roads.cs	World	
+OpenFPS.World/SurfaceRaster.cs	World	
+OpenFPS.World/TerrainBuilder.cs	World	
+OpenFPS.World/Tiles.cs	World	
+OpenFPS.World/TrackClearance.cs	World	

@@ -2,6 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
+    <!-- Maps, prefabs, composites and the world's tiles (docs/ENGINE_PACKAGES.md, stage 4): the server makes them
+         into entities and names their folders. -->
+    <ProjectReference Include="..\OpenFPS.World\OpenFPS.World.csproj" />
     <!-- The compass points: /wind, /build, the editor and the world's "north east of" say them. -->
     <ProjectReference Include="..\OpenFPS.Words\OpenFPS.Words.csproj" />
     <!-- The beacons' categories and a map's policy for them; coordinates as a player types them. -->
@@ -10,8 +13,6 @@
 
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
-    <!-- Overture's buildings are GeoParquet: read by byte range in the server (OneWorld/Overture.cs). MIT, fully managed. -->
-    <PackageReference Include="Parquet.Net" Version="6.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.4" />
     <!-- The native SQLite under EF Core: 2.1.10 bundles SQLite before 3.50.2 (CVE-2025-6965, GHSA-2m69-gcr7-jv3q).

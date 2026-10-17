@@ -430,7 +430,7 @@ ELEVATION_MARGIN = 60.0      # the map's bounds reach this far past the area (ge
 
 def float_tiff(b):
     """One band of 32-bit floats from an uncompressed TIFF, strips or tiles, either byte order: (width,
-    height, values row by row from the top, no-data value or None). OpenFPS.Server/OneWorld/Elevation.cs
+    height, values row by row from the top, no-data value or None). OpenFPS.World/OneWorld/Elevation.cs
     FloatTiff reads the same answers."""
     import struct
     le = b[:2] == b"II"

@@ -100,6 +100,7 @@ FILE_RULES = [
     ('OpenFPS.Geometry/*', 'Geometry', ''), ('OpenFPS.Materials/*', 'Materials', ''), ('OpenFPS.Astronomy/*', 'Astronomy', ''),
     ('OpenFPS.Physics/*', 'Physics', ''), ('OpenFPS.Acoustics/*', 'Acoustics', ''), ('OpenFPS.Models/*', 'Models', ''),
     ('OpenFPS.Accessibility/*', 'Accessibility', ''),
+    ('OpenFPS.World/*', 'World', ''),
 
     # ── Common ──
     ('OpenFPS.Common/AudioEmission.cs', 'Common', 'where a thing sounds from, from values (library stage 6); moves with the second half'),
@@ -107,7 +108,6 @@ FILE_RULES = [
     ('OpenFPS.Common/Components.cs', 'Common', 'wire and entity model'),
     ('OpenFPS.Common/DistantMotion.cs', 'Common', 'how sent states are carried between packets'),
     ('OpenFPS.Common/DrivingCuePlanner.cs', 'Accessibility', 'the driver\'s cues, planned'),
-    ('OpenFPS.Common/EntityType.cs', 'World', 'what a thing is, in a prefab, a map and a definition: on the wire by number'),
     ('OpenFPS.Common/EntityAcoustics.cs', 'Common', 'entity adapter: rooms, openings and the sound\'s world input'),
     ('OpenFPS.Common/EntityEmission.cs', 'Common', 'entity adapter: where an entity sounds from'),
     ('OpenFPS.Common/EntityGeometry.cs', 'Common', 'entity adapter: geometry'),
@@ -120,12 +120,8 @@ FILE_RULES = [
     ('OpenFPS.Common/PhysicsUtils.cs', 'Common', 'entity adapter: the ground probes of a world and of a snapshot (the question: Footing)'),
     ('OpenFPS.Common/PhysicsViews.cs', 'Common', 'entity adapter: a world and a snapshot as the physics sees them (IPhysicsWorld)'),
     ('OpenFPS.Common/RaceLine.cs', 'Agents', 'speeds along a line'),
-    ('OpenFPS.Common/RoadMapData.cs', 'World', 'roads as sent to a driver'),
-    ('OpenFPS.Common/Roads.cs', 'World', 'roads as a map declares them'),
     ('OpenFPS.Common/Scopes.cs', 'game', 'the scope\'s maths and sway (what a scope is: OpenFPS.Models)'),
     ('OpenFPS.Common/StatePacking.cs', 'Common', 'wire'),
-    ('OpenFPS.Common/Tiles.cs', 'World', 'tile detail and streaming radii'),
-    ('OpenFPS.Common/TrackClearance.cs', 'World', 'a map\'s drive route checked at load'),
     ('OpenFPS.Common/UpdateThrottle.cs', 'Common', 'a fixed-rate gate'),
     ('OpenFPS.Common/WorldSnapshot.cs', 'Common', 'the client\'s world for one frame'),
 
@@ -177,7 +173,6 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/*', 'game', ''),
 
     # ── Server ──
-    ('OpenFPS.Server/Water/SurfaceRaster.cs', 'World', 'what covers the ground, as the rain sees it, from boxes'),
     ('OpenFPS.Server/Water/DrainageNetwork.cs', 'Environment', 'a map\'s drainage from its tiles\''),
     ('OpenFPS.Server/Systems/GroundWaterSystem.cs', 'Environment', 'the water on the ground, by map'),
     ('OpenFPS.Server/Systems/VehicleSystem.Following.cs', 'Agents', 'the gap to the car in front (IDM): extract from the partial class'),
@@ -185,7 +180,6 @@ FILE_RULES = [
     ('OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs', 'Agents', 'where a walker crosses a road: extract'),
     ('OpenFPS.Server/Systems/VehicleSystem.Routes.cs', 'Agents', 'tours of lanes from the road network: extract'),
     ('OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs', 'Agents', 'the street\'s random events: extract'),
-    ('OpenFPS.Server/Core/TerrainBuilder.cs', 'World', 'grading the survey; its entity making is the host\'s'),
     ('OpenFPS.Server/Editor/EntitySettings.cs', 'Editor', ''),
     ('OpenFPS.Server/Editor/LiveState.cs', 'Editor', ''),
     ('OpenFPS.Server/Editor/MapOverlay.cs', 'Editor', ''),
@@ -212,20 +206,11 @@ FILE_RULES = [
     ('OpenFPS.Server/Editor/*', 'game', 'host: the editor\'s commands over sessions and maps'),
     ('OpenFPS.Server/Core/MapTiles.cs', 'game', 'host: adapts entities to World\'s tiles'),
     ('OpenFPS.Server/Core/TerrainTiles.cs', 'game', 'host: World\'s terrain as entities'),
-    ('OpenFPS.Server/Core/TerrainBuilder.cs', 'game', 'host: World\'s terrain as entities'),
     ('OpenFPS.Server/Core/TileStreamer.cs', 'game', 'host: World\'s tiles to each session'),
     ('OpenFPS.Server/Core/MapTemplates.cs', 'game', 'host'),
     ('OpenFPS.Server/OneWorld/WorldMaps.cs', 'game', 'host: sessions arriving in World\'s places'),
     ('OpenFPS.Server/OneWorld/WorldPlaces.cs', 'game', 'host: places laid on World\'s tiles as entities'),
     ('OpenFPS.Server/Repositories/PrefabRepository.cs', 'game', 'host: World\'s prefabs made into entities'),
-    ('OpenFPS.Server/OneWorld/*', 'World', ''),
-    ('OpenFPS.Server/Core/MapRoadsBuilder.cs', 'World', ''),
-    ('OpenFPS.Server/Repositories/MapElevation.cs', 'World', ''),
-    ('OpenFPS.Server/Repositories/MapRepository.cs', 'World', 'the map file format'),
-    ('OpenFPS.Server/Repositories/PrefabTemplate.cs', 'World', 'the prefab format'),
-    ('OpenFPS.Server/Repositories/PrefabLibrary.cs', 'World', 'the prefab files, loaded and checked'),
-    ('OpenFPS.Server/Repositories/PrefabValidator.cs', 'World', ''),
-    ('OpenFPS.Server/Repositories/CompositeRepository.cs', 'World', 'composite templates and placements: map data'),
     ('OpenFPS.Server/*', 'game', ''),
 ]
 
@@ -242,7 +227,7 @@ TYPE_RULES = {
 }
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',
-                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.Common',
+                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.World', 'OpenFPS.Common',
                    'OpenFPS.Accessibility',
                    'OpenFPS.Client.Core', 'OpenFPS.Server')
 USERS = ('OpenFPS.Server', 'OpenFPS.Client.Core', 'OpenFPS.Client', 'OpenFPS.Client.Gtk', 'OpenFPS.AudioLab',
@@ -303,7 +288,7 @@ def hashed(path):
     if path.startswith('OpenFPS.Common/'):
         return True
     for pre in ('OpenFPS.Geometry/', 'OpenFPS.Materials/', 'OpenFPS.Acoustics/', 'OpenFPS.Schema/', 'OpenFPS.Physics/',
-                'OpenFPS.Models/'):
+                'OpenFPS.Models/', 'OpenFPS.World/'):
         if path.startswith(pre):
             return True
     return path.startswith('OpenFPS.Sound/') and not path.startswith('OpenFPS.Sound/Core/')
