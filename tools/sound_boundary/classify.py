@@ -57,6 +57,7 @@ FILE_RULES = [
     # Not the library's: how a player who cannot see is told the world (docs/ENGINE_PACKAGES.md, stage 7).
     ('OpenFPS.Accessibility/', 'b', '', 'docs/ENGINE_PACKAGES.md, stage 7'),
     ('OpenFPS.World/', 'b', '', 'maps and the one world: docs/ENGINE_PACKAGES.md, stage 4'),
+    ('OpenFPS.Editor/', 'b', '', 'the world editor\'s model: docs/ENGINE_PACKAGES.md, stage 8'),
     # Synthesis: managed, no FMOD (in OpenFPS.Sound/Core since stage 3; the runtime's five went to OpenFPS.Audio/Core)
     (CC + 'AudioEngine/Core/', 'a', 'Sound', 'synthesis'),
     # Integration files: what of them is library and what is open-fps's adapter
@@ -172,7 +173,7 @@ ALLOWED = {
 SCANNED = ('OpenFPS.Common', 'OpenFPS.Client.Core', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Acoustics', 'OpenFPS.Sound',
            'OpenFPS.Models',
            'OpenFPS.Native', 'OpenFPS.Audio', 'OpenFPS.Schema', 'OpenFPS.Physics', 'OpenFPS.Accessibility',
-           'OpenFPS.World', 'OpenFPS.Environment')
+           'OpenFPS.World', 'OpenFPS.Environment', 'OpenFPS.Editor')
 
 
 def classify(t):

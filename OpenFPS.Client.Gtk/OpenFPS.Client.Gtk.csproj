@@ -13,6 +13,8 @@
     <ProjectReference Include="..\OpenFPS.Client.Core\OpenFPS.Client.Core.csproj" />
     <!-- The key map maps GTK's keys to the game's, and the speech output is Accessibility's. -->
     <ProjectReference Include="..\OpenFPS.Accessibility\OpenFPS.Accessibility.csproj" />
+    <!-- The world editor's dialog and forms, which this head draws (docs/ENGINE_PACKAGES.md, stage 8). -->
+    <ProjectReference Include="..\OpenFPS.Editor\OpenFPS.Editor.csproj" />
   </ItemGroup>
 
   <ItemGroup>

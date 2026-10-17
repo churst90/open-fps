@@ -103,6 +103,7 @@ FILE_RULES = [
     ('OpenFPS.World/*', 'World', ''),
     ('OpenFPS.Audio/*', 'Audio', ''),
     ('OpenFPS.Environment/*', 'Environment', ''),
+    ('OpenFPS.Editor/*', 'Editor', ''),
 
     # ── Common ──
     ('OpenFPS.Common/AudioEvents.cs', 'Common', 'wire'),
@@ -149,10 +150,6 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/WallBumps.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/MapTracker.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/ListeningCalibration.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/EditorDialog.cs', 'Editor', ''),
-    ('OpenFPS.Client.Core/EditorKeys.cs', 'Editor', ''),
-    ('OpenFPS.Client.Core/EditorValuePrompt.cs', 'Editor', ''),
-    ('OpenFPS.Client.Core/BuildForm.cs', 'Editor', ''),
     ('OpenFPS.Client.Core/*', 'game', ''),
 
     # ── Server ──
@@ -161,15 +158,6 @@ FILE_RULES = [
     ('OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs', 'Agents', 'where a walker crosses a road: extract'),
     ('OpenFPS.Server/Systems/VehicleSystem.Routes.cs', 'Agents', 'tours of lanes from the road network: extract'),
     ('OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs', 'Agents', 'the street\'s random events: extract'),
-    ('OpenFPS.Server/Editor/EntitySettings.cs', 'Editor', ''),
-    ('OpenFPS.Server/Editor/LiveState.cs', 'Editor', ''),
-    ('OpenFPS.Server/Editor/MapOverlay.cs', 'Editor', ''),
-    ('OpenFPS.Server/Editor/MapVersions.cs', 'Editor', ''),
-    ('OpenFPS.Server/Editor/EditorKinds.cs', 'Editor', 'the kinds the editor edits'),
-    ('OpenFPS.Server/Editor/ModelStore.cs', 'Editor', ''),
-    ('OpenFPS.Server/Editor/OverlayRoute.cs', 'Editor', ''),
-    ('OpenFPS.Server/Editor/Pose.cs', 'Editor', 'where a placed thing is: LiveState and the undo stack read it'),
-    ('OpenFPS.Server/Core/BuildSession.cs', 'Editor', ''),
     # The server's hosts: they step a package or adapt the entities to it, and stay.
     ('OpenFPS.Server/Systems/VehicleSystem*.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/CrowdSystem.cs', 'game', 'host: steps Agents'),
@@ -208,7 +196,7 @@ TYPE_RULES = {
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',
                    'OpenFPS.Physics', 'OpenFPS.Environment', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.Audio', 'OpenFPS.World',
                    'OpenFPS.Common',
-                   'OpenFPS.Accessibility',
+                   'OpenFPS.Accessibility', 'OpenFPS.Editor',
                    'OpenFPS.Client.Core', 'OpenFPS.Server')
 USERS = ('OpenFPS.Server', 'OpenFPS.Client.Core', 'OpenFPS.Client', 'OpenFPS.Client.Gtk', 'OpenFPS.AudioLab',
          'OpenFPS.Tests')

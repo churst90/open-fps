@@ -114,7 +114,6 @@ OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	Audio
 OpenFPS.Client.Core/AudioDiagnostics.cs	game	
 OpenFPS.Client.Core/BeaconAids.cs	Accessibility	
 OpenFPS.Client.Core/BirdLife.cs	game	library stage 7 (host until split)
-OpenFPS.Client.Core/BuildForm.cs	Editor	
 OpenFPS.Client.Core/ClientAudioPaths.cs	game	
 OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	game	library stage 7 (host until split)
 OpenFPS.Client.Core/ClientAudioSystem.Voices.cs	game	library stage 7 (host until split)
@@ -126,9 +125,6 @@ OpenFPS.Client.Core/ClientSettings.cs	game
 OpenFPS.Client.Core/ClientWorldState.cs	game	
 OpenFPS.Client.Core/DiagnosticSwitches.cs	game	
 OpenFPS.Client.Core/DrivingAids.cs	Accessibility	
-OpenFPS.Client.Core/EditorDialog.cs	Editor	
-OpenFPS.Client.Core/EditorKeys.cs	Editor	
-OpenFPS.Client.Core/EditorValuePrompt.cs	Editor	
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	game	
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	game	
 OpenFPS.Client.Core/LocalPlayerController.cs	game	
@@ -189,6 +185,19 @@ OpenFPS.Common/Scopes.cs	game	the scope's maths and sway (what a scope is: OpenF
 OpenFPS.Common/StatePacking.cs	Common	wire
 OpenFPS.Common/UpdateThrottle.cs	Common	a fixed-rate gate
 OpenFPS.Common/WorldSnapshot.cs	Common	the client's world for one frame
+OpenFPS.Editor/BuildForm.cs	Editor	
+OpenFPS.Editor/BuildSession.cs	Editor	
+OpenFPS.Editor/EditorDialog.cs	Editor	
+OpenFPS.Editor/EditorKeys.cs	Editor	
+OpenFPS.Editor/EditorKinds.cs	Editor	
+OpenFPS.Editor/EditorValuePrompt.cs	Editor	
+OpenFPS.Editor/EntitySettings.cs	Editor	
+OpenFPS.Editor/LiveState.cs	Editor	
+OpenFPS.Editor/MapOverlay.cs	Editor	
+OpenFPS.Editor/MapVersions.cs	Editor	
+OpenFPS.Editor/ModelStore.cs	Editor	
+OpenFPS.Editor/OverlayRoute.cs	Editor	
+OpenFPS.Editor/Pose.cs	Editor	
 OpenFPS.Environment/AirLayers.cs	Environment	
 OpenFPS.Environment/Fire.cs	Environment	
 OpenFPS.Environment/FireShape.cs	Environment	
@@ -291,7 +300,6 @@ OpenFPS.Server/Core/AuthService.cs	game
 OpenFPS.Server/Core/Bans.cs	game	
 OpenFPS.Server/Core/Bodies.cs	game	
 OpenFPS.Server/Core/BoundedLineReader.cs	game	
-OpenFPS.Server/Core/BuildSession.cs	Editor	
 OpenFPS.Server/Core/CombatService.AdminGun.cs	game	
 OpenFPS.Server/Core/CombatService.cs	game	
 OpenFPS.Server/Core/CommandCatalog.cs	game	
@@ -341,14 +349,6 @@ OpenFPS.Server/Core/TileStreamer.cs	game	host: World's tiles to each session
 OpenFPS.Server/Core/UserSession.cs	game	
 OpenFPS.Server/Core/VehicleShell.cs	game	
 OpenFPS.Server/Core/WireCheck.cs	game	
-OpenFPS.Server/Editor/EditorKinds.cs	Editor	the kinds the editor edits
-OpenFPS.Server/Editor/EntitySettings.cs	Editor	
-OpenFPS.Server/Editor/LiveState.cs	Editor	
-OpenFPS.Server/Editor/MapOverlay.cs	Editor	
-OpenFPS.Server/Editor/MapVersions.cs	Editor	
-OpenFPS.Server/Editor/ModelStore.cs	Editor	
-OpenFPS.Server/Editor/OverlayRoute.cs	Editor	
-OpenFPS.Server/Editor/Pose.cs	Editor	where a placed thing is: LiveState and the undo stack read it
 OpenFPS.Server/Editor/WorldEditor.Build.cs	game	host: the editor's commands over sessions and maps
 OpenFPS.Server/Editor/WorldEditor.Changed.cs	game	host: the editor's commands over sessions and maps
 OpenFPS.Server/Editor/WorldEditor.Dialog.cs	game	host: the editor's commands over sessions and maps

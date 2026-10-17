@@ -108,7 +108,6 @@ OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	lib	Audio
 OpenFPS.Client.Core/AudioDiagnostics.cs	host		
 OpenFPS.Client.Core/BeaconAids.cs	host		
 OpenFPS.Client.Core/BirdLife.cs	host		
-OpenFPS.Client.Core/BuildForm.cs	host		
 OpenFPS.Client.Core/ClientAudioPaths.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.Voices.cs	host		
@@ -120,9 +119,6 @@ OpenFPS.Client.Core/ClientSettings.cs	host
 OpenFPS.Client.Core/ClientWorldState.cs	host		
 OpenFPS.Client.Core/DiagnosticSwitches.cs	host		
 OpenFPS.Client.Core/DrivingAids.cs	host		
-OpenFPS.Client.Core/EditorDialog.cs	host		
-OpenFPS.Client.Core/EditorKeys.cs	host		
-OpenFPS.Client.Core/EditorValuePrompt.cs	host		
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	host		
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	host		
 OpenFPS.Client.Core/LocalPlayerController.cs	host		
@@ -183,6 +179,19 @@ OpenFPS.Common/Scopes.cs	host
 OpenFPS.Common/StatePacking.cs	host		
 OpenFPS.Common/UpdateThrottle.cs	host		
 OpenFPS.Common/WorldSnapshot.cs	host		
+OpenFPS.Editor/BuildForm.cs	host		
+OpenFPS.Editor/BuildSession.cs	host		
+OpenFPS.Editor/EditorDialog.cs	host		
+OpenFPS.Editor/EditorKeys.cs	host		
+OpenFPS.Editor/EditorKinds.cs	host		
+OpenFPS.Editor/EditorValuePrompt.cs	host		
+OpenFPS.Editor/EntitySettings.cs	host		
+OpenFPS.Editor/LiveState.cs	host		
+OpenFPS.Editor/MapOverlay.cs	host		
+OpenFPS.Editor/MapVersions.cs	host		
+OpenFPS.Editor/ModelStore.cs	host		
+OpenFPS.Editor/OverlayRoute.cs	host		
+OpenFPS.Editor/Pose.cs	host		
 OpenFPS.Environment/AirLayers.cs	lib	Environment	
 OpenFPS.Environment/Fire.cs	lib	Environment	
 OpenFPS.Environment/FireShape.cs	lib	Environment	

@@ -15,12 +15,13 @@ namespace OpenFPS.Tests;
 public class LibraryBoundaryTests
 {
     /// <summary>The projects whose files are sorted: the two the library is leaving, the library's own, and
-    /// OpenFPS.Accessibility, all host, which took files from the first two (docs/ENGINE_PACKAGES.md, stage 7).</summary>
+    /// OpenFPS.Accessibility, OpenFPS.World and OpenFPS.Editor, all host, which took files from the first two
+    /// and the server (docs/ENGINE_PACKAGES.md, stages 7, 4 and 8).</summary>
     internal static readonly string[] SortedProjects =
     {
         "OpenFPS.Common", "OpenFPS.Client.Core",
         "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Schema",
-        "OpenFPS.Physics", "OpenFPS.Accessibility", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Environment",
+        "OpenFPS.Physics", "OpenFPS.Accessibility", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Environment", "OpenFPS.Editor",
     };
 
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")

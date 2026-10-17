@@ -13,6 +13,8 @@
     <ProjectReference Include="..\OpenFPS.Words\OpenFPS.Words.csproj" />
     <!-- The keys, the speech output and the aids that read no world (docs/ENGINE_PACKAGES.md, stage 7). -->
     <ProjectReference Include="..\OpenFPS.Accessibility\OpenFPS.Accessibility.csproj" />
+    <!-- The world editor's dialogs and forms (docs/ENGINE_PACKAGES.md, stage 8): the session opens them. -->
+    <ProjectReference Include="..\OpenFPS.Editor\OpenFPS.Editor.csproj" />
     <!-- FMOD's wrapper and the Steam Audio bindings (docs/SOUND_LIBRARY_BOUNDARY.md, stage 1). -->
     <ProjectReference Include="..\OpenFPS.Native\OpenFPS.Native.csproj" />
     <!-- The sound library's runtime: the mixer, Steam Audio, the acoustic worker (stage 6). This project is its host. -->

@@ -11,7 +11,7 @@ namespace OpenFPS.Server.Editor;
 /// new version of its prefab or model does not shut an open door, light a fire again or start a machine
 /// that was off. Only running state is carried; everything the model says comes from the new one.
 /// </summary>
-internal readonly record struct LiveState(DoorComponent? Door, bool Parented, SoundEmitterComponent? Emitter, HealthComponent? Health)
+public readonly record struct LiveState(DoorComponent? Door, bool Parented, SoundEmitterComponent? Emitter, HealthComponent? Health)
 {
     public static LiveState Of(World world, Entity e) => new(
         world.Has<DoorComponent>(e) ? world.Get<DoorComponent>(e) : null,

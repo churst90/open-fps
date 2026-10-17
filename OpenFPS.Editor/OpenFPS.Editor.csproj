@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The world editor's model (docs/ENGINE_PACKAGES.md, 3.7 and stage 8): the kinds it edits (EditorKinds), each
+       model's versions (ModelStore), a map's edits as state laid over its data (MapOverlay, OverlayRoute) and
+       their versions (MapVersions), a placed thing's own settings and running state (EntitySettings,
+       LiveState, Pose), a build in hand (BuildSession), and the dialogs and forms a head draws (EditorDialog,
+       EditorValuePrompt, BuildForm) with the editor's keys (EditorKeys). It is the top of the packages: it reads
+       Common, whose messages carry the editor's menus and models, World, the catalogue and the keys.
+
+       Its hosts stay in the game: the server's WorldEditor (the commands over sessions and maps), which hands
+       the overlay the map's data and how a map setting, a route and a parked vehicle are laid (OverlayLaying),
+       and the client's session, which opens the dialogs. It is not in the wire hash (decision 11).
+       Namespaces are those the files had (OpenFPS.Server.Editor, OpenFPS.Server.Core, OpenFPS.Client.Core),
+       as for the other packages' moves. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Words\OpenFPS.Words.csproj" />
+    <ProjectReference Include="..\OpenFPS.Schema\OpenFPS.Schema.csproj" />
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
+    <ProjectReference Include="..\OpenFPS.Environment\OpenFPS.Environment.csproj" />
+    <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />
+    <ProjectReference Include="..\OpenFPS.World\OpenFPS.World.csproj" />
+    <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
+    <ProjectReference Include="..\OpenFPS.Accessibility\OpenFPS.Accessibility.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A placed thing's settings and running state are its components. -->
+    <PackageReference Include="Arch" Version="2.1.0" />
+    <!-- An overlay, a map version or a model version that will not read or write is logged. -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests and the lab reach the overlay's and the dialogs' hooks, as they did in the server and the client. -->
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+  </ItemGroup>
+
+</Project>

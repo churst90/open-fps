@@ -237,7 +237,7 @@ public sealed class MapOverlayStore
     }
 
     /// <summary>An overlay laid over a map's data: what loading does, and what baking writes into a file.</summary>
-    internal static void Lay(MapData map, MapOverlay o, OverlayLaying laying)
+    public static void Lay(MapData map, MapOverlay o, OverlayLaying laying)
     {
         if (o.IsEmpty) return;
 
@@ -321,7 +321,7 @@ public sealed class MapOverlayStore
     /// where the entry says the file had it (or already where the change put it); otherwise any thing of
     /// that prefab at that place; otherwise none.
     /// </summary>
-    internal static EntityData? Find(MapData map, Dictionary<int, EntityData> byId, int id, string prefab, Vector3 was, Vector3? now)
+    public static EntityData? Find(MapData map, Dictionary<int, EntityData> byId, int id, string prefab, Vector3 was, Vector3? now)
     {
         bool Same(EntityData e, Vector3 at) => e.PrefabId.Equals(prefab, StringComparison.OrdinalIgnoreCase)
                                               && Vector3.Distance(e.Position, at) <= FindTolerance;

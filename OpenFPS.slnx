@@ -8,6 +8,7 @@
   <Project Path="OpenFPS.Client.Core/OpenFPS.Client.Core.csproj" />
   <Project Path="OpenFPS.Client.Gtk/OpenFPS.Client.Gtk.csproj" />
   <Project Path="OpenFPS.Common/OpenFPS.Common.csproj" />
+  <Project Path="OpenFPS.Editor/OpenFPS.Editor.csproj" />
   <Project Path="OpenFPS.Environment/OpenFPS.Environment.csproj" />
   <Project Path="OpenFPS.Geometry/OpenFPS.Geometry.csproj" />
   <Project Path="OpenFPS.Materials/OpenFPS.Materials.csproj" />
