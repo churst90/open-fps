@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json.Serialization;
-using OpenFPS.Common.Editing;
+using OpenFPS.Schema;
 using OpenFPS.Acoustics;
 using OpenFPS.Common;
 

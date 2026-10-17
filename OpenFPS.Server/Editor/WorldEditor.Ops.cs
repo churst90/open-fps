@@ -10,6 +10,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Words;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Schema;
 
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 

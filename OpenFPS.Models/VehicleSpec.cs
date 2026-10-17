@@ -1,4 +1,4 @@
-using OpenFPS.Common.Editing;
+using OpenFPS.Schema;
 using OpenFPS.Sound;
 
 namespace OpenFPS.Common;

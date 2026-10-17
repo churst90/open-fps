@@ -10,6 +10,7 @@ using OpenFPS.Server.Editor;
 using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
+using OpenFPS.Schema;
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 using Rig = OpenFPS.Tests.WorldEditorTests.Rig;
 

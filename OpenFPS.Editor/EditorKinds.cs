@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using OpenFPS.Common;
 using OpenFPS.Common.Editing;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Schema;
 
 namespace OpenFPS.Server.Editor;
 

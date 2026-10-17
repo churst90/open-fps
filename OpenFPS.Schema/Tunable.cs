@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Editing;
+namespace OpenFPS.Schema;
 
 /// <summary>
 /// Says what a property of a model is, for the world editor (docs/WORLD_EDITOR.md section 4): its

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json.Nodes;
+using OpenFPS.Schema;
 
 namespace OpenFPS.Common.Editing;
 

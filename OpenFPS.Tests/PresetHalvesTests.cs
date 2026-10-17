@@ -4,6 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Editing;
 using Xunit.Abstractions;
 using OpenFPS.Sound;
+using OpenFPS.Schema;
 
 namespace OpenFPS.Tests;
 

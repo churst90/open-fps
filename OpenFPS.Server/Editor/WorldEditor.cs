@@ -7,6 +7,7 @@ using OpenFPS.Common.Editing;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Words;
+using OpenFPS.Schema;
 
 
 namespace OpenFPS.Server.Editor;

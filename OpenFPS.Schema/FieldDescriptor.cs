@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace OpenFPS.Common.Editing;
+namespace OpenFPS.Schema;
 
 /// <summary>What kind of value a field holds, which decides how it is typed in and checked.</summary>
 public enum FieldType : byte

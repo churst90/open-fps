@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using OpenFPS.Common.Editing;
+using OpenFPS.Schema;
 
 namespace OpenFPS.Sound;
 

@@ -6,7 +6,7 @@
        settings all read. The physics' presets (a gearbox, a chassis) and the sound's are both read by the
        world editor's schema, and the physics may not reference the sound. It references no other project.
 
-       The namespace is the one both had in OpenFPS.Sound (OpenFPS.Common.Editing). -->
+       Namespace OpenFPS.Schema, the project's (docs/SOUND_LIBRARY_BOUNDARY.md 21). -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

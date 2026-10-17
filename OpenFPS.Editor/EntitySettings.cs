@@ -4,6 +4,7 @@ using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Editing;
+using OpenFPS.Schema;
 
 namespace OpenFPS.Server.Editor;
 

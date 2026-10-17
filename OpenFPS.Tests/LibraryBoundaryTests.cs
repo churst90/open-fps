@@ -292,7 +292,7 @@ public class LibraryBoundaryTests
         new object[] { typeof(OpenFPS.Sound.Loudness).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "MemoryPack.Core", "Serilog" } },
         // The editor's attribute on a model's property, and the field it describes: nothing but the runtime.
-        new object[] { typeof(OpenFPS.Common.Editing.TunableAttribute).Assembly.GetName().Name!, Array.Empty<string>() },
+        new object[] { typeof(OpenFPS.Schema.TunableAttribute).Assembly.GetName().Name!, Array.Empty<string>() },
         // The catalogue (docs/ENGINE_PACKAGES.md, stage 2): above the sound, which it hands out. Serilog: a pane
         // that declares no glazing is logged.
         new object[] { typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name!,

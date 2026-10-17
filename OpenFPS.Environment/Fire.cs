@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Editing;
+using OpenFPS.Schema;
 
 namespace OpenFPS.Common;
 

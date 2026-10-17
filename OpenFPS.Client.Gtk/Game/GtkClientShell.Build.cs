@@ -2,7 +2,7 @@ using Gtk;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Input;
 using OpenFPS.Client.Core.Platform;
-using OpenFPS.Common.Editing;
+using OpenFPS.Schema;
 
 namespace OpenFPS.Client.Gtk.Game;
 

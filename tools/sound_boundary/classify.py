@@ -267,7 +267,7 @@ def short(t):
     return t.replace('OpenFPS.Client.AudioEngine.', '').replace('OpenFPS.Client.Core.AudioEngine.', '') \
         .replace('OpenFPS.Client.Core.', '').replace('OpenFPS.Common.', '') \
         .replace('OpenFPS.Geometry.', '').replace('OpenFPS.Acoustics.', '').replace('OpenFPS.Sound.', '') \
-        .replace('OpenFPS.Native.', '').replace('OpenFPS.Audio.', '').replace('OpenFPS.', '')
+        .replace('OpenFPS.Native.', '').replace('OpenFPS.Audio.', '').replace('OpenFPS.Schema.', '').replace('OpenFPS.', '')
 
 
 def fileshort(f):

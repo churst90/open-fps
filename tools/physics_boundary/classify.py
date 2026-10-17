@@ -188,7 +188,7 @@ def allowed_for_physics(t):
 
 
 def short(t):
-    for p in ('OpenFPS.Geometry.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
+    for p in ('OpenFPS.Geometry.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
               'OpenFPS.Sound.Core.Engine.', 'OpenFPS.Server.Systems.', 'OpenFPS.Server.Core.',
               'OpenFPS.Client.Core.'):
         if t.startswith(p):

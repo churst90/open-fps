@@ -186,7 +186,7 @@ public class EnginePackagesTests
     public static IEnumerable<object[]> PackageAssemblies() => new[]
     {
         new object[] { "Words", typeof(OpenFPS.Words.CompassWords).Assembly.GetName().Name! },
-        new object[] { "Schema", typeof(OpenFPS.Common.Editing.TunableAttribute).Assembly.GetName().Name! },
+        new object[] { "Schema", typeof(OpenFPS.Schema.TunableAttribute).Assembly.GetName().Name! },
         new object[] { "Geometry", typeof(OpenFPS.Geometry.TriangleWorld).Assembly.GetName().Name! },
         new object[] { "Native", typeof(FMOD.System).Assembly.GetName().Name! },
         new object[] { "Astronomy", typeof(OpenFPS.Astronomy.Moon).Assembly.GetName().Name! },

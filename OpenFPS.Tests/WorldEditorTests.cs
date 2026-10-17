@@ -12,6 +12,7 @@ using OpenFPS.Server.Editor;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
+using OpenFPS.Schema;
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 
 namespace OpenFPS.Tests;
