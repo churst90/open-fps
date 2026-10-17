@@ -47,6 +47,7 @@ public class AudioSourcesTests
                 var t when t == typeof(bool) => !(bool)field.GetValue(boxed)!,
                 var t when t == typeof(string) => "s" + n,
                 var t when t == typeof(Vector3) => new Vector3(n, n + 1, n + 2),
+                var t when t == typeof(Vector3[]) => new[] { new Vector3(n, 0f, 0f), new Vector3(n + 1, 0f, n + 2) },
                 var t when t == typeof(PlaybackMode) => PlaybackMode.Sequential,
                 var t => throw new InvalidOperationException($"no test value for {t.Name} {field.Name}"),
             };
@@ -65,7 +66,12 @@ public class AudioSourcesTests
         foreach (var field in EmitterFields())
         {
             var twin = typeof(SourceSpec).GetProperty(field.Name)!;
-            Assert.True(Equals(field.GetValue(emitter), twin.GetValue(spec)),
+            object? mine = field.GetValue(emitter), theirs = twin.GetValue(spec);
+            // A line is compared point by point: a copy of its points is as good as its own array.
+            bool same = mine is Vector3[] points && theirs is Vector3[] copied
+                ? points.AsSpan().SequenceEqual(copied)
+                : Equals(mine, theirs);
+            Assert.True(same,
                         $"{field.Name}: the component has {field.GetValue(emitter)}, the spec {twin.GetValue(spec)}");
         }
         Assert.Equal(ColliderShape.Cylinder, spec.Shape);
