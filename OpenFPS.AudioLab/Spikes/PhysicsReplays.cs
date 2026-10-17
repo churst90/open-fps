@@ -150,7 +150,7 @@ public static partial class PhysicsReplays
         new("magnolia_slope_up", "magnolia_tx", new(-66.2f, 218.2f, float.NaN), 0f, "-15 w140 -10",
             "up the steepest smooth ground near the spawn: 2.1 m in 30 m (--physics-replay hills)"),
         new("magnolia_slope_down", "magnolia_tx", new(-66.2f, 248.2f, float.NaN), 180f, "-15 tw10 -10 W60 -10", "down it, in taps and then running"),
-        new("city_bus_roof", "city", new(73f, 131f, 3.3f), 90f, "-15 tw4 -10 w40 -30",
+        new("city_bus_roof", "city", new(73f, 131f, 3.3f), 90f, "-15 tw4 -10 w75 -30",
             "standing on a bus's roof at a stop, four taps along it, then off its east end: three metres down")
         {
             Props = new[] { new Prop("bus", new Vector3(76f, 1.65f, 131f), new Vector3(12f, 3.2f, 2.5f), "Metal") },
