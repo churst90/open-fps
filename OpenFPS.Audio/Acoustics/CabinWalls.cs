@@ -19,17 +19,20 @@ public sealed class CabinWalls
     /// 0 shut to 1 fully down. A vehicle seen for the first time has its windows where they were going: a
     /// car that drove up with them down did not just roll them down.
     /// </summary>
-    public float WindowsOpen(AcousticBody car, double now)
+    public float WindowsOpen(AcousticBody car, double now) => WindowsOpen(car.Id, car.WindowsOpen, now);
+
+    /// <summary>The same, for vehicle <paramref name="id"/> whose windows are going to <paramref name="target"/>.</summary>
+    public float WindowsOpen(int id, float target, double now)
     {
-        float target = Math.Clamp(car.WindowsOpen, 0f, 1f);
-        if (!_windows.TryGetValue(car.Id, out var w))
+        target = Math.Clamp(target, 0f, 1f);
+        if (!_windows.TryGetValue(id, out var w))
         {
-            _windows[car.Id] = (target, now);
+            _windows[id] = (target, now);
             return target;
         }
         float dt = (float)Math.Max(0.0, now - w.At);
         float open = CarWindow.Glide(w.Open, target, dt);
-        _windows[car.Id] = (open, now);
+        _windows[id] = (open, now);
         return open;
     }
 
@@ -42,7 +45,10 @@ public sealed class CabinWalls
     }
 
     /// <summary>The vehicle profile a thing is voiced as, or null for anything that is not a vehicle.</summary>
-    public static VehicleProfile? Vehicle(AcousticBody body) => ModelKindTable.Vehicle(body.SoundId);
+    public static VehicleProfile? Vehicle(AcousticBody body) => Vehicle(body.SoundId);
+
+    /// <summary>The vehicle profile a sound id names, or null.</summary>
+    public static VehicleProfile? Vehicle(string? soundId) => ModelKindTable.Vehicle(soundId);
 
     /// <summary>Whether a vehicle has a closed cabin at all: a motorcycle and a formula car do not.</summary>
     public static bool HasCabin(VehicleProfile v)

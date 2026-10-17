@@ -46,6 +46,9 @@ public partial class ClientAudioSystem
     }
     
     private WorldSnapshot? _lastSnapshot;
+
+    /// <summary>This frame's sources, from the snapshot: what the audio world reads of the entities.</summary>
+    private readonly SnapshotSources _sources = new();
     private AcousticMap? _lastAcousticMap;
     private int _frameCount = 0;
 
@@ -368,6 +371,8 @@ public partial class ClientAudioSystem
         _acoustics = new SpatialAcoustics { Clock = audio.Clock, Atmosphere = audio.Atmosphere };
         // After the acoustics, which it needs: a beacon behind a wall is not blipped.
         _beacons = new BeaconAids(audio, beacons, acoustics: _acoustics);
+        // A placed beacon whose category is off has no voice.
+        _sources.Silenced = def => def.Type == EntityType.Beacon && !_beacons.IsOn(def.Identity.BeaconCategory);
         // Shares this system's acoustics, so a rendered latch takes exactly the path a recorded one would.
         WorldAudio = new WorldAudioPlayer(_audio, _acoustics, prewarm: prewarm && !manualAcoustics);
         WorldAudio.HornReceived = StartHorn;
@@ -552,6 +557,7 @@ public partial class ClientAudioSystem
         // the same object (an unchanged world), and a zero delta is then right.
         var previous = _lastSnapshot;
         _lastSnapshot = world;
+        _sources.Refill(world);
         _acousticWorker.UpdateWorld(world);
 
         // A position stamped after now was stamped on another clock: its age, and so where the mixer reckons
@@ -851,19 +857,19 @@ public partial class ClientAudioSystem
 
         Stage(2, ref stageTicks);     // 5.5: who gets a voice
 
-        foreach (var entityId in world.AudioEntityIds)
+        foreach (var entityId in _sources.Audible)
         {
             if (entityId == OwnEntityId) continue;
-            if (world.Entities.TryGetValue(entityId, out var snap))
+            if (_sources.TryGet(entityId, out var src))
             {
-                // A placed beacon whose category is off (by the map or by you). Doors, items and cars
-                // are BeaconAids'.
-                if (snap.Definition.Type == EntityType.Beacon && !_beacons.IsOn(snap.Definition.Identity.BeaconCategory))
+                // Switched off by the host: a placed beacon whose category is off (by the map or by you).
+                // Doors, items and cars are BeaconAids'.
+                if (src.Silenced)
                 {
                     _voices.Stop(entityId);
                     continue;
                 }
-                ProcessAudioEmitter(world, snap, visualEyePos, engineDt);
+                ProcessAudioEmitter(world, src, visualEyePos, engineDt);
             }
         }
         RetireSpreading();
@@ -1071,12 +1077,17 @@ public partial class ClientAudioSystem
     /// Memoised: asked several times a frame per source.
     /// </summary>
     private string VoiceKey(OpenFPS.Common.Networking.EntityDefinition def)
+        => VoiceKey(def.SoundEmitter.SoundId, def.Collider.Shape, def.Collider.Size);
+
+    private string VoiceKey(in SourceSpec spec) => VoiceKey(spec.SoundId, spec.Shape, spec.Size);
+
+    private string VoiceKey(string? soundId, OpenFPS.Common.Components.ColliderShape shape, Vector3 size)
     {
-        string id = def.SoundEmitter.SoundId ?? "";
+        string id = soundId ?? "";
         if (!OpenFPS.Common.ModelKindTable.Is(id, OpenFPS.Common.ModelSynth.Fire)) return id;
-        var k = (id, def.Collider.Shape, def.Collider.Size);
+        var k = (id, shape, size);
         if (_voiceKeys.TryGetValue(k, out var key)) return key;
-        key = OpenFPS.Common.FireSpec.KeyForPlaced(id, def.Collider.Shape.IsRound(), def.Collider.Size, ModelLibrary.Presets.Fire);
+        key = OpenFPS.Common.FireSpec.KeyForPlaced(id, shape.IsRound(), size, ModelLibrary.Presets.Fire);
         if (_voiceKeys.Count > 4096) _voiceKeys.Clear();
         _voiceKeys[k] = key;
         return key;
@@ -1170,22 +1181,21 @@ public partial class ClientAudioSystem
     /// voice turns into wheels spinning up (AircraftSynth.Touchdown). Not probed at all more than 60 m
     /// over the listener's head, since the ground probe is a grid search.
     /// </summary>
-    private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos, out float height)
+    private bool OnTheWheels(AudioSource src, WorldSnapshot world, Vector3 eyePos, out float height)
     {
-        var p = snap.Transform.Position;
+        var p = src.State.Position;
         height = float.PositiveInfinity;
         if (p.Y - eyePos.Y > 60f) return false;
-        float groundY = OpenFPS.Common.PhysicsUtils.GetGroundHeight(world, p, snap.Id, out _);
+        float groundY = OpenFPS.Common.PhysicsUtils.GetGroundHeight(world, p, src.Id, out _);
         height = p.Y - groundY;
         // A jet sits five metres up on its gear and a light single one: a fraction of length serves both.
-        float sitsAt = 0.15f * (PhysicalAircraft(snap)?.LengthMetres ?? 8f);
+        float sitsAt = 0.15f * (PhysicalAircraft(src.Spec.SoundId)?.LengthMetres ?? 8f);
         return p.Y - groundY <= sitsAt;
     }
 
-    /// <summary>The aircraft profile behind an entity, or null if it is not an aeroplane.</summary>
-    private static OpenFPS.Common.AircraftProfile? PhysicalAircraft(EntitySnapshot snap)
+    /// <summary>The aircraft profile a sound id names, or null if it is not an aeroplane.</summary>
+    private static OpenFPS.Common.AircraftProfile? PhysicalAircraft(string? sid)
     {
-        string? sid = snap.Definition.SoundEmitter.SoundId;
         if (OpenFPS.Common.ModelKindTable.KindOf(sid) is not { Synth: OpenFPS.Common.ModelSynth.Aircraft } kind) return null;
         try { return OpenFPS.Common.AircraftProfile.ByName(kind.Rest(sid!)); }
         catch (Exception ex) { OpenFPS.Common.ModelKindTable.Fail(sid!, ex.Message); return null; }
@@ -1245,7 +1255,7 @@ public partial class ClientAudioSystem
     private float ChorusShare(WorldSnapshot world, int entityId, out float trees)
     {
         trees = 1f;
-        if (IsWood(world, entityId))
+        if (IsWood(entityId))
         {
             if (!_woodWeights.Woods.TryGetValue(entityId, out var w)) return 0f;
             trees = w.Trees;
@@ -1410,7 +1420,7 @@ public partial class ClientAudioSystem
             {
                 _liveMachines.Add(id);
                 // A wood is given its voice's id here if it has none: it is sounded under it later this frame.
-                _audio.ReviveEngine(IsWood(world, id) ? _voices.IdFor(VoiceKind.Wood, id) : id);
+                _audio.ReviveEngine(IsWood(id) ? _voices.IdFor(VoiceKind.Wood, id) : id);
                 if (!_machineStarted.ContainsKey(id)) _machineStarted[id] = now;
             }
         }
@@ -1422,7 +1432,7 @@ public partial class ClientAudioSystem
     {
         if (_voices.TryIdOf(VoiceKind.Wood, entityId, 0, out voiceId)) return true;
         voiceId = entityId;
-        return !IsWood(world, entityId);
+        return !IsWood(entityId);
     }
 
     /// <summary>How loud each car and each standing model was at the ear in this frame's rankings
@@ -1437,8 +1447,14 @@ public partial class ClientAudioSystem
     /// of shore its geometry with it (fetch, which way its water lies), which it carries in its box
     /// (tools/gen_osm.py) and its voice reads from the key.</summary>
     private static string PhysicalKeyOf(in EntitySnapshot snap, string voiceKey)
+        => PhysicalKeyOf(snap.Definition.Collider.Size, snap.Transform.Rotation, voiceKey);
+
+    private static string PhysicalKeyOf(AudioSource src, string voiceKey)
+        => PhysicalKeyOf(src.Spec.Size, src.State.Rotation, voiceKey);
+
+    private static string PhysicalKeyOf(Vector3 size, Quaternion rotation, string voiceKey)
         => OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth == OpenFPS.Common.ModelSynth.Shore
-            ? OpenFPS.Common.ShoreSpec.KeyFor(voiceKey, snap.Definition.Collider.Size, snap.Transform.Rotation)
+            ? OpenFPS.Common.ShoreSpec.KeyFor(voiceKey, size, rotation)
             : voiceKey;
 
     private sealed class MachineGroup
@@ -1870,24 +1886,24 @@ public partial class ClientAudioSystem
     /// (EngineTapState), so it costs a buffer read and an HRTF. All but the position is the machine's
     /// other voice's: level reference, range, path, sampled time.
     /// </summary>
-    private void FrontVoice(WorldSnapshot world, EntitySnapshot snap, OpenFPS.Common.VehicleProfile profile, Vector3 eyePos,
+    private void FrontVoice(WorldSnapshot world, AudioSource src, OpenFPS.Common.VehicleProfile profile, Vector3 eyePos,
                             float levelDb, float volume, float minDistance, float range, double sampledAt)
     {
-        int voiceId = IntakeVoiceId(snap.Id);
-        Vector3 pos = snap.Transform.Position
-                    + Vector3.Transform(IntakeSlot(profile), snap.Transform.Rotation);
+        int voiceId = IntakeVoiceId(src.Id);
+        Vector3 pos = src.State.Position
+                    + Vector3.Transform(IntakeSlot(profile), src.State.Rotation);
 
         var e = new SpatialEmitter
         {
             EntityId = voiceId,
-            Seed = VoiceRegistry.SeedOf(VoiceKind.Intake, snap.Id),
+            Seed = VoiceRegistry.SeedOf(VoiceKind.Intake, src.Id),
             SoundId = "engine-intake",
             IsSynth = true,
-            IntakeOfEntity = snap.Id,
+            IntakeOfEntity = src.Id,
             EngineKey = "",
             Mode = PlaybackMode.LoopOne,
             Type = EmitterType.EntityAttached,
-            Velocity = snap.Velocity,
+            Velocity = src.State.Velocity,
             PositionSampledAt = sampledAt,
             // The exhaust voice's level reference: the taps already carry the difference between intake
             // and tailpipe, and a second, guessed one here would be a taste constant.
@@ -1899,7 +1915,7 @@ public partial class ClientAudioSystem
         };
         // Its path every frame: it kept the tone it started with, a car turning behind a wall within 20 m
         // still breathing in the open (S1).
-        HandPath(ref e, VoiceKind.Intake, world, snap, pos, levelDb, eyePos);
+        HandPath(ref e, VoiceKind.Intake, world, src, pos, levelDb, eyePos);
         ApplyGround(ref e, _groundWorld);
         _voices.Sound(e);
     }
@@ -1932,24 +1948,24 @@ public partial class ClientAudioSystem
     /// each that is not the direction is the interior voice's: the same level, the same distance, the
     /// same room. See CabinPaths and EngineTapState.
     /// </summary>
-    private void CabinVoices(WorldSnapshot world, EntitySnapshot snap, OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Layout layout,
+    private void CabinVoices(WorldSnapshot world, AudioSource src, OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Layout layout,
                              Vector3 ear, in SpatialEmitter engine, Vector3 eyePos)
     {
-        if (_cabinVoiced != snap.Id) RetireCabinVoices();
-        _cabinVoiced = snap.Id;
+        if (_cabinVoiced != src.Id) RetireCabinVoices();
+        _cabinVoiced = src.Id;
         _cabinVoicedPaths = layout.Count;
         _cabinSeenFrame = _frameCount;
         for (int p = 1; p < layout.Count; p++)
         {
             int voiceId = CabinVoiceId(p);
-            var offset = Vector3.Transform(_audio.Options.CabinOffset(layout, p, ear), snap.Transform.Rotation);
+            var offset = Vector3.Transform(_audio.Options.CabinOffset(layout, p, ear), src.State.Rotation);
             var e = engine;
             e.EntityId = voiceId;
             e.Seed = VoiceRegistry.SeedOf(VoiceKind.Cabin, VoiceRegistry.NoEntity, p);
             e.SoundId = "engine-cabin";
             e.EngineKey = "";
             e.PhysicalKey = "";
-            e.CabinOfEntity = snap.Id;
+            e.CabinOfEntity = src.Id;
             e.CabinPath = p;
             e.IntakeOfEntity = 0;
             e.EchoOfEntity = 0;
@@ -1957,7 +1973,7 @@ public partial class ClientAudioSystem
             e.FollowsListener = true;
             e.ListenerOffset = offset;
             // A voice on the head still needs a world position: the budget culls by it.
-            HandPath(ref e, VoiceKind.Cabin, world, snap, eyePos + offset, engine.EarLevelDb, eyePos);
+            HandPath(ref e, VoiceKind.Cabin, world, src, eyePos + offset, engine.EarLevelDb, eyePos);
             _voices.Sound(e);
         }
     }
@@ -2040,7 +2056,9 @@ public partial class ClientAudioSystem
     }
 
     /// <summary>The way a source's own x lies in the world: the way a line of it runs.</summary>
-    private static Vector3 AxisOf(in EntitySnapshot snap) => Vector3.Transform(Vector3.UnitX, snap.Transform.Rotation);
+    private static Vector3 AxisOf(in EntitySnapshot snap) => AxisOf(snap.Transform.Rotation);
+    private static Vector3 AxisOf(AudioSource src) => AxisOf(src.State.Rotation);
+    private static Vector3 AxisOf(Quaternion rotation) => Vector3.Transform(Vector3.UnitX, rotation);
 
     /// <summary>
     /// For the ranking: how much louder a line cut into pieces is here than a point at its middle, both by the
@@ -2064,13 +2082,13 @@ public partial class ClientAudioSystem
     /// they are what the mixer's law makes of each part of it (ExtendedSources.PlaceRule.Pieces); under the old
     /// rule, one gain held them to the source heard from its middle (ExtendedSources.Balance).
     /// </summary>
-    private Spreading SpreadOf(EntitySnapshot snap, Vector3[] layout, ref SpatialEmitter e, Vector3 eyePos, float dt, double now)
+    private Spreading SpreadOf(AudioSource src, Vector3[] layout, ref SpatialEmitter e, Vector3 eyePos, float dt, double now)
     {
-        if (!_spreading.TryGetValue(snap.Id, out var sp) || sp.Layout != layout)
-            _spreading[snap.Id] = sp = new Spreading { Layout = layout, At = new Vector3[layout.Length] };
+        if (!_spreading.TryGetValue(src.Id, out var sp) || sp.Layout != layout)
+            _spreading[src.Id] = sp = new Spreading { Layout = layout, At = new Vector3[layout.Length] };
         sp.Frame = _spreadFrame;
-        for (int i = 0; i < layout.Length; i++) sp.At[i] = e.Position + Vector3.Transform(layout[i], snap.Transform.Rotation);
-        float target = !_placesGranted.Contains(snap.Id) ? 0f : _audio.Options.WideSources.SpreadFor(
+        for (int i = 0; i < layout.Length; i++) sp.At[i] = e.Position + Vector3.Transform(layout[i], src.State.Rotation);
+        float target = !_placesGranted.Contains(src.Id) ? 0f : _audio.Options.WideSources.SpreadFor(
             OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), Vector3.Distance(eyePos, e.Position));
         sp.Spread = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Slew(sp.Spread, target, MathF.Min(dt, 0.25f));
         if (_audio.Options.WideSources.Rule == OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.PlaceRule.Middle)
@@ -2179,11 +2197,11 @@ public partial class ClientAudioSystem
     /// when they change, and its own voice moved to the piece that holds its middle, as loud as everything in it.
     /// A few closed forms a piece (ExtendedSources.Place), so on this thread.
     /// </summary>
-    private Cutting CutOf(EntitySnapshot snap, float length, ref SpatialEmitter e, Vector3 eyePos)
+    private Cutting CutOf(AudioSource src, float length, ref SpatialEmitter e, Vector3 eyePos)
     {
-        if (!_cutting.TryGetValue(snap.Id, out var c)) _cutting[snap.Id] = c = new Cutting();
+        if (!_cutting.TryGetValue(src.Id, out var c)) _cutting[src.Id] = c = new Cutting();
         c.Frame = _spreadFrame;
-        c.Axis = AxisOf(snap);
+        c.Axis = AxisOf(src);
         c.Base = e;
         var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(e.Position, c.Axis, length, eyePos);
         int n = Math.Max(1, c.Count);
@@ -2332,25 +2350,26 @@ public partial class ClientAudioSystem
     private void UpdateSirens(WorldSnapshot world, Vector3 eyePos)
     {
         _sirenCars.Clear();
-        foreach (var snap in world.DynamicEntities)
+        for (int i = 0, n = _sources.MovingCount; i < n; i++)
         {
-            string? sid = snap.Definition.SoundEmitter.SoundId;
+            var src = _sources.MovingAt(i);
+            string? sid = src.Spec.SoundId;
             if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(sid) is not { } preset
                 || OpenFPS.Common.MachineRegistry.VehicleFor(preset).Siren is not { } sirenKey) continue;
             // Asked about only while it sounds: switched off, every patrol car on the map asked the worker
             // every frame and was added to the path pass, and with no engine voice ran the hand-rolled tracer
             // on this thread for nothing.
-            var mode = SirenModeOf(snap);
+            var mode = SirenModeOf(src);
             if (mode == OpenFPS.Common.SirenMode.Off)
             {
-                if (_sirenVoiced.Remove(snap.Id)) _voices.Stop(SirenVoiceId(snap.Id));
+                if (_sirenVoiced.Remove(src.Id)) _voices.Stop(SirenVoiceId(src.Id));
                 // Within earshot, its head is made now off the threads that place sounds, so it sounds the
                 // moment it is switched on: made then, it held every source still for 70-100 ms.
-                else PrepareSiren(snap, sirenKey, eyePos);
+                else PrepareSiren(src, sirenKey, eyePos);
                 continue;
             }
-            _sirenCars.Add(snap.Id);
-            SirenVoice(world, snap, sirenKey, mode, eyePos);
+            _sirenCars.Add(src.Id);
+            SirenVoice(world, src, sirenKey, mode, eyePos);
         }
         _sirensGone.Clear();
         foreach (int id in _sirenVoiced) if (!_sirenCars.Contains(id)) _sirensGone.Add(id);
@@ -2367,15 +2386,15 @@ public partial class ClientAudioSystem
     /// the worker is asked now. Started on an unoccluded line, a car behind a building came in at full
     /// level for a fifth of a second (2026-10-03).
     /// </summary>
-    private AcousticPathData FirstAnswer(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos)
+    private AcousticPathData FirstAnswer(WorldSnapshot world, AudioSource src, Vector3 eyePos)
     {
-        var at = OpenFPS.Common.EntityEmission.PointFor(snap);
+        var at = src.Emission;
         _acousticWorker.EnqueueRequest(new AcousticRequest
         {
-            EntityId = snap.Id, ListenerPos = eyePos, SourcePos = at,
-            SourceRadius = OpenFPS.Common.EntityEmission.OcclusionRadiusFor(snap),
+            EntityId = src.Id, ListenerPos = eyePos, SourcePos = at,
+            SourceRadius = src.ProbeRadius,
         });
-        var path = _acoustics.CalculateAcousticPath(world, snap.Id, eyePos, at);
+        var path = _acoustics.CalculateAcousticPath(world, src.Id, eyePos, at);
         if (_acousticWorker.TryGetNearby(eyePos, at, out var near))
         {
             Vector3 moved = at - near.SourcePosition;
@@ -2466,14 +2485,14 @@ public partial class ClientAudioSystem
         _hornsDone.Clear();
         foreach (var (id, horn) in _horns)
         {
-            if (now > horn.Until || !world.Entities.TryGetValue(id, out var snap))
+            if (now > horn.Until || !_sources.TryGet(id, out var src))
             {
                 _hornsDone.Add(id);
                 continue;
             }
             int voiceId = HornVoiceId(id);
             // Where the vehicle's model has its horn: behind a car's grille, on a train its horn source.
-            Vector3 pos = HornAt(world, snap);
+            Vector3 pos = HornAt(src);
             float levelDb = OpenFPS.Common.Honk.LevelDb(horn.Key[OpenFPS.Common.Honk.Prefix.Length..horn.Key.LastIndexOf(':')], ModelLibrary.Presets);
             var (gain, reference) = _audio.Hearing.Place(levelDb);
             var e = new SpatialEmitter
@@ -2486,9 +2505,9 @@ public partial class ClientAudioSystem
                 EngineKey = "",
                 Mode = PlaybackMode.LoopOne,
                 Type = EmitterType.EntityAttached,
-                Velocity = snap.Velocity,
-                PositionSampledAt = world.PositionsSampledAt,
-                Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
+                Velocity = src.State.Velocity,
+                PositionSampledAt = _sources.SampledAt,
+                Direction = Vector3.Transform(Vector3.UnitZ, src.State.Rotation),
                 Volume = gain,
                 EarLevelDb = levelDb,
                 MinDistance = reference,
@@ -2499,7 +2518,7 @@ public partial class ClientAudioSystem
             // From the horn where the car is now, turned toward the path's edge only when blocked. The path's
             // own point is the exhaust as of the worker's last answer (up to ten frames old): a moving car's
             // horn would trail behind it, from its tailpipe.
-            HandPath(ref e, VoiceKind.Horn, world, snap, pos, levelDb, eyePos);
+            HandPath(ref e, VoiceKind.Horn, world, src, pos, levelDb, eyePos);
             ApplyGround(ref e, _groundWorld);
             _voices.Sound(e);
         }
@@ -2553,12 +2572,12 @@ public partial class ClientAudioSystem
     }
 
     /// <summary>The strikes to hand this vehicle's voice this frame, or null for none new.</summary>
-    internal OpenFPS.Client.AudioEngine.Core.WheelStrike[]? RailStrikes(EntitySnapshot snap, string preset, double sampledAt)
+    internal OpenFPS.Client.AudioEngine.Core.WheelStrike[]? RailStrikes(AudioSource src, string preset, double sampledAt)
     {
         if (_crossings.Count == 0) return null;
-        var vel = new Vector3(snap.Velocity.X, 0f, snap.Velocity.Z);
+        var vel = new Vector3(src.State.Velocity.X, 0f, src.State.Velocity.Z);
         float speed = vel.Length();
-        var pos = snap.Transform.Position;
+        var pos = src.State.Position;
         _strikeBatch.Clear();
         _unstruck.Clear();
         (Vector3[] At, float[] Load, float[] Radius)? layout = null;
@@ -2576,10 +2595,10 @@ public partial class ClientAudioSystem
                 var rail = r == 0 ? left : right;
                 for (int i = 0; i < layout.Value.At.Length; i++)
                 {
-                    var p = pos + Vector3.Transform(layout.Value.At[i], snap.Transform.Rotation);
+                    var p = pos + Vector3.Transform(layout.Value.At[i], src.State.Rotation);
                     var d = new Vector3(p.X - rail.X, 0f, p.Z - rail.Z);
                     float s = Vector3.Dot(d, across);
-                    var key = (snap.Id, i, ci * 2 + r);
+                    var key = (src.Id, i, ci * 2 + r);
                     bool known = _struck.ContainsKey(key);
                     if (MathF.Abs(Vector3.Dot(new Vector3(p.X - c.Centre.X, 0f, p.Z - c.Centre.Z), c.Along)) > c.HalfLengthMetres + 1f)
                     {
@@ -2630,22 +2649,23 @@ public partial class ClientAudioSystem
     /// </summary>
     private void UpdateHeldHorns(WorldSnapshot world, Vector3 eyePos, double now)
     {
-        foreach (var snap in world.DynamicEntities)
+        for (int i = 0, n = _sources.MovingCount; i < n; i++)
         {
-            if (!OpenFPS.Common.VehicleSignalBits.IsManual(snap.Signals)) continue;
-            bool held = OpenFPS.Common.VehicleSignalBits.HornHeld(snap.Signals);
-            if (!held && !_heldHorns.ContainsKey(snap.Id)) continue;
-            if (OpenFPS.Common.ModelKindTable.Vehicle(snap.Definition.SoundEmitter.SoundId) is not { } vehicle) continue;
+            var src = _sources.MovingAt(i);
+            if (!OpenFPS.Common.VehicleSignalBits.IsManual(src.State.Signals)) continue;
+            bool held = OpenFPS.Common.VehicleSignalBits.HornHeld(src.State.Signals);
+            if (!held && !_heldHorns.ContainsKey(src.Id)) continue;
+            if (OpenFPS.Common.ModelKindTable.Vehicle(src.Spec.SoundId) is not { } vehicle) continue;
             string horn = OpenFPS.Common.VehicleProfile.HornFor(vehicle);
-            if (held) _heldHorns[snap.Id] = double.NaN;
-            else if (double.IsNaN(_heldHorns[snap.Id])) _heldHorns[snap.Id] = now;
+            if (held) _heldHorns[src.Id] = double.NaN;
+            else if (double.IsNaN(_heldHorns[src.Id])) _heldHorns[src.Id] = now;
             // Its valve has had its time: stopped below, and not placed once more first.
-            if (!held && now - _heldHorns[snap.Id] > HornReleaseSeconds) continue;
-            HeldHornVoice(world, snap, horn, held, eyePos);
+            if (!held && now - _heldHorns[src.Id] > HornReleaseSeconds) continue;
+            HeldHornVoice(world, src, horn, held, eyePos);
         }
         _heldDone.Clear();
         foreach (var (id, releasedAt) in _heldHorns)
-            if (!world.Entities.ContainsKey(id) || (!double.IsNaN(releasedAt) && now - releasedAt > HornReleaseSeconds))
+            if (!_sources.Contains(id) || (!double.IsNaN(releasedAt) && now - releasedAt > HornReleaseSeconds))
                 _heldDone.Add(id);
         foreach (int id in _heldDone)
         {
@@ -2654,27 +2674,27 @@ public partial class ClientAudioSystem
         }
     }
 
-    private void HeldHornVoice(WorldSnapshot world, EntitySnapshot snap, string horn, bool blowing, Vector3 eyePos)
+    private void HeldHornVoice(WorldSnapshot world, AudioSource src, string horn, bool blowing, Vector3 eyePos)
     {
-        int voiceId = HeldHornVoiceId(snap.Id);
+        int voiceId = HeldHornVoiceId(src.Id);
         // Let go before it ever sounded: nothing to close.
         if (!blowing && !_voices.IsRegistered(voiceId)) return;
-        Vector3 pos = HornAt(world, snap);
+        Vector3 pos = HornAt(src);
         float levelDb = OpenFPS.Common.Honk.LevelDb(horn, ModelLibrary.Presets);
         var (gain, reference) = _audio.Hearing.Place(levelDb);
         var e = new SpatialEmitter
         {
             EntityId = voiceId,
-            Seed = VoiceRegistry.SeedOf(VoiceKind.HeldHorn, snap.Id),
+            Seed = VoiceRegistry.SeedOf(VoiceKind.HeldHorn, src.Id),
             SoundId = "horn",
             IsSynth = true,
             PhysicalKey = OpenFPS.Common.Honk.HoldKey(horn),
             EngineKey = "",
             Mode = PlaybackMode.LoopOne,
             Type = EmitterType.EntityAttached,
-            Velocity = snap.Velocity,
-            PositionSampledAt = world.PositionsSampledAt,
-            Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
+            Velocity = src.State.Velocity,
+            PositionSampledAt = _sources.SampledAt,
+            Direction = Vector3.Transform(Vector3.UnitZ, src.State.Rotation),
             Volume = gain,
             EarLevelDb = levelDb,
             MinDistance = reference,
@@ -2684,21 +2704,21 @@ public partial class ClientAudioSystem
             EngineRunning = blowing,
         };
         // One apparent position, the horn's: the path pass also handed it the exhaust's (S2).
-        HandPath(ref e, VoiceKind.HeldHorn, world, snap, pos, levelDb, eyePos);
+        HandPath(ref e, VoiceKind.HeldHorn, world, src, pos, levelDb, eyePos);
         ApplyGround(ref e, _groundWorld);
         _voices.Sound(e);
     }
 
     /// <summary>A switched-off siren within earshot of its level: the head its voice would start with, made
     /// ahead (VoiceBuilds).</summary>
-    private void PrepareSiren(EntitySnapshot snap, string sirenKey, Vector3 eyePos)
+    private void PrepareSiren(AudioSource src, string sirenKey, Vector3 eyePos)
     {
         OpenFPS.Common.SirenSpec spec;
         try { spec = OpenFPS.Common.SirenSpec.ByName(sirenKey); }
         catch { return; }
-        if (Vector3.Distance(SirenMouth(snap), eyePos) > _audio.Hearing.AudibleRange(spec.SourceLevelDb)) return;
+        if (Vector3.Distance(SirenMouth(src), eyePos) > _audio.Hearing.AudibleRange(spec.SourceLevelDb)) return;
         if (!_sirenKeys.TryGetValue(sirenKey, out string? key)) _sirenKeys[sirenKey] = key = "siren:" + sirenKey;
-        _audio.PrepareVoice(key, VoiceRegistry.SeedOf(VoiceKind.Siren, snap.Id));
+        _audio.PrepareVoice(key, VoiceRegistry.SeedOf(VoiceKind.Siren, src.Id));
     }
     private readonly Dictionary<string, string> _sirenKeys = new(StringComparer.Ordinal);
 
@@ -2708,32 +2728,32 @@ public partial class ClientAudioSystem
     /// (SirenVoiceState). A driven vehicle sounds as switched; traffic's mode is read off what the car
     /// does (<see cref="SirenModeFor"/>).
     /// </summary>
-    private void SirenVoice(WorldSnapshot world, EntitySnapshot snap, string sirenKey, OpenFPS.Common.SirenMode mode, Vector3 eyePos)
+    private void SirenVoice(WorldSnapshot world, AudioSource src, string sirenKey, OpenFPS.Common.SirenMode mode, Vector3 eyePos)
     {
         OpenFPS.Common.SirenSpec spec;
         try { spec = OpenFPS.Common.SirenSpec.ByName(sirenKey); }
         catch { return; }
 
-        int voiceId = SirenVoiceId(snap.Id);
+        int voiceId = SirenVoiceId(src.Id);
 
-        Vector3 pos = SirenMouth(snap);
+        Vector3 pos = SirenMouth(src);
         var (gain, reference) = _audio.Hearing.Place(spec.SourceLevelDb, spec.HornMouthMetres);
 
         var e = new SpatialEmitter
         {
             EntityId = voiceId,
-            Seed = VoiceRegistry.SeedOf(VoiceKind.Siren, snap.Id),
+            Seed = VoiceRegistry.SeedOf(VoiceKind.Siren, src.Id),
             SoundId = "siren",
             IsSynth = true,
             PhysicalKey = "siren:" + sirenKey,
             EngineKey = "",
             Mode = PlaybackMode.LoopOne,
             Type = EmitterType.EntityAttached,
-            Velocity = snap.Velocity,
-            PositionSampledAt = world.PositionsSampledAt,
+            Velocity = src.State.Velocity,
+            PositionSampledAt = _sources.SampledAt,
             // Which way the horn points. Without it the frame falls back to the velocity, which is no
             // answer when the car slows for a junction, exactly when a siren matters most.
-            Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
+            Direction = Vector3.Transform(Vector3.UnitZ, src.State.Rotation),
             Volume = gain,
             EarLevelDb = spec.SourceLevelDb,
             MinDistance = reference,
@@ -2744,53 +2764,56 @@ public partial class ClientAudioSystem
             PowerLever = (float)(int)mode,
             EngineRunning = true,
         };
-        HandPath(ref e, VoiceKind.Siren, world, snap, pos, spec.SourceLevelDb, eyePos);
+        HandPath(ref e, VoiceKind.Siren, world, src, pos, spec.SourceLevelDb, eyePos);
         ApplyGround(ref e, _groundWorld);
         _voices.Sound(e);
-        _sirenVoiced.Add(snap.Id);
+        _sirenVoiced.Add(src.Id);
     }
 
     /// <summary>A siren head, where its vehicle's model has it (VehicleProfile.SirenMount): behind the grille,
     /// in the bumper beside the horn.</summary>
-    internal static Vector3 SirenMouth(in EntitySnapshot snap)
-        => snap.Transform.Position + Vector3.Transform(
-            OpenFPS.Common.ModelKindTable.Vehicle(snap.Definition.SoundEmitter.SoundId)?.SirenMount ?? new Vector3(0f, 0.4f, Grille(snap)),
-            snap.Transform.Rotation);
+    internal static Vector3 SirenMouth(AudioSource src)
+        => src.State.Position + Vector3.Transform(
+            OpenFPS.Common.ModelKindTable.Vehicle(src.Spec.SoundId)?.SirenMount ?? new Vector3(0f, 0.4f, Grille(src)),
+            src.State.Rotation);
 
     /// <summary>
     /// Where a vehicle's horn is, in the world: where its model has it (VehicleProfile.HornMount); a train's is its
     /// horn source (TrainLayout), wherever on the train the honk was reported from. A train with none, or a
     /// vehicle the client cannot name, is logged once by id.
     /// </summary>
-    private Vector3 HornAt(WorldSnapshot world, in EntitySnapshot snap)
+    private Vector3 HornAt(AudioSource src)
     {
-        string? sid = snap.Definition.SoundEmitter.SoundId;
-        if (OpenFPS.Common.ModelKindTable.BodyOf(sid) == OpenFPS.Common.ModelBody.Rails) return TrainHornAt(world, snap);
-        var mount = OpenFPS.Common.ModelKindTable.Vehicle(sid)?.HornMount ?? new Vector3(0f, 0.6f, Grille(snap));
-        return snap.Transform.Position + Vector3.Transform(mount, snap.Transform.Rotation);
+        string? sid = src.Spec.SoundId;
+        if (OpenFPS.Common.ModelKindTable.BodyOf(sid) == OpenFPS.Common.ModelBody.Rails) return TrainHornAt(src);
+        var mount = OpenFPS.Common.ModelKindTable.Vehicle(sid)?.HornMount ?? new Vector3(0f, 0.6f, Grille(src));
+        return src.State.Position + Vector3.Transform(mount, src.State.Rotation);
     }
 
     /// <summary>A train's horn source's point, from the honked source: the train's layout names which of its
     /// sources the horn is, and that source is an entity of its own.</summary>
-    private Vector3 TrainHornAt(WorldSnapshot world, in EntitySnapshot snap)
+    private Vector3 TrainHornAt(AudioSource src)
     {
-        string sid = snap.Definition.SoundEmitter.SoundId ?? "";
+        string sid = src.Spec.SoundId ?? "";
         if (OpenFPS.Common.ModelKindTable.TryRailSource(sid, out string preset, out string train, out int index))
         {
             int horn = -1;
             try { horn = OpenFPS.Common.TrainSignal.WarningSource(OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset), ModelLibrary.Presets)); }
             catch (Exception ex) { OpenFPS.Common.ModelKindTable.Fail(sid, ex.Message); }
-            if (horn == index) return OpenFPS.Common.EntityEmission.PointFor(snap);
+            if (horn == index) return src.Emission;
             if (horn >= 0)
             {
                 string hornId = OpenFPS.Common.ModelKindTable.RailSource(preset, train, horn);
-                foreach (var other in world.DynamicEntities)
-                    if (string.Equals(other.Definition.SoundEmitter.SoundId, hornId, StringComparison.OrdinalIgnoreCase))
-                        return OpenFPS.Common.EntityEmission.PointFor(other);
+                for (int i = 0, n = _sources.MovingCount; i < n; i++)
+                {
+                    var other = _sources.MovingAt(i);
+                    if (string.Equals(other.Spec.SoundId, hornId, StringComparison.OrdinalIgnoreCase))
+                        return other.Emission;
+                }
             }
         }
         OpenFPS.Common.ModelKindTable.Fail(sid, "honked, and its train has no horn source on the map: heard from its own point");
-        return OpenFPS.Common.EntityEmission.PointFor(snap);
+        return src.Emission;
     }
 
     /// <summary>
@@ -2798,11 +2821,11 @@ public partial class ClientAudioSystem
     /// vehicle the client cannot name is logged once by id and measured from its collider, or failing that
     /// put 1.9 m ahead.
     /// </summary>
-    internal static float Grille(in EntitySnapshot snap)
+    internal static float Grille(AudioSource src)
     {
-        string? sid = snap.Definition.SoundEmitter.SoundId;
+        string? sid = src.Spec.SoundId;
         if (OpenFPS.Common.ModelKindTable.Vehicle(sid) is { } vehicle) return vehicle.GrilleZ;
-        float length = snap.Definition.Collider.Size.Z;
+        float length = src.Spec.Size.Z;
         if (length > 0f)
         {
             OpenFPS.Common.ModelKindTable.Fail(sid ?? "", "names no vehicle: its grille is a quarter of a metre in from its collider's nose");
@@ -2844,8 +2867,8 @@ public partial class ClientAudioSystem
     /// standing or with the traffic, wail on a call, yelp braking hard into a junction). Each client decided
     /// that for itself, from the moment it first saw the car, so two players beside one car heard two sirens.
     /// </summary>
-    private static OpenFPS.Common.SirenMode SirenModeOf(EntitySnapshot snap)
-        => OpenFPS.Common.VehicleSignalBits.Siren(snap.Signals);
+    private static OpenFPS.Common.SirenMode SirenModeOf(AudioSource src)
+        => OpenFPS.Common.VehicleSignalBits.Siren(src.State.Signals);
 
     /// <summary>
     /// A car too far away for its own engine, voiced by borrowing a near one: it reads the ring of the
@@ -2854,33 +2877,32 @@ public partial class ClientAudioSystem
     /// metres nobody can tell one engine of a kind from another. The per-car offset matters: without it
     /// the borrowed voices are one waveform and sum into one loud car instead of traffic.
     /// </summary>
-    private void DistantEngine(WorldSnapshot world, EntitySnapshot snap, OpenFPS.Common.Networking.EntityDefinition def, string preset,
-                               Vector3 eyePos)
+    private void DistantEngine(WorldSnapshot world, AudioSource src, string preset, Vector3 eyePos)
     {
-        if (!_distantVoiced.Contains(snap.Id)) return;
+        if (!_distantVoiced.Contains(src.Id)) return;
         if (!_engineSourceByPreset.TryGetValue(preset, out int sourceId)) return;
-        if (sourceId == snap.Id) return;
+        if (sourceId == src.Id) return;
 
-        int voiceId = BorrowedVoiceId(snap.Id);
+        int voiceId = BorrowedVoiceId(src.Id);
 
         // Rebind when the donor changes: a voice pointed at a dead source is silence that never recovers.
-        if (_distantBoundTo.TryGetValue(snap.Id, out int bound) && bound != sourceId)
+        if (_distantBoundTo.TryGetValue(src.Id, out int bound) && bound != sourceId)
             _voices.Stop(voiceId);
-        _distantBoundTo[snap.Id] = sourceId;
+        _distantBoundTo[src.Id] = sourceId;
 
         var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
         float level = DeclaredLevel(preset, profile);
         float extent = OutletSeparation(preset);
         var (gain, reference) = _audio.Hearing.Place(level, extent);
-        Vector3 pos = OpenFPS.Common.EntityEmission.PointFor(snap);
+        Vector3 pos = src.Emission;
 
         // A stable, arbitrary offset per car, spread across most of the ring buffer.
-        float offset = 0.08f + (Math.Abs(snap.Id) % 17) * 0.045f;
+        float offset = 0.08f + (Math.Abs(src.Id) % 17) * 0.045f;
 
         var e = new SpatialEmitter
         {
             EntityId = voiceId,
-            Seed = VoiceRegistry.SeedOf(VoiceKind.Borrowed, snap.Id),
+            Seed = VoiceRegistry.SeedOf(VoiceKind.Borrowed, src.Id),
             SoundId = "engine-distant",
             IsSynth = true,
             EchoOfEntity = sourceId,
@@ -2890,9 +2912,9 @@ public partial class ClientAudioSystem
             Mode = PlaybackMode.LoopOne,
             Type = EmitterType.WorldLocked,
             // Its own velocity, so it Dopplers as itself, not as its donor.
-            Velocity = snap.Velocity,
-            PositionSampledAt = world.PositionsSampledAt,
-            Volume = gain * def.SoundEmitter.Volume,
+            Velocity = src.State.Velocity,
+            PositionSampledAt = _sources.SampledAt,
+            Volume = gain * src.Spec.Volume,
             Range = _audio.Hearing.AudibleRange(level),
             MinDistance = reference,
             ExtentMetres = extent,
@@ -2900,26 +2922,26 @@ public partial class ClientAudioSystem
         };
         // Placed and pathed as the car it stands for. Re-placed bare, it was never occluded nor told its
         // distance whatever its path said (S3).
-        HandPath(ref e, VoiceKind.Borrowed, world, snap, pos, level, eyePos);
+        HandPath(ref e, VoiceKind.Borrowed, world, src, pos, level, eyePos);
         _voices.Sound(e);
     }
 
-    private void ProcessAudioEmitter(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos, float engineDt = 0f)
+    private void ProcessAudioEmitter(WorldSnapshot world, AudioSource src, Vector3 eyePos, float engineDt = 0f)
     {
         double now = _now();
-        var def = snap.Definition;
+        ref readonly var spec = ref src.Spec;
 
         // A physical model outside the budget (ChooseLiveMachines, this frame) is not worked out either:
         // this bails before the path is read, or the city's 116 unvoiced machines cost a frame's work each.
-        if (def.SoundEmitter.IsSynth
-            && VoiceKey(def) is { Length: > 0 } sid
+        if (spec.IsSynth
+            && VoiceKey(spec) is { Length: > 0 } sid
             && PhysicalLevel(sid, out _, out _)
-            && !_liveMachines.Contains(snap.Id))
+            && !_liveMachines.Contains(src.Id))
             return;
 
         // The worker's last answer; until it has one, FirstAnswer. Never "nothing in the way". The entity's
         // path for the frame, which its horn, siren, outlets and places are heard through too.
-        AcousticPathData acousticPath = PathOf(world, snap, eyePos).Raw;
+        AcousticPathData acousticPath = PathOf(world, src, eyePos).Raw;
 
         string resolvedSoundId = "";
         bool interior = false;
@@ -2931,11 +2953,11 @@ public partial class ClientAudioSystem
         float powerLever = 1f, rotorWake = 0f;
         bool onGround = false;
         // Where the sound comes out: the same point the occlusion probe in Update asks about.
-        Vector3 emitterPosition = OpenFPS.Common.EntityEmission.PointFor(snap);
-        float engineVolume = def.SoundEmitter.Volume;
-        float engineMinDistance = def.SoundEmitter.MinDistance;
-        float engineRange = def.SoundEmitter.Range;
-        float engineExtent = def.SoundEmitter.ExtentMetres;
+        Vector3 emitterPosition = src.Emission;
+        float engineVolume = spec.Volume;
+        float engineMinDistance = spec.MinDistance;
+        float engineRange = spec.Range;
+        float engineExtent = spec.ExtentMetres;
         // A tree or a fire: the places it is heard from across its extent (ExtendedSources).
         Vector3[]? extentLayout = null;
         // Running water along a line: cut into pieces at the ear (ExtendedSources.Cut); its length, or none.
@@ -2949,12 +2971,12 @@ public partial class ClientAudioSystem
         OpenFPS.Client.AudioEngine.Core.Signals.LoudspeakerRender? speaker = null;
         // An authored source with a size (a fountain, a grille): as for a machine, the reference widens to
         // its radius and the gain is paid down, so only the near field changes.
-        if (engineExtent > 0f && !def.SoundEmitter.IsSynth)
+        if (engineExtent > 0f && !spec.IsSynth)
             (engineVolume, engineMinDistance) =
                 OpenFPS.Common.Loudness.Widen(engineVolume, engineMinDistance, engineExtent);
-        if (def.SoundEmitter.IsSynth)
+        if (spec.IsSynth)
         {
-            resolvedSoundId = VoiceKey(def);
+            resolvedSoundId = VoiceKey(spec);
             if (string.IsNullOrEmpty(resolvedSoundId))
             {
                 // A synthesised emitter that names no model: the plain oscillator its fields describe.
@@ -2967,10 +2989,10 @@ public partial class ClientAudioSystem
             {
                 // Not a vehicle, so no borrowed voice: outside the budget it is not heard (forty air
                 // conditioners are not one heard from further away).
-                if (!_liveMachines.Contains(snap.Id)) return;
+                if (!_liveMachines.Contains(src.Id)) return;
                 // The ranking's memoised numbers, so the two cannot disagree.
                 if (!PhysicalLevel(resolvedSoundId, out float levelDb, out float extent)) return;
-                physicalKey = PhysicalKeyOf(snap, resolvedSoundId);
+                physicalKey = PhysicalKeyOf(src, resolvedSoundId);
                 var physicalSynth = OpenFPS.Common.ModelKindTable.KindOf(resolvedSoundId)!.Synth;
                 // Placed by its declared level and size: inside its extent the level is flat, and the
                 // gain is paid down so the far field is unchanged (Loudness.Widen; widening without
@@ -2979,9 +3001,9 @@ public partial class ClientAudioSystem
                 // A voice rendered with more headroom than the shared one (a fire's crackles) gets the
                 // difference back, so it is placed by its level and not its peaks.
                 headroomGain = OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
-                engineVolume = gain * def.SoundEmitter.Volume * headroomGain;
+                engineVolume = gain * spec.Volume * headroomGain;
                 // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus).
-                engineVolume *= ChorusShare(world, snap.Id, out chorusTrees);
+                engineVolume *= ChorusShare(world, src.Id, out chorusTrees);
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(levelDb));
@@ -2992,24 +3014,24 @@ public partial class ClientAudioSystem
                 {
                     // Its power lever as the server that flies it sends it (MachinePower: from its flight path
                     // in the air and its ground run on its wheels, a piston's closed throttle in the flare).
-                    powerLever = snap.Lever;
-                    rotorWake = RotorWake(snap.Velocity);
-                    onGround = OnTheWheels(snap, world, eyePos, out _);
+                    powerLever = src.State.Lever;
+                    rotorWake = RotorWake(src.State.Velocity);
+                    onGround = OnTheWheels(src, world, eyePos, out _);
                 }
                 else if (physicalSynth == OpenFPS.Common.ModelSynth.Rail)
                 {
                     // The notch its driver has it in, as the server sends it (MachinePower.TrainNotch), carried
                     // in the lever slot; the wake slot carries the speed, for rolling noise.
-                    powerLever = snap.Lever;
-                    rotorWake = snap.Velocity.Length();
+                    powerLever = src.State.Lever;
+                    rotorWake = src.State.Velocity.Length();
                 }
             }
             else if (OpenFPS.Common.ModelKindTable.KnownVehiclePreset(resolvedSoundId) is { } vehiclePreset)
             {
                 // A vehicle: its own live engine, or a borrowed voice (DistantEngine).
-                if (!_liveEngines.Contains(snap.Id))
+                if (!_liveEngines.Contains(src.Id))
                 {
-                    DistantEngine(world, snap, def, vehiclePreset, eyePos);
+                    DistantEngine(world, src, vehiclePreset, eyePos);
                     return;
                 }
                 engineKey = vehiclePreset;
@@ -3022,7 +3044,7 @@ public partial class ClientAudioSystem
                 // a bare MathF.Max(reference, 3f) handed a quiet vehicle up to 8 dB.
                 float extent = OutletSeparation(engineKey);
                 var (gain, reference) = _audio.Hearing.Place(level, extent);
-                engineVolume = gain * def.SoundEmitter.Volume;
+                engineVolume = gain * spec.Volume;
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(level));
@@ -3033,12 +3055,12 @@ public partial class ClientAudioSystem
                 // (VehicleProfile.ExhaustEmitterBias). Two voices are each placed as points: widening them
                 // too counted the length twice (a hatchback's tailpipe 4 dB short at 2 m, 9 dB at 1 m).
                 // Beyond the extent both placements agree (Widen holds gain times reference).
-                if (_frontVoiced.Contains(snap.Id))
+                if (_frontVoiced.Contains(src.Id))
                 {
-                    emitterPosition = snap.Transform.Position
-                                    + Vector3.Transform(ExhaustSlot(profile), snap.Transform.Rotation);
+                    emitterPosition = src.State.Position
+                                    + Vector3.Transform(ExhaustSlot(profile), src.State.Rotation);
                     (gain, reference) = _audio.Hearing.Place(level);
-                    engineVolume = gain * def.SoundEmitter.Volume;
+                    engineVolume = gain * spec.Volume;
                     engineMinDistance = reference;
                     engineExtent = 0f;
                 }
@@ -3046,16 +3068,16 @@ public partial class ClientAudioSystem
                 // Sitting in it, the machine arrives through the floor and firewall and the voice renders
                 // what gets through the body (EngineVoiceState.Interior). Its level is already pressure at
                 // the ear: unwidened, at the gain its reference distance would have had.
-                if (snap.Id == _state.RidingEntityId)
+                if (src.Id == _state.RidingEntityId)
                 {
                     interior = true;
                     var (g0, r0) = _audio.Hearing.Place(level);
-                    engineVolume = MathF.Min(1f, g0 * r0) * def.SoundEmitter.Volume;
+                    engineVolume = MathF.Min(1f, g0 * r0) * spec.Volume;
                     engineMinDistance = 1f;
                     engineExtent = 0f;
                     // With a cabin (CabinPaths) this voice is the bulkhead; every other path gets its own.
                     cabinLayout = _audio.Options.CabinLayout(profile, ModelLibrary.Presets);
-                    cabinEar = Vector3.Transform(eyePos - snap.Transform.Position, Quaternion.Inverse(snap.Transform.Rotation));
+                    cabinEar = Vector3.Transform(eyePos - src.State.Position, Quaternion.Inverse(src.State.Rotation));
                 }
             }
             else if (OpenFPS.Common.ModelKindTable.KindOf(resolvedSoundId) == null)
@@ -3063,28 +3085,28 @@ public partial class ClientAudioSystem
         }
         else
         {
-            resolvedSoundId = _sounds.ResolvePath(def.SoundEmitter.SoundId);
+            resolvedSoundId = _sounds.ResolvePath(spec.SoundId!);
             if (string.IsNullOrEmpty(resolvedSoundId)) return;
 
             // A recording played through a loudspeaker: its render through the speaker's chain, placed
             // by the level that comes out of it (a paging horn's speech is 106 dB at a metre, not "full scale to 12 m"),
             // beaming as its mouth does. Silent until the render is in.
-            if (!string.IsNullOrEmpty(def.SoundEmitter.Loudspeaker) && !def.SoundEmitter.IsGranular)
+            if (!string.IsNullOrEmpty(spec.Loudspeaker) && !spec.IsGranular)
             {
-                if (!_loudspeakers.TryGet(def.SoundEmitter.Loudspeaker, resolvedSoundId,
-                                          loop: def.SoundEmitter.Mode != PlaybackMode.Single, out var render))
+                if (!_loudspeakers.TryGet(spec.Loudspeaker, resolvedSoundId,
+                                          loop: spec.Mode != PlaybackMode.Single, out var render))
                     return;
                 speaker = render;
                 resolvedSoundId = render.Key;
                 var (gain, reference) = _audio.Hearing.Place(render.LevelDb, engineExtent);
-                engineVolume = gain * def.SoundEmitter.Volume;
+                engineVolume = gain * spec.Volume;
                 engineMinDistance = reference;
                 engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(render.LevelDb));
                 earLevel = render.LevelDb;
             }
 
             // A granular emitter needs its sample decoded into memory.
-            if (def.SoundEmitter.IsGranular && !_preloadedSounds.Contains(resolvedSoundId))
+            if (spec.IsGranular && !_preloadedSounds.Contains(resolvedSoundId))
             {
                 _audio.Preload(resolvedSoundId);
                 _preloadedSounds.Add(resolvedSoundId);
@@ -3092,16 +3114,16 @@ public partial class ClientAudioSystem
         }
 
         // Its own voice: a moving thing's engine or aeroplane, a wood, a standing model, a recording.
-        var ownKind = OwnVoiceKind(world, def, physicalKey.Length > 0);
+        var ownKind = OwnVoiceKind(spec, src.Id, physicalKey.Length > 0);
         var emitter = new SpatialEmitter
         {
-            EntityId = _voices.IdFor(ownKind, snap.Id),
-            Seed = VoiceRegistry.SeedOf(ownKind, snap.Id),
+            EntityId = _voices.IdFor(ownKind, src.Id),
+            Seed = VoiceRegistry.SeedOf(ownKind, src.Id),
             SoundId = resolvedSoundId,
             // Spin-up and spin-down sounds, which VoiceManager plays.
-            StartSoundId = def.SoundEmitter.StartSoundId ?? "",
-            StopSoundId = def.SoundEmitter.StopSoundId ?? "",
-            Mode = def.SoundEmitter.Mode,
+            StartSoundId = spec.StartSoundId ?? "",
+            StopSoundId = spec.StopSoundId ?? "",
+            Mode = spec.Mode,
             Position = emitterPosition,
             ApparentPosition = engineKey.Length > 0 || physicalKey.Length > 0
                              ? emitterPosition : acousticPath.ApparentPosition,
@@ -3113,14 +3135,14 @@ public partial class ClientAudioSystem
             AirLowDb = interior ? 0f : acousticPath.AirLowDb, AirMidDb = interior ? 0f : acousticPath.AirMidDb, AirHighDb = interior ? 0f : acousticPath.AirHighDb,
             ApertureFactor = interior ? 1f : acousticPath.ApertureFactor,
             TransmissionBleed = interior ? 0f : acousticPath.TransmissionBleed,
-            Velocity = snap.Velocity,
-            PositionSampledAt = world.PositionsSampledAt,
+            Velocity = src.State.Velocity,
+            PositionSampledAt = _sources.SampledAt,
             // Its local aim turned by the entity; zero means straight ahead.
             Direction = Vector3.Transform(
-                def.SoundEmitter.Direction.LengthSquared() > 0f
-                    ? Vector3.Normalize(def.SoundEmitter.Direction)
+                spec.Direction.LengthSquared() > 0f
+                    ? Vector3.Normalize(spec.Direction)
                     : Vector3.UnitZ,
-                snap.Transform.Rotation),
+                src.State.Rotation),
             Volume = engineVolume,
             EarLevelDb = earLevel,
             HeadroomGain = headroomGain,
@@ -3131,9 +3153,9 @@ public partial class ClientAudioSystem
             // Inside, its room is yours (the cabin), whatever room the car's middle is in.
             TargetRegionId = interior ? _listenerRegion : acousticPath.RegionId,
             // A loudspeaker's beam is its mouth's, band by band (Radiator), not a flat cone.
-            ConeInside = speaker != null ? 360f : def.SoundEmitter.ConeInsideAngle,
-            ConeOutside = speaker != null ? 360f : def.SoundEmitter.ConeOutsideAngle,
-            ConeOutsideVolume = speaker != null ? 1f : def.SoundEmitter.ConeOutsideVolume,
+            ConeInside = speaker != null ? 360f : spec.ConeInsideAngle,
+            ConeOutside = speaker != null ? 360f : spec.ConeOutsideAngle,
+            ConeOutsideVolume = speaker != null ? 1f : spec.ConeOutsideVolume,
             Radiator = speaker?.Radiator,
             RadiatorBandEnergy = speaker?.BandEnergy,
             RadiatedGain = speaker?.RadiatedGain ?? 0f,
@@ -3145,63 +3167,63 @@ public partial class ClientAudioSystem
             // a cabin), turned with the car so the engine stays in front through a corner.
             FollowsListener = interior,
             ListenerOffset = !interior ? Vector3.Zero
-                           : cabinLayout != null ? Vector3.Transform(_audio.Options.CabinOffset(cabinLayout, 0, cabinEar), snap.Transform.Rotation)
-                           : Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace, snap.Transform.Rotation),
+                           : cabinLayout != null ? Vector3.Transform(_audio.Options.CabinOffset(cabinLayout, 0, cabinEar), src.State.Rotation)
+                           : Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace, src.State.Rotation),
             CabinEarX = cabinEar.X,
             PhysicalKey = physicalKey,
             Trees = chorusTrees,
             PowerLever = powerLever,
             RotorWake = rotorWake,
             OnGround = onGround,
-            EngineSpeed = snap.Velocity.Length(),
+            EngineSpeed = src.State.Velocity.Length(),
             // Whether a synthesised source is sounding. Nearly everything decides that from what the
             // client sees; a crossing's bell rings for a train the listener may be a kilometre from, so
             // it comes down the wire (true for everything else).
-            EngineRunning = def.SoundEmitter.SynthRunning,
-            Quench = def.SoundEmitter.Quench,
-            ServingStop = def.SoundEmitter.ServingStop,
-            WindowsOpen = _cabins.WindowsOpen(snap, _now()),
+            EngineRunning = spec.SynthRunning,
+            Quench = spec.Quench,
+            ServingStop = spec.ServingStop,
+            WindowsOpen = _cabins.WindowsOpen(src.Id, spec.WindowsOpen, _now()),
             // From the server, which knows the corner's banking. Differentiated here from the velocity
             // against flat-ground grip, the speedway's banked corners read 1.43 to 1.59 against a
             // full-slide threshold of 1.45: every car rendered a broadband skid in every corner.
-            TyreSlip = snap.TyreDemand,
-            Wheels = snap.Wheels,
-            WheelStrikes = engineKey.Length > 0 ? RailStrikes(snap, engineKey, world.PositionsSampledAt) : null,
+            TyreSlip = src.State.TyreDemand,
+            Wheels = src.State.Wheels,
+            WheelStrikes = engineKey.Length > 0 ? RailStrikes(src, engineKey, _sources.SampledAt) : null,
             RoadWaterMm = _roadWaterMm,
 
             // Synthesis mapping
-            IsGranular = def.SoundEmitter.IsGranular,
-            GranularPosition = def.SoundEmitter.GranularPosition,
-            GranularGrainSizeMs = def.SoundEmitter.GranularGrainSizeMs,
-            GranularDensity = def.SoundEmitter.GranularDensity,
-            GranularPitch = def.SoundEmitter.GranularPitch,
-            GranularPositionJitter = def.SoundEmitter.GranularPositionJitter,
-            GranularPitchJitter = def.SoundEmitter.GranularPitchJitter,
+            IsGranular = spec.IsGranular,
+            GranularPosition = spec.GranularPosition,
+            GranularGrainSizeMs = spec.GranularGrainSizeMs,
+            GranularDensity = spec.GranularDensity,
+            GranularPitch = spec.GranularPitch,
+            GranularPositionJitter = spec.GranularPositionJitter,
+            GranularPitchJitter = spec.GranularPitchJitter,
 
-            IsSynth = def.SoundEmitter.IsSynth,
-            SynthWave = (SynthWaveType)def.SoundEmitter.SynthWave,
-            SynthFrequency = def.SoundEmitter.SynthFrequency,
-            SynthLfoRate = def.SoundEmitter.SynthLfoRate,
-            SynthLfoDepth = def.SoundEmitter.SynthLfoDepth,
-            SynthFilterCutoff = def.SoundEmitter.SynthFilterCutoff,
-            SynthFilterResonance = def.SoundEmitter.SynthFilterResonance,
-            SynthPulseWidth = def.SoundEmitter.SynthPulseWidth
+            IsSynth = spec.IsSynth,
+            SynthWave = (SynthWaveType)spec.SynthWave,
+            SynthFrequency = spec.SynthFrequency,
+            SynthLfoRate = spec.SynthLfoRate,
+            SynthLfoDepth = spec.SynthLfoDepth,
+            SynthFilterCutoff = spec.SynthFilterCutoff,
+            SynthFilterResonance = spec.SynthFilterResonance,
+            SynthPulseWidth = spec.SynthPulseWidth
         };
         // Its path in the emitter the budget holds, the only writer: heard from its point (a machine, a wood),
         // from the edge its path comes round when blocked (an engine, an aeroplane), or from where the path
         // arrives (a recording).
-        HandPath(ref emitter, ownKind, world, snap, emitterPosition, earLevel, eyePos, inside: interior);
+        HandPath(ref emitter, ownKind, world, src, emitterPosition, earLevel, eyePos, inside: interior);
 
         // A repeating one-shot (RepeatIntervalSeconds: a PA, a foghorn, a station bell) is built as
         // normal and handed over only when its interval comes round.
-        float repeat = def.SoundEmitter.RepeatIntervalSeconds;
+        float repeat = spec.RepeatIntervalSeconds;
         if (repeat > 0f)
         {
-            double due = _repeatDue.GetValueOrDefault(snap.Id, double.NegativeInfinity);
+            double due = _repeatDue.GetValueOrDefault(src.Id, double.NegativeInfinity);
             if (double.IsNegativeInfinity(due))
             {
                 // Staggered by id, so two announcers on one map do not talk over each other for ever.
-                _repeatDue[snap.Id] = now + (Math.Abs(snap.Id) % 7) * 0.9;
+                _repeatDue[src.Id] = now + (Math.Abs(src.Id) % 7) * 0.9;
                 return;
             }
             // Between its firings, or still saying the last one: placed from where it is now, never
@@ -3209,37 +3231,37 @@ public partial class ClientAudioSystem
             // stamp aged the length of the line ("placed at a position 2400 ms old").
             if (now < due || _audio.IsPlaying(emitter.EntityId))
             {
-                if (now >= due) _repeatDue[snap.Id] = now + repeat;
+                if (now >= due) _repeatDue[src.Id] = now + repeat;
                 // A play the budget holds (under way, or waiting on its file) is placed afresh; nothing
                 // else is touched (AudioEngineFacade.Refresh never starts one).
                 _voices.Refresh(emitter);
                 return;
             }
-            _repeatDue[snap.Id] = now + repeat;
+            _repeatDue[src.Id] = now + repeat;
         }
-        if (speaker != null) _speakerOf[snap.Id] = speaker; else _speakerOf.Remove(snap.Id);
+        if (speaker != null) _speakerOf[src.Id] = speaker; else _speakerOf.Remove(src.Id);
 
         // The road under a machine hands its sound back a moment later; see GroundReflection. Engines and
         // physical models only: a sustained recording (a PA's speech) gets none, as speech flanged with
         // one (docs/CLIENT_NOTES.md, "Speech has no ground reflection").
-        Cutting? cutting = lineLength > 0f ? CutOf(snap, lineLength, ref emitter, eyePos) : null;
+        Cutting? cutting = lineLength > 0f ? CutOf(src, lineLength, ref emitter, eyePos) : null;
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
         if (engineKey.Length > 0 || physicalKey.Length > 0) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
-        Spreading? spreading = extentLayout != null ? SpreadOf(snap, extentLayout, ref emitter, eyePos, engineDt, now) : null;
-        _placed[snap.Id] = (emitter.Volume, emitter.MinDistance, emitter.Range);
+        Spreading? spreading = extentLayout != null ? SpreadOf(src, extentLayout, ref emitter, eyePos, engineDt, now) : null;
+        _placed[src.Id] = (emitter.Volume, emitter.MinDistance, emitter.Range);
         _voices.Submit(emitter);
         // ...and its other places, after its middle, so the synth they read already exists.
-        if (spreading != null) PlaceOuter(snap.Id, spreading, emitter, world, now);
-        if (cutting != null) PlacePieces(snap.Id, cutting, emitter, world, eyePos, now);
+        if (spreading != null) PlaceOuter(src.Id, spreading, emitter, world, now);
+        if (cutting != null) PlacePieces(src.Id, cutting, emitter, world, eyePos, now);
 
         // The front outlet, after the machine's own voice so a just-built engine exists for the tap.
-        if (engineKey.Length > 0 && _frontVoiced.Contains(snap.Id))
-            FrontVoice(world, snap, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), eyePos, earLevel,
-                       engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), world.PositionsSampledAt);
+        if (engineKey.Length > 0 && _frontVoiced.Contains(src.Id))
+            FrontVoice(world, src, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), eyePos, earLevel,
+                       engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), _sources.SampledAt);
 
         if (interior && cabinLayout != null && engineKey.Length > 0)
-            CabinVoices(world, snap, cabinLayout, cabinEar, emitter, eyePos);
+            CabinVoices(world, src, cabinLayout, cabinEar, emitter, eyePos);
 
         // The siren is placed in UpdateSirens, not here.
 
@@ -3248,8 +3270,8 @@ public partial class ClientAudioSystem
         if (engineKey.Length > 0)
         {
             long echoAt = System.Diagnostics.Stopwatch.GetTimestamp();
-            _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, _audio.Atmosphere.SpeedOfSound, engineDt, _audio,
-                                 traced: _audio.HasTracedEchoes(snap.Id));
+            _engineEchoes.Update(src.Id, emitter, acousticPath, eyePos, _audio.Atmosphere.SpeedOfSound, engineDt, _audio,
+                                 traced: _audio.HasTracedEchoes(src.Id));
             double echoMs = Ms(echoAt);
             _partMs[0] += echoMs;
             _echoPassMs += echoMs;

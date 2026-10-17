@@ -45,12 +45,12 @@ public partial class ClientAudioSystem
     private readonly Dictionary<int, OwnerPath> _ownerPaths = new();
 
     /// <summary>The owner's path this frame, worked out once.</summary>
-    private OwnerPath PathOf(WorldSnapshot world, in EntitySnapshot owner, Vector3 ear)
+    private OwnerPath PathOf(WorldSnapshot world, AudioSource owner, Vector3 ear)
     {
         if (_ownerPaths.TryGetValue(owner.Id, out var known)) return known;
-        var at = OpenFPS.Common.EntityEmission.PointFor(owner);
+        var at = owner.Emission;
         OwnerPath p;
-        if (_acousticWorker.TryGetDirectFor(owner.Id, at, owner.Velocity.Length(), ear, _earSpeed, out var direct))
+        if (_acousticWorker.TryGetDirectFor(owner.Id, at, owner.State.Velocity.Length(), ear, _earSpeed, out var direct))
             p = Shadowed(world, owner.Id, direct, at, ear);
         else
         {
@@ -85,11 +85,11 @@ public partial class ClientAudioSystem
     /// (<see cref="VoiceRegistry.HeardFromOf"/>), and everything the path does to it, in the one emitter
     /// that places it. The caller starts or re-places it as it always has.
     /// </summary>
-    private void HandPath(ref SpatialEmitter e, VoiceKind kind, WorldSnapshot world, in EntitySnapshot owner,
+    private void HandPath(ref SpatialEmitter e, VoiceKind kind, WorldSnapshot world, AudioSource owner,
                           Vector3 at, float levelDb, Vector3 ear, bool inside = false)
     {
         _voices.Declare(e.EntityId, owner.Id, kind,
-                        VoiceRegistry.MountOf(owner.Transform.Position, owner.Transform.Rotation, at), levelDb, _frameCount);
+                        VoiceRegistry.MountOf(owner.State.Position, owner.State.Rotation, at), levelDb, _frameCount);
         if (kind is VoiceKind.Horn or VoiceKind.HeldHorn or VoiceKind.Siren or VoiceKind.TrainField or VoiceKind.TrainSignal)
             VehiclePathsAsked++;
         e.Position = at;
@@ -131,14 +131,19 @@ public partial class ClientAudioSystem
     /// <summary>What an entity's own voice is: a moving thing's engine or aeroplane, a wood, a standing
     /// physical model, or a recording (anything authored, a loudspeaker's render).</summary>
     private VoiceKind OwnVoiceKind(WorldSnapshot world, EntityDefinition def, bool physical)
+        => OwnVoiceKind(def.SoundEmitter.IsSynth, VoiceKey(def), def.EntityId, physical);
+
+    private VoiceKind OwnVoiceKind(in SourceSpec spec, int id, bool physical)
+        => OwnVoiceKind(spec.IsSynth, VoiceKey(spec), id, physical);
+
+    private VoiceKind OwnVoiceKind(bool synth, string key, int id, bool physical)
     {
-        if (!def.SoundEmitter.IsSynth) return VoiceKind.Recording;
-        string key = VoiceKey(def);
+        if (!synth) return VoiceKind.Recording;
         return OpenFPS.Common.ModelKindTable.KindOf(key) switch
         {
             { Body: OpenFPS.Common.ModelBody.Rolls } when OpenFPS.Common.ModelKindTable.KnownVehiclePreset(key) != null => VoiceKind.Engine,
             { Synth: OpenFPS.Common.ModelSynth.Aircraft } => VoiceKind.Aircraft,
-            _ when IsWood(world, def.EntityId) => VoiceKind.Wood,
+            _ when IsWood(id) => VoiceKind.Wood,
             _ => physical ? VoiceKind.Machine : VoiceKind.Recording,
         };
     }
@@ -148,9 +153,9 @@ public partial class ClientAudioSystem
 
     /// <summary>Whether an entity is one of the woods the world made of its far trees (WoodChorus), by the
     /// woods it has now rather than by where its id falls.</summary>
-    private bool IsWood(WorldSnapshot world, int entityId)
+    private bool IsWood(int entityId)
     {
-        var woods = world.Woods;
+        var woods = _sources.Woods;
         if (!ReferenceEquals(woods, _woodsOf))
         {
             _woodsOf = woods;

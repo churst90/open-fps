@@ -72,6 +72,7 @@ OpenFPS.Audio/Core/DoorRenderCache.cs	Audio
 OpenFPS.Audio/Core/PlacementThread.cs	Audio	
 OpenFPS.Audio/Core/VoiceManager.cs	Audio	
 OpenFPS.Audio/Data/AcousticPathData.cs	Audio	
+OpenFPS.Audio/Data/AudioSources.cs	Audio	
 OpenFPS.Audio/Data/SpatialEmitter.cs	Audio	
 OpenFPS.Audio/Fmod/BoundaryProximityProcessor.cs	Audio	
 OpenFPS.Audio/Fmod/DspFault.cs	Audio	
@@ -169,6 +170,7 @@ OpenFPS.Client.Core/SettingsFolder.cs	game
 OpenFPS.Client.Core/SightGrid.cs	Accessibility	
 OpenFPS.Client.Core/SightWatch.cs	Accessibility	
 OpenFPS.Client.Core/Sightline.cs	Accessibility	
+OpenFPS.Client.Core/SnapshotSources.cs	game	
 OpenFPS.Client.Core/SpatialService.cs	game	
 OpenFPS.Client.Core/StairCues.cs	Accessibility	
 OpenFPS.Client.Core/StrideAccumulator.cs	game	

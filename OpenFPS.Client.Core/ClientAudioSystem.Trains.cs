@@ -114,7 +114,7 @@ public partial class ClientAudioSystem
     }
 
     private readonly List<TrainVoicing.Source> _trainSources = new();
-    private readonly Dictionary<int, (EntitySnapshot Snap, Vector3 At, float Gain)> _trainSourceAt = new();
+    private readonly Dictionary<int, (AudioSource Src, Vector3 At, float Gain)> _trainSourceAt = new();
     private readonly Dictionary<int, float>[] _trainWeights = Enumerable.Range(0, TrainVoicing.Slots).Select(_ => new Dictionary<int, float>()).ToArray();
 
     /// <summary>Whether a train's voice still sounds or fades: an entry of the registry's, which keeps one
@@ -134,16 +134,16 @@ public partial class ClientAudioSystem
         int warningEntity = -1, bellEntity = -1, lead = -1, leadIndex = int.MaxValue;
         foreach (int id in members)
         {
-            if (!world.Entities.TryGetValue(id, out var snap)) continue;
-            var em = snap.Definition.SoundEmitter;
-            if (em.SoundId == null || !TrainVoiceState.ParseKey(em.SoundId, out _, out _, out int index)) continue;
+            if (!_sources.TryGet(id, out var src)) continue;
+            string? soundId = src.Spec.SoundId;
+            if (soundId == null || !TrainVoiceState.ParseKey(soundId, out _, out _, out int index)) continue;
             if (index < 0 || index >= v.Layout.Count) continue;
             var entry = v.Layout[index];
-            var at = EntityEmission.PointFor(snap);
+            var at = src.Emission;
             float d = Vector3.Distance(at, eyePos);
             // As loud as its own voice would play it, the ear model's correction included.
-            float gain = TrainVoicing.LawGain(_audio.Hearing, entry.LevelDb, entry.ExtentMetres, d) * Correction(v, em.SoundId, entry.LevelDb);
-            _trainSourceAt[index] = (snap, at, gain);
+            float gain = TrainVoicing.LawGain(_audio.Hearing, entry.LevelDb, entry.ExtentMetres, d) * Correction(v, soundId, entry.LevelDb);
+            _trainSourceAt[index] = (src, at, gain);
             if (index < leadIndex) { leadIndex = index; lead = id; }
             if (index == warning) { warningEntity = id; continue; }
             if (index == bell) { bellEntity = id; continue; }
@@ -155,10 +155,10 @@ public partial class ClientAudioSystem
         // The train's speed and effort, from its leading source: the notch its driver has it in, as the server
         // sends it on every source of the train (MachinePower.TrainNotch).
         float speed = 0f, lever = 0f;
-        if (lead >= 0 && world.Entities.TryGetValue(lead, out var leadSnap))
+        if (lead >= 0 && _sources.TryGet(lead, out var leadSrc))
         {
-            speed = leadSnap.Velocity.Length();
-            lever = leadSnap.Lever;
+            speed = leadSrc.State.Velocity.Length();
+            lever = leadSrc.State.Lever;
         }
 
         // Regrouped twice a second: where the groups fall changes as the train moves, not every frame.
@@ -193,7 +193,7 @@ public partial class ClientAudioSystem
             // Placed where what it plays comes from: the middle of its sources by the power each brings.
             Vector3 sum = Vector3.Zero;
             float power = 0f, nearest = float.MaxValue;
-            EntitySnapshot rep = default;
+            AudioSource? rep = null;
             foreach (var (i, f) in shown)
             {
                 if (!_trainSourceAt.TryGetValue(i, out var src)) continue;
@@ -223,11 +223,11 @@ public partial class ClientAudioSystem
                 if (_trainSourceAt.TryGetValue(i, out var src))
                 {
                     float d = Vector3.DistanceSquared(src.At, centre);
-                    if (d < nearest) { nearest = d; rep = src.Snap; }
+                    if (d < nearest) { nearest = d; rep = src.Src; }
                 }
-            if (rep.Definition is null) continue;   // no car of the group has a source this frame
+            if (rep is null) continue;   // no car of the group has a source this frame
             float slotGain = TrainVoicing.LawGain(_audio.Hearing, v.SlotLevelDb, 0f, Vector3.Distance(centre, eyePos))
-                           * Correction(v, rep.Definition.SoundEmitter.SoundId!, v.SlotLevelDb);
+                           * Correction(v, rep.Spec.SoundId!, v.SlotLevelDb);
             var weights = _trainWeights[slot];
             weights.Clear();
             foreach (var (i, s) in v.SlotOf)
@@ -255,7 +255,7 @@ public partial class ClientAudioSystem
         }
         var entry = v.Layout[index];
         _audio.PlanTrainSlot(v.Preset, v.Name, slot, new TrainSlotPlan(new[] { index }, new[] { 1f }));
-        PlaceTrainVoice(world, eyePos, v, slot, VoiceKind.TrainSignal, src.Snap, src.At, entry.LevelDb, entry.ExtentMetres, speed, lever);
+        PlaceTrainVoice(world, eyePos, v, slot, VoiceKind.TrainSignal, src.Src, src.At, entry.LevelDb, entry.ExtentMetres, speed, lever);
     }
 
     private void StopTrainVoice(TrainVoicer v, int slot)
@@ -274,7 +274,7 @@ public partial class ClientAudioSystem
 
     /// <summary>One of a train's voices, placed at <paramref name="at"/> and heard through the path of the
     /// source nearest there.</summary>
-    private void PlaceTrainVoice(WorldSnapshot world, Vector3 eyePos, TrainVoicer v, int slot, VoiceKind kind, EntitySnapshot rep,
+    private void PlaceTrainVoice(WorldSnapshot world, Vector3 eyePos, TrainVoicer v, int slot, VoiceKind kind, AudioSource rep,
                                  Vector3 at, float levelDb, float extent, float speed, float lever)
     {
         int voiceId = TrainVoiceId(v, slot);
@@ -289,9 +289,9 @@ public partial class ClientAudioSystem
             EngineKey = "",
             Mode = PlaybackMode.LoopOne,
             Type = EmitterType.EntityAttached,
-            Velocity = rep.Velocity,
-            PositionSampledAt = world.PositionsSampledAt,
-            Direction = Vector3.Transform(Vector3.UnitZ, rep.Transform.Rotation),
+            Velocity = rep.State.Velocity,
+            PositionSampledAt = _sources.SampledAt,
+            Direction = Vector3.Transform(Vector3.UnitZ, rep.State.Rotation),
             // A voice carrying many sources renders with more headroom; the difference comes back here.
             Volume = gain * PhysicalVoiceState.HeadroomGain(TrainSlotState.HeadroomDb),
             HeadroomGain = PhysicalVoiceState.HeadroomGain(TrainSlotState.HeadroomDb),

@@ -95,12 +95,12 @@ public class DrivingSoundsTests
         {
             double now = t0 + f / 60.0;
             var pos = new Vector3(1.5f, 0f, -12f + v * (float)(f / 60.0));
-            var snap = new EntitySnapshot
+            var car = new OpenFPS.Client.AudioEngine.Data.AudioSource(77);
+            car.Set(default, new OpenFPS.Client.AudioEngine.Data.SourceState
             {
-                Id = 77, Transform = new Transform { Position = pos, Rotation = Quaternion.Identity },
-                Velocity = new Vector3(0f, 0f, v),
-            };
-            if (h.Audio.RailStrikes(snap, preset, now) is { } batch) strikes.AddRange(batch);
+                Position = pos, Rotation = Quaternion.Identity, Velocity = new Vector3(0f, 0f, v),
+            });
+            if (h.Audio.RailStrikes(car, preset, now) is { } batch) strikes.AddRange(batch);
         }
         foreach (var s in strikes.OrderBy(s => s.At))
             _o.WriteLine($"wheel {s.Wheel} at {s.At - t0:F3} s, {20 * Math.Log10(s.Pascals / 20e-6):F1} dB peak, contact {s.ContactSeconds * 1000:F1} ms");
