@@ -1,3 +1,4 @@
+using OpenFPS.Client.AudioEngine.Core;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
@@ -60,7 +61,7 @@ public class ClientAudioSelectionTests
     {
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        int budget = ClientAudioSystem.EngineVoiceBudget;
+        int budget = new VoiceBudgets().Engines;
         for (int i = 0; i < budget + 4; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i * 2f, 0f, 0f));
         const int Lone = 5000;
         h.AddCar(Lone, "school_bus", new Vector3(0f, 0f, 200f));
@@ -85,7 +86,7 @@ public class ClientAudioSelectionTests
     {
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        int budget = ClientAudioSystem.EngineVoiceBudget;
+        int budget = new VoiceBudgets().Engines;
         int n = budget + 4;
         for (int i = 0; i < n; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i * 2f, 0f, 0f));
         const int Lone = 5000;
@@ -115,7 +116,7 @@ public class ClientAudioSelectionTests
     {
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        int budget = ClientAudioSystem.EngineVoiceBudget;
+        int budget = new VoiceBudgets().Engines;
         int n = budget + 4;
         for (int i = 0; i < n; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i * 2f, 0f, 0f));
         h.Tick(budget);
@@ -143,7 +144,7 @@ public class ClientAudioSelectionTests
     {
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        int budget = ClientAudioSystem.EngineVoiceBudget;
+        int budget = new VoiceBudgets().Engines;
         int n = budget + 20;
         for (int i = 0; i < n; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i * 3f, 0f, 0f));
         h.Tick(budget);
@@ -169,7 +170,7 @@ public class ClientAudioSelectionTests
     {
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        int budget = ClientAudioSystem.EngineVoiceBudget;
+        int budget = new VoiceBudgets().Engines;
         for (int i = 0; i < budget; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i, 0f, 0f));
         int a = 3001, b = 3005;
         var velocity = new Vector3(0f, 0f, 22f);
@@ -487,7 +488,7 @@ public class ClientAudioSelectionTests
     [Fact]
     public void MachinesAreRankedByWhatTheyWouldSoundLikeHereNotByDistance()
     {
-        int budget = ClientAudioSystem.MachineVoiceBudget;
+        int budget = new VoiceBudgets().Machines;
         Assert.True(budget >= 2, "the test needs a machine budget");
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
@@ -517,7 +518,7 @@ public class ClientAudioSelectionTests
     [Fact]
     public void TheMachineBudgetRanksOnHowLoudTheEarHearsAMachine()
     {
-        int budget = ClientAudioSystem.MachineVoiceBudget;
+        int budget = new VoiceBudgets().Machines;
         const int Condenser = 200;
         bool CondenserWins()
         {
@@ -557,7 +558,7 @@ public class ClientAudioSelectionTests
     [Fact]
     public void ARumbleLosesTheLastMachineSlotToAQuieterToneAtTheSameDistance()
     {
-        int budget = ClientAudioSystem.MachineVoiceBudget;
+        int budget = new VoiceBudgets().Machines;
         const int Condenser = 200, Window = 201;
         (bool Condenser, bool Window) Wins()
         {
@@ -605,7 +606,7 @@ public class ClientAudioSelectionTests
     [Fact]
     public void AMachineKeepsItsVoiceUntilItIsDecisivelyBeaten()
     {
-        int budget = ClientAudioSystem.MachineVoiceBudget;
+        int budget = new VoiceBudgets().Machines;
         var h = new ClientAudioHarness();
         int n = budget + 4;
         for (int i = 0; i < n; i++) AddSource(h, 100 + i, "machine:ac_window", new Vector3(i * 3f, 1f, 4f));
@@ -641,11 +642,11 @@ public class ClientAudioSelectionTests
     {
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        cars = ClientAudioSystem.EngineVoiceBudget + 14;
+        cars = new VoiceBudgets().Engines + 14;
         for (int i = 0; i < cars; i++) h.AddCar(i + 1, Preset, new Vector3(3f + i * 0.6f, 0f, 3f + (i % 2) * 2f));
-        machines = ClientAudioSystem.MachineVoiceBudget;
+        machines = new VoiceBudgets().Machines;
         for (int i = 0; i < machines; i++) AddSource(h, 1000 + i, "machine:ac_window", new Vector3(-6f - i, 1f, -4f));
-        h.Tick(ClientAudioSystem.EngineVoiceBudget);
+        h.Tick(new VoiceBudgets().Engines);
         return h;
     }
 
@@ -662,7 +663,7 @@ public class ClientAudioSelectionTests
         var h = LoadedField(out int cars, out int machines);
         var start = Counts(h, cars, machines);
         _o.WriteLine($"start: {start}");
-        Assert.Equal((ClientAudioSystem.EngineVoiceBudget, 12, 6, machines), start);
+        Assert.Equal((new VoiceBudgets().Engines, 12, 6, machines), start);
 
         h.Wait(4.0);                       // past the hold a scene load starts with
         h.Mixer.Load = 0.95f;
@@ -680,7 +681,7 @@ public class ClientAudioSelectionTests
         int frontsGone = FirstWhen(c => c.Fronts == 0);
         int machinesDown = FirstWhen(c => c.Machines < machines);
         int borrowedDown = FirstWhen(c => c.Borrowed < 12);
-        int enginesDown = FirstWhen(c => c.Engines < ClientAudioSystem.EngineVoiceBudget);
+        int enginesDown = FirstWhen(c => c.Engines < new VoiceBudgets().Engines);
         _o.WriteLine($"fronts gone at {frontsGone}, machines first down at {machinesDown}, borrowed at {borrowedDown}, engines at {enginesDown}");
         Assert.True(frontsGone >= 0 && machinesDown > frontsGone, "machines were given up before the front voices");
         Assert.True(borrowedDown > machinesDown, "borrowed voices were given up before the machines");
@@ -783,7 +784,7 @@ public class ClientAudioSelectionTests
         _o.WriteLine($"inside: {voiced} trees voiced, the wood stands for {near.Trees:F2}");
         // The wood holds a voice of the machine budget itself; its nearest trees have the rest.
         Assert.Contains(woodVoice, h.Mixer.Live);
-        Assert.Equal(Math.Min(ClientAudioSystem.MachineVoiceBudget - 1, trees.Count), voiced);
+        Assert.Equal(Math.Min(new VoiceBudgets().Machines - 1, trees.Count), voiced);
         Assert.Equal(trees.Count - voiced, near.Trees, 1);
         // A tree within the hand-over has the whole of itself in its own voice.
         int nearest = trees.OrderBy(id => Vector3.Distance(h.World.GetSnapshot().Entities[id].Transform.Position, new Vector3(1016f, 1.7f, 1016f))).First();

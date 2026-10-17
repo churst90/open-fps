@@ -154,14 +154,13 @@ public partial class ClientAudioSystem
     /// </summary>
     public const float EngineSourceLevelDb = 116f;
 
-    /// <summary>
-    /// How many vehicles may run a live engine at once (OPENFPS_ENGINE_VOICES overrides). Each is a whole
-    /// engine integrated sample by sample on the render pool; a V8 renders about nine seconds of audio per
-    /// core-second in a release build (`--engine-cost`). The rest borrow a near car's ring (distant voices).
-    /// </summary>
-    public static readonly int EngineVoiceBudget =
-        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ENGINE_VOICES"), out int budget) && budget > 0
-            ? budget : 32;
+    /// <summary>The most voices of each kind this world plays (VoiceBudgets), its options'.</summary>
+    private readonly VoiceBudgets _budgets;
+    private int EngineVoiceBudget => _budgets.Engines;
+    private int EchoCeiling => _budgets.Echoes;
+    private int FrontVoiceBudget => _budgets.Front;
+    private int PlaceVoiceBudget => _budgets.Places;
+    private int MachineVoiceBudget => _budgets.Machines;
 
     /// <summary>
     /// The engine budget in force, steered by the measured mixer load: what an engine costs depends on
@@ -170,31 +169,14 @@ public partial class ClientAudioSystem
     /// sounds like voices being swapped, while nobody notices a wall stop answering. The floor is two
     /// cars; one engine on a racetrack is not a race.
     /// </summary>
-    private int _adaptiveBudget = EngineVoiceBudget;
+    private int _adaptiveBudget;
 
     /// <summary>Producer starves per second above which live engines are given up.</summary>
     private const float StarveCeilingPerSecond = 5f;
     private float _starveRate;
     private int _starvesSeen;
     private double _starveSampledAt = -1;
-    /// <summary>
-    /// Reflections per engine (OPENFPS_ENGINE_ECHOES: 0 none, 1 one; a diagnostic lever). Echoes churn
-    /// more than anything else in the audio system (about 256 created and released in 98 s on the city)
-    /// and are the only voices that read another voice's buffers, so taking them out is the quickest way
-    /// to clear or implicate them in a mixer-thread fault.
-    /// </summary>
-    /// <remarks>
-    /// An unsmeared echo is a coherent copy of the engine: against the direct sound a comb that sweeps as
-    /// either moves (a car heard inside out), alone a point beamed from a wall. So each echo is smeared by
-    /// the roughness of its wall (EngineEchoState.Scattering) and swells and fades over a few hundred
-    /// milliseconds instead of switching.
-    /// </remarks>
-    public static readonly int EchoCeiling =
-        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ENGINE_ECHOES"), out int ec) && ec >= 0
-            ? Math.Min(ec, EngineReflections.MaxEchoesPerEngine)
-            : EngineReflections.MaxEchoesPerEngine;
-
-    private int _adaptiveEchoes = EchoCeiling;
+    private int _adaptiveEchoes;
     private double _lastBudgetChange;
 
     /// <summary>However short the mixer runs, this many cars are fully SYNTHESIZED.</summary>
@@ -210,25 +192,8 @@ public partial class ClientAudioSystem
     /// <summary>A vehicle's siren head's voice. Its own voice; see SirenVoiceState.</summary>
     private int SirenVoiceId(int carId) => _voices.IdFor(VoiceKind.Siren, carId);
 
-    /// <summary>
-    /// How many machines may have their front outlet voiced separately (OPENFPS_FRONT_VOICES=0 keeps
-    /// each on one voice, for an A/B). A car's ends are told apart only inside about 20 m, so few are
-    /// needed except on a start grid. The first thing given up when the mixer runs short, before
-    /// reflections: the machine stays fully audible without it.
-    /// </summary>
-    private static readonly int FrontVoiceBudget =
-        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_FRONT_VOICES"), out int fv) && fv >= 0 ? fv : 6;
-    private int _adaptiveFront = FrontVoiceBudget;
-
-    /// <summary>
-    /// How many outer places of trees, fires and fountain taps may have voices at once (ExtendedSources),
-    /// nearest source first; OPENFPS_PLACE_VOICES=0 keeps each on its middle. A place given up costs only
-    /// geometry (the source merges to its middle at the same level), so places are the first thing the
-    /// mixer gives up and the last it takes back, a source's worth at a time.
-    /// </summary>
-    private static readonly int PlaceVoiceBudget =
-        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_PLACE_VOICES"), out int pv) && pv >= 0 ? pv : 36;
-    private int _adaptivePlaces = PlaceVoiceBudget;
+    private int _adaptiveFront;
+    private int _adaptivePlaces;
     private const int PlaceBudgetStep = 6;
 
     /// <summary>Which machines currently have their front outlet on a voice of its own.</summary>
@@ -239,19 +204,7 @@ public partial class ClientAudioSystem
     /// <summary>How many engines may be BUILT in one audio update. See ChooseLiveEngines.</summary>
     private const int NewEnginesPerUpdate = 2;
 
-    /// <summary>
-    /// How many voices the standing machines (air conditioners, mowers, plant), aircraft, fountains, bells
-    /// and trains may have at once. Its own budget: a map carries tens of vehicles but hundreds of small
-    /// machines (the city has 114 window units). Ranked not by distance but by how loud each would be here,
-    /// at the ear (Loudness.RenderedGain, then Loudness.HeardGain): a rooftop condenser at 65 dB 80 m away
-    /// beats a 59 dB window unit behind a hedge. Counted in voices, not things: a fountain is five and a
-    /// train up to six (TrainVoicing). OPENFPS_MACHINE_VOICES overrides, and 0 is a valid answer: every
-    /// machine and aircraft voice off.
-    /// </summary>
-    public static readonly int MachineVoiceBudget =
-        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MACHINE_VOICES"), out int mbudget) && mbudget >= 0
-            ? mbudget : 24;
-    private int _adaptiveMachines = MachineVoiceBudget;
+    private int _adaptiveMachines;
 
     /// <summary>However short the mixer runs, this many machine voices are kept, and the loudest machine
     /// keeps its voice whatever it costs: the one you are standing next to is the one you would notice
@@ -366,6 +319,12 @@ public partial class ClientAudioSystem
     {
         _now = clock;
         _audio = audio;
+        _budgets = audio.Options.Budgets;
+        _adaptiveBudget = EngineVoiceBudget;
+        _adaptiveEchoes = EchoCeiling;
+        _adaptiveFront = FrontVoiceBudget;
+        _adaptivePlaces = PlaceVoiceBudget;
+        _adaptiveMachines = MachineVoiceBudget;
         _sounds = sounds;
         _player = () => new ListenerState
         {
@@ -565,7 +524,7 @@ public partial class ClientAudioSystem
         // The previous snapshot, kept before assigning: comparing `world` with `_lastSnapshot` after it
         // compared it with itself and silently disabled the moving-region check below. The two may also be
         // the same object (an unchanged world), and a zero delta is then right.
-        var previous = _lastSnapshot;
+        _previous = _lastSnapshot;
         _lastSnapshot = world;
         _sources.Refill(world);
         _acousticWorker.UpdateWorld(world);
@@ -625,14 +584,8 @@ public partial class ClientAudioSystem
         _audio.SetEarWind(earListener);
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(Listener.Shelter);
-        WorldAudio.ListenerVehicleId = _state.RidingEntityId;
-        WorldAudio.ListenerSpeed = _earSpeed;
-        WorldAudio.Cabins = _cabins;
-        WorldAudio.SelfId = OwnEntityId;
-        WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
-        _beacons.EarSpeed = _earSpeed;
-        _beacons.Update(world, visualEyePos, _now(), OwnEntityId);
-        _drivingAids.Update(world, _state, _now());
+        // The host's: the one-off sounds, the beacons and the driving aids, placed from here.
+        ListenerPlaced(visualEyePos, _earSpeed);
         // The rest of the world through the glass, if you sit in anything with a roof.
         var (encLow, encMid, encHigh) = CabinEnclosure();
         // Now and then, forget the windows of vehicles that have gone.
@@ -652,38 +605,15 @@ public partial class ClientAudioSystem
                                            _acousticWorker.ListenerLfDecayRatio);
         }
         
-        if (world.AcousticMap != null)
+        var rooms = ((IAcousticWorld)world).Rooms;
+        bool newRooms = rooms != null && rooms != _lastAcousticMap;
+        if (newRooms)
         {
-            if (world.AcousticMap != _lastAcousticMap)
-            {
-                _audio.SetAcousticMap(world.AcousticMap);
-                _lastAcousticMap = world.AcousticMap;
-            }
-            else
-            {
-                // Regions that moved. Over the region list, not the world: walking every entity is six
-                // thousand struct copies a frame on the city for six hundred regions, almost none movable.
-                foreach (int regionId in world.RegionEntityIds)
-                {
-                    if (world.Entities.TryGetValue(regionId, out var snap))
-                    {
-                        if (previous != null && previous.Entities.TryGetValue(snap.Id, out var oldSnap))
-                        {
-                            if (Vector3.Distance(snap.Transform.Position, oldSnap.Transform.Position) > 0.1f || 
-                                Math.Abs(Quaternion.Dot(snap.Transform.Rotation, oldSnap.Transform.Rotation)) < 0.999f)
-                            {
-                                OpenFPS.Common.Systems.AcousticVolumeGenerator.UpdateRegion(world.AcousticMap, snap.Id, snap.Transform.Position, snap.Transform.Rotation, snap.Definition.Region.ToRoom());
-                            }
-                        }
-                    }
-                }
-            }
+            _audio.SetAcousticMap(rooms!);
+            _lastAcousticMap = rooms;
         }
-        
-        UpdateAcousticState(world, visualEyePos, listenerRegionId);
-        // Through the echo system: the grandstand that answers a car answers the people on it too, on the
-        // same terms (obstruction-tested).
-        WorldAudio.Update(world, visualEyePos, _audio.Clock.Now, _engineEchoes);
+        // The host's: the rooms that moved, the place's name, the one-off sounds.
+        RoomsSet(visualEyePos, listenerRegionId, newRooms);
 
         // Six rays out of the head, turned by its rotation, so the answer is "concrete half a metre to my
         // left"; each becomes its own early reflection (BoundaryModel, BoundaryProximityProcessor). This is
@@ -892,8 +822,8 @@ public partial class ClientAudioSystem
         UpdateTalkers(world, visualEyePos, _audio.Clock.Now);
         _partMs[3] += Ms(partAt);
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
-        _birds.EarSpeed = _earSpeed;
-        _birds.Update(world, visualEyePos, _audio.Clock.Now);
+        // The host's: the birds.
+        SourcesPlaced(visualEyePos, _earSpeed);
         _rain.EarSpeed = _earSpeed;
         _rain.Update(world, _sources.Falling, visualEyePos, _audio.Clock.Now, listenerRegionId, OwnEntityId, Listener.RidingId);
         _partMs[2] += Ms(partAt);
@@ -940,9 +870,9 @@ public partial class ClientAudioSystem
     /// </summary>
     private readonly double[] _partMs = new double[4], _partWorstMs = new double[4];
     private double _partWorstPass;
-    private static readonly string[] PartNames = { "echoes", "ground", "birds", "horns+sirens" };
+    private readonly string[] PartNames = { "echoes", "ground", "birds", "horns+sirens" };
     private static double Ms(long from) => (System.Diagnostics.Stopwatch.GetTimestamp() - from) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-    private static readonly string[] StageNames =
+    private readonly string[] StageNames =
         { "listener+map", "paths", "budget", "emitters", "mixer" };
 
     private void Stage(int stage, ref long since)
@@ -952,6 +882,67 @@ public partial class ClientAudioSystem
         if (ms > _stageWorstMs[stage]) _stageWorstMs[stage] = ms;
         since = now;
     }
+
+    /// <summary>The snapshot before this frame's, for the rooms that moved.</summary>
+    private WorldSnapshot? _previous;
+
+    /// <summary>The host's part once the listener is placed: the one-off sounds told where the ears are, the
+    /// beacons and the driving aids.</summary>
+    private void ListenerPlaced(Vector3 ear, float earSpeed)
+    {
+        var world = _sources.World;
+        WorldAudio.ListenerVehicleId = _state.RidingEntityId;
+        WorldAudio.ListenerSpeed = earSpeed;
+        WorldAudio.Cabins = _cabins;
+        WorldAudio.SelfId = OwnEntityId;
+        WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
+        _beacons.EarSpeed = earSpeed;
+        _beacons.Update(world, ear, _now(), OwnEntityId);
+        _drivingAids.Update(world, _state, _now());
+    }
+
+    /// <summary>The host's part once the rooms are set: the rooms that moved (unless the map is new), the
+    /// place's name, and the one-off sounds through the echo system (the grandstand that answers a car answers
+    /// the people on it too, on the same terms).</summary>
+    private void RoomsSet(Vector3 ear, int listenerRegion, bool newRooms)
+    {
+        var world = _sources.World;
+        if (world.AcousticMap != null && !newRooms)
+        {
+            // Regions that moved. Over the region list, not the world: walking every entity is six
+            // thousand struct copies a frame on the city for six hundred regions, almost none movable.
+            foreach (int regionId in world.RegionEntityIds)
+            {
+                if (world.Entities.TryGetValue(regionId, out var snap))
+                {
+                    if (_previous != null && _previous.Entities.TryGetValue(snap.Id, out var oldSnap))
+                    {
+                        if (Vector3.Distance(snap.Transform.Position, oldSnap.Transform.Position) > 0.1f ||
+                            Math.Abs(Quaternion.Dot(snap.Transform.Rotation, oldSnap.Transform.Rotation)) < 0.999f)
+                        {
+                            OpenFPS.Common.Systems.AcousticVolumeGenerator.UpdateRegion(world.AcousticMap, snap.Id, snap.Transform.Position, snap.Transform.Rotation, snap.Definition.Region.ToRoom());
+                        }
+                    }
+                }
+            }
+        }
+        UpdateAcousticState(world, ear, listenerRegion);
+        WorldAudio.Update(world, ear, _audio.Clock.Now, _engineEchoes);
+    }
+
+    /// <summary>The host's part once the voices are placed: the birds.</summary>
+    private void SourcesPlaced(Vector3 ear, float earSpeed)
+    {
+        _birds.EarSpeed = earSpeed;
+        _birds.Update(_sources.World, ear, _audio.Clock.Now);
+    }
+
+    /// <summary>The floor under a point as the host's physics has it, not counting <paramref name="leaveOut"/>.</summary>
+    private float GroundUnder(Vector3 at, int leaveOut)
+        => OpenFPS.Common.PhysicsUtils.GetGroundHeight(_sources.World, at, leaveOut, out _);
+
+    /// <summary>One-off sounds the host has waiting to be heard, for the census.</summary>
+    private int OneOffsPending => WorldAudio.Pending_Count;
 
     private void UpdateAcousticState(WorldSnapshot world, Vector3 eyePos, int regId)
     {
@@ -1190,7 +1181,7 @@ public partial class ClientAudioSystem
         var p = src.State.Position;
         height = float.PositiveInfinity;
         if (p.Y - eyePos.Y > 60f) return false;
-        float groundY = OpenFPS.Common.PhysicsUtils.GetGroundHeight(world, p, src.Id, out _);
+        float groundY = GroundUnder(p, src.Id);
         height = p.Y - groundY;
         // A jet sits five metres up on its gear and a light single one: a fraction of length serves both.
         float sitsAt = 0.15f * (PhysicalAircraft(src.Spec.SoundId)?.LengthMetres ?? 8f);
@@ -1722,7 +1713,7 @@ public partial class ClientAudioSystem
             Log.Information("  {Voices} reflection voice(s) of a {Budget} budget, floor {Floor:G3}; "
                           + "{Pending} submission(s) queued, {Transients} transient(s) waiting to be heard.",
                             _engineEchoes.VoiceCount, _engineEchoes.MaxReflectionVoices, _engineEchoes.AudibilityFloor,
-                            _audio.PendingSubmissions, WorldAudio.Pending_Count);
+                            _audio.PendingSubmissions, OneOffsPending);
 
             // The longest every source stood still. Target one 60 Hz period, 17 ms; over about 100 ms a
             // car passing in front of you is heard to stop dead and carry on.
@@ -3533,7 +3524,7 @@ public partial class ClientAudioSystem
 
     /// <summary>OPENFPS_AUDIO_DEBUG=1 logs what your own feet did and when: a landing is heavier than a
     /// step, so this answers "periodic bangs" outright.</summary>
-    private static readonly bool _footTrace = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
+    private bool _footTrace => _audio.Options.TraceFeet;
 
     // ── The listening-level calibration's voice (ListeningCalibration) ────────────────────────
     //

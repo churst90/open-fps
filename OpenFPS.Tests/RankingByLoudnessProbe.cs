@@ -100,7 +100,7 @@ public class RankingByLoudnessProbe
                 var feet = new Vector3(spot.East, spot.Height, spot.North);
                 var before = Choose(defs, feet, onGain: true);
                 var after = Choose(defs, feet, onGain: false);
-                Say($"\n{spot.Name} (/tp {spot.East} {spot.North} {spot.Height}): budget {ClientAudioSystem.MachineVoiceBudget} machines");
+                Say($"\n{spot.Name} (/tp {spot.East} {spot.North} {spot.Height}): budget {new VoiceBudgets().Machines} machines");
                 Say("  source                                  dist m   rank by gain   rank by loudness   before  after");
                 var all = before.Keys.Union(after.Keys)
                                 .OrderByDescending(k => after.TryGetValue(k, out var a) ? a.Rank : float.NegativeInfinity)

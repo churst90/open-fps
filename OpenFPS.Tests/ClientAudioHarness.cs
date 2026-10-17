@@ -28,10 +28,11 @@ internal sealed class ClientAudioHarness
 
     /// <param name="soundsPath">A sound bank to resolve recorded sounds from, such as footsteps. None by
     /// default: the synthesised voices need no files.</param>
-    public ClientAudioHarness(string? soundsPath = null)
+    /// <param name="options">The world's options; none: the shipped world.</param>
+    public ClientAudioHarness(string? soundsPath = null, AudioWorldOptions? options = null)
     {
         World.Clear(new Vector3(4000, 400, 4000));
-        Facade = new AudioEngineFacade(Mixer);
+        Facade = new AudioEngineFacade(Mixer, options: options);
         Facade.InitializeForTest(soundsPath);
         // The hand-rolled tracer, as on every runner without phonon, even in a run that has loaded Steam Audio
         // (the opt-in Steam Audio tests): what the harness's tests hold must not depend on the machine.

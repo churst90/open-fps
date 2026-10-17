@@ -23,7 +23,7 @@ public partial class ClientAudioSystem
     /// <summary>How long a train's voice is kept with nothing in it before it is let go, seconds.</summary>
     private const double TrainVoiceHoldSeconds = 4.0;
 
-    private static readonly TrainSlotPlan EmptyTrainPlan = new(Array.Empty<int>(), Array.Empty<float>());
+    private readonly TrainSlotPlan EmptyTrainPlan = new(Array.Empty<int>(), Array.Empty<float>());
 
     /// <summary>Trains the machine budget admitted this frame, by "preset/train", and their entities.</summary>
     private readonly HashSet<string> _liveTrains = new(StringComparer.OrdinalIgnoreCase);

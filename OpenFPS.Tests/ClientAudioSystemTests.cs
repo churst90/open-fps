@@ -1,3 +1,4 @@
+using OpenFPS.Client.AudioEngine.Core;
 using System.Numerics;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
@@ -32,7 +33,7 @@ public class ClientAudioSystemTests
     {
         var h = new ClientAudioHarness();
         h.StandAt(Vector3.Zero);
-        int budget = ClientAudioSystem.EngineVoiceBudget;
+        int budget = new VoiceBudgets().Engines;
         for (int i = 0; i < budget; i++)
         {
             float a = i * 2f * MathF.PI / budget;
@@ -112,9 +113,9 @@ public class ClientAudioSystemTests
         h.StandAt(Vector3.Zero);
         h.AddCar(NearCar, preset, new Vector3(30f, 0f, 0f));
         // Enough of the same kind that the last one has to borrow.
-        for (int i = 1; i <= ClientAudioSystem.EngineVoiceBudget; i++)
+        for (int i = 1; i <= new VoiceBudgets().Engines; i++)
             h.AddCar(NearCar + i, preset, new Vector3(30f + i * 0.5f, 0f, 40f + i));
-        int last = NearCar + ClientAudioSystem.EngineVoiceBudget;
+        int last = NearCar + new VoiceBudgets().Engines;
         int borrowed = h.DistantVoice(last);
         Assert.True(h.TickUntil(() => h.Mixer.WasStarted(NearCar) && h.Mixer.WasStarted(borrowed), 120));
 
@@ -163,7 +164,7 @@ public class ClientAudioSystemTests
     public void TheNearestCarsAreSynthesizedAndTheRestBorrowAndMovingSwapsThem()
     {
         var h = new ClientAudioHarness();
-        int budget = ClientAudioSystem.EngineVoiceBudget;
+        int budget = new VoiceBudgets().Engines;
         const int extra = 8;
         int n = budget + extra;
         for (int i = 0; i < n; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i * 10f, 0f, 0f));

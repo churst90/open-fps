@@ -1,3 +1,4 @@
+using OpenFPS.Client.AudioEngine.Acoustics;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Engine;
@@ -74,6 +75,44 @@ public class AudioWorldOptionsTests
         Assert.False(set.WideSources.Enabled);
         Assert.Equal(ExtendedSources.PlaceRule.Middle, set.WideSources.Rule);
         Assert.False(set.CabinPathsOn);
+    }
+
+    [Fact]
+    public void TheBudgetsComeFromTheEnvironmentAsTheStaticsDid()
+    {
+        var shipped = AudioWorldOptions.From(_ => null).Budgets;
+        Assert.Equal(new VoiceBudgets(), shipped);
+        Assert.Equal((32, EngineReflections.MaxEchoesPerEngine, 6, 36, 24),
+                     (shipped.Engines, shipped.Echoes, shipped.Front, shipped.Places, shipped.Machines));
+
+        var vars = new Dictionary<string, string>
+        {
+            ["OPENFPS_ENGINE_VOICES"] = "5", ["OPENFPS_ENGINE_ECHOES"] = "9", ["OPENFPS_FRONT_VOICES"] = "0",
+            ["OPENFPS_PLACE_VOICES"] = "12", ["OPENFPS_MACHINE_VOICES"] = "0", ["OPENFPS_AUDIO_DEBUG"] = "1",
+        };
+        var set = AudioWorldOptions.From(vars.GetValueOrDefault);
+        // Echoes no more than an engine has; no engines at all is not a budget, no machines is.
+        Assert.Equal((5, EngineReflections.MaxEchoesPerEngine, 0, 12, 0),
+                     (set.Budgets.Engines, set.Budgets.Echoes, set.Budgets.Front, set.Budgets.Places, set.Budgets.Machines));
+        Assert.True(set.TraceFeet);
+        Assert.False(AudioWorldOptions.From(_ => null).TraceFeet);
+        Assert.Equal(32, AudioWorldOptions.From(new Dictionary<string, string> { ["OPENFPS_ENGINE_VOICES"] = "0" }.GetValueOrDefault).Budgets.Engines);
+    }
+
+    [Fact]
+    public void AWorldsEngineBudgetIsItsOwn()
+    {
+        static int Engines(AudioWorldOptions? options)
+        {
+            var h = new ClientAudioHarness(options: options);
+            h.StandAt(Vector3.Zero);
+            for (int i = 0; i < 5; i++)
+                h.AddCar(500 + i, "i4_economy", new Vector3(15f * MathF.Cos(i), 0f, 15f * MathF.Sin(i)));
+            h.Tick(30);
+            return h.Mixer.Started.Where(e => !string.IsNullOrEmpty(e.EngineKey)).Select(e => e.EntityId).Distinct().Count();
+        }
+        Assert.Equal(5, Engines(null));
+        Assert.Equal(3, Engines(new AudioWorldOptions { Budgets = new VoiceBudgets { Engines = 3 } }));
     }
 
     [Fact]
