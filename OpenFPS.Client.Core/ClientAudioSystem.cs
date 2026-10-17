@@ -64,9 +64,6 @@ public sealed class ClientAudioSystem : IAudioHost
         set => _world.OwnVoiceLive = value;
     }
 
-    /// <summary>The birds: found from the map's foliage and roofs, not placed. See BirdLife.</summary>
-    private readonly BirdLife _birds;
-
     /// <summary>With <paramref name="prewarm"/> false the city's doors are not rendered in the background
     /// at start: a session with no sound has nothing to play them on.</summary>
     public ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state, bool prewarm = true)
@@ -103,8 +100,6 @@ public sealed class ClientAudioSystem : IAudioHost
         _sources.Silenced = def => def.Type == EntityType.Beacon && !_beacons.IsOn(def.Identity.BeaconCategory);
         // The wire's events, decoded into the world's one-off sounds.
         WorldAudio = new WorldAudioPlayer(_world.OneOffs);
-        _birds = new BirdLife(audio, _world.Acoustics, seed) { Voices = _world.Voices, Worker = _world.AcousticWorker };
-        WorldAudio.Received = message => _birds.Heard(message, _audio.Clock.Now);
     }
 
     private static Func<double> StopwatchClock()
@@ -267,13 +262,6 @@ public sealed class ClientAudioSystem : IAudioHost
             }
         }
         UpdateAcousticState(world, ear, listenerRegion);
-    }
-
-    /// <summary>Once the voices are placed: the birds.</summary>
-    void IAudioHost.SourcesPlaced(Vector3 ear, float earSpeed)
-    {
-        _birds.EarSpeed = earSpeed;
-        _birds.Update(_sources.World, ear, _audio.Clock.Now);
     }
 
 

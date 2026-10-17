@@ -66,7 +66,6 @@ FILE_RULES = [
     (CC + 'WorldAudioPlayer.cs', 'b', '', "the WorldAudioEvent decoding (stage 7); the one-off sounds and their echoes are Audio's OneOffSounds"),
     (CC + 'SpatialService.cs', 'b', '', 'the game\'s rays and entity lookups; its acoustic queries are the library\'s (AcousticRays, stage 6)'),
     (CC + 'ClientGeometry.cs', 'b', '', "open-fps's geometry adapter (entities to TriangleWorld)"),
-    (CC + 'BirdLife.cs', 'b', '', 'SPLIT: species choice and calling go to Sound/Audio; the habitat survey reads entities'),
     (CC + 'ListeningCalibration.cs', 'b', '', 'a UI flow; uses Loudness'),
     (CC + 'AudioDiagnostics.cs', 'b', '', 'a console test'),
     (CC + 'Platform/', 'b', '', ''),

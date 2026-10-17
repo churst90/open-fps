@@ -39,7 +39,5 @@ public interface IAudioHost
     /// place's name. The world's one-off sounds are placed after it.</summary>
     void RoomsSet(System.Numerics.Vector3 ear, int listenerRegion, bool newRooms);
 
-    /// <summary>The world's sources are placed: what the host places after them (open-fps: the birds).</summary>
-    void SourcesPlaced(System.Numerics.Vector3 ear, float earSpeed);
 
 }

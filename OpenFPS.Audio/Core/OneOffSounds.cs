@@ -340,10 +340,14 @@ public sealed class OneOffSounds
     /// </summary>
     public Action<string, float[], float>? TrainSignalReceived { get; set; }
 
+    /// <summary>Every event's sounds, before they are played: the birds go quiet at a bang.</summary>
+    public Action<IReadOnlyList<TransientSound>>? Received { get; set; }
+
     /// <summary>One event the world reports: its sounds, from <paramref name="sourceEntityId"/> (or -1), drawn from
     /// <paramref name="seed"/>, labelled for the trace. Renders anything new, and queues every sound for its moment.</summary>
     public void Receive(IReadOnlyList<TransientSound> sounds, int sourceEntityId, int seed, string? label, double now)
     {
+        Received?.Invoke(sounds);
         if (HornReceived != null && sounds.Count == 1
             && Honk.TryParse(sounds[0].SynthKey, out string horn, out float[] rhythm))
         {

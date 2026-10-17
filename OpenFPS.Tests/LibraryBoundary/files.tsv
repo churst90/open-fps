@@ -66,6 +66,7 @@ OpenFPS.Audio/Core/AudioWorld.Trains.cs	lib	Audio
 OpenFPS.Audio/Core/AudioWorld.Voices.cs	lib	Audio	
 OpenFPS.Audio/Core/AudioWorld.cs	lib	Audio	
 OpenFPS.Audio/Core/AudioWorldOptions.cs	lib	Audio	
+OpenFPS.Audio/Core/BirdLife.cs	lib	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	lib	Audio	
 OpenFPS.Audio/Core/LoudspeakerVoices.cs	lib	Audio	
 OpenFPS.Audio/Core/OneOffSounds.cs	lib	Audio	
@@ -128,7 +129,6 @@ OpenFPS.Audio/SteamAudio/TracedReverb.cs	lib	Audio
 OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	lib	Audio	
 OpenFPS.Client.Core/AudioDiagnostics.cs	host		
 OpenFPS.Client.Core/BeaconAids.cs	host		
-OpenFPS.Client.Core/BirdLife.cs	host		
 OpenFPS.Client.Core/ClientAudioPaths.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.cs	host		
 OpenFPS.Client.Core/ClientGeometry.cs	host		

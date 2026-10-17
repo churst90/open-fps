@@ -72,6 +72,7 @@ OpenFPS.Audio/Core/AudioWorld.Trains.cs	Audio
 OpenFPS.Audio/Core/AudioWorld.Voices.cs	Audio	
 OpenFPS.Audio/Core/AudioWorld.cs	Audio	
 OpenFPS.Audio/Core/AudioWorldOptions.cs	Audio	
+OpenFPS.Audio/Core/BirdLife.cs	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	Audio	
 OpenFPS.Audio/Core/LoudspeakerVoices.cs	Audio	
 OpenFPS.Audio/Core/OneOffSounds.cs	Audio	
@@ -134,7 +135,6 @@ OpenFPS.Audio/SteamAudio/TracedReverb.cs	Audio
 OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	Audio	
 OpenFPS.Client.Core/AudioDiagnostics.cs	game	
 OpenFPS.Client.Core/BeaconAids.cs	Accessibility	
-OpenFPS.Client.Core/BirdLife.cs	game	library stage 7 (host until split)
 OpenFPS.Client.Core/ClientAudioPaths.cs	game	
 OpenFPS.Client.Core/ClientAudioSystem.cs	game	the audio world's host: sources from the snapshot, the game's sound features, the place's name
 OpenFPS.Client.Core/ClientGeometry.cs	game	

@@ -556,7 +556,7 @@ public class BirdLifeMutationTests
         using var rig = new Rig(10);
         var world = Neighbourhood();
         rig.Run(world, Ear, 0, 60);
-        rig.Birds.Heard(Bang(new Vector3(6f, 1f, 6f), 150f), 60);
+        rig.Birds.Heard(Bang(new Vector3(6f, 1f, 6f), 150f).Sounds, 60);
         int before = rig.Calls.Count;
         rig.Run(world, Ear, 60, 120);
         var after = rig.Calls.Skip(before).ToList();
@@ -576,8 +576,8 @@ public class BirdLifeMutationTests
 
     /// <summary>
     /// A bang that is under a species' startle level by the time it reaches them — 100 dB at the ear
-    /// and every hedge ten metres or more off — does not quiet them; and a message with no sounds in
-    /// it is nothing.
+    /// and every hedge ten metres or more off — does not quiet them; and an event with no sounds in it (the
+    /// wire's decoder drops one with none at all, WorldAudioPlayer) is nothing.
     /// </summary>
     [Fact]
     public void AFarOrQuietBangDoesNotQuietThem()
@@ -586,8 +586,8 @@ public class BirdLifeMutationTests
         var world = World(Grid(1, 900, 6f, 1f, (i, at) => Box(i, at, Hedge, "Foliage"))
                           .Where(e => new Vector2(e.Transform.Position.X, e.Transform.Position.Z).Length() is > 12f and < 40f));
         rig.Run(world, Ear, 0, 60);
-        rig.Birds.Heard(new WorldAudioEvent { Label = "nothing", Sounds = null! }, 60);
-        rig.Birds.Heard(Bang(Ear, 100f), 60);
+        rig.Birds.Heard(Array.Empty<TransientSound>(), 60);
+        rig.Birds.Heard(Bang(Ear, 100f).Sounds, 60);
         int before = rig.Calls.Count;
         rig.Run(world, Ear, 60, 8);
         Assert.True(rig.Calls.Count - before > 5, $"{rig.Calls.Count - before} calls in the 8 s after a distant bang");
@@ -603,7 +603,7 @@ public class BirdLifeMutationTests
         using var rig = new Rig(12);
         var world = Neighbourhood();
         rig.Run(world, new Vector3(2000f, 1.6f, 0f), 0, 5);
-        rig.Birds.Heard(Bang(new Vector3(6f, 1f, 6f), 150f), 5);
+        rig.Birds.Heard(Bang(new Vector3(6f, 1f, 6f), 150f).Sounds, 5);
         rig.Run(world, Ear, 5, 8);
         Assert.True(rig.Calls.Count > 5, $"{rig.Calls.Count} calls on arriving after a bang nobody was near");
     }

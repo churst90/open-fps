@@ -32,6 +32,10 @@ public partial class AudioWorld
     /// </summary>
     public OneOffSounds OneOffs => _oneOffs;
     private readonly OneOffSounds _oneOffs;
+
+    /// <summary>The birds: found from the map's foliage and roofs, not placed. See BirdLife.</summary>
+    public BirdLife Birds => _birds;
+    private readonly BirdLife _birds;
     private readonly AsyncAcousticWorker _acousticWorker;
     private readonly HashSet<string> _preloadedSounds = new();
 
@@ -344,6 +348,9 @@ public partial class AudioWorld
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
         _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced, audio.Clock) { Manual = manualAcoustics, Lab = audio.Lab };
         _oneOffs.Worker = _acousticWorker;
+        // The birds: found from the map's foliage and roofs, heard by the worker's answers (P6), quiet at a bang.
+        _birds = new BirdLife(audio, _acoustics, seed) { Voices = _voices, Worker = _acousticWorker };
+        _oneOffs.Received = sounds => _birds.Heard(sounds, _audio.Clock.Now);
         // The loudest surface of each rain patch is heard by the worker's answer, as every sustained voice is (P6).
         _rain.Worker = _acousticWorker;
         _rain.SlotProbe = slot => _voices.IdFor(VoiceKind.Probe, VoiceRegistry.NoEntity, VoiceRegistry.RainProbe(slot));
@@ -765,8 +772,8 @@ public partial class AudioWorld
         UpdateTalkers(world, visualEyePos, _audio.Clock.Now);
         _partMs[3] += Ms(partAt);
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
-        // The host's: the birds.
-        _host.SourcesPlaced(visualEyePos, _earSpeed);
+        _birds.EarSpeed = _earSpeed;
+        _birds.Update(world, visualEyePos, _audio.Clock.Now);
         _rain.EarSpeed = _earSpeed;
         _rain.Update(world, _sources.Falling, visualEyePos, _audio.Clock.Now, listenerRegionId, OwnEntityId, Listener.RidingId);
         _partMs[2] += Ms(partAt);

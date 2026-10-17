@@ -4,7 +4,6 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Client.Core;
 
@@ -16,7 +15,8 @@ namespace OpenFPS.Client.Core;
 /// Each bird has its own place, pitch, small repertoire and rhythm of bouts, a little contagious, so a
 /// hedge breaks out and settles together; each call is a one-off sound heard through the acoustic path.
 /// A loud enough sound nearby quiets a group for a while, and walking right up to one quiets it until
-/// you move on. Client-side, like footsteps: the server need not agree on a sparrow.
+/// you move on. Client-side, like footsteps: the server need not agree on a sparrow. Where they live is found
+/// from the world input's bodies (foliage, flat roofs with open sky), as the snapshot's entities were walked.
 /// </summary>
 public sealed class BirdLife
 {
@@ -57,6 +57,8 @@ public sealed class BirdLife
     private Group? _skein;
     private double _nextSkein = -1;
     private long _foundFrom = -1;
+    /// <summary>The world's bodies, refilled for each look at the scenery.</summary>
+    private readonly List<AcousticBody> _bodies = new();
 
     /// <summary>How many times the habitat has been looked for. Once per map.</summary>
     internal int SurveysRun { get; private set; }
@@ -105,22 +107,21 @@ public sealed class BirdLife
     /// Keyed on the scenery alone: keyed on the entity count, it reran every few seconds on the city as
     /// people and cars came and went (16 rays a roof on the game thread, 150 ms, 850 ms the first time)
     /// and threw away the birds already calling.</summary>
-    private void Survey(WorldSnapshot world)
+    private void Survey(IAcousticWorld world)
     {
-        long scenery = ScenerySignature(world);
+        long scenery = ScenerySignature(world, _bodies);
         if (scenery == _foundFrom) return;
         _foundFrom = scenery;
         SurveysRun++;
         _perched.Clear();
-        foreach (var e in world.Entities.Values)
+        foreach (var e in _bodies)
         {
             if (!IsScenery(e)) continue;
-            var def = e.Definition;
-            var size = def.Collider.Size;
+            var size = e.Size;
             if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) continue;
             float hash = Hash(e.Id);
 
-            if (AcousticRegistry.IsLeaves(def.Material.Material))
+            if (AcousticRegistry.IsLeaves(e.Material))
             {
                 // A sparrow group in one hedge in six, a dove in one in twelve.
                 if (hash < 0.16f) _perched.Add(Settle(BirdSpecies.HouseSparrow, e, size, onTop: false));
@@ -128,8 +129,8 @@ public sealed class BirdLife
                 continue;
             }
 
-            if (!def.Collider.IsSolid) continue;
-            float top = e.Transform.Position.Y + size.Y * 0.5f;
+            if (!e.Solid) continue;
+            float top = e.Position.Y + size.Y * 0.5f;
             if (top < RoofMinHeight || size.X * size.Z < RoofMinArea) continue;
             if (!NothingAbove(world, e, top)) continue;
             if (hash < 0.5f) _perched.Add(Settle(BirdSpecies.Pigeon, e, size, onTop: true));
@@ -142,20 +143,18 @@ public sealed class BirdLife
     }
 
     /// <summary>A fixed box a bird could live on: not a vehicle, a person or anything else that moves.</summary>
-    private static bool IsScenery(EntitySnapshot e)
-    {
-        var def = e.Definition;
-        return def != null && def.Type == EntityType.StaticObject && !def.Moves && e.Velocity == Vector3.Zero
-            && def.Collider.Shape == ColliderShape.Box;
-    }
+    private static bool IsScenery(in AcousticBody e)
+        => e.Fixed && !e.Moves && e.Velocity == Vector3.Zero && e.Shape == ColliderShape.Box;
 
     /// <summary>Which scenery is loaded, as one number: the count and the ids together, so a map swapped
     /// for another of the same size still counts as a change. A sum, so the order entities are held in
-    /// does not matter.</summary>
-    internal static long ScenerySignature(WorldSnapshot world)
+    /// does not matter. <paramref name="bodies"/> is left holding the world's bodies, in its order.</summary>
+    internal static long ScenerySignature(IAcousticWorld world, List<AcousticBody>? bodies = null)
     {
         long count = 0, ids = 0;
-        foreach (var e in world.Entities.Values)
+        bodies ??= new List<AcousticBody>();
+        world.AllBodies(bodies);
+        foreach (var e in bodies)
             if (IsScenery(e)) { count++; ids = unchecked(ids + (long)Hash(e.Id).GetHashCode() * 2654435761L + e.Id); }
         return unchecked(count * 1_000_003L ^ ids);
     }
@@ -169,16 +168,16 @@ public sealed class BirdLife
     /// Open sky over most of the slab, asked at a 4 x 4 grid of points: a roof has a condenser or a
     /// stair head here and there, and one ray up the middle found one roof on the whole city.
     /// </summary>
-    private bool NothingAbove(WorldSnapshot world, EntitySnapshot e, float top)
+    private bool NothingAbove(IAcousticWorld world, in AcousticBody e, float top)
     {
         if (_acoustics == null) return true;
-        var size = e.Definition.Collider.Size;
+        var size = e.Size;
         int open = 0, asked = 0;
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 4; j++)
             {
                 var local = new Vector3((i + 0.5f) / 4f - 0.5f, 0f, (j + 0.5f) / 4f - 0.5f) * new Vector3(size.X, 0f, size.Z);
-                var at = e.Transform.Position + Vector3.Transform(local, e.Transform.Rotation);
+                var at = e.Position + Vector3.Transform(local, e.Rotation);
                 var from = new Vector3(at.X, top + 0.3f, at.Z);
                 asked++;
                 if (!_acoustics.RaycastMaterial(world, from, Vector3.UnitY, 40f, out _, out _, out _, e.Id)) open++;
@@ -188,7 +187,7 @@ public sealed class BirdLife
 
     /// <summary>A group of one species on one perch. Deterministic in the perch, so every client and
     /// every visit finds the same birds in the same places.</summary>
-    private Group Settle(BirdSpecies species, EntitySnapshot perch, Vector3 size, bool onTop)
+    private Group Settle(BirdSpecies species, in AcousticBody perch, Vector3 size, bool onTop)
     {
         var rng = new Random(perch.Id * 7349 + species.Folder.Length);
         // Bigger perches hold more of a flock, up to the species' own limit.
@@ -217,7 +216,7 @@ public sealed class BirdLife
             }
             birds[i] = new Bird
             {
-                At = perch.Transform.Position + Vector3.Transform(local, perch.Transform.Rotation),
+                At = perch.Position + Vector3.Transform(local, perch.Rotation),
                 Pitch = 1f + species.PitchSpread * (2f * (float)rng.NextDouble() - 1f),
                 Repertoire = Pick(calls, rng, 4),
                 CallsLeft = 0,
@@ -225,7 +224,7 @@ public sealed class BirdLife
         }
         var heard = Vector3.Zero;
         foreach (var b in birds) heard += b.At;
-        return new Group { Species = species, Centre = perch.Transform.Position, Birds = birds, Perch = perch.Id, Heard = heard / Math.Max(1, n) };
+        return new Group { Species = species, Centre = perch.Position, Birds = birds, Perch = perch.Id, Heard = heard / Math.Max(1, n) };
     }
 
     private static string[] Pick(IReadOnlyList<string> calls, Random rng, int count)
@@ -245,7 +244,7 @@ public sealed class BirdLife
 
     // ── What they do ───────────────────────────────────────────────────────────────────────────
 
-    public void Update(WorldSnapshot world, Vector3 listener, double now)
+    public void Update(IAcousticWorld world, Vector3 listener, double now)
     {
         if (now >= _nextSurvey) { _nextSurvey = now + 2.0; Survey(world); }
         _askFrame++;
@@ -271,7 +270,7 @@ public sealed class BirdLife
         _lastNow = now;
     }
 
-    private void Live(WorldSnapshot world, Group g, Vector3 listener, double now)
+    private void Live(IAcousticWorld world, Group g, Vector3 listener, double now)
     {
         var sp = g.Species;
         // Somebody right up against them: they keep still and quiet until you go.
@@ -306,10 +305,9 @@ public sealed class BirdLife
 
     /// <summary>A sound loud enough where a group is (over its StartleDb) quiets it for 8 to 30 s; the
     /// birds come back one at a time.</summary>
-    public void Heard(WorldAudioEvent message, double now)
+    public void Heard(IReadOnlyList<TransientSound> sounds, double now)
     {
-        if (message.Sounds == null) return;
-        foreach (var s in message.Sounds)
+        foreach (var s in sounds)
             foreach (var g in _perched)
             {
                 if (!g.Awake) continue;
@@ -320,7 +318,7 @@ public sealed class BirdLife
             }
     }
 
-    /// <summary>Where every call is given its id and declared as it starts: ClientAudioSystem's registry, or
+    /// <summary>Where every call is given its id and declared as it starts: its audio world's registry, or
     /// one of its own on its own.</summary>
     internal VoiceRegistry Voices { get; set; }
 
@@ -364,7 +362,7 @@ public sealed class BirdLife
     /// as a near source's answer is (FirstAnswer); the hand-rolled tracer's for a group it has not answered yet,
     /// and for the geese.
     /// </summary>
-    private AcousticPathData? PathOf(WorldSnapshot world, Group? g, Vector3 at, Vector3 listener)
+    private AcousticPathData? PathOf(IAcousticWorld world, Group? g, Vector3 at, Vector3 listener)
     {
         if (_acoustics == null) return null;
         if (g != null && Worker != null && Worker.TryGetDirectFor(ProbeOf(g), g.Heard, 0f, listener, EarSpeed, out var answer))
@@ -381,7 +379,7 @@ public sealed class BirdLife
         try { return _acoustics.CalculateAcousticPath(world, -1, listener, at); } catch { return null; }
     }
 
-    private void Call(WorldSnapshot world, BirdSpecies sp, string sound, Vector3 at, Vector3 velocity, float pitch, Vector3 listener,
+    private void Call(IAcousticWorld world, BirdSpecies sp, string sound, Vector3 at, Vector3 velocity, float pitch, Vector3 listener,
                       Group? group = null)
     {
         float range = _audio.Hearing.AudibleRange(sp.CallDb);
@@ -426,7 +424,7 @@ public sealed class BirdLife
     /// Now and then a skein of geese goes over: a V 60 to 110 m up at 14 m/s, passing within 150 m of
     /// you and gone in about a minute and a half.
     /// </summary>
-    private void UpdateSkein(WorldSnapshot world, Vector3 listener, double now)
+    private void UpdateSkein(IAcousticWorld world, Vector3 listener, double now)
     {
         if (_nextSkein < 0) _nextSkein = now + Uniform(60f, SkeinEverySeconds);
         if (_skein == null && now >= _nextSkein)

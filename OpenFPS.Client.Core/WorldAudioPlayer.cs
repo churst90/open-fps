@@ -5,7 +5,7 @@ namespace OpenFPS.Client.Core;
 /// <summary>
 /// The one-off sounds the server reports (WorldAudioEvent), decoded for the audio world's <see cref="OneOffSounds"/>
 /// (docs/SOUND_LIBRARY_BOUNDARY.md, stage 7): the event off the wire is the game's, the playing is the library's.
-/// What hears every event before it is played (the birds go quiet at a bang) hears it here.
+/// The host's own features that hear every event before it is played hear it here (the world's birds hear its sounds).
 /// </summary>
 public sealed class WorldAudioPlayer
 {
@@ -15,7 +15,7 @@ public sealed class WorldAudioPlayer
     /// <summary>The audio world's one-off sounds, which play what this decodes.</summary>
     public OneOffSounds Sounds { get; }
 
-    /// <summary>Everything the world reports, before it is played: the birds go quiet at a bang.</summary>
+    /// <summary>Everything the world reports, before it is played, for the host's own features.</summary>
     public Action<WorldAudioEvent>? Received { get; set; }
 
     /// <summary>Takes an event off the wire: everything new is rendered, and every sound queued for its moment.</summary>

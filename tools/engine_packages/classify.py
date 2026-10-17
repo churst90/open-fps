@@ -93,7 +93,6 @@ PLANNED = set()
 # The first match wins. "by" says whose plan puts it there: this survey, the physics or the library survey.
 P = 'physics stage 2'
 L6 = 'library stage 6'
-L7 = 'library stage 7 (host until split)'
 FILE_RULES = [
     # The projects that are packages already map to themselves.
     ('OpenFPS.Words/*', 'Words', ''), ('OpenFPS.Schema/*', 'Schema', ''), ('OpenFPS.Native/*', 'Native', ''),
@@ -131,7 +130,6 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/Services/SoundMappingService.cs', 'Audio', 'which bank file a footstep plays'),
     ('OpenFPS.Client.Core/ClientAudioSystem.cs', 'game', 'the audio world\'s host: sources from the snapshot, the game\'s sound features, the place\'s name'),
     ('OpenFPS.Client.Core/WorldAudioPlayer.cs', 'game', 'the wire\'s one-off sounds decoded for the audio world\'s OneOffSounds'),
-    ('OpenFPS.Client.Core/BirdLife.cs', 'game', L7),
     ('OpenFPS.Client.Core/BeaconAids.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/DrivingAids.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/StairCues.cs', 'Accessibility', ''),

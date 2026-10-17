@@ -121,7 +121,7 @@ public class BirdLifeTests
         {
             Label = "gunshot",
             Sounds = new List<TransientSound> { new() { Position = hedge.Centre + new Vector3(6f, 0f, 0f), LevelDb = 150f } },
-        }, 61);
+        }.Sounds, 61);
         int after = Run(world, birds, mixer, audio, ear, 61, 7.5, "SPARROW", hedge.Centre);
         _o.WriteLine($"in the 7.5 s after a shot: {after}");
         Assert.True(after <= 1, "the sparrows carried on through a gunshot");
