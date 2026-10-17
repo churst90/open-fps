@@ -7,10 +7,9 @@
 1 ui ui:progress:7
 1 ui ui:progress:10
 1 ui ui:EnterWorld
-4 cue Beacon SYNTH/beacon_vehicle_hum
 8 say! You're in city, at Parking garage, level 0.
+19 cue Beacon SYNTH/beacon_vehicle_hum
 30 say 1.6 hatchback. A 1.6 hatchback. Press E beside it to get in.
-52 cue Beacon SYNTH/beacon_vehicle_hum
 62 say You are in the driver seat of 1.6 hatchback. The engine is off; T starts it. W and S to drive, A and D to steer, shift T switches it off.
 62 cue Aid SYNTH/drive_guide
 80 cue Aid SYNTH/drive_guide
