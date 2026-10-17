@@ -41,8 +41,10 @@ public static class GroundHydrology
 
     /// <summary>The hydrologic soil group, 0..3 for A..D (NEH-630 ch. 7). No soil survey is read yet, so
     /// one group stands for everywhere: B, a moderately fine loam, the commonest in the humid US. An
-    /// assumption until a soil layer gives each tile its own.</summary>
-    public static int SoilGroup = 1;
+    /// assumption until a soil layer gives each tile its own. Each world's ground carries its own
+    /// (GroundWaterSystem.SoilGroup, the networks it builds and the water it keeps; GroundWater.SoilGroup on a
+    /// client), which starts as this: two worlds no longer share one soil.</summary>
+    public const int DefaultSoilGroup = 1;
 
     // TR-55 runoff curve numbers by soil group A, B, C, D. Open: "pasture, grassland or range, fair" (2-2c);
     // Impervious: "paved parking lots, roofs, driveways" and "streets and roads, paved, curbs and storm
@@ -59,13 +61,13 @@ public static class GroundHydrology
         { 100, 100, 100, 100 },
     };
 
-    /// <summary>The surface's curve number in this soil group.</summary>
-    public static float CurveNumber(GroundSurface s) => Curve[Math.Min((int)s, Surfaces - 1), Math.Clamp(SoilGroup, 0, 3)];
+    /// <summary>The surface's curve number in a soil group.</summary>
+    public static float CurveNumber(GroundSurface s, int soilGroup = DefaultSoilGroup) => Curve[Math.Min((int)s, Surfaces - 1), Math.Clamp(soilGroup, 0, 3)];
 
     /// <summary>The potential retention S, mm: 25400 / CN − 254 (TR-55 eq. 2-4 in millimetres).</summary>
-    public static float RetentionMm(GroundSurface s)
+    public static float RetentionMm(GroundSurface s, int soilGroup = DefaultSoilGroup)
     {
-        float cn = CurveNumber(s);
+        float cn = CurveNumber(s, soilGroup);
         return cn >= 100f ? 0f : 25400f / cn - 254f;
     }
 
@@ -78,10 +80,10 @@ public static class GroundHydrology
     /// ground was last dry: the slope of TR-55's Q = (P − Ia)² / (P − Ia + S), dQ/dP = 1 − S² / (P − Ia + S)²,
     /// nothing until Ia has fallen. A lawn soaks up the first 32 mm, a road all but the first millimetre.
     /// </summary>
-    public static float ExcessShare(GroundSurface s, float eventMm)
+    public static float ExcessShare(GroundSurface s, float eventMm, int soilGroup = DefaultSoilGroup)
     {
         if (s == GroundSurface.Water) return 1f;
-        float sMm = RetentionMm(s);
+        float sMm = RetentionMm(s, soilGroup);
         if (sMm <= 0f) return 1f;
         float over = MathF.Max(0f, eventMm) - InitialAbstraction * sMm;
         if (over <= 0f) return 0f;
@@ -90,10 +92,10 @@ public static class GroundHydrology
     }
 
     /// <summary>The depth run off in all from an event of <paramref name="eventMm"/>, mm (TR-55 eq. 2-3).</summary>
-    public static float RunoffMm(GroundSurface s, float eventMm)
+    public static float RunoffMm(GroundSurface s, float eventMm, int soilGroup = DefaultSoilGroup)
     {
         if (s == GroundSurface.Water) return MathF.Max(0f, eventMm);
-        float sMm = RetentionMm(s);
+        float sMm = RetentionMm(s, soilGroup);
         float over = MathF.Max(0f, eventMm) - InitialAbstraction * sMm;
         return over <= 0f ? 0f : over * over / (over + sMm);
     }
@@ -150,7 +152,7 @@ public static class GroundHydrology
 
     /// <summary>The slowest the ground soaks water up once wet, mm/h (NEH-630 ch. 7, TR-55 Appendix A: group A
     /// over 7.6, B 3.8 to 7.6, C 1.3 to 3.8, D under 1.3; the middle of each).</summary>
-    public static float SoakMmPerHour => Math.Clamp(SoilGroup, 0, 3) switch { 0 => 9.5f, 1 => 5.7f, 2 => 2.5f, _ => 0.6f };
+    public static float SoakMmPerHour(int soilGroup = DefaultSoilGroup) => Math.Clamp(soilGroup, 0, 3) switch { 0 => 9.5f, 1 => 5.7f, 2 => 2.5f, _ => 0.6f };
 
     /// <summary>What a sealed surface lets through a crack or a joint, mm/h: the puddles' seepage (RoadWater).</summary>
     public const float SealedSeepMmPerHour = 0.3f;
@@ -312,6 +314,10 @@ public sealed class GroundWater
         public Spills(int[] ids, float[] flows) { Ids = ids; LitresPerSecond = flows; }
     }
 
+    /// <summary>The soil under this water (GroundHydrology.DefaultSoilGroup until a world says otherwise): how much
+    /// of the rain it takes in.</summary>
+    public int SoilGroup { get; init; } = GroundHydrology.DefaultSoilGroup;
+
     /// <summary>The rain falling now, mm/h.</summary>
     public float RainMmPerHour => Volatile.Read(ref _rain);
 
@@ -322,7 +328,7 @@ public sealed class GroundWater
     public float BaseflowMmPerHour => Volatile.Read(ref _groundMm) * 3600f / GroundwaterSeconds;
 
     /// <summary>The share of the rain falling now that runs off a surface.</summary>
-    public float ExcessShare(GroundSurface s) => GroundHydrology.ExcessShare(s, EventMm);
+    public float ExcessShare(GroundSurface s) => GroundHydrology.ExcessShare(s, EventMm, SoilGroup);
 
     /// <summary>
     /// Advances the water by <paramref name="dt"/> seconds of <paramref name="rainMmPerHour"/>. The first call
@@ -341,7 +347,7 @@ public sealed class GroundWater
         Volatile.Write(ref _eventMm, ev);
         for (int s = 0; s < GroundHydrology.Surfaces; s++)
         {
-            float e = i * GroundHydrology.ExcessShare((GroundSurface)s, ev);
+            float e = i * GroundHydrology.ExcessShare((GroundSurface)s, ev, SoilGroup);
             for (int k = 0; k < Rungs; k++)
             {
                 int at = s * Rungs + k;
@@ -350,7 +356,7 @@ public sealed class GroundWater
                 Volatile.Write(ref _held[at], held);
             }
         }
-        float soaked = i * (1f - GroundHydrology.ExcessShare(GroundSurface.Open, ev));
+        float soaked = i * (1f - GroundHydrology.ExcessShare(GroundSurface.Open, ev, SoilGroup));
         float g = _groundMm + (ClimateRechargeMmPerHour + RechargeShare * soaked - _groundMm * 3600f / GroundwaterSeconds) * dt / 3600f;
         Volatile.Write(ref _groundMm, MathF.Max(0f, g));
     }
@@ -364,7 +370,7 @@ public sealed class GroundWater
         Volatile.Write(ref _eventMm, ev);
         for (int s = 0; s < GroundHydrology.Surfaces; s++)
         {
-            float e = i * GroundHydrology.ExcessShare((GroundSurface)s, ev);
+            float e = i * GroundHydrology.ExcessShare((GroundSurface)s, ev, SoilGroup);
             for (int k = 0; k < Rungs; k++) Volatile.Write(ref _held[s * Rungs + k], e);
         }
         Volatile.Write(ref _groundMm, ClimateRechargeMmPerHour * GroundwaterSeconds / 3600f);

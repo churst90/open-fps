@@ -19,17 +19,22 @@ public static class RoadWaterSystem
         public PuddleField? Field;
         public RoadNetwork? Built;
         public readonly Dictionary<RoadData, int> RoadIndex = new(ReferenceEqualityComparer.Instance);
+        /// <summary>The world's water over the ground, whose hollows hold puddles on the roads too.</summary>
+        public GroundWaterSystem? Ground;
     }
 
     private static readonly ConcurrentDictionary<string, MapWater> _maps = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Advances one map's water by <paramref name="dt"/> seconds in its weather: the rain landing on it
-    /// (mm/h, zero when what falls is snow), and the air that dries it.
+    /// (mm/h, zero when what falls is snow), and the air that dries it. <paramref name="ground"/>: the world's
+    /// water over the ground, whose hollows a road's puddles stand in too.
     /// </summary>
-    public static void Update(string mapId, in WorldEnvironmentComponent env, float rainMmPerHour, RoadNetwork? roads, float dt)
+    public static void Update(string mapId, in WorldEnvironmentComponent env, float rainMmPerHour, RoadNetwork? roads, float dt,
+                              GroundWaterSystem? ground = null)
     {
         var m = _maps.GetOrAdd(mapId, _ => new MapWater());
+        m.Ground = ground;
         if (!ReferenceEquals(m.Built, roads))
         {
             m.Field = roads != null ? new PuddleField(roads.Roads.Select(r => r.ToCarriageway()).ToList()) : null;
@@ -66,8 +71,8 @@ public static class RoadWaterSystem
         float puddle = m.Field != null && m.RoadIndex.TryGetValue(road, out int index)
             ? m.Field.PuddleMm(index, along, lateral, m.Water.PuddleFill) : 0f;
         // A hollow of the road's own ground holding water (GroundWaterSystem): a puddle the survey shows.
-        if (road.Centreline.Count >= 2 && GroundWaterSystem.WaterOf(mapId) != null)
-            puddle = MathF.Max(puddle, GroundWaterSystem.StandingMm(mapId, PointOn(road, along, lateral)));
+        if (road.Centreline.Count >= 2 && m.Ground?.WaterOf(mapId) != null)
+            puddle = MathF.Max(puddle, m.Ground.StandingMm(mapId, PointOn(road, along, lateral)));
         return m.Water.WaterMm(surface, MathF.Abs(lateral), half - MathF.Abs(lateral), half, puddle);
     }
 
@@ -78,7 +83,7 @@ public static class RoadWaterSystem
         if (!_maps.TryGetValue(mapId, out var m)) return 0f;
         float water = m.Field != null ? m.Field.WaterAt(m.Water, p, surface) : m.Water.WaterMm(surface, 2f, float.PositiveInfinity, 0f);
         // Standing in a hollow of the ground (GroundWaterSystem): over the texture's own water.
-        float standing = GroundWaterSystem.StandingMm(mapId, p);
+        float standing = m.Ground?.StandingMm(mapId, p) ?? 0f;
         return standing > 0f ? MathF.Max(water, m.Water.TextureMm(surface) + standing) : water;
     }
 

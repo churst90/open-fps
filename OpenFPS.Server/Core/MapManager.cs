@@ -240,6 +240,10 @@ public partial class MapManager
         _prefabRepo = prefabRepo;
     }
 
+    /// <summary>The water over the ground of every map this manager loads (docs/RUNNING_WATER.md 13): this world's,
+    /// on its soil, its frames waiting on the machine's real time. The server steps it each tick and sends it.</summary>
+    public Systems.GroundWaterSystem GroundWater { get; } = new(() => RealTime.Milliseconds / 1000.0);
+
     /// <summary>The map a player lands on, overriding whichever map claims <c>IsDefault</c>. Set from
     /// <c>--map &lt;id&gt;</c> before <see cref="Initialize"/>.</summary>
     public string? RequestedMapId { get; set; }
@@ -559,7 +563,7 @@ public partial class MapManager
                 // (docs/RUNNING_WATER.md 13).
                 try
                 {
-                    foreach (var e in OpenFPS.Server.Water.MapDrainage.AtLoad(m.Id, world, tiles))
+                    foreach (var e in OpenFPS.Server.Water.MapDrainage.AtLoad(m.Id, world, tiles, GroundWater))
                     {
                         lookup[e.Id] = e;
                         if (layers != null) layers[e.Id] = OpenFPS.Server.Water.MapDrainage.Layer;

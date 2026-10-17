@@ -24,11 +24,10 @@ public class GroundWaterMagnoliaTests : IDisposable
     private readonly ITestOutputHelper _o;
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "openfps-groundwater-magnolia-" + Guid.NewGuid().ToString("N"));
 
-    public GroundWaterMagnoliaTests(ITestOutputHelper o) { _o = o; GroundWaterSystem.Reset(); }
+    public GroundWaterMagnoliaTests(ITestOutputHelper o) { _o = o; }
 
     public void Dispose()
     {
-        GroundWaterSystem.Reset();
         try { Directory.Delete(_dir, true); } catch (IOException) { }
     }
 
@@ -49,7 +48,7 @@ public class GroundWaterMagnoliaTests : IDisposable
     {
         if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "places", Id + ".json"))) return;
         var maps = Load();
-        var net = GroundWaterSystem.NetworkOf(Id);
+        var net = maps.GroundWater.NetworkOf(Id);
         Assert.NotNull(net);
         _o.WriteLine($"{net!.Tiles.Count} tiles; built in {net.BuildTime.TotalMilliseconds:F0} ms; {net.Lines.Count} lines ({net.Lines.Sum(l => l.LengthMetres) / 1000:F1} km); " +
                      $"{net.Ponds.Count} ponds ({net.Ponds.Count(p => p.IsPuddle)} puddles) of {net.Hollows} hollows, {net.Culverts} culverts; {net.Voices.Count} voices");
@@ -79,14 +78,14 @@ public class GroundWaterMagnoliaTests : IDisposable
         // Through a storm: the biggest creek's voice and the ditch with the most road draining into it.
         var creek = net.Voices.Where(v => v.Kind == GroundChannelKind.Creek).OrderByDescending(v => v.SquareMetres).First();
         var ditch = net.Voices.Where(v => v.Kind == GroundChannelKind.Ditch).OrderByDescending(v => v.Catchment.AreaSquareMetres[(int)GroundSurface.Impervious]).First();
-        GroundWaterSystem.Settle(Id, 0f);
-        float creekDry = GroundWaterSystem.FlowAt(Id, creek.Position), ditchDry = GroundWaterSystem.FlowAt(Id, ditch.Position);
+        maps.GroundWater.Settle(Id, 0f);
+        float creekDry = maps.GroundWater.FlowAt(Id, creek.Position), ditchDry = maps.GroundWater.FlowAt(Id, ditch.Position);
         var tick = Stopwatch.StartNew();
-        for (int t = 0; t < 600; t++) GroundWaterSystem.Update(Id, Rainfall.HeavyRate, 0.05f, 1f);
+        for (int t = 0; t < 600; t++) maps.GroundWater.Update(Id, Rainfall.HeavyRate, 0.05f, 1f);
         _o.WriteLine($"a second of the map's ground water (the ladders, {net.Ponds.Count} ponds): {tick.Elapsed.TotalMilliseconds / 600:F2} ms");
-        float creekWet = GroundWaterSystem.FlowAt(Id, creek.Position), ditchWet = GroundWaterSystem.FlowAt(Id, ditch.Position);
-        for (int t = 0; t < 1800; t++) GroundWaterSystem.Update(Id, 0f, 0.05f, 1f);
-        float creekAfter = GroundWaterSystem.FlowAt(Id, creek.Position), ditchAfter = GroundWaterSystem.FlowAt(Id, ditch.Position);
+        float creekWet = maps.GroundWater.FlowAt(Id, creek.Position), ditchWet = maps.GroundWater.FlowAt(Id, ditch.Position);
+        for (int t = 0; t < 1800; t++) maps.GroundWater.Update(Id, 0f, 0.05f, 1f);
+        float creekAfter = maps.GroundWater.FlowAt(Id, creek.Position), ditchAfter = maps.GroundWater.FlowAt(Id, ditch.Position);
         _o.WriteLine($"creek ({creek.SquareMetres / 1e4:F0} ha): {creekDry:F2} dry, {creekWet:F2} after 10 min of 25 mm/h, {creekAfter:F2} L/s 30 min after");
         _o.WriteLine($"ditch ({ditch.SquareMetres / 1e4:F1} ha): {ditchDry:F2} dry, {ditchWet:F2}, {ditchAfter:F2} L/s");
         Assert.True(creekDry > 1f, "a creek of a few square kilometres carries base flow in dry weather");
@@ -97,7 +96,7 @@ public class GroundWaterMagnoliaTests : IDisposable
         Assert.InRange(ditchAfter, 0f, 0.5f * ditchWet);
 
         // Where the creek is, how wet it is, what reaches a patch on its bank.
-        var wet = GroundWaterSystem.WetnessAt(Id, creek.Position);
+        var wet = maps.GroundWater.WetnessAt(Id, creek.Position);
         Assert.True(wet.FlowLitresPerSecond > 0f && wet.WaterDepthMm > 0f);
     }
 
@@ -108,7 +107,7 @@ public class GroundWaterMagnoliaTests : IDisposable
     {
         if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "places", Id + ".json"))) return;
         var maps = Load();
-        var net = GroundWaterSystem.NetworkOf(Id)!;
+        var net = maps.GroundWater.NetworkOf(Id)!;
         var clock = Stopwatch.StartNew();
         var places = WorldPlaces.FromMaps(maps);
         var place = Assert.Single(places.Places);

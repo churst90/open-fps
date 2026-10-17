@@ -79,9 +79,9 @@ public static class ExtentWalkSpike
             if (map == "albany_or")
             {
                 // Heavy rain on the place's drainage, as GroundWaterSpike's scenes: the lines running.
-                GroundWaterSystem.Settle(map, 0f);
-                for (int t = 1; t <= (int)(rainMinutes * 60f); t++) GroundWaterSystem.Update(map, Rainfall.HeavyRate, 0.05f, 1f);
-                ground = GroundWaterSystem.WaterOf(map)!.Save();
+                maps.GroundWater.Settle(map, 0f);
+                for (int t = 1; t <= (int)(rainMinutes * 60f); t++) maps.GroundWater.Update(map, Rainfall.HeavyRate, 0.05f, 1f);
+                ground = maps.GroundWater.WaterOf(map)!.Save();
             }
             float Floor(Vector3 near)
             {

@@ -11,9 +11,23 @@ namespace OpenFPS.Server.Systems;
 /// keep water filling and overflowing (ponds and puddles), and water added at a point (a bucket, a hose, a
 /// burst main) carried downhill. Asked by other systems how wet a place is and how much water is reaching a
 /// thing (the fire). Advanced on the tick thread.
+///
+/// One world's: its maps' and frames' water, on its soil. Whoever holds the world makes one (the server's map
+/// manager, MapManager.GroundWater) and hands it the real time its frames wait on; two worlds in one process
+/// (two servers' tests, a lab beside them) never share a pond.
 /// </summary>
-public static class GroundWaterSystem
+public sealed class GroundWaterSystem
 {
+    /// <summary>Seconds on the host's real-time clock: a frame's tiles must be still this long before its
+    /// network is built again (<see cref="RebuildQuietSeconds"/>).</summary>
+    public GroundWaterSystem(Func<double> realSeconds) => _realSeconds = realSeconds;
+
+    private readonly Func<double> _realSeconds;
+
+    /// <summary>The soil of this world's ground (GroundHydrology): the networks it builds are shaped on it and the
+    /// water it keeps soaks into it.</summary>
+    public int SoilGroup { get; init; } = GroundHydrology.DefaultSoilGroup;
+
     /// <summary>How wet one place is now.</summary>
     /// <param name="Surface">What the ground there is.</param>
     /// <param name="RainMmPerHour">The rain falling on it.</param>
@@ -83,7 +97,7 @@ public static class GroundWaterSystem
         public float Evaporation;
     }
 
-    private static readonly ConcurrentDictionary<string, MapGround> _maps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, MapGround> _maps = new(StringComparer.OrdinalIgnoreCase);
 
     // ── A frame of the world: tiles that come and go ────────────────────────────────────────────
 
@@ -101,12 +115,12 @@ public static class GroundWaterSystem
         public DrainageNetwork? Rebuilt;
     }
 
-    private static readonly ConcurrentDictionary<string, FrameTiles> _frames = new(StringComparer.OrdinalIgnoreCase);
-    private static double FrameClock => Environment.TickCount64 / 1000.0;
+    private readonly ConcurrentDictionary<string, FrameTiles> _frames = new(StringComparer.OrdinalIgnoreCase);
+    private double FrameClock => _realSeconds();
 
     /// <summary>A tile of a frame of the world loaded (OneWorld.WorldMaps): its ground and its drainage join the
     /// frame's network when it is next built.</summary>
-    public static void TileArrived(string mapId, DrainageNetwork.TileInput tile)
+    public void TileArrived(string mapId, DrainageNetwork.TileInput tile)
     {
         var f = _frames.GetOrAdd(mapId, _ => new FrameTiles());
         lock (f.Gate)
@@ -118,7 +132,7 @@ public static class GroundWaterSystem
     }
 
     /// <summary>A tile of a frame let go.</summary>
-    public static void TileLeft(string mapId, int x, int z)
+    public void TileLeft(string mapId, int x, int z)
     {
         if (!_frames.TryGetValue(mapId, out var f)) return;
         lock (f.Gate)
@@ -131,7 +145,7 @@ public static class GroundWaterSystem
 
     /// <summary>A frame's network built again since it was last asked: its voices to put in place (WorldMaps).
     /// Null when nothing changed.</summary>
-    public static DrainageNetwork? TakeRebuilt(string mapId)
+    public DrainageNetwork? TakeRebuilt(string mapId)
     {
         if (!_frames.TryGetValue(mapId, out var f)) return null;
         lock (f.Gate)
@@ -144,7 +158,7 @@ public static class GroundWaterSystem
 
     /// <summary>Starts a frame's network building once its tiles have been still a moment, and puts a finished one
     /// in place, keeping the map's water as it was (the ponds settled to the weather now).</summary>
-    private static void PumpFrame(string mapId, FrameTiles f, float rainMmPerHour)
+    private void PumpFrame(string mapId, FrameTiles f, float rainMmPerHour)
     {
         DrainageNetwork? done = null;
         lock (f.Gate)
@@ -158,7 +172,8 @@ public static class GroundWaterSystem
             {
                 f.Dirty = false;
                 var tiles = f.Tiles.Values.ToList();
-                f.Building = Task.Run(() => new DrainageNetwork().Build(tiles));
+                int soil = SoilGroup;
+                f.Building = Task.Run(() => new DrainageNetwork { SoilGroup = soil }.Build(tiles));
             }
         }
         if (done == null) return;
@@ -169,11 +184,11 @@ public static class GroundWaterSystem
     }
 
     /// <summary>Puts a map's drainage network in place (replacing any before it), dry.</summary>
-    public static void Register(string mapId, DrainageNetwork net) => Register(mapId, net, null);
+    public void Register(string mapId, DrainageNetwork net) => Register(mapId, net, null);
 
-    private static void Register(string mapId, DrainageNetwork net, GroundWater? water)
+    private void Register(string mapId, DrainageNetwork net, GroundWater? water)
     {
-        var m = new MapGround(water ?? new GroundWater()) { Net = net };
+        var m = new MapGround(water ?? new GroundWater { SoilGroup = net.SoilGroup }) { Net = net };
         m.PondVolume = net.Ponds.Select(p => FullWhenDry(p) ? p.CapacityCubicMetres : 0f).ToArray();
         m.PondSpill = new float[net.Ponds.Count];
         m.PondsByRank = net.Ponds.OrderBy(p => p.Rank).Select(p => p.Id).ToArray();
@@ -183,18 +198,18 @@ public static class GroundWaterSystem
     }
 
     /// <summary>Forgets a map's ground (unloaded).</summary>
-    public static void Forget(string mapId) => _maps.TryRemove(mapId, out _);
+    public void Forget(string mapId) => _maps.TryRemove(mapId, out _);
 
-    public static DrainageNetwork? NetworkOf(string mapId) => _maps.TryGetValue(mapId, out var m) ? m.Net : null;
+    public DrainageNetwork? NetworkOf(string mapId) => _maps.TryGetValue(mapId, out var m) ? m.Net : null;
 
     /// <summary>A map's water, for the broadcast; null for a map without ground of its own.</summary>
-    public static GroundWater? WaterOf(string mapId) => _maps.TryGetValue(mapId, out var m) ? m.Water : null;
+    public GroundWater? WaterOf(string mapId) => _maps.TryGetValue(mapId, out var m) ? m.Water : null;
 
     /// <summary>
     /// Advances one map's ground water by <paramref name="dt"/> seconds of <paramref name="rainMmPerHour"/>, with
     /// the air taking <paramref name="evaporationMmPerHour"/> off standing water (RoadWaterSystem.Evaporation).
     /// </summary>
-    public static void Update(string mapId, float rainMmPerHour, float evaporationMmPerHour, float dt)
+    public void Update(string mapId, float rainMmPerHour, float evaporationMmPerHour, float dt)
     {
         if (_frames.TryGetValue(mapId, out var frame)) PumpFrame(mapId, frame, rainMmPerHour);
         if (!_maps.TryGetValue(mapId, out var m)) return;
@@ -222,7 +237,7 @@ public static class GroundWaterSystem
 
     /// <summary>Settles a map's water as if the weather had been like this for an hour (tests, the lab); with
     /// <paramref name="keepWater"/>, only its ponds (a network built again).</summary>
-    public static void Settle(string mapId, float rainMmPerHour, bool keepWater = false)
+    public void Settle(string mapId, float rainMmPerHour, bool keepWater = false)
     {
         if (!_maps.TryGetValue(mapId, out var m)) return;
         lock (m.Gate)
@@ -251,7 +266,7 @@ public static class GroundWaterSystem
             float inflow = m.Water.RainFedLitresPerSecond(p.RainCatchment) * 1e-3f;
             foreach (int u in p.Upstream) inflow += m.PondSpill[u] * 1e-3f;
             var (_, wet) = p.LevelOf(m.PondVolume[id], cellArea);
-            float seep = Seep(p) + m.Evaporation;
+            float seep = Seep(p, m.Water.SoilGroup) + m.Evaporation;
             float v = m.PondVolume[id] + (inflow - seep / 3.6e6f * wet) * dt;
             float spill = 0f;
             if (v > p.CapacityCubicMetres) { spill = (v - p.CapacityCubicMetres) / dt * 1e3f; v = p.CapacityCubicMetres; }
@@ -265,11 +280,11 @@ public static class GroundWaterSystem
     /// <summary>What soaks away through a pond's bed, mm/h: the ground's own rate (a puddle's cracks on paving);
     /// none where the pond lies on a line that carries base flow, where the water table stands at the surface
     /// and feeds it rather than draining it.</summary>
-    private static float Seep(DrainageNetwork.Pond p)
+    private static float Seep(DrainageNetwork.Pond p, int soilGroup)
     {
         float perennial = Math.Clamp((p.TotalSquareMetres - GroundWater.PerennialFromSquareMetres)
                                      / (GroundWater.PerennialSquareMetres - GroundWater.PerennialFromSquareMetres), 0f, 1f);
-        return (1f - perennial) * (p.IsPuddle ? GroundHydrology.SealedSeepMmPerHour : GroundHydrology.SoakMmPerHour);
+        return (1f - perennial) * (p.IsPuddle ? GroundHydrology.SealedSeepMmPerHour : GroundHydrology.SoakMmPerHour(soilGroup));
     }
 
     /// <summary>Whether a pond is full in dry weather: one the water table keeps full (on a line that carries
@@ -284,7 +299,7 @@ public static class GroundWaterSystem
     /// ground as it goes (each metre soaks up the surface's own wetting depth over the strip it runs in), into
     /// any pond on its way, until it has all soaked in or left the map. False where the map has no ground.
     /// </summary>
-    public static bool AddWater(string mapId, Vector3 at, float litres, float overSeconds = 0f)
+    public bool AddWater(string mapId, Vector3 at, float litres, float overSeconds = 0f)
     {
         if (!_maps.TryGetValue(mapId, out var m) || !(litres > 0f) || !float.IsFinite(litres)) return false;
         lock (m.Gate)
@@ -355,7 +370,7 @@ public static class GroundWaterSystem
     // ── Asking ──────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>How wet a place of a map is now (default, dry and open, where the map has no ground).</summary>
-    public static Wetness WetnessAt(string mapId, Vector3 at)
+    public Wetness WetnessAt(string mapId, Vector3 at)
     {
         if (!_maps.TryGetValue(mapId, out var m)) return default;
         lock (m.Gate)
@@ -368,7 +383,7 @@ public static class GroundWaterSystem
             float poured = 0f;
             if (m.Soaked.TryGetValue(c, out var s) && m.Clock - s.At < PouredMemorySeconds)
                 poured = s.Litres / (PouredStripMetres * net.CellMetres);
-            float retention = GroundHydrology.RetentionMm(surface);
+            float retention = GroundHydrology.RetentionMm(surface, m.Water.SoilGroup);
             float wetness = surface == GroundSurface.Water ? 1f : Math.Clamp((ev + poured) / MathF.Max(1e-3f, ev + poured + retention), 0f, 1f);
             float flow = FlowOut(m, c);
             float depth = DepthAt(m, c, flow);
@@ -381,7 +396,7 @@ public static class GroundWaterSystem
     /// <paramref name="radius"/> across): the rain on it, what runs onto it from the cells round it that drain
     /// into it, and what poured water reached it in the last second.
     /// </summary>
-    public static WaterReach WaterReaching(string mapId, Vector3 centre, float radius)
+    public WaterReach WaterReaching(string mapId, Vector3 centre, float radius)
     {
         float r = MathF.Max(0.1f, radius);
         if (!_maps.TryGetValue(mapId, out var m)) return default;
@@ -417,7 +432,7 @@ public static class GroundWaterSystem
 
     /// <summary>The depth of water standing at a place (a pond, a puddle on a road), mm: what a wheel splashes
     /// into (RoadWaterSystem). Zero off every hollow that keeps water.</summary>
-    public static float StandingMm(string mapId, Vector3 at)
+    public float StandingMm(string mapId, Vector3 at)
     {
         if (!_maps.TryGetValue(mapId, out var m)) return 0f;
         lock (m.Gate)
@@ -428,7 +443,7 @@ public static class GroundWaterSystem
     }
 
     /// <summary>The flow of a drainage line's voice cell, or any cell, now, L/s (tests and the lab).</summary>
-    public static float FlowAt(string mapId, Vector3 at)
+    public float FlowAt(string mapId, Vector3 at)
     {
         if (!_maps.TryGetValue(mapId, out var m)) return 0f;
         lock (m.Gate)
@@ -439,14 +454,14 @@ public static class GroundWaterSystem
     }
 
     /// <summary>A pond's water now: volume m³ and overflow L/s (tests and the lab).</summary>
-    public static (float CubicMetres, float SpillLitresPerSecond) PondState(string mapId, int pond)
+    public (float CubicMetres, float SpillLitresPerSecond) PondState(string mapId, int pond)
     {
         if (!_maps.TryGetValue(mapId, out var m) || pond < 0 || pond >= m.PondVolume.Length) return default;
         lock (m.Gate) return (m.PondVolume[pond], m.PondSpill[pond]);
     }
 
     /// <summary>Poured water still running (tests and the lab).</summary>
-    public static float PouredRunningLitres(string mapId)
+    public float PouredRunningLitres(string mapId)
     {
         if (!_maps.TryGetValue(mapId, out var m)) return 0f;
         lock (m.Gate) return m.Parcels.Sum(p => p.Litres);
@@ -486,7 +501,7 @@ public static class GroundWaterSystem
         {
             var kind = net.SquareMetres(c) >= net.CreekSquareMetres ? GroundChannelKind.Creek : GroundChannelKind.Rill;
             nMan = GroundChannelBed.ManningN(kind);
-            width = GroundChannelBed.WidthFor(kind, GroundChannelBed.ReferenceFlow(net.CatchmentOf(c)));
+            width = GroundChannelBed.WidthFor(kind, GroundChannelBed.ReferenceFlow(net.CatchmentOf(c), net.SoilGroup));
         }
         else
         {
@@ -498,11 +513,8 @@ public static class GroundWaterSystem
         return y * 1000f;
     }
 
-    /// <summary>Tests: forgets every map.</summary>
-    internal static void Reset() { _maps.Clear(); _frames.Clear(); }
-
     /// <summary>Tests: waits for a frame's network to be built from the tiles it has now.</summary>
-    internal static DrainageNetwork? BuildFrameNow(string mapId)
+    internal DrainageNetwork? BuildFrameNow(string mapId)
     {
         if (!_frames.TryGetValue(mapId, out var f)) return null;
         lock (f.Gate) { f.ChangedAt = double.NegativeInfinity; }

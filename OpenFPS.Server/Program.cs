@@ -943,9 +943,9 @@ public class GameServer
                         ? MapAtmosphere.Of(waterMap)
                         : MapAtmosphere.Default);
                     RoadWaterSystem.Update(entry.Key, roadWeather, _environment.RainRate(roadWeather),
-                                           _maps.TryGetRoads(entry.Key, out var waterRoads) ? waterRoads : null, dt);
+                                           _maps.TryGetRoads(entry.Key, out var waterRoads) ? waterRoads : null, dt, _maps.GroundWater);
                     // And over the ground: the drainage lines, the ponds, water poured out (docs/RUNNING_WATER.md 13).
-                    GroundWaterSystem.Update(entry.Key, _environment.RainRate(roadWeather),
+                    _maps.GroundWater.Update(entry.Key, _environment.RainRate(roadWeather),
                                              RoadWaterSystem.WaterOf(entry.Key)?.EvaporationMmPerHour ?? 0f, dt);
                     // Fire in the same weather: the rain that wets the roads wets the fuel.
                     Fires.Update(_maps, entry.Key, world, roadWeather, _environment.RainRate(roadWeather), dt, _environment.WindTravel);
@@ -2381,7 +2381,7 @@ public class GameServer
                     RainMedianDropMm = falling.MedianDropMm,
                     HailDiameterMm = falling.HailMm,
                     RoadWater = RoadWaterSystem.WaterOf(session.CurrentMapId)?.Save(),
-                    GroundWater = GroundWaterSystem.WaterOf(session.CurrentMapId)?.Save(),
+                    GroundWater = _maps.GroundWater.WaterOf(session.CurrentMapId)?.Save(),
                     DayOfYear = state.DayOfYear,
                 };
                 perMap[session.CurrentMapId] = update;

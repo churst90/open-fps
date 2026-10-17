@@ -514,7 +514,7 @@ public sealed class WorldMaps
                     tiles.RemoveEntities(frame.Loaded[k].Select(e => e.Id));
                     foreach (var e in frame.Loaded[k]) _maps.DestroyEntity(frame.Id, e);
                     DropRunoff(frame, tiles, k);
-                    Systems.GroundWaterSystem.TileLeft(frame.Id, k.X, k.Z);
+                    _maps.GroundWater.TileLeft(frame.Id, k.X, k.Z);
                     tiles.RemoveTile(k);
                     frame.Loaded.Remove(k);
                     frame.UnwantedSince.Remove(k);
@@ -705,7 +705,7 @@ public sealed class WorldMaps
         tiles.AddPlaced(world, local, members);
         frame.Loaded[local] = members.Select(m => m.Entity).ToList();
         _service.Store.Touch(frame.WorldKeyOf(local));
-        if (tile.Terrain is { Posts: >= 2 } ground) Systems.GroundWaterSystem.TileArrived(frame.Id, DrainageInput(frame, local, tiles.TileMetres, ground, tile.Drainage));
+        if (tile.Terrain is { Posts: >= 2 } ground) _maps.GroundWater.TileArrived(frame.Id, DrainageInput(frame, local, tiles.TileMetres, ground, tile.Drainage));
         return true;
     }
 
@@ -736,7 +736,7 @@ public sealed class WorldMaps
     /// </summary>
     private void SyncRunoff(Frame frame)
     {
-        if (Systems.GroundWaterSystem.TakeRebuilt(frame.Id) is not { } net) return;
+        if (_maps.GroundWater.TakeRebuilt(frame.Id) is not { } net) return;
         if (!_maps.TryGetMap(frame.Id, out var world, out _, out _, out _) || !_maps.TryGetTiles(frame.Id, out var tiles)) return;
         var wanted = new Dictionary<TileKey, Dictionary<string, Water.DrainageNetwork.Voice>>();
         foreach (var v in net.Voices)

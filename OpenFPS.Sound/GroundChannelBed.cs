@@ -29,12 +29,12 @@ public static class GroundChannelBed
     public const float ReferenceStormMm = 2f * Rainfall.HeavyRate;
 
     /// <summary>The flow a line's bed is shaped by, L/s: its catchment's run-off in the reference storm, spread
-    /// over the storm's two hours.</summary>
-    public static float ReferenceFlow(GroundCatchment c)
+    /// over the storm's two hours, on its world's soil.</summary>
+    public static float ReferenceFlow(GroundCatchment c, int soilGroup = GroundHydrology.DefaultSoilGroup)
     {
         float q = 0f;
         for (int s = 0; s < c.AreaSquareMetres.Length && s < GroundHydrology.Surfaces; s++)
-            q += c.AreaSquareMetres[s] * GroundHydrology.RunoffMm((GroundSurface)s, ReferenceStormMm) / (2f * 3600f);
+            q += c.AreaSquareMetres[s] * GroundHydrology.RunoffMm((GroundSurface)s, ReferenceStormMm, soilGroup) / (2f * 3600f);
         return q;
     }
 

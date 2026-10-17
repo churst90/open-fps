@@ -43,9 +43,9 @@ public static class MapDrainage
     }
 
     /// <summary>The network of a map's laid tiles (TerrainBuilder.Lay), its surfaces read off the map's
-    /// things. Null for no tiles.</summary>
+    /// things, on its world's soil. Null for no tiles.</summary>
     public static DrainageNetwork? Build(World world, IReadOnlyList<TerrainBuilder.Tile> tiles, out TileDrainage[,] perTile,
-                                         out (int X0, int Z0) origin)
+                                         out (int X0, int Z0) origin, int soilGroup = GroundHydrology.DefaultSoilGroup)
     {
         perTile = new TileDrainage[0, 0];
         origin = (0, 0);
@@ -88,7 +88,7 @@ public static class MapDrainage
             for (int j = 0; j < cells; j++) Array.Copy(cellHeights, (oj + j) * cx + oi, h, j * cells, cells);
             inputs.Add(new DrainageNetwork.TileInput(t.X, t.Z, t.CornerX, t.CornerZ, h, drainage[t.X - tx0, t.Z - tz0]));
         }
-        return new DrainageNetwork().Build(inputs, PlacedWater(world));
+        return new DrainageNetwork { SoilGroup = soilGroup }.Build(inputs, PlacedWater(world));
     }
 
     /// <summary>Where a map already has running or falling water of its own: its creeks, gutters, drains,
@@ -138,17 +138,18 @@ public static class MapDrainage
     }
 
     /// <summary>
-    /// At a map's load (MapManager), after its ground is laid: the network, registered for the ground water's
-    /// tick, and its voices spawned into the map, each on <see cref="Layer"/>. Logs what it found and cost.
+    /// At a map's load (MapManager), after its ground is laid: the network on the world's soil, registered with
+    /// the world's ground water for its tick, and its voices spawned into the map, each on <see cref="Layer"/>.
+    /// Logs what it found and cost.
     /// </summary>
-    public static List<Entity> AtLoad(string mapId, World world, IReadOnlyList<TerrainBuilder.Tile> tiles)
+    public static List<Entity> AtLoad(string mapId, World world, IReadOnlyList<TerrainBuilder.Tile> tiles, Systems.GroundWaterSystem ground)
     {
         var made = new List<Entity>();
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        var net = Build(world, tiles, out _, out _);
+        var net = Build(world, tiles, out _, out _, ground.SoilGroup);
         if (net == null) return made;
         foreach (var v in net.Voices) made.Add(SpawnVoice(world, v));
-        Systems.GroundWaterSystem.Register(mapId, net);
+        ground.Register(mapId, net);
         Log.Information("MapManager: '{Id}' drains over {Tiles} tiles: {Lines} drainage lines, {Voices} voices, {Ponds} ponds of {Hollows} hollows ({Culverts} held by a road, through its culvert), {Loops} loops between tiles broken ({Ms} ms).",
                         mapId, tiles.Count, net.Lines.Count, net.Voices.Count, net.Ponds.Count, net.Hollows, net.Culverts, net.LoopsBroken,
                         clock.ElapsedMilliseconds);

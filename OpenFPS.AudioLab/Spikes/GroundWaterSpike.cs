@@ -76,7 +76,7 @@ public static class GroundWaterSpike
         mm.Initialize();
         var load = clock.Elapsed;
         if (!mm.TryGetMapData(id, out var data)) { Console.WriteLine("FAIL: the map did not load"); return null; }
-        var net = GroundWaterSystem.NetworkOf(id);
+        var net = mm.GroundWater.NetworkOf(id);
         if (net == null) { Console.WriteLine("FAIL: the map has no drainage (no elevation?)"); return null; }
         Console.WriteLine($"{id}: loaded in {load.TotalSeconds:F1} s; drainage network built in {net.BuildTime.TotalMilliseconds:F0} ms");
         return new Loaded(id, mm, data, net, dir, load);
@@ -324,15 +324,15 @@ public static class GroundWaterSpike
         var (creek, ditch) = Chosen(l.Net);
         Console.WriteLine("Creek: " + Describe(creek));
         Console.WriteLine("Ditch: " + Describe(ditch));
-        GroundWaterSystem.Settle(l.Id, 0f);
+        l.Maps.GroundWater.Settle(l.Id, 0f);
         Console.WriteLine("minute  rain mm/h   creek L/s   ditch L/s   event mm   base flow mm/h");
         void Row(float minute)
             => Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"{minute,6:F0}  {GroundWaterSystem.WaterOf(l.Id)!.RainMmPerHour,9:F1}  {GroundWaterSystem.FlowAt(l.Id, creek.Position),10:F3}  {GroundWaterSystem.FlowAt(l.Id, ditch.Position),10:F3}  {GroundWaterSystem.WaterOf(l.Id)!.EventMm,9:F1}  {GroundWaterSystem.WaterOf(l.Id)!.BaseflowMmPerHour,8:F4}"));
+                $"{minute,6:F0}  {l.Maps.GroundWater.WaterOf(l.Id)!.RainMmPerHour,9:F1}  {l.Maps.GroundWater.FlowAt(l.Id, creek.Position),10:F3}  {l.Maps.GroundWater.FlowAt(l.Id, ditch.Position),10:F3}  {l.Maps.GroundWater.WaterOf(l.Id)!.EventMm,9:F1}  {l.Maps.GroundWater.WaterOf(l.Id)!.BaseflowMmPerHour,8:F4}"));
         Row(0);
         for (int t = 1; t <= (int)((wet + after) * 60f); t++)
         {
-            GroundWaterSystem.Update(l.Id, t <= wet * 60f ? rain : 0f, 0.05f, 1f);
+            l.Maps.GroundWater.Update(l.Id, t <= wet * 60f ? rain : 0f, 0.05f, 1f);
             if (t % 60 == 0) Row(t / 60f);
         }
         return 0;
@@ -389,13 +389,13 @@ public static class GroundWaterSpike
 
         // The map's water at each moment of the storm, as the server would send it.
         var states = new Dictionary<string, (float[] State, float Creek, float Ditch, float Rain)>();
-        GroundWaterSystem.Settle(l.Id, 0f);
-        void Keep(string name) => states[name] = (GroundWaterSystem.WaterOf(l.Id)!.Save(), GroundWaterSystem.FlowAt(l.Id, creek.Position),
-                                                 GroundWaterSystem.FlowAt(l.Id, ditch.Position), GroundWaterSystem.WaterOf(l.Id)!.RainMmPerHour);
+        l.Maps.GroundWater.Settle(l.Id, 0f);
+        void Keep(string name) => states[name] = (l.Maps.GroundWater.WaterOf(l.Id)!.Save(), l.Maps.GroundWater.FlowAt(l.Id, creek.Position),
+                                                 l.Maps.GroundWater.FlowAt(l.Id, ditch.Position), l.Maps.GroundWater.WaterOf(l.Id)!.RainMmPerHour);
         Keep("dry");
-        for (int t = 1; t <= 600; t++) GroundWaterSystem.Update(l.Id, Rainfall.HeavyRate, 0.05f, 1f);
+        for (int t = 1; t <= 600; t++) l.Maps.GroundWater.Update(l.Id, Rainfall.HeavyRate, 0.05f, 1f);
         Keep("rain10");
-        for (int t = 1; t <= 1800; t++) GroundWaterSystem.Update(l.Id, 0f, 0.05f, 1f);
+        for (int t = 1; t <= 1800; t++) l.Maps.GroundWater.Update(l.Id, 0f, 0.05f, 1f);
         Keep("after30");
         foreach (var (k, v) in states)
             notes.AppendLine(string.Create(CultureInfo.InvariantCulture, $"{k}: creek {v.Creek:F3} L/s, ditch {v.Ditch:F3} L/s, rain {v.Rain:F1} mm/h"));

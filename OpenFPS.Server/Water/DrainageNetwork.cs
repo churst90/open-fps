@@ -54,6 +54,9 @@ public sealed class DrainageNetwork
     /// L/s.</summary>
     public float VoiceReferenceLitresPerSecond { get; init; } = 0.05f;
 
+    /// <summary>The soil of the ground it drains (GroundHydrology): its world's, which its beds are shaped on.</summary>
+    public int SoilGroup { get; init; } = GroundHydrology.DefaultSoilGroup;
+
     // ── What it is made of ──────────────────────────────────────────────────────────────────────
 
     public int CellsPerTile { get; private set; }
@@ -553,7 +556,7 @@ public sealed class DrainageNetwork
             var total = (float[])areas.Clone();
             foreach (int id in ponds)
                 for (int s = 0; s < total.Length; s++) total[s] += _ponds[id].Total[s];
-            float reference = GroundChannelBed.ReferenceFlow(new GroundCatchment(total, 0f));
+            float reference = GroundChannelBed.ReferenceFlow(new GroundCatchment(total, 0f), SoilGroup);
             if (reference < VoiceReferenceLitresPerSecond) continue;
             var kind = KindOf(cells, k0, k1, _area[mid] * CellArea);
             float width = GroundChannelBed.WidthFor(kind, reference);

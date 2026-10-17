@@ -18,8 +18,10 @@ namespace OpenFPS.Tests;
 public class GroundWaterTests : IDisposable
 {
     private readonly ITestOutputHelper _o;
-    public GroundWaterTests(ITestOutputHelper o) { _o = o; GroundWaterSystem.Reset(); }
-    public void Dispose() => GroundWaterSystem.Reset();
+    /// <summary>This test's world's ground water; its frames never wait (BuildFrameNow builds them).</summary>
+    private GroundWaterSystem _ground = new(() => 0.0);
+    public GroundWaterTests(ITestOutputHelper o) { _o = o; }
+    public void Dispose() { }
 
     private const float Cell = 2f;
 
@@ -397,37 +399,74 @@ public class GroundWaterTests : IDisposable
 
     // ── A map's ground water ────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Two worlds with a map of the same name keep their own water and their own soil (docs/ENGINE_PACKAGES.md,
+    /// stage 3; the audit's S31): rain on one fills nothing on the other, and a world on clay (group D) sheds
+    /// more of the same storm off its lawns than one on loam (B), down to the lines it builds and the water it keeps.
+    /// </summary>
+    [Fact]
+    public void Two_worlds_keep_their_own_water_and_their_own_soil()
+    {
+        var (net, line) = SlopeWithHollow();
+        var wet = new GroundWaterSystem(() => 0.0);
+        var dry = new GroundWaterSystem(() => 0.0);
+        wet.Register("slope", net);
+        dry.Register("slope", net);
+        wet.Settle("slope", 0f);
+        dry.Settle("slope", 0f);
+        for (int t = 1; t <= 1800; t++)
+        {
+            wet.Update("slope", 50f, 0f, 1f);
+            dry.Update("slope", 0f, 0f, 1f);
+        }
+        Assert.True(wet.FlowAt("slope", line) > dry.FlowAt("slope", line) + 0.1f);
+        Assert.True(wet.WetnessAt("slope", line).EventMm > 20f);
+        Assert.Equal(0f, dry.WetnessAt("slope", line).EventMm);
+
+        Assert.Equal(GroundHydrology.DefaultSoilGroup, wet.WaterOf("slope")!.SoilGroup);
+        var clay = new GroundWaterSystem(() => 0.0) { SoilGroup = 3 };
+        var (clayNet, _) = SlopeWithHollow(clay.SoilGroup);
+        clay.Register("slope", clayNet);
+        Assert.Equal(3, clay.WaterOf("slope")!.SoilGroup);
+        var loam = new GroundWater();
+        var clayWater = clay.WaterOf("slope")!;
+        loam.Settle(30f);
+        clayWater.Settle(30f);
+        Assert.True(clayWater.ExcessShare(GroundSurface.Lawn) > loam.ExcessShare(GroundSurface.Lawn) + 0.1f);
+        Assert.True(clayNet.Voices.Sum(v => v.ReferenceLitresPerSecond) > net.Voices.Sum(v => v.ReferenceLitresPerSecond));
+    }
+
     /// <summary>A slope with a road and a hollow on a line: rain fills the hollow, which then overflows down the
     /// line; the line's flow rises in the rain and falls after; and the map's state crosses to a client.</summary>
     [Fact]
     public void A_pond_fills_then_overflows_and_the_line_runs()
     {
         var (net, line) = SlopeWithHollow();
-        GroundWaterSystem.Register("slope", net);
+        _ground.Register("slope", net);
         Assert.NotEmpty(net.Ponds);
         var pond = net.Ponds.OrderByDescending(p => p.CapacityCubicMetres).First();
-        GroundWaterSystem.Settle("slope", 0f);
-        Assert.Equal(0f, GroundWaterSystem.PondState("slope", pond.Id).CubicMetres);
-        float before = GroundWaterSystem.FlowAt("slope", line);
+        _ground.Settle("slope", 0f);
+        Assert.Equal(0f, _ground.PondState("slope", pond.Id).CubicMetres);
+        float before = _ground.FlowAt("slope", line);
         float filledAt = float.NaN, spillAt = float.NaN;
         for (int t = 1; t <= 3600; t++)
         {
-            GroundWaterSystem.Update("slope", 50f, 0f, 1f);
-            var (v, spill) = GroundWaterSystem.PondState("slope", pond.Id);
+            _ground.Update("slope", 50f, 0f, 1f);
+            var (v, spill) = _ground.PondState("slope", pond.Id);
             if (float.IsNaN(filledAt) && v > 0.5f * pond.CapacityCubicMetres) filledAt = t;
             if (float.IsNaN(spillAt) && spill > 0f) spillAt = t;
         }
-        float raining = GroundWaterSystem.FlowAt("slope", line);
-        for (int t = 1; t <= 3600; t++) GroundWaterSystem.Update("slope", 0f, 0.1f, 1f);
-        float after = GroundWaterSystem.FlowAt("slope", line);
+        float raining = _ground.FlowAt("slope", line);
+        for (int t = 1; t <= 3600; t++) _ground.Update("slope", 0f, 0.1f, 1f);
+        float after = _ground.FlowAt("slope", line);
         _o.WriteLine($"pond {pond.CapacityCubicMetres:F1} m³: half full at {filledAt} s, overflowing at {spillAt} s; line {before:F3} -> {raining:F3} -> {after:F3} L/s");
         Assert.False(float.IsNaN(spillAt), "the pond overflows in an hour of 50 mm/h");
         Assert.True(spillAt > filledAt);
         Assert.True(raining > before + 0.1f);
         Assert.True(after < raining);
-        var wet = GroundWaterSystem.WetnessAt("slope", Vector3.Zero with { X = 41f, Z = 41f });
+        var wet = _ground.WetnessAt("slope", Vector3.Zero with { X = 41f, Z = 41f });
         Assert.True(wet.EventMm > 40f);
-        Assert.True(GroundWaterSystem.WaterOf("slope")!.Save().Length > 4);
+        Assert.True(_ground.WaterOf("slope")!.Save().Length > 4);
     }
 
     /// <summary>Water poured at a point runs downhill, further over paving than over grass, reaches what is below
@@ -437,24 +476,24 @@ public class GroundWaterTests : IDisposable
     {
         float Run(GroundSurface ground, out float reached)
         {
-            GroundWaterSystem.Reset();
+            _ground = new GroundWaterSystem(() => 0.0);
             const int n = 60;
             var h = new float[n * n];
             var s = new byte[n * n];
             for (int j = 0; j < n; j++) for (int i = 0; i < n; i++) { h[j * n + i] = 20f + 0.05f * j + 0.002f * MathF.Abs(i - 30); s[j * n + i] = (byte)ground; }
             var (flow, fill) = Drainage.Route(h, n, n, 0, 0, n, n, Cell);
             var net = OneTile(h, n, flow, fill, s);
-            GroundWaterSystem.Register("pour", net);
-            GroundWaterSystem.Settle("pour", 0f);
-            Assert.True(GroundWaterSystem.AddWater("pour", new Vector3(61f, 0f, 110f), 10f));
+            _ground.Register("pour", net);
+            _ground.Settle("pour", 0f);
+            Assert.True(_ground.AddWater("pour", new Vector3(61f, 0f, 110f), 10f));
             reached = 0f;
             for (int t = 0; t < 400; t++)
             {
-                GroundWaterSystem.Update("pour", 0f, 0f, 0.25f);
-                reached += GroundWaterSystem.WaterReaching("pour", new Vector3(61f, 0f, 90f), 3f).PouredLitresPerSecond * 0.25f;
+                _ground.Update("pour", 0f, 0f, 0.25f);
+                reached += _ground.WaterReaching("pour", new Vector3(61f, 0f, 90f), 3f).PouredLitresPerSecond * 0.25f;
             }
-            float wetAt = GroundWaterSystem.WetnessAt("pour", new Vector3(61f, 0f, 104f)).PouredMm;
-            Assert.Equal(0f, GroundWaterSystem.PouredRunningLitres("pour"), 2);
+            float wetAt = _ground.WetnessAt("pour", new Vector3(61f, 0f, 104f)).PouredMm;
+            Assert.Equal(0f, _ground.PouredRunningLitres("pour"), 2);
             return wetAt;
         }
         float paved = Run(GroundSurface.Impervious, out float pavedReached);
@@ -469,18 +508,18 @@ public class GroundWaterTests : IDisposable
     public void Rain_wets_the_ground_and_reaches_a_patch()
     {
         var (net, _) = SlopeWithHollow();
-        GroundWaterSystem.Register("wet", net);
-        GroundWaterSystem.Settle("wet", 0f);
-        var dry = GroundWaterSystem.WetnessAt("wet", new Vector3(20f, 0f, 60f));
+        _ground.Register("wet", net);
+        _ground.Settle("wet", 0f);
+        var dry = _ground.WetnessAt("wet", new Vector3(20f, 0f, 60f));
         Assert.Equal(0f, dry.SoilWetness);
-        for (int t = 0; t < 1200; t++) GroundWaterSystem.Update("wet", 25f, 0f, 1f);
-        var wet = GroundWaterSystem.WetnessAt("wet", new Vector3(20f, 0f, 60f));
+        for (int t = 0; t < 1200; t++) _ground.Update("wet", 25f, 0f, 1f);
+        var wet = _ground.WetnessAt("wet", new Vector3(20f, 0f, 60f));
         Assert.True(wet.SoilWetness > 0.01f);
         Assert.Equal(25f, wet.RainMmPerHour);
-        var reach = GroundWaterSystem.WaterReaching("wet", new Vector3(20f, 0f, 60f), 2f);
+        var reach = _ground.WaterReaching("wet", new Vector3(20f, 0f, 60f), 2f);
         Assert.Equal(25f * MathF.PI * 4f / 3600f, reach.RainLitresPerSecond, 4);
-        Assert.Equal(default, GroundWaterSystem.WetnessAt("nowhere", Vector3.Zero));
-        Assert.False(GroundWaterSystem.AddWater("nowhere", Vector3.Zero, 10f));
+        Assert.Equal(default, _ground.WetnessAt("nowhere", Vector3.Zero));
+        Assert.False(_ground.AddWater("nowhere", Vector3.Zero, 10f));
     }
 
     /// <summary>A frame of the world builds its network from the tiles it is given, again when one goes.</summary>
@@ -496,29 +535,30 @@ public class GroundWaterTests : IDisposable
             return new DrainageNetwork.TileInput(x, 0, x * per * Cell, 0f, h,
                 new TileDrainage { Cells = per, CellMetres = Cell, Flow = flow, FillCm = fill, Surface = new byte[per * per] });
         }
-        GroundWaterSystem.TileArrived("frame", Tile(0));
-        GroundWaterSystem.TileArrived("frame", Tile(1));
-        var net = GroundWaterSystem.BuildFrameNow("frame");
+        _ground.TileArrived("frame", Tile(0));
+        _ground.TileArrived("frame", Tile(1));
+        var net = _ground.BuildFrameNow("frame");
         Assert.NotNull(net);
         Assert.Equal(2, net!.Tiles.Count);
-        Assert.NotNull(GroundWaterSystem.TakeRebuilt("frame"));
-        Assert.Null(GroundWaterSystem.TakeRebuilt("frame"));
-        GroundWaterSystem.TileLeft("frame", 1, 0);
-        Assert.Single(GroundWaterSystem.BuildFrameNow("frame")!.Tiles);
+        Assert.NotNull(_ground.TakeRebuilt("frame"));
+        Assert.Null(_ground.TakeRebuilt("frame"));
+        _ground.TileLeft("frame", 1, 0);
+        Assert.Single(_ground.BuildFrameNow("frame")!.Tiles);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────────────────────
 
-    private static DrainageNetwork OneTile(float[] h, int n, byte[] flow, short[] fill, byte[]? surface = null)
-        => new DrainageNetwork { LineSquareMetres = 200f }.Build(new[]
+    private static DrainageNetwork OneTile(float[] h, int n, byte[] flow, short[] fill, byte[]? surface = null,
+                                           int soilGroup = GroundHydrology.DefaultSoilGroup)
+        => new DrainageNetwork { LineSquareMetres = 200f, SoilGroup = soilGroup }.Build(new[]
         {
             new DrainageNetwork.TileInput(0, 0, 0f, 0f, h,
                 new TileDrainage { Cells = n, CellMetres = Cell, Flow = flow, FillCm = fill, Surface = surface ?? new byte[n * n] }),
         });
 
     /// <summary>A 120 m slope falling south, a road across its top third, a hollow on its middle line, the line
-    /// below it.</summary>
-    private static (DrainageNetwork Net, Vector3 Line) SlopeWithHollow()
+    /// below it, on a soil group.</summary>
+    private static (DrainageNetwork Net, Vector3 Line) SlopeWithHollow(int soilGroup = GroundHydrology.DefaultSoilGroup)
     {
         const int n = 60;
         var h = new float[n * n];
@@ -531,7 +571,7 @@ public class GroundWaterTests : IDisposable
                 s[j * n + i] = (byte)(j is >= 44 and <= 46 ? GroundSurface.Impervious : GroundSurface.Lawn);
             }
         var (flow, fill) = Drainage.Route(h, n, n, 0, 0, n, n, Cell);
-        var net = OneTile(h, n, flow, fill, s);
+        var net = OneTile(h, n, flow, fill, s, soilGroup);
         return (net, new Vector3(30.5f * Cell + 0.5f, 0f, 12.5f * Cell));
     }
 }
