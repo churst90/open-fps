@@ -113,27 +113,87 @@ reverb that comes from the room's actual size and materials.
 
 - C# on .NET 10. Networking: LiteNetLib. Entities: Arch ECS. Serialisation: MemoryPack.
   Audio: FMOD Core and Steam Audio (phonon). UI: GTK 4 (GirCore).
-- Projects: the sound library (`OpenFPS.Geometry`, the triangle world; `OpenFPS.Acoustics`, materials,
-  walls and reflections; `OpenFPS.Sound`, the sound models and synthesis; `OpenFPS.Native`, the FMOD and
-  Steam Audio bindings), `OpenFPS.Common` (shared simulation and the wire), `OpenFPS.Server`,
-  `OpenFPS.Client.Core` (client logic and the audio engine), `OpenFPS.Client.Gtk` (Linux client),
-  `OpenFPS.Client` (Windows client), `OpenFPS.AudioLab` (measurement and rendering tools; `--help`
-  lists them), `OpenFPS.Astronomy` (where the sun and the moon are), `OpenFPS.Words` (the compass points,
-  said one way everywhere), `OpenFPS.Tests`.
-- Build with `--artifacts-path` pointing outside the repository (see the run scripts). Do not use
-  `dotnet run`: it writes `obj/` and `bin/` into the repository. The repository is on btrfs on the
-  NVMe now, not ntfs3 (the run scripts' comments still say ntfs3).
-- On the development machine builds go through `tools/build-local.sh` and test runs through
-  `tools/test-local.sh` (a filter is required). Both are pinned to the last twelve cores at low
-  priority; the test script has two slots, both on those twelve cores, so a third run waits.
-- Tests: about 2,800 test methods in `OpenFPS.Tests`; the full suite runs on GitHub Actions (eight
-  shards).
+
+### The projects
+
+Each part of the engine is its own project, with stated references and no reach into the game above it.
+The sound library is Geometry, Acoustics, Sound, Native and Audio, with the packages it stands on (Materials,
+Physics, Environment, Models, Schema); Resonance is to take it as a submodule. The plans:
+[docs/SOUND_LIBRARY_BOUNDARY.md](docs/SOUND_LIBRARY_BOUNDARY.md),
+[docs/ENGINE_PACKAGES.md](docs/ENGINE_PACKAGES.md) and [docs/PHYSICS_BOUNDARY.md](docs/PHYSICS_BOUNDARY.md).
+
+- `OpenFPS.Words`: the compass points and directions, said one way everywhere, and safe text.
+- `OpenFPS.Schema`: the attribute and field descriptions the editor reads a type's settings by.
+- `OpenFPS.Native`: the FMOD and Steam Audio bindings.
+- `OpenFPS.Geometry`: the triangle world, its BVH and rays, shapes, and the rooms' cells.
+- `OpenFPS.Materials`: the material table, the air and the road surfaces.
+- `OpenFPS.Astronomy`: where the sun and the moon are.
+- `OpenFPS.Physics`: movement, the ground under a body, ballistics and ricochets, tyres, a vehicle's mechanics and
+  step, and one view of the world for server and client (`IPhysicsWorld`).
+- `OpenFPS.Acoustics`: rooms and openings, routes round and through walls, the ground's answer, sound bent by the
+  air.
+- `OpenFPS.Environment`: the weather, the water on the ground and the roads, and fire.
+- `OpenFPS.Sound`: the sound models and their synthesis (engines, tyres, horns, trains, aircraft, doors, water,
+  fire, gunfire and the rest).
+- `OpenFPS.Models`: the catalogue of what things are: machines and their parts lists, models, voices, the kinds
+  the editor knows.
+- `OpenFPS.Audio`: the sound's runtime: the FMOD mixer, Steam Audio, the acoustic worker, and `AudioWorld`, which
+  turns a world's sources into voices.
+- `OpenFPS.World`: maps, prefabs and composites, roads and tiles, and the one world's tiles from open data.
+- `OpenFPS.Agents`: what drives things: the racing line and its driver, traffic's laws, trains' and aircraft's
+  levers.
+- `OpenFPS.Accessibility`: the keys, the speech output, the aids that read no world, the spoken lists and the
+  interface sounds' meanings.
+- `OpenFPS.Common`: the shared simulation's entities and components, and the wire.
+- `OpenFPS.Editor`: the world editor's model: the kinds it edits, versions, the overlay, its dialogs and keys.
+- `OpenFPS.Server`: the server.
+- `OpenFPS.Client.Core`: the client's logic: the session, the snapshot, input, prediction, the aids, and the host
+  of the audio world.
+- `OpenFPS.Client.Gtk`: the Linux client. `OpenFPS.Client`: the Windows client.
+- `OpenFPS.AudioLab`: measurement and rendering tools (`--help` lists them).
+- `OpenFPS.Tests`: the tests, guards and replays.
+
+The layers, lowest first. A project references only projects in lower layers.
+- 0: Words, Schema, Native, Geometry, Materials.
+- 1: Astronomy, Physics, Acoustics.
+- 2: Environment. 3: Sound. 4: Models.
+- 5: Audio, World.
+- 6: Common, Agents. 7: Accessibility. 8: Editor.
+- 9, the game: Server, Client.Core, the two clients, AudioLab, Tests.
+
+The server never references Native or Audio, so it never loads FMOD or Steam Audio. `EnginePackagesTests` and
+`LibraryBoundaryTests` hold the boundaries.
+
+### Building, running and testing
+
+- Builds go outside the repository, with `--artifacts-path`. Do not use `dotnet run`: it writes `obj/` and
+  `bin/` into the repository.
+- `./run-server.sh [map]` builds and starts a server; `./run-gtk-client.sh` builds and starts the Linux client.
+- On the development machine every other build goes through `tools/build-local.sh`, and every test run through
+  `tools/test-local.sh`, which requires a filter. Both are pinned to the last twelve cores at low priority; the
+  test script has two machine-wide slots, so a third run waits.
+
+  ```
+  tools/build-local.sh ~/.cache/openfps-build/NAME OpenFPS.Tests
+  tools/test-local.sh ~/.cache/openfps-build/NAME "FullyQualifiedName~FireTests"
+  ```
+
+  The test script runs what the build left there (`--no-build`), so build first. `/tmp` is 8 GB of RAM: keep
+  artifacts in `~/.cache/openfps-build`.
+- `./publish-windows.sh` builds the Windows client from Linux; `./publish-server.sh` packages the server for a VPS.
+- Tests: about 3,200 test methods in `OpenFPS.Tests`. The full suite runs on GitHub Actions in eight shards, not
+  locally.
+
+### Other notes
+
 - Map and prefab authoring: [docs/AUTHORING.md](docs/AUTHORING.md). Maps of real places, and how
   to make another: [docs/MAPS_FROM_REAL_PLACES.md](docs/MAPS_FROM_REAL_PLACES.md). Their map data is
   (c) OpenStreetMap contributors (ODbL), with buildings from Overture Maps, addresses from the US
   National Address Database and Census TIGER/Line, and tree cover from ESA WorldCover 2021 (CC BY 4.0).
   The world's own tiles take their ground from USGS 3DEP, land cover from ESA WorldCover, roads from
   OpenStreetMap and buildings from Overture Maps.
+- `city.json` and the real places' maps come from their generators (`tools/gen_city.py`, `tools/gen_osm.py`);
+  edit the generator and regenerate, never the map.
 - Planned work: [todo.md](todo.md). Recent changes: [changes.md](changes.md). Done items taken out of
   the todo: [docs/DONE_2026-10.md](docs/DONE_2026-10.md).
 - SQLite's native library (under EF Core) is pinned to 3.50.3 for CVE-2025-6965.
@@ -166,6 +226,8 @@ Plans and designs:
   and geometry into a library shared with Resonance, stage by stage.
 - [PHYSICS_BOUNDARY.md](docs/PHYSICS_BOUNDARY.md): the survey and plan for `OpenFPS.Physics` (Jolt
   Physics through JoltPhysicsSharp, soft bodies, gravity a property of the world).
+- [ENGINE_PACKAGES.md](docs/ENGINE_PACKAGES.md): the rest of the engine as packages (Materials, Models,
+  Environment, World, Agents, Accessibility, Editor), their layers and stages.
 - [SPECIAL_CASES_AUDIT.md](docs/SPECIAL_CASES_AUDIT.md): where the audio code tells sounds apart by id
   ranges, names or prefixes, and the parts that fix it.
 - [MATTER.md](docs/MATTER.md): how materials act on each other; wind, water, fire and struck things.
