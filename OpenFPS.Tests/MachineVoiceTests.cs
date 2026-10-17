@@ -185,6 +185,13 @@ public class MachineVoiceTests
                             $"{Path.GetFileName(file)} names tap {tap} of '{waterPreset}', which has {WaterFeatureSpec.Presets[waterPreset]().Taps.Length}");
                         break;
                     }
+                    // A whole feature placed once, "water:<preset>/<feature>", is heard from its taps.
+                    if (WaterFeatureSpec.TryFeatureKey(id, out string featurePreset, out _))
+                    {
+                        Assert.True(WaterFeatureSpec.Presets.ContainsKey(featurePreset) && WaterFeatureSpec.Presets[featurePreset]().HeardFromTaps,
+                            $"{Path.GetFileName(file)} places '{featurePreset}' whole, which is not a preset heard from its taps");
+                        break;
+                    }
                     Assert.True(WaterFeatureSpec.Presets.ContainsKey(preset),
                         $"{Path.GetFileName(file)} names water '{preset}', which is not a preset");
                     break;

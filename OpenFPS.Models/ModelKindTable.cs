@@ -309,12 +309,13 @@ public static class ModelKindTable
             var feature = ModelLibrary.Presets.Water(preset);
             return tap < feature.Taps.Length ? (feature.SourceLevelDb, feature.Taps[tap].ExtentMetres) : null;
         }
-        var water = ModelLibrary.Presets.Water(id[6..]);
+        // A whole feature placed once ("water:<preset>/<feature>", heard from its taps): the whole.
+        var water = ModelLibrary.Presets.Water(WaterFeatureSpec.TryFeatureKey(id, out string whole, out _) ? whole : id[6..]);
         return (water.SourceLevelDb, water.ExtentMetres);
     }
 
     private static float? WaterHeadroom(string id)
-        => TryWaterTap(id, out string preset, out _, out _)
+        => TryWaterTap(id, out string preset, out _, out _) || WaterFeatureSpec.TryFeatureKey(id, out preset, out _)
             ? ModelLibrary.Presets.Water(preset).PeakHeadroomDb
             : ModelLibrary.Presets.Water(id[6..]).PeakHeadroomDb;
 

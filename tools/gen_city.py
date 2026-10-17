@@ -2356,15 +2356,14 @@ FTN_ROCKS = [(-0.9, 0.7, 0.3, 1.9, 0.95, "north"), (0.7, 1.8, 0.6, 1.7, 0.8, "no
 for (x0, x1, z0, z1, top, side) in FTN_ROCKS:
     box("rock_boulder", PARK_CX + x0, PARK_CX + x1, FTN_WATER, top, PARK_CZ + z0, PARK_CZ + z1,
         name=f"Elm Park fountain rocks, {side} side")
-# The water, where it lands: five voices of one fountain (WaterFeatureSpec.ParkFountain.Taps). The
-# bowl's over the bowl, where the jet comes down; each side's over the water just past the rocks,
-# between where the overflow strikes the stone and where that side's rim jets come down. None inside
-# the pedestal or a rock: a source inside a box is heard through it.
-FTN_TAPS = [(0.0, 1.9, 0.0, "bowl"), (0.0, 0.8, 2.3, "north"), (2.3, 0.8, 0.0, "east"),
-            (0.0, 0.8, -2.3, "south"), (-2.3, 0.8, 0.0, "west")]
-for i, (tx, ty, tz, where) in enumerate(FTN_TAPS):
-    prop(f"elm_fountain_water_{i}", PARK_CX + tx, ty, PARK_CZ + tz,
-         name="Elm Park fountain" if i == 0 else f"Elm Park fountain, {where} side")
+# The fountain, placed once at the middle of its pool on the water (WaterFeatureSpec.ParkFountain): the
+# server lays a voice where each of its waters lands from the spec's own taps (HeardFromTaps,
+# MapManager.SpawnTaps): the bowl, the four sides of the rocks and the four rows of rim jets. Until
+# 2026-10-17 the map put five voices here by hand; the other four's ids are kept, unused, so no other
+# id moves.
+prop("elm_fountain", PARK_CX, FTN_WATER, PARK_CZ, name="Elm Park fountain")
+for _ in range(4):
+    new_id()
 named_place("Elm Park, by the fountain", PARK_CX - 12.0, PARK_CX + 12.0, 0.0, 3.0, PARK_CZ - 12.0, PARK_CZ + 12.0)
 
 # The trees: a trunk you can walk into, a crown that scatters sound, and the wind in it heard from

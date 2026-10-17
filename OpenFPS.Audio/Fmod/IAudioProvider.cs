@@ -83,6 +83,10 @@ public interface IAudioProvider : IDisposable
     /// voice's id: its synth writes each event into the place that plays the piece it happens in. Kept until
     /// replaced or the voice stops.</summary>
     void PlanPieces(int voiceId, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut cut) { }
+
+    /// <summary>A water feature's tap that, while <paramref name="whole"/>, plays every tap's water (the feature far
+    /// enough off to be one voice, docs/RUNNING_WATER.md 15.8); its other taps' voices are let go.</summary>
+    void WholeFeature(int voiceId, bool whole) { }
     /// <summary>A train ("preset/train") the client has seen: its model is made now, off the threads that
     /// place sounds (VoiceBuilds), so it is there when the train is first heard or first blows.</summary>
     void PrepareTrain(string preset, string train) { }

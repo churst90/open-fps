@@ -387,6 +387,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.PlanPieces(voiceId, cut);
     }
 
+    /// <summary>See IAudioProvider.WholeFeature.</summary>
+    public void WholeFeature(int voiceId, bool whole)
+    {
+        if (_isInitialized) _provider.WholeFeature(voiceId, whole);
+    }
+
     /// <summary>See IAudioProvider.PrepareTrain.</summary>
     public void PrepareTrain(string preset, string train)
     {

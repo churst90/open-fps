@@ -77,7 +77,8 @@ public sealed class WaterFeatureVoice
     public readonly string Key;
 
     private const int RingBits = 17;
-    private readonly float[][] _rings;
+    // Each made when its tap's place first sounds: nine taps of four places are 36 rings of half a megabyte.
+    private readonly float[]?[] _rings;
     private readonly int _mask = (1 << RingBits) - 1;
     private readonly float[] _taps;
     private readonly float[] _spread;
@@ -103,7 +104,6 @@ public sealed class WaterFeatureVoice
         Water = new FallingWaterSynth(spec, sampleRate, seed, placesPerTap);
         PlacesPerTap = Water.PlacesPerTap;
         _rings = new float[Water.TapCount * PlacesPerTap][];
-        for (int i = 0; i < _rings.Length; i++) _rings[i] = new float[1 << RingBits];
         _taps = new float[_rings.Length];
         _spread = new float[Water.TapCount];
     }
@@ -144,14 +144,43 @@ public sealed class WaterFeatureVoice
                         }
                         Water.NextPlaces(_taps);
                         int idx = (int)(s & _mask);
-                        for (int i = 0; i < _rings.Length; i++) _rings[i][idx] = _taps[i];
+                        for (int i = 0; i < _rings.Length; i++)
+                        {
+                            var ring = _rings[i];
+                            if (ring == null)
+                            {
+                                if (_taps[i] == 0f) continue;
+                                Volatile.Write(ref _rings[i], ring = new float[1 << RingBits]);
+                            }
+                            ring[idx] = _taps[i];
+                        }
                     }
                     Volatile.Write(ref _rendered, upto);
                 }
             }
         }
-        int ring = Math.Clamp(tap, 0, Water.TapCount - 1) * PlacesPerTap + Math.Clamp(place, 0, PlacesPerTap - 1);
-        return _rings[ring][(int)(at & _mask)];
+        int at0 = (int)(at & _mask);
+        // Heard whole (far off): the tap that plays it carries every tap's water, every place of each, which are
+        // independent streams, so their sum is the feature's power and no copy.
+        if (Volatile.Read(ref _whole) == tap && place == 0)
+        {
+            float sum = 0f;
+            for (int i = 0; i < _rings.Length; i++) if (Volatile.Read(ref _rings[i]) is { } r) sum += r[at0];
+            return sum;
+        }
+        if (Volatile.Read(ref _whole) >= 0) return 0f;
+        var heard = Volatile.Read(ref _rings[Math.Clamp(tap, 0, Water.TapCount - 1) * PlacesPerTap + Math.Clamp(place, 0, PlacesPerTap - 1)]);
+        return heard == null ? 0f : heard[at0];
+    }
+
+    private int _whole = -1;
+
+    /// <summary>The tap that plays every tap's water, the feature heard whole from far off (AudioWorld.WholeFeature);
+    /// -1 for each tap its own.</summary>
+    public int WholeFrom
+    {
+        get => Volatile.Read(ref _whole);
+        set => Volatile.Write(ref _whole, value);
     }
 
     /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;": one tap of one feature on a map. A plain

@@ -334,6 +334,11 @@ public partial class MapManager
                 var entity = SpawnFromData(world, entityData, m.Id, Vector3.Zero, materialsAuthored, indoorAuthored);
                 lookup[entity.Id] = entity;
                 if (layers != null) layers[entity.Id] = entityData.Layer;
+                foreach (var tap in SpawnTaps(world, entity))
+                {
+                    lookup[tap.Id] = tap;
+                    if (layers != null) layers[tap.Id] = entityData.Layer;
+                }
                 if (entityData.EntityId > 0)
                 {
                     authored[entityData.EntityId] = entity;
@@ -409,6 +414,55 @@ public partial class MapManager
         return entity;
     }
 
+    /// <summary>
+    /// A water feature the map places once ("water:&lt;preset&gt;/&lt;feature&gt;") and its spec says is heard from its taps
+    /// (WaterFeatureSpec.HeardFromTaps, docs/RUNNING_WATER.md 15.8): a voice laid at every tap, where its water lands,
+    /// turned and moved with the feature ("water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;", named for the feature and the tap),
+    /// and the feature itself no voice of its own. The taps made; none for anything else.
+    /// </summary>
+    public static List<Entity> SpawnTaps(World world, Entity feature)
+    {
+        var made = new List<Entity>();
+        if (!world.Has<SoundEmitterComponent>(feature) || !world.Has<Transform>(feature)) return made;
+        var em = world.Get<SoundEmitterComponent>(feature);
+        if (!WaterFeatureSpec.TryFeatureKey(em.SoundId, out string preset, out string name)) return made;
+        WaterFeatureSpec spec;
+        try { spec = ModelLibrary.Presets.Water(preset); }
+        catch (ArgumentException ex)
+        {
+            Log.Warning("MapManager: a water feature names '{Preset}', which is not one: {Error}", preset, ex.Message);
+            return made;
+        }
+        if (!spec.HeardFromTaps) return made;
+        var t = world.Get<Transform>(feature);
+        var turn = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
+        string called = world.Has<IdentityComponent>(feature) ? world.Get<IdentityComponent>(feature).Name : spec.Name;
+        for (int i = 0; i < spec.Taps.Length; i++)
+        {
+            var tap = spec.Taps[i];
+            var at = t.Position + Vector3.Transform(new Vector3(tap.EastMetres, tap.UpMetres, tap.NorthMetres), turn);
+            string tapName = i == 0 ? called : $"{called}, {tap.Name}";
+            made.Add(world.Create(
+                EntityType.StaticObject,
+                new Transform { Position = at, Rotation = turn, Scale = Vector3.One },
+                new NameComponent { Name = tapName },
+                new IdentityComponent { Name = tapName, Description = $"{spec.Name}: where {tap.Name} comes down." },
+                new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(0.4f, 0.4f, 0.4f), IsSolid = false },
+                new MaterialComponent { Material = "Water" },
+                new SoundEmitterComponent
+                {
+                    IsSynth = true,
+                    SoundId = $"water:{preset}/{name}/{i}",
+                    Mode = PlaybackMode.LoopOne,
+                    Volume = em.Volume,
+                    Range = em.Range,
+                    MinDistance = em.MinDistance,
+                }));
+        }
+        world.Remove<SoundEmitterComponent>(feature);
+        return made;
+    }
+
     /// <summary>A source the map lays along a line of its own (a mapped creek): the line, on its emitter.</summary>
     private static void ApplyLine(World world, Entity entity, Repositories.EntityData entityData)
     {
@@ -455,6 +509,7 @@ public partial class MapManager
             {
                 var e = SpawnFromData(data.world, d, mapId, offset, null, null);
                 made.Add((e, d.Layer));
+                foreach (var tap in SpawnTaps(data.world, e)) made.Add((tap, d.Layer));
                 if (d.EntityId > 0) { authored[d.EntityId] = e; idMap[d.EntityId] = e.Id; }
             }
             catch (Exception ex)

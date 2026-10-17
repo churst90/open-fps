@@ -208,7 +208,13 @@ public static class TextureSpike
             string id = e.GetProperty("PrefabId").GetString()!;
             var p = e.GetProperty("Position");
             var at = new Vector3(p.GetProperty("X").GetSingle(), p.GetProperty("Y").GetSingle(), p.GetProperty("Z").GetSingle());
-            if (id.StartsWith("elm_fountain_water_", StringComparison.Ordinal)) taps[int.Parse(id[19..], CultureInfo.InvariantCulture)] = at;
+            // Placed once, its taps laid from its spec round it (MapManager.SpawnTaps).
+            if (id == "elm_fountain")
+            {
+                var spec = OpenFPS.Common.ModelLibrary.Presets.Water("park_fountain");
+                for (int k = 0; k < spec.Taps.Length; k++)
+                    taps[k] = at + new Vector3(spec.Taps[k].EastMetres, spec.Taps[k].UpMetres, spec.Taps[k].NorthMetres);
+            }
             if (id == "concrete_floor" && e.TryGetProperty("Name", out var nm) && nm.GetString() == "Elm Park fountain bowl") centre = at with { Y = 0f };
         }
         return (centre, taps.Values.ToList());

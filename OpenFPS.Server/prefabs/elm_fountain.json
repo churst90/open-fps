@@ -1,0 +1,21 @@
+{
+  "Id": "elm_fountain",
+  "Name": "Fountain",
+  "Description": "The Elm Park fountain (WaterFeatureSpec.ParkFountain), placed once at the middle of its pool on the water: the server lays a voice where each of its waters lands from the spec's taps (HeardFromTaps, MapManager.SpawnTaps), the bowl, the four sides of the rocks and the four rows of rim jets, read from one FallingWaterSynth. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 0.4,
+    "Y": 0.4,
+    "Z": 0.4
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "water:park_fountain/elm_park",
+  "Volume": 1.0,
+  "Range": 160,
+  "MinDistance": 1.5,
+  "Mode": "LoopOne"
+}

@@ -92,6 +92,14 @@ public sealed record WaterTapSpec
     public string Name { get; init; } = "";
     [Tunable("m", 0.1, 20, "How big this landing place is. Inside it the sound is flat.", Step = 0.1)]
     public float ExtentMetres { get; init; } = 1.2f;
+    /// <summary>Where its water lands from the feature's middle (its own frame: x east, y up, z north on an unturned
+    /// feature): one map entity places every tap (<see cref="WaterFeatureSpec.HeardFromTaps"/>).</summary>
+    [Tunable("m", -50, 50, "How far east of the feature's middle this water lands.", Label = "east", Step = 0.1)]
+    public float EastMetres { get; init; }
+    [Tunable("m", -10, 30, "How far over the feature's middle (its water's surface) this water lands.", Label = "up", Step = 0.05)]
+    public float UpMetres { get; init; }
+    [Tunable("m", -50, 50, "How far north of the feature's middle this water lands.", Label = "north", Step = 0.1)]
+    public float NorthMetres { get; init; }
 }
 
 /// <summary>A fountain, a cascade, a weir: everything falling into one pool.</summary>
@@ -113,6 +121,25 @@ public sealed record WaterFeatureSpec
     /// A map places them as "water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;" emitters; the whole feature as
     /// one "water:&lt;preset&gt;" emitter plays every tap from one point.</summary>
     public WaterTapSpec[] Taps { get; init; } = { new() { Name = "the whole" } };
+    /// <summary>
+    /// The feature is heard from its taps, each where its water lands (<see cref="WaterTapSpec.EastMetres"/> and
+    /// the rest): a map places the feature once ("water:&lt;preset&gt;/&lt;feature&gt;", at its middle on its water) and the
+    /// server lays a voice at every tap from here (MapManager.SpawnTaps), so the layout is the thing's, not the map's.
+    /// </summary>
+    [Tunable("", 0, 1, "The feature is heard from its taps, each where its water lands: a map places it once and every tap is laid from here.", Label = "heard from its taps")]
+    public bool HeardFromTaps { get; init; }
+
+    /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;": a whole feature a map places once, to be heard from its taps; false
+    /// for a tap's key and for a bare preset.</summary>
+    public static bool TryFeatureKey(string? soundId, out string preset, out string feature)
+    {
+        preset = feature = "";
+        if (string.IsNullOrEmpty(soundId) || !soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase)) return false;
+        var parts = soundId[6..].Split('/');
+        if (parts.Length != 2 || parts[0].Length == 0 || parts[1].Length == 0) return false;
+        (preset, feature) = (parts[0], parts[1]);
+        return true;
+    }
 
     /// <summary>
     /// A park fountain, tiered, over rocks (Cody, 2026-10-06: "a little more lifelike, a little bigger,
@@ -129,21 +156,31 @@ public sealed record WaterFeatureSpec
     /// and beads. Off the rocks it leaves over their outer edges as short sheets and strands, 0.45 m down
     /// into the pool. The rim jets are 8 mm, rising a metre: 0.22 L/s each.
     ///
-    /// It is heard from five places (<see cref="Taps"/>): the bowl, and the four sides of the rock heap,
-    /// where each side's overflow strikes the stone and runs off it and that side's three rim jets come
-    /// down. The map (tools/gen_city.py, Elm Park) puts an emitter at each.
+    /// It is heard from nine places (<see cref="Taps"/>), each where its water lands, laid from here round the
+    /// feature's middle on its water (<see cref="HeardFromTaps"/>; the map, tools/gen_city.py, places the fountain
+    /// once): the bowl, where the central jet comes down 1.55 m over the pool; the four sides of the rock heap, just
+    /// past the rocks (2.3 m out), where each side's overflow strikes the stone and runs off it; and the four rows of
+    /// rim jets, three to a side 1.5 m apart, which come down 2.8 m out, 2.4 m in from the nozzles at the kerb's inner
+    /// face (5.2 m): a jet thrown a metre high at 60° (a judgement: the nozzles' angle is not known) covers that in its
+    /// 0.9 s of flight. Until 2026-10-17 the rim jets were heard from the rocks' taps. The outer pool is calm water
+    /// and has no tap.
     /// </summary>
     public static WaterFeatureSpec ParkFountain => new()
     {
         Name = "Park fountain, tiered, over rocks, with rim jets",
         Falls = ParkFountainFalls(),
+        HeardFromTaps = true,
         Taps = new[]
         {
-            new WaterTapSpec { Name = "the bowl", ExtentMetres = 1.4f },
-            new WaterTapSpec { Name = "north side of the rocks", ExtentMetres = 1.5f },
-            new WaterTapSpec { Name = "east side of the rocks", ExtentMetres = 1.5f },
-            new WaterTapSpec { Name = "south side of the rocks", ExtentMetres = 1.5f },
-            new WaterTapSpec { Name = "west side of the rocks", ExtentMetres = 1.5f },
+            new WaterTapSpec { Name = "the bowl", ExtentMetres = 1.4f, UpMetres = 1.55f },
+            new WaterTapSpec { Name = "north side of the rocks", ExtentMetres = 1.5f, NorthMetres = 2.3f, UpMetres = 0.45f },
+            new WaterTapSpec { Name = "east side of the rocks", ExtentMetres = 1.5f, EastMetres = 2.3f, UpMetres = 0.45f },
+            new WaterTapSpec { Name = "south side of the rocks", ExtentMetres = 1.5f, NorthMetres = -2.3f, UpMetres = 0.45f },
+            new WaterTapSpec { Name = "west side of the rocks", ExtentMetres = 1.5f, EastMetres = -2.3f, UpMetres = 0.45f },
+            new WaterTapSpec { Name = "north rim jets", ExtentMetres = 3.0f, NorthMetres = 2.8f, UpMetres = 0.05f },
+            new WaterTapSpec { Name = "east rim jets", ExtentMetres = 3.0f, EastMetres = 2.8f, UpMetres = 0.05f },
+            new WaterTapSpec { Name = "south rim jets", ExtentMetres = 3.0f, NorthMetres = -2.8f, UpMetres = 0.05f },
+            new WaterTapSpec { Name = "west rim jets", ExtentMetres = 3.0f, EastMetres = -2.8f, UpMetres = 0.05f },
         },
         // MEASURED with `--nature levels water sec=60`, 2026-10-06 (texture round 1: the bigger fountain
         // over rocks, every tap at one point, the field's mean wind): Leq 74.5 dB, 74.7 dB(A) at a
@@ -201,7 +238,7 @@ public sealed record WaterFeatureSpec
                 Name = $"{sides[q]} rim jets",
                 FlowLitresPerSecond = 3f * rim.FlowLitresPerSecond,
                 Streams = 3,
-                Tap = 1 + q,
+                Tap = 5 + q,
             });
         }
         return falls.ToArray();

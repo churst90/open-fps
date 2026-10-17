@@ -2618,6 +2618,17 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>See IAudioProvider.WholeFeature.</summary>
+    public void WholeFeature(int voiceId, bool whole)
+    {
+        if (!_isInitialized) return;
+        lock (_lock)
+        {
+            if (FindActive(voiceId)?.MachineState is WaterTapState { Place: 0 } tap)
+                tap.Shared.WholeFrom = whole ? tap.Tap : -1;
+        }
+    }
+
     /// <summary>One of a train's voices; <paramref name="making"/> while its model is still being made.</summary>
     private PhysicalVoiceState? RailSlot(string key, int rate, out bool making)
     {

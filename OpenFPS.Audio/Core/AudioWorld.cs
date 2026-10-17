@@ -1126,7 +1126,9 @@ public partial class AudioWorld
             {
                 _machineGroups[group] = g = new MachineGroup();
                 if (rail) { SeenTrain(preset, train); g.Train = group; g.Live = _liveTrains.Contains(group); g.Held = _trainStarted.TryGetValue(group, out double t0) && now - t0 < EngineMinimumHoldSeconds; }
+                else if (group.StartsWith("water:", StringComparison.Ordinal)) g.Water = group;
             }
+            if (g.Water != null) g.Taps.Add(src.Emission);
             g.Members.Add(entityId);
             g.FirstId = g.Members.Count == 1 ? entityId : Math.Min(g.FirstId, entityId);
             g.Level = MathF.Max(g.Level, level);
@@ -1140,8 +1142,10 @@ public partial class AudioWorld
             float key = g.Live ? -g.Level / (EngineKeepBias * EngineKeepBias) : -g.Level;
             if (g.Held) key = float.NegativeInfinity;
             g.Key = key;
-            // What it costs in voices: a train its handful (TrainVoicing), anything else one per member.
-            g.Cost = g.Train != null ? TrainVoiceCost(g) : g.Members.Count;
+            // What it costs in voices: a train its handful (TrainVoicing), a water feature far enough off one (its
+            // taps heard as the whole, WholeFeature), anything else one per member.
+            if (g.Water != null) g.Whole = WholeFeature(g, eyePos);
+            g.Cost = g.Train != null ? TrainVoiceCost(g) : g.Whole ? 1 : g.Members.Count;
         }
         _groupOrder.Clear();
         _groupOrder.AddRange(_machineGroups.Values);
@@ -1172,8 +1176,12 @@ public partial class AudioWorld
         for (int i = 0; i < keepGroups; i++)
         {
             if (_keptGroups[i].Train is { } t) { _wantedTrains.Add(t); continue; }
+            // A water feature heard whole plays every tap's water from its first.
+            if (_keptGroups[i].Whole) { _wantedMachines.Add(_keptGroups[i].FirstId); continue; }
             foreach (int id in _keptGroups[i].Members) _wantedMachines.Add(id);
         }
+        foreach (var g in _machineGroups.Values)
+            if (g.Water != null && MachineVoiceId(g.FirstId, out int whole)) _audio.WholeFeature(whole, g.Whole);
         _machineVoicesSpent = spent;
 
         // A machine given up fades out, the registry's to finish; one wanted again before it is silent comes back.
@@ -1206,8 +1214,10 @@ public partial class AudioWorld
                 _trainMembers[g.Train] = g.Members.ToArray();
                 continue;
             }
+            // A water feature heard whole is its first tap alone.
+            var members = g.Whole ? _wholeMembers.Replace(g.FirstId) : g.Members;
             bool isNew = false;
-            foreach (int id in g.Members) if (!_machineStarted.ContainsKey(id)) { isNew = true; break; }
+            foreach (int id in members) if (!_machineStarted.ContainsKey(id)) { isNew = true; break; }
             if (isNew)
             {
                 // A map load presents every machine at once; building one is a set of waveguides and
@@ -1215,7 +1225,7 @@ public partial class AudioWorld
                 if (admittedGroups >= NewEnginesPerUpdate) continue;
                 admittedGroups++;
             }
-            foreach (int id in g.Members)
+            foreach (int id in members)
             {
                 _liveMachines.Add(id);
                 // A wood is given its voice's id here if it has none: it is sounded under it later this frame.
@@ -1264,6 +1274,45 @@ public partial class AudioWorld
         public string? Train;
         /// <summary>Voices it takes.</summary>
         public int Cost = 1;
+        /// <summary>A water feature's group ("water:preset/feature"), its taps' places this frame, and whether it is
+        /// heard whole from its first tap (<see cref="WholeFeature"/>).</summary>
+        public string? Water;
+        public readonly List<Vector3> Taps = new();
+        public bool Whole;
+    }
+
+    /// <summary>A whole feature's one member, without a list a frame.</summary>
+    private sealed class OneMember : List<int>
+    {
+        public OneMember Replace(int id) { Clear(); Add(id); return this; }
+    }
+    private readonly OneMember _wholeMembers = new();
+
+    /// <summary>Which water features were heard whole last frame, for the hysteresis.</summary>
+    private readonly HashSet<string> _wholeFeatures = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Whether a water feature's taps are heard as one from its first (docs/RUNNING_WATER.md 15.8): the angle its taps
+    /// cover at the ear by the line's own cut, as TrainVoicing merges a pair, under its merge angle (4°) together and
+    /// over its split angle (7°) apart, held between; a fountain 11 m across is one voice from about 150 m. Its taps
+    /// stay where they are: heard whole, its first tap plays all of their water, the rest of its voices let go.
+    /// </summary>
+    private bool WholeFeature(MachineGroup g, Vector3 ear)
+    {
+        double widest = 0;
+        for (int i = 0; i < g.Taps.Count; i++)
+            for (int j = i + 1; j < g.Taps.Count; j++)
+            {
+                var a = g.Taps[i] - ear;
+                var b = g.Taps[j] - ear;
+                widest = Math.Max(widest, Math.Atan2(Vector3.Cross(a, b).Length(), Vector3.Dot(a, b)));
+            }
+        float degrees = (float)(widest * 180.0 / Math.PI);
+        bool was = _wholeFeatures.Contains(g.Water!);
+        bool whole = g.Taps.Count > 1 && (was ? degrees < OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SplitAboveDegrees
+                                               : degrees < OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.MergeBelowDegrees);
+        if (whole) _wholeFeatures.Add(g.Water!); else _wholeFeatures.Remove(g.Water!);
+        return whole;
     }
 
     /// <summary>Binaural voices kept free when the machine budget starts something new: what the cars,
