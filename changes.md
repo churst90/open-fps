@@ -21,6 +21,14 @@ Recent work, newest first. `git log` has the rest.
   (`LabLevers.WithoutSteamAudio`) keeps one world's worker on the hand-rolled tracer; the tests of that path
   and the whole-client harness set it, so they hold on any machine. Nothing in the game sets it, and nothing
   a player hears changes.
+- Package stage 4, World (docs/ENGINE_PACKAGES.md, stage 4 as built). Nothing a player hears, sees or is told
+  changes. Maps and the one world are a project of their own, `OpenFPS.World`: the map, prefab and composite
+  formats, roads, tiles, laying the terrain, what covers the ground for the rain, and the world's tiles with
+  OpenStreetMap, Overture, the elevation survey and the land cover. It knows nothing of entities: the server
+  makes the terrain, a tile's ground and the prefabs into entities, and names every folder the world is read
+  from (`WorldRoots`). No byte on the wire moved, and `city.json` and both places' maps regenerate byte for
+  byte. A map the server saves no longer writes a scale under its spawn. The wire hash changes, so the server
+  and the Windows client go out together.
 - Package stage 7's clean half finished: the listening-level calibration (/listening) is in
   `OpenFPS.Accessibility`, playing its cues through `IUiCues` as the lists do; Accessibility now references
   Models and Sound. Nothing a player hears or is told changes, and the wire hash does not.
