@@ -3,6 +3,7 @@ using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using Serilog;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Systems;
 

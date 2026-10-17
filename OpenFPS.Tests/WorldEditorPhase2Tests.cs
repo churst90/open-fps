@@ -8,6 +8,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Editor;
 using OpenFPS.Server.Systems;
+using OpenFPS.Geometry;
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 using Rig = OpenFPS.Tests.WorldEditorTests.Rig;
 

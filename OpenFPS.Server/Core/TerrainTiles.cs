@@ -1,6 +1,7 @@
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Core;
 
@@ -34,7 +35,7 @@ public static class TerrainTiles
         {
             Posts = posts,
             Spacing = spacing,
-            HeightsCm = OpenFPS.Common.Geometry.Heightfield.ToCentimetres(heights, baseY),
+            HeightsCm = OpenFPS.Geometry.Heightfield.ToCentimetres(heights, baseY),
             Cells = cells ?? new byte[(posts - 1) * (posts - 1)],
             Materials = materials ?? new[] { "Dirt" },
         };
@@ -67,7 +68,7 @@ public static class TerrainTiles
         world.Query(in q, (Entity e, ref Transform t, ref ColliderComponent c) =>
         {
             if (!c.IsSolid || c.Shape != ColliderShape.Box) return;
-            if (c.Form != null && (c.Form.Kind != OpenFPS.Common.Geometry.ShapeKind.Prism || c.Form.Outline is not { Length: >= 6 })) return;
+            if (c.Form != null && (c.Form.Kind != OpenFPS.Geometry.ShapeKind.Prism || c.Form.Outline is not { Length: >= 6 })) return;
             if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<DoorComponent>(e)) return;
             if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
             if (TerrainBuilder.SlabOf(t.Position, t.Rotation, c.Size, c.Form?.Outline) is { } slab) slabs.Add(slab);

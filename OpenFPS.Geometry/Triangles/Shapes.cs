@@ -1,7 +1,7 @@
 using System.Numerics;
 using MemoryPack;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>Which shape of the library a solid is (docs/GEOMETRY.md 2.6). Append only: it is on the wire.</summary>
 public enum ShapeKind : byte

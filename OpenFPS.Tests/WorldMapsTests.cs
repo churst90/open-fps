@@ -10,6 +10,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Services;
 using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Tests;
 

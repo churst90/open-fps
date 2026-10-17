@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Components;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// The form of a thing's collider, as the entity model says it and the wire carries it (ColliderComponent).

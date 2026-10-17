@@ -62,7 +62,7 @@ public class ModelLibraryTests : IDisposable
                 // writer skips is missing from both texts. An engine's "derive it" is NaN, a named
                 // literal in JSON.
                 var back = JsonSerializer.Deserialize(before, spec.GetType(),
-                    new JsonSerializerOptions { NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals, Converters = { new OpenFPS.Common.Networking.Vector3Converter() } })!;
+                    new JsonSerializerOptions { NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals, Converters = { new OpenFPS.Geometry.Vector3Converter() } })!;
                 var lost = Readings(spec).Except(Readings(back)).ToList();
                 foreach (var l in lost) _o.WriteLine($"{kind}:{id} lost {l}");
                 Assert.True(lost.Count == 0, $"{kind}:{id} read back differently: {string.Join("; ", lost.Take(4))}");

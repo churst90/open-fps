@@ -9,6 +9,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Instruments;
 
@@ -172,8 +173,8 @@ public static partial class PhysicsReplays
     {
         if (float.IsNaN(at.X)) return map.Maps.GetSpawnPoint(map.Id).Position;
         if (!float.IsNaN(at.Z)) return PlayerCoordinates.ToWorld(at.X, at.Y, at.Z);
-        var any = new OpenFPS.Common.Geometry.AcceptAll();
-        float floor = map.Grid.Geometry!.FloorAt(at.X, at.Y, 200f, OpenFPS.Common.Geometry.GeometryLayers.Ground, ref any, out _);
+        var any = new OpenFPS.Geometry.AcceptAll();
+        float floor = map.Grid.Geometry!.FloorAt(at.X, at.Y, 200f, OpenFPS.Geometry.GeometryLayers.Ground, ref any, out _);
         return new Vector3(at.X, floor + 0.05f, at.Y);
     }
 
@@ -411,8 +412,8 @@ public static partial class PhysicsReplays
     /// <summary>MovementSystem's context for one input, and what OnFoot.Step adds to it on the triangle world
     /// (the capsule, the grade, the solids gathered).</summary>
     public static SharedMovementEngine.MovementContext ServerContext(LoadedMap map, Entity body, Vector3 at, Vector3 velocity, Step step,
-                                                                     float ground, out OpenFPS.Common.Geometry.TriangleWorld? geometry,
-                                                                     out List<OpenFPS.Common.Geometry.SolidRef> solids)
+                                                                     float ground, out OpenFPS.Geometry.TriangleWorld? geometry,
+                                                                     out List<OpenFPS.Geometry.SolidRef> solids)
     {
         var ecs = map.World;
         ref var player = ref ecs.Get<PlayerComponent>(body);
@@ -429,13 +430,13 @@ public static partial class PhysicsReplays
             PlayerRadius = PhysicsConstants.PlayerRadius, PlayerHeight = PhysicsConstants.PlayerHeight, StepHeight = PhysicsConstants.StepHeight,
             IsJumpRequested = step.Jump, MapMin = map.Data.WalkMin, MapMax = map.Data.WalkMax,
         };
-        solids = new List<OpenFPS.Common.Geometry.SolidRef>();
+        solids = new List<OpenFPS.Geometry.SolidRef>();
         var view = ServerPhysicsView.Of(ecs, map.Grid);
         geometry = view.Triangles;
         if (geometry != null)
         {
             var self = new BodyFilter(view, body.Id);
-            ctx.Body = OpenFPS.Common.Geometry.BodyShape.Capsule;
+            ctx.Body = OpenFPS.Geometry.BodyShape.Capsule;
             ctx.Grade = SharedMovementEngine.GradeAlong(geometry, ref self, at, inputDir);
             SharedMovementEngine.GatherSolids(ctx, geometry, ref self, solids);
         }

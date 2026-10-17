@@ -36,7 +36,7 @@ STATICS = rd('statics.tsv')
 SREFS = rd('static_refs.tsv')
 
 C = 'OpenFPS.Common.'
-G = 'OpenFPS.Common.Geometry.'
+G = 'OpenFPS.Geometry.'
 EN = 'OpenFPS.Client.AudioEngine.Core.Engine.'
 
 # ── The inventory: (type, group, note) ─────────────────────────────────────────────────────────────
@@ -124,8 +124,8 @@ RULES = [
     (G + 'TriangleWorld', 'G', 'the BVH and its queries'),
     (G + 'BvhBuilder', 'G', ''),
     (G + 'Heightfield', 'G', ''),
-    (C + 'GeometryUtils', 'G', 'boxes against cylinders, OBB tests'),
-    (C + 'SpatialGrid', 'G', 'the entity grid'),
+    (G + 'GeometryUtils', 'G', 'boxes against cylinders, OBB tests'),
+    (G + 'SpatialGrid', 'G', 'the entity grid'),
     # Server
     (C.replace('Common', 'Server') + 'Systems.MovementSystem', 'H', 'steps players from their inputs'),
     ('OpenFPS.Server.Systems.DrivingSystem', 'H', 'a driven car\'s controls, ignition, tile fences and hearing; its mechanics are VehicleStep\'s (physics stage 3)'),
@@ -187,7 +187,7 @@ def allowed_for_physics(t):
 
 
 def short(t):
-    for p in ('OpenFPS.Common.Geometry.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
+    for p in ('OpenFPS.Geometry.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
               'OpenFPS.Client.AudioEngine.Core.Engine.', 'OpenFPS.Server.Systems.', 'OpenFPS.Server.Core.',
               'OpenFPS.Client.Core.'):
         if t.startswith(p):

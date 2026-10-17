@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 using Xunit;
 using Xunit.Abstractions;
 

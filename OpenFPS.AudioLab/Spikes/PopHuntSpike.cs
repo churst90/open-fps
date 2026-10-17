@@ -224,7 +224,7 @@ public static class PopHuntSpike
         float len = Vector3.Distance(ear, src);
         var hits = new List<(float At, SteamAudioScene.Box B)>();
         foreach (var b in boxes)
-            if (OpenFPS.Common.GeometryUtils.RayIntersectsOBB(ear, dir, b.Center, b.Size, b.Rotation, out float at) && at <= len)
+            if (OpenFPS.Geometry.GeometryUtils.RayIntersectsOBB(ear, dir, b.Center, b.Size, b.Rotation, out float at) && at <= len)
                 hits.Add((at, b));
         hits.Sort((x, y) => x.At.CompareTo(y.At));
         float d = acoustics.Routes?.BarrierPathDifference(src, ear, out var edge, out bool v) ?? -1f;

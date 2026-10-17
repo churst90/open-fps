@@ -480,7 +480,7 @@ public class GroundWaterTests : IDisposable
                         Line = new[] { new Vector3(from, Y(from), 50.5f * Cell) - mid, new Vector3(to, Y(to), 50.5f * Cell) - mid },
                     },
                     new OpenFPS.Common.Components.IdentityComponent { Name = "Test Creek", PrefabId = "waterway_creek" },
-                    new OpenFPS.Common.Components.ColliderComponent { Shape = OpenFPS.Common.Components.ColliderShape.Box, Size = new Vector3(3f, 0.2f, 0.2f) });
+                    new OpenFPS.Common.Components.ColliderComponent { Shape = OpenFPS.Geometry.ColliderShape.Box, Size = new Vector3(3f, 0.2f, 0.2f) });
             }
             var downstream = Part(390f, 200f);
             var upstream = Part(200f, 10f);

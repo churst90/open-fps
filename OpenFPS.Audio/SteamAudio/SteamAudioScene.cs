@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -19,7 +19,7 @@ public sealed class SteamAudioScene : IDisposable
     /// hangs in its frame and is never a layer of the wall round it (LayeredFaces).</summary>
     public readonly record struct Box(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material,
                                       WallBuild Build = default, int EntityId = 0,
-                                      OpenFPS.Common.Geometry.ShapeSpec? Form = null, bool Hung = false);
+                                      OpenFPS.Geometry.ShapeSpec? Form = null, bool Hung = false);
 
     private readonly IntPtr _context;
     private IntPtr _scene;
@@ -223,7 +223,7 @@ public sealed class SteamAudioScene : IDisposable
         return (min, max);
     }
 
-    public void Build(IReadOnlyList<Box> boxes, IReadOnlyList<OpenFPS.Common.Geometry.SolidSpec>? terrains = null)
+    public void Build(IReadOnlyList<Box> boxes, IReadOnlyList<OpenFPS.Geometry.SolidSpec>? terrains = null)
     {
         Release();
         _scene = CreateScene(_context);
@@ -244,7 +244,7 @@ public sealed class SteamAudioScene : IDisposable
     /// none. Vertices in Steam Audio's frame. The bounds are in the game's.
     /// </summary>
     internal static IntPtr AddMesh(IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax,
-                                   IReadOnlyList<OpenFPS.Common.Geometry.SolidSpec>? terrains = null)
+                                   IReadOnlyList<OpenFPS.Geometry.SolidSpec>? terrains = null)
     {
         boundsMin = boundsMax = Vector3.Zero;
         IntPtr mesh = IntPtr.Zero;
@@ -320,7 +320,7 @@ public sealed class SteamAudioScene : IDisposable
     /// corner), each solid's corners shared by its triangles, the same materials the boxes made. Zero if
     /// there are none. The triangles are wound as the box mesh was in Steam Audio's frame.
     /// </summary>
-    internal static IntPtr AddPieceMesh(IntPtr scene, OpenFPS.Common.Geometry.GeometryPiece piece, bool openGround, LayerLookup? layers = null)
+    internal static IntPtr AddPieceMesh(IntPtr scene, OpenFPS.Geometry.GeometryPiece piece, bool openGround, LayerLookup? layers = null)
     {
         var verts = new List<PV>();
         var tris = new List<Phonon.IPLTriangle>();
@@ -332,7 +332,7 @@ public sealed class SteamAudioScene : IDisposable
         {
             ref readonly var rec = ref piece.Solid(s);
             var surface = piece.Surfaces[rec.Surface];
-            if (surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.OpenGround) != openGround) continue;
+            if (surface.Is(OpenFPS.Geometry.SurfaceFlags.OpenGround) != openGround) continue;
             int mi = MaterialIndex(surface.Material, surface.Construction.PanelSize, surface.Construction.Build, materials, matIndexByName);
             var member = layers?.Of(rec.Owner, rec.PlacedAt, rec.BoxSize);
             int first = verts.Count, unique = 0;
@@ -365,7 +365,7 @@ public sealed class SteamAudioScene : IDisposable
         // The tile's ground is open ground.
         if (openGround && piece.Terrain != null)
         {
-            var spec = new OpenFPS.Common.Geometry.SolidSpec(piece.TerrainOwner, default, Quaternion.Identity, Vector3.Zero, default,
+            var spec = new OpenFPS.Geometry.SolidSpec(piece.TerrainOwner, default, Quaternion.Identity, Vector3.Zero, default,
                                                              Terrain: piece.Terrain);
             // The terrain's corner in the piece's frame: the spec's corner is its position less half the tile.
             spec = spec with { Position = piece.TerrainOffset + new Vector3(piece.Terrain.Size * 0.5f, 0f, piece.Terrain.Size * 0.5f) };

@@ -50,8 +50,8 @@ public sealed class MapVersionStore
         Converters =
         {
             new JsonStringEnumConverter(),
-            new OpenFPS.Common.Networking.Vector3Converter(),
-            new OpenFPS.Common.Networking.QuaternionConverter(),
+            new OpenFPS.Geometry.Vector3Converter(),
+            new OpenFPS.Geometry.QuaternionConverter(),
         },
     };
 

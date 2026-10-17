@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// One piece placed in the world: a tile's static geometry at its tile's corner, or a moving thing (a

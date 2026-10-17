@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using JoltPhysicsSharp;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Instruments;
 using OpenFPS.Common;
 

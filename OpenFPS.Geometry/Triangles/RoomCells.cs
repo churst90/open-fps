@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// Which room's flood holds a point (docs/GEOMETRY.md 2.7, 12.6): every flooded room's air and the wall cells round

@@ -2,6 +2,7 @@ using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Core;
 
@@ -226,17 +227,17 @@ public sealed class MapTiles
     /// </summary>
     private static List<List<int>> FloodTogether(World world, IEnumerable<Entity> entities)
     {
-        var seeds = new List<OpenFPS.Common.Geometry.RoomFlood.Seed>();
+        var seeds = new List<OpenFPS.Geometry.RoomFlood.Seed>();
         foreach (var e in entities)
         {
             if (!world.IsAlive(e) || !world.Has<RegionComponent>(e) || !world.Has<Transform>(e)) continue;
             var r = world.Get<RegionComponent>(e);
             if (!r.IsIndoor || r.RoomSize.X <= 0f || r.RoomSize.Y <= 0f || r.RoomSize.Z <= 0f) continue;
             var t = world.Get<Transform>(e);
-            seeds.Add(new OpenFPS.Common.Geometry.RoomFlood.Seed(e.Id, t.Position, r.RoomSize, t.Rotation));
+            seeds.Add(new OpenFPS.Geometry.RoomFlood.Seed(e.Id, t.Position, r.RoomSize, t.Rotation));
         }
         seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
-        return OpenFPS.Common.Geometry.RoomFlood.Groups(seeds, Vector3.Zero, OpenFPS.Common.Geometry.RoomFlood.DefaultMargin + 0.5f)
+        return OpenFPS.Geometry.RoomFlood.Groups(seeds, Vector3.Zero, OpenFPS.Geometry.RoomFlood.DefaultMargin + 0.5f)
                        .Where(g => g.Count > 1).ToList();
     }
 

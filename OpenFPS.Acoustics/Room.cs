@@ -4,7 +4,7 @@ namespace OpenFPS.Common;
 
 /// <summary>A named box and what its six faces are made of; the host fills it (open-fps: from RegionComponent,
 /// in EntityAcoustics). Material "None" is no face at all: see <see cref="RoomAcoustics"/>. A room flooded from
-/// the walls carries what the flood measured (<see cref="RoomAcoustics.Measured(in Room, OpenFPS.Common.Geometry.RoomFlood.Lining)"/>),
+/// the walls carries what the flood measured (<see cref="RoomAcoustics.Measured(in Room, OpenFPS.Geometry.RoomFlood.Lining)"/>),
 /// and its box is then only where it was seeded from.</summary>
 public struct Room
 {

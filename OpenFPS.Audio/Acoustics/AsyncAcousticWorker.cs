@@ -4,6 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.AudioEngine.Acoustics;
 
@@ -822,7 +823,7 @@ public class AsyncAcousticWorker : IDisposable
                                      AcousticRequest req, int region)
     {
         var geometry = _enclosureWorld;
-        var solids = geometry != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? null : ReflectionSolids();
+        var solids = geometry != null && OpenFPS.Geometry.TriangleGeometry.Enabled ? null : ReflectionSolids();
         if (solids != null && solids.Count == 0) return;
 
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
@@ -972,12 +973,12 @@ public class AsyncAcousticWorker : IDisposable
     /// check only ever wrote the report. <paramref name="terrains"/> are the world's tiles of ground, for the
     /// box list (the triangle store has its own).
     /// </summary>
-    private OpeningRoutes BuildRoutes(IAcousticWorld world, List<SteamAudioScene.Box> boxes, List<OpenFPS.Common.Geometry.SolidSpec> terrains,
-                                      OpenFPS.Common.Geometry.TriangleWorld? geometry, OpeningRoutes.TileCache? cache, bool report)
+    private OpeningRoutes BuildRoutes(IAcousticWorld world, List<SteamAudioScene.Box> boxes, List<OpenFPS.Geometry.SolidSpec> terrains,
+                                      OpenFPS.Geometry.TriangleWorld? geometry, OpeningRoutes.TileCache? cache, bool report)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         Func<Vector3, int> regionAt = p => _acoustics.GetRegionAt(world, p);
-        var model = geometry != null && cache != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled
+        var model = geometry != null && cache != null && OpenFPS.Geometry.TriangleGeometry.Enabled
             ? OpeningGraph.Build(world, geometry, report ? regionAt : null, cache)
             : OpeningGraph.Build(world, boxes, regionAt, terrains);
         if (!report) return model;
@@ -1101,7 +1102,7 @@ public class AsyncAcousticWorker : IDisposable
     // A door's rebuild is made off this thread and swapped in when ready: the city's two scenes take
     // about 120 ms (--scene-cost), and occlusion would stand still that long, several times a swing.
     // Replaced scenes are released a few seconds later, once every simulator has the new one.
-    private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map, OpeningRoutes Routes, OpenFPS.Common.Geometry.TriangleWorld? Geometry)>? _doorBuild;
+    private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map, OpeningRoutes Routes, OpenFPS.Geometry.TriangleWorld? Geometry)>? _doorBuild;
     private readonly List<(SteamAudioScene Scene, long At)> _retiredScenes = new();
 
     // ── Tiles arriving and leaving ─────────────────────────────────────────────────────────────
@@ -1120,7 +1121,7 @@ public class AsyncAcousticWorker : IDisposable
     private AcousticGeometry? _acousticStore;
     /// <summary>The acoustic scene as triangles, swapped in with <see cref="_barrierBoxes"/>: what the
     /// enclosure survey casts against.</summary>
-    private OpenFPS.Common.Geometry.TriangleWorld? _enclosureWorld;
+    private OpenFPS.Geometry.TriangleWorld? _enclosureWorld;
     /// <summary>This map's routes kept tile by tile: one build at a time uses it.</summary>
     private OpeningRoutes.TileCache? _routeTiles;
     private double _lastScenesMs, _lastRoutesMs;
@@ -1145,7 +1146,7 @@ public class AsyncAcousticWorker : IDisposable
     /// that changed are built), or, without Embree, built whole.</summary>
     private static (SteamAudioScene Full, SteamAudioScene Listener) ScenesFor(IntPtr ctx, TileSceneSet? set,
                                                                              List<SteamAudioScene.Box> boxes, ISet<int>? leaves,
-                                                                             List<OpenFPS.Common.Geometry.SolidSpec> terrains)
+                                                                             List<OpenFPS.Geometry.SolidSpec> terrains)
     {
         if (set != null)
         {
@@ -1163,11 +1164,11 @@ public class AsyncAcousticWorker : IDisposable
     /// The acoustic scene as triangles (docs/GEOMETRY.md stage 1), what the enclosure survey casts against:
     /// the tile set's store, or without Embree a store of the map's own brought up to the same boxes.
     /// </summary>
-    private static OpenFPS.Common.Geometry.TriangleWorld? GeometryFor(TileSceneSet? set, AcousticGeometry? store,
+    private static OpenFPS.Geometry.TriangleWorld? GeometryFor(TileSceneSet? set, AcousticGeometry? store,
                                                                       List<SteamAudioScene.Box> boxes, ISet<int>? leaves,
-                                                                      List<OpenFPS.Common.Geometry.SolidSpec> terrains)
+                                                                      List<OpenFPS.Geometry.SolidSpec> terrains)
     {
-        if (!OpenFPS.Common.Geometry.TriangleGeometry.Enabled) return null;
+        if (!OpenFPS.Geometry.TriangleGeometry.Enabled) return null;
         if (set != null) return set.Geometry;
         return store?.Update(boxes, leaves, terrains);
     }
@@ -1290,7 +1291,7 @@ public class AsyncAcousticWorker : IDisposable
             if (routesDue) { _routesPortals = portals; _routesBuiltTicks = OpenFPS.Common.AudioClockStamps.StampTicks(_clock); }
             var store = _acousticStore;
             var routeCache = _routeTiles;
-            Func<(SteamAudioScene, SteamAudioScene, List<SteamAudioScene.Box>, AcousticMap?, OpeningRoutes, OpenFPS.Common.Geometry.TriangleWorld?)> build = () =>
+            Func<(SteamAudioScene, SteamAudioScene, List<SteamAudioScene.Box>, AcousticMap?, OpeningRoutes, OpenFPS.Geometry.TriangleWorld?)> build = () =>
             {
                 var parts = System.Diagnostics.Stopwatch.StartNew();
                 var leaves = OpeningGraph.LeavesOf(world);
@@ -1399,7 +1400,7 @@ public class AsyncAcousticWorker : IDisposable
         if (++_reverbTick % ReverbEveryNTicks != 0) return;
 
         var geometry = _enclosureWorld;
-        var survey = geometry != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled
+        var survey = geometry != null && OpenFPS.Geometry.TriangleGeometry.Enabled
             ? Enclosure.Look(listener, geometry)
             : Enclosure.Look(listener, EnclosureSolids());
         var (low, mid, high) = Enclosure.DecaySeconds(survey);

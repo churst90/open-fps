@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 // The round, outlined, roofed and swept shapes of the library (docs/GEOMETRY.md 2.6, stage 4). Each is worked
 // out in doubles from its numbers, fitted to its collider's box, and only then made floats, so the server and

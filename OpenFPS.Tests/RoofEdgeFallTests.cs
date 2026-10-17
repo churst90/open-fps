@@ -7,6 +7,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
+using OpenFPS.Geometry;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Tests;

@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using Serilog;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Systems;
 
@@ -477,5 +478,5 @@ public readonly record struct MapAtmosphere(
         1.0f);
 }
 
-// No MathHelper of its own here: one in this namespace shadowed OpenFPS.Common.MathHelper for every
+// No MathHelper of its own here: one in this namespace shadowed OpenFPS.Geometry.MathHelper for every
 // file in OpenFPS.Server.Systems.

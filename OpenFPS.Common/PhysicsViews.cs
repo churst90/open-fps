@@ -1,7 +1,7 @@
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Common;
 

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
-using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 using static OpenFPS.Common.BodyConstants;
 
 namespace OpenFPS.Common;
@@ -41,7 +41,7 @@ public static class SharedMovementEngine
         public Vector3 MapMax;
         /// <summary>What the body is: the cylinder of the box path and stage 1, or stage 2's capsule
         /// (docs/GEOMETRY.md 3.1). The triangle path walks a capsule; the box path a cylinder.</summary>
-        public OpenFPS.Common.Geometry.BodyShape Body;
+        public OpenFPS.Geometry.BodyShape Body;
         /// <summary>The slope of the ground along the way the body is going, rise over run (positive up);
         /// 0 on the level. See <see cref="GradeAlong"/> and <see cref="GradeSpeed"/>.</summary>
         public float Grade;
@@ -90,13 +90,13 @@ public static class SharedMovementEngine
     public readonly ref struct Obstacles
     {
         public readonly ReadOnlySpan<Collider> Boxes;
-        public readonly OpenFPS.Common.Geometry.TriangleWorld? World;
-        public readonly ReadOnlySpan<OpenFPS.Common.Geometry.SolidRef> Solids;
+        public readonly OpenFPS.Geometry.TriangleWorld? World;
+        public readonly ReadOnlySpan<OpenFPS.Geometry.SolidRef> Solids;
 
         public Obstacles(ReadOnlySpan<Collider> boxes) { Boxes = boxes; World = null; Solids = default; }
 
-        public Obstacles(ReadOnlySpan<Collider> boxes, OpenFPS.Common.Geometry.TriangleWorld? world,
-                         ReadOnlySpan<OpenFPS.Common.Geometry.SolidRef> solids)
+        public Obstacles(ReadOnlySpan<Collider> boxes, OpenFPS.Geometry.TriangleWorld? world,
+                         ReadOnlySpan<OpenFPS.Geometry.SolidRef> solids)
         {
             Boxes = boxes; World = world; Solids = world == null ? default : solids;
         }
@@ -122,7 +122,7 @@ public static class SharedMovementEngine
                 return hit;
             }
             var solid = Solids[j - Boxes.Length];
-            var r = OpenFPS.Common.Geometry.SolidContact.CylinderOverlap(World!, solid, centre, radius, height, canGoDown);
+            var r = OpenFPS.Geometry.SolidContact.CylinderOverlap(World!, solid, centre, radius, height, canGoDown);
             if (r.IsColliding) r.Material = World!.SurfaceOf(solid).Material;
             return r;
         }
@@ -138,46 +138,46 @@ public static class SharedMovementEngine
                 Vector3 localStepPos = Vector3.Transform(centre, worldToLocal);
                 return GeometryUtils.AABBIntersectsCylinder(-col.Size / 2f, col.Size / 2f, localStepPos, radius, height);
             }
-            return OpenFPS.Common.Geometry.SolidContact.CylinderIntersects(World!, Solids[j - Boxes.Length], centre, radius, height);
+            return OpenFPS.Geometry.SolidContact.CylinderIntersects(World!, Solids[j - Boxes.Length], centre, radius, height);
         }
 
         /// <summary>How deep the cylinder is in obstacle <paramref name="j"/> (0 when clear of it).</summary>
         public float Depth(int j, Vector3 centre, float radius, float height)
         {
             if (j < Boxes.Length) return SharedMovementEngine.Depth(Boxes[j], centre, radius, height);
-            var r = OpenFPS.Common.Geometry.SolidContact.CylinderOverlap(World!, Solids[j - Boxes.Length], centre, radius, height);
+            var r = OpenFPS.Geometry.SolidContact.CylinderOverlap(World!, Solids[j - Boxes.Length], centre, radius, height);
             return r.IsColliding ? r.Penetration : 0f;
         }
 
         /// <summary>How a capsule body with its feet at <paramref name="feet"/> overlaps obstacle
         /// <paramref name="j"/>, and the way out (SolidContact.CapsuleOverlap): a floor lifts the feet by
         /// the penetration itself.</summary>
-        public GeometryUtils.CollisionResult CapsuleOverlap(int j, Vector3 feet, in OpenFPS.Common.Geometry.SolidContact.Capsule body, bool airborne,
+        public GeometryUtils.CollisionResult CapsuleOverlap(int j, Vector3 feet, in OpenFPS.Geometry.SolidContact.Capsule body, bool airborne,
                                                            out float depth)
         {
             if (j < Boxes.Length)
             {
                 var col = Boxes[j];
-                var hit = OpenFPS.Common.Geometry.SolidContact.CapsuleOverlapBox(col.Position, col.Size, col.Rotation, feet, body, airborne, out depth);
+                var hit = OpenFPS.Geometry.SolidContact.CapsuleOverlapBox(col.Position, col.Size, col.Rotation, feet, body, airborne, out depth);
                 if (hit.IsColliding) hit.Material = col.Material;
                 return hit;
             }
             var solid = Solids[j - Boxes.Length];
-            var r = OpenFPS.Common.Geometry.SolidContact.CapsuleOverlap(World!, solid, feet, body, airborne, out depth);
+            var r = OpenFPS.Geometry.SolidContact.CapsuleOverlap(World!, solid, feet, body, airborne, out depth);
             if (r.IsColliding) r.Material = World!.SurfaceOf(solid).Material;
             return r;
         }
 
         /// <summary>How deep a capsule body is in obstacle <paramref name="j"/> (0 when clear of it).</summary>
-        public float CapsuleDepth(int j, Vector3 feet, in OpenFPS.Common.Geometry.SolidContact.Capsule body)
+        public float CapsuleDepth(int j, Vector3 feet, in OpenFPS.Geometry.SolidContact.Capsule body)
         {
             if (j < Boxes.Length)
             {
                 var col = Boxes[j];
-                OpenFPS.Common.Geometry.SolidContact.CapsuleOverlapBox(col.Position, col.Size, col.Rotation, feet, body, airborne: true, out float depth);
+                OpenFPS.Geometry.SolidContact.CapsuleOverlapBox(col.Position, col.Size, col.Rotation, feet, body, airborne: true, out float depth);
                 return depth;
             }
-            return OpenFPS.Common.Geometry.SolidContact.CapsuleDepth(World!, Solids[j - Boxes.Length], feet, body);
+            return OpenFPS.Geometry.SolidContact.CapsuleDepth(World!, Solids[j - Boxes.Length], feet, body);
         }
     }
 
@@ -187,15 +187,15 @@ public static class SharedMovementEngine
     /// nothing, so a ramp or a flight reads its pitch and a lone kerb is stepped, not climbed. Static
     /// floors only, the same on the server and every client.
     /// </summary>
-    public static float GradeAlong<F>(OpenFPS.Common.Geometry.TriangleWorld world, ref F filter, Vector3 feet, Vector3 direction,
-                                      float reach = PlayerRadius) where F : OpenFPS.Common.Geometry.IGeometryFilter
+    public static float GradeAlong<F>(OpenFPS.Geometry.TriangleWorld world, ref F filter, Vector3 feet, Vector3 direction,
+                                      float reach = PlayerRadius) where F : OpenFPS.Geometry.IGeometryFilter
     {
         var d = new Vector3(direction.X, 0f, direction.Z);
         float len = d.Length();
         if (len < 1e-4f) return 0f;
         d /= len;
         float top = feet.Y + StepHeight;
-        var layers = OpenFPS.Common.Geometry.GeometryLayers.Ground;
+        var layers = OpenFPS.Geometry.GeometryLayers.Ground;
         float here = world.FloorAt(feet.X, feet.Z, top, layers, ref filter, out _);
         float ahead = world.FloorAt(feet.X + d.X * reach, feet.Z + d.Z * reach, top, layers, ref filter, out _);
         float behind = world.FloorAt(feet.X - d.X * reach, feet.Z - d.Z * reach, top + StepHeight, layers, ref filter, out _);
@@ -222,9 +222,9 @@ public static class SharedMovementEngine
 
     /// <summary>The solids in the movement layer a body could meet this step, sorted by owner so the
     /// server and a client meet them in the same order.</summary>
-    public static void GatherSolids<F>(in MovementContext ctx, OpenFPS.Common.Geometry.TriangleWorld world, ref F filter,
-                                       List<OpenFPS.Common.Geometry.SolidRef> into)
-        where F : OpenFPS.Common.Geometry.IGeometryFilter
+    public static void GatherSolids<F>(in MovementContext ctx, OpenFPS.Geometry.TriangleWorld world, ref F filter,
+                                       List<OpenFPS.Geometry.SolidRef> into)
+        where F : OpenFPS.Geometry.IGeometryFilter
     {
         into.Clear();
         // The old grid gather's reach: every 10 m cell within CollisionSearchRadius, at every height. A
@@ -243,7 +243,7 @@ public static class SharedMovementEngine
         float fall = MathF.Abs(ctx.Velocity.Y * dt) + StepHeight + 1f;
         var tmin = new Vector3(ctx.Position.X - across, ctx.Position.Y - fall, ctx.Position.Z - across);
         var tmax = new Vector3(ctx.Position.X + across, ctx.Position.Y + ctx.PlayerHeight + fall, ctx.Position.Z + across);
-        world.Overlapping(min, max, tmin, tmax, OpenFPS.Common.Geometry.GeometryLayers.Movement, ref filter, into);
+        world.Overlapping(min, max, tmin, tmax, OpenFPS.Geometry.GeometryLayers.Movement, ref filter, into);
         // A handful: an insertion sort, and no comparer to allocate.
         for (int i = 1; i < into.Count; i++)
         {
@@ -254,7 +254,7 @@ public static class SharedMovementEngine
             into[j + 1] = x;
         }
 
-        static bool Before(OpenFPS.Common.Geometry.TriangleWorld w, int ox, OpenFPS.Common.Geometry.SolidRef x, OpenFPS.Common.Geometry.SolidRef y)
+        static bool Before(OpenFPS.Geometry.TriangleWorld w, int ox, OpenFPS.Geometry.SolidRef x, OpenFPS.Geometry.SolidRef y)
         {
             int oy = w.OwnerOf(y);
             if (ox != oy) return ox < oy;
@@ -344,8 +344,8 @@ public static class SharedMovementEngine
         // The push is applied to the position after the move, where its depth was measured: applied to
         // the one before, it shoved a body against a wall backwards a step every tick.
         bool pushed = false;
-        bool capsule = ctx.Body == OpenFPS.Common.Geometry.BodyShape.Capsule;
-        var body = new OpenFPS.Common.Geometry.SolidContact.Capsule(ctx.PlayerRadius, footPadding, ctx.PlayerHeight);
+        bool capsule = ctx.Body == OpenFPS.Geometry.BodyShape.Capsule;
+        var body = new OpenFPS.Geometry.SolidContact.Capsule(ctx.PlayerRadius, footPadding, ctx.PlayerHeight);
         for (int i = 0; i < 3; i++)
         {
             Vector3 nextPos = pos + remainingMove;
@@ -541,7 +541,7 @@ public static class SharedMovementEngine
 
     /// <summary><see cref="PushedDeeperIntoAnything"/> for the capsule.</summary>
     private static bool CapsulePushedDeeper(in MovementContext ctx, Obstacles colliders, Vector3 end,
-                                            in OpenFPS.Common.Geometry.SolidContact.Capsule body)
+                                            in OpenFPS.Geometry.SolidContact.Capsule body)
     {
         for (int j = 0; j < colliders.Count; j++)
         {

@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>What a face of a body's shell is, which is the surface slot of its triangles
 /// (<see cref="MeshAsset.TriangleSurface"/>): whoever places the mesh gives each its material.</summary>

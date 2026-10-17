@@ -10,6 +10,7 @@ using OpenFPS.Server;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Editor;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Geometry;
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 
 namespace OpenFPS.Tests;

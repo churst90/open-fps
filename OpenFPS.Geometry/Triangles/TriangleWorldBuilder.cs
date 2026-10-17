@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// Makes a <see cref="TriangleWorld"/> from solids and keeps making it as they change, building only the

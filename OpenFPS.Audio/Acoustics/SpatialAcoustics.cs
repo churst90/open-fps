@@ -69,17 +69,17 @@ public class SpatialAcoustics
     // ReflectionSolids lists, as a tree the image-source search asks what is near a path, instead of
     // testing every leg against every near solid (a one-off call in dense woods grew with the square of
     // what was near). A snapshot of another map is answered from the list until the worker catches up.
-    private sealed record ReflectionScene(OpenFPS.Common.Geometry.TriangleWorld World, object? Map);
+    private sealed record ReflectionScene(OpenFPS.Geometry.TriangleWorld World, object? Map);
     private volatile ReflectionScene? _reflectionWorld;
 
-    public void PublishReflectionWorld(OpenFPS.Common.Geometry.TriangleWorld? world, object? map)
+    public void PublishReflectionWorld(OpenFPS.Geometry.TriangleWorld? world, object? map)
         => _reflectionWorld = world == null ? null : new ReflectionScene(world, map);
 
     /// <summary>The acoustic triangle world for this snapshot's map, if the worker has one built.</summary>
-    public OpenFPS.Common.Geometry.TriangleWorld? ReflectionWorldFor(IAcousticWorld world)
+    public OpenFPS.Geometry.TriangleWorld? ReflectionWorldFor(IAcousticWorld world)
     {
         var r = _reflectionWorld;
-        return r != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled && ReferenceEquals(r.Map, world.Rooms) ? r.World : null;
+        return r != null && OpenFPS.Geometry.TriangleGeometry.Enabled && ReferenceEquals(r.Map, world.Rooms) ? r.World : null;
     }
 
     /// <summary>

@@ -1,4 +1,3 @@
-using OpenFPS.Common.Geometry;
 
 namespace OpenFPS.Tests;
 

@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// The straight skeleton of a simple polygon (Aichholzer and others, 1995), as the roof it makes: every edge

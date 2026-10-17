@@ -6,6 +6,7 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core.Input;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Services;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core.Session;
 
@@ -1131,7 +1132,7 @@ public sealed partial class ClientGameSession : IDisposable
             // The rooms flood once the geometry is built (ClientWorldState.GeometryPublished); if it is already, now.
             var map = ClientWorldState.BuildAcousticMap(snapshot.Entities.Values.Select(e => e.Definition),
                 _world.CurrentMapSize, _mapMin, _voxelResolution, _occlusionFloor, streamed: _streamed, report: true,
-                geometry: OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? _world.Geometry.Built : null);
+                geometry: OpenFPS.Geometry.TriangleGeometry.Enabled ? _world.Geometry.Built : null);
             _world.SetAcousticMap(map);
         }
         catch (Exception ex)

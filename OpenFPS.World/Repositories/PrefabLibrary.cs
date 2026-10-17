@@ -37,8 +37,8 @@ public class PrefabLibrary
         ReadCommentHandling = JsonCommentHandling.Skip,
         Converters = {
             new System.Text.Json.Serialization.JsonStringEnumConverter(),
-            new OpenFPS.Common.Networking.Vector3Converter(),
-            new OpenFPS.Common.Networking.QuaternionConverter()
+            new OpenFPS.Geometry.Vector3Converter(),
+            new OpenFPS.Geometry.QuaternionConverter()
         }
     };
 
@@ -52,8 +52,8 @@ public class PrefabLibrary
         Converters =
         {
             new System.Text.Json.Serialization.JsonStringEnumConverter(),
-            new OpenFPS.Common.Networking.Vector3Converter(),
-            new OpenFPS.Common.Networking.QuaternionConverter()
+            new OpenFPS.Geometry.Vector3Converter(),
+            new OpenFPS.Geometry.QuaternionConverter()
         }
     };
 
@@ -171,8 +171,8 @@ public class PrefabLibrary
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
             Converters = { 
                 new System.Text.Json.Serialization.JsonStringEnumConverter(),
-                new OpenFPS.Common.Networking.Vector3Converter(),
-                new OpenFPS.Common.Networking.QuaternionConverter()
+                new OpenFPS.Geometry.Vector3Converter(),
+                new OpenFPS.Geometry.QuaternionConverter()
             }
         };
         File.WriteAllText(path, JsonSerializer.Serialize(prefab, options));

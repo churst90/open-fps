@@ -187,7 +187,7 @@ public class EnginePackagesTests
     {
         new object[] { "Words", typeof(OpenFPS.Words.CompassWords).Assembly.GetName().Name! },
         new object[] { "Schema", typeof(OpenFPS.Common.Editing.TunableAttribute).Assembly.GetName().Name! },
-        new object[] { "Geometry", typeof(OpenFPS.Common.Geometry.TriangleWorld).Assembly.GetName().Name! },
+        new object[] { "Geometry", typeof(OpenFPS.Geometry.TriangleWorld).Assembly.GetName().Name! },
         new object[] { "Native", typeof(FMOD.System).Assembly.GetName().Name! },
         new object[] { "Astronomy", typeof(OpenFPS.Astronomy.Moon).Assembly.GetName().Name! },
         new object[] { "Physics", typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetName().Name! },

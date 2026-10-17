@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// How a wall is built, beyond what it is made of: two leaves of the material with a cavity between, a

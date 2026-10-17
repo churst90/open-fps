@@ -10,6 +10,7 @@ using OpenFPS.Server.Repositories;
 
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 using OpenFPS.Words;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Editor;
 

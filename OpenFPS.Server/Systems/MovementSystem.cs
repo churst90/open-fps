@@ -5,6 +5,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using System.Numerics;
 using Serilog;
+using OpenFPS.Geometry;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Server.Systems;
@@ -212,15 +213,15 @@ public static class MovementSystem
         Vector3 checkCylCenter = pos + new Vector3(0, footPadding + (checkHeight / 2f), 0);
 
         IEnumerable<Entity> candidates;
-        var geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
+        var geometry = OpenFPS.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
         if (geometry != null)
         {
-            var near = new List<OpenFPS.Common.Geometry.SolidRef>();
-            var filter = new OpenFPS.Common.Geometry.ExceptOwners(ignoreEntity?.Id ?? int.MinValue);
+            var near = new List<OpenFPS.Geometry.SolidRef>();
+            var filter = new OpenFPS.Geometry.ExceptOwners(ignoreEntity?.Id ?? int.MinValue);
             var reach = new Vector3(radius, checkHeight * 0.5f, radius);
-            geometry.Overlapping(checkCylCenter - reach, checkCylCenter + reach, OpenFPS.Common.Geometry.GeometryLayers.Movement, ref filter, near);
+            geometry.Overlapping(checkCylCenter - reach, checkCylCenter + reach, OpenFPS.Geometry.GeometryLayers.Movement, ref filter, near);
             foreach (var s in near)
-                if (OpenFPS.Common.Geometry.SolidContact.CylinderIntersects(geometry, s, checkCylCenter, radius, checkHeight)) return true;
+                if (OpenFPS.Geometry.SolidContact.CylinderIntersects(geometry, s, checkCylCenter, radius, checkHeight)) return true;
             var others = new List<Entity>();
             grid.CollectDynamicInRadius(pos, 10.0f, others, new HashSet<Entity>());
             candidates = others;

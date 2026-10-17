@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Server.Repositories;
 
 namespace OpenFPS.Tests;

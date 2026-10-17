@@ -4,7 +4,7 @@ using System.Text;
 using MemoryPack;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
 

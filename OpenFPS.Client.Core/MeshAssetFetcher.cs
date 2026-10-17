@@ -1,4 +1,4 @@
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Client.Core;

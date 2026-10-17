@@ -24,11 +24,11 @@ public static class OpeningGraph
 
     /// <summary>
     /// The graph for the scene the acoustic triangle store holds (docs/GEOMETRY.md stage 1): the same
-    /// openings and places as <see cref="Build(IAcousticWorld, IReadOnlyList{SteamAudioScene.Box}, Func{Vector3, int}?, IReadOnlyList{OpenFPS.Common.Geometry.SolidSpec}?)"/>,
+    /// openings and places as <see cref="Build(IAcousticWorld, IReadOnlyList{SteamAudioScene.Box}, Func{Vector3, int}?, IReadOnlyList{OpenFPS.Geometry.SolidSpec}?)"/>,
     /// the boxes asked of the store's tiles, and whatever did not change since the last build kept in
     /// <paramref name="cache"/>.
     /// </summary>
-    public static OpeningRoutes Build(IAcousticWorld world, OpenFPS.Common.Geometry.TriangleWorld scene, Func<Vector3, int>? regionAt,
+    public static OpeningRoutes Build(IAcousticWorld world, OpenFPS.Geometry.TriangleWorld scene, Func<Vector3, int>? regionAt,
                                       OpeningRoutes.TileCache cache)
     {
         var leaves = new List<DoorLeaf>();
@@ -40,7 +40,7 @@ public static class OpeningGraph
     /// makes them, so the leaves stand where the scene has them), with the world's places and openings, and
     /// its tiles of ground (<paramref name="terrains"/>, IAcousticWorld.TerrainSolids), which are no box.</summary>
     public static OpeningRoutes Build(IAcousticWorld world, IReadOnlyList<SteamAudioScene.Box> boxes, Func<Vector3, int>? regionAt,
-                                      IReadOnlyList<OpenFPS.Common.Geometry.SolidSpec>? terrains)
+                                      IReadOnlyList<OpenFPS.Geometry.SolidSpec>? terrains)
     {
         var leafList = new List<DoorLeaf>();
         world.DoorLeaves(leafList);

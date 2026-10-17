@@ -4,7 +4,7 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core;
 
@@ -1069,7 +1069,7 @@ public sealed class OneOffSounds
         if (AcousticRays.UsesTriangles(world))
         {
             var filter = new CopyStops { World = world, Stale = world.GeometryStale };
-            if (world.Geometry!.Enter(start, dir, maxDist, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, out var h)
+            if (world.Geometry!.Enter(start, dir, maxDist, OpenFPS.Geometry.GeometryLayers.Physical, ref filter, out var h)
                 && h.T < hitDistance && world.TryGetBody(h.Owner, out _))
             {
                 hitDistance = h.T; found = true;
@@ -1106,11 +1106,11 @@ public sealed class OneOffSounds
     }
 
     /// <summary>A triangle's owner stops a copy: not being rebuilt, and a thing that stops copies.</summary>
-    private struct CopyStops : OpenFPS.Common.Geometry.IGeometryFilter
+    private struct CopyStops : OpenFPS.Geometry.IGeometryFilter
     {
         public IAcousticWorld World;
         public IReadOnlySet<int>? Stale;
-        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+        public readonly bool Accept(int owner, in OpenFPS.Geometry.Surface surface)
             => owner != int.MinValue && (Stale == null || !Stale.Contains(owner))
                && World.TryGetBody(owner, out var body) && StopsCopies(body);
     }

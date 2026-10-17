@@ -4,6 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using Arch.Core;
 using Serilog;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Repositories;
 

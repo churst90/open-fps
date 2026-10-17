@@ -1,6 +1,7 @@
 using System.Numerics;
 using System;
 using System.Linq;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Common.Systems;
 
@@ -19,7 +20,7 @@ public static class AcousticVolumeGenerator
     /// (<see cref="RoomAcoustics.Measured"/>).</param>
     public static AcousticMap GenerateRegions(IEnumerable<PlacedRoom> rooms, IEnumerable<PlacedOpening> openings, IEnumerable<FaceOpenings.Box> solids,
                                               Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = AcousticConstants.DefaultOcclusionFloor, bool autoDiscoverPortals = false, bool report = true,
-                                              OpenFPS.Common.Geometry.RoomCells? floods = null)
+                                              OpenFPS.Geometry.RoomCells? floods = null)
     {
         var console = report ? Console.Out : System.IO.TextWriter.Null;
         var acousticMap = new AcousticMap(mapSize, minBound, voxelResolution);
@@ -207,10 +208,10 @@ public static class AcousticVolumeGenerator
 
     /// <summary>Each voxel whose middle a room's flood holds, to that room: over the boxes of the places that did not
     /// flood (a yard, a street), as a room inside a hall held the hall's voxels.</summary>
-    private static void MarkFloods(SparseAcousticOctree grid, OpenFPS.Common.Geometry.RoomCells floods, Vector3 min, float res,
+    private static void MarkFloods(SparseAcousticOctree grid, OpenFPS.Geometry.RoomCells floods, Vector3 min, float res,
                                    Dictionary<int, Room> regions)
     {
-        const float cell = OpenFPS.Common.Geometry.RoomFlood.Cell;
+        const float cell = OpenFPS.Geometry.RoomFlood.Cell;
         var o = floods.Origin;
         // The cell holding a voxel's middle, along one axis.
         int MiddleCell(int v, float minA, float originA) => (int)MathF.Floor(((v + 0.5f) * res + minA - originA) / cell);
@@ -239,7 +240,7 @@ public static class AcousticVolumeGenerator
     /// between the same two places), and each patch of open sky a flooded room's air met is an opening to the outdoors.
     /// What a flooded room had from the faces of its box goes; a door keeps its leaf's frame. Build-then-swap.
     /// </summary>
-    public static void ApplyFloodOpenings(AcousticMap map, OpenFPS.Common.Geometry.RoomCells floods)
+    public static void ApplyFloodOpenings(AcousticMap map, OpenFPS.Geometry.RoomCells floods)
     {
         var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
         var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
@@ -252,7 +253,7 @@ public static class AcousticVolumeGenerator
         int nextId = FirstFaceOpeningId;
         foreach (int id in portals.Keys) if (id <= FirstFaceOpeningId) nextId = Math.Min(nextId, id - 1);
 
-        static Vector3 SizeOf(in OpenFPS.Common.Geometry.FloodOpenings.Frame f)
+        static Vector3 SizeOf(in OpenFPS.Geometry.FloodOpenings.Frame f)
             => new(f.Size.X, f.Size.X > 0f ? MathF.Min(f.Size.Y, f.Area / f.Size.X) : f.Size.Y, f.Size.Z);
 
         foreach (var group in floods.Openings.Where(f => f.Opening > 0).GroupBy(f => f.Opening))

@@ -7,7 +7,7 @@ using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Editor;

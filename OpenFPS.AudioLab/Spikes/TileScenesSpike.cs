@@ -3,6 +3,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

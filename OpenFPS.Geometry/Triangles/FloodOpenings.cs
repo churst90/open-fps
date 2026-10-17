@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// Openings framed from where the floods meet them (docs/GEOMETRY.md 12.6, step 3): each opening with no leaf as the

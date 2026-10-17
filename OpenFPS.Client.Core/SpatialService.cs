@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core;
 
@@ -54,16 +55,16 @@ public class SpatialService
     }
 
     /// <summary>Counts what the box path counted: not the stale (rebuilding) and not up to two entities.</summary>
-    private struct StaticFilter : OpenFPS.Common.Geometry.IGeometryFilter
+    private struct StaticFilter : OpenFPS.Geometry.IGeometryFilter
     {
         public IReadOnlySet<int>? Stale;
         public int A, B;
-        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+        public readonly bool Accept(int owner, in OpenFPS.Geometry.Surface surface)
             => owner != A && owner != B && (Stale == null || !Stale.Contains(owner));
     }
 
     /// <summary>The box path's predicates over EntitySnapshots, asked of a triangle's owner.</summary>
-    private struct PredicateFilter : OpenFPS.Common.Geometry.IGeometryFilter
+    private struct PredicateFilter : OpenFPS.Geometry.IGeometryFilter
     {
         public StaticFilter Base;
         public WorldSnapshot World;
@@ -71,10 +72,10 @@ public class SpatialService
         public Func<EntitySnapshot, bool>? Skips;
         public bool GlassBlocks;
         public bool SkipGlass;
-        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+        public readonly bool Accept(int owner, in OpenFPS.Geometry.Surface surface)
         {
             if (!Base.Accept(owner, surface)) return false;
-            if (SkipGlass && !GlassBlocks && surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.Glass)) return false;
+            if (SkipGlass && !GlassBlocks && surface.Is(OpenFPS.Geometry.SurfaceFlags.Glass)) return false;
             if (Accepts == null && Skips == null) return true;
             if (!World.Entities.TryGetValue(owner, out var e)) return false;
             if (Accepts != null && !Accepts(e)) return false;
@@ -170,7 +171,7 @@ public class SpatialService
             {
                 Base = Filter(world, OwnEntityId), World = world, Skips = skip, GlassBlocks = glassBlocks, SkipGlass = true,
             };
-            if (geo.Enter(start, dir, maxDist, OpenFPS.Common.Geometry.GeometryLayers.Sight, ref filter, out var h)
+            if (geo.Enter(start, dir, maxDist, OpenFPS.Geometry.GeometryLayers.Sight, ref filter, out var h)
                 && h.T < hitDistance && world.Entities.TryGetValue(h.Owner, out var e))
             {
                 hitDistance = h.T; hitEntity = e; found = true;
@@ -198,15 +199,15 @@ public class SpatialService
         return found;
     }
 
-    /// <summary>What the first surface a look meets along a line is (<see cref="OpenFPS.Common.Geometry.SurfaceFlags"/>),
+    /// <summary>What the first surface a look meets along a line is (<see cref="OpenFPS.Geometry.SurfaceFlags"/>),
     /// glass included; none without the triangle world, or where it meets nothing.</summary>
-    public OpenFPS.Common.Geometry.SurfaceFlags SurfaceFlagsAlong(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist)
+    public OpenFPS.Geometry.SurfaceFlags SurfaceFlagsAlong(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist)
     {
-        if (!UsesTriangles(world)) return OpenFPS.Common.Geometry.SurfaceFlags.None;
+        if (!UsesTriangles(world)) return OpenFPS.Geometry.SurfaceFlags.None;
         var geo = world.Geometry!;
         var filter = new PredicateFilter { Base = Filter(world, OwnEntityId), World = world, GlassBlocks = true, SkipGlass = true };
-        return geo.Enter(start, Vector3.Normalize(dir), maxDist, OpenFPS.Common.Geometry.GeometryLayers.Sight, ref filter, out var h)
-            ? geo.SurfaceOf(h).Flags : OpenFPS.Common.Geometry.SurfaceFlags.None;
+        return geo.Enter(start, Vector3.Normalize(dir), maxDist, OpenFPS.Geometry.GeometryLayers.Sight, ref filter, out var h)
+            ? geo.SurfaceOf(h).Flags : OpenFPS.Geometry.SurfaceFlags.None;
     }
 
     /// <summary>Whether nothing a look meets is over <paramref name="at"/> for <paramref name="metres"/>, glass included:
@@ -215,7 +216,7 @@ public class SpatialService
     {
         if (!UsesTriangles(world)) return !CastSight(world, at, Vector3.UnitY, metres, out _, out _, glassBlocks: true);
         var filter = new PredicateFilter { Base = Filter(world, OwnEntityId), World = world, GlassBlocks = true, SkipGlass = true };
-        if (world.Geometry!.Any(at, Vector3.UnitY, metres, OpenFPS.Common.Geometry.GeometryLayers.Sight, OpenFPS.Common.Geometry.RayFaces.Both, ref filter))
+        if (world.Geometry!.Any(at, Vector3.UnitY, metres, OpenFPS.Geometry.GeometryLayers.Sight, OpenFPS.Geometry.RayFaces.Both, ref filter))
             return false;
         return !CastSight(world, at, Vector3.UnitY, metres, out _, out _, glassBlocks: true);
     }
@@ -238,7 +239,7 @@ public class SpatialService
         {
             var geo = world.Geometry!;
             var filter = new PredicateFilter { Base = Filter(world), World = world, Accepts = accept };
-            if (geo.Enter(start, dir, maxDist, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, out var h)
+            if (geo.Enter(start, dir, maxDist, OpenFPS.Geometry.GeometryLayers.Physical, ref filter, out var h)
                 && h.T < hitDistance && world.Entities.TryGetValue(h.Owner, out var e))
             {
                 hitDistance = h.T; hitEntity = e; found = true;

@@ -103,7 +103,7 @@ public sealed partial class WorldEditor
     /// <summary>One new thing on the map, kept in its overlay as an addition; <paramref name="placement"/>
     /// names the group placing it is part of.</summary>
     private bool PlaceOne(string mapId, PrefabTemplate t, Pose pose, string? name, Dictionary<string, string>? settings, out Snapshot thing, out string why,
-                          string? placement = null, OpenFPS.Common.Geometry.ShapeSpec? form = null)
+                          string? placement = null, OpenFPS.Geometry.ShapeSpec? form = null)
     {
         var o = Overlays.Get(mapId);
         int id = o.NextId++;

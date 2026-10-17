@@ -178,7 +178,7 @@ public partial class CommandHandler
             var at = session.Entity != Entity.Null && _maps.TryGetMap(mapId, out var w, out _, out _, out _) && w.IsAlive(session.Entity)
                 ? w.Get<OpenFPS.Common.Components.Transform>(session.Entity).Position : default;
             string square = session.Can(Permissions.Edit) || session.Can(Permissions.MapsAny)
-                ? $" Grid square {frame.WorldKeyOf(OpenFPS.Common.TileKey.Of(at, (float)WorldTileKey.TileMetres))}." : "";
+                ? $" Grid square {frame.WorldKeyOf(OpenFPS.Geometry.TileKey.Of(at, (float)WorldTileKey.TileMetres))}." : "";
             return $"You are in {world.Describe(frame, at)}.{square}";
         }
         if (!_maps.TryGetMapData(mapId, out var d)) return $"Map '{mapId}' is not loaded.";

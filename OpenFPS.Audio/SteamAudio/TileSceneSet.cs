@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -128,7 +128,7 @@ internal sealed class TileSceneSet : IDisposable
     /// pair traces changes until <see cref="Assemble"/>.
     /// </summary>
     public void Update(IReadOnlyList<SteamAudioScene.Box> boxes, ISet<int>? leaves = null,
-                       IReadOnlyList<OpenFPS.Common.Geometry.SolidSpec>? terrains = null)
+                       IReadOnlyList<OpenFPS.Geometry.SolidSpec>? terrains = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var world = Store.Update(boxes, leaves, terrains);

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core;
 
@@ -316,7 +317,7 @@ public class ClientWorldState
         _definitions.TryGetValue(def.EntityId, out var before);
         _definitions[def.EntityId] = def;
         _serverTransforms[def.EntityId] = def.Transform;
-        if (def.Collider.Form is { Kind: OpenFPS.Common.Geometry.ShapeKind.Mesh } meshForm) Meshes.Want(meshForm.Mesh, def.EntityId);
+        if (def.Collider.Form is { Kind: OpenFPS.Geometry.ShapeKind.Mesh } meshForm) Meshes.Want(meshForm.Mesh, def.EntityId);
         Geometry.Note(before, def);
 
         // A room that arrived after the map was baked: a building put down in play, or a car's inside,
@@ -914,7 +915,7 @@ public class ClientWorldState
         snap.MarkerEntityIds.AddRange(_markerEntityIds.Keys);
 
         // The static solids as triangles, as far as the last build has them (ClientGeometry).
-        if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled)
+        if (OpenFPS.Geometry.TriangleGeometry.Enabled)
         {
             if (!_geometryHooked) { Geometry.Published = GeometryPublished; _geometryHooked = true; }
             var (world, stale, unindexed) = Geometry.ForSnapshot(
@@ -1036,8 +1037,8 @@ public class ClientWorldState
     /// </summary>
     public static AcousticMap BuildAcousticMap(IEnumerable<EntityDefinition> definitions, Vector3 mapSize, Vector3 min,
                                                float voxelResolution, float occlusionFloor, bool streamed, bool report,
-                                               OpenFPS.Common.Geometry.TriangleWorld? geometry = null,
-                                               OpenFPS.Common.Geometry.RoomFlood.Cache? rooms = null)
+                                               OpenFPS.Geometry.TriangleWorld? geometry = null,
+                                               OpenFPS.Geometry.RoomFlood.Cache? rooms = null)
     {
         // The rooms from the walls (docs/GEOMETRY.md 12.6), as the server floods them: until the geometry is
         // built the boxes serve.
@@ -1056,7 +1057,7 @@ public class ClientWorldState
     public static int RoomFloodThreads => Math.Clamp(Environment.ProcessorCount / 4, 1, 4);
 
     /// <summary>Each group of rooms' flood, kept from one refresh to the next; one flood at a time uses it.</summary>
-    private readonly OpenFPS.Common.Geometry.RoomFlood.Cache _roomFloods = new();
+    private readonly OpenFPS.Geometry.RoomFlood.Cache _roomFloods = new();
     private readonly object _floodLock = new();
 
     /// <summary>Times the rooms were flooded again after the geometry was built, with the rest of the map left as it was.</summary>
@@ -1070,7 +1071,7 @@ public class ClientWorldState
     private void GeometryPublished()
     {
         Touch();
-        if (AcousticMap == null || !OpenFPS.Common.Geometry.TriangleGeometry.Enabled) return;
+        if (AcousticMap == null || !OpenFPS.Geometry.TriangleGeometry.Enabled) return;
         RefreshRunner(() =>
         {
             try
@@ -1082,7 +1083,7 @@ public class ClientWorldState
                 var geometry = Geometry.Built;
                 if (live == null || geometry == null) return;
                 var defs = _definitions.Values.OrderBy(d => d.EntityId).ToList();
-                OpenFPS.Common.Geometry.RoomCells cells;
+                OpenFPS.Geometry.RoomCells cells;
                 lock (_floodLock) cells = OpenFPS.Common.EntityAcoustics.RoomsByFlood(geometry, defs, min, _roomFloods, RoomFloodThreads, measure: true);
                 lock (_metaLock)
                 {
@@ -1184,7 +1185,7 @@ public class ClientWorldState
         AcousticMap built;
         lock (_floodLock)
             built = BuildAcousticMap(defs, size, min, res, floor, streamed: TileMetres > 0f, report: false,
-                                     geometry: OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? Geometry.Built : null, rooms: _roomFloods);
+                                     geometry: OpenFPS.Geometry.TriangleGeometry.Enabled ? Geometry.Built : null, rooms: _roomFloods);
 
         lock (_metaLock)
         {

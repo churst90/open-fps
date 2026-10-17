@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;
 using Serilog;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Core;
 

@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Common;
 
@@ -37,18 +37,18 @@ public static class EntityGeometry
     {
         if (moves) return GeometryRole.None;
         // A tile of ground: not solid to the box readers, a heightfield to the triangle world.
-        if (collider.Shape == Components.ColliderShape.Terrain) return GeometryRole.Static;
+        if (collider.Shape == Geometry.ColliderShape.Terrain) return GeometryRole.Static;
         if (!collider.IsSolid)
         {
             // A fixed box said by name, not an opening: a look finds it (SightGrid's index).
             var n = collider.Size;
-            return announced && type == Components.EntityType.StaticObject && collider.Shape == Components.ColliderShape.Box
+            return announced && type == Components.EntityType.StaticObject && collider.Shape == Geometry.ColliderShape.Box
                    && n.X > 0f && n.Y > 0f && n.Z > 0f && portalRegionA == 0 && portalRegionB == 0
                 ? GeometryRole.SightOnly : GeometryRole.None;
         }
         if (type != Components.EntityType.StaticObject) return GeometryRole.Unindexed;
         var s = collider.Size;
-        if (collider.Shape != Components.ColliderShape.Box || !(s.X > 0f && s.Y > 0f && s.Z > 0f)) return GeometryRole.Unindexed;
+        if (collider.Shape != Geometry.ColliderShape.Box || !(s.X > 0f && s.Y > 0f && s.Z > 0f)) return GeometryRole.Unindexed;
         return portalRegionA != 0 || portalRegionB != 0 ? GeometryRole.Mover : GeometryRole.Static;
     }
 
@@ -66,7 +66,7 @@ public static class EntityGeometry
         var surface = SurfaceOf(def.Material.Material, def.Collider.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow,
                                 a.ShellThickness, a.Absorption, emitter, moves: false, doorLeaf: role == GeometryRole.Mover, assembly: a.Assembly);
         if (role == GeometryRole.SightOnly) surface = SightOnly(surface);
-        if (def.Collider.Shape == Components.ColliderShape.Terrain)
+        if (def.Collider.Shape == Geometry.ColliderShape.Terrain)
             return def.Terrain is { Posts: >= 2 } terrain ? TerrainSpec(def.EntityId, transform.Position, terrain, surface) : default;
         return SolidSpec.OfShape(def.EntityId, transform.Position, transform.Rotation, def.Collider.Size, surface,
                                  def.Collider.Form, AcousticRegistry.IsGlass);

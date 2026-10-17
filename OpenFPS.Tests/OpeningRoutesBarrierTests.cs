@@ -5,9 +5,10 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Systems;
 using Xunit.Abstractions;
-using Heightfield = OpenFPS.Common.Geometry.Heightfield;
-using SolidSpec = OpenFPS.Common.Geometry.SolidSpec;
-using TriangleWorldBuilder = OpenFPS.Common.Geometry.TriangleWorldBuilder;
+using OpenFPS.Geometry;
+using Heightfield = OpenFPS.Geometry.Heightfield;
+using SolidSpec = OpenFPS.Geometry.SolidSpec;
+using TriangleWorldBuilder = OpenFPS.Geometry.TriangleWorldBuilder;
 
 namespace OpenFPS.Tests;
 

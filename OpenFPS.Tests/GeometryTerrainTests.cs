@@ -3,7 +3,7 @@ using Arch.Core;
 using MemoryPack;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 

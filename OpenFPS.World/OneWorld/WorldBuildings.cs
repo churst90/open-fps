@@ -454,7 +454,7 @@ public static class WorldBuildings
         }
 
         // gen_osm.py oform: a shape filling the box round an outline in frame f, the outline about the box's middle.
-        EntityData Oform(string prefab, Frame f, List<(double U, double V)> outline, double y0, double y1, OpenFPS.Common.Geometry.ShapeSpec form,
+        EntityData Oform(string prefab, Frame f, List<(double U, double V)> outline, double y0, double y1, OpenFPS.Geometry.ShapeSpec form,
                          string? nm, string layer, double? foot = null)
         {
             double u0 = outline.Min(q => q.U), u1 = outline.Max(q => q.U), v0 = outline.Min(q => q.V), v1 = outline.Max(q => q.V);
@@ -477,7 +477,7 @@ public static class WorldBuildings
             double hgt = Math.Max(2.2, Math.Min(p.Height ?? 2.5, 6.0));
             // gen_osm.py ground_all, anything else solid: its foot at the lowest ground under it.
             double lo = Samples(f, local.Min(q => q.U), local.Max(q => q.U), local.Min(q => q.V), local.Max(q => q.V), ground).Min();
-            Oform(bd.Area < 30 ? "frame_shed" : "metal_wall", f, local, 0.0, hgt, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism },
+            Oform(bd.Area < 30 ? "frame_shed" : "metal_wall", f, local, 0.0, hgt, new() { Kind = OpenFPS.Geometry.ShapeKind.Prism },
                   name, "structure", lo);
             nextId = id;
             return outList;
@@ -520,7 +520,7 @@ public static class WorldBuildings
         string floorPrefab = "concrete_floor";
         if (homes) floorPrefab = H01(label, "floor") < 0.5 ? "wood_floor" : "carpet_floor";
         var outline = ring.Select(q => F.L(q.X, q.Z)).ToList();
-        Oform("concrete_floor", F, outline, -0.15, 0.10, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism }, $"{name} floor", "structure");
+        Oform("concrete_floor", F, outline, -0.15, 0.10, new() { Kind = OpenFPS.Geometry.ShapeKind.Prism }, $"{name} floor", "structure");
         // A home's finish on the slab, written after the steps (gen_osm.py finishes_later).
         if (homes && later != null)
         {
@@ -530,16 +530,16 @@ public static class WorldBuildings
                 double u0 = outline.Min(q => q.U), u1 = outline.Max(q => q.U), v0 = outline.Min(q => q.V), v1 = outline.Max(q => q.V);
                 var e = Make(finish, F, u0, u1, v0, v1, 0.10, FloorTop, $"{name} {(finish == "wood_floor" ? "floorboards" : "carpet")}", "interiors", null, eid);
                 double cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
-                e.Form = new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism, Outline = outline.SelectMany(q => new[] { R4(q.U - cu), R4(q.V - cv) }).ToArray() };
+                e.Form = new() { Kind = OpenFPS.Geometry.ShapeKind.Prism, Outline = outline.SelectMany(q => new[] { R4(q.U - cu), R4(q.V - cv) }).ToArray() };
                 return e;
             });
         }
         var (style, rise) = RoofOf(bd, kind, mat, wallH, label, p.Height);
-        Oform(roofPrefab, F, outline, wallH, wallH + rise, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Roof, Style = style }, $"{name} roof", "structure");
+        Oform(roofPrefab, F, outline, wallH, wallH + rise, new() { Kind = OpenFPS.Geometry.ShapeKind.Roof, Style = style }, $"{name} roof", "structure");
         var boxes = RoomBoxes(F, ring, R);
         // One ceiling over the whole footprint (gen_osm.py: per room it left a gap up into the eaves).
         if (homes)
-            Oform("plaster_wall", F, outline, Ceil, Ceil + 0.06, new() { Kind = OpenFPS.Common.Geometry.ShapeKind.Prism }, $"{name} ceiling", "structure");
+            Oform("plaster_wall", F, outline, Ceil, Ceil + 0.06, new() { Kind = OpenFPS.Geometry.ShapeKind.Prism }, $"{name} ceiling", "structure");
 
         // One room per rectangle, all called the same; the gaps between them are openings.
         string suffix = p.RoomSuffix ?? "";
@@ -962,8 +962,8 @@ public static class WorldBuildings
     /// gen_osm's simplify_ring) and counter-clockwise, without its repeated last point.</summary>
     public static List<(double X, double Z)> WallRing(IReadOnlyList<(double X, double Z)> ring)
     {
-        var pts = ring.Select(q => new OpenFPS.Common.Geometry.Point2(q.X, q.Z)).ToList();
-        var r = OpenFPS.Common.Geometry.Polygons.CounterClockwise(OpenFPS.Common.Geometry.Polygons.Simplify(pts, RingTol, RingMinEdge));
+        var pts = ring.Select(q => new OpenFPS.Geometry.Point2(q.X, q.Z)).ToList();
+        var r = OpenFPS.Geometry.Polygons.CounterClockwise(OpenFPS.Geometry.Polygons.Simplify(pts, RingTol, RingMinEdge));
         return r.Select(q => (q.X, q.Y)).ToList();
     }
 
@@ -1120,14 +1120,14 @@ public static class WorldBuildings
     }
 
     /// <summary>gen_osm.py roof_of: a roof's style and rise.</summary>
-    public static (OpenFPS.Common.Geometry.RoofStyle Style, double Rise) RoofOf(Shape bd, string kind, string mat, double wallH, string label, double? height)
+    public static (OpenFPS.Geometry.RoofStyle Style, double Rise) RoofOf(Shape bd, string kind, string mat, double wallH, string label, double? height)
     {
         double cap = Math.Max(0.8, (height is double h && h != 0 ? h : 99) - wallH - 0.2);
-        if (mat == "metal") return (OpenFPS.Common.Geometry.RoofStyle.Gable, Math.Min(Math.Max(0.3, bd.Short / 8), cap));
-        if (kind == "premises") return (OpenFPS.Common.Geometry.RoofStyle.Flat, 0.2);
-        if (kind == "church") return (OpenFPS.Common.Geometry.RoofStyle.Gable, Math.Min(Math.Max(0.8, bd.Short / 3), cap));
-        if (kind == "mobile_home") return (OpenFPS.Common.Geometry.RoofStyle.Gable, Math.Min(Math.Max(0.3, bd.Short / 8), cap));
-        return (H01(label, "roof") < 0.5 ? OpenFPS.Common.Geometry.RoofStyle.Hip : OpenFPS.Common.Geometry.RoofStyle.Gable,
+        if (mat == "metal") return (OpenFPS.Geometry.RoofStyle.Gable, Math.Min(Math.Max(0.3, bd.Short / 8), cap));
+        if (kind == "premises") return (OpenFPS.Geometry.RoofStyle.Flat, 0.2);
+        if (kind == "church") return (OpenFPS.Geometry.RoofStyle.Gable, Math.Min(Math.Max(0.8, bd.Short / 3), cap));
+        if (kind == "mobile_home") return (OpenFPS.Geometry.RoofStyle.Gable, Math.Min(Math.Max(0.3, bd.Short / 8), cap));
+        return (H01(label, "roof") < 0.5 ? OpenFPS.Geometry.RoofStyle.Hip : OpenFPS.Geometry.RoofStyle.Gable,
                 Math.Min(Math.Max(0.8, bd.Short / 4), cap));
     }
 

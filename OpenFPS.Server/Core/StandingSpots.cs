@@ -4,6 +4,7 @@ using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Core;
 
@@ -30,7 +31,7 @@ public static class StandingSpots
         {
             // The cells' middles out to their faces, from its floor (the top of the floor's cells in most of its
             // columns: not a flight going down through it).
-            float c = OpenFPS.Common.Geometry.RoomFlood.Cell * 0.5f;
+            float c = OpenFPS.Geometry.RoomFlood.Cell * 0.5f;
             lo -= new Vector3(c); hi += new Vector3(c);
             if (floods.FloorOf(room.Id) is float floor) lo.Y = MathF.Min(floor, hi.Y - 0.5f);
             // About the room's own point where it lies in the air, so the spot nearest it is tried first.

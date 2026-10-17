@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 using MemoryPack;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Common;
 

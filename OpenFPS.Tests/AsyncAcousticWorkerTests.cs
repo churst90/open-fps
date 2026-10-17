@@ -8,6 +8,7 @@ using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Tests;
 
@@ -263,7 +264,7 @@ public class AsyncAcousticWorkerTests
     private sealed class UnreadableWorld : IAcousticWorld
     {
         private static T No<T>() => throw new InvalidOperationException("an unreadable world");
-        public OpenFPS.Common.Geometry.TriangleWorld? Geometry => No<OpenFPS.Common.Geometry.TriangleWorld?>();
+        public OpenFPS.Geometry.TriangleWorld? Geometry => No<OpenFPS.Geometry.TriangleWorld?>();
         public IReadOnlySet<int>? GeometryStale => No<IReadOnlySet<int>?>();
         public long GeometryVersion => No<long>();
         public float TileMetres => No<float>();
@@ -277,6 +278,6 @@ public class AsyncAcousticWorkerTests
         public bool Near(Vector3 centre, float radius, bool staticOnly, List<AcousticBody> into) => No<bool>();
         public void Unindexed(bool staticOnly, List<AcousticBody> into) => No<bool>();
         public void DoorLeaves(List<DoorLeaf> into) => No<bool>();
-        public List<OpenFPS.Common.Geometry.SolidSpec> TerrainSolids() => No<List<OpenFPS.Common.Geometry.SolidSpec>>();
+        public List<OpenFPS.Geometry.SolidSpec> TerrainSolids() => No<List<OpenFPS.Geometry.SolidSpec>>();
     }
 }

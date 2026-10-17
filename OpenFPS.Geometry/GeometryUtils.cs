@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Geometry;
 
 public static class MathHelper
 {

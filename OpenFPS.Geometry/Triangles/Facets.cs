@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// One flat face of a mesh: its connected triangles that lie in one plane and are one surface, merged

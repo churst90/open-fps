@@ -14,6 +14,7 @@ using OpenFPS.Server;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Tests;
 
@@ -213,13 +214,13 @@ public class WorldStreamingTests
 
         // Rooms that flood together share their tiles too: an archway with no door is no doorway, and a client
         // holding one room of a house but not the other flooded the one into the other's air.
-        var seeds = new List<OpenFPS.Common.Geometry.RoomFlood.Seed>();
+        var seeds = new List<OpenFPS.Geometry.RoomFlood.Seed>();
         foreach (var e in lookup.Values)
             if (world.Has<RegionComponent>(e) && world.Get<RegionComponent>(e) is { IsIndoor: true } r && r.RoomSize.X > 0f)
                 seeds.Add(new(e.Id, world.Get<Transform>(e).Position, r.RoomSize, world.Get<Transform>(e).Rotation));
         seeds.Sort((a, b) => a.Id.CompareTo(b.Id));
         int together = 0;
-        foreach (var g in OpenFPS.Common.Geometry.RoomFlood.Groups(seeds, data.MinBound).Where(g => g.Count > 1))
+        foreach (var g in OpenFPS.Geometry.RoomFlood.Groups(seeds, data.MinBound).Where(g => g.Count > 1))
         {
             Assert.True(tiles.TryGet(g[0], out var first));
             foreach (int id2 in g.Skip(1)) { Assert.True(tiles.TryGet(id2, out var m)); Assert.Equal(first.Tiles, m.Tiles); }
@@ -451,7 +452,7 @@ public class WorldStreamingTests
                 float x0 = (float)rng.NextDouble() * t.Size, z0 = (float)rng.NextDouble() * t.Size;
                 float x1 = (float)rng.NextDouble() * t.Size, z1 = (float)rng.NextDouble() * t.Size;
                 float y0 = fine.HeightAt(x0, z0) + 1.0f, y1 = fine.HeightAt(x1, z1) + 1.6f;
-                bool Blocked(OpenFPS.Common.Geometry.Heightfield h)
+                bool Blocked(OpenFPS.Geometry.Heightfield h)
                 {
                     float len = MathF.Sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0));
                     int n = Math.Max(2, (int)(len / 0.5f));
@@ -506,11 +507,11 @@ public class WorldStreamingTests
             tiles[((int)MathF.Round(at.X - t.Size / 2), (int)MathF.Round(at.Z - t.Size / 2))] = (at, t);
         }
         Assert.Equal(196, tiles.Count);
-        var builder = new OpenFPS.Common.Geometry.TriangleWorldBuilder(250f);
-        OpenFPS.Common.Geometry.SolidSpec Fine((Vector3 At, TerrainTileComponent T) x, int id) => EntityGeometry.TerrainSpec(id, x.At, x.T, surface);
-        OpenFPS.Common.Geometry.SolidSpec Coarse((Vector3 At, TerrainTileComponent T) x, int id) => EntityGeometry.TerrainSpec(id, x.At, x.T.Coarse(), surface);
-        OpenFPS.Common.Geometry.SolidSpec Old((Vector3 At, TerrainTileComponent T) x, int id)
-            => OpenFPS.Common.Geometry.SolidSpec.OfTerrain(id, x.At, GeometryTerrainTests.UnskirtedCoarse(x.T, x.At.Y), surface);
+        var builder = new OpenFPS.Geometry.TriangleWorldBuilder(250f);
+        OpenFPS.Geometry.SolidSpec Fine((Vector3 At, TerrainTileComponent T) x, int id) => EntityGeometry.TerrainSpec(id, x.At, x.T, surface);
+        OpenFPS.Geometry.SolidSpec Coarse((Vector3 At, TerrainTileComponent T) x, int id) => EntityGeometry.TerrainSpec(id, x.At, x.T.Coarse(), surface);
+        OpenFPS.Geometry.SolidSpec Old((Vector3 At, TerrainTileComponent T) x, int id)
+            => OpenFPS.Geometry.SolidSpec.OfTerrain(id, x.At, GeometryTerrainTests.UnskirtedCoarse(x.T, x.At.Y), surface);
         int seams = 0, rays = 0, leaks = 0, sights = 0, sightLeaks = 0, oldLeaks = 0, oldSightLeaks = 0, fullLeaks = 0;
         foreach (var ((x, z), a) in tiles)
             foreach (bool alongX in new[] { false, true })
@@ -522,8 +523,8 @@ public class WorldStreamingTests
                 var truthA = GeometryTerrainTests.GroundOf(fa.Terrain!, fa.TerrainCorner);
                 var truthB = GeometryTerrainTests.GroundOf(fb.Terrain!, fb.TerrainCorner);
                 Func<float, float, float> truth = (wx, wz) => (alongX ? wz : wx) < seam ? truthA(wx, wz) : truthB(wx, wz);
-                GeometryTerrainTests.SeamRays Probe(OpenFPS.Common.Geometry.SolidSpec lo, OpenFPS.Common.Geometry.SolidSpec hi)
-                    => GeometryTerrainTests.AcrossSeam(builder.Build(new[] { lo, hi }, Array.Empty<OpenFPS.Common.Geometry.SolidSpec>()),
+                GeometryTerrainTests.SeamRays Probe(OpenFPS.Geometry.SolidSpec lo, OpenFPS.Geometry.SolidSpec hi)
+                    => GeometryTerrainTests.AcrossSeam(builder.Build(new[] { lo, hi }, Array.Empty<OpenFPS.Geometry.SolidSpec>()),
                                                        GeometryTerrainTests.GroundOf(lo.Terrain!, lo.TerrainCorner),
                                                        GeometryTerrainTests.GroundOf(hi.Terrain!, hi.TerrainCorner),
                                                        truth, alongX, seam, v0, v1, seams, 200, 100);

@@ -78,7 +78,7 @@ public static class ModelLibrary
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         // A Vector3 keeps its numbers in fields, which the serializer does not write: an engine's
         // tailpipe exits came back as the origin.
-        Converters = { new OpenFPS.Common.Networking.Vector3Converter() },
+        Converters = { new OpenFPS.Geometry.Vector3Converter() },
     };
 
     // ── The built-in library ────────────────────────────────────────────────────────────────────

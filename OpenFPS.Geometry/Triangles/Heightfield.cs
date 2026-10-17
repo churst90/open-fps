@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// A terrain tile (docs/GEOMETRY.md 2.3): heights on a square grid of posts, a material per cell, in its

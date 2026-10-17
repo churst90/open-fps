@@ -3,7 +3,7 @@ using System.IO.Compression;
 using System.Numerics;
 using MemoryPack;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// A mesh asset as it is stored and sent (docs/GEOMETRY.md 4.2, 4.4): its triangles, its surfaces by name with

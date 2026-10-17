@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Common;
 
@@ -33,15 +34,15 @@ public class WorldSnapshot : IAcousticWorld
     /// since are in <see cref="GeometryStale"/> (not counted) and, if they still exist, in
     /// <see cref="UnindexedStatics"/> with every solid it does not hold, which queries test the old way.
     /// </summary>
-    public OpenFPS.Common.Geometry.TriangleWorld? Geometry;
+    public OpenFPS.Geometry.TriangleWorld? Geometry;
     public IReadOnlySet<int>? GeometryStale;
     public List<int> UnindexedStatics = new();
 
     /// <summary>The tiles of ground held, as solids (docs/GEOMETRY.md 2.3), by owner: what the acoustic
     /// scene lays its ground from. Read from the definitions, so it never lags them.</summary>
-    public List<OpenFPS.Common.Geometry.SolidSpec> TerrainSolids()
+    public List<OpenFPS.Geometry.SolidSpec> TerrainSolids()
     {
-        var list = new List<OpenFPS.Common.Geometry.SolidSpec>();
+        var list = new List<OpenFPS.Geometry.SolidSpec>();
         foreach (var snap in Entities.Values)
         {
             var def = snap.Definition;
@@ -104,7 +105,7 @@ public class WorldSnapshot : IAcousticWorld
     // Each answer is read off the snapshot as it is asked, so the view is exactly as immutable as the
     // snapshot: nothing here is cached against a later change to it.
 
-    OpenFPS.Common.Geometry.TriangleWorld? IAcousticWorld.Geometry => Geometry;
+    OpenFPS.Geometry.TriangleWorld? IAcousticWorld.Geometry => Geometry;
     IReadOnlySet<int>? IAcousticWorld.GeometryStale => GeometryStale;
     long IAcousticWorld.GeometryVersion => GeometryVersion;
     float IAcousticWorld.TileMetres => TileMetres;

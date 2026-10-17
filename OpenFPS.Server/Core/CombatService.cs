@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;
 using Serilog;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Core;
 
@@ -679,7 +680,7 @@ public sealed partial class CombatService
     /// face's material and the grazing angle (<see cref="RicochetLaw.TryBounce"/>), with dice that are the
     /// flight's own for this bounce, so the flight flown ahead and the real one bounce alike.
     /// </summary>
-    private static bool TryRicochet(int seed, int bounces, Slug slug, World world, OpenFPS.Common.Geometry.TriangleWorld? geometry, Entity hit,
+    private static bool TryRicochet(int seed, int bounces, Slug slug, World world, OpenFPS.Geometry.TriangleWorld? geometry, Entity hit,
                                     Vector3 at, Vector3 velocity, out RicochetLaw.Outcome outcome, out Vector3 normal, out Vector3 face)
     {
         outcome = default;
@@ -698,7 +699,7 @@ public sealed partial class CombatService
     /// the normal (a wall's face is its length by its height, a floor's its length by its depth).
     /// </summary>
     internal static void Face(World world, Entity e, Vector3 at, Vector3 velocity, out Vector3 normal, out Vector3 size,
-                              OpenFPS.Common.Geometry.TriangleWorld? geometry = null)
+                              OpenFPS.Geometry.TriangleWorld? geometry = null)
     {
         normal = -Vector3.Normalize(velocity + new Vector3(0f, 0f, 1e-9f));
         size = new Vector3(1f, 1f, 0.1f);
@@ -749,29 +750,29 @@ public sealed partial class CombatService
     }
 
     /// <summary>The triangle world a map's grid has, when the game asks it.</summary>
-    private static OpenFPS.Common.Geometry.TriangleWorld? GeometryOf(SpatialGrid<Entity> grid)
-        => OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
+    private static OpenFPS.Geometry.TriangleWorld? GeometryOf(SpatialGrid<Entity> grid)
+        => OpenFPS.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
 
     /// <summary>The outward normal of the face of <paramref name="owner"/>'s solid a round met at
     /// <paramref name="at"/>: a short ray along its way, from just before the point to just past it.</summary>
-    internal static bool TriangleNormal(OpenFPS.Common.Geometry.TriangleWorld geometry, int owner, Vector3 at, Vector3 velocity, out Vector3 normal)
+    internal static bool TriangleNormal(OpenFPS.Geometry.TriangleWorld geometry, int owner, Vector3 at, Vector3 velocity, out Vector3 normal)
     {
         normal = default;
         float speed = velocity.Length();
         if (speed < 1e-6f) return false;
         var d = velocity / speed;
         var only = new OnlyOwner(owner);
-        if (!geometry.Closest(at - d * 0.05f, d, 0.1f, OpenFPS.Common.Geometry.GeometryLayers.Bullets, OpenFPS.Common.Geometry.RayFaces.Front,
+        if (!geometry.Closest(at - d * 0.05f, d, 0.1f, OpenFPS.Geometry.GeometryLayers.Bullets, OpenFPS.Geometry.RayFaces.Front,
                               ref only, out var hit)) return false;
         normal = hit.Normal;
         return true;
     }
 
-    private readonly struct OnlyOwner : OpenFPS.Common.Geometry.IGeometryFilter
+    private readonly struct OnlyOwner : OpenFPS.Geometry.IGeometryFilter
     {
         private readonly int _owner;
         public OnlyOwner(int owner) => _owner = owner;
-        public bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface) => owner == _owner;
+        public bool Accept(int owner, in OpenFPS.Geometry.Surface surface) => owner == _owner;
     }
 
     private static bool IsGlass(World world, Entity e)
@@ -974,7 +975,7 @@ public sealed partial class CombatService
         float length = path.Length();
         if (length < 1e-5f) return false;
         Vector3 dir = path / length;
-        var geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
+        var geometry = OpenFPS.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
         if (geometry != null && LookupFor(world) is { } lookup)
         {
             // The static solids from the triangle world (docs/GEOMETRY.md 3.6): where the path enters the
@@ -1026,25 +1027,25 @@ public sealed partial class CombatService
     /// The first static solid a round's straight path from <paramref name="a"/> along <paramref name="dir"/>
     /// meets within <paramref name="length"/>: its owner and how far along. Public for the parity harness.
     /// </summary>
-    public static bool StaticFirstHit<F>(OpenFPS.Common.Geometry.TriangleWorld geometry, Vector3 a, Vector3 dir, float length,
+    public static bool StaticFirstHit<F>(OpenFPS.Geometry.TriangleWorld geometry, Vector3 a, Vector3 dir, float length,
                                          ref F filter, out int owner, out float distance)
-        where F : OpenFPS.Common.Geometry.IGeometryFilter
+        where F : OpenFPS.Geometry.IGeometryFilter
     {
         owner = -1; distance = float.MaxValue;
-        if (!geometry.Enter(a, dir, length, OpenFPS.Common.Geometry.GeometryLayers.Bullets, ref filter, out var h)) return false;
+        if (!geometry.Enter(a, dir, length, OpenFPS.Geometry.GeometryLayers.Bullets, ref filter, out var h)) return false;
         owner = h.Owner; distance = h.T;
         return true;
     }
 
     /// <summary>What a round strikes among the static solids: not its shooter, not what they ride in,
     /// not a pane it has already gone through.</summary>
-    public struct StaticStrike : OpenFPS.Common.Geometry.IGeometryFilter
+    public struct StaticStrike : OpenFPS.Geometry.IGeometryFilter
     {
         public int Shooter, Ride;
         public HashSet<int>? Passed;
         public World World;
         public Dictionary<int, Entity> Lookup;
-        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+        public readonly bool Accept(int owner, in OpenFPS.Geometry.Surface surface)
         {
             if (owner == Shooter) return false;
             if (Passed != null && Passed.Contains(owner)) return false;

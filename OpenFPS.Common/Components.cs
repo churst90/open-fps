@@ -1,6 +1,7 @@
 using MemoryPack;
 using System.Numerics;
 using System;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Common.Components;
 
@@ -26,15 +27,15 @@ public partial class TerrainTileComponent
     /// <summary>Post to post across the tile, metres.</summary>
     [MemoryPackIgnore] public float Size => (Posts - 1) * Spacing;
 
-    private OpenFPS.Common.Geometry.Heightfield? _field;
+    private OpenFPS.Geometry.Heightfield? _field;
     private float _fieldBase = float.NaN;
 
     /// <summary>The heightfield for a tile whose base height is <paramref name="baseY"/>, made once.</summary>
-    public OpenFPS.Common.Geometry.Heightfield Field(float baseY)
+    public OpenFPS.Geometry.Heightfield Field(float baseY)
     {
         var f = _field;
         if (f != null && _fieldBase == baseY) return f;
-        f = OpenFPS.Common.Geometry.Heightfield.FromCentimetres(Posts, Spacing, baseY, HeightsCm,
+        f = OpenFPS.Geometry.Heightfield.FromCentimetres(Posts, Spacing, baseY, HeightsCm,
                                                               Cells.Length > 0 ? Cells : null, Materials.Length > 0 ? Materials : null,
                                                               skirted: IsCoarse);
         _fieldBase = baseY;
@@ -365,7 +366,7 @@ public partial struct ColliderComponent
     /// The solid's form from the shape library (docs/GEOMETRY.md 2.6): a ramp, stairs, an arch, filling
     /// the box of <see cref="Size"/>; null for a plain box. Code that reads boxes still sees the box.
     /// </summary>
-    public OpenFPS.Common.Geometry.ShapeSpec? Form { get; set; }
+    public OpenFPS.Geometry.ShapeSpec? Form { get; set; }
 }
 
 [MemoryPackable]

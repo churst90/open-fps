@@ -6,6 +6,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Tests;
 
@@ -31,8 +32,8 @@ public class PrefabSpecTests
         ReadCommentHandling = JsonCommentHandling.Skip,
         Converters = {
             new System.Text.Json.Serialization.JsonStringEnumConverter(),
-            new OpenFPS.Common.Networking.Vector3Converter(),
-            new OpenFPS.Common.Networking.QuaternionConverter()
+            new OpenFPS.Geometry.Vector3Converter(),
+            new OpenFPS.Geometry.QuaternionConverter()
         }
     };
 

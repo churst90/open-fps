@@ -2,7 +2,7 @@ using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace OpenFPS.Common.Networking;
+namespace OpenFPS.Geometry;
 
 public class QuaternionConverter : JsonConverter<Quaternion>
 {

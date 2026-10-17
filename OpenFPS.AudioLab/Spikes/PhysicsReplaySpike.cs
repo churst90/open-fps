@@ -31,10 +31,10 @@ public static class PhysicsReplaySpike
             var m = Map(id);
             var geo = m.Grid.Geometry!;
             var spawn = m.Maps.GetSpawnPoint(id).Position;
-            var any = new OpenFPS.Common.Geometry.AcceptAll();
+            var any = new OpenFPS.Geometry.AcceptAll();
             float Floor(float x, float z, out string mat)
             {
-                float h = geo.FloorAt(x, z, 200f, OpenFPS.Common.Geometry.GeometryLayers.Ground, ref any, out var hit);
+                float h = geo.FloorAt(x, z, 200f, OpenFPS.Geometry.GeometryLayers.Ground, ref any, out var hit);
                 mat = h > -999f ? geo.SurfaceOf(hit.Solid).Material : "";
                 return h;
             }

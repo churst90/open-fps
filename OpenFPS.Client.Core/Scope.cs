@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core;
 
@@ -178,7 +179,7 @@ public static class ScopeView
     {
         var from = feet + new Vector3(0f, 0.3f, 0f);
         if (!spatial.CastSight(snap, from, -Vector3.UnitY, 1.5f, out _, out float d, glassBlocks: true)) return false;
-        if (spatial.SurfaceFlagsAlong(snap, from, -Vector3.UnitY, 1.5f).HasFlag(OpenFPS.Common.Geometry.SurfaceFlags.Roof)) return true;
+        if (spatial.SurfaceFlagsAlong(snap, from, -Vector3.UnitY, 1.5f).HasFlag(OpenFPS.Geometry.SurfaceFlags.Roof)) return true;
         // Under the open sky and in no room: on a suspended ceiling, under the roof, is not on the roof.
         if (Indoors(snap, spatial, feet + new Vector3(0f, 1f, 0f))) return false;
         if (!spatial.UnderOpenSky(snap, feet + new Vector3(0f, 0.1f, 0f), OpenSkyMetres)) return false;

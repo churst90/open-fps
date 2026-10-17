@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Numerics;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Common;
 

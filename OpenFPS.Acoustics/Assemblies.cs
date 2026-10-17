@@ -1,3 +1,5 @@
+using OpenFPS.Geometry;
+
 namespace OpenFPS.Common;
 
 /// <summary>

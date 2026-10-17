@@ -77,7 +77,7 @@ public class HigherOrderReflectionTests
         var solids = new List<EarlyReflections.Solid>();
         foreach (var d in EntityDefinitionFactory.StaticDefinitions(world))
         {
-            if (!d.Collider.IsSolid || d.Collider.Shape != OpenFPS.Common.Components.ColliderShape.Box) continue;
+            if (!d.Collider.IsSolid || d.Collider.Shape != OpenFPS.Geometry.ColliderShape.Box) continue;
             if (!string.IsNullOrEmpty(d.SoundEmitter.SoundId)) continue;
             solids.Add(new EarlyReflections.Solid(d.Transform.Position, d.Collider.Size, d.Transform.Rotation, d.Material.Material));
         }

@@ -14,6 +14,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Server.Services;
+using OpenFPS.Geometry;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Server;
@@ -451,7 +452,7 @@ public class GameServer
         Models.Catalog.Add(new OpenFPS.Server.Editor.GroupKind(Models, prefabRepo));
         Models.LoadAll();
         // Imported meshes (tools/import_mesh, docs/AUTHORING.md), before a map names one.
-        var (meshCount, meshProblems) = OpenFPS.Common.Geometry.MeshLibrary.Shared.LoadFolder("meshes");
+        var (meshCount, meshProblems) = OpenFPS.Geometry.MeshLibrary.Shared.LoadFolder("meshes");
         foreach (var problem in meshProblems) Log.Warning("Meshes: {Problem}", problem);
         if (meshCount > 0) Log.Information("Meshes: {Count} mesh assets", meshCount);
         _mapRepo = new MapRepository(Roots.Maps);
@@ -802,7 +803,7 @@ public class GameServer
         // answered off the game loop.
         _dispatcher.RegisterHandler<MeshAssetRequest>((id, req, reply) => {
             if (!_sessions.TryGetSession(id, out _)) return;
-            reply(MeshAssetBatch.Answer(req, OpenFPS.Common.Geometry.MeshLibrary.Shared));
+            reply(MeshAssetBatch.Answer(req, OpenFPS.Geometry.MeshLibrary.Shared));
         });
         _dispatcher.RegisterHandler<InteractRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);

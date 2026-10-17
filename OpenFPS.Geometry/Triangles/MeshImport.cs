@@ -3,7 +3,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.Json;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>Triangles as a file gave them: positions, three indices and a surface a triangle, and the surfaces' names.</summary>
 public sealed class ImportedTriangles

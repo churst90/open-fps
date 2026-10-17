@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Server.OneWorld;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Core;

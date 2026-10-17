@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// One node of a flattened bounding volume hierarchy, 32 bytes: its bounds, and either its first child

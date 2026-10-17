@@ -4,6 +4,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;
 using Arch.Core;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Core;
 
@@ -67,7 +68,7 @@ public partial class CommandHandler
     /// second apart, as a struck thing (StruckThings): the face you are at, a little above its middle or at
     /// knuckle height. Nobody's body, no ground, nothing carried. False when there is nothing to strike.
     /// </summary>
-    private bool StrikeThingInFront(UserSession session, World world, OpenFPS.Common.SpatialGrid<Entity> grid, Vector3 from,
+    private bool StrikeThingInFront(UserSession session, World world, OpenFPS.Geometry.SpatialGrid<Entity> grid, Vector3 from,
                                     Striker striker, float speed, int blows, string label)
     {
         float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;

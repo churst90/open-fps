@@ -22,7 +22,7 @@ public class ClientPhysicsSystem
 
     /// <summary>On the world: which of its tiles are there to walk into (held, and their ground built), and
     /// their size; null elsewhere. The server fences the same edges (SharedMovementEngine).</summary>
-    public Func<OpenFPS.Common.TileKey, bool>? TileReady { get; set; }
+    public Func<OpenFPS.Geometry.TileKey, bool>? TileReady { get; set; }
     public float TileMetres { get; set; }
 
     /// <summary>The last step was stopped at the edge of a tile not built yet.</summary>

@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -144,7 +145,7 @@ public static class LayersSpike
                 EntityId = id++,
                 Type = OpenFPS.Common.Components.EntityType.StaticObject,
                 Transform = new OpenFPS.Common.Components.Transform { Position = b.Center, Rotation = b.Rotation },
-                Collider = new OpenFPS.Common.Components.ColliderComponent { Shape = OpenFPS.Common.Components.ColliderShape.Box, Size = b.Size, IsSolid = true },
+                Collider = new OpenFPS.Common.Components.ColliderComponent { Shape = OpenFPS.Geometry.ColliderShape.Box, Size = b.Size, IsSolid = true },
                 Material = new OpenFPS.Common.Components.MaterialComponent { Material = b.Material },
                 Acoustics = new OpenFPS.Common.Components.AcousticComponent { LeafMetres = b.Build.LeafMetres, StudSpacingMetres = b.Build.StudSpacingMetres },
             });

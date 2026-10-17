@@ -371,7 +371,7 @@ internal sealed class SpokenReplay
         var snapshot = Session.World.GetSnapshot();
         Session.World.SetAcousticMap(ClientWorldState.BuildAcousticMap(snapshot.Entities.Values.Select(e => e.Definition),
             Session.World.CurrentMapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor, streamed: false, report: false,
-            geometry: OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? Session.World.Geometry.Built : null));
+            geometry: OpenFPS.Geometry.TriangleGeometry.Enabled ? Session.World.Geometry.Built : null));
         // Without the level crossings, which the server's CrossingSystem lays from the rails: none is near
         // the drive (RoadsFor gives the tests' rig the same).
         if (roads)

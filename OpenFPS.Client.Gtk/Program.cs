@@ -7,6 +7,7 @@ using OpenFPS.Client.Core;          // ClientNetworkService
 using OpenFPS.Client.Core.Platform; // ISpeechOutput / SpeechDispatcherOutput / NativeAudioLibraries
 using OpenFPS.Client.Core.Session;  // ClientGameSession
 using OpenFPS.Client.Gtk.Game;      // GtkClientShell / GameWindow
+using OpenFPS.Geometry;
 
 /// <summary>
 /// The GTK (Linux) head: speech, the windows behind IClientShell and the key map. Everything else is

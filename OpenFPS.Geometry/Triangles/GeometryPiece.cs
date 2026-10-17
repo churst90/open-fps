@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>Which faces a ray answers to: those it enters a solid by, those it leaves by, or both.</summary>
 [Flags]

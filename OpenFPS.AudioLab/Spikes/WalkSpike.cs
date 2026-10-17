@@ -4,6 +4,7 @@ using System.Text.Json;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

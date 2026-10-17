@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
 using System.Runtime.CompilerServices;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.AudioEngine.Core;
 

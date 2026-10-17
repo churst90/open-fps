@@ -323,7 +323,7 @@ public sealed class WorldTileService
             Terrain = new WorldTile.TerrainData
             {
                 Posts = Posts, Spacing = Spacing, BaseY = baseY,
-                HeightsCm = OpenFPS.Common.Geometry.Heightfield.ToCentimetres(h, baseY),
+                HeightsCm = OpenFPS.Geometry.Heightfield.ToCentimetres(h, baseY),
                 Cells = cells, Materials = materials,
             },
         };

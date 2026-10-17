@@ -7,6 +7,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Instruments;
 using OpenFPS.Server.Core;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.AudioLab;
 
@@ -95,7 +96,7 @@ public static class PhysicsParitySpike
         {
             if (c.IsSolid && c.Size.X * c.Size.Z < 4000f) solids.Add((t.Position, c.Size));
         });
-        var any = new OpenFPS.Common.Geometry.AcceptAll();
+        var any = new OpenFPS.Geometry.AcceptAll();
         Vector3? Standing()
         {
             for (int tries = 0; tries < 20; tries++)
@@ -104,7 +105,7 @@ public static class PhysicsParitySpike
                 float x = s.Position.X + (float)(rng.NextDouble() - 0.5) * (s.Size.X + 4f);
                 float z = s.Position.Z + (float)(rng.NextDouble() - 0.5) * (s.Size.Z + 4f);
                 float top = s.Position.Y + s.Size.Y * 0.5f + 0.5f;
-                float floor = geo.FloorAt(x, z, (float)(rng.NextDouble() * (top - map.Data.WalkMin.Y)) + map.Data.WalkMin.Y, OpenFPS.Common.Geometry.GeometryLayers.Ground, ref any, out _);
+                float floor = geo.FloorAt(x, z, (float)(rng.NextDouble() * (top - map.Data.WalkMin.Y)) + map.Data.WalkMin.Y, OpenFPS.Geometry.GeometryLayers.Ground, ref any, out _);
                 if (floor > -999f) return new Vector3(x, floor, z);
             }
             return null;

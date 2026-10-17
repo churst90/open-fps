@@ -3,7 +3,7 @@ using Arch.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;

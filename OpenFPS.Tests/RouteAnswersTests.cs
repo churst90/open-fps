@@ -2,7 +2,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Tests;
 

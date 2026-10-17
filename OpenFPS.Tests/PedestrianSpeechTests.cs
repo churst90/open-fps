@@ -3,6 +3,7 @@ using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Tests;
 

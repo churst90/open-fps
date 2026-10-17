@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// Which queries see a surface (docs/GEOMETRY.md 2.1). A chain-link fence blocks movement but hardly any

@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common.Geometry;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// Boxes asked by extent, for finding the ones near another box without asking about every one. What it

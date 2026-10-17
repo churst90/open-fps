@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// Whether the game asks the triangle world (docs/GEOMETRY.md, stage 1) or the box indexes.

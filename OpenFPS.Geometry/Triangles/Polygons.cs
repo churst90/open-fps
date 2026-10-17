@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>A point in a plane, in doubles: the shapes' outlines and profiles are worked out in these.</summary>
 public readonly record struct Point2(double X, double Y)

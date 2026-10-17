@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// Rooms measured from the walls (docs/GEOMETRY.md 2.7, 12.6): each room is a name and a seed point, and its shape is

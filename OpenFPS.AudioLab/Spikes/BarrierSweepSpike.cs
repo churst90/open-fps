@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

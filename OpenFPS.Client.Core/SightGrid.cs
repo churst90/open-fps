@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core;
 
@@ -168,7 +169,7 @@ public sealed class SightGrid
         if (_triangles && world.Geometry is { } geo)
         {
             var look = new Looks { World = world, Stops = accept, Stale = world.GeometryStale };
-            if (geo.Enter(origin, dir, range, OpenFPS.Common.Geometry.GeometryLayers.Sight | OpenFPS.Common.Geometry.GeometryLayers.Announced,
+            if (geo.Enter(origin, dir, range, OpenFPS.Geometry.GeometryLayers.Sight | OpenFPS.Geometry.GeometryLayers.Announced,
                           ref look, out var h)
                 && h.T < distance && world.Entities.TryGetValue(h.Owner, out var e))
             {
@@ -212,12 +213,12 @@ public sealed class SightGrid
     }
 
     /// <summary>What a look stops at, asked of a triangle's owner.</summary>
-    private struct Looks : OpenFPS.Common.Geometry.IGeometryFilter
+    private struct Looks : OpenFPS.Geometry.IGeometryFilter
     {
         public WorldSnapshot World;
         public Func<EntitySnapshot, bool> Stops;
         public IReadOnlySet<int>? Stale;
-        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+        public readonly bool Accept(int owner, in OpenFPS.Geometry.Surface surface)
             => (Stale == null || !Stale.Contains(owner)) && World.Entities.TryGetValue(owner, out var e) && Seen(e) && Stops(e);
     }
 
@@ -260,15 +261,15 @@ public sealed class SightGrid
         bool hit;
         switch (def.Collider.Shape)
         {
-            case OpenFPS.Common.Components.ColliderShape.Box:
+            case OpenFPS.Geometry.ColliderShape.Box:
                 hit = GeometryUtils.RayIntersectsOBB(origin, dir, t.Position, def.Collider.Size, t.Rotation, out distance);
                 break;
-            case OpenFPS.Common.Components.ColliderShape.Sphere:
+            case OpenFPS.Geometry.ColliderShape.Sphere:
                 hit = GeometryUtils.LineIntersectsSphere(origin, origin + dir * range, t.Position, def.Collider.Size.X / 2f);
                 if (hit) distance = Vector3.Distance(origin, t.Position) - def.Collider.Size.X / 2f;
                 break;
-            case OpenFPS.Common.Components.ColliderShape.Cylinder:
-            case OpenFPS.Common.Components.ColliderShape.Cone:
+            case OpenFPS.Geometry.ColliderShape.Cylinder:
+            case OpenFPS.Geometry.ColliderShape.Cone:
                 hit = GeometryUtils.RayIntersectsCylinder(origin, dir, t.Position, def.Collider.Size.X / 2f, def.Collider.Size.Y, out distance);
                 break;
             default:

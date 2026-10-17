@@ -3,6 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.AudioEngine.Acoustics;
 
@@ -105,7 +106,7 @@ public sealed class EngineReflections
     /// With the scene's acoustic triangle world when there is one (SpatialAcoustics.ReflectionWorldFor): a
     /// leg of a mirrored path is then asked of its tree instead of every solid box.
     /// </summary>
-    public void SyncGeometry(IAcousticWorld world, OpenFPS.Common.Geometry.TriangleWorld? acoustic)
+    public void SyncGeometry(IAcousticWorld world, OpenFPS.Geometry.TriangleWorld? acoustic)
     {
         _world = acoustic;
         // The cheap test first: BoxesFromWorld walks every entity and allocates, sixty times a second.
@@ -125,7 +126,7 @@ public sealed class EngineReflections
         {
             var props = AcousticRegistry.GetProperties(b.Material);
             // A shape mirrors from its facets, a box from its six faces.
-            var shape = OpenFPS.Common.Geometry.Shapes.Make(b.Form, b.Size);
+            var shape = OpenFPS.Geometry.Shapes.Make(b.Form, b.Size);
             shaped.Clear();
             int n = shape != null
                 ? ImageSource.FacesOfShape(shape.Outer, b.Center, b.Rotation, props.Absorption, id, shaped, props.Scattering)
@@ -148,7 +149,7 @@ public sealed class EngineReflections
     //
     // A search mirrors through the faces within SurfaceSearchRadius of the path's middle. The tree hands
     // back only those to measure, rather than every face on the map (six a box, 130,000 on Magnolia).
-    private OpenFPS.Common.Geometry.BvhNode[]? _faceNodes;
+    private OpenFPS.Geometry.BvhNode[]? _faceNodes;
     private int[] _faceOrder = Array.Empty<int>();
     private readonly List<int> _faceHits = new();
 
@@ -162,7 +163,7 @@ public sealed class EngineReflections
             var e = Vector3.Abs(s.HalfU) + Vector3.Abs(s.HalfV);
             lo[i] = s.Centre - e; hi[i] = s.Centre + e;
         }
-        _faceNodes = OpenFPS.Common.Geometry.BvhBuilder.Build(lo, hi, _surfaces.Count, 4, out _faceOrder);
+        _faceNodes = OpenFPS.Geometry.BvhBuilder.Build(lo, hi, _surfaces.Count, 4, out _faceOrder);
     }
 
     /// <summary>In the order the list holds them.</summary>
@@ -172,7 +173,7 @@ public sealed class EngineReflections
         var nodes = _faceNodes;
         if (nodes == null) return;
         var min = at - new Vector3(radius); var max = at + new Vector3(radius);
-        Span<int> stack = stackalloc int[OpenFPS.Common.Geometry.BvhBuilder.MaxDepth + 2];
+        Span<int> stack = stackalloc int[OpenFPS.Geometry.BvhBuilder.MaxDepth + 2];
         int sp = 0;
         stack[sp++] = 0;
         while (sp > 0)
@@ -354,20 +355,20 @@ public sealed class EngineReflections
     private readonly List<ReflectingSurface> _near = new();
 
     /// <summary>Legs are asked of it when there is one.</summary>
-    private OpenFPS.Common.Geometry.TriangleWorld? _world;
+    private OpenFPS.Geometry.TriangleWorld? _world;
 
     /// <summary>Whether a leg starts inside a solid, as the box test counted a segment wholly inside a box
     /// as crossing it.</summary>
-    private static bool Inside(OpenFPS.Common.Geometry.TriangleWorld world, Vector3 p)
+    private static bool Inside(OpenFPS.Geometry.TriangleWorld world, Vector3 p)
     {
-        var inside = _inside ??= new List<OpenFPS.Common.Geometry.SolidRef>(4);
+        var inside = _inside ??= new List<OpenFPS.Geometry.SolidRef>(4);
         inside.Clear();
-        var all = new OpenFPS.Common.Geometry.AcceptAll();
-        world.Containing(p, OpenFPS.Common.Geometry.GeometryLayers.Acoustics, ref all, inside);
+        var all = new OpenFPS.Geometry.AcceptAll();
+        world.Containing(p, OpenFPS.Geometry.GeometryLayers.Acoustics, ref all, inside);
         return inside.Count > 0;
     }
 
-    [ThreadStatic] private static List<OpenFPS.Common.Geometry.SolidRef>? _inside;
+    [ThreadStatic] private static List<OpenFPS.Geometry.SolidRef>? _inside;
 
     /// <summary>
     /// Whether anything stands in this leg of a mirrored path. Untested, a reflection sounds off a wall
@@ -386,9 +387,9 @@ public sealed class EngineReflections
         if (_world is { } world)
         {
             if (len <= 2f * Skin) return false;
-            var all = new OpenFPS.Common.Geometry.AcceptAll();
-            return world.Any(a + unit * Skin, unit, len - 2f * Skin, OpenFPS.Common.Geometry.GeometryLayers.Acoustics,
-                             OpenFPS.Common.Geometry.RayFaces.Both, ref all)
+            var all = new OpenFPS.Geometry.AcceptAll();
+            return world.Any(a + unit * Skin, unit, len - 2f * Skin, OpenFPS.Geometry.GeometryLayers.Acoustics,
+                             OpenFPS.Geometry.RayFaces.Both, ref all)
                    || Inside(world, a + unit * Skin);
         }
         Vector3 from = a + unit * Skin, to = b - unit * Skin;

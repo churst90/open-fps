@@ -53,7 +53,7 @@ public class EntityData
 
     /// <summary>Over its prefab: a solid form from the shape library filling the collider's box
     /// (PrefabTemplate.Form): a ramp, a flight of stairs, an arch.</summary>
-    public OpenFPS.Common.Geometry.ShapeSpec? Form { get; set; }
+    public OpenFPS.Geometry.ShapeSpec? Form { get; set; }
 
     /// <summary>Over its prefab: the line a source is laid along, its points in the entity's own frame
     /// (SoundEmitterComponent.Line): a mapped creek's bed, written by tools/gen_osm.py.</summary>
@@ -498,8 +498,8 @@ public class MapRepository
             Converters =
             {
                 new JsonStringEnumConverter(JsonNamingPolicy.CamelCase),
-                new OpenFPS.Common.Networking.Vector3Converter(),
-                new OpenFPS.Common.Networking.QuaternionConverter()
+                new OpenFPS.Geometry.Vector3Converter(),
+                new OpenFPS.Geometry.QuaternionConverter()
             },
             PropertyNameCaseInsensitive = true,
             AllowTrailingCommas = true,
@@ -700,8 +700,8 @@ public class MapRepository
             WriteIndented = true, 
             Converters = { 
                 new JsonStringEnumConverter(),
-                new OpenFPS.Common.Networking.Vector3Converter(),
-                new OpenFPS.Common.Networking.QuaternionConverter()
+                new OpenFPS.Geometry.Vector3Converter(),
+                new OpenFPS.Geometry.QuaternionConverter()
             }
         });
         File.WriteAllText(filePath, json);

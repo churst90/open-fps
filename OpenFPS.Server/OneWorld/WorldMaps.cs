@@ -7,6 +7,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Serilog;
 using OpenFPS.Words;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.OneWorld;
 

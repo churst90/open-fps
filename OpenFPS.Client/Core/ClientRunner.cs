@@ -7,6 +7,7 @@ using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;
 using OpenFPS.Client.Services;
 using OpenFPS.Client.UI;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core;
 

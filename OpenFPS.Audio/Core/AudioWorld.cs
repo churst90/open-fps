@@ -5,6 +5,7 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using Serilog;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core;
 
@@ -877,7 +878,7 @@ public partial class AudioWorld
     }
     private readonly Dictionary<Vector3[], string> _outlineKeys = new(ReferenceEqualityComparer.Instance);
 
-    private string VoiceKey(string? soundId, OpenFPS.Common.Components.ColliderShape shape, Vector3 size)
+    private string VoiceKey(string? soundId, OpenFPS.Geometry.ColliderShape shape, Vector3 size)
     {
         string id = soundId ?? "";
         if (!OpenFPS.Common.ModelKindTable.Is(id, OpenFPS.Common.ModelSynth.Fire)) return id;
@@ -888,7 +889,7 @@ public partial class AudioWorld
         _voiceKeys[k] = key;
         return key;
     }
-    private readonly Dictionary<(string, OpenFPS.Common.Components.ColliderShape, Vector3), string> _voiceKeys = new();
+    private readonly Dictionary<(string, OpenFPS.Geometry.ColliderShape, Vector3), string> _voiceKeys = new();
 
     /// <summary>The headroom a physical voice renders with, dB: its spec's own for water, fire, foliage
     /// and bells, the shared one for the rest. Memoised like the level.</summary>

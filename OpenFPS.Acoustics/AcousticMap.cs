@@ -32,7 +32,7 @@ public partial class AcousticMap
     /// holds is in that room; a flooded room's box says nothing. Null until the rooms have been flooded (the boxes
     /// serve meanwhile).
     /// </summary>
-    public OpenFPS.Common.Geometry.RoomCells? RoomCells { get; set; }
+    public OpenFPS.Geometry.RoomCells? RoomCells { get; set; }
 
     public AcousticMap()
     {

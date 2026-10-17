@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// One square of a streamed map: TileMetres on a side, counted from the map's origin, x east and z

@@ -79,7 +79,7 @@ public static class RoomAcoustics
     /// where half or more of it is open sky; another room's air absorbs nothing here, since the routes count what
     /// leaves by an opening at its own S·tau. The box's material stands on a face nothing lines and nothing opens.
     /// </summary>
-    public static Room Measured(in Room room, OpenFPS.Common.Geometry.RoomFlood.Lining lining)
+    public static Room Measured(in Room room, OpenFPS.Geometry.RoomFlood.Lining lining)
     {
         var measured = room;
         var areas = new float[6];

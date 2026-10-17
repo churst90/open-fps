@@ -929,7 +929,7 @@ public partial class MeshAssetBatch : IMessage
     public List<string> Missing { get; set; } = new();
 
     /// <summary>The answer to a request from what <paramref name="library"/> holds.</summary>
-    public static MeshAssetBatch Answer(MeshAssetRequest request, OpenFPS.Common.Geometry.MeshLibrary library)
+    public static MeshAssetBatch Answer(MeshAssetRequest request, OpenFPS.Geometry.MeshLibrary library)
     {
         var batch = new MeshAssetBatch();
         foreach (var id in request.Ids.Take(MostAssets))

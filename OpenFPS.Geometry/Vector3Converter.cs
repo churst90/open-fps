@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 // Namespace unchanged (docs/SOUND_LIBRARY_BOUNDARY.md, decision 6): the network's JSON and the model
 // library's both write vectors with it.
-namespace OpenFPS.Common.Networking;
+namespace OpenFPS.Geometry;
 
 /// <summary>A vector as {"X":..,"Y":..,"Z":..}: its numbers are fields, which the serializer does not write.</summary>
 public class Vector3Converter : JsonConverter<Vector3>

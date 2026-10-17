@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// Named timers and counters any thread can write to, and a periodic report: how long a named thing takes

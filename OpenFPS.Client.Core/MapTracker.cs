@@ -259,7 +259,7 @@ public sealed class MapTracker
                 {
                     if (cells.TryRoomAt(feet + new Vector3(0f, 1f, 0f), out int inRoom) && inRoom == e.Id)
                         return new Tracked(e.Id, name.Trim(), feet, feet.Y, 0f);
-                    float c = OpenFPS.Common.Geometry.RoomFlood.Cell * 0.5f;
+                    float c = OpenFPS.Geometry.RoomFlood.Cell * 0.5f;
                     (min, max) = (lo - new Vector3(c), hi + new Vector3(c));
                 }
                 else

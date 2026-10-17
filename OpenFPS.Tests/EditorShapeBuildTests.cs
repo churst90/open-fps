@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Editor;
 using OpenFPS.Server.Repositories;

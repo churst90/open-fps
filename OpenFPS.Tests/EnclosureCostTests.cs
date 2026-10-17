@@ -25,7 +25,7 @@ public class EnclosureCostTests
         var solids = new List<Enclosure.Solid>();
         foreach (var d in EntityDefinitionFactory.StaticDefinitions(world))
         {
-            if (!d.Collider.IsSolid || d.Collider.Shape != OpenFPS.Common.Components.ColliderShape.Box) continue;
+            if (!d.Collider.IsSolid || d.Collider.Shape != OpenFPS.Geometry.ColliderShape.Box) continue;
             if (!string.IsNullOrEmpty(d.SoundEmitter.SoundId)) continue;
             solids.Add(new Enclosure.Solid(d.Transform.Position, d.Collider.Size, d.Transform.Rotation, d.Material.Material));
         }

@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;

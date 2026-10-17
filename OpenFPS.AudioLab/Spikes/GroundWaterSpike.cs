@@ -12,6 +12,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using OpenFPS.Server.Water;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.AudioLab.Spikes;
 

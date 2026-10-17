@@ -3,7 +3,7 @@ using System.Text.Json;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 using OpenFPS.Server.Core;
 
 namespace OpenFPS.Tests;

@@ -4,6 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Repositories;
 using Serilog;
+using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Core;
 
@@ -56,10 +57,10 @@ public partial class MapManager
         ref var col = ref world.Get<ColliderComponent>(entity);
         if (entityData.Form != null) col.Form = entityData.Form;
         if (col.Form == null) return;
-        if (col.Form.Kind == OpenFPS.Common.Geometry.ShapeKind.Box) { col.Form = null; return; }
-        var problem = OpenFPS.Common.Geometry.Shapes.Problem(col.Form, col.Size, PhysicsConstants.StepHeight);
-        if (problem == null && col.Form.Kind == OpenFPS.Common.Geometry.ShapeKind.Mesh
-            && !OpenFPS.Common.Geometry.MeshLibrary.Shared.Contains(col.Form.Mesh!))
+        if (col.Form.Kind == OpenFPS.Geometry.ShapeKind.Box) { col.Form = null; return; }
+        var problem = OpenFPS.Geometry.Shapes.Problem(col.Form, col.Size, PhysicsConstants.StepHeight);
+        if (problem == null && col.Form.Kind == OpenFPS.Geometry.ShapeKind.Mesh
+            && !OpenFPS.Geometry.MeshLibrary.Shared.Contains(col.Form.Mesh!))
             problem = $"no mesh {col.Form.Mesh} in the server's meshes folder";
         if (problem != null)
         {
@@ -1041,7 +1042,7 @@ public partial class MapManager
         GridRefreshes++;
         if (!_maps.TryGetValue(mapId, out var data)) return;
         // Only what changed, once the map's fixed things have been filed whole (ServerGeometry.Refresh).
-        if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled && OpenFPS.Common.Geometry.TriangleGeometry.Incremental
+        if (OpenFPS.Geometry.TriangleGeometry.Enabled && OpenFPS.Geometry.TriangleGeometry.Incremental
             && _geometry.TryGetValue(mapId, out var known) && known.Primed)
         {
             known.Refresh(data.world, data.grid, g => FileStatics(data.world, g));
@@ -1057,7 +1058,7 @@ public partial class MapManager
         int gridCount = FileStatics(data.world, data.grid);
 
         // The same static geometry as triangles: only the tiles whose solids changed are built again.
-        if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled)
+        if (OpenFPS.Geometry.TriangleGeometry.Enabled)
         {
             if (!_geometry.TryGetValue(mapId, out var geometry))
                 _geometry[mapId] = geometry = new ServerGeometry(data.data.TileMetres > 0f ? data.data.TileMetres : 250f);

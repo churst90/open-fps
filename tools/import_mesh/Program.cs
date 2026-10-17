@@ -1,6 +1,6 @@
 using System.Text.Json;
 using OpenFPS.Common;
-using OpenFPS.Common.Geometry;
+using OpenFPS.Geometry;
 
 // The mesh importer (docs/AUTHORING.md): a glTF 2.0 (.gltf, .glb) or OBJ file to a mesh asset.
 //

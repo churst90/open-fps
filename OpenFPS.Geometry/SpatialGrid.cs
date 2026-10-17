@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Geometry;
 
 /// <summary>
 /// What is near a point: square cells on the ground plane. Static things are filed by cell once; what
@@ -15,7 +15,7 @@ public class SpatialGrid<T> where T : notnull
     // What moves: the cells each thing covers, as filed, and a tree over them built on the first query
     // after a change. A query hands back exactly what cells would, in the order they were filed.
     private readonly List<(T Item, int X0, int Z0, int X1, int Z1)> _dynamic = new();
-    private OpenFPS.Common.Geometry.BvhNode[]? _dynamicNodes;
+    private OpenFPS.Geometry.BvhNode[]? _dynamicNodes;
     private int[] _dynamicOrder = Array.Empty<int>();
     private readonly object _dynamicBuild = new();
     [ThreadStatic] private static List<int>? _dynamicHits;
@@ -160,14 +160,14 @@ public class SpatialGrid<T> where T : notnull
                         var d = _dynamic[i];
                         lo[i] = new Vector3(d.X0, 0f, d.Z0); hi[i] = new Vector3(d.X1, 0f, d.Z1);
                     }
-                    nodes = OpenFPS.Common.Geometry.BvhBuilder.Build(lo, hi, _dynamic.Count, 4, out _dynamicOrder);
+                    nodes = OpenFPS.Geometry.BvhBuilder.Build(lo, hi, _dynamic.Count, 4, out _dynamicOrder);
                     _dynamicNodes = nodes;
                 }
             }
         var order = _dynamicOrder;
         var hits = _dynamicHits ??= new List<int>(32);
         hits.Clear();
-        Span<int> stack = stackalloc int[OpenFPS.Common.Geometry.BvhBuilder.MaxDepth + 2];
+        Span<int> stack = stackalloc int[OpenFPS.Geometry.BvhBuilder.MaxDepth + 2];
         int sp = 0;
         stack[sp++] = 0;
         while (sp > 0)
@@ -297,12 +297,12 @@ public class SpatialGrid<T> where T : notnull
     /// <summary>The static solid boxes of this grid as a triangle world, or null where nothing has built one
     /// (every query then answers from the grid). Its movers (door leaves) are brought up to
     /// where they stand first (<see cref="BeforeGeometry"/>).</summary>
-    public OpenFPS.Common.Geometry.TriangleWorld? Geometry
+    public OpenFPS.Geometry.TriangleWorld? Geometry
     {
         get { BeforeGeometry?.Invoke(); return _geometry; }
         private set => _geometry = value;
     }
-    private OpenFPS.Common.Geometry.TriangleWorld? _geometry;
+    private OpenFPS.Geometry.TriangleWorld? _geometry;
 
     /// <summary>Run before <see cref="Geometry"/> is handed out: the owner places the movers again if any
     /// has moved since it last did (ServerGeometry, MoverPoses).</summary>
@@ -312,7 +312,7 @@ public class SpatialGrid<T> where T : notnull
     public IReadOnlyList<T> Unindexed => _unindexed;
 
     /// <summary>Puts a newly built triangle world in place, with the static items it does not hold.</summary>
-    public void SetGeometry(OpenFPS.Common.Geometry.TriangleWorld? geometry, IEnumerable<T> unindexed)
+    public void SetGeometry(OpenFPS.Geometry.TriangleWorld? geometry, IEnumerable<T> unindexed)
     {
         _unindexed.Clear();
         _unindexed.AddRange(unindexed);
@@ -321,7 +321,7 @@ public class SpatialGrid<T> where T : notnull
     }
 
     /// <summary>The same geometry with movers in new poses (door leaves): no static item changed.</summary>
-    public void MoveGeometry(OpenFPS.Common.Geometry.TriangleWorld geometry)
+    public void MoveGeometry(OpenFPS.Geometry.TriangleWorld geometry)
     {
         if (ReferenceEquals(geometry, _geometry)) return;
         Geometry = geometry;

@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Geometry;
 
 /// <summary>Where one wheel meets the ground: the height under it, the face's normal and its surface.</summary>
 public readonly record struct WheelContact(bool Found, float Height, Vector3 Normal, string Material);
