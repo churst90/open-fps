@@ -55,11 +55,16 @@ public class FlushToZeroTests
         using (new EngineRenderPool(() => new List<IRenderedVoice> { probe }))
             Assert.True(probe.Done.Wait(TimeSpan.FromSeconds(10)), "the render pool never asked the probe to produce");
         var pool = probe.Seen!.Value;
-        var here = Products.Here();
+        // A plain thread to compare with: a new thread takes its maker's setting on Linux, and a test run before
+        // this one may have left the thread that makes them flushed.
+        Products here = default;
+        var plain = new Thread(() => { Assert.True(FlushToZero.ThisThreadPlain()); here = Products.Here(); });
+        plain.Start();
+        plain.Join();
         _o.WriteLine($"on a render pool thread: {pool}");
-        _o.WriteLine($"on the test's thread:    {here}");
+        _o.WriteLine($"on a plain thread:       {here}");
         Assert.True(pool.AllZero, $"a render pool thread kept a subnormal number: {pool}");
-        Assert.True(here.NoneZero, $"the test's own thread flushed a subnormal number: {here}");
+        Assert.True(here.NoneZero, $"a plain thread flushed a subnormal number: {here}");
     }
 
     [Fact]
@@ -70,6 +75,7 @@ public class FlushToZeroTests
         bool onDuring = false, onAfter = true;
         var t = new Thread(() =>
         {
+            FlushToZero.ThisThreadPlain();
             before = Products.Here();
             during = FlushToZero.Run("the test", () => { onDuring = FlushToZero.IsOn; return Products.Here(); });
             after = Products.Here();
@@ -78,7 +84,7 @@ public class FlushToZeroTests
         t.Start();
         t.Join();
         _o.WriteLine($"before: {before}\nduring: {during}\nafter:  {after}");
-        Assert.True(before.NoneZero, $"a new thread flushed before it was asked: {before}");
+        Assert.True(before.NoneZero, $"a thread made plain flushed before it was asked: {before}");
         Assert.True(during.AllZero && onDuring, $"a render on a borrowed thread kept a subnormal number: {during}");
         Assert.True(after.NoneZero && !onAfter, $"the borrowed thread was handed back flushed: {after}");
     }

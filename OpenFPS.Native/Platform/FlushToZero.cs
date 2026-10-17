@@ -84,6 +84,20 @@ public static class FlushToZero
         _ => state,
     };
 
+    private static uint Unflushed(uint state) => WayHere() switch
+    {
+        Way.GlibcX64 => state & ~(MxcsrFtz | MxcsrDaz),
+        Way.GlibcArm64 => state & ~FpcrFz,
+        Way.WindowsCrt => state & ~McwDn,
+        _ => state,
+    };
+
+    /// <summary>
+    /// Turns the flush off on the calling thread. A new thread takes the setting of the thread that made it (on
+    /// Linux), so one made from a flushed thread starts flushed; a test that needs a plain thread says so with this.
+    /// </summary>
+    internal static bool ThisThreadPlain() => TryRead(out uint state) && TryWrite(Unflushed(state)) && !IsOn;
+
     private static bool IsFlushed(uint state) => WayHere() switch
     {
         Way.GlibcX64 => (state & (MxcsrFtz | MxcsrDaz)) == (MxcsrFtz | MxcsrDaz),
