@@ -43,8 +43,8 @@ public static class ThunderSpike
 
         // The server's Storm: 15 C here, the air near saturated, its wind (15, 0, -10) m/s gusting
         // (0.8). Thunder happens in storms, and the wind is what makes the air turbulent.
-        var air = args.Contains("still") ? new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero, 0f)
-                                         : new Thunder.Air(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
+        var air = args.Contains("still") ? new OutdoorAir(15f, 0.8f, 1013.25f, Vector3.Zero, 0f)
+                                         : new OutdoorAir(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
         var report = new List<string>();
         void Say(string s) { Console.WriteLine(s); report.Add(s); }
 

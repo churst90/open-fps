@@ -83,6 +83,20 @@ public class EnvironmentWireBytesTests
         Assert.Equal(Expected.Strikes, Sha(sounds.SelectMany(s => MemoryPackSerializer.Serialize(s)).ToArray()));
     }
 
+    /// <summary>The world's air as one value (OutdoorAir) is the component's fields, each where it was: the laws that
+    /// read it (thunder, a bullet's and a car's drag) see what the broadcast sends.</summary>
+    [Fact]
+    public void TheWorldsAirIsOneValueOfItsFields()
+    {
+        var env = new WorldEnvironmentComponent
+        {
+            Temperature = 12.5f, Humidity = 0.85f, AirPressure = 990f, WindVelocity = new System.Numerics.Vector3(6f, 0f, -3f),
+            WindGustiness = 0.7f, AirAbsorptionMultiplier = 1.5f, PrecipitationIntensity = 0.4f,
+        };
+        Assert.Equal(new OutdoorAir(12.5f, 0.85f, 990f, new System.Numerics.Vector3(6f, 0f, -3f), 0.7f), env.Outdoors);
+        Assert.Equal(new Air(12.5f, 990f), env.Outdoors.Air);
+    }
+
     private static class Expected
     {
         public const string Weather = "81a57a8e95894b8e1901579e8a9c947c2b15f9ce79204dd73c23fffbd351757d";

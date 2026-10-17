@@ -425,6 +425,11 @@ public partial struct WorldEnvironmentComponent
     public Vector3 WindVelocity { get; set; }
     public float WindGustiness { get; set; }
     public float PrecipitationIntensity { get; set; }
+
+    /// <summary>The air outdoors here now, as one value (OutdoorAir: temperature, humidity, pressure, the wind and
+    /// its gustiness), which the laws read. The fields above are what is sent, one by one.</summary>
+    [MemoryPackIgnore]
+    public readonly OutdoorAir Outdoors => new(Temperature, Humidity, AirPressure, WindVelocity, WindGustiness);
     public WorldEnvironmentComponent() { }
 }
 

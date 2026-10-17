@@ -161,7 +161,7 @@ public class LightningTests
     {
         // A straight vertical channel, so the nearest point is its foot: the thunder starts after
         // that distance over the speed of sound at the air's temperature, and not before.
-        var air = new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero);
+        var air = new OutdoorAir(15f, 0.8f, 1013.25f, Vector3.Zero, 0.3f);
         float c = AudioPhysics.SpeedOfSoundAt(15f);
         Assert.InRange(1000f / c, 2.9f, 3.0f);
         foreach (float d in new[] { 300f, 1000f, 3000f })
@@ -180,7 +180,7 @@ public class LightningTests
     [Fact]
     public void TheAirTakesTheTopOffWithDistance()
     {
-        var air = new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero);
+        var air = new OutdoorAir(15f, 0.8f, 1013.25f, Vector3.Zero, 0.3f);
         float Centroid(float d)
         {
             var (strike, channel) = Straight(d);
@@ -205,7 +205,7 @@ public class LightningTests
     {
         // A wind from the channel toward the listener, so refraction's shadow is out of it: spreading
         // and the air alone.
-        var air = new Thunder.Air(15f, 0.8f, 1013.25f, new Vector3(-15f, 0f, 0f));
+        var air = new OutdoorAir(15f, 0.8f, 1013.25f, new Vector3(-15f, 0f, 0f), 0.3f);
         float Peak(float d)
         {
             var (strike, channel) = Straight(d);
@@ -224,7 +224,7 @@ public class LightningTests
     public void ARealStrikeIsInTheRangeMeasured()
     {
         // HyMeX (Lacroix's thesis 2018, sec. 3): ground strokes 2-10 Pa at 2-4 km.
-        var air = new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero);
+        var air = new OutdoorAir(15f, 0.8f, 1013.25f, Vector3.Zero, 0.3f);
         var parts = Thunder.Render(Ground(3000f, 7, strokes: 4), new Vector3(0f, 1.7f, 0f), air, new Thunder.Options { Threads = 2 });
         Assert.InRange(parts.Max(p => p.PeakPa), 1.5f, 15f);
     }
@@ -234,7 +234,7 @@ public class LightningTests
     {
         // Fleagle (1949): a 5 km source's shadow starts about 30 km out in still standard air.
         Assert.InRange(Thunder.ShadowEdgeMetres(5000f, 15f), 28000f, 31000f);
-        var air = new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero);
+        var air = new OutdoorAir(15f, 0.8f, 1013.25f, Vector3.Zero, 0.3f);
         var ear = new Vector3(0f, 1.7f, 0f);
         Assert.Equal(1f, Thunder.ShadowGain(new Vector3(20000f, 5000f, 0f), ear, 0f, air, 340f));
         float deep = Thunder.ShadowGain(new Vector3(50000f, 5000f, 0f), ear, 0f, air, 340f);
@@ -260,7 +260,7 @@ public class LightningTests
     [Fact]
     public void EveryClientRendersTheSameThunder()
     {
-        var air = new Thunder.Air(12f, 0.9f, 1013.25f, new Vector3(8f, 0f, 3f));
+        var air = new OutdoorAir(12f, 0.9f, 1013.25f, new Vector3(8f, 0f, 3f), 0.3f);
         var s = Ground(1500f, 31, strokes: 3);
         var a = Thunder.Render(s, new Vector3(5f, 1.7f, 5f), air, new Thunder.Options { Threads = 3 });
         var b = Thunder.Render(s, new Vector3(5f, 1.7f, 5f), air, new Thunder.Options { Threads = 3 });
@@ -299,7 +299,7 @@ public class LightningTests
         return gaps;
     }
 
-    private static readonly Thunder.Air StormAir = new(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
+    private static readonly OutdoorAir StormAir = new(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
 
     [Fact]
     public void TheRumbleHasNoHolesInIt()
@@ -329,7 +329,7 @@ public class LightningTests
         Assert.InRange(Thunder.ScatteredShare(1000f, 1000f, mu2, c), 0.4f, 0.9f);
         Assert.True(Thunder.ScatteredShare(125f, 8000f, mu2, c) > 0.8f);
         // Calm air scatters less than a storm.
-        Assert.True(Thunder.TurbulenceVariance(Thunder.Air.Standard, c) < mu2 / 5f);
+        Assert.True(Thunder.TurbulenceVariance(Thunder.StandardAir, c) < mu2 / 5f);
     }
 
     [Fact]
@@ -351,8 +351,8 @@ public class LightningTests
     public void ThunderIsNeverRenderedBelow24kHz()
     {
         // The mixer resamples linearly; from 12 kHz its images land across the top.
-        Assert.Equal(24000, Thunder.ChooseRate(20000f, Thunder.Air.Standard));
-        Assert.Equal(48000, Thunder.ChooseRate(50f, Thunder.Air.Standard));
+        Assert.Equal(24000, Thunder.ChooseRate(20000f, Thunder.StandardAir));
+        Assert.Equal(48000, Thunder.ChooseRate(50f, Thunder.StandardAir));
     }
 
     private static (LightningStrike Strike, LightningChannel Channel) Straight(float d)

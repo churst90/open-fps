@@ -91,6 +91,9 @@ public class WorldSnapshot : IAcousticWorld
     /// the server does not send. Wheels that are sent carry their own (WheelState.Water).</summary>
     public float RoadWaterMm = 0.0f;
 
+    /// <summary>The air outdoors as one value (OutdoorAir), as the world's weather carries it.</summary>
+    public OutdoorAir Outdoors => new(Temperature, Humidity, AirPressure, WindVelocity, WindGustiness);
+
     /// <summary>What is coming down: <see cref="Precipitation"/>, or rain at <see cref="RainRateMmPerHour"/> from a
     /// server that sends only the rate.</summary>
     public Precipitation Falling => Precipitation.Falling ? Precipitation

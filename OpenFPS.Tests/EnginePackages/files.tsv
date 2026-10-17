@@ -197,6 +197,7 @@ OpenFPS.Environment/Fuel.cs	Environment
 OpenFPS.Environment/GroundChannelBed.cs	Environment	
 OpenFPS.Environment/GroundWater.cs	Environment	
 OpenFPS.Environment/Lightning.cs	Environment	
+OpenFPS.Environment/OutdoorAir.cs	Environment	
 OpenFPS.Environment/Precipitation.cs	Environment	
 OpenFPS.Environment/Rain.cs	Environment	
 OpenFPS.Environment/RoadWater.cs	Environment	

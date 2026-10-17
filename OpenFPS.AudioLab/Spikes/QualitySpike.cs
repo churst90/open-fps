@@ -66,7 +66,7 @@ public static class QualitySpike
         {
             // The thunder lab's files were taken from the render's 24 kHz to 48 kHz by linear
             // interpolation; the same strike written both ways, mono, float, unnormalised.
-            var air = new Thunder.Air(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
+            var air = new OutdoorAir(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
             foreach (float km in new[] { 1f, 3f })
             {
                 var parts = Thunder.Render(ThunderSpike.Ground(km * 1000f, 45f, 3, 2), new Vector3(0f, 1.7f, 0f), air);
@@ -505,7 +505,7 @@ public static class QualitySpike
         var to = new Vector3(km * 1000f * MathF.Sin(b), 0f, km * 1000f * MathF.Cos(b));
         var from = to + new Vector3(LightningPhysics.Gaussian(rng) * 800f, 5000f, LightningPhysics.Gaussian(rng) * 800f);
         var strike = new LightningStrike(seed, FlashKind.CloudToGround, from, to, LightningPhysics.GroundFlashEnergyMedian, 2);
-        var parts = Thunder.Render(strike, ear, new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero, 0f),
+        var parts = Thunder.Render(strike, ear, new OutdoorAir(15f, 0.8f, 1013.25f, Vector3.Zero, 0f),
                                    new Thunder.Options { EarAboveGround = 1.7f });
         float first = parts.Count > 0 ? parts.Min(p => p.StartSeconds) : 0f;
         Console.WriteLine($"  thunder: {parts.Count} parts at {(parts.Count > 0 ? parts[0].SampleRate : 0)} Hz, first {first:F1} s after the flash, loudest {(parts.Count > 0 ? parts.Max(p => p.PeakDb) : 0):F0} dB peak at the ear");

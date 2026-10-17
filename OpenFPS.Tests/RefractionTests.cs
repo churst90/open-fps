@@ -82,7 +82,7 @@ public class RefractionTests
         var stirred = Refraction.Shadow(5000f, 0.5f, Ear, k, 10f * Refraction.CalmStirVariance, C);
         Assert.Equal(20f, stirred.High, 3);
         Assert.Equal(20f, Refraction.ShadowFloorDb(1000f * Refraction.CalmStirVariance), 3);
-        var storm = new Thunder.Air(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
+        var storm = new OutdoorAir(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
         // The thunder's own law, as it was written before it was shared: a storm's 18 m/s gusting at 0.8.
         float sv = 0.2f + 0.03f * MathF.Sqrt(325f) * 1.8f, st = 0.5f / (2f * 288.15f);
         Assert.Equal(sv * sv / (C * C) + st * st, Thunder.TurbulenceVariance(storm, C), 9);

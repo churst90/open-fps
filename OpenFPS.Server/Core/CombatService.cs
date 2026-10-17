@@ -411,7 +411,7 @@ public sealed partial class CombatService
     /// gustiness. The server hands this over from its weather; a test sets its own. Null is a still,
     /// standard day.
     /// </summary>
-    public Func<string, (float TemperatureC, float PressureMb, Vector3 Wind, float Gustiness)>? Weather { get; set; }
+    public Func<string, OutdoorAir>? Weather { get; set; }
 
     /// <summary>How far off the server's own heading a scoped shot's aim may be, radians, before the
     /// server keeps its own: a few degrees, the lag of the look inputs plus the sway, and no more.</summary>
@@ -594,9 +594,9 @@ public sealed partial class CombatService
     /// <summary>The air and the wind on a map now.</summary>
     private (Air Air, Vector3 Wind) AirOn(string mapId)
     {
-        var weather = Weather?.Invoke(mapId) ?? (15f, 1013.25f, Vector3.Zero, 0f);
+        var weather = Weather?.Invoke(mapId) ?? new OutdoorAir(Air.Standard.TemperatureC, 0f, Air.Standard.PressureMb, Vector3.Zero, 0f);
         // Out in the open, where a long shot is taken: the full wind, gusts and all.
-        return (new Air(weather.TemperatureC, weather.PressureMb), WindModel.Felt(weather.Wind, weather.Gustiness, Clock()));
+        return (weather.Air, WindModel.Felt(weather.Wind, weather.Gustiness, Clock()));
     }
 
     /// <summary>One stretch of a round's flight between ricochets: its samples (times from the shot),

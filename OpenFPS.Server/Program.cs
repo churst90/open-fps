@@ -517,7 +517,7 @@ public class GameServer
             var state = _environment.GetStateForMap(_maps.TryGetMapData(mapId, out var m)
                 ? MapAtmosphere.Of(m)
                 : MapAtmosphere.Default);
-            return (state.Temperature, state.AirPressure, state.WindVelocity, state.WindGustiness);
+            return state.Outdoors;
         };
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends, combat);
         // Vehicles parked with the world editor are kept in its overlays, not the map files.
@@ -1004,7 +1004,7 @@ public class GameServer
                                          _maps.TryGetTiles(entry.Key, out var driveTiles) && driveTiles.Dynamic
                                              ? new DrivingSystem.TileFence(driveTiles.IsReady, driveTiles.TileMetres) : null,
                                          root => TellDriver(world, root, "The road ahead is not built yet. Stopping here until it is."),
-                                         new Air(driveAir.Temperature, driveAir.AirPressure));
+                                         driveAir.Outdoors.Air);
                     // The glass in every car's windows, toward wherever it was last sent.
                     WindowSystem.Update(world, dt);
                     // Doors swing before ParentSystem places the parts, or the swing of a door in a

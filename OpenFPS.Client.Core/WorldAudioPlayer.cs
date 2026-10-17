@@ -150,7 +150,7 @@ public sealed class WorldAudioPlayer
     /// for one listener at one moment and never asked for again.</summary>
     private readonly List<(string Id, double At)> _releases = new();
     private Vector3 _lastListener;
-    private Thunder.Air _air = Thunder.Air.Standard;
+    private OutdoorAir _air = Thunder.StandardAir;
     private float _earAboveGround = LocalPlayerState.StandingEyeHeight;
     private int _thunderCount;
 
@@ -451,7 +451,7 @@ public sealed class WorldAudioPlayer
             try
             {
                 var strike = new LightningStrike(1, FlashKind.CloudToGround, new Vector3(3000f, 4000f, 0f), new Vector3(3000f, 0f, 0f), 2e5f, 2);
-                Thunder.Render(strike, new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f), Thunder.Air.Standard, new Thunder.Options { Threads = 1 });
+                Thunder.Render(strike, new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f), Thunder.StandardAir, new Thunder.Options { Threads = 1 });
             }
             catch (Exception ex) { Serilog.Log.Debug(ex, "[THUNDER] prewarm failed"); }
         });
@@ -543,7 +543,7 @@ public sealed class WorldAudioPlayer
 
         // The listener and the air, for the next strike's thunder; and any thunder that has come back.
         _lastListener = listenerPosition;
-        _air = new Thunder.Air(world.Temperature, world.Humidity, world.AirPressure, world.WindVelocity, world.WindGustiness);
+        _air = world.Outdoors;
         if (Self != null)
         {
             float ear = listenerPosition.Y - Self().Feet.Y;

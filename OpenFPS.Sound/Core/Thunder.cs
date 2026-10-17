@@ -20,12 +20,9 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// </summary>
 public static class Thunder
 {
-    /// <summary>The air the thunder travels through. <paramref name="Gustiness"/> is the server's
-    /// 0..1 figure; with the wind it sets how turbulent the air is (<see cref="TurbulenceVariance"/>).</summary>
-    public readonly record struct Air(float TemperatureC, float Humidity, float PressureMb, Vector3 Wind, float Gustiness = 0.3f)
-    {
-        public static Air Standard => new(15f, 0.8f, 1013.25f, Vector3.Zero);
-    }
+    /// <summary>The air thunder is heard through before the weather has said: the standard day
+    /// (<see cref="OpenFPS.Common.Air.Standard"/>), damp, still, and as gusty as a breezy day (0.3).</summary>
+    public static OutdoorAir StandardAir => new(OpenFPS.Common.Air.Standard.TemperatureC, 0.8f, OpenFPS.Common.Air.Standard.PressureMb, Vector3.Zero, 0.3f);
 
     /// <summary>One part of the thunder, from one direction: its pressure at the ear, pascals, from
     /// <see cref="StartSeconds"/> after the flash.</summary>
@@ -137,7 +134,7 @@ public static class Thunder
     public const float MaxScatterSeconds = 0.6f;
 
     /// <summary>The variance of the refractive index, mu^2, the thunder's judgement (Refraction.JudgedStirVariance).</summary>
-    public static float TurbulenceVariance(Air air, float c)
+    public static float TurbulenceVariance(OutdoorAir air, float c)
         => Refraction.JudgedStirVariance(new Vector2(air.Wind.X, air.Wind.Z).Length(), air.Gustiness, air.TemperatureC, c);
 
     /// <summary>How fast turbulence takes the coherent wave at <paramref name="f"/> Hz, per metre (intensity).</summary>
@@ -175,10 +172,10 @@ public static class Thunder
     /// The thunder of <paramref name="strike"/> as heard at <paramref name="listener"/>, in up to
     /// <see cref="Options.MaxParts"/> parts, one per direction it comes from.
     /// </summary>
-    public static List<Part> Render(in LightningStrike strike, Vector3 listener, Air air, Options? options = null)
+    public static List<Part> Render(in LightningStrike strike, Vector3 listener, OutdoorAir air, Options? options = null)
         => Render(strike, LightningChannel.Build(strike), listener, air, options);
 
-    public static List<Part> Render(in LightningStrike strike, LightningChannel channel, Vector3 listener, Air air, Options? options = null)
+    public static List<Part> Render(in LightningStrike strike, LightningChannel channel, Vector3 listener, OutdoorAir air, Options? options = null)
     {
         options ??= new Options();
         float c = AudioPhysics.SpeedOfSoundAt(air.TemperatureC);
@@ -383,7 +380,7 @@ public static class Thunder
     /// relight the main channel only, each with its own energy and wave.
     /// </summary>
     private static void Add(float[] buf, double start, int fs, Vector3 a, Vector3 b, Vector3 listener, float weight, float energy,
-                            bool main, LightningChannel channel, KernelBank kernels, float c, Air air, float groundY,
+                            bool main, LightningChannel channel, KernelBank kernels, float c, OutdoorAir air, float groundY,
                             Vector3? shadowFrom = null)
     {
         float d1 = Vector3.Distance(a, listener), d2 = Vector3.Distance(b, listener);
@@ -591,7 +588,7 @@ public static class Thunder
     /// Wind toward the listener pushes that edge out, away pulls it in. Rain-cooled air can weaken the
     /// lapse in a storm; the standard lapse is used.
     /// </summary>
-    public static float ShadowGain(Vector3 at, Vector3 listener, float groundY, Air air, float c)
+    public static float ShadowGain(Vector3 at, Vector3 listener, float groundY, OutdoorAir air, float c)
     {
         float h = MathF.Max(0f, at.Y - groundY);
         var flat = new Vector2(listener.X - at.X, listener.Z - at.Z);
@@ -685,7 +682,7 @@ public static class Thunder
             public readonly System.Collections.Concurrent.ConcurrentDictionary<int, Kernel> Bins = new();
         }
 
-        private readonly int _fs; private readonly float _c, _rho; private readonly Air _air;
+        private readonly int _fs; private readonly float _c, _rho; private readonly OutdoorAir _air;
         // Read from several cores at once (Render's Parallel.For): made at most a few times over, kept once.
         private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Class> _classes = new();
         private readonly System.Collections.Concurrent.ConcurrentDictionary<int, double[]> _alpha = new();
@@ -701,7 +698,7 @@ public static class Thunder
         /// <summary>The refractive index's variance; zero for still, smooth air.</summary>
         public float Mu2 { get; }
 
-        public KernelBank(int fs, float c, Air air, float largestEnergy, float mu2)
+        public KernelBank(int fs, float c, OutdoorAir air, float largestEnergy, float mu2)
         {
             _fs = fs; _c = c; _air = air; Mu2 = mu2;
             _rho = new OpenFPS.Common.Air(air.TemperatureC, air.PressureMb).Density;
@@ -805,7 +802,7 @@ public static class Thunder
 
     /// <summary>48 or 24 kHz: the lower when the air has taken at least 60 dB off its top octave
     /// by the time the nearest bit of channel is heard.</summary>
-    public static int ChooseRate(float nearest, Air air)
+    public static int ChooseRate(float nearest, OutdoorAir air)
     {
         int rate = 48000;
         // Not 12 kHz: the mixer resamples linearly, and from 12 kHz its images of the rumble sit

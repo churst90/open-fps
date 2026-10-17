@@ -92,7 +92,7 @@ public class RenderFingerprintTests
         {
             var strike = new LightningStrike(31, FlashKind.CloudToGround, new Vector3(1800f, 5000f, -200f), new Vector3(1500f, 0f, 0f),
                                              LightningPhysics.GroundFlashEnergyMedian, 1);
-            var parts = Thunder.Render(strike, new Vector3(5f, 1.7f, 5f), new Thunder.Air(12f, 0.9f, 1013.25f, new Vector3(8f, 0f, 3f)),
+            var parts = Thunder.Render(strike, new Vector3(5f, 1.7f, 5f), new OutdoorAir(12f, 0.9f, 1013.25f, new Vector3(8f, 0f, 3f), 0.3f),
                                        new Thunder.Options { Threads = 2, SampleRate = 24000 });
             return parts.SelectMany(p => new[] { new[] { p.StartSeconds, p.SampleRate, p.Direction.X, p.Direction.Y, p.Direction.Z }, p.Pressure }).ToArray();
         },

@@ -211,7 +211,7 @@ public static class RefractionSpike
     /// </summary>
     static int ThunderShare()
     {
-        var storm = new Thunder.Air(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
+        var storm = new OutdoorAir(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
         float c = AudioPhysics.SpeedOfSoundAt(storm.TemperatureC);
         float windSpeed = new Vector2(storm.Wind.X, storm.Wind.Z).Length();
         var down = Vector2.Normalize(new Vector2(storm.Wind.X, storm.Wind.Z));
@@ -245,7 +245,7 @@ public static class RefractionSpike
         return 0;
     }
 
-    static float EdgeOld(float h, Thunder.Air air, float toward, float c)
+    static float EdgeOld(float h, OutdoorAir air, float toward, float c)
     {
         float a = Thunder.LapseRate / (2f * (air.TemperatureC + 273.15f)) - toward / Thunder.WindShearDepthMetres / c;
         return a <= 0f ? float.PositiveInfinity : MathF.Sqrt(2f * h / a) + MathF.Sqrt(2f * 1.7f / a);
