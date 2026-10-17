@@ -12,8 +12,8 @@ library that open-fps and Resonance both reference. Step 1 of
   docs/ENGINE_PACKAGES.md; its accessibility stage reads the world input of stage 6 here.
 
 Where it stands (2026-10-17): stages 0 to 7 built (2026-10-07 to 17, sections 13 to 20), and the namespace rename
-(decision 6, section 21), the engine packages under the library included (21.1). Left: stage 8, versions and how
-Resonance takes the library.
+(decision 6, section 21), the engine packages under the library included (21.1), and stage 8 (section 22): the
+first version, tag `library/v0.1.0`, with docs/LIBRARY_CHANGES.md. Every stage of this plan is built.
 
 ## Contents
 
@@ -39,6 +39,7 @@ Resonance takes the library.
 19. Stage 6 as built: the world input (19.1-19.6), `OpenFPS.Audio` and the world's options and paths (19.7-19.13)
 20. Stage 7 as built: `ClientAudioSystem` split into `AudioWorld` and its host, the one-off sounds and the birds
 21. The namespace rename as built (decision 6); the engine packages and the lab's spikes (21.1)
+22. Stage 8 as built: the first version
 
 ---
 
@@ -3116,3 +3117,19 @@ packages declares or uses `OpenFPS.Common` now: a consumer writes `using OpenFPS
   machines, the voices, the water, fire and weather, with the hardening tests' lookups by name: 961 passed. With
   `DOTNET_PROCESSOR_COUNT=4`, the boundaries, streams, spoken lines, fingerprints, physics replays and wire bytes:
   128 passed.
+
+## 22. Stage 8 as built: the first version (2026-10-17)
+
+- One tag for the whole stack, `library/v0.1.0`, on the commit that adds docs/LIBRARY_CHANGES.md. The library lives
+  inside this repository, so a submodule pins the repository at the tag and a host references the projects it
+  needs; a tag per project would pin the same commit.
+- docs/LIBRARY_CHANGES.md says, per version, what is in the stack, what a host gives it (`AudioEngineFacade` with
+  `AudioDataPaths`, `AudioWorld` and its `Tick`, `IAcousticWorld`, `IAudioSources`, `IAudioHost`, `IRecordings`,
+  `AudioWorldOptions`), the native libraries and FMOD's licence, the old to new namespaces for a host moving from a
+  copy of the code, the traps, what changed in behaviour, and the known open items.
+- Below 1.0 while the host interfaces may still change. A change a host must act on gets a line in
+  LIBRARY_CHANGES.md and a new tag.
+- Checked on the tagged tree: every test class changed since d0116bb5 (365 classes, 4,285 passed, 0 failed, 16
+  skipped, the Steam Audio opt-ins) and the replays and stored data with `DOTNET_PROCESSOR_COUNT=4` (88 passed).
+- Resonance's side, not done here: the submodule, crediting open-fps in its NOTICE.md, and swapping its copies one
+  subsystem at a time.

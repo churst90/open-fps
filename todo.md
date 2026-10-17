@@ -13,7 +13,8 @@ The order as of 2026-10-17. Cody's list of 2026-10-08 and where each of its twel
 
 Where the plans stand (2026-10-17):
 - Sound library (docs/SOUND_LIBRARY_BOUNDARY.md): stages 0 to 7 done, and the namespace rename (decision 6,
-  section 21), the engine packages under the library included (21.1). Left: stage 8.
+  section 21), the engine packages under the library included (21.1), and stage 8: the first version tagged,
+  `library/v0.1.0`, with docs/LIBRARY_CHANGES.md (2026-10-17). Resonance takes it as a submodule pinned to the tag.
 - Engine packages (docs/ENGINE_PACKAGES.md): stages 0 to 5, 7 and 8 done. Left: 6, 9 and 10.
 - Physics (docs/PHYSICS_BOUNDARY.md): stages 0 to 3 done, with stage 2's leftovers (16.6). Left: 4 to 6.
 - Geometry (docs/GEOMETRY.md): stages 1 to 4 done, and stage 6's first half (each vehicle's body as one closed
@@ -62,9 +63,9 @@ fingerprint changed too, so the door renders are made again once.
      leaves the doorway from the wall's face on the side of the room it runs into.
    - Why: no city map hangs a leaf at a face, but OSM maps and the editor's do.
    - Size: half a session, after or with item 2.
-5. Sound library stage 8, versions and Resonance (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8). After the push, since
-   tags need it. Tag versions of the library projects; a short CHANGES per version saying what a consumer must
-   do; Resonance takes a git submodule pinned to a tag. One session.
+5. Sound library stage 8: DONE 2026-10-17. Tag `library/v0.1.0`, docs/LIBRARY_CHANGES.md. Each later library change
+   that a host must act on gets a line there and a new tag. Resonance's side (the submodule, NOTICE.md, swapping
+   its copies one subsystem at a time) is Resonance's to do.
 6. Engine package stage 6, Common to the wire. Runs alone: it touches every project file. One session.
 7. Engine package stages 9 and 10. Both unblocked now (library stages 6 and 7 and physics stage 3 are done).
    - 9: Accessibility on the scene view. The ten aids read the scene view as the audio does. Check: the

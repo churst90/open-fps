@@ -4,6 +4,9 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- The sound library's first version, tag `library/v0.1.0` (docs/LIBRARY_CHANGES.md, docs/SOUND_LIBRARY_BOUNDARY.md
+  section 22): what the stack holds, what a host gives it, the native libraries, and for a host moving from a copy
+  of the code the old to new namespaces and the traps. Nothing heard changes.
 - The engine packages under the library follow their projects' namespaces too (docs/SOUND_LIBRARY_BOUNDARY.md
   21.1): `OpenFPS.Schema` (was `OpenFPS.Common.Editing`), `OpenFPS.Materials`, `OpenFPS.Physics`,
   `OpenFPS.Environment` with `.Water` (was `OpenFPS.Server.Water` and `.Systems`), and `OpenFPS.Models` with
