@@ -108,7 +108,12 @@ public sealed partial class RunningWaterSynth
     private readonly EventSum[]? _inside;
     private readonly Tube[]? _tubes;
     private readonly EventSum _rng;
-    private readonly Site[] _sites;
+    private Site[] _sites = Array.Empty<Site>();
+    /// <summary>A long line's, or a bed of riffles and pools (<see cref="FromTheBed"/>): its stones, from which each cut
+    /// takes the sites it renders. Null: the sites are spread evenly along it once, as they always were.</summary>
+    private readonly StreamBed? _bed;
+    private readonly int _seed;
+    private Dictionary<long, Site>? _byId;
     private readonly FallingWaterSynth? _falls;
     private readonly int[] _fallHome;
     private readonly float _referenceFlow;
@@ -147,6 +152,11 @@ public sealed partial class RunningWaterSynth
         public float NoteMm;          // its characteristic bubble radius
         public float Strip;           // m: the width of flow it gathers
         public float Weight = 1f;     // how many real obstacles it stands for
+        public long Id;               // a bed's stone (StreamBed.Stone.Id), or minus one plus a stand-in's place in cm
+        public float FlowShare = 1f;  // the share of the line's flow that has reached it
+        public float SlopeFactor = 1f; // how steep the water is here against the reach's mean (a riffle, a pool)
+        public int Stratum, Strata = 1; // a stand-in: which of its piece's stand-ins, of how many (StandIn)
+        public float BreakingShare = 1f; // a stand-in: the share of its stones that break now (StandIn)
         // From the flow (UpdateSites):
         public float JetSpeed, Froude, AirRate, BurstRate, HinzeMm, LargestMm, Thickness, Depth;
         public float NextBurst;       // s
@@ -182,15 +192,22 @@ public sealed partial class RunningWaterSynth
             for (int k = 0; k < places; k++) _rain[k] = new RainSynth(sampleRate, seed * 977 + 41 + k * 7919);
         }
 
-        // The breaking sites: as many as the bed has, up to MaxSites, each standing for its share.
+        // The breaking sites: as many as the bed has, up to MaxSites, each standing for its share. A long line's, or a
+        // bed of riffles and pools, are taken from its stones as it is cut (Allot), the whole of it until then.
+        _seed = seed;
         var sites = new List<Site>();
-        if (spec.Obstacles is { } obs && spec.Channel != FlowChannel.None)
+        if (FromTheBed(spec))
+        {
+            _bed = new StreamBed(spec, seed);
+            _sites = Array.Empty<Site>();
+        }
+        else if (spec.Obstacles is { } obs && spec.Channel != FlowChannel.None)
         {
             float real = MathF.Max(0f, obs.PerMetre * spec.LengthMetres);
             int n = Math.Clamp((int)MathF.Round(real), real > 0f ? 1 : 0, MaxSites);
             for (int i = 0; i < n; i++)
             {
-                var rng = new EventSum(sampleRate, seed * 31 + 1000 + i * 7);
+                var rng = EventSum.ForDraws(sampleRate, seed * 31 + 1000 + i * 7);
                 // Spread evenly along the length (jittered), so every place has its share of them.
                 float along = ((i + 0.5f + 0.8f * (rng.Uniform() - 0.5f)) / n - 0.5f) * spec.LengthMetres;
                 var site = new Site
@@ -207,7 +224,7 @@ public sealed partial class RunningWaterSynth
                 sites.Add(site);
             }
         }
-        _sites = sites.ToArray();
+        if (_bed == null) _sites = sites.ToArray();
 
         // The falls, through the fountain's physics, written into these places.
         _fallHome = new int[spec.Falls.Length];
@@ -233,6 +250,7 @@ public sealed partial class RunningWaterSynth
         }
         // Each stone's own note is set by the water it was made for, whatever is running when the voice
         // starts; the flow itself starts where the first control call finds it.
+        if (_bed != null) Allot(null);
         UpdateFlow(MathF.Max(0f, spec.ReferenceFlow));
         Flow = spec.ReferenceFlow;
     }
@@ -372,10 +390,233 @@ public sealed partial class RunningWaterSynth
     {
         _homedBy = cut;
         int places = _open.Length;
-        foreach (var s in _sites) s.Home = cut == null ? s.OwnHome : Math.Min(places - 1, cut.PlaceAt(s.Along));
+        if (_bed != null)
+        {
+            Allot(cut);
+            // A new stone's note is its water's at the flow its bed was made for, as the first ones' were.
+            UpdateFlow(MathF.Max(0f, Spec.ReferenceFlow));
+            UpdateFlow(float.IsNaN(_flow) ? MathF.Max(0f, Spec.ReferenceFlow) : _flow);
+        }
+        else foreach (var s in _sites) s.Home = cut == null ? s.OwnHome : Math.Min(places - 1, cut.PlaceAt(s.Along));
         for (int i = 0; i < _fallHome.Length; i++)
             _fallHome[i] = cut == null || _fallOwnHome[i] < 0 ? _fallOwnHome[i] : Math.Min(places - 1, cut.PlaceAt(_fallAlong[i]));
     }
+
+    // ── A long line's stones (2026-10-17) ───────────────────────────────────────────────────────
+
+    /// <summary>A line longer than this is too long for one set of sites spread evenly along it: beside you a piece
+    /// half a metre long would hold none of them. The creek preset (16 m), the gutter (15 m) and a drainage line's
+    /// stretch (20 m) are under it.</summary>
+    public const float LongLineMetres = 40f;
+
+    /// <summary>A piece whose bed holds no more stones than this on the mean has each rendered (the near pieces); one
+    /// with more is heard from a few that stand for all of them, sizes drawn evenly through the bed's spread.</summary>
+    public const int StonesListedUpTo = 6;
+
+    /// <summary>
+    /// A far piece is never rendered stone by stone: it is heard from at most <see cref="StandInsAPiece"/> sites, and a
+    /// line from at most <see cref="MostStandIns"/>, each standing for its share of the piece's stones. Such a site
+    /// bursts at most <see cref="MostBurstsPerSecond"/> times a second with at most <see cref="StandInBubbles"/> bubbles
+    /// a burst, and lets out at most one bubble of its steady trickle a block, each burst, gulp, spray and bubble as loud
+    /// as the many it stands for together. Far off and among the rest of the line, the grain this leaves is under its
+    /// distance; the cost is a few creeks' (--water-cost line).
+    /// </summary>
+    public const int StandInsAPiece = 3, MostStandIns = 16, StandInBubbles = 8;
+    public const float MostBurstsPerSecond = 40f;
+
+    /// <summary>
+    /// Whether a line's sites come from its bed's stones as it is cut (<see cref="Allot"/>): a line longer than
+    /// <see cref="LongLineMetres"/>, a bed of riffles and pools or steps, or a line that gathers its water along it.
+    /// Everything else keeps the sites it was made with, spread evenly along it.
+    /// </summary>
+    public static bool FromTheBed(RunningWaterSpec spec)
+        => spec.Layout == FlowLayout.Line && spec.Channel != FlowChannel.None && spec.Obstacles is { PerMetre: > 0f }
+           && (spec.LengthMetres > LongLineMetres || spec.Bed != BedForm.Even || spec.HeadShare < 0.999f);
+
+    // What Allot works with, kept so a recut as the listener walks allocates only the stones new to it.
+    private readonly List<StreamBed.Stone> _stones = new();
+    private readonly float[] _from = new float[ExtendedSources.MaxPlaces], _to = new float[ExtendedSources.MaxPlaces];
+    private readonly double[] _count = new double[ExtendedSources.MaxPlaces];
+    private readonly int[] _standIns = new int[ExtendedSources.MaxPlaces];
+    private readonly bool[] _listed = new bool[ExtendedSources.MaxPlaces];
+    private readonly List<Site> _made = new(MaxSites);
+    private Dictionary<long, Site> _spare = new();
+
+    /// <summary>
+    /// The sites a cut is heard from: in each piece whose bed holds few stones (those beside you) every stone, each
+    /// where it is, the fewest first while the sites last; in the rest a few stand-ins (by the square root of how many
+    /// it holds, <see cref="StandInsAPiece"/> at most), each standing for its share, spread evenly through where the
+    /// stones lie and how big they are. Each site's water is the share of the line's that has reached it, on the slope
+    /// of its riffle or pool. A stone already rendered keeps its own state when the cut moves on.
+    /// </summary>
+    private void Allot(ExtendedSources.LineCut? cut)
+    {
+        var bed = _bed!;
+        var obs = Spec.Obstacles!;
+        float length = bed.Length, half = 0.5f * length;
+        int pieces = Math.Min(cut?.Count ?? 1, ExtendedSources.MaxPlaces);
+        // The cut's metres are its path's; the bed's are the spec's, within the rounding of its length.
+        float scale = cut != null && cut.Length > 0f ? length / cut.Length : 1f;
+        int wanting = 0;
+        for (int i = 0; i < pieces; i++)
+        {
+            _from[i] = cut == null ? 0f : (cut.Edges[i] - cut.Edges[0]) * scale;
+            _to[i] = cut == null ? length : (cut.Edges[i + 1] - cut.Edges[0]) * scale;
+            _count[i] = bed.CountBetween(_from[i], _to[i]);
+            _listed[i] = false;
+            _standIns[i] = 0;
+            if (_count[i] > 0) wanting++;
+        }
+        // The near pieces stone by stone, the fewest first, each piece still waiting keeping a site for itself.
+        int used = 0;
+        for (int pass = 0; pass < pieces; pass++)
+        {
+            int i = -1;
+            for (int j = 0; j < pieces; j++)
+                if (!_listed[j] && _count[j] > 0 && _count[j] <= StonesListedUpTo && _standIns[j] == 0 && (i < 0 || _count[j] < _count[i])) i = j;
+            if (i < 0) break;
+            _stones.Clear();
+            bed.StonesBetween(_from[i], _to[i], _stones);
+            if (used + _stones.Count > MaxSites - (wanting - 1)) { _standIns[i] = -1; continue; }
+            _listed[i] = true;
+            wanting--;
+            used += _stones.Count;
+        }
+        // The rest stood in for, a few each and not too many in all.
+        int standIns = 0;
+        for (int i = 0; i < pieces; i++)
+        {
+            _standIns[i] = 0;
+            if (_listed[i] || _count[i] <= 0) continue;
+            _standIns[i] = (int)Math.Clamp(Math.Round(0.5 * Math.Sqrt(_count[i])), 1, Math.Min(StandInsAPiece, Math.Ceiling(_count[i])));
+            standIns += _standIns[i];
+        }
+        int most = Math.Min(MostStandIns, Math.Max(wanting, MaxSites - used));
+        while (standIns > most)
+        {
+            int widest = -1;
+            for (int i = 0; i < pieces; i++)
+                if (_standIns[i] > 1 && (widest < 0 || _standIns[i] > _standIns[widest])) widest = i;
+            if (widest < 0) break;
+            _standIns[widest]--;
+            standIns--;
+        }
+        var known = _byId;
+        var next = _spare;
+        next.Clear();
+        _made.Clear();
+        for (int i = 0; i < pieces; i++)
+        {
+            if (_listed[i])
+            {
+                _stones.Clear();
+                bed.StonesBetween(_from[i], _to[i], _stones);
+                foreach (var st in _stones)
+                    Take(st.Id, st.At, obs.MedianDropMetres * MathF.Exp(obs.DropSpread * NormalQuantile(st.SizeDraw)),
+                         obs.WidthMetres * (0.6f + 0.8f * st.WidthDraw), 1f, i, 0, 1);
+                continue;
+            }
+            int k = _standIns[i];
+            for (int j = 0; j < k; j++)
+            {
+                // Where they lie, evenly through the stones; how big, each its share of those that break as the water now
+                // runs (StandIn), in another order than where they lie so the biggest are not always the furthest.
+                float at = bed.PointAfter(_from[i], (j + 0.5) / k * _count[i], _to[i]);
+                float z = k == 1 ? 0.5f * obs.DropSpread : obs.DropSpread * NormalQuantile(((j + k / 2) % k + 0.5f) / k);
+                Take(-1 - (long)MathF.Round(at * 100f), at, obs.MedianDropMetres * MathF.Exp(z), obs.WidthMetres, (float)(_count[i] / k), i, (j + k / 2) % k, k);
+            }
+        }
+        _sites = _made.ToArray();
+        _spare = known ?? new Dictionary<long, Site>();
+        _byId = next;
+
+        void Take(long id, float at, float drop, float strip, float weight, int piece, int stratum, int strata)
+        {
+            if (known == null || !known.TryGetValue(id, out var site))
+            {
+                var rng = EventSum.ForDraws(_rate, unchecked(_seed * 31 + 1000 + (int)(id ^ (id >> 32)) * 7));
+                site = new Site { Rng = rng, Id = id, Drop = drop, Strip = strip, NextBurst = rng.Uniform() * 0.5f };
+            }
+            site.Along = at - half;
+            site.Weight = weight;
+            site.Stratum = stratum;
+            site.Strata = strata;
+            site.FlowShare = Spec.HeadShare + (1f - Spec.HeadShare) * Math.Clamp(at / length, 0f, 1f);
+            site.SlopeFactor = bed.SlopeAt(at);
+            site.OwnHome = HomeOf(site.Along);
+            site.Home = cut == null ? site.OwnHome : Math.Min(_open.Length - 1, cut.PlaceOfPiece(piece));
+            next[id] = site;
+            _made.Add(site);
+        }
+    }
+
+    /// <summary>The bed's stone sizes as quantiles of its spread, for <see cref="MeanBreaking"/>: the middles of 32 equal
+    /// shares of the normal.</summary>
+    private static readonly float[] SizeQuantiles = Enumerable.Range(0, 32).Select(m => NormalQuantile((m + 0.5f) / 32f)).ToArray();
+
+    private readonly float[] _breaking = new float[32];
+
+    /// <summary>
+    /// A stand-in in this water (its speed, depth, the flow through a stone's strip and the strip): how far its stones'
+    /// lee jets stand over the undular jump's Froude number on the mean over the bed's spread of sizes (the factor of
+    /// a site's air in <see cref="UpdateFlow"/>), and its size set to its share of those that break, by the air each
+    /// size drives under: the j-th of k in its piece the size at the middle of the j-th k-th of the air.
+    /// </summary>
+    private float StandIn(Site s, float v, float y, float q, float strip)
+    {
+        var obs = Spec.Obstacles!;
+        float sum = 0f;
+        for (int m = 0; m < SizeQuantiles.Length; m++)
+        {
+            float size = obs.MedianDropMetres * MathF.Exp(obs.DropSpread * SizeQuantiles[m]);
+            float drop = size * y / (size + y);
+            float jet = MathF.Sqrt(v * v + 2f * Hydraulics.Gravity * drop);
+            float thickness = q / (jet * strip);
+            sum += _breaking[m] = MathF.Max(0f, jet / MathF.Sqrt(Hydraulics.Gravity * MathF.Max(1e-4f, thickness)) - JumpOnsetFroude);
+        }
+        int breaking = 0;
+        foreach (float b in _breaking) if (b > 0f) breaking++;
+        s.BreakingShare = breaking / (float)SizeQuantiles.Length;
+        if (sum > 0f)
+        {
+            float wanted = (s.Stratum + 0.5f) / MathF.Max(1, s.Strata) * sum, upTo = 0f;
+            for (int m = 0; m < SizeQuantiles.Length; m++)
+            {
+                upTo += _breaking[m];
+                if (upTo < wanted && m < SizeQuantiles.Length - 1) continue;
+                s.Drop = obs.MedianDropMetres * MathF.Exp(obs.DropSpread * SizeQuantiles[m]);
+                break;
+            }
+        }
+        return sum / SizeQuantiles.Length;
+    }
+
+    /// <summary>The standard normal's quantile (Acklam's rational approximation, relative error under 1.2e-9).</summary>
+    internal static float NormalQuantile(float p)
+    {
+        double q = Math.Clamp(p, 1e-6, 1 - 1e-6);
+        ReadOnlySpan<double> a = stackalloc double[] { -3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00 };
+        ReadOnlySpan<double> b = stackalloc double[] { -5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01 };
+        ReadOnlySpan<double> c = stackalloc double[] { -7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00 };
+        ReadOnlySpan<double> d = stackalloc double[] { 7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00 };
+        if (q < 0.02425)
+        {
+            double r = Math.Sqrt(-2 * Math.Log(q));
+            return (float)((((((c[0] * r + c[1]) * r + c[2]) * r + c[3]) * r + c[4]) * r + c[5]) / ((((d[0] * r + d[1]) * r + d[2]) * r + d[3]) * r + 1));
+        }
+        if (q > 1 - 0.02425)
+        {
+            double r = Math.Sqrt(-2 * Math.Log(1 - q));
+            return -(float)((((((c[0] * r + c[1]) * r + c[2]) * r + c[3]) * r + c[4]) * r + c[5]) / ((((d[0] * r + d[1]) * r + d[2]) * r + d[3]) * r + 1));
+        }
+        double u = q - 0.5, t = u * u;
+        return (float)((((((a[0] * t + a[1]) * t + a[2]) * t + a[3]) * t + a[4]) * t + a[5]) * u / (((((b[0] * t + b[1]) * t + b[2]) * t + b[3]) * t + b[4]) * t + 1));
+    }
+
+    /// <summary>For the lab and the tests: the sites rendered now, where each is along the line (m from its middle), how
+    /// many stones it stands for, and the air it drives under now (m³/s, its stones' together).</summary>
+    public IReadOnlyList<(float Along, float Weight, float Air, int Home)> Sites
+        => _sites.Select(s => (s.Along, s.Weight, s.AirRate, s.Home)).ToList();
 
     /// <summary>The cut this line is played by now, if any: one with no more pieces than it has places.</summary>
     private ExtendedSources.LineCut? CutNow
@@ -518,23 +759,39 @@ public sealed partial class RunningWaterSynth
     private void UpdateFlow(float flow)
     {
         _state = Hydraulics.Of(Spec, flow);
-        float v = _state.SpeedMetresPerSecond, y = _state.DepthMetres;
+        float v0 = _state.SpeedMetresPerSecond, y0 = _state.DepthMetres;
         foreach (var s in _sites)
         {
-            if (flow <= 0f || y <= 0f) { s.AirRate = 0f; s.BurstRate = 0f; continue; }
+            float v = v0, y = y0, wetted = _state.WettedWidthMetres, here = flow;
+            if (s.FlowShare != 1f || s.SlopeFactor != 1f)
+            {
+                // Its own water: the share of the line's that has reached it, in a bed as much narrower as the water is
+                // less (w as Q^0.5, Leopold and Maddock 1953), on its riffle's or pool's slope. Manning's law in a wide
+                // channel then gives depth as Q^0.3 S^-0.3 and speed as Q^0.2 S^0.3.
+                float share = MathF.Max(1e-3f, s.FlowShare), steep = MathF.Max(1e-3f, s.SlopeFactor);
+                here = flow * share;
+                y *= MathF.Pow(share, 0.3f) * MathF.Pow(steep, -0.3f);
+                v *= MathF.Pow(share, 0.2f) * MathF.Pow(steep, 0.3f);
+                wetted *= MathF.Sqrt(share);
+            }
+            if (here <= 0f || y <= 0f) { s.AirRate = 0f; s.BurstRate = 0f; continue; }
+            // The flow through the site: its strip of the channel, never more than all of it.
+            float strip = MathF.Min(s.Strip, MathF.Max(0.01f, wetted));
+            float q = MathF.Min(here * 1e-3f, v * y * strip);          // m^3/s
+            // A stand-in drives under what its stones do on the mean, their sizes taken through the bed's whole spread,
+            // and is one of the stones that do it: near the onset only the bigger stones break, and a few sizes drawn
+            // through the spread would miss or overstate that tail.
+            float breaking = s.Id < 0 ? StandIn(s, v, y, q, strip) : float.NaN;
             // The surface drops into the lee by the obstacle's height, or by the depth when the obstacle
             // stands out of the water (the water goes round it and falls back behind).
             float drop = s.Drop * y / (s.Drop + y);
             float jet = MathF.Sqrt(v * v + 2f * Hydraulics.Gravity * drop);
             s.JetSpeed = jet;
-            // The flow through the site: its strip of the channel, never more than all of it.
-            float strip = MathF.Min(s.Strip, MathF.Max(0.01f, _state.WettedWidthMetres));
-            float q = MathF.Min(flow * 1e-3f, v * y * strip);          // m^3/s
             s.Thickness = q / (jet * strip);
             // The lee jet meets the water behind the obstacle in a small jump: it breaks, and drives air
             // under, by how far its Froude number stands over the undular jump's.
             s.Froude = jet / MathF.Sqrt(Hydraulics.Gravity * MathF.Max(1e-4f, s.Thickness));
-            float air = q * BreakingAirShare * MathF.Max(0f, s.Froude - JumpOnsetFroude) * s.Weight;   // m^3/s
+            float air = q * BreakingAirShare * (float.IsNaN(breaking) ? MathF.Max(0f, s.Froude - JumpOnsetFroude) : breaking) * s.Weight;   // m^3/s
             // The size of the bubbles the jet breaks the air into: the Hinze scale falls as the
             // turbulence is more violent, as ε^(-2/5) (Hinze 1955; about a millimetre at the 0.1-40 W/kg
             // of a surf zone, Garrett, Li and Farmer 2000), ε here the jet's kinetic energy spent over
@@ -631,7 +888,8 @@ public sealed partial class RunningWaterSynth
         int real = rng.Poisson(steady);
         if (real > 0)
         {
-            int n = Math.Min(real, MaxSteadyPerBlock);
+            // A stand-in (Allot) lets out one bubble a block for all its stones' trickle.
+            int n = Math.Min(real, s.Id < 0 ? 1 : MaxSteadyPerBlock);
             float w = MathF.Sqrt(real / (float)n) * SitePart;
             for (int b = 0; b < n; b++)
                 RingNear(PlaceForSite(s), rng, (int)(rng.Uniform() * Block), DrawBubbleMm(rng, s), w, s.Depth, FallingWaterSynth.BubbleRise);
@@ -640,27 +898,33 @@ public sealed partial class RunningWaterSynth
         s.NextBurst -= dt;
         while (s.NextBurst <= 0f)
         {
-            float rate = MathF.Max(0.05f, s.BurstRate * s.Weight);
+            // A stand-in's stones that do not break shed no bursts.
+            float rate = MathF.Max(0.05f, s.BurstRate * s.Weight * (s.Id < 0 ? s.BreakingShare : 1f));
+            // A site standing for many stones bursts no oftener than this, each burst standing for several.
+            float stands = s.Id < 0 && rate > MostBurstsPerSecond ? rate / MostBurstsPerSecond : 1f;
+            rate /= stands;
             int at = Math.Clamp((int)((dt + s.NextBurst) * _rate), 0, Block - 1);
             // Eddies are shed nearly in time, not at random: a jittered period.
             s.NextBurst += (0.6f + 0.8f * rng.Uniform()) / rate;
-            Burst(s, at, rate, meanVolume);
+            Burst(s, at, rate * stands, meanVolume, stands);
         }
     }
 
-    private void Burst(Site s, int at, float rate, float meanVolume)
+    /// <param name="stands">How many bursts this one stands for: each is one burst's, as loud as that many together.</param>
+    private void Burst(Site s, int at, float rate, float meanVolume, float stands = 1f)
     {
         var rng = s.Rng;
         // This burst's air: its mean share, log-normally uneven (mean one).
         float size = MathF.Exp(BurstSpread * Gauss(rng) - 0.5f * BurstSpread * BurstSpread);
         float air = BurstShare * s.AirRate / rate * size;
+        float louder = stands > 1f ? MathF.Sqrt(stands) : 1f;
         int count = rng.Poisson(air / meanVolume);
         var place = PlaceForSite(s);
         int span = (int)(BurstSeconds * MathF.Sqrt(MathF.Max(0.2f, s.Drop / 0.05f)) * _rate);
         if (count > 0)
         {
-            int n = Math.Min(count, MaxPerBurst);
-            float w = MathF.Sqrt(count / (float)n) * SitePart;
+            int n = Math.Min(count, s.Id < 0 ? StandInBubbles : MaxPerBurst);
+            float w = MathF.Sqrt(count / (float)n) * SitePart * louder;
             for (int b = 0; b < n; b++)
                 RingNear(place, rng, at + (int)(span * rng.Uniform() * rng.Uniform()), DrawBubbleMm(rng, s), w, s.Depth, FallingWaterSynth.BubbleRise);
         }
@@ -675,21 +939,23 @@ public sealed partial class RunningWaterSynth
             float depth = MathF.Pow(rng.Uniform(), FallingWaterSynth.DepthSkew);
             if (depth >= 0.01f)
                 place.Bubble(at + (int)(span * rng.Uniform()), FallingWaterSynth.MinnaertHzMetres / (mm * 1e-3f), FallingWaterSynth.BubbleDamping(mm),
-                             FallingWaterSynth.BubblePascalsPerMm * mm * depth * SitePart, GlugRise);
+                             FallingWaterSynth.BubblePascalsPerMm * mm * depth * SitePart * louder, GlugRise);
         }
         // The crest spilling: spray off the jet, its energy the jet's kinetic energy over the burst.
         if (SprayPart > 0f && s.JetSpeed > SprayOnset)
         {
             // The water this burst carries, as if one lump: its splash's energy goes as its mass, and its
             // duration as its size, held to a lump's (a burst's spray is many small crests, not one).
-            float water = s.Thickness * s.JetSpeed * MathF.Min(s.Strip, 1f) / rate * size;     // m^3
+            // A bed's stones (Allot) burst each as one stone: its water over its own shedding, whatever the site stands
+            // for. The sites spread evenly along a stretch keep the share of it they always had.
+            float water = s.Thickness * s.JetSpeed * MathF.Min(s.Strip, 1f) / (_bed != null ? MathF.Max(0.05f, s.BurstRate) : rate) * size;     // m^3
             float r = MathF.Cbrt(3f * MathF.Max(1e-12f, water) / (4f * MathF.PI));
             float rl = MathF.Min(r, 0.01f);
             var (sr, sd, sp) = FallingWaterSynth.Splash(rl, s.JetSpeed, SpillCrownShare);
             sp *= MathF.Pow(r / rl, 1.5f) * MathF.Min(1f, (s.JetSpeed - SprayOnset) / 0.5f);
             float fc = FallingWaterSynth.SplashCentreHz(rl, s.JetSpeed) * MathF.Exp(0.7f * Gauss(rng));
             fc = Math.Clamp(fc, 600f, 0.4f * _rate);
-            place.Burst(at, sr, sd, sp * SprayPart, fc / 1.6f, MathF.Min(fc * 1.6f, 0.45f * _rate), steep: true);
+            place.Burst(at, sr, sd, sp * SprayPart * louder, fc / 1.6f, MathF.Min(fc * 1.6f, 0.45f * _rate), steep: true);
         }
     }
 

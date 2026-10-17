@@ -475,6 +475,7 @@ OpenFPS.Sound/Core/Nature/RunningWaterSynth.Basin.cs	Sound
 OpenFPS.Sound/Core/Nature/RunningWaterSynth.cs	Sound	
 OpenFPS.Sound/Core/Nature/ShoreReferences.cs	Sound	
 OpenFPS.Sound/Core/Nature/ShoreSynth.cs	Sound	
+OpenFPS.Sound/Core/Nature/StreamBed.cs	Sound	
 OpenFPS.Sound/Core/Nature/TextureStatistics.cs	Sound	
 OpenFPS.Sound/Core/Nature/WideSources.cs	Sound	
 OpenFPS.Sound/Core/Pneumatics/AirSystem.cs	Sound	

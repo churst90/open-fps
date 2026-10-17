@@ -21,6 +21,17 @@ public enum FlowChannel
     None,
 }
 
+/// <summary>How a stream's bed is shaped along it (StreamBed; Montgomery and Buffington 1997, GSA Bulletin 109(5), 596).</summary>
+public enum BedForm
+{
+    /// <summary>Its stones evenly along it: a gutter, a ditch, a rill, a plane bed.</summary>
+    Even,
+    /// <summary>Riffles between pools, a riffle and a pool every five to seven widths: a gentle natural bed.</summary>
+    PoolRiffle,
+    /// <summary>Steps of stones a pool apart, one every one to four widths: a steep natural bed.</summary>
+    StepPool,
+}
+
 /// <summary>How a source's places are laid out (ExtendedSources): along its length, or round its middle.</summary>
 public enum FlowLayout
 {
@@ -226,6 +237,12 @@ public sealed record RunningWaterSpec
     public float LengthMetres { get; init; } = 10f;
     [Tunable("", 0, 1, "The share of the catchment's water that has reached this stretch: half way down the gutter that feeds a grate it has gathered half.", Step = 0.05)]
     public float ShareOfCatchment { get; init; } = 1f;
+    /// <summary>How its stones lie along it (StreamBed).</summary>
+    [Tunable("", 0, 0, "How the bed's stones lie along it: evenly, gathered into riffles between pools (a gentle natural bed), or into steps between pools (a steep one).", Label = "bed form")]
+    public BedForm Bed { get; init; } = BedForm.Even;
+    /// <summary>A line laid upstream first: the flow at its first end against its last, the rest gathered along it.</summary>
+    [Tunable("", 0.01, 1, "The share of its flow it has at its upstream end: the rest joins it along the way, off its banks and from the lines that join it. Its bed widens as its water grows.", Label = "flow at its head", Step = 0.01)]
+    public float HeadShare { get; init; } = 1f;
 
     /// <summary>Null for a source with no channel.</summary>
     public FlowObstacles? Obstacles { get; init; }

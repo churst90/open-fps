@@ -23,7 +23,7 @@ public sealed class EventSum
     private const int Bits = 15;                 // 32768 samples: 0.68 s at 48 kHz
     private const int Mask = (1 << Bits) - 1;
     private const int RingLength = 1 << Bits;
-    private readonly float[] _ring = new float[RingLength];
+    private readonly float[] _ring;
     private readonly float _rate;
     private long _now;
     private uint _rng;
@@ -48,11 +48,18 @@ public sealed class EventSum
         return table;
     }
 
-    public EventSum(float sampleRate, int seed)
+    public EventSum(float sampleRate, int seed) : this(sampleRate, seed, RingLength) { }
+
+    private EventSum(float sampleRate, int seed, int ring)
     {
+        _ring = new float[ring];
         _rate = sampleRate;
         _rng = (uint)seed * 2654435761u | 1u;
     }
+
+    /// <summary>A sum that only draws numbers and never sounds: a running water site's own generator. Its draws are a
+    /// sum's of the same seed; it has no ring, a few bytes where a sum's is 128 kB.</summary>
+    public static EventSum ForDraws(float sampleRate, int seed) => new(sampleRate, seed, 0);
 
     /// <summary>The sample the next <see cref="Next"/> returns. Events are placed relative to it.</summary>
     public long Now => _now;

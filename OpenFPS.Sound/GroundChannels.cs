@@ -91,13 +91,34 @@ public static class GroundChannels
     private static readonly float[,] CreekLevels = { { 40, 39, 37, 36 }, { 55, 51, 48, 45 }, { 64, 60, 57, 55 }, { 72, 70, 69, 70 }, { 79, 75, 75, 82 }, { 82, 79, 80, 87 } };
 
     /// <summary>The sound id of a drainage line: running water's ("flow:"), with <see cref="Key"/> after it.</summary>
-    public static string SoundId(GroundChannelKind kind, float widthMetres, float slope, float lengthMetres, float referenceLitresPerSecond, GroundCatchment catchment)
-        => "flow:" + Key(kind, widthMetres, slope, lengthMetres, referenceLitresPerSecond, catchment);
+    public static string SoundId(GroundChannelKind kind, float widthMetres, float slope, float lengthMetres, float referenceLitresPerSecond, GroundCatchment catchment,
+                                 float headShare = 1f)
+        => "flow:" + Key(kind, widthMetres, slope, lengthMetres, referenceLitresPerSecond, catchment, headShare);
 
-    /// <summary>The sound id of a line's voice.</summary>
-    public static string Key(GroundChannelKind kind, float widthMetres, float slope, float lengthMetres, float referenceLitresPerSecond, GroundCatchment catchment)
-        => string.Create(CultureInfo.InvariantCulture,
-            $"{Prefix}{kind.ToString().ToLowerInvariant()}/{(int)MathF.Round(widthMetres * 100f)}/{(int)MathF.Round(Math.Clamp(slope, 0f, 1f) * 1000f)}/{(int)MathF.Round(lengthMetres)}/{(long)MathF.Round(referenceLitresPerSecond * 1000f)}/{catchment.Key()}");
+    /// <summary>The sound id of a line's voice. A line that gathers water along it ends with the share of its flow at
+    /// its upstream end, in thousandths ("/HEAD"); one that does not has none.</summary>
+    public static string Key(GroundChannelKind kind, float widthMetres, float slope, float lengthMetres, float referenceLitresPerSecond, GroundCatchment catchment,
+                             float headShare = 1f)
+    {
+        int head = (int)MathF.Round(Math.Clamp(headShare, 0.001f, 1f) * 1000f);
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{Prefix}{kind.ToString().ToLowerInvariant()}/{(int)MathF.Round(widthMetres * 100f)}/{(int)MathF.Round(Math.Clamp(slope, 0f, 1f) * 1000f)}/{(int)MathF.Round(lengthMetres)}/{(long)MathF.Round(referenceLitresPerSecond * 1000f)}/{catchment.Key()}")
+            + (head < 1000 ? string.Create(CultureInfo.InvariantCulture, $"/{head}") : "");
+    }
+
+    /// <summary>Where a creek's bed turns from riffles and pools to plane, and from plane to steps, as a slope: about 2
+    /// and 3 per cent (Montgomery and Buffington 1997, GSA Bulletin 109(5), 596: their reach types' slopes).</summary>
+    public const float PlaneBedSlope = 0.02f, StepBedSlope = 0.03f;
+
+    /// <summary>How much more a line of this length declares than the stretch <see cref="LevelDb"/>'s table was measured
+    /// over, dB: its stones' power adds along it. Nothing for a stretch or less.</summary>
+    public static float LengthDb(float lengthMetres)
+        => 10f * MathF.Log10(MathF.Max(1f, Math.Clamp(lengthMetres, 0.5f, 500f) / GroundChannelBed.SegmentMetres));
+
+    /// <summary>How a line's bed lies along it (StreamBed): a creek's by its slope, the rest even.</summary>
+    public static BedForm BedOf(GroundChannelKind kind, float slope)
+        => kind != GroundChannelKind.Creek ? BedForm.Even
+            : slope < PlaneBedSlope ? BedForm.PoolRiffle : slope < StepBedSlope ? BedForm.Even : BedForm.StepPool;
 
     private static readonly ConcurrentDictionary<string, RunningWaterSpec?> _parsed = new(StringComparer.OrdinalIgnoreCase);
 
@@ -114,21 +135,23 @@ public static class GroundChannels
 
     private static RunningWaterSpec? Parse(string key)
     {
-        var parts = key[Prefix.Length..].Split('/', 6);
-        if (parts.Length != 6) return null;
+        var parts = key[Prefix.Length..].Split('/');
+        if (parts.Length is not (6 or 7)) return null;
+        int head = 1000;
+        if (parts.Length == 7 && !int.TryParse(parts[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out head)) return null;
         if (!Enum.TryParse<GroundChannelKind>(parts[0], ignoreCase: true, out var kind)) return null;
         if (!int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int widthCm)
             || !int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int permille)
             || !int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int length)
             || !long.TryParse(parts[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out long refMl)) return null;
         if (!GroundCatchment.TryParse(parts[5], out var catchment)) return null;
-        return SpecFor(kind, widthCm / 100f, permille / 1000f, length, refMl / 1000f, catchment);
+        return SpecFor(kind, widthCm / 100f, permille / 1000f, length, refMl / 1000f, catchment, head / 1000f);
     }
 
     /// <summary>A line's running water: its bed, its obstacles, its level at its reference flow, and its
     /// catchment, through which it takes its flow from the map's state.</summary>
     public static RunningWaterSpec SpecFor(GroundChannelKind kind, float widthMetres, float slope, float lengthMetres,
-                                           float referenceLitresPerSecond, GroundCatchment catchment)
+                                           float referenceLitresPerSecond, GroundCatchment catchment, float headShare = 1f)
     {
         float s = Math.Clamp(slope, 0.001f, 0.5f);
         var bed = new RunningWaterSpec
@@ -164,11 +187,14 @@ public static class GroundChannels
             CatchmentSquareMetres = MathF.Max(1f, catchment.TotalSquareMetres),
             Ground = catchment,
             GroundReferenceLitresPerSecond = MathF.Max(0.001f, referenceLitresPerSecond),
-            SourceLevelDb = LevelDb(kind, referenceLitresPerSecond, s),
+            // The table is a stretch of GroundChannelBed.SegmentMetres; a longer line has as many more stones.
+            SourceLevelDb = LevelDb(kind, referenceLitresPerSecond, s) + LengthDb(lengthMetres),
             PeakHeadroomDb = HeadroomDb,
             ExtentMetres = 2f,
             Places = 5,
             Layout = FlowLayout.Line,
+            Bed = BedOf(kind, s),
+            HeadShare = Math.Clamp(headShare, 0.001f, 1f),
         };
     }
 }
