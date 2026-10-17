@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-16
 
+- Package stage 5, Agents, the laws (docs/ENGINE_PACKAGES.md, stage 5 as built). Nothing a player hears, sees or
+  is told changes. What drives things is a project of its own, `OpenFPS.Agents`: the racing line and the driver
+  steering to it, a vehicle's tour of lanes, an aeroplane on its runway, how hard a driver works a train or an
+  aeroplane, and traffic's laws, taken out of the server's traffic system: the gap to the car in front, who goes
+  first at a junction, where a walker crosses and who waits, a route's stops, the street's random events and
+  which lines fit which moment. Each takes what it reads as values (the roads, the water on them, positions); the
+  server steps them as before. The driving cues' planner moved to `OpenFPS.Accessibility`, the last of stage 7's
+  files. The surveys' reader now sees three projects' references it missed. The wire hash changes, so the
+  server and the Windows client go out together.
 - Package stage 8, Editor (docs/ENGINE_PACKAGES.md, stage 8 as built). Nothing a player hears, sees or is told
   changes. The world editor's model is a project of its own, `OpenFPS.Editor`: the kinds it edits, the model
   and map versions, a map's edits laid over its data, a placed thing's settings and running state, and the

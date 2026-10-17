@@ -13,7 +13,8 @@ models for method and depth are docs/SOUND_LIBRARY_BOUNDARY.md and docs/PHYSICS_
   `ratchet` there (stage 0). Run it again after any move.
 - Already packages: Geometry, Acoustics, Sound, Native, Physics, Schema, Words, Astronomy; Materials since
   stage 1 was built (2026-10-12), Models since stage 2, Accessibility, its clean half, since stage 7,
-  World since stage 4, Environment since stage 3 and Editor since stage 8 (2026-10-16). Planned with their
+  World since stage 4, Environment since stage 3, Editor since stage 8 and Agents, its laws, since stage 5
+  (2026-10-16). Planned with their
   own documents and not planned again here: `OpenFPS.Audio` and the split of `ClientAudioSystem` (sound library
   stages 6 to 8), and physics stages 2 to 6. This survey says where its packages meet them.
 
@@ -1019,6 +1020,58 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
 - Check: the traffic and rail replays, `TrafficRuleTests`, `RouteTrafficTests`, `TrafficTyreDemandTests`,
   `PedestrianSpeechTests`, the emitter stream's `traffic` and `traffic_rain`.
 
+- **Built 2026-10-16, Agents, the laws** (on Linux, in four commits, begun on main `7d45f7f1` and rebased onto
+  `4023fbf2`, which has stage 8; before them, a fifth fixed the reader, stage 3's "found, not fixed").
+  `OpenFPS.Agents` holds 11 files on Physics, Environment, Sound, Models and World; the server and Accessibility
+  reference it, and it references none of the game's projects. Nothing a player hears, sees or is told changes:
+  the traffic, rail and movement replays, the emitter stream's every scenario (`traffic` and `traffic_rain`
+  among them), the render fingerprints and the spoken lines pass unregenerated, and the replays again with four
+  processors.
+  - **First, the lever's byte.** `MachinePower.Encode` and `Decode` are `StatePacking.EncodeLever` and
+    `DecodeLever` (Common), body for body; `EntityState.LeverFraction` reads them, so Common names nothing of
+    Agents (the two crossings into it). `MachineStateTests` holds the same bytes.
+  - **The laws, out of the partial classes.** Each of the five partial files kept its host half (the indexes of
+    who is where this tick, the state on each vehicle, the entity store, the map manager) and called six new types
+    for the rest. Every expression is the one it was, in the order it was, and every draw from the street's
+    generator is made in the order it was made:
+
+    | Type | What it holds | From |
+    |---|---|---|
+    | `CarFollowing` | the IDM gap and its ACC blend (`Allowed`, `Acc`); the rain's caution from a map's `RoadWater`, null for none | `VehicleSystem.Following.cs` |
+    | `JunctionRules` | `Movement`; the look, the imminence and the body clearance; `Committed`, `Rank`, `CriticalGap`, who gives way to whom (`GivesWayTo`), a gap too short to take (`GapTooShort`), `FromTheRight`, whether two ways meet (`Meet`) | `VehicleSystem.Junctions.cs` (the cache of meetings by map stays the host's) |
+    | `CrossingRules` | the kerb and stand-off distances; a carriageway's stretch of a walker's line; the gap a walker needs; a body's reach; a turn taken; a driver letting somebody across; where it stands and how hard it brakes once stopping | `VehicleSystem.Crosswalks.cs` |
+    | `RouteRules` | a route's tour on the road network handed in (`Build`), the lanes' limits, the stops, where on its tour a vehicle is from its line and lap (`WhereOnLane`, `ShortOfTheLine`) | `VehicleSystem.Routes.cs` |
+    | `StreetEvents` | an event's chance, a pick at random over what the host finds eligible, the hard stop, a burst of gunfire, the shot and the horn as the sounds they are from a position handed in | `VehicleSystem.StreetLife.cs` |
+    | `StreetLines` | which lines fit which moment, and `SpeechConditions` | cut whole out of `PedestrianSpeech.cs`; `SpeechConditions.From` read `WorldEnvironmentComponent` and is the host's `PedestrianSpeech.Conditions` |
+
+    The road network, the road's water (`VehicleSystem.RainCaution(mapId, life)` hands the map's to
+    `CarFollowing`) and the positions (a shot's, a horn's) are passed in, as the plan has it.
+    `TrafficTyreDemandTests` asks `CarFollowing.Acc`.
+  - **The move**, each file whole and not a line changed, namespaces as they were: from Common `LaneRoutes.cs`,
+    `LineFollower.cs` (with `DriverSteering`) and `RaceLine.cs`; from Sound `AircraftGroundRun.cs` and
+    `MachinePower.cs`; and the six made above. The plan's 10 files are 11: the five partial files stayed the
+    host's, and six law files came out of them. Common referenced Agents for one commit, while
+    `DrivingCuePlanner` was still in it.
+  - **`DrivingCuePlanner` to Accessibility** (stage 7's last file), in a commit of its own: `git mv`, not a line
+    changed. Accessibility references World and Agents, both under its layer; Common references neither the
+    planner nor Agents. `BeaconTests`, `DrivingAidsTests`, the driving cue tests and the spoken-lines replay pass
+    unchanged.
+  - **The guards followed.** The packages ratchet (Agents a sorted project, its files by one rule, its assembly
+    checked against its layer; the type rules for `StreetLines` and `SpeechConditions` gone with their file), the
+    library's (Agents sorted, all host; `MachinePower` and `AircraftGroundRun` leave the library's universe with
+    Sound). The reader parses the new project, and every project above it references it (the editor's
+    compilation too, since Accessibility does). The physics survey sorts the moved types by name and counts
+    `CarFollowing` among the mechanics' readers, as it did `VehicleSystem`; its 15 are unchanged.
+  - **The counts.** The packages ratchet falls from 714 (main `4023fbf2`) to 692: the lever's 2 and the 20 of the
+    partial files and `PedestrianSpeech.cs`. The library's allowance stays empty.
+  - **The wire hash** changes (60f35a9236d7 on `4023fbf2` to edc1fd88b5f6): the lever's byte moved within it, and
+    the moved files left it, Agents and Accessibility not being hashed (decision 11). The server and the Windows
+    client go out together.
+  - **Left:** `ParkState`, `ParkPhase` and `ParkingSpot` (its type rules, 2 crossings to `DoorManners`) hold
+    entities, the door and the driver, and a door's passage: they wait for stage 10's view of people and doors.
+    The hosts still step the laws over `DemoVehicle`; a vehicle as the laws see it (a view, as stage 10 makes for
+    people) is for physics stage 6, which puts traffic under the vehicle step.
+
 ### Stage 6: Common to the wire (1 session)
 
 - After stages 1 to 5 and physics stage 2: what is left in Common is section 3.8. Drop the unused Arch and
@@ -1067,7 +1120,7 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
     needed an interface of its own. No crossing came or went (the packages ratchet's 1,178, the library's 358,
     the physics survey's 15); the two ratchets' file lists moved the row. The wire hash does not change:
     Accessibility is not in it. `ListeningCalibrationTests` and the spoken-lines replay pass unchanged.
-    `DrivingCuePlanner` still waits on stages 4 and 5.
+    `DrivingCuePlanner` moved with stage 5 (2026-10-16), twelve of the twelve: see stage 5 as built.
 
 ### Stage 8: Editor (1 to 2 sessions)
 
