@@ -447,6 +447,43 @@ the car keeps its own direction. A grandstand gives a detour the barrier ceiling
 and any real opening beats it. Nothing in it knows what a wall or a doorway is.
 (AsyncAcousticWorker.RunSteamAudio.)
 
+## A shut door leaks by its gaps
+
+A shut door passes most of what it passes through the gaps round its leaf, not through the leaf. A hollow-core leaf
+takes about 35 dB at 1.25 kHz by its weight; hung in its frame with a swing's clearance and an undercut, the door
+takes 15 to 20. Until 2026-10-17 a shut doorway passed what its leaf let through and nothing else, so the city's
+doors were 10 to 40 dB too tight, most in the high band.
+
+Each shut door's gaps are now added to its doorway's transmission (`OpeningRoutes.GapsRound`, `DoorGaps`), and so
+to everything that reads it: the routes through it, the absorption it gives each room, and the field of one room
+heard in the next. A gap is a long slit, Gomperts' (Acustica 14, 1964; with Kihlman, Acustica 18, 1967): a plane
+wave in the slit between two strips radiating into a baffle, which passes more than its own area at low
+frequency and rings at its depth's half-wavelengths. A gap under a millimetre is held back by its walls, so the
+air in the slit is a narrow slit's (Stinson, JASA 89, 1991): Poiseuille's flow at low frequency. The undercut lies
+along the floor and is the slit twice as wide with the floor its mirror. A band's figure is the energy averaged
+over its one-third octaves, as a wall's is.
+
+The gaps are the door's data: `DoorGapMetres` round the jambs and head and `DoorUndercutMetres` under it, on a
+prefab (into `PortalComponent.GapMetres` and `UndercutMetres`, so the client has them). Absent, a door takes the
+default for where it hangs: between two rooms 3 mm round and a 10 mm undercut; with the outdoors on either side
+0.3 mm all round, weatherstripped and swept. The lift door declares 6 mm round and at its sill, the most EN 81-20
+allows a landing door. The leaf's thickness is the slit's depth. A leaf swung partly open adds its gaps only for
+the share of the doorway it still covers.
+
+Measured with `--path-probe` (its `nogaps` switch is the old rule) in Selby House:
+
+| | before (low/mid/high dB) | after |
+|---|---|---|
+| a flat's door (wood, 60 mm) | -18/-27/-55 | -14/-16/-16 |
+| a stair door (steel, 80 mm) | -13/-48/-59 | -12/-17/-15 |
+| the glass front door (12 mm) | -18/-28/-45 | -18/-27/-32 |
+| the corridor heard 2 m into flat 00B (door shut) | -17.6/-27.3/-54.7 | -17.6/-16.4/-15.6 |
+| the street heard in the lobby (door shut) | -18.1/-28.0/-44.6 | -18.1/-27.5/-31.7 |
+| the corridor heard in the lobby (stair door shut) | -13.5/-48.4/-58.8 | -13.5/-16.7/-16.0 |
+
+Resonance measured the same rule as a telephone heard from a restroom 15 dB down with the door open and 33 shut;
+the flat's door here puts a shut door about 16 dB under an open one, as the measured doors do.
+
 ## Steam Audio pathing is off (a decision for Cody)
 
 The worker makes its simulator with `enablePathing: false`, so Steam Audio's pathing never runs: no probe

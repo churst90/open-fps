@@ -77,7 +77,7 @@ shape of it.
 | Synth | `IsSynth`, `Synth*` | (same component) |
 | Region | `IsIndoor` | `RegionComponent` |
 | Portal | `RegionAId`, `RegionBId`, `ApertureSize` | `PortalComponent` |
-| Door | `IsDoor`, `DoorKind`, `HingeSide`, `PushSide`, `KeyedSide`, `SwingSeconds`, `SwingDegrees`, `DoorSkinMetres`, `Slides`, `Powered`, `SensorMetres`, `CloseAfterSeconds`, `CloseSeconds` | `DoorComponent` (and a `PortalComponent`) |
+| Door | `IsDoor`, `DoorKind`, `HingeSide`, `PushSide`, `KeyedSide`, `SwingSeconds`, `SwingDegrees`, `DoorSkinMetres`, `DoorGapMetres`, `DoorUndercutMetres`, `Slides`, `Powered`, `SensorMetres`, `CloseAfterSeconds`, `CloseSeconds` | `DoorComponent` (and a `PortalComponent`) |
 | Beacon | `BeaconCategory` | (see Beacons below) |
 
 `ColliderSize` is **full extents in metres**, multiplied by the map instance's `Scale`. So a
@@ -339,6 +339,11 @@ swings out (−1). `HingeSide` (−1 left, +1 right) says which edge it swings o
 
 **Keyed side.** `KeyedSide` +1 or −1 is the face that needs a key; from that face a shut door is
 locked, and opening it is key, then hand. 0 or absent is never locked.
+
+**Gaps.** A shut door lets through most of what it does by the gaps round its leaf (docs/CLIENT_NOTES.md, "A
+shut door leaks by its gaps"). `DoorGapMetres` is the gap at its jambs and head and `DoorUndercutMetres` the gap
+under it. Leave them out for the default where the door hangs: 3 mm round and a 10 mm undercut between two rooms,
+0.3 mm all round a door to the outdoors. A door with seals declares small ones; the lift door declares 6 mm.
 
 A map entity may override `PushSide` and `KeyedSide` for one door. Turn the leaf with `Rotation` so
 its +Z face points the right way; `tools/gen_city.py` does this for every hinged door from the room it

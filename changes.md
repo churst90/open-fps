@@ -18,6 +18,16 @@ Recent work, newest first. `git log` has the rest.
   -40.7 dBFS against -40.5 for the control (it was -36.2). Running water's outer places already read one synth per
   feature and needed nothing. Heard only in the quarter second after a restart; nothing else changes. The wire hash
   does not change.
+- A shut door lets through its gaps (Resonance's 1.1; `DoorGaps`, docs/CLIENT_NOTES.md "A shut door leaks by its
+  gaps"). A shut leaf passed only what its weight let through: Selby House's flat doors -18/-27/-55 dB, its stair
+  doors -13/-48/-59. Each shut door's gaps are added to its doorway now, as Gomperts' slit (Acustica 1964 and 1967)
+  with a narrow gap's friction (Stinson 1991): 3 mm round and a 10 mm undercut between rooms, 0.3 mm round a door to
+  the outdoors, or the door's own (`DoorGapMetres`, `DoorUndercutMetres` on a prefab; the lift door declares EN
+  81-20's 6 mm). The flat doors pass -14/-16/-16 dB, the stair doors -12/-17/-15, the glass front door -18/-27/-32
+  (was -45 in the high band). A sound in Selby House's corridor heard in flat 00B through its shut door: -17.6/-16.4/
+  -15.6 dB, was -17.6/-27.3/-54.7; the corridor's reverberant field in the flat -31.2 dB, was -42.2, and in the
+  stairwell -29.7, was -61.4. A door's own render does not change; what passes it shut does. The wire hash changes
+  (`PortalComponent` gains the two gaps; 635768b546d4 to 039f03ff964f); the door fingerprint does not.
 - The sound library's first version, tag `library/v0.1.0` (docs/LIBRARY_CHANGES.md, docs/SOUND_LIBRARY_BOUNDARY.md
   section 22): what the stack holds, what a host gives it, the native libraries, and for a host moving from a copy
   of the code the old to new namespaces and the traps. Nothing heard changes.

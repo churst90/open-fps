@@ -500,6 +500,14 @@ public partial struct PortalComponent
     /// <inheritdoc cref="OpeningCentre"/>
     public Quaternion OpeningRotation { get; set; }
 
+    /// <summary>For a door, the gap round its leaf shut at its jambs and head, metres; 0 takes the default for where
+    /// it hangs (OpenFPS.Acoustics.DoorGaps: 3 mm between rooms, 0.3 mm weatherstripped to the outdoors).</summary>
+    public float GapMetres { get; set; }
+
+    /// <summary>For a door, the gap under its leaf, metres; 0 takes the default for where it hangs (10 mm undercut
+    /// between rooms, 0.3 mm swept to the outdoors).</summary>
+    public float UndercutMetres { get; set; }
+
     public PortalComponent() { }
 }
 

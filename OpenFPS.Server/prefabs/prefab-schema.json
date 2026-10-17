@@ -439,6 +439,16 @@
       "minimum": 0,
       "description": "A hollow door's skin thickness in metres (two sheets over a core, e.g. 0.0012 for a steel door). Sets its mass and the note it rings at. Omit for a solid leaf."
     },
+    "DoorGapMetres": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "The gap round a door's leaf shut at its jambs and head, metres. Most of what a shut door lets through is by its gaps. Omit for the default where it hangs: 0.003 between rooms, 0.0003 weatherstripped to the outdoors."
+    },
+    "DoorUndercutMetres": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "The gap under a door's leaf, metres. Omit for the default where it hangs: a 0.01 undercut between rooms, 0.0003 swept to the outdoors."
+    },
     "DoorKind": {
       "type": "string",
       "enum": ["knob", "pushbar", "glass-pushbar", "glass-pull", "auto-slide", "patio-slide", "elevator"],

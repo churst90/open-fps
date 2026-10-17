@@ -32,4 +32,21 @@ public readonly record struct Air(float TemperatureC, float PressureMb)
     /// <summary>m/s, an ideal gas: 331.3 at 0 °C, as the square root of the absolute temperature. The
     /// one law for the speed of sound (AudioPhysics.SpeedOfSoundAt reads it).</summary>
     public float SpeedOfSound => 331.3f * MathF.Sqrt(1f + TemperatureC / 273.15f);
+
+    /// <summary>Dynamic viscosity, Pa s: Sutherland's law for air, 1.716e-5 at 0 °C with S = 110.4 K (White, Viscous
+    /// Fluid Flow, 3rd ed., eq. 1-36); 1.81e-5 at 20 °C. What a narrow gap's walls take from the sound in it.</summary>
+    public float Viscosity
+    {
+        get
+        {
+            float kelvin = TemperatureC + 273.15f;
+            return 1.716e-5f * MathF.Pow(kelvin / 273.15f, 1.5f) * (273.15f + 110.4f) / (kelvin + 110.4f);
+        }
+    }
+
+    /// <summary>Air's Prandtl number: how fast heat spreads in it against momentum, 0.71 at room temperature.</summary>
+    public const float Prandtl = 0.71f;
+
+    /// <summary>Air's ratio of specific heats, cp/cv, 1.4 (diatomic).</summary>
+    public const float HeatCapacityRatio = 1.4f;
 }

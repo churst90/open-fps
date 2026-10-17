@@ -123,7 +123,10 @@ public readonly struct AcousticBody
     public float WindowsOpen { get; init; }
 }
 
-/// <summary>A door leaf where it stands now, and the doorway it shuts: its pose when shut, its size, and the two
-/// places it joins (both may be the outside).</summary>
+/// <summary>A door leaf where it stands now, and the doorway it shuts: its pose when shut, its size, the two
+/// places it joins (both may be the outside), and the gaps round it shut, metres, at its jambs and head
+/// (<paramref name="GapMetres"/>) and under it (<paramref name="UndercutMetres"/>); zero takes the default for where it
+/// hangs (<see cref="DoorGaps.For"/>).</summary>
 public readonly record struct DoorLeaf(int Id, Vector3 Position, Quaternion Rotation, Vector3 Size,
-                                      Vector3 DoorwayCentre, Quaternion DoorwayRotation, int RoomA, int RoomB);
+                                      Vector3 DoorwayCentre, Quaternion DoorwayRotation, int RoomA, int RoomB,
+                                      float GapMetres = 0f, float UndercutMetres = 0f);

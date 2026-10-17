@@ -189,6 +189,6 @@ public static class EntityAcoustics
         else if (def.Transform.Rotation != default) { centre = def.Transform.Position; rotation = def.Transform.Rotation; }
         else { centre = snap.Transform.Position; rotation = snap.Transform.Rotation; }
         return new DoorLeaf(snap.Id, snap.Transform.Position, snap.Transform.Rotation, def.Collider.Size, centre, rotation,
-                            def.Portal.RegionAId, def.Portal.RegionBId);
+                            def.Portal.RegionAId, def.Portal.RegionBId, def.Portal.GapMetres, def.Portal.UndercutMetres);
     }
 }

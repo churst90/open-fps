@@ -169,7 +169,7 @@ public static class PrefabSchema
         ["Range"] = "m", ["MinDistance"] = "m", ["ShellThickness"] = "m", ["ApertureSize"] = "m", ["Landing"] = "m",
         ["Thickness"] = "m", ["SynthFreq"] = "Hz", ["SynthLfoRate"] = "Hz", ["ConeInsideAngle"] = "degrees",
         ["ConeOutsideAngle"] = "degrees", ["GranularGrainSize"] = "ms", ["GranularDensity"] = "per second",
-        ["CrowdReactRadiusMetres"] = "m", ["DoorSkinMetres"] = "m", ["SensorMetres"] = "m",
+        ["CrowdReactRadiusMetres"] = "m", ["DoorSkinMetres"] = "m", ["DoorGapMetres"] = "m", ["DoorUndercutMetres"] = "m", ["SensorMetres"] = "m",
     };
 
     public static IReadOnlyList<FieldNode> Describe(string schemaPath)

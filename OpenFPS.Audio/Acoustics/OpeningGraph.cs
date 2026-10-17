@@ -62,8 +62,8 @@ public static class OpeningGraph
         {
             // The doorway, not the leaf: the pose the host recorded for it shut.
             if (!leaves.Add(leaf.Id)) continue;
-            yield return new OpeningRoutes.Declared(leaf.Id, "door", leaf.DoorwayCentre, leaf.DoorwayRotation, leaf.Size, 0f,
-                                                    leaf.RoomA, leaf.RoomB);
+            yield return new OpeningRoutes.Declared(leaf.Id, OpeningRoutes.DoorKind, leaf.DoorwayCentre, leaf.DoorwayRotation, leaf.Size, 0f,
+                                                    leaf.RoomA, leaf.RoomB, leaf.GapMetres, leaf.UndercutMetres);
         }
 
         if (map == null) yield break;

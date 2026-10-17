@@ -75,7 +75,8 @@ public static class AcousticBands
 /// adds the same share at every frequency (about 2 dB on a storey-high wall), so there is no flat
 /// ceiling on what a wall takes.
 ///
-/// Gaps, vents and the leaks round a door are not in the data and are not modelled.
+/// Gaps and vents in a wall are not in the data and are not modelled. The leaks round a shut door are its
+/// doorway's (<see cref="DoorGaps"/>, added in <see cref="OpeningRoutes"/>).
 /// </summary>
 public static class WallTransmission
 {

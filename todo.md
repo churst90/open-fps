@@ -26,7 +26,7 @@ Where the plans stand (2026-10-17):
 Shipping is outside the order. Push, the VPS and the Windows zip go out together, and only when Cody says so,
 each time. Main is 130 commits over origin (d0116bb5), none pushed. Before the push, run a broad sweep: every
 test class changed since d0116bb5, in filtered runs (the 10-16 sweep: 1,733 passed, 0 failed). The last deploy
-was 3fc38430512b on 2026-10-08. The wire hash has changed many times since (635768b546d4 now), so a client and a
+was 3fc38430512b on 2026-10-08. The wire hash has changed many times since (039f03ff964f now), so a client and a
 server from either side refuse each other at login: restart the server and update the clients first. The door
 fingerprint changed too, so the door renders are made again once.
 
@@ -36,15 +36,12 @@ fingerprint changed too, so the door renders are made again once.
    follows the live voice of its id. AudioLab `--resonance-maybes outlet`: no restart delay undone (up to 200 ms
    before), the engine's own voice -40.7 dBFS after the swap against -40.5 for the control (-36.2 before), no
    orphan. Unheard: see "Listen in the game".
-2. A shut door's gaps and undercut (Resonance's 1.1). Now.
-   - What: a shut leaf passes only what its mass allows (a hollow-core door 35 dB down at 1.25 kHz). Real doors
-     pass most through their gaps. Add a shut leaf's gaps to its opening: 3 mm all round and a 10 mm undercut
-     between rooms indoors (about 19 dB), 0.3 mm round an outside door (about 30 dB). The gap sizes go in each
-     door's data, with these as defaults.
-   - Why: doors between rooms are 15 to 20 dB too tight today. Also closes "door gaps and seals are not
-     modelled" (Walls, below).
-   - Size: one session. Shares `OpeningRoutes` with item 4: run one after the other. Any render of a shut door
-     changes; say so.
+2. A shut door's gaps and undercut (Resonance's 1.1): DONE 2026-10-17, unheard. Each shut door's gaps are added
+   to its doorway as Gomperts' slit with a narrow gap's friction (`DoorGaps`, `OpeningRoutes.GapsRound`): 3 mm
+   round and a 10 mm undercut between rooms, 0.3 mm to the outdoors, or the door's own (`DoorGapMetres`,
+   `DoorUndercutMetres`). Selby House's flat doors pass -14/-16/-16 dB (were -18/-27/-55), its stair doors
+   -12/-17/-15 (were -13/-48/-59). docs/CLIENT_NOTES.md "A shut door leaks by its gaps". Listen: "Listen in the
+   game" below.
 3. One-off sounds that move while they play have their echoes found and moved (Resonance's 2.6). Now.
    - What: a one-off that moves while it plays (a door swinging, a thrown thing) keeps its wall echoes where it
      began, so it seems to stay with them. Find and move its echoes as a loop's are.
@@ -360,6 +357,14 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
   into a parked car, out, and into another: the cabin sounds the same each time, with nothing of the first car left.
   By the fire at 58 Alder Street (`/tp -325.0 141.0 0.2`): the fire as before, and when it goes out all of it goes
   out. Lab: AudioLab `--resonance-maybes outlet`.
+- A shut door lets through its gaps (2026-10-17, docs/CLIENT_NOTES.md "A shut door leaks by its gaps"). In
+  Selby House, ground floor: stand in flat 00B (`/tp 23.5 157.5 0.1`) with its door shut and have someone talk
+  or fire in the corridor (`/tp 20.3 157.5 0.1`): heard through the door, muffled but clear, about 16 dB down
+  and no longer dull (the corridor's top band was 55 dB down, now 16); open the door and it is about 16 dB louder.
+  In the lobby (`/tp 11.8 157.4 0.1`) with the glass front door shut, the street (`/tp 8.0 157.5 0.2`) is as
+  before in its body but has a little more hiss and sparkle (high band -32 dB, was -45). Standing in the lobby by
+  the shut steel door to the corridor (`/tp 17.5 157.5 0.1`), the corridor beyond it (`/tp 20.3 157.5 0.1`) is
+  much louder than before (mid -17 dB, was -48): say whether that door should sound sealed.
 - Your own room's reverb stays binaural (2026-10-17, the fault Cody found 2026-10-17 00:40). On Main Street in
   traffic, `/weather rain heavy` (`/tp 7.0 121.0 0.2`), then walk into Selby House's lobby (`/tp 15.2 157.1 0.1`)
   and clap (T), and shut a door: the lobby's reflections and tail are wide round you, not the same in both
@@ -606,9 +611,10 @@ and the server's voice line.
   100 Hz, socks and bare feet more below 100 Hz: Kylliainen et al. 2015, Acta Acustica 101(5)); the
   result radiated from the ceiling under the foot into the room below as a second voice per step.
   Needs footwear in the game (the bank has Carpet/barefoot; nothing chooses it).
-- No cavity resonances or air leaks: sealed glazing is about 10 dB optimistic in the mids; door gaps
-  and seals are not modelled (the gaps are "Next, in order", item 2).
-- Shut glass front doors let more in than steel doors: 17/28/43 dB against 13/48/58 (`--wall-tl`).
+- No cavity resonances or air leaks in walls: sealed glazing is about 10 dB optimistic in the mids. A shut door's
+  gaps are modelled (2026-10-17, `DoorGaps`); a wall's vents and cracks are not.
+- A shut steel stair door leaks as much as a wooden flat door now (-17 dB mid, by the same 3 mm and 10 mm gaps):
+  if the city's stair doors are smoke-sealed fire doors, `steel_door` should declare its seals.
 - Steam Audio counts walls in a row as (2n+1)/3 of one; the tracer counts them exactly.
 - A line run along a sheet pays a panel as thick as its run (2026-10-11): a thin plate's law carried to a
   block, which overstates a thick wall's high band, and no flanking path of its own through the sheet's

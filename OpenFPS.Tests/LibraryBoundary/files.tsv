@@ -22,6 +22,7 @@ OpenFPS.Acoustics/AcousticWorld.cs	lib	Acoustics
 OpenFPS.Acoustics/Assemblies.cs	lib	Acoustics	
 OpenFPS.Acoustics/Constructions.cs	lib	Acoustics	
 OpenFPS.Acoustics/Diffraction.cs	lib	Acoustics	
+OpenFPS.Acoustics/DoorGaps.cs	lib	Acoustics	
 OpenFPS.Acoustics/EarlyReflections.cs	lib	Acoustics	
 OpenFPS.Acoustics/Enclosure.cs	lib	Acoustics	
 OpenFPS.Acoustics/GroundAnswer.cs	lib	Acoustics	

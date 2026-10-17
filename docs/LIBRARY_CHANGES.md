@@ -13,6 +13,12 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   its `Take()` and `HandBack()`; `SplitVoices = true` is left for an offline render that plays the front itself.
   `EngineTapState.Source` and `EngineEchoState.Source` are properties now (`Rebind` moves them). A host using
   `AudioWorld` and the mixer has nothing to do.
+- A shut door lets through its gaps (`OpenFPS.Acoustics.DoorGaps`, added in `OpeningRoutes`). `DoorLeaf` and
+  `OpeningRoutes.Declared` take two more fields at their ends, `GapMetres` and `UndercutMetres`, both optional. A host
+  need do nothing: zero gives every door the default for where it hangs (3 mm round and a 10 mm undercut between two
+  rooms, 0.3 mm to the outdoors). A host whose doors are sealed, or looser, fills them per door. A host that
+  measured levels through shut doors will find them 10 to 40 dB louder, most in the high band. `Air` gains
+  `Viscosity`, `Prandtl` and `HeatCapacityRatio`.
 
 ## library/v0.1.0 (2026-10-17)
 

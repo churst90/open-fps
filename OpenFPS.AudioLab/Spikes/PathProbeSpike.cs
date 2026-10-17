@@ -15,7 +15,7 @@ using OpenFPS.Materials;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [explain] [panels] [emitters] [fields] [overlays=DIR] [root=DIR/]
+/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [explain] [panels] [emitters] [fields] [nogaps] [overlays=DIR] [root=DIR/]
 ///
 /// What the game's occlusion worker hands the mixer for one source and one ear on a real map: occlusion
 /// and the three band gains in dB, with what each part of the answer says on its own — the one-shot
@@ -35,7 +35,9 @@ namespace OpenFPS.AudioLab.Spikes;
 /// worst, what each ran into, and the way over the top (OpeningRoutes.ExplainBarrier).
 /// panels charges every solid as one panel whatever way the line goes through it, as before 2026-10-11
 /// (Constructions.PanelsOnlyForLab); without it, the line's boxes gone into by an edge are listed with their run.
-/// fields gives each other place's reverberant field at the ear, the level its reverb bus is set to (OpeningRoutes.FieldAt).
+/// fields gives each other place's reverberant field at the ear, the level its reverb bus is set to (OpeningRoutes.FieldAt):
+/// the places next door to the ear's, then any within 30 m.
+/// nogaps shuts every door with its leaf alone, as before 2026-10-17, to measure what a shut door's gaps add (DoorGaps).
 /// emitters lists the sounding entities within 3 m of each source as the client is handed them; overlays=DIR
 /// lays the world editor's edits in DIR over the map, as the server does (read only).
 /// legcost times the straight leg from each source to the ear instead: the one-box barrier search and the
@@ -53,6 +55,7 @@ public static class PathProbeSpike
         var srcs = args.Where(a => a.StartsWith("src=")).Select(a => P(a[4..])).ToList();
         string root = args.FirstOrDefault(a => a.StartsWith("root="))?[5..] ?? AppContext.BaseDirectory;
 
+        OpeningRoutes.NoDoorGapsForLab = args.Contains("nogaps");
         var sw = Stopwatch.StartNew();
         var world = LoadAsClient(root, mapId, args.FirstOrDefault(a => a.StartsWith("overlays="))?[9..]);
         Console.WriteLine($"  {mapId}: {world.Entities.Count} entities, {world.AcousticMap?.Regions.Count ?? 0} regions, "
@@ -239,7 +242,8 @@ public static class PathProbeSpike
         {
             static float TauDb(float t) => 10f * MathF.Log10(MathF.Max(1e-12f, t));
             Console.WriteLine($"    {o.Kind} {o.Id} at ({o.Centre.X:F2}, {o.Centre.Y:F2}, {o.Centre.Z:F2}) facing ({o.Normal.X:F1}, {o.Normal.Y:F1}, {o.Normal.Z:F1}), "
-                            + $"{2 * o.HalfWidth:F2} x {2 * o.HalfHeight:F2} m, {2 * o.HalfDepth:F2} deep, passes {TauDb(o.Tau.X):F0}/{TauDb(o.Tau.Y):F0}/{TauDb(o.Tau.Z):F0} dB; "
+                            + $"{2 * o.HalfWidth:F2} x {2 * o.HalfHeight:F2} m, {2 * o.HalfDepth:F2} deep, passes {TauDb(o.Tau.X):F0}/{TauDb(o.Tau.Y):F0}/{TauDb(o.Tau.Z):F0} dB"
+                            + (o.Gaps != Vector3.Zero ? $" (its gaps {TauDb(o.Gaps.X):F0}/{TauDb(o.Gaps.Y):F0}/{TauDb(o.Gaps.Z):F0})" : "") + "; "
                             + $"{Room(o.NodeA)} - {Room(o.NodeB)}" + (o.Problem != null ? $"  PROBLEM: {o.Problem}" : ""));
         }
     }
@@ -252,6 +256,10 @@ public static class PathProbeSpike
         if (routes == null || world.AcousticMap == null) return;
         int lr = acoustics.GetRegionAt(world, ear);
         var ids = new List<int> { world.AcousticMap.GlobalEnvironmentId };
+        // The places next door first, however far their middles are: a corridor's is often thirty metres off.
+        int lNode = routes.NodeOf(lr);
+        foreach (var o in routes.Openings)
+            if (o.NodeA == lNode || o.NodeB == lNode) ids.Add(o.NodeA == lNode ? o.RegionB : o.RegionA);
         ids.AddRange(world.AcousticMap.RegionPositions.Where(kv => kv.Key != lr && Vector3.Distance(kv.Value, ear) < 30f)
                                                        .OrderBy(kv => Vector3.Distance(kv.Value, ear)).Select(kv => kv.Key));
         foreach (int id in ids.Distinct())

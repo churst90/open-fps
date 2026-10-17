@@ -12,8 +12,9 @@ namespace OpenFPS.Acoustics;
 /// (<see cref="WallTransmission"/>) nor one edge's diffraction (<see cref="Diffraction"/>) reaches.
 ///
 /// A route is a sequence of openings from the source to the listener, each a rectangle in a wall with
-/// what fills it (a shut leaf passes what its construction lets through), crossed where the whole path is
-/// shortest. Two things arrive by it, added as energies:
+/// what fills it (a shut leaf passes what its construction lets through, and its gaps what they do:
+/// <see cref="DoorGaps"/>), crossed where the whole path is shortest. Two things arrive by it, added as
+/// energies:
 ///
 /// THE DIFFRACTED RAY. Each opening is a rectangular aperture, and what it passes of a wave from the
 /// previous crossing point to the next is the Fresnel–Kirchhoff result for a rectangle: the product
@@ -50,10 +51,13 @@ public sealed class OpeningRoutes
     /// An opening as the map declares it. <paramref name="Rotation"/> is the doorway's frame when known
     /// (a door's leaf, shut: local X across, Y up, the thin axis through) and the default quaternion when
     /// not; <paramref name="Size"/> the leaf's extent when known, otherwise zero; <paramref name="Aperture"/>
-    /// the authored width, otherwise zero. The geometry decides the rest.
+    /// the authored width, otherwise zero. A door's gaps round its leaf shut, <paramref name="GapMetres"/> and
+    /// <paramref name="UndercutMetres"/>, zero for the default where it hangs (<see cref="DoorGaps.For"/>). The
+    /// geometry decides the rest.
     /// </summary>
     public readonly record struct Declared(int Id, string Kind, Vector3 Centre, Quaternion Rotation, Vector3 Size,
-                                           float Aperture, int RegionA, int RegionB);
+                                           float Aperture, int RegionA, int RegionB,
+                                           float GapMetres = 0f, float UndercutMetres = 0f);
 
     /// <summary>One opening as the geometry has it.</summary>
     public sealed class Opening
@@ -67,8 +71,14 @@ public sealed class OpeningRoutes
         public float HalfWidth, HalfHeight, HalfDepth;
         public float Area => 4f * HalfWidth * HalfHeight;
         /// <summary>The energy fraction what stands in it lets through, per band: 1 for a clear doorway,
-        /// the leaf's transmission for a shut door, the fraction left uncovered for one ajar.</summary>
+        /// the leaf's transmission and its gaps' (<see cref="Gaps"/>) for a shut door, the fraction left
+        /// uncovered for one ajar.</summary>
         public Vector3 Tau = Vector3.One;
+        /// <summary>How much of the opening a leaf stands across, 0..1: 1 shut, 0 swung clear.</summary>
+        public float LeafCover;
+        /// <summary>What the gaps round a door's leaf add to <see cref="Tau"/>, per band (<see cref="DoorGaps"/>): their
+        /// whole leak shut, none with the leaf swung clear.</summary>
+        public Vector3 Gaps;
         /// <summary>The scene boxes that stand in it (its leaf). A leg arriving at the opening does not
         /// charge them: <see cref="Tau"/> already has.</summary>
         public int[] Contents = Array.Empty<int>();
@@ -322,6 +332,7 @@ public sealed class OpeningRoutes
     {
         var h = new HashCode();
         h.Add(d.Id); h.Add(d.Kind); h.Add(d.Centre); h.Add(d.Rotation); h.Add(d.Size); h.Add(d.Aperture); h.Add(d.RegionA); h.Add(d.RegionB);
+        h.Add(d.GapMetres); h.Add(d.UndercutMetres);
         if (d.Rotation == default && map != null)
             foreach (int r in new[] { d.RegionA, d.RegionB })
             {
@@ -410,6 +421,10 @@ public sealed class OpeningRoutes
     /// other test. Never set in the game.</summary>
     [ThreadStatic] public static bool OnlyClearWaysRoundForLab;
 
+    /// <summary>For the lab only (--path-probe nogaps): a shut door passes its leaf alone, as before 2026-10-17, to
+    /// measure what its gaps add (<see cref="DoorGaps"/>). Read when a graph is built. Never set in the game.</summary>
+    public static bool NoDoorGapsForLab;
+
     /// <summary>For the parity harness only: told every box the over-the-top search crosses.</summary>
     public static Action<string>? DebugOverTheTop;
 
@@ -461,6 +476,7 @@ public sealed class OpeningRoutes
             t0 = clock.Elapsed.TotalMilliseconds;
             if (regionAt != null) model.CheckSides(o, regionAt);
             sidesMs += clock.Elapsed.TotalMilliseconds - t0;
+            GapsRound(o, d);
             if (o.Problem != null) problems.Add($"{o.Kind} {o.Id} at ({o.Centre.X:F1}, {o.Centre.Y:F1}, {o.Centre.Z:F1}): {o.Problem}");
             openings.Add(o);
         }
@@ -635,7 +651,7 @@ public sealed class OpeningRoutes
     {
         var found = new HashSet<int>();
         Vector3 sum = Vector3.Zero;
-        int n = 0;
+        int n = 0, covered = 0;
         float depth = o.HalfDepth + 0.05f;
         var cand = Scratch.Get(this).Candidates;
         for (int a = -1; a <= 1; a++)
@@ -645,17 +661,37 @@ public sealed class OpeningRoutes
             Vector3 p0 = p - o.Normal * depth, p1 = p + o.Normal * depth;
             _grid.Along(p0, p1, cand);
             Vector3 tau = Vector3.One;
+            bool leaf = false;
             foreach (int i in cand)
             {
                 if (!SegmentHits(i, p0, p1)) continue;
                 found.Add(i);
                 tau *= _solidGains[i] * _solidGains[i];
+                leaf |= _solids[i].IsLeaf;
             }
             sum += tau; n++;
+            if (leaf) covered++;
         }
         o.Tau = sum / n;
+        o.LeafCover = (float)covered / n;
         o.Contents = new int[found.Count];
         found.CopyTo(o.Contents);
+    }
+
+    /// <summary>
+    /// A door's leaf shut leaves its gaps open (<see cref="DoorGaps"/>): what they pass is added to what the leaf lets
+    /// through, as much of it as the leaf covers. The gaps are the door's own, or the defaults for where it hangs,
+    /// which its two places say: round a door with the outdoors on either side, weatherstripped; between two rooms,
+    /// a swing's clearance and an undercut. The leaf's thickness is the slit's depth.
+    /// </summary>
+    private static void GapsRound(Opening o, in Declared d)
+    {
+        o.Gaps = Vector3.Zero;
+        if (o.Kind != DoorKind || o.LeafCover <= 0f || NoDoorGapsForLab) return;
+        var gaps = DoorGaps.For(d.GapMetres, d.UndercutMetres, o.NodeA == Outside || o.NodeB == Outside);
+        float leaf = d.Size.X > 0f && d.Size.Z > 0f ? MathF.Min(d.Size.X, d.Size.Z) : 2f * o.HalfDepth;
+        o.Gaps = gaps.Leak(2f * o.HalfWidth, 2f * o.HalfHeight, leaf) * o.LeafCover;
+        o.Tau = Vector3.Min(Vector3.One, o.Tau + o.Gaps);
     }
 
     /// <summary>For an opening with no frame of its own: the face of one of its places it lies on.</summary>

@@ -196,12 +196,15 @@ public class OpeningRoutesTests
         var shut = Graph(Building(frontDoorOpen: false)).Model.Openings.Single(o => o.Id == FrontDoor);
         var open = Graph(Building(frontDoorOpen: true)).Model.Openings.Single(o => o.Id == FrontDoor);
         Assert.True(Vector3.Distance(shut.Centre, open.Centre) < 0.01f, $"shut {shut.Centre}, open {open.Centre}");
-        // Shut, the leaf's own construction; swung aside, nothing.
+        // Shut, the leaf's own construction and its gaps (DoorGapsTests); swung aside, nothing.
         var (l, m, h) = WallTransmission.BandGains("Metal", LeafSize, new WallBuild(0.0012f, 0f));
-        Assert.Equal(10f * MathF.Log10(l * l), 10f * MathF.Log10(shut.Tau.X), 1);
-        Assert.Equal(10f * MathF.Log10(m * m), 10f * MathF.Log10(shut.Tau.Y), 1);
-        Assert.Equal(10f * MathF.Log10(h * h), 10f * MathF.Log10(shut.Tau.Z), 1);
+        var leafAlone = shut.Tau - shut.Gaps;
+        Assert.Equal(10f * MathF.Log10(l * l), 10f * MathF.Log10(leafAlone.X), 1);
+        Assert.Equal(10f * MathF.Log10(m * m), 10f * MathF.Log10(leafAlone.Y), 1);
+        Assert.Equal(10f * MathF.Log10(h * h), 10f * MathF.Log10(leafAlone.Z), 1);
+        Assert.True(shut.Gaps.Y > 0f, "a shut door to the street with no gaps");
         Assert.Equal(Vector3.One, open.Tau);
+        Assert.Equal(Vector3.Zero, open.Gaps);
     }
 
     [Fact]
@@ -281,14 +284,16 @@ public class OpeningRoutesTests
     }
 
     [Fact]
-    public void BehindTwoWallsAndAShutDoorTheTopGoesFirst()
+    public void BehindTwoWallsAndAShutDoorTheLowEndLeads()
     {
-        // No floor under the bands: street to corridor, door shut, falls with frequency on both paths.
+        // No floor under the bands: street to corridor, door shut, the low end through and the rest held down.
+        // The door's 0.3 mm seals ring in the high band (DoorGaps), so the high band may stand a little over the
+        // mid (-66 against -69.5 dB, 2026-10-17), as a sealed door's measured loss flattens at the top.
         var world = Building(frontDoorOpen: false);
         var p = new SpatialAcoustics().CalculateAcousticPath(world, -1, InCorridor, OnStreet);
         float l = Db(p.EqLow), m = Db(p.EqMid), h = Db(p.EqHigh);
-        Assert.True(l > m + 6f && m > h + 6f, $"low {l:F1}, mid {m:F1}, high {h:F1}");
-        Assert.True(h < -40f, $"high {h:F1}");
+        Assert.True(l > m + 6f && l > h + 6f, $"low {l:F1}, mid {m:F1}, high {h:F1}");
+        Assert.True(h < -40f && m < -40f, $"mid {m:F1}, high {h:F1}");
     }
 
     [Fact]

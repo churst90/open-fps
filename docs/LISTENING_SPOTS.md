@@ -32,6 +32,8 @@ and furniture stands there. To make another, give AudioLab the room's id from th
 
 | Where | /tp | Listen for |
 |---|---|---|
+| Selby House flat 00B, its door to the corridor shut | `/tp 23.5 157.5 0.1` | A voice or shot in the corridor (`/tp 20.3 157.5 0.1`) through the shut door: about 16 dB down by its gaps, no longer dull; opened, about 16 dB louder |
+| Selby House lobby, the glass front door shut | `/tp 11.8 157.4 0.1` | The street (`/tp 8.0 157.5 0.2`) as before in its body, with a little more hiss through the door's seals |
 | Elm Park, by the fountain | `/tp -325 219 0.2` | Water falling into the basin; the trees round the park |
 | Elm Park, among the trees | `/tp -375 195 0.2` | Wind in the leaves; a gust reaches the west trees first |
 | 58 Alder Street back garden, by the fire | `/tp -325 141 0.2` | The fire pit: flames, crackle, hiss; the timber fence as the near wall |

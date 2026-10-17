@@ -298,6 +298,15 @@ public class PrefabTemplate
     /// lets through, which the transmission figures say.</summary>
     public float? DoorSkinMetres { get; set; }
 
+    /// <summary>The gap round the leaf shut at its jambs and head, metres. Absent for the default where it hangs:
+    /// 3 mm between rooms, 0.3 mm weatherstripped to the outdoors. Most of what a shut door lets through is by its
+    /// gaps (OpenFPS.Acoustics.DoorGaps).</summary>
+    public float? DoorGapMetres { get; set; }
+
+    /// <summary>The gap under the leaf, metres. Absent for the default where it hangs: a 10 mm undercut between
+    /// rooms, 0.3 mm swept to the outdoors.</summary>
+    public float? DoorUndercutMetres { get; set; }
+
     /// <summary>The door's hardware: "knob" (the default), "pushbar", "glass-pushbar", "glass-pull",
     /// "auto-slide", "patio-slide" or "elevator". Names its sound events (docs/DOOR_TYPES_EVENTS.md).</summary>
     public string? DoorKind { get; set; }

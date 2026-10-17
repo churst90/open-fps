@@ -213,7 +213,10 @@ public class PrefabRepository : PrefabLibrary
                 RegionAId = t.RegionAId ?? AcousticConstants.GlobalRegionId,
                 RegionBId = t.RegionBId ?? AcousticConstants.GlobalRegionId,
                 // A door's aperture is however far its leaf has swung: none at rest.
-                ApertureSize = isDoor ? 0f : t.ApertureSize ?? 0f
+                ApertureSize = isDoor ? 0f : t.ApertureSize ?? 0f,
+                // Its gaps shut, where the prefab gives them; zero is the default where it hangs.
+                GapMetres = isDoor ? MathF.Max(0f, t.DoorGapMetres ?? 0f) : 0f,
+                UndercutMetres = isDoor ? MathF.Max(0f, t.DoorUndercutMetres ?? 0f) : 0f,
             });
         }
 
