@@ -1,3 +1,5 @@
+using OpenFPS.Physics;
+
 namespace OpenFPS.Common;
 
 // The waves a wind raises over water, and the shape of the water it raises them over: the sea state, which

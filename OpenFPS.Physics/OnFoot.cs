@@ -1,8 +1,8 @@
 using System.Numerics;
 using OpenFPS.Geometry;
-using static OpenFPS.Common.BodyConstants;
+using static OpenFPS.Physics.BodyConstants;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// A body on foot stepped in a physics world (docs/PHYSICS_BOUNDARY.md stage 3): the one gather of what it can

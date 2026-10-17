@@ -11,6 +11,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Acoustics;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

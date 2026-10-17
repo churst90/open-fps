@@ -1,3 +1,5 @@
+using OpenFPS.Physics;
+
 namespace OpenFPS.Common;
 
 /// <summary>

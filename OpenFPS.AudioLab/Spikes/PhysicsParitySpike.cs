@@ -8,6 +8,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Instruments;
 using OpenFPS.Server.Core;
 using OpenFPS.Geometry;
+using OpenFPS.Physics;
 
 namespace OpenFPS.AudioLab;
 

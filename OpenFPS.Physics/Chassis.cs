@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 // The running gear as data: axles, tyres, which drive, steer and brake, and where the weight is.
 // Every number is declared on a real vehicle's preset with its source, so WheelDynamics invents

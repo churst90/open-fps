@@ -1,9 +1,8 @@
 using System.Numerics;
 using OpenFPS.Geometry;
-using OpenFPS.Common.Networking;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// One map's driven cars on their wheels (docs/PHYSICS_BOUNDARY.md stage 3): what a car does with what its

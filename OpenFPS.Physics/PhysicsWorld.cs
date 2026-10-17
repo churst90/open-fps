@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// A solid the physics meets as a box: a thing that moves (a person, a car, a crate in a hand) or a static

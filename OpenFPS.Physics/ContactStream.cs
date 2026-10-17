@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// One map's contacts for one tick, in the order the steps made them (docs/PHYSICS_BOUNDARY.md stage 3): the

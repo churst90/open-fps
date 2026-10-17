@@ -6,6 +6,7 @@ using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using Xunit.Abstractions;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Tests;
 
@@ -82,7 +83,7 @@ public class CabinPathsTests
             voice.Revive();
             var body = new WheelDynamics(v.Mechanics);
             body.Hold(speed, 0f, 0f);
-            voice.Wheels = body.Wheels.Select(w => OpenFPS.Common.Networking.WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, 0f)).ToArray();
+            voice.Wheels = body.Wheels.Select(w => OpenFPS.Physics.WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, 0f)).ToArray();
             var buf = new float[1024];
             for (int i = 0; i < Rate / 1024; i++) voice.Render(buf);
             double sum = 0; long n = 0;

@@ -10,6 +10,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Tests;
 

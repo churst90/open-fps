@@ -6,6 +6,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Instruments;
 

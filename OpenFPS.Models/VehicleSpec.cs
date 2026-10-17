@@ -1,5 +1,6 @@
 using OpenFPS.Schema;
 using OpenFPS.Sound;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Common;
 

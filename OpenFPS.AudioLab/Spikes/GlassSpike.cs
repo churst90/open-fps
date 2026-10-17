@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using OpenFPS.Audio.Core;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;

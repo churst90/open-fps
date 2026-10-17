@@ -9,6 +9,7 @@ using OpenFPS.Sound.Core.Pneumatics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Audio.Fmod;
 
@@ -76,7 +77,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <see cref="WheelsDrive"/>), and the axle voices only roll. Without it, both axle voices
     /// squeal from <see cref="RoadSlip"/>. Game thread writes.
     /// </summary>
-    public volatile OpenFPS.Common.Networking.WheelState[]? Wheels;
+    public volatile OpenFPS.Physics.WheelState[]? Wheels;
     /// <summary>
     /// The water on the road under a vehicle whose wheels the server does not send, mm (RoadWater; the
     /// world's wheel-path figure). Wheels that are sent carry their own. Game thread writes.
@@ -538,7 +539,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _bayRadiation = new OpenFPS.Sound.Core.Engine.BayRadiation(v, sampleRate);
         // Drums or discs, as the axle doing most of the stopping has.
         var chassis = v.Running;
-        _squeal = new OpenFPS.Sound.Core.BrakeSqueal(sampleRate, drums: chassis.MainBrake == OpenFPS.Common.BrakeKind.Drum, seed: seed + 97);
+        _squeal = new OpenFPS.Sound.Core.BrakeSqueal(sampleRate, drums: chassis.MainBrake == OpenFPS.Physics.BrakeKind.Drum, seed: seed + 97);
         _frontWheels = chassis.Axles.Length > 0 ? chassis.Axles[0].Wheels : 1;
         _frontRadius = chassis.Axles.Length > 0 ? chassis.Axles[0].Tyre.RollingRadiusMetres : 0.337f;
         _rearRadius = chassis.Axles.Length > 0 ? chassis.Axles[^1].Tyre.RollingRadiusMetres : 0.337f;
@@ -623,7 +624,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// distance from the tap over the distance from the wheel (each held to half a metre). False without
     /// this vehicle's count of wheels: then the axle voices squeal from the overall demand.
     /// </summary>
-    private bool WheelsDrive(OpenFPS.Common.Networking.WheelState[]? wheels, bool inside)
+    private bool WheelsDrive(OpenFPS.Physics.WheelState[]? wheels, bool inside)
     {
         if (wheels == null || wheels.Length != _wheelSqueal.Length) return false;
         float u = MathF.Abs(Driveline.Speed);
@@ -661,7 +662,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// The slip each axle's tyre voice plays: the overall demand, shared in the proportion the axles'
     /// worst wheels carry it. Without wheels both play the overall figure.
     /// </summary>
-    private void AxleSlip(float overall, OpenFPS.Common.Networking.WheelState[]? wheels, out float front, out float rear)
+    private void AxleSlip(float overall, OpenFPS.Physics.WheelState[]? wheels, out float front, out float rear)
     {
         front = rear = overall;
         if (wheels == null || wheels.Length <= _frontWheels) return;
@@ -1253,7 +1254,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             bool sent = perWheel && wheels != null;
             byte surface = sent ? wheels![k].Surface : OpenFPS.Materials.RoadSurfaces.IndexOf(OpenFPS.Materials.RoadSurfaces.Default);
             _wetWater[k] = sent ? wheels![k].WaterMm : fallbackWater;
-            _wetTexture[k] = OpenFPS.Common.RoadGripLaw.HoldsMm(surface);
+            _wetTexture[k] = OpenFPS.Physics.RoadGripLaw.HoldsMm(surface);
             if (!sent) _wheelGain[k] = 1f;
         }
         _wet.Block(_wetWater, _wheelGain, _wetTexture, Driveline.Speed, count);

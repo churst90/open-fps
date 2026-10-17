@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// The wind over the map: how fast the air moves at a place and a moment. One field read by everything

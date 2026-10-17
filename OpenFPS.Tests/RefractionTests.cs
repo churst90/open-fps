@@ -3,6 +3,7 @@ using OpenFPS.Sound.Core;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Tests;
 

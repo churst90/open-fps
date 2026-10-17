@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using OpenFPS.Common;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Sound;
 

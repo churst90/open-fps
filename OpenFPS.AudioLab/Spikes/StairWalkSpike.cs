@@ -6,6 +6,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

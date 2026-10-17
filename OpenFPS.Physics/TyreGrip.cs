@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// The friction circle: how hard a tyre is being asked to work against what it can give. One number for the

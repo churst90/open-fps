@@ -93,7 +93,7 @@ public static class PrefabValidator
         {
             if (!hasCollider) r.Errors.Add("Form is set but ColliderSize is not: a form fills the collider's box.");
             else if (shape != ColliderShape.Box) r.Errors.Add($"Form is set on a '{shape}' collider: a form fills a Box collider's box.");
-            else if (OpenFPS.Geometry.Shapes.Problem(t.Form, t.ColliderSize!.Value, OpenFPS.Common.BodyConstants.StepHeight) is { } problem)
+            else if (OpenFPS.Geometry.Shapes.Problem(t.Form, t.ColliderSize!.Value, OpenFPS.Physics.BodyConstants.StepHeight) is { } problem)
                 r.Errors.Add($"Form ({t.Form}) cannot be made at ColliderSize {Fmt(t.ColliderSize!.Value)}: {problem}.");
         }
 

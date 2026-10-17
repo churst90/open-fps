@@ -8,6 +8,7 @@ using Serilog;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Server.Systems;
 
@@ -154,7 +155,7 @@ public sealed partial class VehicleSystem
         /// the wheels only report what holding it there asks of them.</summary>
         public LineFollower? Driver;
         /// <summary>The wheels as last sent, rewritten every tick.</summary>
-        public OpenFPS.Common.Networking.WheelState[]? WireWheels;
+        public OpenFPS.Physics.WheelState[]? WireWheels;
         /// <summary>For a vehicle a driver steers: the fastest it takes a steady turn of a curvature
         /// without its tyres starting to sing (WheelDynamics.SteadyTurnSpeed at the squeal onset).</summary>
         public Func<float, float>? CornerSpeed;
@@ -420,7 +421,7 @@ public sealed partial class VehicleSystem
                 if (profile != null)
                 {
                     v.Wheels = new WheelDynamics(profile.Mechanics, v.Grip) { ForwardOnly = true, Gravity = v.Gravity };
-                    v.WireWheels = new OpenFPS.Common.Networking.WheelState[v.Wheels.Wheels.Length];
+                    v.WireWheels = new OpenFPS.Physics.WheelState[v.Wheels.Wheels.Length];
                     if (route != null)
                     {
                         v.Wheels.Modulated = true;
@@ -957,12 +958,12 @@ public sealed partial class VehicleSystem
         for (int i = 0; i < wire.Length; i++)
         {
             ref var w = ref body.Wheels[i];
-            wire[i] = OpenFPS.Common.Networking.WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, w.Water);
+            wire[i] = OpenFPS.Physics.WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, w.Water);
         }
     }
 
     /// <summary>A vehicle's wheels as last worked out, or false for anything without them.</summary>
-    public bool TryGetWheels(string mapId, int entityId, out OpenFPS.Common.Networking.WheelState[]? wheels)
+    public bool TryGetWheels(string mapId, int entityId, out OpenFPS.Physics.WheelState[]? wheels)
     {
         wheels = _byEntity.TryGetValue((mapId, entityId), out var v) ? v.WireWheels : null;
         return wheels != null;

@@ -3,6 +3,7 @@ using OpenFPS.Sound.Core.Stove;
 using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using Xunit.Abstractions;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Tests;
 

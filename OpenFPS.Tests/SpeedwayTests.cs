@@ -3,6 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Tests;
 

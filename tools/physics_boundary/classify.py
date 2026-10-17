@@ -40,52 +40,53 @@ G = 'OpenFPS.Geometry.'
 EN = 'OpenFPS.Sound.Core.Engine.'
 SO = 'OpenFPS.Sound.'
 MA = 'OpenFPS.Materials.'
+PH = 'OpenFPS.Physics.'
 
 # ── The inventory: (type, group, note) ─────────────────────────────────────────────────────────────
 RULES = [
     # Common: player movement and the ground probes
-    (C + 'SharedMovementEngine', 'P', 'one movement step, client and server'),
-    (C + 'Footing', 'P', 'the floor under a body and where its foot goes down, asked of a triangle world'),
+    (PH + 'SharedMovementEngine', 'P', 'one movement step, client and server'),
+    (PH + 'Footing', 'P', 'the floor under a body and where its foot goes down, asked of a triangle world'),
     (C + 'PhysicsUtils', 'H', 'the server\'s and a client\'s ground probes: adapters over Footing (physics stage 2)'),
     (C + 'PhysicsConstants', 'H', 'the game\'s reach and bounds, the tick and input integrity; the body\'s numbers are BodyConstants\' (physics stage 2)'),
     (C + 'GroundProbeMemo', 'H', 'the server\'s per-session cache of the ground probe'),
     # The state, the world view, the contacts (physics stage 3)
-    (C + 'IPhysicsWorld', 'P', 'the world as the physics sees it: triangles, the statics they do not hold, what moves as boxes'),
-    (C + 'PhysicsBody', 'V', 'a solid the physics meets as a box, and the one rule of near'),
-    (C + 'BodyFilter', 'P', 'the triangles a body counts'),
-    (C + 'OnFoot', 'P', 'a body on foot stepped in a physics world: the one gather, the grade, the step'),
+    (PH + 'IPhysicsWorld', 'P', 'the world as the physics sees it: triangles, the statics they do not hold, what moves as boxes'),
+    (PH + 'PhysicsBody', 'V', 'a solid the physics meets as a box, and the one rule of near'),
+    (PH + 'BodyFilter', 'P', 'the triangles a body counts'),
+    (PH + 'OnFoot', 'P', 'a body on foot stepped in a physics world: the one gather, the grade, the step'),
     (C + 'ServerPhysicsView', 'H', 'the server\'s world and grid as a physics world'),
     (C + 'SnapshotPhysicsView', 'H', 'a client\'s snapshot as a physics world'),
-    (C + 'BodyState', 'V', 'a body after a step, for the wire and the sound'),
-    (C + 'Grounding', 'V', 'whether a body on foot stands'),
-    (C + 'ContactEvent', 'V', 'one contact: the two, where, the normal, the impulse, the speeds, the surfaces'),
-    (C + 'ContactPhase', 'V', ''),
-    (C + 'ContactStream', 'P', 'one map\'s contacts for a tick, each pair\'s phase'),
-    (C + 'VehicleState', 'V', 'a vehicle after a step, for the wire and the sound'),
-    (C + 'AirSample', 'V', 'the air at a point and moment'),
+    (PH + 'BodyState', 'V', 'a body after a step, for the wire and the sound'),
+    (PH + 'Grounding', 'V', 'whether a body on foot stands'),
+    (PH + 'ContactEvent', 'V', 'one contact: the two, where, the normal, the impulse, the speeds, the surfaces'),
+    (PH + 'ContactPhase', 'V', ''),
+    (PH + 'ContactStream', 'P', 'one map\'s contacts for a tick, each pair\'s phase'),
+    (PH + 'VehicleState', 'V', 'a vehicle after a step, for the wire and the sound'),
+    (PH + 'AirSample', 'V', 'the air at a point and moment'),
     ('OpenFPS.Server.Systems.ContactStreams', 'H', 'each map\'s contact stream, by its world'),
     # Sound: the body constants, wheels, tyres, chassis, presets
-    (C + 'BodyConstants', 'P', 'the body: size, mass, walk, run, jump, step, turn'),
-    (C + 'Earth', 'P', 'standard gravity, the one number a map\'s own starts from (physics stage 2)'),
-    (C + 'ChassisSpec', 'P', 'axles, centre of gravity, roll stiffness, steering lock'),
-    (C + 'AxleSpec', 'P', ''),
-    (C + 'TyreSize', 'P', ''),
-    (C + 'BrakeKind', 'V', 'mechanics, and the brake squeal reads it'),
+    (PH + 'BodyConstants', 'P', 'the body: size, mass, walk, run, jump, step, turn'),
+    (PH + 'Earth', 'P', 'standard gravity, the one number a map\'s own starts from (physics stage 2)'),
+    (PH + 'ChassisSpec', 'P', 'axles, centre of gravity, roll stiffness, steering lock'),
+    (PH + 'AxleSpec', 'P', ''),
+    (PH + 'TyreSize', 'P', ''),
+    (PH + 'BrakeKind', 'V', 'mechanics, and the brake squeal reads it'),
     (MA + 'RoadSurfaces', 'V', 'surface grip (Physics) and the surface index the tyres sound by; in OpenFPS.Materials since package stage 1'),
-    (C + 'RoadGripLaw', 'P', 'a tyre on a wet road: the film, aquaplaning, the grip left'),
-    (C + 'RoadTexture', 'V', 'a surface as the wet grip and the water read it'),
-    (C + 'MagicCurve', 'P', 'the Magic Formula'),
-    (C + 'WheelDynamics', 'P', 'planar per-wheel vehicle dynamics'),
-    (C + 'TyreGrip', 'P', 'the friction circle: the demand on a tyre against what it can give'),
-    (C + 'TyreMechanics', 'P', 'the physics half of a tyre preset: grip, Magic Formula shape, pressure, tread depth'),
-    (C + 'VehicleMechanics', 'P', 'the physics half of a vehicle preset: running gear, tyres, mass'),
+    (PH + 'RoadGripLaw', 'P', 'a tyre on a wet road: the film, aquaplaning, the grip left'),
+    (PH + 'RoadTexture', 'V', 'a surface as the wet grip and the water read it'),
+    (PH + 'MagicCurve', 'P', 'the Magic Formula'),
+    (PH + 'WheelDynamics', 'P', 'planar per-wheel vehicle dynamics'),
+    (PH + 'TyreGrip', 'P', 'the friction circle: the demand on a tyre against what it can give'),
+    (PH + 'TyreMechanics', 'P', 'the physics half of a tyre preset: grip, Magic Formula shape, pressure, tread depth'),
+    (PH + 'VehicleMechanics', 'P', 'the physics half of a vehicle preset: running gear, tyres, mass'),
     (SO + 'TyreFriction', 'S', 'the squeal onsets and amounts (the friction circle went to TyreGrip, physics stage 2)'),
-    (C + 'RunningGear', 'P', 'every preset\'s running gear as data'),
-    (C + 'Networking.WheelState', 'V', 'one wheel on the wire'),
-    (C + 'Gearbox', 'P', 'ratios, final drive, shift points'),
+    (PH + 'RunningGear', 'P', 'every preset\'s running gear as data'),
+    (PH + 'WheelState', 'V', 'one wheel on the wire'),
+    (PH + 'Gearbox', 'P', 'ratios, final drive, shift points'),
     (SO + 'TyreProfile', 'S', 'tread and cavity (its mechanics are TyreMechanics, physics stage 2)'),
     (SO + 'VehicleProfile', 'PS', 'a preset: mass, drag, rolling resistance, running gear are mechanics; the rest is sound'),
-    (C + 'EngineMechanics', 'P', 'the physics half of an engine preset: idle, redline, peak torque and its rpm'),
+    (PH + 'EngineMechanics', 'P', 'the physics half of an engine preset: idle, redline, peak torque and its rpm'),
     (SO + 'EngineProfile', 'PS', 'a preset: torque, inertia, friction, idle and redline are mechanics; the gas path is sound'),
     (C + 'VehicleSpec', 'M', 'the editable vehicle kind, as an edited vehicle is stored: the catalogue\'s (physics stage 2, 16.2)'),
     (C + 'VehicleChassisSpec', 'M', 'its chassis, with the one number of the sound\'s it carries (SourceLevelDb)'),
@@ -102,19 +103,19 @@ RULES = [
     (EN + 'DriveOrder', 'S', ''),
     (EN + 'DriverAction', 'S', ''),
     # Sound: projectiles and air
-    (C + 'ExternalBallistics', 'P', 'point-mass flight with drag'),
-    (C + 'BulletState', 'V', ''),
-    (C + 'FlightPoint', 'P', ''),
-    (C + 'Projectile', 'V', 'what flies, made by a weapon'),
+    (PH + 'ExternalBallistics', 'P', 'point-mass flight with drag'),
+    (PH + 'BulletState', 'V', ''),
+    (PH + 'FlightPoint', 'P', ''),
+    (PH + 'Projectile', 'V', 'what flies, made by a weapon'),
     (MA + 'Air', 'V', 'temperature and pressure: density for drag, and the sound\'s air'),
     (SO + 'Ballistics', 'S', 'the crack and the muzzle blast'),
-    (C + 'RicochetLaw', 'P', 'a round off a face: whether it skips, how it leaves, the tumbling slug\'s flight'),
-    (C + 'Slug', 'V', 'what a round is in flight: the bounce makes it, the whine reads it'),
+    (PH + 'RicochetLaw', 'P', 'a round off a face: whether it skips, how it leaves, the tumbling slug\'s flight'),
+    (PH + 'Slug', 'V', 'what a round is in flight: the bounce makes it, the whine reads it'),
     (SO + 'Ricochet', 'S', 'the whine (the bounce and the tumbling flight went to RicochetLaw, physics stage 2)'),
-    (C + 'WindField', 'P', 'the moving air: log law, eddies, carry'),
-    (C + 'WindAir', 'V', 'the wind the server sends'),
-    (C + 'WindWeather', 'V', 'one weather\'s wind ramp'),
-    (C + 'WindModel', 'P', 'the bullets\' second wind law; to be one law with WindField'),
+    (PH + 'WindField', 'P', 'the moving air: log law, eddies, carry'),
+    (PH + 'WindAir', 'V', 'the wind the server sends'),
+    (PH + 'WindWeather', 'V', 'one weather\'s wind ramp'),
+    (PH + 'WindModel', 'P', 'the bullets\' second wind law; to be one law with WindField'),
     (C + 'WorldWeather', 'S', 'one audio world\'s weather: it holds the wind Physics owns'),
     (SO + 'EarWind', 'S', 'the wind at the ears: reads the air'),
     (SO + 'ImpactAcoustics', 'S', 'the sound of an impact from two masses and a closing speed'),
@@ -131,7 +132,7 @@ RULES = [
     # Server
     (C.replace('Common', 'Server') + 'Systems.MovementSystem', 'H', 'steps players from their inputs'),
     ('OpenFPS.Server.Systems.DrivingSystem', 'H', 'a driven car\'s controls, ignition, tile fences and hearing; its mechanics are VehicleStep\'s (physics stage 3)'),
-    (C + 'VehicleStep', 'P', 'one map\'s driven cars: the engine\'s pull, the resistances, the steering limit, the wheels, the pose, the collision test'),
+    (PH + 'VehicleStep', 'P', 'one map\'s driven cars: the engine\'s pull, the resistances, the steering limit, the wheels, the pose, the collision test'),
     ('OpenFPS.Server.Systems.VehicleSystem', 'H', 'traffic on its lines, kinematic'),
     ('OpenFPS.Server.Systems.RailSystem', 'H', 'trains on their tracks, kinematic'),
     ('OpenFPS.Server.Systems.OccupancySystem', 'H', 'seats a body on its vehicle'),
@@ -189,7 +190,7 @@ def allowed_for_physics(t):
 
 
 def short(t):
-    for p in ('OpenFPS.Geometry.', 'OpenFPS.Materials.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
+    for p in ('OpenFPS.Geometry.', 'OpenFPS.Physics.', 'OpenFPS.Materials.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
               'OpenFPS.Sound.Core.Engine.', 'OpenFPS.Server.Systems.', 'OpenFPS.Server.Core.',
               'OpenFPS.Client.Core.'):
         if t.startswith(p):
@@ -299,7 +300,7 @@ def side(e):
     ft = e['from_type']
     if e['from_project'] in SKIP_PROJECTS:
         return 'lab'
-    if ft in MECH_READERS and group(ft) != 'PS' or ft in ('OpenFPS.Server.Systems.DrivingSystem', EN + 'Driveline', C + 'WheelDynamics'):
+    if ft in MECH_READERS and group(ft) != 'PS' or ft in ('OpenFPS.Server.Systems.DrivingSystem', EN + 'Driveline', PH + 'WheelDynamics'):
         return 'mechanics'
     if e['from_project'] in ('OpenFPS.Sound', 'OpenFPS.Acoustics', 'OpenFPS.Audio') \
             or 'ClientAudioSystem' in e['file'] or group(ft) == 'S':
@@ -309,7 +310,7 @@ def side(e):
 
 w('## Members of the split presets by who reads them')
 w()
-for preset in (SO + 'VehicleProfile', SO + 'EngineProfile', SO + 'TyreProfile', C + 'Gearbox', C + 'ChassisSpec'):
+for preset in (SO + 'VehicleProfile', SO + 'EngineProfile', SO + 'TyreProfile', PH + 'Gearbox', PH + 'ChassisSpec'):
     reads = collections.defaultdict(collections.Counter)
     for e in EDGES:
         if e['to_type'] != preset or e['symbol_kind'] not in ('Property', 'Field', 'Method'):

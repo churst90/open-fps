@@ -3,7 +3,7 @@ using System.Numerics;
 using JoltPhysicsSharp;
 using OpenFPS.Geometry;
 using OpenFPS.Instruments;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 
 namespace OpenFPS.AudioLab;
 

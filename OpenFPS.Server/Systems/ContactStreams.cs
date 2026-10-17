@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using Arch.Core;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Server.Systems;
 

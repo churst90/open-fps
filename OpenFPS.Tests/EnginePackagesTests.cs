@@ -190,7 +190,7 @@ public class EnginePackagesTests
         new object[] { "Geometry", typeof(OpenFPS.Geometry.TriangleWorld).Assembly.GetName().Name! },
         new object[] { "Native", typeof(FMOD.System).Assembly.GetName().Name! },
         new object[] { "Astronomy", typeof(OpenFPS.Astronomy.Moon).Assembly.GetName().Name! },
-        new object[] { "Physics", typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetName().Name! },
+        new object[] { "Physics", typeof(OpenFPS.Physics.SharedMovementEngine).Assembly.GetName().Name! },
         new object[] { "Materials", typeof(OpenFPS.Materials.AcousticRegistry).Assembly.GetName().Name! },
         new object[] { "Acoustics", typeof(OpenFPS.Acoustics.AcousticConstants).Assembly.GetName().Name! },
         new object[] { "Sound", typeof(OpenFPS.Sound.Loudness).Assembly.GetName().Name! },

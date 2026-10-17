@@ -13,6 +13,7 @@ using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Tests;
 

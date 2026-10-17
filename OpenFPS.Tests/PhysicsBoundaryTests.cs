@@ -63,19 +63,19 @@ public class PhysicsBoundaryTests
     public void PhysicsReferencesOnlyGeometry()
     {
         var allowed = new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Schema" };
-        var wrong = typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetReferencedAssemblies()
+        var wrong = typeof(OpenFPS.Physics.SharedMovementEngine).Assembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
             .Where(n => !(n == "System" || n.StartsWith("System.", StringComparison.Ordinal) || n is "netstandard" or "mscorlib"
                           || n.StartsWith("Microsoft.Win32.", StringComparison.Ordinal) || allowed.Contains(n)))
             .ToList();
-        Assert.Equal("OpenFPS.Physics", typeof(OpenFPS.Common.SharedMovementEngine).Assembly.GetName().Name);
+        Assert.Equal("OpenFPS.Physics", typeof(OpenFPS.Physics.SharedMovementEngine).Assembly.GetName().Name);
         Assert.True(wrong.Count == 0, $"OpenFPS.Physics references {string.Join(", ", wrong)}: it may reference the runtime, "
             + "OpenFPS.Geometry, OpenFPS.Materials and OpenFPS.Schema only.");
     }
 
     /// <summary>What steps the world. The sound may read the physics' values and presets; it never steps it
     /// (section 9). A stepper added later (a physics world, stage 4's bodies) goes on this list.</summary>
-    private static readonly string[] Steppers = { "OpenFPS.Common.SharedMovementEngine", "OpenFPS.Common.OnFoot", "OpenFPS.Common.VehicleStep" };
+    private static readonly string[] Steppers = { "OpenFPS.Physics.SharedMovementEngine", "OpenFPS.Physics.OnFoot", "OpenFPS.Physics.VehicleStep" };
 
     /// <summary>
     /// Nothing in the sound project names a stepper: the server steps the physics, the client predicts the

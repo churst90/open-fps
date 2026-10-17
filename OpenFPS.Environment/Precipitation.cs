@@ -1,4 +1,5 @@
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Common;
 

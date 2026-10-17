@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Sound;
-using OpenFPS.Common.Networking;
+using OpenFPS.Physics;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 

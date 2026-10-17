@@ -7,6 +7,7 @@ using OpenFPS.Words;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Client.Core;
 

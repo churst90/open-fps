@@ -3,6 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using Serilog;
 using OpenFPS.Geometry;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Server.Systems;
 

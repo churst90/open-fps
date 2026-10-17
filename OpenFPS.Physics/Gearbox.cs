@@ -1,6 +1,6 @@
 using OpenFPS.Schema;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>A manual gearbox: the ratios, and how long the driver's left foot takes.</summary>
 public sealed record Gearbox

@@ -7,6 +7,7 @@ using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

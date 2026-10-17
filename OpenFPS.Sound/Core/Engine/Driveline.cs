@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;

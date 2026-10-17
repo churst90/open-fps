@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common.Networking;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>Whether a body on foot stands on something, as its last step left it. Unknown for anything no
 /// step stands (a car, a crate).</summary>

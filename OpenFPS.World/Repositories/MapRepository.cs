@@ -6,6 +6,7 @@ using OpenFPS.Common.Components;
 using System.Security.Cryptography;
 using Serilog;
 using OpenFPS.Acoustics;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Server.Repositories;
 

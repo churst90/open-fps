@@ -2,6 +2,7 @@ using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Common;
 

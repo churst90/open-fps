@@ -8,6 +8,7 @@ using Serilog;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Audio.Core;
 

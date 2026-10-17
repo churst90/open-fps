@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using OpenFPS.Materials;
 
 namespace OpenFPS.Sound;

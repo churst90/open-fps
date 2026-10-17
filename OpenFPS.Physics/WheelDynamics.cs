@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// One Magic Formula curve with its peak scaled to one: y = sin(C atan(t - E (t - atan t))), with

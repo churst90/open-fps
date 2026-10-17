@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
 using OpenFPS.Schema;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Sound;
 

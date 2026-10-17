@@ -5,6 +5,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
 using OpenFPS.Server.Core;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Tests;
 

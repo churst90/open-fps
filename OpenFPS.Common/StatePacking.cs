@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Common.Networking;
 
@@ -134,8 +135,8 @@ public static class StatePacking
             BinaryPrimitives.WriteInt16LittleEndian(into[at..], s.TurnY); at += 2;
             BinaryPrimitives.WriteInt16LittleEndian(into[at..], s.TurnZ); at += 2;
         }
-        if (s.Grounding == OpenFPS.Common.Grounding.Grounded) flags |= Grounded;
-        else if (s.Grounding == OpenFPS.Common.Grounding.Airborne) flags |= Airborne;
+        if (s.Grounding == OpenFPS.Physics.Grounding.Grounded) flags |= Grounded;
+        else if (s.Grounding == OpenFPS.Physics.Grounding.Airborne) flags |= Airborne;
         if (s.Wheels != null)
         {
             flags |= HasWheels;
@@ -184,8 +185,8 @@ public static class StatePacking
                     at += 12;
                     break;
             }
-            s.Grounding = (flags & Grounded) != 0 ? OpenFPS.Common.Grounding.Grounded
-                        : (flags & Airborne) != 0 ? OpenFPS.Common.Grounding.Airborne : OpenFPS.Common.Grounding.Unknown;
+            s.Grounding = (flags & Grounded) != 0 ? OpenFPS.Physics.Grounding.Grounded
+                        : (flags & Airborne) != 0 ? OpenFPS.Physics.Grounding.Airborne : OpenFPS.Physics.Grounding.Unknown;
             if ((flags & HasTyreDemand) != 0) s.TyreDemand = data[at++];
             if ((flags & HasSignals) != 0) s.Signals = data[at++];
             if ((flags & HasRates) != 0)

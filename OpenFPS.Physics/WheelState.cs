@@ -1,4 +1,4 @@
-namespace OpenFPS.Common.Networking;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// One wheel on the wire, quantised. An unmanaged struct, copied as its bytes (nine, padded to ten).

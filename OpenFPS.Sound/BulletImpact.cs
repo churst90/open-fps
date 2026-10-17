@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Acoustics;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using OpenFPS.Materials;
 using Kind = OpenFPS.Materials.StrikeKind;
 

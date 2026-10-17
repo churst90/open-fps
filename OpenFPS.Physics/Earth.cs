@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>The world as it is unless a map says otherwise.</summary>
 public static class Earth

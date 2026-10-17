@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
+using OpenFPS.Physics;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Client.Core;

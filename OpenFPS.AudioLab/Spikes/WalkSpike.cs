@@ -6,6 +6,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

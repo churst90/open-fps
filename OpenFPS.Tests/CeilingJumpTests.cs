@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
-using static OpenFPS.Common.SharedMovementEngine;
+using static OpenFPS.Physics.SharedMovementEngine;
 
 namespace OpenFPS.Tests;
 

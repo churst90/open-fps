@@ -1,5 +1,6 @@
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Sound.Core.Nature;
 

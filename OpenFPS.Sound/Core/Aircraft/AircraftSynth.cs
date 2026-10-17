@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;

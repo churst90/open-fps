@@ -8,7 +8,7 @@
 
        OpenFPS.Schema is the editor's attribute alone, which its presets carry (decision 7).
 
-       Namespaces are those the files had (OpenFPS.Common.*), as for the sound library's moves. -->
+       Namespace OpenFPS.Physics, the project's (docs/SOUND_LIBRARY_BOUNDARY.md 21). -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

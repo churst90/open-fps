@@ -125,7 +125,7 @@ FILE_RULES = [
 
 # ── Type exceptions: full name -> (group, project, note) ─────────────────────────────────────────
 TYPE_RULES = {
-    'OpenFPS.Common.Networking.WheelState': ('c', 'Physics', 'a wheel\'s state, on the wire (physics stage 1)'),
+    'OpenFPS.Physics.WheelState': ('c', 'Physics', 'a wheel\'s state, on the wire (physics stage 1)'),
     'OpenFPS.Common.Networking.WorldAudioEvent': ('b', '', 'network message carrying a TransientSound'),
     'OpenFPS.Sound.PlaybackMode': ('c', 'Sound', 'an enum the emitter component and the voices share'),
     'OpenFPS.Common.Components.WeatherType': ('c', 'Environment', ''),
@@ -133,7 +133,7 @@ TYPE_RULES = {
     'OpenFPS.Geometry.TileKey': ('c', 'Geometry', 'a tile of the world; the tile scenes key on it'),
     'OpenFPS.Common.Precipitation': ('c', 'Environment', 'weather value in the snapshot'),
     'OpenFPS.Common.PrecipitationKind': ('c', 'Environment', ''),
-    'OpenFPS.Common.WindAir': ('c', 'Physics', 'the wind the server sends (physics stage 1)'),
+    'OpenFPS.Physics.WindAir': ('c', 'Physics', 'the wind the server sends (physics stage 1)'),
     'OpenFPS.Common.LightningStrike': ('c', 'Environment', 'the flash the server sends'),
     'OpenFPS.Common.FlashKind': ('c', 'Environment', ''),
     'OpenFPS.Sound.DoorKind': ('c', 'Sound', 'stored in DoorComponent'),
@@ -267,7 +267,7 @@ def short(t):
     return t.replace('OpenFPS.Client.AudioEngine.', '').replace('OpenFPS.Client.Core.AudioEngine.', '') \
         .replace('OpenFPS.Client.Core.', '').replace('OpenFPS.Common.', '') \
         .replace('OpenFPS.Geometry.', '').replace('OpenFPS.Acoustics.', '').replace('OpenFPS.Sound.', '') \
-        .replace('OpenFPS.Native.', '').replace('OpenFPS.Audio.', '').replace('OpenFPS.Materials.', '').replace('OpenFPS.Schema.', '').replace('OpenFPS.', '')
+        .replace('OpenFPS.Native.', '').replace('OpenFPS.Audio.', '').replace('OpenFPS.Physics.', '').replace('OpenFPS.Materials.', '').replace('OpenFPS.Schema.', '').replace('OpenFPS.', '')
 
 
 def fileshort(f):

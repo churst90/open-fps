@@ -3,6 +3,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Sound.Core.Nature;
 

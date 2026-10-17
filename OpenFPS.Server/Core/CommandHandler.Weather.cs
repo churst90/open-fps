@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;

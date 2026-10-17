@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// What a round is in flight: its mass, its size, and how fast it is turning end over end. A bullet

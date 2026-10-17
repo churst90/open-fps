@@ -3,6 +3,7 @@ using System.Numerics;
 using OpenFPS.Common.Components;
 using OpenFPS.Schema;
 using OpenFPS.Acoustics;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Common.Networking;
 
@@ -597,7 +598,7 @@ public partial struct EntityState
     /// the vertical speed, and a jump's top, where that speed passes zero, read as standing. Unknown for
     /// anything no step stands (a car, a crate).
     /// </summary>
-    public OpenFPS.Common.Grounding Grounding;
+    public OpenFPS.Physics.Grounding Grounding;
 
     public EntityState()
     {

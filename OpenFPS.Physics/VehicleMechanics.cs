@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// A vehicle's mechanics: the physics' half of a vehicle preset, under the same id as the sound's half

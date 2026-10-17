@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// The sustained wind (the server's, broadcast once a second) swung by a gust envelope made from the

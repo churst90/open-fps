@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Geometry;
-using static OpenFPS.Common.BodyConstants;
+using static OpenFPS.Physics.BodyConstants;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// One movement step, stateless, so the client's prediction and the server's authority agree exactly.

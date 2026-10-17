@@ -1,8 +1,8 @@
 using System.Numerics;
 using OpenFPS.Geometry;
-using static OpenFPS.Common.BodyConstants;
+using static OpenFPS.Physics.BodyConstants;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// Where the floor is under a body on foot and where its foot goes down, asked of a triangle world

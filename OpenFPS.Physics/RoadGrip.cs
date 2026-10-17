@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 // What water on the road does to a tyre's grip: a law of the contact between tyre and road, so it is the
 // physics' (docs/PHYSICS_BOUNDARY.md 4.2). The water itself, how it gathers, runs off and dries, and what it

@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Sound.Core;
 

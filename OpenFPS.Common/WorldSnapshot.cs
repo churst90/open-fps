@@ -4,6 +4,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Common;
 

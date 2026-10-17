@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Server.Core;
 

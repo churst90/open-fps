@@ -12,7 +12,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;

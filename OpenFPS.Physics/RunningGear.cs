@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// The running gear of each vehicle preset (see <see cref="ChassisSpec"/>), one real vehicle each,

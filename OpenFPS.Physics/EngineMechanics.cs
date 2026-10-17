@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// An engine's mechanics: the physics' half of an engine preset, under the same id as the sound's half

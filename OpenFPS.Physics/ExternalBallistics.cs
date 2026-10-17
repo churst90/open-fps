@@ -3,7 +3,7 @@ using System.Numerics;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>A bullet in flight: where it is, how fast it is going, and for how long it has flown.</summary>
 /// <summary>

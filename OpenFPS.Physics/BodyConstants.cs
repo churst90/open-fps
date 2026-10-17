@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Physics;
 
 /// <summary>
 /// The person the sound models assume: how tall a person is, how fast they walk and run. Glass,

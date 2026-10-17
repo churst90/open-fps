@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using OpenFPS.Schema;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Sound;
 

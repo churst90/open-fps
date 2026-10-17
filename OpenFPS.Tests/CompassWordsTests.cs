@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Astronomy;
 using OpenFPS.Client.Core;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Editor;
 using OpenFPS.Words;

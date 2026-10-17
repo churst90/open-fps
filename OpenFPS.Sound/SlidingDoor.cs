@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using OpenFPS.Common;
+using OpenFPS.Physics;
 using static OpenFPS.Sound.DoorPhysics;
 
 namespace OpenFPS.Sound;
