@@ -11,6 +11,10 @@ library that open-fps and Resonance both reference. Step 1 of
 - The rest of the engine's packages, beyond this library and the physics, are surveyed in
   docs/ENGINE_PACKAGES.md; its accessibility stage reads the world input of stage 6 here.
 
+Where it stands (2026-10-17): stages 0 to 7 built (2026-10-07 to 17, sections 13 to 20), and the namespace rename
+(decision 6, section 21), the engine packages under the library included (21.1). Left: stage 8, versions and how
+Resonance takes the library.
+
 ## Contents
 
 1. Summary
@@ -716,15 +720,16 @@ Rules for every stage:
 
 A session here is one working session of an agent, as in docs/GEOMETRY.md.
 
-Where the stages stand (2026-10-11): 0, 1 and 2 built 2026-10-07 (sections 13 to 15), 3 built and merged
+Where the stages stand (2026-10-17): 0, 1 and 2 built 2026-10-07 (sections 13 to 15), 3 built and merged
 2026-10-10 (section 16, 563f26de), with decision 4 taken the same day (e081faf0: Acoustics without
 MemoryPack). 4 built and merged 2026-10-10 (section 17, 9f9bf5ab: the rooms and openings are values and in
 Acoustics; 384 crossings left), and the acoustic map switched to the rooms flooded from the walls the same day
 (docs/GEOMETRY.md 12.6 item 1, 25a328b9; approved by ear 2026-10-10). Stage 5's first slice built and merged
 2026-10-10 (section 18, 10c1bcf7: the traced places and the weather are per world; 28 library statics fewer,
-crossings unchanged). The rest of stage 5 starts with `AudioClock` (18.3). Stage 6 built 2026-10-16 (section 19);
-stage 7 built 2026-10-17 (section 20): `ClientAudioSystem` split into `AudioWorld` and its host, the one-off sounds
-and the birds the world's.
+crossings unchanged). The rest of stage 5 built 2026-10-12 (`AudioClock`, 18.6) and 2026-10-16 (18.8). Stage 6
+built 2026-10-16 (section 19); stage 7 built 2026-10-17 (section 20): `ClientAudioSystem` split into `AudioWorld`
+and its host, the one-off sounds and the birds the world's. The namespace rename built 2026-10-17 (section 21).
+Stage 8 is next.
 
 The order agreed with Cody on 2026-10-11 (todo.md, "Next, in order"): the special-cases audit's parts
 (docs/SPECIAL_CASES_AUDIT.md; P0, P1 and P2 done 2026-10-11) with the voice registry (P3a-d), then stage 5's

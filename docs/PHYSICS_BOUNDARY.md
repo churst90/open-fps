@@ -18,11 +18,12 @@ physics lives in Sound (docs/SOUND_LIBRARY_BOUNDARY.md, decision 2).
   accessibility, the editor) are surveyed in docs/ENGINE_PACKAGES.md, which places its materials and catalogue
   stages before stage 2 here.
 
-Where it stands (2026-10-11): surveyed, and Cody's decisions recorded the same day (the last section: all ten
-as recommended, with soft bodies wanted as well as rigid ones, gravity a property of the world, and the engine
-Jolt Physics through JoltPhysicsSharp). Stage 0, the guards, is under way. Stage 4 (rigid and soft bodies)
-goes with geometry stage 6 (docs/GEOMETRY.md section 7). In todo.md's order, agreed 2026-10-11, the physics
-stages come after the special-cases audit's parts.
+Where it stands (2026-10-17): stages 0 to 3 built (2026-10-11 to 16, sections 14 to 17). Stage 2 left one
+rolling resistance and drag law, one brake law, `WindModel` folded into `WindField`, and `VehicleChassisSpec`
+(16.6, "Left of stage 2"). Left: stages 4 to 6; stage 4 (rigid and soft bodies) goes with geometry stage 6's
+second half (docs/GEOMETRY.md section 7). Cody's decisions are in the last section (2026-10-11: all ten as
+recommended, soft bodies as well as rigid ones, gravity a property of the world, Jolt Physics through
+JoltPhysicsSharp).
 
 ## Contents
 
@@ -679,7 +680,7 @@ changes one is finished only when the change is the one intended and its commit 
 |---|---|---:|---|
 | 0 | Guards: the ratchet, the movement replay, the driving and traffic replays, the ballistics table, the parity harness; the Jolt trial. **Built 2026-10-11, section 14** | 1.5 to 2 | the driving replay depends on statics (the thread-static map id) |
 | 1 | `OpenFPS.Physics`; move what moves whole; the four crossing fixes; the wire hash covers it. **Built 2026-10-12, section 15** | 1.5 to 2 | the engine render fingerprint moves with `Gearbox` |
-| 2 | Split the presets and the mixed types; one law per law | 2 to 3 | approved sound depends on the sound's half reading the same numbers |
+| 2 | Split the presets and the mixed types; one law per law. **Built 2026-10-12 to 16, section 16; what it left in 16.6** | 2 to 3 | approved sound depends on the sound's half reading the same numbers |
 | 3 | The state types; one world view both sides fill; the parity divergences; contact events; `DrivingSystem`'s mechanics into a vehicle step. **Built 2026-10-16, section 17** | 3 to 4 | movement parity |
 | 4 | Rigid bodies and contacts, with geometry stage 6 | 5 to 8 | solver cost and stability on the server tick |
 | 5 | Moving air and loose layers | 3 to 5 | the ear wind and foliage were approved on the weather alone |

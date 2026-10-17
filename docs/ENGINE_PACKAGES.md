@@ -18,7 +18,10 @@ models for method and depth are docs/SOUND_LIBRARY_BOUNDARY.md and docs/PHYSICS_
   own documents and not planned again here: `OpenFPS.Audio` and the split of `ClientAudioSystem` (sound library
   stages 6 to 8), and physics stages 2 to 6. This survey says where its packages meet them.
 
-Where it stands (2026-10-12): surveyed; the decisions in section 13 are Cody's to take.
+Where it stands (2026-10-17): stages 0 to 5, 7 and 8 built (2026-10-12 to 16), and the packages the sound
+library stands on renamed to their projects' namespaces (2026-10-17, docs/SOUND_LIBRARY_BOUNDARY.md 21.1). Left:
+stage 6 (Common to the wire, which runs alone), 9 and 10, both unblocked now that library stages 6 and 7 and
+physics stage 3 are built. Cody approved the decisions in section 13 on 2026-10-12.
 
 ## Contents
 

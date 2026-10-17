@@ -18,6 +18,11 @@ Measurements are from the development machine (24 threads, shared with other wor
 to 8 during the runs). The instruments are committed: `python3 tools/geometry_estimate.py` and
 AudioLab `--geometry map=<id> [terrain=<metres>]`.
 
+Where it stands (2026-10-17): stages 1 to 4 built (2026-10-06 to 10, sections 9 to 12), with rooms from their walls
+and regions become places (12.6). Stage 6's first half, each vehicle's body as one closed mesh from its parts list,
+built 2026-10-12. Left: stage 6's second half (the meshes in the Steam Audio scene, moved with their bodies, with
+physics stage 4), and stage 5, held until wanted.
+
 ## Contents
 
 1. What exists today
@@ -727,7 +732,7 @@ within its radius (at medium, 300 m full and 800 m coarse: about 10 full tiles a
 A session is one working session of an agent, as in the streaming plan. Each stage leaves the game
 working and boxes valid.
 
-Where the stages stand (2026-10-11, all merged on main):
+Where the stages stand (2026-10-17, all merged on main):
 
 | Stage | Status |
 |---|---|
@@ -736,7 +741,7 @@ Where the stages stand (2026-10-11, all merged on main):
 | 3. Terrain from real elevation | built 2026-10-09 with streaming stage 2 (section 11) |
 | 4. Shape library, import, generators, editor | built 2026-10-10 (section 12, eb529bfe). Rooms by flood switched on 2026-10-10 (25a328b9) and measured from their floods the same day, both approved by ear 2026-10-10; regions become places, steps 1 to 5, done 2026-10-10 and 11 (steps 2 and 3 approved by ear 2026-10-11); sound points on models begun (12.6). The shapes, footprints and roofs themselves are unheard in play |
 | 5. Diggable ground with strata | not started; held until wanted (Cody, 2026-10-10) |
-| 6. Vehicles and bodies in the acoustic scene | not started; next, with the physics stages (docs/PHYSICS_BOUNDARY.md section 8: physics stage 4, rigid bodies, goes with it, so a body's shape is made once for collision and for the acoustic scene) |
+| 6. Vehicles and bodies in the acoustic scene | first half built 2026-10-12 (each vehicle's body as one closed mesh from its parts list; nothing uses it yet). Second half left, with physics stage 4 (docs/PHYSICS_BOUNDARY.md section 8: rigid bodies go with it, so a body's shape is made once for collision and for the acoustic scene) |
 
 The order agreed with Cody on 2026-10-11 (todo.md, "Next, in order"): regions become places, steps 3 to 5
 (done); the special-cases audit's parts (docs/SPECIAL_CASES_AUDIT.md); the physics survey (done); then the
